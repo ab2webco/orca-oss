@@ -2,13 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 import type {
   TeamLeadCard,
   TeamPanelGameModel,
-  TeamPanelSoloModel
+  TeamPanelSoloModel,
+  TeamPrList,
+  TeamSection
 } from '../../../../shared/team-panel-model-types'
 import { resolveTeamPanelTabs } from './team-panel-tab-registry'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
+
+const NO_PRS: TeamSection<TeamPrList> = {
+  kind: 'ready',
+  value: { rows: [], total: 0, listUrl: null }
+}
 
 const lead: TeamLeadCard = {
   paneKey: 'pane-lead',
@@ -73,7 +80,7 @@ describe('resolveTeamPanelTabs', () => {
 
   it('orders every visible tab as the approved design does', () => {
     const model = gameModel({
-      prs: { kind: 'ready', value: [] },
+      prs: NO_PRS,
       queue: { kind: 'loading' },
       machines: { kind: 'error', message: 'host down' }
     })
@@ -81,7 +88,7 @@ describe('resolveTeamPanelTabs', () => {
   })
 
   it('opens on Activity instead of Team when there is no team', () => {
-    const model = soloModel({ prs: { kind: 'ready', value: [] } })
+    const model = soloModel({ prs: NO_PRS })
     expect(ids(resolveTeamPanelTabs(model))).toEqual(['activity', 'inbox', 'prs'])
   })
 
@@ -91,7 +98,7 @@ describe('resolveTeamPanelTabs', () => {
         kind: 'ready',
         value: { forYou: 2, waiting: 3, threads: 4, answered: 5 }
       },
-      prs: { kind: 'ready', value: [] }
+      prs: NO_PRS
     })
     expect(resolveTeamPanelTabs(model).map((tab) => [tab.id, tab.count])).toEqual([
       ['team', null],
@@ -122,7 +129,7 @@ describe('resolveTeamPanelTabs', () => {
   })
 
   it('draws the empty state for a ready section with nothing in it', () => {
-    const model = gameModel({ prs: { kind: 'ready', value: [] } })
+    const model = gameModel({ prs: NO_PRS })
     const prs = resolveTeamPanelTabs(model).find((tab) => tab.id === 'prs')
     expect(prs?.view.kind).toBe('empty')
   })
@@ -131,16 +138,21 @@ describe('resolveTeamPanelTabs', () => {
     const model = gameModel({
       prs: {
         kind: 'ready',
-        value: [
-          {
-            number: 7,
-            title: 'Fix',
-            url: 'https://example.test/7',
-            status: 'working',
-            reason: 'inReview',
-            memberKey: null
-          }
-        ]
+        value: {
+          rows: [
+            {
+              label: '#7',
+              number: 7,
+              title: 'Fix',
+              url: 'https://example.test/7',
+              status: 'working',
+              reason: 'inReview',
+              memberKey: null
+            }
+          ],
+          total: 1,
+          listUrl: null
+        }
       }
     })
     const prs = resolveTeamPanelTabs(model).find((tab) => tab.id === 'prs')

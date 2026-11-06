@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
@@ -7,6 +8,24 @@ import type {
   TeamPanelGameModel,
   TeamSection
 } from '../../../../shared/team-panel-model-types'
+import {
+  teamMachinesSectionOf,
+  teamPrSectionOf,
+  type TeamPrFailureTexts
+} from '../../../../shared/team-panel-work-tabs'
+
+const prFailureTexts = (): TeamPrFailureTexts => ({
+  providerFailed: translate(
+    'teamPanel.prs.providerFailed',
+    'The provider did not answer. It retries on its own.'
+  ),
+  githubLimit: (minutes) =>
+    translate(
+      'teamPanel.prs.githubLimit',
+      'GitHub API limit reached. It retries on its own in {{minutes}} min.',
+      { minutes }
+    )
+})
 
 function inboxOf(
   state: OrchestratorGameState,
@@ -46,8 +65,8 @@ function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
 
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP, arcade, metrics, PRs, queue, machines) stay
- * empty rather than guessed: their tickets fill them.
+ * Fields game.state does not publish (XP, arcade, metrics, queue) stay empty rather than
+ * guessed: their tickets fill them.
  */
 export function teamPanelModelOf(args: {
   repoId: string
@@ -55,6 +74,8 @@ export function teamPanelModelOf(args: {
   state: OrchestratorGameState
   /** Every question the lead asked the user, answered or not; null when the host could not list them. */
   questions: readonly GameOwnerQuestion[] | null
+  /** A folder workspace has no remote, so no PRs or queue. */
+  isFolder?: boolean
 }): TeamPanelGameModel | null {
   const { state, questions } = args
   const openTickets = new Set(
@@ -83,8 +104,14 @@ export function teamPanelModelOf(args: {
       extensions: state.extensions?.scenes ?? []
     },
     inbox: inboxOf(state, questions),
-    prs: null,
+    prs: teamPrSectionOf({
+      state,
+      members: cards.members,
+      isFolder: args.isFolder === true,
+      texts: prFailureTexts(),
+      now: Date.now()
+    }),
     queue: null,
-    machines: null
+    machines: teamMachinesSectionOf({ state, members: cards.members })
   }
 }

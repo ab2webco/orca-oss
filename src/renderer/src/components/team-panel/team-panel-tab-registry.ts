@@ -76,7 +76,7 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
     id: 'prs',
     title: () => translate('teamPanel.tabs.prs.title', 'PRs'),
     section: (model) => model.prs,
-    isEmpty: isEmptyList,
+    isEmpty: (list) => list.rows.length === 0,
     copy: () => ({
       emptyTitle: translate('teamPanel.tabs.prs.emptyTitle', 'No open pull requests'),
       emptyText: translate(

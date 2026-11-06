@@ -16087,6 +16087,30 @@
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
   "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
   "teamPanel": {
+    "prs": {
+      "reason": {
+        "checksFailed": "Check falló",
+        "checksUnknown": "CI desconocido",
+        "conflict": "Conflicto",
+        "inReview": "En revisión",
+        "ready": "Listo",
+        "draft": "Borrador",
+        "merged": "Fusionado",
+        "closed": "Cerrado"
+      },
+      "viewAll": "Ver los {{count}}",
+      "providerFailed": "El proveedor no respondió. Se reintenta solo.",
+      "githubLimit": "Límite de la API de GitHub alcanzado. Se reintenta solo en {{minutes}} min."
+    },
+    "machines": {
+      "offline": "Sin conexión",
+      "lowMemory": "Poca memoria",
+      "free": "Libre",
+      "running": "{{count}} agentes",
+      "runningOfCap": "{{count}} de {{cap}} agentes",
+      "memoryUsed": "Memoria usada {{percent}}%",
+      "memoryFree": "{{free}} de {{total}} GB libres"
+    },
     "activityBar": {
       "teamTitle": "Equipo",
       "noTeamTitle": "Tu trabajo"

@@ -908,6 +908,7 @@ import {
   type MainWorkItem,
   type GitHubPRBranchLookupOptions
 } from '../github/client'
+import { getPullRequestsMergeable } from '../github/pull-request-mergeable'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
   fetchGitHubPullRequestHeadRef,
@@ -32545,6 +32546,16 @@ export class OrcaRuntimeService {
       },
       githubChecks: (pr) =>
         this.getRepoPRChecks(selector, pr.number, pr.headSha, pr.prRepo ?? null),
+      githubMergeable: async (prRepo, numbers) => {
+        const repo = await this.resolveRepoSelector(selector)
+        return getPullRequestsMergeable(
+          repo.path,
+          prRepo,
+          numbers,
+          repo.connectionId ?? null,
+          ...this.getLocalGitExecutionOptionArgs(repo)
+        )
+      },
       githubIssues: async () =>
         (await this.listRepoWorkItems(selector, 20, 'assignee:@me is:issue is:open')).items.filter(
           (item) => item.type === 'issue'

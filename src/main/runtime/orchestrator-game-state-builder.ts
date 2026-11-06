@@ -9,6 +9,7 @@ import {
   resolveOrchestratorGameIntegrations,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
+import { resolveOrchestratorGamePanel } from '../../shared/orchestrator-game-panel-layers'
 import { gameLeadOverPairedHostsOf } from './orchestrator-game-paired-hosts'
 import { builtInGameActivityRules, gameActivityOf } from '../../shared/orchestrator-game-activity'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
@@ -194,6 +195,7 @@ export async function buildOrchestratorGameState(
     agents,
     ...placed,
     rewardWeights: resolveOrchestratorGameRewardWeights(layers),
+    panel: resolveOrchestratorGamePanel(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
     ...(suggested ? { suggestedView: suggested } : {}),

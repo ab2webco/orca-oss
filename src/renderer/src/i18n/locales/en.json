@@ -17086,6 +17086,30 @@
     }
   },
   "teamPanel": {
+    "prs": {
+      "reason": {
+        "checksFailed": "Check failed",
+        "checksUnknown": "CI unknown",
+        "conflict": "Conflict",
+        "inReview": "In review",
+        "ready": "Ready",
+        "draft": "Draft",
+        "merged": "Merged",
+        "closed": "Closed"
+      },
+      "viewAll": "View all {{count}}",
+      "providerFailed": "The provider did not answer. It retries on its own.",
+      "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
+    },
+    "machines": {
+      "offline": "Offline",
+      "lowMemory": "Low memory",
+      "free": "Free",
+      "running": "{{count}} agents",
+      "runningOfCap": "{{count}} of {{cap}} agents",
+      "memoryUsed": "Memory used {{percent}}%",
+      "memoryFree": "{{free}} of {{total}} GB free"
+    },
     "activityBar": {
       "teamTitle": "Team",
       "noTeamTitle": "Your work"
