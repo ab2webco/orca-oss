@@ -22,7 +22,9 @@ const EDGE = 6
 const GAP = 4
 const LIFT = 10
 const TAIL_INSET = 10
-const END_REACH = 22
+// Why 14: the lead stands 0.10 of the stage right of the advisor, 22 px on the 219 px panel, and
+// its tail must pass this bubble's edge with GAP to spare.
+const END_REACH = 14
 // A cloud narrowed to share a row may wrap one more line, up to its two-line clamp.
 const MIN_SHARED_WIDTH = 80
 const EXTRA_LINE = 13
