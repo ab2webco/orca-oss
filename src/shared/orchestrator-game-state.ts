@@ -72,7 +72,7 @@ export type GameAgent = {
   globalLogin?: true
   /** Set while a member is stopped by its account's usage limit, or `loggedOut` (ORCA-907); absent from an older host. */
   limit?: { resetsAt: number | null; loggedOut?: true }
-  /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
+  /** What Jev in this pane (a member's or the lead's) has it on; absent without Jev there or from an older host. */
   advisor?: GameMemberAdvisor
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
   launch?: GameMemberLaunch

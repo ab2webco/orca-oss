@@ -108,6 +108,65 @@ describe('teamPanelModelOf', () => {
       machines: null
     })
   })
+  it("fills the Advisor from the lead's own Jev report, words as written", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const model = teamPanelModelOf(
+      args({
+        state: state({
+          agents: [
+            { isLeader: false, advisor: { model: 'Haiku 5.5', effort: null, pinned: {} } },
+            {
+              isLeader: true,
+              advisor: {
+                model: 'Opus 5.5',
+                effort: 'high',
+                line: 'Reviewing the plan',
+                pinned: { model: true, effort: false },
+                previous: { model: 'Sonnet 5.5', effort: 'high' }
+              }
+            }
+          ]
+        } as unknown as Partial<OrchestratorGameState>)
+      })
+    )
+
+    expect(model?.advisor).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      line: 'Reviewing the plan',
+      pinned: { model: true, effort: false },
+      previous: { model: 'Sonnet 5.5', effort: 'high' },
+      calls: []
+    })
+  })
+
+  it("leaves the Advisor empty when only a member's Jev reported, and on an older report", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const only = (leadAdvisor: unknown): Parameters<typeof teamPanelModelOf>[0] =>
+      args({
+        state: state({
+          agents: [
+            { isLeader: false, advisor: { model: 'Haiku 5.5', effort: null, pinned: {} } },
+            { isLeader: true, ...(leadAdvisor ? { advisor: leadAdvisor } : {}) }
+          ]
+        } as unknown as Partial<OrchestratorGameState>)
+      })
+
+    expect(teamPanelModelOf(only(null))?.advisor).toBeNull()
+    expect(
+      teamPanelModelOf(
+        only({ model: 'Opus 5.5', effort: null, pinned: { model: false, effort: false } })
+      )?.advisor
+    ).toEqual({
+      model: 'Opus 5.5',
+      effort: null,
+      line: null,
+      pinned: { model: false, effort: false },
+      previous: null,
+      calls: []
+    })
+  })
+
   // Why both: Pixel draws a built-in scene by id, else the plugin or file scene the host carried.
   it('carries the scene id and the scene definitions the host sends, for the live scene', () => {
     teamCardsOf.mockReturnValue(CARDS)
