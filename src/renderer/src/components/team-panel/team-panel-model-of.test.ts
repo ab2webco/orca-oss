@@ -189,4 +189,24 @@ describe('teamPanelModelOf', () => {
 
     expect(teamPanelModelOf(args())?.scene).toEqual({ id: null, extensions: [] })
   })
+
+  it("carries the host's saved plays and the perfect merge that offers one", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const withOffer = state({
+      arcade: { credits: 2, offer: { provider: 'github', number: 923 } }
+    })
+    const kept = state({ arcade: { credits: 3, offer: null } })
+
+    expect(teamPanelModelOf(args({ state: withOffer }))?.arcade).toEqual({
+      credits: 2,
+      offerPr: 923
+    })
+    expect(teamPanelModelOf(args({ state: kept }))?.arcade).toEqual({ credits: 3, offerPr: null })
+  })
+
+  it('reads a host older than the saved plays as no arcade', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args())?.arcade).toBeNull()
+  })
 })

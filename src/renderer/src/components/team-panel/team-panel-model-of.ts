@@ -44,9 +44,16 @@ function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
   }
 }
 
+// Why null when absent: a host older than the saved plays publishes none, and none is not zero.
+function arcadeOf(state: OrchestratorGameState): TeamPanelGameModel['arcade'] {
+  return state.arcade
+    ? { credits: state.arcade.credits, offerPr: state.arcade.offer?.number ?? null }
+    : null
+}
+
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP, arcade, metrics, PRs, queue, machines) stay
+ * Fields game.state does not publish (XP, metrics, PRs, queue, machines) stay
  * empty rather than guessed: their tickets fill them.
  */
 export function teamPanelModelOf(args: {
@@ -75,7 +82,7 @@ export function teamPanelModelOf(args: {
     members: cards.members,
     metrics: { kind: 'unavailable' },
     xp: null,
-    arcade: null,
+    arcade: arcadeOf(state),
     stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
     // Why guarded: a paired host on an older build may send neither.
     scene: {
