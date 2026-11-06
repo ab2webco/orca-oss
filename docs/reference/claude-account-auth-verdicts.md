@@ -180,7 +180,8 @@ the directory of its plaintext `.credentials.json` from `CLAUDE_SECURESTORAGE_CO
 variable is set, even to an empty string, and then ignores `CLAUDE_CONFIG_DIR`. Inherited by every
 pane, it makes each vault read and rotate one shared login on every platform. The CLI never sets it; it only forwards it to the teammates and background sessions it starts.
 A managed account launch now drops it, along with the ambient auth variables (`environment.ts`), on
-local, daemon and SSH spawns.
+local, daemon and SSH spawns. A shell profile that exports it inside the pane, on any host, still
+reaches the CLI; remove that export.
 
 Orca does not copy a vault or a credential between hosts. Each `orca account add` on a host is its
 own sign-in, so a logout on one host is not this chain alias. It is the login's own end, described in
