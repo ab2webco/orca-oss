@@ -16005,5 +16005,63 @@
   "auto.components.settings.HostAccountLoginDialog.finish": "Finalizar inicio de sesión",
   "auto.components.settings.PluginConsentDialog.capability.processSpawn": "Iniciar programas como tú. Los programas que inicia no están restringidos por los permisos de archivos o red del worker del plugin.",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
-  "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal"
+  "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
+  "teamPanel": {
+    "activityBar": {
+      "teamTitle": "Equipo",
+      "noTeamTitle": "Tu trabajo"
+    },
+    "header": {
+      "title": "Equipo",
+      "noTeamTitle": "Tu trabajo",
+      "projectSettings": "Ajustes del proyecto",
+      "panelSettings": "Ajustes del panel"
+    },
+    "state": {
+      "loading": "Cargando",
+      "unavailableText": "Este host de Orca todavía no lo publica.",
+      "modelErrorTitle": "No se pudo leer el equipo",
+      "modelUnavailableTitle": "Los datos del equipo no están disponibles",
+      "retry": "Reintentar"
+    },
+    "tabs": {
+      "label": "Secciones del panel",
+      "team": {
+        "title": "Equipo",
+        "emptyTitle": "Aún no hay agentes",
+        "emptyText": "Lanza uno desde un ticket y aparecerá aquí.",
+        "errorTitle": "No se pudo leer el equipo"
+      },
+      "activity": {
+        "title": "Actividad",
+        "emptyTitle": "No hay agentes en marcha",
+        "emptyText": "Inicia un agente en cualquier espacio de trabajo y aparecerá aquí.",
+        "errorTitle": "No se pudieron leer tus sesiones"
+      },
+      "inbox": {
+        "title": "Bandeja",
+        "emptyTitle": "Nada te espera",
+        "emptyText": "Cuando un agente te pregunte algo, aparecerá aquí.",
+        "errorTitle": "No se pudo leer la bandeja"
+      },
+      "prs": {
+        "title": "PRs",
+        "emptyTitle": "No hay pull requests abiertos",
+        "emptyText": "Aparecen aquí cuando un agente abre uno.",
+        "errorTitle": "No se pudieron leer los pull requests"
+      },
+      "queue": {
+        "title": "Cola",
+        "emptyTitle": "La cola está vacía",
+        "emptyText": "Aquí verás cada pull request en orden hasta su merge.",
+        "errorTitle": "No se pudo leer la cola"
+      },
+      "machines": {
+        "title": "Máquinas",
+        "emptyTitle": "Solo esta máquina",
+        "emptyText": "Empareja otra máquina para repartir agentes entre hosts.",
+        "errorTitle": "No se pudieron leer las máquinas"
+      }
+    }
+  }
 }
