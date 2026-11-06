@@ -1858,7 +1858,7 @@ gana puntos ni XP, no escribe nada en Orca ni en el store, no agrega ningún aju
 descarta la partida.
 
 El merge perfecto de un miembro guarda una partida de arcade para el proyecto en el host de Orca
-([`orchestrator-game-arcade-credits.ts`](../../../src/shared/orchestrator-game-arcade-credits.ts)).
+(`src/shared/orchestrator-game-arcade-credits.ts`).
 El store del juego del host suma el crédito en la misma escritura que el evento `merged` que
 registra, así que un merge visto dos veces paga una sola vez. Se guardan como máximo 9 partidas.
 El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.arcade`
