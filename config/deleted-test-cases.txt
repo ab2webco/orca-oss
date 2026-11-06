@@ -84,3 +84,19 @@ tests/e2e/orchestrator-game-remote-member-scene.spec.ts # a remote member's band
 tests/e2e/orchestrator-game-characters.spec.ts # roster characters on the band and Panel
 tests/e2e/orchestrator-game-built-in-scenes.spec.ts # each built-in scene on the band, Panel and turn
 tests/e2e/orca-game-arcade-released-member.spec.ts # the terminal scene's celebration of a released member's merge
+# ORCA-1055: unit specs of the mod modules the band, Panel and tap rows used, deleted with them.
+resources/claude-plugins/orca-game/tests/flat-view.spec.ts # flat-view.ts, the band's text lines
+resources/claude-plugins/orca-game/tests/member-card-rows.spec.ts # member-card-rows.ts, Panel card rows
+resources/claude-plugins/orca-game/tests/pane-links.spec.ts # pane-links.ts, Panel link hotkeys
+resources/claude-plugins/orca-game/tests/panel-heading.spec.ts # panel-heading.ts, Panel section headings
+resources/claude-plugins/orca-game/tests/project-list-table.spec.ts # project-list-table.ts, Panel To Do table
+resources/claude-plugins/orca-game/tests/tap-layout.spec.ts # tap-layout.ts, phone-width band chips
+# Kept specs that lost the cases on those modules; their live-module cases stay.
+resources/claude-plugins/orca-game/tests/band-links.spec.ts # band-chips.ts link chips; needs line stays
+resources/claude-plugins/orca-game/tests/card-layout.spec.ts # member-card-rows.ts card head
+resources/claude-plugins/orca-game/tests/character-look.spec.ts # flat-view.ts member lines
+resources/claude-plugins/orca-game/tests/flat-mode.spec.ts # band-chips.ts text toggle chip
+resources/claude-plugins/orca-game/tests/game-actions.spec.ts # band-chips.ts QA chip
+resources/claude-plugins/orca-game/tests/github-budget.spec.ts # band-chips.ts low-budget chip
+resources/claude-plugins/orca-game/tests/project-work.spec.ts # band-chips.ts and pane-links.ts list chips
+resources/claude-plugins/orca-game/tests/scene-pet.spec.ts # band-chips.ts Pet chip label
