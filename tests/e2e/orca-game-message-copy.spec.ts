@@ -79,6 +79,44 @@ async function closeSidebars(page: Page): Promise<void> {
 
 const screenOf = async (page: Page): Promise<string> => (await screenRows(page)).join('\n')
 
+/** The words of the message that starts with `● first`, joined across its wrapped rows. */
+function messageWordsOf(rows: string[], first: string): string {
+  const from = rows.findIndex((row) => row.startsWith(`● ${first}`))
+  if (from === -1) {
+    return ''
+  }
+  // Why blank rows count: a paragraph break inside the reply is an empty row.
+  const end = rows.findIndex((row, at) => at > from && row !== '' && !row.startsWith('  '))
+  return rows
+    .slice(from, end === -1 ? undefined : end)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Waits for a repaint to finish: two equal reads that hold every word of both replies. Why: a
+ * resize repaints the transcript, and a capture taken mid-repaint shows rows that are half drawn.
+ */
+async function waitForWholeReplies(page: Page, words: Words): Promise<void> {
+  const answerFirst = words.answer.split(' ')[0]!
+  const askFirst = words.ask.split(' ')[0]!
+  let before = ''
+  await expect
+    .poll(
+      async () => {
+        const rows = await screenRows(page)
+        const now = rows.join('\n')
+        const isSteady = now === before
+        before = now
+        const shown = [messageWordsOf(rows, answerFirst), messageWordsOf(rows, askFirst)]
+        return isSteady ? shown : null
+      },
+      { timeout: 20_000, intervals: [500], message: 'a reply lost words or kept repainting' }
+    )
+    .toEqual([`● ${words.answer}`, `● ${words.ask.replace(/\s+/g, ' ')}`])
+}
+
 async function ask(page: Page, prompt: string, isDone: (screen: string) => boolean): Promise<void> {
   await page.keyboard.type(prompt)
   // Why retried: the first Enter can land before the prompt takes the typed text.
@@ -226,6 +264,7 @@ for (const one of CASES) {
         await closeSidebars(orcaPage)
         await setWindowWidth(electronApp, orcaPage, width)
         await expect.poll(() => screenOf(orcaPage), { timeout: 20_000 }).toContain(one.name)
+        await waitForWholeReplies(orcaPage, words)
         await shoot(`reply-${width}`)
       }
       await closeSidebars(orcaPage)
