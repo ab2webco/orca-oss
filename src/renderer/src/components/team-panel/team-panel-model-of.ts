@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
+import { teamLeadWorkOf } from '../../../../shared/team-panel-lead-work'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
 import type {
   TeamAdvisorRow,
@@ -114,6 +115,7 @@ export function teamPanelModelOf(args: {
     inbox: inboxOf(state, questions),
     prs: teamPrSectionOf(work),
     queue: teamQueueSectionOf(work),
-    machines: teamMachinesSectionOf({ state, members: cards.members })
+    machines: teamMachinesSectionOf({ state, members: cards.members }),
+    leadWork: teamLeadWorkOf(state)
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamPanelLeadWork } from './team-panel-lead-work'
 import { TeamTabContent } from './TeamTabContent'
 import { useTeamPanelLook } from './use-team-panel-look'
 
@@ -19,12 +20,15 @@ export function TeamPanelTeamTab({
   }, [])
   // Why null: the host's play and keep reach this tab with the credit wiring (ORCA-1053 P4b).
   return (
-    <TeamTabContent
-      model={value}
-      look={look}
-      selectTab={selectTab}
-      now={now}
-      arcadeActions={null}
-    />
+    <>
+      <TeamTabContent
+        model={value}
+        look={look}
+        selectTab={selectTab}
+        now={now}
+        arcadeActions={null}
+      />
+      <TeamPanelLeadWork work={value.leadWork} />
+    </>
   )
 }

@@ -5,6 +5,10 @@ import { cn } from '@/lib/utils'
 import type { TeamPrList, TeamPrRow } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { useTeamLeadPrompt } from './use-team-lead-prompt'
+
+const MORE_CLASS =
+  'px-3 py-2 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline'
 
 function reasonText(reason: TeamPrRow['reason']): string {
   switch (reason) {
@@ -53,21 +57,33 @@ function PrRow({ row }: { row: TeamPrRow }): React.JSX.Element {
 }
 
 export function TeamPanelPrsTab({ value }: TeamPanelTabBodyProps<TeamPrList>): React.JSX.Element {
-  const { rows, total, listUrl } = value
+  const { rows, total, listUrl, listAction } = value
+  const send = useTeamLeadPrompt()
+  const more = total > rows.length
+  const viewAll = translate('teamPanel.prs.viewAll', 'View all {{count}}', { count: total })
   return (
     <div className="flex flex-col pb-3 pt-1.5">
       {rows.map((row) => (
         <PrRow key={row.url} row={row} />
       ))}
-      {listUrl && total > rows.length ? (
+      {more && listAction && send ? (
+        <button
+          type="button"
+          data-team-pr-more=""
+          className={MORE_CLASS}
+          onClick={() => send(listAction.id, listAction.prompt, listAction.label)}
+        >
+          {viewAll}
+        </button>
+      ) : more && listUrl ? (
         <a
           data-team-pr-more=""
           href={listUrl}
           target="_blank"
           rel="noreferrer"
-          className="px-3 py-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          className={MORE_CLASS}
         >
-          {translate('teamPanel.prs.viewAll', 'View all {{count}}', { count: total })}
+          {viewAll}
         </a>
       ) : null}
     </div>

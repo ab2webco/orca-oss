@@ -65,7 +65,8 @@ const game: TeamPanelGameModel = {
   },
   prs: { kind: 'error', message: 'rate limited' },
   queue: { kind: 'ready', value: [] },
-  machines: null
+  machines: null,
+  leadWork: { todo: null, actions: [] }
 }
 
 const solo: TeamPanelSoloModel = {

@@ -14,7 +14,7 @@ vi.mock('@/i18n/i18n', () => ({
 
 const NO_PRS: TeamSection<TeamPrList> = {
   kind: 'ready',
-  value: { rows: [], total: 0, listUrl: null }
+  value: { rows: [], total: 0, listUrl: null, listAction: null }
 }
 
 const lead: TeamLeadCard = {
@@ -54,6 +54,7 @@ function gameModel(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameMo
     prs: null,
     queue: null,
     machines: null,
+    leadWork: { todo: null, actions: [] },
     ...overrides
   }
 }
@@ -160,7 +161,8 @@ describe('resolveTeamPanelTabs', () => {
             }
           ],
           total: 1,
-          listUrl: null
+          listUrl: null,
+          listAction: null
         }
       }
     })

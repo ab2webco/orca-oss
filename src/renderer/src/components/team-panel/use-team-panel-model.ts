@@ -127,6 +127,15 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   }, [scope, source, otherOpen])
 }
 
+/** The lead's pane as the last model read it, for what the panel sends it. */
+export function useTeamLeadHandle(): string | null {
+  return useTeamPanelModelStore((s) =>
+    s.source.section.kind === 'ready' && s.source.section.value.kind === 'team'
+      ? s.source.section.value.lead.terminalHandle
+      : null
+  )
+}
+
 /**
  * The last model kind any open panel read, for the activity bar's icon. Never polls: the bar is
  * always mounted, and game.state reads reviews and metrics on the host.

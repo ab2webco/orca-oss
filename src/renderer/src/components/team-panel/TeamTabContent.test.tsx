@@ -104,6 +104,7 @@ function model(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameModel 
     prs: null,
     queue: null,
     machines: null,
+    leadWork: { todo: null, actions: [] },
     ...overrides
   }
 }

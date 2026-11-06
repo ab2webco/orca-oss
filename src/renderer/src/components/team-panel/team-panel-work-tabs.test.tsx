@@ -23,6 +23,12 @@ vi.mock('@/i18n/i18n', () => ({
     )
 }))
 
+const { useTeamLeadPrompt } = vi.hoisted(() => ({
+  useTeamLeadPrompt: vi.fn((): ((...args: string[]) => void) | null => null)
+}))
+
+vi.mock('./use-team-lead-prompt', () => ({ useTeamLeadPrompt }))
+
 const GB = 1024 ** 3
 const model = {} as TeamPanelModel
 const selectTab = vi.fn()
@@ -60,6 +66,7 @@ const list = (rows: TeamPrRow[], over: Partial<TeamPrList> = {}): TeamPrList => 
   rows,
   total: rows.length,
   listUrl: 'https://example.test/pulls',
+  listAction: null,
   ...over
 })
 
@@ -108,6 +115,30 @@ describe('TeamPanelPrsTab', () => {
     const noUrl = prs(list([row()], { total: 12, listUrl: null }))
 
     expect(noUrl.querySelector('a[data-team-pr-more]')).toBeNull()
+  })
+
+  it("sends the lead the list's action instead of opening the list", () => {
+    const send = vi.fn()
+    useTeamLeadPrompt.mockReturnValue(send)
+    const listAction = { id: 'action-0', label: 'Review', prompt: 'Review my PRs' }
+    const view = prs(list([row()], { total: 12, listAction }))
+
+    expect(view.querySelector('a[data-team-pr-more]')).toBeNull()
+    act(() =>
+      view
+        .querySelector('button[data-team-pr-more]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    )
+
+    expect(send).toHaveBeenCalledWith('action-0', 'Review my PRs', 'Review')
+  })
+
+  it('keeps the list link when there is no lead pane to run the action in', () => {
+    useTeamLeadPrompt.mockReturnValue(null)
+    const listAction = { id: 'action-0', label: 'Review', prompt: 'Review my PRs' }
+    const view = prs(list([row()], { total: 12, listAction }))
+
+    expect(view.querySelector('a[data-team-pr-more]')).not.toBeNull()
   })
 })
 
