@@ -118,7 +118,7 @@ export function StatusColorsSetting({ settings, updateSettings }: Props): React.
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <SettingsSegmentedControl
             ariaLabel={translate('settings.appearance.statusColors.themeLabel', 'Theme to edit')}
             value={theme}
@@ -127,11 +127,11 @@ export function StatusColorsSetting({ settings, updateSettings }: Props): React.
             options={[
               {
                 value: 'light',
-                label: translate('auto.components.settings.AppearancePane.fd89b5487c', 'Light')
+                label: translate('settings.appearance.statusColors.themeLight', 'Light')
               },
               {
                 value: 'dark',
-                label: translate('auto.components.settings.AppearancePane.7d26ccabe8', 'Dark')
+                label: translate('settings.appearance.statusColors.themeDark', 'Dark')
               }
             ]}
           />
@@ -140,6 +140,10 @@ export function StatusColorsSetting({ settings, updateSettings }: Props): React.
             variant="outline"
             size="sm"
             disabled={!edited}
+            aria-label={translate(
+              'settings.appearance.statusColors.resetLabel',
+              'Reset status colors'
+            )}
             onClick={() => {
               const { [theme]: _reset, ...rest } = draft
               commit(rest, true)
@@ -174,20 +178,21 @@ export function StatusColorsSetting({ settings, updateSettings }: Props): React.
               <span className="min-w-0 flex-1">
                 <span className="block text-sm">{name}</span>
                 <span className="block text-xs text-muted-foreground">{meaning}</span>
+                {/* Why: a line of its own, so Spanish copy still fits at 320px. */}
+                {warning ? (
+                  <span role="status" className="block text-xs text-status-warning">
+                    {warning.kind === 'close'
+                      ? translate(
+                          'settings.appearance.statusColors.tooClose',
+                          'Too close to {{value0}}',
+                          {
+                            value0: toneCopy(warning.other).name
+                          }
+                        )
+                      : translate('settings.appearance.statusColors.lowContrast', 'Low contrast')}
+                  </span>
+                ) : null}
               </span>
-              {warning ? (
-                <span role="status" className="shrink-0 text-xs text-status-warning">
-                  {warning.kind === 'close'
-                    ? translate(
-                        'settings.appearance.statusColors.tooClose',
-                        'Too close to {{value0}}',
-                        {
-                          value0: toneCopy(warning.other).name
-                        }
-                      )
-                    : translate('settings.appearance.statusColors.lowContrast', 'Low contrast')}
-                </span>
-              ) : null}
             </li>
           )
         })}

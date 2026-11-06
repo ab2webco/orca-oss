@@ -93,7 +93,9 @@ describe('StatusColorsSetting', () => {
       light: { info: '#654321' }
     })
 
-    const reset = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Reset')
+    const reset = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Reset status colors"]'
+    )
     await act(async () => reset!.click())
 
     expect(updateSettings).toHaveBeenCalledWith({ statusColors: { light: { info: '#654321' } } })
