@@ -81,4 +81,5 @@ test('the Team tab opens in the right sidebar and says so when the host has no t
       })
     )
     .toEqual({ view: 'settings', pane: 'agents' })
+  await expect(orcaPage.locator('[id="agents-game-panel"]')).toBeInViewport({ timeout: 15_000 })
 })

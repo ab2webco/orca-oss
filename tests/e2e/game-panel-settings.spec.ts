@@ -31,7 +31,7 @@ async function setWindowWidth(app: ElectronApplication, page: Page, width: numbe
   await expect.poll(async () => page.evaluate(() => window.innerWidth)).toBe(width)
 }
 
-/** What the gear does: target first, then the page, as `openGamePanelSettings` calls them. */
+/** The gear's two calls: the fixture has no team model, so the real gear is in team-panel-shell. */
 async function openTarget(page: Page, repoId: string | null): Promise<string> {
   return page.evaluate((id) => {
     const store = window.__store!.getState()
