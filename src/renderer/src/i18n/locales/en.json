@@ -17208,6 +17208,16 @@
     },
     "memberHeader": {
       "waitingForYou": "Waiting for you"
+    },
+    "inbox": {
+      "sections": "Inbox sections",
+      "forYou": "For you",
+      "waiting": "Waiting",
+      "threads": "Threads",
+      "answered": "Answered",
+      "thisProject": "this project",
+      "projectUnread": "Could not read this project's questions.",
+      "forYouEmpty": "No questions are waiting for you."
     }
   }
 }
