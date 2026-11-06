@@ -31,6 +31,21 @@ export const getThemeEntries = createLocalizedCatalog((): SettingsSearchEntry[] 
   }
 ])
 
+export const getStatusColorEntries = createLocalizedCatalog((): SettingsSearchEntry[] => [
+  {
+    title: translate('settings.appearance.statusColors.title', 'Status colors'),
+    description: translate(
+      'settings.appearance.statusColors.description',
+      'Each color keeps its meaning in every project. Light and dark have their own.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('settings.appearance.statusColors.keywordColor', 'color'),
+      ...translateSearchKeyword('settings.appearance.statusColors.keywordStatus', 'status'),
+      ...translateSearchKeyword('settings.appearance.statusColors.keywordContrast', 'contrast')
+    ]
+  }
+])
+
 export const getLanguageEntries = createLocalizedCatalog((): SettingsSearchEntry[] => [
   {
     title: translate('settings.appearance.language.title', 'Language'),
@@ -225,6 +240,7 @@ function buildAppearancePaneSearchEntries(
   return [
     ...getAppearanceSectionEntries(),
     ...getThemeEntries(),
+    ...getStatusColorEntries(),
     ...(SHOW_UI_LANGUAGE_SETTING ? getLanguageEntries() : []),
     ...getTypographyEntries(),
     ...getZoomEntries(),

@@ -10,7 +10,8 @@ export type StatusDotGlyph = 'dot' | 'spinner' | 'question' | 'check'
 type StatusDotProps = React.ComponentProps<'span'> & {
   tone: StatusTone
   glyph?: StatusDotGlyph
-  size?: 'sm' | 'md'
+  /** badge: the 7px cut-out dot that overlays an icon. */
+  size?: 'badge' | 'sm' | 'md'
   /** Dims the dot, e.g. idle with nothing open. */
   faded?: boolean
 }
@@ -24,6 +25,7 @@ const FADED_BG: Record<StatusTone, string> = {
 }
 
 const SIZES = {
+  badge: { box: 'size-[7px]', inner: 'size-[7px] ring-1 ring-sidebar', icon: 'size-[7px]' },
   sm: { box: 'h-2.5 w-2.5', inner: 'size-1.5', icon: 'size-2.5' },
   md: { box: 'h-3 w-3', inner: 'size-2', icon: 'size-3' }
 } as const

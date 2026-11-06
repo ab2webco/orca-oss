@@ -249,7 +249,7 @@ export function WorktreeIssueLinkField(props: WorktreeIssueLinkFieldProps): Reac
         className={cn(
           'min-h-[28px] text-[10px] leading-[14px]',
           (openIssueFailed || displacedLinkLabels?.length) && !isInvalid && !isReadOnly
-            ? 'text-amber-600 dark:text-amber-400'
+            ? 'text-status-warning'
             : 'text-muted-foreground'
         )}
       >

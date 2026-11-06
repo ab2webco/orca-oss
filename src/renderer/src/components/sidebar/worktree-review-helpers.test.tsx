@@ -28,7 +28,7 @@ describe('ReviewIcon', () => {
     expect(markup).not.toContain('lucide-git-merge')
   })
 
-  // Why: an open MR with no explicit check tone falls through to the emerald "open" colour, so a
+  // Why: an open MR with no explicit check tone falls through to the "open" tone, so a
   // GitLab pipeline blocked on a manual gate must not resolve to a tone-less status — the card
   // would read exactly like a passing pipeline while GitLab still refuses the merge.
   it('does not paint a manual-blocked GitLab pipeline like a passing one', () => {
@@ -40,8 +40,8 @@ describe('ReviewIcon', () => {
       <ReviewIcon review={{ ...gitlabReview, status: 'success' }} className="size-3" />
     )
 
-    expect(blocked).toContain('text-amber-500/85')
-    expect(blocked).not.toContain('text-emerald-500/80')
+    expect(blocked).toContain('text-status-info')
+    expect(blocked).not.toContain('text-status-success')
     expect(blocked).not.toBe(passing)
   })
 
@@ -70,7 +70,7 @@ describe('ReviewIcon', () => {
     )
 
     expect(draft).toContain('lucide-git-pull-request-draft')
-    expect(draft).not.toContain('text-rose-500/85')
+    expect(draft).not.toContain('text-status-attention')
     expect(closed).toContain('lucide-git-pull-request-closed')
     expect(draft).not.toBe(closed)
   })
@@ -84,7 +84,7 @@ describe('ReviewIcon', () => {
       />
     )
 
-    expect(failing).toContain('text-rose-500/85')
+    expect(failing).toContain('text-status-attention')
   })
 
   it('renders merged reviews with the merge glyph', () => {
@@ -97,6 +97,7 @@ describe('ReviewIcon', () => {
     )
 
     expect(merged).toContain('lucide-git-merge')
+    expect(merged).toContain('text-status-success')
   })
 
   // Why: a closed MR used to render the merge glyph, which read as "already merged".
@@ -121,8 +122,8 @@ describe('ReviewIcon', () => {
         />
       )
 
-    expect(stateless('failure')).toContain('text-rose-500/85')
-    expect(stateless('pending')).toContain('text-amber-500/85')
-    expect(stateless('success')).not.toContain('text-emerald-500/80')
+    expect(stateless('failure')).toContain('text-status-attention')
+    expect(stateless('pending')).toContain('text-status-info')
+    expect(stateless('success')).not.toContain('text-status-success')
   })
 })

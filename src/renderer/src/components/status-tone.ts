@@ -1,24 +1,15 @@
 // Why: one colour language for the sidebar, activity bar and cards. Each tone
 // has a fixed meaning; only its hue is themeable (docs/STYLEGUIDE.md).
-export type StatusTone =
-  /** Needs the user, or failed. */
-  | 'attention'
-  /** At risk, but does not need the user yet. */
-  | 'warning'
-  /** An agent is working on it now. */
-  | 'info'
-  /** Done and verified. */
-  | 'success'
-  /** Idle, or no data. */
-  | 'idle'
+import { STATUS_COLOR_TONES, type StatusColorTone } from '../../../shared/status-colors'
 
-export const STATUS_TONES = [
-  'attention',
-  'warning',
-  'info',
-  'success',
-  'idle'
-] as const satisfies readonly StatusTone[]
+/**
+ * attention: needs the user, or failed. warning: at risk, does not need the
+ * user yet. info: an agent is working on it now. success: done and verified.
+ * idle: idle, or no data.
+ */
+export type StatusTone = StatusColorTone
+
+export const STATUS_TONES = STATUS_COLOR_TONES
 
 // Why: full literals so Tailwind's scanner emits every class.
 const TEXT: Record<StatusTone, string> = {

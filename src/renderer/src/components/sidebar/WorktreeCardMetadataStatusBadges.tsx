@@ -6,6 +6,8 @@ import { PullRequestIcon, checksLabel } from './WorktreeCardHelpers'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import type { IssueInfo } from '../../../../shared/github/pull-request-types'
 import { translate } from '@/i18n/i18n'
+import { statusToneBadgeClass } from '@/components/status-tone'
+import { checkStatusTone } from '@/components/review-status-tone'
 
 function MetadataStatusBadge({
   label,
@@ -38,7 +40,7 @@ export function IssueStateBadge({ state }: { state: IssueInfo['state'] }): React
           'auto.components.sidebar.WorktreeCardMetadataStatusBadges.e888362def',
           'State: Closed'
         )}
-        className="border-purple-500/25 bg-purple-500/5 text-purple-600 dark:text-purple-300"
+        className={statusToneBadgeClass('success')}
       >
         <CircleCheck />
       </MetadataStatusBadge>
@@ -51,7 +53,7 @@ export function IssueStateBadge({ state }: { state: IssueInfo['state'] }): React
         'auto.components.sidebar.WorktreeCardMetadataStatusBadges.fe188062a1',
         'State: Open'
       )}
-      className="border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-300"
+      className={statusToneBadgeClass('info')}
     >
       <CircleDot />
     </MetadataStatusBadge>
@@ -64,12 +66,13 @@ export function LinearStateBadge({ stateName }: { stateName: string }): React.JS
   const cancelled = /cancel|canceled|duplicate|wontfix/.test(normalized)
   const active = /progress|doing|started|active/.test(normalized)
   const Icon = done ? CircleCheck : cancelled ? CircleX : active ? Clock : CircleDot
+  // Why: cancelled is a decision, not a failure, so it stays idle rather than red.
   const tone = done
-    ? 'border-purple-500/25 bg-purple-500/5 text-purple-600 dark:text-purple-300'
+    ? statusToneBadgeClass('success')
     : cancelled
-      ? 'border-rose-500/25 bg-rose-500/5 text-rose-600 dark:text-rose-300'
+      ? statusToneBadgeClass('idle')
       : active
-        ? 'border-amber-500/25 bg-amber-500/5 text-amber-600 dark:text-amber-300'
+        ? statusToneBadgeClass('info')
         : 'border-border bg-muted/30 text-muted-foreground'
 
   return (
@@ -104,7 +107,7 @@ export function ReviewStateBadge({
           'auto.components.sidebar.WorktreeCardMetadataStatusBadges.f394b3e86e',
           'State: Merged'
         )}
-        className="border-purple-500/25 bg-purple-500/5 text-purple-600 dark:text-purple-300"
+        className={statusToneBadgeClass('success')}
       >
         <GitMerge />
       </MetadataStatusBadge>
@@ -118,7 +121,7 @@ export function ReviewStateBadge({
           'auto.components.sidebar.WorktreeCardMetadataStatusBadges.e888362def',
           'State: Closed'
         )}
-        className="border-rose-500/25 bg-rose-500/5 text-rose-600 dark:text-rose-300"
+        className={statusToneBadgeClass('idle')}
       >
         <CircleX />
       </MetadataStatusBadge>
@@ -146,7 +149,7 @@ export function ReviewStateBadge({
         'auto.components.sidebar.WorktreeCardMetadataStatusBadges.fe188062a1',
         'State: Open'
       )}
-      className="border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-300"
+      className={statusToneBadgeClass('info')}
     >
       {label === 'MR' ? <GitMerge /> : <PullRequestIcon />}
     </MetadataStatusBadge>
@@ -166,10 +169,7 @@ export function ReviewChecksBadge({
 
   if (status === 'success') {
     return (
-      <MetadataStatusBadge
-        label={label}
-        className="border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-300"
-      >
+      <MetadataStatusBadge label={label} className={statusToneBadgeClass(checkStatusTone(status))}>
         <CircleCheck />
       </MetadataStatusBadge>
     )
@@ -177,20 +177,14 @@ export function ReviewChecksBadge({
 
   if (status === 'failure') {
     return (
-      <MetadataStatusBadge
-        label={label}
-        className="border-rose-500/25 bg-rose-500/5 text-rose-600 dark:text-rose-300"
-      >
+      <MetadataStatusBadge label={label} className={statusToneBadgeClass(checkStatusTone(status))}>
         <CircleX />
       </MetadataStatusBadge>
     )
   }
 
   return (
-    <MetadataStatusBadge
-      label={label}
-      className="border-amber-500/25 bg-amber-500/5 text-amber-600 dark:text-amber-300"
-    >
+    <MetadataStatusBadge label={label} className={statusToneBadgeClass(checkStatusTone(status))}>
       <Clock />
     </MetadataStatusBadge>
   )
