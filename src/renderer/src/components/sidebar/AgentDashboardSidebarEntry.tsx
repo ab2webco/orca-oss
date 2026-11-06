@@ -7,9 +7,9 @@ import { useAgentBucketCounts } from '@/components/dashboard/useAgentBucketCount
 import { translate } from '@/i18n/i18n'
 
 const DASHBOARD_BUCKET_DOT_CLASS: Record<'working' | 'done' | 'idle', string> = {
-  working: 'bg-yellow-500',
-  done: 'bg-emerald-500',
-  idle: 'bg-neutral-500/50'
+  working: 'bg-status-info',
+  done: 'bg-status-success',
+  idle: 'bg-status-idle/50'
 }
 
 function dashboardBucketLabel(bucket: DashboardBucket): string {

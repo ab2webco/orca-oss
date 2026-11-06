@@ -44,4 +44,34 @@ describe('TopActivityOverflowMenu', () => {
       'More sidebar tabs — Error'
     )
   })
+
+  it.each([
+    ['failure', 'bg-status-attention'],
+    ['pending', 'bg-status-info'],
+    ['success', 'bg-status-success']
+  ] as const)('paints hidden %s checks with their status tone', async (status, tone) => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    roots.push(root)
+    const checks: ActivityBarItem = {
+      id: 'checks',
+      icon: () => <span />,
+      title: 'Checks',
+      shortcut: ''
+    }
+
+    await act(async () => {
+      root.render(
+        <TopActivityOverflowMenu
+          items={[checks]}
+          activeTab="explorer"
+          onSelect={vi.fn()}
+          checksStatus={status}
+        />
+      )
+    })
+
+    expect(container.querySelector(`button .${tone}`)).not.toBeNull()
+  })
 })

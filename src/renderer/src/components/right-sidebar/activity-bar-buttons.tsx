@@ -13,6 +13,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
+import { statusToneBgClass } from '@/components/status-tone'
+import { checkStatusTone } from '@/components/review-status-tone'
 
 export type ActivityBarItem = {
   id: ActiveRightSidebarTab
@@ -30,11 +32,8 @@ export type ActivityBarItem = {
   statusIndicator?: CheckStatus
 }
 
-const STATUS_DOT_COLOR: Record<CheckStatus, string> = {
-  success: 'bg-emerald-500',
-  failure: 'bg-rose-500',
-  pending: 'bg-amber-500',
-  neutral: 'bg-muted-foreground'
+function statusDotClass(status: CheckStatus): string {
+  return statusToneBgClass(checkStatusTone(status))
 }
 
 function activityItemAriaLabel(item: ActivityBarItem, status?: CheckStatus | null): string {
@@ -87,7 +86,7 @@ export function TopActivityOverflowMenu({
             <div
               className={cn(
                 'absolute top-[8px] right-[4px] size-[7px] rounded-full ring-1 ring-sidebar',
-                STATUS_DOT_COLOR[hiddenItemStatus] ?? 'bg-muted-foreground'
+                statusDotClass(hiddenItemStatus)
               )}
             />
           )}
@@ -109,7 +108,7 @@ export function TopActivityOverflowMenu({
               <span>{item.title}</span>
               {item.statusIndicator === 'failure' ? (
                 <span
-                  className={cn('ml-auto size-2 rounded-full', STATUS_DOT_COLOR.failure)}
+                  className={cn('ml-auto size-2 rounded-full', statusDotClass('failure'))}
                   aria-hidden="true"
                 />
               ) : null}
@@ -160,7 +159,7 @@ export function ActivityBarButton({
               className={cn(
                 'absolute rounded-full size-[7px] ring-1 ring-sidebar',
                 isTop ? 'top-[8px] right-[5px]' : 'top-[7px] right-[7px]',
-                STATUS_DOT_COLOR[effectiveStatus] ?? 'bg-muted-foreground'
+                statusDotClass(effectiveStatus)
               )}
             />
           )}
