@@ -9,6 +9,8 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
+const ART_STYLES = ['figures', 'office'] as const
+const ART_STAGE_HEIGHT = 176
 const COPY = {
   en: { label: 'Live team scene', open: 'Open terminal' },
   es: { label: 'Escena en vivo del equipo', open: 'Abrir terminal' }
@@ -49,7 +51,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(420_000)
+  test.setTimeout(600_000)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -216,8 +218,42 @@ test('the Team panel draws the live scene beside a member opened under its heade
       }
     }
 
-    // A member opened from the Team tab gets its native header while the scene keeps drawing.
+    // Quest's bundled art, through the real setting. The attribute names what drew, so art that
+    // failed to load in this build falls to Pixel and stops here (ORCA-1052).
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    for (const style of ART_STYLES) {
+      await orcaPage.evaluate(
+        (next) =>
+          window.__store!.getState().updateSettings({
+            orchestratorGame: { panel: { style: next } }
+          }),
+        style
+      )
+      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+        timeout: 30_000
+      })
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          const box = await scene.boundingBox()
+          expect(box?.height, `${style} stage at ${width}px ${theme}`).toBeGreaterThanOrEqual(
+            ART_STAGE_HEIGHT
+          )
+          const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+          expect(overflow, `panel overflows at ${width}px ${theme} ${style}`).toBeLessThanOrEqual(0)
+          await expect.poll(() => paintedColors(orcaPage)).toBeGreaterThan(8)
+          await scene.screenshot({
+            path: testInfo.outputPath(`team-scene-${style}-${width}-${theme}.png`)
+          })
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`team-panel-scene-${style}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+
+    // A member opened from the Team tab gets its native header while the scene keeps drawing.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     const asker = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-14' })
     await asker.locator('button[aria-expanded]').click()

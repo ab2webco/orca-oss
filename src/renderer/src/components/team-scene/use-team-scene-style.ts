@@ -1,9 +1,16 @@
+import { useMemo } from 'react'
+import { useAppStore } from '@/store'
 import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
+import { resolveOrchestratorGamePanel } from '../../../../shared/orchestrator-game-panel-layers'
 
-/**
- * Pixel, ORCA-1071's style for an unset `orchestratorGame.panel.style`, until its resolved
- * setting reaches the renderer; then this reads it, like `useTeamPanelLook`.
- */
+/** The scene style after global Settings and this machine's choice for the project. */
 export function useTeamSceneStyle(): GamePanelStyle {
-  return 'pixel'
+  const repoId = useAppStore((s) =>
+    s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
+  )
+  const global = useAppStore((s) => s.settings?.orchestratorGame)
+  const local = useAppStore((s) =>
+    repoId ? s.settings?.orchestratorGameProjects?.[repoId] : undefined
+  )
+  return useMemo(() => resolveOrchestratorGamePanel({ global, local }).style, [global, local])
 }
