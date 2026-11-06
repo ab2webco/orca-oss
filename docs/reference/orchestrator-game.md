@@ -1732,7 +1732,7 @@ earns no points or XP, writes nothing to Orca or the store, adds no setting, and
 drops the run.
 
 A member's perfect merge saves one arcade play for the project on the Orca host
-(`src/shared/orchestrator-game-arcade-credits.ts`).
+([`orchestrator-game-arcade-credits.ts`](../../src/shared/orchestrator-game-arcade-credits.ts)).
 The host's game store adds the credit in the same write as the `merged` event it records, so a
 merge seen twice pays once. At most 9 plays are kept. The lead's `game state` carries them as
 `arcade: { credits, offer }`, and `game.arcade` (`orca game arcade`) reads them, or with
