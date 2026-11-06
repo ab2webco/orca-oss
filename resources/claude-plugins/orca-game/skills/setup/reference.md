@@ -45,6 +45,15 @@ orchestratorGame:
       prompt: Read my open tickets with the jira CLI and show them by status. Do not launch anything.
     - label: Runs
       mcp: { server: tests, tool: list_test_runs, args: { project: CIN } } # runs from the Panel
+    - label: Deploy
+      command: deploy
+      icon: ship # optional: ship flask tag review scan list pulse launch (play check stop are Orca's)
+      pin: true # optional: in the panel's action row, at most 3; the rest live in its ⋯ menu
+      prompt: Deploy to staging and tell me the result.
+
+  orcaActions: # optional changes to Orca's lead actions: wave status push sweep stop
+    wave: { enabled: false } # hides it; stop cannot be turned off
+    sweep: { prompt: Close only with CI green. } # also label and icon; the command is fixed
 
   orchestrator: # the lead
     autostart: true # a plain session here starts as the lead

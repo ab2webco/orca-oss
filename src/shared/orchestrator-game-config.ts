@@ -1,5 +1,10 @@
 import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
 import {
+  mergeGameOrcaActions,
+  parseGameOrcaActions,
+  type OrchestratorGameOrcaActions
+} from './orchestrator-game-orca-actions'
+import {
   parseGameLead,
   resolveGameLead,
   type GameHostProfile,
@@ -66,6 +71,8 @@ export type OrchestratorGameIntegrations = {
   activity: OrchestratorGameActivityRule[]
   /** Project buttons that send the lead a prompt or run an MCP tool. */
   actions: OrchestratorGameAction[]
+  /** Changes to Orca's own lead buttons; merged field by field across layers. */
+  orcaActions: OrchestratorGameOrcaActions
   /** Where the band's To Do comes from; null picks it from the repo and its linked work item. */
   todo: OrchestratorGameTodoSource | null
   /** What the PR list's link does; a later layer replaces it whole. */
@@ -184,6 +191,7 @@ export function resolveOrchestratorGameIntegrations(
     links: [],
     activity: [],
     actions: [],
+    orcaActions: {},
     todo: null,
     reviews: {}
   }
@@ -206,6 +214,11 @@ export function resolveOrchestratorGameIntegrations(
       resolved.todo = todo
     }
   }
+  resolved.orcaActions = mergeGameOrcaActions(
+    ORCHESTRATOR_GAME_LAYER_ORDER.map(
+      (source) => parseGameOrcaActions(layers[source]?.orcaActions).value
+    )
+  )
   return resolved
 }
 
@@ -229,6 +242,19 @@ export function resolveOrchestratorGameRewardWeights(
 
 const isMode = (value: unknown): value is OrchestratorGameMode =>
   typeof value === 'string' && (ORCHESTRATOR_GAME_MODES as readonly string[]).includes(value)
+
+/** The layer's nested sections, each parsed on its own and dropped when it yields nothing. */
+const SECTION_PARSERS = {
+  links: parseGameLinkTemplates,
+  activity: parseGameActivityRules,
+  actions: parseGameActions,
+  orcaActions: parseGameOrcaActions,
+  orchestrator: parseGameLead,
+  rewardWeights: parseGameRewardWeights,
+  panel: parseGamePanel,
+  reviews: parseGameReviewsSource,
+  todo: parseGameTodoSource
+} satisfies Record<string, (raw: unknown) => { value: unknown; warnings: string[] }>
 
 export function parseOrchestratorGameLayer(raw: unknown): {
   layer: OrchestratorGameLayer
@@ -283,47 +309,11 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       } else {
         warnings.push(`orchestratorGame.${key} must be true or false`)
       }
-    } else if (key === 'links' || key === 'activity') {
-      const parsed = key === 'links' ? parseGameLinkTemplates(value) : parseGameActivityRules(value)
+    } else if (Object.hasOwn(SECTION_PARSERS, key)) {
+      const parsed = SECTION_PARSERS[key as keyof typeof SECTION_PARSERS](value)
       warnings.push(...parsed.warnings)
-      if (parsed.value) {
+      if (parsed.value !== undefined) {
         Object.assign(layer, { [key]: parsed.value })
-      }
-    } else if (key === 'actions') {
-      const parsed = parseGameActions(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value) {
-        layer.actions = parsed.value
-      }
-    } else if (key === 'orchestrator') {
-      const parsed = parseGameLead(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value) {
-        layer.orchestrator = parsed.value
-      }
-    } else if (key === 'rewardWeights') {
-      const parsed = parseGameRewardWeights(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value) {
-        layer.rewardWeights = parsed.value
-      }
-    } else if (key === 'panel') {
-      const parsed = parseGamePanel(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value) {
-        layer.panel = parsed.value
-      }
-    } else if (key === 'reviews') {
-      const parsed = parseGameReviewsSource(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value !== undefined) {
-        layer.reviews = parsed.value
-      }
-    } else if (key === 'todo') {
-      const parsed = parseGameTodoSource(value)
-      warnings.push(...parsed.warnings)
-      if (parsed.value !== undefined) {
-        layer.todo = parsed.value
       }
     } else {
       warnings.push(`orchestratorGame.${key} is not a known setting`)
