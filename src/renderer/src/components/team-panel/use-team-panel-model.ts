@@ -21,6 +21,7 @@ import {
 import { teamPanelModelOf } from './team-panel-model-of'
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
 import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
+import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -93,6 +94,19 @@ export function useTeamPanelModel(): TeamPanelModelSource {
     [hostId, projectName, repoId, worktreeIdList]
   )
   useEffect(() => (scope ? poller.subscribe(scope) : undefined), [scope])
+  // Why: an answer changes the Inbox count now, not at the next 20 s read.
+  useEffect(() => {
+    if (!scope) {
+      return
+    }
+    const refreshNow = (): void => poller.refresh()
+    const stopLocal = window.api.runtime.onGameOwnerQuestionsChanged?.(refreshNow)
+    const stopPaired = onGameOwnerQuestionsChanged(refreshNow)
+    return () => {
+      stopLocal?.()
+      stopPaired()
+    }
+  }, [scope])
   const source = useTeamPanelModelStore((s) => s.source)
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
   return useMemo(() => {

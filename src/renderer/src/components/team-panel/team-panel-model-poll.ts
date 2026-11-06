@@ -45,10 +45,12 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     refs: number
     timer: ReturnType<typeof setInterval>
     ready: boolean
+    reading: boolean
+    again: boolean
   } | null = null
   let generation = 0
 
-  const refresh = async (): Promise<void> => {
+  const read = async (): Promise<void> => {
     const run = active
     if (!run) {
       return
@@ -81,6 +83,28 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     }
   }
 
+  // Why per run: a read for the old project must not hold back the new one's first read.
+  const refresh = async (): Promise<void> => {
+    const run = active
+    if (!run) {
+      return
+    }
+    if (run.reading) {
+      run.again = true
+      return
+    }
+    run.reading = true
+    try {
+      await read()
+    } finally {
+      run.reading = false
+    }
+    if (run.again && active === run) {
+      run.again = false
+      await refresh()
+    }
+  }
+
   const stop = (): void => {
     if (active) {
       clearInterval(active.timer)
@@ -90,6 +114,10 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
   }
 
   return {
+    /** Re-reads now, or once after the read in flight; nothing without a subscriber. */
+    refresh(): void {
+      void refresh()
+    },
     subscribe(scope: TeamPanelScope): () => void {
       if (active?.scope.key !== scope.key) {
         stop()
@@ -98,6 +126,8 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
           scope,
           refs: 0,
           ready: false,
+          reading: false,
+          again: false,
           timer: setInterval(() => void refresh(), intervalMs)
         }
         void refresh()

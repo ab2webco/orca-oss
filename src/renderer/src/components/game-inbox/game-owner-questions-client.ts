@@ -19,13 +19,15 @@ export function gameInboxTargetOf(hostId: string | null | undefined): RuntimeCli
     : { kind: 'local' }
 }
 
+/** Open questions; with `all`, answered ones too (a host that predates `all` returns open only). */
 export async function readOpenGameOwnerQuestions(
-  scope: GameInboxScope
+  scope: GameInboxScope,
+  options?: { all?: boolean }
 ): Promise<GameOwnerQuestion[]> {
   const result = await callRuntimeRpc<{ questions?: unknown }>(
     scope.target,
     'game.ownerQuestions',
-    { worktreeId: scope.worktreeId },
+    { worktreeId: scope.worktreeId, ...(options?.all ? { all: true } : {}) },
     { timeoutMs: GAME_INBOX_RPC_TIMEOUT_MS }
   )
   // Why parse: a paired host may run another build.

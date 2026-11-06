@@ -93,6 +93,9 @@ function renderInbox(
       otherGroups={[other]}
       threads={THREADS}
       onReply={vi.fn(async () => {})}
+      agentQuestions={[]}
+      answeredQuestions={[]}
+      onOpenAgent={vi.fn()}
       {...over}
     />
   )
@@ -166,6 +169,47 @@ describe('Inbox tab', () => {
 
     expect(view.getByText('Nothing waits for you')).toBeTruthy()
     expect(view.queryByRole('tab', { name: /For you/ })).toBeNull()
+  })
+
+  // Why: with no team, a blocked agent's question comes from its AgentStatusEntry, not the board.
+  it('lists an agent that asks, with its options and a way to its terminal', () => {
+    const onOpenAgent = vi.fn()
+    const agent = {
+      paneKey: 'tab-1:leaf-1',
+      worktreeId: 'wt-tooltip',
+      host: { kind: 'local' as const },
+      repoName: 'orca-oss',
+      worktreeName: 'fix-tooltip',
+      text: 'Apply the migration now or leave it for the release?',
+      options: ['Apply it now', 'Leave it for the release']
+    }
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      agentQuestions: [agent],
+      onOpenAgent
+    })
+
+    expect(view.getByRole('tab', { name: /For you/ }).textContent).toContain('1')
+    expect(view.getByText('orca-oss · fix-tooltip')).toBeTruthy()
+    expect(view.getByText(agent.text)).toBeTruthy()
+    expect(view.getByText('Apply it now · Leave it for the release')).toBeTruthy()
+    act(() => fireEvent.click(view.getByRole('button', { name: 'Open terminal' })))
+    expect(onOpenAgent).toHaveBeenCalledWith(agent)
+  })
+
+  it('lists what you answered beside what the lead answered', () => {
+    const answered: GameOwnerQuestion = {
+      ...question('q-old', 'Include #911 in lab.115?', 'ORCA-1011'),
+      answer: { text: 'Yes, include it', at: AT }
+    }
+    const view = renderInbox({ answeredQuestions: [answered] })
+
+    expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('2')
+    pick(view, /Answered/)
+    expect(view.getByText('You answered')).toBeTruthy()
+    expect(view.getByText('You answered: Yes, include it')).toBeTruthy()
+    expect(view.getByText('The lead answered')).toBeTruthy()
   })
 
   it('says nothing waits when For you is empty', () => {
