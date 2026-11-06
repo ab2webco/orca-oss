@@ -36,6 +36,25 @@ const png = (width: number, height: number, bytes = 33): Uint8Array => {
   return out
 }
 
+/** A WebP extended header: a RIFF container and a VP8X chunk with the canvas size. */
+const webp = (width: number, height: number): Uint8Array => {
+  const out = new Uint8Array(30)
+  const view = new DataView(out.buffer)
+  const ascii = (at: number, text: string): void =>
+    out.set(
+      [...text].map((one) => one.charCodeAt(0)),
+      at
+    )
+  ascii(0, 'RIFF')
+  view.setUint32(4, out.byteLength - 8, true)
+  ascii(8, 'WEBP')
+  ascii(12, 'VP8X')
+  view.setUint32(16, 10, true)
+  view.setUint16(24, (width - 1) & 0xffff, true)
+  view.setUint16(27, (height - 1) & 0xffff, true)
+  return out
+}
+
 const parsedNative = (value: unknown) => {
   const { native: parsed, issues } = orchestratorGameSceneNativeOf({ native: value })
   expect(issues).toEqual([])
@@ -169,6 +188,21 @@ describe('the art files of a scene', () => {
       })
     )
     expect(issues).toEqual([])
+  })
+
+  it('reads a real WebP header, so the format the block accepts is one it can measure', async () => {
+    const issues = await orchestratorGameSceneArtIssues(
+      parsedNative({
+        figures: {
+          ...native().figures,
+          roles: { lead: role('art/hero.webp'), member: role('art/hero.webp') }
+        }
+      }),
+      read({ 'art/bushes.webp': webp(960, 352), 'art/hero.webp': webp(64, 96) })
+    )
+    // Why the walk issue: a measured 64x96 sheet is too narrow, which only a parsed header can say.
+    expect(issues).toHaveLength(2)
+    expect(issues[0]).toContain('art/hero.webp to be at least 128x96, it is 64x96')
   })
 
   it('names a missing file, an unreadable one and a link out by their place in the block', async () => {
