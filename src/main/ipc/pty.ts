@@ -114,7 +114,10 @@ import {
 } from '../daemon/daemon-errors'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
-import { CLAUDE_AUTH_ENV_VARS, hasClaudeAuthEnvConflict } from '../claude-accounts/environment'
+import {
+  CLAUDE_MANAGED_LAUNCH_ENV_TO_DELETE,
+  hasClaudeAuthEnvConflict
+} from '../claude-accounts/environment'
 import { ensureClaudeFolderTrustForSpawn } from './pty-claude-folder-trust'
 import {
   getLiveInjectedClaudePtyAccountId,
@@ -5280,7 +5283,7 @@ export function registerPtyHandlers(
       }
 
       const authEnvToDelete = claudeAuth?.stripAuthEnv
-        ? [...CLAUDE_AUTH_ENV_VARS, 'ANTHROPIC_CUSTOM_HEADERS']
+        ? [...CLAUDE_MANAGED_LAUNCH_ENV_TO_DELETE]
         : undefined
       const spawnOptions: PtySpawnOptions = {
         cols: args.cols,
@@ -7264,7 +7267,7 @@ export function registerPtyHandlers(
           ? { ...env, ORCA_TERMINAL_HANDLE: preAllocatedHandle }
           : env
         const envToDelete = claudeAuth?.stripAuthEnv
-          ? [...CLAUDE_AUTH_ENV_VARS, 'ANTHROPIC_CUSTOM_HEADERS']
+          ? [...CLAUDE_MANAGED_LAUNCH_ENV_TO_DELETE]
           : undefined
         let combinedEnvToDelete = mergePtyEnvDeletions(
           envToDelete,

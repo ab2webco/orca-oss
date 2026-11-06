@@ -192,6 +192,29 @@ describe('runtime PTY spawn Claude folder trust (ORCA-776, ORCA-792)', () => {
     await expect(readFile(join(defaultDir, '.claude.json'), 'utf8')).rejects.toThrow(/ENOENT/)
   })
 
+  it('does not hand an inherited Keychain scope to a managed account launch', async () => {
+    spawnMock.mockClear()
+    const { configDir, worktree } = await memberFixture('trusted')
+    // Why: set even to "", the CLI ignores CLAUDE_CONFIG_DIR when naming its Keychain item.
+    vi.stubEnv('CLAUDE_SECURESTORAGE_CONFIG_DIR', '')
+    const prepareClaudeAuth = vi.fn(async () => ({
+      configDir,
+      envPatch: { CLAUDE_CONFIG_DIR: configDir },
+      stripAuthEnv: true,
+      provenance: 'managed:account-1'
+    }))
+
+    await spawnClaude({ cwd: worktree, requireClaudeFolderTrust: true, prepareClaudeAuth })
+
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+    const spawnOptions = spawnMock.mock.calls[0]?.[2] as
+      | { env?: Record<string, string> }
+      | undefined
+    const spawnEnv = spawnOptions?.env
+    expect(spawnEnv?.CLAUDE_CONFIG_DIR).toBe(configDir)
+    expect(spawnEnv).not.toHaveProperty('CLAUDE_SECURESTORAGE_CONFIG_DIR')
+  })
+
   it('refuses a worker launch whose config still does not trust the folder', async () => {
     spawnMock.mockClear()
     const { configDir, worktree } = await memberFixture('unparsable')
