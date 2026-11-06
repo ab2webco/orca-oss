@@ -35,6 +35,38 @@
       "menuBarIcon": {
         "title": "Mostrar icono en la barra de menús",
         "description": "Mantén un acceso directo de Orca Lab e indicador de actividad en la barra de menús de macOS."
+      },
+      "statusColors": {
+        "title": "Colores de estado",
+        "description": "Cada color conserva su significado en todos los proyectos. Claro y oscuro tienen los suyos.",
+        "themeLabel": "Tema a editar",
+        "reset": "Restablecer",
+        "pickerLabel": "Color de {{value0}}",
+        "tooClose": "Se confunde con {{value0}}",
+        "lowContrast": "Poco contraste",
+        "keywordColor": "color",
+        "keywordStatus": "estado",
+        "keywordContrast": "contraste",
+        "attention": {
+          "name": "Te necesita",
+          "meaning": "Te necesita, o algo falló."
+        },
+        "warning": {
+          "name": "En riesgo",
+          "meaning": "Aún no te necesita."
+        },
+        "info": {
+          "name": "Trabajando",
+          "meaning": "Hay un agente en esto ahora."
+        },
+        "success": {
+          "name": "Verificado",
+          "meaning": "Terminado y comprobado."
+        },
+        "idle": {
+          "name": "En reposo",
+          "meaning": "Sin actividad, o sin dato."
+        }
       }
     }
   },

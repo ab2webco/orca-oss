@@ -62,6 +62,38 @@
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
         "description": "Keep an Orca Lab shortcut and activity indicator in the macOS menu bar."
+      },
+      "statusColors": {
+        "title": "Status colors",
+        "description": "Each color keeps its meaning in every project. Light and dark have their own.",
+        "themeLabel": "Theme to edit",
+        "reset": "Reset",
+        "pickerLabel": "{{value0}} color",
+        "tooClose": "Too close to {{value0}}",
+        "lowContrast": "Low contrast",
+        "keywordColor": "color",
+        "keywordStatus": "status",
+        "keywordContrast": "contrast",
+        "attention": {
+          "name": "Needs you",
+          "meaning": "Needs you, or something failed."
+        },
+        "warning": {
+          "name": "At risk",
+          "meaning": "Does not need you yet."
+        },
+        "info": {
+          "name": "Working",
+          "meaning": "An agent is on it now."
+        },
+        "success": {
+          "name": "Verified",
+          "meaning": "Done and checked."
+        },
+        "idle": {
+          "name": "Idle",
+          "meaning": "No activity, or no data."
+        }
       }
     }
   },
