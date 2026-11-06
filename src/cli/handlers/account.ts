@@ -13,6 +13,11 @@ import { readTerminalClaudeAccount } from '../terminal-claude-account'
 import { RuntimeClientError } from '../runtime-client'
 import { rejectRemoteSelectionFlags } from './account-runtime-scope'
 import { switchClaudeTerminalAccount } from './account-switch'
+import {
+  readTokenFromStdin,
+  runAccountTokenClear,
+  runAccountTokenSet
+} from './account-long-lived-token'
 import { stripElectronRunAsNode } from '../runtime/launch'
 import { getDefaultUserDataPath } from '../runtime/metadata'
 import {
@@ -316,5 +321,11 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   },
   'account switch': async (ctx) => {
     await switchClaudeTerminalAccount(ctx)
+  },
+  'account token set': async (ctx) => {
+    await runAccountTokenSet(ctx, readTokenFromStdin)
+  },
+  'account token clear': async (ctx) => {
+    await runAccountTokenClear(ctx)
   }
 }

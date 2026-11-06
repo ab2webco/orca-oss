@@ -14892,6 +14892,14 @@ export class OrcaRuntimeService {
     return this.requireAccountServices().claudeAccounts.addAccountFromConfigDir(configDir, options)
   }
 
+  // Why host-local: a long-lived token is minted per host, so it is set where it will be used.
+  setClaudeLongLivedToken(
+    accountSelector: string,
+    token: string | null
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.requireAccountServices().claudeAccounts.setLongLivedToken(accountSelector, token)
+  }
+
   // Why this one is reachable from a remote client and addClaudeAccountFromConfigDir
   // is not: that one captures a filesystem path on the account-owning host, so a
   // paired client could point it at credentials it must never read. A custom
