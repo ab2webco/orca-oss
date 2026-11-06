@@ -27,3 +27,14 @@ describe('the /orca-game:setup key summary', () => {
     })
   })
 })
+
+describe('the /orca-game:setup questions', () => {
+  // Why: the panel's dock and Settings read these; setup is the only writer of orca.yaml.
+  it("asks for each button's icon and pin, and about Orca's own actions", () => {
+    const skill = readFileSync(join(REFERENCE, '../SKILL.md'), 'utf8')
+    expect(skill).toContain('`icon`')
+    expect(skill).toContain('`pin: true`')
+    expect(skill).toContain('`orcaActions`')
+    expect(skill).toContain('stop never')
+  })
+})

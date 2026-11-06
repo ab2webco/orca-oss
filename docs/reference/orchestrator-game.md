@@ -539,10 +539,22 @@ orchestratorGame:
   changes. A name Claude Code refuses (its own `/status`, say) is skipped and noted once; the
   button still works. Text after the command is appended to the prompt: `/wave CIN-1,CIN-2`. An
   MCP command answers with the tool's lines.
-- **Settings.** The project's **Actions** section shows the `orca.yaml` list read only; **Edit on
-  this machine** starts this machine's list (label, command, prompt or MCP server, tool and JSON
-  arguments, checked by the same parser), which replaces the `orca.yaml` one whole. **Inherit from
-  orca.yaml** drops it.
+- **Settings.** The project's **Actions** section follows prototype V30: **Create with setup**
+  sends `/orca-game:setup` to the lead, **New action** and the **Start with** templates open a form
+  (name, a command that follows the name until typed, icon, a lead prompt or an MCP tool), the
+  project's rows move up and pin to the dock's row (3 at most), and Orca's own rows take **Edit**
+  and an on switch (none on Stop). A change is saved on this machine and replaces `orca.yaml`'s
+  list whole; **Use orca.yaml's list again** drops it. `/orca-game:setup` is what writes `orca.yaml`.
+- **The native panel's dock** ([`TeamActionDock.tsx`](../../src/renderer/src/components/team-panel/TeamActionDock.tsx)):
+  one line under the Team panel with Orca's actions that apply now and their count (wave: To Do
+  with free slots, push: stopped members, sweep: finished members; wave and sweep stand down during a
+  STOP), then up to 3 pinned project actions, Stop with an inline confirmation, and ⋯ with every
+  action grouped Now, This project and From Orca. A run shows the lead's reply from its pane's
+  `lastAssistantMessage`. An MCP action runs from the dock as its `/command`; one without a command
+  runs only from the terminal.
+- **Changing Orca's own** (`orcaActions`): `wave`, `status`, `push`, `sweep` and `stop` each take
+  `enabled`, `label`, `icon` and `prompt`; the command is fixed, `stop` cannot be turned off, a prompt
+  takes no placeholders, and layers merge field by field. Project actions also take `icon` and `pin`.
 
 ## The project lead: `orchestratorGame.orchestrator`
 
