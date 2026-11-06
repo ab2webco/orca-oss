@@ -23,6 +23,7 @@ import {
   type GameStoreMigration
 } from '../../shared/orchestrator-game-store-migration'
 import { mergeAdoptedGameLog } from '../../shared/orchestrator-game-log-adoption'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Ordered steps for this store's file; empty while version 1 is the only shape. */
 export const GAME_HISTORY_MIGRATIONS: readonly GameStoreMigration[] = []
@@ -92,7 +93,8 @@ export class GameHistoryStore {
 
   constructor(
     private readonly dirOf: () => string,
-    private readonly migrations: readonly GameStoreMigration[] = GAME_HISTORY_MIGRATIONS
+    private readonly migrations: readonly GameStoreMigration[] = GAME_HISTORY_MIGRATIONS,
+    private readonly names?: GameStoreNaming
   ) {}
 
   async list(projectKey: string): Promise<GameHistoryRecord[]> {
@@ -277,7 +279,10 @@ export class GameHistoryStore {
   }
 
   private nameOf(projectKey: string): string {
-    return createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    return (
+      this.names?.nameIn(this.dirOf(), '.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    )
   }
 
   private fileOf(projectKey: string): string {

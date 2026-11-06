@@ -6,6 +6,7 @@ import {
   parseGameStop,
   type GameStop
 } from '../../shared/orchestrator-game-stop-state'
+import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 const isMissing = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
@@ -17,7 +18,10 @@ const isMissing = (error: unknown): boolean =>
 export class GameStopSwitch {
   private readonly queues = new Map<string, Promise<unknown>>()
 
-  constructor(private readonly dirOf: () => string) {}
+  constructor(
+    private readonly dirOf: () => string,
+    private readonly names?: GameStoreNaming
+  ) {}
 
   /** Null only when no STOP file exists; one that cannot be read counts as set. */
   async read(projectKey: string): Promise<GameStop | null> {
@@ -93,7 +97,9 @@ export class GameStopSwitch {
   }
 
   private fileOf(projectKey: string): string {
-    const name = createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+    const name =
+      this.names?.nameIn(this.dirOf(), '.stop.json', projectKey) ??
+      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
     return join(this.dirOf(), `${name}.stop.json`)
   }
 }
