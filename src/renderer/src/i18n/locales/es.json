@@ -15457,12 +15457,12 @@
         "ArcadeTab": {
           "title": "Arcade",
           "canvasLabel": "Partida de arcade",
-          "score_one": "{{count}} pto",
-          "score_other": "{{count}} pts",
+          "score": "{{score}} pts",
+          "scoreOne": "1 pto",
           "hint": "Espacio o toque para saltar",
           "held": "En pausa · alguien te necesita",
-          "over_one": "Fin de la partida · {{count}} pto",
-          "over_other": "Fin de la partida · {{count}} pts",
+          "over": "Fin de la partida · {{score}} pts",
+          "overOne": "Fin de la partida · 1 pto",
           "overHint": "Espacio o toque para volver a Claude"
         }
       }
