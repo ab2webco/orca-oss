@@ -35,6 +35,7 @@ import { SCENE_KEY, sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
 import { openArcade } from './arcade-pane'
+import { celebrateArcadeCredit } from './arcade-unlock'
 import { arcadeWords } from './arcade-words'
 import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
@@ -122,8 +123,12 @@ const registerCommand = (on: On, command: GameCommand) => {
       return { text: text.questRenderShown(shownSetting('render')) }
     }
     if ('arcade' in asked) {
-      await openArcade($, asked.isOffer === true)
-      return { text: asked.isOffer === true ? arcadeWords().offered : arcadeWords().opened }
+      if (asked.isOffer === true) {
+        celebrateArcadeCredit($)
+        return { text: arcadeWords().offered }
+      }
+      await openArcade($)
+      return { text: arcadeWords().opened }
     }
     if ('demo' in asked) {
       startDemo()

@@ -1733,25 +1733,27 @@ ground line reads as something to jump.
 earns no points or XP, writes nothing to Orca or the store, adds no setting, and closing the pane
 drops the run.
 
-A lead pane (`role` not `member`, rewards on) offers one run when a member's review turns
-`perfectMerge: true` between two polls
-([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The offer
-is keyed by the perfect-merge reward's id and kept under `arcade-offers` in `$.store`, so a merge
-seen again after a replay or a reload never offers twice. `/orca-game:demo offer` (or
-`/quest demo offer`) plays the same offer
-([`arcade-offer.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), keeping
-nothing:
+A member's perfect merge saves one arcade play for the project on the Orca host
+([`orchestrator-game-arcade-credits.ts`](../../src/shared/orchestrator-game-arcade-credits.ts)).
+The host's game store adds the credit in the same write as the `merged` event it records, so a
+merge seen twice pays once. At most 9 plays are kept. The lead's `game state` carries them as
+`arcade: { credits, offer }`, and `game.arcade` (`orca game arcade`) reads them, or with
+`action: play | keep` spends one or dismisses the offer. Only the lead's project reads or spends
+them. The Team panel plays the run in a center tab.
 
-- The scene celebrates (the merge float and the level-up stars, drawn in the band while idle) and
-  the arcade pane opens asking for the keyboard, so `j` and `n` reach the pane and never the
-  prompt. Claude Code grants that only over an empty composer with no dialog or survey up, so text
-  the user is typing stays theirs; then the line names `ctrl+x tab, then j`, which is true there.
-- A line under the frame counts down 15 seconds. `j` (or a click on Play) starts the run; `n`, Esc
-  or the end of the countdown closes the pane and drops the offer.
-- While a teammate waits on the user (the band's "Needs you"), or a member's own question waits on
-  its lead, the countdown stands still, a run in play holds with no frames, and an offer opened then
-  leaves the keyboard to the prompt for the answer; both go on by themselves once it is answered.
-- Points a real offer's run earns stay apart from member XP; a demo offer writes none.
+Offers the old 15-second countdown made are paid once each. The terminal kept their ids under
+`arcade-offers` in `$.store` without noting which were played, so every one counts. The lead pane
+sends them once with `orca game arcade migrate`, and the host pays each id it has not seen, up to
+the cap, and records them all in the project's file, so a second migration pays nothing, after a
+restart or a repo adoption too. Only the host's answer marks them sent (`arcade-offers-migrated`);
+an Orca older than `game arcade` refuses the command, and the pane tries again in a later session.
+
+The terminal no longer offers a run. A lead pane (`role` not `member`, rewards on) only celebrates
+the merge in its scene and says the play is saved in the Team panel
+([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The cheer
+is keyed by the perfect-merge reward's id and kept under `arcade-cheers` in `$.store`, so a merge
+seen again after a replay or a reload, or one the old countdown already offered, never cheers
+twice. `/orca-game:demo offer` (or `/quest demo offer`) plays the same cheer and saves nothing.
 
 ## Other plugins in a game pane
 

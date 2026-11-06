@@ -11,11 +11,11 @@ import {
 } from './helpers/orchestrator-game-band'
 
 // ORCA-887: the lead and auto-release free a member right after its PR merges, so the lead's next
-// `game state` has no member row, only the merge Orca recorded. The offer must still open, once.
+// `game state` has no member row, only the merge Orca recorded. It must still celebrate, once, and
+// since ORCA-1053 open no pane: the host saves the play for the Team panel.
 const WIDTHS = [1440, 768, 390, 320] as const
-// Why only here: a poll's offer does not show below this yet (ORCA-893); the store proves it fired.
-const SHOWN_FROM = 1440
-const SECONDS_LEFT = /(\d{1,2})s to\s+choose/
+// The old offer's countdown line and pane title; neither may come back.
+const OLD_OFFER = /\d{1,2}s to\s+choose|Arcade · unlocked/
 
 const member = (number: number) => ({
   paneKey: `demo-wren-${number}`,
@@ -72,12 +72,9 @@ const gameState = (agents: unknown[], merges: unknown[]) => ({
 
 const screenOf = async (page: Page): Promise<string> => (await screenRows(page)).join(' ')
 
-const secondsLeftOf = async (page: Page): Promise<number | undefined> => {
-  const found = SECONDS_LEFT.exec(await screenOf(page))
-  return found === null ? undefined : Number(found[1])
-}
+const showsOldOffer = async (page: Page): Promise<boolean> => OLD_OFFER.test(await screenOf(page))
 
-/** The offers the mod has made, from its store under the band's Claude config. */
+/** The merges the mod has celebrated, from its store under the band's Claude config. */
 async function offersOf(root: string): Promise<string[]> {
   const dir = join(root, 'claude-config', 'plugins', 'store')
   const files = await readdir(dir).catch(() => [])
@@ -92,7 +89,7 @@ async function offersOf(root: string): Promise<string[]> {
   })
 }
 
-// Why the 30 s poll and no Refresh click: the lead's offer comes from its timer, not a click.
+// Why the 30 s poll and no Refresh click: the lead's cheer comes from its timer, not a click.
 async function nextPoll(band: GameBand): Promise<void> {
   const before = await band.reads()
   await expect
@@ -101,7 +98,7 @@ async function nextPoll(band: GameBand): Promise<void> {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a member released before the next poll still unlocks the arcade once (${theme})`, async ({
+  test(`a member released before the next poll still celebrates once, with no pane (${theme})`, async ({
     electronApp,
     orcaPage,
     testRepoPath
@@ -133,11 +130,10 @@ for (const theme of ['light', 'dark'] as const) {
         })
         await orcaPage.waitForTimeout(1_500)
 
-        // Each width merges a new PR, so its offer is one the mod has not made yet.
+        // Each width merges a new PR, so its cheer is one the mod has not made yet.
         const number = 300 + index
         await band.setState(gameState([member(number)], merges))
         await nextPoll(band)
-        expect(await secondsLeftOf(orcaPage), `no offer while #${number} is open`).toBeUndefined()
 
         // Released at once: the row is gone and only the recorded merge says it happened.
         merges.push(merge(number))
@@ -145,31 +141,18 @@ for (const theme of ['light', 'dark'] as const) {
         await nextPoll(band)
         const id = `perfect-merge:github#${number}@demo-wt-${number}`
         await expect
-          .poll(() => offersOf(band.root), { timeout: 10_000, message: `no offer for #${number}` })
+          .poll(() => offersOf(band.root), { timeout: 10_000, message: `no cheer for #${number}` })
           .toContain(id)
-        if (width >= SHOWN_FROM) {
-          await expect
-            .poll(() => secondsLeftOf(orcaPage), {
-              timeout: 30_000,
-              message: `the offer for #${number} never showed at ${width}px`
-            })
-            .toBeDefined()
-        }
         await orcaPage.screenshot({
-          path: testInfo.outputPath(`released-offer-${theme}-${width}.png`),
+          path: testInfo.outputPath(`released-celebrate-${theme}-${width}.png`),
           animations: 'disabled'
         })
-        await expect
-          .poll(() => secondsLeftOf(orcaPage), {
-            timeout: 40_000,
-            message: `the offer never closed at ${width}px`
-          })
-          .toBeUndefined()
+        expect(await showsOldOffer(orcaPage), `an offer pane for #${number}`).toBe(false)
 
-        // The same merge read again offers nothing more.
+        // The same merge read again celebrates nothing more.
         await nextPoll(band)
         expect((await offersOf(band.root)).filter((one) => one === id)).toHaveLength(1)
-        expect(await secondsLeftOf(orcaPage), `a second offer for #${number}`).toBeUndefined()
+        expect(await showsOldOffer(orcaPage), `an offer pane for #${number}`).toBe(false)
       }
     } finally {
       await rm(band.root, { recursive: true, force: true })

@@ -35,3 +35,9 @@ config/scripts/pr-workflow-upstream-fetch-order.test.mjs # pr.yml fetched upstre
 config/scripts/resolve-changed-code-base.test.mjs # widened a sync PR's base to the upstream tip
 config/scripts/git-pull-request-diff-base.test.mjs # sync-base resolver hook; first-parent cases kept
 config/scripts/git-pull-request-diff-base.repo.test.mjs # sync widening; first-parent cases kept
+
+# ORCA-1053: a perfect merge saves a credit on the host and the panel plays it; the terminal's
+# 15-second offer and its countdown are gone. The unlock suite now pins the no-pane cheer.
+resources/claude-plugins/orca-game/tests/arcade-offer.test.ts # demo offer pane and countdown
+resources/claude-plugins/orca-game/tests/arcade-offer.spec.ts # countdown timer and offer line
+tests/e2e/orca-game-arcade-offer.spec.ts # offer pane counts down and takes j from the prompt

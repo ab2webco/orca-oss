@@ -1,5 +1,5 @@
 ---
-sourceHash: a734d808cab75b06
+sourceHash: 106cbf0d60b459c8
 ---
 
 # El juego orquestador de Agent Teams
@@ -1859,28 +1859,29 @@ saltar.
 gana puntos ni XP, no escribe nada en Orca ni en el store, no agrega ningún ajuste, y cerrar el pane
 descarta la partida.
 
-Un pane de líder (`role` distinto de `member`, recompensas activadas) ofrece una partida cuando la
-revisión de un miembro pasa a `perfectMerge: true` entre dos sondeos
-([`arcade-unlock.ts`](../../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). La oferta
-se identifica por el id de la recompensa del merge perfecto y se guarda bajo `arcade-offers` en
-`$.store`, así que un merge visto de nuevo después de una repetición o una recarga nunca se ofrece dos
-veces. `/orca-game:demo offer` (o `/quest demo offer`) reproduce la misma oferta
-([`arcade-offer.ts`](../../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), sin guardar
-nada:
+El merge perfecto de un miembro guarda una partida de arcade para el proyecto en el host de Orca
+([`orchestrator-game-arcade-credits.ts`](../../../src/shared/orchestrator-game-arcade-credits.ts)).
+El store del juego del host suma el crédito en la misma escritura que el evento `merged` que
+registra, así que un merge visto dos veces paga una sola vez. Se guardan como máximo 9 partidas.
+El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.arcade`
+(`orca game arcade`) las lee, o con `action: play | keep` gasta una o descarta la oferta. Solo el
+proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central.
 
-- La escena celebra (el texto flotante del merge y las estrellas de subida de nivel, dibujados en la
-  banda mientras está inactiva) y el pane del arcade se abre pidiendo el teclado, para que `j` y `n`
-  lleguen al pane y nunca al prompt. Claude Code solo lo concede sobre un compositor vacío, sin ningún
-  diálogo ni encuesta abiertos, así que el texto que el usuario está escribiendo sigue siendo suyo; en
-  ese caso la línea indica `ctrl+x tab, then j`, que ahí es cierto.
-- Una línea bajo el marco hace una cuenta atrás de 15 segundos. `j` (o un clic en Play) inicia la
-  partida; `n`, Esc o el final de la cuenta atrás cierra el pane y descarta la oferta.
-- Mientras un compañero espera al usuario (el "Needs you" de la banda), o la pregunta propia de un
-  miembro espera a su líder, la cuenta atrás se detiene, una partida en juego se mantiene sin
-  fotogramas, y una oferta abierta en ese momento deja el teclado al prompt para la respuesta; ambas
-  continúan solas una vez que se responde.
-- Los puntos que gana la partida de una oferta real se mantienen separados de la XP de los miembros;
-  una oferta de demo no escribe ninguno.
+Las ofertas que hizo la antigua cuenta atrás de 15 segundos se pagan una vez cada una. La terminal
+guardó sus ids bajo `arcade-offers` en `$.store` sin anotar cuáles se jugaron, así que cuentan
+todas. El pane del líder las envía una vez con `orca game arcade migrate`, y el host paga cada id
+que no haya visto, hasta el máximo, y los registra todos en el archivo del proyecto, así que una
+segunda migración no paga nada, tampoco después de un reinicio o de adoptar el repo. Solo la
+respuesta del host las marca como enviadas (`arcade-offers-migrated`); un Orca anterior a
+`game arcade` rechaza el comando, y el pane lo intenta de nuevo en una sesión posterior.
+
+La terminal ya no ofrece partidas. Un pane de líder (`role` distinto de `member`, recompensas
+activadas) solo celebra el merge en su escena y dice que la partida quedó guardada en el panel de
+Equipo ([`arcade-unlock.ts`](../../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)).
+La celebración se identifica por el id de la recompensa del merge perfecto y se guarda bajo
+`arcade-cheers` en `$.store`, así que un merge visto de nuevo después de una repetición o una
+recarga, o uno que la antigua cuenta atrás ya ofreció, nunca se celebra dos veces.
+`/orca-game:demo offer` (o `/quest demo offer`) reproduce la misma celebración y no guarda nada.
 
 ## Otros plugins en un pane del juego
 
