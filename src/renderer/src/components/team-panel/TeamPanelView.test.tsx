@@ -229,16 +229,55 @@ describe('TeamPanelView', () => {
   it('offers a retry when the model fails to load', async () => {
     const retry = vi.fn()
     const { container } = await render({
-      section: { kind: 'error', message: 'boom' },
+      section: { kind: 'error', message: "Error invoking remote method 'runtime:call': boom" },
       retry
     })
     const button = [...container.querySelectorAll('button')].find(
       (node) => node.textContent === 'Try again'
     )
 
-    expect(container.textContent).toContain('boom')
+    expect(container.textContent).toContain('Could not read the team')
+    expect(container.textContent).toContain('Orca is not responding in this project. Try again.')
+    expect(container.textContent).not.toContain('runtime:call')
     await act(async () => button?.click())
     expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the team on screen with the error and a retry when a later read fails', async () => {
+    const retry = vi.fn()
+    const { container } = await render({ section: { kind: 'ready', value: game }, retry })
+    const button = [...container.querySelectorAll('button')].find(
+      (node) => node.textContent === 'Try again'
+    )
+
+    expect(container.querySelector('[role="tablist"]')).not.toBeNull()
+    expect(container.textContent).toContain('Could not read the team')
+    await act(async () => button?.click())
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  // Why inside the tab: at the panel's foot the floating board button covers the text.
+  it('draws the read error where V28 does, under the lead and before the members', async () => {
+    const { container } = await render({ section: { kind: 'ready', value: game }, retry: vi.fn() })
+    const text = panelText(container)
+
+    expect(text.indexOf('Lead')).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('Lead')).toBeLessThan(text.indexOf('Could not read the team'))
+    expect(text.indexOf('Could not read the team')).toBeLessThan(text.indexOf('No agents yet'))
+  })
+
+  it('keeps the read error on the other tabs, which came from the same read', async () => {
+    useTeamPanelTabStore.setState({ selected: 'inbox' })
+    const { container } = await render({ section: { kind: 'ready', value: game }, retry: vi.fn() })
+
+    expect(selectedTab(container)).toBe('Inbox2')
+    expect(panelText(container)).toContain('Could not read the team')
+  })
+
+  it('shows no read error while the team reads fine', async () => {
+    const { container } = await render({ section: { kind: 'ready', value: game }, retry: null })
+
+    expect(container.textContent).not.toContain('Could not read the team')
   })
 
   it('says so when this host cannot supply team data, with no invented rows', async () => {

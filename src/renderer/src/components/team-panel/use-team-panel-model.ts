@@ -27,7 +27,7 @@ import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
-  /** Null when there is nothing to retry. */
+  /** Null when there is nothing to retry. On a ready section: the read failed, this is the last team. */
   retry: (() => void) | null
 }
 
@@ -86,9 +86,11 @@ const poller = createTeamPanelModelPoller(
 /** Reads the panel again now, after it changed something on the host. */
 export const refreshTeamPanelModel = (): void => poller.refresh()
 
-/** No team means the user's own sessions: no lead, no workspace, or a host with no game. */
-const hasNoTeam = (section: TeamSection<TeamPanelModel>): boolean =>
-  section.kind === 'unavailable' || section.kind === 'error'
+/**
+ * No team means the user's own sessions: no lead, no workspace, or a host with no game.
+ * Why not an error: a failed read says nothing about the team, and solo rows would hide the failure.
+ */
+const hasNoTeam = (section: TeamSection<TeamPanelModel>): boolean => section.kind === 'unavailable'
 
 /**
  * The lead's own game.state for the active project, else the no-team view from agent status.

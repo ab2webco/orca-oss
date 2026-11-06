@@ -12,6 +12,7 @@ import type {
 import { teamHostText, teamLiveText, teamModelText, teamStatusTone } from './team-card-text'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
+import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
 
@@ -138,6 +139,7 @@ export function TeamTabContent({
       ) : null}
       <LeadCardRow lead={model.lead} showName={game} memberCount={model.members.length} />
       {model.advisor ? <AdvisorCardRow advisor={model.advisor} /> : null}
+      <TeamReadNotice />
       {model.members.length === 0 ? (
         <div className="flex flex-col gap-1 px-3 py-6 text-xs text-muted-foreground">
           <p className="text-[13px] font-medium text-foreground">
