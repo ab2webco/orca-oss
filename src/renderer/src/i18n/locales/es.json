@@ -15452,6 +15452,17 @@
           "leadAsks": "Esperándote · {{question}}",
           "leadDone": "Listo, sin tareas pendientes"
         }
+      },
+      "game-arcade": {
+        "ArcadeTab": {
+          "title": "Arcade",
+          "canvasLabel": "Partida de arcade",
+          "score": "{{score}} pts",
+          "hint": "Espacio o toque para saltar",
+          "held": "En pausa · alguien te necesita",
+          "over": "Fin de la partida · {{score}} pts",
+          "overHint": "Espacio o toque para volver a Claude"
+        }
       }
     },
     "i18n": {

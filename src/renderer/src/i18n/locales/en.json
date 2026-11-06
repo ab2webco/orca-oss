@@ -16393,6 +16393,17 @@
           "leadAsks": "Waiting for you · {{question}}",
           "leadDone": "Done, nothing pending"
         }
+      },
+      "game-arcade": {
+        "ArcadeTab": {
+          "title": "Arcade",
+          "canvasLabel": "Arcade game",
+          "score": "{{score}} pts",
+          "hint": "Space or tap to jump",
+          "held": "Paused · someone needs you",
+          "over": "Game over · {{score}} pts",
+          "overHint": "Space or tap to go back to Claude"
+        }
       }
     },
     "i18n": {
