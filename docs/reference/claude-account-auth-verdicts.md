@@ -175,6 +175,13 @@ blob whose refresh chain is another saved account's current chain
 aliases. An alias already on disk still needs one of the two accounts re-authenticated, which the
 Settings notice offers.
 
+A second way needs no Orca write at all. Claude CLI 2.1.319 names its Keychain item from
+`CLAUDE_SECURESTORAGE_CONFIG_DIR` whenever that variable is set, even to an empty string, and then
+ignores `CLAUDE_CONFIG_DIR`. Inherited by every pane, it makes each vault read and rotate one shared
+item. The CLI never sets it; it only forwards it to the teammates and background sessions it starts.
+A managed account launch now drops it, along with the ambient auth variables (`environment.ts`), on
+local, daemon and SSH spawns.
+
 Orca does not copy a vault or a credential between hosts. Each `orca account add` on a host is its
 own sign-in, so a logout on one host is not this chain alias. It is the login's own end, described in
 [A Login The CLI Already Ended](#a-login-the-cli-already-ended), or a host-local rotation.
