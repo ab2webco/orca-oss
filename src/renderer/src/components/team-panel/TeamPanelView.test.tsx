@@ -209,30 +209,29 @@ describe('TeamPanelView', () => {
 })
 
 describe('TeamPanelView scene area', () => {
-  const placeholder = (container: HTMLElement): Element | null =>
-    container.querySelector('[data-team-scene-placeholder]')
+  const scene = (container: HTMLElement): Element | null =>
+    container.querySelector('[data-team-scene] canvas')
 
-  it('holds the scene place in the Game look with no figure drawn', async () => {
+  it('draws the live scene in the Game look', async () => {
     const { container } = await render(
       { section: { kind: 'ready', value: game }, retry: null },
       vi.fn(),
       'game'
     )
 
-    expect(placeholder(container)).not.toBeNull()
-    expect(container.querySelector('canvas, img')).toBeNull()
+    expect(scene(container)).not.toBeNull()
   })
 
   it('draws no scene in the Plain look or without a team', async () => {
     const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
-    expect(placeholder(plain.container)).toBeNull()
+    expect(scene(plain.container)).toBeNull()
 
     const noTeam = await render(
       { section: { kind: 'ready', value: solo }, retry: null },
       vi.fn(),
       'game'
     )
-    expect(placeholder(noTeam.container)).toBeNull()
+    expect(scene(noTeam.container)).toBeNull()
   })
 })
 

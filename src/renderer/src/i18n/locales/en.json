@@ -17181,9 +17181,6 @@
       "by": "Stopped by {{by}}",
       "plain": "Stopped"
     },
-    "scene": {
-      "placeholder": "The live scene appears here"
-    },
     "open": {
       "failed": "Could not open {{name}}"
     },
