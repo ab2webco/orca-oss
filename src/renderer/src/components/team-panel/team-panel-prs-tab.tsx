@@ -1,10 +1,10 @@
-import { StatusDot } from '@/components/StatusDot'
 import { statusToneTextClass } from '@/components/status-tone'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamPrList, TeamPrRow } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamStatusMark } from './TeamStatusMark'
 import { useTeamLeadPrompt } from './use-team-lead-prompt'
 
 const MORE_CLASS =
@@ -49,7 +49,7 @@ function PrRow({ row }: { row: TeamPrRow }): React.JSX.Element {
           'text-muted-foreground': row.status === 'idle'
         })}
       >
-        <StatusDot tone={tone} />
+        <TeamStatusMark status={row.status} />
         {reasonText(row.reason)}
       </span>
     </a>

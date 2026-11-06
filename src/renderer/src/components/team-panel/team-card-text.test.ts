@@ -5,6 +5,8 @@ import {
   teamLiveText,
   teamModelText,
   teamPhaseText,
+  teamAgeText,
+  teamStatusGlyph,
   teamStatusTone
 } from './team-card-text'
 
@@ -14,10 +16,10 @@ vi.mock('@/i18n/i18n', () => ({
 }))
 
 describe('teamLiveText', () => {
-  it('shows the tool and what it works on', () => {
-    expect(
-      teamLiveText({ kind: 'tool', tool: 'Edit', detail: 'terminal-role.ts' }, 'working')
-    ).toBe('Edit · terminal-role.ts')
+  it('shows what the tool works on, as V28 does, and the tool alone without it', () => {
+    expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr view 923' }, 'working')).toBe(
+      'gh pr view 923'
+    )
     expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
   })
 
@@ -89,5 +91,21 @@ describe('card words', () => {
     expect(teamStatusTone('working')).toBe('info')
     expect(teamStatusTone('done')).toBe('success')
     expect(teamStatusTone('idle')).toBe('idle')
+  })
+
+  it('marks needs-you or failed with a question and working with a spinner', () => {
+    expect(teamStatusGlyph('attention')).toBe('question')
+    expect(teamStatusGlyph('working')).toBe('spinner')
+    expect(teamStatusGlyph('risk')).toBe('dot')
+    expect(teamStatusGlyph('done')).toBe('dot')
+    expect(teamStatusGlyph('idle')).toBe('dot')
+  })
+
+  it('reads an age short, as V28 does', () => {
+    const now = 10 * 86_400_000
+    expect(teamAgeText(now - 20_000, now)).toBe('now')
+    expect(teamAgeText(now - 10 * 60_000, now)).toBe('10 min')
+    expect(teamAgeText(now - 13 * 3_600_000, now)).toBe('13 h')
+    expect(teamAgeText(now - 3 * 86_400_000, now)).toBe('3 d')
   })
 })

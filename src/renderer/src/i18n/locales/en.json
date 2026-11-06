@@ -17231,7 +17231,8 @@
     },
     "advisor": {
       "label": "Advisor",
-      "source": "Jev"
+      "source": "Jev",
+      "name": "Wizard"
     },
     "xp": {
       "level": "Lv {{level}}",
@@ -17261,6 +17262,12 @@
       "youAnswered": "You answered",
       "youAnsweredText": "You answered: {{text}}",
       "leadAnswered": "The lead answered"
+    },
+    "age": {
+      "now": "now",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
     }
   }
 }

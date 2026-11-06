@@ -1,4 +1,6 @@
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import { characterKeyOf, memberNameOf, memberRosterOf } from './orchestrator-game-member-names'
+import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import type {
@@ -78,7 +80,6 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
   }
 }
 
-// Why tool name only: game.state carries no tool input, so docs and tests read as code or plan.
 const flowPhaseOf = (agent: GameAgent, work: Work): TeamFlowPhase => {
   if (isFinished(work) || work.workItem?.statusGroup === 'review') {
     return 'merge'
@@ -123,7 +124,9 @@ const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
     const { name, id, url, running } = agent.activity
     return { kind: 'link', name, id, url, running }
   }
-  return agent.toolName ? { kind: 'tool', tool: agent.toolName, detail: null } : null
+  return agent.toolName
+    ? { kind: 'tool', tool: agent.toolName, detail: agent.toolInput || null }
+    : null
 }
 
 const ticketOf = (agent: GameAgent, name: string): TeamTicket | null => {
@@ -166,13 +169,20 @@ const workOf = (agent: GameAgent): Work => ({
   workItem: agent.workItem ?? null
 })
 
+// Why: the roster folds `Merlín` and `Merlin` into one key, so the look never follows the pane.
+const characterOf = (roster: readonly GameMemberName[], shown: string | null): string | null => {
+  const name = (memberNameOf(shown) ?? shown)?.trim()
+  return name ? characterKeyOf(roster, name) : null
+}
+
 function memberCardOf(
   agent: GameAgent,
   state: OrchestratorGameState,
-  questionTickets: ReadonlySet<string>
+  questionTickets: ReadonlySet<string>,
+  roster: readonly GameMemberName[]
 ): TeamMemberCard {
-  const name = agent.displayName ?? agent.worktree?.displayName ?? agent.paneKey
-  const ticket = ticketOf(agent, name)
+  const shown = agent.displayName ?? agent.worktree?.displayName ?? agent.paneKey
+  const ticket = ticketOf(agent, shown)
   const work = workOf(agent)
   const condition = conditionOf(agent)
   const needsYou =
@@ -183,7 +193,7 @@ function memberCardOf(
     terminalHandle: agent.terminalHandle ?? null,
     worktreeId: agent.worktree?.id ?? null,
     host: hostOf(agent),
-    name,
+    name: memberNameOf(shown) ?? shown,
     agentType: agent.agentType,
     status: statusOf(condition, needsYou, work),
     condition,
@@ -191,7 +201,7 @@ function memberCardOf(
     liveAction: liveActionOf(agent),
     model: modelOf(agent),
     account: accountOf(agent, state),
-    characterKey: null,
+    characterKey: characterOf(roster, agent.displayName),
     ticket,
     flowPhase: flowPhaseOf(agent, work),
     summary: inbox?.last?.subject ?? null,
@@ -204,7 +214,8 @@ function memberCardOf(
 
 function offlineCardOf(
   member: GamePausedMember | GameQueuedMember,
-  condition: 'paused' | 'queued'
+  condition: 'paused' | 'queued',
+  roster: readonly GameMemberName[]
 ): TeamMemberCard {
   const paused = condition === 'paused' ? (member as GamePausedMember) : null
   const since = paused ? Date.parse(paused.since) : Number.NaN
@@ -221,7 +232,7 @@ function offlineCardOf(
     liveAction: null,
     model: null,
     account: null,
-    characterKey: null,
+    characterKey: characterOf(roster, member.name),
     ticket: { identifier: member.ticket, title: null, url: null, statusGroup: null },
     flowPhase: null,
     summary: null,
@@ -242,12 +253,13 @@ export function teamCardsOf(
     return null
   }
   const condition = conditionOf(leader)
+  const roster = memberRosterOf({ ...state, config: state.config ?? {} })
   const lead: TeamLeadCard = {
     paneKey: leader.paneKey,
     terminalHandle: leader.terminalHandle ?? null,
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
-    name: leader.displayName ?? state.worktree?.displayName ?? leader.paneKey,
+    name: state.lead?.label ?? leader.displayName ?? state.worktree?.displayName ?? leader.paneKey,
     agentType: leader.agentType,
     status: statusOf(condition, leader.state === 'waiting', { review: null, workItem: null }),
     condition,
@@ -261,9 +273,9 @@ export function teamCardsOf(
   const members = [
     ...state.agents
       .filter((one) => one.isMember && !one.isLeader)
-      .map((one) => memberCardOf(one, state, questionTickets)),
-    ...(state.pausedMembers ?? []).map((one) => offlineCardOf(one, 'paused')),
-    ...(state.queuedMembers ?? []).map((one) => offlineCardOf(one, 'queued'))
+      .map((one) => memberCardOf(one, state, questionTickets, roster)),
+    ...(state.pausedMembers ?? []).map((one) => offlineCardOf(one, 'paused', roster)),
+    ...(state.queuedMembers ?? []).map((one) => offlineCardOf(one, 'queued', roster))
   ]
     .map((card, index) => ({ card, index }))
     .sort((a, b) => STATUS_RANK[a.card.status] - STATUS_RANK[b.card.status] || a.index - b.index)

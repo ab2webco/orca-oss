@@ -16232,7 +16232,8 @@
     },
     "advisor": {
       "label": "Advisor",
-      "source": "Jev"
+      "source": "Jev",
+      "name": "Mago"
     },
     "xp": {
       "level": "Nv {{level}}",
@@ -16262,6 +16263,12 @@
       "youAnswered": "Respondiste",
       "youAnsweredText": "Respondiste: {{text}}",
       "leadAnswered": "Respondió el lead"
+    },
+    "age": {
+      "now": "ahora",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
     }
   }
 }
