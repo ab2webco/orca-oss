@@ -168,6 +168,7 @@ export function createFiguresPainter(colors: TeamSceneStatusColors): TeamScenePa
 
   return {
     height: HEIGHT,
+    headTop: (depth, h) => feetY(depth, h) - 58 * teamSceneScaleAt(depth),
     paint: (g, f: TeamSceneFrame) => {
       const { width: w, height: h } = f
       g.drawImage(backdropFor(w, h, f.ratio), 0, 0, w, h)
