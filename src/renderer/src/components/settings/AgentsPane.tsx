@@ -21,6 +21,7 @@ import { Input } from '../ui/input'
 import { cn } from '@/lib/utils'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
 import { OrchestratorGameSetting } from './OrchestratorGameSetting'
+import { GamePanelSetting } from './OrchestratorGamePanelSetting'
 import { AgentCacheTimerSection } from './AgentCacheTimerSection'
 import { PreservedAgentSessionsSection } from './resume-vault/PreservedAgentSessionsSection'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
@@ -910,6 +911,8 @@ export function AgentsPane({
       ) : null}
 
       <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
+
+      <GamePanelSetting settings={settings} updateSettings={updateSettings} />
 
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
 

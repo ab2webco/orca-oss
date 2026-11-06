@@ -1,7 +1,7 @@
 import type { OrchestratorGameConfig } from './orchestrator-game-config'
 
 export const GAME_PANEL_LOOKS = ['game', 'display', 'plain'] as const
-export const GAME_PANEL_STYLES = ['figures', 'soft', 'office', 'pixel'] as const
+export const GAME_PANEL_STYLES = ['figures', 'office', 'pixel'] as const
 export const GAME_PANEL_TABS = ['prs', 'queue', 'machines'] as const
 
 export type GamePanelLook = (typeof GAME_PANEL_LOOKS)[number]
@@ -86,8 +86,10 @@ export function parseGamePanel(raw: unknown): {
         warnings.push(`${at(key)} must be ${orList(GAME_PANEL_LOOKS)}`)
       }
     } else if (key === 'style') {
-      if (isStyle(entry)) {
-        value.style = entry
+      // Why: Soft was selectable before anything drew it; a saved one keeps drawing in Pixel.
+      const style = entry === 'soft' ? 'pixel' : entry
+      if (isStyle(style)) {
+        value.style = style
       } else {
         warnings.push(`${at(key)} must be ${orList(GAME_PANEL_STYLES)}`)
       }

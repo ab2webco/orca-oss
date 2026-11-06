@@ -20,6 +20,7 @@ import { matchesSettingsSearch } from './settings-search'
 import { useAppStore } from '../../store'
 import { getRepositoryIconSectionId } from './repository-settings-targets'
 import { RepositoryIconPicker } from './RepositoryIconPicker'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
@@ -189,7 +190,9 @@ export function RepositoryPane({
     translate('auto.components.settings.repository.search.443d127b5a', 'Worktree Location'),
     translate('auto.components.settings.repository.search.externalWorktrees', 'External worktrees'),
     translate('auto.components.settings.repository.search.projectRuntime', 'Project Runtime'),
-    translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project')
+    translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project'),
+    // Why: the game section renders inside Identity, so its panel rows must keep Identity visible.
+    ...getGamePanelSearchEntries().map((entry) => entry.title)
   ])
   const identityEntries = allEntries.filter((entry) => identityEntryTitles.has(entry.title))
   const sparsePresetEntries = allEntries.filter((entry) =>

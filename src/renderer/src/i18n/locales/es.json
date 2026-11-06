@@ -10924,6 +10924,31 @@
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
           "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+        },
+        "OrchestratorGamePanelSetting": {
+          "advisor": "Advisor",
+          "advisorDescription": "Fila bajo el líder. Solo aparece si el plugin está instalado.",
+          "arcade": "Arcade",
+          "arcadeDescription": "Un merge perfecto guarda una partida.",
+          "description": "El panel de la barra derecha para tus agentes. Cada proyecto puede cambiarlo en sus propios ajustes.",
+          "look": "Apariencia del panel",
+          "lookDescription": "Los mismos datos y acciones en las tres.",
+          "lookDisplay": "Display",
+          "lookGame": "Juego",
+          "lookPlain": "Sobrio",
+          "machines": "Máquinas",
+          "machinesDescription": "Pestaña con los hosts y su memoria.",
+          "prs": "PRs",
+          "prsDescription": "Pestaña con tus PRs abiertos.",
+          "queue": "Cola",
+          "queueDescription": "Pestaña con la cola de merge.",
+          "show": "Mostrar {{label}}",
+          "style": "Estilo de la escena",
+          "styleDescription": "Todas actúan el mismo estado real.",
+          "styleFigures": "Figuras",
+          "styleOffice": "Oficina",
+          "stylePixel": "Pixel",
+          "title": "Panel"
         }
       },
       "right": {

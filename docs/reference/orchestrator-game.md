@@ -228,7 +228,7 @@ orchestratorGame:
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
-    style: pixel # figures | soft | office | pixel, for the game look
+    style: pixel # figures | office | pixel, for the game look
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
@@ -252,6 +252,7 @@ the other layers still apply.
 `panel` belongs to the native panel and merges key by key, `tabs` tab by tab. An unset `look`
 follows `mode` (`zen` is Display, `flat` is Plain, anything else Game) and an unset `style` is
 Pixel, so nothing changes look on update ([`orchestrator-game-panel.ts`](../../src/shared/orchestrator-game-panel.ts)).
+Soft is not a style to pick, because nothing draws it: a `style: soft` saved earlier reads as Pixel.
 It is edited in the project's game section and, as the default for every project, in Settings,
 Agents, Panel; the panel's gear opens the first with a team and the second without one. An Orca
 older than `panel` reports it as an unknown setting and ignores it.
