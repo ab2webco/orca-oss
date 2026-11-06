@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
-import type { GameInboxQuestionGroup } from '@/components/game-inbox/GameInboxSheet'
+import type { GameInboxQuestionGroup } from '@/components/game-inbox/use-other-game-inbox-groups'
 import { TeamInboxView } from './team-panel-inbox-tab'
 
 vi.mock('@tanstack/react-virtual', () => ({

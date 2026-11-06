@@ -4,6 +4,7 @@ import type { GameInboxNotificationTarget } from '../../../../shared/notificatio
 import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { useGameInboxAppState } from './game-inbox-app-state'
+import { useTeamPanelTabStore } from '@/components/team-panel/team-panel-tab-store'
 import {
   newGameOwnerQuestions,
   openGameOwnerQuestionCount,
@@ -67,8 +68,10 @@ function openInboxAt(target: GameInboxNotificationTarget): void {
         : undefined
     )
   }
-  state.setSidebarOpen(true)
-  useGameInboxAppState.getState().setOpen(true)
+  // Why the Team panel: its Inbox tab is the only place a question shows in full.
+  useTeamPanelTabStore.getState().select('inbox')
+  state.setRightSidebarTab('team')
+  state.setRightSidebarOpen(true)
 }
 
 /** Keeps every host's open owner questions, the dock count and a notification per new question. */

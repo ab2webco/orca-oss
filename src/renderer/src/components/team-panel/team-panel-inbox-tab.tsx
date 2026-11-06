@@ -16,7 +16,6 @@ import {
   GameMemberOverride,
   GameMemberReplyForm
 } from '@/components/game-inbox/GameMemberReplyForm'
-import type { GameInboxQuestionGroup } from '@/components/game-inbox/GameInboxSheet'
 import type { GameMemberReply } from '@/components/game-inbox/game-inbox-threads-client'
 import {
   gameInboxTargetOf,
@@ -24,7 +23,10 @@ import {
 } from '@/components/game-inbox/game-owner-questions-client'
 import { useGameOwnerQuestions } from '@/components/game-inbox/useGameOwnerQuestions'
 import { useGameInboxThreads } from '@/components/game-inbox/useGameInboxThreads'
-import { useOtherGameInboxGroups } from '@/components/game-inbox/use-other-game-inbox-groups'
+import {
+  useOtherGameInboxGroups,
+  type GameInboxQuestionGroup
+} from '@/components/game-inbox/use-other-game-inbox-groups'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import {

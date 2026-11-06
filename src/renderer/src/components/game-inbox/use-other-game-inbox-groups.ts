@@ -1,12 +1,24 @@
 import React from 'react'
-import type { GameOwnerReply } from '../../../../shared/orchestrator-game-owner-questions'
+import type {
+  GameOwnerQuestion,
+  GameOwnerReply
+} from '../../../../shared/orchestrator-game-owner-questions'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { answerGameOwnerQuestion, type GameInboxScope } from './game-owner-questions-client'
-import type { GameInboxQuestionGroup } from './GameInboxSheet'
 import { useGameInboxAppState } from './game-inbox-app-state'
 import { environmentIdOfHost, otherGameOwnerQuestionGroups } from './game-owner-question-groups'
 import { signalGameOwnerQuestionsChanged } from './game-owner-questions-signal'
+
+/** Another project's open questions, answered through that project's worktree. */
+export type GameInboxQuestionGroup = {
+  key: string
+  title: string
+  /** The paired host's name; null on this computer. */
+  host: string | null
+  questions: GameOwnerQuestion[]
+  onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
+}
 
 /** Every other project's and host's open questions, each answered through its own worktree. */
 export function useOtherGameInboxGroups(): GameInboxQuestionGroup[] {
