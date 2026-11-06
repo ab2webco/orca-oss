@@ -217,11 +217,11 @@ test('the Team tab shows the live lead and its members from the lead game state'
         })
       }, look)
     const leadCard = panel.locator('[data-team-card="lead"]')
-    await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(1)
+    await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
     await expect(leadCard).toContainText('master')
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
-      await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(0)
+      await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
       await expect(leadCard).not.toContainText('master')
       for (const language of ['en', 'es'] as const) {
         await orcaPage.evaluate(
@@ -247,7 +247,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
       }
     }
     await setLook('game')
-    await expect(panel.locator('[data-team-scene-placeholder]')).toHaveCount(1)
+    await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
 
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
