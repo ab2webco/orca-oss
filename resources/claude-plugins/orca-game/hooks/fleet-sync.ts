@@ -10,6 +10,7 @@ import { cliInvocationOf } from './cli-invocation'
 import {
   gameArcadeMigrateArgvOf,
   gameFleetArgvOf,
+  gameHideTabArgvOf,
   gameStateArgvOf,
   gameViewArgvOf,
   openLinkArgvOf,
@@ -24,6 +25,8 @@ import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
 import { isLeadStarted } from './lead-started'
 import { runningLeadSubagents, withLeadSubagents } from './lead-subagents'
+import { projectKeyOf } from './panel-layout'
+import { migrateHiddenReviews } from './panel-layout-store'
 import { teamEventsOf } from './team-events'
 import {
   clawdReact,
@@ -195,6 +198,19 @@ export async function storeGameView(
   return out?.exitCode === 0
 }
 
+// Why once a session: an older Orca refuses the command, and the poll must not ask every 30 s.
+async function migrateTabsOnce($: EngineInterface, state: GameState): Promise<void> {
+  if (quest.isTabsMigrationAsked || state.role !== 'lead' || state.worktree === null) {
+    return
+  }
+  quest.isTabsMigrationAsked = true
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  await migrateHiddenReviews($, projectKeyOf(state.worktree.id), async () => {
+    const out = await runCli($, gameHideTabArgvOf(cli, 'prs'))
+    return out?.exitCode === 0
+  })
+}
+
 type Score = { xp: number; recent: readonly RecentReward[] }
 
 async function syncXp(
@@ -247,6 +263,7 @@ export async function refresh($: EngineInterface): Promise<void> {
       $.ui.invalidate('ui.render')
     }
     questLiveConfig($, next.config, next.sources)
+    await migrateTabsOnce($, next).catch(() => undefined)
   }
   const config = gameConfig()
   const kept: Score = { xp: before.xp, recent: before.recent ?? [] }

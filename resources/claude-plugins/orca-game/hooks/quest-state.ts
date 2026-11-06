@@ -35,6 +35,7 @@ type QuestRuntime = {
   alert: string
   isDone: boolean
   action: Action | undefined
+  isTabsMigrationAsked: boolean
   isDemo: boolean
   demoStep: number
   demoAt: number
@@ -73,6 +74,7 @@ export const quest: QuestRuntime = {
   alert: '',
   isDone: false,
   action: undefined,
+  isTabsMigrationAsked: false,
   isDemo: false,
   demoStep: 0,
   demoAt: 0,

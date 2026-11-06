@@ -1,6 +1,8 @@
 import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
+import { GAME_PANEL_TABS, type GamePanelTab } from '../../shared/orchestrator-game-panel'
+import type { OrchestratorGamePanelTabWrite } from '../../shared/orchestrator-game-panel-tab-write'
 import {
   isOrchestratorGameViewId,
   ORCHESTRATOR_GAME_VIEW_SCOPES,
@@ -20,7 +22,24 @@ const SCOPE_NAMES: Record<OrchestratorGameViewScope, string> = {
   global: 'every project'
 }
 
+const isTab = (value: string): value is GamePanelTab =>
+  (GAME_PANEL_TABS as readonly string[]).includes(value)
+
 export const ORCHESTRATOR_GAME_VIEW_HANDLERS: Record<string, CommandHandler> = {
+  'game hide-tab': async ({ flags, client, json }) => {
+    const tab = wordOf(flags.get('tab'))
+    if (!isTab(tab)) {
+      throw new RuntimeClientError('invalid_argument', `Name a tab: ${GAME_PANEL_TABS.join(', ')}.`)
+    }
+    const result = await client.call<OrchestratorGamePanelTabWrite>('game.hidePanelTab', {
+      tab,
+      worktreeId: process.env.ORCA_WORKTREE_ID,
+      terminalHandle: process.env.ORCA_TERMINAL_HANDLE
+    })
+    printResult(result, json, (one) =>
+      one.changed ? `Tab ${one.tab} hidden for this project` : `Tab ${one.tab} left as it was`
+    )
+  },
   'game view': async ({ flags, client, json }) => {
     const view = wordOf(flags.get('view'))
     const scope = wordOf(flags.get('scope'))
