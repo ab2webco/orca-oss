@@ -73,7 +73,8 @@ export async function buildOrchestratorGameState(
     openOwnerQuestions,
     githubBudget,
     merges,
-    metrics
+    metrics,
+    arcade
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -87,7 +88,8 @@ export async function buildOrchestratorGameState(
     leadOnly(readOpenOwnerQuestions),
     readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
     leadOnly(input.readMerges),
-    leadOnly(readMetrics && (() => readMetrics(timezone)))
+    leadOnly(readMetrics && (() => readMetrics(timezone))),
+    leadOnly(input.readArcade)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -211,6 +213,7 @@ export async function buildOrchestratorGameState(
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
     ...(merges ? { merges } : {}),
+    ...(arcade ? { arcade } : {}),
     ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')

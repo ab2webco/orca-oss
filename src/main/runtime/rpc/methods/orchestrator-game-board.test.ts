@@ -219,6 +219,54 @@ describe('game board RPC: the person answers a member (ORCA-878)', () => {
     ])
   })
 
+  it('reads the arcade credits without an action and plays or keeps one with it', async () => {
+    const calls: unknown[][] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getGameArcade: () => ({
+        read: async (caller: unknown) => {
+          calls.push(['read', caller])
+          return { credits: 1, offer: null }
+        },
+        apply: async (caller: unknown, action: unknown) => {
+          calls.push(['apply', caller, action])
+          return { ok: true, arcade: { credits: 0, offer: null } }
+        },
+        migrate: async (caller: unknown, offers: unknown) => {
+          calls.push(['migrate', caller, offers])
+          return { ok: true, paid: 2, arcade: { credits: 2, offer: null } }
+        }
+      })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_BOARD_METHODS })
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'b', authToken: 'test', method: 'game.arcade', params })
+
+    await expect(send({ worktreeId: 'wt_1' })).resolves.toMatchObject({
+      ok: true,
+      result: { arcade: { credits: 1, offer: null } }
+    })
+    await expect(send({ worktreeId: 'wt_1', action: 'play' })).resolves.toMatchObject({
+      ok: true,
+      result: { ok: true, arcade: { credits: 0 } }
+    })
+    await expect(send({ worktreeId: 'wt_1', action: 'jackpot' })).resolves.toMatchObject({
+      ok: false
+    })
+    await expect(
+      send({ worktreeId: 'wt_1', action: 'migrate', offers: ['r-1', 'r-2'] })
+    ).resolves.toMatchObject({ ok: true, result: { paid: 2, arcade: { credits: 2 } } })
+    await expect(send({ worktreeId: 'wt_1', action: 'migrate' })).resolves.toMatchObject({
+      ok: false
+    })
+    const caller = { worktreeId: 'wt_1', terminalHandle: undefined }
+    expect(calls).toEqual([
+      ['read', caller],
+      ['apply', caller, 'play'],
+      ['migrate', caller, ['r-1', 'r-2']]
+    ])
+  })
+
   it("lists every project's open owner questions from the runtime", async () => {
     const projects = [{ repoId: 'r1', repoName: 'orca', worktreeId: 'r1::/w', questions: [] }]
     const runtime = {
