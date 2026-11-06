@@ -106,6 +106,13 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
         .ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS
   },
   {
+    name: 'orchestrator-game-arcade-credits',
+    keys: ['game arcade'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-arcade-credits.js'))
+        .ORCHESTRATOR_GAME_ARCADE_CREDIT_HANDLERS
+  },
+  {
     name: 'orchestrator-game-inbox',
     keys: ['game inbox'],
     load: async () =>
