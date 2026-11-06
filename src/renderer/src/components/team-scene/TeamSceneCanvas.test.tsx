@@ -79,30 +79,17 @@ afterEach(() => {
 
 describe('TeamSceneCanvas', () => {
   it('draws an image labelled for screen readers', () => {
-    render(
-      <TeamSceneCanvas
-        input={input([])}
-        painter={painter().value}
-        label="Live team scene"
-        leadLine={null}
-      />
-    )
+    render(<TeamSceneCanvas input={input([])} painter={painter().value} leadLine={null} />)
     const canvas = host.querySelector('canvas')!
     expect(canvas.getAttribute('role')).toBe('img')
+    // Named through translate(), so it follows the UI language.
     expect(canvas.getAttribute('aria-label')).toBe('Live team scene')
   })
 
   it('animates only while the window is visible', () => {
     hidden = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
-    render(
-      <TeamSceneCanvas
-        input={input(['a'])}
-        painter={painter().value}
-        label="scene"
-        leadLine={null}
-      />
-    )
+    render(<TeamSceneCanvas input={input(['a'])} painter={painter().value} leadLine={null} />)
     expect(raf).not.toHaveBeenCalled()
     hidden = false
     act(() => document.dispatchEvent(new Event('visibilitychange')))
@@ -113,10 +100,8 @@ describe('TeamSceneCanvas', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
     const p = painter()
-    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} label="scene" leadLine={null} />)
-    render(
-      <TeamSceneCanvas input={input(['a', 'n'])} painter={p.value} label="scene" leadLine={null} />
-    )
+    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} />)
+    render(<TeamSceneCanvas input={input(['a', 'n'])} painter={p.value} leadLine={null} />)
     expect(raf).not.toHaveBeenCalled()
     expect(p.frames).toHaveLength(2)
     const newcomer = p.frames[1].actors.find((a) => a.key === 'n')!
@@ -128,12 +113,7 @@ describe('TeamSceneCanvas', () => {
   it('ties the lead line to the lead', () => {
     reduced = true
     render(
-      <TeamSceneCanvas
-        input={input(['a'])}
-        painter={painter().value}
-        label="scene"
-        leadLine="Reviewing #923"
-      />
+      <TeamSceneCanvas input={input(['a'])} painter={painter().value} leadLine="Reviewing #923" />
     )
     act(() => {})
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Reviewing #923')
@@ -145,20 +125,11 @@ describe('TeamSceneCanvas', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120)
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30)
     const cloudy = { ...painter().value, cloudPixel: 3 }
-    render(
-      <TeamSceneCanvas input={input(['a'])} painter={cloudy} label="scene" leadLine="Merge?" />
-    )
+    render(<TeamSceneCanvas input={input(['a'])} painter={cloudy} leadLine="Merge?" />)
     const bubble = host.querySelector('[data-scene-bubble="lead"]')!
     expect(bubble.querySelector('canvas')).not.toBeNull()
     expect(bubble.className).toContain('font-mono')
-    render(
-      <TeamSceneCanvas
-        input={input(['a'])}
-        painter={painter().value}
-        label="scene"
-        leadLine="Merge?"
-      />
-    )
+    render(<TeamSceneCanvas input={input(['a'])} painter={painter().value} leadLine="Merge?" />)
     expect(host.querySelector('[data-scene-bubble="lead"] canvas')).toBeNull()
   })
 
@@ -166,17 +137,8 @@ describe('TeamSceneCanvas', () => {
     vi.useFakeTimers()
     reduced = true
     const p = painter()
-    render(
-      <TeamSceneCanvas input={input([], 'first')} painter={p.value} label="scene" leadLine={null} />
-    )
-    render(
-      <TeamSceneCanvas
-        input={input([], 'Raised effort')}
-        painter={p.value}
-        label="scene"
-        leadLine={null}
-      />
-    )
+    render(<TeamSceneCanvas input={input([], 'first')} painter={p.value} leadLine={null} />)
+    render(<TeamSceneCanvas input={input([], 'Raised effort')} painter={p.value} leadLine={null} />)
     expect(host.querySelector('[data-scene-bubble="advisor"]')?.textContent).toBe('Raised effort')
     act(() => vi.advanceTimersByTime(5900))
     expect(host.querySelector('[data-scene-bubble="advisor"]')).not.toBeNull()
@@ -189,7 +151,7 @@ describe('TeamSceneCanvas', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(7)
     const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
     const p = painter()
-    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} label="scene" leadLine={null} />)
+    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} />)
     const canvas = host.querySelector('canvas')!
     act(() => root.unmount())
     expect(cancel).toHaveBeenCalledWith(7)

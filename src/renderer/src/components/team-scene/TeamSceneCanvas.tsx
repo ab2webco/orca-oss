@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/team-scene/team-scene-director'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { teamSceneLabel } from './team-scene-copy'
 import { createTeamSceneFrameLoop } from './team-scene-frame-loop'
 import { TeamSceneBubbles, type TeamSceneSpeech } from './TeamSceneBubbles'
 import type { TeamScenePainter } from './team-scene-painter'
@@ -18,16 +19,14 @@ import type { TeamScenePainter } from './team-scene-painter'
 type Props = {
   input: TeamSceneInput
   painter: TeamScenePainter
-  /** Translated by the caller; the canvas is one image to assistive tech. */
-  label: string
-  /** The lead's live step for its bubble, already worded by the caller; null shows none. */
+  /** The lead's bubble, from `teamSceneLeadLineOf`; null shows none. */
   leadLine: string | null
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
 const ADVISOR_BUBBLE_MS = 6000
 
-export function TeamSceneCanvas({ input, painter, label, leadLine }: Props): React.JSX.Element {
+export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
   const reducedMotion = usePrefersReducedMotion()
@@ -163,7 +162,7 @@ export function TeamSceneCanvas({ input, painter, label, leadLine }: Props): Rea
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label={label}
+        aria-label={teamSceneLabel()}
         className="block w-full"
         style={{ height: painter.height }}
       />

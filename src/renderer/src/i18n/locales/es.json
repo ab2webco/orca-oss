@@ -15420,6 +15420,13 @@
           "notMirrored": "Su worktree está abierto, pero la terminal aún no aparece en esta ventana.",
           "terminalGone": "El host ya no tiene esta terminal; puede que el miembro haya terminado o se haya liberado."
         }
+      },
+      "team-scene": {
+        "team-scene-copy": {
+          "label": "Escena en vivo del equipo",
+          "leadAsks": "Esperándote · {{question}}",
+          "leadDone": "Listo, sin tareas pendientes"
+        }
       }
     },
     "i18n": {
