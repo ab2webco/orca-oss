@@ -4473,7 +4473,7 @@
           "489d1c8c9f": "Buscar proyectos...",
           "ee240a39eb": "Editar filtros",
           "automationCreated": "Ocultar creados por automatizaciones",
-          "cliCreated": "Hide CLI-created",
+          "cliCreated": "Ocultar creados por la CLI",
           "detachedHead": "Ocultar HEAD desacoplado",
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
@@ -4542,7 +4542,7 @@
           "ed1611b65b": "Ocultar en reposo",
           "82594419ba": "Filtros",
           "automationCreated": "Ocultar creados por automatizaciones",
-          "cliCreated": "Hide CLI-created",
+          "cliCreated": "Ocultar creados por la CLI",
           "detachedHead": "Ocultar HEAD desacoplado",
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"

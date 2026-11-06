@@ -55,6 +55,8 @@ async function addAdvisorAndPr(app: ElectronApplication): Promise<void> {
             : one.displayName?.includes('ORCA-12')
               ? {
                   ...one,
+                  // Why: the audit's 320 clip was a name beside a long host name (ORCA-1098).
+                  remote: { host: 'orca-contabo', stateKnown: true },
                   review: {
                     provider: 'github',
                     number: 924,
@@ -262,6 +264,14 @@ test('Team cards carry names, live detail and V28 status marks', async ({
         await setTheme(orcaPage, theme)
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${theme}`).toBeLessThanOrEqual(0)
+        const cutNames = await panel
+          .locator('[data-team-name]')
+          .evaluateAll((list) =>
+            list
+              .filter((node) => node.scrollWidth > node.clientWidth)
+              .map((node) => node.textContent)
+          )
+        expect(cutNames, `names cut at ${width}px ${theme}`).toEqual([])
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`cards-${width}-${theme}.png`)

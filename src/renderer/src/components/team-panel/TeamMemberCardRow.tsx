@@ -31,14 +31,18 @@ export function MetaLine({
     return null
   }
   return (
-    <span className="flex min-w-0 items-center gap-1 truncate whitespace-nowrap text-[11.5px] text-muted-foreground/80">
+    // Why wrap, not cut: at 320 the phase and age matter more than one line.
+    <span
+      data-team-meta=""
+      className="flex min-w-0 flex-wrap items-center gap-x-1 text-[11.5px] text-muted-foreground/80"
+    >
       {model ? (
         <code data-team-model="" className="shrink-0 font-mono">
           {model}
         </code>
       ) : null}
       {shown.length > 0 ? (
-        <span className="truncate">{`${model ? '· ' : ''}${shown.join(' · ')}`}</span>
+        <span className="min-w-0 break-words">{`${model ? '· ' : ''}${shown.join(' · ')}`}</span>
       ) : null}
     </span>
   )
@@ -92,12 +96,20 @@ export function TeamMemberCardRow({
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
             {showName ? (
-              <span className="truncate text-[13px] font-medium">{card.name}</span>
+              <span
+                data-team-name=""
+                className="max-w-full shrink-0 truncate text-[13px] font-medium"
+              >
+                {card.name}
+              </span>
             ) : null}
             {ticket ? (
               <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
             ) : null}
-            <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+            <span
+              data-team-host=""
+              className="ml-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground"
+            >
               {teamHostText(card.host)}
             </span>
           </span>

@@ -199,6 +199,20 @@ describe('TeamTabContent', () => {
     )
   })
 
+  it('gives way at narrow widths with the host, never the name, and wraps the meta line', async () => {
+    const { container } = await render(model())
+    for (const card of [leadCard(container), ...memberCards(container)]) {
+      const name = card.querySelector('[data-team-name]')!
+      const host = card.querySelector('[data-team-host]')!
+      expect(name.className).toContain('shrink-0')
+      expect(host.className).toContain('truncate')
+      expect(host.className).toContain('min-w-0')
+      const meta = card.querySelector('[data-team-meta]')!
+      expect(meta.className).toContain('flex-wrap')
+      expect(meta.className).not.toContain('truncate')
+    }
+  })
+
   it('sets the model in mono, as V28 does', async () => {
     const { container } = await render(model())
     const [card] = memberCards(container)
