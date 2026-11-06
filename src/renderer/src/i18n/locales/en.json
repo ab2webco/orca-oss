@@ -16399,9 +16399,11 @@
           "title": "Arcade",
           "canvasLabel": "Arcade game",
           "score": "{{score}} pts",
+          "scoreOne": "1 pt",
           "hint": "Space or tap to jump",
           "held": "Paused · someone needs you",
           "over": "Game over · {{score}} pts",
+          "overOne": "Game over · 1 pt",
           "overHint": "Space or tap to go back to Claude"
         }
       }
