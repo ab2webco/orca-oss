@@ -12,6 +12,8 @@ const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
 const LANGUAGES = ['en', 'es'] as const
 
+type SavedPanels = { global: string | undefined; project: string | undefined }
+
 async function applySettings(page: Page, patch: Record<string, string>): Promise<void> {
   await page.evaluate(async (next) => {
     const settings = await window.api.settings.set(next)
@@ -70,11 +72,77 @@ test('the panel gear opens the project game section and Agents > Panel', async (
           const sectionId = await openTarget(orcaPage, target)
           await expectSectionInView(orcaPage, sectionId)
           await orcaPage.screenshot({
-            path: testInfo.outputPath(`${name}-${language}-${theme}-${width}.png`)
+            path: testInfo.outputPath(`${name}-${language}-${theme}-${width}.png`),
+            // Why: Settings fades in, and a shot taken mid-fade reads as low contrast.
+            animations: 'disabled'
           })
           await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
         }
       }
     }
   }
+})
+
+test('panel rows save to their layer and the Advisor row follows the project host', async ({
+  orcaPage
+}, testInfo: TestInfo) => {
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  const viewBefore = await orcaPage.evaluate(() => window.__store!.getState().activeView)
+  const press = (section: string, group: string, label: string): Promise<void> =>
+    orcaPage
+      .locator(`[id="${section}"] [aria-label="${group}"] button`)
+      .filter({ hasText: new RegExp(`^${label}$`) })
+      .click()
+  const savedPanel = (): Promise<SavedPanels> =>
+    orcaPage.evaluate(async (id) => {
+      const saved = (await window.api.settings.get()) as {
+        orchestratorGame?: { panel?: { look?: string } }
+        orchestratorGameProjects?: Record<string, { panel?: { look?: string } }>
+      }
+      return {
+        global: saved.orchestratorGame?.panel?.look,
+        project: saved.orchestratorGameProjects?.[id]?.panel?.look
+      }
+    }, repoId)
+
+  const globalSection = await openTarget(orcaPage, null)
+  await expectSectionInView(orcaPage, globalSection)
+  await press(globalSection, 'Panel look', 'Plain')
+  await expect.poll(savedPanel).toMatchObject({ global: 'plain' })
+  await expect(orcaPage.locator(`[id="${globalSection}"] [aria-label="Scene style"]`)).toHaveCount(
+    0
+  )
+  await press(globalSection, 'Panel look', 'Game')
+  await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+  await expect
+    .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeView))
+    .toBe(viewBefore)
+
+  const projectSection = await openTarget(orcaPage, repoId)
+  await expectSectionInView(orcaPage, projectSection)
+  await press(projectSection, 'Panel look', 'Display')
+  await expect.poll(savedPanel).toMatchObject({ project: 'display' })
+  await press(projectSection, 'Panel look', 'Inherit')
+  await expect.poll(async () => (await savedPanel()).project).toBeUndefined()
+
+  // Why: the fixture host has no Advisor plugin, and an SSH host cannot be asked.
+  const advisor = orcaPage.locator(`[id="${projectSection}"] [aria-label="Advisor"]`)
+  await expect(advisor).toHaveCount(0)
+  await orcaPage.evaluate((id) => {
+    window.__store!.setState((state) => ({
+      repos: state.repos.map((repo) =>
+        repo.id === id
+          ? { ...repo, connectionId: 'e2e-ssh', executionHostId: 'ssh:e2e-ssh' as const }
+          : repo
+      )
+    }))
+  }, repoId)
+  await expect(advisor).toBeVisible()
+  await advisor.scrollIntoViewIfNeeded()
+  await orcaPage.screenshot({
+    path: testInfo.outputPath('project-with-advisor-row.png'),
+    animations: 'disabled'
+  })
 })
