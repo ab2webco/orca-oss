@@ -66,3 +66,21 @@ resources/claude-plugins/orca-game/tests/member-advisor.test.ts # the Panel's me
 resources/claude-plugins/orca-game/tests/panel-layout.test.ts # Panel section drawing; /orca-game:layout stays
 resources/claude-plugins/orca-game/tests/render.test.ts # hd scene over the spinner
 resources/claude-plugins/orca-game/tests/windows-cli.test.ts # opening a band link through a .cmd CLI
+# ORCA-1055: E2E specs that drove the terminal band, member band, Panel or scene through a real
+# Claude Code. The pane draws only the text layer now; the native Team panel has its own specs.
+tests/e2e/orchestrator-game-band-push.spec.ts # a pushed fleet change redrawing the band
+tests/e2e/orchestrator-game-band-ghosts.spec.ts # band slots for working members over ghosts
+tests/e2e/orchestrator-game-member-band.spec.ts # member band menu and text toggle
+tests/e2e/orchestrator-game-panel-host-capacity.spec.ts # Panel host capacity rows
+tests/e2e/orchestrator-game-panel-remote-member-models.spec.ts # Panel model rows for remote members
+tests/e2e/orchestrator-game-panel-member-recovery.spec.ts # Panel Resume and Reconnect buttons
+tests/e2e/orchestrator-game-panel-remote-view.spec.ts # Panel View on a remote member
+tests/e2e/orchestrator-game-panel-found-sessions.spec.ts # Panel cards for found sessions
+tests/e2e/orchestrator-game-panel-metrics.spec.ts # Panel Metrics widget
+tests/e2e/orchestrator-game-panel-logged-out-member.spec.ts # Panel logged-out and limited cards
+tests/e2e/orchestrator-game-panel-widgets.spec.ts # Panel widgets and To Do
+tests/e2e/orchestrator-game-panel-remote-member.spec.ts # Panel remote member cards
+tests/e2e/orchestrator-game-remote-member-scene.spec.ts # a remote member's band drawing only itself
+tests/e2e/orchestrator-game-characters.spec.ts # roster characters on the band and Panel
+tests/e2e/orchestrator-game-built-in-scenes.spec.ts # each built-in scene on the band, Panel and turn
+tests/e2e/orca-game-arcade-released-member.spec.ts # the terminal scene's celebration of a released member's merge
