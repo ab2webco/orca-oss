@@ -4,9 +4,11 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
+  TeamActivityRow,
   TeamLeadCard,
   TeamPanelGameModel,
-  TeamPanelSoloModel
+  TeamPanelSoloModel,
+  TeamStatus
 } from '../../../../shared/team-panel-model-types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TeamPanelView, teamPanelSettingsRepoId } from './TeamPanelView'
@@ -15,7 +17,8 @@ import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
 
 vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string) => fallback
+  translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
+    fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''))
 }))
 
 const roots: ReturnType<typeof createRoot>[] = []
@@ -27,7 +30,7 @@ afterEach(async () => {
     }
   })
   document.body.innerHTML = ''
-  useTeamPanelTabStore.setState({ selected: null })
+  useTeamPanelTabStore.setState({ selected: null, shown: null })
 })
 
 const lead: TeamLeadCard = {
@@ -68,6 +71,24 @@ const game: TeamPanelGameModel = {
   queue: { kind: 'ready', value: [] },
   machines: null
 }
+
+const sessionRow = (status: TeamStatus): TeamActivityRow => ({
+  ...lead,
+  status,
+  repoName: 'orca-oss',
+  worktreeName: 'main',
+  isPrimary: false,
+  prompt: null,
+  ticket: null,
+  pr: null,
+  lastMessage: null,
+  cacheExpiresAt: null,
+  ports: [],
+  note: null,
+  subagentCount: 0,
+  recentSteps: [],
+  advisor: null
+})
 
 const solo: TeamPanelSoloModel = {
   kind: 'solo',
@@ -160,6 +181,39 @@ describe('TeamPanelView', () => {
     expect(container.querySelector('h2')?.textContent).toBe('Your work')
     expect(selectedTab(container)).toBe('Activity')
     expect(panelText(container)).toContain('No agents running')
+  })
+
+  it('counts the sessions above the tabs on every tab, hidden with a single session', async () => {
+    const twoSessions: TeamPanelSoloModel = {
+      ...solo,
+      rows: [sessionRow('attention'), sessionRow('attention')],
+      inbox: { kind: 'ready', value: { forYou: 2, waiting: 0, threads: 0, answered: 0 } }
+    }
+    const { container: view } = await render({
+      section: { kind: 'ready', value: twoSessions },
+      retry: null
+    })
+    const count = (): Element | null => view.querySelector('[data-team-activity-count]')
+    expect(count()?.textContent).toBe('2 need you0 working0 done')
+    expect(
+      count()!.compareDocumentPosition(view.querySelector('[role="tablist"]')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    await act(async () => useTeamPanelTabStore.getState().select('inbox'))
+    expect(useTeamPanelTabStore.getState().shown).toBe('inbox')
+    expect(count()).not.toBeNull()
+
+    const { container: one } = await render({
+      section: { kind: 'ready', value: { ...solo, rows: [sessionRow('working')] } },
+      retry: null
+    })
+    expect(one.querySelector('[data-team-activity-count]')).toBeNull()
+  })
+
+  it('publishes the tab it really shows, so a hidden stored tab reads as Activity', async () => {
+    useTeamPanelTabStore.setState({ selected: 'prs' })
+    await render({ section: { kind: 'ready', value: solo }, retry: null })
+    expect(useTeamPanelTabStore.getState().shown).toBe('activity')
   })
 
   it('shows a busy skeleton while the model loads', async () => {

@@ -11,6 +11,7 @@ import {
 } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails, WorktreeCardPortsTrigger } from './WorktreeCardPorts'
 import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
+import { worktreeCardTitleHoverShown } from './worktree-card-title-hover'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function buildWorktreeCardPresentation(card: WorktreeCardController) {
@@ -70,7 +71,8 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     handleUnlinkReview,
     detailsHoverControl,
     showDeleteQuickAction,
-    activityViewOpen
+    activityViewOpen,
+    hasLiveAgent
   } = card
 
   // Why: pinned trees mix repos, so the repo icon shows regardless of groupBy's hideRepoBadge.
@@ -156,7 +158,14 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     ? hasHoverDetails
       ? (title: React.ReactElement): React.ReactElement => title
       : undefined
-    : compactCards && !activityViewOpen && (showBranchIdentityHover || hasDetails || hasPorts)
+    : worktreeCardTitleHoverShown({
+          compactCards,
+          activityViewOpen,
+          showBranchIdentityHover,
+          hasDetails,
+          hasPorts,
+          hasLiveAgent
+        })
       ? (title: React.ReactElement): React.ReactElement => (
           <WorktreeCardDetailsHover
             issue={metaIssue}

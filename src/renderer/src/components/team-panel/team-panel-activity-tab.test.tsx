@@ -111,8 +111,7 @@ describe('TeamPanelActivityTab', () => {
     expect(selected?.textContent).toContain('Check the merge queue')
     expect(selected?.textContent).toContain('Opus 5.5')
     expect(selected?.textContent).toContain('dev@example.com')
-    // One session: no count line and no other sessions.
-    expect(host.querySelector('[data-team-activity-count]')).toBeNull()
+    // One session: no other sessions.
     expect(host.querySelectorAll('[data-team-activity="other"]')).toHaveLength(0)
   })
 
@@ -126,9 +125,66 @@ describe('TeamPanelActivityTab', () => {
     const others = host.querySelectorAll('[data-team-activity="other"]')
     expect(others).toHaveLength(1)
     expect(others[0]?.textContent).toContain('Bash · gh pr checks 912')
-    expect(host.querySelector('[data-team-activity-count]')?.textContent).toBe(
-      '1 needs you1 working'
+  })
+
+  it('lists the facts in the design order, with its labels and the effort', async () => {
+    const host = await render(
+      model(
+        [
+          row({
+            model: { label: 'Opus 5.5', effort: 'high', source: 'session' },
+            ticket: { identifier: 'ORCA-1012', title: null, url: null, statusGroup: null },
+            ports: [5173],
+            note: 'Review the copy',
+            subagentCount: 2
+          })
+        ],
+        'tab-a:leaf-a'
+      )
     )
+    const labels = [...host.querySelectorAll('[data-team-activity="selected"] dt')].map(
+      (one) => one.textContent
+    )
+    expect(labels).toEqual(['Prompt', 'Now', 'Model', 'Account', 'Ticket', 'Ports', 'Notes'])
+    expect(host.textContent).toContain('Opus 5.5 · high')
+  })
+
+  it('keeps the final reply of an idle session under Final', async () => {
+    const host = await render(
+      model(
+        [
+          row({ status: 'idle', condition: 'idle', liveAction: null, lastMessage: 'Stopped here.' })
+        ],
+        null
+      )
+    )
+    const selected = host.querySelector('[data-team-activity="selected"]')
+    expect(selected?.textContent).toContain('Final')
+    expect(selected?.textContent).toContain('Stopped here.')
+  })
+
+  it('says a waiting session needs you, on its own card and in the list', async () => {
+    const host = await render(model([blocked, { ...blocked, paneKey: 'tab-c:leaf-c' }], null))
+    expect(host.querySelector('[data-team-activity="selected"]')?.textContent).toContain(
+      'Needs you'
+    )
+    expect(host.querySelector('[data-team-activity="other"]')?.textContent).toContain('Needs you')
+  })
+
+  it('names the tool a waiting session is stopped on', async () => {
+    const host = await render(
+      model(
+        [
+          row({
+            status: 'attention',
+            condition: 'waiting',
+            liveAction: { kind: 'tool', tool: 'Bash', detail: 'rm -rf dist' }
+          })
+        ],
+        null
+      )
+    )
+    expect(host.textContent).toContain('Bash · rm -rf dist')
   })
 
   it('opens another session in the center when it is pressed', async () => {

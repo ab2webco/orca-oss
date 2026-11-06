@@ -4864,7 +4864,7 @@
           "planeWorkItem": "Plane work item",
           "showSection": "Show",
           "account": "Account",
-          "model": "Model"
+          "model": "Model and effort"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -17230,10 +17230,10 @@
       "openTerminal": "Open terminal"
     },
     "activity": {
-      "prompt": "Asked",
+      "prompt": "Prompt",
       "now": "Now",
       "question": "Question",
-      "last": "Last reply",
+      "last": "Final",
       "model": "Model",
       "modelPinned": "Model pinned",
       "change": "Change",
@@ -17243,7 +17243,7 @@
       "ticket": "Ticket",
       "ports": "Ports",
       "notes": "Notes",
-      "subagents": "Subagents",
+      "needsYou": "Needs you",
       "otherSessions": "Other sessions",
       "countNeedsYou_one": "{{count}} needs you",
       "countNeedsYou_other": "{{count}} need you",

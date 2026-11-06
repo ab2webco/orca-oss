@@ -42,6 +42,18 @@ describe('openTeamSession', () => {
     })
   })
 
+  it('routes to the paired host a remote session runs on', () => {
+    openTeamSession({
+      paneKey: `tab-1:${LEAF}`,
+      terminalHandle: null,
+      worktreeId: 'wt-1',
+      host: { kind: 'remote', name: 'imac', environmentId: 'env-1', reachable: true }
+    })
+    expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith('wt-1', {
+      executionHostId: 'runtime:env-1'
+    })
+  })
+
   it('never focuses a guessed pane for a malformed key or a tab the workspace lacks', () => {
     expect(
       openTeamSession({

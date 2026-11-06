@@ -6,10 +6,10 @@ import CacheTimer from '../sidebar/CacheTimer'
 import type { TeamActivityRow, TeamAdvisorRow } from '../../../../shared/team-panel-model-types'
 import {
   teamCiText,
-  teamConditionText,
   teamHostText,
   teamLiveText,
   teamModelText,
+  teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
 
@@ -48,7 +48,7 @@ function AdvisorFacts({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Eleme
       <h4 className="mb-1 text-[11.5px] font-medium text-muted-foreground/80">
         {translate('teamPanel.activity.jev', 'Jev')}
       </h4>
-      <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
+      <dl className="grid grid-cols-[62px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
         <Fact
           label={translate('teamPanel.activity.model', 'Model')}
           value={pinned ? translate('teamPanel.activity.modelPinned', 'Model pinned') : null}
@@ -78,7 +78,7 @@ export function TeamActivityDetail({
 }): React.JSX.Element {
   const question = row.liveAction?.kind === 'question' ? row.liveAction.text : null
   const doing =
-    row.condition === 'working' && row.liveAction && row.liveAction.kind !== 'question'
+    row.liveAction && row.liveAction.kind !== 'question'
       ? teamLiveText(row.liveAction, row.condition)
       : null
   const ci = row.pr ? teamCiText(row.pr) : null
@@ -99,12 +99,12 @@ export function TeamActivityDetail({
       <div className="mb-2.5 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
         <StatusDot tone={teamStatusTone(row.status)} />
         <span className={cn(row.status === 'attention' && 'text-status-attention')}>
-          {teamConditionText(row.condition)}
+          {teamSessionStateText(row.condition)}
           {row.since !== null ? ` · ${formatUiRelativeTime(row.since - now)}` : ''}
         </span>
       </div>
-      <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
-        <Fact label={translate('teamPanel.activity.prompt', 'Asked')} value={row.prompt} />
+      <dl className="grid grid-cols-[62px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
+        <Fact label={translate('teamPanel.activity.prompt', 'Prompt')} value={row.prompt} />
         <Fact label={translate('teamPanel.activity.now', 'Now')} value={doing} />
         <Fact
           label={translate('teamPanel.activity.question', 'Question')}
@@ -112,8 +112,8 @@ export function TeamActivityDetail({
           attention
         />
         <Fact
-          label={translate('teamPanel.activity.last', 'Last reply')}
-          value={row.condition === 'done' ? row.lastMessage : null}
+          label={translate('teamPanel.activity.last', 'Final')}
+          value={row.condition === 'done' || row.condition === 'idle' ? row.lastMessage : null}
         />
         <Fact
           label={translate('teamPanel.activity.model', 'Model')}
@@ -150,10 +150,6 @@ export function TeamActivityDetail({
           value={row.ports.length > 0 ? row.ports.join(', ') : null}
         />
         <Fact label={translate('teamPanel.activity.notes', 'Notes')} value={row.note} />
-        <Fact
-          label={translate('teamPanel.activity.subagents', 'Subagents')}
-          value={row.subagentCount > 0 ? String(row.subagentCount) : null}
-        />
       </dl>
       {row.advisor ? <AdvisorFacts advisor={row.advisor} /> : null}
       {/* Why no History: AgentStatusEntry keeps no tool steps yet (ORCA-1049 gap). */}

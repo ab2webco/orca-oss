@@ -8,7 +8,9 @@ import { useWorktreeCardLinkedDetails } from './use-worktree-card-linked-details
 import { useWorktreeCardReviewDetails } from './use-worktree-card-review-details'
 import { useWorktreeCardSecondaryDetails } from './use-worktree-card-secondary-details'
 import { useWorktreeCardWorkspaceActions } from './use-worktree-card-workspace-actions'
+import { useAppStore } from '@/store'
 import { useTeamActivityViewOpen } from '../team-panel/use-team-activity-view-open'
+import { selectLiveAgentStatusEntriesForWorktree } from './worktree-agent-row-selectors'
 
 export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
   const { worktree, repo } = props
@@ -48,6 +50,9 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
   const detailsHoverControl = useWorktreeCardDetailsHoverControl()
   const hoverDetailsOpen = detailsHoverControl.hoverOpen
   const activityViewOpen = useTeamActivityViewOpen()
+  const hasLiveAgent = useAppStore(
+    (s) => selectLiveAgentStatusEntriesForWorktree(s, worktree.id).length > 0
+  )
 
   useWorktreeCardLifecycleEffects({
     worktree,
@@ -158,6 +163,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     ...linked,
     detailsHoverControl,
     activityViewOpen,
+    hasLiveAgent,
     showStatus,
     showIssue,
     showLinearIssue,

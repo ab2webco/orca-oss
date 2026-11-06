@@ -4,16 +4,13 @@ import { StatusDot } from '@/components/StatusDot'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTime } from '@/i18n/relative-time-format'
-import type {
-  TeamActivityRow,
-  TeamPanelSoloModel,
-  TeamStatus
-} from '../../../../shared/team-panel-model-types'
+import type { TeamActivityRow, TeamPanelSoloModel } from '../../../../shared/team-panel-model-types'
 import {
   teamConditionText,
   teamHostText,
   teamLiveText,
   teamModelText,
+  teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
 import { MetaLine } from './TeamMemberCardRow'
@@ -32,53 +29,6 @@ export function teamActivityLine(row: TeamActivityRow): string {
     return row.lastMessage
   }
   return row.prompt ?? teamConditionText(row.condition)
-}
-
-function countText(status: TeamStatus, count: number): string {
-  const one = count === 1
-  switch (status) {
-    case 'attention':
-      return one
-        ? translate('teamPanel.activity.countNeedsYou_one', '{{count}} needs you', { count })
-        : translate('teamPanel.activity.countNeedsYou_other', '{{count}} need you', { count })
-    case 'working':
-      return translate('teamPanel.activity.countWorking', '{{count}} working', {
-        count
-      })
-    default:
-      return one
-        ? translate('teamPanel.activity.countDone_one', '{{count}} done', {
-            count
-          })
-        : translate('teamPanel.activity.countDone_other', '{{count}} done', {
-            count
-          })
-  }
-}
-
-const COUNTED: TeamStatus[] = ['attention', 'working', 'done']
-
-function SessionCount({ rows }: { rows: readonly TeamActivityRow[] }): React.JSX.Element | null {
-  const parts = COUNTED.map(
-    (status) => [status, rows.filter((row) => row.status === status).length] as const
-  )
-  const shown = parts.filter(([, n]) => n > 0)
-  if (shown.length === 0) {
-    return null
-  }
-  return (
-    <div
-      data-team-activity-count=""
-      className="flex flex-wrap gap-x-3.5 gap-y-1 px-3 pt-2.5 text-xs text-muted-foreground"
-    >
-      {shown.map(([status, count]) => (
-        <span key={status} className="inline-flex items-center gap-1.5">
-          <StatusDot tone={teamStatusTone(status)} />
-          {countText(status, count)}
-        </span>
-      ))}
-    </div>
-  )
 }
 
 function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): React.JSX.Element {
@@ -110,7 +60,7 @@ function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): Reac
       <MetaLine
         parts={[
           teamModelText(row.model),
-          teamConditionText(row.condition),
+          teamSessionStateText(row.condition),
           row.since !== null ? formatUiRelativeTime(row.since - now) : null
         ]}
       />
@@ -137,7 +87,6 @@ export function TeamPanelActivityTab({
   const others = value.rows.filter((row) => row !== selected)
   return (
     <div data-team-activity-tab="">
-      {value.rows.length > 1 ? <SessionCount rows={value.rows} /> : null}
       <TeamActivityDetail
         row={pluginsOn ? selected : { ...selected, advisor: null }}
         now={now}

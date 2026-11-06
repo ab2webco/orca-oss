@@ -4606,7 +4606,7 @@
           "cli": "Orca Lab CLI",
           "showSection": "Mostrar",
           "account": "Cuenta",
-          "model": "Modelo"
+          "model": "Modelo y esfuerzo"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",
@@ -16244,7 +16244,7 @@
       "ticket": "Ticket",
       "ports": "Puertos",
       "notes": "Notas",
-      "subagents": "Subagentes",
+      "needsYou": "Te necesita",
       "otherSessions": "Otras sesiones",
       "countNeedsYou_one": "{{count}} te necesita",
       "countNeedsYou_other": "{{count}} te necesitan",

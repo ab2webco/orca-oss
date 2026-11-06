@@ -2,6 +2,7 @@ import type { AppState } from '@/store/types'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import { getWorkspacePortsByWorktreeId } from '@/lib/workspace-port-groups'
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filter'
 import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
 import { buildWorktreeClaudeAccountChipModel } from '../sidebar/worktree-claude-account-chip-model'
@@ -29,6 +30,7 @@ export type TeamSoloSessionsState = Pick<
   | 'hostedReviewCache'
   | 'workspacePortScan'
   | 'claudeAccountRoster'
+  | 'runtimeEnvironments'
   | 'sshTargetLabels'
   | 'sshConnectionStates'
 >
@@ -53,7 +55,9 @@ function hostOf(
   if (parsed?.kind === 'runtime') {
     return {
       kind: 'remote',
-      name: parsed.environmentId,
+      name:
+        state.runtimeEnvironments.find((one) => one.id === parsed.environmentId)?.name ??
+        parsed.environmentId,
       environmentId: parsed.environmentId,
       reachable: true
     }
@@ -130,7 +134,11 @@ function accountOf(
   repo: Repo | undefined
 ): TeamAccount | null {
   // Why: only Claude panes on a host Orca manages accounts for have a known account.
-  if (entry.agentType !== 'claude' || !canPinClaudeAccountToWorktree(worktree, repo)) {
+  if (
+    entry.agentType !== 'claude' ||
+    isWebClientLocation() ||
+    !canPinClaudeAccountToWorktree(worktree, repo)
+  ) {
     return null
   }
   const chip = buildWorktreeClaudeAccountChipModel({

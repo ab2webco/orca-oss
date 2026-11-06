@@ -1,6 +1,7 @@
 import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { TeamSessionRef } from '../../../../shared/team-panel-model-types'
 
@@ -10,7 +11,14 @@ export function openTeamSession(ref: TeamSessionRef): boolean {
   if (!parsed || !ref.worktreeId) {
     return false
   }
-  activateAndRevealWorktree(ref.worktreeId)
+  const environmentId = ref.host.kind === 'remote' ? ref.host.environmentId : null
+  if (environmentId) {
+    activateAndRevealWorktree(ref.worktreeId, {
+      executionHostId: toRuntimeExecutionHostId(environmentId)
+    })
+  } else {
+    activateAndRevealWorktree(ref.worktreeId)
+  }
   const tabs = useAppStore.getState().tabsByWorktree[ref.worktreeId] ?? []
   if (!tabs.some((tab) => tab.id === parsed.tabId)) {
     return false

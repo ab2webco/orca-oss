@@ -54,6 +54,13 @@ export function teamConditionText(condition: TeamCondition): string {
   }
 }
 
+/** A session's state as the no-team view words it; only waiting differs from a member's. */
+export function teamSessionStateText(condition: TeamCondition): string {
+  return condition === 'waiting'
+    ? translate('teamPanel.activity.needsYou', 'Needs you')
+    : teamConditionText(condition)
+}
+
 /** What the agent does now; agent words (tool detail, questions) are shown as written. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
   if (!action) {

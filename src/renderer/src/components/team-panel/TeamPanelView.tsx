@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
+import { TeamSessionCount } from './team-panel-session-count'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
 import {
@@ -108,8 +109,11 @@ function stripFade({ start, end }: TabStripOverflow): string | undefined {
 function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element | null {
   const selected = useTeamPanelTabStore((s) => s.selected)
   const select = useTeamPanelTabStore((s) => s.select)
+  const publishShown = useTeamPanelTabStore((s) => s.publishShown)
   const tabs = resolveTeamPanelTabs(model)
   const active = pickTeamPanelTab(tabs, selected)
+  const shownId = active?.id ?? null
+  useEffect(() => publishShown(shownId), [publishShown, shownId])
   const activeTrigger = useRef<HTMLButtonElement>(null)
   const activeId = active?.id
   const tabIds = tabs.map((tab) => tab.id).join()
@@ -230,6 +234,7 @@ export function TeamPanelView({
         <TeamPanelScene model={model} style={sceneStyle} />
       ) : null}
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
+      {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
         <TeamPanelTabs model={section.value} />
       ) : section.kind === 'loading' ? (

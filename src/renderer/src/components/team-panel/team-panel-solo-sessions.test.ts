@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { Repo, Worktree } from '../../../../shared/types'
 import { teamSoloSessionsOf, type TeamSoloSessionsState } from './team-panel-solo-sessions'
@@ -51,11 +51,26 @@ function state(overrides: Partial<TeamSoloSessionsState>): TeamSoloSessionsState
     hostedReviewCache: {},
     workspacePortScan: null,
     claudeAccountRoster: { accounts: [], activeAccountId: null },
+    runtimeEnvironments: [],
     sshTargetLabels: new Map(),
     sshConnectionStates: new Map(),
     ...overrides
   } as TeamSoloSessionsState
 }
+
+const mocks = vi.hoisted(() => ({ webClient: false }))
+vi.mock('@/lib/web-client-location', () => ({ isWebClientLocation: () => mocks.webClient }))
+
+afterEach(() => {
+  mocks.webClient = false
+})
+
+const claudeRoster = {
+  claudeAccountRoster: {
+    accounts: [{ id: 'a-1', email: 'dev@example.com' }],
+    activeAccountId: 'a-1'
+  }
+} as Partial<TeamSoloSessionsState>
 
 describe('teamSoloSessionsOf', () => {
   it('names each session after its workspace and project and reads its ticket and note', () => {
@@ -141,7 +156,58 @@ describe('teamSoloSessionsOf', () => {
   })
 })
 
+describe('teamSoloSessionsOf hosts and accounts', () => {
+  const live = { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) }
+
+  it('names a paired host by its environment, not its id', () => {
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        repos: [{ ...repo, executionHostId: 'runtime:env-1' } as Repo],
+        runtimeEnvironments: [{ id: 'env-1', name: 'imac' }] as never
+      })
+    )
+    expect(session?.host).toEqual({
+      kind: 'remote',
+      name: 'imac',
+      environmentId: 'env-1',
+      reachable: true
+    })
+  })
+
+  it('shows the same account the sidebar chip would', () => {
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))
+    expect(session?.account?.email).toBe('dev@example.com')
+  })
+
+  it('never names an account on a web client, where the sidebar hides it too', () => {
+    mocks.webClient = true
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))
+    expect(session?.account).toBeNull()
+  })
+})
+
 describe('teamPanelSoloModelFrom', () => {
+  it('counts only the questions the Inbox can list', () => {
+    const model = teamPanelSoloModelFrom({
+      ...state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({
+            state: 'blocked',
+            toolName: 'Bash',
+            toolInput: 'rm -rf dist'
+          })
+        }
+      }),
+      selectedPaneKey: null
+    })
+    expect(model.rows[0]?.status).toBe('attention')
+    expect(model.inbox).toEqual({
+      kind: 'ready',
+      value: { forYou: 0, waiting: 0, threads: 0, answered: 0 }
+    })
+  })
+
   it('puts a blocked session first, opens on the focused pane and counts it in Inbox', () => {
     const model = teamPanelSoloModelFrom({
       ...state({

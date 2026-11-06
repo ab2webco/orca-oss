@@ -86,7 +86,10 @@ export const PROPERTY_OPTIONS: { id: WorktreeCardProperty; label: string }[] = [
   {
     id: 'model',
     get label() {
-      return translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.model', 'Model')
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.model',
+        'Model and effort'
+      )
     }
   }
 ]

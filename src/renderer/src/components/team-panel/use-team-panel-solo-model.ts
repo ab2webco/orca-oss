@@ -20,6 +20,7 @@ function soloInputsOf(s: AppState): SoloInputs {
     hostedReviewCache: s.hostedReviewCache,
     workspacePortScan: s.workspacePortScan,
     claudeAccountRoster: s.claudeAccountRoster,
+    runtimeEnvironments: s.runtimeEnvironments,
     sshTargetLabels: s.sshTargetLabels,
     sshConnectionStates: s.sshConnectionStates,
     selectedPaneKey: s.activeWorktreeId
@@ -41,7 +42,8 @@ export function teamPanelSoloModelFrom(inputs: SoloInputs): TeamPanelSoloModel {
       machines: null
     }
   })
-  const forYou = model.rows.filter((row) => row.status === 'attention').length
+  // Why questions, not attention: Inbox lists only these, and a count must match what it opens on.
+  const forYou = model.rows.filter((row) => row.liveAction?.kind === 'question').length
   return {
     ...model,
     inbox: {
