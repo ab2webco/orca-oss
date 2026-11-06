@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -6,6 +7,7 @@ import { translate } from '@/i18n/i18n'
 import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
+import { tabStripScrollLeftFor } from './team-panel-tab-strip'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import {
   TeamPanelLoadingState,
@@ -93,6 +95,30 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
   const select = useTeamPanelTabStore((s) => s.select)
   const tabs = resolveTeamPanelTabs(model)
   const active = pickTeamPanelTab(tabs, selected)
+  const activeTrigger = useRef<HTMLButtonElement>(null)
+  const activeId = active?.id
+  // Why: a narrower window clips the selected tab too, so reveal on resize as well as on select.
+  // Not scrollIntoView, which would also move the shell's hidden-overflow ancestors.
+  useEffect(() => {
+    const strip = activeTrigger.current?.parentElement
+    if (!strip) {
+      return
+    }
+    const reveal = (): void => {
+      const trigger = activeTrigger.current
+      if (trigger) {
+        strip.scrollLeft = tabStripScrollLeftFor(
+          strip.getBoundingClientRect(),
+          trigger.getBoundingClientRect(),
+          strip.scrollLeft
+        )
+      }
+    }
+    reveal()
+    const observer = new ResizeObserver(reveal)
+    observer.observe(strip)
+    return () => observer.disconnect()
+  }, [activeId])
   if (!active) {
     return null
   }
@@ -110,6 +136,7 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
         {tabs.map((tab) => (
           <TabsTrigger
             key={tab.id}
+            ref={tab.id === active.id ? activeTrigger : undefined}
             value={tab.id}
             className="h-full flex-none rounded-none px-0 text-[13px] after:bottom-[-1px]"
           >
@@ -122,7 +149,11 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
           </TabsTrigger>
         ))}
       </TabsList>
-      <TabsContent value={active.id} className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
+      {/* Why: the floating trigger covers this corner; the last row must scroll clear of it. */}
+      <TabsContent
+        value={active.id}
+        className="min-h-0 flex-1 overflow-y-auto pb-24 scrollbar-sleek"
+      >
         <TeamPanelTabBody tab={active} selectTab={select} />
       </TabsContent>
     </Tabs>
