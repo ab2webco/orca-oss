@@ -292,6 +292,11 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
       prompt: 'Lead the team'
     })
 
+    // Why: waited before the gated read, whose 15 s timeout would end loading; another feature's first-run hint would sit on the first captures at narrow widths.
+    await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
+      timeout: 15_000
+    })
+
     const all = scenes(Date.now())
     await wrapGameState(electronApp)
     await setScene(electronApp, all.full)
@@ -302,17 +307,14 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
     })
     const panel = orcaPage.getByTestId('team-panel')
 
-    // Why: another feature's first-run hint would sit on the first captures at narrow widths.
-    await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
-      timeout: 15_000
-    })
-
     // Loading holds the read; it has no words, so one language says all of it.
     await expect(panel.locator('[aria-busy="true"]')).toBeVisible({ timeout: 30_000 })
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of THEMES) {
         await setTheme(orcaPage, theme)
+        // Why: a fresh read per capture keeps each one inside the panel's 15 s request timeout.
+        await rereadPanel(orcaPage)
         await expect(panel.locator('[aria-busy="true"]')).toBeVisible()
         await panel.screenshot({
           animations: 'disabled',
