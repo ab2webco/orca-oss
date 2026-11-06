@@ -1,5 +1,48 @@
 import { describe, expect, it } from 'vitest'
+import { NOON } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
+import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
+import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
+import {
+  applyTeamSceneInput,
+  createTeamSceneWorld
+} from '../../../../shared/team-scene/team-scene-director'
 import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
+import { createImagePainter } from './team-scene-image-painter'
+import { createPixelPainter } from './team-scene-pixel-painter'
+import { teamSceneQuestArtOf } from './team-scene-quest-art'
+
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+// The panel's stage at the 390 and 320 viewports is 219 px wide; the rest are wider panels.
+const STAGE_WIDTHS = [219, 320, 480, 768]
+// One and two lines, from TeamSceneBubbles' classes: glass is 10.5 px snug text with py-1 and a
+// hairline, Pixel's cloud 10 px tight text with pt-4 and pb-3.
+const STAGES = [
+  ...(['figures', 'office'] as const).map((style) => ({
+    style,
+    painter: createImagePainter({
+      art: { style: teamSceneQuestArtOf(style), images: new Map() },
+      colors: COLORS
+    }),
+    heights: [25, 39],
+    beside: false
+  })),
+  {
+    style: 'pixel',
+    painter: createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS }),
+    heights: [41, 53],
+    beside: true
+  }
+]
+const SPEAKERS = (() => {
+  const world = createTeamSceneWorld()
+  applyTeamSceneInput(world, {
+    lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+    advisor: { line: null },
+    members: []
+  })
+  const spot = (role: 'lead' | 'advisor') => teamSceneActors(world).find((a) => a.role === role)!
+  return { lead: spot('lead'), advisor: spot('advisor') }
+})()
 
 const overlaps = (a: TeamSceneBubbleBox, b: TeamSceneBubbleBox): boolean =>
   a.left < b.left + b.width &&
@@ -26,41 +69,53 @@ describe('layoutTeamSceneBubbles', () => {
     expect(box!.left + box!.tailX).toBe(380)
   })
 
-  it('fits both bubbles, with tails that reach their speakers and cross nothing, down to 320', () => {
-    for (const width of [320, 360, 390, 480, 768]) {
-      for (const textWidth of [60, 120, 170]) {
-        const boxes = layoutTeamSceneBubbles(
-          [
-            {
-              key: 'advisor',
-              anchor: { x: width * 0.74, top: 104 },
-              width: textWidth,
-              height: 44,
-              align: 'end'
-            },
-            { key: 'lead', anchor: { x: width * 0.84, top: 110 }, width: textWidth, height: 30 }
-          ],
-          { width, height: 176 }
-        )
-        expect(boxes).toHaveLength(2)
-        expect(overlaps(boxes[0]!, boxes[1]!)).toBe(false)
-        const anchors = { lead: width * 0.84, advisor: width * 0.74 }
-        const tops = { lead: 110, advisor: 104 }
-        for (const box of boxes) {
-          const key = box.key as 'lead' | 'advisor'
-          const tailX = box.left + box.tailX
-          // The tail meets its own speaker and passes no other bubble on the way down.
-          expect(Math.abs(tailX - anchors[key])).toBeLessThanOrEqual(1)
-          for (const other of boxes.filter((o) => o !== box)) {
-            const inColumn = tailX >= other.left && tailX <= other.left + other.width
-            const inRows = other.top < tops[key] && other.top + other.height > box.top + box.height
-            expect(inColumn && inRows).toBe(false)
+  it("fits the lead's and advisor's bubbles on every style's real stage, down to the 219 px panel", () => {
+    // Why every pairing: the advisor's line is often long and the lead's a short tool name.
+    const sizes = (heights: number[]) =>
+      [60, 120, 170].flatMap((width) => heights.map((height) => ({ width, height })))
+    for (const stage of STAGES) {
+      for (const width of STAGE_WIDTHS) {
+        for (const advisorSize of sizes(stage.heights)) {
+          for (const leadSize of sizes(stage.heights)) {
+            const at = (key: 'lead' | 'advisor') => ({
+              x: SPEAKERS[key].x * width,
+              top: stage.painter.headTop(SPEAKERS[key].depth, stage.painter.height)
+            })
+            const anchors = { advisor: at('advisor'), lead: at('lead') }
+            const asked = { advisor: advisorSize, lead: leadSize }
+            const boxes = layoutTeamSceneBubbles(
+              [
+                { key: 'advisor', anchor: anchors.advisor, ...advisorSize, align: 'end' },
+                { key: 'lead', anchor: anchors.lead, ...leadSize }
+              ],
+              { width, height: stage.painter.height },
+              { beside: stage.beside }
+            )
+            const where = `${stage.style} ${width} px, advisor ${advisorSize.width}x${advisorSize.height}, lead ${leadSize.width}x${leadSize.height}`
+            expect(boxes.map((box) => box.key).sort(), where).toEqual(['advisor', 'lead'])
+            expect(overlaps(boxes[0]!, boxes[1]!), where).toBe(false)
+            for (const box of boxes) {
+              const key = box.key as 'lead' | 'advisor'
+              const anchor = anchors[key]
+              const tailX = box.left + box.tailX
+              expect(box.width, where).toBeLessThanOrEqual(asked[key].width)
+              expect(box.left, where).toBeGreaterThanOrEqual(0)
+              expect(box.left + box.width, where).toBeLessThanOrEqual(width)
+              expect(box.top, where).toBeGreaterThanOrEqual(0)
+              expect(box.top + box.height, where).toBeLessThanOrEqual(anchor.top)
+              // Why only glass: Pixel's cloud trail drifts toward its speaker from a shared row.
+              if (!stage.beside) {
+                expect(Math.abs(tailX - anchor.x), where).toBeLessThanOrEqual(1)
+              }
+              // The tail passes no other bubble on its way down.
+              for (const other of boxes.filter((o) => o !== box)) {
+                const inColumn = tailX >= other.left && tailX <= other.left + other.width
+                const inRows =
+                  other.top < anchor.top && other.top + other.height > box.top + box.height
+                expect(inColumn && inRows, where).toBe(false)
+              }
+            }
           }
-        }
-        for (const box of boxes) {
-          expect(box.left).toBeGreaterThanOrEqual(0)
-          expect(box.left + box.width).toBeLessThanOrEqual(width)
-          expect(box.top).toBeGreaterThanOrEqual(0)
         }
       }
     }
@@ -80,7 +135,7 @@ describe('layoutTeamSceneBubbles', () => {
       { width: 400, height: 176 }
     )
     expect(kept).toEqual(alone[0])
-    expect(kept!.left + kept!.width).toBe(296 + 22)
+    expect(kept!.left + kept!.width).toBe(296 + 14)
     expect(lead!.top + lead!.height).toBeLessThan(kept!.top)
   })
 

@@ -38,7 +38,7 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
   const speakersKeyRef = useRef('')
 
   const paint = useCallback(
-    (dt: number) => {
+    (dt: number, elapsed = dt) => {
       const canvas = canvasRef.current
       const world = worldRef.current
       const width = canvas?.clientWidth ?? 0
@@ -51,7 +51,7 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
         canvas.width = Math.round(width * ratio)
         canvas.height = Math.round(height * ratio)
       }
-      stepTeamScene(world, dt, { width })
+      stepTeamScene(world, dt, { width, elapsed })
       const g = canvas.getContext('2d')
       if (!g) {
         return

@@ -14,9 +14,12 @@ export type TeamSceneFrameLoop = {
   dispose: () => void
 }
 
-/** Paints at most 30 times a second, only while running; `dt` restarts at 0 after a pause. */
+/**
+ * Paints at most 30 times a second, only while running. `dt` is capped for motion and `elapsed`
+ * is the real time since the last paint; both restart at 0 after a pause.
+ */
 export function createTeamSceneFrameLoop(
-  paint: (dt: number) => void,
+  paint: (dt: number, elapsed: number) => void,
   scheduler: TeamSceneFrameScheduler
 ): TeamSceneFrameLoop {
   let frameId: number | null = null
@@ -28,9 +31,9 @@ export function createTeamSceneFrameLoop(
     if (lastPaint !== null && now - lastPaint < INTERVAL_MS) {
       return
     }
-    const dt = lastPaint === null ? 0 : Math.min(MAX_DT_SECONDS, (now - lastPaint) / 1000)
+    const elapsed = lastPaint === null ? 0 : (now - lastPaint) / 1000
     lastPaint = now
-    paint(dt)
+    paint(Math.min(MAX_DT_SECONDS, elapsed), elapsed)
   }
 
   const stop = (): void => {

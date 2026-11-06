@@ -188,4 +188,17 @@ describe('team scene director', () => {
     runUntil(world, () => false, 0.2)
     expect(advisorLineShown(world)).toBeNull()
   })
+
+  it("times the advisor's line on real seconds when a slow frame's step is capped", () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([], 'first'))
+    applyTeamSceneInput(world, input([], 'Raised effort'))
+    // 3.5 frames a second: each 0.286 s frame moves the scene only 0.05 s.
+    for (let frame = 0; frame < 20; frame++) {
+      stepTeamScene(world, 0.05, { width: WIDTH, elapsed: 0.286 })
+    }
+    expect(advisorLineShown(world)).toBe('Raised effort')
+    stepTeamScene(world, 0.05, { width: WIDTH, elapsed: 0.286 })
+    expect(advisorLineShown(world)).toBeNull()
+  })
 })

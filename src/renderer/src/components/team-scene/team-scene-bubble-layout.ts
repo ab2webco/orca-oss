@@ -22,9 +22,10 @@ const EDGE = 6
 const GAP = 4
 const LIFT = 10
 const TAIL_INSET = 10
-const END_REACH = 22
+// Why 14: the lead stands 0.10 of the stage right of the advisor, 22 px on the 219 px panel, and
+// its tail must pass this bubble's edge with GAP to spare.
+const END_REACH = 14
 // A cloud narrowed to share a row may wrap one more line, up to its two-line clamp.
-const MIN_SHARED_WIDTH = 80
 const EXTRA_LINE = 13
 
 const overlaps = (a: TeamSceneBubbleBox, b: TeamSceneBubbleBox): boolean =>
@@ -122,9 +123,16 @@ function besideOf(
   const room = width - 2 * EDGE - GAP
   const total = first.box.width + second.box.width
   if (total > room) {
-    for (const one of [first, second]) {
-      const narrowed = Math.max(MIN_SHARED_WIDTH, Math.floor((one.box.width * room) / total))
-      one.box = { ...one.box, width: narrowed, height: one.box.height + EXTRA_LINE }
+    // Why: a short line, often the lead's tool name, keeps its width up to half the row.
+    const [short, long] = first.box.width <= second.box.width ? [first, second] : [second, first]
+    const shortWidth = Math.min(short.box.width, Math.floor(room / 2))
+    for (const [one, fit] of [
+      [short, shortWidth],
+      [long, Math.floor(room - shortWidth)]
+    ] as const) {
+      if (fit < one.box.width) {
+        one.box = { ...one.box, width: fit, height: one.box.height + EXTRA_LINE }
+      }
     }
   }
   const secondLeft = Math.min(second.x - second.box.width / 2, width - EDGE - second.box.width)
