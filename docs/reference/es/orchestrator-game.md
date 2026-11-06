@@ -1,5 +1,5 @@
 ---
-sourceHash: a4195bc9fccf0114
+sourceHash: 3e75afd63bf7edfd
 ---
 
 # El juego orquestador de Agent Teams
@@ -239,6 +239,12 @@ orchestratorGame:
   openLinks: system # orca (default) | system: where the game's links open
   render: hd # classic (default) | hd | hd-compact: see "Render: classic, hd or hd-compact" below
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
+  panel: # the native panel; mode and render keep driving the terminal (see below)
+    look: game # game | display | plain; unset follows mode
+    style: pixel # figures | soft | office | pixel, for the game look
+    tabs: { prs: true, queue: false, machines: true }
+    advisor: true # the Advisor row, drawn only with its plugin
+    arcade: true # saved arcade credits, game look only
 ```
 
 `openLinks: system` abre todos los enlaces del juego (PR, CI, ticket, actividad, los encabezados de las
@@ -256,6 +262,13 @@ Un valor no válido se descarta y se informa (Settings muestra el origen de cada
 Para un worktree SSH, la capa del proyecto se lee desde el host a través del sistema de archivos SSH
 ([`worktree-orca-yaml.ts`](../../../src/main/worktree-orca-yaml.ts)); mientras el host está desconectado,
 las demás capas siguen aplicándose.
+
+`panel` es del panel nativo y se fusiona clave por clave, y `tabs` pestaña por pestaña. Un `look`
+sin fijar sigue a `mode` (`zen` es Display, `flat` es Sobrio, lo demás Juego) y un `style` sin fijar es
+Pixel, así que nadie cambia de apariencia al actualizar ([`orchestrator-game-panel.ts`](../../../src/shared/orchestrator-game-panel.ts)).
+Se edita en la sección del juego del proyecto y, como valor por defecto para todos los proyectos, en
+Settings, Agents, Panel; el engranaje del panel abre la primera con equipo y la segunda sin él. Un Orca
+anterior a `panel` lo informa como ajuste desconocido y lo ignora.
 
 `rewardWeights` se fusiona clave por clave como `orchestrator`: el proyecto puede bajar una recompensa
 en `orca.yaml` mientras un dev desactiva otra en el JSON de Settings del proyecto. Igual que las listas

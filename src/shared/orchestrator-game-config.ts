@@ -29,6 +29,7 @@ import {
   ORCHESTRATOR_GAME_LOCAL_TIMEZONE,
   type OrchestratorGameRender
 } from './orchestrator-game-render'
+import { parseGamePanel, type OrchestratorGamePanelLayer } from './orchestrator-game-panel'
 import {
   orchestratorGameSceneFileErrorText,
   orchestratorGameSceneFileId,
@@ -81,6 +82,8 @@ export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
     rewardWeights?: Partial<GameRewardWeights>
     /** A scene JSON relative to the worktree root; read only from the project layers. */
     sceneFile?: string
+    /** The native panel's look and tabs; merged key by key across layers. */
+    panel?: OrchestratorGamePanelLayer
   }
 
 export type OrchestratorGameSource = 'default' | 'global' | 'project' | 'local'
@@ -303,6 +306,12 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       warnings.push(...parsed.warnings)
       if (parsed.value) {
         layer.rewardWeights = parsed.value
+      }
+    } else if (key === 'panel') {
+      const parsed = parseGamePanel(value)
+      warnings.push(...parsed.warnings)
+      if (parsed.value) {
+        layer.panel = parsed.value
       }
     } else if (key === 'reviews') {
       const parsed = parseGameReviewsSource(value)
