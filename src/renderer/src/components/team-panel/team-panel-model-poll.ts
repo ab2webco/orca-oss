@@ -31,7 +31,8 @@ export type TeamPanelPollDeps = {
     state: OrchestratorGameState
     questions: GameOwnerQuestion[] | null
   }) => TeamPanelGameModel | null
-  publish: (source: TeamPanelModelSource) => void
+  /** `scope` is the one the source was read for. */
+  publish: (source: TeamPanelModelSource, scope: TeamPanelScope) => void
 }
 
 const messageOf = (error: unknown): string =>
@@ -70,16 +71,19 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       run.ready = model !== null
-      deps.publish({
-        section: model ? { kind: 'ready', value: model } : { kind: 'unavailable' },
-        retry: null
-      })
+      deps.publish(
+        {
+          section: model ? { kind: 'ready', value: model } : { kind: 'unavailable' },
+          retry: null
+        },
+        scope
+      )
     } catch (error) {
       // Why keep the last team: one failed read says nothing about the team.
       if (mine !== generation || active !== run || run.ready) {
         return
       }
-      deps.publish({ section: { kind: 'error', message: messageOf(error) }, retry })
+      deps.publish({ section: { kind: 'error', message: messageOf(error) }, retry }, scope)
     }
   }
 
@@ -121,7 +125,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     subscribe(scope: TeamPanelScope): () => void {
       if (active?.scope.key !== scope.key) {
         stop()
-        deps.publish({ section: { kind: 'loading' }, retry: null })
+        deps.publish({ section: { kind: 'loading' }, retry: null }, scope)
         active = {
           scope,
           refs: 0,

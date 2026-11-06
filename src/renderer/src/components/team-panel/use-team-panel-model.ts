@@ -7,7 +7,6 @@ import {
   useOtherGameInboxGroups
 } from '@/components/game-inbox/use-other-game-inbox-groups'
 import { isFolderRepo } from '../../../../shared/repo-kind'
-import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type {
   TeamMemberCard,
   TeamPanelModel,
@@ -20,6 +19,7 @@ import {
   readTeamOwnerQuestions
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
+import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
 import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
@@ -37,6 +37,15 @@ const NO_WORKSPACE: TeamPanelModelSource = { section: { kind: 'unavailable' }, r
 const useTeamPanelModelStore = create<{ source: TeamPanelModelSource }>(() => ({
   source: { section: { kind: 'loading' }, retry: null }
 }))
+
+const NO_MEMBERS: readonly TeamMemberCard[] = []
+const membersOf = (source: TeamPanelModelSource): readonly TeamMemberCard[] =>
+  source.section.kind === 'ready' && source.section.value.kind === 'team'
+    ? source.section.value.members
+    : NO_MEMBERS
+
+// Why outside the store: a project switch publishes loading, and the hold must outlive it.
+let lastTeam: { scope: TeamPanelScope; members: readonly TeamMemberCard[] } | null = null
 
 function worktreeIdOfTab(tabId: string): string | null {
   for (const [worktreeId, tabs] of Object.entries(useAppStore.getState().tabsByWorktree)) {
@@ -63,7 +72,13 @@ const poller = createTeamPanelModelPoller(
       const repo = useAppStore.getState().repos.find((one) => one.id === args.repoId)
       return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false })
     },
-    publish: (source) => useTeamPanelModelStore.setState({ source })
+    publish: (source, scope) => {
+      const members = membersOf(source)
+      if (members !== NO_MEMBERS) {
+        lastTeam = { scope, members }
+      }
+      useTeamPanelModelStore.setState({ source })
+    }
   },
   TEAM_REFRESH_MS
 )
@@ -84,7 +99,7 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   const worktreeIdList = useAppStore((s) =>
     repoId ? (s.worktreesByRepo[repoId] ?? []).map((one) => one.id).join('\n') : ''
   )
-  const scope = useMemo<TeamPanelScope | null>(
+  const activeScope = useMemo<TeamPanelScope | null>(
     () =>
       repoId && projectName
         ? {
@@ -97,6 +112,10 @@ export function useTeamPanelModel(): TeamPanelModelSource {
         : null,
     [hostId, projectName, repoId, worktreeIdList]
   )
+  const heldKey = useAppStore((s) =>
+    lastTeam && isRemoteMemberWorktreeActive(lastTeam.members, s) ? lastTeam.scope.key : null
+  )
+  const scope = heldKey !== null && lastTeam?.scope.key === heldKey ? lastTeam.scope : activeScope
   useEffect(() => (scope ? poller.subscribe(scope) : undefined), [scope])
   // Why: an answer changes the Inbox count now, not at the next 20 s read.
   useEffect(() => {
@@ -148,16 +167,11 @@ export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
 
 /** The member whose pane is in this terminal tab, from the last model the panel read; never polls. */
 export function useTeamMemberOfTab(tabId: string): TeamMemberCard | null {
-  return useTeamPanelModelStore((s) => {
-    const section = s.source.section
-    if (section.kind !== 'ready' || section.value.kind !== 'team') {
-      return null
-    }
-    // Why local only: a paired host's pane key names a tab on that host, not in this window.
-    return (
-      section.value.members.find(
-        (card) => card.host.kind === 'local' && parsePaneKey(card.paneKey)?.tabId === tabId
-      ) ?? null
-    )
-  })
+  const members = useTeamPanelModelStore((s) => membersOf(s.source))
+  const index = useAppStore((s) =>
+    s.rightSidebarOpen && s.rightSidebarTab === 'team'
+      ? members.findIndex((card) => isMemberInTab(card, tabId, s))
+      : -1
+  )
+  return members[index] ?? null
 }

@@ -10,28 +10,35 @@ import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-ow
 
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
-let publish: (source: TeamPanelModelSource) => void = () => {}
+let publish: (source: TeamPanelModelSource, scope?: unknown) => void = () => {}
 vi.mock('./team-panel-model-poll', () => ({
   createTeamPanelModelPoller: (deps: { publish: typeof publish }) => {
     publish = deps.publish
     return { subscribe, refresh }
   }
 }))
+const baseState = (): Record<string, unknown> => ({
+  activeWorkspaceExecutionHostId: null,
+  activeWorktreeId: 'wt',
+  getKnownWorktreeById: () => ({ repoId: 'repo-1' }),
+  repos: [{ id: 'repo-1', displayName: 'orca-oss' }],
+  worktreesByRepo: { 'repo-1': [{ id: 'wt' }] },
+  runtimeEnvironments: [],
+  rightSidebarOpen: true,
+  rightSidebarTab: 'team',
+  tabsByWorktree: {},
+  ptyIdsByTabId: {},
+  terminalLayoutsByTabId: {}
+})
+let appState = baseState()
 vi.mock('@/store', () => ({
   useAppStore: Object.assign(
-    (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        activeWorkspaceExecutionHostId: null,
-        activeWorktreeId: 'wt',
-        getKnownWorktreeById: () => ({ repoId: 'repo-1' }),
-        repos: [{ id: 'repo-1', displayName: 'orca-oss' }],
-        worktreesByRepo: { 'repo-1': [{ id: 'wt' }] },
-        runtimeEnvironments: []
-      }),
+    (selector: (state: Record<string, unknown>) => unknown) => selector(appState),
     { getState: () => ({}) }
   )
 }))
 
+const { toRemoteRuntimePtyId } = await import('@/runtime/runtime-terminal-stream')
 const { useTeamMemberOfTab, useTeamPanelKind, useTeamPanelModel } =
   await import('./use-team-panel-model')
 
@@ -47,6 +54,7 @@ afterEach(async () => {
   })
   subscribe.mockClear()
   refresh.mockClear()
+  appState = baseState()
   useGameInboxAppState.setState({ hosts: [] })
   // Why: the model store is module state; a test's partial model must not reach the next test.
   publish({ section: { kind: 'loading' }, retry: null })
@@ -112,6 +120,64 @@ describe('useTeamMemberOfTab', () => {
 
     expect(seen.slice(-2)).toEqual(['Knight', null])
     expect(subscribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('a paired host member', () => {
+  const squire = {
+    name: 'Squire',
+    paneKey: `host-tab:${LEAF}`,
+    terminalHandle: 'term_squire',
+    worktreeId: 'host-wt',
+    host: { kind: 'remote', name: 'mini', environmentId: 'env-mini', reachable: true }
+  } as TeamMemberCard
+  const teamOf = (members: TeamMemberCard[]): TeamPanelModelSource => ({
+    section: { kind: 'ready', value: { kind: 'team', members } as unknown as TeamPanelGameModel },
+    retry: null
+  })
+
+  it('heads the tab that mirrors its terminal, under another tab id than the host gave', async () => {
+    appState = {
+      ...baseState(),
+      tabsByWorktree: { 'host-wt': [{ id: 'local-tab' }] },
+      terminalLayoutsByTabId: {
+        'local-tab': { ptyIdsByLeafId: { leaf: toRemoteRuntimePtyId('term_squire', 'env-mini') } }
+      }
+    }
+    publish(teamOf([squire]))
+    const seen: (string | null)[] = []
+
+    await mount(() => {
+      seen.push(useTeamMemberOfTab('local-tab')?.name ?? null)
+      return null
+    })
+
+    expect(seen.at(-1)).toBe('Squire')
+  })
+
+  // Why: opening it activates the host's worktree, which is another project to the panel.
+  it("keeps reading the lead's team while the member's worktree on its host is active", async () => {
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+    const leadScope = (subscribe.mock.calls.at(-1) as unknown as [{ key: string }])[0]
+    publish(teamOf([squire]), leadScope)
+    appState = {
+      ...baseState(),
+      activeWorktreeId: 'host-wt',
+      activeWorkspaceExecutionHostId: 'runtime:env-mini',
+      getKnownWorktreeById: () => ({ repoId: 'host-repo' }),
+      repos: [{ id: 'host-repo', displayName: 'orca-oss' }]
+    }
+
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    const scopes = subscribe.mock.calls.map((call) => (call as unknown as [{ key: string }])[0].key)
+    expect(scopes.at(-1)).toBe(leadScope.key)
   })
 })
 
