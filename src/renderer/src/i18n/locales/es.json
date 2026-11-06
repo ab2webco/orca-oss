@@ -16162,7 +16162,8 @@
       "ciRunning": "CI en curso",
       "ciPassed": "CI en verde",
       "answerInInbox": "Responder en Bandeja",
-      "waitingForAnswer": "Esperando tu respuesta"
+      "waitingForAnswer": "Esperando tu respuesta",
+      "openTerminal": "Abrir terminal"
     },
     "lead": {
       "badge": "Líder",
@@ -16183,6 +16184,12 @@
     },
     "scene": {
       "placeholder": "Aquí aparece la escena en vivo"
+    },
+    "open": {
+      "failed": "No se pudo abrir {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Te espera"
     }
   }
 }

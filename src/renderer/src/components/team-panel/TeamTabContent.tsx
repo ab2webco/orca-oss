@@ -10,6 +10,7 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import { teamHostText, teamLiveText, teamModelText, teamStatusTone } from './team-card-text'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
+import { openTeamSession } from './team-session-open'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 
 function coordinatesText(count: number): string {
@@ -28,25 +29,28 @@ function LeadCardRow({
   memberCount: number
 }): React.JSX.Element {
   return (
-    <article
-      data-team-card="lead"
-      className="flex flex-col gap-0.5 border-b border-border px-3 py-2"
-    >
-      <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-        {showName ? <span className="truncate text-[13px] font-medium">{lead.name}</span> : null}
-        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
-          <Crown data-crown="" className="size-3" aria-hidden="true" />
-          {translate('teamPanel.lead.badge', 'Lead')}
+    <article data-team-card="lead" className="border-b border-border">
+      <button
+        type="button"
+        onClick={() => void openTeamSession(lead, lead.name)}
+        className="flex w-full min-w-0 flex-col gap-0.5 px-3 py-2 text-left hover:bg-sidebar-accent"
+      >
+        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+          {showName ? <span className="truncate text-[13px] font-medium">{lead.name}</span> : null}
+          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
+            <Crown data-crown="" className="size-3" aria-hidden="true" />
+            {translate('teamPanel.lead.badge', 'Lead')}
+          </span>
+          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+            {teamHostText(lead.host)}
+          </span>
         </span>
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {teamHostText(lead.host)}
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <StatusDot tone={teamStatusTone(lead.status)} />
+          <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
         </span>
-      </span>
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <StatusDot tone={teamStatusTone(lead.status)} />
-        <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
-      </span>
-      <MetaLine parts={[teamModelText(lead.model), coordinatesText(memberCount)]} />
+        <MetaLine parts={[teamModelText(lead.model), coordinatesText(memberCount)]} />
+      </button>
     </article>
   )
 }

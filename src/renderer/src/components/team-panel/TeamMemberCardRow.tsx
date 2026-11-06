@@ -3,32 +3,18 @@ import { StatusDot } from '@/components/StatusDot'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { formatUiRelativeTime } from '@/i18n/relative-time-format'
-import type { TeamMemberCard, TeamPullRequest } from '../../../../shared/team-panel-model-types'
+import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
+  teamCiText,
   teamHostText,
   teamLiveText,
   teamModelText,
   teamPhaseText,
-  teamStatusTone
+  teamStatusTone,
+  teamTicketBesideName
 } from './team-card-text'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
-
-function ciText(pr: TeamPullRequest): string | null {
-  if (pr.state === 'merged') {
-    return translate('teamPanel.card.merged', 'Merged')
-  }
-  switch (pr.ci) {
-    case 'failure':
-      return translate('teamPanel.card.ciFailed', 'CI failing')
-    case 'pending':
-      return translate('teamPanel.card.ciRunning', 'CI running')
-    case 'success':
-      return translate('teamPanel.card.ciPassed', 'CI green')
-    case 'neutral':
-    case 'none':
-      return null
-  }
-}
+import { openTeamSession } from './team-session-open'
 
 /** Splits a row's meta into `a · b · c` with the separators drawn by the parent. */
 export function MetaLine({ parts }: { parts: (string | null)[] }): React.JSX.Element | null {
@@ -58,14 +44,14 @@ export function TeamMemberCardRow({
   selectTab: SelectTeamPanelTab
   now: number
 }): React.JSX.Element {
-  // Why: a member launched by ticket is named after it, and the card would print it twice.
-  const ticketShown = card.ticket && !(showName && card.name === card.ticket.identifier)
+  const ticket = teamTicketBesideName(card, showName)
   const answer = card.needsYou ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
-  const ci = card.pr ? ciText(card.pr) : null
+  const ci = card.pr ? teamCiText(card.pr) : null
+  const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   return (
     <article data-team-card="member" data-pane-key={card.paneKey}>
       <button
@@ -79,10 +65,8 @@ export function TeamMemberCardRow({
       >
         <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
           {showName ? <span className="truncate text-[13px] font-medium">{card.name}</span> : null}
-          {ticketShown && card.ticket ? (
-            <code className="font-mono text-[11.5px] text-muted-foreground">
-              {card.ticket.identifier}
-            </code>
+          {ticket ? (
+            <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
           ) : null}
           <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
             {teamHostText(card.host)}
@@ -134,6 +118,9 @@ export function TeamMemberCardRow({
               </span>
             ) : null}
           </div>
+          <Button size="xs" variant="outline" onClick={() => void openTeamSession(card, shownName)}>
+            {translate('teamPanel.card.openTerminal', 'Open terminal')}
+          </Button>
         </div>
       ) : null}
     </article>

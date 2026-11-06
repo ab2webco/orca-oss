@@ -6,7 +6,9 @@ import type {
   TeamHost,
   TeamLiveAction,
   TeamModel,
-  TeamStatus
+  TeamPullRequest,
+  TeamStatus,
+  TeamTicket
 } from '../../../../shared/team-panel-model-types'
 
 const TONE: Record<TeamStatus, StatusTone> = {
@@ -93,4 +95,31 @@ export function teamModelText(model: TeamModel | null): string | null {
 
 export function teamHostText(host: TeamHost): string {
   return host.kind === 'local' ? translate('teamPanel.host.local', 'local') : host.name
+}
+
+/** The PR chip's second half; null when there is nothing to say about its checks. */
+export function teamCiText(pr: TeamPullRequest): string | null {
+  if (pr.state === 'merged') {
+    return translate('teamPanel.card.merged', 'Merged')
+  }
+  switch (pr.ci) {
+    case 'failure':
+      return translate('teamPanel.card.ciFailed', 'CI failing')
+    case 'pending':
+      return translate('teamPanel.card.ciRunning', 'CI running')
+    case 'success':
+      return translate('teamPanel.card.ciPassed', 'CI green')
+    case 'neutral':
+    case 'none':
+      return null
+  }
+}
+
+/** The ticket printed beside the name; null when the member is named after it, so it shows once. */
+export function teamTicketBesideName(
+  card: { name: string; ticket: TeamTicket | null },
+  showName: boolean
+): string | null {
+  const identifier = card.ticket?.identifier ?? null
+  return identifier && !(showName && card.name === identifier) ? identifier : null
 }

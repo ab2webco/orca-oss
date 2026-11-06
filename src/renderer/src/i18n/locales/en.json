@@ -17161,7 +17161,8 @@
       "ciRunning": "CI running",
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
-      "waitingForAnswer": "Waiting for your answer"
+      "waitingForAnswer": "Waiting for your answer",
+      "openTerminal": "Open terminal"
     },
     "lead": {
       "badge": "Lead",
@@ -17182,6 +17183,12 @@
     },
     "scene": {
       "placeholder": "The live scene appears here"
+    },
+    "open": {
+      "failed": "Could not open {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Waiting for you"
     }
   }
 }
