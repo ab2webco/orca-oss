@@ -16,6 +16,8 @@ import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { AgentSessionHistoryIcon } from './agent-session-history-icon'
 import type { ActivityBarItem } from './activity-bar-buttons'
+import { teamPanelActivityItem } from '../team-panel/team-panel-activity-item'
+import { useTeamPanelModel } from '../team-panel/use-team-panel-model'
 
 export type RightSidebarActivityItems = {
   visibleItems: ActivityBarItem[]
@@ -54,6 +56,8 @@ export function useRightSidebarActivityItems({
   const installedPlugins = usePluginPanelsStore((s) => s.plugins)
   const pluginFetchStatus = usePluginPanelsStore((s) => s.fetchStatus)
   const pluginPanelErrors = usePluginPanelsStore((s) => s.panelErrors)
+  const teamSection = useTeamPanelModel().section
+  const teamKind = teamSection.kind === 'ready' ? teamSection.value.kind : null
   const installedPluginTabKeys = useMemo(
     () => collectInstalledPluginTabKeys(installedPlugins),
     [installedPlugins]
@@ -111,6 +115,7 @@ export function useRightSidebarActivityItems({
         shortcut: portsShortcut === 'Unassigned' ? '' : portsShortcut,
         sshOnly: true
       },
+      teamPanelActivityItem(teamKind),
       // Why: plugin panels append after the built-in tabs so core navigation
       // keeps stable positions regardless of which plugins are installed.
       ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors)
@@ -121,7 +126,8 @@ export function useRightSidebarActivityItems({
       pluginPanelErrors,
       visiblePluginPanels,
       portsShortcut,
-      sourceControlShortcut
+      sourceControlShortcut,
+      teamKind
     ]
   )
 
