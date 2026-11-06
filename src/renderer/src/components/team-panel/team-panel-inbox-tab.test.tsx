@@ -156,6 +156,18 @@ describe('Inbox tab', () => {
     expect(view.getByText('Include #911 in lab.115?')).toBeTruthy()
   })
 
+  // Why: the model counts the lead's own inbox as a thread, so the shell may not draw empty itself.
+  it('draws the empty state when every list is empty', () => {
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      threads: { threads: [], waiting: [], answered: [] }
+    })
+
+    expect(view.getByText('Nothing waits for you')).toBeTruthy()
+    expect(view.queryByRole('tab', { name: /For you/ })).toBeNull()
+  })
+
   it('says nothing waits when For you is empty', () => {
     const view = renderInbox({ questions: [], otherGroups: [] })
 

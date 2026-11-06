@@ -126,6 +126,23 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
             if (scroller) {
               const wide = await scroller.evaluate((node) => node.scrollWidth - node.clientWidth)
               expect(wide, `${name} list is cut at ${width}px ${theme} ${language}`).toBe(0)
+              // A wrapped sub-tab bar must push the list down, not draw over it.
+              const overlap = await scroller.evaluate((node) => {
+                // Why the tabs, not the list: a fixed-height list keeps its box while tabs spill out.
+                const bottom = Math.max(
+                  ...[...node.querySelectorAll('[role="tab"]')].map(
+                    (tab) => tab.getBoundingClientRect().bottom
+                  )
+                )
+                const list = node
+                  .querySelector('[role="tabpanel"][data-state="active"]')
+                  ?.getBoundingClientRect()
+                return list ? bottom - list.top : 0
+              })
+              expect(
+                overlap,
+                `${name} tabs cover the list at ${width}px ${language}`
+              ).toBeLessThanOrEqual(0.5)
             }
             if (CAPTURE) {
               await orcaPage.screenshot({
@@ -172,7 +189,6 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     const send = (from: string, to: string, type: string, subject: string, body: string) =>
       client.call('orchestration.send', { from, to, type, subject, body })
     await send(member!, lead, 'status', 'Reading the ticket', 'Reading ORCA-12.')
-    await send(member!, lead, 'decision_gate', 'Rebase now?', 'Rebase #917 now or wait for #913?')
     await send(member!, lead, 'decision_gate', 'Port?', 'Which port should the preview use?')
     const waitingId = async (text: string): Promise<string> => {
       let id: string | undefined
@@ -190,6 +206,9 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
       body: 'Use 8080',
       from: lead
     })
+    // Why after the reply: the lead's reply settles every gate the member had open.
+    await send(member!, lead, 'decision_gate', 'Rebase now?', 'Rebase #917 now or wait for #913?')
+    await waitingId('Rebase #917')
 
     await client.call('game.ownerAsk', {
       worktreeId,

@@ -26,11 +26,12 @@ import { useGameOwnerQuestions } from '@/components/game-inbox/useGameOwnerQuest
 import { useGameInboxThreads } from '@/components/game-inbox/useGameInboxThreads'
 import { useOtherGameInboxGroups } from '@/components/game-inbox/use-other-game-inbox-groups'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamPanelMessageState } from './team-panel-section-state'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
 const SUB_TAB =
-  'h-[26px] flex-none rounded-md px-2 text-xs font-medium data-[state=active]:bg-muted data-[state=active]:shadow-none dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted'
+  'h-[26px] flex-none gap-1 rounded-md px-1.5 text-xs font-medium data-[state=active]:bg-muted data-[state=active]:shadow-none dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted'
 const LIST = 'mt-0 px-3 pb-4'
 
 function GroupLabel({ title, place }: { title: string; place: string | null }): React.JSX.Element {
@@ -66,6 +67,17 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   ]
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
+  if (subTabs.every(([, , count]) => count === 0) && !props.projectUnread) {
+    return (
+      <TeamPanelMessageState
+        title={translate('teamPanel.tabs.inbox.emptyTitle', 'Nothing waits for you')}
+        text={translate(
+          'teamPanel.tabs.inbox.emptyText',
+          'When an agent asks you something, it shows here.'
+        )}
+      />
+    )
+  }
   return (
     <Tabs
       value={tab}
@@ -75,7 +87,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
     >
       <TabsList
         aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
-        className="h-auto w-full shrink-0 justify-start gap-1 overflow-x-auto rounded-none bg-transparent px-3 pt-2.5 pb-2 [scrollbar-width:none]"
+        className="h-auto w-full shrink-0 flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto gap-0.5 rounded-none bg-transparent px-3 pt-2.5 pb-2"
       >
         {subTabs.map(([id, label, count]) => (
           <TabsTrigger key={id} value={id} className={SUB_TAB}>
