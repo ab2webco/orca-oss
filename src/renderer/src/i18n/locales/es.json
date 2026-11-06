@@ -16262,6 +16262,50 @@
       "youAnswered": "Respondiste",
       "youAnsweredText": "Respondiste: {{text}}",
       "leadAnswered": "Respondió el lead"
+    },
+    "display": {
+      "label": "Métricas del equipo",
+      "pause": "Pausar el carrusel",
+      "resume": "Reanudar el carrusel",
+      "previous": "Métrica anterior",
+      "next": "Métrica siguiente",
+      "page": {
+        "summary": "Resumen",
+        "delivery": "Entrega",
+        "quality": "Calidad",
+        "machines": "Máquinas",
+        "usage": "Uso"
+      },
+      "noData": "Sin datos",
+      "active": "Activos",
+      "alerts": "Alertas",
+      "queued": "En cola",
+      "merges": "Merges",
+      "merges24h": "Merges 24 h",
+      "noHourly": "Sin datos por hora",
+      "merges7d": "Merges 7 d",
+      "median": "Mediana {{time}}",
+      "noLeadTime": "Aún sin tiempo de entrega",
+      "noMerges": "Este host no publica merges",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "minutes": "{{minutes}} m",
+      "ciGreen": "CI en verde",
+      "flaky": "{{count}} inestables",
+      "days14": "14 días",
+      "noCiHistory": "Orca aún no guarda historial de CI",
+      "agents": "Agentes",
+      "offline": "Sin conexión",
+      "noMachines": "Este host no publica máquinas",
+      "costToday": "Costo hoy",
+      "noCost": "Orca no tiene datos de costo",
+      "accounts7d": "Cuentas · 7 días",
+      "noAccounts": "Sin uso de cuentas reportado",
+      "ticker": {
+        "waiting": "{{name}} espera tu respuesta",
+        "failing": "{{pr}} con CI fallando, {{name}} lo corrige",
+        "queue": "Cola {{count}}, próximo {{pr}}",
+        "working": "{{count}} trabajando"
+      }
     }
   }
 }

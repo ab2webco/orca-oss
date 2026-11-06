@@ -17261,6 +17261,50 @@
       "youAnswered": "You answered",
       "youAnsweredText": "You answered: {{text}}",
       "leadAnswered": "The lead answered"
+    },
+    "display": {
+      "label": "Team metrics",
+      "pause": "Pause the carousel",
+      "resume": "Resume the carousel",
+      "previous": "Previous metric",
+      "next": "Next metric",
+      "page": {
+        "summary": "Summary",
+        "delivery": "Delivery",
+        "quality": "Quality",
+        "machines": "Machines",
+        "usage": "Usage"
+      },
+      "noData": "No data",
+      "active": "Active",
+      "alerts": "Alerts",
+      "queued": "Queued",
+      "merges": "Merges",
+      "merges24h": "Merges 24 h",
+      "noHourly": "No hourly data",
+      "merges7d": "Merges 7 d",
+      "median": "Median {{time}}",
+      "noLeadTime": "No lead time yet",
+      "noMerges": "No merge history from this host",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "minutes": "{{minutes}} m",
+      "ciGreen": "CI green",
+      "flaky": "{{count}} flaky",
+      "days14": "14 days",
+      "noCiHistory": "Orca keeps no CI history yet",
+      "agents": "Agents",
+      "offline": "Offline",
+      "noMachines": "No machine data from this host",
+      "costToday": "Cost today",
+      "noCost": "Orca has no cost data",
+      "accounts7d": "Accounts · 7 days",
+      "noAccounts": "No account use reported",
+      "ticker": {
+        "waiting": "{{name}} is waiting for you",
+        "failing": "{{pr}} checks failing, {{name}} on it",
+        "queue": "Queue {{count}}, next {{pr}}",
+        "working": "{{count}} working"
+      }
     }
   }
 }

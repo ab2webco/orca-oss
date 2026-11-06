@@ -65,7 +65,7 @@ describe('TeamDisplayPageView', () => {
 
     expect(figures(container)).toEqual(['9'])
     expect(container.textContent).toContain('Median 1 h 42 m')
-    expect(container.textContent).toContain('TF')
+    expect(container.textContent).toContain('4T5F')
   })
 
   it('marks an offline machine instead of drawing its load', async () => {
@@ -118,6 +118,12 @@ describe('TeamDisplayPageView', () => {
       seen.push(`${page.id}: ${figures(container).join(',')} | ${container.textContent}`)
     }
 
-    expect(seen.join('\n')).toMatchInlineSnapshot()
+    expect(seen.join('\n')).toMatchInlineSnapshot(`
+      "summary: 0,No data,No data,No data | ActiveAlertsQueuedMergesMerges 24 hNo hourly dataCI—5H—7D—
+      delivery: No data | Merges 7 dNo lead time yetNo merge history from this host
+      quality: No data | CI greenNo data14 daysOrca keeps no CI history yet
+      machines:  | No machine data from this host
+      usage: No data | Cost todayOrca has no cost dataAccounts · 7 daysNo account use reported"
+    `)
   })
 })
