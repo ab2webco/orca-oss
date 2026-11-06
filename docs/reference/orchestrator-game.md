@@ -1458,8 +1458,11 @@ orchestratorGame:
   reads every file and reports problems as `native.<style>…: <message>`; the game drops a broken
   block with a warning. A scene with no art for a style draws in Pixel
   (`orchestratorGameSceneDrawnStyle`), and so does art that does not load on this machine, such as
-  a scene carried to a remote member. Quest's art ships with Orca. Game state carries the block as
-  an optional field; the images travel through the existing file read, so there is no new RPC. The
+  a scene carried to a remote member. Quest's art ships with Orca, in
+  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json), and only that art
+  reaches the panel today: `useTeamScenePainter` picks the painter, and the panel cannot yet read a
+  file's or a plugin's images, locally or from a host, so a scene with a block validates and draws
+  in Pixel until ORCA-1085. Game state carries the block as an optional field. The
   [scenes guide](../../skill-guides/orca-game-scenes.md#native-optional) has the format.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,

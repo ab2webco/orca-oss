@@ -18,6 +18,7 @@ const MAX_FRAMES = 32
 const MAX_FPS = 30
 const MIN_SIZE_PX = 16
 const MAX_SIZE_PX = 160
+const MAX_STRIDE_PX = 1024
 const MEGABYTE = 1024 * 1024
 
 const PATH_ERRORS = {
@@ -50,6 +51,8 @@ const animationSchema = z.object({
   frames: wholeNumber(1, MAX_FRAMES),
   /** Ignored by `walk`, which the engine steps by distance so feet stay planted. */
   fps: wholeNumber(1, MAX_FPS).default(8),
+  /** Sheet pixels the ground moves in one `walk` cycle; without it, feet slide at other sizes. */
+  stride: wholeNumber(1, MAX_STRIDE_PX).optional(),
   /** What the scene calls this action; the engine's own word when absent. */
   label: localizedSceneName.optional()
 })
@@ -255,15 +258,12 @@ export function orchestratorGameSceneDrawnStyle(args: {
   sceneId: string
   /** The scene game state carries; absent when a file did not read or the scene is built in. */
   scene?: { native?: OrchestratorGameSceneNative }
-  /** The block's images did not load here, such as a carried scene whose files stayed on the lead. */
+  /** The art did not load here, such as a carried scene whose files stayed on the lead. */
   artFailed?: boolean
 }): OrchestratorGameSceneStyle {
   const { style, sceneId, scene, artFailed } = args
-  if (style !== 'figures' && style !== 'office') {
+  if ((style !== 'figures' && style !== 'office') || artFailed) {
     return 'pixel'
   }
-  if (scene?.native?.[style]) {
-    return artFailed ? 'pixel' : style
-  }
-  return sceneId === 'quest' ? style : 'pixel'
+  return scene?.native?.[style] || sceneId === 'quest' ? style : 'pixel'
 }

@@ -466,8 +466,13 @@ and swaps the station prop.
 - **`animations`.** `idle` is required, and any action left out plays it. The others are `work`,
   `walk`, `raise`, `give`, `wave` and `cheer`, and nothing else: a misspelt one is refused rather
   than silently standing idle. Frames run left to right from the first column of `row`. `fps` is 1
-  to 30, default 8; `walk` ignores it, since the engine steps it by distance so feet stay planted.
-  `label` (a name, or `{ "en", "es" }`) is what the scene calls that action.
+  to 30, default 8; `walk` ignores it, since the engine steps it by distance. `stride` on `walk` is
+  how many sheet pixels the ground moves in one full cycle: set it, or feet slide at any `size` but
+  the one the art was drawn for. `work` plays only at a station, so draw it for one; the lead has no
+  station and stands on `idle` instead. `label` (a name, or `{ "en", "es" }`) is what the scene
+  calls that action.
+- **`props.station`.** Drawn in the member art's scale, centered on the seat, and always the way it
+  is in the file, so a seated member faces the way the sheet does.
 - **Limits.** Each file at most 2 MB; each style at most 8 MB and 16 megapixels in total, which is
   what it costs in memory however well the files compress.
 
@@ -476,6 +481,11 @@ not an image, an animation that runs past its sheet, and a style over its limits
 `native.<style>…: <message>`, and exits 1. Orca only leaves a broken block out with a warning and
 draws the scene in Pixel. So do an Orca that predates the block and the terminal game, which ignore
 the key.
+
+**Not drawn in the panel yet.** Only Quest's bundled art reaches the panel today. It has no way to
+read a scene file's or a plugin's images, so any scene with a `native` block draws in Pixel there,
+however clean `validate` is. The block is checked now and drawn when the panel can read it
+(ORCA-1085).
 
 **Pixel is the floor.** A built-in scene other than Quest, a plugin or private scene with no block,
 a style the block does not cover, and art that does not load on this machine all draw in Pixel,

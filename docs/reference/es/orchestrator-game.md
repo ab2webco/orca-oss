@@ -1,5 +1,5 @@
 ---
-sourceHash: eb87719603cdd5dc
+sourceHash: 02f9d9cd7c5b8336
 ---
 
 # El juego orquestador de Agent Teams
@@ -1562,9 +1562,11 @@ orchestratorGame:
   `orca game scene validate` lee cada archivo e informa los problemas como
   `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. Una escena sin arte
   para un estilo se dibuja en Pixel (`orchestratorGameSceneDrawnStyle`), igual que el arte que no carga
-  en esta máquina, como una escena llevada a un miembro remoto. El arte de Quest viene con Orca. El
-  estado del juego lleva el bloque como campo opcional; las imágenes viajan por la lectura de archivos
-  existente, así que no hay RPC nueva. La
+  en esta máquina, como una escena llevada a un miembro remoto. El arte de Quest viene con Orca, en
+  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json), y hoy solo ese arte
+  llega al panel: `useTeamScenePainter` elige el painter, y el panel aún no puede leer las imágenes de
+  un archivo o de un plugin, ni en local ni desde un host, así que una escena con bloque se valida y se
+  dibuja en Pixel hasta ORCA-1085. El estado del juego lleva el bloque como campo opcional. La
   [guía de escenas](../../../skill-guides/orca-game-scenes.md#native-optional) tiene el formato.
 
 **Settings.** El selector **Scene** del proyecto termina con **Custom file…**, que muestra la ruta

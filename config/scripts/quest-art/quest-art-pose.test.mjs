@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOOT_REACH, QUEST_ACTIONS, footAt, poseAt } from './quest-art-pose.mjs'
+import { FOOT_REACH, QUEST_ACTIONS, WALK_CYCLE_UNITS, footAt, poseAt } from './quest-art-pose.mjs'
 
 describe('the Quest art poses', () => {
   it('slides a planted foot back at one speed, flat on the ground', () => {
@@ -7,6 +7,10 @@ describe('the Quest art poses', () => {
     expect(steps.every((foot) => foot.y === 0)).toBe(true)
     const deltas = steps.slice(1).map((foot, at) => steps[at].x - foot.x)
     deltas.forEach((delta) => expect(delta).toBeCloseTo(0.4 * FOOT_REACH))
+  })
+
+  it('counts as a walk cycle the ground two stances cover', () => {
+    expect(WALK_CYCLE_UNITS).toBeCloseTo(2 * (footAt(0).x - footAt(0.5).x))
   })
 
   it('lifts the foot only on its way forward and closes the cycle', () => {
