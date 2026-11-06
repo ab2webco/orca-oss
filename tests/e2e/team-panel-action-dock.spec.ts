@@ -68,16 +68,19 @@ async function expectOneLine(dock: Locator, where: string): Promise<number> {
   return fit!.shown
 }
 
-// Why: the app's star card can open mid-run over the panel's foot, where the dock is.
-async function dismissStarCard(page: Page): Promise<void> {
-  const later = page.getByRole('button', { name: /^(Later|Más tarde)$/ })
-  if (await later.isVisible().catch(() => false)) {
-    await later.click()
+// Why: the app's star and update cards can open mid-run over the panel's foot, where the dock is.
+async function dismissAppCards(page: Page): Promise<void> {
+  for (const name of [/^(Later|Más tarde)$/, /^(Dismiss|Descartar)$/]) {
+    for (const one of await page.getByRole('button', { name }).all()) {
+      if (await one.isVisible().catch(() => false)) {
+        await one.click()
+      }
+    }
   }
 }
 
 async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
-  await dismissStarCard(page)
+  await dismissAppCards(page)
   const box = await panel.boundingBox()
   if (!box) {
     return
@@ -253,7 +256,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
 
     // Stop asks inline, in the dock, and sends nothing on Cancel.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await dismissStarCard(orcaPage)
+    await dismissAppCards(orcaPage)
     await dock.getByRole('button', { name: 'Detener a todos' }).click()
     await expect(dock).toContainText(
       '¿Detener a los 2 miembros? Siguen parados hasta que los reactives.'
@@ -264,7 +267,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         await captureDock(orcaPage, panel, testInfo.outputPath(`stop-confirm-es-${width}.png`))
       }
     }
-    await dismissStarCard(orcaPage)
+    await dismissAppCards(orcaPage)
     await dock.getByRole('button', { name: 'Cancelar' }).click()
     await expect(chips).toHaveCount(3)
 
@@ -272,7 +275,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     await setTheme(orcaPage, 'dark')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await dismissStarCard(orcaPage)
+    await dismissAppCards(orcaPage)
     await chips.filter({ hasText: 'Release' }).click()
     await expect(chips.filter({ hasText: 'Release' }).locator('[data-agent-spinner]')).toBeVisible()
     await expect(chips.filter({ hasText: 'Push' })).toBeDisabled()
