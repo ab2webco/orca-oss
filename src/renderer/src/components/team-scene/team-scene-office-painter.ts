@@ -27,28 +27,96 @@ function paintOffice(g: CanvasRenderingContext2D, w: number, h: number): void {
   sky.addColorStop(1, '#f4b271')
   g.fillStyle = sky
   g.fillRect(0, 6, glass, WALL - 10)
+  g.save()
+  g.beginPath()
+  g.rect(0, 6, glass, WALL - 10)
+  g.clip()
   for (let b = 0; b < 20; b++) {
     const bx = (b * glass) / 18 - 6
     const bh = 26 + ((b * 37) % 48)
+    const bw = 14 + ((b * 13) % 12)
     g.fillStyle = b % 2 ? '#23274a' : '#2d3158'
-    g.fillRect(bx, WALL - 4 - bh, 14 + ((b * 13) % 12), bh)
+    g.fillRect(bx, WALL - 4 - bh, bw, bh)
+    g.fillStyle = 'rgb(255 222 160 / 0.75)'
+    for (let r = 0; r < bh / 8; r++) {
+      for (let q = 0; q < 3; q++) {
+        if ((b + r * 2 + q) % 3) {
+          g.fillRect(bx + 2 + q * 4, WALL - 4 - bh + 3 + r * 7, 1.6, 2.6)
+        }
+      }
+    }
   }
+  g.restore()
   g.fillStyle = '#14171e'
   for (let i = 0; i <= 5; i++) {
     g.fillRect((i * glass) / 5 - 1, 6, 2.4, WALL - 10)
   }
+  g.fillRect(0, 5, glass, 2.5)
+  g.fillRect(0, 30, glass, 1.2)
   g.fillRect(0, 0, w, 6)
+  for (const x of [0.16, 0.4, 0.64]) {
+    g.strokeStyle = '#0c0e13'
+    g.lineWidth = 1
+    g.beginPath()
+    g.moveTo(w * x, 0)
+    g.lineTo(w * x, 22)
+    g.stroke()
+    g.fillStyle = '#2a2e38'
+    g.beginPath()
+    g.moveTo(w * x - 10, 28)
+    g.lineTo(w * x - 5, 22)
+    g.lineTo(w * x + 5, 22)
+    g.lineTo(w * x + 10, 28)
+    g.closePath()
+    g.fill()
+    const lamp = g.createRadialGradient(w * x, 30, 1, w * x, 60, 74)
+    lamp.addColorStop(0, 'rgb(255 224 170 / 0.34)')
+    lamp.addColorStop(1, 'rgb(255 224 170 / 0)')
+    g.fillStyle = lamp
+    g.fillRect(w * x - 78, 28, 156, 110)
+  }
+  const room = w * 0.77
   g.fillStyle = '#262b36'
-  g.fillRect(glass, 6, w - glass, WALL - 6)
+  g.fillRect(room, 6, w - room, WALL - 6)
+  const board = w * 0.15
   g.fillStyle = '#e6eaf0'
-  g.fillRect(glass + 10, 24, w * 0.15, 46)
+  g.fillRect(room + 10, 24, board, 46)
+  ;['#ffd24a', '#7fd1ae', '#8ab8ff', '#ffa8a8'].forEach((note, i) => {
+    for (let r = 0; r < 3 - (i % 2); r++) {
+      g.fillStyle = note
+      g.fillRect(room + 14 + (i * board) / 4.4, 29 + r * 13, board / 6.5, 9)
+    }
+  })
+  g.fillStyle = 'rgb(170 205 230 / 0.1)'
+  g.fillRect(room, 6, w - room, WALL - 6)
+  g.strokeStyle = 'rgb(200 225 245 / 0.35)'
+  g.strokeRect(room, 6, w - room - 1, WALL - 6)
   const floor = g.createLinearGradient(0, WALL, 0, h)
   floor.addColorStop(0, '#4b4f58')
   floor.addColorStop(1, '#2c2f37')
   g.fillStyle = floor
   g.fillRect(0, WALL, w, h - WALL)
+  g.fillStyle = 'rgb(244 178 113 / 0.1)'
+  for (let i = 0; i < 5; i++) {
+    g.beginPath()
+    g.moveTo((i * glass) / 5 + 6, WALL)
+    g.lineTo(((i + 1) * glass) / 5 - 4, WALL)
+    g.lineTo(((i + 1) * glass) / 5 + 26, h)
+    g.lineTo((i * glass) / 5 + 30, h)
+    g.closePath()
+    g.fill()
+  }
   g.fillStyle = '#14171e'
   g.fillRect(0, WALL - 2, w, 2.4)
+  const px = w * 0.97
+  g.fillStyle = '#d9d4c8'
+  g.fillRect(px - 7, 108, 14, 16)
+  g.fillStyle = '#2f7a56'
+  for (let i = -4; i <= 4; i++) {
+    g.beginPath()
+    g.ellipse(px + i * 3, 97 - (4 - Math.abs(i)) * 4, 2.6, 13, i * 0.3, 0, TAU)
+    g.fill()
+  }
 }
 
 type Screen = { background: string; line: string | null }
