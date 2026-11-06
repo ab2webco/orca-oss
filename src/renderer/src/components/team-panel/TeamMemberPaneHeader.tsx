@@ -26,34 +26,37 @@ export function TeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.El
   const ticket = teamTicketBesideName(card, showName)
   const model = teamModelText(card.model)
   return (
+    // Why padding inside: a padded box cannot shrink with a center that both sidebars squeeze to 0.
     <div
       data-team-member-header=""
-      className="flex min-h-8 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-border bg-card px-3 py-1 text-xs text-muted-foreground"
+      className="min-w-0 shrink-0 overflow-hidden border-b border-border bg-card text-xs text-muted-foreground"
     >
-      <span className="flex min-w-0 items-center gap-1.5">
-        <StatusDot tone={teamStatusTone(card.status)} />
-        {showName ? (
-          <span className="truncate font-medium text-foreground">{card.name}</span>
-        ) : null}
-        {ticket ? <code className="font-mono text-[11.5px]">{ticket}</code> : null}
-      </span>
-      <span className="font-mono text-[11px]">{teamHostText(card.host)}</span>
-      {model ? <span className="truncate">{model}</span> : null}
-      {card.pr ? (
-        <a
-          href={card.pr.url}
-          target="_blank"
-          rel="noreferrer"
-          className="whitespace-nowrap underline underline-offset-2 hover:text-foreground"
-        >
-          {`#${card.pr.number}${ci ? ` · ${ci}` : ''}`}
-        </a>
-      ) : null}
-      {card.needsYou ? (
-        <span className="ml-auto whitespace-nowrap font-medium text-status-attention">
-          {translate('teamPanel.memberHeader.waitingForYou', 'Waiting for you')}
+      <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <StatusDot tone={teamStatusTone(card.status)} />
+          {showName ? (
+            <span className="truncate font-medium text-foreground">{card.name}</span>
+          ) : null}
+          {ticket ? <code className="font-mono text-[11.5px]">{ticket}</code> : null}
         </span>
-      ) : null}
+        <span className="font-mono text-[11px]">{teamHostText(card.host)}</span>
+        {model ? <span className="truncate">{model}</span> : null}
+        {card.pr ? (
+          <a
+            href={card.pr.url}
+            target="_blank"
+            rel="noreferrer"
+            className="whitespace-nowrap underline underline-offset-2 hover:text-foreground"
+          >
+            {`#${card.pr.number}${ci ? ` · ${ci}` : ''}`}
+          </a>
+        ) : null}
+        {card.needsYou ? (
+          <span className="ml-auto whitespace-nowrap font-medium text-status-attention">
+            {translate('teamPanel.memberHeader.waitingForYou', 'Waiting for you')}
+          </span>
+        ) : null}
+      </div>
     </div>
   )
 }

@@ -220,8 +220,13 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
       .toBe(members[1].paneKey.split(':')[0])
-    const header = orcaPage.locator('[data-team-member-header]:visible')
-    await expect(header).toHaveCount(1)
+    const askerTab = members[1].paneKey.split(':')[0]
+    // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
+    const header = orcaPage.locator(
+      `[data-terminal-overlay-tab-id="${askerTab}"] [data-team-member-header]`
+    )
+    await expect(header).toBeVisible()
+    await expect(orcaPage.locator('[data-team-member-header]:visible')).toHaveCount(1)
     await expect(header).toContainText('local')
     expect((await header.innerText()).match(/ORCA-14/g)).toHaveLength(1)
     await expect(panel).toBeVisible()
@@ -235,11 +240,24 @@ test('the Team tab shows the live lead and its members from the lead game state'
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
           await setTheme(orcaPage, theme)
-          const overflow = await header.evaluate((node) => node.scrollWidth - node.clientWidth)
-          expect(
-            overflow,
-            `header overflows at ${width}px ${theme} ${language}`
-          ).toBeLessThanOrEqual(0)
+          const fit = await header.evaluate((node) => {
+            const slot = node.parentElement!.getBoundingClientRect()
+            return {
+              spill: node.getBoundingClientRect().right - slot.right,
+              slot: Math.round(slot.width),
+              hidden: node.scrollWidth - node.clientWidth
+            }
+          })
+          testInfo.annotations.push({
+            type: 'member-header',
+            description: `${language} ${width} ${theme}: slot ${fit.slot}px, hidden ${fit.hidden}px`
+          })
+          const where = `${width}px ${theme} ${language}`
+          expect(fit.spill, `header spills out of the center at ${where}`).toBeLessThanOrEqual(0)
+          // Why 300: narrower, both sidebars leave the center terminal itself without columns.
+          if (fit.slot >= 300) {
+            expect(fit.hidden, `header cuts its facts at ${where}`).toBeLessThanOrEqual(0)
+          }
           await orcaPage.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`member-header-${language}-${width}-${theme}.png`)
