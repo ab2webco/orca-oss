@@ -54,7 +54,6 @@ function gameModel(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameMo
     prs: null,
     queue: null,
     machines: null,
-    leadWork: { todo: null, actions: [] },
     ...overrides
   }
 }

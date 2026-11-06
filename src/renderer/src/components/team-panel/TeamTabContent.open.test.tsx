@@ -72,6 +72,7 @@ async function render(look: 'game' | 'plain'): Promise<HTMLElement> {
         look={look}
         selectTab={vi.fn()}
         now={0}
+        onOpenTasks={vi.fn()}
       />
     )
   })

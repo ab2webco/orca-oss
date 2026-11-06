@@ -2,7 +2,7 @@ import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { GameReviewVerdict, GameStatusGroup } from './orchestrator-game-state'
-import type { TeamLeadAction, TeamLeadWork } from './team-panel-lead-work'
+import type { TeamLeadAction } from './team-panel-list-action'
 
 // Why: one view model for the desktop Team panel and the mobile sheet (ORCA-1048). It holds ids
 // and facts only; each client translates words and maps a status to its own tokens.
@@ -260,7 +260,6 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   /** The project's STOP; null when clear. */
   stopped: { since: string | null; by: string | null } | null
   scene: TeamSceneSource
-  leadWork: TeamLeadWork
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */

@@ -48,8 +48,7 @@ const model = (scene: TeamPanelGameModel['scene']): TeamPanelGameModel => ({
   inbox: { kind: 'loading' },
   prs: null,
   queue: null,
-  machines: null,
-  leadWork: { todo: null, actions: [] }
+  machines: null
 })
 // A plugin scene with no native art: it can only draw in Pixel.
 const plain = {

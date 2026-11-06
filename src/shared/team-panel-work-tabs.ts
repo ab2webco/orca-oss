@@ -2,7 +2,7 @@ import { gameHostMemoryIsLow, type GameHostCapacity } from './orchestrator-game-
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameProjectItem, GameQueueEntry } from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
-import { teamListActionOf } from './team-panel-lead-work'
+import { teamListActionOf } from './team-panel-list-action'
 import type {
   TeamHost,
   TeamMachine,

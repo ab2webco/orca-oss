@@ -16088,28 +16088,8 @@
   "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
   "teamPanel": {
     "leadWork": {
-      "todo": "Por hacer",
-      "todoEmpty": "Nada por hacer",
-      "actions": "Acciones",
-      "workOn": "Trabajar en {{id}}",
-      "viewAll": "Ver los {{count}}",
-      "more": "+{{count}} más",
       "sent": "Enviado al líder: {{label}}",
-      "failed": "No se pudo enviar {{label}}",
-      "heading": {
-        "inProgress": "En curso",
-        "review": "QA / revisión",
-        "todo": "Por hacer",
-        "backlog": "Backlog",
-        "other": "Otros"
-      },
-      "action": {
-        "wave": "Ola",
-        "status": "Estado",
-        "push": "Reactivar",
-        "sweep": "Barrer",
-        "stop": "Detener"
-      }
+      "failed": "No se pudo enviar {{label}}"
     },
     "queue": {
       "checks": "En checks",
@@ -16173,6 +16153,7 @@
         "title": "Equipo",
         "emptyTitle": "Aún no hay agentes",
         "emptyText": "Lanza uno desde un ticket y aparecerá aquí.",
+        "viewTasks": "Ver tareas",
         "errorTitle": "No se pudo leer el equipo"
       },
       "activity": {

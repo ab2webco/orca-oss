@@ -17087,28 +17087,8 @@
   },
   "teamPanel": {
     "leadWork": {
-      "todo": "To Do",
-      "todoEmpty": "Nothing to do",
-      "actions": "Actions",
-      "workOn": "Work on {{id}}",
-      "viewAll": "View all {{count}}",
-      "more": "+{{count}} more",
       "sent": "Sent to the lead: {{label}}",
-      "failed": "Could not send {{label}}",
-      "heading": {
-        "inProgress": "In progress",
-        "review": "QA / review",
-        "todo": "To do",
-        "backlog": "Backlog",
-        "other": "Other"
-      },
-      "action": {
-        "wave": "Wave",
-        "status": "Status",
-        "push": "Push",
-        "sweep": "Sweep",
-        "stop": "Stop"
-      }
+      "failed": "Could not send {{label}}"
     },
     "queue": {
       "checks": "In checks",
@@ -17172,6 +17152,7 @@
         "title": "Team",
         "emptyTitle": "No agents yet",
         "emptyText": "Launch one from a ticket and it shows here.",
+        "viewTasks": "View tasks",
         "errorTitle": "Could not read the team"
       },
       "activity": {
