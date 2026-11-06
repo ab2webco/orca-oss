@@ -13,7 +13,10 @@ let memberOfTab: TeamMemberCard | null = null
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof sidebar) => unknown) => selector(sidebar)
 }))
-vi.mock('./use-team-panel-model', () => ({ useTeamMemberOfTab: () => memberOfTab }))
+const memberHook = vi.hoisted(() => vi.fn())
+const lookHook = vi.hoisted(() => vi.fn(() => 'game'))
+vi.mock('./use-team-panel-model', () => ({ useTeamMemberOfTab: memberHook }))
+vi.mock('./use-team-panel-look', () => ({ useTeamPanelLook: lookHook }))
 
 const { TeamMemberPaneHeader } = await import('./TeamMemberPaneHeader')
 
@@ -58,6 +61,9 @@ describe('TeamMemberPaneHeader', () => {
   beforeEach(() => {
     sidebar = { rightSidebarOpen: true, rightSidebarTab: 'team' }
     memberOfTab = member()
+    memberHook.mockReset()
+    memberHook.mockImplementation(() => memberOfTab)
+    lookHook.mockClear()
   })
 
   it("heads a member's terminal with its ticket, host, model and PR", () => {
@@ -100,5 +106,14 @@ describe('TeamMemberPaneHeader', () => {
     sidebar = { rightSidebarOpen: false, rightSidebarTab: 'team' }
 
     expect(render()).toBe('')
+  })
+
+  // Why: every terminal tab mounts the header; reading while closed would pin the orca.yaml read open.
+  it('reads neither the member nor the panel settings while the Team panel is closed', () => {
+    sidebar = { rightSidebarOpen: false, rightSidebarTab: 'team' }
+    render()
+
+    expect(memberHook).not.toHaveBeenCalled()
+    expect(lookHook).not.toHaveBeenCalled()
   })
 })
