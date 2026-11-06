@@ -226,6 +226,12 @@ orchestratorGame:
   openLinks: system # orca (default) | system: where the game's links open
   render: hd # classic (default) | hd | hd-compact: see "Render: classic, hd or hd-compact" below
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
+  panel: # the native panel; mode and render keep driving the terminal (see below)
+    look: game # game | display | plain; unset follows mode
+    style: pixel # figures | soft | office | pixel, for the game look
+    tabs: { prs: true, queue: false, machines: true }
+    advisor: true # the Advisor row, drawn only with its plugin
+    arcade: true # saved arcade credits, game look only
 ```
 
 `openLinks: system` opens every game link (PR, CI, ticket, activity, the PR and To Do list
@@ -242,6 +248,13 @@ An invalid value is dropped and reported (Settings shows the source of every val
 For an SSH worktree the project layer is read from the host over the SSH filesystem
 ([`worktree-orca-yaml.ts`](../../src/main/worktree-orca-yaml.ts)); while the host is disconnected
 the other layers still apply.
+
+`panel` belongs to the native panel and merges key by key, `tabs` tab by tab. An unset `look`
+follows `mode` (`zen` is Display, `flat` is Plain, anything else Game) and an unset `style` is
+Pixel, so nothing changes look on update ([`orchestrator-game-panel.ts`](../../src/shared/orchestrator-game-panel.ts)).
+It is edited in the project's game section and, as the default for every project, in Settings,
+Agents, Panel; the panel's gear opens the first with a team and the second without one. An Orca
+older than `panel` reports it as an unknown setting and ignores it.
 
 `rewardWeights` merges key by key like `orchestrator`: the project can lower one reward in
 `orca.yaml` while a dev turns another off in the project's Settings JSON. Like the lists below it
