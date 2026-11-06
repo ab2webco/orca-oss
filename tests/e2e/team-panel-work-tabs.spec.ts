@@ -12,6 +12,10 @@ const GB = 1024 ** 3
 const HOUR_MS = 3_600_000
 const LANGUAGES = ['en', 'es'] as const
 const TABS = ['team', 'prs', 'queue', 'machines'] as const
+// Why: the full capture matrix outruns the CI test budget; ORCA_CAPTURE_EVIDENCE=1 runs it locally.
+const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
+const CHECK_WIDTHS = CAPTURE_EVIDENCE ? WIDTHS : ([1440, 320] as const)
+const CHECK_THEMES = CAPTURE_EVIDENCE ? THEMES : (['dark'] as const)
 
 type Language = (typeof LANGUAGES)[number]
 type Tab = (typeof TABS)[number]
@@ -309,17 +313,19 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
 
     // Loading holds the read; it has no words, so one language says all of it.
     await expect(panel.locator('[aria-busy="true"]')).toBeVisible({ timeout: 30_000 })
-    for (const width of WIDTHS) {
+    for (const width of CHECK_WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
-      for (const theme of THEMES) {
+      for (const theme of CHECK_THEMES) {
         await setTheme(orcaPage, theme)
         // Why: a fresh read per capture keeps each one inside the panel's 15 s request timeout.
         await rereadPanel(orcaPage)
         await expect(panel.locator('[aria-busy="true"]')).toBeVisible()
-        await panel.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`loading-${width}-${theme}.png`)
-        })
+        if (CAPTURE_EVIDENCE) {
+          await panel.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`loading-${width}-${theme}.png`)
+          })
+        }
       }
     }
     await electronApp.evaluate(() => (globalThis as RigGlobal).__teamOpenGate?.())
@@ -361,15 +367,18 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
           await panel.getByRole('tab', { name: COPY[language].tabs[tab] }).click()
           // Why: the pointer stays on the tab it pressed, and draws another tab's hover once narrow.
           await orcaPage.mouse.move(0, 0)
-          for (const width of WIDTHS) {
+          for (const width of CHECK_WIDTHS) {
             await orcaPage.setViewportSize({ width, height: 900 })
-            for (const theme of THEMES) {
+            for (const theme of CHECK_THEMES) {
               await setTheme(orcaPage, theme)
               await scrollTabToEnd(orcaPage)
               const label = `${name} ${tab} ${width} ${theme} ${language}`
               await expectNoSidewaysScroll(orcaPage, label)
               await expectNoRowUnderTrigger(orcaPage, label)
               await expectActiveTabInsideStrip(orcaPage, label)
+              if (!CAPTURE_EVIDENCE) {
+                continue
+              }
               if (name === 'full') {
                 await orcaPage.screenshot({
                   animations: 'disabled',
@@ -408,10 +417,12 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
     const wave = panel.locator('[data-team-action="lead:wave"]')
     await expect(wave).toBeVisible({ timeout: 30_000 })
     await expect(panel.locator('[data-team-action="action-1"]')).toHaveCount(0)
-    await orcaPage.screenshot({
-      animations: 'disabled',
-      path: testInfo.outputPath('full-team-window.png')
-    })
+    if (CAPTURE_EVIDENCE) {
+      await orcaPage.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath('full-team-window.png')
+      })
+    }
 
     await wave.dblclick()
     await expect(orcaPage.getByText(COPY.es.sent).first()).toBeVisible()
