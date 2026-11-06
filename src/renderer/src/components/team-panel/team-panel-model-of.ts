@@ -89,7 +89,9 @@ export function teamPanelModelOf(args: {
     return null
   }
   const work = {
-    state,
+    // Why no host `panel`: it lags a toggle by a poll and, on a paired host, is that host's
+    // settings; teamPanelModelWithSettings applies this window's instead.
+    state: { ...state, panel: undefined },
     members: cards.members,
     isFolder: args.isFolder === true,
     texts: prFailureTexts(),
@@ -114,6 +116,6 @@ export function teamPanelModelOf(args: {
     inbox: inboxOf(state, questions),
     prs: teamPrSectionOf(work),
     queue: teamQueueSectionOf(work),
-    machines: teamMachinesSectionOf({ state, members: cards.members })
+    machines: teamMachinesSectionOf({ state: work.state, members: cards.members })
   }
 }
