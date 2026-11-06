@@ -9,7 +9,8 @@ const FRONT_ROW = 0.85
 const SINGLE_ROW = 0.55
 // Stations fill the left; the lead and advisor own the right edge.
 const FIRST_X = 0.1
-const LAST_X = 0.64
+// Why 0.58: the staggered front row then ends at 0.66, clear of the advisor at 0.74.
+const LAST_X = 0.58
 
 export type TeamSceneSeat = { key: string; spot: TeamSceneSpot }
 
