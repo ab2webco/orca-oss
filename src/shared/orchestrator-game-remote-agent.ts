@@ -11,6 +11,7 @@ import {
   type GameMemberAdvisor
 } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf, type GameMemberLaunch } from './orchestrator-game-member-launch'
+import { gameToolInputOf } from './orchestrator-game-tool-input'
 
 /**
  * A remote member's agent as its host's Claude/Codex hooks report it, relayed on
@@ -30,6 +31,8 @@ export type RemoteMemberAgent = {
   globalLogin?: true
   /** The tool the pane's hooks say it runs; absent from an older host (ORCA-933). */
   toolName?: string
+  /** A one-line preview of that tool's input; absent from an older host. */
+  toolInput?: string
   /** The Jev report the member's pane posted to its host; absent without Jev or from an older host. */
   advisor?: GameMemberAdvisor
   /** The model its hooks named, else its launch's; absent when neither named one or from an older host. */
@@ -52,8 +55,14 @@ export function remoteMemberAgentOf(
     agentType: entry.agentType ?? null,
     updatedAt: entry.receivedAt,
     ...(Number.isFinite(entry.stateStartedAt) ? { stateStartedAt: entry.stateStartedAt } : {}),
-    ...(entry.toolName ? { toolName: entry.toolName } : {})
+    ...(entry.toolName ? { toolName: entry.toolName } : {}),
+    ...toolInputField(entry.toolInput)
   }
+}
+
+const toolInputField = (value: unknown): { toolInput?: string } => {
+  const toolInput = gameToolInputOf(value)
+  return toolInput ? { toolInput } : {}
 }
 
 /** What a host relayed, or null when it relayed nothing usable. */
@@ -63,7 +72,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   }
   const { state, agentType, updatedAt, stateStartedAt, limit, account, globalLogin } =
     value as Record<string, unknown>
-  const { toolName, advisor, launch } = value as Record<string, unknown>
+  const { toolName, toolInput, advisor, launch } = value as Record<string, unknown>
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -100,6 +109,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
     ...(typeof toolName === 'string' && toolName !== ''
       ? { toolName: toolName.slice(0, TOOL_NAME_MAX) }
       : {}),
+    ...toolInputField(toolInput),
     ...(relayedAdvisor ? { advisor: relayedAdvisor } : {}),
     ...(relayedLaunch ? { launch: relayedLaunch } : {})
   }

@@ -179,6 +179,26 @@ describe('remote members of a lead (ORCA-824)', () => {
     })
   })
 
+  it("shows the tool and its input preview the member's host relays (ORCA-1049)", async () => {
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({
+        branch: 'b',
+        title: null,
+        liveness: 'running',
+        agent: {
+          state: 'working',
+          agentType: 'claude',
+          updatedAt: 0,
+          toolName: 'Bash',
+          toolInput: 'gh pr checks 912'
+        }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member).toMatchObject({ toolName: 'Bash', toolInput: 'gh pr checks 912' })
+  })
+
   it('relays a waiting agent and one stopped by its usage limit (ORCA-837)', async () => {
     const other = { ...source, dispatchId: 'ctx_806', remoteWorktreeId: 'repo::/home/me/orca-806' }
     const members = await remoteGameMembersOf([source, other], {

@@ -28,7 +28,11 @@ export type GameAgentRow = Pick<
   | 'toolName'
   | 'lastActivityAt'
   | 'orphaned'
-> & { parentPaneKey?: string | null; stateStartedAt?: number }
+> &
+  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>> & {
+    parentPaneKey?: string | null
+    stateStartedAt?: number
+  }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
 export type GameMemberAccountOf = (member: {
