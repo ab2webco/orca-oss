@@ -29,7 +29,9 @@ import {
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
+import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
@@ -145,11 +147,7 @@ export function GamePanelSetting({
   const layer = settings.orchestratorGame
   const panel = resolveOrchestratorGamePanel({ global: layer })
   const text = copy()
-  const title = translate('auto.components.settings.OrchestratorGamePanelSetting.title', 'Panel')
-  const description = translate(
-    'auto.components.settings.OrchestratorGamePanelSetting.description',
-    'The right sidebar panel for your agents. Each project can change it in its own settings.'
-  )
+  const [{ title, description, keywords }] = getGamePanelSearchEntries()
   const set = (field: GamePanelField, value: boolean | string): void =>
     updateSettings({ orchestratorGame: withGamePanelField(layer, field, value as PanelValue) })
   return (
@@ -157,7 +155,7 @@ export function GamePanelSetting({
       id={GAME_PANEL_GLOBAL_SECTION_ID}
       title={title}
       description={description}
-      keywords={['panel', 'team', 'look', 'tabs', 'prs', 'queue', 'machines']}
+      keywords={keywords}
       className="space-y-1"
     >
       <SettingsSubsectionHeader title={title} description={description} />
@@ -206,11 +204,13 @@ export function ProjectGamePanelRows({
   repoId,
   settings,
   projectLayer,
+  advisorPlugin,
   updateSettings
 }: {
   repoId: string
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
+  advisorPlugin: AdvisorPluginPresence
   updateSettings: Update
 }): React.JSX.Element {
   const local = settings.orchestratorGameProjects?.[repoId]
@@ -238,7 +238,7 @@ export function ProjectGamePanelRows({
   }
   const toggles: Toggle[] = [
     ...GAME_PANEL_TABS,
-    'advisor',
+    ...(advisorPlugin === 'missing' ? [] : (['advisor'] as const)),
     ...(panel.look === 'game' ? (['arcade'] as const) : [])
   ]
   const choices = (field: 'look' | 'style') => [

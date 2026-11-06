@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
 import { GamePanelSetting, ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
+import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 
@@ -79,13 +80,18 @@ describe('GamePanelSetting', () => {
 })
 
 describe('ProjectGamePanelRows', () => {
-  const projectRows = (settings: GameSettings, projectLayer?: OrchestratorGameLayer) => {
+  const projectRows = (
+    settings: GameSettings,
+    projectLayer?: OrchestratorGameLayer,
+    advisorPlugin: AdvisorPluginPresence = 'installed'
+  ) => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectGamePanelRows
         repoId="r1"
         settings={settings}
         projectLayer={projectLayer}
+        advisorPlugin={advisorPlugin}
         updateSettings={(next) => updates.push(next)}
       />
     )
@@ -129,5 +135,18 @@ describe('ProjectGamePanelRows', () => {
     expect(view.container.querySelector('[aria-label="Arcade"]')).toBeNull()
     expect(view.container.querySelector('[aria-label="Advisor"]')).toBeTruthy()
     view.unmount()
+  })
+
+  it('hides the Advisor row only when the host says the plugin is missing', () => {
+    const shown = (presence: AdvisorPluginPresence): boolean => {
+      const view = projectRows({}, undefined, presence)
+      const row = view.container.querySelector('[aria-label="Advisor"]') !== null
+      view.unmount()
+      return row
+    }
+
+    expect(shown('installed')).toBe(true)
+    expect(shown('unknown')).toBe(true)
+    expect(shown('missing')).toBe(false)
   })
 })

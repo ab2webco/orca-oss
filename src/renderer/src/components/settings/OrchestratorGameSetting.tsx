@@ -64,6 +64,8 @@ import {
 } from './OrchestratorGameViewSetting'
 import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
 import { ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import { useAdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { getRepositoryGameSectionId } from './repository-settings-targets'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
@@ -204,12 +206,13 @@ export function ProjectOrchestratorGameSetting({
   projectLayer,
   updateSettings
 }: {
-  repo: Pick<Repo, 'id' | 'path' | 'connectionId'>
+  repo: Pick<Repo, 'id' | 'path' | 'connectionId' | 'executionHostId'>
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
   const repoId = repo.id
+  const advisorPlugin = useAdvisorPluginPresence(repo)
   const local = settings.orchestratorGameProjects?.[repoId]
   const { config, sources, sceneFile } = resolveOrchestratorGameConfig({
     global: settings.orchestratorGame,
@@ -298,7 +301,7 @@ export function ProjectOrchestratorGameSetting({
       id={getRepositoryGameSectionId(repoId)}
       title={title()}
       description={description}
-      keywords={keywords}
+      keywords={[...keywords, ...getGamePanelSearchEntries()[0].keywords]}
     >
       <div className="space-y-1">
         {sectionHeader()}
@@ -307,6 +310,7 @@ export function ProjectOrchestratorGameSetting({
           repoId={repoId}
           settings={settings}
           projectLayer={projectLayer}
+          advisorPlugin={advisorPlugin}
           updateSettings={updateSettings}
         />
         <ProjectOrchestratorGameViewRows
