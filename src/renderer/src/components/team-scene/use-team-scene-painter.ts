@@ -46,8 +46,11 @@ export function teamSceneDrawnStyleOf(args: {
   })
 }
 
-/** The painter for the panel's style; null only while its art decodes, so hold the stage's height. */
-export function useTeamScenePainter(args: TeamScenePainterArgs): TeamScenePainter | null {
+/** The style really drawn, with its painter; null only while the art decodes. */
+export type TeamSceneStage = { drawn: GamePanelStyle; painter: TeamScenePainter | null }
+
+/** The stage for the panel's style; while the painter is null, hold `TEAM_SCENE_ART_HEIGHT`. */
+export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage {
   const { style, scene, timezone } = args
   const colors = useTeamSceneStatusColors()
   const [failed, setFailed] = useState<GamePanelStyle | null>(null)
@@ -96,10 +99,11 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamScenePainte
   }, [sceneKey, timezone])
 
   const art = loaded?.style === artStyle ? loaded?.art : null
-  return useMemo(() => {
+  const painter = useMemo(() => {
     if (artStyle === null) {
       return createPixelPainter({ ...pixelScene, colors })
     }
     return art ? createImagePainter({ art, colors }) : null
   }, [artStyle, art, pixelScene, colors])
+  return { drawn, painter }
 }

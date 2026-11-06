@@ -21,7 +21,8 @@ export type TeamSceneImageArt = {
   images: ReadonlyMap<string, TeamSceneArtImage>
 }
 
-const HEIGHT = 176
+/** The art styles' stage, which the panel holds while their images decode. */
+export const TEAM_SCENE_ART_HEIGHT = 176
 const TAU = 2 * Math.PI
 const SEAT_PX = 2
 const SHADOW_WIDTH = 0.2
@@ -146,7 +147,7 @@ export function createImagePainter(args: {
   }
 
   return {
-    height: HEIGHT,
+    height: TEAM_SCENE_ART_HEIGHT,
     headTop: (depth, h) => {
       const art = style.roles.lead
       return feetY(depth, h) - feetOf(art).y * sheetPxAt(art, depth)

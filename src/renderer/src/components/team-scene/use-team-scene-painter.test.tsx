@@ -76,7 +76,7 @@ describe('useTeamScenePainter', () => {
   let seen: (TeamScenePainter | null)[]
 
   function Probe(props: TeamScenePainterArgs): null {
-    seen.push(useTeamScenePainter(props))
+    seen.push(useTeamScenePainter(props).painter)
     return null
   }
   const render = async (style: GamePanelStyle, scene: TeamScenePainterArgs['scene']) =>
