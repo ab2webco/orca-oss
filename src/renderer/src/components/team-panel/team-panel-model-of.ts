@@ -1,3 +1,4 @@
+import { gameCharacterLevelOf } from '../../../../shared/orchestrator-game-characters'
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
@@ -65,8 +66,7 @@ function arcadeOf(state: OrchestratorGameState): TeamPanelGameModel['arcade'] {
 
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP) stay empty rather than guessed:
- * their tickets fill them.
+ * XP comes from game.characters, read beside game.state, and stays empty when it is not.
  */
 export function teamPanelModelOf(args: {
   repoId: string
@@ -76,6 +76,10 @@ export function teamPanelModelOf(args: {
   questions: readonly GameOwnerQuestion[] | null
   /** A folder workspace has no remote, so no PRs or queue. */
   isFolder?: boolean
+  /** The project's characters XP summed; null when the host could not list them. */
+  xp?: number | null
+  /** The UI language, for the lead's default character name. */
+  locale?: string
 }): TeamPanelGameModel | null {
   const { state, questions } = args
   const openTickets = new Set(
@@ -85,7 +89,12 @@ export function teamPanelModelOf(args: {
   )
   const open = (questions ?? []).filter((one) => !one.answer)
   const oldest = open.toSorted((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
-  const cards = teamCardsOf(state, openTickets, oldest ? { ticket: oldest.ticket } : null)
+  const cards = teamCardsOf(
+    state,
+    openTickets,
+    oldest ? { ticket: oldest.ticket } : null,
+    args.locale
+  )
   if (!cards) {
     return null
   }
@@ -106,7 +115,8 @@ export function teamPanelModelOf(args: {
     advisor: advisorOf(state),
     members: cards.members,
     metrics: teamMetricsOf(state),
-    xp: null,
+    // Why the game's curve: the level is what the characters earned, not a figure drawn here (ORCA-1094).
+    xp: typeof args.xp === 'number' ? gameCharacterLevelOf(args.xp) : null,
     arcade: arcadeOf(state),
     stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
     // Why guarded: a paired host on an older build may send neither.
