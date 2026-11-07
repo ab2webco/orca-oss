@@ -23,14 +23,15 @@ const LIVE_COLORS: Readonly<Record<LiveState, string | undefined>> = {
 const beneathOf = (drawn: RenderElement): RenderElement[] =>
   drawn.type === 'engine' ? [] : [drawn]
 
+// Why a list: an empty one draws nothing, with no null beside RenderElement in the type.
 async function liveRow(
   $: EngineInterface,
   e: RenderInput<'AbovePrompt'>
-): Promise<RenderElement | null> {
+): Promise<RenderElement[]> {
   await readLiveBeat($)
   const turn = quest.turn
   if (turn === undefined || e.props.view.agentId !== undefined) {
-    return null
+    return []
   }
   const status = liveStatusOf(turn, await $.clock.now())
   const phase = shownPhase() ?? 'working'
@@ -50,8 +51,8 @@ async function liveRow(
   const head = ` ${line.verb} ${line.time}`
   const room = e.props.bodyColumns - cellWidthOf(`${line.glyph} ${line.name}${head} · `)
   const { Box, Text } = $.ui.resolve(e)
-  return (
-    <Box flexDirection="row">
+  return [
+    <Box key="live" flexDirection="row">
       <Text color={color}>{line.glyph}</Text>
       <Text> </Text>
       <Text bold color={color}>
@@ -62,7 +63,7 @@ async function liveRow(
         <Text dimColor wrap="truncate-end">{` · ${fitCells(line.step, room)}`}</Text>
       )}
     </Box>
-  )
+  ]
 }
 
 /** Above the prompt the live line, then Jev's failures, stops and escalations; the team lives in the Team panel. */
