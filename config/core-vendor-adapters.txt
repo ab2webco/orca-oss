@@ -1,0 +1,36 @@
+# Core files allowed to name Jev, Sonar or Engram in code (ORCA-1005). Each one keeps Orca whole
+# when its vendor is absent. A new line needs a reviewer's yes; a line whose file stops naming the
+# vendor fails the check, so this list only shrinks. Checked by check:core-vendor-dependencies.
+# Format: <vendor> <path> -- <why it is safe without the vendor>
+
+jev resources/claude-plugins/orca-game/hooks/advisor-calls.ts -- draws Jev's calls only when a Jev report is held
+jev resources/claude-plugins/orca-game/hooks/advisor-card-rows.ts -- marks which rows Jev picked; plain rows otherwise
+jev resources/claude-plugins/orca-game/hooks/advisor-cues.ts -- matches Jev's gate wording; no gate, no cue
+jev resources/claude-plugins/orca-game/hooks/advisor-state.ts -- reads Jev's mod state key, which catches to null
+jev resources/claude-plugins/orca-game/hooks/advisor-sync.ts -- listens for Jev's state writes, which never fire without it
+jev resources/claude-plugins/orca-game/hooks/allies.ts -- builds Jev's ally rows from a held report only
+jev resources/claude-plugins/orca-game/hooks/fleet-sync.ts -- sends the Jev report when one reads, null otherwise
+jev resources/claude-plugins/orca-game/hooks/jev-alerts.ts -- alerts from a held Jev report; empty for null
+jev resources/claude-plugins/orca-game/hooks/member-advisor.ts -- labels a member's Jev line, drawn only with a report
+jev resources/claude-plugins/orca-game/hooks/text-layer.tsx -- reads Jev's alerts, which are empty without a report
+jev src/cli/bundled-skill-guides.ts -- generated skill guide text that mentions Jev
+jev src/renderer/src/components/settings/use-advisor-plugin-presence.ts -- asks whether Jev's plugin is installed; missing is an answer
+jev src/renderer/src/components/team-panel/TeamTabContent.tsx -- the Advisor row's source label, drawn only with a Jev report
+sonar src/cli/bundled-skill-guides.ts -- generated skill guide text that mentions orca sonar
+sonar src/cli/handler-group-manifest.ts -- registers `orca sonar`, which refuses plainly without the plugin
+sonar src/cli/handlers/sonar.ts -- `orca sonar` handler; refuses when the plugin is not installed
+sonar src/cli/index.ts -- routes `orca sonar` before the runtime starts
+sonar src/cli/sonar-command.ts -- finds the installed plugin's CLI, or reports it missing
+sonar src/cli/specs/index.ts -- lists the `orca sonar` command spec
+sonar src/cli/specs/sonar.ts -- the `orca sonar` command spec
+sonar src/main/index.ts -- schedules the index warm-up, which returns when the plugin is inactive
+sonar src/main/ipc/notification-sound-selection.ts -- the Sonar notification sound, not the plugin
+sonar src/main/persistence/applying-settings/onboarding-normalization.ts -- the Sonar notification sound, not the plugin
+sonar src/main/sonar-index-warmup.ts -- warm-up gated on the plugin being active; never awaited, never throws
+sonar src/renderer/src/components/notification-sound-options.ts -- the Sonar notification sound, not the plugin
+sonar src/shared/appimage-cli-command-roots.ts -- the CLI command name list, which `orca sonar` belongs to
+sonar src/shared/notification-settings-types.ts -- the Sonar notification sound, not the plugin
+sonar src/shared/pr-comment-audience.ts -- SonarCloud and SonarQube review bots, not the plugin
+sonar src/shared/sonar-cli-location.ts -- resolves the installed plugin's CLI path, ok false when absent
+engram src/main/runtime/orca-runtime.ts -- wires Engram as a lesson mirror; lessons live in Orca's own store
+engram src/main/runtime/orchestrator-game-lesson-engram.ts -- the mirror itself: 1.5 s timeout, a failure never reaches a brief

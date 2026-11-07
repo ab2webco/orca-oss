@@ -230,3 +230,51 @@ describe('mergeGameMemberSession with fields left undefined', () => {
     expect(parseGameMemberSessionsFile(serializeGameMemberSessions(list)).ok).toBe(true)
   })
 })
+
+describe('a worktree id longer than a saved field (ORCA-1119)', () => {
+  const base = `${'r'.repeat(36)}::/Users/someone/a/deep/workspace/dir/${'x'.repeat(120)}/repo/`
+  const long = `${base}live-2`
+  const saved = () => {
+    const list = mergeGameMemberSession([], { ...member('ORCA-1'), worktreeId: long }, 'now')
+    return JSON.parse(serializeGameMemberSessions(list)) as {
+      members: Record<string, unknown>[]
+    }
+  }
+
+  it('reads back whole after a save', () => {
+    const list = mergeGameMemberSession([], { ...member('ORCA-1'), worktreeId: long }, 'now')
+    const read = parseGameMemberSessionsFile(serializeGameMemberSessions(list))
+    expect(read.ok && read.members[0]?.worktreeId).toBe(long)
+    expect(read.ok && read.kept).toBeUndefined()
+  })
+
+  it('keeps every field an older parser checks within 200 characters', () => {
+    const [one] = saved().members
+    for (const [key, value] of Object.entries(one ?? {})) {
+      if (key !== 'fullWorktreeId' && typeof value === 'string') {
+        expect(value.length, key).toBeLessThanOrEqual(200)
+      }
+    }
+    expect(one?.fullWorktreeId).toBe(long)
+  })
+
+  it('reads the id an older Orca saved over the stand-in, not the stale whole one', () => {
+    const file = saved()
+    const other = `${base}live-1`.slice(0, 200)
+    file.members[0] = { ...file.members[0], worktreeId: other }
+    const read = parseGameMemberSessionsFile(JSON.stringify(file))
+    expect(read.ok && read.members[0]?.worktreeId).toBe(other)
+  })
+
+  it('reads a file with no whole id as before', () => {
+    const file = saved()
+    delete file.members[0]?.fullWorktreeId
+    const read = parseGameMemberSessionsFile(JSON.stringify(file))
+    expect(read.ok && read.members[0]?.worktreeId).toBe(`${long.slice(0, 199)}…`)
+  })
+
+  it('saves a short id with no whole-id field', () => {
+    const list = mergeGameMemberSession([], { ...member('ORCA-1'), worktreeId: 'repo::/w' }, 'now')
+    expect(serializeGameMemberSessions(list)).not.toContain('fullWorktreeId')
+  })
+})

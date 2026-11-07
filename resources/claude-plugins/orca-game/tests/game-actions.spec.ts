@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { GameProjectItem, GameProjectList, GameState, GameStatusGroup } from '../types'
-import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import {
   ACTION_HOTKEYS,
   PANEL_RESERVED_KEYS,
@@ -213,47 +212,6 @@ describe('the To Do grouped by status', () => {
       items: [ticketOf('#1'), ticketOf('#2')]
     }
     expect(todoSectionsOf(list)).toEqual([{ heading: null, items: list.items }])
-  })
-})
-
-describe('the QA chip', () => {
-  const chipsOf = (groups?: GameProjectList['groups']): BandChip[] =>
-    stateChipsOf(
-      {
-        ...STATE,
-        project: {
-          reviews: null,
-          todo: {
-            provider: 'plane',
-            total: 5,
-            url: 'https://plane.example/todo',
-            items: [],
-            ...(groups === undefined ? {} : { groups })
-          }
-        }
-      },
-      { working: 0, idle: 0, done: 0, waiting: 0 },
-      0,
-      '',
-      false
-    )
-
-  it('counts the tickets waiting on QA, green, opening the To Do, after the To Do chip', () => {
-    const chips = chipsOf({ review: 2, todo: 3 })
-    const qa = chips.find((one) => one.key === 'band-qa')
-    const todo = chips.find((one) => one.key === 'band-todo')
-    expect(qa).toMatchObject({
-      labels: ['✓ QA 2', '✓ 2'],
-      href: 'https://plane.example/todo',
-      color: 'green',
-      isLink: true
-    })
-    expect(qa?.priority).toBeGreaterThan(todo?.priority ?? Infinity)
-  })
-
-  it('draws no QA chip with nothing in QA or no groups', () => {
-    expect(chipsOf({ review: 0, todo: 3 }).some((one) => one.key === 'band-qa')).toBe(false)
-    expect(chipsOf().some((one) => one.key === 'band-qa')).toBe(false)
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
+  TeamActivityRow,
   TeamAdvisorRow,
   TeamLeadCard,
   TeamPanelGameModel,
@@ -97,6 +98,23 @@ describe('teamPanelModelWithSettings', () => {
       expect(tabIds(teamPanelModelWithSettings(solo, panel({ tabs })))).not.toContain(id)
     }
   )
+
+  it("drops each no-team session's Jev section when Advisor is off", () => {
+    const row = { paneKey: 'pane-a', advisor } as TeamActivityRow
+    const model: TeamPanelSoloModel = {
+      kind: 'solo',
+      selectedPaneKey: null,
+      rows: [row],
+      inbox: { kind: 'loading' },
+      prs: null,
+      queue: null,
+      machines: null
+    }
+    const hidden = teamPanelModelWithSettings(model, panel({ advisor: false }))
+    expect(hidden.kind === 'solo' ? hidden.rows[0]?.advisor : 'team').toBeNull()
+    const shown = teamPanelModelWithSettings(model, panel())
+    expect(shown.kind === 'solo' ? shown.rows[0]?.advisor : 'team').toEqual(advisor)
+  })
 
   it('drops the Advisor row under the lead when Advisor is off', () => {
     const hidden = teamPanelModelWithSettings(team, panel({ advisor: false }))

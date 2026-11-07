@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { GameAgent, GameState } from '../types'
 import { ACCESSORIES, characterCostumeOf } from '../hooks/character-look'
-import { flatMemberLinesOf } from '../hooks/flat-view'
 import { hudGridOf, type HudMember } from '../hooks/fleet-hud'
 import { tileGridOf } from '../hooks/fleet-tiles'
 import { placedPartyOf } from '../hooks/hd-party'
@@ -173,33 +171,5 @@ describe('members drawn as their characters', () => {
       spriteWidth: 12
     })
     expect(new Set(party.map((one) => JSON.stringify(one.sprite.rows))).size).toBe(4)
-  })
-
-  it('marks each character in the flat view with its own color, a plain name too', () => {
-    const agent = (displayName: string, paneKey: string): GameAgent => ({
-      paneKey,
-      displayName,
-      agentType: 'claude',
-      state: 'working',
-      toolName: 'Edit',
-      isLeader: false
-    })
-    const state: GameState = {
-      config: {},
-      warnings: [],
-      extensions: { scenes: [] },
-      links: [],
-      activity: null,
-      worktree: null,
-      agents: NAMES.map((name, i) => agent(name, `p${i}`)),
-      review: null,
-      workItem: null,
-      role: 'lead'
-    }
-    const lines = flatMemberLinesOf({ state, scene: SCENE, columns: 80, maxMembers: 4 })
-    const looks = lines.map((line) => line.parts.find((part) => part.key === 'look')?.color)
-    expect(looks).not.toContain(undefined)
-    expect(new Set(looks).size).toBe(4)
-    expect(looks[1]).toBe('#5f8fd7')
   })
 })

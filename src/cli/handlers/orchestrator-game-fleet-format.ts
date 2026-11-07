@@ -36,7 +36,15 @@ export type GameWaveResult = GameWavePlan & {
 }
 
 export type SweepClose =
-  | { via: 'release'; dispatchId: string; state: string; reason?: string; recovery?: string }
+  | {
+      via: 'release'
+      dispatchId: string
+      state: string
+      reason?: string
+      recovery?: string
+      /** The other dispatches of its host worktree this release freed too (ORCA-1076). */
+      worktreeDispatches?: { dispatchId: string; state: string }[]
+    }
   | { via: 'close'; terminal: string }
   | { via: 'release' | 'close'; error: string }
 
@@ -238,7 +246,7 @@ function formatSweepClose(closed: SweepClose | null | undefined): string {
   }
   return closed.via === 'close'
     ? ` — closed ${closed.terminal}`
-    : ` — release ${closed.dispatchId} [${closed.state}]${closed.reason ? ` ${closed.reason}` : ''}`
+    : ` — release ${closed.dispatchId} [${closed.state}]${(closed.worktreeDispatches ?? []).map((other, index) => `${index === 0 ? ' with' : ','} ${other.dispatchId} [${other.state}]`).join('')}${closed.reason ? ` ${closed.reason}` : ''}`
 }
 
 export function formatSweep(sweep: GameSweepResult, now: number = Date.now()): string {

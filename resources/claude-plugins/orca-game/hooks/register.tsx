@@ -19,6 +19,7 @@ import { isGameLeadCommand, isLeadStarted, isMadeLeadOutput } from './lead-start
 import { noteSubagentCall, noteSubagentDone, runningLeadSubagents } from './lead-subagents'
 import { viewOf } from './fleet-sync'
 import { questLeadActive, questToolCall, questTurnComplete } from './quest-turns'
+import { bumpLive, liveAsk, liveTurnEnd, liveTurnStart } from './live-turn'
 
 export const register: Register = (on) => {
   registerQuest(on)
@@ -44,9 +45,19 @@ export const register: Register = (on) => {
     return started
   })
 
-  on('turn.complete', ($, e, next) => {
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined) {
+      liveTurnStart(await $.clock.now())
+      void bumpLive($)
+    }
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
     questTurnComplete(e.agentId)
     if (e.agentId === undefined) {
+      liveTurnEnd(e, await $.clock.now())
+      void bumpLive($)
       if (dropAdvisorCall()) {
         $.ui.invalidate('ui.render')
       }
@@ -60,6 +71,16 @@ export const register: Register = (on) => {
 
   on('tool.call', async ($, e, next) => {
     questToolCall(String(e.tool), e, e.agentId)
+    if (e.agentId === undefined && String(e.tool) === 'AskUserQuestion') {
+      const close = liveAsk(e, await $.clock.now())
+      void bumpLive($)
+      try {
+        return await next(e)
+      } finally {
+        close()
+        void bumpLive($)
+      }
+    }
     if (e.agentId !== undefined) {
       noteSubagentCall(runningLeadSubagents, e.agentId, String(e.tool), await $.clock.now())
     } else if (String(e.tool) === 'Bash') {

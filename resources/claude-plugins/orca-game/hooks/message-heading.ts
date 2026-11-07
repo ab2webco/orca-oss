@@ -1,4 +1,5 @@
 import type { ScenePhase } from '../types'
+import { cellWidthOf } from './cell-width'
 import { shortMemberNameOf } from './member-character'
 import type { MessageHeadingWords, ToolKind } from './message-heading-words'
 
@@ -9,6 +10,30 @@ export const messageHeadingOf = (
   isQuestion: boolean,
   words: MessageHeadingWords
 ): string => `${name} · ${isQuestion ? words.asksYou : words.phases[phase]}`
+
+const MINUTE_MS = 60_000
+const RULE_MIN = 3
+
+/** How far into its turn a block was written: `0:06` under a minute, then `10 min`, `1 h 5 min`. */
+export const headingTimeOf = (elapsedMs: number): string => {
+  const seconds = Math.max(0, Math.floor(elapsedMs / 1000))
+  if (seconds < 60) {
+    return `0:${String(seconds).padStart(2, '0')}`
+  }
+  const minutes = Math.floor(elapsedMs / MINUTE_MS)
+  const hours = Math.floor(minutes / 60)
+  if (hours === 0) {
+    return `${minutes} min`
+  }
+  return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`
+}
+
+// Why one column spare: a row that fills the last column wraps on some terminals.
+/** Cells of the rule between a heading and its time, a space either side. */
+export const headingRuleWidthOf = (label: string, time: string, columns: number): number => {
+  const timeCells = time === '' ? 0 : cellWidthOf(time) + 1
+  return Math.max(RULE_MIN, columns - 1 - cellWidthOf(label) - 1 - timeCells)
+}
 
 /** A member's character, a lead's title, else the phase card's name. */
 export const headingNameOf = (hero: string | undefined, cardName: string): string =>

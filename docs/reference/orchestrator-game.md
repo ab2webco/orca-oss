@@ -49,15 +49,11 @@ its words from it. A Raster only takes width-1 characters, so a wide character i
 
 ### A member's pane
 
-A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws a member
-band in place of the lead's: one line with its character, ticket, the phase card it shows, its PR
-and CI ([`member-band.tsx`](../../resources/claude-plugins/orca-game/hooks/member-band.tsx)). It has
-no Panel, team chips, party HUD or lead buttons, only a menu row on the pane's own colors:
-**Collapse** folds the band to that row and takes the scene off the spinner for the session,
-**Text** is the lead's text toggle, and **Refresh** reads `game state` again. While the member's
-`orca orchestration ask` waits on the lead, a line shows the question (`? Asked <lead>: …`), kept
-when collapsed and cleared when the answer returns. Its replies use the same heading rows as the lead's,
-and the scene still draws above the spinner unless collapsed or in text mode.
+A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws the same
+text layer as the lead's pane, with no band
+([`text-layer.tsx`](../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)). Its ticket, host,
+model, PR and whether it waits for you show in the native header over its terminal while the Team
+panel is open (ORCA-1055).
 
 A local member draws its lead's scene file when its own worktree cannot read it: `.orca/` is often
 git-excluded, so a fresh member worktree lacks the file the lead draws, and `game state` reads the
@@ -604,7 +600,13 @@ members hold only while another name is free: they give way before a launch numb
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
-- `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead` — the standing rules that make this session the lead (none for a member). A
+  local Claude pane started without the game mod (no `ORCA_GAME_MODE`) is refused with `Not the lead:`
+  and told to run `/orca-game:lead` in a Claude Agent Teams tab, since it would lead with no Advisor
+  row and no `/orca-game` commands. Where the mod can never load (SSH, WSL, the game off, a Claude
+  older than 2.1.287) the pane still leads, and a first line says what it lacks. A lead that is not
+  Claude is unchanged. The rules name `ORCA_GAME_CLI`, else WSL's `ORCA_CLI_COMMAND`, before a bare
+  `orca` ([`orchestrator-game-lead-pane.ts`](../../src/cli/handlers/orchestrator-game-lead-pane.ts)).
 - `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
   project's stored lead conversation and this session becomes the new lead instead of reopening it.
   A live lead still wins, and an older host that drops the flag reopens the old one and says so.
@@ -1757,39 +1759,21 @@ twice. `/orca-game:demo offer` (or `/quest demo offer`) plays the same cheer and
 
 ## Other plugins in a game pane
 
-Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,
-`zen` or `flat` with the band on) the mod draws what they show in the scene's style instead of
-letting each one paint its own
-([`allies-strip.tsx`](../../resources/claude-plugins/orca-game/hooks/allies-strip.tsx)):
+Other Claude Code plugins keep running in a team pane and draw their own status lines and bands;
+since ORCA-1055 the game no longer holds them in a strip. While the game is on, the mod keeps one
+thing above the prompt
+([`text-layer.tsx`](../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)):
 
-- **Status lines.** A `ui.status` hook takes another plugin's `$.ui.status(text)` before Claude Code
-  sees it and keeps it as a row of the **allies strip** under the band, labeled with the plugin's
-  name; `undefined` removes the row. With the game `off` the call passes through untouched. The
-  user's own `statusLine` is not a plugin call and is never touched.
-- **Jev.** The strip reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
-  `AdvisorState`, `version: 1`) without depending on Jev: its line with model·effort, one row per
-  running subagent (title, model, verdict), its CI rows and its latest notice. Any other version, or
-  a value that is not an advisor, is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
-  value is written; nothing polls it. The same value puts Jev's advisor in the scene and its card
-  in the Panel ([The cast](#the-cast-a-pet-and-jevs-advisor)).
+- **Jev's alerts.** It reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
+  `AdvisorState`, `version: 1`) without depending on Jev, and draws a `Jev · …` line for each failed
+  CI run and for Jev's latest notice when it is a stop (red) or an escalation (yellow). Jev's model
+  line, subagent rows, running CI and info notices are left to the Team panel. Any other version
+  draws nothing.
 - **Following the game.** The game publishes `{ plugin: 'orca-game', key: 'absorbing' }`, a
-  `boolean` true exactly while it draws other plugins' lines (mode not `off`, HUD on), at load and
-  on every change: the env, Orca's live config and `/orca-game:mode`. Jev reads it, so a pane where the game
-  stops drawing (`/orca-game:mode off`, the HUD turned off in Settings) shows Jev's own line again, and one
-  where it starts never shows Jev twice. `/orca-game:mode off` keeps the band (the HUD is its own switch) and
-  drops the strip, since the other plugins then draw for themselves.
-- **One bad row.** An advisor value Jev extends with a row the strip cannot read loses that row
-  only; the rest of Jev still draws. Any other `version` draws no Jev row.
-- **Stale lines.** Each session starts with no held status, so a plugin that was disabled, reloaded
-  or crashed without clearing its line leaves nothing behind.
-- **Zen** keeps one row: Jev's line, or else the latest status.
-- **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, drawn under
-  the strip, and a `ui.resolve` hook paints every other plugin's `Text` in the scene palette (a
-  highlighted run as the gold pill; red, green, yellow and the theme's error, warning and success
-  stay). A plugin loaded in the `prepend` tier draws outside the game and can hide it.
-
-The strip keeps at most six rows, the last saying how many it left out, and each row is cut to
-the band's width (the label to a third of it, the text next, the badge dropped first).
+  `boolean` true while the game is on with the HUD, at load and on every change. Jev reads it, so
+  its alerts are drawn once, by the game.
+- **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, under the
+  game's lines.
 
 ## Narrow panes
 

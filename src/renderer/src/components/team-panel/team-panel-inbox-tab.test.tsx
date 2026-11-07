@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
-import type { GameInboxQuestionGroup } from '@/components/game-inbox/GameInboxSheet'
+import type { GameInboxQuestionGroup } from '@/components/game-inbox/use-other-game-inbox-groups'
 import { TeamInboxView } from './team-panel-inbox-tab'
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -89,6 +89,7 @@ function renderInbox(
       projectName="orca-oss"
       projectUnread={null}
       questions={[question('q-1', 'Merge #923 now or wait for #915?', 'ORCA-1039')]}
+      undelivered={[]}
       onAnswer={vi.fn(async () => {})}
       otherGroups={[other]}
       threads={THREADS}
@@ -171,11 +172,27 @@ describe('Inbox tab', () => {
     expect(view.queryByRole('tab', { name: /For you/ })).toBeNull()
   })
 
+  // Why: the sidebar entry stayed up for a held answer, so an empty Inbox must not hide one.
+  it('shows a held answer when every list is empty', () => {
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      threads: { threads: [], waiting: [], answered: [] },
+      undelivered: [question('q-held', 'Does the warning still show?', 'ORCA-1039')]
+    })
+
+    expect(view.getByTestId('game-inbox-undelivered').textContent).toContain(
+      'Does the warning still show?'
+    )
+    expect(view.queryByText('Nothing waits for you')).toBeNull()
+  })
+
   // Why: with no team, a blocked agent's question comes from its AgentStatusEntry, not the board.
   it('lists an agent that asks, with its options and a way to its terminal', () => {
     const onOpenAgent = vi.fn()
     const agent = {
       paneKey: 'tab-1:leaf-1',
+      terminalHandle: null,
       worktreeId: 'wt-tooltip',
       host: { kind: 'local' as const },
       repoName: 'orca-oss',
