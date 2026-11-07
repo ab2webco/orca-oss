@@ -8,10 +8,33 @@ import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { runOrcaCli } from './helpers/orca-cli-process'
 import { waitForSessionReady } from './helpers/store'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { AgentHookEndpoint } from '../../src/shared/agent-hook-endpoint-file'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
+
+// Why Claude: the lead and the other session are Claude panes, as in the live check; the
+// launched Codex member then has the global login to itself.
+async function postClaudePrompt(
+  endpoint: AgentHookEndpoint,
+  pane: { paneKey: string; worktreeId: string },
+  prompt: string
+): Promise<void> {
+  const response = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Orca-Agent-Hook-Token': endpoint.token },
+    body: JSON.stringify({
+      paneKey: pane.paneKey,
+      tabId: pane.paneKey.split(':')[0],
+      worktreeId: pane.worktreeId,
+      env: endpoint.env,
+      version: endpoint.version,
+      payload: { hook_event_name: 'UserPromptSubmit', prompt }
+    })
+  })
+  expect(response.status).toBe(204)
+}
 
 // ORCA-1135: a lead in a project-group folder workspace (no git, no repo record) sees and adopts
 // that folder's other agents, launches a member that runs in the folder, and the panel shows it.
@@ -99,14 +122,14 @@ for (const plugins of [false, true]) {
       await expect
         .poll(
           async () => {
-            await emitCodexHookStatus(endpoint, { ...otherPane, state: 'working', prompt: 'Other' })
+            await postClaudePrompt(endpoint, otherPane, 'Other')
             const state = await readState()
             return { role: state.role, folder: state.worktree?.folder, found: foundOf(state) }
           },
           { timeout: 60_000, message: 'game.state never found the folder agent' }
         )
         .toEqual({ role: 'lead', folder: true, found: [otherPane.paneKey] })
-      await emitCodexHookStatus(endpoint, { ...leadPane, state: 'working', prompt: 'Lead' })
+      await postClaudePrompt(endpoint, leadPane, 'Lead')
       await expect
         .poll(async () => foundOf(await readState()), { timeout: 30_000 })
         .toEqual([otherPane.paneKey])
