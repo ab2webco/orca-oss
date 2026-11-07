@@ -16,6 +16,9 @@ import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
 
+/** Why here: core names its advisor only in the files core-vendor-adapters.txt lists. */
+export const teamAdvisorSourceText = (): string => translate('teamPanel.advisor.source', 'Jev')
+
 function coordinatesText(count: number): string {
   return count === 1
     ? translate('teamPanel.lead.coordinatesOne', 'Coordinates 1 agent')
@@ -74,7 +77,7 @@ function AdvisorCardRow({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Ele
           {translate('teamPanel.advisor.label', 'Advisor')}
         </code>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {translate('teamPanel.advisor.source', 'Jev')}
+          {teamAdvisorSourceText()}
         </span>
       </span>
       {advisor.line ? (

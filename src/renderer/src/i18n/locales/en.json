@@ -17253,8 +17253,7 @@
       "countWorking": "{{count}} working",
       "countDone_one": "{{count}} done",
       "countDone_other": "{{count}} done",
-      "agent": "Agent",
-      "jev": "Jev"
+      "agent": "Agent"
     },
     "lead": {
       "badge": "Lead",

@@ -13,6 +13,7 @@ import {
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
+import { teamAdvisorSourceText } from './TeamTabContent'
 
 function Fact({
   label,
@@ -57,7 +58,7 @@ function AdvisorFacts({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Eleme
   return (
     <section data-team-activity-advisor="" className="mt-3">
       <h4 className="mb-1 text-[11.5px] font-medium text-muted-foreground/80">
-        {translate('teamPanel.activity.jev', 'Jev')}
+        {teamAdvisorSourceText()}
       </h4>
       <dl className="grid grid-cols-[62px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
         <Fact label={translate('teamPanel.activity.model', 'Model')} value={model} />

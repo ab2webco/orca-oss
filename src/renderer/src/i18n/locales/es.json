@@ -16254,8 +16254,7 @@
       "countWorking": "{{count}} trabajando",
       "countDone_one": "{{count}} terminado",
       "countDone_other": "{{count}} terminados",
-      "agent": "Agente",
-      "jev": "Jev"
+      "agent": "Agente"
     },
     "lead": {
       "badge": "Líder",

@@ -301,6 +301,7 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await setPluginSystem(orcaPage, true)
   await capture(orcaPage, testInfo, 'jev', async (language) => {
     await expect(jev).toContainText(`Sonnet 5.5 · ${PINNED[language]}`)
+    await expect(jev.getByRole('heading', { name: 'Jev' })).toBeVisible()
     await expect(jev).toContainText('Opus 5.5 → Sonnet 5.5')
   })
   await setPluginSystem(orcaPage, false)
