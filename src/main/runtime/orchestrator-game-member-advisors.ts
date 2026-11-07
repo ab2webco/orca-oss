@@ -29,12 +29,14 @@ export class GameMemberAdvisors {
     private readonly keeper?: GameMemberAdvisorKeeper
   ) {}
 
-  note(paneKey: string, report: GameMemberAdvisorReport | null, now: number): void {
+  /** True when the panel would now show something else for this pane. */
+  note(paneKey: string, report: GameMemberAdvisorReport | null, now: number): boolean {
     const kept = this.of(paneKey, now)
     this.byPane.delete(paneKey)
     this.keeper?.write(paneKey, report)
+    const changed = !isSameReport(kept, report)
     if (report === null) {
-      return
+      return changed
     }
     const previous =
       kept === null ? undefined : isSamePick(kept, report) ? kept.previous : pickOf(kept)
@@ -49,14 +51,13 @@ export class GameMemberAdvisors {
       }
       this.byPane.delete(stale)
     }
+    return changed
   }
 
   /** A pane's report as it came over the wire; one this build cannot read leaves the last. */
-  noteReport(paneKey: string, raw: unknown, now: number): void {
+  noteReport(paneKey: string, raw: unknown, now: number): boolean {
     const report = parseGameMemberAdvisorReport(raw)
-    if (report !== undefined) {
-      this.note(paneKey, report, now)
-    }
+    return report !== undefined && this.note(paneKey, report, now)
   }
 
   of(paneKey: string, now: number): GameMemberAdvisor | null {
@@ -76,6 +77,20 @@ export class GameMemberAdvisors {
     return this.keeper?.read(paneKey) ?? null
   }
 }
+
+// Why sorted keys: also orders `pinned`, whose keys repeat the top level's; `previous` is derived here.
+const reportKeyOf = (report: GameMemberAdvisor | GameMemberAdvisorReport | null): string => {
+  if (report === null) {
+    return 'null'
+  }
+  const { previous: _previous, ...rest } = report as GameMemberAdvisor
+  return JSON.stringify(rest, Object.keys(rest).sort())
+}
+
+const isSameReport = (
+  kept: GameMemberAdvisor | null,
+  report: GameMemberAdvisorReport | null
+): boolean => reportKeyOf(kept) === reportKeyOf(report)
 
 const pickOf = (advisor: GameMemberAdvisorPick): GameMemberAdvisorPick => ({
   model: advisor.model,

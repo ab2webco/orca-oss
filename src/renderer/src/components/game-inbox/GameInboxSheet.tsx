@@ -17,6 +17,7 @@ import { GameOwnerQuestionCard } from './GameOwnerQuestionCard'
 import { GameInboxWaitingList } from './GameInboxWaitingList'
 import { GameInboxAnsweredList } from './GameInboxAnsweredList'
 import { GameInboxThreadsView } from './GameInboxThreadsView'
+import { GameInboxUndelivered } from './GameInboxUndelivered'
 import { GameMemberOverride, GameMemberReplyForm } from './GameMemberReplyForm'
 import type { GameMemberReply } from './game-inbox-threads-client'
 
@@ -31,6 +32,7 @@ export type GameInboxQuestionGroup = {
 }
 
 const NO_GROUPS: GameInboxQuestionGroup[] = []
+const NO_QUESTIONS: GameOwnerQuestion[] = []
 
 function TabCount({ count }: { count: number }): React.JSX.Element | null {
   return count > 0 ? (
@@ -48,6 +50,7 @@ export function GameInboxSheet({
   open,
   onOpenChange,
   questions,
+  undelivered = NO_QUESTIONS,
   onAnswer,
   otherGroups = NO_GROUPS,
   threads,
@@ -56,6 +59,8 @@ export function GameInboxSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
   questions: GameOwnerQuestion[]
+  /** Answers the board still holds because no lead took them yet. */
+  undelivered?: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
   otherGroups?: GameInboxQuestionGroup[]
   threads: GameInboxThreads
@@ -102,6 +107,7 @@ export function GameInboxSheet({
             </TabsList>
           </div>
           <TabsContent value="for-you" className={`${LIST_PANEL} space-y-3`}>
+            <GameInboxUndelivered questions={undelivered} />
             {forYouCount === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {translate(

@@ -41,6 +41,8 @@ export const STOPPABLE: ReadonlySet<string> = new Set([
   'stop_unknown'
 ])
 
+const STOP_UNPROVEN: ReadonlySet<string> = new Set(['stopping', 'stop_unknown'])
+
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
@@ -134,7 +136,8 @@ async function stopRemote(
   entry.dispatchId = dispatchId
   const worker = workers.find((candidate) => candidate.dispatchId === dispatchId)
   try {
-    if (worker && STOPPABLE.has(worker.workerState)) {
+    // Why: the home refuses a second stop; release proves on the host that nothing is left (ORCA-1076).
+    if (worker && STOPPABLE.has(worker.workerState) && !STOP_UNPROVEN.has(worker.workerState)) {
       await client.call('orchestration.workerStop', { dispatch: dispatchId })
     }
     const { result } = await client.call<{ state: string; reason?: string; recovery?: string }>(
