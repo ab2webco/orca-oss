@@ -17,8 +17,8 @@ export const ORCHESTRATOR_GAME_LEADS_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'game.leadRegister',
     params: GameLeadRegisterParams,
-    handler: async (params, { runtime }) =>
-      runtime.getGameLeads().register({
+    handler: async (params, { runtime }) => {
+      const result = await runtime.getGameLeads().register({
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         project: params.project,
@@ -26,6 +26,19 @@ export const ORCHESTRATOR_GAME_LEADS_METHODS: RpcMethod[] = [
         ...(params.claim === undefined ? {} : { claim: params.claim }),
         ...(params.fresh === undefined ? {} : { fresh: params.fresh })
       })
+      const lead =
+        result.resumed?.handle ??
+        result.live?.handle ??
+        (result.registered ? params.terminalHandle : undefined)
+      // Why (ORCA-1100): an answer given while the project had no lead reaches the one that just took over.
+      if (lead) {
+        void runtime
+          .getGameBoard()
+          .heldAnswers.deliver({ terminalHandle: lead })
+          .catch(() => undefined)
+      }
+      return result
+    }
   }),
   defineMethod({
     name: 'game.leads',

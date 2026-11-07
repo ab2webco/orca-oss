@@ -22,6 +22,7 @@ function start(
     eventTimeoutMs?: number
     networkHosts?: readonly string[]
     grantedCapabilities?: readonly ['process:spawn']
+    homeDir?: string
   } = {}
 ) {
   processMocks.fork.mockReturnValue(child)
@@ -75,6 +76,17 @@ describe('startPluginWorker', () => {
         ]
       })
     )
+  })
+
+  it('forks with the given home instead of the user home (ORCA-1113)', async () => {
+    const child = new FakeChild()
+    const pending = start(child, { homeDir: '/profile/plugin-home' })
+    child.emit('message', { type: 'ready', commands: [] })
+    await pending
+
+    const env = processMocks.fork.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(env.HOME).toBe('/profile/plugin-home')
+    expect(env.HOME).not.toBe(process.env.HOME)
   })
 
   it('adds child-process permission only for the exact approved grant', async () => {

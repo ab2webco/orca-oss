@@ -16,6 +16,7 @@ import { getManagedScript } from './managed-hook-script'
 import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import { getManagedStatusLineScript } from './statusline-script'
 import { installManagedStatusLine, parseVaultConfig } from './hook-service-vault-statusline'
+import type { ManagedHookWritePolicy } from './managed-hook-placement'
 import {
   applyManagedHooks,
   applyManagedStatusLine,
@@ -67,6 +68,7 @@ const DEFAULT_CLAUDE_HOOK_SERVICE_OPTIONS: ClaudeHookServiceOptions = {
 export class ClaudeHookService {
   private readonly options: ClaudeHookServiceOptions
   private localEventsCache: readonly ClaudeHookEventSpec[] | null = null
+  private homeManagedHookPolicy: ManagedHookWritePolicy = 'replace'
 
   constructor(options: Partial<ClaudeHookServiceOptions> = {}) {
     this.options = {
@@ -145,6 +147,11 @@ export class ClaudeHookService {
     )
   }
 
+  /** Applies to the shared home settings only; vaults belong to this instance's profile. */
+  setHomeManagedHookPolicy(policy: ManagedHookWritePolicy): void {
+    this.homeManagedHookPolicy = policy
+  }
+
   install(): AgentHookInstallStatus {
     const configPath = getConfigPath(this.options.settings)
     const scriptPath = getManagedScriptPath(this.options.settings)
@@ -164,7 +171,8 @@ export class ClaudeHookService {
       config,
       hook,
       getManagedScriptFileName(this.options.settings),
-      this.getLocalEligibleEvents()
+      this.getLocalEligibleEvents(),
+      this.homeManagedHookPolicy
     )
     writeManagedScript(
       scriptPath,
@@ -172,7 +180,11 @@ export class ClaudeHookService {
     )
     // Why: the statusline usage feed is Claude-only — OpenClaude data would be misattributed to the Claude provider.
     if (this.options.agent === 'claude') {
-      nextConfig = installManagedStatusLine(nextConfig, this.options.settings)
+      nextConfig = installManagedStatusLine(
+        nextConfig,
+        this.options.settings,
+        this.homeManagedHookPolicy
+      )
     }
     writeHooksJson(configPath, nextConfig)
     return this.getStatus()

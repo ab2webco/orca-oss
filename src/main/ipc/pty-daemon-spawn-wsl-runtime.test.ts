@@ -495,6 +495,21 @@ describe('registerPtyHandlers', () => {
           mockedApp.isPackaged = prev
         }
       })
+      it('targets its own runtime when a dev spawn carries another instance root (ORCA-1113)', async () => {
+        const { app } = await import('electron')
+        const mockedApp = app as unknown as { isPackaged: boolean }
+        const prev = mockedApp.isPackaged
+        mockedApp.isPackaged = false
+        try {
+          const env = await daemonSpawnAndGetEnv({
+            PATH: '/usr/bin',
+            ORCA_USER_DATA_PATH: '/Users/me/Library/Application Support/orca'
+          })
+          expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
+        } finally {
+          mockedApp.isPackaged = prev
+        }
+      })
       it('preserves the inherited PATH when dev-mode daemon env omits PATH', async () => {
         const { app } = await import('electron')
         const mockedApp = app as unknown as { isPackaged: boolean }

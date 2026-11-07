@@ -144,6 +144,13 @@ npm test > /tmp/test.log 2>&1        # then read the file
 set -o pipefail                      # or make the pipeline report the first failure
 ```
 
+One exception to "read the `Tests` line": `npm test` runs under the hang watchdog
+(`config/scripts/run-vitest-with-hang-watchdog.mjs`). After 180 s with no output it kills the run,
+exits `124`, and ends with `Vitest hang: run killed by the watchdog, never finished: <file>`. That
+last line outranks any `Tests` line above it: the watchdog's probe signal can end the stalled child
+and let vitest print a green summary just before the kill (ORCA-1123). A bare `npx vitest run` has
+no watchdog, so a worker blocked in `spawnSync` hangs it with no output at all.
+
 The same applies to `&&` chains inside an npm script: a project appended after a passing one still
 gates the whole script, but only if you are reading the script's own status and not a filter's.
 

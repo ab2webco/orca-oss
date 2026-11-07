@@ -25,7 +25,7 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
     () => (worktreeId ? { target: gameInboxTargetOf(hostId), worktreeId } : null),
     [worktreeId, hostId]
   )
-  const { questions, answer } = useGameOwnerQuestions(scope)
+  const { questions, undelivered, answer } = useGameOwnerQuestions(scope)
   const hosts = useGameInboxAppState((s) => s.hosts)
   const open = useGameInboxAppState((s) => s.open)
   const setOpen = useGameInboxAppState((s) => s.setOpen)
@@ -67,7 +67,7 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
   const count =
     questions.length + otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
 
-  if (count === 0 && threads.threads.length === 0 && !open) {
+  if (count === 0 && undelivered.length === 0 && threads.threads.length === 0 && !open) {
     return null
   }
   return (
@@ -101,6 +101,7 @@ export function SidebarGameInboxEntry(): React.JSX.Element | null {
         open={open}
         onOpenChange={setOpen}
         questions={questions}
+        undelivered={undelivered}
         onAnswer={answer}
         otherGroups={otherGroups}
         threads={threads}

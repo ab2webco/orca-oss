@@ -15376,6 +15376,9 @@
           "send": "Enviar",
           "overridePlaceholder": "Reemplaza la respuesta del lead",
           "override": "Corregir"
+        },
+        "GameInboxUndelivered": {
+          "title": "Tu respuesta aún no le llegó al lead. Orca la entrega en cuanto un lead la tome."
         }
       },
       "terminal-pane": {
@@ -16005,5 +16008,11 @@
   "auto.components.settings.HostAccountLoginDialog.finish": "Finalizar inicio de sesión",
   "auto.components.settings.PluginConsentDialog.capability.processSpawn": "Iniciar programas como tú. Los programas que inicia no están restringidos por los permisos de archivos o red del worker del plugin.",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
-  "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal"
+  "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
+  "claudeDeadHooks": {
+    "title": "Hay hooks de Claude que no se ejecutan",
+    "one": "{{name}} no se ejecuta: falta su script {{script}}. Reinstálalo o quita el hook de settings.json.",
+    "manyMore": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}} y {{more}} más. El log de Orca Lab tiene cada ruta.",
+    "many": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}}. El log de Orca Lab tiene cada ruta."
+  }
 }
