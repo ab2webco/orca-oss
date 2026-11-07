@@ -153,6 +153,26 @@ describe('teamSoloModelOf', () => {
     ).toEqual({ kind: 'tool', tool: 'Bash', detail: 'send [redacted]' })
   })
 
+  // Why (ORCA-1130 D8): an idle pane read working after a restart, by its last tool from disk.
+  it('reads a row restored from disk as idle, with no tool', () => {
+    const restored = entry({
+      state: 'working',
+      toolName: 'mcp__plugin_engram_engram__mem_current_project',
+      restoredUnconfirmed: true
+    })
+    const [row] = rowsOf([session({ entry: restored })])
+    expect(row).toMatchObject({ status: 'idle', condition: 'idle', liveAction: null })
+    expect(teamLiveActionOfEntry(restored)).toBeNull()
+  })
+
+  it('names a working MCP tool in words, never by its raw id', () => {
+    const working = entry({ toolName: 'mcp__plugin_engram_engram__mem_current_project' })
+    expect(teamLiveActionOfEntry(working)).toMatchObject({
+      kind: 'tool',
+      tool: 'engram: mem current project'
+    })
+  })
+
   it('names the tool a blocked agent waits on when it asked no question', () => {
     const [row] = rowsOf([
       session({ entry: entry({ state: 'blocked', toolName: 'Bash', toolInput: 'rm -rf dist' }) })
@@ -171,7 +191,12 @@ describe('teamSoloModelOf', () => {
   it('keeps the last message of a finished turn and greys an interrupted one', () => {
     const [done, stopped] = rowsOf([
       session({
-        entry: entry({ paneKey: 'a', state: 'done', lastCompletedAssistantMessage: 'Tests pass.' })
+        entry: entry({
+          paneKey: 'a',
+          state: 'done',
+          lastAssistantMessage: 'Tests pass.',
+          lastCompletedAssistantMessage: 'The turn before.'
+        })
       }),
       session({ entry: entry({ paneKey: 'b', state: 'done', interrupted: true }) })
     ])

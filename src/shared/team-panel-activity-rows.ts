@@ -1,4 +1,5 @@
 import type { AgentStatusEntry } from './agent-status-types'
+import { agentToolLabelOf } from './agent-tool-label'
 import { redactDispatchCapability } from './dispatch-capability-redaction'
 import { parseAskFromStatus } from './native-chat-ask'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
@@ -45,8 +46,11 @@ const STATUS_RANK: Record<TeamStatus, number> = {
   idle: 4
 }
 
-// Why: an interrupted turn or a session boundary is not work that finished.
+// Why: an interrupted turn or a session boundary is not work that finished; a row restored from disk proves no live turn.
 const conditionOf = (entry: AgentStatusEntry): TeamCondition => {
+  if (entry.restoredUnconfirmed) {
+    return 'idle'
+  }
   if (entry.state === 'done') {
     return entry.interrupted || entry.sessionBoundary ? 'idle' : 'done'
   }
@@ -63,6 +67,9 @@ const shownTextOf = (text: string | null | undefined): string | null =>
   text ? redactDispatchCapability(text) : null
 
 const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLiveAction | null => {
+  if (entry.restoredUnconfirmed) {
+    return null
+  }
   const ask = parseAskFromStatus(entry.interactivePrompt, entry.toolName)?.questions[0]
   if (ask) {
     return {
@@ -73,7 +80,7 @@ const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLi
   }
   // Why waiting too: a permission prompt asks nothing parseable; its tool is what it waits on.
   return (condition === 'working' || condition === 'waiting') && entry.toolName
-    ? { kind: 'tool', tool: entry.toolName, detail: shownTextOf(entry.toolInput) }
+    ? { kind: 'tool', tool: agentToolLabelOf(entry.toolName), detail: shownTextOf(entry.toolInput) }
     : null
 }
 
@@ -94,6 +101,12 @@ const modelOf = (entry: AgentStatusEntry, advisor: TeamAdvisorRow | null): TeamM
   advisor?.model
     ? { label: advisor.model, effort: advisor.effort, source: 'advisor' }
     : teamSessionModelOf(entry)
+
+// Why (ORCA-1130): the completed slot holds the turn moved out when the next began or a session boundary landed; a real done's own message is the turn that just ended.
+const finalMessageOf = (entry: AgentStatusEntry): string | undefined =>
+  entry.state === 'done' && !entry.sessionBoundary
+    ? entry.lastAssistantMessage
+    : entry.lastCompletedAssistantMessage || entry.lastAssistantMessage
 
 function activityRowOf(session: TeamSoloSession): TeamActivityRow {
   const { entry } = session
@@ -118,7 +131,7 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     prompt: shownTextOf(entry.prompt),
     ticket: session.ticket,
     pr: session.pr,
-    lastMessage: shownTextOf(entry.lastCompletedAssistantMessage || entry.lastAssistantMessage),
+    lastMessage: shownTextOf(finalMessageOf(entry)),
     cacheExpiresAt: session.cacheExpiresAt,
     ports: session.ports,
     note: shownTextOf(session.note),

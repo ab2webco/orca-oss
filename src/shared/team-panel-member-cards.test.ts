@@ -199,6 +199,14 @@ describe('teamCardsOf', () => {
     })
   })
 
+  // Why (ORCA-1130 D8): the raw MCP id reached cards and the scene bubble.
+  it('names a working MCP tool in words, never by its raw id', () => {
+    const [card] =
+      cardsOf([agent({ toolName: 'mcp__plugin_engram_engram__mem_current_project' })])?.members ??
+      []
+    expect(card?.liveAction).toMatchObject({ kind: 'tool', tool: 'engram: mem current project' })
+  })
+
   it('shows a running MCP link before the tool name', () => {
     const [card] =
       cardsOf([
