@@ -239,6 +239,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       )
       await setTheme(orcaPage, theme)
       await expect(chips.first()).toHaveText(language === 'en' ? 'Push2' : 'Reactivar2')
+      await expect(chips.first()).toHaveAccessibleName(
+        language === 'en' ? 'Push, 2 stopped' : 'Reactivar, 2 detenidos'
+      )
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         const shown = await expectOneLine(dock, `${width}px ${language}`)
