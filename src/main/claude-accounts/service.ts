@@ -99,6 +99,7 @@ import {
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
 import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
+import { assertRefreshChainNotHeldByOtherAccount } from './claude-refresh-chain-ownership'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const STATUS_TIMEOUT_MS = 20_000
@@ -1550,6 +1551,14 @@ export class ClaudeAccountService {
     credentialsJson: string
   ): Promise<void> {
     const trustedPath = this.assertManagedAuthPath(managedAuthPath, accountId)
+    // Why: a login capture can pick up a chain another account holds (ORCA-1039); refuse it.
+    await assertRefreshChainNotHeldByOtherAccount(
+      accountId,
+      credentialsJson,
+      this.store.getSettings().claudeManagedAccounts,
+      async (other) =>
+        (await this.readManagedAuthSnapshot(other.id, other.managedAuthPath)).credentialsJson
+    )
     if (process.platform === 'darwin') {
       await writeManagedClaudeKeychainCredentials(accountId, credentialsJson)
     } else {

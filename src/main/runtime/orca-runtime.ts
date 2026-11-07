@@ -823,7 +823,8 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import {
   gameOwnerQuestionMobileNotification,
@@ -2404,6 +2405,7 @@ type RuntimeNotifier = {
   reposChanged(): void
   gameOwnerQuestionsChanged?(): void
   gameInboxChanged?(): void
+  gameAdvisorChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -32108,8 +32110,14 @@ export class OrcaRuntimeService {
     /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
     role?: string
   }): Promise<OrchestratorGameState> {
-    if (args.paneKey && args.advisor !== undefined) {
+    if (
+      args.paneKey &&
+      args.advisor !== undefined &&
       this.gameMemberAdvisors.noteReport(args.paneKey, args.advisor, Date.now())
+    ) {
+      // Why: the Team panel reads every 20 s, and a new Jev line or model is news now.
+      this.notifier?.gameAdvisorChanged?.()
+      this.emitClientEvent({ type: 'gameAdvisorChanged' })
     }
     const worktreesById = await this.getResolvedWorktreeMap()
     let worktreeId = args.worktreeId

@@ -314,8 +314,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
     }
 
     // The lead's Jev, on the same game.state call its mod polls with, and a real tool hook for the
-    // lead's bubble. A new line is a new advisor bubble that fades in 6 s and the panel reads state every
-    // 20 s, so each width waits for its own line (ORCA-1052).
+    // lead's bubble. A new line is a new advisor bubble that fades in 6 s, so each width says its own
+    // line (ORCA-1052). The host pushes a changed report to the panel, so the line shows well before
+    // the panel's 20 s read; the wait below is shorter than that read so only the push meets it (ORCA-1120).
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
       worktreeId,
@@ -357,7 +358,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
         said += 1
         const line = `Keep this one small, step ${said}`
         await reportJev(line)
-        await expect(advisorCard).toContainText(line, { timeout: 45_000 })
+        await expect(advisorCard).toContainText(line, { timeout: 5_000 })
         await expect(advisorCard).toContainText('Opus 5.5 · high')
         await expect(advisorBubble).toHaveText(line)
         await expect(advisorBubble).toBeVisible()
