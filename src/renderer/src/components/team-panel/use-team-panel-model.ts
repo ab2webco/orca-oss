@@ -83,6 +83,9 @@ const poller = createTeamPanelModelPoller(
   TEAM_REFRESH_MS
 )
 
+/** Reads the panel again now, after it changed something on the host. */
+export const refreshTeamPanelModel = (): void => poller.refresh()
+
 /**
  * The Team panel's only data source: the lead's own game.state for the active project.
  * Why one poller: the activity bar and the panel both call this hook.

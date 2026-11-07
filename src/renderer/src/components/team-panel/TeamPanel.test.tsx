@@ -61,10 +61,12 @@ const team: TeamPanelGameModel = {
   inbox: { kind: 'ready', value: { forYou: 0, waiting: 0, threads: 0, answered: 0 } },
   prs: { kind: 'ready', value: { rows: [], total: 0, listUrl: null, listAction: null } },
   queue: { kind: 'ready', value: [] },
-  machines: { kind: 'ready', value: [] }
+  machines: { kind: 'ready', value: [] },
+  actions: []
 }
 vi.mock('./use-team-panel-model', () => ({
-  useTeamPanelModel: () => ({ section: { kind: 'ready', value: team }, retry: null })
+  useTeamPanelModel: () => ({ section: { kind: 'ready', value: team }, retry: null }),
+  refreshTeamPanelModel: vi.fn()
 }))
 
 const { default: TeamPanel } = await import('./TeamPanel')

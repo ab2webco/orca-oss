@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { playSavedArcadeRun, readGameArcadeCredits } from './game-arcade-client'
+import { keepArcadeOffer, playSavedArcadeRun, readGameArcadeCredits } from './game-arcade-client'
 
 const scope = { target: { kind: 'local' as const }, worktreeId: 'wt-1' }
 
@@ -54,5 +54,19 @@ describe('playSavedArcadeRun', () => {
     const open = vi.fn()
     await expect(playSavedArcadeRun(scope, open)).resolves.toBe(false)
     expect(open).not.toHaveBeenCalled()
+  })
+})
+
+describe('keepArcadeOffer', () => {
+  it('keeps the offered play saved on the host and says whether there was an offer', async () => {
+    const call = stubRuntime(() => ok({ ok: true, arcade: { credits: 1, offer: null } }))
+    await expect(keepArcadeOffer(scope)).resolves.toBe(true)
+    expect(call.mock.calls[0]?.[0]).toMatchObject({
+      method: 'game.arcade',
+      params: { worktreeId: 'wt-1', action: 'keep' }
+    })
+
+    stubRuntime(() => ok({ ok: false, arcade: { credits: 1, offer: null } }))
+    await expect(keepArcadeOffer(scope)).resolves.toBe(false)
   })
 })

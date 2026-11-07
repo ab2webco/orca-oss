@@ -16132,7 +16132,8 @@
       "play": "Jugar",
       "keep": "Guardar",
       "savedOne": "1 partida guardada",
-      "savedMany": "{{count}} partidas guardadas"
+      "savedMany": "{{count}} partidas guardadas",
+      "failed": "No se pudo contactar con el host para tu partida guardada"
     },
     "header": {
       "title": "Equipo",
