@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: PTY IPC is centralized in one main-process module so spawn env scoping, lifecycle cleanup, process inspection, and renderer IPC stay behind one audited boundary. */
 import { join, delimiter } from 'node:path'
+import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import {
@@ -132,7 +133,7 @@ import {
   resolveClaudeLaunchAccountForSpawn,
   type ClaudeLaunchAccount
 } from '../claude-accounts/claude-resume-launch-account'
-import { findSessionInSharedStore } from '../claude-accounts/claude-shared-store-session'
+import { locateClaudeResumeSession } from '../claude-accounts/claude-resume-session-location'
 import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
 import { requiresLiveClaudePtyReattach } from '../claude-accounts/live-claude-pty-reattach-requirement'
 import {
@@ -1433,12 +1434,29 @@ function claudeLaunchAccountForSpawn(
     launchAccountId: args.claudeAccountId,
     resumeProviderSession: args.resumeProviderSession,
     hasManagedAccount: (accountId) => accounts.some((account) => account.id === accountId),
-    // Why host only: a WSL Claude keeps its conversations inside the distro, not in this store.
+    // Why host only: a WSL Claude keeps its conversations inside the distro, not in these dirs.
     ...(runtime === 'wsl'
       ? {}
       : {
-          findInSharedStore: (session: AgentProviderSessionMetadata) =>
-            findSessionInSharedStore({ storeRoot: getSharedClaudeTranscriptsRoot(), session })
+          locateSession: (session: AgentProviderSessionMetadata) =>
+            locateClaudeResumeSession({
+              storeRoot: getSharedClaudeTranscriptsRoot(),
+              universes: [
+                {
+                  accountId: null,
+                  configDir: process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
+                },
+                ...accounts
+                  .filter(
+                    (account) =>
+                      account.managedAuthRuntime !== 'wsl' &&
+                      typeof account.managedAuthPath === 'string'
+                  )
+                  .map((account) => ({ accountId: account.id, configDir: account.managedAuthPath }))
+              ],
+              session,
+              caseInsensitivePaths: process.platform === 'win32'
+            })
         })
   })
 }

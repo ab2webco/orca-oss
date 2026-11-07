@@ -3,7 +3,7 @@ import {
   CLAUDE_RESUME_SESSION_MISSING_MESSAGE,
   resolveClaudeLaunchAccountForSpawn
 } from './claude-resume-launch-account'
-import type { SharedStoreSessionVerdict } from './claude-shared-store-session'
+import type { ClaudeResumeSessionLocation } from './claude-resume-session-location'
 
 const managedTranscript =
   '/Users/me/Library/Application Support/orca/claude-accounts/acct-lead/auth/projects/-repo/abc.jsonl'
@@ -17,53 +17,53 @@ const resume = (transcriptPath?: string) => ({
   ...(transcriptPath ? { transcriptPath } : {})
 })
 
-const storeSays = (verdict: SharedStoreSessionVerdict) => vi.fn(async () => verdict)
+const located = (location: ClaudeResumeSessionLocation) => vi.fn(async () => location)
 
 describe('resolveClaudeLaunchAccountForSpawn', () => {
   it('keeps an explicit launch account over everything', () => {
-    const findInSharedStore = storeSays('missing')
+    const locateSession = located({ kind: 'missing' })
 
     expect(
       resolveClaudeLaunchAccountForSpawn({
         launchAccountId: 'acct-explicit',
         resumeProviderSession: resume(managedTranscript),
         hasManagedAccount: () => false,
-        findInSharedStore
+        locateSession
       })
     ).toBe('acct-explicit')
-    expect(findInSharedStore).not.toHaveBeenCalled()
+    expect(locateSession).not.toHaveBeenCalled()
   })
 
   it('resumes on the account whose vault the transcript lives under, without waiting', () => {
-    const findInSharedStore = storeSays('missing')
+    const locateSession = located({ kind: 'missing' })
 
     expect(
       resolveClaudeLaunchAccountForSpawn({
         launchAccountId: undefined,
         resumeProviderSession: resume(managedTranscript),
         hasManagedAccount: (id) => id === 'acct-lead',
-        findInSharedStore
+        locateSession
       })
     ).toBe('acct-lead')
-    expect(findInSharedStore).not.toHaveBeenCalled()
+    expect(locateSession).not.toHaveBeenCalled()
   })
 
-  it('leaves a fresh launch alone and never checks the store', () => {
-    const findInSharedStore = storeSays('missing')
+  it('leaves a fresh launch alone and never looks anything up', () => {
+    const locateSession = located({ kind: 'missing' })
 
     expect(
       resolveClaudeLaunchAccountForSpawn({
         launchAccountId: undefined,
         resumeProviderSession: undefined,
         hasManagedAccount: () => true,
-        findInSharedStore
+        locateSession
       })
     ).toBeUndefined()
-    expect(findInSharedStore).not.toHaveBeenCalled()
+    expect(locateSession).not.toHaveBeenCalled()
   })
 
-  // ORCA-718: every universe links projects/ to one shared store, so any account can resume any
-  // conversation in it; the pane takes what a new launch in its worktree would get.
+  // ORCA-718: every linked universe reads one shared transcript store, so a conversation there
+  // resumes on what a new launch in its worktree would get.
   describe('a resume no existing vault account owns', () => {
     for (const [label, session, hasManagedAccount] of [
       ['an account that was removed', resume(managedTranscript), () => false],
@@ -71,44 +71,56 @@ describe('resolveClaudeLaunchAccountForSpawn', () => {
       ['a path inside the shared store', resume(storeTranscript), () => true],
       ['no transcript path', resume(), () => true]
     ] as const) {
-      it(`uses the worktree pin or selected account for ${label} when the store holds it`, async () => {
-        const findInSharedStore = storeSays('found')
+      it(`uses the worktree pin or selected account for ${label} when any account can read it`, async () => {
+        const locateSession = located({ kind: 'shared' })
 
         await expect(
           resolveClaudeLaunchAccountForSpawn({
             launchAccountId: undefined,
             resumeProviderSession: session,
             hasManagedAccount,
-            findInSharedStore
+            locateSession
           })
         ).resolves.toBeUndefined()
-        expect(findInSharedStore).toHaveBeenCalledWith(session)
+        expect(locateSession).toHaveBeenCalledWith(session)
       })
     }
 
-    it('refuses only when the store does not hold the conversation, since nothing can resume it', async () => {
-      await expect(
-        resolveClaudeLaunchAccountForSpawn({
-          launchAccountId: undefined,
-          resumeProviderSession: resume(managedTranscript),
-          hasManagedAccount: () => false,
-          findInSharedStore: storeSays('missing')
-        })
-      ).rejects.toThrow(CLAUDE_RESUME_SESSION_MISSING_MESSAGE)
-    })
-
-    it('does not refuse on a host with no shared store, whose universes keep their own transcripts', async () => {
+    // Why: a universe whose link was skipped keeps a projects/ no other account can read.
+    it('runs on the unlinked vault that alone holds the conversation', async () => {
       await expect(
         resolveClaudeLaunchAccountForSpawn({
           launchAccountId: undefined,
           resumeProviderSession: resume(),
           hasManagedAccount: () => true,
-          findInSharedStore: storeSays('no-store')
+          locateSession: located({ kind: 'universe', accountId: 'acct-unlinked' })
         })
-      ).resolves.toBeUndefined()
+      ).resolves.toBe('acct-unlinked')
     })
 
-    it('keeps the new-launch account where the store cannot be checked, as on a WSL spawn', () => {
+    it('forces the shared home when only the unlinked shared home holds the conversation', async () => {
+      await expect(
+        resolveClaudeLaunchAccountForSpawn({
+          launchAccountId: undefined,
+          resumeProviderSession: resume(sharedTranscript),
+          hasManagedAccount: () => true,
+          locateSession: located({ kind: 'universe', accountId: null })
+        })
+      ).resolves.toBeNull()
+    })
+
+    it('refuses only when no account can read the conversation', async () => {
+      await expect(
+        resolveClaudeLaunchAccountForSpawn({
+          launchAccountId: undefined,
+          resumeProviderSession: resume(managedTranscript),
+          hasManagedAccount: () => false,
+          locateSession: located({ kind: 'missing' })
+        })
+      ).rejects.toThrow(CLAUDE_RESUME_SESSION_MISSING_MESSAGE)
+    })
+
+    it('keeps the new-launch account where the conversation cannot be located, as on a WSL spawn', () => {
       expect(
         resolveClaudeLaunchAccountForSpawn({
           launchAccountId: undefined,
