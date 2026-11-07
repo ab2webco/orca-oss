@@ -16335,16 +16335,6 @@
         "restartNow": "Restart now"
       },
       "game-inbox": {
-        "GameInboxSheet": {
-          "title": "Inbox",
-          "description": "What the lead asked you, what waits on it, and how it talks with each member.",
-          "forYou": "For you",
-          "empty": "No questions are waiting for you.",
-          "waiting": "Waiting",
-          "threads": "Threads",
-          "answered": "Answered",
-          "answerInstead": "Answer instead of the lead"
-        },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
           "yourAnswer": "Your answer",
@@ -16352,7 +16342,6 @@
           "send": "Send"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Inbox",
           "noWorktree": "Open this project in Orca to answer."
         },
         "GameInboxKindTag": {
