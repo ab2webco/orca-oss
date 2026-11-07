@@ -16,8 +16,8 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import {
   findTeamLeadCaller,
+  readTeamLeadRoster,
   readTeamLeadState,
-  readTeamLeads,
   readTeamOwnerQuestions,
   readTeamXp
 } from './team-panel-lead-read'
@@ -62,10 +62,11 @@ function worktreeIdOfTab(tabId: string): string | null {
 
 const poller = createTeamPanelModelPoller(
   {
-    readLeads: readTeamLeads,
-    findCaller: (leads, scope) =>
+    readLeads: readTeamLeadRoster,
+    findCaller: ({ leads, restoring }, scope) =>
       findTeamLeadCaller({
         leads,
+        restoring,
         entries: useAppStore.getState().agentStatusByPaneKey,
         worktreeIdOfTab,
         repoWorktreeIds: scope.worktreeIds

@@ -186,7 +186,11 @@ export function TeamPanelView({
     </>
   )
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-testid="team-panel"
+      data-team-panel-state={model?.kind ?? section.kind}
+    >
       {model?.kind === 'team' && look === 'game' ? (
         <TeamPanelScene model={model} style={sceneStyle}>
           {body}

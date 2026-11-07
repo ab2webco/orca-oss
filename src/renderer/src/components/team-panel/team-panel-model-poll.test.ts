@@ -18,7 +18,7 @@ const SCOPE = {
 function deps(overrides: Partial<TeamPanelPollDeps> = {}) {
   const sources: TeamPanelModelSource[] = []
   const all: TeamPanelPollDeps = {
-    readLeads: vi.fn(async () => [{ handle: 'term' }]),
+    readLeads: vi.fn(async () => ({ leads: [{ handle: 'term' }], restoring: [] })),
     findCaller: vi.fn(() => CALLER),
     readState: vi.fn(async () => ({ role: 'lead' }) as OrchestratorGameState),
     readQuestions: vi.fn(async () => []),
@@ -88,6 +88,21 @@ describe('createTeamPanelModelPoller', () => {
 
     expect(last()).toEqual({ kind: 'unavailable' })
     expect(all.readState).not.toHaveBeenCalled()
+  })
+
+  // Why (ORCA-1130): the no-team form while the lead's pane comes back says the team is gone.
+  it('stays loading while the host restores the lead, and reads again soon', async () => {
+    const findCaller = vi.fn().mockReturnValueOnce('restoring').mockReturnValue(CALLER)
+    const { all, sources, last } = deps({ findCaller })
+
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    expect(last()).toEqual({ kind: 'loading' })
+    expect(all.readState).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+    expect(sources.some((one) => one.section.kind === 'unavailable')).toBe(false)
   })
 
   it('keeps the last team and offers a retry when a later read fails', async () => {

@@ -1,3 +1,4 @@
+import { agentToolLabelOf } from './agent-tool-label'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 import {
   characterKeyOf,
@@ -135,7 +136,11 @@ const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
     return { kind: 'link', name, id, url, running }
   }
   return agent.toolName
-    ? { kind: 'tool', tool: agent.toolName, detail: redactedDetailOf(agent.toolInput) }
+    ? {
+        kind: 'tool',
+        tool: agentToolLabelOf(agent.toolName),
+        detail: redactedDetailOf(agent.toolInput)
+      }
     : null
 }
 
@@ -272,7 +277,11 @@ export function teamCardsOf(
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
     name:
-      state.lead?.label ?? leadCharacterOf(roster, locale) ?? leader.displayName ?? leader.paneKey,
+      state.lead?.label ??
+      leadCharacterOf(roster, locale) ??
+      leader.displayName ??
+      state.worktree?.displayName ??
+      leader.paneKey,
     agentType: leader.agentType,
     status: statusOf(condition, leader.state === 'waiting' || ownerAsk !== null, {
       review: null,

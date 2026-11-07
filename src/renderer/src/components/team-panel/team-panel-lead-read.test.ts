@@ -34,6 +34,24 @@ describe('findTeamLeadCaller', () => {
     expect(findTeamLeadCaller({ ...base, repoWorktreeIds: new Set(['wt-member']) })).toBeNull()
     expect(findTeamLeadCaller({ ...base, leads: [] })).toBeNull()
   })
+
+  // Why (ORCA-1130): after a restart an idle lead never reports, so its entry is missing.
+  it('finds an idle lead from the pane the host lists, with no agent status for it', () => {
+    const leads = [{ handle: 'term-lead', paneKey: PANE }]
+    expect(findTeamLeadCaller({ ...base, leads, entries: {} })).toEqual({
+      worktreeId: 'wt-main',
+      terminalHandle: 'term-lead',
+      paneKey: PANE
+    })
+  })
+
+  it('says restoring while the host is bringing back a lead of this project', () => {
+    const restoring = { leads: [], entries: {}, restoring: [PANE] }
+    expect(findTeamLeadCaller({ ...base, ...restoring })).toBe('restoring')
+    expect(
+      findTeamLeadCaller({ ...base, ...restoring, repoWorktreeIds: new Set(['wt-member']) })
+    ).toBeNull()
+  })
 })
 
 describe('readTeamXp', () => {
