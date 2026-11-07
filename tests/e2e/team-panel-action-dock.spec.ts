@@ -294,6 +294,29 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     ])
     await expect(menu.getByRole('menuitem', { name: /^Ola/ })).toBeDisabled()
     await expect(menu.getByPlaceholder('Buscar acción')).toBeFocused()
+    // The menu opens over the dock it spans, at every sidebar width (ORCA-1092 row 19).
+    const sidebarBefore = await orcaPage.evaluate(
+      () => window.__store!.getState().rightSidebarWidth
+    )
+    for (const sidebar of [300, 456, 600]) {
+      await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), sidebar)
+      await expect
+        .poll(async () => {
+          const [box, dockBox] = await Promise.all([menu.boundingBox(), dock.boundingBox()])
+          if (!box || !dockBox) {
+            return 'unmeasured'
+          }
+          const inside =
+            box.x >= dockBox.x - 1 && box.x + box.width <= dockBox.x + dockBox.width + 1
+          const gap = Math.round(dockBox.y - (box.y + box.height))
+          return inside && gap >= 0 && gap <= 12 ? 'over the dock' : `x ${box.x} gap ${gap}`
+        }, `menu at sidebar ${sidebar}`)
+        .toBe('over the dock')
+    }
+    await orcaPage.evaluate(
+      (w) => window.__store!.getState().setRightSidebarWidth(w),
+      sidebarBefore
+    )
     if (CAPTURE_EVIDENCE) {
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })

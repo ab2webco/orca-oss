@@ -107,7 +107,11 @@ export function TeamActionMenu({
         setQuery('')
       }}
     >
-      {anchor ? <PopoverAnchor virtualRef={anchor as React.RefObject<HTMLElement>} /> : null}
+      {/* Why the key: a fresh anchor on each open re-points Radix at the dock; StrictMode's ref
+          replay otherwise leaves it on the first trigger, detached since. */}
+      {anchor ? (
+        <PopoverAnchor key={String(open)} virtualRef={anchor as React.RefObject<HTMLElement>} />
+      ) : null}
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
