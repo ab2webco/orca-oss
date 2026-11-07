@@ -7,7 +7,6 @@ import {
   teamPhaseText,
   teamAgeText,
   teamStatusGlyph,
-  teamSoloLiveText,
   teamStatusTone
 } from './team-card-text'
 
@@ -16,26 +15,27 @@ vi.mock('@/i18n/i18n', () => ({
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''))
 }))
 
-describe('teamSoloLiveText', () => {
-  it('names the tool on a no-team row, as V28 soloNow does', () => {
+describe('teamLiveText tool labels', () => {
+  it('names the tool on every row, as V28 soloNow does', () => {
     expect(
-      teamSoloLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 912' }, 'working')
+      teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 912' }, 'working')
     ).toBe('Bash · gh pr checks 912')
-    expect(teamSoloLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
+    expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
   })
 
   it('leaves questions and links to the shared text', () => {
     expect(
-      teamSoloLiveText({ kind: 'question', text: 'Merge #923 now?', options: ['Yes'] }, 'waiting')
+      teamLiveText({ kind: 'question', text: 'Merge #923 now?', options: ['Yes'] }, 'waiting')
     ).toBe('Merge #923 now?')
-    expect(teamSoloLiveText(null, 'working')).toBe('Working')
+    expect(teamLiveText(null, 'working')).toBe('Working')
   })
 })
 
 describe('teamLiveText', () => {
-  it('shows what the tool works on, as V28 does, and the tool alone without it', () => {
+  // Why (ORCA-1129): a team card showed a bare command, unlike every other tool label.
+  it("names a command's tool on a team card too, and the tool alone without detail", () => {
     expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr view 923' }, 'working')).toBe(
-      'gh pr view 923'
+      'Bash · gh pr view 923'
     )
     expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
   })

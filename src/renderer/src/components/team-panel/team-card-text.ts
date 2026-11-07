@@ -84,26 +84,23 @@ export function teamSessionStateText(condition: TeamCondition): string {
     : teamConditionText(condition)
 }
 
-/** What the agent does now; agent words (tool detail, questions) are shown as written, as V28 does. */
+/** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`. */
+export const teamToolText = (tool: string, detail: string | null): string =>
+  detail ? `${tool} · ${detail}` : tool
+
+/** What the agent does now; agent words (tool detail, questions) are shown as written. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
   if (!action) {
     return teamConditionText(condition)
   }
   switch (action.kind) {
     case 'tool':
-      return action.detail ?? action.tool
+      return teamToolText(action.tool, action.detail)
     case 'link':
       return `${action.name} · ${action.id}`
     case 'question':
       return action.text
   }
-}
-
-/** A no-team session's line. Why not teamLiveText: V28's solo rows name the tool, its team cards do not. */
-export function teamSoloLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
-  return action?.kind === 'tool' && action.detail
-    ? `${action.tool} · ${action.detail}`
-    : teamLiveText(action, condition)
 }
 
 /** GitLab numbers a merge request !12; every other provider says #12. */

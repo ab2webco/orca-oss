@@ -16388,7 +16388,8 @@
         "team-scene-copy": {
           "label": "Live team scene",
           "leadAsks": "Waiting for you · {{question}}",
-          "leadDone": "Done, nothing pending"
+          "leadDone": "Done, nothing pending",
+          "leadWaits": "Waiting for you"
         }
       },
       "game-arcade": {

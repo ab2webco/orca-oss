@@ -190,6 +190,48 @@ async function captureCard(
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
+// Why 20 s: the Team model's poll; the lead's question must not wait for a second one.
+const TEAM_POLL_MS = 20_000
+
+/** No bubble's text may run past its box: a cut path loses characters (ORCA-1129). */
+async function expectBubblesFit(page: Page, where: string): Promise<void> {
+  const cut = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-scene-bubble] > span:first-child')].flatMap((node) =>
+      node.scrollWidth > node.clientWidth ? [`${node.scrollWidth}>${node.clientWidth}`] : []
+    )
+  )
+  expect(cut, `a bubble's text overflows ${where}`).toEqual([])
+}
+
+async function captureScene(
+  page: Page,
+  panel: Locator,
+  testInfo: { outputPath: (n: string) => string }
+): Promise<void> {
+  for (const language of ['en', 'es'] as const) {
+    await page.evaluate(
+      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+      language
+    )
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const theme of THEMES) {
+        await setTheme(page, theme)
+        await expect(panel.locator('[data-scene-bubble="lead"]')).toContainText(QUESTION)
+        await expectBubblesFit(page, `at ${width}px ${theme} ${language}`)
+        if (CAPTURE) {
+          await page.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`scene-lead-question-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+  }
+  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
+
 for (const plugins of [false, true]) {
   const label = plugins ? 'plugins on' : 'plugins off'
 
@@ -221,17 +263,30 @@ for (const plugins of [false, true]) {
           return registered.result.registered
         })
         .toBe(true)
-      await askThroughHook(electronApp, pane)
-
       const { panel, inboxTab } = await openInbox(orcaPage)
       await expect(panel.locator('[data-team-card="lead"]')).toBeVisible({ timeout: 90_000 })
-      // D4: game.state carries no AskUserQuestion; the count must still say 1.
-      await expect(inboxTab).toContainText('1', { timeout: 30_000 })
+      await askThroughHook(electronApp, pane)
+      const asked = Date.now()
+
+      // The scene's bubble says the question, never the tool's name, and fits its box.
+      const bubble = panel.locator('[data-scene-bubble="lead"]')
+      await expect(bubble).toHaveText(`Waiting for you · ${QUESTION}`, { timeout: TEAM_POLL_MS })
+      await expectBubblesFit(orcaPage, label)
+      if (!plugins) {
+        await captureScene(orcaPage, panel, testInfo)
+      }
+
+      // D4: game.state carries no AskUserQuestion; For you shows it within one model poll.
       await inboxTab.click()
       const inbox = panel.getByTestId('team-panel-inbox')
-      await expect(inbox.getByRole('tab', { name: /For you/ })).toContainText('1')
       const card = inbox.locator(`[data-team-inbox-agent="${pane.paneKey}"]`)
-      await expect(card).toContainText(QUESTION)
+      await expect(card).toContainText(QUESTION, { timeout: TEAM_POLL_MS - (Date.now() - asked) })
+      testInfo.annotations.push({
+        type: 'for-you-after-ms',
+        description: String(Date.now() - asked)
+      })
+      await expect(inbox.getByRole('tab', { name: /For you/ })).toContainText('1')
+      await expect(inboxTab).toContainText('1')
       if (!plugins) {
         await captureCard(orcaPage, panel, 'team-inbox-lead-question', testInfo)
       }

@@ -28,12 +28,20 @@ describe('team scene copy', () => {
     expect(teamSceneLeadLineOf(asking)).toBe('Esperándote · ¿Mergeo #923?')
   })
 
-  it('shows what the tool works on, as V28 does, or a link as written', () => {
+  // Why (ORCA-1129): with no question read, the bubble showed the raw tool name.
+  it('never names the question tool, in the UI language', async () => {
+    const asking = lead({ liveAction: { kind: 'tool', tool: 'AskUserQuestion', detail: null } })
+    expect(teamSceneLeadLineOf(asking)).toBe('Waiting for you')
+    await setRendererUiLanguage('es')
+    expect(teamSceneLeadLineOf(asking)).toBe('Esperándote')
+  })
+
+  it('labels what the tool works on as every tool label does, or a link as written', () => {
     expect(
       teamSceneLeadLineOf(
         lead({ liveAction: { kind: 'tool', tool: 'Bash', detail: 'gh pr checks 924' } })
       )
-    ).toBe('gh pr checks 924')
+    ).toBe('Bash · gh pr checks 924')
     expect(
       teamSceneLeadLineOf(lead({ liveAction: { kind: 'tool', tool: 'Read', detail: null } }))
     ).toBe('Read')
