@@ -23,6 +23,7 @@ import {
 } from './team-panel-section-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
+import { TeamXpRow } from './TeamXpRow'
 import { TeamPanelScene } from '../team-scene/TeamPanelScene'
 import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
@@ -234,6 +235,7 @@ export function TeamPanelView({
   const body = (
     <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
+      {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
         <TeamReadRetryContext.Provider value={retry}>

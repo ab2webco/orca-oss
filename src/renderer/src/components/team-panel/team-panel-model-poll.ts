@@ -26,11 +26,14 @@ export type TeamPanelPollDeps = {
     target: RuntimeClientTarget,
     caller: TeamLeadCaller
   ) => Promise<GameOwnerQuestion[] | null>
+  /** The project's characters XP summed; null when the host keeps no list. */
+  readXp: (target: RuntimeClientTarget, caller: TeamLeadCaller) => Promise<number | null>
   modelOf: (args: {
     repoId: string
     projectName: string
     state: OrchestratorGameState
     questions: GameOwnerQuestion[] | null
+    xp: number | null
   }) => TeamPanelGameModel | null
   /** `scope` is the one the source was read for. */
   publish: (source: TeamPanelModelSource, scope: TeamPanelScope) => void
@@ -69,10 +72,21 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     try {
       const caller = deps.findCaller(await deps.readLeads(scope.target), scope)
       const state = caller ? await deps.readState(scope.target, caller) : null
-      const questions =
-        caller && state ? await deps.readQuestions(scope.target, caller).catch(() => null) : null
+      const [questions, xp] =
+        caller && state
+          ? await Promise.all([
+              deps.readQuestions(scope.target, caller).catch(() => null),
+              deps.readXp(scope.target, caller).catch(() => null)
+            ])
+          : [null, null]
       const model = state
-        ? deps.modelOf({ repoId: scope.repoId, projectName: scope.projectName, state, questions })
+        ? deps.modelOf({
+            repoId: scope.repoId,
+            projectName: scope.projectName,
+            state,
+            questions,
+            xp
+          })
         : null
       if (mine !== generation || active !== run) {
         return

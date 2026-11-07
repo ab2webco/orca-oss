@@ -22,6 +22,7 @@ function deps(overrides: Partial<TeamPanelPollDeps> = {}) {
     findCaller: vi.fn(() => CALLER),
     readState: vi.fn(async () => ({ role: 'lead' }) as OrchestratorGameState),
     readQuestions: vi.fn(async () => []),
+    readXp: vi.fn(async () => 350),
     modelOf: vi.fn(() => MODEL),
     publish: (source) => sources.push(source),
     ...overrides
@@ -39,6 +40,27 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('createTeamPanelModelPoller', () => {
+  it('hands the model the characters XP, and null when the host cannot list them', async () => {
+    const read = deps()
+    const poller = createTeamPanelModelPoller(read.all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    expect(read.all.modelOf).toHaveBeenLastCalledWith(expect.objectContaining({ xp: 350 }))
+    release()
+
+    const failing = deps({
+      readXp: vi.fn(async () => {
+        throw new Error('old host')
+      })
+    })
+    const again = createTeamPanelModelPoller(failing.all, 20_000).subscribe(SCOPE)
+    // Why twice: the rejected read settles through its own catch before the model is built.
+    await flush()
+    await flush()
+    expect(failing.all.modelOf).toHaveBeenLastCalledWith(expect.objectContaining({ xp: null }))
+    again()
+  })
+
   it('reads once for every subscriber of the same project and stops when the last leaves', async () => {
     const { all, last } = deps()
     const poller = createTeamPanelModelPoller(all, 20_000)
