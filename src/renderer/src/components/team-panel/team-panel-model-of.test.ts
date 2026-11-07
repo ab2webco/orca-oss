@@ -217,6 +217,21 @@ describe('teamPanelModelOf', () => {
     })
   })
 
+  // Why: the host's copy lags a toggle by a poll and, on a paired host, is that host's settings.
+  it("keeps the tabs the host's own panel settings hid; this window's settings decide", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const panel = { tabs: { prs: false, queue: false, machines: false } }
+    const model = teamPanelModelOf(
+      args({ state: state({ panel } as unknown as Partial<OrchestratorGameState>) })
+    )
+
+    expect(model).toMatchObject({
+      prs: { kind: 'unavailable' },
+      queue: { kind: 'unavailable' },
+      machines: { kind: 'unavailable' }
+    })
+  })
+
   it('hides PRs in a folder workspace', () => {
     teamCardsOf.mockReturnValue(CARDS)
 
