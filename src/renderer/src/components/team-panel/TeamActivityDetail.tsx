@@ -7,7 +7,7 @@ import type { TeamActivityRow, TeamAdvisorRow } from '../../../../shared/team-pa
 import {
   teamCiText,
   teamHostText,
-  teamLiveText,
+  teamSoloLiveText,
   teamModelText,
   teamPrNumberText,
   teamSessionStateText,
@@ -88,7 +88,7 @@ export function TeamActivityDetail({
   const question = row.liveAction?.kind === 'question' ? row.liveAction.text : null
   const doing =
     row.liveAction && row.liveAction.kind !== 'question'
-      ? teamLiveText(row.liveAction, row.condition)
+      ? teamSoloLiveText(row.liveAction, row.condition)
       : null
   const pr = row.pr
     ? [teamPrNumberText(row.pr), teamCiText(row.pr)].filter(Boolean).join(' · ')

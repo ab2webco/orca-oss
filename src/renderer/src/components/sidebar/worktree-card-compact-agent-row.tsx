@@ -11,7 +11,7 @@ import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
-import { teamLiveText, teamModelText } from '@/components/team-panel/team-card-text'
+import { teamSoloLiveText, teamModelText } from '@/components/team-panel/team-card-text'
 import {
   teamLiveActionOfEntry,
   teamSessionModelOf
@@ -141,7 +141,7 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
     liveAction !== null &&
     (liveAction.kind === 'question' || agent.state === 'blocked' || agent.state === 'waiting')
   const primary = liveAction
-    ? teamLiveText(liveAction, 'working')
+    ? teamSoloLiveText(liveAction, 'working')
     : (label ?? getCompactAgentPrimary(agent))
   const isLineageChild = agent.lineage?.depth === 1
   const rawSecondary = liveAction ? '' : getCompactAgentSecondary(agent)

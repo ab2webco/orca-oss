@@ -76,6 +76,13 @@ export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondi
   }
 }
 
+/** A no-team session's line. Why not teamLiveText: V28's solo rows name the tool, its team cards do not. */
+export function teamSoloLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
+  return action?.kind === 'tool' && action.detail
+    ? `${action.tool} · ${action.detail}`
+    : teamLiveText(action, condition)
+}
+
 /** GitLab numbers a merge request !12; every other provider says #12. */
 export function teamPrNumberText(pr: Pick<TeamPullRequest, 'provider' | 'number'>): string {
   return pr.provider === 'gitlab' ? `!${pr.number}` : `#${pr.number}`
