@@ -10,15 +10,27 @@ const sessionOf = (value: unknown): GameLeadSession | null => {
   if (typeof value !== 'object' || value === null) {
     return null
   }
-  const { sessionId, agentArgs, worktreeId, accountId } = value as Record<string, unknown>
+  const { sessionId, agentArgs, worktreeId, accountId, transcriptPath } = value as Record<
+    string,
+    unknown
+  >
   // Why a missing account is valid: records kept before leads named their account have none.
-  return typeof sessionId === 'string' &&
-    sessionId !== '' &&
-    typeof worktreeId === 'string' &&
-    (agentArgs === null || typeof agentArgs === 'string') &&
-    (accountId === undefined || accountId === null || typeof accountId === 'string')
-    ? { sessionId, agentArgs, worktreeId, accountId: accountId ?? null }
-    : null
+  if (
+    typeof sessionId !== 'string' ||
+    sessionId === '' ||
+    typeof worktreeId !== 'string' ||
+    (agentArgs !== null && typeof agentArgs !== 'string') ||
+    (accountId !== undefined && accountId !== null && typeof accountId !== 'string')
+  ) {
+    return null
+  }
+  return {
+    sessionId,
+    agentArgs,
+    worktreeId,
+    accountId: accountId ?? null,
+    ...(typeof transcriptPath === 'string' && transcriptPath !== '' ? { transcriptPath } : {})
+  }
 }
 
 const AGENT_TEAMS_WRAPPER = /(?:^|[\s'"])claude-teams(?=[\s'"]|$)/

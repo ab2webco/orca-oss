@@ -248,7 +248,18 @@ export function PluginSettingsRow({
               </span>
             </p>
           ) : null}
-          {plugin.error ? (
+          {plugin.blockedByDevSharedVault ? (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-destructive">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">
+                {translate(
+                  'auto.components.settings.PluginSettingsRow.devSharedVaultMessage',
+                  "Not started: this dev build's accounts folder is another install's account vault, and this plugin can run processes that rewrite it. Start the dev build with {{value0}} to run it.",
+                  { value0: 'ORCA_DEV_SHARED_VAULT_PLUGINS=1' }
+                )}
+              </span>
+            </p>
+          ) : plugin.error ? (
             <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-destructive">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
               <span>

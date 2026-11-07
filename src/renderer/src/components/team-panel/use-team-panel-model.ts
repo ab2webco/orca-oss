@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n/i18n'
 import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
@@ -17,7 +18,8 @@ import {
   findTeamLeadCaller,
   readTeamLeadRoster,
   readTeamLeadState,
-  readTeamOwnerQuestions
+  readTeamOwnerQuestions,
+  readTeamXp
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
 import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
@@ -72,9 +74,12 @@ const poller = createTeamPanelModelPoller(
       }),
     readState: readTeamLeadState,
     readQuestions: readTeamOwnerQuestions,
+    readXp: readTeamXp,
     modelOf: (args) => {
       const repo = useAppStore.getState().repos.find((one) => one.id === args.repoId)
-      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false })
+      // Why the resolved language: the setting can be `system`, and roster names come per language.
+      const locale = i18n.language.split('-')[0] ?? 'en'
+      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false, locale })
     },
     publish: (source, scope) => {
       const members = membersOf(source)

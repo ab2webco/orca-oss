@@ -46,14 +46,16 @@ function commitRawEntries(root, parent, entries) {
     const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
       cwd: root,
       encoding: 'utf8',
-      input: 'too prominent\n'
+      input: 'too prominent\n',
+      timeout: 20_000
     }).trim()
     return Buffer.concat([Buffer.from(`100644 blob ${blob}\t`), name, Buffer.from([0])])
   })
   const tree = execFileSync('git', ['mktree', '-z'], {
     cwd: root,
     encoding: 'utf8',
-    input: Buffer.concat([parentTree, ...records])
+    input: Buffer.concat([parentTree, ...records]),
+    timeout: 20_000
   }).trim()
   return execFileSync('git', ['commit-tree', tree, '-p', parent, '-m', 'head'], {
     cwd: root,

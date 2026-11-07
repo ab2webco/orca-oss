@@ -13,9 +13,15 @@ import { useTeamPanelTabStore } from './team-panel-tab-store'
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
+const settings = { pluginSystemEnabled: true }
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({ openSettingsTarget: vi.fn(), openSettingsPage: vi.fn(), openTaskPage: vi.fn() })
+    selector({
+      settings,
+      openSettingsTarget: vi.fn(),
+      openSettingsPage: vi.fn(),
+      openTaskPage: vi.fn()
+    })
 }))
 let global: OrchestratorGameLayer | undefined
 vi.mock('./team-panel-setting-layers', () => ({
@@ -81,6 +87,7 @@ afterEach(async () => {
   })
   document.body.innerHTML = ''
   useTeamPanelTabStore.setState({ selected: null })
+  settings.pluginSystemEnabled = true
 })
 
 async function render(panel: OrchestratorGameLayer['panel']): Promise<HTMLElement> {
@@ -120,6 +127,13 @@ describe('TeamPanel settings', () => {
 
   it('drops the Advisor row when Advisor is off', async () => {
     const container = await render({ advisor: false })
+
+    expect(container.querySelector('[data-team-card="advisor"]')).toBeNull()
+  })
+
+  it('drops the Advisor row while the plugin system is off', async () => {
+    settings.pluginSystemEnabled = false
+    const container = await render({})
 
     expect(container.querySelector('[data-team-card="advisor"]')).toBeNull()
   })

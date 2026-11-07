@@ -3,6 +3,7 @@ import { gameBoardCaller } from './orchestrator-game-board-call'
 import { isLaunchRefusal } from './orchestrator-game-launch-retry'
 import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import {
+  leadCharacterOf,
   memberNameOf,
   memberRosterOf,
   nextMemberName
@@ -37,11 +38,17 @@ export async function memberNameFor(
     : nextMemberName(roster, taken, locale)
 }
 
-/** The names this lead's members hold; a remote start that failed has none. */
-export const namesInUseOf = (state: OrchestratorGameState): string[] =>
-  state.agents.flatMap((agent) =>
-    agent.remote?.startFailed ? [] : (memberNameOf(agent.displayName) ?? [])
-  )
+/** The names this lead's members hold, and the lead's own default; a remote start that failed has none. */
+export const namesInUseOf = (state: OrchestratorGameState): string[] => {
+  // Why: a lead with no Lead name is shown as this character, so no member may take it (ORCA-1094).
+  const lead = state.lead?.label ? null : leadCharacterOf(memberRosterOf(state), 'en')
+  return [
+    ...state.agents.flatMap((agent) =>
+      agent.remote?.startFailed ? [] : (memberNameOf(agent.displayName) ?? [])
+    ),
+    ...(lead === null ? [] : [lead])
+  ]
+}
 
 // Why: workerStart names only a worktree it creates, and a member's own band reads that name.
 export async function nameReusedWorktree(

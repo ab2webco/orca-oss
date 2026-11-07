@@ -13,6 +13,7 @@ import {
   type HooksConfig
 } from '../agent-hooks/installer-utils'
 import { resolveHooksJsonWritePath } from '../agent-hooks/hook-config-write-path'
+import { getSharedHookFilePolicy } from '../agent-hooks/shared-hook-file-policy'
 import { getCodexManagedScriptFileName } from './codex-hook-identity'
 import {
   CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS,
@@ -93,6 +94,10 @@ export function ensureRealHomeCodexHookState(args: {
   hooksEnabled: boolean
   userDataPath: string
 }): RealHomeCodexHookLane {
+  if (getSharedHookFilePolicy() === 'keep-existing') {
+    // Why: the installed Orca owns ~/.codex/hooks.json; a dev Orca's panes use its managed home (ORCA-1131).
+    return (currentLane = 'unavailable')
+  }
   // Why: the grant client caches failed probes, but mutating and rolling back
   // hooks.json before consulting it still adds synchronous work to every pane.
   if (args.hooksEnabled && currentLane === 'unavailable' && Date.now() < installRetryAfterMs) {

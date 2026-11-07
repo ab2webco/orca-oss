@@ -1,6 +1,5 @@
 import { memo, useCallback, useMemo, useState, type MutableRefObject } from 'react'
 import { RepoIconGlyph } from '@/components/repo/repo-icon'
-import { translate } from '@/i18n/i18n'
 import type { DashboardCard, DashboardSpawnAgentArgs } from '../../../../shared/dashboard-snapshot'
 import type { RepoIcon } from '../../../../shared/repo-icon'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -11,7 +10,11 @@ import type {
   AgentMapWorktreeRing
 } from './agent-map-layout'
 import { AGENT_MAP_LINEAGE_RELATION, shouldAggregateAgentMapWorktree } from './agent-map-layout'
-import { selectVisibleAgentMapLabels } from './agent-map-label-declutter'
+import {
+  AGENT_MAP_PROJECT_COUNT_BASELINE,
+  agentMapProjectCountText,
+  selectVisibleAgentMapLabels
+} from './agent-map-label-declutter'
 import { agentMapDirectLineageChevronPath } from './agent-map-lineage-chevron-path'
 import type { AgentMapFlareStatus } from './agent-map-node-metadata'
 import { AgentMapWorktreeLabel } from './AgentMapWorktreeLabel'
@@ -140,11 +143,7 @@ export const AgentMapScene = memo(function AgentMapScene({
           }
         }
         const projectHosts = [...projectHostsById.values()]
-        const projectCountText = translate(
-          'dashboardPopout.map.projectCount',
-          '{{agents}} agents · {{workspaces}} workspaces',
-          { agents: project.agentCount, workspaces: project.worktrees.length }
-        ).toUpperCase()
+        const projectCountText = agentMapProjectCountText(project)
         const crossWorktreeLineage = !showOrchestrationLinks
           ? []
           : project.worktrees.flatMap((worktree) =>
@@ -277,12 +276,16 @@ export const AgentMapScene = memo(function AgentMapScene({
                   ))}
                 </div>
               </foreignObject>
-              {visibleLabels.projectCountIds.has(project.id) ? (
-                <text className="agent-map-project-count" y={32}>
-                  {projectCountText}
-                </text>
-              ) : null}
             </g>
+            {visibleLabels.projectCountIds.has(project.id) ? (
+              <text
+                className="agent-map-project-count"
+                transform={`translate(${project.x} ${project.y + project.radius}) scale(${labelScale})`}
+                y={AGENT_MAP_PROJECT_COUNT_BASELINE}
+              >
+                {projectCountText}
+              </text>
+            ) : null}
           </g>
         )
       })}

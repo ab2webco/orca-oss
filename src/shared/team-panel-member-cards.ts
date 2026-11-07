@@ -1,6 +1,11 @@
 import { agentToolLabelOf } from './agent-tool-label'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
-import { characterKeyOf, memberNameOf, memberRosterOf } from './orchestrator-game-member-names'
+import {
+  characterKeyOf,
+  leadCharacterOf,
+  memberNameOf,
+  memberRosterOf
+} from './orchestrator-game-member-names'
 import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
@@ -257,7 +262,8 @@ function offlineCardOf(
 export function teamCardsOf(
   state: OrchestratorGameState,
   questionTickets: ReadonlySet<string>,
-  ownerAsk: { ticket: string | null } | null = null
+  ownerAsk: { ticket: string | null } | null = null,
+  locale = 'en'
 ): TeamCards | null {
   const leader = state.agents.find((one) => one.isLeader)
   if (!leader) {
@@ -270,7 +276,12 @@ export function teamCardsOf(
     terminalHandle: leader.terminalHandle ?? null,
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
-    name: state.lead?.label ?? leader.displayName ?? state.worktree?.displayName ?? leader.paneKey,
+    name:
+      state.lead?.label ??
+      leadCharacterOf(roster, locale) ??
+      leader.displayName ??
+      state.worktree?.displayName ??
+      leader.paneKey,
     agentType: leader.agentType,
     status: statusOf(condition, leader.state === 'waiting' || ownerAsk !== null, {
       review: null,
