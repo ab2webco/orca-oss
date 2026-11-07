@@ -166,14 +166,26 @@ for (const [index, one] of CASES.entries()) {
         await expect(panel.locator('[data-team-card="advisor"]')).toHaveCount(0)
         await orcaPage.screenshot({ path: testInfo.outputPath('team-no-report.png') })
 
-        // A report in Jev's shape draws the row; Orca's plugin system plays no part in it.
-        await leadState(lead, JEV_SHAPED_REPORT)
+        // A report in Jev's shape reaches game.state either way; the panel draws it only with
+        // the plugin system on, since Jev reaches a pane only through its plugin (ORCA-1134).
+        const reported = await leadState(lead, JEV_SHAPED_REPORT)
+        expect(reported.agents.find((one) => one.isLeader)?.advisor?.line).toBe(
+          'Keeps the lead on Sonnet for review work'
+        )
         const advisor = panel.locator('[data-team-card="advisor"]')
-        await expect(advisor).toContainText('Keeps the lead on Sonnet for review work', {
-          timeout: 60_000
-        })
-        // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
-        await expect(advisor).not.toContainText('Sonnet 5.5')
+        if (one.system) {
+          await expect(advisor).toContainText('Keeps the lead on Sonnet for review work', {
+            timeout: 60_000
+          })
+          // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
+          await expect(advisor).not.toContainText('Sonnet 5.5')
+        } else {
+          // Why a reread first: the absence must come from the gate, not from a read still to land.
+          await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+          await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+          await expect(panel.locator('[data-team-card="lead"]')).toBeVisible({ timeout: 30_000 })
+          await expect(advisor).toHaveCount(0)
+        }
         await orcaPage.screenshot({ path: testInfo.outputPath('team-jev-shaped-report.png') })
         await leadState(lead, 'null')
         await expect(advisor).toHaveCount(0, { timeout: 60_000 })
