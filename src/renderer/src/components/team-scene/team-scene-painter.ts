@@ -15,7 +15,7 @@ export type TeamSceneFrame = {
   height: number
   /** Device pixels per CSS px, for caches drawn off screen. */
   ratio: number
-  /** Scene seconds, for idle sway and flicker; it stops while the scene is paused. */
+  /** Real seconds the scene has run, for idle sway and flicker; it stops while the scene is paused. */
   t: number
   dt: number
   actors: TeamSceneActor[]

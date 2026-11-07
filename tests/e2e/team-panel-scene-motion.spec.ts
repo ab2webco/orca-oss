@@ -29,13 +29,31 @@ async function canvasHash(page: Page): Promise<string> {
   })
 }
 
-async function hashesOver(page: Page): Promise<string[]> {
-  const seen: string[] = []
+// Why counted alongside: CI renders at about 3.5 frames/s, so a still result must say whether frames ran.
+async function hashesOver(page: Page): Promise<{ hashes: string[]; frames: number }> {
+  await page.evaluate(() => {
+    const w = window as Window & { __sceneFrames?: number; __sceneCounting?: boolean }
+    w.__sceneFrames = 0
+    w.__sceneCounting = true
+    const tick = (): void => {
+      if (w.__sceneCounting) {
+        w.__sceneFrames = (w.__sceneFrames ?? 0) + 1
+        requestAnimationFrame(tick)
+      }
+    }
+    requestAnimationFrame(tick)
+  })
+  const hashes: string[] = []
   for (let i = 0; i < SAMPLES; i++) {
-    seen.push(await canvasHash(page))
+    hashes.push(await canvasHash(page))
     await page.waitForTimeout(WINDOW_MS / (SAMPLES - 1))
   }
-  return seen
+  const frames = await page.evaluate(() => {
+    const w = window as Window & { __sceneFrames?: number; __sceneCounting?: boolean }
+    w.__sceneCounting = false
+    return w.__sceneFrames ?? 0
+  })
+  return { hashes, frames }
 }
 
 // A real lead, one member working and one asking the user; nothing walks once they are seated, so
@@ -184,16 +202,19 @@ test('every Team scene style moves while its team works, with no one entering or
       await expect.poll(() => canvasHash(orcaPage), { timeout: 30_000 }).not.toBe('unpainted')
       // Why a wait first: the members walked in when they joined; by now every one is seated.
       await orcaPage.waitForTimeout(8000)
-      const hashes = await hashesOver(orcaPage)
+      const { hashes, frames } = await hashesOver(orcaPage)
       testInfo.annotations.push({
         type: 'team-scene-motion',
-        description: `${style}: ${new Set(hashes).size} distinct frames in ${SAMPLES} samples over ${WINDOW_MS} ms`
+        description: `${style}: ${new Set(hashes).size} distinct frames in ${SAMPLES} samples over ${WINDOW_MS} ms, ${frames} animation frames`
       })
       await panel.locator('[data-team-scene]').screenshot({
         path: testInfo.outputPath(`team-scene-motion-${style}.png`)
       })
       expect
-        .soft(new Set(hashes).size, `${style} drew one still frame for ${WINDOW_MS} ms`)
+        .soft(
+          new Set(hashes).size,
+          `${style} drew one still frame for ${WINDOW_MS} ms over ${frames} animation frames`
+        )
         .toBeGreaterThan(1)
     }
 
