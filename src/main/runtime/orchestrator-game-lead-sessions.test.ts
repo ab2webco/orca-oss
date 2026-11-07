@@ -55,6 +55,14 @@ describe('GameLeadSessions', () => {
     expect(await store.read('repo:a')).toEqual({ ...SESSION, accountId: 'acct-1' })
   })
 
+  it("keeps where the lead's conversation lives, which names its account when none was recorded", async () => {
+    const { store } = sessions()
+    const transcriptPath = '/home/me/orca/claude-accounts/acct-1/auth/projects/-repo/sess-1.jsonl'
+    await store.write('repo:a', { ...SESSION, transcriptPath })
+
+    expect(await store.read('repo:a')).toEqual({ ...SESSION, transcriptPath })
+  })
+
   it('reads a record kept before leads named their account as one with no account', async () => {
     const { store, dir } = sessions()
     await store.write('repo:a', SESSION)
