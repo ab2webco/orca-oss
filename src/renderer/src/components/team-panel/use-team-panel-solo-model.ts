@@ -24,13 +24,13 @@ import {
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import { useTeamSoloAdvisors } from './use-team-solo-advisors'
 import { useTeamSoloMachineReadings } from './use-team-solo-machine-readings'
-import { useGameLeadHandles } from './game-lead-handles'
+import { useTeamSoloLeadHandles } from './use-team-solo-lead-handles'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
 
 type MachineReadings = ReadonlyMap<string, GameHostReading>
 
 type SoloInputs = TeamSoloSessionsState &
-  Pick<AppState, 'ptyIdsByTabId' | 'terminalLayoutsByTabId'> & { selectedPaneKey: string | null }
+  Pick<AppState, 'ptyIdsByTabId'> & { selectedPaneKey: string | null }
 
 function soloInputsOf(s: AppState): SoloInputs {
   return {
@@ -114,12 +114,12 @@ const NO_SESSIONS: readonly TeamSoloSession[] = []
 /** Null while `active` is false, so a team view pays nothing for agent status churn. */
 export function useTeamPanelSoloModel(active: boolean): TeamPanelSoloModel | null {
   const inputs = useAppStore(useShallow((s) => (active ? soloInputsOf(s) : IDLE)))
-  const leadHandles = useGameLeadHandles()
-  const sessions = useMemo(
-    () => (inputs ? teamSoloSessionsOf(inputs, leadHandles) : NO_SESSIONS),
-    [inputs, leadHandles]
-  )
   const environmentIds = (inputs?.runtimeEnvironments ?? []).map((one) => one.id).join('\n')
+  const leadsByHost = useTeamSoloLeadHandles(environmentIds, active)
+  const sessions = useMemo(
+    () => (inputs ? teamSoloSessionsOf(inputs, leadsByHost) : NO_SESSIONS),
+    [inputs, leadsByHost]
+  )
   const shownTab = useTeamPanelTabStore((s) => s.shown)
   // Why: Jev reaches a pane only through its plugin, so with the plugin system off nothing is asked.
   const pluginsOn = useAppStore((s) => s.settings?.pluginSystemEnabled === true)

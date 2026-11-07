@@ -83,7 +83,13 @@ const advisors = vi.hoisted(() => vi.fn())
 vi.mock('./use-team-solo-advisors', () => ({ useTeamSoloAdvisors: advisors }))
 
 let leadHandles: ReadonlySet<string> = new Set()
-vi.mock('./game-lead-handles', () => ({ useGameLeadHandles: () => leadHandles }))
+vi.mock('./use-team-solo-lead-handles', () => ({
+  useTeamSoloLeadHandles: () =>
+    new Map([
+      ['', leadHandles],
+      ['env-1', leadHandles]
+    ])
+}))
 
 const { useTeamPanelSoloModel } = await import('./use-team-panel-solo-model')
 
