@@ -48,45 +48,57 @@ export function redactAgentStatusText<T extends AgentStatusText>(payload: T): T 
   }
 }
 
+const TOKEN_CHAR = /[A-Za-z0-9_-]/
+// A capability is 32 random bytes in base64url (orchestration db), so a match crosses rows for 43 chars at most.
+const WRAPPED_CAPABILITY = /dcap_[A-Za-z0-9_-]{1,43}/g
+
 /**
- * A screen row is cut at the terminal width, so a token can wrap onto the next row. Rows as long as the
- * longest one read are taken as wrapped and redacted as one line; the token's tail on later rows goes.
+ * A token can run past its row by the terminal's wrap or an app's wrap under a hanging indent, at any row
+ * length. So every row's last word is read as running on into the next row's first word, past the indent
+ * or border between them. The cost, taken for a secret: a word after a cut token at a row's end goes too.
  */
 export function redactWrappedTerminalRows(rows: readonly string[]): string[] {
-  const width = Math.max(0, ...rows.map((row) => row.length))
-  const groups: string[][] = []
-  for (let start = 0; start < rows.length; ) {
-    let end = start
-    while (end < rows.length - 1 && rows[end].length === width) {
+  let stream = ''
+  const origin: { row: number; column: number }[] = []
+  rows.forEach((row, rowIndex) => {
+    let first = 0
+    let last = row.length
+    while (first < last && !TOKEN_CHAR.test(row[first])) {
+      first++
+    }
+    while (last > first && !TOKEN_CHAR.test(row[last - 1])) {
+      last--
+    }
+    stream += row.slice(first, last)
+    for (let column = first; column < last; column++) {
+      origin[origin.length] = { row: rowIndex, column }
+    }
+  })
+  // Per row: each hidden column, and whether a token starts there.
+  const hidden = rows.map(() => new Map<number, boolean>())
+  for (const match of stream.matchAll(WRAPPED_CAPABILITY)) {
+    let end = match.index + match[0].length
+    // Inside one row a longer run is no word of the next row, so it goes whole, as on a single line.
+    while (
+      end < stream.length &&
+      origin[end].row === origin[end - 1].row &&
+      TOKEN_CHAR.test(stream[end])
+    ) {
       end++
     }
-    groups[groups.length] = redactAcrossRows(rows.slice(start, end + 1))
-    start = end + 1
-  }
-  return groups.flat()
-}
-
-function redactAcrossRows(rows: readonly string[]): string[] {
-  const joined = rows.join('')
-  const matches = Array.from(joined.matchAll(DISPATCH_CAPABILITY), (match) => ({
-    start: match.index,
-    end: match.index + match[0].length
-  }))
-  if (matches.length === 0) {
-    return [...rows]
-  }
-  let offset = 0
-  return rows.map((row) => {
-    let shown = ''
-    for (let index = offset; index < offset + row.length; index++) {
-      const match = matches.find((one) => index >= one.start && index < one.end)
-      if (!match) {
-        shown += joined[index]
-      } else if (index === match.start) {
-        shown += '[redacted]'
-      }
+    for (let at = match.index; at < end; at++) {
+      hidden[origin[at].row].set(origin[at].column, at === match.index)
     }
-    offset += row.length
+  }
+  return rows.map((row, index) => {
+    if (hidden[index].size === 0) {
+      return row
+    }
+    let shown = ''
+    for (let column = 0; column < row.length; column++) {
+      const start = hidden[index].get(column)
+      shown += start === undefined ? row[column] : start ? '[redacted]' : ''
+    }
     return shown
   })
 }

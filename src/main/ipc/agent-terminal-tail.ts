@@ -25,6 +25,8 @@ export const AGENT_TERMINAL_TAIL_MIN_READ_INTERVAL_MS = 750
 /** Terminal reads for remote panes are RPC-bound; a few at a time keeps them
  *  interleaved rather than arriving on the main thread as one block. */
 const READ_CONCURRENCY = 4
+/** A 48-char capability wrapped at a 4-column hanging indent spans 12 rows. */
+const CAPABILITY_HEAD_ROWS = 12
 
 type CachedTail = { readAtMs: number; lines: number; tail: AgentTerminalTailReading }
 
@@ -74,11 +76,13 @@ export function createAgentTerminalTailReader(
         : cached.tail
     }
     let tail: AgentTerminalTailReading
+    // Why more rows than shown: a capability's head can sit above the shown rows, and its tail is only found from there.
+    const readRows = lines + CAPABILITY_HEAD_ROWS
     try {
-      const read = await runtime.readTerminalVisibleLines(ptyId, lines)
+      const read = await runtime.readTerminalVisibleLines(ptyId, readRows)
       // Why after the lines: colour is an enrichment, and a pane whose emulator
       // is not here still has a readable tail.
-      const segments = await runtime.readTerminalVisibleSegments?.(ptyId, lines)
+      const segments = await runtime.readTerminalVisibleSegments?.(ptyId, readRows)
       tail =
         read === null
           ? { read: false, reason: 'terminal-unreadable' }
@@ -87,7 +91,7 @@ export function createAgentTerminalTailReader(
               // Why: a worker's tail shows its brief, whose commands carry its capability.
               lines: boundAgentTerminalTailLines(redactWrappedTerminalRows(read), lines),
               ...(segments && segments.length > 0
-                ? { segments: redactTerminalSegmentRows(segments.slice(-lines)) }
+                ? { segments: redactTerminalSegmentRows(segments).slice(-lines) }
                 : {})
             }
     } catch {
