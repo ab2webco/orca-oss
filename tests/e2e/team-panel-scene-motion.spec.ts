@@ -203,6 +203,13 @@ test('every Team scene style moves while its team works, with no one entering or
     )
     const pixel = panel.locator('[data-team-scene="pixel"]')
     await expect(pixel.locator('canvas')).toBeVisible({ timeout: 30_000 })
+    // A sequence across one swing, so the motion can be read frame by frame.
+    for (let frame = 0; frame < 6; frame++) {
+      await pixel.screenshot({
+        path: testInfo.outputPath(`team-scene-pixel-sequence-${frame}.png`)
+      })
+      await orcaPage.waitForTimeout(200)
+    }
     for (const width of [1440, 768, 390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
