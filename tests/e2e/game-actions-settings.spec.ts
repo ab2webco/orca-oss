@@ -152,4 +152,28 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
       }
     }
   }
+
+  // The same page's Scene listbox opens at its control; the trigger is read once it is in view (ORCA-1092 row 28).
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const scene = orcaPage.getByRole('combobox', { name: /^Scene/ })
+  for (const width of WIDTHS) {
+    await setWindowWidth(electronApp, orcaPage, width)
+    await dismissAppCards(orcaPage)
+    await scene.scrollIntoViewIfNeeded()
+    const control = await scene.boundingBox()
+    await scene.click()
+    const list = orcaPage.locator('[role="listbox"]')
+    await expect(list).toBeVisible()
+    const box = await list.boundingBox()
+    const gap =
+      box && control
+        ? Math.max(box.y - (control.y + control.height), control.y - (box.y + box.height))
+        : Infinity
+    const overlaps =
+      box && control && box.x < control.x + control.width && control.x < box.x + box.width
+    expect(gap, `Scene listbox gap at ${width}`).toBeLessThanOrEqual(12)
+    expect(overlaps, `Scene listbox under its control at ${width}`).toBe(true)
+    await orcaPage.keyboard.press('Escape')
+    await expect(list).toBeHidden()
+  }
 })
