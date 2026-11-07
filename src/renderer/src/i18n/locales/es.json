@@ -5572,7 +5572,14 @@
           "editEndpointTokenPlaceholder": "Leave blank to keep the current token",
           "editEndpointSubmit": "Save changes",
           "reassignSystemDefault": "System default",
-          "hostReauthUnsupported": "Este servidor es demasiado antiguo para volver a autenticar una cuenta en su sitio. Actualízalo, o inicia sesión en el propio servidor."
+          "hostReauthUnsupported": "Este servidor es demasiado antiguo para volver a autenticar una cuenta en su sitio. Actualízalo, o inicia sesión en el propio servidor.",
+          "longLivedTokenRemoteHint": "Configúralo en ese host con orca account token set.",
+          "longLivedTokenWslHint": "Los tokens de larga duración todavía no funcionan con cuentas de WSL.",
+          "longLivedTokenBadgeHint": "Los agentes de esta cuenta usan un token de larga duración, no el inicio de sesión guardado. El estado de sesión y la cuota de abajo describen el inicio de sesión guardado.",
+          "longLivedTokenBadge": "Token",
+          "longLivedTokenAction": "Token",
+          "longLivedTokenUpdated": "Token de larga duración actualizado.",
+          "longLivedTokenRestart": "Reinicia los terminales de Claude abiertos en esta cuenta para que lo usen."
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",
@@ -10889,6 +10896,15 @@
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
           "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+        },
+        "ClaudeLongLivedTokenDialog": {
+          "title": "Token de larga duración",
+          "description": "Ejecuta claude setup-token en este host con la sesión de {{value0}} iniciada y pega el token. Los agentes de esta cuenta lo usan en lugar del inicio de sesión guardado, así que dejan de rotarlo.",
+          "inputLabel": "Token",
+          "replacePlaceholder": "Ya hay un token guardado. Pega uno nuevo para reemplazarlo.",
+          "limits": "El token solo hace solicitudes al modelo: Remote Control y los conectores de claude.ai no funcionan con él. Se queda en este host.",
+          "remove": "Quitar token",
+          "save": "Guardar token"
         }
       },
       "right": {
