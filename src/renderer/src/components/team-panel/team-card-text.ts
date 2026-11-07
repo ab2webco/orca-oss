@@ -54,6 +54,13 @@ export function teamConditionText(condition: TeamCondition): string {
   }
 }
 
+/** A session's state as the no-team view words it; only waiting differs from a member's. */
+export function teamSessionStateText(condition: TeamCondition): string {
+  return condition === 'waiting'
+    ? translate('teamPanel.activity.needsYou', 'Needs you')
+    : teamConditionText(condition)
+}
+
 /** What the agent does now; agent words (tool detail, questions) are shown as written. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
   if (!action) {
@@ -67,6 +74,18 @@ export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondi
     case 'question':
       return action.text
   }
+}
+
+/** A no-team session's line. Why not teamLiveText: V28's solo rows name the tool, its team cards do not. */
+export function teamSoloLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
+  return action?.kind === 'tool' && action.detail
+    ? `${action.tool} · ${action.detail}`
+    : teamLiveText(action, condition)
+}
+
+/** GitLab numbers a merge request !12; every other provider says #12. */
+export function teamPrNumberText(pr: Pick<TeamPullRequest, 'provider' | 'number'>): string {
+  return pr.provider === 'gitlab' ? `!${pr.number}` : `#${pr.number}`
 }
 
 export function teamPhaseText(phase: TeamFlowPhase): string {
