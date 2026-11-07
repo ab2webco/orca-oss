@@ -35,6 +35,12 @@ const HEIGHT = PIXELS * PIXEL
 const GROUND = PIXELS - 3
 const feetRow = (depth: number): number => GROUND - 2 + Math.round(depth * 2)
 
+// V28's tool and paper tones, and its swing: every 1.15 s, easing out over about 0.43 s.
+const TOOL = '#e8eef4'
+const PAPER = '#f4e6c0'
+const SWING_SECONDS = 1.15
+const SWING_FADE = 2.3
+
 const hex = (color: number): string => `#${(color & 0xffffff).toString(16).padStart(6, '0')}`
 
 function bitmapOf(
@@ -56,6 +62,49 @@ function bitmapOf(
     }
   }
   return canvas
+}
+
+/** What a seated actor holds in hand, in scene pixels from its middle (`cx`, `hy`), as V28 draws it. */
+function drawTool(
+  g: CanvasRenderingContext2D,
+  a: TeamSceneActor,
+  t: number,
+  cx: number,
+  hy: number
+): void {
+  const hx = cx + a.facing * 4
+  const dot = (dx: number, dy: number, w: number, h: number, color: string): void => {
+    g.fillStyle = color
+    const x = a.facing > 0 ? hx + dx : hx - dx - w + 1
+    g.fillRect(x * PIXEL, (hy + dy) * PIXEL, w * PIXEL, h * PIXEL)
+  }
+  if (a.carrying || a.pose === 'give') {
+    dot(1, 0, 3, 2, PAPER)
+    return
+  }
+  if (a.pose === 'raise' || a.pose === 'wave' || a.pose === 'cheer') {
+    dot(0, -6 + (Math.floor(t * 6) % 2), 1, 4, TOOL)
+    return
+  }
+  if (a.pose !== 'work') {
+    return
+  }
+  const swing = Math.max(
+    0,
+    1 - (((t % SWING_SECONDS) + SWING_SECONDS) % SWING_SECONDS) * SWING_FADE
+  )
+  if (swing > 0.6) {
+    dot(1, -4, 1, 4, TOOL)
+  } else if (swing > 0.3) {
+    dot(1, -1, 1, 1, TOOL)
+    dot(2, -2, 1, 1, TOOL)
+    dot(3, -3, 1, 1, TOOL)
+  } else if (swing > 0) {
+    dot(1, 1, 4, 1, TOOL)
+  } else {
+    // Why held between swings: a worker at rest must still read apart from a resting member.
+    dot(1, -1, 1, 3, TOOL)
+  }
 }
 
 /** The Pixel style: the game's own scene, sprites and crown, placed by the shared simulation. */
@@ -108,7 +157,12 @@ export function createPixelPainter(args: {
     const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
     return spriteFor(costumeSpriteOf(costume, leg, false), a.role === 'lead')
   }
-  const drawActor = (g: CanvasRenderingContext2D, a: TeamSceneActor, columns: number): void => {
+  const drawActor = (
+    g: CanvasRenderingContext2D,
+    a: TeamSceneActor,
+    columns: number,
+    t: number
+  ): void => {
     const leg = a.pose === 'walk' ? Math.floor(a.gait / Math.PI) % 2 : 0
     const image = imageOf(a, leg)
     const left = Math.round(a.x * columns - image.width / 2)
@@ -123,6 +177,7 @@ export function createPixelPainter(args: {
     g.scale(a.facing * PIXEL, PIXEL)
     g.drawImage(image, 0, 0)
     g.restore()
+    drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
     if (a.emote) {
       drawSceneEmote(
         g,
@@ -152,7 +207,8 @@ export function createPixelPainter(args: {
       g.drawImage(backdropFor(columns), 0, 0, columns * PIXEL, HEIGHT)
       effects.start(f.effects, f.actors, f.height)
       for (const a of f.actors) {
-        drawActor(g, a, columns)
+        // Why offset by x: members side by side swing out of step, as in Figures and Office.
+        drawActor(g, a, columns, f.t + a.x * 7)
       }
       effects.draw(g, f)
       drawSceneOverflow(g, f.overflow)

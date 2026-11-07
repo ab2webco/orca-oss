@@ -118,6 +118,35 @@ describe('createPixelPainter', () => {
     expect(asking.calls.map((c) => c.fillStyle)).toContain(COLORS.attention)
   })
 
+  // ORCA-1097: the frame loop paints ~31 times a second, so a painter that ignores t draws one still.
+  describe('idle motion as V28 draws it', () => {
+    const fillsAt = (pose: TeamSceneActor['pose'], t: number): string => {
+      const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+      const r = recordingContext()
+      painter.paint(r.g, { ...frame([actor('a', { pose })]), t })
+      return JSON.stringify(r.calls.filter((c) => c.name === 'fillRect'))
+    }
+    const over = (pose: TeamSceneActor['pose']): Set<string> =>
+      new Set(Array.from({ length: 24 }, (_, i) => fillsAt(pose, i / 12)))
+
+    it('swings a working member’s tool within each 2 s', () => {
+      expect(over('work').size).toBeGreaterThan(1)
+    })
+
+    it('bobs the raised tool of a member who needs the user', () => {
+      expect(over('raise').size).toBeGreaterThan(1)
+    })
+
+    it('keeps a resting member still', () => {
+      expect(over('idle').size).toBe(1)
+    })
+
+    it('draws working, resting and asking apart at the same moment', () => {
+      const looks = new Set((['work', 'idle', 'raise'] as const).map((pose) => fillsAt(pose, 0.1)))
+      expect(looks.size).toBe(3)
+    })
+  })
+
   it('draws a card face from the same sprite, crowned for the lead, crisp and centered', () => {
     const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
     const face = (who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey' | 'name'>) => {
