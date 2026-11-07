@@ -114,6 +114,25 @@ describe('orchestration RPC methods', () => {
       )
     })
 
+    // ORCA-1094 row 6: the member's tab reads its name, ticket and host, as V28 does.
+    it("titles a named member's tab with its character, ticket and host", async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const task = db.createTask({ spec: 'keep the look' })
+
+      await call('orchestration.workerStart', {
+        task: task.id,
+        from: 'term_coord',
+        agent: 'codex',
+        displayName: 'Merlín · ORCA-12 Keep the look'
+      })
+
+      expect(runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({ title: 'Merlín · ORCA-12 · local' })
+      )
+    })
+
     it('applies and reports opaque per-invocation model preferences', async () => {
       setup()
       mockCurrentWorkerStart()

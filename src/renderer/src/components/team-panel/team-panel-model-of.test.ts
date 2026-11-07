@@ -48,6 +48,15 @@ const args = (overrides: Partial<Parameters<typeof teamPanelModelOf>[0]> = {}) =
 })
 
 describe('teamPanelModelOf', () => {
+  // ORCA-1094 row 2: the level is the team's real character XP on the game's own curve.
+  it('levels the project from its characters XP, and draws none when it could not be read', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args({ xp: 350 }))?.xp).toEqual({ level: 3, into: 50, need: 300 })
+    expect(teamPanelModelOf(args({ xp: 0 }))?.xp).toEqual({ level: 1, into: 0, need: 100 })
+    expect(teamPanelModelOf(args({ xp: null }))?.xp).toBeNull()
+  })
+
   it('builds the cards with the tickets that have an open question for the user', () => {
     teamCardsOf.mockReturnValue(CARDS)
     const questions = [

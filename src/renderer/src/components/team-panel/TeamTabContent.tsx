@@ -121,27 +121,6 @@ function AdvisorCardRow({
   )
 }
 
-function XpRow({ xp }: { xp: NonNullable<TeamPanelGameModel['xp']> }): React.JSX.Element {
-  const ratio = xp.need > 0 ? Math.min(1, xp.into / xp.need) : 0
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 text-xs tabular-nums text-muted-foreground">
-      <span>{translate('teamPanel.xp.level', 'Lv {{level}}', { level: xp.level })}</span>
-      <span className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-        <span
-          className="block h-full origin-left bg-foreground/60"
-          style={{ transform: `scaleX(${ratio})` }}
-        />
-      </span>
-      <span>
-        {translate('teamPanel.xp.progress', '{{into}}/{{need}} XP', {
-          into: xp.into,
-          need: xp.need
-        })}
-      </span>
-    </div>
-  )
-}
-
 export function TeamTabContent({
   model,
   look,
@@ -162,7 +141,6 @@ export function TeamTabContent({
   const game = look === 'game'
   return (
     <div className="flex flex-col pb-3">
-      {game && model.xp ? <XpRow xp={model.xp} /> : null}
       {model.stopped ? (
         <p className="px-3 py-1.5 text-xs font-medium text-status-attention">
           {model.stopped.by

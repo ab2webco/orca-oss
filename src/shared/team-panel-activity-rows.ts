@@ -101,6 +101,12 @@ const modelOf = (entry: AgentStatusEntry, advisor: TeamAdvisorRow | null): TeamM
     ? { label: advisor.model, effort: advisor.effort, source: 'advisor' }
     : teamSessionModelOf(entry)
 
+// Why (ORCA-1130): the completed slot holds the turn moved out when the next began or a session boundary landed; a real done's own message is the turn that just ended.
+const finalMessageOf = (entry: AgentStatusEntry): string | undefined =>
+  entry.state === 'done' && !entry.sessionBoundary
+    ? entry.lastAssistantMessage
+    : entry.lastCompletedAssistantMessage || entry.lastAssistantMessage
+
 function activityRowOf(session: TeamSoloSession): TeamActivityRow {
   const { entry } = session
   const condition = conditionOf(entry)
@@ -123,7 +129,7 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     prompt: shownTextOf(entry.prompt),
     ticket: session.ticket,
     pr: session.pr,
-    lastMessage: shownTextOf(entry.lastCompletedAssistantMessage || entry.lastAssistantMessage),
+    lastMessage: shownTextOf(finalMessageOf(entry)),
     cacheExpiresAt: session.cacheExpiresAt,
     ports: session.ports,
     note: shownTextOf(session.note),
