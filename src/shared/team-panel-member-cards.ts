@@ -1,3 +1,4 @@
+import { agentToolLabelOf } from './agent-tool-label'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 import { characterKeyOf, memberNameOf, memberRosterOf } from './orchestrator-game-member-names'
 import type { GameMemberName } from './orchestrator-game-member-names'
@@ -130,7 +131,11 @@ const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
     return { kind: 'link', name, id, url, running }
   }
   return agent.toolName
-    ? { kind: 'tool', tool: agent.toolName, detail: redactedDetailOf(agent.toolInput) }
+    ? {
+        kind: 'tool',
+        tool: agentToolLabelOf(agent.toolName),
+        detail: redactedDetailOf(agent.toolInput)
+      }
     : null
 }
 
