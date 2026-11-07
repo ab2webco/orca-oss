@@ -4862,7 +4862,9 @@
           "cli": "Orca Lab CLI",
           "planeWorkItems": "Plane work items",
           "planeWorkItem": "Plane work item",
-          "showSection": "Show"
+          "showSection": "Show",
+          "account": "Account",
+          "model": "Model and effort"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -17250,7 +17252,8 @@
       "countNeedsYou_other": "{{count}} need you",
       "countWorking": "{{count}} working",
       "countDone_one": "{{count}} done",
-      "countDone_other": "{{count}} done"
+      "countDone_other": "{{count}} done",
+      "agent": "Agent"
     },
     "lead": {
       "badge": "Lead",
