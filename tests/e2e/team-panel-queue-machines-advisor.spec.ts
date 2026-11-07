@@ -58,28 +58,11 @@ test.afterAll(() => {
   rmSync(fakeGhDir, { recursive: true, force: true })
 })
 
-function useGitHubRemote(repoPath: string): void {
-  for (const name of ['origin', 'upstream']) {
-    try {
-      execSync(`git remote remove ${name}`, { cwd: repoPath, stdio: 'ignore' })
-    } catch {
-      // Missing remote is fine for the disposable E2E repo.
-    }
-  }
-  execSync('git remote add origin https://github.com/acme/repo.git', { cwd: repoPath })
-}
-
 const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
   page.evaluate(
     (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
     enabled
   )
-
-// Why through another tab: the panel re-reads on mount, far sooner than its 20 s poll.
-async function rereadPanel(page: Page): Promise<void> {
-  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
-  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
-}
 
 // The real lead's game.state, with no overlay: GitHub is the fake gh, the machine is this one.
 test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev follows the plugin system', async ({
@@ -88,7 +71,8 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
   testRepoPath
 }, testInfo) => {
   test.setTimeout(CAPTURE_EVIDENCE ? 900_000 : 300_000)
-  useGitHubRemote(testRepoPath)
+  // Why only origin: the seeded repo has no remote, and Orca reads the GitHub slug from it.
+  execSync('git config remote.origin.url https://github.com/acme/repo.git', { cwd: testRepoPath })
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -120,36 +104,10 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
       state: 'working',
       prompt: 'Lead the team'
     })
-    // The lead's Jev report, on the same game.state call its mod polls with, once it lists the lead.
-    const report = () =>
-      client.call<OrchestratorGameState>('game.state', {
-        worktreeId,
-        terminalHandle: lead,
-        paneKey: pane.paneKey,
-        advisor: {
-          version: 1,
-          model: 'Opus 5.5',
-          effort: 'high',
-          line: JEV_LINE,
-          pinned: { model: false, effort: false }
-        }
-      })
-    let reported = await report()
-    await expect
-      .poll(
-        async () => {
-          reported = await report()
-          return reported.result.agents.find((one) => one.isLeader)?.advisor?.line ?? null
-        },
-        { timeout: 60_000, message: 'game.state never listed the lead with its Jev report' }
-      )
-      .toBe(JEV_LINE)
-    expect(reported.result.localHost, 'a lead alone publishes this machine').toMatchObject({
-      host: 'local',
-      status: 'ok'
-    })
-    // Why each poll: Orca's login-shell PATH hydration puts the shell's own gh ahead of the fake.
-    // Why so long: a read before then is cached for 90 s.
+    // The lead's Jev report, on the same game.state call its mod polls with.
+    // Why the PATH each poll: Orca's login-shell PATH hydration puts the shell's own gh first.
+    // Why so long: a queue read before then is cached for 90 s.
+    let reported: OrchestratorGameState | null = null
     await expect
       .poll(
         async () => {
@@ -160,16 +118,31 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
             },
             { dir: fakeGhDir, sep: path.delimiter }
           )
-          const state = await client.call<OrchestratorGameState>('game.state', {
-            worktreeId,
-            terminalHandle: lead,
-            paneKey: pane.paneKey
-          })
-          return state.result.project?.queue?.entries?.map((one) => one.id) ?? null
+          const advisor = { version: 1, model: 'Opus 5.5', effort: 'high', line: JEV_LINE }
+          reported = (
+            await client.call<OrchestratorGameState>('game.state', {
+              worktreeId,
+              terminalHandle: lead,
+              paneKey: pane.paneKey,
+              advisor: { ...advisor, pinned: { model: false, effort: false } }
+            })
+          ).result
+          return {
+            jev: reported.agents.find((one) => one.isLeader)?.advisor?.line ?? null,
+            queue: reported.project?.queue?.entries?.map((one) => one.id) ?? null
+          }
         },
-        { timeout: 150_000, intervals: [5_000], message: 'game.state never carried the queue' }
+        {
+          timeout: 150_000,
+          intervals: [5_000],
+          message: 'game.state never carried Jev and the queue'
+        }
       )
-      .toEqual(['#951', '#952'])
+      .toEqual({ jev: JEV_LINE, queue: ['#951', '#952'] })
+    expect(reported!.localHost, 'a lead alone publishes this machine').toMatchObject({
+      host: 'local',
+      status: 'ok'
+    })
 
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
@@ -227,7 +200,9 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
 
     // Plugins off: the report reached the host, and the panel still draws no Jev row.
     await panel.getByRole('tab', { name: 'Team' }).click()
-    await rereadPanel(orcaPage)
+    // Why through another tab: the panel re-reads on mount, far sooner than its 20 s poll.
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
     await expect(panel.locator('[data-team-card="lead"]')).toBeVisible({ timeout: 30_000 })
     await expect(advisor).toHaveCount(0)
     await capture('off')
