@@ -4,6 +4,8 @@
  * Needs E2E: the token rides the real /hook/claude server, main's normalizer and the renderer row.
  */
 
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
@@ -108,7 +110,7 @@ async function expectTerminalCovered(page: Page, surface: string): Promise<void>
 }
 
 /** Every text node holding any piece of the token must be under something else, never on top. */
-async function expectNoVisibleCapability(page: Page, surface: string): Promise<void> {
+async function expectNoVisibleCapability(page: Page, surface: string, leak = LEAK): Promise<void> {
   const visible = await page.evaluate((pattern) => {
     const leak = new RegExp(pattern)
     const found: string[] = []
@@ -133,7 +135,7 @@ async function expectNoVisibleCapability(page: Page, surface: string): Promise<v
       }
     }
     return found
-  }, LEAK.source)
+  }, leak.source)
   expect(visible, `${surface} shows the capability`).toEqual([])
 }
 
@@ -277,5 +279,82 @@ test('a seeded dispatch capability is visible on no agent surface', async ({
     expect(await sheet.innerHTML(), `grid tail at ${width}`).not.toMatch(LEAK)
     await expectNoVisibleCapability(orcaPage, `grid tail at ${width}`)
     await orcaPage.screenshot({ path: testInfo.outputPath(`dashboard-grid-tail-${width}.png`) })
+  }
+})
+
+// Why only Q, X, J and Z in the body: no other sheet text holds them, so three in a row is a fragment.
+const WRAPPED = `dcap_${'QXJZ'.repeat(11).slice(0, 43)}`
+const FRAGMENT = /dcap|[QXJZ]{3}/
+
+/** A Claude-style hanging-indent wrap ending in a 3-char fragment, a terminal wrap mid-row, longer rows around. */
+function wrappedRows(cols: number): string {
+  return [
+    'x'.repeat(cols - 1),
+    `${'p'.repeat(cols - 20)} ${WRAPPED} done`,
+    `  ⎿  send --dispatch-capability ${WRAPPED.slice(0, 6)}`,
+    `     ${WRAPPED.slice(6, 22)}`,
+    `     ${WRAPPED.slice(22, 38)}`,
+    `     ${WRAPPED.slice(38, 45)}`,
+    `     ${WRAPPED.slice(45)} --type heartbeat`,
+    'y'.repeat(cols - 1),
+    ''
+  ].join('\n')
+}
+
+test('a capability wrapped across rows leaves no fragment in the narrow grid', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  await waitForSessionReady(orcaPage)
+  await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActiveTerminalManager(orcaPage, 30_000)
+  await waitForPaneCount(orcaPage, 1, 30_000)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const endpoint = await readHookEndpoint(electronApp)
+  await orcaPage.evaluate(async () => {
+    const settings = await window.api.settings.set({
+      experimentalActivity: true,
+      experimentalAgentDashboardPopout: true,
+      experimentalAgentDashboardShowIdle: true
+    })
+    window.__store!.setState({ settings })
+    window.__store!.getState().setRightSidebarOpen(false)
+  })
+
+  await setWindowWidth(electronApp, orcaPage, 600)
+  const cols = await orcaPage.evaluate(() => {
+    const manager = [...(window.__paneManagers?.values() ?? [])][0]
+    return (manager?.getActivePane?.() ?? manager?.getPanes?.()[0])?.terminal.cols ?? 0
+  })
+  expect(cols).toBeGreaterThan(30)
+  const file = testInfo.outputPath('wrapped-rows.txt')
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, wrappedRows(cols))
+  await execInTerminal(orcaPage, await waitForActivePanePtyId(orcaPage), `cat '${file}'`)
+  await waitForTerminalOutput(orcaPage, 'heartbeat')
+  await postClaudeHook(endpoint, pane, { hook_event_name: 'UserPromptSubmit', prompt: 'check' })
+
+  const sheet = orcaPage.locator('[data-agent-dashboard-sheet]')
+  await orcaPage.getByRole('button', { name: /Agent Dashboard/ }).click()
+  await sheet.waitFor({ state: 'visible' })
+  await sheet.getByRole('button', { name: 'Grid', exact: true }).click()
+  await settle(orcaPage)
+  const tail = sheet.locator('[data-terminal-tail]').first()
+  // Why: the hanging-indent rows and the 3-char fragment's row are inside the shown tail, not cut above it.
+  await expect(tail).toContainText('--type heartbeat')
+  await expect(tail).toContainText('--dispatch-capability [redacted]')
+  for (const width of [600, 1440, 390]) {
+    await setWindowWidth(electronApp, orcaPage, width)
+    await expectSheetFillsViewport(orcaPage)
+    // Markup without icons: an SVG path's letters are not text.
+    const markup = await sheet.evaluate((element) => {
+      const copy = element.cloneNode(true) as HTMLElement
+      copy.querySelectorAll('svg').forEach((svg) => svg.remove())
+      return copy.outerHTML
+    })
+    expect(markup, `grid at ${width}`).not.toMatch(FRAGMENT)
+    await expectNoVisibleCapability(orcaPage, `grid at ${width}`, FRAGMENT)
+    await orcaPage.screenshot({ path: testInfo.outputPath(`wrapped-grid-${width}.png`) })
   }
 })

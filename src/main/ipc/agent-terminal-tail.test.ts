@@ -91,6 +91,24 @@ describe('createAgentTerminalTailReader', () => {
     })
   })
 
+  it('hides a tail whose head wrapped on a row above the ones it shows', async () => {
+    const capability = `dcap_${'K'.repeat(43)}`
+    const screen = [
+      'x'.repeat(60),
+      `  ⎿  send --dispatch-capability ${capability.slice(0, 20)}`,
+      `     ${capability.slice(20)} --type heartbeat`,
+      '✻ Working…'
+    ]
+    const read = createAgentTerminalTailReader(
+      runtimeReading(async (_ptyId, limit) => screen.slice(-limit))
+    )
+    const [reading] = await read(['a'], 2)
+    expect(reading.tail).toEqual({
+      read: true,
+      lines: ['      --type heartbeat', '✻ Working…']
+    })
+  })
+
   it('reads every pty in the batch and keeps request order', async () => {
     const read = createAgentTerminalTailReader(runtimeReading(async (ptyId) => [`${ptyId} line`]))
     await expect(read(['a', 'b'], 4)).resolves.toEqual([

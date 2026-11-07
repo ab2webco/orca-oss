@@ -100,7 +100,13 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
                 <Kanban className="size-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}>
+            {/* Why capped: the Spanish hint is wider than a 320 px window and was cut at its edge. */}
+            <TooltipContent
+              side="top"
+              sideOffset={4}
+              collisionPadding={8}
+              className="max-w-[calc(100vw-1rem)]"
+            >
               {workspaceBoardMovedHintOpen
                 ? translate(
                     'auto.components.sidebar.SidebarToolbar.87d0064026',
