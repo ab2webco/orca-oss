@@ -13,6 +13,7 @@ import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
 import { teamLiveText, teamModelText } from '@/components/team-panel/team-card-text'
 import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
+import { agentToolLabelOf } from '../../../../shared/agent-tool-label'
 import {
   teamLiveActionOfEntry,
   teamSessionModelOf
@@ -44,7 +45,7 @@ function getCompactAgentSecondary(agent: DashboardAgentRowData): string {
     return 'Interrupted by user'
   }
   if (agent.state === 'working') {
-    const toolName = agent.entry.toolName?.trim() ?? ''
+    const toolName = agentToolLabelOf(agent.entry.toolName?.trim() ?? '')
     const toolInput = agent.entry.toolInput?.trim() ?? ''
     if (toolName && toolInput) {
       return `${toolName}: ${toolInput}`
