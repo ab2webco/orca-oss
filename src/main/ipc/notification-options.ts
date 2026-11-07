@@ -1,3 +1,4 @@
+import { redactDispatchCapability } from '../../shared/dispatch-capability-redaction'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 
 const NOTIFICATION_AGENT_LABEL_MAX_LENGTH = 40
@@ -21,12 +22,21 @@ const AGENT_TYPE_LABELS: Readonly<Record<string, string>> = {
   hermes: 'Hermes'
 }
 
-export function buildNotificationOptions(args: NotificationDispatchRequest): {
-  title: string
-  body: string
-  silent?: boolean
-  sound?: string
-} {
+type NotificationOptions = { title: string; body: string; silent?: boolean; sound?: string }
+
+/** Desktop and mobile both send what this returns, so the capability redaction lives here once. */
+export function buildNotificationOptions(args: NotificationDispatchRequest): NotificationOptions {
+  const options = buildUnredactedNotificationOptions(args)
+  return {
+    ...options,
+    title: redactDispatchCapability(options.title),
+    body: redactDispatchCapability(options.body)
+  }
+}
+
+function buildUnredactedNotificationOptions(
+  args: NotificationDispatchRequest
+): NotificationOptions {
   if (args.source === 'terminal-bell') {
     return {
       title: `Bell in ${args.worktreeLabel ?? 'workspace'}`,

@@ -36,6 +36,7 @@ export function GameOwnerQuestionCard({
   needsYou?: boolean
   onAnswer: (reply: GameOwnerReply) => Promise<void>
 }): React.JSX.Element {
+  const [open, setOpen] = React.useState(false)
   const [text, setText] = React.useState('')
   const [sending, setSending] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -97,54 +98,64 @@ export function GameOwnerQuestionCard({
           <p className="text-xs break-words text-muted-foreground">{question.context}</p>
         )
       ) : null}
-      {question.options.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {question.options.map((option, index) => (
-            <Button
-              key={option}
-              type="button"
-              variant={needsYou ? (index === 0 ? 'default' : 'secondary') : 'outline'}
-              size="sm"
-              className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
-              disabled={sending}
-              onClick={() => send({ option: index + 1 })}
-            >
-              {option}
-            </Button>
-          ))}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {question.options.map((option, index) => (
+          <Button
+            key={option}
+            type="button"
+            variant={needsYou ? (index === 0 ? 'default' : 'secondary') : 'outline'}
+            size="sm"
+            className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
+            disabled={sending}
+            onClick={() => send({ option: index + 1 })}
+          >
+            {option}
+          </Button>
+        ))}
+        {/* Why behind a button (ORCA-1095): V28's card is the question and its options; typing is the exception. */}
+        {open ? null : (
+          <Button type="button" variant="ghost" size="xs" onClick={() => setOpen(true)}>
+            {translate('teamPanel.inbox.answer', 'Answer')}
+          </Button>
+        )}
+      </div>
       {/* Why stacked in a narrow card: beside Send, the placeholder is cut mid-word at 320px. */}
-      <form
-        className="flex flex-col gap-2 @xs:flex-row @xs:items-center"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (typed) {
-            send({ text: typed })
-          }
-        }}
-      >
-        <label htmlFor={answerId} className="sr-only">
-          {translate('auto.components.game-inbox.GameOwnerQuestionCard.yourAnswer', 'Your answer')}
-        </label>
-        <Input
-          id={answerId}
-          value={text}
-          disabled={sending}
-          placeholder={
-            placeholder ??
-            translate(
-              'auto.components.game-inbox.GameOwnerQuestionCard.placeholder',
-              'Answer in your own words'
-            )
-          }
-          className="h-8 min-w-0 text-sm @xs:flex-1"
-          onChange={(event) => setText(event.target.value)}
-        />
-        <Button type="submit" size="sm" className="self-end" disabled={sending || !typed}>
-          {translate('auto.components.game-inbox.GameOwnerQuestionCard.send', 'Send')}
-        </Button>
-      </form>
+      {open ? (
+        <form
+          className="flex flex-col gap-2 @xs:flex-row @xs:items-center"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (typed) {
+              send({ text: typed })
+            }
+          }}
+        >
+          <label htmlFor={answerId} className="sr-only">
+            {translate(
+              'auto.components.game-inbox.GameOwnerQuestionCard.yourAnswer',
+              'Your answer'
+            )}
+          </label>
+          <Input
+            id={answerId}
+            autoFocus
+            value={text}
+            disabled={sending}
+            placeholder={
+              placeholder ??
+              translate(
+                'auto.components.game-inbox.GameOwnerQuestionCard.placeholder',
+                'Answer in your own words'
+              )
+            }
+            className="h-8 min-w-0 text-sm @xs:flex-1"
+            onChange={(event) => setText(event.target.value)}
+          />
+          <Button type="submit" size="sm" className="self-end" disabled={sending || !typed}>
+            {translate('auto.components.game-inbox.GameOwnerQuestionCard.send', 'Send')}
+          </Button>
+        </form>
+      ) : null}
       {error ? (
         <p role="alert" className="text-xs break-words text-destructive">
           {error}

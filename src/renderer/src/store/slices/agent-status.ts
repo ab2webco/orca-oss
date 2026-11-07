@@ -13,6 +13,10 @@ import {
   type ParsedAgentStatusPayload
 } from '../../../../shared/agent-status-types'
 import {
+  redactAgentStatusText,
+  redactOptionalDispatchCapability
+} from '../../../../shared/dispatch-capability-redaction'
+import {
   agentProviderSessionsEqual,
   getAgentResumeArgv,
   isResumableTuiAgent,
@@ -1921,6 +1925,9 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
 
     setAgentStatus: (paneKey, payload, terminalTitle, timing, routing, metadata) => {
       paneKey = resolveAgentPaneAuthorityKey(paneKey)
+      // Why: seeds such as Command Code's typed prompt reach here without the payload normalizer.
+      payload = redactAgentStatusText(payload)
+      terminalTitle = redactOptionalDispatchCapability(terminalTitle)
       const updatedAt = timing?.updatedAt ?? Date.now()
       if (
         paneKey in get().recentlyRetiredAgentStatusPaneKeys ||

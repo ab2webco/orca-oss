@@ -204,9 +204,9 @@ export function AgentGridView({
         {allCells.length > 1 ? (
           <div
             data-agent-grid-controls
-            className="sticky top-0 z-10 flex shrink-0 items-center gap-1 bg-background text-[11px] text-muted-foreground"
+            className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-1 bg-background text-[11px] text-muted-foreground"
           >
-            <span className="mr-3 flex items-center gap-2.5">
+            <span className="mr-3 flex flex-wrap items-center gap-2.5">
               {(
                 [
                   ['attention', 'waiting'],
@@ -224,7 +224,7 @@ export function AgentGridView({
                     setBucketFilter((current) => (current === bucket ? null : bucket))
                   }}
                   className={cn(
-                    'flex items-center gap-1 rounded px-1.5 py-0.5 disabled:opacity-40',
+                    'flex items-center gap-1 rounded px-1.5 py-0.5 whitespace-nowrap disabled:opacity-40',
                     bucketFilter === bucket
                       ? 'bg-accent text-foreground'
                       : 'hover:bg-accent/60 hover:text-foreground'
@@ -236,25 +236,28 @@ export function AgentGridView({
                 </button>
               ))}
             </span>
-            {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-label={`${option}`}
-                aria-pressed={option === pageSize}
-                onClick={() => {
-                  setPageSize(option)
-                }}
-                className={cn(
-                  'rounded px-1.5 py-0.5 tabular-nums',
-                  option === pageSize
-                    ? 'bg-accent text-foreground'
-                    : 'hover:bg-accent/60 hover:text-foreground'
-                )}
-              >
-                {option}
-              </button>
-            ))}
+            {/* Why one group: when the strip wraps, the page sizes move as a unit. */}
+            <span className="flex items-center gap-1">
+              {AGENT_GRID_PAGE_SIZE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-label={`${option}`}
+                  aria-pressed={option === pageSize}
+                  onClick={() => {
+                    setPageSize(option)
+                  }}
+                  className={cn(
+                    'rounded px-1.5 py-0.5 tabular-nums',
+                    option === pageSize
+                      ? 'bg-accent text-foreground'
+                      : 'hover:bg-accent/60 hover:text-foreground'
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+            </span>
           </div>
         ) : null}
         {/* Measured here, not on the scroll box: this is the element the tracks

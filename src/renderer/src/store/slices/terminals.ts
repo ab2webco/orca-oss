@@ -4,6 +4,7 @@ import type { AppState } from '../types'
 import type { WorkspaceKey } from '../../../../shared/folder-workspace-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Tab } from '../../../../shared/tab-types'
+import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
@@ -2210,6 +2211,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
   },
 
   setRuntimePaneTitle: (tabId, paneId, title) => {
+    title = redactDispatchCapability(title)
     set((s) => {
       const currentByPane = s.runtimePaneTitlesByTabId[tabId] ?? {}
       const prevTitle = currentByPane[paneId]

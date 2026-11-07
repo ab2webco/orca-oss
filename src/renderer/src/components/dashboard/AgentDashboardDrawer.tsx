@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useAppStore } from '@/store'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
@@ -29,6 +29,19 @@ const AGENT_BOARD_ESCAPE_BLOCKING_OVERLAY_SELECTOR = [
   '[role="menu"][data-state="open"]',
   '[role="listbox"][data-state="open"]'
 ].join(', ')
+
+// Why: narrower than this beside the sidebar, the board's header and one column cannot fit, so the
+// sheet covers the sidebar instead (ORCA-1126). 768 with the default 280 px sidebar stays beside it.
+const SHEET_MIN_WIDTH_BESIDE_SIDEBAR = 480
+
+function subscribeToViewportWidth(onChange: () => void): () => void {
+  window.addEventListener('resize', onChange)
+  return () => window.removeEventListener('resize', onChange)
+}
+
+function readViewportWidth(): number {
+  return window.innerWidth
+}
 
 /** The in-window Agent Dashboard body. Mounted only while open so the live
  *  snapshot derivation stays off the hot path when the drawer is closed. */
@@ -165,8 +178,11 @@ export function AgentDashboardDrawer({
     return () => document.removeEventListener('keydown', handleKeyDown, true)
   }, [close, open])
 
-  const drawerLeft = sidebarOpen ? sidebarWidth : 0
-  const drawerLeftCss = sidebarOpen
+  const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth)
+  const besideSidebar =
+    sidebarOpen && viewportWidth - sidebarWidth >= SHEET_MIN_WIDTH_BESIDE_SIDEBAR
+  const drawerLeft = besideSidebar ? sidebarWidth : 0
+  const drawerLeftCss = besideSidebar
     ? `var(--workspace-sidebar-live-width, ${sidebarWidth}px)`
     : '0px'
   // Why: App reserves a bottom status row while visible; the portalled board
