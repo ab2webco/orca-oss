@@ -28,12 +28,12 @@ describe('team scene copy', () => {
     expect(teamSceneLeadLineOf(asking)).toBe('Esperándote · ¿Mergeo #923?')
   })
 
-  it('shows a tool step or a link as written, like the sidebar rows', () => {
+  it('shows what the tool works on, as V28 does, or a link as written', () => {
     expect(
       teamSceneLeadLineOf(
         lead({ liveAction: { kind: 'tool', tool: 'Bash', detail: 'gh pr checks 924' } })
       )
-    ).toBe('Bash: gh pr checks 924')
+    ).toBe('gh pr checks 924')
     expect(
       teamSceneLeadLineOf(lead({ liveAction: { kind: 'tool', tool: 'Read', detail: null } }))
     ).toBe('Read')

@@ -26,6 +26,7 @@ const lead = (extra: Partial<TeamLeadCard> = {}): TeamLeadCard => ({
   ...facts('lead-pane'),
   characterKey: 'king',
   branch: null,
+  ownerAsk: null,
   ...extra
 })
 const card = (paneKey: string, extra: Partial<TeamMemberCard> = {}): TeamMemberCard => ({

@@ -120,6 +120,36 @@ describe('gameReviewOf', () => {
   })
 })
 
+describe('gameReviewOf mergeState', () => {
+  const review = {
+    provider: 'github' as const,
+    number: 990,
+    title: 'Game',
+    url: 'https://github.com/o/r/pull/990',
+    state: 'open' as const,
+    status: 'success' as const
+  }
+
+  // ORCA-1103 #4: two accessory checks read ci success while GitHub still blocked the merge.
+  it('keeps GitHub merge state apart from a green ci', () => {
+    const out = gameReviewOf({ ...review, mergeStateStatus: 'BLOCKED' })
+    expect(out?.ci).toBe('success')
+    expect(out?.mergeState).toBe('blocked')
+    expect(gameReviewOf({ ...review, mergeStateStatus: 'CLEAN' })?.mergeState).toBe('clean')
+  })
+
+  it('reads a state it does not know as unknown, never as clean', () => {
+    expect(gameReviewOf({ ...review, mergeStateStatus: 'SOMETHING_NEW' })?.mergeState).toBe(
+      'unknown'
+    )
+  })
+
+  it('leaves the field out when the host sent none (older runtime or other provider)', () => {
+    expect(gameReviewOf(review)).not.toHaveProperty('mergeState')
+    expect(gameReviewOf({ ...review, mergeStateStatus: null })).not.toHaveProperty('mergeState')
+  })
+})
+
 describe('gameReviewOf verdict', () => {
   const review = {
     provider: 'github' as const,

@@ -9,14 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
-import { GameInboxWaitingList } from '@/components/game-inbox/GameInboxWaitingList'
-import { GameInboxAnsweredList } from '@/components/game-inbox/GameInboxAnsweredList'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
-import {
-  GameMemberOverride,
-  GameMemberReplyForm
-} from '@/components/game-inbox/GameMemberReplyForm'
-import type { GameInboxQuestionGroup } from '@/components/game-inbox/GameInboxSheet'
+import { GameInboxUndelivered } from '@/components/game-inbox/GameInboxUndelivered'
+import { GameMemberOverride } from '@/components/game-inbox/GameMemberReplyForm'
 import type { GameMemberReply } from '@/components/game-inbox/game-inbox-threads-client'
 import {
   gameInboxTargetOf,
@@ -24,7 +19,10 @@ import {
 } from '@/components/game-inbox/game-owner-questions-client'
 import { useGameOwnerQuestions } from '@/components/game-inbox/useGameOwnerQuestions'
 import { useGameInboxThreads } from '@/components/game-inbox/useGameInboxThreads'
-import { useOtherGameInboxGroups } from '@/components/game-inbox/use-other-game-inbox-groups'
+import {
+  useOtherGameInboxGroups,
+  type GameInboxQuestionGroup
+} from '@/components/game-inbox/use-other-game-inbox-groups'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import {
@@ -32,7 +30,11 @@ import {
   teamInboxAgentQuestionsOf,
   type TeamInboxAgentQuestion
 } from './team-panel-inbox-agents'
-import { TeamInboxAgentCard, TeamInboxYouAnsweredList } from './team-panel-inbox-items'
+import {
+  TeamInboxAgentCard,
+  TeamInboxAnsweredRows,
+  TeamInboxWaitingRows
+} from './team-panel-inbox-items'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
@@ -53,6 +55,8 @@ export type TeamInboxViewProps = {
   /** Set when this project's own questions were not read; other projects still show. */
   projectUnread: { message: string | null } | null
   questions: GameOwnerQuestion[]
+  /** Answers the board still holds because no lead took them yet. */
+  undelivered: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
@@ -62,6 +66,8 @@ export type TeamInboxViewProps = {
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
   onOpenAgent: (question: TeamInboxAgentQuestion) => void
+  /** Each member's character name by ticket, so a waiting question says who asks. */
+  memberNames: ReadonlyMap<string, string>
 }
 
 /** The full questions live only here: For you across projects and hosts, then the lead's mail. */
@@ -82,11 +88,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       threads.answered.length + answeredQuestions.length
     ]
   ]
-  // Why short: the panel can be about 200 px wide, where the Sheet's longer placeholders were cut.
+  // Why short: the panel can be about 200 px wide, where a longer placeholder is cut.
   const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
-  if (subTabs.every(([, , count]) => count === 0) && !props.projectUnread) {
+  const nothing = subTabs.every(([, , count]) => count === 0) && props.undelivered.length === 0
+  if (nothing && !props.projectUnread) {
     return (
       <TeamPanelMessageState
         title={translate('teamPanel.tabs.inbox.emptyTitle', 'Nothing waits for you')}
@@ -116,6 +123,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         ))}
       </TabsList>
       <TabsContent value="for-you" className={`${LIST} space-y-2`}>
+        <GameInboxUndelivered questions={props.undelivered} />
         {/* Why only with none read: the tab's own read may succeed where the model's failed. */}
         {props.projectUnread && questions.length === 0 ? (
           <div role="status" className="space-y-1 pt-2 text-xs text-muted-foreground">
@@ -148,6 +156,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
                 key={question.id}
                 question={question}
                 placeholder={yourAnswer}
+                needsYou
                 onAnswer={(answer) => props.onAnswer(question.id, answer)}
               />
             ))}
@@ -173,13 +182,16 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         ) : null}
       </TabsContent>
       <TabsContent value="waiting" className={LIST}>
-        <GameInboxWaitingList
+        <TeamInboxWaitingRows
           items={threads.waiting}
+          memberNames={props.memberNames}
+          now={Date.now()}
           renderActions={(item) => (
-            <GameMemberReplyForm
+            <GameMemberOverride
               id={item.id}
               ticket={item.ticket}
               placeholder={yourAnswer}
+              label={translate('teamPanel.inbox.answer', 'Answer')}
               onReply={reply(item)}
             />
           )}
@@ -188,23 +200,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col">
         <GameInboxThreadsView threads={threads.threads} />
       </TabsContent>
-      <TabsContent value="answered" className={`${LIST} space-y-2`}>
-        {answeredQuestions.length > 0 ? (
-          <>
-            <GroupLabel
-              title={translate('teamPanel.inbox.youAnswered', 'You answered')}
-              place={null}
-            />
-            <TeamInboxYouAnsweredList questions={answeredQuestions} />
-            <GroupLabel
-              title={translate('teamPanel.inbox.leadAnswered', 'The lead answered')}
-              place={null}
-            />
-          </>
-        ) : null}
-        <GameInboxAnsweredList
-          items={threads.answered}
-          renderActions={(item) => (
+      <TabsContent value="answered" className={LIST}>
+        <TeamInboxAnsweredRows
+          yours={answeredQuestions}
+          lead={threads.answered}
+          now={Date.now()}
+          renderOverride={(item) => (
             <GameMemberOverride
               id={item.id}
               ticket={item.ticket}
@@ -238,14 +239,24 @@ export function TeamPanelInboxTab({
     done.sort((a, b) => (b.answer?.at ?? '').localeCompare(a.answer?.at ?? ''))
     return { open: read.questions.filter((one) => !one.answer), answered: done }
   }, [read.questions])
-  // Why open: the tab follows every message while it is shown, as the Sheet did when open.
+  // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
+  const memberNames = React.useMemo(
+    () =>
+      new Map(
+        model.kind === 'team'
+          ? model.members.flatMap((one) => (one.ticket ? [[one.ticket.identifier, one.name]] : []))
+          : []
+      ),
+    [model]
+  )
   return (
     <TeamInboxView
       projectName={model.kind === 'team' ? model.projectName : projectName}
       projectUnread={value.projectUnread ?? null}
       questions={open}
+      undelivered={read.undelivered}
       onAnswer={read.answer}
       otherGroups={otherGroups}
       threads={threads}
@@ -253,6 +264,7 @@ export function TeamPanelInboxTab({
       agentQuestions={teamInboxAgentQuestionsOf(model)}
       answeredQuestions={answered}
       onOpenAgent={openTeamInboxAgent}
+      memberNames={memberNames}
     />
   )
 }

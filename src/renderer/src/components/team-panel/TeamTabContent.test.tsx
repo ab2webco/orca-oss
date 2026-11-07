@@ -10,6 +10,9 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import type { TeamArcadeActions } from './TeamArcadeSection'
 import { TeamTabContent } from './TeamTabContent'
+import { TeamScenePainterContext } from '../team-scene/team-scene-painter-context'
+import type { TeamScenePainter } from '../team-scene/team-scene-painter'
+import { recordingContext } from '../team-scene/team-scene-recording-context'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -44,7 +47,8 @@ const lead: TeamLeadCard = {
   model: { label: 'Opus 5.5', effort: 'high', source: 'session' },
   account: null,
   characterKey: 'hero',
-  branch: 'main'
+  branch: 'main',
+  ownerAsk: null
 }
 
 function member(overrides: Partial<TeamMemberCard>): TeamMemberCard {
@@ -114,7 +118,8 @@ async function render(
   look: 'game' | 'display' | 'plain' = 'game',
   selectTab = vi.fn(),
   arcadeActions: TeamArcadeActions | null = null,
-  openTasks = vi.fn()
+  openTasks = vi.fn(),
+  painter: TeamScenePainter | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -122,18 +127,29 @@ async function render(
   roots.push(root)
   await act(async () => {
     root.render(
-      <TeamTabContent
-        model={value}
-        look={look}
-        selectTab={selectTab}
-        now={NOW}
-        arcadeActions={arcadeActions}
-        onOpenTasks={openTasks}
-      />
+      <TeamScenePainterContext.Provider value={painter}>
+        <TeamTabContent
+          model={value}
+          look={look}
+          selectTab={selectTab}
+          now={NOW}
+          arcadeActions={arcadeActions}
+          onOpenTasks={openTasks}
+        />
+      </TeamScenePainterContext.Provider>
     )
   })
   return { container, selectTab, openTasks }
 }
+
+const advisorOf = () => ({
+  model: 'Opus 5.5',
+  effort: 'medium',
+  pinned: { model: false, effort: false },
+  line: 'Watching #923',
+  previous: null,
+  calls: []
+})
 
 const leadCard = (container: HTMLElement): HTMLElement =>
   container.querySelector<HTMLElement>('[data-team-card="lead"]')!
@@ -151,7 +167,8 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Lead')
     expect(card.querySelector('svg[data-crown]')).not.toBeNull()
     expect(card.textContent).toContain('local')
-    expect(card.textContent).toContain('Bash · gh pr checks 923')
+    expect(card.textContent).toContain('gh pr checks 923')
+    expect(card.textContent).not.toContain('Bash')
     expect(card.textContent).toContain('Opus 5.5 · high')
     expect(card.textContent).toContain('Coordinates 1 agent')
   })
@@ -163,10 +180,103 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Knight')
     expect(card.textContent).toContain('ORCA-1044')
     expect(card.textContent).toContain('imac')
-    expect(card.textContent).toContain('Edit · terminal-role.ts')
+    expect(card.textContent).toContain('terminal-role.ts')
     expect(card.textContent).toContain('Sonnet 5.5 · medium')
     expect(card.textContent).toContain('Coding')
-    expect(card.textContent).toContain('2 minutes ago')
+    expect(card.textContent).toContain('2 min')
+    expect(card.textContent).not.toContain('ago')
+  })
+
+  it('says the lead waits on the user and on which ticket, never the question itself', async () => {
+    const { container } = await render(
+      model({ lead: { ...lead, status: 'attention', ownerAsk: { ticket: 'ORCA-14' } } })
+    )
+    const card = leadCard(container)
+    expect(card.textContent).toContain('Waiting for you · Question on ORCA-14')
+    expect(card.textContent).not.toContain('gh pr checks 923')
+    expect(card.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'question'
+    )
+  })
+
+  it('gives way at narrow widths with the host first, never scrolls sideways, and wraps the meta line', async () => {
+    const { container } = await render(model())
+    for (const card of [leadCard(container), ...memberCards(container)]) {
+      const name = card.querySelector('[data-team-name]')!
+      const host = card.querySelector('[data-team-host]')!
+      // Why basis-0: the host claims only what is left, so it gives way before the name does.
+      expect(host.className).toContain('basis-0')
+      expect(host.className).toContain('flex-1')
+      expect(host.className).toContain('truncate')
+      expect(host.className).toContain('min-w-0')
+      // ORCA-1092 row 23: a name too long for the row truncates instead of pushing the row wider.
+      expect(name.className).not.toContain('shrink-0')
+      expect(name.className).toContain('min-w-0')
+      expect(name.className).toContain('truncate')
+      expect(name.nextElementSibling?.className).toContain('shrink-0')
+      const meta = card.querySelector('[data-team-meta]')!
+      expect(meta.className).toContain('flex-wrap')
+      expect(meta.className).not.toContain('truncate')
+    }
+  })
+
+  it('sets the model in mono, as V28 does', async () => {
+    const { container } = await render(model())
+    const [card] = memberCards(container)
+    const mono = card.querySelector('[data-team-model]')!
+    expect(mono.textContent).toBe('Sonnet 5.5 · medium')
+    expect(mono.className).toContain('font-mono')
+    expect(leadCard(container).querySelector('[data-team-model]')?.textContent).toBe(
+      'Opus 5.5 · high'
+    )
+  })
+
+  it('marks needs-you with a question and working with a spinner', async () => {
+    const { container } = await render(
+      model({
+        members: [
+          member({ paneKey: 'ask', status: 'attention', needsYou: true }),
+          member({ paneKey: 'work' })
+        ]
+      })
+    )
+    const [ask, work] = memberCards(container)
+    expect(ask.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'question'
+    )
+    expect(work.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'spinner'
+    )
+  })
+
+  it("draws each card's face with the scene's own painter, only in the Game look", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => recordingContext().g as never
+    )
+    const portrait = vi.fn()
+    const painter = {
+      height: 1,
+      headTop: () => 0,
+      paint: vi.fn(),
+      dispose: vi.fn(),
+      portrait
+    } satisfies TeamScenePainter
+    const value = model({ advisor: advisorOf(), members: [member({ characterKey: 'merlin' })] })
+    const { container } = await render(value, 'game', vi.fn(), null, vi.fn(), painter)
+
+    expect(container.querySelectorAll('canvas[data-team-face]')).toHaveLength(3)
+    expect(portrait.mock.calls.map(([, who]) => who)).toEqual([
+      { role: 'lead', key: 'lead', characterKey: 'hero', name: 'Castle' },
+      { role: 'advisor', key: 'advisor', characterKey: null, name: 'Wizard' },
+      { role: 'member', key: 'pane-m', characterKey: 'merlin', name: 'Knight' }
+    ])
+    expect(portrait.mock.calls.every(([, , size]) => size === 38)).toBe(true)
+
+    const plain = await render(value, 'plain', vi.fn(), null, vi.fn(), painter)
+    expect(plain.container.querySelector('[data-team-face]')).toBeNull()
+    const without = await render(value)
+    expect(without.container.querySelector('[data-team-face]')).toBeNull()
+    vi.restoreAllMocks()
   })
 
   it('names characters only in the Game look', async () => {
@@ -260,6 +370,10 @@ describe('TeamTabContent', () => {
     expect(container.textContent).toContain('#924')
     expect(container.textContent).toContain('Remote member keeps its role')
     expect(container.textContent).toContain('CI failing')
+    const chip = container.querySelector('[data-team-pr-chip]')!
+    expect(chip.querySelector('[data-status-tone]')?.getAttribute('data-status-tone')).toBe(
+      'attention'
+    )
     expect(container.textContent).toContain('dev@example.test · 12%')
   })
 
@@ -282,6 +396,14 @@ describe('TeamTabContent', () => {
     const row = container.querySelector('[data-team-card="advisor"]')!
     expect(row.previousElementSibling).toBe(leadCard(container))
     expect(row.textContent).toContain('Approved Opus 5.5 · medium for ORCA-1044')
+    expect(row.textContent).toContain('Wizard')
+    // Why: V28's Advisor row has no model line; the model is already in the sentence.
+    expect(row.querySelector('[data-team-model]')).toBeNull()
+
+    const plain = await render(model({ advisor: { ...advisorOf() } }), 'plain')
+    expect(plain.container.querySelector('[data-team-card="advisor"]')!.textContent).not.toContain(
+      'Wizard'
+    )
   })
 
   it('shows XP only in the Game look and only when rewards report it', async () => {

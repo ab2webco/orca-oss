@@ -28,6 +28,23 @@ describe('agent status tool + assistant fields', () => {
     expect(entry.lastAssistantMessage).toBe('Edited config.ts')
   })
 
+  it('keeps the model effort across a payload that omits it, as it keeps the model', () => {
+    vi.useFakeTimers()
+    const store = createTestStore()
+    store.getState().setAgentStatus('tab-1:1', {
+      state: 'working',
+      prompt: 'Edit the config',
+      agentType: 'claude',
+      model: 'claude-opus-5-5',
+      effort: 'high'
+    })
+    expect(store.getState().agentStatusByPaneKey['tab-1:1'].effort).toBe('high')
+    store
+      .getState()
+      .setAgentStatus('tab-1:1', { state: 'working', prompt: 'Next step', agentType: 'claude' })
+    expect(store.getState().agentStatusByPaneKey['tab-1:1'].effort).toBe('high')
+  })
+
   it('clears fields to undefined when a later payload omits them', () => {
     vi.useFakeTimers()
     const store = createTestStore()

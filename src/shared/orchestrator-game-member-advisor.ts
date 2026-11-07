@@ -28,6 +28,7 @@ export type GameMemberAdvisorReport = GameMemberAdvisorPick &
 export type GameMemberAdvisor = GameMemberAdvisorReport & { previous?: GameMemberAdvisorPick }
 
 export const GAME_MEMBER_ADVISOR_VERSION = 1
+export const GAME_MEMBER_ADVISOR_PANES_MAX = 64
 const WORDS_MAX = 64
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -74,4 +75,21 @@ export function parseGameMemberAdvisorReport(
     pinned: { model: pinned.model === true, effort: pinned.effort === true },
     ...detail
   }
+}
+
+/** An advisor a host hands back; null for a shape this build cannot read, as a host may run another. */
+export function parseGameMemberAdvisor(value: unknown): GameMemberAdvisor | null {
+  if (!isRecord(value)) {
+    return null
+  }
+  const report = parseGameMemberAdvisorReport({ ...value, version: GAME_MEMBER_ADVISOR_VERSION })
+  if (!report) {
+    return null
+  }
+  const previous = isRecord(value.previous) ? value.previous : {}
+  const model = wordsOf(previous.model)
+  const effort = wordsOf(previous.effort, true)
+  return model === undefined || effort === undefined
+    ? report
+    : { ...report, previous: { model, effort } }
 }
