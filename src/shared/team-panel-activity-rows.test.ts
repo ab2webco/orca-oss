@@ -190,7 +190,12 @@ describe('teamSoloModelOf', () => {
   it('keeps the last message of a finished turn and greys an interrupted one', () => {
     const [done, stopped] = rowsOf([
       session({
-        entry: entry({ paneKey: 'a', state: 'done', lastCompletedAssistantMessage: 'Tests pass.' })
+        entry: entry({
+          paneKey: 'a',
+          state: 'done',
+          lastAssistantMessage: 'Tests pass.',
+          lastCompletedAssistantMessage: 'The turn before.'
+        })
       }),
       session({ entry: entry({ paneKey: 'b', state: 'done', interrupted: true }) })
     ])
