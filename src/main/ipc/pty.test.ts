@@ -2626,6 +2626,7 @@ describe('registerPtyHandlers', () => {
         sessionId?: string
         claudeAccountId?: string
         codexAccountId?: string
+        resumeProviderSession?: { key: 'session_id'; id: string; transcriptPath?: string }
       }): Promise<{ id: string }>
     }
 
@@ -2719,6 +2720,74 @@ describe('registerPtyHandlers', () => {
         undefined
       )
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    // ORCA-718: a restored pane resumes on a fresh PTY whose account binding died with the old CLI.
+    const leadTranscript =
+      '/Users/me/Library/Application Support/orca/claude-accounts/account-lead/auth/projects/-repo/abc.jsonl'
+
+    it('resumes a restored Claude conversation on the account that owns its transcript', async () => {
+      installExitOnKillSpawnMock()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })),
+        getSettings: vi.fn(() => ({ claudeManagedAccounts: [{ id: 'account-lead' }] }))
+      }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude --resume abc',
+        worktreeId: 'wt-pinned',
+        resumeProviderSession: { key: 'session_id', id: 'abc', transcriptPath: leadTranscript }
+      })) as { id: string }
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-lead' }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    it('refuses to resume a conversation whose account was removed instead of using the global login', async () => {
+      installExitOnKillSpawnMock()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+      const store = {
+        getWorktreeMeta: vi.fn(() => undefined),
+        getSettings: vi.fn(() => ({ claudeManagedAccounts: [] }))
+      }
+      const { runtime, getController } = makeRuntimeControllerHarness()
+      registerPtyHandlers(
+        mainWindow as never,
+        runtime as never,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      await expect(
+        getController().spawn({
+          cols: 80,
+          rows: 24,
+          command: 'claude --resume abc',
+          worktreeId: 'wt-plain',
+          resumeProviderSession: { key: 'session_id', id: 'abc', transcriptPath: leadTranscript }
+        })
+      ).rejects.toThrow('The Claude account that owns this conversation was removed')
+      expect(prepareClaudeAuth).not.toHaveBeenCalled()
     })
 
     it('lets a launch-scoped Claude account beat the worktree pin on the runtime path', async () => {

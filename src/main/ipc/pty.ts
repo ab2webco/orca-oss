@@ -128,6 +128,7 @@ import {
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import { resolveClaudeLaunchAccountForSpawn } from '../claude-accounts/claude-resume-launch-account'
 import { requiresLiveClaudePtyReattach } from '../claude-accounts/live-claude-pty-reattach-requirement'
 import {
   abortInPlaceClaudeAccountSwitch,
@@ -1400,6 +1401,35 @@ function getClaudeSelectionTargetForPty(
       ? (store.getWorktreeMeta(worktreeId)?.claudeAccountId ?? undefined)
       : undefined)
   return overrideAccountId ? { ...base, overrideAccountId } : base
+}
+
+// Why reattach is skipped: a surviving CLI keeps the account it started with (see existingInjectedAccountId).
+function claudeLaunchAccountForSpawn(
+  store: Store | undefined,
+  args: {
+    sessionId?: string
+    claudeAccountId?: string | null
+    resumeProviderSession?: AgentProviderSessionMetadata
+  },
+  isClaudeLaunch: boolean
+): string | null | undefined {
+  if (!isClaudeLaunch) {
+    return undefined
+  }
+  if (
+    args.sessionId &&
+    (getLiveInjectedClaudePtyAccountId(args.sessionId) || isLiveSharedClaudePty(args.sessionId))
+  ) {
+    return args.claudeAccountId
+  }
+  return resolveClaudeLaunchAccountForSpawn({
+    launchAccountId: args.claudeAccountId,
+    resumeProviderSession: args.resumeProviderSession,
+    hasManagedAccount: (accountId) =>
+      (store?.getSettings?.().claudeManagedAccounts ?? []).some(
+        (account) => account.id === accountId
+      )
+  })
 }
 
 function getCompatibleSelectedCodexHomePath(
@@ -5007,7 +5037,7 @@ export function registerPtyHandlers(
         codexSelectionTarget,
         store,
         args.worktreeId,
-        isClaudeLaunch ? args.claudeAccountId : undefined
+        claudeLaunchAccountForSpawn(store, args, isClaudeLaunch)
       )
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)
@@ -6858,7 +6888,7 @@ export function registerPtyHandlers(
           initialSelectionTarget,
           store,
           args.worktreeId,
-          isClaudeLaunch ? args.claudeAccountId : undefined
+          claudeLaunchAccountForSpawn(store, args, isClaudeLaunch)
         )
         const existingInjectedAccountId = args.sessionId
           ? getLiveInjectedClaudePtyAccountId(args.sessionId)
