@@ -201,7 +201,9 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect(answered).toContainText('8080')
 
     await inbox.getByRole('tab', { name: /Threads/ }).click()
-    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
+    // V28's thread row (ORCA-1095): its message count and last line, not a waiting badge.
+    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText(/\d+ messages/)
+    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText('Ship now?')
     await inbox.getByTestId('game-inbox-thread-ORCA-12').click()
     const messages = inbox.getByTestId('game-inbox-thread-messages')
     await expect(
