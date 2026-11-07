@@ -183,7 +183,7 @@ export function ProjectOrchestratorGameActionsSetting({
             )}
           </p>
         </div>
-        <div className="flex flex-none flex-wrap gap-1.5">
+        <div className="flex min-w-0 flex-wrap gap-1.5">
           <Button
             variant="secondary"
             size="sm"
