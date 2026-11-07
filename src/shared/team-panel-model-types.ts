@@ -3,6 +3,7 @@ import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { GameReviewVerdict, GameStatusGroup } from './orchestrator-game-state'
 import type { TeamLeadAction } from './team-panel-list-action'
+import type { TeamAction } from './team-panel-actions'
 
 // Why: one view model for the desktop Team panel and the mobile sheet (ORCA-1048). It holds ids
 // and facts only; each client translates words and maps a status to its own tokens.
@@ -260,6 +261,8 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   /** The project's STOP; null when clear. */
   stopped: { since: string | null; by: string | null } | null
   scene: TeamSceneSource
+  /** Orca's and the project's actions for the dock and its menu, in game.state's order. */
+  actions: TeamAction[]
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */

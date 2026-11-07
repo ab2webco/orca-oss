@@ -58,6 +58,7 @@ const game: TeamPanelGameModel = {
   xp: null,
   arcade: null,
   stopped: null,
+  actions: [],
   scene: { id: null, extensions: [] },
   inbox: {
     kind: 'ready',

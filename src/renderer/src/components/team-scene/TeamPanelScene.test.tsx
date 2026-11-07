@@ -44,6 +44,7 @@ const model = (scene: TeamPanelGameModel['scene']): TeamPanelGameModel => ({
   xp: null,
   arcade: null,
   stopped: null,
+  actions: [],
   scene,
   inbox: { kind: 'loading' },
   prs: null,

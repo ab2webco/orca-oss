@@ -99,6 +99,7 @@ function model(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameModel 
     xp: null,
     arcade: null,
     stopped: null,
+    actions: [],
     scene: { id: null, extensions: [] },
     inbox: { kind: 'loading' },
     prs: null,

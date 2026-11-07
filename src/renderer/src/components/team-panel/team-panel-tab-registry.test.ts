@@ -46,6 +46,7 @@ function gameModel(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameMo
     xp: null,
     arcade: null,
     stopped: null,
+    actions: [],
     scene: { id: null, extensions: [] },
     inbox: {
       kind: 'ready',

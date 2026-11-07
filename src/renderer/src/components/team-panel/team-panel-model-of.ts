@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
+import { teamActionsOf } from '../../../../shared/team-panel-actions'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
 import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
 import type {
@@ -114,6 +115,7 @@ export function teamPanelModelOf(args: {
       id: typeof state.config?.scene === 'string' ? state.config.scene : null,
       extensions: state.extensions?.scenes ?? []
     },
+    actions: teamActionsOf(state),
     inbox: inboxOf(state, questions),
     prs: teamPrSectionOf(work),
     queue: teamQueueSectionOf(work),
