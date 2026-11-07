@@ -10368,6 +10368,7 @@
           "bundled": "Incluido",
           "noDescription": "No description provided.",
           "killListMessage": "La lista de seguridad de Orca Lab desactivó este plugin: {{value0}}",
+          "devSharedVaultMessage": "Sin iniciar: la carpeta de cuentas de este build de desarrollo es la bóveda de cuentas de otra instalación, y este plugin puede ejecutar procesos que la reescriben. Inicia el build de desarrollo con {{value0}} para ejecutarlo.",
           "viewAdvisory": "Ver aviso",
           "runtimeError": "El plugin se detuvo tras un error de activación o del proceso.",
           "restartCount": " · {{value0}} reinicios",

@@ -55,6 +55,9 @@ await orcaPage.evaluate(async () => {
 
 `tests/e2e/linear-filter-chip-labels.spec.ts` is the shortest complete example.
 
+A live check on a dev build signed in to the real accounts follows
+[`dev-build-real-accounts.md`](./dev-build-real-accounts.md).
+
 ## Seed enough data to make the question real
 
 A layout question about scrolling cannot be answered by a screen that does not scroll. Seed enough
