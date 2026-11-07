@@ -60,7 +60,8 @@ test('keeps conventional commit-message lines intact in the history tooltip', as
   execFileSync('git', ['commit', '--allow-empty', '--file', '-'], {
     cwd: fixture.worktreePath,
     input: commitMessage,
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: 30_000
   })
 
   await orcaPage.setViewportSize({ width: 1440, height: 900 })

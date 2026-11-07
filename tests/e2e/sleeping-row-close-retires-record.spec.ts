@@ -18,7 +18,12 @@ function paneKeyOf(terminal: Pick<RuntimeTerminalSummary, 'tabId' | 'leafId'>): 
   return `${terminal.tabId}:${terminal.leafId}`
 }
 
-async function seedSleepingRecord(page: Page, worktreeId: string, paneKey: string): Promise<void> {
+async function seedSleepingRecord(
+  page: Page,
+  worktreeId: string,
+  paneKey: string,
+  origin: SleepingAgentSessionRecord['origin'] = 'live'
+): Promise<void> {
   const record: SleepingAgentSessionRecord = {
     paneKey,
     tabId: paneKey.split(':')[0]!,
@@ -29,7 +34,7 @@ async function seedSleepingRecord(page: Page, worktreeId: string, paneKey: strin
     state: 'working',
     capturedAt: Date.now(),
     updatedAt: Date.now(),
-    origin: 'live'
+    origin
   }
   await page.evaluate((next) => {
     window.__store?.setState((state) => ({
@@ -78,7 +83,8 @@ async function expectGoneAfterNextPersist(
 ): Promise<void> {
   await expect.poll(() => rendererHasRecord(page, closedPaneKey)).toBe(false)
   const witnessPaneKey = `${randomUUID()}:${randomUUID()}`
-  await seedSleepingRecord(page, worktreeId, witnessPaneKey)
+  // Why worktree-sleep: only it is listed with no tab; a tab-less live record was closed (ORCA-718).
+  await seedSleepingRecord(page, worktreeId, witnessPaneKey, 'worktree-sleep')
   await waitForSleepingRow(client, witnessPaneKey)
   const listed = await listTerminals(client)
   expect(listed.some((terminal) => paneKeyOf(terminal) === closedPaneKey)).toBe(false)
@@ -108,7 +114,7 @@ test.describe('closing a sleeping row through the runtime', () => {
 
   test('an orphaned sleeping row closed with --tab stays gone', async ({ orcaPage }) => {
     const paneKey = `${randomUUID()}:${randomUUID()}`
-    await seedSleepingRecord(orcaPage, worktreeId, paneKey)
+    await seedSleepingRecord(orcaPage, worktreeId, paneKey, 'worktree-sleep')
     const row = await waitForSleepingRow(client, paneKey)
 
     await client.call('terminal.closeTab', { terminal: row.handle })

@@ -89,6 +89,7 @@ describe('wrapRemoteCommandForPosixShell', () => {
 function runThroughShell(shell: string, command: string, input?: string) {
   return spawnSync(shell, ['-c', wrapRemoteCommandForPosixShell(command)], {
     encoding: 'utf8',
-    input
+    input,
+    timeout: 20_000
   })
 }

@@ -20,6 +20,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
+import {
+  seedClaudeTranscriptStore as seedClaudeTranscriptStoreIn,
+  type ClaudeTranscriptStoreSeed
+} from './claude-transcript-store-seed'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
@@ -54,6 +58,11 @@ type LaunchOptions = {
 type RestartSession = {
   userDataDir: string
   seedCodexResumeRollout: (sessionId: string, cwd: string) => string
+  /** Lays out the shared Claude transcript store and links the isolated home to it. */
+  seedClaudeTranscriptStore: (args: ClaudeTranscriptStoreSeed) => {
+    storeDir: string
+    homeClaudeDir: string
+  }
   launch: (options?: LaunchOptions) => Promise<LaunchedOrca>
   /** Gracefully close a launch, letting beforeunload flush session state. */
   close: (app: ElectronApplication) => Promise<void>
@@ -109,8 +118,11 @@ function createRestartLaunchIsolation(
   headful: boolean,
   extraEnv: Record<string, string>
 ): ElectronHomeIsolation {
-  const { ELECTRON_RUN_AS_NODE: _unused, ...cleanEnv } = process.env
+  // Why CLAUDE_CONFIG_DIR: the app's shared Claude home must be the isolated one, never the
+  // runner's own account vault (ORCA-718 looks conversations up there).
+  const { ELECTRON_RUN_AS_NODE: _unused, CLAUDE_CONFIG_DIR: _claudeHome, ...cleanEnv } = process.env
   void _unused
+  void _claudeHome
   return createElectronHomeIsolation({
     inheritedEnv: cleanEnv,
     launchEnv: {
@@ -176,6 +188,9 @@ export function createRestartSession(
     return transcriptPath
   }
 
+  const seedClaudeTranscriptStore: RestartSession['seedClaudeTranscriptStore'] = (args) =>
+    seedClaudeTranscriptStoreIn(homeIsolation.isolatedHome, args)
+
   const launch = async (options?: LaunchOptions): Promise<LaunchedOrca> => {
     runtimeWsPort ??= await reserveRestartRuntimeWsPort()
     const launchElectron = (): Promise<ElectronApplication> =>
@@ -228,7 +243,7 @@ export function createRestartSession(
     }
   }
 
-  return { userDataDir, seedCodexResumeRollout, launch, close, dispose }
+  return { userDataDir, seedCodexResumeRollout, seedClaudeTranscriptStore, launch, close, dispose }
 }
 
 /**
