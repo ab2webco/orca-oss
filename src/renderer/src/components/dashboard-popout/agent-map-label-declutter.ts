@@ -152,14 +152,20 @@ function isLabelCandidate(worktree: AgentMapWorktreeRing, mapScale: number): boo
 
 /** The summary line the scene draws under a project's name, in the UI language. */
 export function agentMapProjectCountText(project: AgentMapProjectRing): string {
-  return translate(
-    'dashboardPopout.map.projectCount',
-    '{{agents}} agents · {{workspaces}} workspaces',
-    {
-      agents: project.agentCount,
-      workspaces: project.worktrees.length
-    }
-  ).toUpperCase()
+  const agents = project.agentCount
+  const workspaces = project.worktrees.length
+  return translate('dashboardPopout.map.projectCount', '{{agents}} · {{workspaces}}', {
+    agents: translate(
+      'dashboardPopout.map.agentCount',
+      agents === 1 ? '{{count}} agent' : '{{count}} agents',
+      { count: agents }
+    ),
+    workspaces: translate(
+      'dashboardPopout.map.workspaceCount',
+      workspaces === 1 ? '{{count}} workspace' : '{{count}} workspaces',
+      { count: workspaces }
+    )
+  }).toUpperCase()
 }
 
 /** True when the box comes within clearance of any project's ring disc. */

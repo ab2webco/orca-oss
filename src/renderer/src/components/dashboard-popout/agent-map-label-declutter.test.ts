@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { selectVisibleAgentMapLabels } from './agent-map-label-declutter'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setRendererUiLanguage } from '@/i18n/i18n'
+import { agentMapProjectCountText, selectVisibleAgentMapLabels } from './agent-map-label-declutter'
 import type { AgentMapLayout, AgentMapProjectRing, AgentMapWorktreeRing } from './agent-map-layout'
 import {
   agentMapQuietCount,
@@ -166,5 +167,30 @@ describe('selectVisibleAgentMapLabels', () => {
 
     expect(zoomedOut.size).toBeLessThan(zoomedIn.size)
     expect(zoomedIn.size).toBe(6)
+  })
+})
+
+describe('agentMapProjectCountText', () => {
+  afterEach(async () => {
+    await setRendererUiLanguage('en')
+  })
+
+  function project(agents: number, workspaces: number): AgentMapProjectRing {
+    const worktrees = Array.from({ length: workspaces }, (_unused, index) =>
+      worktree({ id: `w-${index}` })
+    )
+    return { ...layoutOf(worktrees).projects[0], agentCount: agents }
+  }
+
+  it.each([
+    ['en', 1, 1, '1 AGENT · 1 WORKSPACE'],
+    ['en', 3, 2, '3 AGENTS · 2 WORKSPACES'],
+    ['es', 1, 1, '1 AGENTE · 1 ESPACIO DE TRABAJO'],
+    ['es', 3, 1, '3 AGENTES · 1 ESPACIO DE TRABAJO'],
+    ['es', 1, 2, '1 AGENTE · 2 ESPACIOS DE TRABAJO']
+  ] as const)('%s: %i agents, %i workspaces', async (language, agents, workspaces, expected) => {
+    await setRendererUiLanguage(language)
+
+    expect(agentMapProjectCountText(project(agents, workspaces))).toBe(expected)
   })
 })
