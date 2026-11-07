@@ -7,7 +7,6 @@ import { test } from './test-budget'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { ARCADE_PANE } from '../hooks/arcade-pane'
 import {
   ARCADE_CHEERS_KEY,
   ARCADE_OFFERS_KEY,
@@ -133,7 +132,8 @@ const start = async ($: Engine, on: On, patch: Partial<World> = {}) => {
   return { clock, world }
 }
 
-const panes = (world: World) => world.opened.filter((one) => one.id === ARCADE_PANE)
+// Why every pane: the mod has no pane of its own since ORCA-1055, so any open is wrong.
+const panes = (world: World) => world.opened
 const celebrated = (world: World) => world.store.get(ARCADE_CHEERS_KEY) ?? []
 
 const mergePerfectly = async (world: World, clock: { advance: (ms: number) => Promise<void> }) => {

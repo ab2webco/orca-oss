@@ -119,6 +119,22 @@ describe('TeamSceneCanvas', () => {
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Reviewing #923')
   })
 
+  it('tags a member who needs the user with its name over the alert, as V28 does', () => {
+    reduced = true
+    const asking: TeamSceneInput = {
+      ...input(['a']),
+      members: [{ ...member('h'), name: 'Herrero', activity: 'needsYou' }, member('a')]
+    }
+    render(<TeamSceneCanvas input={asking} painter={painter().value} leadLine={null} />)
+    act(() => {})
+    const tags = [...host.querySelectorAll('[data-scene-speaker]')]
+    expect(tags.map((one) => [one.getAttribute('data-scene-speaker'), one.textContent])).toEqual([
+      ['h', 'Herrero']
+    ])
+    // Above the head and its alert mark, never over the speaker's face.
+    expect(Number.parseFloat((tags[0] as HTMLElement).style.top)).toBeLessThan(100 - 16)
+  })
+
   it("draws Pixel's thought cloud instead of the glass bubble", () => {
     reduced = true
     // happy-dom has no layout; a measured bubble is what lets the layout place it.

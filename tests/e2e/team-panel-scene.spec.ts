@@ -241,6 +241,10 @@ test('the Team panel draws the live scene beside a member opened under its heade
     const scene = panel.locator('[data-team-scene]')
     await expect(scene.locator('canvas')).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)
+    // V28 names the member who asks over its alert (ORCA-1097); ORCA-14 has the open question.
+    const askerTag = scene.locator('[data-scene-speaker]')
+    await expect(askerTag).toHaveCount(1, { timeout: 30_000 })
+    await expect(askerTag).toContainText('ORCA-14')
 
     for (const language of ['en', 'es'] as const) {
       await orcaPage.evaluate(
@@ -287,6 +291,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
         timeout: 30_000
       })
+      await expect(askerTag).toHaveCount(1)
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
