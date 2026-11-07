@@ -1,5 +1,6 @@
 import { deriveGeneratedTabTitle } from '../../../../shared/agent-tab-title'
 import { isDecorativeAgentTitleFrameChange } from '../../../../shared/agent-decorative-title-signature'
+import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
 import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { Tab } from '../../../../shared/tab-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
@@ -178,7 +179,8 @@ export function applyTerminalTabTitleUpdates(
     if (!currentTab || !tabIndexes) {
       continue
     }
-    const nextTitle = title.trim() || getFallbackTabTitle(currentTab)
+    // Why: a shell's OSC title echoes the running command, a worker's capability included.
+    const nextTitle = redactDispatchCapability(title.trim()) || getFallbackTabTitle(currentTab)
     if (isDecorativeAgentTitleFrameChange(currentTab.title, nextTitle)) {
       updateStageUnifiedLabel(stage, tabId, 'label', currentTab.title)
       continue

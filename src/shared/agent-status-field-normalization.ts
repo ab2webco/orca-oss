@@ -4,10 +4,14 @@
 // truncate without splitting surrogate pairs. Extracted from
 // agent-status-types.ts, which owns the payload shapes and per-field caps.
 
+import { redactDispatchCapability } from './dispatch-capability-redaction'
 import {
   compactDispatchPromptForStatus,
   isOrcaDispatchStatusPrompt
 } from './orca-dispatch-status-prompt'
+
+// Why redaction lives in these exits: every hook, OSC and IPC status text in main and renderer passes them,
+// and a capability cut by the length cap still leaves a head the pattern catches.
 
 /** Maximum character length for the prompt field. Truncated on parse. */
 export const AGENT_STATUS_MAX_FIELD_LENGTH = 200
@@ -92,7 +96,7 @@ function normalizeSingleLinePreview(value: string, maxLength: number): string {
   if (normalized.length < maxLength) {
     normalized = trimTrailingWhitespace(normalized)
   }
-  return truncatePreservingSurrogates(normalized, maxLength)
+  return redactDispatchCapability(truncatePreservingSurrogates(normalized, maxLength))
 }
 
 // Why: assistant messages are a multi-paragraph "what did the agent say"
@@ -131,7 +135,7 @@ function normalizeMultilineField(value: unknown, maxLength: number): string {
     normalized += value[index]
     newlineRun = 0
   }
-  return truncatePreservingSurrogates(normalized, maxLength)
+  return redactDispatchCapability(truncatePreservingSurrogates(normalized, maxLength))
 }
 
 function getTrimmedStringBounds(value: string): { start: number; end: number } {
@@ -189,7 +193,7 @@ export function normalizeInteractivePromptField(
   if (typeof value !== 'string' || value.length === 0) {
     return undefined
   }
-  const truncated = truncatePreservingSurrogates(value, maxLength)
+  const truncated = redactDispatchCapability(truncatePreservingSurrogates(value, maxLength))
   return truncated.length > 0 ? truncated : undefined
 }
 
