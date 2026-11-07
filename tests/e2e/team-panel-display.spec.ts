@@ -253,7 +253,7 @@ test('the Display look draws a metrics carousel from real game.state metrics', a
         await orcaPage.mouse.move(0, 0)
         for (const width of CAPTURE_EVIDENCE ? WIDTHS : ([1440, 320] as const)) {
           await orcaPage.setViewportSize({ width, height: 900 })
-          for (const theme of CAPTURE_EVIDENCE && width === 1440 ? THEMES : (['dark'] as const)) {
+          for (const theme of CAPTURE_EVIDENCE ? THEMES : (['dark'] as const)) {
             await setTheme(orcaPage, theme)
             await expectNoSidewaysScroll(orcaPage, `${name} ${width} ${theme} ${language}`)
             await expectNothingCut(orcaPage, `${name} ${width} ${theme} ${language}`)

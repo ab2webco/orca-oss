@@ -309,6 +309,10 @@ test('the Team tab shows the live lead and its members from the lead game state'
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
+      // Display adds its metrics carousel above the tabs; Plain draws none.
+      await expect(panel.locator('[aria-roledescription="carousel"]')).toHaveCount(
+        look === 'display' ? 1 : 0
+      )
       await expect(leadCard).not.toContainText(leadName)
       for (const language of ['en', 'es'] as const) {
         await orcaPage.evaluate(
