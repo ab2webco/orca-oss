@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
-import { test as base, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { setTheme, THEMES, WIDTHS } from './helpers/settings-window'
@@ -22,12 +22,16 @@ const fakeGhBody = `#!/usr/bin/env node
 const args = process.argv.slice(2)
 const joined = args.join(' ')
 const pr = (number, title) => ({ number, title, url: 'https://github.com/acme/repo/pull/' + number })
+if (args[0] === '--version') {
+  console.log('gh version 2.60.0 (2024-10-01)')
+  process.exit(0)
+}
 if (args[0] === 'api' && joined.includes('rate_limit')) {
   const bucket = { limit: 5000, remaining: 5000, reset: 0 }
   console.log(JSON.stringify({ resources: { core: bucket, graphql: bucket, search: bucket } }))
   process.exit(0)
 }
-if (args[0] === 'api' && args[1] === 'graphql' && joined.includes('mergeQueue')) {
+if (args[0] === 'api' && args.includes('graphql') && joined.includes('mergeQueue')) {
   const nodes = [
     { position: 1, state: 'AWAITING_CHECKS', enqueuedAt: new Date().toISOString(), pullRequest: pr(951, 'Launch E2E waits') },
     { position: 2, state: 'QUEUED', enqueuedAt: new Date().toISOString(), pullRequest: pr(952, 'Keep the reflow column') }
@@ -48,9 +52,7 @@ if (process.platform === 'win32') {
   chmodSync(fakeGhPath, 0o755)
 }
 
-const test = base.extend({
-  launchEnv: [{ PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ''}` }, { option: true }]
-})
+test.use({ launchEnv: { PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ''}` } })
 
 test.afterAll(() => {
   rmSync(fakeGhDir, { recursive: true, force: true })
@@ -118,24 +120,56 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
       state: 'working',
       prompt: 'Lead the team'
     })
-    // The lead's Jev report, on the same game.state call its mod polls with.
-    const reported = await client.call<OrchestratorGameState>('game.state', {
-      worktreeId,
-      terminalHandle: lead,
-      paneKey: pane.paneKey,
-      advisor: {
-        version: 1,
-        model: 'Opus 5.5',
-        effort: 'high',
-        line: JEV_LINE,
-        pinned: { model: false, effort: false }
-      }
-    })
-    expect(reported.result.agents.find((one) => one.isLeader)?.advisor?.line).toBe(JEV_LINE)
+    // The lead's Jev report, on the same game.state call its mod polls with, once it lists the lead.
+    const report = () =>
+      client.call<OrchestratorGameState>('game.state', {
+        worktreeId,
+        terminalHandle: lead,
+        paneKey: pane.paneKey,
+        advisor: {
+          version: 1,
+          model: 'Opus 5.5',
+          effort: 'high',
+          line: JEV_LINE,
+          pinned: { model: false, effort: false }
+        }
+      })
+    let reported = await report()
+    await expect
+      .poll(
+        async () => {
+          reported = await report()
+          return reported.result.agents.find((one) => one.isLeader)?.advisor?.line ?? null
+        },
+        { timeout: 60_000, message: 'game.state never listed the lead with its Jev report' }
+      )
+      .toBe(JEV_LINE)
     expect(reported.result.localHost, 'a lead alone publishes this machine').toMatchObject({
       host: 'local',
       status: 'ok'
     })
+    // Why each poll: Orca's login-shell PATH hydration puts the shell's own gh ahead of the fake.
+    // Why so long: a read before then is cached for 90 s.
+    await expect
+      .poll(
+        async () => {
+          await electronApp.evaluate(
+            (_, { dir, sep }) => {
+              const parts = (process.env.PATH ?? '').split(sep).filter((one) => one !== dir)
+              process.env.PATH = [dir, ...parts].join(sep)
+            },
+            { dir: fakeGhDir, sep: path.delimiter }
+          )
+          const state = await client.call<OrchestratorGameState>('game.state', {
+            worktreeId,
+            terminalHandle: lead,
+            paneKey: pane.paneKey
+          })
+          return state.result.project?.queue?.entries?.map((one) => one.id) ?? null
+        },
+        { timeout: 150_000, intervals: [5_000], message: 'game.state never carried the queue' }
+      )
+      .toEqual(['#951', '#952'])
 
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
