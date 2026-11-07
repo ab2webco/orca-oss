@@ -371,6 +371,7 @@ import { PluginBundledBootstrapCoordinator } from './plugins/plugin-bundled-boot
 import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
 import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
 import { createPluginWorkerFactory, resolvePluginWorkerHome } from './plugins/plugin-worker-home'
+import { resolveDevSharedVaultWorkerBlockReason } from './plugins/plugin-dev-shared-vault-gate'
 import { getMainE2EConfig } from './e2e-config'
 import { startDeadClaudeHookReporter } from './claude/dead-hook-report'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
@@ -3066,6 +3067,13 @@ void app.whenReady().then(async () => {
     hostVersion: app.getVersion(),
     blockedPluginReason: (pluginKey) => pluginKillListService?.reason(pluginKey) ?? null
   })
+  // Why: decided once at launch; a dev profile on a linked vault keeps spawn-capable plugins off (ORCA-1131).
+  const devSharedVaultWorkerBlockReason = resolveDevSharedVaultWorkerBlockReason({
+    isPackaged: app.isPackaged,
+    isE2E: getMainE2EConfig().userDataDir !== null,
+    userDataPath: app.getPath('userData'),
+    env: process.env
+  })
   pluginService = new PluginService({
     userDataPath: app.getPath('userData'),
     hostVersion: app.getVersion(),
@@ -3080,6 +3088,7 @@ void app.whenReady().then(async () => {
     getKeybindings: () => keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
     hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged),
+    getSpawnCapableWorkerBlockReason: () => devSharedVaultWorkerBlockReason,
     workerFactory: createPluginWorkerFactory(
       resolvePluginWorkerHome({
         isPackaged: app.isPackaged,
