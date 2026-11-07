@@ -15378,7 +15378,7 @@
           "override": "Corregir"
         },
         "GameInboxUndelivered": {
-          "title": "Tu respuesta aún no le llegó al lead. Orca sigue reintentando y la entrega cuando haya un lead en marcha."
+          "title": "Tu respuesta aún no le llegó al lead. Orca la entrega en cuanto un lead la tome."
         }
       },
       "terminal-pane": {

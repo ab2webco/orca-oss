@@ -133,7 +133,11 @@ describe('GameInboxSheet', () => {
     )
 
     const notice = view.getByTestId('game-inbox-undelivered')
-    expect(notice.textContent).toMatch(/not reached the lead yet/)
+    // Why: retries stop after about 10 minutes, so the notice promises only the hand-over a lead's register makes.
+    expect(notice.textContent).toContain(
+      'Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it.'
+    )
+    expect(notice.textContent).not.toMatch(/retry/i)
     expect(within(notice).getByText('ORCA-1039')).toBeTruthy()
     expect(within(notice).getByText('Does the warning still show?')).toBeTruthy()
   })

@@ -20,7 +20,7 @@ export function GameInboxUndelivered({
       <p className="text-sm font-medium">
         {translate(
           'auto.components.game-inbox.GameInboxUndelivered.title',
-          'Your answer has not reached the lead yet. Orca keeps retrying and delivers it once a lead is running.'
+          'Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it.'
         )}
       </p>
       <ul className="space-y-1">
