@@ -11,6 +11,7 @@ import {
   isShellProcess,
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
+import { redactDispatchCapability } from '../../shared/dispatch-capability-redaction'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
@@ -14231,6 +14232,14 @@ export class OrcaRuntimeService {
   private readonly mobileNotificationReplay = new MobileNotificationReplayBuffer()
 
   dispatchMobileNotification(event: MobileNotificationEvent): void {
+    // Why here: every phone push passes this one call, owner questions and plugin notices included.
+    if (event.type === 'notification') {
+      event = {
+        ...event,
+        title: redactDispatchCapability(event.title),
+        body: redactDispatchCapability(event.body)
+      }
+    }
     const seq = this.mobileNotificationReplay.record(event)
     // Why: surface the desktop-assigned seq to live listeners so they can watermark the last event
     // delivered and feed it back to getMissedSince on reconnect (idempotent catch-up, no dupes).
@@ -14286,8 +14295,8 @@ export class OrcaRuntimeService {
   }): Promise<{ delivered: boolean }> {
     // Why: prefix with the plugin id so a plugin cannot spoof an Orca system
     // notification or impersonate another plugin.
-    const title = `${input.pluginId}: ${input.title}`
-    const body = input.body ?? ''
+    const title = redactDispatchCapability(`${input.pluginId}: ${input.title}`)
+    const body = redactDispatchCapability(input.body ?? '')
     let delivered = false
     try {
       if (Notification.isSupported()) {
