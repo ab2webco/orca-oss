@@ -60,6 +60,8 @@ export type OrchestratorGameStateInput = {
   /** Every other session on this machine; read only for a lead (ORCA-914). */
   found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
+  /** True when the leader's pane has no agent row on this host, so it has reported nothing yet. */
+  leaderUnreported?: boolean
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
   /** The pane says it was launched as a member; its lead may be on another host, with no parent here. */

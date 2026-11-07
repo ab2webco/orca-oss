@@ -211,12 +211,13 @@ describe('buildOrchestratorGameState fleet', () => {
     })
 
     expect(asked).toEqual(['wt-cin-8', 'wt-cin-9'])
-    expect(state.agents[0]).toMatchObject({
+    const members = state.agents.filter((one) => !one.isLeader)
+    expect(members[0]).toMatchObject({
       review: { number: 12, ci: 'failure', url: 'https://github.com/o/r/pull/12' },
       workItem: { identifier: 'CIN-8', status: 'QA', statusGroup: 'review' }
     })
-    expect(state.agents[1]).not.toHaveProperty('review')
-    expect(state.agents[1]).not.toHaveProperty('workItem')
+    expect(members[1]).not.toHaveProperty('review')
+    expect(members[1]).not.toHaveProperty('workItem')
   })
 
   it('adds every other session the lead did not launch as a found member, with its worktree, account and work (ORCA-914)', async () => {
