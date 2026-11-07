@@ -87,6 +87,7 @@ afterEach(async () => {
   })
   document.body.innerHTML = ''
   useTeamPanelTabStore.setState({ selected: null })
+  settings.pluginSystemEnabled = true
 })
 
 async function render(panel: OrchestratorGameLayer['panel']): Promise<HTMLElement> {
@@ -132,11 +133,8 @@ describe('TeamPanel settings', () => {
 
   it('drops the Advisor row while the plugin system is off', async () => {
     settings.pluginSystemEnabled = false
-    try {
-      const container = await render({})
-      expect(container.querySelector('[data-team-card="advisor"]')).toBeNull()
-    } finally {
-      settings.pluginSystemEnabled = true
-    }
+    const container = await render({})
+
+    expect(container.querySelector('[data-team-card="advisor"]')).toBeNull()
   })
 })

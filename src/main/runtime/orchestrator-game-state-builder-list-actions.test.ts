@@ -107,19 +107,8 @@ describe('the actions the PR and To Do lists run', () => {
 
 describe('the merge queue', () => {
   it('carries the queue the project work read, and none when it read none', async () => {
-    const queue = {
-      provider: 'github' as const,
-      entries: [
-        {
-          id: '#951',
-          title: 'Launch E2E waits',
-          url: 'https://github.com/o/r/pull/951',
-          position: 1,
-          state: 'checks' as const,
-          since: null
-        }
-      ]
-    }
+    const entry = { id: '#951', title: 'Waits', url: 'u', position: 1, since: null }
+    const queue = { provider: 'github' as const, entries: [{ ...entry, state: 'checks' as const }] }
     const stateWith = (work: { queue?: typeof queue }) =>
       buildOrchestratorGameState({
         settings: undefined,
