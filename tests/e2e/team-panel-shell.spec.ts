@@ -23,20 +23,20 @@ async function setLanguage(page: Page, uiLanguage: 'en' | 'es'): Promise<void> {
 
 const COPY = {
   en: {
-    title: 'Team',
-    unavailable: 'Team data is not available',
+    title: 'Your work',
+    empty: 'No agents running',
     gear: 'Panel settings'
   },
   es: {
-    title: 'Equipo',
-    unavailable: 'Los datos del equipo no están disponibles',
+    title: 'Tu trabajo',
+    empty: 'No hay agentes en marcha',
     gear: 'Ajustes del panel'
   }
 } as const
 
-// The Team tab is a right sidebar tab like Explorer (ORCA-1050). Until a host publishes the team
-// model it says so, and never draws rows it does not have.
-test('the Team tab opens in the right sidebar and says so when the host has no team data', async ({
+// The Team tab is a right sidebar tab like Explorer (ORCA-1050). With no game team it is the user's
+// own work (ORCA-1074), and with no agent running it says so instead of drawing rows.
+test('the Team tab opens in the right sidebar as Your work when there is no team', async ({
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
@@ -52,8 +52,7 @@ test('the Team tab opens in the right sidebar and says so when the host has no t
     await setLanguage(orcaPage, language)
     const copy = COPY[language]
     await expect(panel.getByRole('heading', { name: copy.title })).toBeVisible()
-    await expect(panel.getByText(copy.unavailable)).toBeVisible()
-    await expect(panel.getByRole('tablist')).toHaveCount(0)
+    await expect(panel.getByText(copy.empty)).toBeVisible()
 
     for (const width of [1440, 768, 390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })

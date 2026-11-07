@@ -4,6 +4,7 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { useGameInboxAppState } from './game-inbox-app-state'
+import { useTeamPanelTabStore } from '@/components/team-panel/team-panel-tab-store'
 import { GameOwnerQuestionsWatcher } from './GameOwnerQuestionsWatcher'
 
 const question = (id: string) => ({
@@ -65,7 +66,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   useAppStore.setState(useAppStore.getInitialState(), true)
-  useGameInboxAppState.setState({ hosts: [], open: false })
+  useGameInboxAppState.setState({ hosts: [] })
+  useTeamPanelTabStore.setState({ selected: null })
   Reflect.deleteProperty(window, 'api')
 })
 
@@ -80,6 +82,7 @@ describe('GameOwnerQuestionsWatcher', () => {
     expect(dispatch).not.toHaveBeenCalled()
   })
 
+  // Why the Team panel: the Inbox tab replaced the sidebar entry and its Sheet (ORCA-1072).
   it('announces a question asked in another project and opens its Inbox on click', async () => {
     render(<GameOwnerQuestionsWatcher />)
     await waitFor(() => expect(setBadgeCount).toHaveBeenLastCalledWith(0))
@@ -101,10 +104,24 @@ describe('GameOwnerQuestionsWatcher', () => {
     )
     expect(setBadgeCount).toHaveBeenLastCalledWith(1)
 
-    useAppStore.setState({ sidebarOpen: false })
+    useAppStore.setState({ rightSidebarOpen: false, rightSidebarTab: 'explorer' })
     openInbox?.({ environmentId: null, worktreeId: 'r1::/w' })
 
-    expect(useGameInboxAppState.getState().open).toBe(true)
-    expect(useAppStore.getState().sidebarOpen).toBe(true)
+    expect(useAppStore.getState().rightSidebarOpen).toBe(true)
+    expect(useAppStore.getState().rightSidebarTab).toBe('team')
+    expect(useTeamPanelTabStore.getState().selected).toBe('inbox')
+  })
+
+  // Why: full-page views suppress the right sidebar, and the Sheet used to open over them.
+  it('leaves a full-page view for the Inbox when the question has no workspace to open', async () => {
+    render(<GameOwnerQuestionsWatcher />)
+    await waitFor(() => expect(setBadgeCount).toHaveBeenLastCalledWith(0))
+
+    useAppStore.setState({ activeView: 'settings', rightSidebarOpen: false })
+    openInbox?.({ environmentId: null, worktreeId: null })
+
+    expect(useAppStore.getState().activeView).toBe('terminal')
+    expect(useAppStore.getState().rightSidebarOpen).toBe(true)
+    expect(useTeamPanelTabStore.getState().selected).toBe('inbox')
   })
 })

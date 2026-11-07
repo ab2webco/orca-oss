@@ -35,4 +35,28 @@ describe('buildPluginWorkerEnv', () => {
       ELECTRON_RUN_AS_NODE: '1'
     })
   })
+
+  it('points every home variable at the given home and never the user one (ORCA-1113)', () => {
+    const userHome = { HOME: '/home/me', XDG_CONFIG_HOME: '/home/me/.config' }
+    const env = buildPluginWorkerEnv(userHome, 'linux', '/profile/plugin-home')
+    expect(env).toMatchObject({
+      HOME: '/profile/plugin-home',
+      XDG_CONFIG_HOME: '/profile/plugin-home/.config'
+    })
+    expect(Object.values(env)).not.toContain('/home/me')
+    expect(Object.values(env)).not.toContain('/home/me/.config')
+  })
+
+  it('replaces USERPROFILE on Windows, where os.homedir() reads it', () => {
+    const env = buildPluginWorkerEnv(
+      { USERPROFILE: 'C:\\Users\\me', HOME: 'C:\\Users\\me' },
+      'win32',
+      'C:\\Orca\\plugin-home'
+    )
+    expect(env).toMatchObject({
+      USERPROFILE: 'C:\\Orca\\plugin-home',
+      HOME: 'C:\\Orca\\plugin-home',
+      XDG_CONFIG_HOME: 'C:\\Orca\\plugin-home\\.config'
+    })
+  })
 })

@@ -2130,6 +2130,9 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
           model:
             payload.model ??
             (existing?.agentType === identity.agentType ? existing.model : undefined),
+          effort:
+            payload.effort ??
+            (existing?.agentType === identity.agentType ? existing.effort : undefined),
           paneKey,
           terminalHandle: statusTerminalHandle,
           worktreeId:

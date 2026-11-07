@@ -114,6 +114,13 @@ describe('resolveTeamPanelTabs', () => {
     expect(resolveTeamPanelTabs(soloModel())[1].count).toBeNull()
   })
 
+  // Why: a no-team model counts only agent questions, so zero does not mean the Inbox is empty.
+  it('always draws the Inbox body, which reads what its counts leave out', () => {
+    const inbox = resolveTeamPanelTabs(gameModel()).find((tab) => tab.id === 'inbox')
+
+    expect(inbox?.view.kind).toBe('ready')
+  })
+
   it('carries each section state through to the tab view', () => {
     const model = gameModel({
       prs: { kind: 'loading' },

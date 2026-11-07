@@ -94,6 +94,7 @@ describe('openTeamSession', () => {
   })
 
   it('says so without a call when a remote member has no paired host to open it through', async () => {
+    tabsByWorktree = {}
     await openTeamSession(
       local({ host: { kind: 'remote', name: 'mini', environmentId: null, reachable: false } }),
       'ORCA-12'
@@ -101,5 +102,41 @@ describe('openTeamSession', () => {
 
     expect(calls.rpc).not.toHaveBeenCalled()
     expect(calls.toastError).toHaveBeenCalledWith('Could not open ORCA-12')
+  })
+
+  it("opens a no-team SSH session from this window's own tabs", async () => {
+    await openTeamSession(
+      local({
+        terminalHandle: null,
+        host: { kind: 'remote', name: 'box', environmentId: null, reachable: true }
+      }),
+      'main'
+    )
+
+    expect(calls.reveal).toHaveBeenCalledWith('wt-7')
+    expect(calls.focusPane).toHaveBeenCalledTimes(1)
+    expect(calls.rpc).not.toHaveBeenCalled()
+    expect(calls.toastError).not.toHaveBeenCalled()
+  })
+
+  it('opens a paired session with no terminal handle on its own host', async () => {
+    await openTeamSession(
+      local({
+        terminalHandle: null,
+        host: { kind: 'remote', name: 'mini', environmentId: 'env-1', reachable: true }
+      }),
+      'main'
+    )
+
+    expect(calls.reveal).toHaveBeenCalledWith('wt-7', { executionHostId: 'runtime:env-1' })
+    expect(calls.focusPane).toHaveBeenCalledTimes(1)
+    expect(calls.toastError).not.toHaveBeenCalled()
+  })
+
+  it('never focuses a guessed pane for a malformed key', async () => {
+    await openTeamSession(local({ paneKey: 'tab-7:not-a-leaf', terminalHandle: null }), 'main')
+
+    expect(calls.focusPane).not.toHaveBeenCalled()
+    expect(calls.toastError).toHaveBeenCalledWith('Could not open main')
   })
 })

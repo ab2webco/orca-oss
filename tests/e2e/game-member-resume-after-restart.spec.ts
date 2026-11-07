@@ -1,8 +1,8 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
+import { runOrcaCli } from './helpers/orca-cli-process'
 import { TEST_REPO_PATH_FILE } from './global-setup'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import { cleanupE2EDaemons } from './helpers/electron-process-shutdown'
@@ -16,23 +16,11 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const TICKET = 'E2E-702'
-const cliEntry = path.join(process.cwd(), 'out', 'cli', 'index.js')
 
 type LeadPane = { paneKey: string; handle: string; worktreeId: string }
 
 type ResumeJson = {
   result: { members: { ticket: string; result: string; dispatchId?: string; reason?: string }[] }
-}
-
-function runCli(userDataDir: string, env: Record<string, string>, args: string[]) {
-  const { ORCA_ENVIRONMENT: _e, ORCA_PAIRING_CODE: _p, ...clean } = process.env
-  void _e
-  void _p
-  return spawnSync(process.execPath, [cliEntry, ...args], {
-    env: { ...clean, ORCA_USER_DATA_PATH: userDataDir, ORCA_DEV_CLI_INVOCATION: '1', ...env },
-    encoding: 'utf8',
-    timeout: 60_000
-  })
 }
 
 // Why polled: the restored lead pane binds a terminal handle a moment after the window loads.
@@ -264,7 +252,7 @@ test('a game member paused by a real restart is resumed on its own task and can 
     }
     // Why an offset: the first launch's dispatch capability is in the same ledger.
     const stdinBeforeResume = agent.readStdin().length
-    const resumed = runCli(session.userDataDir, leadEnv, ['game', 'resume-members', '--json'])
+    const resumed = runOrcaCli(session.userDataDir, leadEnv, ['game', 'resume-members', '--json'])
     expect(resumed.status, resumed.stderr || resumed.stdout).toBe(0)
     const outcome = (JSON.parse(resumed.stdout) as ResumeJson).result.members
     expect(outcome).toEqual([
@@ -306,7 +294,7 @@ test('a game member paused by a real restart is resumed on its own task and can 
         { timeout: 60_000, message: 'the relaunched agent never received its dispatch capability' }
       )
       .not.toBeNull()
-    const done = runCli(session.userDataDir, { ORCA_TERMINAL_HANDLE: newHandle }, [
+    const done = runOrcaCli(session.userDataDir, { ORCA_TERMINAL_HANDLE: newHandle }, [
       'orchestration',
       'send',
       '--from',

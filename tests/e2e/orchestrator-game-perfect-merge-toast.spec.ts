@@ -128,13 +128,15 @@ async function readAgain(band: GameBand): Promise<void> {
     .toBeGreaterThan(before)
 }
 
+// Why at file level: a skip inside the test runs after the app launched, ~14 s per case on CI.
+test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+
 for (const run of RUNS) {
   test(`the mod toasts a perfect merge only when the host decided one (${run.theme}, ${run.locale})`, async ({
     electronApp,
     orcaPage,
     testRepoPath
   }, testInfo) => {
-    test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
     test.setTimeout(300_000)
     await waitForSessionReady(orcaPage)
     const band = await startGameBand(orcaPage, testRepoPath, {

@@ -5093,6 +5093,25 @@ export class OrchestrationDb {
       .get(dispatchId) as FederatedDispatchRow | undefined
   }
 
+  /** The other unreleased dispatches on the same host worktree, newest first: with it, one member. */
+  listUnreleasedWorktreeSiblings(
+    dispatchId: string
+  ): { dispatchId: string; state: WorkerDispatchState | null }[] {
+    return this.db
+      .prepare(
+        `SELECT s.dispatch_id AS dispatchId, w.state AS state
+           FROM federated_dispatches f
+           JOIN federated_dispatches s
+             ON s.environment_id = f.environment_id
+            AND s.remote_worktree_id = f.remote_worktree_id
+            AND s.dispatch_id <> f.dispatch_id
+           LEFT JOIN worker_dispatches w ON w.dispatch_id = s.dispatch_id
+          WHERE f.dispatch_id = ? AND COALESCE(w.stage, '') <> 'released'
+          ORDER BY s.created_at DESC, s.rowid DESC`
+      )
+      .all(dispatchId) as { dispatchId: string; state: WorkerDispatchState | null }[]
+  }
+
   listActiveFederatedDispatches(runId?: string): FederatedDispatchRow[] {
     return this.db
       .prepare(

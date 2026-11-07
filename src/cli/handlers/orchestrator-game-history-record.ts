@@ -1,5 +1,5 @@
 import type { CommandHandler } from '../dispatch'
-import { dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
+import type { GameStopWorker } from './orchestrator-game-stop'
 import {
   gameHistoryOutcomeOf,
   type GameHistoryRecord
@@ -14,7 +14,7 @@ import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator
 
 type Client = Parameters<CommandHandler>[0]['client']
 
-type InboxMessage = { from_handle: string; type: string; body: string }
+type InboxMessage = { from_handle: string; type: string; body: string; sequence?: number }
 
 const REPORT_TYPES: ReadonlySet<string> = new Set(['worker_done', 'escalation'])
 // Why 100: enough to reach a member's last report in a busy lead's inbox.
@@ -52,22 +52,56 @@ async function launchedAtOf(
   return shown?.result?.worker?.created_at ?? null
 }
 
-async function lastReportOf(client: Client, member: GameAgent): Promise<string | null> {
+/** The member's latest dispatch in any state: history reads it after the member ended (ORCA-1005). */
+export function historyDispatchOf(
+  member: Pick<GameAgent, 'paneKey' | 'remote' | 'terminalHandle' | 'worktree'>,
+  workers: readonly GameStopWorker[]
+): GameStopWorker | undefined {
+  const remoteId = member.remote ? member.paneKey.replace(/^remote:/, '') : null
+  const handle = member.terminalHandle ?? null
+  const worktreeId = member.worktree?.id ?? null
+  return (
+    workers.findLast((worker) => remoteId !== null && worker.dispatchId === remoteId) ??
+    workers.findLast((worker) => handle !== null && worker.agentTerminalHandle === handle) ??
+    workers.findLast((worker) => worktreeId !== null && worker.resource?.worktreeId === worktreeId)
+  )
+}
+
+async function lastReportOf(
+  client: Client,
+  member: GameAgent,
+  dispatch: Pick<GameStopWorker, 'dispatchId' | 'runId'> | undefined
+): Promise<string | null> {
   const lead = process.env.ORCA_TERMINAL_HANDLE
-  if (!lead || !member.terminalHandle) {
+  // Why the run: a member's worker_done is addressed to `run:<id>`, not to the lead's terminal.
+  const addresses = [lead, dispatch?.runId ? `run:${dispatch.runId}` : undefined].filter(
+    (one): one is string => Boolean(one)
+  )
+  // Why the dispatch: a remote member's report is relayed from `dispatch:<id>`, with no terminal.
+  const senders = new Set(
+    [member.terminalHandle, dispatch ? `dispatch:${dispatch.dispatchId}` : undefined].filter(
+      (one): one is string => Boolean(one)
+    )
+  )
+  if (addresses.length === 0 || senders.size === 0) {
     return null
   }
-  const inbox = await client
-    .call<{ messages?: InboxMessage[] }>('orchestration.inbox', {
-      terminal: lead,
-      limit: INBOX_READ
-    })
-    .catch(() => null)
-  // Why find: the inbox lists newest first.
-  const report = (inbox?.result?.messages ?? []).find(
-    (one) => one.from_handle === member.terminalHandle && REPORT_TYPES.has(one.type)
+  const reads = await Promise.all(
+    addresses.map((terminal) =>
+      client
+        .call<{ messages?: InboxMessage[] }>('orchestration.inbox', { terminal, limit: INBOX_READ })
+        .catch(() => null)
+    )
   )
-  return report?.body ?? null
+  const reports = reads
+    .flatMap((read) => read?.result?.messages ?? [])
+    .filter((one) => senders.has(one.from_handle) && REPORT_TYPES.has(one.type))
+  // Why by sequence: each address lists newest first, but the two lists interleave.
+  const newest = reports.reduce<InboxMessage | null>(
+    (best, one) => (best === null || (one.sequence ?? 0) > (best.sequence ?? 0) ? one : best),
+    null
+  )
+  return newest?.body ?? null
 }
 
 /**
@@ -80,24 +114,16 @@ export async function recordFreedMember(args: {
   freedBy: 'sweep' | 'stop'
   workers: readonly GameStopWorker[]
   /** The dispatch the caller frees, when it found it its own way. */
-  dispatch?: Pick<GameStopWorker, 'dispatchId' | 'workerState'>
+  dispatch?: Pick<GameStopWorker, 'dispatchId' | 'workerState' | 'runId'>
   /** The project's roster, which names the member's character in every language. */
   roster: readonly GameMemberName[]
 }): Promise<string | null> {
   const { client, member } = args
   const character = memberNameOf(member.displayName)
-  const dispatch =
-    args.dispatch ??
-    dispatchOf(
-      {
-        row: { terminalHandle: member.terminalHandle ?? null },
-        worktreeId: member.worktree?.id ?? null
-      },
-      [...args.workers]
-    )
+  const dispatch = args.dispatch ?? historyDispatchOf(member, args.workers)
   const [launchedAt, lastReport] = await Promise.all([
     launchedAtOf(client, dispatch?.dispatchId),
-    lastReportOf(client, member)
+    lastReportOf(client, member, dispatch)
   ])
   const record: GameHistoryRecord = {
     ticket: ticketOfMember(member),

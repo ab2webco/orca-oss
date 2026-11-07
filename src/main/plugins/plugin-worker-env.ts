@@ -1,3 +1,5 @@
+import { posix, win32 } from 'node:path'
+
 /**
  * Scrubbed environment for plugin workers. Deliberately an allowlist — the
  * app's own environment can carry secrets (tokens exported in the user's
@@ -31,9 +33,11 @@ const WORKER_ENV_ALLOWLIST = [
   'NUMBER_OF_PROCESSORS'
 ] as const
 
+/** @param homeDir replaces the user's home (see plugin-worker-home.ts); null keeps it. */
 export function buildPluginWorkerEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  homeDir: string | null = null
 ): Record<string, string> {
   const env: Record<string, string> = {}
   const windowsLookup = new Map<string, string>()
@@ -50,6 +54,15 @@ export function buildPluginWorkerEnv(
     const value = platform === 'win32' ? windowsLookup.get(key) : baseEnv[key]
     if (value !== undefined) {
       env[key === 'SYSTEMROOT' ? 'SystemRoot' : key] = value
+    }
+  }
+  if (homeDir !== null) {
+    // Why all three: os.homedir() reads USERPROFILE on Windows and HOME elsewhere, and
+    // Linux config dirs follow XDG_CONFIG_HOME before falling back to ~/.config.
+    env.HOME = homeDir
+    env.XDG_CONFIG_HOME = (platform === 'win32' ? win32 : posix).join(homeDir, '.config')
+    if (platform === 'win32') {
+      env.USERPROFILE = homeDir
     }
   }
   env.ELECTRON_RUN_AS_NODE = '1'

@@ -225,6 +225,21 @@ describe('TeamPanelMachinesTab', () => {
     )
   })
 
+  it('says one agent in the singular', () => {
+    const text = machines([machine({ running: 1, cap: null, status: 'working' })]).textContent
+    expect(text).toContain('1 agent')
+    expect(text).not.toContain('1 agents')
+  })
+
+  // Why no bar: a figure with no reading behind it would be invented.
+  it('shows what it knows of a host with no reading', () => {
+    const view = machines([
+      machine({ running: 2, cap: null, status: 'working', reading: { kind: 'unread' } })
+    ])
+    expect(view.textContent).toContain('2 agents')
+    expect(view.querySelector('[role="img"]')).toBeNull()
+  })
+
   it('says low memory rather than the agent count', () => {
     const view = machines([machine({ running: 2, status: 'risk' })])
 

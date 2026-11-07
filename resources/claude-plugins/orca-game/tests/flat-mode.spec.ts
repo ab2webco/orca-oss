@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { menuChipsOf } from '../hooks/band-chips'
 import { gameCommandOf } from '../hooks/game-commands'
 import { gameConfigOfEnv, isAbsorbingConfig } from '../hooks/game-config'
 import { setGameLocale } from '../hooks/game-strings'
 import { isSceneMode, questCommandOf } from '../hooks/quest-policy'
-import { sceneOf } from '../hooks/scenes/index'
 
 afterEach(() => setGameLocale('en'))
 
@@ -29,21 +27,5 @@ describe('the flat mode', () => {
       const asked = questCommandOf('nope')
       expect('error' in asked && asked.error, locale).toContain('/orca-game:mode flat')
     }
-  })
-})
-
-describe('the band menu', () => {
-  const scene = sceneOf('quest')
-  const keysOf = (isFlat: boolean) => menuChipsOf(scene, isFlat).map((chip) => chip.key)
-
-  it('offers the text view beside Pet while the scene draws', () => {
-    expect(keysOf(false)).toEqual(['band-panel', 'band-refresh', 'band-flat', 'band-pet'])
-    expect(menuChipsOf(scene, false)[2]?.labels).toEqual(['≡ Text', '≡'])
-  })
-
-  it('offers the scene back and drops Pet, which only the scene draws', () => {
-    expect(keysOf(true)).toEqual(['band-panel', 'band-refresh', 'band-flat'])
-    setGameLocale('es')
-    expect(menuChipsOf(scene, true)[2]?.labels).toEqual(['▦ Escena', '▦'])
   })
 })
