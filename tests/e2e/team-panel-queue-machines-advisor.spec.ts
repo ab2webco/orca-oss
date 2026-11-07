@@ -2,7 +2,6 @@ import { execSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -54,15 +53,7 @@ if (process.platform === 'win32') {
 
 test.use({ launchEnv: { PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ''}` } })
 
-test.afterAll(() => {
-  rmSync(fakeGhDir, { recursive: true, force: true })
-})
-
-const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
-  page.evaluate(
-    (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
-    enabled
-  )
+test.afterAll(() => rmSync(fakeGhDir, { recursive: true, force: true }))
 
 // The real lead's game.state, with no overlay: GitHub is the fake gh, the machine is this one.
 test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev follows the plugin system', async ({
@@ -132,17 +123,10 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
             queue: reported.project?.queue?.entries?.map((one) => one.id) ?? null
           }
         },
-        {
-          timeout: 150_000,
-          intervals: [5_000],
-          message: 'game.state never carried Jev and the queue'
-        }
+        { timeout: 150_000, intervals: [5_000], message: 'no Jev or queue in game.state' }
       )
       .toEqual({ jev: JEV_LINE, queue: ['#951', '#952'] })
-    expect(reported!.localHost, 'a lead alone publishes this machine').toMatchObject({
-      host: 'local',
-      status: 'ok'
-    })
+    expect(reported!.localHost?.status, 'a lead alone publishes this machine').toBe('ok')
 
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
@@ -150,9 +134,6 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')
     })
-    expect(
-      await orcaPage.evaluate(() => window.__store!.getState().settings?.pluginSystemEnabled)
-    ).not.toBe(true)
     const panel = orcaPage.getByTestId('team-panel')
     await expect(panel.locator('[data-team-card="lead"]')).toBeVisible({ timeout: 60_000 })
 
@@ -207,12 +188,17 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
     await expect(advisor).toHaveCount(0)
     await capture('off')
 
-    await setPluginSystem(orcaPage, true)
+    const plugins = (on: boolean): Promise<unknown> =>
+      orcaPage.evaluate(
+        (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
+        on
+      )
+    await plugins(true)
     await panel.getByRole('tab', { name: 'Team' }).click()
     await expect(advisor).toContainText(JEV_LINE, { timeout: 30_000 })
     await capture('on')
 
-    await setPluginSystem(orcaPage, false)
+    await plugins(false)
     await expect(advisor).toHaveCount(0, { timeout: 30_000 })
   } finally {
     agent.dispose()

@@ -1,4 +1,4 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -17,6 +17,8 @@ const WINDOW_MS = 2000
 const MAX_FRAME_GAP_MS = 430
 // Why fresh windows, not a longer one: a stretched window would judge "within N s", not 2 s.
 const MAX_WINDOWS = 5
+// Why by role and name: Pixel's thought cloud is a canvas too.
+const sceneCanvasIn = (root: Locator): Locator => root.getByRole('img', { name: 'Live team scene' })
 
 // Why mapped: a never-shown window gets a frame only every ~1017 ms on CI (ORCA-760), too sparse
 // for any window to be judged (PR #1067 run 42408533741).
@@ -34,7 +36,7 @@ async function sceneWindow(page: Page): Promise<SceneWindow> {
     (windowMs) =>
       new Promise<SceneWindow>((resolve) => {
         const hashOf = (): string => {
-          const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] canvas')
+          const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
           const g = canvas?.getContext('2d')
           if (!canvas || !g || canvas.width === 0) {
             return 'unpainted'
@@ -76,7 +78,7 @@ async function sceneWindow(page: Page): Promise<SceneWindow> {
 
 async function canvasHash(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] canvas')
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
     const g = canvas?.getContext('2d')
     if (!canvas || !g || canvas.width === 0) {
       return 'unpainted'
@@ -230,7 +232,7 @@ test('every Team scene style moves while its team works, with no one entering or
           }),
         style
       )
-      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+      await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
       await expect.poll(() => canvasHash(orcaPage), { timeout: 30_000 }).not.toBe('unpainted')
@@ -273,7 +275,7 @@ test('every Team scene style moves while its team works, with no one entering or
       window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
     )
     const pixel = panel.locator('[data-team-scene="pixel"]')
-    await expect(pixel.locator('canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(sceneCanvasIn(pixel)).toBeVisible({ timeout: 30_000 })
     // A sequence across one swing, so the motion can be read frame by frame.
     for (let frame = 0; frame < 6; frame++) {
       await pixel.screenshot({

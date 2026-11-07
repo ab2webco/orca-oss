@@ -1,6 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -18,11 +18,13 @@ const COPY = {
   en: { label: 'Live team scene', open: 'Open terminal' },
   es: { label: 'Escena en vivo del equipo', open: 'Abrir terminal' }
 } as const
+// Why by role and name: Pixel's thought cloud is a canvas too.
+const sceneCanvasIn = (root: Locator): Locator => root.getByRole('img', { name: COPY.en.label })
 
 // Why sampled: a mounted canvas that never painted is still visible; varied pixels prove a frame.
 async function paintedColors(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] canvas')
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
     const g = canvas?.getContext('2d')
     if (!canvas || !g || canvas.width === 0) {
       return 0
@@ -241,7 +243,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     })
     const panel = orcaPage.getByTestId('team-panel')
     const scene = panel.locator('[data-team-scene]')
-    await expect(scene.locator('canvas')).toBeVisible({ timeout: 90_000 })
+    await expect(sceneCanvasIn(scene)).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)
     // V28 names the member who asks over its alert (ORCA-1097); ORCA-14 has the open question.
     const askerTag = scene.locator('[data-scene-speaker]')
@@ -253,7 +255,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
         (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
         language
       )
-      await expect(scene.locator('canvas')).toHaveAttribute('aria-label', COPY[language].label)
+      await expect(scene.getByRole('img', { name: COPY[language].label })).toBeVisible()
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
@@ -290,7 +292,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
           }),
         style
       )
-      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+      await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
       await expect(askerTag).toHaveCount(1)
@@ -351,7 +353,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
           }),
         style
       )
-      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+      await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
       for (const width of WIDTHS) {
@@ -404,7 +406,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       `[data-terminal-overlay-tab-id="${askerTab}"] [data-team-member-header]`
     )
     await expect(header).toBeVisible({ timeout: 30_000 })
-    await expect(scene.locator('canvas')).toBeVisible()
+    await expect(sceneCanvasIn(scene)).toBeVisible()
     await expect.poll(() => paintedColors(orcaPage)).toBeGreaterThan(8)
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
@@ -429,7 +431,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     })
     await expect(panel).toBeHidden()
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
-    await expect(panel.locator('[data-team-scene="figures"] canvas')).toBeVisible({
+    await expect(sceneCanvasIn(panel.locator('[data-team-scene="figures"]'))).toBeVisible({
       timeout: 30_000
     })
     await expect(header).toBeVisible()
