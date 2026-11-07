@@ -29,7 +29,8 @@ const baseState = (): Record<string, unknown> => ({
   rightSidebarTab: 'team',
   tabsByWorktree: {},
   ptyIdsByTabId: {},
-  terminalLayoutsByTabId: {}
+  terminalLayoutsByTabId: {},
+  agentStatusByPaneKey: {}
 })
 let appState = baseState()
 vi.mock('@/store', () => ({
@@ -38,6 +39,8 @@ vi.mock('@/store', () => ({
     { getState: () => ({}) }
   )
 }))
+
+const LEAD = { paneKey: 'tab-lead:leaf-lead', host: { kind: 'local' }, name: 'Run home' }
 
 const solo = {
   kind: 'solo',
@@ -143,7 +146,11 @@ describe('useTeamMemberOfTab', () => {
     publish({
       section: {
         kind: 'ready',
-        value: { kind: 'team', members: [remote, local] } as unknown as TeamPanelGameModel
+        value: {
+          kind: 'team',
+          lead: LEAD,
+          members: [remote, local]
+        } as unknown as TeamPanelGameModel
       },
       retry: null
     })
@@ -171,7 +178,10 @@ describe('a paired host member', () => {
     host: { kind: 'remote', name: 'mini', environmentId: 'env-mini', reachable: true }
   } as TeamMemberCard
   const teamOf = (members: TeamMemberCard[]): TeamPanelModelSource => ({
-    section: { kind: 'ready', value: { kind: 'team', members } as unknown as TeamPanelGameModel },
+    section: {
+      kind: 'ready',
+      value: { kind: 'team', lead: LEAD, members } as unknown as TeamPanelGameModel
+    },
     retry: null
   })
 
@@ -256,6 +266,7 @@ describe('Team model Inbox count', () => {
     })
     const model = {
       kind: 'team',
+      lead: LEAD,
       inbox: { kind: 'ready', value: { forYou: 1, waiting: 0, threads: 2, answered: 0 } }
     } as unknown as TeamPanelGameModel
     await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
@@ -264,6 +275,43 @@ describe('Team model Inbox count', () => {
     expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
       kind: 'ready',
       value: { forYou: 2, waiting: 0, threads: 2, answered: 0 }
+    })
+  })
+})
+
+describe("Team model Inbox count with the lead's own question (ORCA-1129 D4)", () => {
+  // Why: game.state carries no AskUserQuestion, so Para ti read 0 while the lead waited on you.
+  it("counts the lead's live AskUserQuestion in For you", async () => {
+    appState = {
+      ...baseState(),
+      agentStatusByPaneKey: {
+        'tab-lead:leaf-lead': {
+          state: 'waiting',
+          paneKey: 'tab-lead:leaf-lead',
+          toolName: 'AskUserQuestion',
+          interactivePrompt: JSON.stringify({
+            questions: [{ question: 'Merge #923 now?', options: [{ label: 'Now' }] }]
+          })
+        }
+      }
+    }
+    let seen: TeamPanelModelSource | null = null
+    await mount(() => {
+      seen = useTeamPanelModel()
+      return null
+    })
+    const model = {
+      kind: 'team',
+      projectName: 'orca-oss',
+      lead: { paneKey: 'tab-lead:leaf-lead', host: { kind: 'local' }, name: 'Run home' },
+      inbox: { kind: 'ready', value: { forYou: 0, waiting: 0, threads: 0, answered: 0 } }
+    } as unknown as TeamPanelGameModel
+    await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
+
+    const section = (seen as TeamPanelModelSource | null)?.section
+    expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
+      kind: 'ready',
+      value: { forYou: 1, waiting: 0, threads: 0, answered: 0 }
     })
   })
 })

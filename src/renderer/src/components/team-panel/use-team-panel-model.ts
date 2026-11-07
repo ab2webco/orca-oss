@@ -28,6 +28,7 @@ import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
+import { teamLeadQuestionOf } from './team-panel-inbox-agents'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -149,6 +150,12 @@ export function useTeamPanelModel(): TeamPanelModelSource {
     return () => stops.forEach((stop) => stop?.())
   }, [scope])
   const source = useTeamPanelModelStore((s) => s.source)
+  const team =
+    source.section.kind === 'ready' && source.section.value.kind === 'team'
+      ? source.section.value
+      : null
+  // Why: game.state carries no question, so the lead's own AskUserQuestion comes from agent status.
+  const leadAsks = useAppStore((s) => (team && teamLeadQuestionOf(team, s) ? 1 : 0))
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
   const everyOpen = useOpenGameOwnerQuestionCount()
   const noTeam = !scope || hasNoTeam(source.section)
@@ -160,14 +167,14 @@ export function useTeamPanelModel(): TeamPanelModelSource {
       : source
     const { section } = shown
     // Why every project: the no-team model reads agent status, so it misses this project's too.
-    const added = noTeamModel ? everyOpen : otherOpen
+    const added = noTeamModel ? everyOpen : otherOpen + leadAsks
     if (added === 0 || section.kind !== 'ready') {
       return shown
     }
     const model = section.value
     const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, added) }
     return { ...shown, section: { kind: 'ready', value } }
-  }, [noTeam, solo, source, otherOpen, everyOpen])
+  }, [noTeam, solo, source, otherOpen, everyOpen, leadAsks])
 }
 
 /** The lead's pane as the last model read it, for what the panel sends it. */

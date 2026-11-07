@@ -14,6 +14,7 @@ import { loadTeamSceneArt } from './team-scene-art-load'
 import type { TeamSceneArtImage, TeamSceneImageArt } from './team-scene-image-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 import { recordingContext } from './team-scene-recording-context'
+import { useAppStore } from '@/store'
 
 vi.mock('./team-scene-art-load', () => ({ loadTeamSceneArt: vi.fn() }))
 
@@ -118,6 +119,40 @@ afterEach(() => {
 })
 
 describe('TeamPanelScene', () => {
+  // Why (ORCA-1129): game.state names only the tool, so the bubble read "AskUserQuestion".
+  it("says the lead's question in its bubble, never the question tool's name", async () => {
+    const asking = {
+      ...model({ id: 'quest', extensions: [] }),
+      lead: {
+        ...lead,
+        liveAction: { kind: 'tool' as const, tool: 'AskUserQuestion', detail: null }
+      }
+    }
+    useAppStore.setState({
+      agentStatusByPaneKey: {
+        'pane-lead': {
+          state: 'waiting',
+          prompt: 'Ship it',
+          updatedAt: 1,
+          stateStartedAt: 1,
+          paneKey: 'pane-lead',
+          stateHistory: [],
+          toolName: 'AskUserQuestion',
+          interactivePrompt: JSON.stringify({
+            questions: [{ question: 'Merge #923 now?', options: [{ label: 'Now' }] }]
+          })
+        }
+      }
+    })
+    await act(async () => root.render(<TeamPanelScene model={asking} style="pixel" />))
+
+    const bubble = host.querySelector('[data-scene-bubble="lead"]')?.textContent
+    expect(bubble).toBe('Waiting for you · Merge #923 now?')
+
+    act(() => useAppStore.setState({ agentStatusByPaneKey: {} }))
+    expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Waiting for you')
+  })
+
   it('hands its painter to what it wraps, so card faces match the scene', async () => {
     let seen: TeamScenePainter | null = null
     function Probe(): null {

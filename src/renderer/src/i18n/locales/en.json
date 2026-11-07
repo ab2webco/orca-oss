@@ -16389,7 +16389,8 @@
         "team-scene-copy": {
           "label": "Live team scene",
           "leadAsks": "Waiting for you · {{question}}",
-          "leadDone": "Done, nothing pending"
+          "leadDone": "Done, nothing pending",
+          "leadWaits": "Waiting for you"
         }
       },
       "game-arcade": {
@@ -17294,7 +17295,8 @@
       "waitingEmpty": "No member is waiting for an answer.",
       "answeredEmpty": "Nothing answered yet.",
       "leadAnsweredText": "The lead answered: {{text}}",
-      "answer": "Answer"
+      "answer": "Answer",
+      "answerFailed": "Could not send the answer. Open the terminal."
     },
     "age": {
       "now": "now",
@@ -17311,5 +17313,9 @@
     "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
     "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
     "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
+  },
+  "agentQuestionNotification": {
+    "title": "{{context}} - {{agent}} asks you",
+    "body": "Open the Inbox to answer."
   }
 }

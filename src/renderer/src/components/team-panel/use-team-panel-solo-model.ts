@@ -24,15 +24,20 @@ import {
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import { useTeamSoloAdvisors } from './use-team-solo-advisors'
 import { useTeamSoloMachineReadings } from './use-team-solo-machine-readings'
+import { useGameLeadHandles } from './game-lead-handles'
+import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
 
 type MachineReadings = ReadonlyMap<string, GameHostReading>
 
-type SoloInputs = TeamSoloSessionsState & { selectedPaneKey: string | null }
+type SoloInputs = TeamSoloSessionsState &
+  Pick<AppState, 'ptyIdsByTabId' | 'terminalLayoutsByTabId'> & { selectedPaneKey: string | null }
 
 function soloInputsOf(s: AppState): SoloInputs {
   return {
     agentStatusByPaneKey: s.agentStatusByPaneKey,
     tabsByWorktree: s.tabsByWorktree,
+    ptyIdsByTabId: s.ptyIdsByTabId,
+    terminalLayoutsByTabId: s.terminalLayoutsByTabId,
     worktreesByRepo: s.worktreesByRepo,
     repos: s.repos,
     settings: s.settings,
@@ -93,7 +98,7 @@ export function teamPanelSoloModelFrom(
     }
   })
   // Why questions, not attention: Inbox lists only these, and a count must match what it opens on.
-  const forYou = model.rows.filter((row) => row.liveAction?.kind === 'question').length
+  const forYou = teamInboxAgentQuestionsOf(model, inputs).length
   return {
     ...model,
     inbox: {
@@ -109,7 +114,11 @@ const NO_SESSIONS: readonly TeamSoloSession[] = []
 /** Null while `active` is false, so a team view pays nothing for agent status churn. */
 export function useTeamPanelSoloModel(active: boolean): TeamPanelSoloModel | null {
   const inputs = useAppStore(useShallow((s) => (active ? soloInputsOf(s) : IDLE)))
-  const sessions = useMemo(() => (inputs ? teamSoloSessionsOf(inputs) : NO_SESSIONS), [inputs])
+  const leadHandles = useGameLeadHandles()
+  const sessions = useMemo(
+    () => (inputs ? teamSoloSessionsOf(inputs, leadHandles) : NO_SESSIONS),
+    [inputs, leadHandles]
+  )
   const environmentIds = (inputs?.runtimeEnvironments ?? []).map((one) => one.id).join('\n')
   const shownTab = useTeamPanelTabStore((s) => s.shown)
   // Why: Jev reaches a pane only through its plugin, so with the plugin system off nothing is asked.

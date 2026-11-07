@@ -291,6 +291,8 @@ describe('teamPanelSoloModelFrom', () => {
           })
         }
       }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
       selectedPaneKey: null
     })
     expect(model.rows[0]?.status).toBe('attention')
@@ -317,6 +319,8 @@ describe('teamPanelSoloModelFrom', () => {
           })
         }
       }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
       selectedPaneKey: 'tab-1:11111111-1111-4111-8111-111111111111'
     })
     expect(model.rows.map((row) => row.paneKey)).toEqual([

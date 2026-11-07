@@ -388,6 +388,45 @@ describe('dispatchTerminalNotification', () => {
     expect(mockState.markTerminalPaneUnread).not.toHaveBeenCalled()
   })
 
+  // Why (ORCA-1129 D6): the alert read "Using AskUserQuestion" and its click left the Inbox closed.
+  it('sends the question an agent asks and opens the Inbox on click', () => {
+    const asking = {
+      state: 'waiting' as const,
+      prompt: 'Run home',
+      agentType: 'claude' as const,
+      toolName: 'AskUserQuestion',
+      interactivePrompt: JSON.stringify({
+        questions: [{ question: 'Merge #923 now?', options: [{ label: 'Now' }] }]
+      })
+    }
+    const stored = makeAgentStatus(paneKey, { ...asking, terminalTitle: 'claude' })
+    mockState.agentStatusByPaneKey = { [paneKey]: stored }
+
+    dispatchTerminalNotification('wt-primary', {
+      source: 'agent-task-complete',
+      terminalTitle: 'claude',
+      paneKey,
+      agentStatusSnapshot: { ...asking, stateStartedAt: stored.stateStartedAt }
+    })
+
+    expect(getLastNotificationDispatchArg()).toMatchObject({
+      agentQuestion: 'Merge #923 now?',
+      gameInbox: { environmentId: null, worktreeId: 'wt-primary' }
+    })
+  })
+
+  it('sends no question for a finished turn, so its click focuses the terminal', () => {
+    dispatchTerminalNotification('wt-primary', {
+      source: 'agent-task-complete',
+      terminalTitle: 'codex',
+      paneKey
+    })
+
+    const sent = getLastNotificationDispatchArg()
+    expect(sent).not.toHaveProperty('agentQuestion')
+    expect(sent).not.toHaveProperty('gameInbox')
+  })
+
   it('uses a fresh hook snapshot when inactive PTY liveness has not caught up', () => {
     mockState.ptyIdsByTabId = {}
 

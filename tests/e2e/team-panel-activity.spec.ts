@@ -344,6 +344,8 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(tab).toContainText('1')
     await expect(panel).toContainText(QUESTION)
+    // ORCA-1129 D5: V28's options are buttons that answer, not text.
+    await expect(panel.getByRole('button', { name: 'At release', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: copy.openTerminal })).toBeVisible()
   })
   await panel.getByRole('tab', { name: COPY.en.activity }).click()
