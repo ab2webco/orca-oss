@@ -75,7 +75,7 @@ function AgentDashboardDrawerBody({
       initialView="grid"
       // Why: bg-transparent lets the sheet's worktree-sidebar surface through
       // so the board reads as the same companion panel as the workspace board.
-      containerClassName="h-full w-full bg-transparent"
+      containerClassName="h-full w-full bg-transparent [--agent-board-surface:var(--worktree-sidebar)]"
       onAckAgent={handleAckAgent}
       onRevealAgent={handleRevealAgent}
       onSpawnAgent={launchDashboardAgent}
