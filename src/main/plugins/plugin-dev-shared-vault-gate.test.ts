@@ -133,7 +133,11 @@ describe('PluginService on a dev profile with a linked vault', () => {
     const list = await buildPluginList(service, emptyPluginLockfile())
     expect(list.find((entry) => entry.pluginKey === 'orca-samples.spawner')).toMatchObject({
       status: 'errored',
-      error: DEV_SHARED_VAULT_WORKER_BLOCK_REASON
+      error: DEV_SHARED_VAULT_WORKER_BLOCK_REASON,
+      blockedByDevSharedVault: true
     })
+    expect(list.find((entry) => entry.pluginKey === 'orca-samples.plain')).not.toHaveProperty(
+      'blockedByDevSharedVault'
+    )
   })
 })
