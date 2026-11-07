@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isHttpUrl } from '../../../../shared/orchestrator-game-integrations'
+import { GAME_PANEL_TABS } from '../../../../shared/orchestrator-game-panel'
 import {
   ORCHESTRATOR_GAME_VIEWS,
   ORCHESTRATOR_GAME_VIEW_SCOPES
@@ -27,6 +28,12 @@ const GameStateParams = z
 const GameSetViewParams = z.object({
   view: z.enum(ORCHESTRATOR_GAME_VIEWS.map((view) => view.id)),
   scope: z.enum(ORCHESTRATOR_GAME_VIEW_SCOPES),
+  worktreeId: z.string().optional(),
+  terminalHandle: z.string().optional()
+})
+
+const GameHidePanelTabParams = z.object({
+  tab: z.enum(GAME_PANEL_TABS),
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional()
 })
@@ -160,6 +167,16 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       runtime.setOrchestratorGameView({
         view: params.view,
         scope: params.scope,
+        worktreeId: params.worktreeId,
+        terminalHandle: params.terminalHandle
+      })
+  }),
+  defineMethod({
+    name: 'game.hidePanelTab',
+    params: GameHidePanelTabParams,
+    handler: async (params, { runtime }) =>
+      runtime.hideOrchestratorGamePanelTab({
+        tab: params.tab,
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle
       })

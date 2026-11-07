@@ -4,6 +4,7 @@ import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../sha
 import type { SettingsSearchEntry } from './settings-search'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { getRepositoryGitAuthorSearchEntries } from './repository-git-author-search-entries'
 import { getRepositoryGitHooksSearchEntries } from './repository-git-hooks-search-entries'
 import { getRepositoryGitWorktreeSearchEntries } from './repository-git-worktree-search-entries'
@@ -187,6 +188,10 @@ export function getRepositoryPaneSearchEntries(
     },
     ...(isFolder
       ? []
-      : [...getRepositoryGitAuthorSearchEntries(repo), ...getRepositoryGitHooksSearchEntries(repo)])
+      : [
+          ...getRepositoryGitAuthorSearchEntries(repo),
+          ...getRepositoryGitHooksSearchEntries(repo)
+        ]),
+    ...getGamePanelSearchEntries()
   ]
 }

@@ -9,6 +9,7 @@ import {
   resolveOrchestratorGameIntegrations,
   resolveOrchestratorGameRewardWeights
 } from '../../shared/orchestrator-game-config'
+import { resolveOrchestratorGamePanel } from '../../shared/orchestrator-game-panel-layers'
 import { gameLeadOverPairedHostsOf } from './orchestrator-game-paired-hosts'
 import { builtInGameActivityRules, gameActivityOf } from '../../shared/orchestrator-game-activity'
 import { compileGameActivityRule } from '../../shared/orchestrator-game-integrations'
@@ -73,7 +74,8 @@ export async function buildOrchestratorGameState(
     openOwnerQuestions,
     githubBudget,
     merges,
-    metrics
+    metrics,
+    arcade
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -87,7 +89,8 @@ export async function buildOrchestratorGameState(
     leadOnly(readOpenOwnerQuestions),
     readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
     leadOnly(input.readMerges),
-    leadOnly(readMetrics && (() => readMetrics(timezone)))
+    leadOnly(readMetrics && (() => readMetrics(timezone))),
+    leadOnly(input.readArcade)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -124,7 +127,8 @@ export async function buildOrchestratorGameState(
   const actions = gameStateActionsOf({
     role,
     lead: placed.lead,
-    project: gameActionsOf(integrations.actions, placeholders)
+    project: gameActionsOf(integrations.actions, placeholders),
+    orca: integrations.orcaActions
   })
   const workPrompt = integrations.todo === 'off' ? undefined : integrations.todo?.workPrompt
   const listActions = gameListActionsOf(actions, {
@@ -192,6 +196,7 @@ export async function buildOrchestratorGameState(
     agents,
     ...placed,
     rewardWeights: resolveOrchestratorGameRewardWeights(layers),
+    panel: resolveOrchestratorGamePanel(layers),
     role,
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
     ...(suggested ? { suggestedView: suggested } : {}),
@@ -211,6 +216,7 @@ export async function buildOrchestratorGameState(
     ...(projectState ? { project: projectState } : {}),
     ...(githubBudget ? { githubBudget } : {}),
     ...(merges ? { merges } : {}),
+    ...(arcade ? { arcade } : {}),
     ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')

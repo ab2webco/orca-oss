@@ -88,6 +88,7 @@ function isRuntimeClientEvent(
     message.type === 'worktreesChanged' ||
     message.type === 'gameOwnerQuestionsChanged' ||
     message.type === 'gameInboxChanged' ||
+    message.type === 'gameAdvisorChanged' ||
     message.type === 'nativeChatLaunchDraftResolved' ||
     message.type === 'terminalSideEffects' ||
     message.type === 'sshStateChanged' ||

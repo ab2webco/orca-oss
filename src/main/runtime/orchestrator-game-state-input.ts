@@ -23,6 +23,7 @@ import type {
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
 import type { GameMerge } from '../../shared/orchestrator-game-events'
+import type { GameArcadeCredits } from '../../shared/orchestrator-game-arcade-credits'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
@@ -94,6 +95,8 @@ export type OrchestratorGameStateInput = {
   readOpenOwnerQuestions?: () => Promise<number>
   /** The members' latest recorded merges; read only for a lead. */
   readMerges?: () => Promise<GameMerge[]>
+  /** The project's saved arcade plays; read only for a lead. */
+  readArcade?: () => Promise<GameArcadeCredits | null>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */

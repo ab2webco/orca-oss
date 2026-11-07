@@ -62,6 +62,41 @@
       "menuBarIcon": {
         "title": "Show Menu Bar Icon",
         "description": "Keep an Orca Lab shortcut and activity indicator in the macOS menu bar."
+      },
+      "statusColors": {
+        "title": "Status colors",
+        "description": "Each color keeps its meaning in every project. Light and dark have their own.",
+        "themeLabel": "Theme to edit",
+        "themeLight": "Light",
+        "themeDark": "Dark",
+        "reset": "Reset",
+        "resetLabel": "Reset status colors",
+        "pickerLabel": "{{value0}} color",
+        "tooClose": "Too close to {{value0}}",
+        "lowContrast": "Low contrast",
+        "keywordColor": "color",
+        "keywordStatus": "status",
+        "keywordContrast": "contrast",
+        "attention": {
+          "name": "Needs you",
+          "meaning": "Needs you, or something failed."
+        },
+        "warning": {
+          "name": "At risk",
+          "meaning": "Does not need you yet."
+        },
+        "info": {
+          "name": "Working",
+          "meaning": "An agent is on it now."
+        },
+        "success": {
+          "name": "Verified",
+          "meaning": "Done and checked."
+        },
+        "idle": {
+          "name": "Idle",
+          "meaning": "No activity, or no data."
+        }
       }
     }
   },
@@ -4827,7 +4862,9 @@
           "cli": "Orca Lab CLI",
           "planeWorkItems": "Plane work items",
           "planeWorkItem": "Plane work item",
-          "showSection": "Show"
+          "showSection": "Show",
+          "account": "Account",
+          "model": "Model and effort"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -11517,6 +11554,31 @@
           "view": "Default view",
           "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
           "viewDescription": "How panes draw the game, with what it costs. Each project can change it, and one pane with /orca-game:view."
+        },
+        "OrchestratorGamePanelSetting": {
+          "advisor": "Advisor",
+          "advisorDescription": "Row under the lead. Shows only when the plugin is installed.",
+          "arcade": "Arcade",
+          "arcadeDescription": "A perfect merge saves a game.",
+          "description": "The right sidebar panel for your agents. Each project can change it in its own settings.",
+          "look": "Panel look",
+          "lookDescription": "Same data and actions in all three.",
+          "lookDisplay": "Display",
+          "lookGame": "Game",
+          "lookPlain": "Plain",
+          "machines": "Machines",
+          "machinesDescription": "Tab with the hosts and their memory.",
+          "prs": "PRs",
+          "prsDescription": "Tab with your open PRs.",
+          "queue": "Queue",
+          "queueDescription": "Tab with the merge queue.",
+          "show": "Show {{label}}",
+          "style": "Scene style",
+          "styleDescription": "They all act out the same real state.",
+          "styleFigures": "Figures",
+          "styleOffice": "Office",
+          "stylePixel": "Pixel",
+          "title": "Panel"
         }
       },
       "right": {
@@ -16273,24 +16335,14 @@
         "restartNow": "Restart now"
       },
       "game-inbox": {
-        "GameInboxSheet": {
-          "title": "Inbox",
-          "description": "What the lead asked you, what waits on it, and how it talks with each member.",
-          "forYou": "For you",
-          "empty": "No questions are waiting for you.",
-          "waiting": "Waiting",
-          "threads": "Threads",
-          "answered": "Answered",
-          "answerInstead": "Answer instead of the lead"
-        },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
           "yourAnswer": "Your answer",
           "placeholder": "Answer in your own words",
-          "send": "Send"
+          "send": "Send",
+          "needsYou": "Needs you"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Inbox",
           "noWorktree": "Open this project in Orca to answer."
         },
         "GameInboxKindTag": {
@@ -16317,7 +16369,9 @@
           "failed": "Failed",
           "back": "All threads",
           "empty": "No member has talked with the lead yet.",
-          "waiting": "{{count}} waiting"
+          "waiting": "{{count}} waiting",
+          "messageOne": "1 message",
+          "messageMany": "{{count}} messages"
         },
         "GameMemberReplyForm": {
           "failed": "The reply was not sent.",
@@ -16328,6 +16382,26 @@
         },
         "GameInboxUndelivered": {
           "title": "Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it."
+        }
+      },
+      "team-scene": {
+        "team-scene-copy": {
+          "label": "Live team scene",
+          "leadAsks": "Waiting for you · {{question}}",
+          "leadDone": "Done, nothing pending"
+        }
+      },
+      "game-arcade": {
+        "ArcadeTab": {
+          "title": "Arcade",
+          "canvasLabel": "Arcade game",
+          "score": "{{score}} pts",
+          "scoreOne": "1 pt",
+          "hint": "Space or tap to jump",
+          "held": "Paused · someone needs you",
+          "over": "Game over · {{score}} pts",
+          "overOne": "Game over · 1 pt",
+          "overHint": "Space or tap to go back to Claude"
         }
       }
     },
@@ -17006,6 +17080,223 @@
     "confirmReleaseAll": {
       "title": "Release {{value0}} resume records?",
       "description": "Orca Lab will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected."
+    }
+  },
+  "teamPanel": {
+    "leadWork": {
+      "sent": "Sent to the lead: {{label}}",
+      "failed": "Could not send {{label}}"
+    },
+    "queue": {
+      "checks": "In checks",
+      "waiting": "In queue",
+      "failed": "Failed",
+      "longWait": "For {{hours}} h"
+    },
+    "prs": {
+      "reason": {
+        "checksFailed": "Check failed",
+        "checksUnknown": "CI unknown",
+        "conflict": "Conflict",
+        "inReview": "In review",
+        "ready": "Ready",
+        "draft": "Draft",
+        "merged": "Merged",
+        "closed": "Closed"
+      },
+      "viewAll": "View all {{count}}",
+      "providerFailed": "The provider did not answer. It retries on its own.",
+      "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
+    },
+    "machines": {
+      "offline": "Offline",
+      "lowMemory": "Low memory",
+      "free": "Free",
+      "running": "{{count}} agents",
+      "runningOne": "1 agent",
+      "runningOfCap": "{{count}} of {{cap}} agents",
+      "memoryUsed": "Memory used {{percent}}%",
+      "memoryFree": "{{free}} of {{total}} GB free"
+    },
+    "activityBar": {
+      "teamTitle": "Team",
+      "noTeamTitle": "Your work"
+    },
+    "arcade": {
+      "label": "Arcade",
+      "offerTitle": "Perfect merge of #{{pr}}",
+      "offerText": "You won a play. It stays saved until you want it.",
+      "play": "Play",
+      "keep": "Keep",
+      "savedOne": "1 saved play",
+      "savedMany": "{{count}} saved plays",
+      "failed": "Could not reach the host for your saved play"
+    },
+    "header": {
+      "title": "Team",
+      "noTeamTitle": "Your work",
+      "projectSettings": "Project settings",
+      "panelSettings": "Panel settings"
+    },
+    "state": {
+      "loading": "Loading",
+      "unavailableText": "This Orca host does not publish it yet.",
+      "modelErrorTitle": "Could not read the team",
+      "modelErrorText": "Orca is not responding in this project. Try again.",
+      "modelUnavailableTitle": "Team data is not available",
+      "retry": "Try again"
+    },
+    "tabs": {
+      "label": "Panel sections",
+      "team": {
+        "title": "Team",
+        "emptyTitle": "No agents yet",
+        "emptyText": "Launch one from a ticket and it shows here.",
+        "viewTasks": "View tasks",
+        "errorTitle": "Could not read the team"
+      },
+      "activity": {
+        "title": "Activity",
+        "emptyTitle": "No agents running",
+        "emptyText": "Start an agent in any workspace and it shows here.",
+        "errorTitle": "Could not read your sessions"
+      },
+      "inbox": {
+        "title": "Inbox",
+        "emptyTitle": "Nothing waits for you",
+        "emptyText": "When an agent asks you something, it shows here.",
+        "errorTitle": "Could not read the inbox"
+      },
+      "prs": {
+        "title": "PRs",
+        "emptyTitle": "No open pull requests",
+        "emptyText": "They show here when an agent opens one.",
+        "errorTitle": "Could not read pull requests"
+      },
+      "queue": {
+        "title": "Queue",
+        "emptyTitle": "The queue is empty",
+        "emptyText": "Each pull request shows here in order until it merges.",
+        "errorTitle": "Could not read the queue",
+        "unavailableTitle": "No merge queue to show",
+        "unavailableText": "This project has no merge queue, or its provider or host does not publish one."
+      },
+      "machines": {
+        "title": "Machines",
+        "emptyTitle": "Only this machine",
+        "emptyText": "Pair another machine to spread agents across hosts.",
+        "errorTitle": "Could not read the machines"
+      }
+    },
+    "condition": {
+      "working": "Working",
+      "waiting": "Waiting for you",
+      "idle": "Idle",
+      "done": "Done",
+      "starting": "Starting",
+      "queued": "Queued",
+      "paused": "Paused",
+      "asleep": "Asleep",
+      "limited": "Usage limit reached",
+      "loggedOut": "Logged out",
+      "unreachable": "Host unreachable",
+      "gone": "Session closed",
+      "startFailed": "Failed to start"
+    },
+    "phase": {
+      "plan": "Planning",
+      "docs": "Documenting",
+      "code": "Coding",
+      "tests": "Testing",
+      "pr": "In PR",
+      "merge": "Merging"
+    },
+    "host": {
+      "local": "local"
+    },
+    "card": {
+      "merged": "Merged",
+      "ciFailed": "CI failing",
+      "ciRunning": "CI running",
+      "ciPassed": "CI green",
+      "answerInInbox": "Answer in Inbox",
+      "waitingForAnswer": "Waiting for your answer",
+      "openTerminal": "Open terminal"
+    },
+    "activity": {
+      "prompt": "Prompt",
+      "now": "Now",
+      "question": "Question",
+      "last": "Final",
+      "model": "Model",
+      "effortPinned": "Effort pinned",
+      "modelPinned": "Model pinned",
+      "change": "Change",
+      "account": "Account",
+      "cache": "Cache",
+      "pr": "PR",
+      "ticket": "Ticket",
+      "ports": "Ports",
+      "notes": "Notes",
+      "needsYou": "Needs you",
+      "otherSessions": "Other sessions",
+      "countNeedsYou_one": "{{count}} needs you",
+      "countNeedsYou_other": "{{count}} need you",
+      "countWorking": "{{count}} working",
+      "countDone_one": "{{count}} done",
+      "countDone_other": "{{count}} done",
+      "agent": "Agent"
+    },
+    "lead": {
+      "badge": "Lead",
+      "coordinatesOne": "Coordinates 1 agent",
+      "coordinatesMany": "Coordinates {{count}} agents",
+      "asksOn": "Waiting for you · Question on {{ticket}}",
+      "asks": "Waiting for you"
+    },
+    "advisor": {
+      "label": "Advisor",
+      "source": "Jev",
+      "name": "Wizard"
+    },
+    "xp": {
+      "level": "Lv {{level}}",
+      "progress": "{{into}}/{{need}} XP"
+    },
+    "stopped": {
+      "by": "Stopped by {{by}}",
+      "plain": "Stopped"
+    },
+    "open": {
+      "failed": "Could not open {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Waiting for you"
+    },
+    "inbox": {
+      "sections": "Inbox sections",
+      "forYou": "For you",
+      "waiting": "Waiting",
+      "threads": "Threads",
+      "answered": "Answered",
+      "thisProject": "this project",
+      "projectUnread": "Could not read this project's questions.",
+      "forYouEmpty": "No questions are waiting for you.",
+      "yourAnswer": "Your answer",
+      "openTerminal": "Open terminal",
+      "youAnswered": "You answered",
+      "youAnsweredText": "You answered: {{text}}",
+      "leadAnswered": "The lead answered",
+      "waitingEmpty": "No member is waiting for an answer.",
+      "answeredEmpty": "Nothing answered yet.",
+      "leadAnsweredText": "The lead answered: {{text}}",
+      "answer": "Answer"
+    },
+    "age": {
+      "now": "now",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
     }
   },
   "claudeDeadHooks": {

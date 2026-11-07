@@ -1,16 +1,10 @@
 import React from 'react'
-import { CircleCheck } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { AgentQuestionIcon } from '@/components/AgentQuestionIcon'
-import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
+import { StatusDot, type StatusDotGlyph } from '@/components/StatusDot'
+import type { StatusTone } from '@/components/status-tone'
 
-// Why: shared state-indicator primitive so the dashboard and the sidebar's
-// agent hover share a single state vocabulary. Most states render as a dot;
-// 'working' renders a spinner. 'done' intentionally diverges from the
-// sidebar's StatusIndicator: the dashboard uses a check icon so completion
-// is visually distinct from 'idle' (grey dot) and the sidebar's 'active'
-// (emerald dot), while the sidebar collapses 'done'/'active' to the same
-// emerald dot and relies on a tooltip. It sits next to the agent icon
+// Why: agent rows and terminal tabs draw through the shared StatusDot so they
+// speak the same colour language as the sidebar. 'done' keeps a check glyph so
+// it scans apart from the idle dot in long lists. It sits next to the agent icon
 // (Claude/Codex/etc.) — two distinct glyphs: one for *who* (agent icon) and
 // one for *what state* (this indicator). Keeping them separate keeps each
 // scannable instead of fused into one decorated icon.
@@ -54,6 +48,17 @@ export function agentStateLabel(state: AgentDotState): string {
   }
 }
 
+const PRESENTATION: Record<AgentDotState, { tone: StatusTone; glyph: StatusDotGlyph }> = {
+  working: { tone: 'info', glyph: 'spinner' },
+  blocked: { tone: 'attention', glyph: 'dot' },
+  waiting: { tone: 'attention', glyph: 'question' },
+  interrupted: { tone: 'attention', glyph: 'dot' },
+  failed: { tone: 'attention', glyph: 'dot' },
+  done: { tone: 'success', glyph: 'check' },
+  idle: { tone: 'idle', glyph: 'dot' },
+  permission: { tone: 'attention', glyph: 'question' }
+}
+
 type Props = {
   state: AgentDotState
   size?: 'sm' | 'md'
@@ -66,61 +71,17 @@ export const AgentStateDot = React.memo(function AgentStateDot({
   size = 'sm',
   className
 }: Props): React.JSX.Element {
-  const box = size === 'md' ? 'h-3 w-3' : 'h-2.5 w-2.5'
-  const inner = size === 'md' ? 'size-2' : 'size-1.5'
-  const icon = size === 'md' ? 'size-3' : 'size-2.5'
-
-  if (state === 'working') {
-    return (
-      <span
-        className={cn('inline-flex shrink-0 items-center justify-center', box, className)}
-        aria-label={agentStateLabel(state)}
-      >
-        <AgentWorkingSpinner className={inner} />
-      </span>
-    )
-  }
-
-  if (state === 'done') {
-    // Why: the dashboard lists many agents, so a check glyph scans well for
-    // agent-reported completion and keeps 'done' visually distinct from
-    // 'idle' and other dot states at a glance. The sidebar's StatusIndicator
-    // intentionally diverges (emerald dot + tooltip) — see file header.
-    return (
-      <span
-        className={cn('inline-flex shrink-0 items-center justify-center', box, className)}
-        aria-label={agentStateLabel(state)}
-      >
-        <CircleCheck className={cn('text-emerald-500', icon)} aria-hidden="true" />
-      </span>
-    )
-  }
-
-  if (state === 'permission' || state === 'waiting') {
-    return (
-      <span
-        className={cn('inline-flex shrink-0 items-center justify-center', box, className)}
-        aria-label={agentStateLabel(state)}
-      >
-        <AgentQuestionIcon className={icon} />
-      </span>
-    )
-  }
-
+  const { tone, glyph } = PRESENTATION[state]
   return (
-    <span
-      className={cn('inline-flex shrink-0 items-center justify-center', box, className)}
+    <StatusDot
+      tone={tone}
+      glyph={glyph}
+      // Why: idle stays the faded grey it always was; the dashboard has no
+      // separate quiet-but-open state.
+      faded={state === 'idle'}
+      size={size}
+      className={className}
       aria-label={agentStateLabel(state)}
-    >
-      <span
-        className={cn(
-          'block rounded-full',
-          inner,
-          state === 'blocked' || state === 'interrupted' || state === 'failed'
-            ? 'bg-red-500'
-            : 'bg-neutral-500/40'
-        )}
-      />
-    </span>
+    />
   )
 })

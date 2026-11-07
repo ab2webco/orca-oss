@@ -62,6 +62,33 @@ function renderRow(agent: DashboardAgentRowData, label?: string): string {
   )
 }
 
+function renderLeadRow(isGameLead: boolean): string {
+  return renderToStaticMarkup(
+    <TooltipProvider>
+      <DashboardAgentRow
+        agent={makeAgent()}
+        onDismiss={vi.fn()}
+        onActivate={vi.fn()}
+        now={NOW}
+        hideIdentityIcon
+        hideExpand
+        isGameLead={isGameLead}
+      />
+    </TooltipProvider>
+  )
+}
+
+describe('DashboardAgentRow game lead', () => {
+  it("crowns the project's live game lead", () => {
+    expect(renderLeadRow(true)).toContain('data-game-lead-crown')
+    expect(renderLeadRow(true)).toContain('aria-label="Lead"')
+  })
+
+  it('draws no crown on any other agent', () => {
+    expect(renderLeadRow(false)).not.toContain('data-game-lead-crown')
+  })
+})
+
 function renderSendTargetRow(
   props: Pick<
     ComponentProps<typeof DashboardAgentRow>,
@@ -279,7 +306,7 @@ describe('DashboardAgentRow', () => {
     const tokens = classTokens(markup)
 
     expect(markup).toContain('aria-label="Blocked"')
-    expect(tokens).toContain('bg-red-500')
+    expect(tokens).toContain('bg-status-attention')
     expect(tokens).not.toContain('bg-amber-500')
   })
 
@@ -336,7 +363,7 @@ describe('DashboardAgentRow', () => {
     // on the response line so it does not compete with the user's prompt.
     expect(markup).toContain('data-slot="tooltip-trigger"')
     expect(markup).toContain('aria-label="Interrupted by user"')
-    expect(markup).toContain('bg-red-500')
+    expect(markup).toContain('bg-status-attention')
     expect(markup).not.toContain('data-slot="badge"')
     expect(interruptedIndex).toBeGreaterThan(promptIndex)
     expect(markup).not.toContain('lucide-circle-check')

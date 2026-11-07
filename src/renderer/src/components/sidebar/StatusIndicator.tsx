@@ -1,7 +1,6 @@
 import React from 'react'
-import { cn } from '@/lib/utils'
-import { AgentQuestionIcon } from '@/components/AgentQuestionIcon'
-import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
+import { StatusDot, type StatusDotGlyph } from '@/components/StatusDot'
+import type { StatusTone } from '@/components/status-tone'
 import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
 
 // Why: re-export WorktreeStatus under the existing `Status` alias so the
@@ -14,62 +13,34 @@ type StatusIndicatorProps = React.ComponentProps<'span'> & {
   status: Status
 }
 
+// Why: 'active' (terminal open, quiet) is idle, not done, so it no longer
+// shares the done green; it differs from 'inactive' only by fill.
+const PRESENTATION: Record<Status, { tone: StatusTone; glyph: StatusDotGlyph; faded?: boolean }> = {
+  working: { tone: 'info', glyph: 'spinner' },
+  permission: { tone: 'attention', glyph: 'question' },
+  done: { tone: 'success', glyph: 'dot' },
+  active: { tone: 'idle', glyph: 'dot' },
+  inactive: { tone: 'idle', glyph: 'dot', faded: true }
+}
+
 const StatusIndicator = React.memo(function StatusIndicator({
   status,
-  className,
   title,
   ...rest
 }: StatusIndicatorProps) {
-  // Why: surface the status label as a native tooltip so hovering the dot
-  // reveals the state — matters especially for 'active' vs 'done', which
-  // share the same emerald dot. Callers pass aria-hidden="true" alongside
-  // an sr-only label, so the `title` attribute is ignored by AT and only
-  // serves sighted users on hover. Callers can override by passing their
-  // own `title`.
-  const resolvedTitle = title ?? getWorktreeStatusLabel(status)
-
-  if (status === 'working') {
-    return (
-      <span
-        className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
-        title={resolvedTitle}
-        {...rest}
-      >
-        <AgentWorkingSpinner className="size-2" />
-      </span>
-    )
-  }
-
-  if (status === 'permission') {
-    return (
-      <span
-        className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
-        title={resolvedTitle}
-        {...rest}
-      >
-        <AgentQuestionIcon className="size-3" />
-      </span>
-    )
-  }
-
+  // Why: native tooltip names the state for sighted users; callers pair
+  // aria-hidden with an sr-only label, so AT ignores it.
+  // Why: an unknown value (stale or newer producer) drew grey before; never crash the row.
+  const { tone, glyph, faded } = PRESENTATION[status] ?? PRESENTATION.inactive
   return (
-    <span
-      className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
-      title={resolvedTitle}
+    <StatusDot
+      tone={tone}
+      glyph={glyph}
+      faded={faded}
+      size="md"
+      title={title ?? getWorktreeStatusLabel(status)}
       {...rest}
-    >
-      <span
-        className={cn(
-          'block size-2 rounded-full',
-          status === 'done' || status === 'active'
-            ? // Green dot for both hook-reported 'done' and the heuristic
-              // 'active' (terminal open, quiet). Working uses a yellow
-              // ring above; 'inactive' stays grey.
-              'bg-emerald-500'
-            : 'bg-neutral-500/40'
-        )}
-      />
-    </span>
+    />
   )
 })
 

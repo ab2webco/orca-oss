@@ -321,6 +321,29 @@ describe('game.memberNameReserve RPC', () => {
   })
 })
 
+describe('game.hidePanelTab RPC', () => {
+  it('hides a known tab and refuses anything else', async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      hideOrchestratorGamePanelTab: async (args: unknown) => {
+        calls.push(args)
+        return { tab: 'prs', changed: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const hide = (params: unknown) =>
+      dispatcher.dispatch({ id: 't', authToken: 'test', method: 'game.hidePanelTab', params })
+
+    await expect(hide({ tab: 'prs', worktreeId: 'w1' })).resolves.toMatchObject({
+      ok: true,
+      result: { tab: 'prs', changed: true }
+    })
+    await expect(hide({ tab: 'team' })).resolves.toMatchObject({ ok: false })
+    expect(calls).toEqual([{ tab: 'prs', worktreeId: 'w1', terminalHandle: undefined }])
+  })
+})
+
 describe('game.setView RPC', () => {
   it('stores a known view for a known scope and refuses anything else', async () => {
     const calls: unknown[] = []

@@ -408,6 +408,8 @@ describe('AgentsPane', () => {
 
   it('includes awake and sleep search metadata for the setting', () => {
     expect(matchesSettingsSearch('awake', getAgentsPaneSearchEntries())).toBe(true)
+    expect(matchesSettingsSearch('panel look', getAgentsPaneSearchEntries())).toBe(true)
+    expect(matchesSettingsSearch('machines', getAgentsPaneSearchEntries())).toBe(true)
     expect(matchesSettingsSearch('sleep', getAgentsPaneSearchEntries())).toBe(true)
     expect(matchesSettingsSearch('lid', getAgentsPaneSearchEntries())).toBe(true)
   })

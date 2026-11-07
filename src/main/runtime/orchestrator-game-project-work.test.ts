@@ -27,12 +27,209 @@ const port = (overrides: Partial<GameProjectWorkPort>): GameProjectWorkPort => (
   githubPullRequests: unused,
   githubChecks: unused,
   githubIssues: unused,
+  githubMergeable: async () => new Map(),
+  githubMergeQueue: async () => null,
+  githubBudgetLow: async () => false,
   gitlabMergeRequests: async () => null,
   gitlabIssues: unused,
   planeAssigned: unused,
   jiraSearch: unused,
   linearAssigned: unused,
   ...overrides
+})
+
+describe('readGameProjectWork queue', () => {
+  const github: Partial<GameProjectWorkPort> = {
+    githubRepo: async () => ({ owner: 'ab2webco', repo: 'orca-oss' }),
+    githubPullRequests: async () => ({ repos: [], items: [] }),
+    githubIssues: async () => []
+  }
+  const queueOf = async (over: Partial<GameProjectWorkPort>) =>
+    (await readGameProjectWork(port(over), { todo: 'off', workItem: null })).queue
+
+  it('carries the entries of a repo with a merge queue', async () => {
+    const entry = {
+      id: '#1',
+      title: 'PR',
+      url: 'u/1',
+      position: 1,
+      state: 'waiting' as const,
+      since: null
+    }
+
+    expect(await queueOf({ ...github, githubMergeQueue: async () => [entry] })).toEqual({
+      provider: 'github',
+      entries: [entry]
+    })
+  })
+
+  it('keeps an empty queue apart from no queue', async () => {
+    expect(await queueOf({ ...github, githubMergeQueue: async () => [] })).toEqual({
+      provider: 'github',
+      entries: []
+    })
+    expect(await queueOf({ ...github, githubMergeQueue: async () => null })).toBeUndefined()
+  })
+
+  it('says the read failed rather than that nothing waits', async () => {
+    expect(await queueOf({ ...github, githubMergeQueue: unused })).toEqual({
+      provider: 'github',
+      entries: null
+    })
+  })
+
+  it('spends nothing while the GitHub budget is low', async () => {
+    let reads = 0
+    const queue = await queueOf({
+      ...github,
+      githubBudgetLow: async () => true,
+      githubMergeQueue: async () => {
+        reads += 1
+        return []
+      }
+    })
+
+    expect(queue).toBeUndefined()
+    expect(reads).toBe(0)
+  })
+
+  it('still reads the queue when the budget itself cannot be read', async () => {
+    const queue = await queueOf({
+      ...github,
+      githubBudgetLow: unused,
+      githubMergeQueue: async () => []
+    })
+
+    expect(queue).toEqual({ provider: 'github', entries: [] })
+  })
+
+  it('never asks GitHub for the queue of a repo without a GitHub remote', async () => {
+    let reads = 0
+    const queue = await queueOf({
+      gitlabIssues: async () => [],
+      githubMergeQueue: async () => {
+        reads += 1
+        return []
+      }
+    })
+
+    expect(queue).toBeUndefined()
+    expect(reads).toBe(0)
+  })
+})
+
+describe('readGameProjectWork review blocks', () => {
+  const repo = { owner: 'ab2webco', repo: 'orca-oss' }
+  const github = (
+    items: { number: number; state?: 'open' | 'draft'; prRepo?: GitHubRepositoryIdentity }[]
+  ): Partial<GameProjectWorkPort> => ({
+    githubRepo: async () => repo,
+    githubPullRequests: async () => ({
+      repos: [repo],
+      items: items.map((one) => ({
+        ...one,
+        title: `PR ${one.number}`,
+        url: `https://github.com/ab2webco/orca-oss/pull/${one.number}`
+      }))
+    }),
+    githubChecks: async () => [check('success')],
+    githubIssues: async () => []
+  })
+  const blocksOf = async (over: Partial<GameProjectWorkPort>) => {
+    const work = await readGameProjectWork(port(over), { todo: 'off', workItem: null })
+    return work.reviews?.items.map((one) => [one.id, one.reviewBlock])
+  }
+
+  it('marks a conflict over a draft, and a draft from the list', async () => {
+    const blocks = await blocksOf({
+      ...github([{ number: 1 }, { number: 2, state: 'draft' }, { number: 3, state: 'draft' }]),
+      githubMergeable: async () =>
+        new Map([
+          [1, 'CONFLICTING'],
+          [2, 'MERGEABLE'],
+          [3, 'CONFLICTING']
+        ])
+    })
+
+    expect(blocks).toEqual([
+      ['#1', 'conflict'],
+      ['#2', 'draft'],
+      ['#3', 'conflict']
+    ])
+  })
+
+  it('asks once per repo, and only for the PRs it keeps', async () => {
+    const asked: [string, number[]][] = []
+    const upstream = { owner: 'stablyai', repo: 'orca' }
+    await blocksOf({
+      ...github([
+        ...Array.from({ length: 6 }, (_, at) => ({ number: at + 1 })),
+        { number: 9, prRepo: upstream }
+      ]),
+      githubMergeable: async (prRepo, numbers) => {
+        asked.push([prRepo?.repo ?? 'own', [...numbers]])
+        return new Map()
+      }
+    })
+
+    expect(asked).toEqual([['own', [1, 2, 3, 4, 5]]])
+  })
+
+  it('splits the read when a fork and its upstream are both kept', async () => {
+    const asked: [string, number[]][] = []
+    const upstream = { owner: 'stablyai', repo: 'orca' }
+    await blocksOf({
+      ...github([{ number: 1 }, { number: 2, prRepo: upstream }]),
+      githubMergeable: async (prRepo, numbers) => {
+        asked.push([prRepo?.repo ?? 'own', [...numbers]])
+        return new Map()
+      }
+    })
+
+    expect(asked).toEqual([
+      ['own', [1]],
+      ['orca', [2]]
+    ])
+  })
+
+  it('costs only the block when the conflict read fails', async () => {
+    const blocks = await blocksOf({
+      ...github([{ number: 1 }, { number: 2, state: 'draft' }]),
+      githubMergeable: unused
+    })
+
+    expect(blocks).toEqual([
+      ['#1', undefined],
+      ['#2', 'draft']
+    ])
+  })
+
+  it('reads a GitLab block from the list, with no CI', async () => {
+    const mr = (number: number, over: object) => ({
+      number,
+      title: `MR ${number}`,
+      url: `https://gitlab.com/g/p/-/merge_requests/${number}`,
+      state: 'opened' as const,
+      ...over
+    })
+    const work = await readGameProjectWork(
+      port({
+        gitlabMergeRequests: async () => [
+          mr(1, { mergeable: 'CONFLICTING' }),
+          mr(2, { state: 'draft' }),
+          mr(3, { mergeable: 'MERGEABLE' })
+        ],
+        gitlabIssues: async () => []
+      }),
+      { todo: 'off', workItem: null }
+    )
+
+    expect(work.reviews?.items.map((one) => [one.id, one.reviewBlock, one.status])).toEqual([
+      ['!1', 'conflict', undefined],
+      ['!2', 'draft', undefined],
+      ['!3', undefined, undefined]
+    ])
+  })
 })
 
 describe('readGameProjectWork', () => {

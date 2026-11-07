@@ -93,6 +93,12 @@ function ThreadMessages({ thread }: { thread: GameInboxThread }): React.JSX.Elem
   )
 }
 
+// Why: members prefix subjects with their ticket, which the row already names.
+const subjectWithoutTicket = (subject: string, ticket: string): string =>
+  subject.toUpperCase().startsWith(`${ticket.toUpperCase()}:`)
+    ? subject.slice(ticket.length + 1).trimStart()
+    : subject
+
 /** Every ticket's conversation with the lead; picking one shows its messages, oldest first. */
 export function GameInboxThreadsView({
   threads
@@ -139,23 +145,25 @@ export function GameInboxThreadsView({
               className="flex w-full min-w-0 flex-col gap-1 rounded-md px-2 py-2 text-left hover:bg-accent"
             >
               <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono text-[13px] font-medium text-foreground">
+                <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap text-foreground">
                   {one.ticket}
                 </span>
-                {one.waiting > 0 ? (
-                  <span className="rounded-full border border-border px-1.5 text-[10px] font-semibold tabular-nums">
-                    {translate(
-                      'auto.components.game-inbox.GameInboxThreadsView.waiting',
-                      '{{count}} waiting',
-                      { count: one.waiting }
-                    )}
-                  </span>
-                ) : null}
-                <span className="ml-auto shrink-0">{formatUiRelativeTimeFromDate(one.last)}</span>
+                <span className="ml-auto min-w-0 truncate tabular-nums">
+                  {one.messages.length === 1
+                    ? translate(
+                        'auto.components.game-inbox.GameInboxThreadsView.messageOne',
+                        '1 message'
+                      )
+                    : translate(
+                        'auto.components.game-inbox.GameInboxThreadsView.messageMany',
+                        '{{count}} messages',
+                        { count: one.messages.length }
+                      )}
+                </span>
               </span>
               {last ? (
                 <span className="truncate text-xs text-muted-foreground">
-                  {last.from}: {last.subject}
+                  {subjectWithoutTicket(last.subject, one.ticket)}
                 </span>
               ) : null}
             </button>

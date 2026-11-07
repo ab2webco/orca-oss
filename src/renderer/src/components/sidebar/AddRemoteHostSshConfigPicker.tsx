@@ -195,7 +195,7 @@ export function AddRemoteHostSshConfigPicker({
                   ) : host.alreadyInOrca ? (
                     <Badge
                       variant="outline"
-                      className="mt-0.5 shrink-0 border-emerald-500/40 text-[10.5px] text-emerald-400"
+                      className="mt-0.5 shrink-0 border-status-success/40 text-[10.5px] text-status-success"
                     >
                       {translate(
                         'auto.components.sidebar.AddRemoteHostDialog.sshConfigPickerInOrca',

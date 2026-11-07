@@ -35,3 +35,75 @@ config/scripts/pr-workflow-upstream-fetch-order.test.mjs # pr.yml fetched upstre
 config/scripts/resolve-changed-code-base.test.mjs # widened a sync PR's base to the upstream tip
 config/scripts/git-pull-request-diff-base.test.mjs # sync-base resolver hook; first-parent cases kept
 config/scripts/git-pull-request-diff-base.repo.test.mjs # sync widening; first-parent cases kept
+
+# ORCA-1053: a perfect merge saves a credit on the host and the panel plays it; the terminal's
+# 15-second offer and its countdown are gone. The unlock suite now pins the no-pane cheer.
+resources/claude-plugins/orca-game/tests/arcade-offer.test.ts # demo offer pane and countdown
+resources/claude-plugins/orca-game/tests/arcade-offer.spec.ts # countdown timer and offer line
+tests/e2e/orca-game-arcade-offer.spec.ts # offer pane counts down and takes j from the prompt
+
+# ORCA-1055: the orca-game mod no longer draws the band, member band, Panel, arcade pane or
+# scene in the terminal; the native Team panel draws them. Cases that only drew those go with them.
+resources/claude-plugins/orca-game/tests/advisor-calls.test.ts # advisor calls acted out in the scene
+resources/claude-plugins/orca-game/tests/allies.test.ts # other plugins' lines in the band's strip
+resources/claude-plugins/orca-game/tests/arcade-practice.test.ts # the terminal arcade pane
+resources/claude-plugins/orca-game/tests/band-layout.test.ts # band rows fitting each width
+resources/claude-plugins/orca-game/tests/cast.test.ts # scene pet and Jev acting in the scene and Panel
+resources/claude-plugins/orca-game/tests/flat-mode.test.ts # the band's and Panel's text-only toggle
+resources/claude-plugins/orca-game/tests/github-low-band.test.ts # low GitHub budget chip on the band
+resources/claude-plugins/orca-game/tests/lead-crown.test.ts # crown on the band's and Panel's hero
+resources/claude-plugins/orca-game/tests/links.test.ts # band and Panel link chips
+resources/claude-plugins/orca-game/tests/member-band-colors.test.ts # member band colors
+resources/claude-plugins/orca-game/tests/member-band.test.ts # member band rows and menu
+resources/claude-plugins/orca-game/tests/panel-band.test.ts # Panel opened from the band
+resources/claude-plugins/orca-game/tests/scene-switch.test.ts # band, spinner and Panel redrawn on a scene switch
+resources/claude-plugins/orca-game/tests/tap-layout.test.ts # phone-width band buttons
+resources/claude-plugins/orca-game/tests/view-panel.test.ts # the Panel's view picker
+# Kept files that lost their band and Panel cases; their command, action and poll cases stay.
+resources/claude-plugins/orca-game/tests/actions.test.ts # action buttons now covered via slash commands
+resources/claude-plugins/orca-game/tests/engine.test.ts # band, Fleet pane and language drawing
+resources/claude-plugins/orca-game/tests/member-advisor.test.ts # the Panel's member and advisor cards
+resources/claude-plugins/orca-game/tests/panel-layout.test.ts # Panel section drawing; /orca-game:layout stays
+resources/claude-plugins/orca-game/tests/render.test.ts # hd scene over the spinner
+resources/claude-plugins/orca-game/tests/windows-cli.test.ts # opening a band link through a .cmd CLI
+# ORCA-1055: E2E specs that drove the terminal band, member band, Panel or scene through a real
+# Claude Code. The pane draws only the text layer now; the native Team panel has its own specs.
+tests/e2e/orchestrator-game-band-push.spec.ts # a pushed fleet change redrawing the band
+tests/e2e/orchestrator-game-band-ghosts.spec.ts # band slots for working members over ghosts
+tests/e2e/orchestrator-game-member-band.spec.ts # member band menu and text toggle
+tests/e2e/orchestrator-game-panel-host-capacity.spec.ts # Panel host capacity rows
+tests/e2e/orchestrator-game-panel-remote-member-models.spec.ts # Panel model rows for remote members
+tests/e2e/orchestrator-game-panel-member-recovery.spec.ts # Panel Resume and Reconnect buttons
+tests/e2e/orchestrator-game-panel-remote-view.spec.ts # Panel View on a remote member
+tests/e2e/orchestrator-game-panel-found-sessions.spec.ts # Panel cards for found sessions
+tests/e2e/orchestrator-game-panel-metrics.spec.ts # Panel Metrics widget
+tests/e2e/orchestrator-game-panel-logged-out-member.spec.ts # Panel logged-out and limited cards
+tests/e2e/orchestrator-game-panel-widgets.spec.ts # Panel widgets and To Do
+tests/e2e/orchestrator-game-panel-remote-member.spec.ts # Panel remote member cards
+tests/e2e/orchestrator-game-remote-member-scene.spec.ts # a remote member's band drawing only itself
+tests/e2e/orchestrator-game-characters.spec.ts # roster characters on the band and Panel
+tests/e2e/orchestrator-game-built-in-scenes.spec.ts # each built-in scene on the band, Panel and turn
+tests/e2e/orca-game-arcade-released-member.spec.ts # the terminal scene's celebration of a released member's merge
+# ORCA-1055: unit specs of the mod modules the band, Panel and tap rows used, deleted with them.
+resources/claude-plugins/orca-game/tests/flat-view.spec.ts # flat-view.ts, the band's text lines
+resources/claude-plugins/orca-game/tests/member-card-rows.spec.ts # member-card-rows.ts, Panel card rows
+resources/claude-plugins/orca-game/tests/pane-links.spec.ts # pane-links.ts, Panel link hotkeys
+resources/claude-plugins/orca-game/tests/panel-heading.spec.ts # panel-heading.ts, Panel section headings
+resources/claude-plugins/orca-game/tests/project-list-table.spec.ts # project-list-table.ts, Panel To Do table
+resources/claude-plugins/orca-game/tests/tap-layout.spec.ts # tap-layout.ts, phone-width band chips
+# Kept specs that lost the cases on those modules; their live-module cases stay.
+resources/claude-plugins/orca-game/tests/band-links.spec.ts # band-chips.ts link chips; needs line stays
+resources/claude-plugins/orca-game/tests/card-layout.spec.ts # member-card-rows.ts card head
+resources/claude-plugins/orca-game/tests/character-look.spec.ts # flat-view.ts member lines
+resources/claude-plugins/orca-game/tests/flat-mode.spec.ts # band-chips.ts text toggle chip
+resources/claude-plugins/orca-game/tests/game-actions.spec.ts # band-chips.ts QA chip
+resources/claude-plugins/orca-game/tests/github-budget.spec.ts # band-chips.ts low-budget chip
+resources/claude-plugins/orca-game/tests/project-work.spec.ts # band-chips.ts and pane-links.ts list chips
+resources/claude-plugins/orca-game/tests/scene-pet.spec.ts # band-chips.ts Pet chip label
+
+# ORCA-1072: the Team panel's Inbox tab replaced the sidebar Inbox entry and its Sheet. The Sheet's
+# eight cases run against the tab in team-panel-inbox-mail.test.tsx. The entry's counts run in
+# team-panel-inbox-overlay, use-team-panel-model and team-panel-tab-registry tests; its "stays out
+# of the sidebar" case is gone with the entry.
+src/renderer/src/components/game-inbox/GameInboxSheet.test.tsx # moved to team-panel-inbox-mail.test.tsx
+src/renderer/src/components/game-inbox/SidebarGameInboxEntry.test.tsx # entry removed; counts tested on the tab

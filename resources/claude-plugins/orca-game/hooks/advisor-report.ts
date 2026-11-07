@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { GameMemberAdvisor } from '../types'
 import type { Advisor } from './allies'
 
-// What this pane tells Orca about its Jev, so a lead's Panel can show it on this member's card.
+// What this pane tells Orca about its Jev, so a lead's Panel can show it on this pane's card.
 
 /** The CLI hands it to `game.state`; an older CLI ignores it, where an unknown flag could fail. */
 export const ADVISOR_REPORT_ENV = 'ORCA_GAME_ADVISOR'
@@ -21,7 +21,7 @@ export async function advisorPinsOf($: EngineInterface): Promise<AdvisorPins> {
   return { model: isPinnedValue(model), effort: isPinnedValue(effort) }
 }
 
-/** This pane's Jev as a member card draws it, for the lead's own card, which Orca reports nothing for. */
+/** This pane's Jev as a member card draws it, for the lead's own card when an older host sends none. */
 export const ownAdvisorOf = (advisor: Advisor, pins: AdvisorPins): GameMemberAdvisor => ({
   model: advisor.model,
   effort: advisor.effort === null ? null : String(advisor.effort),
@@ -37,6 +37,7 @@ export const advisorReportOf = (advisor: Advisor | null, pins: AdvisorPins): str
           version: 1,
           model: advisor.model,
           effort: advisor.effort === null ? null : String(advisor.effort),
+          line: advisor.line,
           pinned: pins
         }
   )

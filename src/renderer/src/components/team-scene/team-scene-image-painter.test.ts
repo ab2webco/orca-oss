@@ -1,0 +1,304 @@
+// @vitest-environment happy-dom
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orchestrator-game-scene-native'
+import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
+import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
+import { figureSeedOf } from './team-scene-figure-looks'
+import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-painter'
+import type { TeamSceneFrame } from './team-scene-painter'
+import { recordingContext, type RecordedCall } from './team-scene-recording-context'
+
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+
+const role = (sheets: string[]): OrchestratorGameSceneNativeStyle['roles']['lead'] => ({
+  sheets,
+  frame: { width: 128, height: 128 },
+  feet: { x: 64, y: 122 },
+  size: 76,
+  animations: {
+    idle: { row: 0, frames: 4, fps: 4 },
+    work: { row: 1, frames: 6, fps: 8 },
+    walk: { row: 2, frames: 8, fps: 8, stride: 35 }
+  }
+})
+
+const style = (
+  extra: Partial<OrchestratorGameSceneNativeStyle> = {}
+): OrchestratorGameSceneNativeStyle =>
+  ({
+    layers: [{ src: 'sky.png' }, { src: 'grass.png', front: true }],
+    roles: { lead: role(['lead.png']), member: role(['m1.png', 'm2.png']) },
+    props: { station: 'desk.png' },
+    ...extra
+  }) satisfies OrchestratorGameSceneNativeStyle
+
+const image = (width: number, height: number): TeamSceneArtImage =>
+  ({ width, height }) as TeamSceneArtImage
+
+const IMAGES = new Map<string, TeamSceneArtImage>([
+  ['sky.png', image(1536, 352)],
+  ['grass.png', image(1536, 352)],
+  ['desk.png', image(240, 128)],
+  ['lead.png', image(1024, 896)],
+  ['advisor.png', image(1024, 896)],
+  ['m1.png', image(1024, 896)],
+  ['m2.png', image(1024, 896)]
+])
+
+const actor = (key: string, extra: Partial<TeamSceneActor> = {}): TeamSceneActor => ({
+  key,
+  role: key === 'lead' ? 'lead' : key === 'advisor' ? 'advisor' : 'member',
+  name: key,
+  characterKey: null,
+  x: 0.5,
+  depth: 1,
+  facing: 1,
+  pose: 'idle',
+  gait: 0,
+  stride: 8.8 * teamSceneScaleAt(1),
+  carrying: false,
+  emote: null,
+  jump: 0,
+  ...extra
+})
+
+const frame = (extra: Partial<TeamSceneFrame> = {}): TeamSceneFrame => ({
+  width: 400,
+  height: 176,
+  ratio: 2,
+  t: 0,
+  dt: 1 / 30,
+  actors: [actor('lead')],
+  effects: [],
+  overflow: 0,
+  stations: [],
+  ...extra
+})
+
+const sprites = (calls: RecordedCall[]): RecordedCall[] =>
+  calls.filter((c) => c.name === 'drawImage' && c.args.length === 9)
+
+const painterOf = (art = style()) =>
+  createImagePainter({ art: { style: art, images: IMAGES }, colors: COLORS })
+
+let backdropCalls: RecordedCall[][] = []
+beforeEach(() => {
+  backdropCalls = []
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+    const recorder = recordingContext()
+    backdropCalls.push(recorder.calls)
+    return recorder.g
+  })
+})
+afterEach(() => vi.restoreAllMocks())
+
+describe('createImagePainter', () => {
+  it('draws each frame at the declared size with the feet on the stage', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame())
+    const [sprite] = sprites(calls)
+    const [source, sx, sy, sw, sh, dx, dy, dw, dh] = sprite!.args
+    expect(source).toBe(IMAGES.get('lead.png'))
+    // t is 0 and x is 0.5, so this figure's own phase picks the column.
+    expect([sx, sy, sw, sh]).toEqual([(14 % 4) * 128, 0, 128, 128])
+    expect(dw).toBeCloseTo(76)
+    expect(dh).toBeCloseTo(76)
+    // translate puts the origin on the feet, so the frame sits above and around it.
+    expect(dx).toBeCloseTo(-38)
+    expect(dy).toBeCloseTo((-122 / 128) * 76)
+    const origin = calls.find((c) => c.name === 'translate')
+    expect(origin?.args).toEqual([200, 176 - 36 + 22])
+  })
+
+  it('shrinks with depth by the same scale the engine uses', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame({ actors: [actor('lead', { depth: 0 })] }))
+    expect(sprites(calls)[0]!.args[8]).toBeCloseTo(76 * (teamSceneScaleAt(0) / teamSceneScaleAt(1)))
+  })
+
+  it('picks the pose row and steps frames by fps', () => {
+    const { g, calls } = recordingContext()
+    const stations = [{ x: 0, depth: 1 }]
+    painterOf().paint(g, frame({ t: 1, stations, actors: [actor('m', { pose: 'work', x: 0 })] }))
+    const [, sx, sy] = sprites(calls)[0]!.args
+    expect(sy).toBe(128)
+    expect(sx).toBe((8 % 6) * 128)
+  })
+
+  it('never sits a figure with no station on the air: work is the seated row', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame({ actors: [actor('lead', { pose: 'work', x: 0 })] }))
+    expect(sprites(calls)[0]!.args[2]).toBe(0)
+  })
+
+  it('stands an action the art does not have on idle', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame({ actors: [actor('lead', { pose: 'cheer', x: 0 })] }))
+    expect(sprites(calls)[0]!.args[2]).toBe(0)
+  })
+
+  it('steps walk by distance, so one cycle covers the sheet stride on the ground', () => {
+    const paintAfter = (px: number): number => {
+      const { g, calls } = recordingContext()
+      const walked = actor('lead', { pose: 'walk' })
+      const gait = (px / walked.stride) * Math.PI
+      painterOf().paint(g, frame({ actors: [{ ...walked, gait }] }))
+      return sprites(calls)[0]!.args[1] as number
+    }
+    const cyclePx = 35 * (76 / 128)
+    expect(paintAfter(0)).toBe(0)
+    expect(paintAfter(cyclePx / 2 + 0.01)).toBe(4 * 128)
+    expect(paintAfter(cyclePx + 0.01)).toBe(0)
+  })
+
+  it('keeps a member on its sheet by its character, not its pane', () => {
+    const sheetOf = (key: string, characterKey: string | null): unknown => {
+      const { g, calls } = recordingContext()
+      painterOf().paint(g, frame({ actors: [actor(key, { characterKey })] }))
+      return sprites(calls)[0]!.args[0]
+    }
+    expect(sheetOf('pane-1', 'hero')).toBe(sheetOf('pane-2', 'hero'))
+    const looks = new Set(['a', 'b', 'c', 'd', 'e', 'f'].map((key) => sheetOf(key, key)))
+    expect(looks).toEqual(new Set([IMAGES.get('m1.png'), IMAGES.get('m2.png')]))
+  })
+
+  it('dresses the advisor in the member art when it has none, and in its own otherwise', () => {
+    const sheetOf = (art: OrchestratorGameSceneNativeStyle): unknown => {
+      const { g, calls } = recordingContext()
+      painterOf(art).paint(g, frame({ actors: [actor('advisor')] }))
+      return sprites(calls)[0]!.args[0]
+    }
+    expect([IMAGES.get('m1.png'), IMAGES.get('m2.png')]).toContain(sheetOf(style()))
+    const own = style({
+      roles: { ...style().roles, advisor: role(['advisor.png']) }
+    })
+    expect(sheetOf(own)).toBe(IMAGES.get('advisor.png'))
+  })
+
+  it('mirrors a figure that faces left', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame({ actors: [actor('lead', { facing: -1 })] }))
+    expect(calls.find((c) => c.name === 'scale')?.args).toEqual([-1, 1])
+  })
+
+  it('faces a seated member its station, as the prop is drawn', () => {
+    const { g, calls } = recordingContext()
+    const stations = [{ x: 0.5, depth: 1 }]
+    const seated = actor('m', { facing: -1, pose: 'work' })
+    painterOf().paint(g, frame({ actors: [seated], stations }))
+    expect(calls.find((c) => c.name === 'scale')?.args).toEqual([1, 1])
+  })
+
+  it('draws the station centered on its seat, in the art scale, behind the figures', () => {
+    const { g, calls } = recordingContext()
+    const stations = [{ x: 0.25, depth: 1 }]
+    painterOf().paint(g, frame({ actors: [actor('lead')], stations }))
+    const desk = calls.findIndex(
+      (c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png')
+    )
+    const args = calls[desk]!.args
+    const px = 76 / 128
+    expect(args[1]).toBeCloseTo(100 - (240 * px) / 2)
+    expect(args[3]).toBeCloseTo(240 * px)
+    expect(args[4]).toBeCloseTo(128 * px)
+    expect(args[2]).toBeCloseTo(162 - 128 * px)
+    expect(desk).toBeLessThan(calls.indexOf(sprites(calls)[0]!))
+  })
+
+  it('bakes each stage once, and draws the front one over the figures', () => {
+    const painter = painterOf()
+    const { g, calls } = recordingContext()
+    painter.paint(g, frame())
+    painter.paint(g, frame())
+    expect(backdropCalls).toHaveLength(2)
+    const back = backdropCalls[0]!.filter((c) => c.name === 'drawImage')
+    const front = backdropCalls[1]!.filter((c) => c.name === 'drawImage')
+    expect(back.map((c) => c.args[0])).toEqual([IMAGES.get('sky.png')])
+    expect(front.map((c) => c.args[0])).toEqual([IMAGES.get('grass.png')])
+    const lastSprite = calls.lastIndexOf(sprites(calls).at(-1)!)
+    expect(calls.slice(lastSprite).some((c) => c.name === 'drawImage' && c.args.length === 5)).toBe(
+      true
+    )
+  })
+
+  it('covers a narrow stage from the bottom center and a wide one from the bottom', () => {
+    const coverAt = (width: number): unknown[] => {
+      backdropCalls = []
+      const { g } = recordingContext()
+      painterOf().paint(g, frame({ width, actors: [] }))
+      return backdropCalls[0]!.find((c) => c.name === 'drawImage')!.args
+    }
+    expect(coverAt(320).slice(1)).toEqual([-224, 0, 768, 176])
+    const wide = coverAt(1000)
+    expect(wide[1]).toBeCloseTo(0)
+    expect(wide[3]).toBeCloseTo(1000)
+    expect(wide[2]).toBeCloseTo(176 - 1000 * (352 / 1536))
+  })
+
+  it('shows who needs the user: a status shadow and the emote above the head', () => {
+    const { g, fills } = recordingContext()
+    painterOf().paint(g, frame({ actors: [actor('lead', { emote: 'alert' })] }))
+    expect(fills().filter((fill) => fill === COLORS.attention).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('counts members past the seats', () => {
+    const { g, calls } = recordingContext()
+    painterOf().paint(g, frame({ overflow: 3 }))
+    expect(calls.find((c) => c.name === 'fillText')?.args[0]).toBe('+3')
+  })
+
+  it('lifts a bubble to the top of the frame at that depth', () => {
+    const painter = painterOf()
+    expect(painter.height).toBe(176)
+    expect(painter.headTop(1, 176)).toBeCloseTo(162 - (122 / 128) * 76)
+    expect(painter.headTop(0, 176)).toBeGreaterThan(painter.headTop(1, 176) - 22 + 1)
+  })
+
+  it('still paints after dispose, as StrictMode disposes a painter it keeps', () => {
+    const painter = painterOf()
+    const { g, calls } = recordingContext()
+    painter.dispose()
+    painter.paint(g, frame())
+    expect(sprites(calls)).toHaveLength(1)
+  })
+})
+
+describe('createImagePainter portrait', () => {
+  it("draws a card face from the character's idle frame, head up, covering the face", () => {
+    const painter = createImagePainter({ art: { style: style(), images: IMAGES }, colors: COLORS })
+    const face = (who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey' | 'name'>) => {
+      const { g, calls } = recordingContext()
+      painter.portrait!(g, who, 38)
+      const [call] = sprites(calls)
+      return call!.args as [
+        TeamSceneArtImage,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number
+      ]
+    }
+    const merlin = face({ role: 'member', key: 'p1', characterKey: 'merlin', name: 'Merlín' })
+    expect(face({ role: 'member', key: 'p2', characterKey: 'merlin', name: 'Merlín' })[0]).toBe(
+      merlin[0]
+    )
+    const sheet = ['m1.png', 'm2.png'][figureSeedOf('merlin') % 2]!
+    expect(merlin[0]).toBe(IMAGES.get(sheet))
+    // The idle row's first frame, cut above the feet so the head fills the face.
+    const [, sx, sy, sw, sh] = merlin
+    expect(sx).toBeGreaterThanOrEqual(0)
+    expect(sx + sw).toBeLessThanOrEqual(128)
+    expect(sy).toBeGreaterThanOrEqual(0)
+    expect(sy + sh).toBeLessThan(122)
+    expect(sw).toBe(sh)
+    expect(merlin[7]).toBeGreaterThanOrEqual(38)
+    expect(face({ role: 'lead', key: 'lead', characterKey: null, name: 'Alfred' })[0]).toBe(
+      IMAGES.get('lead.png')
+    )
+  })
+})

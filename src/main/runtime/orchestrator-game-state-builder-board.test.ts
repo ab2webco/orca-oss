@@ -94,6 +94,28 @@ describe('buildOrchestratorGameState merges', () => {
   })
 })
 
+describe('buildOrchestratorGameState arcade', () => {
+  const arcade = { credits: 2, offer: { provider: 'github' as const, number: 4 } }
+
+  it('gives the lead its saved arcade credits, a member none, and none when unreadable', async () => {
+    const lead = await buildOrchestratorGameState({ ...base, readArcade: async () => arcade })
+    expect(lead.arcade).toEqual(arcade)
+    const member = await buildOrchestratorGameState({
+      ...base,
+      callerParentPaneKey: 'tab:lead',
+      readArcade: async () => arcade
+    })
+    expect('arcade' in member).toBe(false)
+    const failed = await buildOrchestratorGameState({
+      ...base,
+      readArcade: async () => {
+        throw new Error('EACCES')
+      }
+    })
+    expect('arcade' in failed).toBe(false)
+  })
+})
+
 describe('buildOrchestratorGameState owner questions', () => {
   it('gives the lead the count of questions waiting on the person, a member none', async () => {
     const lead = await buildOrchestratorGameState({

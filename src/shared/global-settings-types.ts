@@ -9,6 +9,7 @@ import type { SourceControlAiSettings } from './source-control-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { OrchestratorGameLayer } from './orchestrator-game-config'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
+import type { StatusColorOverrides } from './status-colors'
 import type { TerminalPaneActionsPosition } from './terminal-pane-actions-position'
 import type { UiLanguage } from './ui-language'
 import type { GlobalWindowsRuntimeDefault } from './project-execution-runtime'
@@ -263,6 +264,8 @@ export type GlobalSettings = {
   /** Bot-marked comment-author logins (stored lowercased); escape hatch for review bots on regular accounts that defeat provider metadata/heuristics. */
   prBotAuthorOverrides: string[]
   notifications: NotificationSettings
+  /** User hues for the five status tones, per theme; absent tones use the theme default. */
+  statusColors?: StatusColorOverrides
   /** Countdown after a Claude agent goes idle showing time left before the prompt cache expires. */
   promptCacheTimerEnabled: boolean
   /** Prompt-cache TTL (ms); only 300000 (5 min standard) or 3600000 (1 hr, extended-TTL plans). */

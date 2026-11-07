@@ -28,7 +28,11 @@ export type GameAgentRow = Pick<
   | 'toolName'
   | 'lastActivityAt'
   | 'orphaned'
-> & { parentPaneKey?: string | null; stateStartedAt?: number }
+> &
+  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>> & {
+    parentPaneKey?: string | null
+    stateStartedAt?: number
+  }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
 export type GameMemberAccountOf = (member: {
@@ -113,7 +117,7 @@ export async function gameFleetOf(args: {
   accountOf?: GameMemberAccountOf
   globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
-  /** What a member pane's own Jev last reported; read only for members. */
+  /** What a pane's own Jev last reported; read only for the lead and members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** The model and effort Orca dispatched a member on; read only for members. */
   launchOf?: (paneKey: string) => GameMemberLaunch | null
@@ -181,7 +185,8 @@ export async function gameFleetOf(args: {
               })
             )
           : null
-      const advisor = isMember ? (args.advisorOf?.(row.paneKey) ?? null) : null
+      const advisor =
+        isMember || row.paneKey === leaderPaneKey ? (args.advisorOf?.(row.paneKey) ?? null) : null
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,

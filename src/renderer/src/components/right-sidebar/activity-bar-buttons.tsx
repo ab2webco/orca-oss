@@ -13,6 +13,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
+import { StatusDot } from '@/components/StatusDot'
+import { checkStatusTone } from '@/components/review-status-tone'
 
 export type ActivityBarItem = {
   id: ActiveRightSidebarTab
@@ -28,13 +30,6 @@ export type ActivityBarItem = {
   sshOnly?: boolean
   /** Host-owned health indicator; plugin content cannot style this chrome. */
   statusIndicator?: CheckStatus
-}
-
-const STATUS_DOT_COLOR: Record<CheckStatus, string> = {
-  success: 'bg-emerald-500',
-  failure: 'bg-rose-500',
-  pending: 'bg-amber-500',
-  neutral: 'bg-muted-foreground'
 }
 
 function activityItemAriaLabel(item: ActivityBarItem, status?: CheckStatus | null): string {
@@ -84,11 +79,11 @@ export function TopActivityOverflowMenu({
         >
           <MoreHorizontal size={16} />
           {hiddenItemStatus && (
-            <div
-              className={cn(
-                'absolute top-[8px] right-[4px] size-[7px] rounded-full ring-1 ring-sidebar',
-                STATUS_DOT_COLOR[hiddenItemStatus] ?? 'bg-muted-foreground'
-              )}
+            <StatusDot
+              tone={checkStatusTone(hiddenItemStatus)}
+              size="badge"
+              className="absolute top-[8px] right-[4px]"
+              aria-hidden="true"
             />
           )}
         </button>
@@ -108,10 +103,7 @@ export function TopActivityOverflowMenu({
               <Icon size={14} />
               <span>{item.title}</span>
               {item.statusIndicator === 'failure' ? (
-                <span
-                  className={cn('ml-auto size-2 rounded-full', STATUS_DOT_COLOR.failure)}
-                  aria-hidden="true"
-                />
+                <StatusDot tone="attention" size="md" className="ml-auto" aria-hidden="true" />
               ) : null}
               {item.shortcut && <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>}
             </DropdownMenuItem>
@@ -156,12 +148,11 @@ export function ActivityBarButton({
           <Icon size={isTop ? 16 : 18} />
 
           {effectiveStatus && effectiveStatus !== 'neutral' && (
-            <div
-              className={cn(
-                'absolute rounded-full size-[7px] ring-1 ring-sidebar',
-                isTop ? 'top-[8px] right-[5px]' : 'top-[7px] right-[7px]',
-                STATUS_DOT_COLOR[effectiveStatus] ?? 'bg-muted-foreground'
-              )}
+            <StatusDot
+              tone={checkStatusTone(effectiveStatus)}
+              size="badge"
+              className={cn('absolute', isTop ? 'top-[8px] right-[5px]' : 'top-[7px] right-[7px]')}
+              aria-hidden="true"
             />
           )}
 

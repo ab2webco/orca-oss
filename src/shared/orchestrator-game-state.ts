@@ -8,8 +8,10 @@ import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights } from './orchestrator-game-reward-weights'
+import type { OrchestratorGamePanel } from './orchestrator-game-panel'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { GameMerge } from './orchestrator-game-events'
+import type { GameArcadeCredits } from './orchestrator-game-arcade-credits'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { RuntimeWorktreeAgentRow } from './runtime-types'
 import type { GameStop } from './orchestrator-game-stop-state'
@@ -19,6 +21,7 @@ import type { GameMetricsSummary } from './orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
+import { gameToolInputOf } from './orchestrator-game-tool-input'
 import type {
   GamePausedMember,
   GameQueuedMember,
@@ -50,6 +53,8 @@ export type GameAgent = {
   agentType: string | null
   state: 'working' | 'waiting' | 'idle' | 'done'
   toolName: string | null
+  /** A one-line preview of the tool's input; absent when none or from an older host. */
+  toolInput?: string
   isLeader: boolean
   /** Optional on the wire: older hosts send none, and a pane with no terminal gets none. */
   terminalHandle?: string
@@ -68,7 +73,7 @@ export type GameAgent = {
   globalLogin?: true
   /** Set while a member is stopped by its account's usage limit, or `loggedOut` (ORCA-907); absent from an older host. */
   limit?: { resetsAt: number | null; loggedOut?: true }
-  /** What Jev in the member's own pane has it on; absent without Jev there or from an older host. */
+  /** What Jev in this pane (a member's or the lead's) has it on; absent without Jev there or from an older host. */
   advisor?: GameMemberAdvisor
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
   launch?: GameMemberLaunch
@@ -206,6 +211,8 @@ export type OrchestratorGameState = {
   activity?: GameActivity
   /** My open PRs and tickets across the project; absent with the tracker off or from an older host. */
   project?: GameProjectWork
+  /** The native panel's resolved look and tabs; absent from an older host. */
+  panel?: OrchestratorGamePanel
   /** The project's buttons, filled for this worktree; absent when it declares none. */
   actions?: GameAction[]
   /** How this project's lead orchestrates; absent from an older host. */
@@ -244,6 +251,8 @@ export type OrchestratorGameState = {
   locale?: SupportedUiLocale
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
   merges?: GameMerge[]
+  /** The project's saved arcade plays; only for the lead, absent from an older host. */
+  arcade?: GameArcadeCredits
 }
 
 const REVIEW_NAME = /review|qa|testing|verify/i
@@ -308,16 +317,19 @@ export function gameAgentOf(
   row: Pick<
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
-  >,
+  > &
+    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>>,
   leaderPaneKey: string | null,
   terminalHandle: string | null = null
 ): GameAgent {
+  const toolInput = gameToolInputOf(row.toolInput)
   return {
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
     state: gameAgentStateOf(row.state),
     toolName: row.toolName,
+    ...(toolInput ? { toolInput } : {}),
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})
   }

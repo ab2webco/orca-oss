@@ -1,5 +1,6 @@
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import type { StatusTone } from '@/components/status-tone'
 
 export type PromptCacheCountdownSelection = {
   startedAt: number
@@ -45,4 +46,12 @@ export function getPromptCacheCountdownForPane(
   }
   const startedAt = cacheTimerByKey[paneKey]
   return startedAt == null ? null : { startedAt, ttlMs }
+}
+
+/** Idle while the cache is warm, at risk in its last minute, needs you once gone. */
+export function getPromptCacheCountdownTone(remainingMs: number): StatusTone {
+  if (remainingMs <= 0) {
+    return 'attention'
+  }
+  return remainingMs <= 60_000 ? 'warning' : 'idle'
 }

@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
 import DashboardAgentRow from '@/components/dashboard/DashboardAgentRow'
+import { useGameLeadHandles } from '@/components/team-panel/game-lead-handles'
 import { useNow } from '@/components/dashboard/useNow'
 import { deriveRunningAgentSendTargets } from '@/lib/running-agent-targets'
 import {
@@ -89,6 +90,10 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
   const sendTargetInputs = useAppStore(useShallow((s) => selectSendTargetInputs(s, worktreeId)))
   const sendPromptToSidebarAgentTarget = useAppStore((s) => s.sendPromptToSidebarAgentTarget)
   const focusedAgentPaneKey = useFocusedAgentPaneKey(worktreeId)
+  const gameLeadHandles = useGameLeadHandles()
+  const showModel = useAppStore((s) => s.worktreeCardProperties?.includes('model') === true)
+  const isGameLead = (agent: DashboardAgentRowData): boolean =>
+    agent.entry.terminalHandle !== undefined && gameLeadHandles.has(agent.entry.terminalHandle)
   const compactAgentListRootRef = useRef<HTMLDivElement | null>(null)
   const labelsByPaneKey = useMemo(
     () => resolveRenderedAgentRowLabels(agents, generatedTitlesEnabled),
@@ -287,6 +292,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
           // Why: keep leaf rows aligned with parent rows — see anyRootHasChildren above.
           reserveDisclosureGutter={isRootAgent && anyRootHasChildren && !hasChildAgents}
           isFocusedPane={agent.paneKey === focusedAgentPaneKey}
+          isGameLead={isGameLead(agent)}
           sendTargetStatus={sendTarget?.status}
           sendTargetDisabledReason={sendTarget?.disabledReason}
           onSendTargetClick={isAgentSendTargetModeActive ? handleSendTargetClick : undefined}
@@ -343,7 +349,9 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
           }
           reserveDisclosureGutter={isRootAgent && anyRootHasChildren && !hasChildAgents}
           isFocusedPane={agent.paneKey === focusedAgentPaneKey}
+          isGameLead={isGameLead(agent)}
           cacheTimerActive={cacheTimerActive}
+          showModel={showModel}
         />
         {hasChildAgents ? (
           <CompactAgentExpansion expanded={expanded}>

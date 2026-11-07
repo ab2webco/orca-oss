@@ -1,5 +1,7 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
+import type { ScenePhase } from '../types'
+
 import {
   GAME_COMMANDS,
   QUEST_ALIAS,
@@ -7,7 +9,16 @@ import {
   gameCommandOf,
   type GameCommand
 } from './game-commands'
-import { cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
+import { activityOf, cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
+import {
+  headingNameOf,
+  headingRuleWidthOf,
+  headingTimeOf,
+  isQuestionToPerson,
+  messageHeadingOf,
+  toolSummaryOf
+} from './message-heading'
+import { messageHeadingWords } from './message-heading-words'
 import { briefPathOf } from './brief-line'
 import {
   configuredConfig,
@@ -18,27 +29,21 @@ import {
   ready,
   resetQuest,
   shownPhase,
-  stageCellsOf,
-  stageOf,
-  startDemo,
   type Animated
 } from './quest-runtime'
 import { gameStrings, localizedNameOf } from './game-strings'
-import { SCENE_KEY, sceneColumnsOf } from './scene'
+import { sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
-import { openArcade } from './arcade-pane'
-import { arcadeWords } from './arcade-words'
-import { flatLine } from './flat-block'
 import { dropScenes } from './flat-toggle'
-import { flatPhaseLineOf } from './flat-view'
-import { isMemberBandCollapsed } from './member-pane'
-import { shownCaption } from './quest-state'
+import { shownSpeaker } from './quest-state'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
+// Why a named color: the terminal's own red reads on dark and light themes alike.
+const NEEDS_YOU_COLOR = 'red'
 
 // Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
 const shownSetting = (key: 'mode' | 'render'): string => {
@@ -112,15 +117,9 @@ const registerCommand = (on: On, command: GameCommand) => {
       $.ui.invalidate('ui.render')
       return { text: text.questRenderShown(shownSetting('render')) }
     }
-    if ('arcade' in asked) {
-      await openArcade($, asked.isOffer === true)
-      return { text: asked.isOffer === true ? arcadeWords().offered : arcadeWords().opened }
-    }
-    if ('demo' in asked) {
-      startDemo()
-      $.ui.invalidate('ui.render')
-      await publishAbsorbing($)
-      return { text: text.questDemo }
+    // Why: the demo party and the arcade draw in the Team panel; this pane keeps the text.
+    if ('arcade' in asked || 'demo' in asked) {
+      return { text: text.questInPanel }
     }
     quest.isDemo = false
     quest.modeOverride = asked.mode
@@ -189,70 +188,58 @@ const registerNotes = (on: On) => {
   })
 }
 
-const registerSpinner = (on: On) => {
-  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
-    await ready($)
-    // Why: a member who collapsed its band asked for Claude's own spinner, with no scene above it.
-    const isCollapsed = isMemberBandCollapsed()
-    if (isCollapsed || !isSceneDrawn() || e.surface !== 'terminal') {
-      quest.stages.delete(e.requestId)
-      forgetFrames(e.requestId)
-      if (isCollapsed || isOff() || e.surface !== 'terminal') {
-        return next(e)
-      }
-      // Flat keeps what the hero shows, the phase's card and the caption, as one line of text.
-      const scene = currentScene()
-      const columns = sceneColumnsOf(e.viewport?.columns)
-      const line = flatPhaseLineOf(scene, shownPhase(), shownCaption(), columns)
-      const spinner = await next(e)
-      const { Box } = $.ui.resolve(e)
-      return (
-        <Box flexDirection="column">
-          {flatLine($, e, line, scene.band)}
-          {spinner}
-        </Box>
-      )
-    }
-    const stage = stageOf(sceneColumnsOf(e.viewport?.columns), e.viewport?.rows)
-    quest.stages.set(e.requestId, stage)
-    const cells = stageCellsOf(stage)
-    rememberFrame(e.requestId, SCENE_KEY, cells)
-    const spinner = await next(e)
-    const { Box, Raster } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="column">
-        <Raster key={SCENE_KEY} columns={stage.columns} rows={stage.rows} cells={cells} />
-        {spinner}
-      </Box>
-    )
-  })
+// Why zen stays hidden: it is the quiet view; on and flat show each step as one dim line.
+const isToolLineShown = (): boolean => gameConfig().mode !== 'zen'
+
+function toolLine($: EngineInterface, e: RenderInput, text: string) {
+  const { Text } = $.ui.resolve(e)
+  return <Text dimColor>{`▸ ${text}`}</Text>
 }
 
 const registerQuietRows = (on: On) => {
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     await ready($)
-    if (isOff() || e.props.isErrored || e.props.isInterrupted) {
+    const { isErrored, isInterrupted, isExpanded, tool, input } = e.props
+    if (isOff() || isErrored || isInterrupted || isExpanded === true) {
       return next(e)
     }
-    return hidden($, e)
+    return isToolLineShown() ? toolLine($, e, activityOf(tool, input)) : hidden($, e)
   })
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
     await ready($)
-    return isOff() || e.props.isErrored ? next(e) : hidden($, e)
+    return isOff() || e.props.isErrored || e.props.isExpanded === true ? next(e) : hidden($, e)
   })
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     await ready($)
-    if (isOff() || e.props.calls.some((call) => call.isErrored)) {
+    const { calls, isExpanded } = e.props
+    if (isOff() || isExpanded || calls.some((call) => call.isErrored || call.isInterrupted)) {
       return next(e)
     }
-    return hidden($, e)
+    const summary = toolSummaryOf(calls, messageHeadingWords())
+    return isToolLineShown() && summary !== '' ? toolLine($, e, summary) : hidden($, e)
   })
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     await ready($)
     return isOff() ? next(e) : hidden($, e)
   })
+  // Why: the live line above the prompt says what the spinner did, with whose turn it is.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    await ready($)
+    return isOff() ? next(e) : hidden($, e)
+  })
 }
 
+// Why no time with no turn seen: a resumed transcript's blocks were written in turns this process never timed.
+async function firstHeadOf($: EngineInterface): Promise<{ phase: ScenePhase; time: string }> {
+  const turn = quest.turn
+  const end = turn?.endedAt ?? (await $.clock.now())
+  return {
+    phase: shownPhase() ?? 'working',
+    time: turn === undefined ? '' : headingTimeOf(end - turn.startedAt)
+  }
+}
+
+// Why no frame or padding: a terminal selection copies every cell of the row, border included.
 const registerCards = (on: On) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     await ready($)
@@ -265,20 +252,35 @@ const registerCards = (on: On) => {
     if (isOff() || key === '') {
       return drawn
     }
-    // A card keeps the phase it was first drawn in, so scrolling back never repaints it.
-    const cardKey = cardKeyOf(e.requestId, e.props.text)
-    if (!quest.cardPhases.has(cardKey)) {
-      quest.cardPhases.set(cardKey, shownPhase() ?? 'working')
+    const isQuestion = isQuestionToPerson(e.props.text)
+    if (!e.props.isFirstOfReply && !isQuestion) {
+      return drawn
     }
-    const card = currentScene().cards[quest.cardPhases.get(cardKey) ?? 'working']
+    const cardKey = cardKeyOf(e.requestId, e.props.text)
+    const head = quest.cardHeads.get(cardKey) ?? (await firstHeadOf($))
+    quest.cardHeads.set(cardKey, head)
+    const name = headingNameOf(
+      shownSpeaker(),
+      localizedNameOf(currentScene().cards[head.phase].name)
+    )
+    const heading = messageHeadingOf(name, head.phase, isQuestion, messageHeadingWords())
+    const rule = headingRuleWidthOf(heading, head.time, e.viewport?.columns ?? 80)
+    const color = isQuestion ? NEEDS_YOU_COLOR : undefined
     const { Box, Text } = $.ui.resolve(e)
+    // Why a top margin only: an empty row copies as nothing, and it parts the heading from the prompt.
+    // Why struck spaces for the rule: a selection copies them as blanks, never as line glyphs.
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={card.color} paddingX={1}>
-        {e.props.isFirstOfReply ? (
-          <Text bold color={card.color}>{`${card.icon} ${localizedNameOf(card.name)}`}</Text>
-        ) : (
-          <Box />
-        )}
+      <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="row">
+          <Text bold color={color}>
+            {heading}
+          </Text>
+          <Text> </Text>
+          <Text color={color} dimColor strikethrough>
+            {' '.repeat(rule)}
+          </Text>
+          {head.time === '' ? null : <Text dimColor>{` ${head.time}`}</Text>}
+        </Box>
         {drawn}
       </Box>
     )
@@ -291,23 +293,16 @@ const registerCards = (on: On) => {
     if (!isHumanOrigin(e.props.origin.kind)) {
       return hidden($, e)
     }
-    const teller = currentScene().teller
-    const { Box, Text } = $.ui.resolve(e)
     // Why not when expanded: ctrl+o shows the line Orca typed, as for any compact row.
     const brief = e.props.isExpanded ? null : briefPathOf(e.props.text)
-    if (brief !== null) {
-      return (
-        <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
-          <Text bold color={teller.color}>{`📜 ${gameStrings().text.briefReceived}`}</Text>
-          <Text dimColor>{brief}</Text>
-        </Box>
-      )
+    if (brief === null) {
+      return next(e)
     }
-    const drawn = await next(e)
+    const { Box, Text } = $.ui.resolve(e)
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={teller.color} paddingX={1}>
-        <Text bold color={teller.color}>{`${teller.icon} ${localizedNameOf(teller.name)}`}</Text>
-        {drawn}
+      <Box flexDirection="column">
+        <Text bold>{`📜 ${gameStrings().text.briefReceived}`}</Text>
+        <Text dimColor>{brief}</Text>
       </Box>
     )
   })
@@ -320,7 +315,6 @@ export const registerQuest = (on: On): void => {
   }
   registerView(on)
   registerNotes(on)
-  registerSpinner(on)
   registerQuietRows(on)
   registerCards(on)
 }

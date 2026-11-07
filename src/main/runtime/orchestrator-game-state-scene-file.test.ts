@@ -12,6 +12,7 @@ import {
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
+import { orchestratorGameSceneDrawnStyle } from '../../shared/orchestrator-game-scene-native'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const dirs: string[] = []
@@ -87,6 +88,73 @@ describe('buildOrchestratorGameState scene file', () => {
     expect(state.extensions?.scenes[0]).toMatchObject({ id: ID, pluginId: 'file' })
     expect(state.extensions?.scenes[0]?.definition.id).toBe(ID)
     expect(state.extensions?.scenes[0]?.definition.looks.pr.skyTop).toBe(0x102030)
+  })
+
+  describe('native art', () => {
+    const role = {
+      sheets: ['art/hero.png'],
+      frame: { width: 32, height: 48 },
+      size: 58,
+      animations: { idle: { row: 0, frames: 2 } }
+    }
+    const native = {
+      figures: { layers: [{ src: 'art/sky.png' }], roles: { lead: role, member: role } }
+    }
+    const WITH_ART = JSON.stringify(sceneFile({ native }))
+
+    it('reaches the panel on game state, from a private file no commit carries', async () => {
+      const state = await build(checkout({ '.orca/scenes/space.json': WITH_ART }), {
+        local: { sceneFile: '.orca/scenes/space.json' }
+      })
+
+      expect(state.warnings).toEqual([])
+      const definition = state.extensions?.scenes[0]?.definition
+      expect(definition?.native?.figures?.layers).toEqual([{ src: 'art/sky.png' }])
+      expect(
+        orchestratorGameSceneDrawnStyle({
+          style: 'figures',
+          sceneId: state.config.scene,
+          scene: definition
+        })
+      ).toBe('figures')
+    })
+
+    it('stays on a scene carried to a remote member, whose art may not be on that host', async () => {
+      const state = await build(checkout({}), {
+        carried: { id: ID, text: WITH_ART }
+      })
+
+      const definition = state.extensions?.scenes[0]?.definition
+      expect(definition?.native?.figures).toBeDefined()
+      expect(
+        orchestratorGameSceneDrawnStyle({
+          style: 'figures',
+          sceneId: ID,
+          scene: definition,
+          artFailed: true
+        })
+      ).toBe('pixel')
+    })
+
+    it('draws a file with a broken block in Pixel, and says why', async () => {
+      const state = await build(
+        checkout({
+          '.orca/scenes/space.json': JSON.stringify(
+            sceneFile({ native: { figures: { layers: [] } } })
+          )
+        }),
+        { local: { sceneFile: '.orca/scenes/space.json' } }
+      )
+
+      expect(state.warnings[0]).toMatch(/native\.figures\.layers.*drawn without it/)
+      expect(
+        orchestratorGameSceneDrawnStyle({
+          style: 'figures',
+          sceneId: state.config.scene,
+          scene: state.extensions?.scenes[0]?.definition
+        })
+      ).toBe('pixel')
+    })
   })
 
   it('draws a scene file whose pet is invalid without its pet, and says why', async () => {

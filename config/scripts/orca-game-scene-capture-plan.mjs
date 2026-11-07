@@ -62,6 +62,33 @@ export const rosterShotsOf = (id, phases, names) =>
     names.map((member, i) => ({ name: `roster-${id}-${phase}-${i + 1}`, phase, member }))
   )
 
+/** One sheet per style a scene's `native` block draws: its stage, props and every animation strip. */
+export const nativeSheetsOf = (native) =>
+  Object.entries(native ?? {})
+    .filter(([, art]) => art)
+    .map(([style, art]) => ({
+      name: `native-${style}`,
+      layers: art.layers.map((layer) => layer.src),
+      props: art.props?.station ? [art.props.station] : [],
+      strips: Object.entries(art.roles)
+        .filter(([, role]) => role)
+        .flatMap(([role, { sheets, frame, animations }]) =>
+          sheets.flatMap((sheet) =>
+            Object.entries(animations)
+              .filter(([, animation]) => animation)
+              .map(([action, { row, frames }]) => ({
+                role,
+                sheet,
+                action,
+                width: frame.width,
+                height: frame.height,
+                row,
+                frames
+              }))
+          )
+        )
+    }))
+
 // 1440, 768, 390 and 320 px at 9 px a cell; the game's look has a day and a night, no app theme.
 const ARCADE_COLUMNS = [160, 85, 43, 35]
 

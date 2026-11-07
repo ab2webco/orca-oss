@@ -111,8 +111,14 @@ describe('buildOrchestratorGameState member accounts', () => {
     ])
   })
 
-  it("carries each member's Jev report, asking only for members", async () => {
+  it("carries the lead's and each member's Jev report, asking for no other pane", async () => {
     const asked: string[] = []
+    const leadJev = {
+      model: 'Opus 5.5',
+      effort: 'high',
+      line: 'Reviewing the plan',
+      pinned: { model: false, effort: false }
+    }
     const jev = {
       model: 'Sonnet 5.5',
       effort: 'high',
@@ -125,23 +131,25 @@ describe('buildOrchestratorGameState member accounts', () => {
       agents: [
         { ...row, paneKey: 'tab-1:lead' },
         { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead' },
-        { ...row, paneKey: 'tab-5:quiet', parentPaneKey: 'tab-1:lead' }
+        { ...row, paneKey: 'tab-5:quiet', parentPaneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-6:apart' }
       ],
       leaderPaneKey: 'tab-1:lead',
       advisorOf: (paneKey) => {
         asked.push(paneKey)
-        return paneKey === 'tab-4:here' ? jev : null
+        return paneKey === 'tab-1:lead' ? leadJev : paneKey === 'tab-4:here' ? jev : null
       },
       readReview: none,
       readPlane: none,
       readLinear: none
     })
 
-    expect(asked).toEqual(['tab-4:here', 'tab-5:quiet'])
+    expect(asked).toEqual(['tab-1:lead', 'tab-4:here', 'tab-5:quiet'])
     expect(state.agents.map((agent) => [agent.paneKey, agent.advisor])).toEqual([
-      ['tab-1:lead', undefined],
+      ['tab-1:lead', leadJev],
       ['tab-4:here', jev],
-      ['tab-5:quiet', undefined]
+      ['tab-5:quiet', undefined],
+      ['tab-6:apart', undefined]
     ])
   })
 

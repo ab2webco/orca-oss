@@ -370,6 +370,7 @@ function registerRuntimeWindowLifecycle(
     reposChanged: () => send('repos:changed'),
     gameOwnerQuestionsChanged: () => send('runtime:gameOwnerQuestionsChanged'),
     gameInboxChanged: () => send('runtime:gameInboxChanged'),
+    gameAdvisorChanged: () => send('runtime:gameAdvisorChanged'),
     activateWorktree: (
       repoId,
       worktreeId,
