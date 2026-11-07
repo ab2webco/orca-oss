@@ -168,9 +168,9 @@ describe('TeamActionDock', () => {
 
   it("holds the rest in the menu after Stop, whose Stop asks inline like the icon's", async () => {
     const { container, props } = await render()
-    const controls = [...container.querySelectorAll('section button[aria-label]')].map((one) =>
-      one.getAttribute('aria-label')
-    )
+    const controls = [
+      ...container.querySelectorAll('section button[aria-label]:not([data-team-action])')
+    ].map((one) => one.getAttribute('aria-label'))
     expect(controls).toEqual(['Stop every member', 'All actions'])
     await click(container.querySelector('[aria-label="All actions"]'))
     const stopRow = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
