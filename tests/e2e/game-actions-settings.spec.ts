@@ -64,6 +64,8 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
 }, testInfo) => {
   test.setTimeout(CAPTURE_EVIDENCE ? 600_000 : 180_000)
   await waitForSessionReady(orcaPage)
+  // Why: the star card opens on its own over the page's lower right, where the switches are.
+  await orcaPage.evaluate(() => window.api.ui.set({ starNagCompleted: true }))
   const repo = await orcaPage.evaluate(() => {
     const first = window.__store!.getState().repos[0]
     return first ? { id: first.id, path: first.path } : null
@@ -188,7 +190,10 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
         description: `${width} ${theme}: gap ${Math.round(gap)} px`
       })
       if (CAPTURE_EVIDENCE) {
-        await orcaPage.screenshot({ path: testInfo.outputPath(`scene-${width}-${theme}.png`) })
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`scene-${width}-${theme}.png`)
+        })
       }
       await orcaPage.keyboard.press('Escape')
       await expect(list).toBeHidden()
