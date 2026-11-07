@@ -318,17 +318,19 @@ export function gameAgentOf(
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
   > &
-    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>>,
+    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed'>>,
   leaderPaneKey: string | null,
   terminalHandle: string | null = null
 ): GameAgent {
-  const toolInput = gameToolInputOf(row.toolInput)
+  // Why (ORCA-1130): a row restored from disk may describe a turn that ended while Orca was down.
+  const unconfirmed = row.restoredUnconfirmed === true
+  const toolInput = unconfirmed ? null : gameToolInputOf(row.toolInput)
   return {
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
-    state: gameAgentStateOf(row.state),
-    toolName: row.toolName,
+    state: unconfirmed ? 'idle' : gameAgentStateOf(row.state),
+    toolName: unconfirmed ? null : row.toolName,
     ...(toolInput ? { toolInput } : {}),
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})

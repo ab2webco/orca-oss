@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n/i18n'
 import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
@@ -15,9 +16,10 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import {
   findTeamLeadCaller,
+  readTeamLeadRoster,
   readTeamLeadState,
-  readTeamLeads,
-  readTeamOwnerQuestions
+  readTeamOwnerQuestions,
+  readTeamXp
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
 import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
@@ -60,19 +62,23 @@ function worktreeIdOfTab(tabId: string): string | null {
 
 const poller = createTeamPanelModelPoller(
   {
-    readLeads: readTeamLeads,
-    findCaller: (leads, scope) =>
+    readLeads: readTeamLeadRoster,
+    findCaller: ({ leads, restoring }, scope) =>
       findTeamLeadCaller({
         leads,
+        restoring,
         entries: useAppStore.getState().agentStatusByPaneKey,
         worktreeIdOfTab,
         repoWorktreeIds: scope.worktreeIds
       }),
     readState: readTeamLeadState,
     readQuestions: readTeamOwnerQuestions,
+    readXp: readTeamXp,
     modelOf: (args) => {
       const repo = useAppStore.getState().repos.find((one) => one.id === args.repoId)
-      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false })
+      // Why the resolved language: the setting can be `system`, and roster names come per language.
+      const locale = i18n.language.split('-')[0] ?? 'en'
+      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false, locale })
     },
     publish: (source, scope) => {
       const members = membersOf(source)
