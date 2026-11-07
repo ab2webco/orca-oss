@@ -54,7 +54,8 @@ const team: TeamPanelGameModel = {
   inbox: { kind: 'ready', value: { forYou: 0, waiting: 0, threads: 0, answered: 0 } },
   prs: { kind: 'ready', value: { rows: [], total: 0, listUrl: null, listAction: null } },
   queue: { kind: 'ready', value: [] },
-  machines: { kind: 'ready', value: [] }
+  machines: { kind: 'ready', value: [] },
+  actions: []
 }
 
 const solo: TeamPanelSoloModel = {
