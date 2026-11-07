@@ -345,6 +345,21 @@ describe('teamCardsOf', () => {
     })
   })
 
+  it.each([
+    'orca orchestration send --dispatch-capability dcap_B7igsCMGVjop78B6D_HS4i8Mdq --type heartbeat',
+    'orca orchestration ask --dispatch-capability=dcap_Abc-123_x --question "Merge?"',
+    'echo dcap_Abc123xyz'
+  ])('never puts a dispatch capability on a card: %s', (toolInput) => {
+    const cards = teamCardsOf(
+      state([{ ...lead, toolName: 'Bash', toolInput }, agent({ toolName: 'Bash', toolInput })]),
+      new Set()
+    )
+    const shown = JSON.stringify(cards)
+    expect(shown).not.toMatch(/dcap_/)
+    expect(cards?.members[0]?.liveAction).toMatchObject({ kind: 'tool', tool: 'Bash' })
+    expect(JSON.stringify(cards?.members[0]?.liveAction)).toContain('[redacted]')
+  })
+
   it('leaves out agents that are neither the lead nor members', () => {
     const cards = cardsOf([agent({ paneKey: 'other', isMember: false })])
     expect(cards?.members).toEqual([])

@@ -119,13 +119,18 @@ const modelOf = (
     : null
 }
 
+// Why: a worker's Bash line carries its dispatch capability, a bearer secret no card may show.
+const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
+const redactedDetailOf = (text: string | null | undefined): string | null =>
+  text ? text.replace(DISPATCH_CAPABILITY, '[redacted]') : null
+
 const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
   if (agent.activity?.running) {
     const { name, id, url, running } = agent.activity
     return { kind: 'link', name, id, url, running }
   }
   return agent.toolName
-    ? { kind: 'tool', tool: agent.toolName, detail: agent.toolInput || null }
+    ? { kind: 'tool', tool: agent.toolName, detail: redactedDetailOf(agent.toolInput) }
     : null
 }
 
