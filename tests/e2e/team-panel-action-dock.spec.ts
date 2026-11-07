@@ -318,20 +318,23 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       sidebarBefore
     )
     if (CAPTURE_EVIDENCE) {
-      for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
-        await clearForCapture(orcaPage)
-        const box = await menu.boundingBox()
-        const panelBox = await panel.boundingBox()
-        expect(
-          box && panelBox && box.x >= panelBox.x - 1,
-          `menu leaves the panel at ${width}`
-        ).toBe(true)
-        await orcaPage.screenshot({
-          animations: 'disabled',
-          path: testInfo.outputPath(`menu-es-${width}.png`),
-          clip: { x: panelBox!.x, y: 300, width: panelBox!.width, height: 600 }
-        })
+      for (const theme of ['light', 'dark'] as const) {
+        await setTheme(orcaPage, theme)
+        for (const width of WIDTHS) {
+          await orcaPage.setViewportSize({ width, height: 900 })
+          await clearForCapture(orcaPage)
+          const box = await menu.boundingBox()
+          const panelBox = await panel.boundingBox()
+          expect(
+            box && panelBox && box.x >= panelBox.x - 1,
+            `menu leaves the panel at ${width}`
+          ).toBe(true)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`menu-es-${width}-${theme}.png`),
+            clip: { x: panelBox!.x, y: 300, width: panelBox!.width, height: 600 }
+          })
+        }
       }
       await orcaPage.setViewportSize({ width: 1440, height: 900 })
     }
