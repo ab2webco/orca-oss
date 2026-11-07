@@ -180,8 +180,19 @@ function worktreeIdOf(state: TeamSoloSessionsState, entry: AgentStatusEntry): st
   return null
 }
 
+// Why the coordinator too: a member reports its lead's handle, not its own role.
+const isTeamPane = (entry: AgentStatusEntry, leadHandles: ReadonlySet<string>): boolean =>
+  [
+    entry.terminalHandle,
+    entry.orchestration?.coordinatorHandle,
+    entry.orchestration?.parentTerminalHandle
+  ].some((handle) => handle !== undefined && leadHandles.has(handle))
+
 /** Every live agent pane with the facts the sidebar already holds for its workspace. */
-export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSession[] {
+export function teamSoloSessionsOf(
+  state: TeamSoloSessionsState,
+  leadHandles: ReadonlySet<string> = new Set()
+): TeamSoloSession[] {
   const worktrees = new Map<string, Worktree>()
   for (const list of Object.values(state.worktreesByRepo)) {
     for (const worktree of list) {
@@ -213,6 +224,7 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
         worktreeName: worktree.displayName,
         worktreeId: worktree.id,
         isPrimary: worktree.isMainWorktree === true,
+        inTeam: isTeamPane(entry, leadHandles),
         host: hostOf(state, worktree, repo),
         ticket: ticketOf(worktree),
         pr: pullRequestOf(state, worktree, repo),

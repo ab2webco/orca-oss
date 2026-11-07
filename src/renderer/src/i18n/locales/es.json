@@ -15448,7 +15448,8 @@
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
           "leadAsks": "Esperándote · {{question}}",
-          "leadDone": "Listo, sin tareas pendientes"
+          "leadDone": "Listo, sin tareas pendientes",
+          "leadWaits": "Esperándote"
         }
       },
       "game-arcade": {
@@ -15980,8 +15981,13 @@
       "zoomOut": "Alejar",
       "zoomIn": "Acercar",
       "fit": "Ajustar",
-      "projectCount": "{{agents}} agentes · {{workspaces}} espacios de trabajo",
+      "projectCount": "{{agents}} · {{workspaces}}",
       "agentCount": "{{count}} agentes",
+      "agentCount_one": "{{count}} agente",
+      "agentCount_other": "{{count}} agentes",
+      "workspaceCount": "{{count}} espacios de trabajo",
+      "workspaceCount_one": "{{count}} espacio de trabajo",
+      "workspaceCount_other": "{{count}} espacios de trabajo",
       "filters": {
         "orchestrationLinksHidden": "Enlaces de orquestación ocultos",
         "title": "Controles del mapa",
@@ -16292,7 +16298,8 @@
       "waitingEmpty": "Ningún miembro espera respuesta.",
       "answeredEmpty": "Todavía no hay nada respondido.",
       "leadAnsweredText": "Respondió el lead: {{text}}",
-      "answer": "Responder"
+      "answer": "Responder",
+      "answerFailed": "No se pudo enviar la respuesta. Abre la terminal."
     },
     "age": {
       "now": "ahora",
@@ -16309,5 +16316,9 @@
     "one": "{{name}} no se ejecuta: falta su script {{script}}. Reinstálalo o quita el hook de settings.json.",
     "manyMore": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}} y {{more}} más. El log de Orca Lab tiene cada ruta.",
     "many": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}}. El log de Orca Lab tiene cada ruta."
+  },
+  "agentQuestionNotification": {
+    "title": "{{context}} - {{agent}} te pregunta",
+    "body": "Abre la Bandeja para responder."
   }
 }

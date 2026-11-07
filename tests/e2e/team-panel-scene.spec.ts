@@ -11,6 +11,8 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
+const LONG_COMMAND =
+  'cat /Users/dev/orca/src/renderer/src/components/team-scene/TeamSceneBubbles.tsx'
 const ART_STYLES = ['figures', 'office'] as const
 const ADVISOR_STYLES = ['pixel', ...ART_STYLES] as const
 const ART_STAGE_HEIGHT = 176
@@ -374,6 +376,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
           `lead and advisor bubbles clash at ${width}px ${style}`
         ).toBe(false)
         expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
+
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${style}`).toBeLessThanOrEqual(0)
         await orcaPage.screenshot({
@@ -392,6 +395,38 @@ test('the Team panel draws the live scene beside a member opened under its heade
         await expect(leadBubble).toBeVisible()
         await orcaPage.screenshot({
           path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-faded.png`)
+        })
+      }
+    }
+
+    // ORCA-1129: one long unbroken path wraps or ends in an ellipsis, never cut mid-word.
+    await emitCodexHookStatus(endpoint, {
+      paneKey: pane.paneKey,
+      worktreeId,
+      state: 'working',
+      tool: 'exec_command',
+      toolInput: { cmd: LONG_COMMAND }
+    })
+    for (const style of ADVISOR_STYLES) {
+      await orcaPage.evaluate(
+        (next) =>
+          window
+            .__store!.getState()
+            .updateSettings({ orchestratorGame: { panel: { style: next } } }),
+        style
+      )
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        // Why 30 s: game.state names the new tool at the panel's next 20 s read.
+        await expect(leadBubble).toHaveText(`exec_command · ${LONG_COMMAND}`, { timeout: 30_000 })
+        await expect(leadBubble).toBeVisible()
+        const cut = await leadBubble
+          .locator('span')
+          .first()
+          .evaluate((text) => text.scrollWidth - text.clientWidth)
+        expect(cut, `the lead's bubble cuts its text at ${width}px ${style}`).toBeLessThanOrEqual(0)
+        await scene.screenshot({
+          path: testInfo.outputPath(`team-scene-long-command-${style}-${width}-dark.png`)
         })
       }
     }
