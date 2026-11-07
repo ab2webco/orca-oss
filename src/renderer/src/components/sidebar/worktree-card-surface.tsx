@@ -6,6 +6,7 @@ import { AutoRenameFailedDialog } from './AutoRenameFailedDialog'
 import WorktreeContextMenu from './WorktreeContextMenu'
 import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
+import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
 import { WorktreeCardParentContent } from './worktree-card-parent-content'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
@@ -76,7 +77,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
   )
 
   const parentCardBodyWithHoverDetails =
-    hasHoverDetails && !titleRenaming ? (
+    hasHoverDetails && !titleRenaming && !card.activityViewOpen ? (
       <WorktreeCardDetailsHover
         issue={hoverIssue}
         linearIssue={hoverLinearIssue}
@@ -91,7 +92,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         workspaceTitle={hoverWorkspaceTitle}
         workspaceTitleRenameDisabled={isDeleting || affiliateListMode}
         detailsAfter={
-          workspacePorts.length > 0 ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null
+          <>
+            <WorktreeCardAgentHoverDetails worktree={worktree} repo={card.repo} />
+            {workspacePorts.length > 0 ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null}
+          </>
         }
         openDelay={100}
         hoverControl={detailsHoverControl}

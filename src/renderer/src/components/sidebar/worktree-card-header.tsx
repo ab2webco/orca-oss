@@ -77,7 +77,8 @@ export function WorktreeCardHeader({
     titleRenaming,
     handleOpenRenameErrorDialog,
     isFolder,
-    handleWorkspaceQuickAction
+    handleWorkspaceQuickAction,
+    cardProps
   } = card
   const {
     showPinnedRepoIcon,
@@ -262,7 +263,9 @@ export function WorktreeCardHeader({
           </Tooltip>
         )}
 
-        <WorktreeCardClaudeAccountChip worktree={worktree} repo={repo} />
+        {cardProps.includes('account') ? (
+          <WorktreeCardClaudeAccountChip worktree={worktree} repo={repo} />
+        ) : null}
 
         {showTitleRowIndicators && titleRowIndicators}
       </div>

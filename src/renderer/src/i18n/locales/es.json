@@ -4604,7 +4604,9 @@
           "219ebf1961": "Nombre de rama",
           "folderPathIdentity": "Rama / ruta de carpeta",
           "cli": "Orca Lab CLI",
-          "showSection": "Mostrar"
+          "showSection": "Mostrar",
+          "account": "Cuenta",
+          "model": "Modelo y esfuerzo"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",
@@ -16251,7 +16253,8 @@
       "countNeedsYou_other": "{{count}} te necesitan",
       "countWorking": "{{count}} trabajando",
       "countDone_one": "{{count}} terminado",
-      "countDone_other": "{{count}} terminados"
+      "countDone_other": "{{count}} terminados",
+      "agent": "Agente"
     },
     "lead": {
       "badge": "Líder",
