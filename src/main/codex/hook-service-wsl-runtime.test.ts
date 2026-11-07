@@ -186,7 +186,8 @@ describe('Codex WSL runtime hook install', () => {
       expect(command).toBe(expectedManagedCommand(plan.commandScriptPath))
 
       const result = spawnSync('/bin/sh', ['-c', command!], {
-        input: Buffer.alloc(1_000_000, 'x')
+        input: Buffer.alloc(1_000_000, 'x'),
+        timeout: 20_000
       })
       expect(result.error).toBeUndefined()
       expect(result.status).toBe(0)
@@ -326,9 +327,11 @@ describe('Codex WSL runtime hook install', () => {
           ORCA_AGENT_HOOK_TOKEN: 'stale-token',
           ORCA_PANE_KEY: 'pane-1',
           ORCA_TEST_CAPTURE: capturePath
-        }
+        },
+        timeout: 20_000
       })
 
+      expect(result.error).toBeUndefined()
       expect(result.status).toBe(0)
       const posted = readFileSync(capturePath, 'utf-8')
       expect(posted).toContain('http://127.0.0.1:43210/hook/codex')
@@ -368,9 +371,11 @@ describe('Codex WSL runtime hook install', () => {
           ORCA_AGENT_HOOK_TOKEN: 'token',
           ORCA_PANE_KEY: 'pane-1',
           ORCA_TEST_CAPTURE: capturePath
-        }
+        },
+        timeout: 20_000
       })
 
+      expect(result.error).toBeUndefined()
       expect(result.status).toBe(0)
       const posted = readFileSync(capturePath, 'utf-8')
       expect(posted).toContain('http://127.0.0.1:43210/hook/codex')
