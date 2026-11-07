@@ -63,7 +63,7 @@ type WorkerStartResult = Pick<
   GameLaunchResult,
   'runId' | 'taskId' | 'dispatchId' | 'state' | 'setupQueue' | 'lastError'
 > & {
-  effects?: { kind: string; id?: string }[]
+  effects?: { kind: string; id?: string; action?: string; warning?: string }[]
   /** The host's own account for a member placed with --on; only its email crosses back (ORCA-798). */
   account?: { provider: string; email: string }
   /** A member placed with --on that runs on its host's global login, and why. */
