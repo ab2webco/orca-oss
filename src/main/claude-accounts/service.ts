@@ -100,6 +100,10 @@ import {
 } from './runtime-selection'
 import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
 import { assertRefreshChainNotHeldByOtherAccount } from './claude-refresh-chain-ownership'
+import {
+  applyLongLivedTokenToVaultSettings,
+  normalizeLongLivedToken
+} from './claude-long-lived-token'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const STATUS_TIMEOUT_MS = 20_000
@@ -253,6 +257,75 @@ export class ClaudeAccountService {
         'account-record'
       )
     )
+  }
+
+  /**
+   * Stores (or clears, with null) a `claude setup-token` credential in one account's vault on
+   * this host. Launches on that vault then authenticate without refreshing the account's
+   * single-use chain (ORCA-1039). `accountSelector` is an account id or email.
+   */
+  async setLongLivedToken(
+    accountSelector: string,
+    rawToken: string | null
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const account = this.resolveOAuthAccountSelector(accountSelector)
+    const token = rawToken === null ? null : normalizeLongLivedToken(rawToken)
+    return this.serializeMutation(() =>
+      this.withManagedAccountMutation(
+        account.id,
+        async () => this.doSetLongLivedToken(account.id, token),
+        'account-record'
+      )
+    )
+  }
+
+  private resolveOAuthAccountSelector(selector: string): ClaudeManagedAccount {
+    const wanted = selector.trim()
+    const accounts = this.store.getSettings().claudeManagedAccounts
+    const byId = accounts.find((entry) => entry.id === wanted)
+    const byEmail = accounts.filter(
+      (entry) => entry.email.trim().toLowerCase() === wanted.toLowerCase()
+    )
+    if (!byId && byEmail.length > 1) {
+      throw new Error('More than one managed Claude account has that email; use its id.')
+    }
+    const account = byId ?? byEmail[0]
+    if (!account) {
+      throw new Error('No managed Claude account matches that email or id.')
+    }
+    if (account.authMethod === 'custom-endpoint') {
+      throw new Error('A long-lived token belongs to a Claude sign-in, not a custom endpoint.')
+    }
+    if ((account.managedAuthRuntime ?? 'host') !== 'host') {
+      throw new Error('Long-lived tokens are not supported for WSL accounts yet.')
+    }
+    return account
+  }
+
+  private async doSetLongLivedToken(
+    accountId: string,
+    token: string | null
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const account = this.requireAccount(accountId)
+    const owned = resolveOwnedClaudeManagedAuthPath(accountId, account.managedAuthPath)
+    if (!owned) {
+      throw new Error('Managed Claude auth storage is not owned by Orca Lab.')
+    }
+    writeClaudeManagedAuthFile(
+      owned,
+      'settings.json',
+      applyLongLivedTokenToVaultSettings(readClaudeManagedAuthFile(owned, 'settings.json'), token)
+    )
+    const now = Date.now()
+    const settings = this.store.getSettings()
+    this.store.updateSettings({
+      claudeManagedAccounts: settings.claudeManagedAccounts.map((entry) =>
+        entry.id === accountId
+          ? { ...entry, longLivedTokenSetAt: token === null ? null : now, updatedAt: now }
+          : entry
+      )
+    })
+    return this.getSnapshot()
   }
 
   /** Returns the current endpoint config (never the token) to pre-fill the edit dialog. */
@@ -1228,6 +1301,7 @@ export class ClaudeAccountService {
       endpointLabel: account.endpointLabel ?? null,
       endpointBaseUrl: account.endpointBaseUrl ?? null,
       endpointModel: account.endpointModel ?? null,
+      longLivedTokenSetAt: account.longLivedTokenSetAt ?? null,
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
       lastAuthenticatedAt: account.lastAuthenticatedAt
