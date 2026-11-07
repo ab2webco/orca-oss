@@ -16298,6 +16298,9 @@
       "minutes": "{{count}} min",
       "hours": "{{count}} h",
       "days": "{{count}} d"
+    },
+    "display": {
+      "noData": "Sin datos"
     }
   },
   "claudeDeadHooks": {
