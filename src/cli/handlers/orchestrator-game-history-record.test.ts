@@ -44,7 +44,7 @@ function clientWith(mail: Mail[]) {
         return { result: { messages: to, count: to.length } }
       }
       if (method === 'orchestration.workerShow') {
-        return { result: { worker: { created_at: `launched ${params.dispatch}` } } }
+        return { result: { worker: { created_at: `launched ${String(params.dispatch)}` } } }
       }
       if (method === 'game.historyRecord') {
         recorded.push(params.record as GameHistoryRecord)
