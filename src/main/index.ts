@@ -368,6 +368,7 @@ import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
 import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
 import { createPluginWorkerFactory, resolvePluginWorkerHome } from './plugins/plugin-worker-home'
 import { getMainE2EConfig } from './e2e-config'
+import { startDeadClaudeHookReporter } from './claude/dead-hook-report'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
 import { setPluginServiceForRpc } from './runtime/rpc/methods/plugins'
 import {
@@ -3268,6 +3269,7 @@ void app.whenReady().then(async () => {
       console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
     })
   }
+  startDeadClaudeHookReporter()
   app.on('child-process-gone', (_event, details) => {
     recordProcessGoneCrash('child', details.type, details.reason, details.exitCode ?? null, {
       name: details.name,
