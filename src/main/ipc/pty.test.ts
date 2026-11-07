@@ -2790,6 +2790,141 @@ describe('registerPtyHandlers', () => {
       expect(prepareClaudeAuth).not.toHaveBeenCalled()
     })
 
+    // ORCA-718: a resume recorded before transcript paths were kept carries only the session id.
+    describe('a Claude resume with no transcript path', () => {
+      const SESSION = '0f8fad5b-d9cb-469f-a165-70867728950e'
+      let root: string
+      let previousConfigDir: string | undefined
+
+      beforeEach(async () => {
+        const { mkdtemp, mkdir } = await import('node:fs/promises')
+        const { tmpdir } = await import('node:os')
+        root = await mkdtemp(join(tmpdir(), 'orca-718-lookup-'))
+        await mkdir(join(root, 'home', 'projects', '-repo'), { recursive: true })
+        await mkdir(join(root, 'vault', 'projects', '-repo'), { recursive: true })
+        previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+        process.env.CLAUDE_CONFIG_DIR = join(root, 'home')
+      })
+
+      afterEach(async () => {
+        if (previousConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        }
+        const { rm } = await import('node:fs/promises')
+        await rm(root, { recursive: true, force: true })
+      })
+
+      async function keepSessionIn(...universes: ('home' | 'vault')[]): Promise<void> {
+        const { writeFile } = await import('node:fs/promises')
+        for (const universe of universes) {
+          await writeFile(join(root, universe, 'projects', '-repo', `${SESSION}.jsonl`), '{}\n')
+        }
+      }
+
+      function storeWithVault() {
+        return {
+          getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })),
+          getSettings: vi.fn(() => ({
+            claudeManagedAccounts: [
+              {
+                id: 'account-lead',
+                email: 'lead@example.com',
+                managedAuthPath: join(root, 'vault')
+              }
+            ]
+          }))
+        }
+      }
+
+      it('resumes on the one account whose vault holds the conversation', async () => {
+        await keepSessionIn('vault')
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWithVault() as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        const spawnResult = (await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: `claude --resume ${SESSION}`,
+          worktreeId: 'wt-pinned',
+          resumeProviderSession: { key: 'session_id', id: SESSION }
+        })) as { id: string }
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-lead' }),
+          undefined
+        )
+        await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      })
+
+      it('refuses, instead of the global login, when no account holds the conversation', async () => {
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+        const { runtime, getController } = makeRuntimeControllerHarness()
+        registerPtyHandlers(
+          mainWindow as never,
+          runtime as never,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWithVault() as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        await expect(
+          getController().spawn({
+            cols: 80,
+            rows: 24,
+            command: `claude --resume ${SESSION}`,
+            worktreeId: 'wt-pinned',
+            resumeProviderSession: { key: 'session_id', id: SESSION }
+          })
+        ).rejects.toThrow('Orca could not find this Claude conversation under any Claude account')
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+      })
+
+      it('refuses to guess when more than one account holds the conversation', async () => {
+        await keepSessionIn('home', 'vault')
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWithVault() as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        await expect(
+          handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            command: `claude --resume ${SESSION}`,
+            worktreeId: 'wt-pinned',
+            resumeProviderSession: { key: 'session_id', id: SESSION }
+          })
+        ).rejects.toThrow(
+          'This Claude conversation is stored under more than one Claude account (the default login, lead@example.com)'
+        )
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+      })
+    })
+
     it('lets a launch-scoped Claude account beat the worktree pin on the runtime path', async () => {
       installExitOnKillSpawnMock()
       const { runtime, getController } = makeRuntimeControllerHarness()

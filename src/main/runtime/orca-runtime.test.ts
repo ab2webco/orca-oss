@@ -13991,6 +13991,29 @@ describe('OrcaRuntimeService', () => {
     expect(worker?.env ?? {}).not.toHaveProperty('CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION')
   })
 
+  // ORCA-718: without the session the spawn cannot tell which account a reopened lead belongs to.
+  it('hands an ensured Claude resume its provider session, so the spawn can find its account', async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await runtime.ensureAgentSession({
+      kind: 'explicit',
+      worktree: `id:${TEST_WORKTREE_ID}`,
+      agent: 'claude',
+      providerSession: { key: 'session_id', id: 'lead-session' }
+    })
+
+    expect(spawn.mock.calls[0]?.[0]).toMatchObject({
+      resumeProviderSession: { key: 'session_id', id: 'lead-session' }
+    })
+  })
+
   it('resolves a startupAgent to the CLI binary on Windows, where `cursor` is the IDE', async () => {
     setPlatform('win32')
     const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })

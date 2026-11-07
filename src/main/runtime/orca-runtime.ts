@@ -4001,7 +4001,8 @@ export class OrcaRuntimeService {
         worktreeId: session.worktreeId,
         sessionId: session.sessionId,
         ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-        accountId: session.accountId ?? this.claudeAccountOfTranscript(session.transcriptPath),
+        accountId:
+          session.accountId ?? (await this.claudeAccountOfTranscript(session.transcriptPath)),
         presentation: 'focused'
       }),
     focus: async (handle) => {
@@ -28378,6 +28379,8 @@ export class OrcaRuntimeService {
       env: startup.env,
       launchConfig: startup.launchConfig,
       launchAgent: request.agent,
+      // Why: the spawn picks a Claude resume's account from this session (ORCA-718).
+      ...(request.agent === 'claude' ? { resumeProviderSession: identity.providerSession } : {}),
       presentation: request.presentation ?? 'background',
       tabId: request.placement?.tabId,
       leafId: request.placement?.leafId,
@@ -31640,11 +31643,14 @@ export class OrcaRuntimeService {
   }
 
   /** The managed account a lead's transcript lives under; null for the shared home or no verdict. */
-  private claudeAccountOfTranscript(transcriptPath: string | undefined): string | null {
+  private async claudeAccountOfTranscript(
+    transcriptPath: string | undefined
+  ): Promise<string | null> {
     // Why: a lead whose pane binding was gone when it registered still names its account by path,
-    // and reopening it on the global login lost the conversation (ORCA-718).
+    // and reopening it on the global login lost the conversation (ORCA-718). With no path the
+    // spawn looks the session up itself.
     return (
-      resolveClaudeLaunchAccountForSpawn({
+      (await resolveClaudeLaunchAccountForSpawn({
         launchAccountId: undefined,
         resumeProviderSession: transcriptPath
           ? { key: 'session_id', id: 'lead', transcriptPath }
@@ -31658,7 +31664,7 @@ export class OrcaRuntimeService {
             return true
           }
         }
-      }) ?? null
+      })) ?? null
     )
   }
 

@@ -54,6 +54,8 @@ type LaunchOptions = {
 type RestartSession = {
   userDataDir: string
   seedCodexResumeRollout: (sessionId: string, cwd: string) => string
+  /** Writes a Claude conversation into the isolated shared home, as a resumable session needs. */
+  seedClaudeTranscript: (sessionId: string) => string
   launch: (options?: LaunchOptions) => Promise<LaunchedOrca>
   /** Gracefully close a launch, letting beforeunload flush session state. */
   close: (app: ElectronApplication) => Promise<void>
@@ -109,8 +111,11 @@ function createRestartLaunchIsolation(
   headful: boolean,
   extraEnv: Record<string, string>
 ): ElectronHomeIsolation {
-  const { ELECTRON_RUN_AS_NODE: _unused, ...cleanEnv } = process.env
+  // Why CLAUDE_CONFIG_DIR: the app's shared Claude home must be the isolated one, never the
+  // runner's own account vault (ORCA-718 looks conversations up there).
+  const { ELECTRON_RUN_AS_NODE: _unused, CLAUDE_CONFIG_DIR: _claudeHome, ...cleanEnv } = process.env
   void _unused
+  void _claudeHome
   return createElectronHomeIsolation({
     inheritedEnv: cleanEnv,
     launchEnv: {
@@ -176,6 +181,14 @@ export function createRestartSession(
     return transcriptPath
   }
 
+  const seedClaudeTranscript = (sessionId: string): string => {
+    const projectDir = path.join(homeIsolation.isolatedHome, '.claude', 'projects', '-e2e-repo')
+    mkdirSync(projectDir, { recursive: true })
+    const transcriptPath = path.join(projectDir, `${sessionId}.jsonl`)
+    writeFileSync(transcriptPath, `${JSON.stringify({ type: 'summary', sessionId })}\n`)
+    return transcriptPath
+  }
+
   const launch = async (options?: LaunchOptions): Promise<LaunchedOrca> => {
     runtimeWsPort ??= await reserveRestartRuntimeWsPort()
     const launchElectron = (): Promise<ElectronApplication> =>
@@ -228,7 +241,7 @@ export function createRestartSession(
     }
   }
 
-  return { userDataDir, seedCodexResumeRollout, launch, close, dispose }
+  return { userDataDir, seedCodexResumeRollout, seedClaudeTranscript, launch, close, dispose }
 }
 
 /**

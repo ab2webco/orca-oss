@@ -93,111 +93,130 @@ function stripPersistedPtyOwnership(userDataDir: string): void {
 
 test.describe.configure({ mode: 'serial' })
 
-test('a restored Claude tab never resumes on the global login when its account was removed', async ({
-  flushRendererRecoveryEvidenceQueue
-}, testInfo) => {
-  void flushRendererRecoveryEvidenceQueue
-  const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
-  const session = createRestartSession(testInfo)
-  let firstApp: ElectronApplication | null = null
-  let secondApp: ElectronApplication | null = null
-
-  try {
-    const firstLaunch = await session.launch()
-    firstApp = firstLaunch.app
-    const page = firstLaunch.page
-    const worktreeId = await attachRepoAndOpenTerminal(page, repoPath)
-    await waitForSessionReady(page)
-    await expect
-      .poll(() => page.evaluate(() => window.__store?.getState().hydrationSucceeded === true), {
-        timeout: 30_000
-      })
-      .toBe(true)
-    await waitForActiveWorktree(page)
-    await ensureTerminalVisible(page)
-    await waitForActiveTerminalManager(page, 30_000)
-    await waitForActivePanePtyId(page)
-    const { paneKey } = await waitForActivePaneHookDescriptor(page)
-
-    // Why `echo claude`: the spawn must read as a Claude launch without a real CLI; on the old
-    // code it ran and printed the resume line on the global login.
-    const record: SleepingAgentSessionRecord = {
-      paneKey,
-      tabId: paneKey.split(':')[0]!,
-      worktreeId,
-      agent: 'claude',
-      providerSession: {
-        key: 'session_id',
-        id: PROVIDER_SESSION_ID,
-        transcriptPath: path.join(
-          session.userDataDir,
-          'claude-accounts',
-          'acct-removed',
-          'auth',
-          'projects',
-          '-repo',
-          `${PROVIDER_SESSION_ID}.jsonl`
-        )
-      },
-      prompt: '',
-      state: 'working',
-      capturedAt: Date.now(),
-      updatedAt: Date.now(),
-      origin: 'quit',
-      launchConfig: { agentCommand: 'echo claude', agentArgs: '', agentEnv: {} }
-    }
-    await page.evaluate((next) => {
-      window.__store?.setState((state) => ({
-        sleepingAgentSessionsByPaneKey: {
-          ...state.sleepingAgentSessionsByPaneKey,
-          [next.paneKey]: next
-        }
-      }))
-    }, record)
-    await expect
-      .poll(
-        () =>
-          Object.values(
-            readPersistedData(session.userDataDir).workspaceSession
-              ?.sleepingAgentSessionsByPaneKey ?? {}
-          ).some((entry) => entry.providerSession?.id === PROVIDER_SESSION_ID),
-        { timeout: 30_000, message: 'the resume record never reached disk' }
-      )
-      .toBe(true)
-
-    const daemonPid = readDaemonPid(session.userDataDir)
-    await forceKillElectronApp(firstApp)
-    firstApp = null
-    killPid(daemonPid)
-    stripPersistedPtyOwnership(session.userDataDir)
-
-    const secondLaunch = await session.launch()
-    secondApp = secondLaunch.app
-    const restored = secondLaunch.page
-    await waitForSessionReady(restored)
-    await expect
-      .poll(() => restored.evaluate(() => window.__store?.getState().activeWorktreeId), {
-        timeout: 15_000
-      })
-      .toBe(worktreeId)
-    await ensureTerminalVisible(restored)
-    await waitForActiveTerminalManager(restored, 30_000)
-
-    await expect
-      .poll(() => restored.evaluate(() => document.body.innerText), {
-        timeout: 30_000,
-        message: 'the restored pane never said its Claude account was removed'
-      })
-      .toContain('The Claude account that owns this conversation was removed')
-    expect(await getTerminalContent(restored)).not.toContain(`--resume ${PROVIDER_SESSION_ID}`)
-    await restored.screenshot({ path: testInfo.outputPath('restored-pane.png') })
-  } finally {
-    if (secondApp) {
-      await session.close(secondApp)
-    }
-    if (firstApp) {
-      await forceKillElectronApp(firstApp)
-    }
-    await session.dispose()
+const CASES = [
+  {
+    title: 'when its account was removed',
+    transcriptPath: (userDataDir: string) =>
+      path.join(
+        userDataDir,
+        'claude-accounts',
+        'acct-removed',
+        'auth',
+        'projects',
+        '-repo',
+        `${PROVIDER_SESSION_ID}.jsonl`
+      ),
+    refusal: 'The Claude account that owns this conversation was removed'
+  },
+  {
+    // Why: a record kept before transcript paths were stored carries the session id alone.
+    title: 'when no transcript path was kept and no account holds the conversation',
+    transcriptPath: () => undefined,
+    refusal: 'Orca could not find this Claude conversation under any Claude account'
   }
-})
+] as const
+
+for (const { title, transcriptPath, refusal } of CASES) {
+  test(`a restored Claude tab never resumes on the global login ${title}`, async ({
+    flushRendererRecoveryEvidenceQueue
+  }, testInfo) => {
+    void flushRendererRecoveryEvidenceQueue
+    const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
+    const session = createRestartSession(testInfo)
+    let firstApp: ElectronApplication | null = null
+    let secondApp: ElectronApplication | null = null
+
+    try {
+      const firstLaunch = await session.launch()
+      firstApp = firstLaunch.app
+      const page = firstLaunch.page
+      const worktreeId = await attachRepoAndOpenTerminal(page, repoPath)
+      await waitForSessionReady(page)
+      await expect
+        .poll(() => page.evaluate(() => window.__store?.getState().hydrationSucceeded === true), {
+          timeout: 30_000
+        })
+        .toBe(true)
+      await waitForActiveWorktree(page)
+      await ensureTerminalVisible(page)
+      await waitForActiveTerminalManager(page, 30_000)
+      await waitForActivePanePtyId(page)
+      const { paneKey } = await waitForActivePaneHookDescriptor(page)
+
+      // Why `echo claude`: the spawn must read as a Claude launch without a real CLI; on the old
+      // code it ran and printed the resume line on the global login.
+      const record: SleepingAgentSessionRecord = {
+        paneKey,
+        tabId: paneKey.split(':')[0]!,
+        worktreeId,
+        agent: 'claude',
+        providerSession: {
+          key: 'session_id',
+          id: PROVIDER_SESSION_ID,
+          ...(transcriptPath(session.userDataDir)
+            ? { transcriptPath: transcriptPath(session.userDataDir) }
+            : {})
+        },
+        prompt: '',
+        state: 'working',
+        capturedAt: Date.now(),
+        updatedAt: Date.now(),
+        origin: 'quit',
+        launchConfig: { agentCommand: 'echo claude', agentArgs: '', agentEnv: {} }
+      }
+      await page.evaluate((next) => {
+        window.__store?.setState((state) => ({
+          sleepingAgentSessionsByPaneKey: {
+            ...state.sleepingAgentSessionsByPaneKey,
+            [next.paneKey]: next
+          }
+        }))
+      }, record)
+      await expect
+        .poll(
+          () =>
+            Object.values(
+              readPersistedData(session.userDataDir).workspaceSession
+                ?.sleepingAgentSessionsByPaneKey ?? {}
+            ).some((entry) => entry.providerSession?.id === PROVIDER_SESSION_ID),
+          { timeout: 30_000, message: 'the resume record never reached disk' }
+        )
+        .toBe(true)
+
+      const daemonPid = readDaemonPid(session.userDataDir)
+      await forceKillElectronApp(firstApp)
+      firstApp = null
+      killPid(daemonPid)
+      stripPersistedPtyOwnership(session.userDataDir)
+
+      const secondLaunch = await session.launch()
+      secondApp = secondLaunch.app
+      const restored = secondLaunch.page
+      await waitForSessionReady(restored)
+      await expect
+        .poll(() => restored.evaluate(() => window.__store?.getState().activeWorktreeId), {
+          timeout: 15_000
+        })
+        .toBe(worktreeId)
+      await ensureTerminalVisible(restored)
+      await waitForActiveTerminalManager(restored, 30_000)
+
+      await expect
+        .poll(() => restored.evaluate(() => document.body.innerText), {
+          timeout: 30_000,
+          message: `the restored pane never refused to resume ${title}`
+        })
+        .toContain(refusal)
+      expect(await getTerminalContent(restored)).not.toContain(`--resume ${PROVIDER_SESSION_ID}`)
+      await restored.screenshot({ path: testInfo.outputPath('restored-pane.png') })
+    } finally {
+      if (secondApp) {
+        await session.close(secondApp)
+      }
+      if (firstApp) {
+        await forceKillElectronApp(firstApp)
+      }
+      await session.dispose()
+    }
+  })
+}
