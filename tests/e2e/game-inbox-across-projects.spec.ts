@@ -151,6 +151,16 @@ test('another project’s question is announced, counted, answered and opens the
     // The project left behind is now the other one, listed under its name.
     await expect(inbox.getByRole('heading', { name: firstName ?? '' })).toBeVisible()
     await expect(inbox.locator('[data-game-owner-question]')).toHaveCount(2)
+    // V28's card starts closed (ORCA-1095); opened here so the boxes are measured, not skipped.
+    await expect(inbox.getByRole('textbox')).toHaveCount(0)
+    for (
+      let left = await inbox.getByRole('button', { name: 'Answer' }).count();
+      left > 0;
+      left -= 1
+    ) {
+      await inbox.getByRole('button', { name: 'Answer' }).first().click()
+    }
+    await expect(inbox.getByRole('textbox')).toHaveCount(2)
 
     for (const width of [1440, 768, 390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })

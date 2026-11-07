@@ -43,7 +43,7 @@ const THREADS: GameInboxThreads = {
           from: 'ORCA-1039',
           to: 'lead',
           kind: 'status',
-          subject: 'Approach approved',
+          subject: 'ORCA-1039: Approach approved',
           body: '',
           failure: null
         }
@@ -97,6 +97,7 @@ function renderInbox(
       agentQuestions={[]}
       answeredQuestions={[]}
       onOpenAgent={vi.fn()}
+      memberNames={new Map([['ORCA-1033', 'Sabio']])}
       {...over}
     />
   )
@@ -120,6 +121,23 @@ describe('Inbox tab', () => {
     expect(view.getByText('Merge #923 now or wait for #915?')).toBeTruthy()
     expect(view.getByText('Ab2Web · imac')).toBeTruthy()
     expect(view.getByText('Ship the price change today?')).toBeTruthy()
+  })
+
+  it("marks this project's question as the one to act on, as V28 does", () => {
+    const view = renderInbox()
+    const mine = view.container.querySelector<HTMLElement>('[data-game-owner-question="q-1"]')!
+    const other = view.container.querySelector<HTMLElement>('[data-game-owner-question="q-web"]')!
+
+    expect(mine.getAttribute('data-needs-you')).toBe('true')
+    expect(mine.textContent).toContain('Needs you')
+    expect(mine.className).toContain('bg-status-attention')
+    const [first, second] = [...mine.querySelectorAll('button')].filter((one) =>
+      ['Merge now', 'Wait for #915'].includes(one.textContent ?? '')
+    )
+    expect(first.getAttribute('data-variant')).toBe('default')
+    expect(second.getAttribute('data-variant')).toBe('secondary')
+    expect(other.getAttribute('data-needs-you')).toBeNull()
+    expect(other.textContent).not.toContain('Needs you')
   })
 
   it('answers a question through its own project', async () => {
@@ -150,14 +168,38 @@ describe('Inbox tab', () => {
     expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('1')
 
     pick(view, /Waiting/)
-    expect(view.getByText('Rebase #917 now or wait for #913?')).toBeTruthy()
-    expect(view.getByPlaceholderText('Your answer')).toBeTruthy()
+    expect(view.getByText(/Rebase #917 now or wait for #913\?/)).toBeTruthy()
 
     pick(view, /Threads/)
     expect(view.getByTestId('game-inbox-thread-ORCA-1039')).toBeTruthy()
 
     pick(view, /Answered/)
     expect(view.getByText('Include #911 in lab.115?')).toBeTruthy()
+  })
+
+  it('lists Waiting compactly, as V28 does: ticket, age, and who asks what', () => {
+    const view = renderInbox()
+    pick(view, /Waiting/)
+    const row = view.getByTestId('team-inbox-waiting-w1')
+
+    expect(row.textContent).toContain('ORCA-1033')
+    expect(row.textContent).toContain('Sabio: Rebase #917 now or wait for #913?')
+    expect(row.textContent).not.toContain('must answer')
+    expect(row.className).not.toContain('border')
+    // Why behind a button: answering a member is the exception; the lead answers by default.
+    expect(view.queryByPlaceholderText('Your answer')).toBeNull()
+    act(() => fireEvent.click(view.getByRole('button', { name: 'Answer' })))
+    expect(view.getByPlaceholderText('Your answer')).toBeTruthy()
+  })
+
+  it('lists a thread with its message count and last line, the ticket said once', () => {
+    const view = renderInbox()
+    pick(view, /Threads/)
+    const row = view.getByTestId('game-inbox-thread-ORCA-1039')
+
+    expect(row.textContent).toContain('1 message')
+    expect(row.textContent).toContain('Approach approved')
+    expect(row.textContent!.match(/ORCA-1039/g)).toHaveLength(1)
   })
 
   // Why: the model counts the lead's own inbox as a thread, so the shell may not draw empty itself.
@@ -224,9 +266,14 @@ describe('Inbox tab', () => {
 
     expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('2')
     pick(view, /Answered/)
-    expect(view.getByText('You answered')).toBeTruthy()
+    // V28 is one plain list: no outlined cards, no second block with its own heading.
+    expect(view.queryByText('You answered')).toBeNull()
+    expect(view.queryByText('The lead answered')).toBeNull()
     expect(view.getByText('You answered: Yes, include it')).toBeTruthy()
-    expect(view.getByText('The lead answered')).toBeTruthy()
+    expect(view.getByText('The lead answered: Yes, include it')).toBeTruthy()
+    const rows = view.getAllByTestId(/^team-inbox-answered-/)
+    expect(rows).toHaveLength(2)
+    expect(rows.every((row) => !row.className.includes('border'))).toBe(true)
   })
 
   it('says nothing waits when For you is empty', () => {

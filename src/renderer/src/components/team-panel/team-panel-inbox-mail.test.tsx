@@ -105,6 +105,7 @@ function renderSheet(
       agentQuestions={[]}
       answeredQuestions={[]}
       onOpenAgent={() => {}}
+      memberNames={new Map()}
     />
   )
 }
@@ -158,16 +159,15 @@ describe("Inbox tab: the lead's mail", () => {
     expect(view.getByTestId('team-panel-inbox')).toBeTruthy()
   })
 
-  it('lists under Waiting what the lead has not answered, with its age and who must answer', () => {
+  // V28's compact row (ORCA-1095): ticket, age and the question, no kind label or answerer line.
+  it('lists under Waiting what the lead has not answered, with its ticket and age', () => {
     const view = renderSheet()
     tab(view, /Waiting/)
 
-    const row = view.getByTestId('game-inbox-waiting-q1')
+    const row = view.getByTestId('team-inbox-waiting-q1')
     expect(within(row).getByText('ORCA-12')).toBeTruthy()
     expect(within(row).getByText('Which port?')).toBeTruthy()
-    expect(within(row).getByText('Question')).toBeTruthy()
-    expect(row.textContent).toMatch(/lead must answer/)
-    expect(row.textContent).toMatch(/1 hour ago/)
+    expect(row.textContent).toMatch(/1 h/)
   })
 
   it("opens a ticket's thread from Threads: typed messages in order and the failure shown", () => {
@@ -196,11 +196,11 @@ describe("Inbox tab: the lead's mail", () => {
     const view = renderSheet()
     tab(view, /Answered/)
 
-    const row = view.getByTestId('game-inbox-answered-q0')
+    const row = view.getByTestId('team-inbox-answered-q0')
     expect(within(row).getByText('Rebase onto main?')).toBeTruthy()
-    expect(within(row).getByText('Yes, rebase.')).toBeTruthy()
-    expect(within(row).getByText('Decision')).toBeTruthy()
-    expect(row.textContent).toMatch(/You replaced it: No, merge first\./)
+    // Why your words only: once you override the lead, your answer is the one that stands.
+    expect(within(row).getByText('You answered: No, merge first.')).toBeTruthy()
+    expect(row.textContent).toMatch(/1 h/)
   })
 
   it('answers a waiting member for the person, and shows why a reply failed', async () => {
@@ -211,7 +211,8 @@ describe("Inbox tab: the lead's mail", () => {
     })
     const view = renderSheet(onReply)
     tab(view, /Waiting/)
-    const row = view.getByTestId('game-inbox-waiting-q1')
+    const row = view.getByTestId('team-inbox-waiting-q1')
+    act(() => fireEvent.click(within(row).getByRole('button', { name: 'Answer' })))
     const box = within(row).getByRole('textbox', { name: /Your answer to ORCA-12/ })
     expect(box.getAttribute('placeholder')).toBe('Your answer')
 
@@ -230,7 +231,7 @@ describe("Inbox tab: the lead's mail", () => {
     const onReply = vi.fn(async () => {})
     const view = renderSheet(onReply)
     tab(view, /Answered/)
-    const row = view.getByTestId('game-inbox-answered-q0')
+    const row = view.getByTestId('team-inbox-answered-q0')
 
     expect(within(row).queryByRole('textbox')).toBeNull()
     act(() => fireEvent.click(within(row).getByRole('button', { name: /Override/ })))

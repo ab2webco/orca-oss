@@ -94,6 +94,16 @@ test('the Inbox lists every open question for the person and sends the answer th
   await expect(inboxTab).toContainText('6', { timeout: 15_000 })
   await expect(inbox.getByRole('tab', { name: /For you/ })).toHaveAttribute('aria-selected', 'true')
   await expect(inbox.locator('[data-game-owner-question]')).toHaveCount(6)
+  // V28's card starts closed (ORCA-1095); opened here so the boxes are measured, not skipped.
+  await expect(inbox.getByRole('textbox')).toHaveCount(0)
+  for (
+    let left = await inbox.getByRole('button', { name: 'Answer' }).count();
+    left > 0;
+    left -= 1
+  ) {
+    await inbox.getByRole('button', { name: 'Answer' }).first().click()
+  }
+  await expect(inbox.getByRole('textbox')).toHaveCount(6)
   // A screenshot of a list that does not scroll proves nothing about the rows below the fold.
   expect(
     await inbox.evaluate((node) => {
@@ -144,6 +154,9 @@ test('the Inbox lists every open question for the person and sends the answer th
   expect(await answerOf(byOption.result.question.id)).toBe('Wait for lab.112')
 
   const textCard = inbox.locator(`[data-game-owner-question="${byText.result.question.id}"]`)
+  // Why a click: the sidebar was closed above, so the card mounts closed again, as V28 draws it.
+  await expect(textCard.getByRole('textbox')).toHaveCount(0)
+  await textCard.getByRole('button', { name: 'Answer' }).click()
   await textCard.getByRole('textbox', { name: 'Your answer' }).fill('The iMac, it has room')
   await textCard.getByRole('textbox', { name: 'Your answer' }).press('Enter')
   await expect(textCard).toHaveCount(0)

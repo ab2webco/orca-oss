@@ -15390,7 +15390,8 @@
           "failed": "La respuesta no se envió.",
           "yourAnswer": "Tu respuesta",
           "placeholder": "Responde con tus palabras",
-          "send": "Enviar"
+          "send": "Enviar",
+          "needsYou": "Te necesita"
         },
         "SidebarGameInboxEntry": {
           "noWorktree": "Abre este proyecto en Orca para responder."
@@ -15419,7 +15420,9 @@
           "failed": "Falló",
           "back": "Todos los hilos",
           "empty": "Ningún miembro ha hablado con el lead todavía.",
-          "waiting": "{{count}} esperando"
+          "waiting": "{{count}} esperando",
+          "messageOne": "1 mensaje",
+          "messageMany": "{{count}} mensajes"
         },
         "GameMemberReplyForm": {
           "failed": "La respuesta no se envió.",
@@ -16284,7 +16287,11 @@
       "openTerminal": "Abrir terminal",
       "youAnswered": "Respondiste",
       "youAnsweredText": "Respondiste: {{text}}",
-      "leadAnswered": "Respondió el lead"
+      "leadAnswered": "Respondió el lead",
+      "waitingEmpty": "Ningún miembro espera respuesta.",
+      "answeredEmpty": "Todavía no hay nada respondido.",
+      "leadAnsweredText": "Respondió el lead: {{text}}",
+      "answer": "Responder"
     },
     "age": {
       "now": "ahora",

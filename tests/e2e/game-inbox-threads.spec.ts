@@ -192,16 +192,18 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect(inbox.getByRole('tab', { name: /Waiting/ })).toContainText('2')
 
     await inbox.getByRole('tab', { name: /Waiting/ }).click()
-    await expect(inbox.locator('[data-testid^="game-inbox-waiting-"]')).toHaveCount(2)
+    await expect(inbox.locator('[data-testid^="team-inbox-waiting-"]')).toHaveCount(2)
     await captureEveryWidth('waiting')
 
     await inbox.getByRole('tab', { name: /Answered/ }).click()
-    const answered = inbox.locator('[data-testid^="game-inbox-answered-"]')
+    const answered = inbox.locator('[data-testid^="team-inbox-answered-"]')
     await expect(answered).toHaveCount(1)
     await expect(answered).toContainText('8080')
 
     await inbox.getByRole('tab', { name: /Threads/ }).click()
-    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
+    // V28's thread row (ORCA-1095): its message count and last line, not a waiting badge.
+    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText(/\d+ messages/)
+    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText('Ship now?')
     await inbox.getByTestId('game-inbox-thread-ORCA-12').click()
     const messages = inbox.getByTestId('game-inbox-thread-messages')
     await expect(
@@ -232,7 +234,9 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
         })
       ).result.inbox.messages.map((one) => one.subject)
     await inbox.getByRole('tab', { name: /Waiting/ }).click()
-    const renameRow = inbox.getByTestId(`game-inbox-waiting-${renameQuestion}`)
+    const renameRow = inbox.getByTestId(`team-inbox-waiting-${renameQuestion}`)
+    // Why a click first: V28 keeps answering a member behind a button; the lead answers by default.
+    await renameRow.getByRole('button', { name: 'Answer' }).click()
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Keep Inbox')
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
     await expect(renameRow).toHaveCount(0)
@@ -242,7 +246,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
 
     // And overrides an answer the lead gave: the member hears it on that question's thread.
     await inbox.getByRole('tab', { name: /Answered/ }).click()
-    const portRow = inbox.getByTestId(`game-inbox-answered-${portQuestion}`)
+    const portRow = inbox.getByTestId(`team-inbox-answered-${portQuestion}`)
     await portRow.getByRole('button', { name: 'Override' }).click()
     await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
     await captureEveryWidth('override')
@@ -259,7 +263,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect
       .poll(leadMail)
       .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
-    await expect(portRow).toContainText('You replaced it: Use 3000')
+    await expect(portRow).toContainText('You answered: Use 3000')
     await captureEveryWidth('answered-after')
   } finally {
     agent.dispose()

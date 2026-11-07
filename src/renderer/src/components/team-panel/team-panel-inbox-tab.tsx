@@ -9,14 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
-import { GameInboxWaitingList } from '@/components/game-inbox/GameInboxWaitingList'
-import { GameInboxAnsweredList } from '@/components/game-inbox/GameInboxAnsweredList'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
 import { GameInboxUndelivered } from '@/components/game-inbox/GameInboxUndelivered'
-import {
-  GameMemberOverride,
-  GameMemberReplyForm
-} from '@/components/game-inbox/GameMemberReplyForm'
+import { GameMemberOverride } from '@/components/game-inbox/GameMemberReplyForm'
 import type { GameMemberReply } from '@/components/game-inbox/game-inbox-threads-client'
 import {
   gameInboxTargetOf,
@@ -35,7 +30,11 @@ import {
   teamInboxAgentQuestionsOf,
   type TeamInboxAgentQuestion
 } from './team-panel-inbox-agents'
-import { TeamInboxAgentCard, TeamInboxYouAnsweredList } from './team-panel-inbox-items'
+import {
+  TeamInboxAgentCard,
+  TeamInboxAnsweredRows,
+  TeamInboxWaitingRows
+} from './team-panel-inbox-items'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
@@ -67,6 +66,8 @@ export type TeamInboxViewProps = {
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
   onOpenAgent: (question: TeamInboxAgentQuestion) => void
+  /** Each member's character name by ticket, so a waiting question says who asks. */
+  memberNames: ReadonlyMap<string, string>
 }
 
 /** The full questions live only here: For you across projects and hosts, then the lead's mail. */
@@ -155,6 +156,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
                 key={question.id}
                 question={question}
                 placeholder={yourAnswer}
+                needsYou
                 onAnswer={(answer) => props.onAnswer(question.id, answer)}
               />
             ))}
@@ -180,13 +182,16 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         ) : null}
       </TabsContent>
       <TabsContent value="waiting" className={LIST}>
-        <GameInboxWaitingList
+        <TeamInboxWaitingRows
           items={threads.waiting}
+          memberNames={props.memberNames}
+          now={Date.now()}
           renderActions={(item) => (
-            <GameMemberReplyForm
+            <GameMemberOverride
               id={item.id}
               ticket={item.ticket}
               placeholder={yourAnswer}
+              label={translate('teamPanel.inbox.answer', 'Answer')}
               onReply={reply(item)}
             />
           )}
@@ -195,23 +200,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col">
         <GameInboxThreadsView threads={threads.threads} />
       </TabsContent>
-      <TabsContent value="answered" className={`${LIST} space-y-2`}>
-        {answeredQuestions.length > 0 ? (
-          <>
-            <GroupLabel
-              title={translate('teamPanel.inbox.youAnswered', 'You answered')}
-              place={null}
-            />
-            <TeamInboxYouAnsweredList questions={answeredQuestions} />
-            <GroupLabel
-              title={translate('teamPanel.inbox.leadAnswered', 'The lead answered')}
-              place={null}
-            />
-          </>
-        ) : null}
-        <GameInboxAnsweredList
-          items={threads.answered}
-          renderActions={(item) => (
+      <TabsContent value="answered" className={LIST}>
+        <TeamInboxAnsweredRows
+          yours={answeredQuestions}
+          lead={threads.answered}
+          now={Date.now()}
+          renderOverride={(item) => (
             <GameMemberOverride
               id={item.id}
               ticket={item.ticket}
@@ -248,6 +242,15 @@ export function TeamPanelInboxTab({
   // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
+  const memberNames = React.useMemo(
+    () =>
+      new Map(
+        model.kind === 'team'
+          ? model.members.flatMap((one) => (one.ticket ? [[one.ticket.identifier, one.name]] : []))
+          : []
+      ),
+    [model]
+  )
   return (
     <TeamInboxView
       projectName={model.kind === 'team' ? model.projectName : projectName}
@@ -261,6 +264,7 @@ export function TeamPanelInboxTab({
       agentQuestions={teamInboxAgentQuestionsOf(model)}
       answeredQuestions={answered}
       onOpenAgent={openTeamInboxAgent}
+      memberNames={memberNames}
     />
   )
 }
