@@ -2,166 +2,166 @@
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
 import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
+import { requestNewGameAction } from './game-actions-settings-intent'
+
+vi.mock('../team-panel/use-team-lead-prompt', () => ({ useTeamLeadPrompt: () => null }))
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGameProjects'>
 
 const YAML: OrchestratorGameLayer = {
   actions: [
-    { label: 'Test runs', command: 'test-runs', prompt: 'Run the QA test runs' },
-    { label: 'Runs', mcp: { server: 'tambora', tool: 'list_test_runs' } }
+    { label: 'Release', command: 'release', icon: 'tag', pin: true, prompt: 'Prepare it' },
+    { label: 'Board', command: 'board', mcp: { server: 'plane', tool: 'list' } }
   ]
 }
 
-function render(
-  settings: GameSettings,
-  projectLayer: OrchestratorGameLayer | undefined,
-  updates: Partial<GlobalSettings>[] = []
-): { container: HTMLDivElement; unmount: () => void } {
+function render(settings: GameSettings, projectLayer: OrchestratorGameLayer | undefined = YAML) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  act(() => {
-    root.render(
-      <ProjectOrchestratorGameActionsSetting
-        repoId="repo1"
-        settings={settings}
-        projectLayer={projectLayer}
-        updateSettings={(update) => updates.push(update)}
-      />
-    )
-  })
-  return {
-    container,
-    unmount: () => {
-      act(() => root.unmount())
-      container.remove()
-    }
-  }
+  const updates: Partial<GlobalSettings>[] = []
+  const draw = (next: GameSettings): void =>
+    act(() => {
+      root.render(
+        <ProjectOrchestratorGameActionsSetting
+          repoId="repo1"
+          settings={next}
+          projectLayer={projectLayer}
+          updateSettings={(update) => {
+            updates.push(update)
+            draw({ ...next, ...update })
+          }}
+        />
+      )
+    })
+  draw(settings)
+  return { container, updates }
 }
 
-function click(container: HTMLElement, label: string): void {
-  const target = Array.from(container.querySelectorAll<HTMLElement>('button')).find(
-    (entry) => entry.textContent?.trim() === label || entry.getAttribute('aria-label') === label
+const press = (container: HTMLElement, name: string): void => {
+  const target = [...container.querySelectorAll<HTMLElement>('button')].find(
+    (one) => one.textContent?.trim() === name || one.getAttribute('aria-label') === name
   )
-  expect(target, label).toBeTruthy()
-  act(() => {
-    target?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
+  expect(target, name).toBeTruthy()
+  act(() => target!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 }
 
-const button = (container: HTMLElement, label: string): HTMLButtonElement | undefined =>
-  Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-    (entry) => entry.textContent?.trim() === label
-  )
-
-function type(container: HTMLElement, label: string, value: string): void {
-  const input = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-    `[aria-label="${label}"]`
-  )
-  expect(input, label).toBeTruthy()
-  const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
-  const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value')?.set
+const type = (input: HTMLInputElement | HTMLTextAreaElement, value: string): void =>
   act(() => {
-    setter?.call(input, value)
-    input?.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-}
-
-describe('ProjectOrchestratorGameActionsSetting', () => {
-  it('shows the orca.yaml list read only until it is edited on this machine', () => {
-    const view = render({}, YAML)
-    const text = view.container.textContent ?? ''
-    expect(text).toContain('Test runs')
-    expect(text).toContain('/test-runs')
-    expect(text).toContain('tambora · list_test_runs')
-    expect(view.container.querySelector('input')).toBeNull()
-
-    click(view.container, 'Edit on this machine')
-    expect(view.container.querySelector<HTMLInputElement>('[aria-label="Label 1"]')?.value).toBe(
-      'Test runs'
-    )
-    expect(view.container.querySelector<HTMLInputElement>('[aria-label="Tool 2"]')?.value).toBe(
-      'list_test_runs'
-    )
-    view.unmount()
+    const proto = Object.getPrototypeOf(input) as object
+    Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
   })
 
-  it("saves this machine's list, which replaces orca.yaml's whole", () => {
-    const updates: Partial<GlobalSettings>[] = []
-    const view = render({}, YAML, updates)
-    click(view.container, 'Edit on this machine')
-    click(view.container, 'Remove action 2')
-    click(view.container, 'Add action')
-    type(view.container, 'Label 2', 'Wave QA')
-    type(view.container, 'Command 2', 'wave-qa')
-    type(view.container, 'Prompt 2', 'Launch a member for each QA ticket')
-    click(view.container, 'Save actions')
+const rows = (container: HTMLElement) =>
+  [...container.querySelectorAll('[data-slot="game-action-row"]')].map((one) =>
+    one.textContent?.replace(/\s+/g, ' ').trim()
+  )
+const actionsSaved = (updates: Partial<GlobalSettings>[]) =>
+  updates.at(-1)?.orchestratorGameProjects?.repo1?.actions
 
-    expect(updates).toEqual([
-      {
-        orchestratorGameProjects: {
-          repo1: {
-            actions: [
-              { label: 'Test runs', command: 'test-runs', prompt: 'Run the QA test runs' },
-              { label: 'Wave QA', command: 'wave-qa', prompt: 'Launch a member for each QA ticket' }
-            ]
-          }
+describe('Settings > Actions, as V30', () => {
+  it("lists the project's actions with their source and pin, then Orca's with when they apply", () => {
+    const { container } = render({})
+    expect(container.textContent).toContain('This project · 2 of 6')
+    expect(rows(container)).toEqual([
+      '↑Release/release · Ask the leadorca.yamlEdit',
+      '↑Board/board · MCP planeorca.yamlEdit',
+      'WaveWhen there is To Do and free slots.Edit',
+      'PushWhen members are stopped.Edit',
+      'SweepWhen finished members wait to be closed.Edit',
+      'StatusAlways, in the menu.Edit',
+      'StopAlways, with confirmation.Edit'
+    ])
+    const pins = container.querySelectorAll('[role="switch"][aria-label^="Show"]')
+    expect([...pins].map((one) => one.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+    expect(container.querySelector('[aria-label="Turn on Stop"]')).toBeNull()
+    expect(container.textContent).toContain('Start with')
+  })
+
+  it('creates an action first in the list, pinned, with the command from its name', () => {
+    const { container, updates } = render({})
+    press(container, 'Tests')
+    const form = () => container.querySelector('[data-slot="game-action-form"]')!
+    expect(form().querySelector<HTMLInputElement>('input')?.value).toBe('Tests')
+    expect(form().textContent).toContain('/tests')
+    press(container, 'Cancel')
+    press(container, 'New action')
+    type(form().querySelector<HTMLInputElement>('input')!, 'Smoke tests')
+    expect(form().textContent).toContain('/smoke-tests')
+    press(container, 'Icon flask')
+    type(form().querySelector<HTMLTextAreaElement>('textarea')!, 'Run the smoke suite.')
+    press(container, 'Create action')
+    expect(
+      actionsSaved(updates)?.map((one) => [one.label, one.command, one.icon, one.pin])
+    ).toEqual([
+      ['Smoke tests', 'smoke-tests', 'flask', true],
+      ['Release', 'release', 'tag', true],
+      ['Board', 'board', undefined, undefined]
+    ])
+    expect(rows(container)[0]).toContain('This machine')
+  })
+
+  it("says what is wrong before saving, and holds the row's pins to three", () => {
+    const { container, updates } = render({})
+    press(container, 'New action')
+    press(container, 'Create action')
+    expect(container.textContent).toContain('Give the button a name.')
+    const name = container.querySelector<HTMLInputElement>('[data-slot="game-action-form"] input')!
+    type(name, 'Release')
+    press(container, 'Create action')
+    expect(container.textContent).toContain('/release already exists.')
+    expect(updates).toEqual([])
+
+    const three = render({
+      orchestratorGameProjects: {
+        repo1: {
+          actions: ['A', 'B', 'C', 'D'].map((label, at) => ({
+            label,
+            prompt: label,
+            pin: at < 3
+          }))
         }
       }
-    ])
-    view.unmount()
+    })
+    press(three.container, 'Show D in the row')
+    expect(three.container.textContent).toContain(
+      'The row holds 3 of your actions. Turn another off first.'
+    )
+    press(three.container, 'Move D up')
+    expect(actionsSaved(three.updates)?.map((one) => one.label)).toEqual(['A', 'B', 'D', 'C'])
   })
 
-  it('says what is wrong in a row and keeps Save off until it is fixed', () => {
-    const view = render({}, YAML)
-    click(view.container, 'Edit on this machine')
-    type(view.container, 'Command 1', 'wave')
-    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
-      'A lead button or another action already uses this command.'
+  it("turns Orca's off and edits their words on this machine; Stop has no switch", () => {
+    const { container, updates } = render({})
+    press(container, 'Turn on Wave')
+    expect(updates.at(-1)?.orchestratorGameProjects?.repo1?.orcaActions).toEqual({
+      wave: { enabled: false }
+    })
+    const editButtons = [...container.querySelectorAll<HTMLElement>('button')].filter(
+      (one) => one.textContent === 'Edit'
     )
-    expect(button(view.container, 'Save actions')?.disabled).toBe(true)
-
-    type(view.container, 'Command 1', 'test-runs')
-    type(view.container, 'Key 1', 'q')
-    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
-      'Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.'
-    )
-    type(view.container, 'Key 1', '')
-    type(view.container, 'Command 1', 'Bad Name')
-    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
-      'Use a lowercase name like test-runs, up to 24 characters.'
-    )
-    const kind = view.container.querySelector<HTMLElement>('[aria-label="Kind 1"]')
-    expect(kind).toBeTruthy()
-    click(kind as HTMLElement, 'MCP')
-    type(view.container, 'Command 1', '')
-    type(view.container, 'MCP server 1', 'tambora')
-    type(view.container, 'Tool 1', 'list')
-    type(view.container, 'Arguments (JSON) 1', '{nope')
-    expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
-      'Arguments must be a JSON object, like {"project": "CIN"}.'
-    )
-    view.unmount()
+    act(() => editButtons[4]!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    const prompt = container.querySelector<HTMLTextAreaElement>(
+      '[data-slot="game-action-form"] textarea'
+    )!
+    type(prompt, 'Close only with CI green.')
+    press(container, 'Save')
+    expect(updates.at(-1)?.orchestratorGameProjects?.repo1?.orcaActions).toEqual({
+      wave: { enabled: false },
+      sweep: { prompt: 'Close only with CI green.' }
+    })
   })
 
-  it('inherits orca.yaml again, and can save an empty list', () => {
-    const updates: Partial<GlobalSettings>[] = []
-    const local = { orchestratorGameProjects: { repo1: { actions: YAML.actions } } }
-    const view = render(local, YAML, updates)
-    click(view.container, 'Remove action 2')
-    click(view.container, 'Remove action 1')
-    expect(view.container.textContent).toContain('No actions on this machine.')
-    click(view.container, 'Save actions')
-    click(view.container, 'Inherit from orca.yaml')
-    expect(updates).toEqual([
-      { orchestratorGameProjects: { repo1: { actions: [] } } },
-      { orchestratorGameProjects: {} }
-    ])
-    expect(view.container.textContent).toContain('Edit on this machine')
-    view.unmount()
+  it("opens the new action form when the dock's menu asked for one, once", () => {
+    requestNewGameAction('repo1')
+    const { container } = render({})
+    expect(container.querySelector('[data-slot="game-action-form"]')).not.toBeNull()
+    const again = render({})
+    expect(again.container.querySelector('[data-slot="game-action-form"]')).toBeNull()
   })
 })
