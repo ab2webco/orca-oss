@@ -138,6 +138,7 @@ describe('CliSkillRuntimeSetup runtime helpers', () => {
           execFileSync('/bin/sh', ['-c', getWslOuterShellScript(wrapped)], {
             encoding: 'utf8',
             input: 'terminal-input\n',
+            timeout: 20_000,
             env: {
               ...process.env,
               PATH: `${tools}:/usr/bin:/bin`,
