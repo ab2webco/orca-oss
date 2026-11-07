@@ -163,6 +163,13 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
     const named = ticketsOf(flags)
     const response = await readCallerGameState(client)
     const state = response.result
+    // Why first: a member's state carries no paused members, which read as an old Orca (ORCA-1118).
+    if (state.role === 'member') {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        'Only the lead resumes members: this pane runs as a member (ORCA_GAME_ROLE=member).'
+      )
+    }
     if (state.pausedMembers === undefined && state.pausedMembersError === undefined) {
       throw new RuntimeClientError(
         'incompatible_runtime',

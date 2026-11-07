@@ -1,5 +1,5 @@
 ---
-sourceHash: bbe64fe0844852ad
+sourceHash: 8d96c6c2e20ee09e
 ---
 
 # El juego orquestador de Agent Teams
@@ -614,7 +614,13 @@ Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — las reglas permanentes que convierten esta sesión en el líder (ninguna para un
-  miembro).
+  miembro). Un pane local de Claude abierto sin el mod del juego (sin `ORCA_GAME_MODE`) se rechaza
+  con `Not the lead:` y se le indica correr `/orca-game:lead` en una pestaña Claude Agent Teams, porque
+  lideraría sin fila de Advisor ni comandos `/orca-game`. Donde el mod nunca carga (SSH, WSL, el juego
+  apagado, un Claude anterior a 2.1.287) el pane sigue liderando y una primera línea dice qué le
+  falta. Un líder que no es Claude no cambia. Las reglas nombran `ORCA_GAME_CLI`, si no el
+  `ORCA_CLI_COMMAND` de WSL, antes que un `orca` pelado
+  ([`orchestrator-game-lead-pane.ts`](../../../src/cli/handlers/orchestrator-game-lead-pane.ts)).
 - `orca game lead --fresh` — rota el líder: con el pane del líder saliente cerrado, Orca retira la
   conversación de líder guardada del proyecto y esta sesión pasa a ser el nuevo líder en lugar de
   reabrirla. Un líder vivo sigue ganando, y un host más antiguo que descarta el flag reabre el
