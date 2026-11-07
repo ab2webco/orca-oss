@@ -99,7 +99,10 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
       await form.scrollIntoViewIfNeeded()
       const overflow = await section.evaluate((node) => node.scrollWidth - node.clientWidth)
       expect(overflow, `the form overflows at ${width}`).toBeLessThanOrEqual(0)
-      await orcaPage.screenshot({ path: testInfo.outputPath(`form-en-${width}.png`) })
+      for (const theme of ['light', 'dark'] as const) {
+        await applySettings(orcaPage, { theme })
+        await orcaPage.screenshot({ path: testInfo.outputPath(`form-en-${width}-${theme}.png`) })
+      }
     }
     await setWindowWidth(electronApp, orcaPage, 1440)
   }
@@ -148,7 +151,12 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
       expect(overflow, `Actions overflows at ${width}px ${language}`).toBeLessThanOrEqual(0)
       if (CAPTURE_EVIDENCE) {
         await section.scrollIntoViewIfNeeded()
-        await orcaPage.screenshot({ path: testInfo.outputPath(`actions-${language}-${width}.png`) })
+        for (const theme of ['light', 'dark'] as const) {
+          await applySettings(orcaPage, { theme })
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`actions-${language}-${width}-${theme}.png`)
+          })
+        }
       }
     }
   }
@@ -156,24 +164,34 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
   // The same page's Scene listbox opens at its control; the trigger is read once it is in view (ORCA-1092 row 28).
   await applySettings(orcaPage, { uiLanguage: 'en' })
   const scene = orcaPage.getByRole('combobox', { name: /^Scene/ })
-  for (const width of WIDTHS) {
-    await setWindowWidth(electronApp, orcaPage, width)
-    await dismissAppCards(orcaPage)
-    await scene.scrollIntoViewIfNeeded()
-    const control = await scene.boundingBox()
-    await scene.click()
-    const list = orcaPage.locator('[role="listbox"]')
-    await expect(list).toBeVisible()
-    const box = await list.boundingBox()
-    const gap =
-      box && control
-        ? Math.max(box.y - (control.y + control.height), control.y - (box.y + box.height))
-        : Infinity
-    const overlaps =
-      box && control && box.x < control.x + control.width && control.x < box.x + box.width
-    expect(gap, `Scene listbox gap at ${width}`).toBeLessThanOrEqual(12)
-    expect(overlaps, `Scene listbox under its control at ${width}`).toBe(true)
-    await orcaPage.keyboard.press('Escape')
-    await expect(list).toBeHidden()
+  for (const theme of CAPTURE_EVIDENCE ? (['light', 'dark'] as const) : (['light'] as const)) {
+    await applySettings(orcaPage, { theme })
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await dismissAppCards(orcaPage)
+      await scene.scrollIntoViewIfNeeded()
+      const control = await scene.boundingBox()
+      await scene.click()
+      const list = orcaPage.locator('[role="listbox"]')
+      await expect(list).toBeVisible()
+      const box = await list.boundingBox()
+      const gap =
+        box && control
+          ? Math.max(box.y - (control.y + control.height), control.y - (box.y + box.height))
+          : Infinity
+      const overlaps =
+        box && control && box.x < control.x + control.width && control.x < box.x + box.width
+      expect(gap, `Scene listbox gap at ${width} ${theme}`).toBeLessThanOrEqual(12)
+      expect(overlaps, `Scene listbox under its control at ${width} ${theme}`).toBe(true)
+      testInfo.annotations.push({
+        type: 'scene',
+        description: `${width} ${theme}: gap ${Math.round(gap)} px`
+      })
+      if (CAPTURE_EVIDENCE) {
+        await orcaPage.screenshot({ path: testInfo.outputPath(`scene-${width}-${theme}.png`) })
+      }
+      await orcaPage.keyboard.press('Escape')
+      await expect(list).toBeHidden()
+    }
   }
 })
