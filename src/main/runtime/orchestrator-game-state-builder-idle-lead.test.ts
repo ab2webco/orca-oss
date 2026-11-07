@@ -69,4 +69,30 @@ describe('buildOrchestratorGameState for a lead that reported no status', () => 
 
     expect(state.agents).toEqual([])
   })
+
+  // Why (ORCA-1130 D8): a row restored from disk may describe a turn that ended while Orca was down.
+  it('reads a row restored from disk as idle, with no tool and no old age', async () => {
+    const state = await buildOrchestratorGameState({
+      settings: undefined,
+      worktree: null,
+      agents: [
+        {
+          ...MEMBER_ROW,
+          toolName: 'mcp__plugin_engram_engram__mem_current_project',
+          toolInput: '{}',
+          stateStartedAt: 1,
+          restoredUnconfirmed: true
+        }
+      ],
+      leaderPaneKey: 'tab-lead:1',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    })
+
+    const member = state.agents.find((one) => one.paneKey === 'tab-m:1')
+    expect(member).toMatchObject({ state: 'idle', toolName: null })
+    expect(member).not.toHaveProperty('toolInput')
+    expect(member).not.toHaveProperty('stateSince')
+  })
 })
