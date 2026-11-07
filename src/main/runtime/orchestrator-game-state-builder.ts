@@ -1,5 +1,5 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
-import { gameFleetOf, liveLinkedItemOf, settle } from './orchestrator-game-fleet'
+import { gameFleetOf, liveLinkedItemOf, settle, withIdleLeader } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
 import { trackerWorkItemOf } from './orchestrator-game-lead-work-item'
 import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
@@ -153,7 +153,7 @@ export async function buildOrchestratorGameState(
     const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
-  const agents = await gameFleetOf({
+  const fleet = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
     found: isMember ? [] : input.found,
@@ -170,6 +170,10 @@ export async function buildOrchestratorGameState(
     launchOf: input.launchOf,
     leadWorktreeId: input.worktree?.id ?? null
   })
+  const agents =
+    isMember || !input.leaderUnreported
+      ? fleet
+      : withIdleLeader(fleet, input.leaderPaneKey, input.terminalHandleOf)
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
   return {
     config,
