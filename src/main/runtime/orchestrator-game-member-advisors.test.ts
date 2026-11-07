@@ -141,4 +141,17 @@ describe('GameMemberAdvisors kept copy', () => {
     expect(kept.has('pane-a')).toBe(false)
     expect(store.of('pane-a', 2)).toBeNull()
   })
+
+  it('liveOf answers only while the pane keeps reporting, never from the kept copy', () => {
+    const kept = new Map<string, GameMemberAdvisorReport | null>()
+    const store = new GameMemberAdvisors(undefined, {
+      read: (paneKey) => kept.get(paneKey) ?? null,
+      write: (paneKey, report) => void kept.set(paneKey, report)
+    })
+    store.note('pane-a', on('Opus 5.5'), 0)
+
+    expect(store.liveOf('pane-a', MINUTE)).toEqual(on('Opus 5.5'))
+    expect(store.liveOf('pane-a', 4 * MINUTE)).toBeNull()
+    expect(store.of('pane-a', 4 * MINUTE)).toEqual(on('Opus 5.5'))
+  })
 })
