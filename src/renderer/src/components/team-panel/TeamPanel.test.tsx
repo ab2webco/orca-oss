@@ -17,6 +17,8 @@ vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ openSettingsTarget: vi.fn(), openSettingsPage: vi.fn(), openTaskPage: vi.fn() })
 }))
+// Why: the dock reads the lead pane from the store; its own tests cover it, these cover the tabs.
+vi.mock('./TeamActionDockConnected', () => ({ TeamActionDockConnected: () => null }))
 let global: OrchestratorGameLayer | undefined
 vi.mock('./team-panel-setting-layers', () => ({
   useTeamPanelSettingLayers: () => ({ global, project: undefined, local: undefined })
