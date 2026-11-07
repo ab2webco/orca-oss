@@ -1,4 +1,5 @@
 import type { AgentStatusEntry } from './agent-status-types'
+import { agentToolLabelOf } from './agent-tool-label'
 import { redactDispatchCapability } from './dispatch-capability-redaction'
 import { parseAskFromStatus } from './native-chat-ask'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
@@ -44,8 +45,11 @@ const STATUS_RANK: Record<TeamStatus, number> = {
   idle: 4
 }
 
-// Why: an interrupted turn or a session boundary is not work that finished.
+// Why: an interrupted turn or a session boundary is not work that finished; a row restored from disk proves no live turn.
 const conditionOf = (entry: AgentStatusEntry): TeamCondition => {
+  if (entry.restoredUnconfirmed) {
+    return 'idle'
+  }
   if (entry.state === 'done') {
     return entry.interrupted || entry.sessionBoundary ? 'idle' : 'done'
   }
@@ -62,6 +66,9 @@ const shownTextOf = (text: string | null | undefined): string | null =>
   text ? redactDispatchCapability(text) : null
 
 const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLiveAction | null => {
+  if (entry.restoredUnconfirmed) {
+    return null
+  }
   const ask = parseAskFromStatus(entry.interactivePrompt, entry.toolName)?.questions[0]
   if (ask) {
     return {
@@ -72,7 +79,7 @@ const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLi
   }
   // Why waiting too: a permission prompt asks nothing parseable; its tool is what it waits on.
   return (condition === 'working' || condition === 'waiting') && entry.toolName
-    ? { kind: 'tool', tool: entry.toolName, detail: shownTextOf(entry.toolInput) }
+    ? { kind: 'tool', tool: agentToolLabelOf(entry.toolName), detail: shownTextOf(entry.toolInput) }
     : null
 }
 
