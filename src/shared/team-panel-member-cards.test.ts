@@ -52,7 +52,8 @@ describe('teamCardsOf', () => {
     )
     expect(cards?.lead).toMatchObject({
       paneKey: 'lead:leaf',
-      name: 'Castle',
+      // Why not the pane's name: with no Lead name the lead is the roster's last character (ORCA-1094).
+      name: 'Elaine',
       branch: 'main',
       worktreeId: 'repo::/w/main',
       terminalHandle: 'term_1',
@@ -316,7 +317,7 @@ describe('teamCardsOf', () => {
     expect(cards?.members.map((one) => one.characterKey)).toEqual(['arthur', null])
   })
 
-  it('names the lead after the Lead name setting before its pane or worktree', () => {
+  it('names the lead after the Lead name setting, else a roster character, never its worktree', () => {
     const named = teamCardsOf(
       state([{ ...lead, displayName: null }], {
         lead: { autostart: false, cap: 4, agent: 'claude', label: 'Alfred' }
@@ -324,7 +325,14 @@ describe('teamCardsOf', () => {
       new Set()
     )
     expect(named?.lead.name).toBe('Alfred')
-    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe('main')
+    // ORCA-1094 row 1: the quest roster's last character, the same in every launch of the project.
+    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe(
+      'Elaine'
+    )
+    const vigilante = state([lead], {
+      config: { scene: 'vigilante' } as OrchestratorGameState['config']
+    })
+    expect(teamCardsOf(vigilante, new Set())?.lead.name).toBe('Cipher')
   })
 
   it('names a launched member after its character, as V28 does', () => {

@@ -302,8 +302,8 @@ test('the Team tab shows the live lead and its members from the lead game state'
         })
       }, look)
     const leadCard = panel.locator('[data-team-card="lead"]')
-    // Why both: the test repo takes the machine's git default, master on Linux and main on Apple's.
-    const leadName = /^(master|main)/
+    // ORCA-1094 row 1: with no Lead name the lead is the quest roster's last character, never the worktree.
+    const leadName = 'Elaine'
     await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
     await expect(leadCard).toContainText(leadName)
     for (const look of ['display', 'plain'] as const) {
