@@ -23,6 +23,7 @@ const session = (over: Partial<TeamSoloSession> = {}): TeamSoloSession => ({
   worktreeName: 'fix-tooltip',
   worktreeId: 'repo::/w/fix-tooltip',
   isPrimary: false,
+  inTeam: false,
   host: { kind: 'local' },
   ticket: null,
   pr: null,

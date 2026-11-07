@@ -26,6 +26,7 @@ export type TeamSoloSession = {
   worktreeName: string
   worktreeId: string | null
   isPrimary: boolean
+  inTeam: boolean
   host: TeamHost
   ticket: TeamTicket | null
   pr: TeamPullRequest | null
@@ -113,6 +114,7 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     repoName: session.repoName,
     worktreeName: session.worktreeName,
     isPrimary: session.isPrimary,
+    inTeam: session.inTeam,
     prompt: shownTextOf(entry.prompt),
     ticket: session.ticket,
     pr: session.pr,

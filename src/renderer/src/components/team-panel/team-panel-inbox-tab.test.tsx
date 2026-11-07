@@ -97,6 +97,7 @@ function renderInbox(
       agentQuestions={[]}
       answeredQuestions={[]}
       onOpenAgent={vi.fn()}
+      answerAgentOf={() => null}
       memberNames={new Map([['ORCA-1033', 'Sabio']])}
       {...over}
     />
@@ -255,6 +256,34 @@ describe('Inbox tab', () => {
     expect(view.getByText('Apply it now · Leave it for the release')).toBeTruthy()
     act(() => fireEvent.click(view.getByRole('button', { name: 'Open terminal' })))
     expect(onOpenAgent).toHaveBeenCalledWith(agent)
+  })
+
+  // Why (ORCA-1129 D5): V28 solo-many-inbox answers from the card; the options were text only.
+  it("answers an agent's question with its option buttons, once", () => {
+    const answer = vi.fn(() => true)
+    const agent = {
+      paneKey: 'tab-1:leaf-1',
+      terminalHandle: null,
+      worktreeId: 'wt-tooltip',
+      host: { kind: 'local' as const },
+      repoName: 'orca-oss',
+      worktreeName: 'fix-tooltip',
+      text: 'Apply the migration now?',
+      options: ['Apply it now', 'Leave it for the release']
+    }
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      agentQuestions: [agent],
+      answerAgentOf: () => answer
+    })
+
+    act(() => fireEvent.click(view.getByRole('button', { name: 'Leave it for the release' })))
+
+    expect(answer).toHaveBeenCalledWith(1)
+    const first = view.getByRole('button', { name: 'Apply it now' }) as HTMLButtonElement
+    expect(first.disabled).toBe(true)
+    expect(view.getByRole('button', { name: 'Open terminal' })).toBeTruthy()
   })
 
   it('lists what you answered beside what the lead answered', () => {

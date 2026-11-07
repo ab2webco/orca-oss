@@ -7,6 +7,8 @@ import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbo
 import type { TeamInboxCounts } from '../../../../shared/team-panel-model-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
+import { useShallow } from 'zustand/react/shallow'
+import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
@@ -26,6 +28,8 @@ import {
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import {
+  answerTeamInboxAgent,
+  isOneTapQuestion,
   openTeamInboxAgent,
   teamInboxAgentQuestionsOf,
   type TeamInboxAgentQuestion
@@ -66,6 +70,8 @@ export type TeamInboxViewProps = {
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
   onOpenAgent: (question: TeamInboxAgentQuestion) => void
+  /** Null when the question cannot be answered with one option from here. */
+  answerAgentOf: (question: TeamInboxAgentQuestion) => ((optionIndex: number) => boolean) | null
   /** Each member's character name by ticket, so a waiting question says who asks. */
   memberNames: ReadonlyMap<string, string>
 }
@@ -143,6 +149,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             key={question.paneKey}
             question={question}
             onOpen={props.onOpenAgent}
+            onAnswer={props.answerAgentOf(question)}
           />
         ))}
         {questions.length > 0 ? (
@@ -219,6 +226,21 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   )
 }
 
+function answerAgentOf(question: TeamInboxAgentQuestion): ((index: number) => boolean) | null {
+  if (!isOneTapQuestion(question)) {
+    return null
+  }
+  return (index) => {
+    const sent = answerTeamInboxAgent(question, index)
+    if (!sent) {
+      toast.error(
+        translate('teamPanel.inbox.answerFailed', 'Could not send the answer. Open the terminal.')
+      )
+    }
+    return sent
+  }
+}
+
 export function TeamPanelInboxTab({
   value,
   model
@@ -242,6 +264,18 @@ export function TeamPanelInboxTab({
   // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
+  const liveState = useAppStore(
+    useShallow((s) => ({
+      agentStatusByPaneKey: s.agentStatusByPaneKey,
+      tabsByWorktree: s.tabsByWorktree,
+      ptyIdsByTabId: s.ptyIdsByTabId,
+      terminalLayoutsByTabId: s.terminalLayoutsByTabId
+    }))
+  )
+  const agentQuestions = React.useMemo(
+    () => teamInboxAgentQuestionsOf(model, liveState),
+    [model, liveState]
+  )
   const memberNames = React.useMemo(
     () =>
       new Map(
@@ -261,9 +295,10 @@ export function TeamPanelInboxTab({
       otherGroups={otherGroups}
       threads={threads}
       onReply={threads.reply}
-      agentQuestions={teamInboxAgentQuestionsOf(model)}
+      agentQuestions={agentQuestions}
       answeredQuestions={answered}
       onOpenAgent={openTeamInboxAgent}
+      answerAgentOf={answerAgentOf}
       memberNames={memberNames}
     />
   )
