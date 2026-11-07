@@ -1778,8 +1778,10 @@ html.native-shell .app-layout {
 }
 
 /* Why: this board is attached to the worktree sidebar, not floating above it;
-   the generic Sheet elevation casts a haze over the sidebar when left open. */
+   the generic Sheet elevation casts a haze over the sidebar when left open.
+   Opaque fill: without the blur, the Sheet's 96% dark fill lets terminal text show through. */
 .workspace-kanban-sheet-content {
+  background-color: var(--worktree-sidebar);
   box-shadow: inset 1px 0 0 color-mix(in srgb, var(--worktree-sidebar-border) 80%, transparent);
   backdrop-filter: none;
 }

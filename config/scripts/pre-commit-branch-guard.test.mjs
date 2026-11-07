@@ -28,8 +28,10 @@ function runHook(command, branch = 'main') {
   const result = spawnSync('python3', [hookScript], {
     cwd,
     encoding: 'utf8',
-    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd })
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd }),
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
   const stdout = result.stdout.trim()
   return stdout ? (JSON.parse(stdout).systemMessage ?? '') : ''

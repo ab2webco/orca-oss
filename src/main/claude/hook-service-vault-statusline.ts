@@ -10,6 +10,7 @@ import {
   type ClaudeCompatibleHookSettings
 } from './hook-settings'
 import { getManagedStatusLineScript } from './statusline-script'
+import type { ManagedHookWritePolicy } from './managed-hook-placement'
 
 export function parseVaultConfig(currentSettingsJson: string | null): HooksConfig | null {
   if (currentSettingsJson === null) {
@@ -27,7 +28,8 @@ export function parseVaultConfig(currentSettingsJson: string | null): HooksConfi
 // managed entry has opted out, and the marker distinguishes that deletion from a first install.
 export function installManagedStatusLine(
   config: HooksConfig,
-  settingsPath: ClaudeCompatibleHookSettings
+  settingsPath: ClaudeCompatibleHookSettings,
+  policy: ManagedHookWritePolicy = 'replace'
 ): HooksConfig {
   const scriptFileName = getStatusLineScriptFileName(settingsPath)
   const markerPath = getStatusLineInstallMarkerPath(settingsPath)
@@ -45,7 +47,8 @@ export function installManagedStatusLine(
   const next = applyManagedStatusLine(
     config,
     getManagedCommand(statusLineScriptPath),
-    scriptFileName
+    scriptFileName,
+    policy
   )
   try {
     writeFileSync(markerPath, '')

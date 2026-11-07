@@ -2626,6 +2626,7 @@ describe('registerPtyHandlers', () => {
         sessionId?: string
         claudeAccountId?: string
         codexAccountId?: string
+        resumeProviderSession?: { key: 'session_id'; id: string; transcriptPath?: string }
       }): Promise<{ id: string }>
     }
 
@@ -2719,6 +2720,272 @@ describe('registerPtyHandlers', () => {
         undefined
       )
       await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    // ORCA-718: a restored pane resumes on a fresh PTY whose account binding died with the old CLI.
+    const leadTranscript =
+      '/Users/me/Library/Application Support/orca/claude-accounts/account-lead/auth/projects/-repo/abc.jsonl'
+
+    it('resumes a restored Claude conversation on the account that owns its transcript', async () => {
+      installExitOnKillSpawnMock()
+      const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-lead'))
+      const store = {
+        getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })),
+        getSettings: vi.fn(() => ({ claudeManagedAccounts: [{ id: 'account-lead' }] }))
+      }
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth,
+        store as never,
+        undefined,
+        (target) => Boolean(target?.overrideAccountId)
+      )
+
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        command: 'claude --resume abc',
+        worktreeId: 'wt-pinned',
+        resumeProviderSession: { key: 'session_id', id: 'abc', transcriptPath: leadTranscript }
+      })) as { id: string }
+
+      expect(prepareClaudeAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ overrideAccountId: 'account-lead' }),
+        undefined
+      )
+      await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+    })
+
+    // ORCA-718: every universe links projects/ to one shared store, so a resume no existing vault
+    // account owns takes what a new launch in its worktree gets, and fails only when the store lacks it.
+    describe('a Claude resume no existing vault account owns', () => {
+      const SESSION = '0f8fad5b-d9cb-469f-a165-70867728950e'
+      let userData: string
+      let previousConfigDir: string | undefined
+
+      beforeEach(async () => {
+        const { mkdtemp, mkdir } = await import('node:fs/promises')
+        const { tmpdir } = await import('node:os')
+        userData = await mkdtemp(join(tmpdir(), 'orca-718-store-'))
+        await mkdir(join(userData, 'claude-transcripts', 'projects', '-repo'), { recursive: true })
+        getPathMock.mockReturnValue(userData)
+        // Why: the shared home is a universe the lookup may read; never the runner's real one.
+        previousConfigDir = process.env.CLAUDE_CONFIG_DIR
+        process.env.CLAUDE_CONFIG_DIR = join(userData, 'home')
+      })
+
+      afterEach(async () => {
+        if (previousConfigDir === undefined) {
+          delete process.env.CLAUDE_CONFIG_DIR
+        } else {
+          process.env.CLAUDE_CONFIG_DIR = previousConfigDir
+        }
+        const { rm } = await import('node:fs/promises')
+        await rm(userData, { recursive: true, force: true })
+      })
+
+      /** A universe whose link to the store was skipped keeps a real projects/ of its own. */
+      async function keepInUnlinked(configDir: string): Promise<string> {
+        const { mkdir, writeFile } = await import('node:fs/promises')
+        await mkdir(join(configDir, 'projects', '-repo'), { recursive: true })
+        const file = join(configDir, 'projects', '-repo', `${SESSION}.jsonl`)
+        await writeFile(file, '{}\n')
+        return file
+      }
+
+      async function keepInStore(): Promise<void> {
+        const { writeFile } = await import('node:fs/promises')
+        await writeFile(
+          join(userData, 'claude-transcripts', 'projects', '-repo', `${SESSION}.jsonl`),
+          '{}\n'
+        )
+      }
+
+      const removedTranscript = `/orca/claude-accounts/account-removed/auth/projects/-repo/${SESSION}.jsonl`
+
+      function storeWith(pin: string | undefined) {
+        return {
+          getWorktreeMeta: vi.fn(() => (pin ? { claudeAccountId: pin } : undefined)),
+          getSettings: vi.fn(() => ({ claudeManagedAccounts: [{ id: 'account-pinned' }] }))
+        }
+      }
+
+      it("resumes a removed account's conversation on the worktree pin when the store holds it", async () => {
+        await keepInStore()
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-pinned'))
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWith('account-pinned') as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        const spawnResult = (await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: `claude --resume ${SESSION}`,
+          worktreeId: 'wt-pinned',
+          resumeProviderSession: {
+            key: 'session_id',
+            id: SESSION,
+            transcriptPath: removedTranscript
+          }
+        })) as { id: string }
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-pinned' }),
+          undefined
+        )
+        await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      })
+
+      it('resumes on the selected account, as a new launch would, with no pin and no transcript path', async () => {
+        await keepInStore()
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(async () => ({
+          configDir: '/tmp/claude',
+          envPatch: {},
+          stripAuthEnv: false,
+          provenance: 'system'
+        }))
+        const { runtime, getController } = makeRuntimeControllerHarness()
+        registerPtyHandlers(
+          mainWindow as never,
+          runtime as never,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWith(undefined) as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        const result = await getController().spawn({
+          cols: 80,
+          rows: 24,
+          command: `claude --resume ${SESSION}`,
+          worktreeId: 'wt-plain',
+          resumeProviderSession: { key: 'session_id', id: SESSION }
+        })
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.not.objectContaining({ overrideAccountId: expect.anything() }),
+          undefined
+        )
+        await handlers.get('pty:kill')!(null, { id: result.id })
+      })
+
+      it('resumes on the unlinked vault that alone holds a conversation with no transcript path', async () => {
+        await keepInUnlinked(join(userData, 'vault'))
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-unlinked'))
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          {
+            getWorktreeMeta: vi.fn(() => ({ claudeAccountId: 'account-pinned' })),
+            getSettings: vi.fn(() => ({
+              claudeManagedAccounts: [
+                { id: 'account-pinned', managedAuthPath: join(userData, 'pinned') },
+                { id: 'account-unlinked', managedAuthPath: join(userData, 'vault') }
+              ]
+            }))
+          } as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        const spawnResult = (await handlers.get('pty:spawn')!(null, {
+          cols: 80,
+          rows: 24,
+          command: `claude --resume ${SESSION}`,
+          worktreeId: 'wt-pinned',
+          resumeProviderSession: { key: 'session_id', id: SESSION }
+        })) as { id: string }
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: 'account-unlinked' }),
+          undefined
+        )
+        await handlers.get('pty:kill')!(null, { id: spawnResult.id })
+      })
+
+      it('resumes a transcript kept in an unlinked shared home on the shared home, not the pin', async () => {
+        const transcriptPath = await keepInUnlinked(join(userData, 'home'))
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(async () => ({
+          configDir: join(userData, 'home'),
+          envPatch: {},
+          stripAuthEnv: false,
+          provenance: 'system'
+        }))
+        const { runtime, getController } = makeRuntimeControllerHarness()
+        registerPtyHandlers(
+          mainWindow as never,
+          runtime as never,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWith('account-pinned') as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        const result = await getController().spawn({
+          cols: 80,
+          rows: 24,
+          command: `claude --resume ${SESSION}`,
+          worktreeId: 'wt-pinned',
+          resumeProviderSession: { key: 'session_id', id: SESSION, transcriptPath }
+        })
+
+        expect(prepareClaudeAuth).toHaveBeenCalledWith(
+          expect.objectContaining({ overrideAccountId: null }),
+          undefined
+        )
+        await handlers.get('pty:kill')!(null, { id: result.id })
+      })
+
+      it('refuses only when the store does not hold the conversation, since nothing can resume it', async () => {
+        installExitOnKillSpawnMock()
+        const prepareClaudeAuth = vi.fn(injectedLaunchPreparation('account-pinned'))
+        registerPtyHandlers(
+          mainWindow as never,
+          undefined,
+          undefined,
+          undefined,
+          prepareClaudeAuth,
+          storeWith('account-pinned') as never,
+          undefined,
+          (target) => Boolean(target?.overrideAccountId)
+        )
+
+        await expect(
+          handlers.get('pty:spawn')!(null, {
+            cols: 80,
+            rows: 24,
+            command: `claude --resume ${SESSION}`,
+            worktreeId: 'wt-pinned',
+            resumeProviderSession: {
+              key: 'session_id',
+              id: SESSION,
+              transcriptPath: removedTranscript
+            }
+          })
+        ).rejects.toThrow('Orca could not find this Claude conversation in its transcript store')
+        expect(prepareClaudeAuth).not.toHaveBeenCalled()
+      })
     })
 
     it('lets a launch-scoped Claude account beat the worktree pin on the runtime path', async () => {
