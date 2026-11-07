@@ -110,6 +110,8 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
+    // Why: the star card opens on agent counts and covered the dock in CI and in captures.
+    await orcaPage.evaluate(() => window.api.ui.set({ starNagCompleted: true }))
     const worktreeId = await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
     await waitForActivePanePtyId(orcaPage)
