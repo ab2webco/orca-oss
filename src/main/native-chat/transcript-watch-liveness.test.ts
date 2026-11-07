@@ -70,6 +70,34 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<voi
   }
 }
 
+/**
+ * Bounds an unbound watcher's delivery in drains, not wall time: each drain ends with a
+ * failed bind, and the second one counted after the append started after it, so it must
+ * have read it. A stalled CI worker spends any wall-clock budget without one drain
+ * running (ORCA-1122); the clock here only catches a hang.
+ */
+async function waitForWithinUnboundDrains(predicate: () => boolean): Promise<void> {
+  const startBinds = watchMock.mock.calls.length
+  const start = Date.now()
+  let lastTick = start
+  let maxLoopLagMs = 0
+  while (!predicate()) {
+    const drains = watchMock.mock.calls.length - startBinds
+    const elapsedMs = Date.now() - start
+    const detail = `${drains} drains, ${elapsedMs} ms, max event-loop lag ${maxLoopLagMs} ms`
+    if (drains >= 2) {
+      throw new Error(`append not delivered by the drain that followed it (${detail})`)
+    }
+    if (elapsedMs > 15_000) {
+      throw new Error(`reconciliation stopped draining (${detail})`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const now = Date.now()
+    maxLoopLagMs = Math.max(maxLoopLagMs, now - lastTick - 10)
+    lastTick = now
+  }
+}
+
 describe('native chat transcript watcher liveness', () => {
   it('reconciles without a native watcher when fs.watch cannot bind', async () => {
     watchState.error = new Error('ENOSYS')
@@ -88,7 +116,9 @@ describe('native chat transcript watcher liveness', () => {
     await waitFor(() => snapshots.mock.calls.length === 1)
 
     await appendFile(filePath, claudeLine('poll-only', 'assistant', 'recovered'))
-    await waitFor(() => appends.mock.calls.flat(2).some((message) => message.id === 'poll-only'))
+    await waitForWithinUnboundDrains(() =>
+      appends.mock.calls.flat(2).some((message) => message.id === 'poll-only')
+    )
 
     subscription.unsubscribe()
     expect(subscription.watching).toBe(true)
@@ -114,7 +144,7 @@ describe('native chat transcript watcher liveness', () => {
     watchState.error = new Error('EPERM')
     watchers[0]!.emit('error', watchState.error)
     await appendFile(filePath, claudeLine('failed-rebind', 'assistant', 'still tailed'))
-    await waitFor(
+    await waitForWithinUnboundDrains(
       () =>
         appends.mock.calls.flat(2).some((message) => message.id === 'failed-rebind') &&
         watchMock.mock.calls.length > 1
