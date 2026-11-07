@@ -39,6 +39,11 @@ vi.mock('@/store', () => ({
   )
 }))
 
+const solo = { kind: 'solo' }
+vi.mock('./use-team-panel-solo-model', () => ({
+  useTeamPanelSoloModel: (active: boolean) => (active ? solo : null)
+}))
+
 const { toRemoteRuntimePtyId } = await import('@/runtime/runtime-terminal-stream')
 const { useTeamMemberOfTab, useTeamPanelKind, useTeamPanelModel } =
   await import('./use-team-panel-model')
@@ -86,6 +91,36 @@ describe('Team model polling', () => {
     })
 
     expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  // Why: a failed read says nothing about the team, so it must never read as the user's own sessions.
+  it('keeps a failed read on the team view instead of the no-team view', async () => {
+    const seen: { section: unknown; kind: unknown } = { section: null, kind: undefined }
+    await mount(() => {
+      seen.section = useTeamPanelModel().section
+      seen.kind = useTeamPanelKind()
+      return null
+    })
+
+    const section: TeamPanelModelSource['section'] = { kind: 'error', message: 'timeout' }
+    await act(async () => publish({ section, retry: () => {} }))
+
+    expect(seen.section).toEqual(section)
+    expect(seen.kind).toBeNull()
+  })
+
+  it('shows the no-team view when the host has no team to read', async () => {
+    const seen: { section: unknown; kind: unknown } = { section: null, kind: undefined }
+    await mount(() => {
+      seen.section = useTeamPanelModel().section
+      seen.kind = useTeamPanelKind()
+      return null
+    })
+
+    await act(async () => publish({ section: { kind: 'unavailable' }, retry: null }))
+
+    expect(seen.section).toEqual({ kind: 'ready', value: solo })
+    expect(seen.kind).toBe('solo')
   })
 })
 
