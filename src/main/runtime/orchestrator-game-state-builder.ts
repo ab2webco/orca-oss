@@ -142,7 +142,8 @@ export async function buildOrchestratorGameState(
       ...todo,
       ...listActions.todo,
       items: todo.items.map((one) => ({ ...one, prompt: renderGameWorkPrompt(workPrompt, one) }))
-    }
+    },
+    ...(projectWork.queue ? { queue: projectWork.queue } : {})
   }
   // Why: project rules first, so a repo can override what Orca's own integrations would link.
   const rules = [

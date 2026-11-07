@@ -104,3 +104,35 @@ describe('the actions the PR and To Do lists run', () => {
     expect(missing.warnings).toContain('orchestratorGame.reviews.action names no action: nope')
   })
 })
+
+describe('the merge queue', () => {
+  it('carries the queue the project work read, and none when it read none', async () => {
+    const queue = {
+      provider: 'github' as const,
+      entries: [
+        {
+          id: '#951',
+          title: 'Launch E2E waits',
+          url: 'https://github.com/o/r/pull/951',
+          position: 1,
+          state: 'checks' as const,
+          since: null
+        }
+      ]
+    }
+    const stateWith = (work: { queue?: typeof queue }) =>
+      buildOrchestratorGameState({
+        settings: undefined,
+        worktree: worktree(checkout('orchestratorGame:\n  mode: band\n')),
+        agents: [],
+        leaderPaneKey: null,
+        readReview: none,
+        readPlane: none,
+        readLinear: none,
+        readProjectWork: async () => ({ reviews: null, todo: null, ...work })
+      })
+
+    expect((await stateWith({ queue })).project?.queue).toEqual(queue)
+    expect((await stateWith({})).project).not.toHaveProperty('queue')
+  })
+})

@@ -165,7 +165,8 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await overlayGameState(electronApp)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
-      state.updateSettings({ uiLanguage: 'en' })
+      // Why plugins on: the panel draws no Jev row with the plugin system off.
+      state.updateSettings({ uiLanguage: 'en', pluginSystemEnabled: true })
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')
     })

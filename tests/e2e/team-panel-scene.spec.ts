@@ -126,7 +126,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
         uiLanguage: 'en',
         defaultTuiAgent: 'codex',
         agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
+        agentDefaultArgs: { codex: '' },
+        // Why: the panel draws no Jev row or bubble with the plugin system off.
+        pluginSystemEnabled: true
       })
     }, agent.command)
 
