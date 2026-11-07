@@ -117,8 +117,8 @@ describe('selectVisibleAgentMapLabels', () => {
   })
 
   it('drops the project count rather than a workspace name when they collide', () => {
-    // The workspace ring's name lands on the project's count line.
-    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 42 })], {
+    // The workspace ring's name lands on the project's count line under the ring.
+    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 96 })], {
       x: 0,
       y: 0,
       radius: 40,
@@ -135,6 +135,25 @@ describe('selectVisibleAgentMapLabels', () => {
     const layout = layoutOf([worktree({ id: 'a', x: 0, y: 0 })])
 
     expect([...selectVisibleAgentMapLabels(layout, 1, 1).projectCountIds]).toEqual(['project-1'])
+  })
+
+  it('drops the project count when it would reach a neighbouring cluster', () => {
+    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 0 })])
+    const [project] = layout.projects
+    const below = {
+      ...project,
+      id: 'project-2',
+      worktrees: [],
+      y: project.y + 2 * project.radius + 12
+    }
+
+    const { projectCountIds } = selectVisibleAgentMapLabels(
+      { ...layout, projects: [project, below] },
+      1,
+      1
+    )
+
+    expect([...projectCountIds]).not.toContain('project-1')
   })
 
   it('admits more labels as zooming in shrinks their world footprint', () => {

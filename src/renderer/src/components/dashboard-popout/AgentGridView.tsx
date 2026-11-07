@@ -204,7 +204,8 @@ export function AgentGridView({
         {allCells.length > 1 ? (
           <div
             data-agent-grid-controls
-            className="sticky top-0 z-10 flex shrink-0 items-center gap-1 bg-background text-[11px] text-muted-foreground"
+            // Why: sticky, so it needs an opaque fill — the host's surface, not always --background.
+            className="sticky top-0 z-10 flex shrink-0 items-center gap-1 bg-[var(--agent-board-surface,var(--background))] text-[11px] text-muted-foreground"
           >
             <span className="mr-3 flex items-center gap-2.5">
               {(
