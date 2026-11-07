@@ -204,7 +204,23 @@ describe('useTeamPanelSoloModel Jev', () => {
     expect(advisors).toHaveBeenCalledWith(JSON.stringify(reads), false)
   })
 
+  it('drops what it read once the plugin system goes off, so the report names no model', async () => {
+    advisors.mockReturnValue(
+      new Map([
+        [
+          `tab-a:${LEAF_A}`,
+          { model: 'Sonnet 5.5', effort: 'low', pinned: { model: true, effort: false } }
+        ]
+      ])
+    )
+
+    await mount()
+
+    expect(model?.rows.every((row) => row.advisor === null)).toBe(true)
+  })
+
   it("puts a pane's report on its own row, and no section on the others", async () => {
+    appState = { ...threeHosts(), settings: { pluginSystemEnabled: true } }
     advisors.mockReturnValue(
       new Map([
         [

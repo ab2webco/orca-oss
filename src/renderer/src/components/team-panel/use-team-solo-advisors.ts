@@ -5,7 +5,7 @@ import {
   type GameMemberAdvisor
 } from '../../../../shared/orchestrator-game-member-advisor'
 
-/** One host with an Orca to ask and its panes; null is this machine. */
+/** One host's panes to ask about; null is this machine. */
 export type TeamSoloAdvisorRead = { environmentId: string | null; paneKeys: string[] }
 
 type Reports = ReadonlyMap<string, GameMemberAdvisor>

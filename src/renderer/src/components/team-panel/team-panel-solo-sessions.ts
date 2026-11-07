@@ -227,7 +227,7 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
   })
 }
 
-/** Each host with an Orca to ask and the panes on it; an SSH target has none. */
+/** Each host that can hold a report, and its panes. Why no SSH: the relay drops that env var. */
 export function teamSoloAdvisorReadsOf(
   sessions: readonly TeamSoloSession[]
 ): TeamSoloAdvisorRead[] {

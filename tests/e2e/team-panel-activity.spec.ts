@@ -1,4 +1,4 @@
-import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
+import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { clickWithoutFrameDependency } from './helpers/frame-independent-ui'
 import {
@@ -131,6 +131,14 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
     },
     { panes, question: QUESTION }
   )
+}
+
+/** What opens the default card's hover: its title, or the plug when a port is live in the worktree. */
+async function defaultCardHover(page: Page): Promise<Locator> {
+  const plug = page.getByRole('button', { name: /live port/ }).first()
+  return (await plug.isVisible())
+    ? plug
+    : page.locator('[data-worktree-title-inline-rename]').first()
 }
 
 const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
@@ -289,6 +297,8 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   })
   await setPluginSystem(orcaPage, false)
   await expect(jev).toHaveCount(0)
+  // Why: this session was seeded on Opus; a held report must not go on naming its model.
+  await expect(panel.locator('[data-team-activity="other"]')).toContainText('Opus 5.5')
 
   await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
   await capture(orcaPage, testInfo, 'inbox', async (language) => {
@@ -344,16 +354,18 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await panel.getByRole('tab', { name: COPY.en.activity }).click()
   await expect(selected).toHaveAttribute('data-pane-key', asker)
 
-  // The default card has no badge here, so its title is the way to the hover card.
-  const title = orcaPage.locator('[data-worktree-title-inline-rename]').first()
   const defaultFacts = orcaPage.locator('[data-worktree-agent-hover]')
-  await title.hover()
+  await (await defaultCardHover(orcaPage)).hover()
   await orcaPage.waitForTimeout(600)
   await expect(defaultFacts).toHaveCount(0)
   await orcaPage.mouse.move(700, 600)
   await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
-  await title.hover()
-  await expect(defaultFacts).toBeVisible()
+  // Why retried: the host's port scan can land mid-step and move the hover to the plug.
+  await expect(async () => {
+    await orcaPage.mouse.move(700, 600)
+    await (await defaultCardHover(orcaPage)).hover()
+    await expect(defaultFacts).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
   await expect(defaultFacts).toContainText('Opus 5.5 · high')
   await orcaPage.screenshot({
     animations: 'disabled',

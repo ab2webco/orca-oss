@@ -119,8 +119,11 @@ export function useTeamPanelSoloModel(active: boolean): TeamPanelSoloModel | nul
     JSON.stringify(teamSoloAdvisorReadsOf(sessions)),
     active && pluginsOn && shownTab === 'activity'
   )
+  // Why not only the read: reports held from before the switch would go on naming the model.
+  const reports = pluginsOn ? advisors : undefined
   return useMemo(
-    () => (inputs ? teamPanelSoloModelFrom(inputs, { sessions, readings, advisors }) : null),
-    [inputs, sessions, readings, advisors]
+    () =>
+      inputs ? teamPanelSoloModelFrom(inputs, { sessions, readings, advisors: reports }) : null,
+    [inputs, sessions, readings, reports]
   )
 }
