@@ -365,6 +365,8 @@ import { PluginMarketplaceInstaller } from './plugins/plugin-marketplace-install
 import { PluginBundledBootstrapCoordinator } from './plugins/plugin-bundled-bootstrap-coordinator'
 import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
 import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
+import { createPluginWorkerFactory, resolvePluginWorkerHome } from './plugins/plugin-worker-home'
+import { getMainE2EConfig } from './e2e-config'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
 import { setPluginServiceForRpc } from './runtime/rpc/methods/plugins'
 import {
@@ -3071,7 +3073,14 @@ void app.whenReady().then(async () => {
       normalizePluginIdList(store?.getSettings().trustedDevPluginPaths),
     getKeybindings: () => keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
-    hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged)
+    hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged),
+    workerFactory: createPluginWorkerFactory(
+      resolvePluginWorkerHome({
+        isPackaged: app.isPackaged,
+        isE2E: getMainE2EConfig().userDataDir !== null,
+        userDataPath: app.getPath('userData')
+      })
+    )
   })
   const bundledPluginBootstrap = new PluginBundledBootstrapCoordinator({
     root: resolveBundledPluginRoot({
