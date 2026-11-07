@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { MESSAGE_HEADING_WORDS } from '../hooks/message-heading-words'
+import { leadCharacterOf } from '../hooks/game-lead'
 import {
   headingNameOf,
+  headingRuleWidthOf,
+  headingTimeOf,
   isQuestionToPerson,
   messageHeadingOf,
   toolSummaryOf
@@ -34,6 +37,48 @@ describe('message heading', () => {
     expect(headingNameOf('Castillo · ORCA-1047 Game panes', 'Squire')).toBe('Castillo')
     expect(headingNameOf('Lead', 'Squire')).toBe('Lead')
     expect(headingNameOf(undefined, 'Squire')).toBe('Squire')
+  })
+})
+
+describe('heading time and rule', () => {
+  it('reads as a clock under a minute, then in minutes', () => {
+    expect(headingTimeOf(6_000)).toBe('0:06')
+    expect(headingTimeOf(59_999)).toBe('0:59')
+    expect(headingTimeOf(60_000)).toBe('1 min')
+    expect(headingTimeOf(600_000)).toBe('10 min')
+    expect(headingTimeOf(3_900_000)).toBe('1 h 5 min')
+    expect(headingTimeOf(7_200_000)).toBe('2 h')
+  })
+
+  it('the rule fills the row between the name and the time', () => {
+    // 'Castillo · revisando' is 20 cells, '0:06' 4, a space either side of the rule.
+    expect(headingRuleWidthOf('Castillo · revisando', '0:06', 80)).toBe(80 - 1 - 20 - 4 - 2)
+    expect(headingRuleWidthOf('Castillo · revisando', '', 40)).toBe(40 - 1 - 20 - 1)
+  })
+
+  it('a narrow pane keeps a short rule', () => {
+    expect(headingRuleWidthOf('Castillo · revisando', '10 min', 20)).toBe(3)
+  })
+})
+
+describe("the lead's character", () => {
+  const lead = (displayName: string) => ({
+    paneKey: 'p1',
+    agentType: 'claude',
+    displayName,
+    isLeader: true
+  })
+
+  it('is the name its Team card shows, short of its ticket', () => {
+    const state = { agents: [lead('Castillo · ORCA-1092 Audit')], lead: { label: 'Boss' } }
+    expect(leadCharacterOf(state, 'Lead')).toBe('Castillo')
+  })
+
+  it("falls back to the lead worktree's name, then the label, then the title", () => {
+    const worktree = { id: 'w', path: '/w', branch: 'main', displayName: 'Castillo' }
+    expect(leadCharacterOf({ agents: [lead('claude')], worktree }, 'Lead')).toBe('Castillo')
+    expect(leadCharacterOf({ agents: [lead('p1')], lead: { label: 'Boss' } }, 'Lead')).toBe('Boss')
+    expect(leadCharacterOf({ agents: [] }, 'Lead')).toBe('Lead')
   })
 })
 

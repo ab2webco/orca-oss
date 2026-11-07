@@ -84,6 +84,7 @@ import {
   type AgentProviderSessionMetadata
 } from '../../shared/agent-session-resume'
 import { isCommandCodeNewTurnWhileWorking } from '../../shared/command-code-turn-boundary'
+import { ClaudeTurnEndPoller } from '../../shared/claude-turn-end-transcript'
 import {
   GameMcpCallLog,
   mcpToolCallOfHookBody,
@@ -657,6 +658,11 @@ export class AgentHookServer {
   private statusPersistTimer: ReturnType<typeof setTimeout> | null = null
   private assistantMessageRetryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private codexSubagentPollTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private claudeTurnEndPoller = new ClaudeTurnEndPoller({
+    state: this.state,
+    isListening: () => this.server !== null,
+    ingestStop: (stopBody) => this.ingestLocalHookBody('claude', stopBody)
+  })
   private promptSentDedupeByPaneKey = new Map<string, AgentPromptSentDedupeEntry>()
   private promptSentHashSalt = randomBytes(16).toString('hex')
   private closedAgentStatusTabIds = new Set<string>()
@@ -1488,6 +1494,29 @@ export class AgentHookServer {
     this.applyNormalizedStatus(normalized.event, normalized.onAccepted)
   }
 
+  private ingestLocalHookBody(source: AgentHookSource, aliasedBody: unknown): void {
+    const normalized = this.normalizeLocalHookPayload(source, aliasedBody)
+    const statusDisposition = normalized.event
+      ? this.getAgentStatusDisposition(normalized.event.paneKey, {
+          hookEventName: normalized.event.hookEventName,
+          isReplay: normalized.event.isReplay
+        })
+      : 'suppress'
+    if (!normalized.event || statusDisposition === 'suppress') {
+      return
+    }
+    const event =
+      statusDisposition === 'restart'
+        ? { ...normalized.event, launchToken: undefined }
+        : normalized.event
+    this.recordCurrentAuthorityObservation(event)
+    const enriched = this.applyNormalizedStatus(event, normalized.onAccepted)
+    this.recordGameMcpCall(event, aliasedBody)
+    this.scheduleAssistantMessageRetry(source, aliasedBody, enriched)
+    this.scheduleCodexSubagentPoll(source, aliasedBody, enriched)
+    this.claudeTurnEndPoller.schedule(source, event.paneKey, aliasedBody)
+  }
+
   setPaneKeyAliasPersistenceListener(listener: PaneKeyAliasPersistenceListener | null): void {
     this.paneKeyAliasPersistenceListener = listener
   }
@@ -1671,6 +1700,7 @@ export class AgentHookServer {
     }
     this.clearAssistantMessageRetry(previousOwnerPaneKey)
     this.clearCodexSubagentPoll(previousOwnerPaneKey)
+    this.claudeTurnEndPoller.clear(previousOwnerPaneKey)
     // Why: the live process keeps posting the physical source key after detach; persist a chain-safe mapping to the current owner.
     this.legacyPaneKeyAliases.set(physicalPaneKey, {
       stablePaneKey: toPaneKey,
@@ -1716,6 +1746,7 @@ export class AgentHookServer {
       }
       this.clearAssistantMessageRetry(key)
       this.clearCodexSubagentPoll(key)
+      this.claudeTurnEndPoller.clear(key)
       clearPaneCacheState(this.state, key)
       this.runtimeObservedStatusPaneKeys.delete(key)
       this.currentAuthorityObservations.delete(key)
@@ -2225,25 +2256,7 @@ export class AgentHookServer {
         }
 
         trackEmptyPaneKeyHook(body)
-        const aliasedBody = this.normalizeHookBodyPaneKeyAlias(body)
-        const normalized = this.normalizeLocalHookPayload(source, aliasedBody)
-        const statusDisposition = normalized.event
-          ? this.getAgentStatusDisposition(normalized.event.paneKey, {
-              hookEventName: normalized.event.hookEventName,
-              isReplay: normalized.event.isReplay
-            })
-          : 'suppress'
-        if (normalized.event && statusDisposition !== 'suppress') {
-          const event =
-            statusDisposition === 'restart'
-              ? { ...normalized.event, launchToken: undefined }
-              : normalized.event
-          this.recordCurrentAuthorityObservation(event)
-          const enriched = this.applyNormalizedStatus(event, normalized.onAccepted)
-          this.recordGameMcpCall(event, aliasedBody)
-          this.scheduleAssistantMessageRetry(source, aliasedBody, enriched)
-          this.scheduleCodexSubagentPoll(source, aliasedBody, enriched)
-        }
+        this.ingestLocalHookBody(source, this.normalizeHookBodyPaneKeyAlias(body))
 
         res.writeHead(204)
         res.end()
@@ -2299,6 +2312,7 @@ export class AgentHookServer {
       clearTimeout(timer)
     }
     this.codexSubagentPollTimers.clear()
+    this.claudeTurnEndPoller.clearAll()
     // Why: don't unlink the endpoint file — a stale file matches fail-open and avoids a TOCTOU race with a concurrent Orca.
     this.endpointDir = null
     this.endpointFilePathCache = null
@@ -2411,6 +2425,7 @@ export class AgentHookServer {
     }
     this.clearAssistantMessageRetry(resolvedPaneKey)
     this.clearCodexSubagentPoll(resolvedPaneKey)
+    this.claudeTurnEndPoller.clear(resolvedPaneKey)
     this.runtimeObservedStatusPaneKeys.delete(resolvedPaneKey)
     this.currentAuthorityObservations.delete(resolvedPaneKey)
     if (existing.payload.state === 'done') {
@@ -2484,6 +2499,7 @@ export class AgentHookServer {
       }
       this.clearAssistantMessageRetry(paneKey)
       this.clearCodexSubagentPoll(paneKey)
+      this.claudeTurnEndPoller.clear(paneKey)
       clearPaneCacheState(this.state, paneKey)
       this.runtimeObservedStatusPaneKeys.delete(paneKey)
       this.currentAuthorityObservations.delete(paneKey)
@@ -2505,6 +2521,7 @@ export class AgentHookServer {
     const hadStatus = this.state.lastStatusByPaneKey.has(resolvedPaneKey)
     this.clearAssistantMessageRetry(resolvedPaneKey)
     this.clearCodexSubagentPoll(resolvedPaneKey)
+    this.claudeTurnEndPoller.clear(resolvedPaneKey)
     clearPaneCacheState(this.state, resolvedPaneKey)
     this.currentAuthorityObservations.delete(resolvedPaneKey)
     this.promptSentDedupeByPaneKey.delete(resolvedPaneKey)

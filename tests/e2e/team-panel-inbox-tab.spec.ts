@@ -209,7 +209,28 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
       from: lead
     })
     // Why after the reply: the lead's reply settles every gate the member had open.
-    await send(member!, lead, 'decision_gate', 'Rebase now?', 'Rebase #917 now or wait for #913?')
+    // A real `orchestration ask`, with the member's own dispatch capability from its preamble.
+    let capability: string | null = null
+    await expect
+      .poll(
+        () => {
+          capability =
+            new RegExp(
+              `Your task ID is: ${task.result.task.id}[\\s\\S]*?--dispatch-capability (dcap_[A-Za-z0-9_-]+)`
+            ).exec(agent.readStdin())?.[1] ?? null
+          return capability
+        },
+        { timeout: 60_000, message: 'the member never got its dispatch capability' }
+      )
+      .not.toBeNull()
+    // Why not awaited: ask blocks until the lead answers, and this one is left for the lead.
+    void client
+      .call(
+        'orchestration.ask',
+        { from: member!, question: 'Rebase #917 now or wait for #913?', timeoutMs: 240_000 },
+        { orchestrationCapability: capability! }
+      )
+      .catch(() => {})
     await waitingId('Rebase #917')
 
     await client.call('game.ownerAsk', {
@@ -243,6 +264,18 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     })
     await expect(inbox.getByText('Ship the price change today or tomorrow?')).toBeVisible()
     await expect(inbox.getByText(`${otherName}`, { exact: false }).first()).toBeVisible()
+    // ORCA-780: the member's ask is the lead's to answer; it reaches you only through the lead.
+    const needsYou = inbox.locator('[data-needs-you="true"]')
+    await expect(needsYou).toHaveCount(1)
+    await expect(needsYou).toContainText('Needs you')
+    await expect(needsYou).toContainText('ORCA-12')
+    await expect(needsYou).toContainText('Merge #923 now or wait for #915 first?')
+    await expect(inbox.getByText(/Rebase #917 now or wait for #913\?/)).toHaveCount(0)
+    // ORCA-1095 criterion 1: V28's closed card is the question and its options; typing waits behind Answer.
+    const forYouList = inbox.locator('[role="tabpanel"][data-state="active"]')
+    await expect(forYouList.getByRole('textbox')).toHaveCount(0)
+    await expect(forYouList.getByRole('button', { name: 'Send' })).toHaveCount(0)
+    await expect(forYouList.getByRole('button', { name: 'Answer' })).toHaveCount(2)
     await capture('for-you', inbox)
 
     for (const [key, name] of [
@@ -256,7 +289,9 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
         'true'
       )
       if (key === 'waiting') {
-        await expect(inbox.getByText('Rebase #917 now or wait for #913?')).toBeVisible()
+        await expect(inbox.getByText(/Rebase #917 now or wait for #913\?/)).toBeVisible()
+        // Opened so the reply box behind Answer is measured too.
+        await inbox.getByRole('button', { name: 'Answer' }).click()
       } else if (key === 'threads') {
         await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toBeVisible()
       } else {
@@ -282,9 +317,42 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     })
     // Why 5 s: the badge follows the answer's change push, not the 20 s model poll.
     await expect(inboxTab).not.toContainText('1', { timeout: 5_000 })
+    // Both ways of answering reach the lead as its owner mail, the answer first.
+    // Why game.inbox: it reads the lead's mail without consuming it, as the lead's own check would.
+    const leadHeard = async (): Promise<string[]> =>
+      (
+        await client.call<{ inbox: { messages: { from: string; body: string }[] } }>('game.inbox', {
+          terminalHandle: lead
+        })
+      ).result.inbox.messages.map((one) => one.body)
+    await expect
+      .poll(leadHeard, { timeout: 30_000 })
+      .toContainEqual(expect.stringContaining('Answer: Merge now'))
+
+    // A question with no options keeps Answer in sight, and a typed answer reaches the lead too.
+    const typed = (
+      await client.call<{ question: { id: string } }>('game.ownerAsk', {
+        worktreeId,
+        terminalHandle: lead,
+        ticket: 'ORCA-12',
+        question: 'Which day should lab.116 ship?',
+        options: []
+      })
+    ).result.question
+    const typedCard = inbox.locator(`[data-game-owner-question="${typed.id}"]`)
+    await expect(typedCard).toBeVisible({ timeout: 60_000 })
+    await expect(typedCard.getByRole('textbox')).toHaveCount(0)
+    await typedCard.getByRole('button', { name: 'Answer' }).click()
+    await capture('for-you-typing', inbox)
+    await typedCard.getByRole('textbox', { name: 'Your answer' }).fill('Thursday, after the RC')
+    await typedCard.getByRole('button', { name: 'Send' }).click()
+    await expect(typedCard).toHaveCount(0, { timeout: 60_000 })
+    await expect
+      .poll(leadHeard, { timeout: 30_000 })
+      .toContainEqual(expect.stringContaining('Answer: Thursday, after the RC'))
     await inbox.getByRole('tab', { name: /Answered/ }).click()
     await expect(inbox.getByText('You answered: Merge now')).toBeVisible({ timeout: 60_000 })
-    await expect(inbox.getByText('The lead answered')).toBeVisible()
+    await expect(inbox.getByText('The lead answered: Use 8080')).toBeVisible()
     await capture('answered-yours', inbox)
   } finally {
     agent.dispose()

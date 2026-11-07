@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GameProjectWork, GameState } from '../types'
-import { stateChipsOf, type BandChip } from '../hooks/band-chips'
 import { gameStateOf } from '../hooks/game-state'
-import { paneLinksOf } from '../hooks/pane-links'
 import { listActionOf, todoActionOf } from '../hooks/lead-actions'
 
 const PROJECT: GameProjectWork = {
@@ -51,10 +49,6 @@ const STATE: GameState = {
   project: PROJECT
 }
 
-const COUNTS = { working: 0, idle: 0, done: 0, waiting: 0 }
-const chipsOf = (state: GameState): BandChip[] => stateChipsOf(state, COUNTS, 0, '', false)
-const byKey = (chips: readonly BandChip[], key: string) => chips.find((one) => one.key === key)
-
 describe('project work from Orca', () => {
   it('keeps valid lists and items, drops unsafe urls and caps what it keeps', () => {
     const items = Array.from({ length: 12 }, (_, at) => ({
@@ -99,113 +93,6 @@ describe('project work from Orca', () => {
   })
 })
 
-describe('project chips', () => {
-  it('draws each open PR as a chip that opens it, colored by its CI, and my To Do opening its list', () => {
-    const chips = chipsOf(STATE)
-    expect(byKey(chips, 'band-pr-#469')).toMatchObject({
-      labels: ['⇄ #469', '#469'],
-      href: 'https://github.com/o/r/pull/469',
-      color: 'red',
-      isLink: true
-    })
-    expect(byKey(chips, 'band-pr-#470')).toMatchObject({
-      labels: ['⇄ #470', '#470'],
-      href: 'https://github.com/o/r/pull/470',
-      color: 'green'
-    })
-    expect(byKey(chips, 'band-reviews')).toBeUndefined()
-    expect(byKey(chips, 'band-todo')).toMatchObject({
-      labels: ['☐ To Do 3', '☐ 3'],
-      href: 'https://app.plane.so/w/workspace-views/assigned/',
-      isLink: true
-    })
-  })
-
-  it('adds the count that opens the list when more PRs are open than the band shows', () => {
-    const items = Array.from({ length: 5 }, (_, at) => ({
-      id: `#${at + 1}`,
-      title: `PR ${at + 1}`,
-      url: `https://github.com/o/r/pull/${at + 1}`
-    }))
-    const chips = chipsOf({
-      ...STATE,
-      project: { reviews: { ...PROJECT.reviews!, total: 7, items }, todo: null }
-    })
-    expect(chips.filter((one) => one.key.startsWith('band-pr-')).map((one) => one.key)).toEqual([
-      'band-pr-#1',
-      'band-pr-#2',
-      'band-pr-#3'
-    ])
-    expect(byKey(chips, 'band-reviews')).toMatchObject({
-      labels: ['⇄ My PRs 7', '⇄ 7'],
-      href: 'https://github.com/o/r/pulls?q=is%3Apr'
-    })
-  })
-
-  it("leaves out the PR the worktree's own review chip already shows", () => {
-    const chips = chipsOf({
-      ...STATE,
-      review: {
-        provider: 'github',
-        number: 469,
-        title: 'Spawn race',
-        url: 'https://github.com/o/r/pull/469',
-        state: 'open',
-        ci: 'failure'
-      }
-    })
-    expect(byKey(chips, 'band-pr-#469')).toBeUndefined()
-    expect(byKey(chips, 'band-pr-#470')).toBeDefined()
-  })
-
-  it('names GitLab reviews MRs and draws a list with no url as plain text', () => {
-    const chips = chipsOf({
-      ...STATE,
-      project: {
-        reviews: { provider: 'gitlab', total: 1, url: null, items: [] },
-        todo: null
-      }
-    })
-    expect(byKey(chips, 'band-reviews')).toMatchObject({ labels: ['⇄ My MRs 1', '⇄ 1'] })
-    expect(byKey(chips, 'band-reviews')?.href).toBeUndefined()
-    expect(byKey(chips, 'band-todo')).toBeUndefined()
-  })
-
-  it('ranks an empty list after every other link', () => {
-    const chips = chipsOf({
-      ...STATE,
-      project: { reviews: { ...PROJECT.reviews!, total: 0, items: [] }, todo: PROJECT.todo }
-    })
-    expect(byKey(chips, 'band-reviews')?.priority).toBeGreaterThan(
-      byKey(chips, 'band-todo')?.priority ?? 0
-    )
-  })
-
-  it('draws no project chips without project work', () => {
-    const chips = chipsOf({ ...STATE, project: undefined })
-    expect(chips.some((one) => one.key === 'band-reviews' || one.key === 'band-todo')).toBe(false)
-  })
-})
-
-describe('project pane links', () => {
-  it('opens my PRs on g and my To Do on t', () => {
-    expect(paneLinksOf(STATE)).toEqual([
-      {
-        key: 'open-reviews',
-        hotkey: 'g',
-        label: 'My PRs 2',
-        url: 'https://github.com/o/r/pulls?q=is%3Apr'
-      },
-      {
-        key: 'open-todo',
-        hotkey: 't',
-        label: 'To Do 3',
-        url: 'https://app.plane.so/w/workspace-views/assigned/'
-      }
-    ])
-  })
-})
-
 describe('a To Do that runs an action', () => {
   const JIRA = { id: 'action-0', label: 'Jira', command: 'jira', prompt: 'Show my To Do' }
   const withAction = (actionId?: string): GameState => ({
@@ -226,46 +113,22 @@ describe('a To Do that runs an action', () => {
     expect(todoActionOf(parsed as GameState)).toEqual(JIRA)
   })
 
-  it('makes the band chip and the t link run it instead of opening the list', () => {
-    const state = withAction('action-0')
-    const chip = byKey(chipsOf(state), 'band-todo')
-    expect(chip?.href).toBeUndefined()
-    expect(chip?.actionId).toBe('action-0')
-    expect(paneLinksOf(state).find((one) => one.key === 'open-todo')).toMatchObject({
-      hotkey: 't',
-      url: '',
-      action: JIRA
-    })
-  })
-
-  it('keeps the link when the action is missing or unset', () => {
+  it('names no action when the one it points at is missing or unset', () => {
     for (const state of [withAction('action-9'), withAction()]) {
       expect(todoActionOf(state)).toBeUndefined()
-      expect(byKey(chipsOf(state), 'band-todo')?.href).toBe(PROJECT.todo?.url)
-      expect(paneLinksOf(state).find((one) => one.key === 'open-todo')?.url).toBe(PROJECT.todo?.url)
     }
   })
 })
 
 describe('a PR list that runs an action', () => {
-  const PRS = { id: 'action-0', label: 'PRs', command: 'prs', prompt: 'Show my PRs' }
-  const reviews = { ...(PROJECT.reviews as NonNullable<GameProjectWork['reviews']>), total: 0 }
-  const state: GameState = {
-    ...STATE,
-    actions: [PRS],
-    project: { reviews: { ...reviews, actionId: 'action-0' }, todo: null }
-  }
-
-  it('makes the band count and the g link run it instead of opening the list', () => {
-    const parsed = gameStateOf(state) as GameState
+  it('keeps the action Orca names for the PR list', () => {
+    const PRS = { id: 'action-0', label: 'PRs', command: 'prs', prompt: 'Show my PRs' }
+    const reviews = { ...(PROJECT.reviews as NonNullable<GameProjectWork['reviews']>), total: 0 }
+    const parsed = gameStateOf({
+      ...STATE,
+      actions: [PRS],
+      project: { reviews: { ...reviews, actionId: 'action-0' }, todo: null }
+    }) as GameState
     expect(listActionOf(parsed, 'reviews')).toEqual(PRS)
-    const chip = byKey(chipsOf(parsed), 'band-reviews')
-    expect(chip?.href).toBeUndefined()
-    expect(chip?.actionId).toBe('action-0')
-    expect(paneLinksOf(parsed).find((one) => one.key === 'open-reviews')).toMatchObject({
-      hotkey: 'g',
-      url: '',
-      action: PRS
-    })
   })
 })

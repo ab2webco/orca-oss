@@ -77,6 +77,28 @@ describe('GameMemberAdvisors', () => {
     store.noteReport('pane-a', null, 2)
     expect(store.of('pane-a', 3)).toBeNull()
   })
+
+  // Why: a true answer makes the lead's Team panel read again now (ORCA-1120).
+  it('says when a report changes what the panel shows, and only then', () => {
+    const store = new GameMemberAdvisors()
+    const raw = (line: string, effort = 'high') => ({
+      version: 1,
+      model: 'Opus 5.5',
+      effort,
+      line,
+      pinned: { effort: true }
+    })
+    expect(store.noteReport('pane-a', raw('Keep it small'), 0)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Keep it small'), 1)).toBe(false)
+    const { line, ...reordered } = raw('Keep it small')
+    expect(store.noteReport('pane-a', { line, ...reordered }, 2)).toBe(false)
+    expect(store.noteReport('pane-a', raw('Split the PR'), 3)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Split the PR', 'low'), 4)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Split the PR', 'low'), 5)).toBe(false)
+    expect(store.noteReport('pane-a', { version: 2 }, 6)).toBe(false)
+    expect(store.noteReport('pane-a', null, 7)).toBe(true)
+    expect(store.noteReport('pane-a', null, 8)).toBe(false)
+  })
 })
 
 describe('GameMemberAdvisors kept copy', () => {
@@ -118,5 +140,18 @@ describe('GameMemberAdvisors kept copy', () => {
     store.note('pane-a', null, 1)
     expect(kept.has('pane-a')).toBe(false)
     expect(store.of('pane-a', 2)).toBeNull()
+  })
+
+  it('liveOf answers only while the pane keeps reporting, never from the kept copy', () => {
+    const kept = new Map<string, GameMemberAdvisorReport | null>()
+    const store = new GameMemberAdvisors(undefined, {
+      read: (paneKey) => kept.get(paneKey) ?? null,
+      write: (paneKey, report) => void kept.set(paneKey, report)
+    })
+    store.note('pane-a', on('Opus 5.5'), 0)
+
+    expect(store.liveOf('pane-a', MINUTE)).toEqual(on('Opus 5.5'))
+    expect(store.liveOf('pane-a', 4 * MINUTE)).toBeNull()
+    expect(store.of('pane-a', 4 * MINUTE)).toEqual(on('Opus 5.5'))
   })
 })

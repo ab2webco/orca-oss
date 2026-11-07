@@ -81,6 +81,22 @@ describe('useGameOwnerQuestions', () => {
     await waitFor(() => expect(result.current.questions).toEqual([]))
   })
 
+  // Why (ORCA-1100): an answer the lead never got must stay visible until a pushed change says it arrived.
+  it('keeps an answer the board still holds until it reaches the lead', async () => {
+    const held = {
+      ...question('oq_9'),
+      answer: { text: 'No', at: '2026-10-29T10:01:00.000Z', undelivered: true }
+    }
+    let undelivered: unknown[] = [held]
+    const runtime = stubRuntime(() => ({ questions: [], undelivered }))
+    const { result } = renderHook(() => useGameOwnerQuestions(SCOPE))
+    await waitFor(() => expect(result.current.undelivered.map((one) => one.id)).toEqual(['oq_9']))
+
+    undelivered = []
+    act(() => runtime.push())
+    await waitFor(() => expect(result.current.undelivered).toEqual([]))
+  })
+
   it('answers, then rereads; a refused answer is thrown for the row to show', async () => {
     let open = [question('oq_1')]
     const { call } = stubRuntime((args) => {

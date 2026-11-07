@@ -1,4 +1,4 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -17,7 +17,11 @@ const COPY = {
     lead: 'Lead',
     waiting: 'Waiting for your answer',
     open: 'Open terminal',
-    awaited: 'Waiting for you'
+    awaited: 'Waiting for you',
+    noTeam: 'Your work',
+    readError: 'Could not read the team',
+    readErrorText: 'Orca is not responding in this project. Try again.',
+    retry: 'Try again'
   },
   es: {
     team: 'Equipo',
@@ -26,7 +30,11 @@ const COPY = {
     lead: 'Líder',
     waiting: 'Esperando tu respuesta',
     open: 'Abrir terminal',
-    awaited: 'Te espera'
+    awaited: 'Te espera',
+    noTeam: 'Tu trabajo',
+    readError: 'No se pudo leer el equipo',
+    readErrorText: 'Orca no responde en este proyecto. Vuelve a intentarlo.',
+    retry: 'Reintentar'
   }
 } as const
 
@@ -42,13 +50,72 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     .toBe(theme)
 }
 
+type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
+type ReadRig = typeof globalThis & { __teamReadFails?: boolean }
+
+/** Fails the panel's game.state as a host that stopped answering does; the CLI client is untouched. */
+async function wrapPanelReads(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ ipcMain }) => {
+    const rig = globalThis as ReadRig
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, RuntimeCall> })
+      ._invokeHandlers
+    const real = handlers.get('runtime:call')!
+    ipcMain.removeHandler('runtime:call')
+    ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
+      if (args.method === 'game.state' && rig.__teamReadFails) {
+        throw new Error('host did not answer')
+      }
+      return real(event, args)
+    })
+  })
+}
+
+const failPanelReads = (app: ElectronApplication, fails: boolean): Promise<void> =>
+  app.evaluate((_, next) => {
+    ;(globalThis as ReadRig).__teamReadFails = next
+  }, fails)
+
+/** Every language, width and theme, after checking the screen means what the name says. */
+async function captureEvery(
+  page: Page,
+  outputPath: (name: string) => string,
+  name: string,
+  check: (language: 'en' | 'es') => Promise<void>
+): Promise<void> {
+  const panel = page.getByTestId('team-panel')
+  for (const language of ['en', 'es'] as const) {
+    await page.evaluate(
+      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+      language
+    )
+    await check(language)
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(page, theme)
+        // A card wider than the panel is cut, and the person cannot read the member's line.
+        const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+        expect(overflow, `panel overflows at ${width}px ${theme} ${language}`).toBeLessThanOrEqual(
+          0
+        )
+        await page.screenshot({
+          animations: 'disabled',
+          path: outputPath(`${name}-${language}-${width}-${theme}.png`)
+        })
+      }
+    }
+  }
+  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
+
 // The Team tab draws the lead and members the runtime itself reports; nothing is seeded into the
 // panel (ORCA-1050). A real lead pane, real orchestration members and a real owner question.
 test('the Team tab shows the live lead and its members from the lead game state', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(420_000)
+  test.setTimeout(600_000)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -163,6 +230,9 @@ test('the Team tab shows the live lead and its members from the lead game state'
       )
       .toBe(2)
 
+    // A live lead whose game.state fails: the team's error, never the user's own sessions.
+    await wrapPanelReads(electronApp)
+    await failPanelReads(electronApp, true)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       state.setRightSidebarOpen(true)
@@ -170,6 +240,17 @@ test('the Team tab shows the live lead and its members from the lead game state'
     })
     const panel = orcaPage.getByTestId('team-panel')
     const cards = panel.locator('[data-team-card="member"]')
+    const readError = async (language: 'en' | 'es'): Promise<void> => {
+      await expect(panel).toContainText(COPY[language].readError, { timeout: 60_000 })
+      await expect(panel).toContainText(COPY[language].readErrorText)
+      await expect(panel.getByRole('button', { name: COPY[language].retry })).toBeVisible()
+      await expect(panel).not.toContainText('runtime:call')
+      await expect(panel).not.toContainText(COPY[language].noTeam)
+    }
+    await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
+    await failPanelReads(electronApp, false)
+    await panel.getByRole('button', { name: COPY.en.retry }).click()
+
     await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
       timeout: 90_000
     })
@@ -178,34 +259,38 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await expect(cards.filter({ hasText: 'ORCA-14' })).toHaveCount(1)
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toContainText('1')
 
-    for (const language of ['en', 'es'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
-      await expect(panel.getByRole('tab', { name: COPY[language].team })).toBeVisible()
-      // The red tone says ORCA-14 needs the user, so its line must say so too, and name it once.
-      const asking = cards.filter({ hasText: 'ORCA-14' })
-      await expect(asking).toContainText(COPY[language].waiting)
-      await expect(asking).not.toContainText(/Working|Trabajando/)
-      expect((await asking.innerText()).match(/ORCA-14/g)).toHaveLength(1)
-      for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
-        for (const theme of ['dark', 'light'] as const) {
-          await setTheme(orcaPage, theme)
-          // A card wider than the panel is cut, and the person cannot read the member's line.
-          const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
-          expect(
-            overflow,
-            `panel overflows at ${width}px ${theme} ${language}`
-          ).toBeLessThanOrEqual(0)
-          await orcaPage.screenshot({
-            animations: 'disabled',
-            path: testInfo.outputPath(`team-tab-${language}-${width}-${theme}.png`)
-          })
-        }
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'team-tab',
+      async (language) => {
+        await expect(panel.getByRole('tab', { name: COPY[language].team })).toBeVisible()
+        // The red tone says ORCA-14 needs the user, so its line must say so too, and name it once.
+        const asking = cards.filter({ hasText: 'ORCA-14' })
+        await expect(asking).toContainText(COPY[language].waiting)
+        await expect(asking).not.toContainText(/Working|Trabajando/)
+        expect((await asking.innerText()).match(/ORCA-14/g)).toHaveLength(1)
       }
-    }
+    )
+
+    // Reopening the panel starts a new read; a host that stopped answering must not cost the team.
+    await failPanelReads(electronApp, true)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'read-error-team-kept',
+      async (language) => {
+        await readError(language)
+        await expect(panel.locator('[data-team-card="lead"]')).toBeVisible()
+        await expect(cards).toHaveCount(2)
+      }
+    )
+    await failPanelReads(electronApp, false)
+    await panel.getByRole('button', { name: COPY.en.retry }).click()
+    await expect(panel).not.toContainText(COPY.en.readError)
+    await expect(cards).toHaveCount(2)
 
     // Display and Plain come from the real panel look setting: no scene slot, agents by role.
     const setLook = (look: 'game' | 'display' | 'plain') =>
@@ -217,12 +302,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
         })
       }, look)
     const leadCard = panel.locator('[data-team-card="lead"]')
+    // Why both: the test repo takes the machine's git default, master on Linux and main on Apple's.
+    const leadName = /^(master|main)/
     await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
-    await expect(leadCard).toContainText('master')
+    await expect(leadCard).toContainText(leadName)
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
-      await expect(leadCard).not.toContainText('master')
+      await expect(leadCard).not.toContainText(leadName)
       for (const language of ['en', 'es'] as const) {
         await orcaPage.evaluate(
           (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),

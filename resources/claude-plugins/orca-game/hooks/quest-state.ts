@@ -8,6 +8,7 @@ import { dayOf, daylightAt, hourOf, NOON, type Daylight } from './hd-daylight'
 import type { TeamEvent } from './hd-overlay'
 import { crownedLeadOf, type HdMember, type March } from './hd-party'
 import type { LeadState } from './lead-state'
+import type { LiveTurn } from './live-line'
 import { isSceneMode, type Action, type FlowPhase } from './quest-policy'
 import { isReacting, type Reaction } from './scene'
 import { sceneOf, type SceneDefinition, type ScenePhase } from './scenes/index'
@@ -46,7 +47,10 @@ type QuestRuntime = {
   replies: Set<string>
   stages: Map<string, Stage>
   animations: Map<string, readonly Animated[]>
-  cardPhases: Map<string, ScenePhase>
+  /** Each heading's phase and time as first drawn, so scrolling back never repaints it. */
+  cardHeads: Map<string, { phase: ScenePhase; time: string }>
+  /** The main loop's latest turn; undefined before one runs here or after an interrupt. */
+  turn: LiveTurn | undefined
   /** The time hd's day and night read, sampled from `$.clock`; 0 until the first sample. */
   clockMs: number
   hdParty: readonly HdMember[]
@@ -56,6 +60,8 @@ type QuestRuntime = {
   lead: string | undefined
   /** Whose figure this pane's hero is: the member's own name, or the lead's title. */
   hero: string | undefined
+  /** Who heads this pane's replies and live line: the member's character, or the lead's. */
+  speaker: string | undefined
   /** This pane's own state as the lead; undefined in a member's pane or before the first refresh. */
   leadState: LeadState | undefined
   event: { kind: TeamEvent['kind']; text: string; at: number } | undefined
@@ -85,7 +91,8 @@ export const quest: QuestRuntime = {
   replies: new Set<string>(),
   stages: new Map<string, Stage>(),
   animations: new Map<string, readonly Animated[]>(),
-  cardPhases: new Map<string, ScenePhase>(),
+  cardHeads: new Map<string, { phase: ScenePhase; time: string }>(),
+  turn: undefined,
   clockMs: 0,
   hdParty: [],
   isHdPartySeen: false,
@@ -93,6 +100,7 @@ export const quest: QuestRuntime = {
   marches: new Map<string, March>(),
   lead: undefined,
   hero: undefined,
+  speaker: undefined,
   leadState: undefined,
   event: undefined
 }
@@ -140,6 +148,8 @@ export const shownLead = (): string | undefined => crownedLeadOf(quest.lead, que
 
 /** Who this pane's hero is; the demo walks the phase costumes. */
 export const shownHero = (): string | undefined => (quest.isDemo ? undefined : quest.hero)
+
+export const shownSpeaker = (): string | undefined => (quest.isDemo ? undefined : quest.speaker)
 
 export const shownAction = (): Action | undefined =>
   quest.isDemo ? demoNow().action : quest.action

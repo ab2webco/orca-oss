@@ -149,6 +149,8 @@ export type HookListenerState = {
   claudeActiveSessionCronPaneKeys: Set<string>
   /** Background task ids of each pane's armed Monitor tools; these wait for events, not work. */
   claudeMonitorTaskIdsByPaneKey: Map<string, Set<string>>
+  /** Panes whose lead sent tool hooks after its Stop with no new prompt: a blocked Stop resumed the turn, which may end with no Stop. */
+  claudePostStopContinuationPaneKeys: Set<string>
   /** Live thread-spawn children per Codex pane. */
   codexSubagentRosterByPaneKey: Map<string, CodexSubagentRoster>
   /** Incremental parent/child rollout cursors for Codex collaboration v2. */
@@ -190,6 +192,7 @@ export function createHookListenerState(): HookListenerState {
     claudeRunningNonAgentTaskPaneKeys: new Set(),
     claudeActiveSessionCronPaneKeys: new Set(),
     claudeMonitorTaskIdsByPaneKey: new Map(),
+    claudePostStopContinuationPaneKeys: new Set(),
     claudeSessionModelByPaneKey: new Map(),
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
@@ -209,6 +212,7 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
   state.claudeActiveSessionCronPaneKeys.delete(paneKey)
   state.claudeMonitorTaskIdsByPaneKey.delete(paneKey)
+  state.claudePostStopContinuationPaneKeys.delete(paneKey)
   state.claudeSessionModelByPaneKey.delete(paneKey)
   state.codexSubagentRosterByPaneKey.delete(paneKey)
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
@@ -258,6 +262,7 @@ export function movePaneCacheState(
   movePaneScopedSetEntries(state.claudeRunningNonAgentTaskPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedSetEntries(state.claudeActiveSessionCronPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.claudeMonitorTaskIdsByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedSetEntries(state.claudePostStopContinuationPaneKeys, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.claudeSessionModelByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentRosterByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
@@ -305,6 +310,7 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.claudeRunningNonAgentTaskPaneKeys.clear()
   state.claudeActiveSessionCronPaneKeys.clear()
   state.claudeMonitorTaskIdsByPaneKey.clear()
+  state.claudePostStopContinuationPaneKeys.clear()
   state.claudeSessionModelByPaneKey.clear()
   state.codexSubagentRosterByPaneKey.clear()
   state.codexSubagentTranscriptByPaneKey.clear()
@@ -1500,7 +1506,7 @@ function readLastAssistantFromTranscriptOnce(transcriptPath: string): string | u
   return readLastTextFromTranscriptOnce(transcriptPath, extractAssistantTextFromLine)
 }
 
-function readLastTextFromTranscriptOnce<T = string>(
+export function readLastTextFromTranscriptOnce<T = string>(
   transcriptPath: string,
   extractLineText: (line: string) => T | undefined
 ): T | undefined {
@@ -2861,6 +2867,7 @@ function normalizeClaudeEvent(
     state.claudeSubagentRosterByPaneKey.delete(paneKey)
     state.claudeRunningNonAgentTaskPaneKeys.delete(paneKey)
     state.claudeActiveSessionCronPaneKeys.delete(paneKey)
+    state.claudePostStopContinuationPaneKeys.delete(paneKey)
     state.claudeLeadStateByPaneKey.set(paneKey, { state: 'done' })
     return buildClaudeStatusPayload(state, eventName, promptText, paneKey, hookPayload, {
       stateName: 'done',
@@ -3030,6 +3037,9 @@ function normalizeClaudeEvent(
           }
       : undefined
   const waitingToolUseId = eventToolUseId ?? previousLead?.waitingToolUseId
+  if (eventAgentId === undefined) {
+    trackClaudePostStopContinuation(state, paneKey, eventName, previousLead?.state)
+  }
   state.claudeLeadStateByPaneKey.set(paneKey, {
     state: reportedStateName,
     ...(interrupted ? { interrupted } : {}),
@@ -3066,6 +3076,21 @@ function normalizeClaudeEvent(
     updateToolSnapshot: true,
     interrupted
   })
+}
+
+function trackClaudePostStopContinuation(
+  state: HookListenerState,
+  paneKey: string,
+  eventName: unknown,
+  previousLeadState: AgentStatusState | undefined
+): void {
+  const isToolEvent =
+    eventName === 'PreToolUse' || eventName === 'PostToolUse' || eventName === 'PostToolUseFailure'
+  if (isToolEvent && previousLeadState === 'done') {
+    state.claudePostStopContinuationPaneKeys.add(paneKey)
+  } else if (!isToolEvent && eventName !== 'PermissionRequest') {
+    state.claudePostStopContinuationPaneKeys.delete(paneKey)
+  }
 }
 
 function buildClaudeStatusPayload(
