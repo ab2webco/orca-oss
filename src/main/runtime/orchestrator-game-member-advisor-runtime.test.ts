@@ -56,6 +56,32 @@ describe("a member pane's Jev report through the runtime", () => {
     })
   })
 
+  // Why: the Team panel otherwise waits up to its 20 s read for a new Jev line (ORCA-1120).
+  it('tells this window and paired clients when a report changes, not on a repeat', async () => {
+    const runtime = runtimeWithMember()
+    const gameAdvisorChanged = vi.fn()
+    runtime.setNotifier({ gameAdvisorChanged } as never)
+    const events: unknown[] = []
+    runtime.onClientEvent((event) => events.push(event), { consumesTerminalSideEffects: false })
+    const report = (line: string) => ({
+      version: 1,
+      model: 'Opus 5.5',
+      effort: 'high',
+      line,
+      pinned: { model: false, effort: false }
+    })
+
+    await runtime.getOrchestratorGameState({ paneKey: 'tab-4:member', advisor: report('Small') })
+    await runtime.getOrchestratorGameState({ paneKey: 'tab-4:member', advisor: report('Small') })
+    await runtime.getOrchestratorGameState({ paneKey: 'tab-1:lead' })
+    await runtime.getOrchestratorGameState({ paneKey: 'tab-4:member', advisor: report('Split') })
+
+    expect(gameAdvisorChanged).toHaveBeenCalledTimes(2)
+    expect(
+      events.filter((event) => (event as { type: string }).type === 'gameAdvisorChanged')
+    ).toHaveLength(2)
+  })
+
   it('still shows on the lead row once the member stopped reporting, from the dispatch it ran on', async () => {
     const runtime = runtimeWithMember()
     const db = new OrchestrationDb(':memory:')

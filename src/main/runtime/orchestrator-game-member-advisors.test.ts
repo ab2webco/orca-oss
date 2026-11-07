@@ -77,6 +77,28 @@ describe('GameMemberAdvisors', () => {
     store.noteReport('pane-a', null, 2)
     expect(store.of('pane-a', 3)).toBeNull()
   })
+
+  // Why: a true answer makes the lead's Team panel read again now (ORCA-1120).
+  it('says when a report changes what the panel shows, and only then', () => {
+    const store = new GameMemberAdvisors()
+    const raw = (line: string, effort = 'high') => ({
+      version: 1,
+      model: 'Opus 5.5',
+      effort,
+      line,
+      pinned: { effort: true }
+    })
+    expect(store.noteReport('pane-a', raw('Keep it small'), 0)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Keep it small'), 1)).toBe(false)
+    const { line, ...reordered } = raw('Keep it small')
+    expect(store.noteReport('pane-a', { line, ...reordered }, 2)).toBe(false)
+    expect(store.noteReport('pane-a', raw('Split the PR'), 3)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Split the PR', 'low'), 4)).toBe(true)
+    expect(store.noteReport('pane-a', raw('Split the PR', 'low'), 5)).toBe(false)
+    expect(store.noteReport('pane-a', { version: 2 }, 6)).toBe(false)
+    expect(store.noteReport('pane-a', null, 7)).toBe(true)
+    expect(store.noteReport('pane-a', null, 8)).toBe(false)
+  })
 })
 
 describe('GameMemberAdvisors kept copy', () => {
