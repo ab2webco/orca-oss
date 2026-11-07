@@ -14,8 +14,10 @@ describe('orca game state', () => {
     process.env.ORCA_WORKTREE_ID = 'wt1'
     process.env.ORCA_TERMINAL_HANDLE = 'h1'
     process.env.ORCA_PANE_KEY = 'tab:leaf'
-    // Why: the suite may run inside a member pane, which exports it.
+    // Why: the suite may run inside a member, Claude or WSL pane, which export these.
     delete process.env.ORCA_GAME_ROLE
+    delete process.env.CLAUDECODE
+    delete process.env.ORCA_CLI_COMMAND
   })
 
   afterEach(() => {
