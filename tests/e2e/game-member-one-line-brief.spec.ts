@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from './helpers/orca-app'
+import { ORCA_CLI_ENTRY, runOrcaCli } from './helpers/orca-cli-process'
 import { createBriefReadingAgent } from './helpers/game-member-brief-agent'
 import { memberDispatchOf, memberWorkspaceOf } from './helpers/game-member-workspace'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
@@ -9,25 +10,13 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 // A launched member is typed one line naming its brief, and acts on the file alone (ORCA-757).
-const cliEntry = path.join(process.cwd(), 'out', 'cli', 'index.js')
-
-function runCli(userDataDir: string, env: Record<string, string>, args: string[]) {
-  const { ORCA_ENVIRONMENT: _e, ORCA_PAIRING_CODE: _p, ...clean } = process.env
-  void _e
-  void _p
-  return spawnSync(process.execPath, [cliEntry, ...args], {
-    env: { ...clean, ORCA_USER_DATA_PATH: userDataDir, ORCA_DEV_CLI_INVOCATION: '1', ...env },
-    encoding: 'utf8',
-    timeout: 60_000
-  })
-}
 
 test('a launched member reads its one-line brief and sends the start heartbeat for its dispatch', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
   test.setTimeout(240_000)
-  const agent = createBriefReadingAgent(cliEntry)
+  const agent = createBriefReadingAgent(ORCA_CLI_ENTRY)
   try {
     await waitForSessionReady(orcaPage)
     // Why an override: the login shell's PATH puts a real codex ahead of any fixture dir.
@@ -81,7 +70,7 @@ test('a launched member reads its one-line brief and sends the start heartbeat f
         { timeout: 60_000, message: "the runtime never listed the lead's worktree" }
       )
       .toBe(true)
-    const launch = runCli(
+    const launch = runOrcaCli(
       userDataDir,
       {
         ORCA_TERMINAL_HANDLE: lead!.handle,

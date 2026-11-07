@@ -45,6 +45,8 @@ jobs:
     name: build e2e app
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      changed_shards: ${{ steps.changed-shards.outputs.matrix }}
 
     steps:
       - name: Checkout
@@ -64,6 +66,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
+
+      # Why here: changed-e2e needs its matrix before it starts, and this job runs first anyway.
+      - name: Split changed specs into shards
+        id: changed-shards
+        env:
+          TEST_FILES_JSON: ${{ inputs.test_files }}
+        run: node config/scripts/split-changed-e2e-specs.mjs
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -243,11 +252,18 @@ jobs:
           if-no-files-found: ignore
 
   changed-e2e:
-    name: changed e2e specs
+    name: changed e2e specs ${{ matrix.name }}
     needs: build
-    if: inputs.test_files != ''
+    # Why both: an empty matrix fails the run, so the split's '[]' must skip before it expands.
+    if: inputs.test_files != '' && needs.build.outputs.changed_shards != '[]'
     runs-on: ubuntu-latest
+    # Why shards and not a higher cap: one runner took 28-30 min for the panel branch's 16 specs
+    # and each new spec added to it (ORCA-1120). The split keeps a short list on one runner.
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.build.outputs.changed_shards) }}
 
     steps:
       - name: Checkout
@@ -291,7 +307,7 @@ jobs:
       # added to the run.
       - name: Run changed E2E specs
         env:
-          TEST_FILES_JSON: ${{ inputs.test_files }}
+          TEST_FILES_JSON: ${{ matrix.files }}
           PROJECT: ${{ inputs.project }}
         run: |
           mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
@@ -330,7 +346,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-json-report-changed-attempt-${{ github.run_attempt }}
+          name: e2e-json-report-changed-${{ matrix.name }}-attempt-${{ github.run_attempt }}
           path: tests/test-results/e2e-report.json
           retention-days: 30
           if-no-files-found: warn
@@ -339,7 +355,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-traces-changed
+          name: playwright-traces-changed-${{ matrix.name }}
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore

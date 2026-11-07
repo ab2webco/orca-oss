@@ -53,6 +53,7 @@ export type StartPluginWorkerOptions = {
   entryPath: string
   grantedCapabilities: readonly PluginCapabilityKind[]
   networkHosts?: readonly string[]
+  homeDir?: string | null
   executeHostCall: PluginWorkerHostCallExecutor
   log: PluginWorkerLogSink
   readyTimeoutMs?: number
@@ -80,7 +81,7 @@ export async function startPluginWorker(
     // plain Node. The env is a scrubbed allowlist — never ...process.env,
     // which can carry shell-exported secrets into third-party code.
     env: {
-      ...buildPluginWorkerEnv(),
+      ...buildPluginWorkerEnv(process.env, process.platform, options.homeDir ?? null),
       ORCA_PLUGIN_NET_FETCH_HOSTS: JSON.stringify(options.networkHosts ?? [])
     },
     // Why: never inherit Orca's flags; only this fixed sandbox may run here.

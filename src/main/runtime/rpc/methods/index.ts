@@ -46,6 +46,7 @@ import { DASHBOARD_POPOUT_METHODS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
 import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
 import { ORCHESTRATOR_GAME_LEADS_METHODS } from './orchestrator-game-leads'
+import { ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS } from './orchestrator-game-pane-advisors'
 import { ORCHESTRATOR_GAME_MEMBER_MCP_METHODS } from './orchestrator-game-member-mcp'
 
 // Why: a flat manifest keeps registration order explicit and provides one
@@ -59,6 +60,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ORCHESTRATOR_GAME_METHODS,
   ...ORCHESTRATOR_GAME_BOARD_METHODS,
   ...ORCHESTRATOR_GAME_LEADS_METHODS,
+  ...ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS,
   ...ORCHESTRATOR_GAME_MEMBER_MCP_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,

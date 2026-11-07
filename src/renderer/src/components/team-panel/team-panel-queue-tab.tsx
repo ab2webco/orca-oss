@@ -1,10 +1,10 @@
-import { StatusDot } from '@/components/StatusDot'
 import { statusToneTextClass } from '@/components/status-tone'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamQueueEntry } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamStatusMark } from './TeamStatusMark'
 
 function stateText(entry: TeamQueueEntry): string {
   if (entry.longWaitHours !== null) {
@@ -41,7 +41,7 @@ function QueueRow({ entry }: { entry: TeamQueueEntry }): React.JSX.Element {
           'text-muted-foreground': entry.status === 'idle'
         })}
       >
-        <StatusDot tone={tone} />
+        <TeamStatusMark status={entry.status} />
         {stateText(entry)}
       </span>
     </a>

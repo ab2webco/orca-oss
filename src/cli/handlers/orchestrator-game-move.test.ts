@@ -206,7 +206,9 @@ describe('orca game move', () => {
         worktree: 'id:repo::/w/cin-5',
         agent: 'codex',
         codexAccountId: 'acct_di',
-        run: 'run_1'
+        run: 'run_1',
+        // ORCA-1116: a moved member nests under the lead like a launched one.
+        game: true
       })
     )
     expect(printed()).toEqual(

@@ -25,7 +25,6 @@ describe('AgentDashboardSidebarHost', () => {
     useAppStore.setState({ agentDashboardDrawerOpen: true })
     render(
       <AgentDashboardSidebarHost
-        sidebarOpen
         workspaceBoardOpen
         closeWorkspaceBoard={vi.fn()}
         statusBarVisible
@@ -39,7 +38,6 @@ describe('AgentDashboardSidebarHost', () => {
     const closeWorkspaceBoard = vi.fn()
     const view = render(
       <AgentDashboardSidebarHost
-        sidebarOpen
         workspaceBoardOpen={false}
         closeWorkspaceBoard={closeWorkspaceBoard}
         statusBarVisible
@@ -49,7 +47,6 @@ describe('AgentDashboardSidebarHost', () => {
     act(() => useAppStore.setState({ agentDashboardDrawerOpen: true }))
     view.rerender(
       <AgentDashboardSidebarHost
-        sidebarOpen
         workspaceBoardOpen={false}
         closeWorkspaceBoard={closeWorkspaceBoard}
         statusBarVisible
@@ -59,17 +56,17 @@ describe('AgentDashboardSidebarHost', () => {
     await waitFor(() => expect(closeWorkspaceBoard).toHaveBeenCalledOnce())
   })
 
-  it('clears an open dashboard when the sidebar closes', async () => {
+  it('leaves an open dashboard open while the workspace board stays closed', async () => {
     useAppStore.setState({ agentDashboardDrawerOpen: true })
     render(
       <AgentDashboardSidebarHost
-        sidebarOpen={false}
         workspaceBoardOpen={false}
         closeWorkspaceBoard={vi.fn()}
         statusBarVisible
       />
     )
 
-    await waitFor(() => expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(false))
+    await act(async () => {})
+    expect(useAppStore.getState().agentDashboardDrawerOpen).toBe(true)
   })
 })

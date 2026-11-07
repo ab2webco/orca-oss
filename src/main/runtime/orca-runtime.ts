@@ -11,6 +11,7 @@ import {
   isShellProcess,
   normalizeTerminalTitle
 } from '../../shared/agent-detection'
+import { redactDispatchCapability } from '../../shared/dispatch-capability-redaction'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import type { TerminalLineSegment } from '../../shared/terminal-line-segments'
 import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-update'
@@ -578,6 +579,7 @@ import {
   worktreeWorkspaceKey
 } from '../../shared/workspace-scope'
 import {
+  isValidResolvedWorktreeLineageEdge,
   projectResolvedWorktreeLineage,
   sharesResolvedWorktreeLineageBoundary
 } from '../../shared/resolved-worktree-lineage'
@@ -823,7 +825,8 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import {
   gameOwnerQuestionMobileNotification,
@@ -859,6 +862,7 @@ import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-ag
 import {
   GAME_MEMBER_ADVISOR_VERSION,
   parseGameMemberAdvisorReport,
+  type GameMemberAdvisor,
   type GameMemberAdvisorReport
 } from '../../shared/orchestrator-game-member-advisor'
 import {
@@ -2404,6 +2408,7 @@ type RuntimeNotifier = {
   reposChanged(): void
   gameOwnerQuestionsChanged?(): void
   gameInboxChanged?(): void
+  gameAdvisorChanged?(): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -14227,6 +14232,14 @@ export class OrcaRuntimeService {
   private readonly mobileNotificationReplay = new MobileNotificationReplayBuffer()
 
   dispatchMobileNotification(event: MobileNotificationEvent): void {
+    // Why here: every phone push passes this one call, owner questions and plugin notices included.
+    if (event.type === 'notification') {
+      event = {
+        ...event,
+        title: redactDispatchCapability(event.title),
+        body: redactDispatchCapability(event.body)
+      }
+    }
     const seq = this.mobileNotificationReplay.record(event)
     // Why: surface the desktop-assigned seq to live listeners so they can watermark the last event
     // delivered and feed it back to getMissedSince on reconnect (idempotent catch-up, no dupes).
@@ -14282,8 +14295,8 @@ export class OrcaRuntimeService {
   }): Promise<{ delivered: boolean }> {
     // Why: prefix with the plugin id so a plugin cannot spoof an Orca system
     // notification or impersonate another plugin.
-    const title = `${input.pluginId}: ${input.title}`
-    const body = input.body ?? ''
+    const title = redactDispatchCapability(`${input.pluginId}: ${input.title}`)
+    const body = redactDispatchCapability(input.body ?? '')
     let delivered = false
     try {
       if (Notification.isSupported()) {
@@ -26671,6 +26684,80 @@ export class OrcaRuntimeService {
       : null
   }
 
+  /**
+   * Nests a game member's worktree under its lead's whatever path started it (ORCA-1116).
+   * Returns why it cannot, so the launch reports it instead of a silent top-level row.
+   */
+  async nestGameMemberWorktree(
+    memberWorktreeId: string,
+    leadWorktreeId: string,
+    context: { taskId: string; runId: string; coordinatorHandle: string }
+  ): Promise<string | null> {
+    const store = this.store
+    if (memberWorktreeId === leadWorktreeId) {
+      return null
+    }
+    if (!store?.setWorktreeLineage || !store.getWorktreeLineage) {
+      return 'Orca Lab could not store worktree lineage.'
+    }
+    const member = await this.resolveWorktreeSelector(`id:${memberWorktreeId}`)
+    const lead = await this.resolveWorktreeSelector(`id:${leadWorktreeId}`)
+    const current = store.getWorktreeLineage(member.id)
+    const currentParent = current
+      ? await this.resolveWorktreeSelector(`id:${current.parentWorktreeId}`).catch(() => undefined)
+      : undefined
+    // Why keep a hand-set parent: the person chose it; any other edge follows the current lead.
+    if (
+      current &&
+      currentParent &&
+      isValidResolvedWorktreeLineageEdge(member, currentParent, current) &&
+      (currentParent.id === lead.id || current.origin === 'manual')
+    ) {
+      return null
+    }
+    try {
+      this.validateLineageParent(member, lead)
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+    // Why mint: a worktree with no meta row (often the lead's main checkout) has no instanceId,
+    // and worktree creation then records no edge at all.
+    const memberInstanceId = member.instanceId ?? store.setWorktreeMeta(member.id, {}).instanceId
+    const leadInstanceId = lead.instanceId ?? store.setWorktreeMeta(lead.id, {}).instanceId
+    if (!memberInstanceId || !leadInstanceId) {
+      return 'Worktree instance identity was unavailable.'
+    }
+    const createdAt = Date.now()
+    const capture = { source: 'orchestration-context', confidence: 'explicit' } as const
+    store.setWorktreeLineage(member.id, {
+      worktreeId: member.id,
+      worktreeInstanceId: memberInstanceId,
+      parentWorktreeId: lead.id,
+      parentWorktreeInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    store.setWorkspaceLineage?.({
+      childWorkspaceKey: worktreeWorkspaceKey(member.id),
+      childInstanceId: memberInstanceId,
+      parentWorkspaceKey: worktreeWorkspaceKey(lead.id),
+      parentInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    this.invalidateResolvedWorktreeCache()
+    this.notifyWorktreesChanged(member.repoId)
+    return null
+  }
+
   async updateManagedWorktreeMeta(
     worktreeSelector: string,
     updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
@@ -31352,6 +31439,19 @@ export class OrcaRuntimeService {
     return this.gameArcade
   }
 
+  /** What each pane running the mod reports now, for a panel with no lead to read it through. */
+  getGamePaneAdvisors(paneKeys: readonly string[]): {
+    advisors: { paneKey: string; advisor: GameMemberAdvisor }[]
+  } {
+    const now = Date.now()
+    return {
+      advisors: paneKeys.flatMap((paneKey) => {
+        const advisor = this.gameMemberAdvisors.liveOf(paneKey, now)
+        return advisor ? [{ paneKey, advisor }] : []
+      })
+    }
+  }
+
   getGameLeads(): GameLeads {
     return this.gameLeads
   }
@@ -32108,8 +32208,14 @@ export class OrcaRuntimeService {
     /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
     role?: string
   }): Promise<OrchestratorGameState> {
-    if (args.paneKey && args.advisor !== undefined) {
+    if (
+      args.paneKey &&
+      args.advisor !== undefined &&
       this.gameMemberAdvisors.noteReport(args.paneKey, args.advisor, Date.now())
+    ) {
+      // Why: the Team panel reads every 20 s, and a new Jev line or model is news now.
+      this.notifier?.gameAdvisorChanged?.()
+      this.emitClientEvent({ type: 'gameAdvisorChanged' })
     }
     const worktreesById = await this.getResolvedWorktreeMap()
     let worktreeId = args.worktreeId

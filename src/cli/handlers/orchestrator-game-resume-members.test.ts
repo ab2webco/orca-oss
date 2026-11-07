@@ -34,6 +34,7 @@ const target = (ticket: string, extra: Record<string, unknown> = {}) => ({
 const LEAD = { paneKey: 'tab:lead', state: 'idle', isLeader: true, displayName: 'Lead' }
 
 function fakeClient(args: {
+  role?: 'lead' | 'member'
   pausedMembers?: unknown[]
   unlistedMembers?: unknown[]
   pausedMembersError?: string
@@ -54,6 +55,7 @@ function fakeClient(args: {
           config: { mode: 'on' },
           agents: args.agents ?? [LEAD],
           lead: { autostart: false, cap: args.cap ?? 4, agent: 'claude' },
+          ...(args.role ? { role: args.role } : {}),
           ...(args.pausedMembers ? { pausedMembers: args.pausedMembers } : {}),
           ...(args.unlistedMembers ? { unlistedMembers: args.unlistedMembers } : {}),
           ...(args.pausedMembersError ? { pausedMembersError: args.pausedMembersError } : {})
@@ -493,6 +495,13 @@ describe('orca game resume-members', () => {
   it('says to update Orca when the host keeps no members', async () => {
     const { client } = fakeClient({})
     await expect(run(client)).rejects.toThrow('does not keep game members yet')
+  })
+
+  // Why (ORCA-1118): a member's state has no paused members, and that read as an Orca to update.
+  it('tells a member pane that only the lead resumes members', async () => {
+    const { client, calls } = fakeClient({ role: 'member' })
+    await expect(run(client)).rejects.toThrow('Only the lead resumes members')
+    expect(calls.map(([m]) => m)).toEqual(['game.state'])
   })
 
   // Why (ORCA-754): its dispatch still holds the task, so memberResume refused it and
