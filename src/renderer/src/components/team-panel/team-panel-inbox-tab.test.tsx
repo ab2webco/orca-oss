@@ -176,6 +176,7 @@ describe('Inbox tab', () => {
     const onOpenAgent = vi.fn()
     const agent = {
       paneKey: 'tab-1:leaf-1',
+      terminalHandle: null,
       worktreeId: 'wt-tooltip',
       host: { kind: 'local' as const },
       repoName: 'orca-oss',

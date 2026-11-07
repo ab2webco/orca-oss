@@ -16148,6 +16148,7 @@
       "loading": "Cargando",
       "unavailableText": "Este host de Orca todavía no lo publica.",
       "modelErrorTitle": "No se pudo leer el equipo",
+      "modelErrorText": "Orca no responde en este proyecto. Vuelve a intentarlo.",
       "modelUnavailableTitle": "Los datos del equipo no están disponibles",
       "retry": "Reintentar"
     },

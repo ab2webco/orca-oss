@@ -17147,6 +17147,7 @@
       "loading": "Loading",
       "unavailableText": "This Orca host does not publish it yet.",
       "modelErrorTitle": "Could not read the team",
+      "modelErrorText": "Orca is not responding in this project. Try again.",
       "modelUnavailableTitle": "Team data is not available",
       "retry": "Try again"
     },
