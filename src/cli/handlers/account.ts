@@ -18,7 +18,7 @@ import {
   runAccountTokenClear,
   runAccountTokenSet
 } from './account-long-lived-token'
-import { stripElectronRunAsNode } from '../runtime/launch'
+import { envWithoutClaudeSession } from '../runtime/launch'
 import { getDefaultUserDataPath } from '../runtime/metadata'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -119,7 +119,7 @@ async function runAgentLoginInTerminal(
       )
       return
     }
-    const env = addAgentNodePaths({ ...stripElectronRunAsNode(process.env), ...extraEnv })
+    const env = addAgentNodePaths({ ...envWithoutClaudeSession(), ...extraEnv })
     const child = spawn(spawnCmd, spawnArgs, {
       // Why: JSON mode reserves stdout for the response envelope while keeping
       // the interactive login attached to the user's terminal via stderr.
