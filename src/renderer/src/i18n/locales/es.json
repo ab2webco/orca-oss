@@ -16228,7 +16228,9 @@
     "lead": {
       "badge": "Líder",
       "coordinatesOne": "Coordina 1 agente",
-      "coordinatesMany": "Coordina {{count}} agentes"
+      "coordinatesMany": "Coordina {{count}} agentes",
+      "asksOn": "Te espera · Pregunta sobre {{ticket}}",
+      "asks": "Te espera"
     },
     "advisor": {
       "label": "Advisor",

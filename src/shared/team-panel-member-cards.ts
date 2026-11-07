@@ -251,7 +251,8 @@ function offlineCardOf(
 /** The lead and member cards of a game project; null when the state has no lead. */
 export function teamCardsOf(
   state: OrchestratorGameState,
-  questionTickets: ReadonlySet<string>
+  questionTickets: ReadonlySet<string>,
+  ownerAsk: { ticket: string | null } | null = null
 ): TeamCards | null {
   const leader = state.agents.find((one) => one.isLeader)
   if (!leader) {
@@ -266,14 +267,18 @@ export function teamCardsOf(
     host: hostOf(leader),
     name: state.lead?.label ?? leader.displayName ?? state.worktree?.displayName ?? leader.paneKey,
     agentType: leader.agentType,
-    status: statusOf(condition, leader.state === 'waiting', { review: null, workItem: null }),
+    status: statusOf(condition, leader.state === 'waiting' || ownerAsk !== null, {
+      review: null,
+      workItem: null
+    }),
     condition,
     since: leader.stateSince ?? null,
     liveAction: liveActionOf(leader),
     model: modelOf(leader, state.lead),
     account: accountOf(leader, state),
     characterKey: null,
-    branch: state.worktree?.branch ?? null
+    branch: state.worktree?.branch ?? null,
+    ownerAsk
   }
   const members = [
     ...state.agents

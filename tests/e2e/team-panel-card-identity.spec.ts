@@ -207,6 +207,8 @@ test('Team cards carry names, live detail and V28 status marks', async ({
     await postHooks()
 
     await expect(leadCard).toContainText('Alfred')
+    // The lead asked about ORCA-14, so its card says it waits, not what its tool runs.
+    await expect(leadCard).toContainText('Te espera · Pregunta sobre ORCA-14')
     await expect(leadCard.locator('[data-team-model]')).toHaveCSS('font-family', /mono/i)
     await expect(advisor).toContainText('Mago')
     await expect(advisor.locator('[data-team-model]')).toHaveCount(0)

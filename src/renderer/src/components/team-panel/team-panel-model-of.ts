@@ -93,7 +93,9 @@ export function teamPanelModelOf(args: {
       !one.answer && one.ticket ? [one.ticket.toUpperCase()] : []
     )
   )
-  const cards = teamCardsOf(state, openTickets)
+  const open = (questions ?? []).filter((one) => !one.answer)
+  const oldest = open.toSorted((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
+  const cards = teamCardsOf(state, openTickets, oldest ? { ticket: oldest.ticket } : null)
   if (!cards) {
     return null
   }

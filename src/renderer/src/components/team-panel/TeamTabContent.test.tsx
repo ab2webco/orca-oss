@@ -47,7 +47,8 @@ const lead: TeamLeadCard = {
   model: { label: 'Opus 5.5', effort: 'high', source: 'session' },
   account: null,
   characterKey: 'hero',
-  branch: 'main'
+  branch: 'main',
+  ownerAsk: null
 }
 
 function member(overrides: Partial<TeamMemberCard>): TeamMemberCard {
@@ -184,6 +185,18 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Coding')
     expect(card.textContent).toContain('2 min')
     expect(card.textContent).not.toContain('ago')
+  })
+
+  it('says the lead waits on the user and on which ticket, never the question itself', async () => {
+    const { container } = await render(
+      model({ lead: { ...lead, status: 'attention', ownerAsk: { ticket: 'ORCA-14' } } })
+    )
+    const card = leadCard(container)
+    expect(card.textContent).toContain('Waiting for you · Question on ORCA-14')
+    expect(card.textContent).not.toContain('gh pr checks 923')
+    expect(card.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'question'
+    )
   })
 
   it('sets the model in mono, as V28 does', async () => {

@@ -58,7 +58,17 @@ function LeadCardRow({
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <TeamStatusMark status={lead.status} />
-            <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
+            {lead.ownerAsk ? (
+              <span className="truncate text-status-attention">
+                {lead.ownerAsk.ticket
+                  ? translate('teamPanel.lead.asksOn', 'Waiting for you · Question on {{ticket}}', {
+                      ticket: lead.ownerAsk.ticket
+                    })
+                  : translate('teamPanel.lead.asks', 'Waiting for you')}
+              </span>
+            ) : (
+              <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
+            )}
           </span>
           <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
         </span>
