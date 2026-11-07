@@ -1,5 +1,6 @@
 import React from 'react'
 import { FolderPlus, Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -15,6 +16,8 @@ type SidebarHeaderProps = {
 const SidebarHeader = React.memo(function SidebarHeader({
   onWorkspaceBoardMenuOpenChange
 }: SidebarHeaderProps) {
+  // Why: this memo boundary needs its own language subscription to retitle the list (ORCA-1131).
+  useTranslation()
   const openModal = useAppStore((s) => s.openModal)
   const newWorktreeShortcutLabel = useShortcutLabel('workspace.create')
   const groupBy = useAppStore((s) => s.groupBy)

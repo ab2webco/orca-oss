@@ -1,4 +1,7 @@
+// @vitest-environment happy-dom
 // ORCA-1131: the Spanish sidebar still titled its list "Projects".
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -36,6 +39,25 @@ describe('SidebarHeader section title', () => {
     expect(sectionTitle()).toBe('Proyectos')
     mocks.groupBy = 'none'
     expect(sectionTitle()).toBe('Espacios de trabajo')
+  })
+
+  it('renames the list when the language changes after mount', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
+    })
+    const title = (): string | null | undefined =>
+      container.querySelector('[data-sidebar-section-title]')?.textContent
+
+    expect(title()).toBe('Projects')
+    await act(async () => {
+      await i18n.changeLanguage('es')
+    })
+    expect(title()).toBe('Proyectos')
+    act(() => root.unmount())
+    container.remove()
   })
 
   it('keeps English titles in English', () => {
