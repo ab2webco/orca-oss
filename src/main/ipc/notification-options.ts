@@ -1,4 +1,5 @@
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
+import { translateMain } from '../i18n/main-i18n'
 
 const NOTIFICATION_AGENT_LABEL_MAX_LENGTH = 40
 const NOTIFICATION_TITLE_CONTEXT_MAX_LENGTH = 80
@@ -29,25 +30,36 @@ export function buildNotificationOptions(args: NotificationDispatchRequest): {
 } {
   if (args.source === 'terminal-bell') {
     return {
-      title: `Bell in ${args.worktreeLabel ?? 'workspace'}`,
-      body: args.repoLabel ? `${args.repoLabel} · Attention requested` : 'Attention requested'
+      title: translateMain('agentNotification.bellTitle', 'Bell in {{workspace}}', {
+        workspace: args.worktreeLabel ?? workspaceWord()
+      }),
+      body: args.repoLabel
+        ? `${args.repoLabel} · ${translateMain('agentNotification.attentionRequested', 'Attention requested')}`
+        : translateMain('agentNotification.attentionRequested', 'Attention requested')
     }
   }
 
   if (args.source === 'game-owner-question') {
     const project = normalizeNotificationText(args.repoLabel, NOTIFICATION_TITLE_CONTEXT_MAX_LENGTH)
     return {
-      title: project ? `${project}: the lead asks you` : 'The lead asks you',
+      title: project
+        ? translateMain('agentNotification.leadAsksProject', '{{project}}: the lead asks you', {
+            project
+          })
+        : translateMain('agentNotification.leadAsks', 'The lead asks you'),
       body:
-        normalizeNotificationText(args.ownerQuestion, NOTIFICATION_BODY_PREVIEW_MAX_LENGTH) ??
-        'Open the Inbox to answer.'
+        normalizeNotificationText(args.ownerQuestion, NOTIFICATION_BODY_PREVIEW_MAX_LENGTH) ||
+        translateMain('agentNotification.openInbox', 'Open the Inbox to answer.')
     }
   }
 
   if (args.source === 'test') {
     return {
-      title: 'Orca Lab notifications are on',
-      body: 'This is a test notification from Orca Lab.'
+      title: translateMain('agentNotification.testTitle', 'Orca Lab notifications are on'),
+      body: translateMain(
+        'agentNotification.testBody',
+        'This is a test notification from Orca Lab.'
+      )
     }
   }
 
@@ -68,16 +80,19 @@ function buildAgentTaskCompleteNotificationOptions(
 
   const agentLabel = formatNotificationAgentLabel(args.agentType)
   const worktreeContext = formatNotificationWorktreeContext(args)
-  const statusText =
+  const status =
     args.agentState === 'blocked' || args.agentState === 'waiting'
-      ? 'needs input'
+      ? { key: 'needsInput', fallback: '{{agent}} needs input' }
       : args.agentState === 'done' && args.agentInterrupted
-        ? 'stopped'
-        : 'finished'
+        ? { key: 'stopped', fallback: '{{agent}} stopped' }
+        : { key: 'finished', fallback: '{{agent}} finished' }
+  const statusText = translateMain(`agentNotification.${status.key}`, status.fallback, {
+    agent: agentLabel
+  })
 
   return {
-    title: `${worktreeContext} - ${agentLabel} ${statusText}`,
-    body: buildAgentTaskCompleteRichBody(args) ?? `${agentLabel} ${statusText}.`
+    title: `${worktreeContext} - ${statusText}`,
+    body: buildAgentTaskCompleteRichBody(args) ?? `${statusText}.`
   }
 }
 
@@ -93,7 +108,7 @@ function formatNotificationWorktreeContext(args: NotificationDispatchRequest): s
       NOTIFICATION_TITLE_CONTEXT_MAX_LENGTH
     )
   }
-  return worktreeLabel || repoLabel || 'workspace'
+  return worktreeLabel || repoLabel || workspaceWord()
 }
 
 function hasAgentNotificationSnapshot(args: NotificationDispatchRequest): boolean {
@@ -123,13 +138,18 @@ function buildAgentTaskCompleteRichBody(args: NotificationDispatchRequest): stri
     NOTIFICATION_BODY_PREVIEW_MAX_LENGTH
   )
   if (toolName && toolInput) {
-    return `Using ${toolName}: ${toolInput}`
+    return translateMain('agentNotification.usingToolWithInput', 'Using {{tool}}: {{input}}', {
+      tool: toolName,
+      input: toolInput
+    })
   }
   if (toolName) {
-    return `Using ${toolName}`
+    return translateMain('agentNotification.usingTool', 'Using {{tool}}', { tool: toolName })
   }
   if (toolInput) {
-    return `Tool input: ${toolInput}`
+    return translateMain('agentNotification.toolInput', 'Tool input: {{input}}', {
+      input: toolInput
+    })
   }
 
   return null
@@ -140,7 +160,9 @@ function buildAgentTaskCompleteFallbackNotificationOptions(args: NotificationDis
   body: string
 } {
   return {
-    title: `Task complete in ${args.worktreeLabel ?? 'workspace'}`,
+    title: translateMain('agentNotification.taskComplete', 'Task complete in {{workspace}}', {
+      workspace: args.worktreeLabel ?? workspaceWord()
+    }),
     body: buildAgentTaskCompleteFallbackBody(args)
   }
 }
@@ -148,13 +170,14 @@ function buildAgentTaskCompleteFallbackNotificationOptions(args: NotificationDis
 function buildAgentTaskCompleteFallbackBody(args: NotificationDispatchRequest): string {
   return args.repoLabel
     ? `${args.repoLabel}${args.terminalTitle ? ` · ${args.terminalTitle}` : ''}`
-    : (args.terminalTitle ?? 'A coding agent finished working.')
+    : (args.terminalTitle ??
+        translateMain('agentNotification.agentFinished', 'A coding agent finished working.'))
 }
 
 function formatNotificationAgentLabel(agentType: string | null | undefined): string {
   const normalized = normalizeNotificationText(agentType, NOTIFICATION_AGENT_LABEL_MAX_LENGTH)
   if (!normalized || normalized === 'unknown') {
-    return 'Agent'
+    return translateMain('agentNotification.agent', 'Agent')
   }
   return AGENT_TYPE_LABELS[normalized] ?? normalized
 }
@@ -169,4 +192,8 @@ function normalizeNotificationText(value: string | null | undefined, maxLength: 
   const safeTruncated =
     lastCode >= 0xd800 && lastCode <= 0xdbff ? truncated.slice(0, -1) : truncated
   return `${safeTruncated}…`
+}
+
+function workspaceWord(): string {
+  return translateMain('agentNotification.workspace', 'workspace')
 }
