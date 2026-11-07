@@ -93,6 +93,12 @@ function ThreadMessages({ thread }: { thread: GameInboxThread }): React.JSX.Elem
   )
 }
 
+// Why: members prefix subjects with their ticket, which the row already names.
+const subjectWithoutTicket = (subject: string, ticket: string): string =>
+  subject.toUpperCase().startsWith(`${ticket.toUpperCase()}:`)
+    ? subject.slice(ticket.length + 1).trimStart()
+    : subject
+
 /** Every ticket's conversation with the lead; picking one shows its messages, oldest first. */
 export function GameInboxThreadsView({
   threads
@@ -142,22 +148,22 @@ export function GameInboxThreadsView({
                 <span className="shrink-0 font-mono text-[13px] font-medium whitespace-nowrap text-foreground">
                   {one.ticket}
                 </span>
-                {one.waiting > 0 ? (
-                  <span className="shrink-0 rounded-full border border-border px-1.5 text-[10px] font-semibold whitespace-nowrap tabular-nums">
-                    {translate(
-                      'auto.components.game-inbox.GameInboxThreadsView.waiting',
-                      '{{count}} waiting',
-                      { count: one.waiting }
-                    )}
-                  </span>
-                ) : null}
-                <span className="ml-auto min-w-0 truncate">
-                  {formatUiRelativeTimeFromDate(one.last)}
+                <span className="ml-auto min-w-0 truncate tabular-nums">
+                  {one.messages.length === 1
+                    ? translate(
+                        'auto.components.game-inbox.GameInboxThreadsView.messageOne',
+                        '1 message'
+                      )
+                    : translate(
+                        'auto.components.game-inbox.GameInboxThreadsView.messageMany',
+                        '{{count}} messages',
+                        { count: one.messages.length }
+                      )}
                 </span>
               </span>
               {last ? (
                 <span className="truncate text-xs text-muted-foreground">
-                  {last.from}: {last.subject}
+                  {subjectWithoutTicket(last.subject, one.ticket)}
                 </span>
               ) : null}
             </button>

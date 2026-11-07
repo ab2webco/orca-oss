@@ -212,6 +212,34 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
         timeout: SETTLE_MS
       }
     )
+
+    // At 320 the 219 px panel cannot fit five tabs: the strip must say more lie on each side.
+    await setPanel(orcaPage, { look: 'plain' })
+    const strip = panel.getByRole('tablist')
+    await orcaPage.setViewportSize({ width: 320, height: 900 })
+    await panel.getByRole('tab', { name: 'Team' }).click()
+    await orcaPage.mouse.move(0, 0)
+    await expect(strip).toHaveAttribute('data-overflow-end', 'true')
+    await expect(strip).toHaveAttribute('data-overflow-start', 'false')
+    if (CAPTURE_EVIDENCE) {
+      await panel.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath('strip-320-start.png')
+      })
+    }
+    await panel.getByRole('tab', { name: 'Machines' }).click()
+    await orcaPage.mouse.move(0, 0)
+    await expect(strip).toHaveAttribute('data-overflow-start', 'true')
+    await expect(strip).toHaveAttribute('data-overflow-end', 'false')
+    if (CAPTURE_EVIDENCE) {
+      await panel.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath('strip-320-end.png')
+      })
+    }
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await expect(strip).toHaveAttribute('data-overflow-start', 'false')
+    await expect(strip).toHaveAttribute('data-overflow-end', 'false')
   } finally {
     agent.dispose()
   }

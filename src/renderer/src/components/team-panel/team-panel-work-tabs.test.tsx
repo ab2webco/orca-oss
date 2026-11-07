@@ -225,6 +225,21 @@ describe('TeamPanelMachinesTab', () => {
     )
   })
 
+  it('says one agent in the singular', () => {
+    const text = machines([machine({ running: 1, cap: null, status: 'working' })]).textContent
+    expect(text).toContain('1 agent')
+    expect(text).not.toContain('1 agents')
+  })
+
+  // Why no bar: a figure with no reading behind it would be invented.
+  it('shows what it knows of a host with no reading', () => {
+    const view = machines([
+      machine({ running: 2, cap: null, status: 'working', reading: { kind: 'unread' } })
+    ])
+    expect(view.textContent).toContain('2 agents')
+    expect(view.querySelector('[role="img"]')).toBeNull()
+  })
+
   it('says low memory rather than the agent count', () => {
     const view = machines([machine({ running: 2, status: 'risk' })])
 
@@ -249,5 +264,37 @@ describe('TeamPanelMachinesTab', () => {
     expect(view.textContent).toContain('Offline')
     expect(view.textContent).not.toContain('GB')
     expect(view.querySelector('[role="img"]')).toBeNull()
+  })
+})
+
+describe('status marks, as V28 draws them', () => {
+  const glyphs = (view: HTMLElement): (string | null)[] =>
+    [...view.querySelectorAll('[data-status-glyph]')].map((one) =>
+      one.getAttribute('data-status-glyph')
+    )
+
+  it('marks a failed PR with a question and a ready one with a dot', () => {
+    expect(
+      glyphs(prs(list([row(), row({ label: '#925', url: 'u2', status: 'done', reason: 'ready' })])))
+    ).toEqual(['question', 'dot'])
+  })
+
+  it('spins for a queue entry in checks', () => {
+    expect(glyphs(queue([queueEntry()]))).toEqual(['spinner'])
+  })
+
+  it('marks an offline machine with a question and a busy one with a spinner', () => {
+    expect(
+      glyphs(
+        machines([
+          machine({ status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } }),
+          machine({
+            host: { kind: 'local' },
+            running: 2,
+            status: 'working'
+          })
+        ])
+      )
+    ).toEqual(['question', 'spinner'])
   })
 })

@@ -19,20 +19,30 @@ export function gameInboxTargetOf(hostId: string | null | undefined): RuntimeCli
     : { kind: 'local' }
 }
 
-/** Open questions; with `all`, answered ones too (a host that predates `all` returns open only). */
-export async function readOpenGameOwnerQuestions(
+/** The open questions (with `all`, answered ones too; a host that predates `all` returns open only), and the answers the board still holds because no lead took them yet (ORCA-1100). */
+export async function readGameOwnerQuestions(
   scope: GameInboxScope,
   options?: { all?: boolean }
-): Promise<GameOwnerQuestion[]> {
-  const result = await callRuntimeRpc<{ questions?: unknown }>(
+): Promise<{ questions: GameOwnerQuestion[]; undelivered: GameOwnerQuestion[] }> {
+  const result = await callRuntimeRpc<{ questions?: unknown; undelivered?: unknown }>(
     scope.target,
     'game.ownerQuestions',
     { worktreeId: scope.worktreeId, ...(options?.all ? { all: true } : {}) },
     { timeoutMs: GAME_INBOX_RPC_TIMEOUT_MS }
   )
-  // Why parse: a paired host may run another build.
-  const questions = Array.isArray(result.questions) ? result.questions : []
-  return questions.flatMap((raw) => parseGameOwnerQuestion(raw) ?? [])
+  // Why parse: a paired host may run another build, and an older one sends no `undelivered`.
+  const parsed = (raw: unknown): GameOwnerQuestion[] =>
+    Array.isArray(raw) ? raw.flatMap((one) => parseGameOwnerQuestion(one) ?? []) : []
+  return {
+    questions: parsed(result.questions),
+    undelivered: parsed(result.undelivered).filter((one) => one.answer?.undelivered)
+  }
+}
+
+export async function readOpenGameOwnerQuestions(
+  scope: GameInboxScope
+): Promise<GameOwnerQuestion[]> {
+  return (await readGameOwnerQuestions(scope)).questions
 }
 
 export async function answerGameOwnerQuestion(

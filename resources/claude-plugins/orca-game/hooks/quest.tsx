@@ -1,5 +1,7 @@
 import type { EngineInterface, On, RenderElement, RenderInput } from 'claude-code'
 
+import type { ScenePhase } from '../types'
+
 import {
   GAME_COMMANDS,
   QUEST_ALIAS,
@@ -10,6 +12,8 @@ import {
 import { activityOf, cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
   headingNameOf,
+  headingRuleWidthOf,
+  headingTimeOf,
   isQuestionToPerson,
   messageHeadingOf,
   toolSummaryOf
@@ -32,7 +36,7 @@ import { sceneColumnsOf } from './scene'
 import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
 import { dropScenes } from './flat-toggle'
-import { shownHero } from './quest-state'
+import { shownSpeaker } from './quest-state'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
 
@@ -218,6 +222,21 @@ const registerQuietRows = (on: On) => {
     await ready($)
     return isOff() ? next(e) : hidden($, e)
   })
+  // Why: the live line above the prompt says what the spinner did, with whose turn it is.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    await ready($)
+    return isOff() ? next(e) : hidden($, e)
+  })
+}
+
+// Why no time with no turn seen: a resumed transcript's blocks were written in turns this process never timed.
+async function firstHeadOf($: EngineInterface): Promise<{ phase: ScenePhase; time: string }> {
+  const turn = quest.turn
+  const end = turn?.endedAt ?? (await $.clock.now())
+  return {
+    phase: shownPhase() ?? 'working',
+    time: turn === undefined ? '' : headingTimeOf(end - turn.startedAt)
+  }
 }
 
 // Why no frame or padding: a terminal selection copies every cell of the row, border included.
@@ -237,21 +256,31 @@ const registerCards = (on: On) => {
     if (!e.props.isFirstOfReply && !isQuestion) {
       return drawn
     }
-    // A heading keeps the phase it was first drawn in, so scrolling back never repaints it.
     const cardKey = cardKeyOf(e.requestId, e.props.text)
-    if (!quest.cardPhases.has(cardKey)) {
-      quest.cardPhases.set(cardKey, shownPhase() ?? 'working')
-    }
-    const phase = quest.cardPhases.get(cardKey) ?? 'working'
-    const name = headingNameOf(shownHero(), localizedNameOf(currentScene().cards[phase].name))
-    const heading = messageHeadingOf(name, phase, isQuestion, messageHeadingWords())
+    const head = quest.cardHeads.get(cardKey) ?? (await firstHeadOf($))
+    quest.cardHeads.set(cardKey, head)
+    const name = headingNameOf(
+      shownSpeaker(),
+      localizedNameOf(currentScene().cards[head.phase].name)
+    )
+    const heading = messageHeadingOf(name, head.phase, isQuestion, messageHeadingWords())
+    const rule = headingRuleWidthOf(heading, head.time, e.viewport?.columns ?? 80)
+    const color = isQuestion ? NEEDS_YOU_COLOR : undefined
     const { Box, Text } = $.ui.resolve(e)
     // Why a top margin only: an empty row copies as nothing, and it parts the heading from the prompt.
+    // Why struck spaces for the rule: a selection copies them as blanks, never as line glyphs.
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text bold color={isQuestion ? NEEDS_YOU_COLOR : undefined}>
-          {heading}
-        </Text>
+        <Box flexDirection="row">
+          <Text bold color={color}>
+            {heading}
+          </Text>
+          <Text> </Text>
+          <Text color={color} dimColor strikethrough>
+            {' '.repeat(rule)}
+          </Text>
+          {head.time === '' ? null : <Text dimColor>{` ${head.time}`}</Text>}
+        </Box>
         {drawn}
       </Box>
     )

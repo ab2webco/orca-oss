@@ -126,15 +126,27 @@ describe('PR E2E gate contract', () => {
     expect(filterStep.run).toContain('node config/scripts/select-pr-e2e-scope.mjs')
   })
 
-  it('uses one runner for changed specs and keeps full runs sharded', () => {
+  // Why the build's split: one runner for the panel branch's 16 specs hit the 30-minute cap (ORCA-1120).
+  it('shards changed specs by the build job split and keeps full runs sharded', () => {
     expect(e2eWorkflow.jobs.e2e.if).toBe("inputs.test_files == ''")
-    expect(e2eWorkflow.jobs['changed-e2e'].if).toBe("inputs.test_files != ''")
-    expect(e2eWorkflow.jobs['changed-e2e'].strategy).toBeUndefined()
+    expect(e2eWorkflow.jobs['changed-e2e'].if).toBe(
+      "inputs.test_files != '' && needs.build.outputs.changed_shards != '[]'"
+    )
+    expect(e2eWorkflow.jobs['changed-e2e'].strategy).toEqual({
+      'fail-fast': false,
+      matrix: { include: '${{ fromJSON(needs.build.outputs.changed_shards) }}' }
+    })
+    const split = e2eWorkflow.jobs.build.steps.find((step) => step.id === 'changed-shards')
+    expect(split.env.TEST_FILES_JSON).toBe('${{ inputs.test_files }}')
+    expect(split.run).toBe('node config/scripts/split-changed-e2e-specs.mjs')
+    expect(e2eWorkflow.jobs.build.outputs.changed_shards).toBe(
+      '${{ steps.changed-shards.outputs.matrix }}'
+    )
     expect(e2eWorkflow.jobs['ssh-docker-watcher-isolation'].if).toBe("inputs.test_files == ''")
     const changedRun = e2eWorkflow.jobs['changed-e2e'].steps.find(
       (step) => step.name === 'Run changed E2E specs'
     )
-    expect(changedRun.env.TEST_FILES_JSON).toBe('${{ inputs.test_files }}')
+    expect(changedRun.env.TEST_FILES_JSON).toBe('${{ matrix.files }}')
     expect(changedRun.run).toContain('grep -l \'@headful\' "${TEST_FILES[@]}"')
     expect(changedRun.run).toContain('E2E_PROJECT_ARGS+=(--project=electron-headful)')
     expect(changedRun.run).toContain(

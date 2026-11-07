@@ -1,4 +1,5 @@
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-result'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
@@ -45,11 +46,17 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     scope: TeamPanelScope
     refs: number
     timer: ReturnType<typeof setInterval>
-    ready: boolean
     reading: boolean
     again: boolean
   } | null = null
   let generation = 0
+  // Why outside the run: leaving the panel ends the run, and a sick host must not cost the team.
+  const lastTeams = new Map<string, TeamPanelGameModel>()
+
+  const publishNoTeam = (scope: TeamPanelScope): void => {
+    lastTeams.delete(scope.key)
+    deps.publish({ section: { kind: 'unavailable' }, retry: null }, scope)
+  }
 
   const read = async (): Promise<void> => {
     const run = active
@@ -70,20 +77,32 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       if (mine !== generation || active !== run) {
         return
       }
-      run.ready = model !== null
+      if (!model) {
+        publishNoTeam(scope)
+        return
+      }
+      lastTeams.set(scope.key, model)
+      deps.publish({ section: { kind: 'ready', value: model }, retry: null }, scope)
+    } catch (error) {
+      if (mine !== generation || active !== run) {
+        return
+      }
+      // Why: a host older than the game has nothing to read, which is no team and not a failure.
+      if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
+        publishNoTeam(scope)
+        return
+      }
+      // Why keep the last team: one failed read says nothing about the team, only about the host.
+      const team = lastTeams.get(scope.key)
       deps.publish(
         {
-          section: model ? { kind: 'ready', value: model } : { kind: 'unavailable' },
-          retry: null
+          section: team
+            ? { kind: 'ready', value: team }
+            : { kind: 'error', message: messageOf(error) },
+          retry
         },
         scope
       )
-    } catch (error) {
-      // Why keep the last team: one failed read says nothing about the team.
-      if (mine !== generation || active !== run || run.ready) {
-        return
-      }
-      deps.publish({ section: { kind: 'error', message: messageOf(error) }, retry }, scope)
     }
   }
 
@@ -129,7 +148,6 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         active = {
           scope,
           refs: 0,
-          ready: false,
           reading: false,
           again: false,
           timer: setInterval(() => void refresh(), intervalMs)

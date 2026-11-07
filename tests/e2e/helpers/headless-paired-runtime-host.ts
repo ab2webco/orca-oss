@@ -186,13 +186,21 @@ async function readPairingOffer(app: ElectronApplication): Promise<RuntimeDeskto
   })
 }
 
-export async function launchHeadlessPairedRuntimeHost(): Promise<HeadlessPairedRuntimeHost> {
+function profileWith(settings: Record<string, unknown>) {
+  const profile = getE2ECompletedOnboardingProfile()
+  return { ...profile, settings: { ...profile.settings, ...settings } }
+}
+
+/** `settings` are merged into the profile before launch; a headless host has no settings IPC. */
+export async function launchHeadlessPairedRuntimeHost(
+  settings: Record<string, unknown> = {}
+): Promise<HeadlessPairedRuntimeHost> {
   const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-headless-paired-'))
   let app: ElectronApplication | undefined
   try {
     writeFileSync(
       path.join(userDataDir, 'orca-data.json'),
-      `${JSON.stringify(getE2ECompletedOnboardingProfile(), null, 2)}\n`
+      `${JSON.stringify(profileWith(settings), null, 2)}\n`
     )
     const { ELECTRON_RUN_AS_NODE: _unused, ...cleanEnv } = process.env
     void _unused

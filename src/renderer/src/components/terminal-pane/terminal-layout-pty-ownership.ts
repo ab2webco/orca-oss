@@ -1,6 +1,18 @@
 import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
 import { collectLeafIds, pruneLeaves } from './terminal-pane-layout-tree'
 
+/** Why: a split's snapshot falls back to a bound leaf until its PTY spawns, so binding the focused pane hands focus back. */
+export function terminalLayoutWithPtyBinding(
+  layout: TerminalLayoutSnapshot,
+  binding: { leafId: string; ptyId: string; focusedLeafId: string | null | undefined }
+): TerminalLayoutSnapshot {
+  return {
+    ...layout,
+    activeLeafId: binding.focusedLeafId === binding.leafId ? binding.leafId : layout.activeLeafId,
+    ptyIdsByLeafId: { ...layout.ptyIdsByLeafId, [binding.leafId]: binding.ptyId }
+  }
+}
+
 type TerminalLayoutPtyOwnershipNormalization = {
   snapshot: TerminalLayoutSnapshot
   changed: boolean

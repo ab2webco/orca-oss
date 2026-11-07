@@ -83,7 +83,8 @@ export function AgentDashboardToolbar({
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+      {/* Why: at phone widths the shortcut hint and Filter label give their room to the placeholder. */}
+      <div className="@container/board-toolbar flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -95,7 +96,11 @@ export function AgentDashboardToolbar({
               'Search worktree, project, or agent…'
             )}
             aria-label={translate('dashboardPopout.search.label', 'Search agents')}
-            className="h-7 bg-muted/55 pr-16 pl-7 text-xs"
+            className={cn(
+              'h-7 bg-muted/55 pr-16 pl-7 text-xs',
+              // Why: narrow, only the clear button needs room, and it shows only with a query.
+              query ? '@max-[440px]/board-toolbar:pr-6' : '@max-[440px]/board-toolbar:pr-2'
+            )}
           />
           {query ? (
             <Button
@@ -110,7 +115,7 @@ export function AgentDashboardToolbar({
           ) : (
             <ShortcutKeyCombo
               keys={[isMac ? '⌘' : 'Ctrl', 'K']}
-              className="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2"
+              className="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 @max-[440px]/board-toolbar:hidden"
               keyCapClassName="min-w-4 px-1 py-0 text-[9px] shadow-none"
               separatorClassName="text-[9px] text-muted-foreground"
             />
@@ -136,13 +141,15 @@ export function AgentDashboardToolbar({
                 )}
               >
                 <Filter className="size-3" />
-                {translate('dashboardPopout.filters.label', 'Filter')}
+                <span className="@max-[440px]/board-toolbar:sr-only">
+                  {translate('dashboardPopout.filters.label', 'Filter')}
+                </span>
                 {activeCount > 0 ? (
                   <span className="rounded-full bg-foreground px-1.5 py-px text-[10px] leading-none text-background">
                     {activeCount}
                   </span>
                 ) : null}
-                <ChevronDown className="size-3" />
+                <ChevronDown className="size-3 @max-[440px]/board-toolbar:hidden" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64" sideOffset={6}>
