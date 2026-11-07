@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
@@ -22,6 +30,20 @@ import { readHookEndpoint } from './helpers/agent-hook-endpoint'
 // tab left open must. The close only sticks once main retires the surface and persists it.
 
 const SORTABLE_TAB = '[data-testid="sortable-tab"]'
+
+/** Puts a `claude` shim for the golden stub first on PATH; the New tab menu lists only found agents. */
+function createClaudeStubLaunchEnv(shimDir: string): Record<string, string> {
+  const stub = path.join(process.cwd(), 'tests', 'e2e', 'fixtures', 'golden-stub-agent')
+  writeFileSync(path.join(shimDir, 'claude'), `#!/bin/sh\nexec "${stub}/golden-stub-agent" "$@"\n`)
+  chmodSync(path.join(shimDir, 'claude'), 0o755)
+  writeFileSync(
+    path.join(shimDir, 'claude.cmd'),
+    `@echo off\r\ncall "${stub}\\golden-stub-agent.cmd" %*\r\n`
+  )
+  const env = getGoldenStubAgentLaunchEnv() as Record<string, string>
+  const pathKey = Object.keys(env)[0]!
+  return { [pathKey]: [shimDir, env[pathKey]].join(path.delimiter) }
+}
 
 function readPersistedTabIds(userDataDir: string, workspaceId: string): string[] | null {
   const profilesDir = path.join(userDataDir, 'profiles')
@@ -178,10 +200,8 @@ for (const workspaceKind of ['git worktree', 'folder workspace'] as const) {
       return
     }
     const folderPath = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-closed-tabs-folder-'))
-    const session = createRestartSession(
-      testInfo,
-      getGoldenStubAgentLaunchEnv() as Record<string, string>
-    )
+    const shimDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-claude-shim-'))
+    const session = createRestartSession(testInfo, createClaudeStubLaunchEnv(shimDir))
     let app: ElectronApplication | null = null
 
     const activate = async (page: Page, workspaceId: string): Promise<void> => {
@@ -308,6 +328,7 @@ for (const workspaceKind of ['git worktree', 'folder workspace'] as const) {
       }
       await session.dispose()
       rmSync(folderPath, { recursive: true, force: true })
+      rmSync(shimDir, { recursive: true, force: true })
     }
   })
 }
