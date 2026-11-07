@@ -10,6 +10,7 @@ import { getWorktreeCardJiraIssueDisplay } from '../sidebar/worktree-card-jira-i
 import { buildWorktreeClaudeAccountChipModel } from '../sidebar/worktree-claude-account-chip-model'
 import { getPromptCacheCountdownForPane } from '../sidebar/prompt-cache-timer-selection'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
+import { GAME_MEMBER_ADVISOR_PANES_MAX } from '../../../../shared/orchestrator-game-member-advisor'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo, Worktree } from '../../../../shared/types'
@@ -21,6 +22,7 @@ import type {
   TeamPullRequest,
   TeamTicket
 } from '../../../../shared/team-panel-model-types'
+import type { TeamSoloAdvisorRead } from './use-team-solo-advisors'
 
 export type TeamSoloSessionsState = Pick<
   AppState,
@@ -218,9 +220,27 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
         ports: (ports.get(worktree.id) ?? []).map((one) => one.port),
         account: accountOf(state, entry, worktree, repo),
         cacheExpiresAt: cache ? cache.startedAt + cache.ttlMs : null,
-        // Why null: Jev reaches Orca only through the game mod; a pane with no game has no path.
+        // Why null: only a pane running the mod reports it; `game.paneAdvisors` fills that one in.
         advisor: null
       }
     ]
   })
+}
+
+/** Each host with an Orca to ask and the panes on it; an SSH target has none. */
+export function teamSoloAdvisorReadsOf(
+  sessions: readonly TeamSoloSession[]
+): TeamSoloAdvisorRead[] {
+  const reads = new Map<string | null, string[]>()
+  for (const { host, entry } of sessions) {
+    if (host.kind === 'remote' && !host.environmentId) {
+      continue
+    }
+    const environmentId = host.kind === 'remote' ? host.environmentId : null
+    reads.set(environmentId, [...(reads.get(environmentId) ?? []), entry.paneKey])
+  }
+  return [...reads].map(([environmentId, paneKeys]) => ({
+    environmentId,
+    paneKeys: paneKeys.slice(0, GAME_MEMBER_ADVISOR_PANES_MAX)
+  }))
 }

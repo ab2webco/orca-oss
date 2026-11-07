@@ -1,11 +1,11 @@
 import {
+  GAME_MEMBER_ADVISOR_PANES_MAX,
   parseGameMemberAdvisorReport,
   type GameMemberAdvisor,
   type GameMemberAdvisorPick,
   type GameMemberAdvisorReport
 } from '../../shared/orchestrator-game-member-advisor'
 
-const GAME_MEMBER_ADVISOR_PANES_MAX = 64
 // Why 3 minutes: a member polls every 30 s, so six missed reports mean its Jev or its mod is gone.
 export const GAME_MEMBER_ADVISOR_TTL_MS = 3 * 60_000
 
@@ -69,6 +69,12 @@ export class GameMemberAdvisors {
       return this.keptOf(paneKey)
     }
     return held.advisor
+  }
+
+  /** Only what the pane still reports. Why no kept copy: a section must not outlive its mod. */
+  liveOf(paneKey: string, now: number): GameMemberAdvisor | null {
+    const held = this.byPane.get(paneKey)
+    return held && now - held.at < GAME_MEMBER_ADVISOR_TTL_MS ? held.advisor : null
   }
 
   // Why: a finished member stopped polling, so its last report is the model it still runs on.

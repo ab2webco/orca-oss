@@ -3,17 +3,26 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { getFocusedAgentPaneKeyForWorktree } from '../sidebar/focused-agent-row-highlight'
-import { teamSoloModelOf } from '../../../../shared/team-panel-activity-rows'
+import {
+  teamAdvisorRowOf,
+  teamSoloModelOf,
+  type TeamSoloSession
+} from '../../../../shared/team-panel-activity-rows'
 import type { GameHostReading } from '../../../../shared/orchestrator-game-host-capacity'
+import type { GameMemberAdvisor } from '../../../../shared/orchestrator-game-member-advisor'
 import type { TeamPanelSoloModel } from '../../../../shared/team-panel-model-types'
 import {
   teamHostKeyOf,
   teamSoloMachineHostsOf,
   teamSoloMachinesOf
 } from '../../../../shared/team-panel-solo-machines'
-import type { TeamSoloSession } from '../../../../shared/team-panel-activity-rows'
-import { teamSoloSessionsOf, type TeamSoloSessionsState } from './team-panel-solo-sessions'
+import {
+  teamSoloAdvisorReadsOf,
+  teamSoloSessionsOf,
+  type TeamSoloSessionsState
+} from './team-panel-solo-sessions'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
+import { useTeamSoloAdvisors } from './use-team-solo-advisors'
 import { useTeamSoloMachineReadings } from './use-team-solo-machine-readings'
 
 type MachineReadings = ReadonlyMap<string, GameHostReading>
@@ -62,9 +71,16 @@ function machinesOf(
 /** The no-team model from the agent status Orca already holds; needs no game or plugin. */
 export function teamPanelSoloModelFrom(
   inputs: SoloInputs,
-  readings: MachineReadings | null = null
+  reads: {
+    sessions?: readonly TeamSoloSession[]
+    readings?: MachineReadings | null
+    advisors?: ReadonlyMap<string, GameMemberAdvisor>
+  } = {}
 ): TeamPanelSoloModel {
-  const sessions = teamSoloSessionsOf(inputs)
+  const sessions = (reads.sessions ?? teamSoloSessionsOf(inputs)).map((session) => {
+    const advisor = reads.advisors?.get(session.entry.paneKey)
+    return advisor ? { ...session, advisor: teamAdvisorRowOf(advisor) } : session
+  })
   const model = teamSoloModelOf({
     sessions,
     selectedPaneKey: inputs.selectedPaneKey,
@@ -73,7 +89,7 @@ export function teamPanelSoloModelFrom(
       inbox: { kind: 'loading' },
       prs: null,
       queue: null,
-      machines: machinesOf(inputs, sessions, readings)
+      machines: machinesOf(inputs, sessions, reads.readings ?? null)
     }
   })
   // Why questions, not attention: Inbox lists only these, and a count must match what it opens on.
@@ -88,15 +104,23 @@ export function teamPanelSoloModelFrom(
 }
 
 const IDLE: SoloInputs | null = null
+const NO_SESSIONS: readonly TeamSoloSession[] = []
 
 /** Null while `active` is false, so a team view pays nothing for agent status churn. */
 export function useTeamPanelSoloModel(active: boolean): TeamPanelSoloModel | null {
   const inputs = useAppStore(useShallow((s) => (active ? soloInputsOf(s) : IDLE)))
+  const sessions = useMemo(() => (inputs ? teamSoloSessionsOf(inputs) : NO_SESSIONS), [inputs])
   const environmentIds = (inputs?.runtimeEnvironments ?? []).map((one) => one.id).join('\n')
-  const machinesShown = useTeamPanelTabStore((s) => s.shown === 'machines')
-  const readings = useTeamSoloMachineReadings(environmentIds, active && machinesShown)
+  const shownTab = useTeamPanelTabStore((s) => s.shown)
+  // Why: Jev reaches a pane only through its plugin, so with the plugin system off nothing is asked.
+  const pluginsOn = useAppStore((s) => s.settings?.pluginSystemEnabled === true)
+  const readings = useTeamSoloMachineReadings(environmentIds, active && shownTab === 'machines')
+  const advisors = useTeamSoloAdvisors(
+    JSON.stringify(teamSoloAdvisorReadsOf(sessions)),
+    active && pluginsOn && shownTab === 'activity'
+  )
   return useMemo(
-    () => (inputs ? teamPanelSoloModelFrom(inputs, readings) : null),
-    [inputs, readings]
+    () => (inputs ? teamPanelSoloModelFrom(inputs, { sessions, readings, advisors }) : null),
+    [inputs, sessions, readings, advisors]
   )
 }

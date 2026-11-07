@@ -239,6 +239,94 @@ describe('TeamPanelActivityTab', () => {
     expect(jev?.textContent).toContain('Haiku 5.5 · approved')
   })
 
+  it('names the model Jev has the session on, with its pin', async () => {
+    settings.pluginSystemEnabled = true
+    const pick = { line: null, previous: null, calls: [] }
+    const free = await render(
+      model(
+        [
+          row({
+            advisor: {
+              ...pick,
+              model: 'Sonnet 5.5',
+              effort: 'low',
+              pinned: { model: false, effort: false }
+            }
+          })
+        ],
+        null
+      )
+    )
+    const jev = free.querySelector('[data-team-activity-advisor]')
+    expect(jev?.textContent).toContain('Sonnet 5.5')
+    expect(jev?.textContent).not.toContain('Model pinned')
+
+    const held = await render(
+      model(
+        [
+          row({
+            advisor: {
+              ...pick,
+              model: 'Sonnet 5.5',
+              effort: 'low',
+              pinned: { model: true, effort: false }
+            }
+          })
+        ],
+        null
+      )
+    )
+    expect(held.querySelector('[data-team-activity-advisor]')?.textContent).toContain(
+      'Sonnet 5.5 · Model pinned'
+    )
+  })
+
+  it('says which dimension is pinned', async () => {
+    settings.pluginSystemEnabled = true
+    const host = await render(
+      model(
+        [
+          row({
+            advisor: {
+              model: 'Sonnet 5.5',
+              effort: 'low',
+              pinned: { model: false, effort: true },
+              line: null,
+              previous: null,
+              calls: []
+            }
+          })
+        ],
+        null
+      )
+    )
+    const jev = host.querySelector('[data-team-activity-advisor]')
+    expect(jev?.textContent).toContain('Effort pinned')
+    expect(jev?.textContent).not.toContain('Model pinned')
+  })
+
+  it('draws no Jev section when the report has nothing to show', async () => {
+    settings.pluginSystemEnabled = true
+    const host = await render(
+      model(
+        [
+          row({
+            advisor: {
+              model: null,
+              effort: null,
+              pinned: { model: false, effort: false },
+              line: null,
+              previous: null,
+              calls: []
+            }
+          })
+        ],
+        null
+      )
+    )
+    expect(host.querySelector('[data-team-activity-advisor]')).toBeNull()
+  })
+
   it('shows the cache countdown only when the row carries one', async () => {
     const without = await render(model([row({})], null))
     expect(without.textContent).not.toContain('Cache')

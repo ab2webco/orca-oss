@@ -17237,6 +17237,7 @@
       "question": "Question",
       "last": "Final",
       "model": "Model",
+      "effortPinned": "Effort pinned",
       "modelPinned": "Model pinned",
       "change": "Change",
       "account": "Account",

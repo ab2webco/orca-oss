@@ -38,22 +38,29 @@ function Fact({
   )
 }
 
-function AdvisorFacts({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Element {
-  const pinned = advisor.pinned.model || advisor.pinned.effort
+function pinText(pinned: TeamAdvisorRow['pinned']): string | null {
+  if (pinned.model) {
+    return translate('teamPanel.activity.modelPinned', 'Model pinned')
+  }
+  return pinned.effort ? translate('teamPanel.activity.effortPinned', 'Effort pinned') : null
+}
+
+function AdvisorFacts({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Element | null {
+  const model = [advisor.model, pinText(advisor.pinned)].filter(Boolean).join(' · ')
   const change =
     advisor.previous?.model && advisor.previous.model !== advisor.model
       ? `${advisor.previous.model} → ${advisor.model ?? ''}`
       : null
+  if (!model && !change && advisor.calls.length === 0) {
+    return null
+  }
   return (
     <section data-team-activity-advisor="" className="mt-3">
       <h4 className="mb-1 text-[11.5px] font-medium text-muted-foreground/80">
         {translate('teamPanel.activity.jev', 'Jev')}
       </h4>
       <dl className="grid grid-cols-[62px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-xs">
-        <Fact
-          label={translate('teamPanel.activity.model', 'Model')}
-          value={pinned ? translate('teamPanel.activity.modelPinned', 'Model pinned') : null}
-        />
+        <Fact label={translate('teamPanel.activity.model', 'Model')} value={model} />
         <Fact label={translate('teamPanel.activity.change', 'Change')} value={change} />
         {advisor.calls.map((call) => (
           <Fact

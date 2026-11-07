@@ -860,6 +860,7 @@ import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-ag
 import {
   GAME_MEMBER_ADVISOR_VERSION,
   parseGameMemberAdvisorReport,
+  type GameMemberAdvisor,
   type GameMemberAdvisorReport
 } from '../../shared/orchestrator-game-member-advisor'
 import {
@@ -31351,6 +31352,19 @@ export class OrcaRuntimeService {
 
   getGameArcade(): GameArcadeLedger {
     return this.gameArcade
+  }
+
+  /** What each pane running the mod reports now, for a panel with no lead to read it through. */
+  getGamePaneAdvisors(paneKeys: readonly string[]): {
+    advisors: { paneKey: string; advisor: GameMemberAdvisor }[]
+  } {
+    const now = Date.now()
+    return {
+      advisors: paneKeys.flatMap((paneKey) => {
+        const advisor = this.gameMemberAdvisors.liveOf(paneKey, now)
+        return advisor ? [{ paneKey, advisor }] : []
+      })
+    }
   }
 
   getGameLeads(): GameLeads {

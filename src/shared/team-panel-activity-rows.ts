@@ -1,5 +1,6 @@
 import type { AgentStatusEntry } from './agent-status-types'
 import { parseAskFromStatus } from './native-chat-ask'
+import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 import type {
   TeamAccount,
@@ -121,6 +122,16 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     advisor: session.advisor
   }
 }
+
+/** Why no calls: Jev's decisions live in the pane's own state, which never reaches Orca. */
+export const teamAdvisorRowOf = (advisor: GameMemberAdvisor): TeamAdvisorRow => ({
+  model: advisor.model,
+  effort: advisor.effort,
+  pinned: advisor.pinned,
+  line: advisor.line ?? null,
+  previous: advisor.previous ?? null,
+  calls: []
+})
 
 /** The no-team panel: every session, needs-you first, opened on the selected one. */
 export function teamSoloModelOf(input: {

@@ -8,6 +8,8 @@ import {
   waitForPaneIdentitySnapshot
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import { GAME_MEMBER_ADVISOR_VERSION } from '../../src/shared/orchestrator-game-member-advisor'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate(async (next) => {
@@ -58,6 +60,7 @@ const COPY = {
 const EMPTY = { en: 'No agents running', es: 'No hay agentes en marcha' } as const
 
 const QUESTION = 'Apply the migration now or at release?'
+const PINNED = { en: 'Model pinned', es: 'Modelo fijado' } as const
 
 /** Every language, width and theme, after checking the screen means what the name says. */
 async function capture(
@@ -127,6 +130,29 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
     },
     { panes, question: QUESTION }
   )
+}
+
+const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
+  page.evaluate(
+    (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
+    enabled
+  )
+
+/** What the mod's poll sends: `orca game state` with the pane's report. */
+async function reportJev(app: ElectronApplication, panes: string[], model: string): Promise<void> {
+  const userDataDir = await app.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  for (const paneKey of panes) {
+    await client.call('game.state', {
+      paneKey,
+      advisor: {
+        version: GAME_MEMBER_ADVISOR_VERSION,
+        model,
+        effort: 'high',
+        pinned: { model: true, effort: false }
+      }
+    })
+  }
 }
 
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
@@ -249,6 +275,19 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(panel.locator('[data-team-activity="other"]')).toHaveCount(1)
     await expect(panel.getByRole('tab', { name: copy.machines })).toHaveCount(0)
   })
+
+  await setPluginSystem(orcaPage, false)
+  await reportJev(electronApp, panes, 'Opus 5.5')
+  await reportJev(electronApp, panes, 'Sonnet 5.5')
+  const jev = panel.locator('[data-team-activity-advisor]')
+  await expect(jev).toHaveCount(0)
+  await setPluginSystem(orcaPage, true)
+  await capture(orcaPage, testInfo, 'jev', async (language) => {
+    await expect(jev).toContainText(`Sonnet 5.5 · ${PINNED[language]}`)
+    await expect(jev).toContainText('Opus 5.5 → Sonnet 5.5')
+  })
+  await setPluginSystem(orcaPage, false)
+  await expect(jev).toHaveCount(0)
 
   await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
   await capture(orcaPage, testInfo, 'inbox', async (language) => {

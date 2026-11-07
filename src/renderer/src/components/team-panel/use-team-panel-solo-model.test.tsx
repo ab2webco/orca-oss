@@ -77,6 +77,8 @@ vi.mock('@/store', () => ({
 
 const readings = vi.hoisted(() => vi.fn())
 vi.mock('./use-team-solo-machine-readings', () => ({ useTeamSoloMachineReadings: readings }))
+const advisors = vi.hoisted(() => vi.fn())
+vi.mock('./use-team-solo-advisors', () => ({ useTeamSoloAdvisors: advisors }))
 
 const { useTeamPanelSoloModel } = await import('./use-team-panel-solo-model')
 
@@ -100,6 +102,8 @@ beforeEach(() => {
   appState = threeHosts()
   readings.mockReset()
   readings.mockReturnValue(null)
+  advisors.mockReset()
+  advisors.mockReturnValue(new Map())
   useTeamPanelTabStore.setState({ shown: null })
 })
 afterEach(async () => {
@@ -165,5 +169,67 @@ describe('useTeamPanelSoloModel Machines', () => {
     ])
     expect(rows.map((one) => one.running)).toEqual([1, 1, 1])
     expect(rows.map((one) => one.reading.kind)).toEqual(['ok', 'unreachable', 'unread'])
+  })
+})
+
+describe('useTeamPanelSoloModel Jev', () => {
+  const reads = [
+    { environmentId: null, paneKeys: [`tab-a:${LEAF_A}`] },
+    { environmentId: 'env-1', paneKeys: [`tab-b:${LEAF_B}`] }
+  ]
+
+  it('asks each host with an Orca for its own panes, while Activity shows and plugins are on', async () => {
+    appState = { ...threeHosts(), settings: { pluginSystemEnabled: true } }
+    useTeamPanelTabStore.setState({ shown: 'activity' })
+
+    await mount()
+
+    expect(advisors).toHaveBeenCalledWith(JSON.stringify(reads), true)
+  })
+
+  it('reads nothing with the plugin system off', async () => {
+    useTeamPanelTabStore.setState({ shown: 'activity' })
+
+    await mount()
+
+    expect(advisors).toHaveBeenCalledWith(JSON.stringify(reads), false)
+  })
+
+  it('reads nothing while another tab shows', async () => {
+    appState = { ...threeHosts(), settings: { pluginSystemEnabled: true } }
+    useTeamPanelTabStore.setState({ shown: 'inbox' })
+
+    await mount()
+
+    expect(advisors).toHaveBeenCalledWith(JSON.stringify(reads), false)
+  })
+
+  it("puts a pane's report on its own row, and no section on the others", async () => {
+    advisors.mockReturnValue(
+      new Map([
+        [
+          `tab-a:${LEAF_A}`,
+          {
+            model: 'Sonnet 5.5',
+            effort: 'low',
+            pinned: { model: true, effort: false },
+            previous: { model: 'Opus 5.5', effort: 'high' }
+          }
+        ]
+      ])
+    )
+
+    await mount()
+
+    const held = model?.rows.find((row) => row.paneKey === `tab-a:${LEAF_A}`)
+    expect(held?.advisor).toEqual({
+      model: 'Sonnet 5.5',
+      effort: 'low',
+      pinned: { model: true, effort: false },
+      line: null,
+      previous: { model: 'Opus 5.5', effort: 'high' },
+      calls: []
+    })
+    expect(model?.rows.filter((row) => row.advisor !== null)).toHaveLength(1)
   })
 })
