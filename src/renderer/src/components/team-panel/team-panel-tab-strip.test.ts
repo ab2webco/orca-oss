@@ -12,6 +12,10 @@ describe('tabStripScrollLeftFor', () => {
     expect(tabStripScrollLeftFor(strip, { left: 60, right: 120 }, 80)).toBe(28)
   })
 
+  it('scrolls a tab that ends inside the faded edge clear of it', () => {
+    expect(tabStripScrollLeftFor(strip, { left: 240, right: 310 }, 0)).toBe(3)
+  })
+
   it('leaves the strip alone when the tab is already whole', () => {
     expect(tabStripScrollLeftFor(strip, { left: 150, right: 200 }, 40)).toBe(40)
   })

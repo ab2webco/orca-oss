@@ -219,24 +219,24 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await orcaPage.setViewportSize({ width: 320, height: 900 })
     await panel.getByRole('tab', { name: 'Team' }).click()
     await orcaPage.mouse.move(0, 0)
+    await expect(strip).toHaveAttribute('data-overflow-end', 'true')
+    await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     if (CAPTURE_EVIDENCE) {
       await panel.screenshot({
         animations: 'disabled',
         path: testInfo.outputPath('strip-320-start.png')
       })
     }
-    await expect(strip).toHaveAttribute('data-overflow-end', 'true')
-    await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     await panel.getByRole('tab', { name: 'Machines' }).click()
     await orcaPage.mouse.move(0, 0)
+    await expect(strip).toHaveAttribute('data-overflow-start', 'true')
+    await expect(strip).toHaveAttribute('data-overflow-end', 'false')
     if (CAPTURE_EVIDENCE) {
       await panel.screenshot({
         animations: 'disabled',
         path: testInfo.outputPath('strip-320-end.png')
       })
     }
-    await expect(strip).toHaveAttribute('data-overflow-start', 'true')
-    await expect(strip).toHaveAttribute('data-overflow-end', 'false')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     await expect(strip).toHaveAttribute('data-overflow-end', 'false')
