@@ -1,11 +1,15 @@
 import type { TerminalLineSegment } from './terminal-line-segments'
 
 // Why no length floor, unlike the transcript's: status text is cut at 160 chars, so a line can hold only a token's head.
-const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
+// A Claude OAuth token (sk-ant-oat, refresh sk-ant-ort) shows up when a member runs env or printenv.
+const BEARER_SECRET = /dcap_[A-Za-z0-9_-]+|(?<![A-Za-z0-9_-])sk-ant-o[ar]t[A-Za-z0-9_-]*/g
 
-/** A worker's own command lines carry its capability, a bearer secret no row may show. */
+const holdsSecret = (text: string | undefined): text is string =>
+  text !== undefined && (text.includes('dcap_') || text.includes('sk-ant-o'))
+
+/** A worker's own command lines carry its capability, and its env its OAuth token: bearer secrets no row may show. */
 export const redactDispatchCapability = (text: string): string =>
-  text.includes('dcap_') ? text.replace(DISPATCH_CAPABILITY, '[redacted]') : text
+  holdsSecret(text) ? text.replace(BEARER_SECRET, '[redacted]') : text
 
 export const redactOptionalDispatchCapability = <T extends string | undefined>(text: T): T =>
   (text === undefined ? text : redactDispatchCapability(text)) as T
@@ -27,7 +31,7 @@ export function redactAgentStatusText<T extends AgentStatusText>(payload: T): T 
     payload.lastAssistantMessage,
     ...(payload.subagents ?? []).map((one) => one.description)
   ]
-  if (!fields.some((text) => text?.includes('dcap_'))) {
+  if (!fields.some(holdsSecret)) {
     return payload
   }
   return {
@@ -39,7 +43,7 @@ export function redactAgentStatusText<T extends AgentStatusText>(payload: T): T 
     ...(payload.subagents
       ? {
           subagents: payload.subagents.map((one) =>
-            one.description?.includes('dcap_')
+            holdsSecret(one.description)
               ? { ...one, description: redactDispatchCapability(one.description) }
               : one
           )
@@ -50,7 +54,9 @@ export function redactAgentStatusText<T extends AgentStatusText>(payload: T): T 
 
 const TOKEN_CHAR = /[A-Za-z0-9_-]/
 // A capability is 32 random bytes in base64url (orchestration db), so a match crosses rows for 43 chars at most.
-const WRAPPED_CAPABILITY = /dcap_[A-Za-z0-9_-]{1,43}/g
+// An OAuth token runs about 95 chars past its prefix; the bound leaves room for a longer one. No left
+// boundary here: the row join drops the `=` before a token that starts the next row.
+const WRAPPED_SECRET = /dcap_[A-Za-z0-9_-]{1,43}|sk-ant-o[ar]t[A-Za-z0-9_-]{1,128}/g
 
 /**
  * A token can run past its row by the terminal's wrap or an app's wrap under a hanging indent, at any row
@@ -76,7 +82,7 @@ export function redactWrappedTerminalRows(rows: readonly string[]): string[] {
   })
   // Per row: each hidden column, and whether a token starts there.
   const hidden = rows.map(() => new Map<number, boolean>())
-  for (const match of stream.matchAll(WRAPPED_CAPABILITY)) {
+  for (const match of stream.matchAll(WRAPPED_SECRET)) {
     let end = match.index + match[0].length
     // Inside one row a longer run is no word of the next row, so it goes whole, as on a single line.
     while (

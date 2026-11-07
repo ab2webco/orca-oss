@@ -176,3 +176,84 @@ describe('redactTerminalSegmentRows', () => {
     expect(redactTerminalSegmentRows([row])[0]).toBe(row)
   })
 })
+
+// A member running `env` or `printenv` prints its Claude OAuth token (ORCA-1039). Real length: 13 + 95.
+// Why only Q, X, J, Z, '-' and '_' in the body: no other text here holds Q, X, J or Z.
+const OAUTH = `sk-ant-oat01-${'QXJZ'.repeat(22).slice(0, 86)}-ZJXQ_ZQX`
+const REFRESH = `sk-ant-ort01-${'ZQXJ'.repeat(24).slice(0, 95)}`
+const OAUTH_BODY = /[QXJZ]/
+
+describe('Claude OAuth tokens', () => {
+  it('uses a real-length token', () => {
+    expect(OAUTH).toHaveLength(108)
+  })
+
+  it.each([
+    [`CLAUDE_CODE_OAUTH_TOKEN=${OAUTH}`, 'CLAUDE_CODE_OAUTH_TOKEN=[redacted]'],
+    [`export CLAUDE_CODE_OAUTH_TOKEN="${OAUTH}"`, 'export CLAUDE_CODE_OAUTH_TOKEN="[redacted]"'],
+    [`"refreshToken":"${REFRESH}"`, '"refreshToken":"[redacted]"'],
+    // Why: status text is cut at 160 chars, so a line can hold only the token's head.
+    [
+      'PATH=/usr/bin CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-QX',
+      'PATH=/usr/bin CLAUDE_CODE_OAUTH_TOKEN=[redacted]'
+    ]
+  ])('hides it in: %s', (line, shown) => {
+    expect(redactDispatchCapability(line)).toBe(shown)
+  })
+
+  it('hides it in every text a hook payload carries', () => {
+    const printenv = `HOME=/home/m\nCLAUDE_CODE_OAUTH_TOKEN=${OAUTH}\nSHELL=/bin/zsh`
+    const parsed = parseAgentStatusPayload(
+      JSON.stringify({
+        state: 'working',
+        prompt: `why is ${OAUTH} rejected`,
+        toolName: 'Bash',
+        toolInput: printenv,
+        lastAssistantMessage: printenv,
+        subagents: [{ id: 'sub-1', state: 'working', startedAt: 1, description: printenv }]
+      })
+    )
+    expect(JSON.stringify(parsed)).not.toContain('sk-ant-oat')
+    expect(JSON.stringify(parsed)).not.toMatch(OAUTH_BODY)
+  })
+
+  const appWrap = (line: string, width: number, indent: string): string[] => {
+    const rows = [line.slice(0, width)]
+    for (let at = width; at < line.length; at += width - indent.length) {
+      rows.push(indent + line.slice(at, at + width - indent.length))
+    }
+    return rows
+  }
+  const cases = [`CLAUDE_CODE_OAUTH_TOKEN=${OAUTH}`, `env | grep TOKEN ${OAUTH} done`].flatMap(
+    (line) =>
+      [8, 12, 20, 33, 40, 80, 120].flatMap((width) =>
+        ['', '  ', '     ', '  ⎿  ', '│ '].map((indent) => ({ line, width, indent }))
+      )
+  )
+
+  it.each(cases)(
+    'keeps no character of a wrapped token at width $width, indent "$indent": $line',
+    ({ line, width, indent }) => {
+      const rows = [
+        'x'.repeat(width + 30),
+        ...appWrap(line, width, indent),
+        `${'y'.repeat(width + 10)} done`
+      ]
+      const shown = redactWrappedTerminalRows(rows).join('\n')
+      expect(shown).not.toMatch(OAUTH_BODY)
+      expect(shown).not.toContain('sk-ant')
+      expect(shown).toContain('[redacted]')
+    }
+  )
+
+  it('redacts one split across colour runs', () => {
+    const run = (text: string) => ({ text, color: 'default' as const, bold: false, dim: false })
+    const row = [run('CLAUDE_CODE_OAUTH_TOKEN='), run(OAUTH.slice(0, 20)), run(OAUTH.slice(20))]
+    expect(redactTerminalSegmentRows([row])).toEqual([[run('CLAUDE_CODE_OAUTH_TOKEN=[redacted]')]])
+  })
+
+  it('leaves other sk- text alone', () => {
+    const line = 'risk-ant-oath and sk-proj-notours stay'
+    expect(redactDispatchCapability(line)).toBe(line)
+  })
+})
