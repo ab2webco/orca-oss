@@ -26,6 +26,12 @@ type Props = {
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
 const ADVISOR_BUBBLE_MS = 6000
 
+type TeamSceneAsker = { key: string; name: string; x: number; top: number }
+
+// Why: V28 names the asker in a tag above its alert mark, which sits about 20px over the head.
+const ASKER_LIFT = 38
+const ASKER_EDGE = 32
+
 export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
@@ -34,7 +40,8 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
     width: number
     advisor: string | null
     anchors: Map<string, TeamSceneSpeech['anchor']>
-  }>({ width: 0, advisor: null, anchors: new Map() })
+    askers: TeamSceneAsker[]
+  }>({ width: 0, advisor: null, anchors: new Map(), askers: [] })
   const speakersKeyRef = useRef('')
 
   const paint = useCallback(
@@ -64,11 +71,21 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
           .filter((a) => a.role !== 'member')
           .map((a) => [a.key, { x: a.x * width, top: painter.headTop(a.depth, height) }])
       )
+      const askers = actors
+        .filter((a) => a.role === 'member' && a.emote === 'alert')
+        .map((a) => ({
+          key: a.key,
+          name: a.name,
+          x: Math.round(a.x * width),
+          top: Math.round(painter.headTop(a.depth, height) - ASKER_LIFT)
+        }))
       // Why keyed: speakers stand still, so the overlay re-renders only when a line or size changes.
-      const key = `${width}|${advisor}|${[...anchors.keys()].join()}`
+      const key = `${width}|${advisor}|${[...anchors.keys()].join()}|${askers
+        .map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`)
+        .join()}`
       if (key !== speakersKeyRef.current) {
         speakersKeyRef.current = key
-        setSpeakers({ width, advisor, anchors })
+        setSpeakers({ width, advisor, anchors, askers })
       }
       painter.paint(g, {
         width,
@@ -166,6 +183,20 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
         className="block w-full"
         style={{ height: painter.height }}
       />
+      {speakers.askers.map((asker) => (
+        <span
+          key={asker.key}
+          data-scene-speaker={asker.key}
+          aria-hidden="true"
+          className="pointer-events-none absolute max-w-[96px] -translate-x-1/2 truncate rounded bg-status-attention px-1.5 py-px text-[10.5px] font-medium leading-4 text-white"
+          style={{
+            left: Math.min(Math.max(asker.x, ASKER_EDGE), speakers.width - ASKER_EDGE),
+            top: asker.top
+          }}
+        >
+          {asker.name}
+        </span>
+      ))}
       <TeamSceneBubbles
         speeches={speeches}
         width={speakers.width}
