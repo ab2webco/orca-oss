@@ -87,8 +87,17 @@ async function clickPastAppCards(page: Page, target: Locator): Promise<void> {
   }).toPass({ timeout: 30_000 })
 }
 
-async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
+// Why: after a resize the pointer can rest on the sidebar's board button, whose tooltip covers the dock.
+async function clearForCapture(page: Page): Promise<void> {
   await dismissAppCards(page)
+  await page.mouse.move(0, 0)
+  await expect(
+    page.getByText(/Workspace board moved|tablero de espacios de trabajo se movió/)
+  ).toBeHidden({ timeout: 20_000 })
+}
+
+async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
+  await clearForCapture(page)
   const box = await panel.boundingBox()
   if (!box) {
     return
@@ -258,6 +267,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
             testInfo.outputPath(`dock-${language}-${width}-${theme}.png`)
           )
           if (width === 1440 || width === 320) {
+            await clearForCapture(orcaPage)
             await orcaPage.screenshot({
               animations: 'disabled',
               path: testInfo.outputPath(`window-${language}-${width}-${theme}.png`)
@@ -266,6 +276,72 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         }
       }
     }
+
+    // The menu holds every action: what applies now, this project's, then Orca's, each with why.
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'Todas las acciones' }))
+    const menu = orcaPage.getByRole('menu', { name: 'Todas las acciones' })
+    await expect(menu.locator('h4')).toHaveText(['Ahora', 'De este proyecto', 'De Orca'])
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      /^Reactivar.*2 detenidos$/,
+      /^Release.*\/release$/,
+      /^Deploy staging.*\/deploy$/,
+      /^Board.*\/board$/,
+      /^Ola.*Nada por hacer$/,
+      /^Estado.*\/status$/,
+      /^Barrer.*Nada por cerrar$/,
+      /^Detener.*\/stop$/
+    ])
+    await expect(menu.getByRole('menuitem', { name: /^Ola/ })).toBeDisabled()
+    await expect(menu.getByPlaceholder('Buscar acción')).toBeFocused()
+    // The menu opens over the dock it spans, at every sidebar width (ORCA-1092 row 19).
+    const sidebarBefore = await orcaPage.evaluate(
+      () => window.__store!.getState().rightSidebarWidth
+    )
+    for (const sidebar of [300, 456, 600]) {
+      await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), sidebar)
+      await expect
+        .poll(async () => {
+          const [box, dockBox] = await Promise.all([menu.boundingBox(), dock.boundingBox()])
+          if (!box || !dockBox) {
+            return 'unmeasured'
+          }
+          const inside =
+            box.x >= dockBox.x - 1 && box.x + box.width <= dockBox.x + dockBox.width + 1
+          const gap = Math.round(dockBox.y - (box.y + box.height))
+          return inside && gap >= 0 && gap <= 12 ? 'over the dock' : `x ${box.x} gap ${gap}`
+        }, `menu at sidebar ${sidebar}`)
+        .toBe('over the dock')
+    }
+    await orcaPage.evaluate(
+      (w) => window.__store!.getState().setRightSidebarWidth(w),
+      sidebarBefore
+    )
+    if (CAPTURE_EVIDENCE) {
+      for (const theme of ['light', 'dark'] as const) {
+        await setTheme(orcaPage, theme)
+        for (const width of WIDTHS) {
+          await orcaPage.setViewportSize({ width, height: 900 })
+          await clearForCapture(orcaPage)
+          const box = await menu.boundingBox()
+          const panelBox = await panel.boundingBox()
+          expect(
+            box && panelBox && box.x >= panelBox.x - 1,
+            `menu leaves the panel at ${width}`
+          ).toBe(true)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`menu-es-${width}-${theme}.png`),
+            clip: { x: panelBox!.x, y: 300, width: panelBox!.width, height: 600 }
+          })
+        }
+      }
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    }
+    await menu.getByPlaceholder('Buscar acción').fill('dep')
+    await expect(menu.getByRole('menuitem')).toHaveText([/^Deploy staging/])
+    await orcaPage.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
 
     // Stop asks inline, in the dock, and sends nothing on Cancel.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
