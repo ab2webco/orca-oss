@@ -23,6 +23,9 @@ import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGameProjects'>
 
+// Why: icon and pin are set by the panel's own controls, not typed into a box.
+type TextField = Exclude<keyof ActionDraft, 'icon' | 'pin' | 'kind'>
+
 const problemText = (problem: ActionDraftProblem): string =>
   ({
     label: translate(
@@ -82,7 +85,7 @@ function ActionRow({
   onRemove: () => void
 }): React.JSX.Element {
   const n = index + 1
-  const field = (key: keyof ActionDraft, label: string, placeholder: string, mono = false) => (
+  const field = (key: TextField, label: string, placeholder: string, mono = false) => (
     <Input
       aria-label={`${label} ${n}`}
       aria-invalid={problem !== null && (PROBLEM_FIELDS.get(problem) ?? []).includes(key)}

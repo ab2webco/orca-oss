@@ -71,6 +71,25 @@
           "meaning": "Sin actividad, o sin dato."
         }
       }
+    },
+    "gameActions": {
+      "templates": {
+        "deploy": {
+          "command": "deploy",
+          "label": "Deploy",
+          "prompt": "Despliega a staging y dime el resultado."
+        },
+        "redPrs": {
+          "command": "prs-rojo",
+          "label": "PRs en rojo",
+          "prompt": "Revisa los PRs en rojo y dime cuál necesita un miembro."
+        },
+        "tests": {
+          "command": "tests",
+          "label": "Tests",
+          "prompt": "Corre la suite completa y dime solo lo que falló."
+        }
+      }
     }
   },
   "menu": {
