@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   answerGameOwnerQuestion,
   gameInboxTargetOf,
+  readGameOwnerQuestions,
   readOpenGameOwnerQuestions
 } from './game-owner-questions-client'
 
@@ -43,6 +44,28 @@ describe('gameInboxTargetOf', () => {
 })
 
 describe('readOpenGameOwnerQuestions', () => {
+  // Why (ORCA-1100): the board lists handed-over answers too; only the ones still held are news.
+  it('keeps the answers that have not reached the lead yet, and none from an older host', async () => {
+    const held = {
+      ...QUESTION,
+      id: 'oq_h',
+      answer: { text: 'No', at: QUESTION.askedAt, undelivered: true }
+    }
+    const handed = { ...QUESTION, id: 'oq_d', answer: { text: 'Yes', at: QUESTION.askedAt } }
+    stubRuntime({ questions: [], open: 0, undelivered: [held, handed] })
+    const scope = { target: { kind: 'local' as const }, worktreeId: 'repo::wt' }
+
+    await expect(readGameOwnerQuestions(scope)).resolves.toEqual({
+      questions: [],
+      undelivered: [held]
+    })
+    stubRuntime({ questions: [QUESTION], open: 1 })
+    await expect(readGameOwnerQuestions(scope)).resolves.toEqual({
+      questions: [QUESTION],
+      undelivered: []
+    })
+  })
+
   it("asks the worktree's board and drops entries this build cannot read", async () => {
     const call = stubRuntime({ questions: [QUESTION, { id: 'oq_2' }], open: 2 })
 

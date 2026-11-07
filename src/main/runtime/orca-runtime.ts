@@ -823,7 +823,8 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import {
   gameOwnerQuestionMobileNotification,

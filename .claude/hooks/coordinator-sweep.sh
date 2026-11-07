@@ -14,17 +14,23 @@ INTERVAL="${ORCA_SWEEP_INTERVAL:-1800}"
 sweep_line() {
   cd "$ROOT" 2>/dev/null || { echo "SWEEP: repo missing at $ROOT"; return; }
 
-  local prs green red pending dirty stale board
-  prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup,baseRefName 2>/dev/null) || prs='[]'
-  local states='[.statusCheckRollup[]?|(.conclusion//.state)]'
+  local prs green held unverified red pending dirty stale board buckets
+  prs=$(gh pr list -R "$REPO" --state open --json number,mergeStateStatus,statusCheckRollup,baseRefName,body 2>/dev/null) || prs='[]'
 
-  # Green means every check is conclusively good. A running check reports IN_PROGRESS or
-  # QUEUED with no conclusion, so an allowlist is the only safe polarity — a denylist of
-  # FAILURE/PENDING called a PR mergeable while its E2E shards were still running.
-  local settled='["SUCCESS","SKIPPED","NEUTRAL"]'
-  green=$(jq -r "[.[]|select(([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)==0 and (.mergeStateStatus!=\"DIRTY\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
-  red=$(jq -r "[.[]|select($states|index(\"FAILURE\"))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
-  pending=$(jq -r "[.[]|select(($states|index(\"FAILURE\")|not) and (([$states[]|select(. as \$s|$settled|index(\$s)|not)]|length)>0))|\"#\(.number)\"]|join(\" \")" <<<"$prs" 2>/dev/null)
+  # A running check has no conclusion, so "settled" is an allowlist: a denylist called a PR
+  # mergeable while its E2E shards ran. Mergeable also needs verify SUCCESS and CLEAN, because
+  # the rollup lists only checks that started, so accessory checks alone read green (ORCA-1103).
+  # shellcheck disable=SC2016
+  buckets=$(jq -c '
+    def states: [.statusCheckRollup[]?|(.conclusion//.state)];
+    def red: states|any(. as $s|["FAILURE","CANCELLED","TIMED_OUT","ERROR","STARTUP_FAILURE","ACTION_REQUIRED"]|index($s));
+    def running: states|any(. as $s|["SUCCESS","SKIPPED","NEUTRAL"]|index($s)|not);
+    def verified: .mergeStateStatus=="CLEAN" and any(.statusCheckRollup[]?;(.name//.context)=="verify" and .conclusion=="SUCCESS");
+    map(.number) as $open
+    | map((([(.body//"")|scan("(?:#|/pull/)([0-9]+)")|.[0]|tonumber]|unique|map(select(. as $n|$open|index($n)))) - [.number]) as $after
+      | {n:"#\(.number)", b:(if red then "red" elif running then "pending" elif verified|not then (if .mergeStateStatus=="DIRTY" then "" else "unverified" end) elif $after==[] then "mergeable" else "held" end), after:$after})' <<<"$prs" 2>/dev/null)
+  bucket() { jq -r --arg b "$1" '[.[]?|select(.b==$b)|if .after==[] or $b!="held" then .n else "\(.n)(after-\(.after|map("#\(.)")|join(",")))" end]|join(" ")' <<<"$buckets" 2>/dev/null; }
+  green=$(bucket mergeable) held=$(bucket held) unverified=$(bucket unverified) red=$(bucket red) pending=$(bucket pending)
 
   # Leftover means: no open PR AND nothing unpushed to show for it. A worker still
   # committing has neither, and main never has a PR — flagging either is noise that
@@ -93,7 +99,7 @@ sweep_line() {
   fi
 
   stale=${stale# } unshipped=${unshipped# }
-  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | unshipped:${unshipped:-none} | board-drift:${drift:-none} | board-open:${board:-?}"
+  echo "SWEEP $(date '+%H:%M') | mergeable:${green:-none} | held:${held:-none} | unverified:${unverified:-none} | red:${red:-none} | pending:${pending:-none} | conflictivos:${dirty:-none} | leftover-worktrees:${stale:-none} | unshipped:${unshipped:-none} | board-drift:${drift:-none} | board-open:${board:-?}"
 }
 
 if [ "${1:-}" = "--once" ]; then
