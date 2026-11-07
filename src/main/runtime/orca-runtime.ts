@@ -32305,6 +32305,9 @@ export class OrcaRuntimeService {
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
+      leaderUnreported:
+        args.paneKey !== undefined &&
+        !summaries.some((one) => one.agents.some((row) => row.paneKey === args.paneKey)),
       callerParentPaneKey,
       callerRole,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),

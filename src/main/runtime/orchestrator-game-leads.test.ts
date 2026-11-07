@@ -473,12 +473,51 @@ describe('GameLeads after a restart', () => {
     let handle: string | null = null
     let state: 'running' | 'starting' = 'starting'
     const game = relaunched(dir, { handle: () => handle, state: () => state, sessionId: null })
+    const restoring = { leads: [], restoring: [{ project: 'cineco', paneKey: PANE }] }
 
-    await expect(game.list()).resolves.toEqual({ leads: [] })
+    await expect(game.list()).resolves.toEqual(restoring)
     handle = 'term_new'
-    await expect(game.list()).resolves.toEqual({ leads: [] })
+    await expect(game.list()).resolves.toEqual(restoring)
     state = 'running'
-    expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_new'])
+    await expect(game.list()).resolves.toEqual({
+      leads: [{ project: 'cineco', label: 'Ana', handle: 'term_new', since: AT }]
+    })
+  })
+
+  // Why (ORCA-1130): an idle lead never reports a status, so the panel finds its pane from here.
+  it("names the restored lead's pane", async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: 'term_new', paneKey: null } }),
+      isLive: (handle) => handle === 'term_new',
+      roster: new GameLeadRoster(() => dir),
+      handleOfPane: (paneKey) => (paneKey === PANE ? 'term_new' : null),
+      paneOf: (handle) => (handle === 'term_new' ? PANE : null),
+      paneState: async () => 'running'
+    })
+
+    await expect(game.list()).resolves.toEqual({
+      leads: [{ project: 'cineco', label: 'Ana', handle: 'term_new', since: AT, paneKey: PANE }]
+    })
+  })
+
+  it('stops naming a lead as restoring once the restore grace is over', async () => {
+    const dir = rosterDir()
+    await registeredBefore(dir, WITH_PANE)
+    let now = Date.UTC(2026, 9, 17, 11)
+    const game = new GameLeads({
+      projectOf: async () => LEAD,
+      isLive: () => false,
+      now: () => new Date(now),
+      roster: new GameLeadRoster(() => dir),
+      handleOfPane: () => null,
+      paneState: async () => 'running'
+    })
+
+    expect((await game.list()).restoring).toEqual([{ project: 'cineco', paneKey: PANE }])
+    now += 120_000
+    await expect(game.list()).resolves.toEqual({ leads: [] })
   })
 
   it('lists no pane that never ran game lead', async () => {
