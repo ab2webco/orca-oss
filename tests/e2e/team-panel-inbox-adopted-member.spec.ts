@@ -68,6 +68,20 @@ test('the Inbox names an adopted member, gives it a thread, and credits the pers
         return registered.result.registered
       })
       .toBe(true)
+    // Why wait: workerStart and the adopt seat need both worktrees, which the first scan lists.
+    let worktrees: { id: string; repoId: string }[] = []
+    await expect
+      .poll(
+        async () => {
+          worktrees = (
+            await client.call<{ worktrees: { id: string; repoId: string }[] }>('worktree.list', {})
+          ).result.worktrees
+          const repoId = worktrees.find((one) => one.id === worktreeId)?.repoId
+          return worktrees.filter((one) => one.repoId === repoId).length
+        },
+        { timeout: 60_000, message: "the runtime never listed the project's two worktrees" }
+      )
+      .toBeGreaterThanOrEqual(2)
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
       objective: 'Adopted member Inbox',
       from: lead
@@ -96,9 +110,6 @@ test('the Inbox names an adopted member, gives it a thread, and credits the pers
     expect(busy, 'workerStart opened no agent terminal for ORCA-12').toBeTruthy()
 
     // The agent to adopt: started by hand in this project's other worktree, idle at its prompt.
-    const worktrees = (
-      await client.call<{ worktrees: { id: string; repoId: string }[] }>('worktree.list', {})
-    ).result.worktrees
     const leadRepo = worktrees.find((one) => one.id === worktreeId)?.repoId
     const otherWorktreeId = worktrees.find(
       (one) => one.repoId === leadRepo && one.id !== worktreeId
