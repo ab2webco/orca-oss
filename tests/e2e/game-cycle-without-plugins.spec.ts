@@ -169,7 +169,11 @@ for (const [index, one] of CASES.entries()) {
         // A report in Jev's shape draws the row; Orca's plugin system plays no part in it.
         await leadState(lead, JEV_SHAPED_REPORT)
         const advisor = panel.locator('[data-team-card="advisor"]')
-        await expect(advisor).toContainText('Sonnet 5.5', { timeout: 60_000 })
+        await expect(advisor).toContainText('Keeps the lead on Sonnet for review work', {
+          timeout: 60_000
+        })
+        // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
+        await expect(advisor).not.toContainText('Sonnet 5.5')
         await orcaPage.screenshot({ path: testInfo.outputPath('team-jev-shaped-report.png') })
         await leadState(lead, 'null')
         await expect(advisor).toHaveCount(0, { timeout: 60_000 })
