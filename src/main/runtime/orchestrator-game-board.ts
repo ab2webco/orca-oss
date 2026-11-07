@@ -14,6 +14,7 @@ import {
 } from '../../shared/orchestrator-game-inbox-threads'
 import {
   deliverHeldOwnerAnswers,
+  HeldOwnerAnswers,
   ownerAnswerTellerOf
 } from './orchestrator-game-owner-answer-delivery'
 import {
@@ -57,19 +58,6 @@ export type GameBoardProject = {
 
 export type GameBoardLead = { handle: string; paneKey: string | null }
 
-/** The person's Inbox calls with a worktree, never a terminal: its lead is the project's live one. */
-export async function withProjectLead(
-  project: GameBoardProject,
-  liveLeadOf: (projectKey: string) => Promise<string | null>,
-  paneOf: (handle: string) => string | null
-): Promise<GameBoardProject> {
-  if (project.lead || project.isMember) {
-    return project
-  }
-  const handle = await liveLeadOf(project.key)
-  return handle ? { ...project, lead: { handle, paneKey: paneOf(handle) } } : project
-}
-
 /** Mail the host sends the lead itself; tellLead returns false when it could not be stored. */
 export type GameLeadNote = { subject: string; body: string; payload: Record<string, unknown> }
 
@@ -103,8 +91,13 @@ export class GameBoard {
       /** Sends the person's words to a member through the lead's run; throws why it could not. */
       replyToMember?: (lead: GameBoardLead, args: { id: string; text: string }) => OwnerMemberReply
       now?: () => Date
+      /** Runs a held answer's next retry; tests drive it by hand. */
+      later?: (ms: number, run: () => void) => void
     }
   ) {}
+
+  // Why a getter: deps is set after field initializers run.
+  readonly heldAnswers = new HeldOwnerAnswers(() => this.deps)
 
   /** The person answers or overrides for a member from the Inbox; the lead hears it once, to record it on the ticket. */
   async replyToMember(
@@ -286,6 +279,9 @@ export class GameBoard {
         this.deps.ownerQuestionsChanged?.(project.key)
         this.deps.ownerQuestionSettled?.(project.key, result.question)
         const delivered = result.question.answer?.undelivered !== true
+        if (!delivered) {
+          this.heldAnswers.retry(args, project.key)
+        }
         return { question: result.question, delivered, repeated: false }
       }
     }

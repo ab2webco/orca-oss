@@ -16385,6 +16385,9 @@
           "send": "Send",
           "overridePlaceholder": "Replace the lead's answer",
           "override": "Override"
+        },
+        "GameInboxUndelivered": {
+          "title": "Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it."
         }
       },
       "team-scene": {

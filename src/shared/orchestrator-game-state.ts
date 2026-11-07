@@ -112,6 +112,22 @@ export type GameMemberWorktree = { id: string; branch: string; displayName: stri
 
 export type GameReviewVerdict = 'approved' | 'changes_requested' | 'review_required'
 
+const GAME_REVIEW_MERGE_STATES = [
+  'clean',
+  'blocked',
+  'behind',
+  'dirty',
+  'unstable',
+  'has_hooks',
+  'draft',
+  'unknown'
+] as const
+
+export type GameReviewMergeState = (typeof GAME_REVIEW_MERGE_STATES)[number]
+
+const gameReviewMergeStateOf = (status: string): GameReviewMergeState =>
+  GAME_REVIEW_MERGE_STATES.find((one) => one === status.toLowerCase()) ?? 'unknown'
+
 export type GameReview = {
   provider: Exclude<HostedReviewProvider, 'unsupported'>
   number: number
@@ -121,6 +137,8 @@ export type GameReview = {
   ci: CheckStatus | 'none'
   /** The host's review decision; absent without one (GitLab) or from an older host (ORCA-686). */
   verdict?: GameReviewVerdict
+  /** GitHub's merge state; only `clean` is mergeable. Not folded into ci: two accessory checks read green while verify never ran (ORCA-1103). */
+  mergeState?: GameReviewMergeState
   /** CI per pushed head, oldest first; these three are read together, GitHub only. */
   ciHistory?: GameReviewHeadCi[]
   /** Review comment threads on the PR. */
@@ -326,6 +344,7 @@ export function gameReviewOf(
     state: HostedReviewState
     status: CheckStatus
     reviewDecision?: PRReviewDecision | null
+    mergeStateStatus?: string | null
     ciHistory?: readonly GameReviewHeadCi[]
     commentCount?: number
     reopenCount?: number
@@ -341,7 +360,10 @@ export function gameReviewOf(
     url: review.url,
     state: review.state,
     ci: review.status,
-    ...(review.reviewDecision ? { verdict: REVIEW_VERDICT[review.reviewDecision] } : {})
+    ...(review.reviewDecision ? { verdict: REVIEW_VERDICT[review.reviewDecision] } : {}),
+    ...(review.mergeStateStatus
+      ? { mergeState: gameReviewMergeStateOf(review.mergeStateStatus) }
+      : {})
   }
   const { ciHistory, commentCount, reopenCount } = review
   if (ciHistory === undefined || commentCount === undefined || reopenCount === undefined) {
