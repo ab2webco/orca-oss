@@ -327,6 +327,7 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
+import { resolveClaudeLaunchAccountForSpawn } from '../claude-accounts/claude-resume-launch-account'
 import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
 import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
@@ -1828,7 +1829,7 @@ export type RuntimeClaudeTerminalSwitchSnapshot = {
   wslDistro: string | null
   /** Non-null for SSH/remote-owned PTYs, whose auth and transcripts live elsewhere. */
   remoteConnectionId: string | null
-  providerSession: { agent: 'claude'; id: string } | null
+  providerSession: { agent: 'claude'; id: string; transcriptPath?: string } | null
 }
 
 type TerminalCreateOptions = {
@@ -3983,20 +3984,24 @@ export class OrcaRuntimeService {
       const accountId = pane.remoteConnectionId
         ? null
         : getLiveInjectedClaudePtyAccountId(pane.ptyId)
+      const transcriptPath = pane.remoteConnectionId
+        ? undefined
+        : pane.providerSession.transcriptPath
       return {
         sessionId: pane.providerSession.id,
         agentArgs: leadResumeArgsOf(pane.launchConfig),
         worktreeId: pane.worktreeId,
-        accountId
+        accountId,
+        ...(transcriptPath ? { transcriptPath } : {})
       }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
-    resume: (session) =>
+    resume: async (session) =>
       this.reopenClaudeConversation({
         worktreeId: session.worktreeId,
         sessionId: session.sessionId,
         ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-        accountId: session.accountId,
+        accountId: session.accountId ?? this.claudeAccountOfTranscript(session.transcriptPath),
         presentation: 'focused'
       }),
     focus: async (handle) => {
@@ -17466,10 +17471,19 @@ export class OrcaRuntimeService {
         continue
       }
       scannedSessions.add(session)
+      const sessionTabIds = new Set(
+        Object.values(session.tabsByWorktree ?? {}).flatMap((tabs) => tabs.map((tab) => tab.id))
+      )
       for (const [paneKey, record] of Object.entries(
         session.sleepingAgentSessionsByPaneKey ?? {}
       )) {
-        if (!worktreeIdsInScope.has(record.worktreeId) || !parsePaneKey(paneKey)) {
+        const pane = parsePaneKey(paneKey)
+        if (!worktreeIdsInScope.has(record.worktreeId) || !pane) {
+          continue
+        }
+        // Why: a live/quit record whose tab is gone was closed; listing it relisted the closed tab
+        // as sleeping (ORCA-718). The record stays so the conversation can still be resumed by hand.
+        if (record.origin !== 'worktree-sleep' && !sessionTabIds.has(record.tabId ?? pane.tabId)) {
           continue
         }
         byPaneKey.set(paneKey, record)
@@ -18596,7 +18610,13 @@ export class OrcaRuntimeService {
       remoteConnectionId: pty.connectionId,
       providerSession:
         observed?.agent === 'claude' && observed.providerSession?.id
-          ? { agent: 'claude', id: observed.providerSession.id }
+          ? {
+              agent: 'claude',
+              id: observed.providerSession.id,
+              ...(observed.providerSession.transcriptPath
+                ? { transcriptPath: observed.providerSession.transcriptPath }
+                : {})
+            }
           : null
     }
   }
@@ -31617,6 +31637,29 @@ export class OrcaRuntimeService {
       )
     }
     return handle
+  }
+
+  /** The managed account a lead's transcript lives under; null for the shared home or no verdict. */
+  private claudeAccountOfTranscript(transcriptPath: string | undefined): string | null {
+    // Why: a lead whose pane binding was gone when it registered still names its account by path,
+    // and reopening it on the global login lost the conversation (ORCA-718).
+    return (
+      resolveClaudeLaunchAccountForSpawn({
+        launchAccountId: undefined,
+        resumeProviderSession: transcriptPath
+          ? { key: 'session_id', id: 'lead', transcriptPath }
+          : undefined,
+        hasManagedAccount: (accountId) => {
+          // Why present on a failed read: only a confirmed removal may refuse the reopen.
+          try {
+            const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts
+            return accounts ? accounts.some((one) => one.id === accountId) : true
+          } catch {
+            return true
+          }
+        }
+      }) ?? null
+    )
   }
 
   private claudeAccountLabelOf(accountId: string | null): string | null {

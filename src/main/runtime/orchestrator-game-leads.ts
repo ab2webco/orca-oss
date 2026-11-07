@@ -10,6 +10,8 @@ export type GameLeadSession = {
   agentArgs: string | null
   worktreeId: string
   accountId: string | null
+  /** Where Claude keeps the conversation; names its account when `accountId` was not recorded. */
+  transcriptPath?: string
 }
 
 /** `registered: false` with `live` or `resumed` names the pane that is the lead instead of the caller. */
