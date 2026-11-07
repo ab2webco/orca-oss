@@ -143,13 +143,16 @@ export function AgentMapFilterPanel({
           className={cn('h-7 gap-1.5 px-2 text-xs', activeCount > 0 && 'border-foreground/25')}
         >
           <Filter className="size-3" />
-          {translate('dashboardPopout.filters.label', 'Filter')}
+          {/* Why: matches the board toolbar's narrow mode; the container is AgentDashboardToolbar's. */}
+          <span className="@max-[440px]/board-toolbar:sr-only">
+            {translate('dashboardPopout.filters.label', 'Filter')}
+          </span>
           {activeCount > 0 ? (
             <span className="rounded-full bg-foreground px-1.5 py-px text-[10px] leading-none text-background">
               {activeCount}
             </span>
           ) : null}
-          <ChevronDown className="size-3" />
+          <ChevronDown className="size-3 @max-[440px]/board-toolbar:hidden" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

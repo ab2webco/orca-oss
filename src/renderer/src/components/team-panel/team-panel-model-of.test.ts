@@ -77,6 +77,24 @@ describe('teamPanelModelOf', () => {
     expect(teamPanelModelOf(args())?.actions).toEqual([])
   })
 
+  it("hands the lead the oldest open question's ticket, and none once all are answered", () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const questions = [
+      question({ id: 'new', ticket: 'ORCA-9', askedAt: '2026-11-06T02:00:00.000Z' }),
+      question({ id: 'old', ticket: 'ORCA-7', askedAt: '2026-11-06T01:00:00.000Z' }),
+      question({
+        id: 'done',
+        ticket: 'ORCA-1',
+        askedAt: '2026-11-06T00:00:00.000Z',
+        answer: { text: 'Yes', at: 'x' } as never
+      })
+    ]
+    teamPanelModelOf(args({ questions }))
+    expect(teamCardsOf.mock.calls.at(-1)?.[2]).toEqual({ ticket: 'ORCA-7' })
+    teamPanelModelOf(args({ questions: [questions[2]!] }))
+    expect(teamCardsOf.mock.calls.at(-1)?.[2]).toBeNull()
+  })
+
   it('is null when the state has no lead', () => {
     teamCardsOf.mockReturnValue(null)
 

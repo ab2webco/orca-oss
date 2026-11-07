@@ -184,7 +184,8 @@ export function TabBarQuickCommandsButton({
               )}
             >
               <Play className="size-3.5" />
-              <span className="text-[12px] font-medium">
+              {/* Why: in a narrow tab strip the label ran under the right-sidebar toggle (ORCA-1126). */}
+              <span className="text-[12px] font-medium @max-[240px]/tab-strip:sr-only">
                 {translate(
                   'auto.components.tab.bar.TabBarQuickCommandsButton.a2c7a33831',
                   'Command'

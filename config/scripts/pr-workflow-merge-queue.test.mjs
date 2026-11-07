@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
+import { SPECS_PER_SHARD, splitChangedSpecs } from './split-changed-e2e-specs.mjs'
 
 // ORCA-932: GitHub Free caps the org at 20 concurrent jobs, and each PR push used to
 // schedule ~45. A push now runs the fast set; the rest runs once, in the merge queue.
@@ -99,10 +100,12 @@ describe('PR checks split between the push and the merge queue', () => {
 
   it('schedules fewer than 20 jobs for an ordinary PR push', () => {
     // Upper bound: every per-push job, the fork's one Node major, and the changed-specs E2E
-    // lane (its build plus one runner). The full E2E lane only runs in the merge queue.
-    const changedSpecsLane = Object.values(e2eWorkflow.jobs).filter(
-      (job) => job.if === "inputs.test_files != ''" || !job.if
-    ).length
+    // lane (its build plus the runners its split asks for). The full E2E lane only runs in the
+    // merge queue. Why SPECS_PER_SHARD specs: an ordinary push changes that many at most.
+    const ordinarySpecs = Array.from({ length: SPECS_PER_SHARD }, (_, i) => `spec-${i}`)
+    const changedSpecsLane =
+      Object.values(e2eWorkflow.jobs).filter((job) => !job.if).length +
+      splitChangedSpecs(ordinarySpecs, () => 1).length
     let count = 0
     for (const job of PER_PUSH_JOBS) {
       if (job === 'test') {

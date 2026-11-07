@@ -127,6 +127,9 @@ const CASES = [
   { role: 'member' as const, theme: 'light' as const, locale: 'en' as const, name: 'Castillo' }
 ]
 
+// Why at file level: a skip inside the test runs after the app launched, ~14 s per case on CI.
+test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+
 for (const one of CASES) {
   const label = `${one.role}-${one.theme}-${one.locale}`
   test(`a ${one.role} pane draws only the text layer (${label})`, async ({
@@ -134,7 +137,6 @@ for (const one of CASES) {
     orcaPage,
     testRepoPath
   }, testInfo) => {
-    test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
     test.setTimeout(300_000)
     const words = WORDS[one.locale]
     const api = await startMessagesApi([

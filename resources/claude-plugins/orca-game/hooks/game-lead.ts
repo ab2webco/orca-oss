@@ -47,6 +47,26 @@ export const isLeadAutostart = (
 export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): string =>
   state.lead?.label ?? fallback
 
+// Why the paneKey and agent type: game-state fills a leader with no title with them, and the Team card skips both.
+/** The lead's character as its Team card names it, short of its ticket; else its label, else `fallback`. */
+export const leadCharacterOf = (
+  state: Pick<GameState, 'lead' | 'worktree'> & {
+    agents: readonly Pick<
+      GameState['agents'][number],
+      'paneKey' | 'agentType' | 'displayName' | 'isLeader'
+    >[]
+  },
+  fallback: string
+): string => {
+  const leader = state.agents.find((one) => one.isLeader)
+  const own =
+    leader === undefined || [leader.paneKey, leader.agentType, ''].includes(leader.displayName)
+      ? undefined
+      : leader.displayName
+  const name = (own ?? state.worktree?.displayName ?? '').split(' · ')[0]?.trim() ?? ''
+  return name !== '' ? name : (state.lead?.label ?? fallback)
+}
+
 /** What the mod last did to this session's name, kept in the store per session. */
 export type LeadNameRecord = { applied?: string; isPersonNamed?: boolean }
 

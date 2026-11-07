@@ -1,5 +1,5 @@
 ---
-sourceHash: 106cbf0d60b459c8
+sourceHash: 0984ae7011b2d1b9
 ---
 
 # El juego orquestador de Agent Teams
@@ -55,16 +55,11 @@ archivo en CJK que informe un agente) se dibuja como `?`.
 
 ### El pane de un miembro
 
-Un pane iniciado con `ORCA_GAME_ROLE=member`, o uno al que `game state` llama miembro, dibuja una
-banda de miembro en lugar de la del líder: una línea con su personaje, su ticket, la tarjeta de fase
-que muestra, su PR y su CI ([`member-band.tsx`](../../../resources/claude-plugins/orca-game/hooks/member-band.tsx)).
-No tiene Panel, chips de equipo, HUD del grupo ni botones del líder, solo una fila de menú con los
-colores del propio pane: **Collapse** pliega la banda a esa fila y quita la escena del spinner durante
-la sesión, **Text** es el mismo interruptor de texto del líder y **Refresh** vuelve a leer `game state`.
-Mientras el `orca orchestration ask` del miembro espera al líder, una línea muestra la pregunta
-(`? Asked <lead>: …`), que se mantiene al plegar la banda y se borra cuando vuelve la respuesta. Sus
-respuestas usan las mismas filas de encabezado que las del líder, y la escena se sigue dibujando sobre el
-spinner salvo que esté plegada o en modo texto.
+Un pane iniciado con `ORCA_GAME_ROLE=member`, o uno al que `game state` llama miembro, dibuja la
+misma capa de texto que el pane del líder, sin banda
+([`text-layer.tsx`](../../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)). Su ticket, host,
+modelo, PR y si te espera aparecen en la cabecera nativa sobre su terminal mientras el panel de Equipo
+está abierto (ORCA-1055).
 
 Un miembro local dibuja el archivo de escena de su líder cuando su propio worktree no puede leerlo:
 `.orca/` suele estar excluido de git, así que a un worktree de miembro recién creado le falta el
@@ -628,7 +623,13 @@ Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
 - `orca game lead` — las reglas permanentes que convierten esta sesión en el líder (ninguna para un
-  miembro).
+  miembro). Un pane local de Claude abierto sin el mod del juego (sin `ORCA_GAME_MODE`) se rechaza
+  con `Not the lead:` y se le indica correr `/orca-game:lead` en una pestaña Claude Agent Teams, porque
+  lideraría sin fila de Advisor ni comandos `/orca-game`. Donde el mod nunca carga (SSH, WSL, el juego
+  apagado, un Claude anterior a 2.1.287) el pane sigue liderando y una primera línea dice qué le
+  falta. Un líder que no es Claude no cambia. Las reglas nombran `ORCA_GAME_CLI`, si no el
+  `ORCA_CLI_COMMAND` de WSL, antes que un `orca` pelado
+  ([`orchestrator-game-lead-pane.ts`](../../../src/cli/handlers/orchestrator-game-lead-pane.ts)).
 - `orca game lead --fresh` — rota el líder: con el pane del líder saliente cerrado, Orca retira la
   conversación de líder guardada del proyecto y esta sesión pasa a ser el nuevo líder en lugar de
   reabrirla. Un líder vivo sigue ganando, y un host más antiguo que descarta el flag reabre el
@@ -1885,44 +1886,21 @@ recarga, o uno que la antigua cuenta atrás ya ofreció, nunca se celebra dos ve
 
 ## Otros plugins en un pane del juego
 
-Otros plugins de Claude Code siguen funcionando en un pane del equipo; mientras el juego se dibuja (modo
-`on`, `zen` o `flat` con la banda activada) el mod dibuja lo que muestran con el estilo de la escena en
-lugar de dejar que cada uno pinte lo suyo
-([`allies-strip.tsx`](../../../resources/claude-plugins/orca-game/hooks/allies-strip.tsx)):
+Otros plugins de Claude Code siguen funcionando en un pane del equipo y dibujan sus propias líneas de
+estado y bandas; desde ORCA-1055 el juego ya no los guarda en una franja. Mientras el juego está activo,
+el mod conserva una sola cosa sobre el prompt
+([`text-layer.tsx`](../../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)):
 
-- **Líneas de estado.** Un hook `ui.status` toma el `$.ui.status(text)` de otro plugin antes de que
-  Claude Code lo vea y lo guarda como una fila de la **franja de aliados** bajo la banda, etiquetada con
-  el nombre del plugin; `undefined` elimina la fila. Con el juego en `off` la llamada pasa sin tocarse.
-  El `statusLine` propio del usuario no es una llamada de plugin y nunca se toca.
-- **Jev.** La franja lee `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (el
-  `AdvisorState` de Jev, `version: 1`) sin depender de Jev: su línea con model·effort, una fila por cada
-  subagente en ejecución (título, modelo, veredicto), sus filas de CI y su último aviso. Cualquier otra
-  versión, o un valor que no es un advisor, se ignora, así que un Jev más nuevo no dibuja ninguna fila en
-  lugar de una incorrecta. La banda se vuelve a dibujar cuando se escribe ese
-  valor; nada lo sondea. El mismo valor pone al advisor de Jev en la escena y su tarjeta
-  en el Panel ([El elenco](#el-elenco-una-mascota-y-el-advisor-de-jev)).
-- **Seguir al juego.** El juego publica `{ plugin: 'orca-game', key: 'absorbing' }`, un
-  `boolean` verdadero exactamente mientras dibuja las líneas de otros plugins (modo distinto de `off`,
-  HUD activado), al cargar y en cada cambio: el entorno, la configuración en vivo de Orca y
-  `/orca-game:mode`. Jev lo lee, así que un pane donde el juego deja de dibujar (`/orca-game:mode off`,
-  el HUD apagado en Settings) vuelve a mostrar la línea propia de Jev, y uno donde empieza nunca muestra
-  a Jev dos veces. `/orca-game:mode off` mantiene la banda (el HUD tiene su propio interruptor) y quita
-  la franja, ya que los otros plugins pasan entonces a dibujar por sí mismos.
-- **Una fila incorrecta.** Un valor de advisor que Jev amplía con una fila que la franja no puede leer
-  pierde solo esa fila; el resto de Jev se sigue dibujando. Cualquier otra `version` no dibuja ninguna
-  fila de Jev.
-- **Líneas obsoletas.** Cada sesión empieza sin ningún estado retenido, así que un plugin que se
-  desactivó, se recargó o se cayó sin limpiar su línea no deja nada atrás.
-- **Zen** conserva una fila: la línea de Jev o, si no, el último estado.
-- **Bandas.** Un plugin cuyo hook `AbovePrompt` está por debajo del juego conserva su contenido,
-  dibujado bajo la franja, y un hook `ui.resolve` pinta el `Text` de cada otro plugin con la paleta de la
-  escena (un tramo resaltado como la píldora dorada; el rojo, el verde, el amarillo y los colores de
-  error, advertencia y éxito del tema se mantienen). Un plugin cargado en el nivel `prepend` dibuja fuera
-  del juego y puede ocultarlo.
-
-La franja conserva como máximo seis filas, la última indicando cuántas dejó fuera, y cada fila se recorta
-al ancho de la banda (la etiqueta a un tercio de él, luego el texto, y la insignia es lo primero que se
-quita).
+- **Alertas de Jev.** Lee `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (el
+  `AdvisorState` de Jev, `version: 1`) sin depender de Jev, y dibuja una línea `Jev · …` por cada CI
+  fallido y por el último aviso de Jev cuando es una detención (rojo) o una escalada (amarillo). La línea
+  de modelo de Jev, sus filas de subagentes, el CI en curso y los avisos informativos quedan para el panel
+  de Equipo. Cualquier otra versión no dibuja nada.
+- **Seguir al juego.** El juego publica `{ plugin: 'orca-game', key: 'absorbing' }`, un `boolean`
+  verdadero mientras el juego está activo con el HUD, al cargar y en cada cambio. Jev lo lee, así que
+  sus alertas se dibujan una sola vez, por el juego.
+- **Bandas.** Un plugin cuyo hook `AbovePrompt` está debajo del juego conserva su contenido, bajo las
+  líneas del juego.
 
 ## Panes estrechos
 

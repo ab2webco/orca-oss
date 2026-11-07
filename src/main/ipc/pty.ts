@@ -2024,7 +2024,8 @@ export function buildPtyHostEnv(
     baseEnv.ORCA_CLI_COMMAND = opts.isPackaged ? 'orca-ide' : 'orca-dev'
   } else {
     if (!opts.isPackaged) {
-      baseEnv.ORCA_USER_DATA_PATH ??= opts.userDataPath
+      // Why: a spawn env can carry another instance's root (e.g. the Orca terminal that launched this dev build).
+      baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
     }
     delete baseEnv.ORCA_CLI_COMMAND
   }
