@@ -3,7 +3,6 @@ import { useAppStore } from '@/store'
 import { AgentDashboardDrawer } from '@/components/dashboard/AgentDashboardDrawer'
 
 type AgentDashboardSidebarHostProps = {
-  sidebarOpen: boolean
   workspaceBoardOpen: boolean
   closeWorkspaceBoard: () => void
   leftSidebarStyle?: React.CSSProperties
@@ -12,20 +11,14 @@ type AgentDashboardSidebarHostProps = {
 
 /** Opt-in dashboard coordination stays outside the normal sidebar path. */
 export default function AgentDashboardSidebarHost({
-  sidebarOpen,
   workspaceBoardOpen,
   closeWorkspaceBoard,
   leftSidebarStyle,
   statusBarVisible
-}: AgentDashboardSidebarHostProps): React.JSX.Element | null {
+}: AgentDashboardSidebarHostProps): React.JSX.Element {
   const drawerOpen = useAppStore((s) => s.agentDashboardDrawerOpen)
   const setDrawerOpen = useAppStore((s) => s.setAgentDashboardDrawerOpen)
 
-  useEffect(() => {
-    if (!sidebarOpen && drawerOpen) {
-      setDrawerOpen(false)
-    }
-  }, [drawerOpen, setDrawerOpen, sidebarOpen])
   useEffect(() => {
     if (drawerOpen) {
       closeWorkspaceBoard()
@@ -37,7 +30,8 @@ export default function AgentDashboardSidebarHost({
     }
   }, [setDrawerOpen, workspaceBoardOpen])
 
-  return sidebarOpen ? (
+  // Why not gated on sidebarOpen: collapsing the sidebar must leave the board open (ORCA-1126).
+  return (
     <AgentDashboardDrawer leftSidebarStyle={leftSidebarStyle} statusBarVisible={statusBarVisible} />
-  ) : null
+  )
 }
