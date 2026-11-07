@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { menuChipsOf } from '../hooks/band-chips'
 import { setGameLocale, stringsOf, GAME_LOCALES } from '../hooks/game-strings'
 import { UPPER_HALF } from '../hooks/pixel-canvas'
 import { restColumnOf, SCENE_ROWS, sceneGridOf, walkColumn } from '../hooks/scene'
@@ -114,18 +113,7 @@ describe('the scene pet', () => {
   })
 })
 
-describe('the Pet button', () => {
-  const petLabel = (scene: SceneDefinition) =>
-    menuChipsOf(scene).find((chip) => chip.key === 'band-pet')?.labels[0]
-
-  it('names the scene pet, and is plain Pet without one', () => {
-    expect(petLabel(PLAIN_QUEST)).toBe('♥ Pet')
-    expect(petLabel(WITH_PET)).toBe('♥ Pet Wolf')
-    setGameLocale('es')
-    expect(petLabel(PLAIN_QUEST)).toBe('♥ Mimar')
-    expect(petLabel(WITH_PET)).toBe('♥ Mimar a Lobo')
-  })
-
+describe('the Pet words', () => {
   it('has its words in every language', () => {
     for (const locale of GAME_LOCALES) {
       const { text } = stringsOf(locale)

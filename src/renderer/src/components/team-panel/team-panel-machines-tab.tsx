@@ -21,12 +21,15 @@ function statusWord(machine: TeamMachine): string {
   if (machine.running === 0) {
     return translate('teamPanel.machines.free', 'Free')
   }
-  return machine.cap === null
-    ? translate('teamPanel.machines.running', '{{count}} agents', { count: machine.running })
-    : translate('teamPanel.machines.runningOfCap', '{{count}} of {{cap}} agents', {
-        count: machine.running,
-        cap: machine.cap
-      })
+  if (machine.cap !== null) {
+    return translate('teamPanel.machines.runningOfCap', '{{count}} of {{cap}} agents', {
+      count: machine.running,
+      cap: machine.cap
+    })
+  }
+  return machine.running === 1
+    ? translate('teamPanel.machines.runningOne', '1 agent')
+    : translate('teamPanel.machines.running', '{{count}} agents', { count: machine.running })
 }
 
 function MemoryBar({

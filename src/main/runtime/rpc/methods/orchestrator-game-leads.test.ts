@@ -3,13 +3,24 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATOR_GAME_LEADS_METHODS } from './orchestrator-game-leads'
 
-function dispatcherWith(leads: {
-  register: (args: unknown) => Promise<unknown>
-  list: () => unknown
-}) {
+function dispatcherWith(
+  leads: {
+    register: (args: unknown) => Promise<unknown>
+    list: () => unknown
+  },
+  delivered: unknown[] = []
+) {
   const runtime = {
     getRuntimeId: () => 'runtime',
-    getGameLeads: () => leads
+    getGameLeads: () => leads,
+    getGameBoard: () => ({
+      heldAnswers: {
+        deliver: async (caller: unknown) => {
+          delivered.push(caller)
+          return []
+        }
+      }
+    })
   } as unknown as OrcaRuntimeService
   const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_LEADS_METHODS })
   return (method: string, params: unknown) =>
@@ -17,6 +28,35 @@ function dispatcherWith(leads: {
 }
 
 describe('game leads RPC', () => {
+  // Why (ORCA-1100): an answer held while the project had no lead must reach the one taking over.
+  it.each([
+    [{ registered: true }, 'term_b'],
+    [{ registered: false, live: { handle: 'term_a' } }, 'term_a'],
+    [{ registered: false, resumed: { handle: 'term_c' } }, 'term_c']
+  ])('hands held owner answers to the lead after %j', async (outcome, lead) => {
+    const delivered: unknown[] = []
+    const send = dispatcherWith(
+      { register: async () => outcome, list: () => ({ leads: [] }) },
+      delivered
+    )
+
+    await send('game.leadRegister', { terminalHandle: 'term_b', project: 'p', label: 'L' })
+
+    expect(delivered).toEqual([{ terminalHandle: lead }])
+  })
+
+  it('hands nothing over when the caller did not become a lead', async () => {
+    const delivered: unknown[] = []
+    const send = dispatcherWith(
+      { register: async () => ({ registered: false }), list: () => ({ leads: [] }) },
+      delivered
+    )
+
+    await send('game.leadRegister', { terminalHandle: 'term_m', project: 'p', label: 'L' })
+
+    expect(delivered).toEqual([])
+  })
+
   it("registers the caller's lead with its project name and label", async () => {
     const seen: unknown[] = []
     const send = dispatcherWith({

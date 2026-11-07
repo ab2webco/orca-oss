@@ -10,6 +10,9 @@ export type MessageHeadingWords = {
   phases: Readonly<Record<ScenePhase, string>>
   /** In place of the phase, for a question to the person. */
   asksYou: string
+  /** The live line's verb while the pane waits on the person, and once its turn is done. */
+  waiting: string
+  done: string
   /** One kind's count, lower case; the line capitalises its first. */
   toolCounts: Readonly<Record<ToolKind, (count: number) => string>>
 }
@@ -27,6 +30,8 @@ const EN: MessageHeadingWords = {
     handoff: 'handing off'
   },
   asksYou: 'asks you',
+  waiting: 'Waiting on you',
+  done: 'Done',
   toolCounts: {
     read: (count) => `read ${plural(count, 'file', 'files')}`,
     command: (count) => `ran ${plural(count, 'command', 'commands')}`,
@@ -46,6 +51,8 @@ const ES: MessageHeadingWords = {
     handoff: 'entregando'
   },
   asksYou: 'te pregunta',
+  waiting: 'Esperándote',
+  done: 'Listo',
   toolCounts: {
     read: (count) => `leyó ${plural(count, 'archivo', 'archivos')}`,
     command: (count) => `ejecutó ${plural(count, 'comando', 'comandos')}`,

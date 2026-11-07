@@ -3,7 +3,8 @@ import { test, expect } from './helpers/orca-app'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { expectGameInboxPlaceholdersFit, settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { expectPlaceholdersFit } from './helpers/placeholder-fit'
+import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -168,42 +169,41 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     const renameAsk = ask('May I rename the Inbox tab to Mail?')
     const renameQuestion = await pendingQuestion('rename the Inbox')
 
-    const entry = orcaPage.getByTestId('game-inbox-entry')
-    // Pushed by the runtime as the team's mail lands; nothing is for the person, so no count.
-    await expect(entry).toBeVisible()
-    await expect(entry).toHaveText('Inbox')
-    await entry.click()
-    const sheet = orcaPage.getByTestId('game-inbox-sheet')
-    // Every Inbox screen at each width in both themes, the sheet settled before each capture.
+    // Since ORCA-1072 the Inbox is the Team panel's tab; it finds the lead through its agent row.
+    await postLeadAgentRow(electronApp, { paneKey: pane.paneKey, worktreeId })
+    const { inboxTab, inbox } = await openTeamInbox(orcaPage)
+    // The team's mail lands, but nothing is for the person, so no count.
+    await expect(inboxTab).toHaveText('Inbox')
+    // Every Inbox screen at each width in both themes.
     const captureEveryWidth = async (name: string): Promise<void> => {
       for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
           await setTheme(orcaPage, theme)
-          await settleGameInboxSheet(orcaPage, width)
-          await expectGameInboxPlaceholdersFit(orcaPage, width)
+          await expectPlaceholdersFit(inbox, `in ${name} at ${width}px ${theme}`)
           await orcaPage.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`${name}-${width}-${theme}.png`)
           })
         }
       }
-      await settleGameInboxSheet(orcaPage, 1440)
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
     }
-    await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('2')
+    await expect(inbox.getByRole('tab', { name: /Waiting/ })).toContainText('2')
 
-    await sheet.getByRole('tab', { name: /Waiting/ }).click()
-    await expect(sheet.locator('[data-testid^="game-inbox-waiting-"]')).toHaveCount(2)
+    await inbox.getByRole('tab', { name: /Waiting/ }).click()
+    await expect(inbox.locator('[data-testid^="team-inbox-waiting-"]')).toHaveCount(2)
     await captureEveryWidth('waiting')
 
-    await sheet.getByRole('tab', { name: /Answered/ }).click()
-    const answered = sheet.locator('[data-testid^="game-inbox-answered-"]')
+    await inbox.getByRole('tab', { name: /Answered/ }).click()
+    const answered = inbox.locator('[data-testid^="team-inbox-answered-"]')
     await expect(answered).toHaveCount(1)
     await expect(answered).toContainText('8080')
 
-    await sheet.getByRole('tab', { name: /Threads/ }).click()
-    await expect(sheet.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
-    await sheet.getByTestId('game-inbox-thread-ORCA-12').click()
-    const messages = sheet.getByTestId('game-inbox-thread-messages')
+    await inbox.getByRole('tab', { name: /Threads/ }).click()
+    await expect(inbox.getByTestId('game-inbox-thread-ORCA-12')).toContainText('1 waiting')
+    await inbox.getByTestId('game-inbox-thread-ORCA-12').click()
+    const messages = inbox.getByTestId('game-inbox-thread-messages')
     await expect(
       messages.getByText('Ship the arcade in lab.111, or wait for lab.112?')
     ).toBeVisible()
@@ -215,10 +215,10 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect(messages.getByText('Blocked on CI')).toBeVisible()
 
     await captureEveryWidth('thread')
-    await sheet.getByRole('button', { name: /All threads/ }).click()
+    await inbox.getByRole('button', { name: /All threads/ }).click()
     await captureEveryWidth('threads')
-    await sheet.getByRole('tab', { name: /Answered/ }).click()
-    await expect(sheet.getByRole('tab', { name: /Answered/ })).toHaveAttribute(
+    await inbox.getByRole('tab', { name: /Answered/ }).click()
+    await expect(inbox.getByRole('tab', { name: /Answered/ })).toHaveAttribute(
       'aria-selected',
       'true'
     )
@@ -231,18 +231,20 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
           terminalHandle: lead
         })
       ).result.inbox.messages.map((one) => one.subject)
-    await sheet.getByRole('tab', { name: /Waiting/ }).click()
-    const renameRow = sheet.getByTestId(`game-inbox-waiting-${renameQuestion}`)
+    await inbox.getByRole('tab', { name: /Waiting/ }).click()
+    const renameRow = inbox.getByTestId(`team-inbox-waiting-${renameQuestion}`)
+    // Why a click first: V28 keeps answering a member behind a button; the lead answers by default.
+    await renameRow.getByRole('button', { name: 'Answer' }).click()
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Keep Inbox')
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
     await expect(renameRow).toHaveCount(0)
-    await expect(sheet.getByRole('tab', { name: /Waiting/ })).toContainText('1')
+    await expect(inbox.getByRole('tab', { name: /Waiting/ })).toContainText('1')
     expect(JSON.stringify(await renameAsk)).toContain('Keep Inbox')
     await expect.poll(leadMail).toContainEqual(expect.stringContaining('Owner answered ORCA-14'))
 
     // And overrides an answer the lead gave: the member hears it on that question's thread.
-    await sheet.getByRole('tab', { name: /Answered/ }).click()
-    const portRow = sheet.getByTestId(`game-inbox-answered-${portQuestion}`)
+    await inbox.getByRole('tab', { name: /Answered/ }).click()
+    const portRow = inbox.getByTestId(`team-inbox-answered-${portQuestion}`)
     await portRow.getByRole('button', { name: 'Override' }).click()
     await portRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Use 3000')
     await captureEveryWidth('override')
@@ -259,7 +261,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await expect
       .poll(leadMail)
       .toContainEqual(expect.stringContaining('Owner overrode your answer on ORCA-14'))
-    await expect(portRow).toContainText('You replaced it: Use 3000')
+    await expect(portRow).toContainText('You answered: Use 3000')
     await captureEveryWidth('answered-after')
   } finally {
     agent.dispose()

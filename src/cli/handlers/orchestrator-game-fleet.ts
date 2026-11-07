@@ -9,8 +9,7 @@ import {
   formatWave,
   type GamePushResult,
   type GameSweepResult,
-  type GameWaveResult,
-  type SweepClose
+  type GameWaveResult
 } from './orchestrator-game-fleet-format'
 import { launchGameMember, readCallerGameState } from './orchestrator-game-launch'
 import { isLaunchUnderway } from './orchestrator-game-launch-result'
@@ -24,8 +23,7 @@ import {
   gamePushPlanOf,
   gameSweepOf,
   gameWavePlanOf,
-  localGameFreeOf,
-  type GameSweepEntry
+  localGameFreeOf
 } from '../../shared/orchestrator-game-fleet-verbs'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import { sendFollowingRemoteMember, sendOnHost } from './remote-member-terminal-send'
@@ -38,15 +36,11 @@ import {
   tellStillRunning
 } from './orchestrator-game-hold'
 import { gameStopRefusal } from '../../shared/orchestrator-game-stop-state'
-
-type Client = Parameters<CommandHandler>[0]['client']
-
-type WorkerRow = {
-  dispatchId: string
-  agentTerminalHandle: string | null
-  terminalState: string | null
-  workerState: string
-}
+import {
+  closeFinished,
+  sweptDispatchOf,
+  type SweepWorkerRow
+} from './orchestrator-game-sweep-close'
 
 const TICKET = /^[A-Z0-9][A-Z0-9_-]{0,39}$/
 
@@ -67,52 +61,6 @@ export function ticketsOf(flags: Map<string, string | boolean>): string[] {
     throw new RuntimeClientError('invalid_argument', `${bad} is not a ticket id like CIN-12.`)
   }
   return tickets
-}
-
-// Why: a terminal reused across dispatches keeps its released rows; only a live one owns it now.
-const liveDispatchOf = (handle: string | null, workers: WorkerRow[]): WorkerRow | undefined =>
-  handle === null
-    ? undefined
-    : workers.findLast(
-        (worker) => worker.agentTerminalHandle === handle && worker.terminalState !== 'released'
-      )
-
-async function closeFinished(
-  client: Client,
-  entry: GameSweepEntry,
-  workers: WorkerRow[]
-): Promise<SweepClose | null> {
-  const handle = entry.row.terminalHandle
-  if (!handle) {
-    return null
-  }
-  const dispatch = liveDispatchOf(handle, workers)
-  try {
-    if (dispatch) {
-      const { result } = await client.call<{
-        dispatchId: string
-        state: string
-        reason?: string
-        recovery?: string
-      }>('orchestration.workerRelease', { dispatch: dispatch.dispatchId })
-      // Why: an unproven release must never be followed by a guessed terminal close.
-      if (result.state === 'release_unknown') {
-        process.exitCode = 1
-      }
-      return {
-        via: 'release',
-        dispatchId: result.dispatchId,
-        state: result.state,
-        ...(result.reason ? { reason: result.reason } : {}),
-        ...(result.recovery ? { recovery: result.recovery } : {})
-      }
-    }
-    await client.call('terminal.close', { terminal: handle })
-    return { via: 'close', terminal: handle }
-  } catch (error) {
-    process.exitCode = 1
-    return { via: dispatch ? 'release' : 'close', error: errorText(error) }
-  }
 }
 
 export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = {
@@ -205,24 +153,28 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     const entries = gameSweepOf(response.result)
     const sweep: GameSweepResult = { closed: close, finished: entries }
     if (close && entries.some((entry) => entry.row.terminalHandle)) {
-      const { result } = await client.call<{ workers: WorkerRow[] }>('orchestration.workerList', {})
+      const { result } = await client.call<{ workers: SweepWorkerRow[] }>(
+        'orchestration.workerList',
+        {}
+      )
       sweep.finished = []
       for (const entry of entries) {
         const member = agentOfRow(response.result, entry.row)
+        const dispatch = sweptDispatchOf(entry, member, result.workers)
         const history = member
           ? await recordFreedMember({
               client,
               member,
               freedBy: 'sweep',
               workers: result.workers,
-              dispatch: liveDispatchOf(entry.row.terminalHandle, result.workers),
+              dispatch,
               roster: memberRosterOf(response.result)
             })
           : null
         sweep.finished.push({
           ...entry,
           ...(history ? { history } : {}),
-          closed: await closeFinished(client, entry, result.workers)
+          closed: await closeFinished(client, entry, dispatch)
         })
       }
     }

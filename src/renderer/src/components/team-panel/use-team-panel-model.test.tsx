@@ -7,6 +7,7 @@ import type { TeamMemberCard, TeamPanelGameModel } from '../../../../shared/team
 import { useGameInboxAppState } from '@/components/game-inbox/game-inbox-app-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
+import { signalGameAdvisorChanged } from './game-advisor-signal'
 
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
@@ -36,6 +37,14 @@ vi.mock('@/store', () => ({
     (selector: (state: Record<string, unknown>) => unknown) => selector(appState),
     { getState: () => ({}) }
   )
+}))
+
+const solo = {
+  kind: 'solo',
+  inbox: { kind: 'ready', value: { forYou: 1, waiting: 0, threads: 0, answered: 0 } }
+}
+vi.mock('./use-team-panel-solo-model', () => ({
+  useTeamPanelSoloModel: (active: boolean) => (active ? solo : null)
 }))
 
 const { toRemoteRuntimePtyId } = await import('@/runtime/runtime-terminal-stream')
@@ -85,6 +94,36 @@ describe('Team model polling', () => {
     })
 
     expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  // Why: a failed read says nothing about the team, so it must never read as the user's own sessions.
+  it('keeps a failed read on the team view instead of the no-team view', async () => {
+    const seen: { section: unknown; kind: unknown } = { section: null, kind: undefined }
+    await mount(() => {
+      seen.section = useTeamPanelModel().section
+      seen.kind = useTeamPanelKind()
+      return null
+    })
+
+    const section: TeamPanelModelSource['section'] = { kind: 'error', message: 'timeout' }
+    await act(async () => publish({ section, retry: () => {} }))
+
+    expect(seen.section).toEqual(section)
+    expect(seen.kind).toBeNull()
+  })
+
+  it('shows the no-team view when the host has no team to read', async () => {
+    const seen: { section: unknown; kind: unknown } = { section: null, kind: undefined }
+    await mount(() => {
+      seen.section = useTeamPanelModel().section
+      seen.kind = useTeamPanelKind()
+      return null
+    })
+
+    await act(async () => publish({ section: { kind: 'unavailable' }, retry: null }))
+
+    expect(seen.section).toEqual({ kind: 'ready', value: solo })
+    expect(seen.kind).toBe('solo')
   })
 })
 
@@ -229,6 +268,51 @@ describe('Team model Inbox count', () => {
   })
 })
 
+describe('Team model Inbox count with no team', () => {
+  // Why: the no-team model reads agent status alone, and the Sheet counted the project's questions.
+  it("adds this project's own open questions to the agents that ask", async () => {
+    appState = { ...baseState(), activeWorktreeId: 'repo-1::/wt' }
+    useGameInboxAppState.setState({
+      hosts: [
+        {
+          environmentId: null,
+          status: 'ok',
+          projects: [
+            {
+              repoId: 'repo-1',
+              repoName: 'orca-oss',
+              worktreeId: 'repo-1::/wt',
+              questions: [
+                {
+                  id: 'q-own',
+                  ticket: 'ORCA-940',
+                  question: 'Ship the arcade in lab.111?',
+                  options: [],
+                  context: null,
+                  askedAt: '2026-11-06T10:00:00.000Z',
+                  answer: null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    })
+    let seen: TeamPanelModelSource | null = null
+    await mount(() => {
+      seen = useTeamPanelModel()
+      return null
+    })
+    await act(async () => publish({ section: { kind: 'unavailable' }, retry: null }))
+
+    const section = (seen as TeamPanelModelSource | null)?.section
+    expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
+      kind: 'ready',
+      value: { forYou: 2, waiting: 0, threads: 0, answered: 0 }
+    })
+  })
+})
+
 describe('Team model refresh', () => {
   // Why: an answer changes the Inbox count now; the 20 s poll alone left the badge stale.
   it('re-reads when an owner question changes on this computer or a paired host', async () => {
@@ -254,6 +338,37 @@ describe('Team model refresh', () => {
     ;(pushed as (() => void) | null)?.()
     act(() => signalGameOwnerQuestionsChanged())
 
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+
+  // Why: the scene's advisor bubble fades in 6 s; a 20 s read showed a new Jev line late (ORCA-1120).
+  it('re-reads when a Jev report changes on this computer or a paired host', async () => {
+    let pushed: (() => void) | null = null
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        runtime: {
+          onGameAdvisorChanged: (callback: () => void) => {
+            pushed = callback
+            return () => {
+              pushed = null
+            }
+          }
+        }
+      }
+    })
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    ;(pushed as (() => void) | null)?.()
+    act(() => signalGameAdvisorChanged())
+    expect(refresh).toHaveBeenCalledTimes(2)
+
+    await act(async () => roots.splice(0).forEach((root) => root.unmount()))
+    act(() => signalGameAdvisorChanged())
+    expect(pushed).toBeNull()
     expect(refresh).toHaveBeenCalledTimes(2)
   })
 })

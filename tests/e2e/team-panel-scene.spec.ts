@@ -241,6 +241,10 @@ test('the Team panel draws the live scene beside a member opened under its heade
     const scene = panel.locator('[data-team-scene]')
     await expect(scene.locator('canvas')).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)
+    // V28 names the member who asks over its alert (ORCA-1097); ORCA-14 has the open question.
+    const askerTag = scene.locator('[data-scene-speaker]')
+    await expect(askerTag).toHaveCount(1, { timeout: 30_000 })
+    await expect(askerTag).toContainText('ORCA-14')
 
     for (const language of ['en', 'es'] as const) {
       await orcaPage.evaluate(
@@ -287,6 +291,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
         timeout: 30_000
       })
+      await expect(askerTag).toHaveCount(1)
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
@@ -309,8 +314,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
     }
 
     // The lead's Jev, on the same game.state call its mod polls with, and a real tool hook for the
-    // lead's bubble. A new line is a new advisor bubble that fades in 6 s and the panel reads state every
-    // 20 s, so each width waits for its own line (ORCA-1052).
+    // lead's bubble. A new line is a new advisor bubble that fades in 6 s, so each width says its own
+    // line (ORCA-1052). The host pushes a changed report to the panel, so the line shows well before
+    // the panel's 20 s read; the wait below is shorter than that read so only the push meets it (ORCA-1120).
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
       worktreeId,
@@ -352,7 +358,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
         said += 1
         const line = `Keep this one small, step ${said}`
         await reportJev(line)
-        await expect(advisorCard).toContainText(line, { timeout: 45_000 })
+        await expect(advisorCard).toContainText(line, { timeout: 5_000 })
         // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
         await expect(advisorCard).not.toContainText('Opus 5.5 · high')
         await expect(advisorBubble).toHaveText(line)

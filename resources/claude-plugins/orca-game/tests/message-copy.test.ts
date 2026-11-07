@@ -17,6 +17,22 @@ const MEMBER_STATE = {
   review: null,
   workItem: null
 }
+const LEAD_STATE = {
+  ...MEMBER_STATE,
+  role: 'lead',
+  worktree: { id: 'wt-0', path: '/w', branch: 'main', displayName: 'orca-oss' },
+  agents: [
+    {
+      paneKey: 'p0',
+      displayName: 'Castillo · ORCA-1092 Audit',
+      agentType: 'claude',
+      state: 'working',
+      toolName: null,
+      isLeader: true
+    }
+  ],
+  lead: { autostart: false, cap: 4, label: 'Boss' }
+}
 // Box drawing, block elements and the half-blocks a rule or frame is drawn with.
 const BOX_CHARACTERS = /[─-▟]/
 // Why marginTop passes: an empty row above copies as nothing, while side spacing copies as spaces.
@@ -65,6 +81,7 @@ const start = async ($: Engine, on: On, env: Record<string, string> = {}, state?
   )
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
   on('process.run', () => ({
     value: {
       exitCode: state === undefined ? 1 : 0,
@@ -76,6 +93,7 @@ const start = async ($: Engine, on: On, env: Record<string, string> = {}, state?
   }))
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
+  return clock
 }
 
 const mount = ($: Engine, component: string, props: object) =>
@@ -117,6 +135,43 @@ describe('message copy', () => {
     await row.unmount()
   })
 
+  test('the heading runs a rule of plain spaces to the time into the turn', async ($, on) => {
+    const clock = await start($, on)
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const row = await reply($, 'The build is green.')
+    const rule = await row.find({ type: 'Text', text: /^ {3,}$/ })
+    expect(rule?.props).toMatchObject({ strikethrough: true, dimColor: true })
+    expect((await row.find({ type: 'Text', text: /^ 0:06$/ }))?.props.dimColor).toBe(true)
+    expect(framingOf(await row.drawn())).toEqual([])
+    await row.unmount()
+  })
+
+  test('a heading keeps the time it was first drawn at', async ($, on) => {
+    const clock = await start($, on)
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const row = await reply($, 'The build is green.')
+    await clock.advance(120_000)
+    await row.redraw({ text: 'The build is green.', isFirstOfReply: true } as never)
+    expect(await row.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await row.unmount()
+  })
+
+  test('a reply drawn with no turn seen, as on a resume, has no time', async ($, on) => {
+    await start($, on)
+    const row = await reply($, 'The build is green.')
+    expect(await row.find({ type: 'Text', text: /\d:\d\d|min/ })).toBeUndefined()
+    await row.unmount()
+  })
+
+  test("the lead's reply is headed by its own character, as its Team card names it", async ($, on) => {
+    await start($, on, {}, LEAD_STATE)
+    const row = await reply($, 'Queued #923.')
+    expect(await row.find({ type: 'Text', text: /^Castillo · working$/ })).toBeDefined()
+    await row.unmount()
+  })
+
   test('a later block of the same reply draws its body alone', async ($, on) => {
     await start($, on)
     const row = await reply($, 'Second block.', false)
@@ -129,6 +184,8 @@ describe('message copy', () => {
     const row = await reply($, 'Tests en verde.\n\n¿Abro el PR?', false)
     const heading = await row.find({ type: 'Text', text: /^Escudero · te pregunta$/ })
     expect(heading?.props.color).toBe('red')
+    const rule = await row.find({ type: 'Text', text: /^ {3,}$/ })
+    expect(rule?.props).toMatchObject({ color: 'red', strikethrough: true, dimColor: true })
     expect(framingOf(await row.drawn())).toEqual([])
     await row.unmount()
   })

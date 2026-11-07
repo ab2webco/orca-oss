@@ -159,6 +159,26 @@ does have, and a dead process cannot be stranded by a rotation.
 without a re-check, so a stale claim can still block select/re-auth/remove until
 some rotation decision reconciles it.
 
+## How Two Accounts Came To Share A Chain
+
+Settings flags two saved accounts that hold one recorded refresh chain, because whichever refreshes
+first logs the other out. One way that state was being written is reproduced in
+`runtime-auth-service-chain-alias.test.ts` (ORCA-1039). The global runtime read-back accepted a
+credential blob that carried no email for the selected account whenever its organization matched.
+With two accounts in one organization, that blob could be the other account's live chain, written
+both into the account being switched away from and into the selected account.
+
+An organization match now counts as proof only when no other saved account shares that
+organization. Every managed write (read-back, switch-away, re-authentication, add) also refuses a
+blob whose refresh chain is another saved account's current chain
+(`claude-refresh-chain-ownership.ts`), whatever path produced it. This refusal only prevents new
+aliases. An alias already on disk still needs one of the two accounts re-authenticated, which the
+Settings notice offers.
+
+Orca does not copy a vault or a credential between hosts. Each `orca account add` on a host is its
+own sign-in, so a logout on one host is not this chain alias. It is the login's own end, described in
+[A Login The CLI Already Ended](#a-login-the-cli-already-ended), or a host-local rotation.
+
 ## Known Limit
 
 "A pane cannot testify about a credential issued after it started" is decided in
