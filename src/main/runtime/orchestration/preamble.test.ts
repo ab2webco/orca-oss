@@ -75,7 +75,12 @@ describe('buildDispatchPreamble', () => {
         .filter((line) => !line.trim().startsWith('==='))
         .join('\n')
 
-      const check = spawnSync('bash', ['-n'], { input: stripped, encoding: 'utf8' })
+      const check = spawnSync('bash', ['-n'], {
+        input: stripped,
+        encoding: 'utf8',
+        timeout: 20_000
+      })
+      expect(check.error).toBeUndefined()
       expect(check.status).toBe(0)
     }
   )

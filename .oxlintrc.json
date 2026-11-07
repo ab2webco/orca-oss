@@ -17,6 +17,10 @@
     {
       "name": "renderer-scrollbar-style",
       "specifier": "./config/oxlint-plugins/renderer-scrollbar-style.mjs"
+    },
+    {
+      "name": "sync-spawn-input-timeout",
+      "specifier": "./config/oxlint-plugins/sync-spawn-input-timeout.mjs"
     }
   ],
   "categories": {
@@ -30,6 +34,7 @@
     "eslint/no-useless-call": "error",
     "oxc/no-accumulating-spread": "error",
     "quadratic-buffer-concat/no-loop-carried-concat": "error",
+    "sync-spawn-input-timeout/require-timeout": "error",
     "react/jsx-no-duplicate-props": "error",
     "react/jsx-no-undef": "error",
     "react/no-children-prop": "error",
