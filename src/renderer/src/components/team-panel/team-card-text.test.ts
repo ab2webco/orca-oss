@@ -40,6 +40,12 @@ describe('teamLiveText', () => {
     expect(teamLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
   })
 
+  it('never names the question tool on a card', () => {
+    expect(teamLiveText({ kind: 'tool', tool: 'AskUserQuestion', detail: null }, 'working')).toBe(
+      'Waiting for you'
+    )
+  })
+
   it('shows a question as written', () => {
     expect(
       teamLiveText({ kind: 'question', text: 'Merge #923 now?', options: ['Yes'] }, 'waiting')

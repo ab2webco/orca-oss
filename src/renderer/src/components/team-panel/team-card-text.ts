@@ -1,3 +1,4 @@
+import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -95,7 +96,10 @@ export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondi
   }
   switch (action.kind) {
     case 'tool':
-      return teamToolText(action.tool, action.detail)
+      // Why: game.state names the question tool, never its question, and a name is no status.
+      return isAskUserQuestionTool(action.tool)
+        ? teamConditionText('waiting')
+        : teamToolText(action.tool, action.detail)
     case 'link':
       return `${action.name} · ${action.id}`
     case 'question':
