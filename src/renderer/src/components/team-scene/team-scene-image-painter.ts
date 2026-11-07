@@ -2,7 +2,11 @@ import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orches
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { figureSeedOf } from './team-scene-figure-looks'
-import type { TeamSceneFrame, TeamScenePainter } from './team-scene-painter'
+import type {
+  TeamSceneFrame,
+  TeamScenePainter,
+  TeamScenePortraitSubject
+} from './team-scene-painter'
 import {
   createSceneBackdrop,
   createSceneEffects,
@@ -26,6 +30,8 @@ export const TEAM_SCENE_ART_HEIGHT = 176
 const TAU = 2 * Math.PI
 const SEAT_PX = 2
 const SHADOW_WIDTH = 0.2
+const PORTRAIT_SIDE = 0.44
+const PORTRAIT_TOP = 0.76
 const feetY = (depth: number, h: number): number => h - 36 + depth * 22
 // Why against the front: `size` is the drawn height at the front of the stage.
 const depthScale = (depth: number): number => teamSceneScaleAt(depth) / teamSceneScaleAt(1)
@@ -78,7 +84,7 @@ export function createImagePainter(args: {
   const foreground = createSceneBackdrop(layersOf(true))
   const hasForeground = style.layers.some((one) => one.front)
   const effects = createSceneEffects(feetY)
-  const roleOf = (a: TeamSceneActor): RoleArt =>
+  const roleOf = (a: Pick<TeamSceneActor, 'role'>): RoleArt =>
     a.role === 'lead'
       ? style.roles.lead
       : a.role === 'advisor'
@@ -108,6 +114,32 @@ export function createImagePainter(args: {
     }
   }
 
+  const sheetOf = (art: RoleArt, a: TeamScenePortraitSubject): TeamSceneArtImage =>
+    image(art.sheets[figureSeedOf(a.characterKey ?? a.key) % art.sheets.length]!)
+
+  // Why these fractions: Quest's figures stand about 0.75 of a frame tall, head in the top 0.44.
+  const portrait = (g: CanvasRenderingContext2D, a: TeamScenePortraitSubject, size: number) => {
+    const art = roleOf(a)
+    const feet = feetOf(art)
+    const side = Math.round(art.frame.height * PORTRAIT_SIDE)
+    const top = Math.max(0, Math.round(feet.y - art.frame.height * PORTRAIT_TOP))
+    const left = Math.min(Math.max(0, Math.round(feet.x - side / 2)), art.frame.width - side)
+    const idle = art.animations.idle
+    g.imageSmoothingEnabled = true
+    g.imageSmoothingQuality = 'high'
+    g.drawImage(
+      sheetOf(art, a),
+      left,
+      idle.row * art.frame.height + top,
+      side,
+      side,
+      0,
+      0,
+      size,
+      size
+    )
+  }
+
   const drawActor = (g: CanvasRenderingContext2D, a: TeamSceneActor, f: TeamSceneFrame): void => {
     const art = roleOf(a)
     const px = sheetPxAt(art, a.depth)
@@ -130,7 +162,7 @@ export function createImagePainter(args: {
     g.translate(x, y - a.jump)
     g.scale(seated ? 1 : a.facing, 1)
     g.drawImage(
-      image(art.sheets[figureSeedOf(a.characterKey ?? a.key) % art.sheets.length]!),
+      sheetOf(art, a),
       column * art.frame.width,
       row * art.frame.height,
       art.frame.width,
@@ -148,6 +180,7 @@ export function createImagePainter(args: {
 
   return {
     height: TEAM_SCENE_ART_HEIGHT,
+    portrait,
     headTop: (depth, h) => {
       const art = style.roles.lead
       return feetY(depth, h) - feetOf(art).y * sheetPxAt(art, depth)

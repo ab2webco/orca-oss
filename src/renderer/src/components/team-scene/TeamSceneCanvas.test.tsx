@@ -96,6 +96,25 @@ describe('TeamSceneCanvas', () => {
     expect(raf).toHaveBeenCalled()
   })
 
+  // ORCA-1097: at the 3.5 frames/s a slow renderer paints, capped steps would slow idle motion
+  // to a sixth of real time; idle sway follows real seconds while walks stay capped.
+  it('keys idle motion to real seconds, not the capped step, when frames are sparse', () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const p = painter()
+    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} />)
+    for (const now of [0, 285, 570, 855]) {
+      act(() => next?.(now))
+    }
+    const [first, , , last] = p.frames.slice(-4)
+    expect(last!.t - first!.t).toBeCloseTo(0.855, 2)
+    expect(last!.dt).toBe(0.05)
+  })
+
   it('paints the settled end state once per change under reduced motion', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)

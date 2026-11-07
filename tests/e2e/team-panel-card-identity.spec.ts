@@ -71,8 +71,9 @@ async function addAdvisorAndPr(app: ElectronApplication): Promise<void> {
   })
 }
 
-// ORCA-1094: the cards name the lead from Settings and members after their character, mark
-// needs-you with V28's `?` and working with a spinner, and show what the tool works on.
+// ORCA-1094: the cards name the lead from Settings and members after their character, draw each
+// face as the scene does, mark needs-you with V28's `?` and working with a spinner, and show what
+// the tool works on.
 test('Team cards carry names, live detail and V28 status marks', async ({
   electronApp,
   orcaPage
@@ -206,6 +207,8 @@ test('Team cards carry names, live detail and V28 status marks', async ({
     await postHooks()
 
     await expect(leadCard).toContainText('Alfred')
+    // The lead asked about ORCA-14, so its card says it waits, not what its tool runs.
+    await expect(leadCard).toContainText('Te espera · Pregunta sobre ORCA-14')
     await expect(leadCard.locator('[data-team-model]')).toHaveCSS('font-family', /mono/i)
     await expect(advisor).toContainText('Mago')
     await expect(advisor.locator('[data-team-model]')).toHaveCount(0)
@@ -223,6 +226,35 @@ test('Team cards carry names, live detail and V28 status marks', async ({
       'data-status-glyph',
       'question'
     )
+
+    // V28 draws each card's face as the scene draws that character, in every style.
+    const faces = panel.locator('canvas[data-team-face]')
+    for (const style of ['figures', 'office', 'pixel'] as const) {
+      await orcaPage.evaluate((next) => {
+        const state = window.__store!.getState()
+        const game = state.settings?.orchestratorGame
+        return state.updateSettings({
+          orchestratorGame: { ...game, panel: { ...game?.panel, style: next } }
+        })
+      }, style)
+      await expect(panel.locator(`[data-team-scene="${style}"]`)).toBeVisible()
+      await expect(faces).toHaveCount(4)
+      await expect
+        .poll(() =>
+          faces.evaluateAll((list) =>
+            list.map((node) => {
+              const canvas = node as HTMLCanvasElement
+              const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height)
+              return data.data.some((value, index) => index % 4 === 3 && value > 0)
+            })
+          )
+        )
+        .toEqual([true, true, true, true])
+      await panel.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath(`faces-${style}.png`)
+      })
+    }
 
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })

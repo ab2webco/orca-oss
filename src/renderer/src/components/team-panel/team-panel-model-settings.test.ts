@@ -28,7 +28,8 @@ const lead: TeamLeadCard = {
   model: null,
   account: null,
   characterKey: null,
-  branch: null
+  branch: null,
+  ownerAsk: null
 }
 
 const advisor: TeamAdvisorRow = {

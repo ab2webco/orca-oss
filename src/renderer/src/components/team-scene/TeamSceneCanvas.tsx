@@ -91,7 +91,8 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
         width,
         height,
         ratio,
-        t: world.t,
+        // Why the clock: idle sway keeps real pace on a slow renderer; only walks need the capped step.
+        t: world.clock,
         dt,
         actors,
         effects: drainTeamSceneEffects(world),

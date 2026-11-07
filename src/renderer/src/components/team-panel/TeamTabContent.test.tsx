@@ -10,6 +10,9 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import type { TeamArcadeActions } from './TeamArcadeSection'
 import { TeamTabContent } from './TeamTabContent'
+import { TeamScenePainterContext } from '../team-scene/team-scene-painter-context'
+import type { TeamScenePainter } from '../team-scene/team-scene-painter'
+import { recordingContext } from '../team-scene/team-scene-recording-context'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -44,7 +47,8 @@ const lead: TeamLeadCard = {
   model: { label: 'Opus 5.5', effort: 'high', source: 'session' },
   account: null,
   characterKey: 'hero',
-  branch: 'main'
+  branch: 'main',
+  ownerAsk: null
 }
 
 function member(overrides: Partial<TeamMemberCard>): TeamMemberCard {
@@ -114,7 +118,8 @@ async function render(
   look: 'game' | 'display' | 'plain' = 'game',
   selectTab = vi.fn(),
   arcadeActions: TeamArcadeActions | null = null,
-  openTasks = vi.fn()
+  openTasks = vi.fn(),
+  painter: TeamScenePainter | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -122,14 +127,16 @@ async function render(
   roots.push(root)
   await act(async () => {
     root.render(
-      <TeamTabContent
-        model={value}
-        look={look}
-        selectTab={selectTab}
-        now={NOW}
-        arcadeActions={arcadeActions}
-        onOpenTasks={openTasks}
-      />
+      <TeamScenePainterContext.Provider value={painter}>
+        <TeamTabContent
+          model={value}
+          look={look}
+          selectTab={selectTab}
+          now={NOW}
+          arcadeActions={arcadeActions}
+          onOpenTasks={openTasks}
+        />
+      </TeamScenePainterContext.Provider>
     )
   })
   return { container, selectTab, openTasks }
@@ -180,6 +187,18 @@ describe('TeamTabContent', () => {
     expect(card.textContent).not.toContain('ago')
   })
 
+  it('says the lead waits on the user and on which ticket, never the question itself', async () => {
+    const { container } = await render(
+      model({ lead: { ...lead, status: 'attention', ownerAsk: { ticket: 'ORCA-14' } } })
+    )
+    const card = leadCard(container)
+    expect(card.textContent).toContain('Waiting for you · Question on ORCA-14')
+    expect(card.textContent).not.toContain('gh pr checks 923')
+    expect(card.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'question'
+    )
+  })
+
   it('sets the model in mono, as V28 does', async () => {
     const { container } = await render(model())
     const [card] = memberCards(container)
@@ -207,6 +226,36 @@ describe('TeamTabContent', () => {
     expect(work.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
       'spinner'
     )
+  })
+
+  it("draws each card's face with the scene's own painter, only in the Game look", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => recordingContext().g as never
+    )
+    const portrait = vi.fn()
+    const painter = {
+      height: 1,
+      headTop: () => 0,
+      paint: vi.fn(),
+      dispose: vi.fn(),
+      portrait
+    } satisfies TeamScenePainter
+    const value = model({ advisor: advisorOf(), members: [member({ characterKey: 'merlin' })] })
+    const { container } = await render(value, 'game', vi.fn(), null, vi.fn(), painter)
+
+    expect(container.querySelectorAll('canvas[data-team-face]')).toHaveLength(3)
+    expect(portrait.mock.calls.map(([, who]) => who)).toEqual([
+      { role: 'lead', key: 'lead', characterKey: 'hero', name: 'Castle' },
+      { role: 'advisor', key: 'advisor', characterKey: null, name: 'Wizard' },
+      { role: 'member', key: 'pane-m', characterKey: 'merlin', name: 'Knight' }
+    ])
+    expect(portrait.mock.calls.every(([, , size]) => size === 38)).toBe(true)
+
+    const plain = await render(value, 'plain', vi.fn(), null, vi.fn(), painter)
+    expect(plain.container.querySelector('[data-team-face]')).toBeNull()
+    const without = await render(value)
+    expect(without.container.querySelector('[data-team-face]')).toBeNull()
+    vi.restoreAllMocks()
   })
 
   it('names characters only in the Game look', async () => {

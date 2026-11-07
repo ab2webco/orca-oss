@@ -231,11 +231,8 @@ export function TeamPanelView({
   const { section, retry } = source
   const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
-  return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
-      {model?.kind === 'team' && look === 'game' ? (
-        <TeamPanelScene model={model} style={sceneStyle} />
-      ) : null}
+  const body = (
+    <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
@@ -250,6 +247,17 @@ export function TeamPanelView({
         <TeamPanelUnavailableState
           title={translate('teamPanel.state.modelUnavailableTitle', 'Team data is not available')}
         />
+      )}
+    </>
+  )
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
+      {model?.kind === 'team' && look === 'game' ? (
+        <TeamPanelScene model={model} style={sceneStyle}>
+          {body}
+        </TeamPanelScene>
+      ) : (
+        body
       )}
     </div>
   )

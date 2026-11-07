@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
+import { act, useContext } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
@@ -8,6 +8,8 @@ import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestr
 import { orchestratorGameSceneArtFiles } from '../../../../shared/orchestrator-game-scene-native'
 import type { TeamLeadCard, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { TeamPanelScene } from './TeamPanelScene'
+import { TeamScenePainterContext } from './team-scene-painter-context'
+import type { TeamScenePainter } from './team-scene-painter'
 import { loadTeamSceneArt } from './team-scene-art-load'
 import type { TeamSceneArtImage, TeamSceneImageArt } from './team-scene-image-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
@@ -31,7 +33,8 @@ const lead: TeamLeadCard = {
   model: null,
   account: null,
   characterKey: null,
-  branch: null
+  branch: null,
+  ownerAsk: null
 }
 const model = (scene: TeamPanelGameModel['scene']): TeamPanelGameModel => ({
   kind: 'team',
@@ -115,6 +118,23 @@ afterEach(() => {
 })
 
 describe('TeamPanelScene', () => {
+  it('hands its painter to what it wraps, so card faces match the scene', async () => {
+    let seen: TeamScenePainter | null = null
+    function Probe(): null {
+      seen = useContext(TeamScenePainterContext)
+      return null
+    }
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={model({ id: 'quest', extensions: [] })} style="pixel">
+          <Probe />
+        </TeamPanelScene>
+      )
+    )
+    expect(seen).not.toBeNull()
+    expect(typeof seen!.portrait).toBe('function')
+  })
+
   it('draws Quest in its art for the style asked for', async () => {
     await act(async () =>
       root.render(<TeamPanelScene model={model({ id: 'quest', extensions: [] })} style="figures" />)

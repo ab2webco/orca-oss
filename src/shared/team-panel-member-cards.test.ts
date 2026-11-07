@@ -360,6 +360,15 @@ describe('teamCardsOf', () => {
     expect(JSON.stringify(cards?.members[0]?.liveAction)).toContain('[redacted]')
   })
 
+  it('marks the lead as waiting on the user while it has a question open, as V28 does', () => {
+    const asking = teamCardsOf(state([lead]), new Set(['ORCA-14']), { ticket: 'ORCA-14' })
+    expect(asking?.lead).toMatchObject({ status: 'attention', ownerAsk: { ticket: 'ORCA-14' } })
+    expect(teamCardsOf(state([lead]), new Set())?.lead).toMatchObject({
+      status: 'working',
+      ownerAsk: null
+    })
+  })
+
   it('leaves out agents that are neither the lead nor members', () => {
     const cards = cardsOf([agent({ paneKey: 'other', isMember: false })])
     expect(cards?.members).toEqual([])
