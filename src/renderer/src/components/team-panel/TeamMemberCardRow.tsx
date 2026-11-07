@@ -125,7 +125,10 @@ export function TeamMemberCardRow({
             model={teamModelText(card.model)}
             parts={[
               card.flowPhase ? teamPhaseText(card.flowPhase) : null,
-              card.since !== null ? teamAgeText(card.since, now) : null
+              card.since !== null ? teamAgeText(card.since, now) : null,
+              card.inFolder
+                ? translate('teamPanel.card.inFolder', 'In the folder, no worktree')
+                : null
             ]}
           />
         </span>

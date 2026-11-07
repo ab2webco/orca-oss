@@ -112,6 +112,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   limitResetsAt: number | null
   /** Started outside `game launch`: stopped by name, never acted on in bulk. */
   found: boolean
+  /** Runs in the lead's folder, which has no git for a worktree of its own (ORCA-1135). */
+  inFolder?: true
 }
 
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */

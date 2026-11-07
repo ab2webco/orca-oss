@@ -32222,9 +32222,20 @@ export class OrcaRuntimeService {
     if (!worktreeId && args.terminalHandle) {
       worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
     }
-    const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
+    const folderLead =
+      worktreeId && !worktreesById.has(worktreeId) ? this.gameFolderWorkspaceOf(worktreeId) : null
+    const worktree = worktreeId
+      ? (worktreesById.get(worktreeId) ?? folderLead?.worktree ?? null)
+      : null
+    const leadRepo = worktree ? this.store?.getRepo(worktree.repoId) : undefined
+    const inFolder = folderLead !== null || (leadRepo ? isFolderRepo(leadRepo) : false)
     const summaries = (await this.getWorktreePs()).worktrees
     const summary = worktree ? summaries.find((row) => row.worktreeId === worktree.id) : undefined
+    // Why: a folder has no worktree per agent, so the lead's other unlaunched sessions there are found ones (ORCA-1135).
+    const ownRows =
+      inFolder && args.paneKey
+        ? summary?.agents.filter((row) => row.paneKey === args.paneKey || row.parentPaneKey)
+        : summary?.agents
     // Why: a member the lead launched with `orca orchestration` runs in its own child worktree.
     const members = args.paneKey
       ? summaries.flatMap((one) =>
@@ -32258,14 +32269,15 @@ export class OrcaRuntimeService {
         ? {
             id: worktree.id,
             repoId: worktree.repoId ?? null,
-            connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null,
+            connectionId: folderLead ? folderLead.connectionId : (leadRepo?.connectionId ?? null),
             path: worktree.path,
             branch: summary?.branch ?? worktree.branch ?? '',
             displayName: summary?.displayName ?? worktree.displayName ?? '',
-            linkedWorkItem: worktree.linkedWorkItem
+            linkedWorkItem: worktree.linkedWorkItem,
+            ...(inFolder ? { folder: true } : {})
           }
         : null,
-      agents: summary?.agents ?? [],
+      agents: ownRows ?? [],
       members,
       found: args.paneKey
         ? foundGameSessionsOf(summaries, {
@@ -33698,6 +33710,23 @@ export class OrcaRuntimeService {
     return parsed?.type === 'folder'
       ? folderWorkspaceKey(parsed.folderWorkspaceId)
       : this.resolveEmulatorWorkspaceId(selector)
+  }
+
+  /** A lead's folder workspace, which the repo worktree map never lists; null for anything else. */
+  private gameFolderWorkspaceOf(
+    worktreeId: string
+  ): { worktree: ResolvedWorktree; connectionId: string | null } | null {
+    try {
+      const folder = this.resolveFolderWorkspaceSelector(worktreeId)
+      return folder
+        ? {
+            worktree: this.folderWorkspaceToResolvedWorktree(folder),
+            connectionId: this.resolveFolderWorkspaceConnectionId(folder)
+          }
+        : null
+    } catch {
+      return null
+    }
   }
 
   private folderWorkspaceToResolvedWorktree(folderWorkspace: FolderWorkspace): ResolvedWorktree {

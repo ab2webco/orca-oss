@@ -16222,7 +16222,8 @@
       "ciPassed": "CI en verde",
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
-      "openTerminal": "Abrir terminal"
+      "openTerminal": "Abrir terminal",
+      "inFolder": "En la carpeta, sin worktree"
     },
     "activity": {
       "prompt": "Pedido",

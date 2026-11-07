@@ -7,7 +7,6 @@ import {
   useOpenGameOwnerQuestionCount,
   useOtherGameInboxGroups
 } from '@/components/game-inbox/use-other-game-inbox-groups'
-import { isFolderRepo } from '../../../../shared/repo-kind'
 import type {
   TeamMemberCard,
   TeamPanelModel,
@@ -26,6 +25,7 @@ import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
+import { teamPanelProjectOf } from './team-panel-project'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -71,10 +71,11 @@ const poller = createTeamPanelModelPoller(
       }),
     readState: readTeamLeadState,
     readQuestions: readTeamOwnerQuestions,
-    modelOf: (args) => {
-      const repo = useAppStore.getState().repos.find((one) => one.id === args.repoId)
-      return teamPanelModelOf({ ...args, isFolder: repo ? isFolderRepo(repo) : false })
-    },
+    modelOf: (args) =>
+      teamPanelModelOf({
+        ...args,
+        isFolder: teamPanelProjectOf(useAppStore.getState(), args.repoId)?.isFolder === true
+      }),
     publish: (source, scope) => {
       const members = membersOf(source)
       if (members !== NO_MEMBERS) {
@@ -105,11 +106,11 @@ export function useTeamPanelModel(): TeamPanelModelSource {
     s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
   )
   const projectName = useAppStore(
-    (s) => s.repos.find((repo) => repo.id === repoId)?.displayName ?? null
+    (s) => (repoId ? teamPanelProjectOf(s, repoId)?.name : null) ?? null
   )
   // Why joined: a string keeps the selector stable across unrelated store writes.
   const worktreeIdList = useAppStore((s) =>
-    repoId ? (s.worktreesByRepo[repoId] ?? []).map((one) => one.id).join('\n') : ''
+    repoId ? (teamPanelProjectOf(s, repoId)?.worktreeIds.join('\n') ?? '') : ''
   )
   const activeScope = useMemo<TeamPanelScope | null>(
     () =>
