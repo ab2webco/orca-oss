@@ -36,6 +36,8 @@ const render = (row: DashboardAgentRow, showModel = false): string =>
     <CompactAgentRow agent={row} now={2} onActivate={() => {}} showModel={showModel} />
   )
 
+const CAPABILITY = `dcap_${'A'.repeat(43)}`
+
 describe('CompactAgentRow live line', () => {
   it('shows the live tool instead of the prompt while working', () => {
     const markup = render(agent({ toolName: 'Bash', toolInput: 'gh pr checks 912' }))
@@ -73,5 +75,28 @@ describe('CompactAgentRow live line', () => {
     const markup = render(agent({ state: 'blocked', toolName: 'Bash', toolInput: 'rm -rf dist' }))
     expect(markup).toContain('class="text-status-attention">Bash · rm -rf dist')
     expect(markup).not.toContain('Fix the tooltip')
+  })
+
+  it('keeps a dispatch capability off the live line and its tooltip', () => {
+    const markup = render(agent({ toolName: 'Bash', toolInput: `send ${CAPABILITY}` }))
+    expect(markup).toContain('Bash · send [redacted]')
+    expect(markup).not.toContain('dcap_')
+  })
+
+  it('keeps it off a row with no live action, which reads the raw status', () => {
+    const subagent = {
+      ...agent({ toolName: 'Bash', toolInput: `send ${CAPABILITY}` }),
+      rowSource: 'subagent'
+    } as DashboardAgentRow
+    const finished = agent({
+      state: 'done',
+      prompt: `Run with ${CAPABILITY}`,
+      lastAssistantMessage: `Sent with ${CAPABILITY}`
+    })
+    expect(render(subagent)).toContain('Bash: send [redacted]')
+    expect(render(subagent)).not.toContain('dcap_')
+    expect(render(finished)).toContain('Run with [redacted]')
+    expect(render(finished)).toContain('Sent with [redacted]')
+    expect(render(finished)).not.toContain('dcap_')
   })
 })

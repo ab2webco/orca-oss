@@ -88,9 +88,13 @@ async function capture(
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
-async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
+async function seedAgents(
+  page: Page,
+  panes: [string, string],
+  toolInput = 'gh pr checks 912'
+): Promise<void> {
   await page.evaluate(
-    ({ panes, question }) => {
+    ({ panes, question, toolInput }) => {
       const store = window.__store!
       const now = Date.now()
       store.getState().setAgentStatus(
@@ -102,7 +106,7 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
           model: 'claude-opus-5-5',
           effort: 'high',
           toolName: 'Bash',
-          toolInput: 'gh pr checks 912'
+          toolInput
         },
         'Claude main',
         { updatedAt: now - 60_000, stateStartedAt: now - 60_000 }
@@ -129,7 +133,7 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
         { updatedAt: now - 120_000, stateStartedAt: now - 120_000 }
       )
     },
-    { panes, question: QUESTION }
+    { panes, question: QUESTION, toolInput }
   )
 }
 
@@ -292,6 +296,22 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(panel.locator('[data-team-activity="other"]')).toHaveCount(1)
     await expect(panel.getByRole('tab', { name: copy.machines })).toHaveCount(0)
   })
+
+  // Why: a worker's own Bash line carries its capability, a bearer secret no screen may print.
+  const panePair: [string, string] = [panes[0]!, panes[1]!]
+  await seedAgents(
+    orcaPage,
+    panePair,
+    `orca game send --dispatch-capability dcap_${'A'.repeat(43)}`
+  )
+  await capture(orcaPage, testInfo, 'redacted', async () => {
+    await expect(panel.locator('[data-team-activity="other"]')).toContainText('[redacted]')
+    await expect(
+      orcaPage.locator('.compact-agent-row').filter({ hasText: '[redacted]' })
+    ).toHaveCount(1)
+    await expect(orcaPage.locator('body')).not.toContainText('dcap_')
+  })
+  await seedAgents(orcaPage, panePair)
 
   await setPluginSystem(orcaPage, false)
   await reportJev(electronApp, panes, 'Opus 5.5')

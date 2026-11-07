@@ -12,6 +12,7 @@ import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timesta
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
 import { teamSoloLiveText, teamModelText } from '@/components/team-panel/team-card-text'
+import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
 import {
   teamLiveActionOfEntry,
   teamSessionModelOf
@@ -142,9 +143,9 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
     (liveAction.kind === 'question' || agent.state === 'blocked' || agent.state === 'waiting')
   const primary = liveAction
     ? teamSoloLiveText(liveAction, 'working')
-    : (label ?? getCompactAgentPrimary(agent))
+    : redactDispatchCapability(label ?? getCompactAgentPrimary(agent))
   const isLineageChild = agent.lineage?.depth === 1
-  const rawSecondary = liveAction ? '' : getCompactAgentSecondary(agent)
+  const rawSecondary = liveAction ? '' : redactDispatchCapability(getCompactAgentSecondary(agent))
   const secondary = rawSecondary === primary ? '' : rawSecondary
   const model = showModel ? (teamModelText(teamSessionModelOf(agent.entry)) ?? '') : ''
   const shortTime = getCompactAgentTime(agent, now)

@@ -1,4 +1,5 @@
 import type { AgentStatusEntry } from './agent-status-types'
+import { redactDispatchCapability } from './dispatch-capability-redaction'
 import { parseAskFromStatus } from './native-chat-ask'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
@@ -57,18 +58,21 @@ const STATUS_OF: Partial<Record<TeamCondition, TeamStatus>> = {
   done: 'done'
 }
 
+const shownTextOf = (text: string | null | undefined): string | null =>
+  text ? redactDispatchCapability(text) : null
+
 const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLiveAction | null => {
   const ask = parseAskFromStatus(entry.interactivePrompt, entry.toolName)?.questions[0]
   if (ask) {
     return {
       kind: 'question',
-      text: ask.question,
-      options: ask.options.map((one) => one.label)
+      text: redactDispatchCapability(ask.question),
+      options: ask.options.map((one) => redactDispatchCapability(one.label))
     }
   }
   // Why waiting too: a permission prompt asks nothing parseable; its tool is what it waits on.
   return (condition === 'working' || condition === 'waiting') && entry.toolName
-    ? { kind: 'tool', tool: entry.toolName, detail: entry.toolInput || null }
+    ? { kind: 'tool', tool: entry.toolName, detail: shownTextOf(entry.toolInput) }
     : null
 }
 
@@ -109,13 +113,13 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     repoName: session.repoName,
     worktreeName: session.worktreeName,
     isPrimary: session.isPrimary,
-    prompt: entry.prompt || null,
+    prompt: shownTextOf(entry.prompt),
     ticket: session.ticket,
     pr: session.pr,
-    lastMessage: entry.lastCompletedAssistantMessage || entry.lastAssistantMessage || null,
+    lastMessage: shownTextOf(entry.lastCompletedAssistantMessage || entry.lastAssistantMessage),
     cacheExpiresAt: session.cacheExpiresAt,
     ports: session.ports,
-    note: session.note,
+    note: shownTextOf(session.note),
     subagentCount: entry.subagents?.length ?? 0,
     // Why empty: AgentStatusEntry keeps no tool history; the ORCA-1049 audit lists the gap.
     recentSteps: [],

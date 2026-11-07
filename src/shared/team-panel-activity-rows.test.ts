@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentStatusEntry } from './agent-status-types'
-import { teamSoloModelOf, type TeamSoloSession } from './team-panel-activity-rows'
+import {
+  teamLiveActionOfEntry,
+  teamSoloModelOf,
+  type TeamSoloSession
+} from './team-panel-activity-rows'
 import type { TeamPanelTabs } from './team-panel-model-types'
 
 const entry = (over: Partial<AgentStatusEntry> = {}): AgentStatusEntry => ({
@@ -46,6 +50,8 @@ const ask = JSON.stringify({
     }
   ]
 })
+
+const CAPABILITY = `dcap_${'A'.repeat(43)}`
 
 const rowsOf = (sessions: TeamSoloSession[]) =>
   teamSoloModelOf({ sessions, selectedPaneKey: null, tabs }).rows
@@ -96,6 +102,54 @@ describe('teamSoloModelOf', () => {
         options: ['Now', 'At release']
       }
     })
+  })
+
+  it.each([
+    `orca orchestration send --dispatch-capability ${CAPABILITY} --type heartbeat`,
+    `orca orchestration ask --dispatch-capability=${CAPABILITY} --question "Merge?"`,
+    'orca orchestration send --dispatch-capability dcap_Ab'
+  ])('never puts a dispatch capability on a tool line: %s', (toolInput) => {
+    const [row] = rowsOf([session({ entry: entry({ toolName: 'Bash', toolInput }) })])
+    expect(JSON.stringify(row)).not.toMatch(/dcap_/)
+    expect(row?.liveAction).toMatchObject({ kind: 'tool', tool: 'Bash' })
+    expect(JSON.stringify(row?.liveAction)).toContain('[redacted]')
+  })
+
+  it('never puts one on a row through its prompt, reply, note or question', () => {
+    const interactivePrompt = JSON.stringify({
+      questions: [
+        {
+          question: `Send ${CAPABILITY}?`,
+          multiSelect: false,
+          options: [{ label: `Use ${CAPABILITY}` }, { label: 'No' }]
+        }
+      ]
+    })
+    const [row] = rowsOf([
+      session({
+        note: `Token ${CAPABILITY}`,
+        entry: entry({
+          state: 'blocked',
+          toolName: 'AskUserQuestion',
+          interactivePrompt,
+          prompt: `Run with ${CAPABILITY}`,
+          lastAssistantMessage: `Sent with ${CAPABILITY}`
+        })
+      })
+    ])
+    expect(JSON.stringify(row)).not.toMatch(/dcap_/)
+    expect(row).toMatchObject({
+      prompt: 'Run with [redacted]',
+      lastMessage: 'Sent with [redacted]',
+      note: 'Token [redacted]',
+      liveAction: { text: 'Send [redacted]?', options: ['Use [redacted]', 'No'] }
+    })
+  })
+
+  it('keeps the capability off the live action the sidebar reads', () => {
+    expect(
+      teamLiveActionOfEntry(entry({ toolName: 'Bash', toolInput: `send ${CAPABILITY}` }))
+    ).toEqual({ kind: 'tool', tool: 'Bash', detail: 'send [redacted]' })
   })
 
   it('names the tool a blocked agent waits on when it asked no question', () => {
