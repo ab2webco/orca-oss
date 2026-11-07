@@ -272,9 +272,16 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       '¿Detener a los 2 miembros? Siguen parados hasta que los reactives.'
     )
     if (CAPTURE_EVIDENCE) {
-      for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
-        await captureDock(orcaPage, panel, testInfo.outputPath(`stop-confirm-es-${width}.png`))
+      for (const theme of ['light', 'dark'] as const) {
+        await setTheme(orcaPage, theme)
+        for (const width of WIDTHS) {
+          await orcaPage.setViewportSize({ width, height: 900 })
+          await captureDock(
+            orcaPage,
+            panel,
+            testInfo.outputPath(`stop-confirm-es-${width}-${theme}.png`)
+          )
+        }
       }
     }
     await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'Cancelar' }))
@@ -301,9 +308,13 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await expect(receipt).toContainText('Release: Two PRs still have to merge before the release.')
     await expect(chips.filter({ hasText: 'Push' })).toBeEnabled()
     if (CAPTURE_EVIDENCE) {
-      for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
-        await captureDock(orcaPage, panel, testInfo.outputPath(`reply-en-${width}.png`))
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        for (const width of WIDTHS) {
+          await orcaPage.setViewportSize({ width, height: 900 })
+          await expect(dock.getByRole('status')).toBeVisible()
+          await captureDock(orcaPage, panel, testInfo.outputPath(`reply-en-${width}-${theme}.png`))
+        }
       }
     }
   } finally {
