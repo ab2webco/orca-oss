@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import { gameInboxTargetOf } from '@/components/game-inbox/game-owner-questions-client'
 import {
   openQuestionCountOf,
+  useOpenGameOwnerQuestionCount,
   useOtherGameInboxGroups
 } from '@/components/game-inbox/use-other-game-inbox-groups'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -143,19 +144,24 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   }, [scope])
   const source = useTeamPanelModelStore((s) => s.source)
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
+  const everyOpen = useOpenGameOwnerQuestionCount()
   const noTeam = !scope || hasNoTeam(source.section)
   const solo = useTeamPanelSoloModel(noTeam)
   return useMemo<TeamPanelModelSource>(() => {
-    const shown: TeamPanelModelSource =
-      noTeam && solo ? { section: { kind: 'ready', value: solo }, retry: null } : source
+    const noTeamModel = noTeam ? solo : null
+    const shown: TeamPanelModelSource = noTeamModel
+      ? { section: { kind: 'ready', value: noTeamModel }, retry: null }
+      : source
     const { section } = shown
-    if (otherOpen === 0 || section.kind !== 'ready') {
+    // Why every project: the no-team model reads agent status, so it misses this project's too.
+    const added = noTeamModel ? everyOpen : otherOpen
+    if (added === 0 || section.kind !== 'ready') {
       return shown
     }
     const model = section.value
-    const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, otherOpen) }
+    const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, added) }
     return { ...shown, section: { kind: 'ready', value } }
-  }, [noTeam, solo, source, otherOpen])
+  }, [noTeam, solo, source, otherOpen, everyOpen])
 }
 
 /** The lead's pane as the last model read it, for what the panel sends it. */

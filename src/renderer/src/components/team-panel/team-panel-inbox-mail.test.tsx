@@ -3,8 +3,11 @@
 import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
-import { GameInboxSheet } from './GameInboxSheet'
-import type { GameMemberReply } from './game-inbox-threads-client'
+import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
+import type { GameMemberReply } from '@/components/game-inbox/game-inbox-threads-client'
+import { TeamInboxView } from './team-panel-inbox-tab'
+
+// Moved from GameInboxSheet.test.tsx when the Inbox tab replaced the Sheet (ORCA-1072).
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
@@ -85,15 +88,23 @@ afterEach(() => {
   cleanup()
 })
 
-function renderSheet(onReply: (reply: GameMemberReply) => Promise<void> = async () => {}) {
+function renderSheet(
+  onReply: (reply: GameMemberReply) => Promise<void> = async () => {},
+  undelivered: GameOwnerQuestion[] = []
+) {
   return render(
-    <GameInboxSheet
-      open
-      onOpenChange={() => {}}
+    <TeamInboxView
+      projectName="orca-oss"
+      projectUnread={null}
       questions={[]}
+      undelivered={undelivered}
       onAnswer={async () => {}}
+      otherGroups={[]}
       threads={THREADS}
       onReply={onReply}
+      agentQuestions={[]}
+      answeredQuestions={[]}
+      onOpenAgent={() => {}}
     />
   )
 }
@@ -107,30 +118,20 @@ const tab = (view: ReturnType<typeof render>, name: RegExp) => {
   return trigger
 }
 
-describe('GameInboxSheet', () => {
+describe("Inbox tab: the lead's mail", () => {
   // Why (ORCA-1100): the Inbox read "answered" while the lead never got the answer.
   it('shows under For you an answer that has not reached the lead yet', () => {
-    const view = render(
-      <GameInboxSheet
-        open
-        onOpenChange={() => {}}
-        questions={[]}
-        undelivered={[
-          {
-            id: 'oq_9',
-            ticket: 'ORCA-1039',
-            question: 'Does the warning still show?',
-            options: [],
-            context: null,
-            askedAt: AN_HOUR_AGO,
-            answer: { text: 'No', at: AN_HOUR_AGO, undelivered: true }
-          }
-        ]}
-        onAnswer={async () => {}}
-        threads={THREADS}
-        onReply={async () => {}}
-      />
-    )
+    const view = renderSheet(undefined, [
+      {
+        id: 'oq_9',
+        ticket: 'ORCA-1039',
+        question: 'Does the warning still show?',
+        options: [],
+        context: null,
+        askedAt: AN_HOUR_AGO,
+        answer: { text: 'No', at: AN_HOUR_AGO, undelivered: true }
+      }
+    ])
 
     const notice = view.getByTestId('game-inbox-undelivered')
     // Why: retries stop after about 10 minutes, so the notice promises only the hand-over a lead's register makes.
@@ -154,6 +155,7 @@ describe('GameInboxSheet', () => {
     expect(view.getByRole('tab', { name: /For you/ }).getAttribute('data-state')).toBe('active')
     expect(view.getByRole('tab', { name: /Waiting/ }).textContent).toContain('1')
     expect(view.getByText('No questions are waiting for you.')).toBeTruthy()
+    expect(view.getByTestId('team-panel-inbox')).toBeTruthy()
   })
 
   it('lists under Waiting what the lead has not answered, with its age and who must answer', () => {
@@ -211,6 +213,7 @@ describe('GameInboxSheet', () => {
     tab(view, /Waiting/)
     const row = view.getByTestId('game-inbox-waiting-q1')
     const box = within(row).getByRole('textbox', { name: /Your answer to ORCA-12/ })
+    expect(box.getAttribute('placeholder')).toBe('Your answer')
 
     act(() => fireEvent.change(box, { target: { value: '8080' } }))
     act(() => fireEvent.submit(box))

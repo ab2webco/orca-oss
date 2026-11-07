@@ -39,7 +39,10 @@ vi.mock('@/store', () => ({
   )
 }))
 
-const solo = { kind: 'solo' }
+const solo = {
+  kind: 'solo',
+  inbox: { kind: 'ready', value: { forYou: 1, waiting: 0, threads: 0, answered: 0 } }
+}
 vi.mock('./use-team-panel-solo-model', () => ({
   useTeamPanelSoloModel: (active: boolean) => (active ? solo : null)
 }))
@@ -261,6 +264,51 @@ describe('Team model Inbox count', () => {
     expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
       kind: 'ready',
       value: { forYou: 2, waiting: 0, threads: 2, answered: 0 }
+    })
+  })
+})
+
+describe('Team model Inbox count with no team', () => {
+  // Why: the no-team model reads agent status alone, and the Sheet counted the project's questions.
+  it("adds this project's own open questions to the agents that ask", async () => {
+    appState = { ...baseState(), activeWorktreeId: 'repo-1::/wt' }
+    useGameInboxAppState.setState({
+      hosts: [
+        {
+          environmentId: null,
+          status: 'ok',
+          projects: [
+            {
+              repoId: 'repo-1',
+              repoName: 'orca-oss',
+              worktreeId: 'repo-1::/wt',
+              questions: [
+                {
+                  id: 'q-own',
+                  ticket: 'ORCA-940',
+                  question: 'Ship the arcade in lab.111?',
+                  options: [],
+                  context: null,
+                  askedAt: '2026-11-06T10:00:00.000Z',
+                  answer: null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    })
+    let seen: TeamPanelModelSource | null = null
+    await mount(() => {
+      seen = useTeamPanelModel()
+      return null
+    })
+    await act(async () => publish({ section: { kind: 'unavailable' }, retry: null }))
+
+    const section = (seen as TeamPanelModelSource | null)?.section
+    expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
+      kind: 'ready',
+      value: { forYou: 2, waiting: 0, threads: 0, answered: 0 }
     })
   })
 })

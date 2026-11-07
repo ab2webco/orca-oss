@@ -15386,16 +15386,6 @@
         "restartNow": "Reiniciar ahora"
       },
       "game-inbox": {
-        "GameInboxSheet": {
-          "title": "Bandeja",
-          "description": "Lo que el lead te preguntó, lo que espera su respuesta y cómo habla con cada miembro.",
-          "forYou": "Para ti",
-          "empty": "No hay preguntas esperando tu respuesta.",
-          "waiting": "Esperando",
-          "threads": "Hilos",
-          "answered": "Respondidas",
-          "answerInstead": "Responde en lugar del lead"
-        },
         "GameOwnerQuestionCard": {
           "failed": "La respuesta no se envió.",
           "yourAnswer": "Tu respuesta",
@@ -15403,7 +15393,6 @@
           "send": "Enviar"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Bandeja",
           "noWorktree": "Abre este proyecto en Orca para responder."
         },
         "GameInboxKindTag": {
