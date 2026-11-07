@@ -287,6 +287,79 @@ describe('teamCardsOf', () => {
     expect(order).toEqual(['wait', 'risk', 'work1', 'work2', 'idle'])
   })
 
+  it('keys a member to its roster character across languages and pane keys', () => {
+    const run = (paneKey: string, displayName: string) =>
+      cardsOf([agent({ paneKey, displayName })], { config: { scene: 'quest' } } as never)
+        ?.members[0]?.characterKey
+    expect(run('a', 'Merlín · ORCA-1 Fix it')).toBe('merlin')
+    expect(run('b', 'Merlin')).toBe('merlin')
+    expect(run('c', 'Herrero')).toBe('herrero')
+  })
+
+  it('keys a paused member to its character and leaves a nameless one unkeyed', () => {
+    const cards = cardsOf([], {
+      pausedMembers: [
+        {
+          ticket: 'ORCA-5',
+          name: 'Arturo',
+          agent: 'claude',
+          account: null,
+          branch: 'orca-5',
+          lastState: 'working',
+          resumable: true,
+          runId: 'run',
+          since: '1970-01-01T00:00:00.007Z'
+        }
+      ],
+      queuedMembers: [{ ticket: 'ORCA-6', name: null, position: 1, waitingOn: 'ORCA-4' }]
+    })
+    expect(cards?.members.map((one) => one.characterKey)).toEqual(['arthur', null])
+  })
+
+  it('names the lead after the Lead name setting before its pane or worktree', () => {
+    const named = teamCardsOf(
+      state([{ ...lead, displayName: null }], {
+        lead: { autostart: false, cap: 4, agent: 'claude', label: 'Alfred' }
+      }),
+      new Set()
+    )
+    expect(named?.lead.name).toBe('Alfred')
+    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe('main')
+  })
+
+  it('names a launched member after its character, as V28 does', () => {
+    const [card] =
+      cardsOf([agent({ displayName: 'Merlín · ORCA-12 Keep the look' })])?.members ?? []
+    expect(card?.name).toBe('Merlín')
+    expect(card?.ticket?.identifier).toBe('ORCA-12')
+  })
+
+  it('carries the tool input as the live detail', () => {
+    const [card] =
+      cardsOf([agent({ toolName: 'Bash', toolInput: 'npx vitest run terminal-role' })])?.members ??
+      []
+    expect(card?.liveAction).toEqual({
+      kind: 'tool',
+      tool: 'Bash',
+      detail: 'npx vitest run terminal-role'
+    })
+  })
+
+  it.each([
+    'orca orchestration send --dispatch-capability dcap_B7igsCMGVjop78B6D_HS4i8Mdq --type heartbeat',
+    'orca orchestration ask --dispatch-capability=dcap_Abc-123_x --question "Merge?"',
+    'echo dcap_Abc123xyz'
+  ])('never puts a dispatch capability on a card: %s', (toolInput) => {
+    const cards = teamCardsOf(
+      state([{ ...lead, toolName: 'Bash', toolInput }, agent({ toolName: 'Bash', toolInput })]),
+      new Set()
+    )
+    const shown = JSON.stringify(cards)
+    expect(shown).not.toMatch(/dcap_/)
+    expect(cards?.members[0]?.liveAction).toMatchObject({ kind: 'tool', tool: 'Bash' })
+    expect(JSON.stringify(cards?.members[0]?.liveAction)).toContain('[redacted]')
+  })
+
   it('leaves out agents that are neither the lead nor members', () => {
     const cards = cardsOf([agent({ paneKey: 'other', isMember: false })])
     expect(cards?.members).toEqual([])

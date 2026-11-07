@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Crown } from 'lucide-react'
-import { StatusDot } from '@/components/StatusDot'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import type { TeamPanelLook } from './use-team-panel-look'
@@ -9,7 +8,8 @@ import type {
   TeamLeadCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamLiveText, teamModelText, teamStatusTone } from './team-card-text'
+import { teamHostText, teamLiveText, teamModelText } from './team-card-text'
+import { TeamStatusMark } from './TeamStatusMark'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
 import { TeamReadNotice } from './team-panel-read-error'
@@ -52,27 +52,34 @@ function LeadCardRow({
           </span>
         </span>
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <StatusDot tone={teamStatusTone(lead.status)} />
+          <TeamStatusMark status={lead.status} />
           <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
         </span>
-        <MetaLine parts={[teamModelText(lead.model), coordinatesText(memberCount)]} />
+        <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
       </button>
     </article>
   )
 }
 
-function AdvisorCardRow({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Element {
-  const model = advisor.model
-    ? advisor.effort
-      ? `${advisor.model} · ${advisor.effort}`
-      : advisor.model
-    : null
+// Why no model line: V28's row has none, and Jev's sentence already names the model it chose.
+function AdvisorCardRow({
+  advisor,
+  showName
+}: {
+  advisor: TeamAdvisorRow
+  showName: boolean
+}): React.JSX.Element {
   return (
     <article
       data-team-card="advisor"
       className="flex flex-col gap-0.5 border-b border-border px-3 py-2"
     >
       <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
+        {showName ? (
+          <span className="truncate text-[13px] font-medium">
+            {translate('teamPanel.advisor.name', 'Wizard')}
+          </span>
+        ) : null}
         <code className="font-mono text-[11.5px] text-muted-foreground">
           {translate('teamPanel.advisor.label', 'Advisor')}
         </code>
@@ -83,7 +90,6 @@ function AdvisorCardRow({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Ele
       {advisor.line ? (
         <span className="truncate text-xs text-muted-foreground">{advisor.line}</span>
       ) : null}
-      <MetaLine parts={[model]} />
     </article>
   )
 }
@@ -141,7 +147,7 @@ export function TeamTabContent({
         <TeamArcadeSection arcade={model.arcade} actions={arcadeActions} />
       ) : null}
       <LeadCardRow lead={model.lead} showName={game} memberCount={model.members.length} />
-      {model.advisor ? <AdvisorCardRow advisor={model.advisor} /> : null}
+      {model.advisor ? <AdvisorCardRow advisor={model.advisor} showName={game} /> : null}
       <TeamReadNotice />
       {model.members.length === 0 ? (
         <div className="flex flex-col gap-1 px-3 py-6 text-xs text-muted-foreground">

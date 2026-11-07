@@ -266,3 +266,35 @@ describe('TeamPanelMachinesTab', () => {
     expect(view.querySelector('[role="img"]')).toBeNull()
   })
 })
+
+describe('status marks, as V28 draws them', () => {
+  const glyphs = (view: HTMLElement): (string | null)[] =>
+    [...view.querySelectorAll('[data-status-glyph]')].map((one) =>
+      one.getAttribute('data-status-glyph')
+    )
+
+  it('marks a failed PR with a question and a ready one with a dot', () => {
+    expect(
+      glyphs(prs(list([row(), row({ label: '#925', url: 'u2', status: 'done', reason: 'ready' })])))
+    ).toEqual(['question', 'dot'])
+  })
+
+  it('spins for a queue entry in checks', () => {
+    expect(glyphs(queue([queueEntry()]))).toEqual(['spinner'])
+  })
+
+  it('marks an offline machine with a question and a busy one with a spinner', () => {
+    expect(
+      glyphs(
+        machines([
+          machine({ status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } }),
+          machine({
+            host: { kind: 'local' },
+            running: 2,
+            status: 'working'
+          })
+        ])
+      )
+    ).toEqual(['question', 'spinner'])
+  })
+})

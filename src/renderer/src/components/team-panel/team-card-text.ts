@@ -1,5 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
+import type { StatusDotGlyph } from '@/components/StatusDot'
 import type {
   TeamCondition,
   TeamFlowPhase,
@@ -21,6 +22,28 @@ const TONE: Record<TeamStatus, StatusTone> = {
 
 export function teamStatusTone(status: TeamStatus): StatusTone {
   return TONE[status]
+}
+
+/** V28's marks: a question for needs-you or failed, a spinner while working, else a dot. */
+export function teamStatusGlyph(status: TeamStatus): StatusDotGlyph {
+  return status === 'attention' ? 'question' : status === 'working' ? 'spinner' : 'dot'
+}
+
+const MINUTE = 60_000
+
+/** V28's short age: `now`, `10 min`, `13 h`, `3 d`. */
+export function teamAgeText(since: number, now: number): string {
+  const minutes = Math.floor((now - since) / MINUTE)
+  if (minutes < 1) {
+    return translate('teamPanel.age.now', 'now')
+  }
+  if (minutes < 60) {
+    return translate('teamPanel.age.minutes', '{{count}} min', { count: minutes })
+  }
+  const hours = Math.floor(minutes / 60)
+  return hours < 24
+    ? translate('teamPanel.age.hours', '{{count}} h', { count: hours })
+    : translate('teamPanel.age.days', '{{count}} d', { count: Math.floor(hours / 24) })
 }
 
 export function teamConditionText(condition: TeamCondition): string {
@@ -61,14 +84,14 @@ export function teamSessionStateText(condition: TeamCondition): string {
     : teamConditionText(condition)
 }
 
-/** What the agent does now; agent words (tool detail, questions) are shown as written. */
+/** What the agent does now; agent words (tool detail, questions) are shown as written, as V28 does. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
   if (!action) {
     return teamConditionText(condition)
   }
   switch (action.kind) {
     case 'tool':
-      return action.detail ? `${action.tool} · ${action.detail}` : action.tool
+      return action.detail ?? action.tool
     case 'link':
       return `${action.name} · ${action.id}`
     case 'question':
@@ -128,6 +151,24 @@ export function teamCiText(pr: TeamPullRequest): string | null {
       return translate('teamPanel.card.ciRunning', 'CI running')
     case 'success':
       return translate('teamPanel.card.ciPassed', 'CI green')
+    case 'neutral':
+    case 'none':
+      return null
+  }
+}
+
+/** The PR chip's dot, as V28 draws it; null when its checks say nothing. */
+export function statusToneOfCi(pr: Pick<TeamPullRequest, 'state' | 'ci'>): StatusTone | null {
+  if (pr.state === 'merged') {
+    return 'success'
+  }
+  switch (pr.ci) {
+    case 'failure':
+      return 'attention'
+    case 'pending':
+      return 'info'
+    case 'success':
+      return 'success'
     case 'neutral':
     case 'none':
       return null

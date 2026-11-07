@@ -359,7 +359,8 @@ test('the Team panel draws the live scene beside a member opened under its heade
         const line = `Keep this one small, step ${said}`
         await reportJev(line)
         await expect(advisorCard).toContainText(line, { timeout: 5_000 })
-        await expect(advisorCard).toContainText('Opus 5.5 · high')
+        // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
+        await expect(advisorCard).not.toContainText('Opus 5.5 · high')
         await expect(advisorBubble).toHaveText(line)
         await expect(advisorBubble).toBeVisible()
         const shown = await shownBubbles(orcaPage)

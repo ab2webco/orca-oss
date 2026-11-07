@@ -135,6 +135,15 @@ async function render(
   return { container, selectTab, openTasks }
 }
 
+const advisorOf = () => ({
+  model: 'Opus 5.5',
+  effort: 'medium',
+  pinned: { model: false, effort: false },
+  line: 'Watching #923',
+  previous: null,
+  calls: []
+})
+
 const leadCard = (container: HTMLElement): HTMLElement =>
   container.querySelector<HTMLElement>('[data-team-card="lead"]')!
 const memberCards = (container: HTMLElement): HTMLElement[] => [
@@ -151,7 +160,8 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Lead')
     expect(card.querySelector('svg[data-crown]')).not.toBeNull()
     expect(card.textContent).toContain('local')
-    expect(card.textContent).toContain('Bash · gh pr checks 923')
+    expect(card.textContent).toContain('gh pr checks 923')
+    expect(card.textContent).not.toContain('Bash')
     expect(card.textContent).toContain('Opus 5.5 · high')
     expect(card.textContent).toContain('Coordinates 1 agent')
   })
@@ -163,10 +173,40 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Knight')
     expect(card.textContent).toContain('ORCA-1044')
     expect(card.textContent).toContain('imac')
-    expect(card.textContent).toContain('Edit · terminal-role.ts')
+    expect(card.textContent).toContain('terminal-role.ts')
     expect(card.textContent).toContain('Sonnet 5.5 · medium')
     expect(card.textContent).toContain('Coding')
-    expect(card.textContent).toContain('2 minutes ago')
+    expect(card.textContent).toContain('2 min')
+    expect(card.textContent).not.toContain('ago')
+  })
+
+  it('sets the model in mono, as V28 does', async () => {
+    const { container } = await render(model())
+    const [card] = memberCards(container)
+    const mono = card.querySelector('[data-team-model]')!
+    expect(mono.textContent).toBe('Sonnet 5.5 · medium')
+    expect(mono.className).toContain('font-mono')
+    expect(leadCard(container).querySelector('[data-team-model]')?.textContent).toBe(
+      'Opus 5.5 · high'
+    )
+  })
+
+  it('marks needs-you with a question and working with a spinner', async () => {
+    const { container } = await render(
+      model({
+        members: [
+          member({ paneKey: 'ask', status: 'attention', needsYou: true }),
+          member({ paneKey: 'work' })
+        ]
+      })
+    )
+    const [ask, work] = memberCards(container)
+    expect(ask.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'question'
+    )
+    expect(work.querySelector('[data-status-glyph]')?.getAttribute('data-status-glyph')).toBe(
+      'spinner'
+    )
   })
 
   it('names characters only in the Game look', async () => {
@@ -260,6 +300,10 @@ describe('TeamTabContent', () => {
     expect(container.textContent).toContain('#924')
     expect(container.textContent).toContain('Remote member keeps its role')
     expect(container.textContent).toContain('CI failing')
+    const chip = container.querySelector('[data-team-pr-chip]')!
+    expect(chip.querySelector('[data-status-tone]')?.getAttribute('data-status-tone')).toBe(
+      'attention'
+    )
     expect(container.textContent).toContain('dev@example.test · 12%')
   })
 
@@ -282,6 +326,14 @@ describe('TeamTabContent', () => {
     const row = container.querySelector('[data-team-card="advisor"]')!
     expect(row.previousElementSibling).toBe(leadCard(container))
     expect(row.textContent).toContain('Approved Opus 5.5 · medium for ORCA-1044')
+    expect(row.textContent).toContain('Wizard')
+    // Why: V28's Advisor row has no model line; the model is already in the sentence.
+    expect(row.querySelector('[data-team-model]')).toBeNull()
+
+    const plain = await render(model({ advisor: { ...advisorOf() } }), 'plain')
+    expect(plain.container.querySelector('[data-team-card="advisor"]')!.textContent).not.toContain(
+      'Wizard'
+    )
   })
 
   it('shows XP only in the Game look and only when rewards report it', async () => {
