@@ -5,6 +5,16 @@ export const CLAUDE_AUTH_ENV_VARS = [
   'AWS_BEARER_TOKEN_BEDROCK'
 ] as const
 
+// Why: when set, even to "", the CLI derives its Keychain item and its .credentials.json dir from it
+// instead of CLAUDE_CONFIG_DIR, so every managed vault would share one refresh chain (ORCA-1039).
+const CLAUDE_KEYCHAIN_SCOPE_ENV = 'CLAUDE_SECURESTORAGE_CONFIG_DIR'
+
+export const CLAUDE_MANAGED_LAUNCH_ENV_TO_DELETE: readonly string[] = [
+  ...CLAUDE_AUTH_ENV_VARS,
+  'ANTHROPIC_CUSTOM_HEADERS',
+  CLAUDE_KEYCHAIN_SCOPE_ENV
+]
+
 export type ClaudeEnvPatch = {
   CLAUDE_CONFIG_DIR?: string
   ANTHROPIC_CUSTOM_HEADERS?: string
@@ -22,6 +32,7 @@ export function applyClaudeEnvPatch(
     if (isAuthLikeCustomHeaders(baseEnv.ANTHROPIC_CUSTOM_HEADERS)) {
       delete baseEnv.ANTHROPIC_CUSTOM_HEADERS
     }
+    delete baseEnv[CLAUDE_KEYCHAIN_SCOPE_ENV]
   }
 
   if (patch.CLAUDE_CONFIG_DIR) {

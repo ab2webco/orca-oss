@@ -76,6 +76,7 @@ const game: TeamPanelGameModel = {
 const sessionRow = (status: TeamStatus): TeamActivityRow => ({
   ...lead,
   status,
+  inTeam: false,
   repoName: 'orca-oss',
   worktreeName: 'main',
   isPrimary: false,

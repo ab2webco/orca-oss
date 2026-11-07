@@ -12,6 +12,7 @@ export default function TeamPanel(): React.JSX.Element {
   useTranslation()
   const read = useTeamPanelModel()
   const panel = useTeamPanelSettings()
+  const pluginsOn = useAppStore((s) => s.settings?.pluginSystemEnabled === true)
   const source = useMemo(
     () =>
       read.section.kind === 'ready'
@@ -19,11 +20,11 @@ export default function TeamPanel(): React.JSX.Element {
             ...read,
             section: {
               kind: 'ready' as const,
-              value: teamPanelModelWithSettings(read.section.value, panel)
+              value: teamPanelModelWithSettings(read.section.value, { ...panel, pluginsOn })
             }
           }
         : read,
-    [read, panel]
+    [read, panel, pluginsOn]
   )
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)

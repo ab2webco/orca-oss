@@ -102,8 +102,10 @@ function runHook(root, payload, prs, { extraEnv = {}, script = hookScript } = {}
     cwd: payload.cwd,
     input: JSON.stringify(payload),
     encoding: 'utf8',
-    env
+    env,
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   return {
     ...result,
     json: result.stdout.trim() ? JSON.parse(result.stdout) : null
@@ -660,8 +662,10 @@ describe('merged-worktree-close hook', () => {
   it('exits 0 silently on input that is not JSON', () => {
     const result = spawnSync('node', [hookScript], {
       input: 'not json',
-      encoding: 'utf8'
+      encoding: 'utf8',
+      timeout: 20_000
     })
+    expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)
     expect(result.stdout).toBe('')
   })

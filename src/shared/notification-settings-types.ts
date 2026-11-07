@@ -53,8 +53,11 @@ export type NotificationDispatchRequest = {
   agentToolInput?: string
   agentLastAssistantMessage?: string
   agentInterrupted?: boolean
+  /** The question an agent waits on; empty when its tool asked something unreadable. */
+  agentQuestion?: string
   /** What the lead asked, for source `game-owner-question`. */
   ownerQuestion?: string
+  /** Set for an owner or agent question: a click opens the Inbox there. */
   gameInbox?: GameInboxNotificationTarget
 }
 

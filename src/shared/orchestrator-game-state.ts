@@ -254,6 +254,8 @@ export type OrchestratorGameState = {
   metrics?: GameMetricsSummary
   /** This Orca and each paired host: members, cores, free memory, load; only for a lead with a saved environment (ORCA-841). */
   hostCapacity?: GameHostCapacity[]
+  /** This Orca alone, for a lead with no saved environment, so the panel still shows it; absent from an older host. */
+  localHost?: GameHostCapacity
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
