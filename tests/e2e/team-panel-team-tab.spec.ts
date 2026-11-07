@@ -310,6 +310,27 @@ test('the Team tab shows the live lead and its members from the lead game state'
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
       await expect(leadCard).not.toContainText(leadName)
+      // ORCA-1094 row 5: as V28 draws Plain and Display, members sit indented under the lead with
+      // their status in a column of its own, left of the text, not inline under the ticket.
+      const layout = await panel.evaluate((node) => {
+        const left = (el: Element | null | undefined) =>
+          el?.getBoundingClientRect().left ?? Number.NaN
+        const badge = node.querySelector('[data-team-card="lead"] [data-crown]')?.parentElement
+        return [...node.querySelectorAll('[data-team-card="member"]')].map((card) => {
+          const text = card.querySelector('code')
+          const glyph = card.querySelector('[data-status-glyph]')
+          return {
+            indent: left(text) - left(badge),
+            glyphRight: glyph?.getBoundingClientRect().right ?? Number.NaN,
+            textLeft: left(text)
+          }
+        })
+      })
+      expect(layout.length, `members in ${look}`).toBeGreaterThan(0)
+      for (const row of layout) {
+        expect(row.indent, `member indent in ${look}`).toBeGreaterThanOrEqual(16)
+        expect(row.glyphRight, `status column in ${look}`).toBeLessThanOrEqual(row.textLeft)
+      }
       for (const language of ['en', 'es'] as const) {
         await orcaPage.evaluate(
           (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
