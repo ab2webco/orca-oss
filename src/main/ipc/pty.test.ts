@@ -3424,6 +3424,76 @@ describe('registerPtyHandlers', () => {
       }
     })
 
+    // ORCA-1128: the close's own teardown released the Claude owner, which used to discard the
+    // deferred exit, so the runtime never retired the closed tab and it came back after restart.
+    it.each([
+      ['shared', 'pty:kill'],
+      ['injected', 'pty:kill'],
+      ['shared', 'controller kill'],
+      ['shared', 'stopAndWait']
+    ] as const)(
+      'delivers the exit of a %s Claude PTY closed through %s to the runtime',
+      async (ownershipMode, closePath) => {
+        const exitHandlers = new Set<(payload: { id: string; code: number }) => void>()
+        let resolveInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
+        const verifierInventory = new Promise<{ id: string; cwd: string; title: string }[]>(
+          (resolve) => {
+            resolveInventory = resolve
+          }
+        )
+        // Why: only the exit verifier's inventory read is slow; stop verification reads settle.
+        const listProcesses = vi
+          .fn(async () => [] as { id: string; cwd: string; title: string }[])
+          .mockReturnValueOnce(verifierInventory)
+        const id = `closed-${ownershipMode}-claude-session`
+        const shutdown = vi.fn(async () => {
+          // Why: the daemon reports the exit while the close's shutdown is still in flight.
+          for (const handler of exitHandlers) {
+            handler({ id, code: 0 })
+          }
+        })
+        setLocalPtyProvider({
+          ...createAgentClaimProvider({}),
+          listProcesses,
+          shutdown,
+          onExit: vi.fn((handler: (payload: { id: string; code: number }) => void) => {
+            exitHandlers.add(handler)
+            return () => exitHandlers.delete(handler)
+          })
+        } as never)
+        const runtime = { setPtyController: vi.fn(), onPtyExit: vi.fn(), onPtyData: vi.fn() }
+        handlers.clear()
+        registerPtyHandlers(mainWindow as never, runtime as never)
+        const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
+          kill(ptyId: string): boolean
+          stopAndWait(ptyId: string): Promise<boolean>
+        }
+        if (ownershipMode === 'shared') {
+          markClaudePtySpawned(id, 'account-a')
+        } else {
+          livePtyGate.markInjectedClaudePtySpawned(id, 'account-a')
+        }
+
+        try {
+          if (closePath === 'pty:kill') {
+            await handlers.get('pty:kill')!(null, { id })
+          } else if (closePath === 'stopAndWait') {
+            expect(await controller.stopAndWait(id)).toBe(true)
+          } else {
+            expect(controller.kill(id)).toBe(true)
+            await vi.waitFor(() => expect(shutdown).toHaveBeenCalled())
+            await new Promise((resolve) => setTimeout(resolve, 0))
+          }
+          await vi.waitFor(() => expect(listProcesses).toHaveBeenCalled())
+          resolveInventory([])
+          await vi.waitFor(() => expect(runtime.onPtyExit).toHaveBeenCalledOnce(), { timeout: 500 })
+          expect(runtime.onPtyExit.mock.calls[0]?.[0]).toBe(id)
+        } finally {
+          livePtyGate.markClaudePtyExited(id)
+        }
+      }
+    )
+
     it('does not apply an old exit proof after same-ID Claude ownership is renewed', async () => {
       let resolveOldInventory!: (sessions: { id: string; cwd: string; title: string }[]) => void
       const oldInventory = new Promise<{ id: string; cwd: string; title: string }[]>((resolve) => {
