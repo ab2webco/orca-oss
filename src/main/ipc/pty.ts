@@ -2399,6 +2399,13 @@ type PendingClaudeProviderExit = {
   liveSettleRetryCount: number
 }
 const pendingClaudeProviderExits = new Map<string, PendingClaudeProviderExit>()
+
+/** Whether a shutdown caller must deliver the exit itself; call right before finishPtyShutdown. */
+function takeUndeliveredShutdownExit(ptyId: string, providerExitObserved: boolean): boolean {
+  // Why: finishPtyShutdown releases the Claude owner, so the verifier would drop a deferred exit
+  // as stale and the runtime would never retire the closed surface (ORCA-1128).
+  return pendingClaudeProviderExits.delete(ptyId) || !providerExitObserved
+}
 let providerListenerGeneration = 0
 let cancelProviderExitReconciliation: (() => void) | null = null
 let claudeProviderInventoryRequest: {
@@ -6259,8 +6266,9 @@ export function registerPtyHandlers(
         void shutdownProviderAndDetectExit(provider, ptyId, { immediate: false })
           .then((providerExitObserved) => {
             const retired = retiredRejectedPtyIds.has(ptyId)
+            const exitUndelivered = takeUndeliveredShutdownExit(ptyId, providerExitObserved)
             const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
-            if (!providerExitObserved && !retired) {
+            if (exitUndelivered && !retired) {
               runtime?.onPtyExit(ptyId, -1, incarnationId)
               rememberSyntheticKillExit(ptyId)
               sendPtyExitToRenderer({ id: ptyId, code: -1 })
@@ -6413,8 +6421,9 @@ export function registerPtyHandlers(
         )
         return false
       }
+      const exitUndelivered = takeUndeliveredShutdownExit(ptyId, providerExitObserved)
       const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
-      if (!providerExitObserved) {
+      if (exitUndelivered) {
         runtime?.onPtyExit(ptyId, -1, incarnationId)
         rememberSyntheticKillExit(ptyId)
         sendPtyExitToRenderer({ id: ptyId, code: -1 })
@@ -8601,8 +8610,9 @@ export function registerPtyHandlers(
     }
     // Why: some shutdown paths do not emit onExit through the provider listener.
     // Explicit cleanup is idempotent and covers already-dead PTYs.
+    const exitUndelivered = takeUndeliveredShutdownExit(args.id, providerExitObserved)
     const incarnationId = finishPtyShutdown(args.id, connectionId, store)
-    if (!providerExitObserved) {
+    if (exitUndelivered) {
       runtime?.onPtyExit(args.id, -1, incarnationId)
       rememberSyntheticKillExit(args.id)
       sendPtyExitToRenderer({ id: args.id, code: -1 })
