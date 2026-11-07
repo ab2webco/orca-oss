@@ -162,19 +162,32 @@ describe('a game lead reopened on claim', () => {
     expect(ensure).toHaveBeenCalledWith(expect.anything(), {}, { claudeAccountId: 'acct-lead' })
   })
 
-  it('refuses to reopen a lead whose account was removed instead of using the global login', async () => {
-    const runtime = runtimeWithAccounts()
-    const ensure = vi.spyOn(runtime, 'ensureAgentSession')
-
-    await expect(
-      leadDepsOf(runtime).resume({
+  // Why: the shared transcript store lets any account resume it, so the spawn picks what a new
+  // launch would get instead of naming an account that no longer exists.
+  for (const [label, stored] of [
+    [
+      'whose transcript names a removed account',
+      {
         ...STORED,
         accountId: null,
         transcriptPath: LEAD_TRANSCRIPT.replace('acct-lead', 'acct-gone')
-      })
-    ).rejects.toThrow('The Claude account that owns this conversation was removed')
-    expect(ensure).not.toHaveBeenCalled()
-  })
+      }
+    ],
+    ['whose recorded account was removed', { ...STORED, accountId: 'acct-gone' }]
+  ] as const) {
+    it(`reopens a lead ${label} with no account of its own, for the spawn to choose`, async () => {
+      const runtime = runtimeWithAccounts()
+      const ensure = vi
+        .spyOn(runtime, 'ensureAgentSession')
+        .mockResolvedValue({ terminal: { handle: 'term_new' }, disposition: 'created' } as never)
+      vi.spyOn(runtime, 'getExactWorkerProviderSessionIdentity').mockReturnValue({
+        providerSession: { key: 'session_id', id: 'sess-lead' }
+      } as never)
+
+      expect(await leadDepsOf(runtime).resume(stored)).toBe('term_new')
+      expect(ensure).toHaveBeenCalledWith(expect.anything(), {}, {})
+    })
+  }
 
   it("keeps the pane's last words in the error before it closes the pane Claude left", async () => {
     const runtime = runtimeWithAccounts()

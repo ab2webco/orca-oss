@@ -327,7 +327,7 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
-import { resolveClaudeLaunchAccountForSpawn } from '../claude-accounts/claude-resume-launch-account'
+import { resolveClaudeTranscriptUniverse } from '../../shared/claude-transcript-universe'
 import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
 import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
@@ -829,7 +829,7 @@ import {
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
-import { GameLeads } from './orchestrator-game-leads'
+import { GameLeads, type GameLeadSession } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
   GameLeadSessions,
@@ -4001,8 +4001,8 @@ export class OrcaRuntimeService {
         worktreeId: session.worktreeId,
         sessionId: session.sessionId,
         ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-        accountId:
-          session.accountId ?? (await this.claudeAccountOfTranscript(session.transcriptPath)),
+        ...(session.transcriptPath ? { transcriptPath: session.transcriptPath } : {}),
+        accountId: this.leadReopenAccountOf(session),
         presentation: 'focused'
       }),
     focus: async (handle) => {
@@ -31593,6 +31593,7 @@ export class OrcaRuntimeService {
     worktreeId: string
     sessionId: string
     agentArgs?: string
+    transcriptPath?: string
     accountId: string | null
     presentation: 'focused' | 'background'
     gameMember?: boolean
@@ -31603,7 +31604,12 @@ export class OrcaRuntimeService {
           kind: 'explicit',
           worktree: `id:${args.worktreeId}`,
           agent: 'claude',
-          providerSession: { key: 'session_id', id: args.sessionId },
+          providerSession: {
+            key: 'session_id',
+            id: args.sessionId,
+            // Why: the spawn finds the conversation in the shared store by this file name.
+            ...(args.transcriptPath ? { transcriptPath: args.transcriptPath } : {})
+          },
           ...(args.agentArgs === undefined ? {} : { agentArgs: args.agentArgs }),
           presentation: args.presentation
         },
@@ -31642,30 +31648,30 @@ export class OrcaRuntimeService {
     return handle
   }
 
-  /** The managed account a lead's transcript lives under; null for the shared home or no verdict. */
-  private async claudeAccountOfTranscript(
-    transcriptPath: string | undefined
-  ): Promise<string | null> {
-    // Why: a lead whose pane binding was gone when it registered still names its account by path,
-    // and reopening it on the global login lost the conversation (ORCA-718). With no path the
-    // spawn looks the session up itself.
-    return (
-      (await resolveClaudeLaunchAccountForSpawn({
-        launchAccountId: undefined,
-        resumeProviderSession: transcriptPath
-          ? { key: 'session_id', id: 'lead', transcriptPath }
-          : undefined,
-        hasManagedAccount: (accountId) => {
-          // Why present on a failed read: only a confirmed removal may refuse the reopen.
-          try {
-            const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts
-            return accounts ? accounts.some((one) => one.id === accountId) : true
-          } catch {
-            return true
-          }
-        }
-      })) ?? null
-    )
+  /**
+   * The account a reopened lead runs on: its recorded one, else the vault its transcript lives
+   * under, while that account exists. Null leaves it to the spawn, which takes what a new launch
+   * would get; the shared transcript store lets any account resume it (ORCA-718).
+   */
+  private leadReopenAccountOf(session: GameLeadSession): string | null {
+    const universe = session.transcriptPath
+      ? resolveClaudeTranscriptUniverse(session.transcriptPath)
+      : null
+    const candidates = [
+      session.accountId,
+      universe?.kind === 'managed-account' ? universe.accountId : null
+    ]
+    return candidates.find((accountId) => accountId && this.hasClaudeAccount(accountId)) ?? null
+  }
+
+  private hasClaudeAccount(accountId: string): boolean {
+    // Why present on a failed read: only a confirmed removal may drop a recorded account.
+    try {
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts
+      return accounts ? accounts.some((one) => one.id === accountId) : true
+    } catch {
+      return true
+    }
   }
 
   private claudeAccountLabelOf(accountId: string | null): string | null {

@@ -20,6 +20,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
+import {
+  seedClaudeTranscriptStore as seedClaudeTranscriptStoreIn,
+  type ClaudeTranscriptStoreSeed
+} from './claude-transcript-store-seed'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
@@ -54,8 +58,11 @@ type LaunchOptions = {
 type RestartSession = {
   userDataDir: string
   seedCodexResumeRollout: (sessionId: string, cwd: string) => string
-  /** Writes a Claude conversation into the isolated shared home, as a resumable session needs. */
-  seedClaudeTranscript: (sessionId: string) => string
+  /** Lays out the shared Claude transcript store and links the isolated home to it. */
+  seedClaudeTranscriptStore: (args: ClaudeTranscriptStoreSeed) => {
+    storeDir: string
+    homeClaudeDir: string
+  }
   launch: (options?: LaunchOptions) => Promise<LaunchedOrca>
   /** Gracefully close a launch, letting beforeunload flush session state. */
   close: (app: ElectronApplication) => Promise<void>
@@ -181,13 +188,8 @@ export function createRestartSession(
     return transcriptPath
   }
 
-  const seedClaudeTranscript = (sessionId: string): string => {
-    const projectDir = path.join(homeIsolation.isolatedHome, '.claude', 'projects', '-e2e-repo')
-    mkdirSync(projectDir, { recursive: true })
-    const transcriptPath = path.join(projectDir, `${sessionId}.jsonl`)
-    writeFileSync(transcriptPath, `${JSON.stringify({ type: 'summary', sessionId })}\n`)
-    return transcriptPath
-  }
+  const seedClaudeTranscriptStore: RestartSession['seedClaudeTranscriptStore'] = (args) =>
+    seedClaudeTranscriptStoreIn(homeIsolation.isolatedHome, args)
 
   const launch = async (options?: LaunchOptions): Promise<LaunchedOrca> => {
     runtimeWsPort ??= await reserveRestartRuntimeWsPort()
@@ -241,7 +243,7 @@ export function createRestartSession(
     }
   }
 
-  return { userDataDir, seedCodexResumeRollout, seedClaudeTranscript, launch, close, dispose }
+  return { userDataDir, seedCodexResumeRollout, seedClaudeTranscriptStore, launch, close, dispose }
 }
 
 /**

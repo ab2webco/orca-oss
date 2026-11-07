@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- Why: PTY IPC is centralized in one main-process module so spawn env scoping, lifecycle cleanup, process inspection, and renderer IPC stay behind one audited boundary. */
 import { join, delimiter } from 'node:path'
-import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import {
@@ -133,7 +132,8 @@ import {
   resolveClaudeLaunchAccountForSpawn,
   type ClaudeLaunchAccount
 } from '../claude-accounts/claude-resume-launch-account'
-import { findClaudeSessionUniverse } from '../claude-accounts/claude-resume-session-lookup'
+import { findSessionInSharedStore } from '../claude-accounts/claude-shared-store-session'
+import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
 import { requiresLiveClaudePtyReattach } from '../claude-accounts/live-claude-pty-reattach-requirement'
 import {
   abortInPlaceClaudeAccountSwitch,
@@ -1433,28 +1433,12 @@ function claudeLaunchAccountForSpawn(
     launchAccountId: args.claudeAccountId,
     resumeProviderSession: args.resumeProviderSession,
     hasManagedAccount: (accountId) => accounts.some((account) => account.id === accountId),
-    // Why host only: a WSL Claude keeps its conversations inside the distro, not in these dirs.
+    // Why host only: a WSL Claude keeps its conversations inside the distro, not in this store.
     ...(runtime === 'wsl'
       ? {}
       : {
-          findSessionUniverse: (sessionId: string) =>
-            findClaudeSessionUniverse({
-              sessionId,
-              universes: [
-                {
-                  accountId: null,
-                  configDir: process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
-                },
-                ...accounts
-                  .filter((account) => account.managedAuthRuntime !== 'wsl')
-                  .map((account) => ({ accountId: account.id, configDir: account.managedAuthPath }))
-              ],
-              caseInsensitivePaths: process.platform === 'win32'
-            }),
-          labelOf: (accountId: string | null) =>
-            accountId === null
-              ? 'the default login'
-              : (accounts.find((account) => account.id === accountId)?.email ?? accountId)
+          findInSharedStore: (session: AgentProviderSessionMetadata) =>
+            findSessionInSharedStore({ storeRoot: getSharedClaudeTranscriptsRoot(), session })
         })
   })
 }

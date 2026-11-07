@@ -80,8 +80,11 @@ test('a lead closed with terminal.close does not come back after a restart', asy
     )
 
     const sessionId = randomUUID()
-    // Why: a resume whose conversation no account holds is refused (ORCA-718).
-    session.seedClaudeTranscript(sessionId)
+    // Why: a resume whose conversation the shared store lacks is refused (ORCA-718).
+    session.seedClaudeTranscriptStore({
+      appUserDataDir: await firstLaunch.app.evaluate(({ app }) => app.getPath('userData')),
+      sessionId
+    })
     const client = new RuntimeClient(session.userDataDir, 30_000, null, null)
     const handle = await ensureClaudeSession(client, page, worktreeId, sessionId)
     await expect.poll(async () => (await getWorktreeTabs(page, worktreeId)).length).toBe(2)

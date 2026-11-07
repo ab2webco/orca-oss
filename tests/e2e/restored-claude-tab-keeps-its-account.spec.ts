@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { ChildProcess } from 'node:child_process'
 import type { ElectronApplication } from '@stablyai/playwright-test'
@@ -17,11 +18,32 @@ import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
 import { DEFAULT_LOCAL_ORCA_PROFILE_ID } from '../../src/shared/orca-profiles'
 import type { SleepingAgentSessionRecord } from '../../src/shared/agent-session-resume'
 
-// ORCA-718: a Claude tab open at quit cold-restores on a fresh PTY after the daemon dies, and its
-// old account binding died with the CLI. It used to resume on the global login; it must keep the
-// account that owns its transcript, or refuse when that account is gone.
+// ORCA-718: a Claude tab open at quit cold-restores on a fresh PTY after the daemon dies. Every
+// universe links projects/ to one shared transcript store, so a conversation whose account was
+// removed still resumes, on what a new launch would get; only one missing from the store cannot.
 
 const PROVIDER_SESSION_ID = 'e2e-orca-718-removed-account-session'
+const CONVERSATION_MARKER = 'ORCA718_CONVERSATION_CONTENT'
+
+/** A stand-in `claude` that prints the conversation its own config dir can reach, the way a real
+ *  resume reads it, so the pane shows both which login ran and that the content is there. */
+function writeFakeClaude(): string {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-718-fake-claude-'))
+  const script = path.join(dir, 'claude')
+  writeFileSync(
+    script,
+    [
+      '#!/bin/sh',
+      'while [ "$#" -gt 0 ]; do [ "$1" = "--resume" ] && id="$2"; shift; done',
+      'home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"',
+      'echo "RESUMED_IN=$home"',
+      'cat "$home"/projects/*/"$id".jsonl 2>/dev/null || echo "NO_CONVERSATION_FOUND"',
+      ''
+    ].join('\n')
+  )
+  chmodSync(script, 0o755)
+  return script
+}
 
 type PersistedData = {
   workspaceSession?: {
@@ -92,37 +114,32 @@ function stripPersistedPtyOwnership(userDataDir: string): void {
 }
 
 test.describe.configure({ mode: 'serial' })
+// Why: the stand-in CLI is a POSIX shell script.
+test.skip(process.platform === 'win32', 'the stand-in claude is a POSIX script')
 
 const CASES = [
   {
-    title: 'when its account was removed',
-    transcriptPath: (userDataDir: string) =>
-      path.join(
-        userDataDir,
-        'claude-accounts',
-        'acct-removed',
-        'auth',
-        'projects',
-        '-repo',
-        `${PROVIDER_SESSION_ID}.jsonl`
-      ),
-    refusal: 'The Claude account that owns this conversation was removed'
+    title: "resumes a removed account's conversation on the selected login, with its content",
+    inStore: true,
+    expectInPage: CONVERSATION_MARKER,
+    expectInTerminal: true
   },
   {
-    // Why: a record kept before transcript paths were stored carries the session id alone.
-    title: 'when no transcript path was kept and no account holds the conversation',
-    transcriptPath: () => undefined,
-    refusal: 'Orca could not find this Claude conversation under any Claude account'
+    title: 'refuses a conversation missing from the shared store, since nothing can resume it',
+    inStore: false,
+    expectInPage: 'Orca could not find this Claude conversation in its transcript store',
+    expectInTerminal: false
   }
 ] as const
 
-for (const { title, transcriptPath, refusal } of CASES) {
-  test(`a restored Claude tab never resumes on the global login ${title}`, async ({
+for (const { title, inStore, expectInPage, expectInTerminal } of CASES) {
+  test(`a restored Claude tab ${title}`, async ({
     flushRendererRecoveryEvidenceQueue
   }, testInfo) => {
     void flushRendererRecoveryEvidenceQueue
     const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf8').trim()
     const session = createRestartSession(testInfo)
+    const fakeClaude = writeFakeClaude()
     let firstApp: ElectronApplication | null = null
     let secondApp: ElectronApplication | null = null
 
@@ -130,6 +147,13 @@ for (const { title, transcriptPath, refusal } of CASES) {
       const firstLaunch = await session.launch()
       firstApp = firstLaunch.app
       const page = firstLaunch.page
+      const appUserDataDir = await firstLaunch.app.evaluate(({ app }) => app.getPath('userData'))
+      const { homeClaudeDir } = session.seedClaudeTranscriptStore({
+        appUserDataDir,
+        sessionId: PROVIDER_SESSION_ID,
+        content: `${JSON.stringify({ type: 'user', text: CONVERSATION_MARKER })}\n`,
+        inStore
+      })
       const worktreeId = await attachRepoAndOpenTerminal(page, repoPath)
       await waitForSessionReady(page)
       await expect
@@ -143,8 +167,7 @@ for (const { title, transcriptPath, refusal } of CASES) {
       await waitForActivePanePtyId(page)
       const { paneKey } = await waitForActivePaneHookDescriptor(page)
 
-      // Why `echo claude`: the spawn must read as a Claude launch without a real CLI; on the old
-      // code it ran and printed the resume line on the global login.
+      // Why this path: the conversation ran on a managed account that no longer exists.
       const record: SleepingAgentSessionRecord = {
         paneKey,
         tabId: paneKey.split(':')[0]!,
@@ -153,16 +176,22 @@ for (const { title, transcriptPath, refusal } of CASES) {
         providerSession: {
           key: 'session_id',
           id: PROVIDER_SESSION_ID,
-          ...(transcriptPath(session.userDataDir)
-            ? { transcriptPath: transcriptPath(session.userDataDir) }
-            : {})
+          transcriptPath: path.join(
+            appUserDataDir,
+            'claude-accounts',
+            'acct-removed',
+            'auth',
+            'projects',
+            '-e2e-repo',
+            `${PROVIDER_SESSION_ID}.jsonl`
+          )
         },
         prompt: '',
         state: 'working',
         capturedAt: Date.now(),
         updatedAt: Date.now(),
         origin: 'quit',
-        launchConfig: { agentCommand: 'echo claude', agentArgs: '', agentEnv: {} }
+        launchConfig: { agentCommand: fakeClaude, agentArgs: '', agentEnv: {} }
       }
       await page.evaluate((next) => {
         window.__store?.setState((state) => ({
@@ -189,7 +218,11 @@ for (const { title, transcriptPath, refusal } of CASES) {
       killPid(daemonPid)
       stripPersistedPtyOwnership(session.userDataDir)
 
-      const secondLaunch = await session.launch()
+      // Why: the pane's login shell resets HOME to the real one, so the default login's config
+      // dir is named the way Orca forwards an inherited one, keeping the resume off real data.
+      const secondLaunch = await session.launch({
+        extraEnv: { CLAUDE_CONFIG_DIR: homeClaudeDir }
+      })
       secondApp = secondLaunch.app
       const restored = secondLaunch.page
       await waitForSessionReady(restored)
@@ -201,13 +234,27 @@ for (const { title, transcriptPath, refusal } of CASES) {
       await ensureTerminalVisible(restored)
       await waitForActiveTerminalManager(restored, 30_000)
 
-      await expect
-        .poll(() => restored.evaluate(() => document.body.innerText), {
-          timeout: 30_000,
-          message: `the restored pane never refused to resume ${title}`
-        })
-        .toContain(refusal)
-      expect(await getTerminalContent(restored)).not.toContain(`--resume ${PROVIDER_SESSION_ID}`)
+      if (expectInTerminal) {
+        await expect
+          .poll(() => getTerminalContent(restored), {
+            timeout: 30_000,
+            message: 'the restored pane never showed the conversation it resumed'
+          })
+          .toContain(expectInPage)
+        // No pin and no managed account is selected, so the resume ran where a new launch would:
+        // the default login's config dir, whose projects/ links to the shared store.
+        const terminal = await getTerminalContent(restored)
+        expect(terminal).toContain(`RESUMED_IN=${homeClaudeDir}`)
+        expect(terminal).not.toContain('acct-removed')
+      } else {
+        await expect
+          .poll(() => restored.evaluate(() => document.body.innerText), {
+            timeout: 30_000,
+            message: 'the restored pane never refused the missing conversation'
+          })
+          .toContain(expectInPage)
+        expect(await getTerminalContent(restored)).not.toContain('RESUMED_IN=')
+      }
       await restored.screenshot({ path: testInfo.outputPath('restored-pane.png') })
     } finally {
       if (secondApp) {
