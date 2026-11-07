@@ -5,13 +5,10 @@
 
 jev resources/claude-plugins/orca-game/hooks/advisor-calls.ts -- draws Jev's calls only when a Jev report is held
 jev resources/claude-plugins/orca-game/hooks/advisor-card-rows.ts -- marks which rows Jev picked; plain rows otherwise
-jev resources/claude-plugins/orca-game/hooks/advisor-card.tsx -- the advisor card reads Jev's state key, empty without it
 jev resources/claude-plugins/orca-game/hooks/advisor-cues.ts -- matches Jev's gate wording; no gate, no cue
 jev resources/claude-plugins/orca-game/hooks/advisor-state.ts -- reads Jev's mod state key, which catches to null
 jev resources/claude-plugins/orca-game/hooks/advisor-sync.ts -- listens for Jev's state writes, which never fire without it
-jev resources/claude-plugins/orca-game/hooks/allies-strip.tsx -- adds Jev's row only when its advisor reads non-null
 jev resources/claude-plugins/orca-game/hooks/allies.ts -- builds Jev's ally rows from a held report only
-jev resources/claude-plugins/orca-game/hooks/fleet-pane.tsx -- flags members with a Jev model; none without reports
 jev resources/claude-plugins/orca-game/hooks/fleet-sync.ts -- sends the Jev report when one reads, null otherwise
 jev resources/claude-plugins/orca-game/hooks/jev-alerts.ts -- alerts from a held Jev report; empty for null
 jev resources/claude-plugins/orca-game/hooks/member-advisor.ts -- labels a member's Jev line, drawn only with a report
