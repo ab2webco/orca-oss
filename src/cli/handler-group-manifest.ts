@@ -33,7 +33,13 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'account',
-    keys: ['account add', 'account list', 'account switch'],
+    keys: [
+      'account add',
+      'account list',
+      'account switch',
+      'account token set',
+      'account token clear'
+    ],
     load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
   },
   {

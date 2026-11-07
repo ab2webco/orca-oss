@@ -13,7 +13,12 @@ import { readTerminalClaudeAccount } from '../terminal-claude-account'
 import { RuntimeClientError } from '../runtime-client'
 import { rejectRemoteSelectionFlags } from './account-runtime-scope'
 import { switchClaudeTerminalAccount } from './account-switch'
-import { stripElectronRunAsNode } from '../runtime/launch'
+import {
+  readTokenFromStdin,
+  runAccountTokenClear,
+  runAccountTokenSet
+} from './account-long-lived-token'
+import { envWithoutClaudeSession } from '../runtime/launch'
 import { getDefaultUserDataPath } from '../runtime/metadata'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
@@ -114,7 +119,7 @@ async function runAgentLoginInTerminal(
       )
       return
     }
-    const env = addAgentNodePaths({ ...stripElectronRunAsNode(process.env), ...extraEnv })
+    const env = addAgentNodePaths({ ...envWithoutClaudeSession(), ...extraEnv })
     const child = spawn(spawnCmd, spawnArgs, {
       // Why: JSON mode reserves stdout for the response envelope while keeping
       // the interactive login attached to the user's terminal via stderr.
@@ -316,5 +321,11 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   },
   'account switch': async (ctx) => {
     await switchClaudeTerminalAccount(ctx)
+  },
+  'account token set': async (ctx) => {
+    await runAccountTokenSet(ctx, readTokenFromStdin)
+  },
+  'account token clear': async (ctx) => {
+    await runAccountTokenClear(ctx)
   }
 }
