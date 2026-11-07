@@ -18,6 +18,10 @@ const MAX_FRAME_GAP_MS = 430
 // Why fresh windows, not a longer one: a stretched window would judge "within N s", not 2 s.
 const MAX_WINDOWS = 5
 
+// Why mapped: a never-shown window gets a frame only every ~1017 ms on CI (ORCA-760), too sparse
+// for any window to be judged (PR #1067 run 42408533741).
+test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
+
 type SceneWindow = { hashes: string[]; frames: number; maxGapMs: number }
 
 const describeWindow = (w: SceneWindow): string =>
