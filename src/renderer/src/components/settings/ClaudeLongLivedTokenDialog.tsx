@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,15 +32,6 @@ export function ClaudeLongLivedTokenDialog({
   onSave,
   onClear
 }: ClaudeLongLivedTokenDialogProps): React.JSX.Element {
-  const [draft, setDraft] = useState('')
-  // Why: a secret typed and then abandoned must not survive into the next open.
-  useEffect(() => {
-    if (!open) {
-      setDraft('')
-    }
-  }, [open])
-  const canSave = draft.trim().length > 0 && !submitting
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -59,51 +50,76 @@ export function ClaudeLongLivedTokenDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <Label htmlFor="claude-long-lived-token">
-            {translate('auto.components.settings.ClaudeLongLivedTokenDialog.inputLabel', 'Token')}
-          </Label>
-          <Input
-            id="claude-long-lived-token"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={
-              hasToken
-                ? translate(
-                    'auto.components.settings.ClaudeLongLivedTokenDialog.replacePlaceholder',
-                    'A token is stored. Paste a new one to replace it.'
-                  )
-                : undefined
-            }
-            className="text-xs"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            {translate(
-              'auto.components.settings.ClaudeLongLivedTokenDialog.limits',
-              'The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It stays on this host.'
-            )}
-          </p>
-        </div>
-        <DialogFooter className="gap-2 sm:justify-between">
-          {hasToken ? (
-            <Button variant="outline" onClick={onClear} disabled={submitting}>
-              {translate(
-                'auto.components.settings.ClaudeLongLivedTokenDialog.remove',
-                'Remove token'
-              )}
-            </Button>
-          ) : (
-            <span />
-          )}
-          <Button onClick={() => onSave(draft)} disabled={!canSave} className="gap-1.5">
-            {submitting ? <Loader2 className="size-3 animate-spin" /> : null}
-            {translate('auto.components.settings.ClaudeLongLivedTokenDialog.save', 'Save token')}
-          </Button>
-        </DialogFooter>
+        {/* Why: DialogContent unmounts on close, so a typed secret never survives into the next open. */}
+        <TokenFields
+          hasToken={hasToken}
+          submitting={submitting}
+          onSave={onSave}
+          onClear={onClear}
+        />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function TokenFields({
+  hasToken,
+  submitting,
+  onSave,
+  onClear
+}: Pick<
+  ClaudeLongLivedTokenDialogProps,
+  'hasToken' | 'submitting' | 'onSave' | 'onClear'
+>): React.JSX.Element {
+  const [draft, setDraft] = useState('')
+  const canSave = draft.trim().length > 0 && !submitting
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="claude-long-lived-token">
+          {translate('auto.components.settings.ClaudeLongLivedTokenDialog.inputLabel', 'Token')}
+        </Label>
+        <Input
+          id="claude-long-lived-token"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={
+            hasToken
+              ? translate(
+                  'auto.components.settings.ClaudeLongLivedTokenDialog.replacePlaceholder',
+                  'A token is stored. Paste a new one to replace it.'
+                )
+              : undefined
+          }
+          className="text-xs"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          {translate(
+            'auto.components.settings.ClaudeLongLivedTokenDialog.limits',
+            'The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It stays on this host.'
+          )}
+        </p>
+      </div>
+      <DialogFooter className="gap-2 sm:justify-between">
+        {hasToken ? (
+          <Button variant="outline" onClick={onClear} disabled={submitting}>
+            {translate(
+              'auto.components.settings.ClaudeLongLivedTokenDialog.remove',
+              'Remove token'
+            )}
+          </Button>
+        ) : (
+          <span />
+        )}
+        <Button onClick={() => onSave(draft)} disabled={!canSave} className="gap-1.5">
+          {submitting ? <Loader2 className="size-3 animate-spin" /> : null}
+          {translate('auto.components.settings.ClaudeLongLivedTokenDialog.save', 'Save token')}
+        </Button>
+      </DialogFooter>
+    </>
   )
 }
