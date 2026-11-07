@@ -41,4 +41,27 @@ describe('a paired host resolving a member account reads its stored logins first
     ).rejects.toThrow(/scloud@example\.com's sign-in failed on this host/)
     expect(runtime.reportEndedClaudeLogins).toHaveBeenCalledOnce()
   })
+
+  it('launches on an ended login when the host holds a long-lived token for it (ORCA-1039)', async () => {
+    const snapshot = snapshotWith([
+      { accountId: 'acct_scloud', state: 'failed', failure: 'credential-rejected' }
+    ])
+    const accounts: Record<string, unknown>[] = snapshot.claude.accounts
+    accounts[0] = { ...accounts[0], longLivedTokenSetAt: 1 }
+    const runtime = {
+      reportEndedClaudeLogins: vi.fn(async () => {}),
+      getAccountsSnapshot: vi.fn(() => snapshot),
+      refreshAccountsForMobile: vi.fn(async () => {}),
+      gameAgentsOnAccounts: vi.fn(() => [])
+    }
+
+    await expect(
+      resolveHostMemberAccount({
+        runtime: runtime as never,
+        agent: 'claude',
+        selector: 'scloud@example.com',
+        reusesTerminal: false
+      })
+    ).resolves.toMatchObject({ pin: { claudeAccountId: 'acct_scloud' } })
+  })
 })

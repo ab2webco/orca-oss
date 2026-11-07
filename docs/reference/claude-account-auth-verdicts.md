@@ -181,6 +181,35 @@ Orca does not copy a vault or a credential between hosts. Each `orca account add
 own sign-in, so a logout on one host is not this chain alias. It is the login's own end, described in
 [A Login The CLI Already Ended](#a-login-the-cli-already-ended), or a host-local rotation.
 
+## Long-Lived Tokens
+
+`claude setup-token` prints a one-year OAuth token. It saves nothing, and the CLI ranks
+`CLAUDE_CODE_OAUTH_TOKEN` above the stored /login credential
+([Claude Code authentication](https://code.claude.com/docs/en/authentication)).
+`orca account token set --account <email|id>` reads the token from a hidden prompt or stdin, never
+from argv. It stores the token in that account's vault `settings.json` env, mode 600, and the
+account record keeps only `longLivedTokenSetAt`. Every launch whose `CLAUDE_CONFIG_DIR` is the
+vault applies that env: members, `--claude-account` launches, worktree pins and an in-place account
+switch, on local, SSH and paired hosts. Those launches are expected to authenticate with the token
+and leave the stored login's refresh chain alone. That expectation is not yet observed live. The
+first live launch should confirm it by checking that the vault's stored refresh token is unchanged
+after a session. A pane opened on the global status-bar selection is not covered. It runs on the
+shared runtime credentials Orca materializes, not on the vault, so it still uses the rotating
+login. The vault belongs to its host, so each host needs its own token, set from that host. `applyClaudeEnvPatch` strips only a token the caller's environment
+supplies. The vault's own setting is untouched.
+
+What the token does not change:
+
+- The token can only make model requests. Remote Control and claude.ai connectors do not work on
+  it. Before a member depends on a connector, check that its account has no token, or clear it.
+- The verdict and the quota on a row still describe the stored login. A failed or ended login no
+  longer refuses a launch on an account that holds a token (`claudeSignInBlocksLaunch`), and the
+  login-end warning is skipped for it. `orca account list` says the token carries launches. Quota is
+  read only through the stored login. Once that login has ended, the row shows no quota (`quota:
+  unavailable` in the CLI) and never a figure attributed to the token.
+- Unverified: whether minting a new token revokes an earlier one for the same account. If it does,
+  the owner should mint once per account and reuse that token, instead of minting one per host.
+
 ## Known Limit
 
 "A pane cannot testify about a credential issued after it started" is decided in
