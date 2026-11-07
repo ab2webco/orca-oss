@@ -7,26 +7,40 @@ import { startMessagesApi } from './helpers/showcase-messages-api'
 
 // ORCA-1047: a reply drawn by the orca-game mod inside a real Claude Code copies as plain text. The
 // mod heads it with one text row and frames nothing, so a selection of its body is the same text
-// Claude Code alone draws, which `/quest off` shows in place.
+// Claude Code alone draws, which `/quest off` shows in place. ORCA-1109: the heading runs a rule of
+// struck spaces to the time into the turn, and a live line under the conversation says who, how
+// long and on what, as prototype V30 draws them.
 const WIDTHS = [1440, 768, 390, 320]
 // Box drawing and block elements: any frame, rule or bar a mod could draw around a message.
 const BOX_CHARACTERS = /[─-▟]/
 
-type Words = { status: string; next: string; answer: string; ask: string; asks: string }
+type Words = {
+  status: string
+  next: string
+  answer: string
+  ask: string
+  asks: string
+  waiting: string
+  done: string
+}
 const WORDS: Record<'en' | 'es', Words> = {
   en: {
     status: 'How is the build?',
     next: 'What now?',
     answer: 'The tests pass and the build is green. PR 924 is still in review.',
     ask: 'Everything is ready to publish.\n\nShall I open the PR?',
-    asks: 'asks you'
+    asks: 'asks you',
+    waiting: 'Waiting on you',
+    done: 'Done'
   },
   es: {
     status: '¿Cómo va el build?',
     next: '¿Y ahora?',
     answer: 'Los tests pasan y el build está en verde. El PR 924 sigue en revisión.',
     ask: 'Todo está listo para publicar.\n\n¿Abro el PR?',
-    asks: 'te pregunta'
+    asks: 'te pregunta',
+    waiting: 'Esperándote',
+    done: 'Listo'
   }
 }
 
@@ -183,6 +197,40 @@ async function copyBetween(page: Page, first: string, last: string): Promise<str
   return copyRows(page, from, to)
 }
 
+const TIME = '(\\d+:\\d\\d|\\d+ min)'
+// Why: the band's row ends in the engine's own collapse mark.
+const BAND_MARK = '( +\\[-\\])?'
+
+/** The cells of the visible row starting with `heading`: each one's character and its styles. */
+async function headingCellsOf(
+  page: Page,
+  heading: string
+): Promise<{ chars: string; isStruck: boolean }[]> {
+  return page.evaluate((text) => {
+    for (const manager of window.__paneManagers?.values() ?? []) {
+      const terminal = manager.getActivePane?.()?.terminal
+      if (!terminal) {
+        continue
+      }
+      const buffer = terminal.buffer.active
+      for (let row = 0; row < terminal.rows; row++) {
+        const line = buffer.getLine(buffer.viewportY + row)
+        if (!line?.translateToString(true).startsWith(text)) {
+          continue
+        }
+        return Array.from({ length: line.length }, (_, x) => {
+          const cell = line.getCell(x)
+          return {
+            chars: cell?.getChars() ?? '',
+            isStruck: cell?.isStrikethrough() !== 0
+          }
+        })
+      }
+    }
+    return []
+  }, heading)
+}
+
 const CASES = [
   { role: 'member' as const, theme: 'dark' as const, locale: 'es' as const, name: 'Castillo' },
   { role: 'member' as const, theme: 'light' as const, locale: 'en' as const, name: 'Castillo' },
@@ -229,6 +277,13 @@ for (const one of CASES) {
         .poll(() => screenOf(orcaPage), { timeout: 60_000, message: 'Claude never drew' })
         .toMatch(/❯|>/)
       await ask(orcaPage, words.status, (screen) => screen.includes(`${one.name} · `))
+      // A plain answer ends the turn: the live line says done, with the turn's length.
+      await expect
+        .poll(async () => rowsOf(orcaPage), { timeout: 20_000 })
+        .toContainEqual(
+          expect.stringMatching(new RegExp(`^✓ ${one.name} ${words.done} \\d+:\\d\\d${BAND_MARK}$`))
+        )
+      await shoot('live-done')
       await ask(orcaPage, words.next, (screen) => screen.includes(`${one.name} · ${words.asks}`))
       for (const width of WIDTHS) {
         await closeSidebars(orcaPage)
@@ -242,12 +297,31 @@ for (const one of CASES) {
       await expect.poll(() => screenOf(orcaPage), { timeout: 20_000 }).toContain(question)
 
       const headingText = `${one.name} · ${words.asks}`
+      // A question ends the turn waiting on the person, with the question as the step.
+      // Why polled: the band redraws a beat after the terminal widens back from 320 px.
+      await expect
+        .poll(() => rowsOf(orcaPage), { timeout: 20_000, message: 'no waiting live line' })
+        .toContainEqual(
+          expect.stringMatching(
+            new RegExp(
+              `^◆ ${one.name} ${words.waiting} \\d+:\\d\\d · ${question.replace(/[?¿]/g, '.')}${BAND_MARK}$`
+            )
+          )
+        )
       const rows = await rowsOf(orcaPage)
       expect(rows, 'the question heading is not at column 0').toContainEqual(
-        expect.stringMatching(new RegExp(`^${headingText}`))
+        expect.stringMatching(new RegExp(`^${headingText} {3,}${TIME}$`))
       )
+      // Why Claude Code's dimColor is not checked: it draws a gray foreground, not the dim attribute.
+      // The rule is struck spaces between the heading and its time: a line to the eye, blanks to a copy.
+      const cells = await headingCellsOf(orcaPage, headingText)
+      const rule = cells.filter((cell) => cell.isStruck)
+      expect(rule.length, 'no struck rule in the heading row').toBeGreaterThan(3)
+      expect(rule.map((cell) => cell.chars).join('')).toBe(' '.repeat(rule.length))
       const copied = await copyBetween(orcaPage, headingText, question)
-      expect(copied.split('\n')[0], JSON.stringify(copied)).toBe(headingText)
+      expect(copied.split('\n')[0], JSON.stringify(copied)).toMatch(
+        new RegExp(`^${headingText} {3,}${TIME}$`)
+      )
       expect(copied).not.toMatch(BOX_CHARACTERS)
       const askFirst = words.ask.split('\n')[0]!
       const body = await copyBetween(orcaPage, `● ${askFirst}`, question)
@@ -257,6 +331,9 @@ for (const one of CASES) {
       // The same rows as Claude Code alone draws them: the body must not change by a cell.
       await ask(orcaPage, '/quest off', (screen) => !screen.includes(headingText))
       await shoot('native-1440')
+      expect(await rowsOf(orcaPage), 'mode off still draws the live line').not.toContainEqual(
+        expect.stringMatching(new RegExp(`^[◆✓] ${one.name} `))
+      )
       const nativeBody = await copyBetween(orcaPage, `● ${askFirst}`, question)
       const nativeAnswer = await copyBetween(orcaPage, `● ${answerStart}`, answerStart)
       expect(body).toBe(nativeBody)
