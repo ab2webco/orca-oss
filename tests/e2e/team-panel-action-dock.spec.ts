@@ -80,11 +80,13 @@ async function dismissAppCards(page: Page): Promise<void> {
 }
 
 // Why: a card can open after a dismiss and cover the dock's corner, so each try dismisses again.
+// Why a trial: CI applied a click after its timeout, and the retry undid it (Cancel, the menu).
 async function clickPastAppCards(page: Page, target: Locator): Promise<void> {
   await expect(async () => {
     await dismissAppCards(page)
-    await target.click({ timeout: 2_000 })
+    await target.click({ trial: true, timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
+  await target.click()
 }
 
 async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
