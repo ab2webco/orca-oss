@@ -9,6 +9,7 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { ExecutionHostId } from '../../src/shared/execution-host'
 import { GAME_MEMBER_ADVISOR_VERSION } from '../../src/shared/orchestrator-game-member-advisor'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -188,7 +189,7 @@ const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
 /** A session on another host, with the worktree facts a real one carries in the store. */
 async function seedSessionOn(
   page: Page,
-  session: { worktreeId: string; hostId: string; name: string; paneKey: string }
+  session: { worktreeId: string; hostId: ExecutionHostId; name: string; paneKey: string }
 ): Promise<void> {
   await page.evaluate(({ worktreeId, hostId, name, paneKey }) => {
     const store = window.__store!
