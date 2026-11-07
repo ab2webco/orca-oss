@@ -13,7 +13,12 @@ export function teamPanelModelWithSettings(
     queue: panel.tabs.queue ? model.queue : null,
     machines: panel.tabs.machines ? model.machines : null
   }
-  return model.kind === 'team'
-    ? { ...model, ...tabs, advisor: panel.advisor ? model.advisor : null }
-    : { ...model, ...tabs }
+  if (model.kind === 'team') {
+    return { ...model, ...tabs, advisor: panel.advisor ? model.advisor : null }
+  }
+  return {
+    ...model,
+    ...tabs,
+    rows: panel.advisor ? model.rows : model.rows.map((row) => ({ ...row, advisor: null }))
+  }
 }
