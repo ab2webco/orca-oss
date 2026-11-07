@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
+import { TeamReadError, TeamReadNotice, TeamReadRetryContext } from './team-panel-read-error'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
 import {
@@ -206,6 +207,8 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
         value={active.id}
         className="min-h-0 flex-1 overflow-y-auto pb-24 scrollbar-sleek"
       >
+        {/* Why not Team: V28 draws it under the lead, and that tab places it there. */}
+        {active.id === 'team' ? null : <TeamReadNotice />}
         <TeamPanelTabBody tab={active} selectTab={select} />
       </TabsContent>
     </Tabs>
@@ -231,23 +234,13 @@ export function TeamPanelView({
       ) : null}
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
       {section.kind === 'ready' ? (
-        <TeamPanelTabs model={section.value} />
+        <TeamReadRetryContext.Provider value={retry}>
+          <TeamPanelTabs model={section.value} />
+        </TeamReadRetryContext.Provider>
       ) : section.kind === 'loading' ? (
         <TeamPanelLoadingState rows={5} />
       ) : section.kind === 'error' ? (
-        <TeamPanelMessageState
-          title={translate('teamPanel.state.modelErrorTitle', 'Could not read the team')}
-          text={section.message}
-          tone="error"
-          action={
-            retry
-              ? {
-                  label: translate('teamPanel.state.retry', 'Try again'),
-                  onClick: retry
-                }
-              : null
-          }
-        />
+        <TeamReadError retry={retry} />
       ) : (
         <TeamPanelUnavailableState
           title={translate('teamPanel.state.modelUnavailableTitle', 'Team data is not available')}

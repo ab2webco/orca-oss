@@ -1,14 +1,8 @@
-import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
-import { parsePaneKey } from '../../../../shared/stable-pane-id'
-import type { TeamHost, TeamPanelModel } from '../../../../shared/team-panel-model-types'
-import { activateAndRevealWorktree } from '@/lib/worktree-activation'
-import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
+import type { TeamPanelModel, TeamSessionRef } from '../../../../shared/team-panel-model-types'
+import { openTeamSession } from './team-session-open'
 
 /** An agent session blocked on a question to the user, as its AgentStatusEntry reports it. */
-export type TeamInboxAgentQuestion = {
-  paneKey: string
-  worktreeId: string | null
-  host: TeamHost
+export type TeamInboxAgentQuestion = TeamSessionRef & {
   repoName: string
   worktreeName: string
   text: string
@@ -25,6 +19,7 @@ export function teamInboxAgentQuestionsOf(model: TeamPanelModel): TeamInboxAgent
       ? [
           {
             paneKey: row.paneKey,
+            terminalHandle: row.terminalHandle,
             worktreeId: row.worktreeId,
             host: row.host,
             repoName: row.repoName,
@@ -39,14 +34,5 @@ export function teamInboxAgentQuestionsOf(model: TeamPanelModel): TeamInboxAgent
 
 // Why open the terminal: answering a live prompt from a row is still an open owner decision.
 export function openTeamInboxAgent(question: TeamInboxAgentQuestion): void {
-  const parsed = parsePaneKey(question.paneKey)
-  if (!question.worktreeId || !parsed) {
-    return
-  }
-  const environmentId = question.host.kind === 'remote' ? question.host.environmentId : null
-  activateAndRevealWorktree(
-    question.worktreeId,
-    environmentId ? { executionHostId: toRuntimeExecutionHostId(environmentId) } : undefined
-  )
-  activateTabAndFocusPane(parsed.tabId, parsed.leafId, { flashFocusedPane: true })
+  void openTeamSession(question, question.worktreeName)
 }
