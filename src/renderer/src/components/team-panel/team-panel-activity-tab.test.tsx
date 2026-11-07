@@ -19,8 +19,8 @@ vi.mock('@/store', () => ({
 }))
 
 const openTeamSession = vi.fn()
-vi.mock('./team-panel-open-session', () => ({
-  openTeamSession: (ref: unknown) => openTeamSession(ref)
+vi.mock('./team-session-open', () => ({
+  openTeamSession: (ref: unknown, name: string) => openTeamSession(ref, name)
 }))
 
 const roots: ReturnType<typeof createRoot>[] = []
@@ -216,7 +216,8 @@ describe('TeamPanelActivityTab', () => {
       ;(host.querySelector('[data-team-activity="other"]') as HTMLButtonElement).click()
     })
     expect(openTeamSession).toHaveBeenCalledWith(
-      expect.objectContaining({ paneKey: 'tab-a:leaf-a', worktreeId: 'wt-a' })
+      expect.objectContaining({ paneKey: 'tab-a:leaf-a', worktreeId: 'wt-a' }),
+      expect.any(String)
     )
   })
 

@@ -14,7 +14,7 @@ import {
   teamStatusTone
 } from './team-card-text'
 import { TeamActivityDetail } from './TeamActivityDetail'
-import { openTeamSession } from './team-panel-open-session'
+import { openTeamSession } from './team-session-open'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 
 const AGE_TICK_MS = 30_000
@@ -36,7 +36,7 @@ function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): Reac
       type="button"
       data-team-activity="other"
       data-pane-key={row.paneKey}
-      onClick={() => openTeamSession(row)}
+      onClick={() => void openTeamSession(row, row.worktreeName)}
       className="flex w-full min-w-0 flex-col gap-0.5 border-t border-border px-3 py-2 text-left hover:bg-sidebar-accent"
     >
       <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">

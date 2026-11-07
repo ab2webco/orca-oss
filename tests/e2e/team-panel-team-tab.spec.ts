@@ -302,12 +302,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
         })
       }, look)
     const leadCard = panel.locator('[data-team-card="lead"]')
+    // Why both: the test repo takes the machine's git default, master on Linux and main on Apple's.
+    const leadName = /^(master|main)/
     await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
-    await expect(leadCard).toContainText('master')
+    await expect(leadCard).toContainText(leadName)
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
-      await expect(leadCard).not.toContainText('master')
+      await expect(leadCard).not.toContainText(leadName)
       for (const language of ['en', 'es'] as const) {
         await orcaPage.evaluate(
           (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
