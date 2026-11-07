@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameMemberAdvisor } from '../../../../shared/orchestrator-game-member-advisor'
+import { signalGameAdvisorChanged } from './game-advisor-signal'
 
 const call = vi.hoisted(() => vi.fn())
 vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: call }))
@@ -18,6 +19,7 @@ const reads = JSON.stringify([
 
 let seen: ReadonlyMap<string, GameMemberAdvisor> = new Map()
 let root: ReturnType<typeof createRoot> | null = null
+let localChanged: (() => void) | null = null
 
 function Probe({ json, active }: { json: string; active: boolean }): null {
   seen = useTeamSoloAdvisors(json, active)
@@ -35,6 +37,20 @@ beforeEach(() => {
   vi.useFakeTimers()
   call.mockReset()
   seen = new Map()
+  localChanged = null
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      runtime: {
+        onGameAdvisorChanged: (callback: () => void) => {
+          localChanged = callback
+          return () => {
+            localChanged = null
+          }
+        }
+      }
+    }
+  })
 })
 afterEach(async () => {
   await act(async () => root?.unmount())
@@ -111,6 +127,43 @@ describe('useTeamSoloAdvisors', () => {
     expect(seen.has('tab-a:leaf')).toBe(false)
   })
 
+  // Why: a push alone reaches the Team panel at once; these rows must not lag it by a 20 s read.
+  it('reads again when a Jev report changes on this computer or a paired host', async () => {
+    call.mockResolvedValue({ advisors: [] })
+    await mount(reads, true)
+    expect(seen.size).toBe(0)
+
+    call.mockResolvedValue(answers('tab-a:leaf'))
+    await act(async () => localChanged?.())
+    expect(seen.has('tab-a:leaf')).toBe(true)
+
+    call.mockResolvedValue({ advisors: [] })
+    await act(async () => signalGameAdvisorChanged())
+    expect(seen.has('tab-a:leaf')).toBe(false)
+  })
+
+  it('keeps the newer answer when a slower read lands after it', async () => {
+    let landSlow: (answer: unknown) => void = () => {}
+    call.mockReturnValueOnce(new Promise((resolve) => (landSlow = resolve)))
+    await mount(JSON.stringify([{ environmentId: null, paneKeys: ['tab-a:leaf'] }]), true)
+
+    call.mockResolvedValueOnce(answers('tab-a:leaf'))
+    await act(async () => signalGameAdvisorChanged())
+    expect(seen.has('tab-a:leaf')).toBe(true)
+
+    await act(async () => landSlow({ advisors: [] }))
+    expect(seen.has('tab-a:leaf')).toBe(true)
+  })
+
+  it('stays with its timer on a build with no local push', async () => {
+    Object.defineProperty(window, 'api', { configurable: true, value: { runtime: {} } })
+    call.mockResolvedValue(answers('tab-a:leaf'))
+
+    await mount(reads, true)
+
+    expect(seen.has('tab-a:leaf')).toBe(true)
+  })
+
   it('skips what a host of another build sends in a shape it cannot read', async () => {
     call.mockResolvedValue({
       advisors: [
@@ -134,7 +187,9 @@ describe('useTeamSoloAdvisors', () => {
     root = null
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000)
+      signalGameAdvisorChanged()
     })
+    expect(localChanged).toBeNull()
     expect(call).toHaveBeenCalledTimes(2)
   })
 })

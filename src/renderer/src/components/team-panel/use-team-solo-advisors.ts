@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { onGameAdvisorChanged } from './game-advisor-signal'
 import {
   parseGameMemberAdvisor,
   type GameMemberAdvisor
@@ -36,7 +37,12 @@ export function useTeamSoloAdvisors(readsJson: string, active: boolean): Reports
     }
     let live = true
     const hosts = JSON.parse(readsJson) as TeamSoloAdvisorRead[]
-    const land = ({ environmentId, paneKeys }: TeamSoloAdvisorRead): void => {
+    // Why: a push can start a read while a slower one is out, and the last to land must not win.
+    const turns = new Map<TeamSoloAdvisorRead, number>()
+    const land = (host: TeamSoloAdvisorRead): void => {
+      const { environmentId, paneKeys } = host
+      const turn = (turns.get(host) ?? 0) + 1
+      turns.set(host, turn)
       const target: RuntimeClientTarget = environmentId
         ? { kind: 'environment', environmentId }
         : { kind: 'local' }
@@ -48,7 +54,7 @@ export function useTeamSoloAdvisors(readsJson: string, active: boolean): Reports
       )
         .catch(() => null)
         .then((result) => {
-          if (!live) {
+          if (!live || turns.get(host) !== turn) {
             return
           }
           setReports((held) => {
@@ -61,10 +67,13 @@ export function useTeamSoloAdvisors(readsJson: string, active: boolean): Reports
     }
     const read = (): void => hosts.forEach(land)
     read()
+    // Why keep the timer: a report that expires, or a host older than the push, sends no signal.
     const timer = setInterval(read, READ_MS)
+    const stops = [window.api.runtime.onGameAdvisorChanged?.(read), onGameAdvisorChanged(read)]
     return () => {
       live = false
       clearInterval(timer)
+      stops.forEach((stop) => stop?.())
     }
   }, [active, readsJson])
   return reports
