@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
+import type {
+  TeamPanelGameModel,
+  TeamPanelModel,
+  TeamTabId
+} from '../../../../shared/team-panel-model-types'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
 import { tabStripScrollLeftFor } from './team-panel-tab-strip'
@@ -163,11 +167,14 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
 export function TeamPanelView({
   source,
   look,
-  onOpenSettings
+  onOpenSettings,
+  dock
 }: {
   source: TeamPanelModelSource
   look: TeamPanelLook
   onOpenSettings: (repoId: string | null) => void
+  /** The action dock at the panel's foot; a slot so this view stays free of the store. */
+  dock?: (model: TeamPanelGameModel) => React.ReactNode
 }): React.JSX.Element {
   const { section, retry } = source
   const sceneStyle = useTeamSceneStyle()
@@ -201,6 +208,7 @@ export function TeamPanelView({
           title={translate('teamPanel.state.modelUnavailableTitle', 'Team data is not available')}
         />
       )}
+      {model?.kind === 'team' && dock ? dock(model) : null}
     </div>
   )
 }
