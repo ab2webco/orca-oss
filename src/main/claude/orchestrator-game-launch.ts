@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { compareAppVersions } from '../../shared/app-version'
+import { ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION } from '../../shared/orchestrator-game-min-claude-version'
 import type { ResolvedOrchestratorGameConfig } from '../../shared/orchestrator-game-config'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
@@ -13,8 +14,7 @@ import {
 import { quoteStartupArg, type AgentStartupShell } from '../../shared/tui-agent-startup-shell'
 import { quoteCmdToken } from '../claude-accounts/windows-command-invocation'
 
-// Why: Claude Code loads plugin hook modules ("mods") from this version on.
-export const ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION = '2.1.287'
+export { ORCHESTRATOR_GAME_MIN_CLAUDE_VERSION }
 
 export type OrchestratorGameLaunch = { args: string[]; env: Record<string, string> }
 

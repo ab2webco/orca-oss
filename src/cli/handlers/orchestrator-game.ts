@@ -8,6 +8,13 @@ import type { OrchestratorGameState } from '../../shared/orchestrator-game-state
 import { gameStopLabel } from '../../shared/orchestrator-game-stop-state'
 import { withGameMemberIdentity } from '../../shared/orchestrator-game-member-identity'
 import { formatGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import {
+  GAME_LEAD_PLAIN_PANE_TEXT,
+  gameLeadCliOf,
+  gameLeadNoModNoteOf,
+  gameLeadPaneGapOf,
+  type GameLeadPaneGap
+} from './orchestrator-game-lead-pane'
 
 type GameLeadRegistration = {
   registered?: boolean
@@ -21,7 +28,10 @@ type GameLeadResult = {
   lead: OrchestratorGameLead
   /** Null for a member, and for a pane that is not the project's lead: another one is. */
   brief: string | null
-  outcome?: 'live' | 'resumed'
+  /** `plain`: a Claude pane without the game mod, which cannot lead (ORCA-1110). */
+  outcome?: 'live' | 'resumed' | 'plain'
+  /** Why this lead's pane has no game mod, when it never can. */
+  noGameMod?: Exclude<GameLeadPaneGap, 'missing'>
   handle?: string
   resumeError?: string
   fresh?: boolean
@@ -31,6 +41,9 @@ type GameLeadResult = {
 const NOT_LEAD = 'Not the lead:'
 
 function leadOutcomeText(result: GameLeadResult, project: string): string | null {
+  if (result.outcome === 'plain') {
+    return `${NOT_LEAD} ${GAME_LEAD_PLAIN_PANE_TEXT}`
+  }
   if (result.outcome === 'live') {
     const rotate = result.fresh
       ? ' To rotate, close that lead, then run `orca game lead --fresh` again here.'
@@ -132,8 +145,9 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
     const lead = state.lead ?? DEFAULT_GAME_LEAD
     const role = state.role ?? 'lead'
     const project = projectNameOf(state.worktree)
+    const gap = role === 'member' ? null : gameLeadPaneGapOf(process.env, state.config)
     let registration: GameLeadRegistration = {}
-    if (role !== 'member') {
+    if (role !== 'member' && gap !== 'missing') {
       // Why quiet: an older host has no directory, and the brief must still print.
       registration =
         (await client
@@ -153,12 +167,14 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       role,
       lead,
       brief:
-        role === 'member' || elsewhere
+        role === 'member' || elsewhere || gap === 'missing'
           ? null
-          : gameLeadBriefOf(lead, project, process.env.ORCA_GAME_CLI || 'orca'),
+          : gameLeadBriefOf(lead, project, gameLeadCliOf(process.env)),
+      ...(gap === 'missing' ? { outcome: 'plain' } : {}),
       ...(elsewhere
         ? { outcome: registration.live ? 'live' : 'resumed', handle: elsewhere.handle }
         : {}),
+      ...(gap !== null && gap !== 'missing' && !elsewhere ? { noGameMod: gap } : {}),
       ...(registration.resumeError ? { resumeError: registration.resumeError } : {}),
       ...(fresh ? { fresh: true } : {})
     }
@@ -170,12 +186,15 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       if (notLead !== null || one.brief === null) {
         return notLead ?? ''
       }
+      const brief = one.noGameMod
+        ? `${gameLeadNoModNoteOf(one.noGameMod)}\n\n${one.brief}`
+        : one.brief
       if (one.resumeError) {
-        return `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${one.brief}`
+        return `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${brief}`
       }
       return one.fresh
-        ? `Orca retired ${project}'s previous lead conversation, so this session is the new lead.\n\n${one.brief}`
-        : one.brief
+        ? `Orca retired ${project}'s previous lead conversation, so this session is the new lead.\n\n${brief}`
+        : brief
     })
   }
 }
