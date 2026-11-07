@@ -79,6 +79,14 @@ async function dismissAppCards(page: Page): Promise<void> {
   }
 }
 
+// Why: a card can open after a dismiss and cover the dock's corner, so each try dismisses again.
+async function clickPastAppCards(page: Page, target: Locator): Promise<void> {
+  await expect(async () => {
+    await dismissAppCards(page)
+    await target.click({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+}
+
 async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
   await dismissAppCards(page)
   const box = await panel.boundingBox()
@@ -256,8 +264,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
 
     // Stop asks inline, in the dock, and sends nothing on Cancel.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await dismissAppCards(orcaPage)
-    await dock.getByRole('button', { name: 'Detener a todos' }).click()
+    await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'Detener a todos' }))
     await expect(dock).toContainText(
       '¿Detener a los 2 miembros? Siguen parados hasta que los reactives.'
     )
@@ -267,16 +274,14 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         await captureDock(orcaPage, panel, testInfo.outputPath(`stop-confirm-es-${width}.png`))
       }
     }
-    await dismissAppCards(orcaPage)
-    await dock.getByRole('button', { name: 'Cancelar' }).click()
+    await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'Cancelar' }))
     await expect(chips).toHaveCount(3)
 
     // The lead's own Stop hook carries the reply the dock shows: lastAssistantMessage reaches it.
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     await setTheme(orcaPage, 'dark')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await dismissAppCards(orcaPage)
-    await chips.filter({ hasText: 'Release' }).click()
+    await clickPastAppCards(orcaPage, chips.filter({ hasText: 'Release' }))
     await expect(chips.filter({ hasText: 'Release' }).locator('[data-agent-spinner]')).toBeVisible()
     await expect(chips.filter({ hasText: 'Push' })).toBeDisabled()
     await emitCodexHookStatus(endpoint, {
