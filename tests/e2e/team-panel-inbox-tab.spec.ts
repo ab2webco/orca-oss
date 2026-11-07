@@ -209,7 +209,28 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
       from: lead
     })
     // Why after the reply: the lead's reply settles every gate the member had open.
-    await send(member!, lead, 'decision_gate', 'Rebase now?', 'Rebase #917 now or wait for #913?')
+    // A real `orchestration ask`, with the member's own dispatch capability from its preamble.
+    let capability: string | null = null
+    await expect
+      .poll(
+        () => {
+          capability =
+            new RegExp(
+              `Your task ID is: ${task.result.task.id}[\\s\\S]*?--dispatch-capability (dcap_[A-Za-z0-9_-]+)`
+            ).exec(agent.readStdin())?.[1] ?? null
+          return capability
+        },
+        { timeout: 60_000, message: 'the member never got its dispatch capability' }
+      )
+      .not.toBeNull()
+    // Why not awaited: ask blocks until the lead answers, and this one is left for the lead.
+    void client
+      .call(
+        'orchestration.ask',
+        { from: member!, question: 'Rebase #917 now or wait for #913?', timeoutMs: 240_000 },
+        { orchestrationCapability: capability! }
+      )
+      .catch(() => {})
     await waitingId('Rebase #917')
 
     await client.call('game.ownerAsk', {
@@ -243,6 +264,13 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     })
     await expect(inbox.getByText('Ship the price change today or tomorrow?')).toBeVisible()
     await expect(inbox.getByText(`${otherName}`, { exact: false }).first()).toBeVisible()
+    // ORCA-780: the member's ask is the lead's to answer; it reaches you only through the lead.
+    const needsYou = inbox.locator('[data-needs-you="true"]')
+    await expect(needsYou).toHaveCount(1)
+    await expect(needsYou).toContainText('Needs you')
+    await expect(needsYou).toContainText('ORCA-12')
+    await expect(needsYou).toContainText('Merge #923 now or wait for #915 first?')
+    await expect(inbox.getByText(/Rebase #917 now or wait for #913\?/)).toHaveCount(0)
     await capture('for-you', inbox)
 
     for (const [key, name] of [
