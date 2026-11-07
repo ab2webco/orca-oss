@@ -210,6 +210,24 @@ What the token does not change:
 - Unverified: whether minting a new token revokes an earlier one for the same account. If it does,
   the owner should mint once per account and reuse that token, instead of minting one per host.
 
+Where the token goes (`claude-long-lived-token-containment.test.ts` holds a sentinel on each path):
+
+- Orca never copies it out of the vault. The global config sync, home settings mirroring, the
+  hook and statusline rewrite, account snapshots sent to paired clients, the member MCP inventory,
+  and the status and dead-hook reports all read or rewrite the vault file. They keep the token
+  in it and write it nowhere else. A vault file that does not parse is never logged, because V8's
+  parse error quotes the text around the error. Crash reports and diagnostics never read a vault.
+  Clearing the token leaves no copy behind.
+- The CLI does put the token in the environment of every subprocess it starts: Bash commands,
+  hooks, the statusline and stdio MCP servers
+  ([settings env](https://code.claude.com/docs/en/settings-reference#env)).
+  This is the same exposure as the documented `export`. Those processes run as the same user and
+  can already read the vault. An `orca` command run from such a subprocess drops the token before it
+  starts the Orca app or another account's login (`envWithoutClaudeSession`). A non-Claude agent
+  started from a member's Bash still inherits it. `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` would strip
+  it, but it also strips `CLAUDE_CONFIG_DIR`, which the statusline needs for account attribution, and
+  on Linux it hides host processes from `ps` and `kill`, so Orca does not set it.
+
 ## Known Limit
 
 "A pane cannot testify about a credential issued after it started" is decided in
