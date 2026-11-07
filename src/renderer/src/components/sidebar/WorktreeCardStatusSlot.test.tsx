@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '../../i18n/i18n'
 import { WorktreeCardStatusSlot } from './WorktreeCardStatusSlot'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 
@@ -38,7 +39,8 @@ describe('WorktreeCardStatusSlot', () => {
     status: 'pending'
   }
 
-  it('lets the unread bell replace the visual status dot by default', () => {
+  // ORCA-1131: as in V28 the row keeps its status glyph; red means only that the agent needs you.
+  it('keeps the status dot of an unread row instead of swapping it for a bell', () => {
     const markup = renderToStaticMarkup(
       <WorktreeCardStatusSlot
         worktreeId="wt-1"
@@ -52,10 +54,41 @@ describe('WorktreeCardStatusSlot', () => {
     )
 
     expect(markup).toContain('aria-label="Mark as read"')
-    expect(markup).toContain('Mark as read')
-    expect(markup).not.toContain('Active · Mark as read')
-    expect(markup).not.toContain('bg-emerald-500')
-    expect(markup).toContain('text-amber-500')
+    expect(markup).toContain('bg-emerald-500')
+    expect(markup).not.toContain('text-amber-500')
+    expect(markup).not.toContain('text-status-attention')
+  })
+
+  it('labels the unread action in the UI language', async () => {
+    await i18n.changeLanguage('es')
+    try {
+      const unread = renderToStaticMarkup(
+        <WorktreeCardStatusSlot
+          worktreeId="wt-1"
+          showStatus
+          showUnreadAction
+          isUnread
+          unreadTooltip="Marcar como leído"
+          onPointerDown={vi.fn()}
+          onToggleUnread={vi.fn()}
+        />
+      )
+      const read = renderToStaticMarkup(
+        <WorktreeCardStatusSlot
+          worktreeId="wt-1"
+          showStatus
+          showUnreadAction
+          isUnread={false}
+          unreadTooltip="Marcar como no leído"
+          onPointerDown={vi.fn()}
+          onToggleUnread={vi.fn()}
+        />
+      )
+      expect(unread).toContain('aria-label="Marcar como leído"')
+      expect(read).toContain('aria-label="Marcar como no leído"')
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 
   it('overlays an unread badge on the status dot when new card style is on', () => {
@@ -134,7 +167,7 @@ describe('WorktreeCardStatusSlot', () => {
     expect(markup).not.toContain('lucide-bell')
   })
 
-  it('keeps legacy unread working cards on the unread bell control', () => {
+  it('keeps a working glyph on an unread legacy card, behind the unread control', () => {
     mocks.status = 'working'
     const markup = renderToStaticMarkup(
       <WorktreeCardStatusSlot
@@ -151,8 +184,8 @@ describe('WorktreeCardStatusSlot', () => {
     expect(markup).toContain('aria-label="Mark as read"')
     expect(markup).toContain('Mark as read')
     expect(markup).toContain('Working')
-    expect(markup).toContain('text-amber-500')
-    expect(markup).not.toContain('border-yellow-500')
+    expect(markup).toContain('border-yellow-500')
+    expect(markup).not.toContain('text-amber-500')
     expect(markup).not.toContain('data-worktree-unread-alert=""')
   })
 
@@ -384,7 +417,7 @@ describe('WorktreeCardStatusSlot', () => {
     expect(markup).not.toContain('PR checks: Failed')
   })
 
-  it('keeps unread ahead of PR status by default', () => {
+  it('keeps the status dot ahead of PR status on an unread legacy card', () => {
     const markup = renderToStaticMarkup(
       <WorktreeCardStatusSlot
         worktreeId="wt-1"
@@ -402,8 +435,8 @@ describe('WorktreeCardStatusSlot', () => {
     expect(markup).toContain('Mark as read')
     expect(markup).not.toContain('Active · Mark as read')
     expect(markup).not.toContain('PR checks: Failed')
-    expect(markup).not.toContain('bg-emerald-500')
-    expect(markup).toContain('text-amber-500')
+    expect(markup).toContain('bg-emerald-500')
+    expect(markup).not.toContain('text-amber-500')
   })
 
   it('overlays an unread badge on PR status when new card style is on', () => {
