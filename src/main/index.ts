@@ -259,6 +259,10 @@ import {
   normalizeClaudeRuntimeSelection
 } from './claude-accounts/runtime-selection'
 import { codexHookService, setSystemCodexHomeHookSweepSuppressed } from './codex/hook-service'
+import {
+  resolveSharedHookFilePolicy,
+  setSharedHookFilePolicy
+} from './agent-hooks/shared-hook-file-policy'
 import { reconcileRetainedCodexHookHomes } from './codex/retained-codex-hook-state'
 import {
   ensureRealHomeCodexHookState,
@@ -3235,11 +3239,14 @@ void app.whenReady().then(async () => {
     console.warn('[worktrees] Failed to sweep leftover worktree directories:', error)
   })
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
-  // Why: a dev Orca shares ~/.claude with the installed one; it must not rewrite that Orca's entries (ORCA-1113).
-  if (!app.isPackaged && getMainE2EConfig().userDataDir === null) {
-    claudeHookService.setHomeManagedHookPolicy('keep-existing')
-    openClaudeHookService.setHomeManagedHookPolicy('keep-existing')
-  }
+  // Why: a dev Orca shares ~/.claude, ~/.orca/agent-hooks and ~/.codex with the installed one; it must not rewrite that Orca's files (ORCA-1113, ORCA-1131).
+  const sharedHookFilePolicy = resolveSharedHookFilePolicy({
+    isPackaged: app.isPackaged,
+    isE2E: getMainE2EConfig().userDataDir !== null
+  })
+  setSharedHookFilePolicy(sharedHookFilePolicy)
+  claudeHookService.setHomeManagedHookPolicy(sharedHookFilePolicy)
+  openClaudeHookService.setHomeManagedHookPolicy(sharedHookFilePolicy)
   const startupManagedHookSettings = store.getSettings()
   const shouldReconcileStartupManagedHooks =
     shouldInstallManagedHooks(is.dev) &&
