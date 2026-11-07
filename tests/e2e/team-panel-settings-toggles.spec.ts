@@ -215,7 +215,8 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
 
     // At 320 the 219 px panel cannot fit five tabs: the strip must say more lie on each side.
     await setPanel(orcaPage, { look: 'plain' })
-    const strip = panel.getByRole('tablist')
+    // Why first: once Inbox opens, its sub-tab list is a second tablist inside the panel.
+    const strip = panel.getByRole('tablist').first()
     await orcaPage.setViewportSize({ width: 320, height: 900 })
     await panel.getByRole('tab', { name: 'Team' }).click()
     await orcaPage.mouse.move(0, 0)
