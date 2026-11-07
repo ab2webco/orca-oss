@@ -125,6 +125,18 @@ describe('GameMemberResume.resume', () => {
     ])
   })
 
+  it('resumes a member whose worktree id is longer than a saved field (ORCA-1119)', async () => {
+    const long = `${'r'.repeat(36)}::/${'deep/'.repeat(40)}repo/live-2`
+    const { store, resume, resumed } = setup({ worktrees: [long] })
+    await store.upsert('repo:a', saved('ORCA-1', { worktreeId: long }))
+    expect(await resume.resume('repo:a', 'ORCA-1')).toEqual({
+      outcome: 'resumed',
+      terminal: 'term-ORCA-1',
+      member: { ...target, worktreeId: long }
+    })
+    expect(resumed.map((one) => one.worktreeId)).toEqual([long])
+  })
+
   it('never resumes a member whose task completed, and forgets it', async () => {
     const { store, resume, resumed } = setup({ taskStatus: 'completed' })
     await store.upsert('repo:a', saved('ORCA-1'))
