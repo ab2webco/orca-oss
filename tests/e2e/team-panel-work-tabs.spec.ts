@@ -327,6 +327,57 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
     }
     await electronApp.evaluate(() => (globalThis as RigGlobal).__teamOpenGate?.())
 
+    // TEMPORARY ORCA-1120 probe: what the live scene costs this runner's renderer. Removed before merge.
+    {
+      const probe = async (look: string): Promise<string> => {
+        await orcaPage.evaluate(
+          (next) =>
+            window.__store!.getState().updateSettings({
+              orchestratorGame: { panel: { look: next } }
+            } as never),
+          look
+        )
+        await expect(panel.locator('[data-team-scene]')).toHaveCount(look === 'game' ? 1 : 0, {
+          timeout: 30_000
+        })
+        await orcaPage.waitForTimeout(2000)
+        const fps = await orcaPage.evaluate(
+          () =>
+            new Promise<number>((resolve) => {
+              let frames = 0
+              const start = performance.now()
+              const tick = (now: number): void => {
+                frames += 1
+                if (now - start < 3000) {
+                  requestAnimationFrame(tick)
+                } else {
+                  resolve(frames / 3)
+                }
+              }
+              requestAnimationFrame(tick)
+            })
+        )
+        let started = Date.now()
+        for (let i = 0; i < 20; i++) {
+          await orcaPage.evaluate(() => document.title)
+        }
+        const roundTrip = (Date.now() - started) / 20
+        started = Date.now()
+        await setTheme(orcaPage, 'dark')
+        await settleLayout(orcaPage)
+        await expectNoSidewaysScroll(orcaPage, 'probe')
+        const check = Date.now() - started
+        return `${look}: ${fps.toFixed(1)} frames/s, ${roundTrip.toFixed(0)} ms per evaluate, ${check} ms per check`
+      }
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
+      await expect(panel.locator('[data-team-scene] canvas')).toBeVisible({ timeout: 30_000 })
+      for (const look of ['game', 'plain', 'game']) {
+        const description = await probe(look)
+        console.log(`[ORCA-1120 probe] ${description}`)
+        testInfo.annotations.push({ type: 'orca-1120-probe', description })
+      }
+    }
+
     const expectScene = async (name: SceneName, language: Language): Promise<void> => {
       const words = COPY[language]
       await panel.getByRole('tab', { name: words.tabs.prs }).click()
