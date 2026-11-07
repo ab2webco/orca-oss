@@ -5,6 +5,10 @@
 
 import { ipcMain, type WebContents } from 'electron'
 import {
+  redactTerminalSegmentRows,
+  redactWrappedTerminalRows
+} from '../../shared/dispatch-capability-redaction'
+import {
   AGENT_TERMINAL_TAIL_MAX_PANES,
   boundAgentTerminalTailLines,
   clampAgentTerminalTailLines,
@@ -80,8 +84,11 @@ export function createAgentTerminalTailReader(
           ? { read: false, reason: 'terminal-unreadable' }
           : {
               read: true,
-              lines: boundAgentTerminalTailLines(read, lines),
-              ...(segments && segments.length > 0 ? { segments: segments.slice(-lines) } : {})
+              // Why: a worker's tail shows its brief, whose commands carry its capability.
+              lines: boundAgentTerminalTailLines(redactWrappedTerminalRows(read), lines),
+              ...(segments && segments.length > 0
+                ? { segments: redactTerminalSegmentRows(segments.slice(-lines)) }
+                : {})
             }
     } catch {
       tail = { read: false, reason: 'terminal-unreadable' }
