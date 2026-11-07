@@ -2,7 +2,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
-import { settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { openTeamInbox } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
 
@@ -86,11 +86,8 @@ test('an Inbox answer wakes a lead that has no Run, and a held one shows until i
   // Why a settle: the waiter must be parked before the answer, or this proves a plain read.
   await orcaPage.waitForTimeout(1_000)
 
-  const entry = orcaPage.getByTestId('game-inbox-entry')
-  await expect(entry).toBeVisible()
-  await entry.click()
-  const sheet = orcaPage.getByTestId('game-inbox-sheet')
-  const card = sheet.locator(`[data-game-owner-question="${first.id}"]`)
+  const { inbox } = await openTeamInbox(orcaPage)
+  const card = inbox.locator(`[data-game-owner-question="${first.id}"]`)
   await card.getByRole('button', { name: 'No' }).click()
   await expect(card).toHaveCount(0)
 
@@ -98,30 +95,39 @@ test('an Inbox answer wakes a lead that has no Run, and a held one shows until i
   expect(woke).toMatchObject([
     { from_handle: 'owner', type: 'escalation', subject: expect.stringContaining('ORCA-1100') }
   ])
-  await expect(sheet.getByTestId('game-inbox-undelivered')).toHaveCount(0)
+  await expect(inbox.getByTestId('game-inbox-undelivered')).toHaveCount(0)
 
   // With the lead pane back at its shell, no lead can take an answer: the Inbox says so.
   await client.call('terminal.send', { terminal: lead, text: '\u0003' })
   const second = await ask('Merge #951 now?')
-  await expect(sheet.locator(`[data-game-owner-question="${second.id}"]`)).toBeVisible()
-  await sheet
+  await expect(inbox.locator(`[data-game-owner-question="${second.id}"]`)).toBeVisible()
+  await inbox
     .locator(`[data-game-owner-question="${second.id}"]`)
     .getByRole('button', { name: 'Yes' })
     .click()
-  const notice = sheet.getByTestId('game-inbox-undelivered')
+  const notice = inbox.getByTestId('game-inbox-undelivered')
   await expect(notice).toBeVisible()
   await expect(notice).toContainText('Merge #951 now?')
   for (const width of WIDTHS) {
+    await orcaPage.setViewportSize({ width, height: 900 })
+    await expect(notice).toBeVisible()
+    const box = await notice.boundingBox()
+    expect(box, `the notice has no box at ${width}px`).not.toBeNull()
+    expect((box?.x ?? 0) + (box?.width ?? 0), `right edge at ${width}px`).toBeLessThanOrEqual(width)
+    // The question is all that says what was held, and the panel can be about 200 px wide.
+    const cut = await notice
+      .getByText('Merge #951 now?')
+      .evaluate((node) => node.scrollWidth > node.clientWidth)
+    expect(cut, `the question is cut at ${width}px`).toBe(false)
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
-      await settleGameInboxSheet(orcaPage, width)
       await orcaPage.screenshot({
         animations: 'disabled',
         path: testInfo.outputPath(`game-inbox-undelivered-${width}-${theme}.png`)
       })
     }
   }
-  await settleGameInboxSheet(orcaPage, 1440)
+  await orcaPage.setViewportSize({ width: 1440, height: 900 })
 
   // The next lead takes it on registering, with no read of its own, and the notice goes.
   await startLead()

@@ -89,6 +89,7 @@ function renderInbox(
       projectName="orca-oss"
       projectUnread={null}
       questions={[question('q-1', 'Merge #923 now or wait for #915?', 'ORCA-1039')]}
+      undelivered={[]}
       onAnswer={vi.fn(async () => {})}
       otherGroups={[other]}
       threads={THREADS}
@@ -169,6 +170,21 @@ describe('Inbox tab', () => {
 
     expect(view.getByText('Nothing waits for you')).toBeTruthy()
     expect(view.queryByRole('tab', { name: /For you/ })).toBeNull()
+  })
+
+  // Why: the sidebar entry stayed up for a held answer, so an empty Inbox must not hide one.
+  it('shows a held answer when every list is empty', () => {
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      threads: { threads: [], waiting: [], answered: [] },
+      undelivered: [question('q-held', 'Does the warning still show?', 'ORCA-1039')]
+    })
+
+    expect(view.getByTestId('game-inbox-undelivered').textContent).toContain(
+      'Does the warning still show?'
+    )
+    expect(view.queryByText('Nothing waits for you')).toBeNull()
   })
 
   // Why: with no team, a blocked agent's question comes from its AgentStatusEntry, not the board.

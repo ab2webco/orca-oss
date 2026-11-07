@@ -111,4 +111,17 @@ describe('GameOwnerQuestionsWatcher', () => {
     expect(useAppStore.getState().rightSidebarTab).toBe('team')
     expect(useTeamPanelTabStore.getState().selected).toBe('inbox')
   })
+
+  // Why: full-page views suppress the right sidebar, and the Sheet used to open over them.
+  it('leaves a full-page view for the Inbox when the question has no workspace to open', async () => {
+    render(<GameOwnerQuestionsWatcher />)
+    await waitFor(() => expect(setBadgeCount).toHaveBeenLastCalledWith(0))
+
+    useAppStore.setState({ activeView: 'settings', rightSidebarOpen: false })
+    openInbox?.({ environmentId: null, worktreeId: null })
+
+    expect(useAppStore.getState().activeView).toBe('terminal')
+    expect(useAppStore.getState().rightSidebarOpen).toBe(true)
+    expect(useTeamPanelTabStore.getState().selected).toBe('inbox')
+  })
 })

@@ -47,9 +47,6 @@ test('another project’s question is announced, counted, answered and opens the
   electronApp,
   orcaPage
 }, testInfo) => {
-  // Why fixme: neither project has a lead, and until ORCA-1074 publishes the no-team model the
-  // Team panel shows nothing without one. Remove this line when ORCA-1074 lands (ORCA-1072).
-  test.fixme(true, 'needs the no-team Team panel model from ORCA-1074')
   const otherRepo = createOtherRepo()
   try {
     await waitForSessionReady(orcaPage)

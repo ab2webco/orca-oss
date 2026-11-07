@@ -12,6 +12,7 @@ import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestion
 import { GameInboxWaitingList } from '@/components/game-inbox/GameInboxWaitingList'
 import { GameInboxAnsweredList } from '@/components/game-inbox/GameInboxAnsweredList'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
+import { GameInboxUndelivered } from '@/components/game-inbox/GameInboxUndelivered'
 import {
   GameMemberOverride,
   GameMemberReplyForm
@@ -55,6 +56,8 @@ export type TeamInboxViewProps = {
   /** Set when this project's own questions were not read; other projects still show. */
   projectUnread: { message: string | null } | null
   questions: GameOwnerQuestion[]
+  /** Answers the board still holds because no lead took them yet. */
+  undelivered: GameOwnerQuestion[]
   onAnswer: (id: string, reply: GameOwnerReply) => Promise<void>
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
@@ -84,11 +87,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       threads.answered.length + answeredQuestions.length
     ]
   ]
-  // Why short: the panel can be about 200 px wide, where the Sheet's longer placeholders were cut.
+  // Why short: the panel can be about 200 px wide, where a longer placeholder is cut.
   const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
-  if (subTabs.every(([, , count]) => count === 0) && !props.projectUnread) {
+  const nothing = subTabs.every(([, , count]) => count === 0) && props.undelivered.length === 0
+  if (nothing && !props.projectUnread) {
     return (
       <TeamPanelMessageState
         title={translate('teamPanel.tabs.inbox.emptyTitle', 'Nothing waits for you')}
@@ -118,6 +122,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         ))}
       </TabsList>
       <TabsContent value="for-you" className={`${LIST} space-y-2`}>
+        <GameInboxUndelivered questions={props.undelivered} />
         {/* Why only with none read: the tab's own read may succeed where the model's failed. */}
         {props.projectUnread && questions.length === 0 ? (
           <div role="status" className="space-y-1 pt-2 text-xs text-muted-foreground">
@@ -240,7 +245,7 @@ export function TeamPanelInboxTab({
     done.sort((a, b) => (b.answer?.at ?? '').localeCompare(a.answer?.at ?? ''))
     return { open: read.questions.filter((one) => !one.answer), answered: done }
   }, [read.questions])
-  // Why open: the tab follows every message while it is shown, as the Sheet did when open.
+  // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
   return (
@@ -248,6 +253,7 @@ export function TeamPanelInboxTab({
       projectName={model.kind === 'team' ? model.projectName : projectName}
       projectUnread={value.projectUnread ?? null}
       questions={open}
+      undelivered={read.undelivered}
       onAnswer={read.answer}
       otherGroups={otherGroups}
       threads={threads}

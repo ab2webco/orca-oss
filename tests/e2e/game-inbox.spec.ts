@@ -113,7 +113,30 @@ test('the Inbox lists every open question for the person and sends the answer th
       })
     }
   }
+
+  // Six questions wait, and the sidebar keeps no Inbox row: they live on the tab alone.
+  const nav = orcaPage.locator('[data-contextual-tour-target="sidebar-navigation"]')
+  for (const width of [1440, 768, 390, 320]) {
+    await orcaPage.setViewportSize({ width, height: 900 })
+    await orcaPage.evaluate(() => {
+      const state = window.__store!.getState()
+      state.setRightSidebarOpen(false)
+      state.setSidebarOpen(true)
+    })
+    await expect(nav).toBeVisible()
+    await expect(nav.getByRole('button').first()).toBeVisible()
+    await expect(nav.getByRole('button', { name: /Inbox|Bandeja/ })).toHaveCount(0)
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      await orcaPage.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath(`game-inbox-sidebar-${width}-${theme}.png`)
+      })
+    }
+  }
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
+  await expect(inbox).toBeVisible()
 
   const optionCard = inbox.locator(`[data-game-owner-question="${byOption.result.question.id}"]`)
   await optionCard.getByRole('button', { name: 'Wait for lab.112' }).click()

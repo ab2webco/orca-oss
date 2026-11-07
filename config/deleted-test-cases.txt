@@ -102,7 +102,7 @@ resources/claude-plugins/orca-game/tests/project-work.spec.ts # band-chips.ts an
 resources/claude-plugins/orca-game/tests/scene-pet.spec.ts # band-chips.ts Pet chip label
 
 # ORCA-1072: the Team panel's Inbox tab replaced the sidebar Inbox entry and its Sheet. The Sheet's
-# six cases run against the tab in team-panel-inbox-mail.test.tsx. The entry's counts run in
+# eight cases run against the tab in team-panel-inbox-mail.test.tsx. The entry's counts run in
 # team-panel-inbox-overlay, use-team-panel-model and team-panel-tab-registry tests; its "stays out
 # of the sidebar" case is gone with the entry.
 src/renderer/src/components/game-inbox/GameInboxSheet.test.tsx # moved to team-panel-inbox-mail.test.tsx

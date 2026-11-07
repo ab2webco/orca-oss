@@ -7,6 +7,7 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { answerGameOwnerQuestion, type GameInboxScope } from './game-owner-questions-client'
 import { useGameInboxAppState } from './game-inbox-app-state'
+import { openGameOwnerQuestionCount } from './game-owner-questions-across-hosts'
 import { environmentIdOfHost, otherGameOwnerQuestionGroups } from './game-owner-question-groups'
 import { signalGameOwnerQuestionsChanged } from './game-owner-questions-signal'
 
@@ -59,6 +60,11 @@ export function useOtherGameInboxGroups(): GameInboxQuestionGroup[] {
       }),
     [hosts, worktreeId, hostId, environments]
   )
+}
+
+/** Every project's open questions on every host, the active project's included. */
+export function useOpenGameOwnerQuestionCount(): number {
+  return useGameInboxAppState((s) => openGameOwnerQuestionCount(s.hosts))
 }
 
 export function openQuestionCountOf(groups: readonly GameInboxQuestionGroup[]): number {
