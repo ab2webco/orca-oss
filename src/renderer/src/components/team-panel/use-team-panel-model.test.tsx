@@ -7,6 +7,7 @@ import type { TeamMemberCard, TeamPanelGameModel } from '../../../../shared/team
 import { useGameInboxAppState } from '@/components/game-inbox/game-inbox-app-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
+import { signalGameAdvisorChanged } from './game-advisor-signal'
 
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
@@ -254,6 +255,37 @@ describe('Team model refresh', () => {
     ;(pushed as (() => void) | null)?.()
     act(() => signalGameOwnerQuestionsChanged())
 
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
+
+  // Why: the scene's advisor bubble fades in 6 s; a 20 s read showed a new Jev line late (ORCA-1120).
+  it('re-reads when a Jev report changes on this computer or a paired host', async () => {
+    let pushed: (() => void) | null = null
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        runtime: {
+          onGameAdvisorChanged: (callback: () => void) => {
+            pushed = callback
+            return () => {
+              pushed = null
+            }
+          }
+        }
+      }
+    })
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    ;(pushed as (() => void) | null)?.()
+    act(() => signalGameAdvisorChanged())
+    expect(refresh).toHaveBeenCalledTimes(2)
+
+    await act(async () => roots.splice(0).forEach((root) => root.unmount()))
+    act(() => signalGameAdvisorChanged())
+    expect(pushed).toBeNull()
     expect(refresh).toHaveBeenCalledTimes(2)
   })
 })
