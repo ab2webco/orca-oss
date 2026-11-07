@@ -72,6 +72,28 @@ describe('game stop on a remote member', () => {
     ])
   })
 
+  // Why: the home refuses a second stop from stopping or stop_unknown; only release can prove it gone.
+  it.each(['stop_unknown', 'stopping'])(
+    'releases a remote member in %s without asking for another stop',
+    async (state) => {
+      const calls: string[] = []
+      const client = {
+        call: async (method: string) => {
+          calls.push(method)
+          if (method === 'orchestration.workerStop') {
+            throw new Error(`Dispatch ctx_826 cannot stop from ${state}.`)
+          }
+          return { id: 'r', ok: true, result: { dispatchId: 'ctx_826', state: 'released' } }
+        }
+      } as unknown as RuntimeClient
+
+      const entry = await stopOne(client, target(), [worker(state)])
+
+      expect(calls).toEqual(['orchestration.workerRelease'])
+      expect(entry).toMatchObject({ outcome: 'stopped', dispatchState: 'released' })
+    }
+  )
+
   it('fails by name when the host keeps the member', async () => {
     const { client } = fakeClient({
       'orchestration.workerRelease': {

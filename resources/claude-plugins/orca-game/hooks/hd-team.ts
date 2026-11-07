@@ -1,7 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { GameState } from '../types'
-import { leadTitleOf } from './game-lead'
+import { leadCharacterOf, leadTitleOf } from './game-lead'
 import { gameStrings } from './game-strings'
 import { leadStateOf } from './lead-state'
 import { isMemberPane } from './member-pane'
@@ -50,6 +50,11 @@ export function syncHdTeam(state: GameState, hasRewards: boolean): void {
   quest.lead = isLead ? leadTitleOf(state, gameStrings().art.lead) : undefined
   quest.leadState = isLead ? leadStateOf(state) : undefined
   quest.hero = heroNameOf(isMemberPane(state), state.worktree?.displayName, quest.lead)
+  quest.speaker = heroNameOf(
+    isMemberPane(state),
+    state.worktree?.displayName,
+    isLead ? leadCharacterOf(state, gameStrings().art.lead) : undefined
+  )
 }
 
 /** Plays a team event in the hd scene from this tick. */

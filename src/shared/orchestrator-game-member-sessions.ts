@@ -1,5 +1,11 @@
 /** What the lead needs to resume a member after Orca or the machine restarts: `orca game resume-members`. */
 
+import {
+  WORKTREE_ID_MAX,
+  savedWorktreeId,
+  savedWorktreeIdFields
+} from './orchestrator-game-member-worktree-id'
+
 export const GAME_MEMBER_SESSIONS_VERSION = 1
 // Why 50: a few times the 12-member cap, so finished members the lead never swept still fit.
 export const GAME_MEMBER_SESSIONS_MAX = 50
@@ -71,10 +77,18 @@ function parseMember(raw: unknown): GameMemberSession | null {
   const member = Object.fromEntries(
     [...REQUIRED_FIELDS, ...NULLABLE_FIELDS].map((key) => [key, raw[key]])
   ) as GameMemberSession
-  return { ...member, ticket: member.ticket.toUpperCase() }
+  return {
+    ...member,
+    ticket: member.ticket.toUpperCase(),
+    worktreeId: savedWorktreeId(member.worktreeId, raw.fullWorktreeId, TEXT_MAX)
+  }
 }
 
-const MEMBER_KEYS: ReadonlySet<string> = new Set([...REQUIRED_FIELDS, ...NULLABLE_FIELDS])
+const MEMBER_KEYS: ReadonlySet<string> = new Set([
+  ...REQUIRED_FIELDS,
+  ...NULLABLE_FIELDS,
+  'fullWorktreeId'
+])
 const FILE_KEYS: ReadonlySet<string> = new Set(['version', 'members'])
 
 const keysOutside = (
@@ -135,7 +149,11 @@ export function serializeGameMemberSessions(
   return JSON.stringify({
     ...kept?.file,
     version: GAME_MEMBER_SESSIONS_VERSION,
-    members: members.map((member) => ({ ...kept?.members[member.ticket], ...member }))
+    members: members.map((member) => ({
+      ...kept?.members[member.ticket],
+      ...member,
+      ...savedWorktreeIdFields(member.worktreeId, TEXT_MAX)
+    }))
   })
 }
 
@@ -144,7 +162,12 @@ const clipped = (patch: GameMemberSessionPatch): GameMemberSessionPatch =>
   Object.fromEntries(
     Object.entries(patch)
       .filter((entry) => entry[1] !== undefined && entry[1] !== '')
-      .map(([key, value]) => [key, typeof value === 'string' ? value.slice(0, TEXT_MAX) : value])
+      .map(([key, value]) => [
+        key,
+        typeof value === 'string'
+          ? value.slice(0, key === 'worktreeId' ? WORKTREE_ID_MAX : TEXT_MAX)
+          : value
+      ])
   ) as GameMemberSessionPatch
 
 /** What `orca game resume-members` needs to bind a fresh dispatch to a member's own task. */

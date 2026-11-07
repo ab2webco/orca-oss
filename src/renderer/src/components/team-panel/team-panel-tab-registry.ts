@@ -57,7 +57,8 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
     id: 'inbox',
     title: () => translate('teamPanel.tabs.inbox.title', 'Inbox'),
     section: (model) => model.inbox,
-    isEmpty: (counts) => counts.forYou + counts.waiting + counts.threads + counts.answered === 0,
+    // Why never: a no-team model counts only agent questions, so the body judges from what it reads.
+    isEmpty: () => false,
     count: (model) =>
       model.inbox.kind === 'ready' && model.inbox.value.forYou > 0
         ? model.inbox.value.forYou

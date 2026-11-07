@@ -90,7 +90,7 @@ export type AgentSubagentSnapshot = {
   startedAt: number
 }
 
-export type AgentStatusEntry = {
+export type AgentStatusEntry = Pick<AgentStatusPayload, 'effort'> & {
   state: AgentStatusState
   /** The user's most recent prompt. Cached across the turn — later tool-use events
    *  omit it, so the last value persists until a new prompt or pane reset. Empty when unknown. */

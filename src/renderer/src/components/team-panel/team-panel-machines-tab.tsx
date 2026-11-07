@@ -1,10 +1,10 @@
-import { StatusDot } from '@/components/StatusDot'
 import { statusToneTextClass } from '@/components/status-tone'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamMachine } from '../../../../shared/team-panel-model-types'
 import { teamHostText, teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamStatusMark } from './TeamStatusMark'
 
 const GB = 1024 ** 3
 const FULL_PERCENT = 95
@@ -21,12 +21,15 @@ function statusWord(machine: TeamMachine): string {
   if (machine.running === 0) {
     return translate('teamPanel.machines.free', 'Free')
   }
-  return machine.cap === null
-    ? translate('teamPanel.machines.running', '{{count}} agents', { count: machine.running })
-    : translate('teamPanel.machines.runningOfCap', '{{count}} of {{cap}} agents', {
-        count: machine.running,
-        cap: machine.cap
-      })
+  if (machine.cap !== null) {
+    return translate('teamPanel.machines.runningOfCap', '{{count}} of {{cap}} agents', {
+      count: machine.running,
+      cap: machine.cap
+    })
+  }
+  return machine.running === 1
+    ? translate('teamPanel.machines.runningOne', '1 agent')
+    : translate('teamPanel.machines.running', '{{count}} agents', { count: machine.running })
 }
 
 function MemoryBar({
@@ -85,7 +88,7 @@ function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
             'text-muted-foreground': machine.status === 'idle'
           })}
         >
-          <StatusDot tone={tone} />
+          <TeamStatusMark status={machine.status} />
           {statusWord(machine)}
         </span>
       </div>

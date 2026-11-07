@@ -118,6 +118,8 @@ export type TeamMemberCard = TeamAgentFacts & {
 export type TeamLeadCard = TeamAgentFacts & {
   characterKey: string | null
   branch: string | null
+  /** The oldest question the lead asked the user that is still open; the text stays in Inbox. */
+  ownerAsk: { ticket: string | null } | null
 }
 
 /** One sub-agent decision Jev made: which agent, on what, and what it did. */
@@ -203,6 +205,8 @@ export type TeamMachine = {
         loadAverage1m: number | null
       }
     | { kind: 'unreachable'; lastSeenAt: number | null }
+    /** No figures to show: an SSH target has no Orca to ask, and a saved host may not have answered yet. */
+    | { kind: 'unread' }
 }
 
 /** Display's figures; each is null when Orca has no data for it, and the page says so. */

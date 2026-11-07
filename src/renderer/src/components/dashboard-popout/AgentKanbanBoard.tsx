@@ -112,7 +112,10 @@ function KanbanColumn({
   return (
     // Why: attention no longer tints the whole column — the cards inside carry
     // their own state color, so a column border would double-signal it.
-    <section className="flex min-w-[264px] flex-1 flex-col rounded-xl border border-border/60 bg-muted/30">
+    <section
+      data-agent-board-column={bucket}
+      className="flex min-w-[264px] flex-1 flex-col rounded-xl border border-border/60 bg-muted/30"
+    >
       <header className="flex items-center gap-2 px-3 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {bucketLabel(bucket)}
@@ -312,16 +315,21 @@ export function AgentKanbanBoard({
       <div
         className={cn('relative flex flex-col bg-background text-foreground', containerClassName)}
       >
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+        {/* Why: at phone widths the toggle drops to a row of its own, below the title and actions. */}
+        <div className="@container/board-header flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
           <h1 className="text-[13px] font-semibold">
             {translate('dashboardPopout.title', 'Agents')}
           </h1>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[11px] whitespace-nowrap text-muted-foreground">
             {translate('dashboardPopout.total', '{{count}} total', {
               count: availableCards.length
             })}
           </span>
-          <AgentDashboardViewToggle view={view} onViewChange={handleViewChange} />
+          <AgentDashboardViewToggle
+            view={view}
+            onViewChange={handleViewChange}
+            className="@max-[440px]/board-header:order-last"
+          />
           {headerActions || onClose ? (
             <div className="ml-auto flex items-center gap-1">
               {headerActions}
