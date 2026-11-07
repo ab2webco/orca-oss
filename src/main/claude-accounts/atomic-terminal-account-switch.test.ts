@@ -383,13 +383,31 @@ describe('runAtomicClaudeTerminalAccountSwitch rollback', () => {
     // Claude eventually starts there owns the pane on a session nobody captured.
     expect(writes).toHaveLength(1)
     expect(calls.filter((call) => call === 'writeLaunchCommand')).toHaveLength(1)
+    // Why: the live destination CLI runs on the target vault; releasing that claim or
+    // rebinding the pane to the source lets Orca rotate the target chain under it.
+    expect(calls).toContain('commit')
+    expect(calls).not.toContain('abort')
     expect(result.recovery).toEqual({
       accountId: 'account-source',
       sessionId: SESSION_ID,
       terminal: 'orca-terminal-1',
-      ptyId: 'pty-1',
-      configDir: '/vault/account-source/auth'
+      ptyId: 'pty-1'
     })
+  })
+
+  it('keeps the target reserved when a still-running destination cannot be bound', async () => {
+    const { ports, calls } = buildPorts({
+      awaitExactSession: async () => ({ ok: false, reason: 'session-mismatch' }),
+      stopDestination: async () => false,
+      commit: async () => {
+        calls.push('commit')
+        return false
+      }
+    })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+
+    expect(result.state).toBe('rollback-failed')
+    expect(calls).not.toContain('abort')
   })
 
   it('reports rollback-failed when the restored source session cannot be re-verified', async () => {

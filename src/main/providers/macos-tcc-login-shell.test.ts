@@ -463,7 +463,8 @@ describe('wrapShellSpawnForMacosTccAttribution', () => {
       {
         encoding: 'utf8',
         env: { ...process.env, BASH_ENV: '/dev/stdin' },
-        input: 'printf "BASH_ENV_EXECUTED\\n"\n'
+        input: 'printf "BASH_ENV_EXECUTED\\n"\n',
+        timeout: 20_000
       }
     )
 

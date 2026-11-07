@@ -319,14 +319,16 @@ export async function runAtomicClaudeTerminalAccountSwitch(
     // rollback ends up on a fresh session with no transcript (ORCA-169).
     const destinationStopped =
       options.launched === false ? true : await ports.stopDestination(capture!)
+    // Why refusing beats relaunching: leaving the captured session unresumed is recoverable
+    // from the recovery payload; losing its binding to a fresh session is not. The live
+    // destination stays claimed on the target, or Orca could rotate that chain under it.
+    if (!destinationStopped) {
+      await ports.commit({ capture: capture!, reservationId: begun.reservationId })
+      return rollbackFailed(cause)
+    }
     const aborted = await ports.abort({ capture: capture!, reservationId: begun.reservationId })
     if (!aborted.ok) {
       return rollbackFailed(cause)
-    }
-    // Why refusing beats relaunching: leaving the captured session unresumed is recoverable
-    // from the recovery payload; losing its binding to a fresh session is not.
-    if (!destinationStopped) {
-      return rollbackFailed(cause, aborted.configDir)
     }
     if (!(await restoreSource({ configDir: aborted.configDir, shell: begun.shell }))) {
       return rollbackFailed(cause, aborted.configDir)
