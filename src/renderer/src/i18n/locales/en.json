@@ -16341,6 +16341,9 @@
           "send": "Send",
           "overridePlaceholder": "Replace the lead's answer",
           "override": "Override"
+        },
+        "GameInboxUndelivered": {
+          "title": "Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it."
         }
       }
     },
@@ -17020,5 +17023,11 @@
       "title": "Release {{value0}} resume records?",
       "description": "Orca Lab will no longer offer to resume these sessions in {{value0}}. Transcripts on disk are not affected."
     }
+  },
+  "claudeDeadHooks": {
+    "title": "Claude hooks are not running",
+    "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
+    "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
+    "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
   }
 }

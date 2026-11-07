@@ -12,6 +12,11 @@ import {
   type HooksConfig
 } from '../agent-hooks/installer-utils'
 import { wrapRuntimeHomeHookCommand } from '../agent-hooks/runtime-home-hook-command'
+import {
+  hasAnyManagedHook,
+  holdsIdenticalManagedEntry,
+  type ManagedHookWritePolicy
+} from './managed-hook-placement'
 
 export type ClaudeCompatibleHookSettings = {
   configDirName: '.claude' | '.openclaude'
@@ -213,18 +218,27 @@ export function applyManagedHooks(
   scriptFileName = getManagedScriptFileName(),
   // Why: callers pass a version-gated subset so an older Claude Code client
   // never receives an event key it would reject; defaults to the full set.
-  events: readonly ClaudeHookEventSpec[] = CLAUDE_EVENTS
+  events: readonly ClaudeHookEventSpec[] = CLAUDE_EVENTS,
+  policy: ManagedHookWritePolicy = 'replace'
 ): HooksConfig {
   const nextHooks = { ...config.hooks }
   const isManagedCommand = createManagedCommandMatcher(scriptFileName)
+  if (policy === 'keep-existing' && hasAnyManagedHook(config, isManagedCommand)) {
+    return config
+  }
 
   for (const event of events) {
     const current = Array.isArray(nextHooks[event.eventName]) ? nextHooks[event.eventName] : []
-    const cleaned = removeManagedCommands(current, isManagedCommand)
     const definition: HookDefinition = {
       ...event.definition,
       hooks: [hook]
     }
+    // Why: moving an unchanged entry to the end rewrote the file on every start once a plugin
+    // appended a hook after it.
+    if (holdsIdenticalManagedEntry(current, definition, isManagedCommand)) {
+      continue
+    }
+    const cleaned = removeManagedCommands(current, isManagedCommand)
     nextHooks[event.eventName] = [...cleaned, definition]
   }
 
@@ -259,9 +273,11 @@ export function getStatusLineInstallMarkerPath(settings = CLAUDE_HOOK_SETTINGS):
 export function applyManagedStatusLine(
   config: HooksConfig,
   command: string,
-  scriptFileName = getStatusLineScriptFileName()
+  scriptFileName = getStatusLineScriptFileName(),
+  policy: ManagedHookWritePolicy = 'replace'
 ): HooksConfig {
-  if (getStatusLineSlotState(config, scriptFileName) === 'user') {
+  const slot = getStatusLineSlotState(config, scriptFileName)
+  if (slot === 'user' || (slot === 'managed' && policy === 'keep-existing')) {
     return config
   }
   return { ...config, statusLine: { type: 'command', command } }

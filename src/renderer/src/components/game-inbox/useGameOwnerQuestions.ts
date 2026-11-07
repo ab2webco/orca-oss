@@ -5,7 +5,7 @@ import type {
 } from '../../../../shared/orchestrator-game-owner-questions'
 import {
   answerGameOwnerQuestion,
-  readOpenGameOwnerQuestions,
+  readGameOwnerQuestions,
   type GameInboxScope
 } from './game-owner-questions-client'
 import { onGameOwnerQuestionsChanged } from './game-owner-questions-signal'
@@ -20,12 +20,19 @@ function scopeKeyOf(scope: GameInboxScope | null): string | null {
   return `${host}\u0000${scope.worktreeId}`
 }
 
-/** The open questions the lead asked the person, reread on a pushed change or window focus; pass a memoized scope. */
+type LoadedQuestions = {
+  key: string
+  questions: GameOwnerQuestion[]
+  undelivered: GameOwnerQuestion[]
+}
+
+/** The open questions the lead asked the person, and answers not yet with the lead, reread on a pushed change or window focus; pass a memoized scope. */
 export function useGameOwnerQuestions(scope: GameInboxScope | null): {
   questions: GameOwnerQuestion[]
+  undelivered: GameOwnerQuestion[]
   answer: (id: string, reply: GameOwnerReply) => Promise<void>
 } {
-  const [loaded, setLoaded] = useState<{ key: string; questions: GameOwnerQuestion[] } | null>(null)
+  const [loaded, setLoaded] = useState<LoadedQuestions | null>(null)
   // Why: a slower earlier read must not overwrite a later one.
   const readSeq = useRef(0)
 
@@ -33,14 +40,14 @@ export function useGameOwnerQuestions(scope: GameInboxScope | null): {
     const key = scopeKeyOf(current)
     const seq = ++readSeq.current
     try {
-      const questions = await readOpenGameOwnerQuestions(current)
+      const read = await readGameOwnerQuestions(current)
       if (seq === readSeq.current && key) {
-        setLoaded({ key, questions })
+        setLoaded({ key, ...read })
       }
     } catch {
       // Why: a host without the board (older build, offline) shows no questions, not an error.
       if (seq === readSeq.current && key) {
-        setLoaded({ key, questions: NO_QUESTIONS })
+        setLoaded({ key, questions: NO_QUESTIONS, undelivered: NO_QUESTIONS })
       }
     }
   }, [])
@@ -73,8 +80,10 @@ export function useGameOwnerQuestions(scope: GameInboxScope | null): {
   )
 
   const scopeKey = scopeKeyOf(scope)
+  const current = loaded && loaded.key === scopeKey ? loaded : null
   return {
-    questions: loaded && loaded.key === scopeKey ? loaded.questions : NO_QUESTIONS,
+    questions: current?.questions ?? NO_QUESTIONS,
+    undelivered: current?.undelivered ?? NO_QUESTIONS,
     answer
   }
 }

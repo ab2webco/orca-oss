@@ -327,6 +327,7 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
+import { resolveClaudeTranscriptUniverse } from '../../shared/claude-transcript-universe'
 import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
 import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
@@ -578,6 +579,7 @@ import {
   worktreeWorkspaceKey
 } from '../../shared/workspace-scope'
 import {
+  isValidResolvedWorktreeLineageEdge,
   projectResolvedWorktreeLineage,
   sharesResolvedWorktreeLineageBoundary
 } from '../../shared/resolved-worktree-lineage'
@@ -818,7 +820,8 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
-import { GameBoard, withProjectLead, type GameBoardProject } from './orchestrator-game-board'
+import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import { withProjectLead } from './orchestrator-game-project-lead'
 import {
   gameOwnerQuestionMobileNotification,
   gameOwnerQuestionNotificationId,
@@ -827,7 +830,7 @@ import {
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
-import { GameLeads } from './orchestrator-game-leads'
+import { GameLeads, type GameLeadSession } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
   GameLeadSessions,
@@ -1827,7 +1830,7 @@ export type RuntimeClaudeTerminalSwitchSnapshot = {
   wslDistro: string | null
   /** Non-null for SSH/remote-owned PTYs, whose auth and transcripts live elsewhere. */
   remoteConnectionId: string | null
-  providerSession: { agent: 'claude'; id: string } | null
+  providerSession: { agent: 'claude'; id: string; transcriptPath?: string } | null
 }
 
 type TerminalCreateOptions = {
@@ -3982,20 +3985,25 @@ export class OrcaRuntimeService {
       const accountId = pane.remoteConnectionId
         ? null
         : getLiveInjectedClaudePtyAccountId(pane.ptyId)
+      const transcriptPath = pane.remoteConnectionId
+        ? undefined
+        : pane.providerSession.transcriptPath
       return {
         sessionId: pane.providerSession.id,
         agentArgs: leadResumeArgsOf(pane.launchConfig),
         worktreeId: pane.worktreeId,
-        accountId
+        accountId,
+        ...(transcriptPath ? { transcriptPath } : {})
       }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
-    resume: (session) =>
+    resume: async (session) =>
       this.reopenClaudeConversation({
         worktreeId: session.worktreeId,
         sessionId: session.sessionId,
         ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-        accountId: session.accountId,
+        ...(session.transcriptPath ? { transcriptPath: session.transcriptPath } : {}),
+        accountId: this.leadReopenAccountOf(session),
         presentation: 'focused'
       }),
     focus: async (handle) => {
@@ -17473,10 +17481,19 @@ export class OrcaRuntimeService {
         continue
       }
       scannedSessions.add(session)
+      const sessionTabIds = new Set(
+        Object.values(session.tabsByWorktree ?? {}).flatMap((tabs) => tabs.map((tab) => tab.id))
+      )
       for (const [paneKey, record] of Object.entries(
         session.sleepingAgentSessionsByPaneKey ?? {}
       )) {
-        if (!worktreeIdsInScope.has(record.worktreeId) || !parsePaneKey(paneKey)) {
+        const pane = parsePaneKey(paneKey)
+        if (!worktreeIdsInScope.has(record.worktreeId) || !pane) {
+          continue
+        }
+        // Why: a live/quit record whose tab is gone was closed; listing it relisted the closed tab
+        // as sleeping (ORCA-718). The record stays so the conversation can still be resumed by hand.
+        if (record.origin !== 'worktree-sleep' && !sessionTabIds.has(record.tabId ?? pane.tabId)) {
           continue
         }
         byPaneKey.set(paneKey, record)
@@ -18603,7 +18620,13 @@ export class OrcaRuntimeService {
       remoteConnectionId: pty.connectionId,
       providerSession:
         observed?.agent === 'claude' && observed.providerSession?.id
-          ? { agent: 'claude', id: observed.providerSession.id }
+          ? {
+              agent: 'claude',
+              id: observed.providerSession.id,
+              ...(observed.providerSession.transcriptPath
+                ? { transcriptPath: observed.providerSession.transcriptPath }
+                : {})
+            }
           : null
     }
   }
@@ -26666,6 +26689,80 @@ export class OrcaRuntimeService {
       : null
   }
 
+  /**
+   * Nests a game member's worktree under its lead's whatever path started it (ORCA-1116).
+   * Returns why it cannot, so the launch reports it instead of a silent top-level row.
+   */
+  async nestGameMemberWorktree(
+    memberWorktreeId: string,
+    leadWorktreeId: string,
+    context: { taskId: string; runId: string; coordinatorHandle: string }
+  ): Promise<string | null> {
+    const store = this.store
+    if (memberWorktreeId === leadWorktreeId) {
+      return null
+    }
+    if (!store?.setWorktreeLineage || !store.getWorktreeLineage) {
+      return 'Orca Lab could not store worktree lineage.'
+    }
+    const member = await this.resolveWorktreeSelector(`id:${memberWorktreeId}`)
+    const lead = await this.resolveWorktreeSelector(`id:${leadWorktreeId}`)
+    const current = store.getWorktreeLineage(member.id)
+    const currentParent = current
+      ? await this.resolveWorktreeSelector(`id:${current.parentWorktreeId}`).catch(() => undefined)
+      : undefined
+    // Why keep a hand-set parent: the person chose it; any other edge follows the current lead.
+    if (
+      current &&
+      currentParent &&
+      isValidResolvedWorktreeLineageEdge(member, currentParent, current) &&
+      (currentParent.id === lead.id || current.origin === 'manual')
+    ) {
+      return null
+    }
+    try {
+      this.validateLineageParent(member, lead)
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+    // Why mint: a worktree with no meta row (often the lead's main checkout) has no instanceId,
+    // and worktree creation then records no edge at all.
+    const memberInstanceId = member.instanceId ?? store.setWorktreeMeta(member.id, {}).instanceId
+    const leadInstanceId = lead.instanceId ?? store.setWorktreeMeta(lead.id, {}).instanceId
+    if (!memberInstanceId || !leadInstanceId) {
+      return 'Worktree instance identity was unavailable.'
+    }
+    const createdAt = Date.now()
+    const capture = { source: 'orchestration-context', confidence: 'explicit' } as const
+    store.setWorktreeLineage(member.id, {
+      worktreeId: member.id,
+      worktreeInstanceId: memberInstanceId,
+      parentWorktreeId: lead.id,
+      parentWorktreeInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    store.setWorkspaceLineage?.({
+      childWorkspaceKey: worktreeWorkspaceKey(member.id),
+      childInstanceId: memberInstanceId,
+      parentWorkspaceKey: worktreeWorkspaceKey(lead.id),
+      parentInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    this.invalidateResolvedWorktreeCache()
+    this.notifyWorktreesChanged(member.repoId)
+    return null
+  }
+
   async updateManagedWorktreeMeta(
     worktreeSelector: string,
     updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
@@ -28365,6 +28462,8 @@ export class OrcaRuntimeService {
       env: startup.env,
       launchConfig: startup.launchConfig,
       launchAgent: request.agent,
+      // Why: the spawn picks a Claude resume's account from this session (ORCA-718).
+      ...(request.agent === 'claude' ? { resumeProviderSession: identity.providerSession } : {}),
       presentation: request.presentation ?? 'background',
       tabId: request.placement?.tabId,
       leafId: request.placement?.leafId,
@@ -31577,6 +31676,7 @@ export class OrcaRuntimeService {
     worktreeId: string
     sessionId: string
     agentArgs?: string
+    transcriptPath?: string
     accountId: string | null
     presentation: 'focused' | 'background'
     gameMember?: boolean
@@ -31587,7 +31687,12 @@ export class OrcaRuntimeService {
           kind: 'explicit',
           worktree: `id:${args.worktreeId}`,
           agent: 'claude',
-          providerSession: { key: 'session_id', id: args.sessionId },
+          providerSession: {
+            key: 'session_id',
+            id: args.sessionId,
+            // Why: the spawn finds the conversation in the shared store by this file name.
+            ...(args.transcriptPath ? { transcriptPath: args.transcriptPath } : {})
+          },
           ...(args.agentArgs === undefined ? {} : { agentArgs: args.agentArgs }),
           presentation: args.presentation
         },
@@ -31624,6 +31729,32 @@ export class OrcaRuntimeService {
       )
     }
     return handle
+  }
+
+  /**
+   * The account a reopened lead runs on: its recorded one, else the vault its transcript lives
+   * under, while that account exists. Null leaves it to the spawn, which takes what a new launch
+   * would get; the shared transcript store lets any account resume it (ORCA-718).
+   */
+  private leadReopenAccountOf(session: GameLeadSession): string | null {
+    const universe = session.transcriptPath
+      ? resolveClaudeTranscriptUniverse(session.transcriptPath)
+      : null
+    const candidates = [
+      session.accountId,
+      universe?.kind === 'managed-account' ? universe.accountId : null
+    ]
+    return candidates.find((accountId) => accountId && this.hasClaudeAccount(accountId)) ?? null
+  }
+
+  private hasClaudeAccount(accountId: string): boolean {
+    // Why present on a failed read: only a confirmed removal may drop a recorded account.
+    try {
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts
+      return accounts ? accounts.some((one) => one.id === accountId) : true
+    } catch {
+      return true
+    }
   }
 
   private claudeAccountLabelOf(accountId: string | null): string | null {

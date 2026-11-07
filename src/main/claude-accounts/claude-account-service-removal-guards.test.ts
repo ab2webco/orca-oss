@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ClaudeRateLimitAccountsState } from '../../shared/types'
 import {
@@ -9,8 +8,11 @@ import {
   setPlatform
 } from './claude-account-service-test-harness'
 import { deleteActiveClaudeKeychainCredentialsStrict } from './keychain'
+import { createIsolatedTestProfilePath } from './claude-service-test-profile'
 
-const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-removal-guards-test')
+const CLAUDE_SERVICE_TEST_ROOT = createIsolatedTestProfilePath(
+  'orca-claude-service-removal-guards-test'
+)
 
 vi.mock('electron', () => ({
   app: {
