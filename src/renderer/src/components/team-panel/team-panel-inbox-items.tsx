@@ -1,3 +1,4 @@
+import React from 'react'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -8,14 +9,19 @@ import type {
 import { teamAgeText, teamHostText } from './team-card-text'
 import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
 
-/** A session blocked on the user; its options are shown, answered in its own terminal. */
+/** A session blocked on the user; V28's option buttons answer it, its terminal stays one click away. */
 export function TeamInboxAgentCard({
   question,
-  onOpen
+  onOpen,
+  onAnswer
 }: {
   question: TeamInboxAgentQuestion
   onOpen: (question: TeamInboxAgentQuestion) => void
+  /** Null when one option cannot answer it, as with several questions or a multi-select. */
+  onAnswer: ((optionIndex: number) => boolean) | null
 }): React.JSX.Element {
+  // Why hold the buttons: a second tap would type its digit into the agent's next turn.
+  const [sent, setSent] = React.useState(false)
   const place = [question.repoName, question.worktreeName]
   if (question.host.kind === 'remote') {
     place.push(teamHostText(question.host))
@@ -27,18 +33,35 @@ export function TeamInboxAgentCard({
     >
       <p className="truncate text-xs text-muted-foreground">{place.join(' · ')}</p>
       <p className="text-sm break-words whitespace-pre-wrap">{question.text}</p>
-      {question.options.length > 0 ? (
+      {question.options.length > 0 && !onAnswer ? (
         <p className="text-xs break-words text-muted-foreground">{question.options.join(' · ')}</p>
       ) : null}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={!question.worktreeId}
-        onClick={() => onOpen(question)}
-      >
-        {translate('teamPanel.inbox.openTerminal', 'Open terminal')}
-      </Button>
+      <div className="flex flex-wrap gap-1.5">
+        {onAnswer
+          ? question.options.map((option, index) => (
+              <Button
+                key={option}
+                type="button"
+                variant={index === 0 ? 'default' : 'outline'}
+                size="sm"
+                className="h-auto min-h-8 max-w-full whitespace-normal break-words text-left"
+                disabled={sent}
+                onClick={() => setSent(onAnswer(index))}
+              >
+                {option}
+              </Button>
+            ))
+          : null}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!question.worktreeId}
+          onClick={() => onOpen(question)}
+        >
+          {translate('teamPanel.inbox.openTerminal', 'Open terminal')}
+        </Button>
+      </div>
     </article>
   )
 }

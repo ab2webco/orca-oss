@@ -274,6 +274,8 @@ export type TeamActivityRow = TeamAgentFacts & {
   repoName: string
   worktreeName: string
   isPrimary: boolean
+  /** A game lead's or member's pane: its questions belong to that team's Inbox. */
+  inTeam: boolean
   /** The user's latest prompt, as written; the row shows it only while idle. */
   prompt: string | null
   ticket: TeamTicket | null

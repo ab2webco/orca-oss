@@ -57,5 +57,26 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account switch --to acct_123 --terminal orca-terminal-4 --json',
       'orca account switch --to other@example.com --terminal orca-terminal-4 --environment imac'
     ]
+  },
+  {
+    path: ['account', 'token', 'set'],
+    summary: 'Store a long-lived `claude setup-token` token for one Claude account on this host',
+    usage: 'orca account token set --account <email|id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'account'],
+    notes: [
+      'Run `claude setup-token` on this host, then paste the token at the hidden prompt, or pipe it on stdin. It is never accepted as a flag.',
+      'The token goes into that account vault `settings.json` env as CLAUDE_CODE_OAUTH_TOKEN (mode 600), so every launch on the vault uses it and never refreshes the account login.',
+      'Tokens are per host: set one on each host, from that host. The token can only make model requests, so quota and sign-in checks still use the account login.',
+      'Not supported for WSL or custom-endpoint accounts.'
+    ],
+    examples: ['orca account token set --account me@example.com']
+  },
+  {
+    path: ['account', 'token', 'clear'],
+    summary: 'Remove the long-lived token from one Claude account on this host',
+    usage: 'orca account token clear --account <email|id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'account'],
+    notes: ['Launches on the account go back to its stored login.'],
+    examples: ['orca account token clear --account me@example.com']
   }
 ]

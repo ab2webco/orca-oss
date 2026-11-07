@@ -1,5 +1,6 @@
 import { redactDispatchCapability } from '../../shared/dispatch-capability-redaction'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
+import { translateMain } from '../i18n/main-i18n'
 
 const NOTIFICATION_AGENT_LABEL_MAX_LENGTH = 40
 const NOTIFICATION_TITLE_CONTEXT_MAX_LENGTH = 80
@@ -78,6 +79,18 @@ function buildAgentTaskCompleteNotificationOptions(
 
   const agentLabel = formatNotificationAgentLabel(args.agentType)
   const worktreeContext = formatNotificationWorktreeContext(args)
+  // Why: the click opens the Inbox on this question, so the alert says it, never the tool's name.
+  if (args.agentQuestion !== undefined) {
+    return {
+      title: translateMain('agentQuestionNotification.title', '{{context}} - {{agent}} asks you', {
+        context: worktreeContext,
+        agent: agentLabel
+      }),
+      body:
+        normalizeNotificationText(args.agentQuestion, NOTIFICATION_BODY_PREVIEW_MAX_LENGTH) ||
+        translateMain('agentQuestionNotification.body', 'Open the Inbox to answer.')
+    }
+  }
   const statusText =
     args.agentState === 'blocked' || args.agentState === 'waiting'
       ? 'needs input'
