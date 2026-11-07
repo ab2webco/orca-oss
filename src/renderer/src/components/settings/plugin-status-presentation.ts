@@ -8,7 +8,7 @@ export function pluginStatusPresentation(plugin: PluginHostListEntry): {
   label: string
   className: string
 } {
-  if (plugin.blockedByKillList) {
+  if (plugin.blockedByKillList || plugin.blockedByDevSharedVault) {
     return {
       label: translate('auto.components.settings.PluginSettingsRow.blocked', 'Blocked'),
       className: 'border-destructive/25 bg-destructive/8 text-destructive'

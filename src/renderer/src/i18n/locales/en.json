@@ -10843,7 +10843,8 @@
           "finishSetup": "Finish setup",
           "configure": "Configure",
           "networkRestricted": "Network access is restricted to the hosts declared by this plugin.",
-          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch."
+          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch.",
+          "devSharedVaultMessage": "Not started: this dev build's accounts folder is another install's account vault, and this plugin can run processes that rewrite it. Start the dev build with {{value0}} to run it."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",
@@ -17297,6 +17298,9 @@
       "minutes": "{{count}} min",
       "hours": "{{count}} h",
       "days": "{{count}} d"
+    },
+    "display": {
+      "noData": "No data"
     }
   },
   "claudeDeadHooks": {

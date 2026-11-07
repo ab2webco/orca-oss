@@ -124,6 +124,14 @@ function reportHang({ journalPath, idleMs, childPid }) {
   )
   lines.push('==============================')
   process.stderr.write(`${lines.join('\n')}\n`)
+  return summary
+}
+
+/** Printed after the kill: the probe can release a stalled worker into a late green summary. */
+function hangTrailer(summary) {
+  const wedged = summary.suspects.map((suspect) => suspect.module).join(', ')
+  const cause = wedged ? `never finished: ${wedged}` : `verdict: ${summary.verdict}`
+  return `${VITEST_HANG_ANNOTATION_TITLE}: run killed by the watchdog, ${cause}. Any Tests line above is not a result.\n`
 }
 
 function signalGroup(pid, signal) {
@@ -176,10 +184,15 @@ async function main() {
       }
       firing = true
       clearInterval(poll)
-      reportHang({ journalPath, idleMs: Date.now() - lastOutputMs, childPid: child.pid })
+      const summary = reportHang({
+        journalPath,
+        idleMs: Date.now() - lastOutputMs,
+        childPid: child.pid
+      })
       signalGroup(child.pid, 'SIGUSR2')
       setTimeout(() => {
         signalGroup(child.pid, 'SIGKILL')
+        process.stderr.write(hangTrailer(summary))
         resolveExit(VITEST_HANG_EXIT_CODE)
       }, PROBE_GRACE_MS)
     }, 1_000)
