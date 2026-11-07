@@ -154,6 +154,11 @@ export function TeamActionDock({
                     type="button"
                     data-team-action={action.id}
                     title={action.off ? teamActionOffText(action.off) : teamActionHint(action)}
+                    aria-label={
+                      now && !own
+                        ? `${teamActionLabel(action)}, ${teamActionHint(action)}`
+                        : undefined
+                    }
                     disabled={(busy && !own) || action.off !== null}
                     aria-hidden={hidden || undefined}
                     tabIndex={hidden ? -1 : undefined}

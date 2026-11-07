@@ -82,6 +82,10 @@ describe('TeamActionDock', () => {
   it('shows what applies now with its count and the pinned project actions, then Stop', async () => {
     const { container } = await render()
     expect(buttons(container).map((one) => one.textContent)).toEqual(['Wave4', 'Release'])
+    // Why: the name a reader or a sweep hears is the label and why, never "Wave4".
+    expect(
+      buttons(container).map((one) => one.getAttribute('aria-label') ?? one.textContent)
+    ).toEqual(['Wave, 4 to do, slots free', 'Release'])
     const stop = container.querySelector('[aria-label="Stop every member"]')
     expect(stop).not.toBeNull()
     expect(container.textContent).not.toContain('Board')
