@@ -29,7 +29,7 @@ export type GameAgentRow = Pick<
   | 'lastActivityAt'
   | 'orphaned'
 > &
-  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>> & {
+  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed'>> & {
     parentPaneKey?: string | null
     stateStartedAt?: number
   }
@@ -205,7 +205,9 @@ export async function gameFleetOf(args: {
         ...(advisor ? { advisor } : {}),
         ...(launch ? { launch } : {}),
         ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
-        ...(isMember && row.stateStartedAt ? { stateSince: row.stateStartedAt } : {}),
+        ...(isMember && row.stateStartedAt && !row.restoredUnconfirmed
+          ? { stateSince: row.stateStartedAt }
+          : {}),
         ...(isMember && row.orphaned ? { orphaned: true as const } : {})
       }
     })
