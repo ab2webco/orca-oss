@@ -80,10 +80,25 @@ test('the Team panel never scrolls sideways, with a long member name or no team'
     const panel = orcaPage.getByTestId('team-panel')
     await expect(panel).toBeVisible({ timeout: 60_000 })
 
-    // No team yet. Why this state: the Activity view is unwired here until ORCA-1074, so the no-team
-    // user sees the unavailable state, and that is what must not scroll.
-    await expect(panel.getByText('Team data is not available')).toBeVisible({ timeout: 60_000 })
-    await expectNoSidewaysScroll(orcaPage, 'the no-team view')
+    // No team yet: the Activity view (ORCA-1074), with a long session name, prompt and tool line.
+    await orcaPage.evaluate(
+      ({ paneKey, name }) =>
+        window.__store!.getState().setAgentStatus(
+          paneKey,
+          {
+            state: 'working',
+            prompt: `Check ${name} and every merge queue run it touched`,
+            agentType: 'claude',
+            toolName: 'Bash',
+            toolInput: `gh pr checks 912 --watch --interval 30 --json name,state,${'bucket,'.repeat(8)}`
+          },
+          name
+        ),
+      { paneKey: pane.paneKey, name: LONG_NAME }
+    )
+    await expect(panel.locator('[data-team-activity-tab]')).toBeVisible({ timeout: 60_000 })
+    await expect(panel.locator('[data-team-activity="selected"]')).toContainText('gh pr checks 912')
+    await expectNoSidewaysScroll(orcaPage, 'the no-team Activity view')
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
