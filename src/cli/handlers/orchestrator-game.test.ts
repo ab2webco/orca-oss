@@ -117,6 +117,37 @@ describe('orca game state', () => {
     ])
   })
 
+  it('prints the merge state beside CI, and nothing for a host that sent none (ORCA-1103)', async () => {
+    const review = { provider: 'github', number: 990, state: 'open', ci: 'success' }
+    const stateText = async (extra: object): Promise<string> => {
+      output.length = 0
+      const client = {
+        call: async () => ({
+          ok: true,
+          result: {
+            config: { mode: 'on', scene: 'quest' },
+            sources: { mode: 'default' },
+            review: { ...review, ...extra },
+            agents: [],
+            warnings: []
+          }
+        })
+      } as unknown as RuntimeClient
+      await ORCHESTRATOR_GAME_HANDLERS['game state']({
+        flags: new Map(),
+        client,
+        cwd: '/tmp',
+        json: false
+      })
+      return output.join('')
+    }
+
+    expect(await stateText({ mergeState: 'blocked' })).toContain(
+      'Review: github #990 open, CI success, merge blocked'
+    )
+    expect(await stateText({})).toMatch(/^Review: github #990 open, CI success$/m)
+  })
+
   it("hands on the member pane's Jev report from the env, dropping one that is not JSON", async () => {
     const calls: unknown[] = []
     const client = {

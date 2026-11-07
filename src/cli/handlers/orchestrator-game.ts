@@ -84,7 +84,7 @@ function formatGameState(state: OrchestratorGameState): string {
   ]
   if (state.review) {
     lines.push(
-      `Review: ${state.review.provider} #${state.review.number} ${state.review.state}, CI ${state.review.ci}`
+      `Review: ${state.review.provider} #${state.review.number} ${state.review.state}, CI ${state.review.ci}${state.review.mergeState ? `, merge ${state.review.mergeState}` : ''}`
     )
   }
   if (state.workItem) {
