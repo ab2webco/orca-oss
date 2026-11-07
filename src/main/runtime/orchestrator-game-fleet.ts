@@ -211,3 +211,28 @@ export async function gameFleetOf(args: {
     })
   )
 }
+
+/**
+ * The lead's pane as an idle leader when it has no agent row. Why idle: any prompt fires a hook, so a
+ * pane that reported nothing since it started has done no work (ORCA-1130).
+ */
+export function withIdleLeader(
+  agents: GameAgent[],
+  leaderPaneKey: string | null,
+  terminalHandleOf: ((paneKey: string) => string | null) | undefined
+): GameAgent[] {
+  if (!leaderPaneKey || agents.some((one) => one.paneKey === leaderPaneKey)) {
+    return agents
+  }
+  const terminalHandle = terminalHandleOf?.(leaderPaneKey) ?? null
+  const leader: GameAgent = {
+    paneKey: leaderPaneKey,
+    displayName: null,
+    agentType: null,
+    state: 'idle',
+    toolName: null,
+    isLeader: true,
+    ...(terminalHandle ? { terminalHandle } : {})
+  }
+  return [leader, ...agents]
+}
