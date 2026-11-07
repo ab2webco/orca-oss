@@ -73,6 +73,38 @@
       }
     },
     "gameActions": {
+      "cancel": "Cancelar",
+      "command": "Comando",
+      "commandPlaceholder": "deploy",
+      "create": "Crear acción",
+      "edit": "Editar",
+      "enable": "Activar {{label}}",
+      "icon": "Icono",
+      "kind": "Qué hace",
+      "kindLead": "Orden al líder",
+      "kindMcp": "Herramienta MCP",
+      "moveUp": "Subir {{label}}",
+      "name": "Nombre del botón",
+      "namePlaceholder": "Deploy",
+      "namePlaceholderShort": "Nombre",
+      "pin": "Mostrar {{label}} en la fila",
+      "pinTitle": "En la fila",
+      "preview": "Vista previa",
+      "previewCommand": "comando",
+      "problem": {
+        "command": "El comando va en minúsculas, sin espacios, y empieza con una letra.",
+        "commandTaken": "/{{command}} ya existe.",
+        "hidden": "Sus argumentos o su tecla en orca.yaml no son válidos; corrígelos allí.",
+        "label": "Ponle un nombre al botón.",
+        "mcp": "Indica el servidor y la herramienta MCP.",
+        "prompt": "Escribe qué le pide al líder."
+      },
+      "prompt": "Qué le pide al líder",
+      "promptPlaceholder": "Qué debe correr y qué debe reportar",
+      "remove": "Quitar",
+      "save": "Guardar",
+      "server": "Servidor MCP",
+      "serverPlaceholder": "plane",
       "templates": {
         "deploy": {
           "command": "deploy",
@@ -89,6 +121,15 @@
           "label": "Tests",
           "prompt": "Corre la suite completa y dime solo lo que falló."
         }
+      },
+      "tool": "Herramienta",
+      "toolPlaceholder": "list_work_items",
+      "when": {
+        "push": "Cuando hay miembros detenidos.",
+        "status": "Siempre, en el menú.",
+        "stop": "Siempre, con confirmación.",
+        "sweep": "Cuando hay miembros terminados por cerrar.",
+        "wave": "Cuando hay tareas por hacer y cupos libres."
       }
     }
   },
