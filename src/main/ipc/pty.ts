@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: PTY IPC is centralized in one main-process module so spawn env scoping, lifecycle cleanup, process inspection, and renderer IPC stay behind one audited boundary. */
 import { join, delimiter } from 'node:path'
+import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import {
@@ -128,6 +129,12 @@ import {
   releaseInjectedClaudeAccountLaunch,
   releaseSharedClaudeAccountLaunch
 } from '../claude-accounts/live-pty-gate'
+import {
+  resolveClaudeLaunchAccountForSpawn,
+  type ClaudeLaunchAccount
+} from '../claude-accounts/claude-resume-launch-account'
+import { locateClaudeResumeSession } from '../claude-accounts/claude-resume-session-location'
+import { getSharedClaudeTranscriptsRoot } from '../claude-accounts/shared-transcript-store'
 import { requiresLiveClaudePtyReattach } from '../claude-accounts/live-claude-pty-reattach-requirement'
 import {
   abortInPlaceClaudeAccountSwitch,
@@ -1400,6 +1407,58 @@ function getClaudeSelectionTargetForPty(
       ? (store.getWorktreeMeta(worktreeId)?.claudeAccountId ?? undefined)
       : undefined)
   return overrideAccountId ? { ...base, overrideAccountId } : base
+}
+
+// Why reattach is skipped: a surviving CLI keeps the account it started with (see existingInjectedAccountId).
+function claudeLaunchAccountForSpawn(
+  store: Store | undefined,
+  args: {
+    sessionId?: string
+    claudeAccountId?: string | null
+    resumeProviderSession?: AgentProviderSessionMetadata
+  },
+  isClaudeLaunch: boolean,
+  runtime: CodexAccountSelectionTarget['runtime']
+): ClaudeLaunchAccount | Promise<ClaudeLaunchAccount> {
+  if (!isClaudeLaunch) {
+    return undefined
+  }
+  if (
+    args.sessionId &&
+    (getLiveInjectedClaudePtyAccountId(args.sessionId) || isLiveSharedClaudePty(args.sessionId))
+  ) {
+    return args.claudeAccountId
+  }
+  const accounts = store?.getSettings?.().claudeManagedAccounts ?? []
+  return resolveClaudeLaunchAccountForSpawn({
+    launchAccountId: args.claudeAccountId,
+    resumeProviderSession: args.resumeProviderSession,
+    hasManagedAccount: (accountId) => accounts.some((account) => account.id === accountId),
+    // Why host only: a WSL Claude keeps its conversations inside the distro, not in these dirs.
+    ...(runtime === 'wsl'
+      ? {}
+      : {
+          locateSession: (session: AgentProviderSessionMetadata) =>
+            locateClaudeResumeSession({
+              storeRoot: getSharedClaudeTranscriptsRoot(),
+              universes: [
+                {
+                  accountId: null,
+                  configDir: process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
+                },
+                ...accounts
+                  .filter(
+                    (account) =>
+                      account.managedAuthRuntime !== 'wsl' &&
+                      typeof account.managedAuthPath === 'string'
+                  )
+                  .map((account) => ({ accountId: account.id, configDir: account.managedAuthPath }))
+              ],
+              session,
+              caseInsensitivePaths: process.platform === 'win32'
+            })
+        })
+  })
 }
 
 function getCompatibleSelectedCodexHomePath(
@@ -5004,11 +5063,18 @@ export function registerPtyHandlers(
         cwd,
         expectedWslDistro
       )
+      const claudeLaunchAccount = claudeLaunchAccountForSpawn(
+        store,
+        args,
+        isClaudeLaunch,
+        codexSelectionTarget.runtime
+      )
       let claudeSelectionTarget = getClaudeSelectionTargetForPty(
         codexSelectionTarget,
         store,
         args.worktreeId,
-        isClaudeLaunch ? args.claudeAccountId : undefined
+        // Why only a promise is awaited: an await would cost every other spawn a tick.
+        claudeLaunchAccount instanceof Promise ? await claudeLaunchAccount : claudeLaunchAccount
       )
       const existingInjectedAccountId = args.sessionId
         ? getLiveInjectedClaudePtyAccountId(args.sessionId)
@@ -6855,11 +6921,17 @@ export function registerPtyHandlers(
           cwd,
           expectedWslDistro
         )
+        const claudeLaunchAccount = claudeLaunchAccountForSpawn(
+          store,
+          args,
+          isClaudeLaunch,
+          initialSelectionTarget.runtime
+        )
         let claudeSelectionTarget = getClaudeSelectionTargetForPty(
           initialSelectionTarget,
           store,
           args.worktreeId,
-          isClaudeLaunch ? args.claudeAccountId : undefined
+          claudeLaunchAccount instanceof Promise ? await claudeLaunchAccount : claudeLaunchAccount
         )
         const existingInjectedAccountId = args.sessionId
           ? getLiveInjectedClaudePtyAccountId(args.sessionId)
