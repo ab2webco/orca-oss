@@ -34,11 +34,8 @@ import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
-import {
-  postGameEvents,
-  readCallerGameState,
-  recordGameMember
-} from './orchestrator-game-board-call'
+import { recordGameStartOutcome } from './orchestrator-game-launch-outcome'
+import { readCallerGameState, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
 import type { GameLaunchedOnAccount } from '../../shared/orchestrator-game-account-usage'
@@ -66,7 +63,7 @@ type WorkerStartResult = Pick<
   GameLaunchResult,
   'runId' | 'taskId' | 'dispatchId' | 'state' | 'setupQueue' | 'lastError'
 > & {
-  effects?: { kind: string; id?: string }[]
+  effects?: { kind: string; id?: string; action?: string; warning?: string }[]
   /** The host's own account for a member placed with --on; only its email crosses back (ORCA-798). */
   account?: { provider: string; email: string }
   /** A member placed with --on that runs on its host's global login, and why. */
@@ -265,14 +262,7 @@ async function startGameMember(
     ...(args.remote && hostGlobalLogin ? remoteGlobalLoginOf(args.remote.on, hostGlobalLogin) : {}),
     ...started
   }
-  await postGameEvents(client, [
-    {
-      kind: 'claimed',
-      ticket,
-      text: `${launched.dispatchId ? `member ${launched.dispatchId} ` : ''}[${launched.state}] ${[launched.agent, launched.account].filter(Boolean).join(' · ')}`
-    }
-  ])
-  return launched
+  return recordGameStartOutcome(client, launched, args.remote?.on ?? null)
 }
 
 export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> = {

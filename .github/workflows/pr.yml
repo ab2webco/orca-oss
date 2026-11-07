@@ -81,6 +81,9 @@ jobs:
       - name: Enforce renderer brand drift ratchet
         run: pnpm run check:renderer-brand-drift-ratchet
 
+      - name: Keep core free of Jev, Sonar and Engram
+        run: pnpm run check:core-vendor-dependencies
+
       - name: Parse the shell in every workflow run block
         run: pnpm run check:workflow-run-shell
 

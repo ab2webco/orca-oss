@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseGameMemberAdvisorReport } from './orchestrator-game-member-advisor'
+import {
+  parseGameMemberAdvisor,
+  parseGameMemberAdvisorReport
+} from './orchestrator-game-member-advisor'
 
 const report = (patch: Record<string, unknown> = {}) => ({
   version: 1,
@@ -89,5 +92,34 @@ describe('parseGameMemberAdvisorReport detail fields', () => {
 
   it('keeps an explicit null detail field as null', () => {
     expect(parseGameMemberAdvisorReport(report({ hold: null }))).toMatchObject({ hold: null })
+  })
+
+  it('reads an advisor a host hands back, with what it was on before', () => {
+    expect(
+      parseGameMemberAdvisor({
+        model: 'Sonnet 5.5',
+        effort: 'low',
+        pinned: { model: true, effort: false },
+        line: 'jev',
+        previous: { model: 'Opus 5.5', effort: null }
+      })
+    ).toEqual({
+      model: 'Sonnet 5.5',
+      effort: 'low',
+      pinned: { model: true, effort: false },
+      line: 'jev',
+      previous: { model: 'Opus 5.5', effort: null }
+    })
+  })
+
+  it('reads no advisor from a shape this build cannot read', () => {
+    expect(parseGameMemberAdvisor(null)).toBeNull()
+    expect(parseGameMemberAdvisor('jev')).toBeNull()
+    expect(parseGameMemberAdvisor({ model: 7 })).toBeNull()
+    expect(parseGameMemberAdvisor({ model: 'x', effort: null, pinned: {}, previous: 3 })).toEqual({
+      model: 'x',
+      effort: null,
+      pinned: { model: false, effort: false }
+    })
   })
 })

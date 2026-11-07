@@ -31,7 +31,8 @@ const lead: TeamLeadCard = {
   model: null,
   account: null,
   characterKey: null,
-  branch: null
+  branch: null,
+  ownerAsk: null
 }
 
 function gameModel(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameModel {
@@ -111,6 +112,13 @@ describe('resolveTeamPanelTabs', () => {
   it('shows no count while nothing waits for the user or Inbox has not loaded', () => {
     expect(resolveTeamPanelTabs(gameModel())[1].count).toBeNull()
     expect(resolveTeamPanelTabs(soloModel())[1].count).toBeNull()
+  })
+
+  // Why: a no-team model counts only agent questions, so zero does not mean the Inbox is empty.
+  it('always draws the Inbox body, which reads what its counts leave out', () => {
+    const inbox = resolveTeamPanelTabs(gameModel()).find((tab) => tab.id === 'inbox')
+
+    expect(inbox?.view.kind).toBe('ready')
   })
 
   it('carries each section state through to the tab view', () => {

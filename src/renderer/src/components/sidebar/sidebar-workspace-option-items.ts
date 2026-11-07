@@ -4,6 +4,7 @@ import type {
 } from '../../../../shared/ui-chrome-types'
 import { TASK_WORKTREE_CARD_PROPERTIES } from '../../../../shared/constants'
 import { translate } from '@/i18n/i18n'
+import { AGENT_ROW_PROPERTY_OPTIONS } from './worktree-card-agent-row-property-options'
 
 export const GROUP_BY_OPTIONS = [
   {
@@ -123,6 +124,7 @@ const BASE_WORKTREE_CARD_PROPERTY_OPTIONS: WorktreeCardPropertyOption[] = [
       )
     }
   },
+  ...AGENT_ROW_PROPERTY_OPTIONS,
   {
     id: 'branch',
     properties: ['branch'],

@@ -96,6 +96,25 @@ describe('TeamSceneCanvas', () => {
     expect(raf).toHaveBeenCalled()
   })
 
+  // ORCA-1097: at the 3.5 frames/s a slow renderer paints, capped steps would slow idle motion
+  // to a sixth of real time; idle sway follows real seconds while walks stay capped.
+  it('keys idle motion to real seconds, not the capped step, when frames are sparse', () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const p = painter()
+    render(<TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} />)
+    for (const now of [0, 285, 570, 855]) {
+      act(() => next?.(now))
+    }
+    const [first, , , last] = p.frames.slice(-4)
+    expect(last!.t - first!.t).toBeCloseTo(0.855, 2)
+    expect(last!.dt).toBe(0.05)
+  })
+
   it('paints the settled end state once per change under reduced motion', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
@@ -117,6 +136,22 @@ describe('TeamSceneCanvas', () => {
     )
     act(() => {})
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Reviewing #923')
+  })
+
+  it('tags a member who needs the user with its name over the alert, as V28 does', () => {
+    reduced = true
+    const asking: TeamSceneInput = {
+      ...input(['a']),
+      members: [{ ...member('h'), name: 'Herrero', activity: 'needsYou' }, member('a')]
+    }
+    render(<TeamSceneCanvas input={asking} painter={painter().value} leadLine={null} />)
+    act(() => {})
+    const tags = [...host.querySelectorAll('[data-scene-speaker]')]
+    expect(tags.map((one) => [one.getAttribute('data-scene-speaker'), one.textContent])).toEqual([
+      ['h', 'Herrero']
+    ])
+    // Above the head and its alert mark, never over the speaker's face.
+    expect(Number.parseFloat((tags[0] as HTMLElement).style.top)).toBeLessThan(100 - 16)
   })
 
   it("draws Pixel's thought cloud instead of the glass bubble", () => {

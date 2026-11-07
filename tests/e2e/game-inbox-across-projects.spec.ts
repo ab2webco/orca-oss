@@ -5,7 +5,8 @@ import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { expectGameInboxPlaceholdersFit, settleGameInboxSheet } from './helpers/game-inbox-sheet'
+import { expectPlaceholdersFit } from './helpers/placeholder-fit'
+import { openTeamInbox } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
 
@@ -114,8 +115,8 @@ test('another project’s question is announced, counted, answered and opens the
       )
     await expect.poll(async () => (await recorded()).badge.at(-1)).toBe(2)
 
-    const entry = orcaPage.getByTestId('game-inbox-entry')
-    await expect(entry).toContainText('2')
+    const { inboxTab, inbox } = await openTeamInbox(orcaPage)
+    await expect(inboxTab).toContainText('2')
 
     // The host names the worktree the click opens; the window must know it to switch to it.
     const target = (await recorded()).dispatched.find(
@@ -143,29 +144,38 @@ test('another project’s question is announced, counted, answered and opens the
     await electronApp.evaluate(({ BrowserWindow }, inbox) => {
       BrowserWindow.getAllWindows()[0]?.webContents.send('ui:openGameInbox', inbox)
     }, target)
-    const sheet = orcaPage.getByTestId('game-inbox-sheet')
-    await expect(sheet).toHaveAttribute('data-state', 'open')
+    await expect(inboxTab).toHaveAttribute('aria-selected', 'true')
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(target?.worktreeId)
     // The project left behind is now the other one, listed under its name.
-    await expect(sheet.getByRole('heading', { name: firstName ?? '' })).toBeVisible()
-    await expect(sheet.locator('[data-game-owner-question]')).toHaveCount(2)
+    await expect(inbox.getByRole('heading', { name: firstName ?? '' })).toBeVisible()
+    await expect(inbox.locator('[data-game-owner-question]')).toHaveCount(2)
+    // V28's card starts closed (ORCA-1095); opened here so the boxes are measured, not skipped.
+    await expect(inbox.getByRole('textbox')).toHaveCount(0)
+    for (
+      let left = await inbox.getByRole('button', { name: 'Answer' }).count();
+      left > 0;
+      left -= 1
+    ) {
+      await inbox.getByRole('button', { name: 'Answer' }).first().click()
+    }
+    await expect(inbox.getByRole('textbox')).toHaveCount(2)
 
     for (const width of [1440, 768, 390, 320]) {
+      await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
-        await settleGameInboxSheet(orcaPage, width)
-        await expectGameInboxPlaceholdersFit(orcaPage, width)
+        await expectPlaceholdersFit(inbox, `at ${width}px ${theme}`)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`game-inbox-across-${width}-${theme}.png`)
         })
       }
     }
-    await settleGameInboxSheet(orcaPage, 1440)
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
 
-    const otherCard = sheet.locator(`[data-game-owner-question="${other.result.question.id}"]`)
+    const otherCard = inbox.locator(`[data-game-owner-question="${other.result.question.id}"]`)
     await otherCard.getByRole('button', { name: 'Wait for Monday' }).click()
     await expect(otherCard).toHaveCount(0)
     const answered = await client.call<{ questions: GameOwnerQuestion[] }>('game.ownerQuestions', {
@@ -175,7 +185,7 @@ test('another project’s question is announced, counted, answered and opens the
     expect(
       answered.result.questions.find((one) => one.id === other.result.question.id)?.answer?.text
     ).toBe('Wait for Monday')
-    await expect(entry).toContainText('1')
+    await expect(inboxTab).toContainText('1')
     await expect.poll(async () => (await recorded()).badge.at(-1)).toBe(1)
   } finally {
     rmSync(otherRepo, { recursive: true, force: true })
