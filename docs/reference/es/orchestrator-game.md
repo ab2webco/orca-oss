@@ -1,5 +1,5 @@
 ---
-sourceHash: 106cbf0d60b459c8
+sourceHash: 2f7fa966f23a81b5
 ---
 
 # El juego orquestador de Agent Teams
@@ -559,10 +559,23 @@ orchestratorGame:
   lista. Un nombre que Claude Code rechaza (su propio `/status`, por ejemplo) se omite y se anota una
   vez; el botón sigue funcionando. El texto después del comando se añade al prompt: `/wave CIN-1,CIN-2`.
   Un comando MCP responde con las líneas de la herramienta.
-- **Settings.** La sección **Actions** del proyecto muestra la lista de `orca.yaml` en solo lectura;
-  **Edit on this machine** inicia la lista de esta máquina (etiqueta, comando, prompt o servidor MCP,
-  herramienta y argumentos JSON, comprobados por el mismo parser), que reemplaza entera la de
-  `orca.yaml`. **Inherit from orca.yaml** la descarta.
+- **Ajustes.** La sección **Acciones** del proyecto sigue el prototipo V30: **Crear con setup** envía
+  `/orca-game:setup` al líder, **Nueva acción** y las plantillas de **Empieza con** abren un formulario
+  (nombre, un comando que sigue al nombre hasta que se escribe, icono, una orden al líder o una
+  herramienta MCP), las filas del proyecto suben y se fijan en la fila del dock (3 como máximo), y las
+  de Orca tienen **Editar** y un interruptor (Detener no). Un cambio se guarda en esta máquina y
+  reemplaza la lista entera de `orca.yaml`; **Volver a la lista de orca.yaml** lo descarta.
+  `/orca-game:setup` es quien escribe `orca.yaml`.
+- **El dock del panel nativo**: una línea bajo el panel Equipo con las acciones de Orca que aplican
+  ahora y su número (ola: Por hacer con cupos libres, reactivar: miembros detenidos, barrer: miembros
+  terminados; ola y barrer se apartan durante un STOP), luego hasta 3 acciones fijadas del proyecto,
+  Detener con confirmación en línea y ⋯ con todas agrupadas en Ahora, De este proyecto y De Orca. Una
+  ejecución muestra la respuesta del líder desde el `lastAssistantMessage` de su panel. Una acción MCP
+  corre desde el dock como su `/command`; una sin comando solo corre desde la terminal.
+- **Cambiar las de Orca** (`orcaActions`): `wave`, `status`, `push`, `sweep` y `stop` aceptan
+  `enabled`, `label`, `icon` y `prompt`; el comando es fijo, `stop` no se puede apagar, un prompt no
+  admite placeholders y las capas se mezclan campo por campo. Las acciones del proyecto aceptan también
+  `icon` y `pin`.
 
 ## El líder del proyecto: `orchestratorGame.orchestrator`
 
