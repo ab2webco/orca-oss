@@ -227,7 +227,8 @@ function readGitBlobs(objectShas) {
   // subprocess per historical file while remaining available on Git 2.25.
   const output = execFileSync('git', ['cat-file', '--batch'], {
     input: `${uniqueShas.join('\n')}\n`,
-    maxBuffer: 64 * 1024 * 1024
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: 120_000
   })
   const blobs = new Map()
   let offset = 0
@@ -328,7 +329,8 @@ function skillsTreeShasAtRefs(refs) {
   }
   const output = execFileSync('git', ['cat-file', '--batch-check=%(objectname) %(objecttype)'], {
     input: `${refs.map((ref) => `${ref}:skills`).join('\n')}\n`,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: 120_000
   })
   const lines = output.trimEnd().split('\n')
   if (lines.length !== refs.length) {

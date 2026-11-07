@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 // what a workflow's own checks accept, so the contract worth pinning is what it feeds bash.
 function parses(script) {
   try {
-    execFileSync('bash', ['-n'], { input: script, stdio: 'pipe' })
+    execFileSync('bash', ['-n'], { input: script, stdio: 'pipe', timeout: 20_000 })
     return true
   } catch {
     return false
