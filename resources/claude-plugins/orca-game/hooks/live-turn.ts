@@ -1,5 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
+import { askStepOf } from './live-line'
 import { isQuestionToPerson } from './message-heading'
 import { gameConfig, quest } from './quest-state'
 
@@ -27,8 +28,6 @@ export const isLiveTicking = (): boolean =>
   quest.turn !== undefined &&
   (quest.turn.endedAt === undefined || quest.turn.ask !== undefined)
 
-const lastLineOf = (text: string): string => text.trimEnd().split('\n').at(-1)?.trim() ?? ''
-
 export function liveTurnStart(now: number): void {
   quest.turn = { startedAt: now }
 }
@@ -46,7 +45,7 @@ export function liveTurnEnd(end: { answer: string; isAborted: boolean }, now: nu
   quest.turn = {
     startedAt: quest.turn.startedAt,
     endedAt: now,
-    ...(isAsking ? { ask: { at: now, text: lastLineOf(end.answer) } } : {})
+    ...(isAsking ? { ask: { at: now, text: askStepOf(end.answer) } } : {})
   }
 }
 

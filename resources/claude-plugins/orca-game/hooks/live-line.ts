@@ -35,6 +35,12 @@ export const liveStatusOf = (turn: LiveTurn, now: number): LiveStatus => {
   return { state: 'working', elapsedMs: now - turn.startedAt }
 }
 
+/** What a turn that ended in a question waits on: the last sentence of its last line. */
+export const askStepOf = (answer: string): string => {
+  const last = answer.trimEnd().split('\n').at(-1)?.trim() ?? ''
+  return last.split(/(?<=[.!?…])\s+/u).at(-1) ?? last
+}
+
 const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
 export const liveLineOf = (

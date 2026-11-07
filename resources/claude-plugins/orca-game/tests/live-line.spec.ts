@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { MESSAGE_HEADING_WORDS } from '../hooks/message-heading-words'
-import { liveLineOf, liveStatusOf, liveTimerOf } from '../hooks/live-line'
+import { askStepOf, liveLineOf, liveStatusOf, liveTimerOf } from '../hooks/live-line'
 
 const EN = MESSAGE_HEADING_WORDS.en
 const ES = MESSAGE_HEADING_WORDS.es
@@ -79,5 +79,14 @@ describe('live status of a turn', () => {
       state: 'done',
       elapsedMs: 8_000
     })
+  })
+})
+
+describe('the step a question waits on', () => {
+  it('is the last sentence of the last line, so a long paragraph still shows the question', () => {
+    const answer =
+      'Done.\n\nNothing else has changed: no members are running and nothing waits. Which ticket should I start?'
+    expect(askStepOf(answer)).toBe('Which ticket should I start?')
+    expect(askStepOf('¿Abro el PR?  \n')).toBe('¿Abro el PR?')
   })
 })
