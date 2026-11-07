@@ -138,6 +138,8 @@ export async function startGameBand(
     extraPluginDirs?: readonly string[]
     /** Launch the pane as Orca launches a member, with ORCA_GAME_ROLE=member. */
     role?: 'member'
+    /** A real `orca` CLI for the mod; `state`, `reads` and pushes then do nothing. */
+    cli?: string
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -215,7 +217,7 @@ export async function startGameBand(
     DISABLE_AUTOUPDATER: '1',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     CLAUDE_CODE_NO_FLICKER: '1',
-    ORCA_GAME_CLI: cli,
+    ORCA_GAME_CLI: options.cli ?? cli,
     ORCA_GAME_MODE: 'on',
     ORCA_GAME_SCENE: options.scene ?? 'quest',
     ORCA_GAME_HUD: '1',

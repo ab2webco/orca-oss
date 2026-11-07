@@ -5,6 +5,7 @@ import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { translate } from '@/i18n/i18n'
 import { gameInboxTargetOf } from '@/components/game-inbox/game-owner-questions-client'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { TeamSessionRef } from '../../../../shared/team-panel-model-types'
 
@@ -16,8 +17,15 @@ function focusLoadedPane(ref: TeamSessionRef): boolean {
   if (!pane || !ref.worktreeId || !tabs?.some((tab) => tab.id === pane.tabId)) {
     return false
   }
+  const environmentId = ref.host.kind === 'remote' ? ref.host.environmentId : null
   // Why the sidebar row's path: it keeps nav history and the left row selected.
-  activateAndRevealWorktree(ref.worktreeId)
+  if (environmentId) {
+    activateAndRevealWorktree(ref.worktreeId, {
+      executionHostId: toRuntimeExecutionHostId(environmentId)
+    })
+  } else {
+    activateAndRevealWorktree(ref.worktreeId)
+  }
   activateTabAndFocusPane(pane.tabId, pane.leafId, {
     ackPaneKeyOnSuccess: ref.paneKey,
     flashFocusedPane: true,
@@ -52,13 +60,14 @@ async function focusThroughHost(ref: TeamSessionRef): Promise<boolean> {
   return true
 }
 
-/** Opens a lead's or member's own terminal in the center; the Team tab stays open beside it. */
+/** Opens a lead's, member's or no-team session's terminal in the center; the panel stays open. */
 export async function openTeamSession(ref: TeamSessionRef, name: string): Promise<void> {
   if (ref.host.kind === 'local' && focusLoadedPane(ref)) {
     return
   }
   const opened = await focusThroughHost(ref).catch(() => false)
-  if (!opened) {
+  // Why last: a no-team SSH session, or one with no handle, lives only in this window's tabs.
+  if (!opened && !focusLoadedPane(ref)) {
     toast.error(translate('teamPanel.open.failed', 'Could not open {{name}}', { name }))
   }
 }

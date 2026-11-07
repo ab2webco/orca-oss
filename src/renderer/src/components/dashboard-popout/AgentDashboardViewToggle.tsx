@@ -24,14 +24,16 @@ const OPTIONS: readonly ToggleOption[] = [
 
 export function AgentDashboardViewToggle({
   view,
-  onViewChange
+  onViewChange,
+  className
 }: {
   view: AgentDashboardView
   onViewChange: (view: AgentDashboardView) => void
+  className?: string
 }): React.JSX.Element {
   return (
     <div
-      className="flex items-center gap-0.5 rounded-md border border-border p-0.5"
+      className={cn('flex items-center gap-0.5 rounded-md border border-border p-0.5', className)}
       role="group"
       aria-label={translate('dashboardPopout.view.label', 'Dashboard view')}
     >

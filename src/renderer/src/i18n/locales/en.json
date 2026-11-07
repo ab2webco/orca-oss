@@ -4862,7 +4862,9 @@
           "cli": "Orca Lab CLI",
           "planeWorkItems": "Plane work items",
           "planeWorkItem": "Plane work item",
-          "showSection": "Show"
+          "showSection": "Show",
+          "account": "Account",
+          "model": "Model and effort"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -16333,24 +16335,14 @@
         "restartNow": "Restart now"
       },
       "game-inbox": {
-        "GameInboxSheet": {
-          "title": "Inbox",
-          "description": "What the lead asked you, what waits on it, and how it talks with each member.",
-          "forYou": "For you",
-          "empty": "No questions are waiting for you.",
-          "waiting": "Waiting",
-          "threads": "Threads",
-          "answered": "Answered",
-          "answerInstead": "Answer instead of the lead"
-        },
         "GameOwnerQuestionCard": {
           "failed": "The answer was not sent.",
           "yourAnswer": "Your answer",
           "placeholder": "Answer in your own words",
-          "send": "Send"
+          "send": "Send",
+          "needsYou": "Needs you"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Inbox",
           "noWorktree": "Open this project in Orca to answer."
         },
         "GameInboxKindTag": {
@@ -16377,7 +16369,9 @@
           "failed": "Failed",
           "back": "All threads",
           "empty": "No member has talked with the lead yet.",
-          "waiting": "{{count}} waiting"
+          "waiting": "{{count}} waiting",
+          "messageOne": "1 message",
+          "messageMany": "{{count}} messages"
         },
         "GameMemberReplyForm": {
           "failed": "The reply was not sent.",
@@ -16385,6 +16379,9 @@
           "send": "Send",
           "overridePlaceholder": "Replace the lead's answer",
           "override": "Override"
+        },
+        "GameInboxUndelivered": {
+          "title": "Your answer has not reached the lead yet. Orca delivers it as soon as a lead takes it."
         }
       },
       "team-scene": {
@@ -17116,6 +17113,7 @@
       "lowMemory": "Low memory",
       "free": "Free",
       "running": "{{count}} agents",
+      "runningOne": "1 agent",
       "runningOfCap": "{{count}} of {{cap}} agents",
       "memoryUsed": "Memory used {{percent}}%",
       "memoryFree": "{{free}} of {{total}} GB free"
@@ -17144,6 +17142,7 @@
       "loading": "Loading",
       "unavailableText": "This Orca host does not publish it yet.",
       "modelErrorTitle": "Could not read the team",
+      "modelErrorText": "Orca is not responding in this project. Try again.",
       "modelUnavailableTitle": "Team data is not available",
       "retry": "Try again"
     },
@@ -17224,14 +17223,41 @@
       "waitingForAnswer": "Waiting for your answer",
       "openTerminal": "Open terminal"
     },
+    "activity": {
+      "prompt": "Prompt",
+      "now": "Now",
+      "question": "Question",
+      "last": "Final",
+      "model": "Model",
+      "effortPinned": "Effort pinned",
+      "modelPinned": "Model pinned",
+      "change": "Change",
+      "account": "Account",
+      "cache": "Cache",
+      "pr": "PR",
+      "ticket": "Ticket",
+      "ports": "Ports",
+      "notes": "Notes",
+      "needsYou": "Needs you",
+      "otherSessions": "Other sessions",
+      "countNeedsYou_one": "{{count}} needs you",
+      "countNeedsYou_other": "{{count}} need you",
+      "countWorking": "{{count}} working",
+      "countDone_one": "{{count}} done",
+      "countDone_other": "{{count}} done",
+      "agent": "Agent"
+    },
     "lead": {
       "badge": "Lead",
       "coordinatesOne": "Coordinates 1 agent",
-      "coordinatesMany": "Coordinates {{count}} agents"
+      "coordinatesMany": "Coordinates {{count}} agents",
+      "asksOn": "Waiting for you · Question on {{ticket}}",
+      "asks": "Waiting for you"
     },
     "advisor": {
       "label": "Advisor",
-      "source": "Jev"
+      "source": "Jev",
+      "name": "Wizard"
     },
     "xp": {
       "level": "Lv {{level}}",
@@ -17260,7 +17286,11 @@
       "openTerminal": "Open terminal",
       "youAnswered": "You answered",
       "youAnsweredText": "You answered: {{text}}",
-      "leadAnswered": "The lead answered"
+      "leadAnswered": "The lead answered",
+      "waitingEmpty": "No member is waiting for an answer.",
+      "answeredEmpty": "Nothing answered yet.",
+      "leadAnsweredText": "The lead answered: {{text}}",
+      "answer": "Answer"
     },
     "actions": {
       "label": "Actions",
@@ -17287,6 +17317,18 @@
         "push": "{{count}} stopped",
         "sweep": "{{count}} finished to close"
       }
+    },
+    "age": {
+      "now": "now",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
     }
+  },
+  "claudeDeadHooks": {
+    "title": "Claude hooks are not running",
+    "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
+    "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
+    "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
   }
 }

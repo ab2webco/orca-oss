@@ -91,6 +91,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
   const sendPromptToSidebarAgentTarget = useAppStore((s) => s.sendPromptToSidebarAgentTarget)
   const focusedAgentPaneKey = useFocusedAgentPaneKey(worktreeId)
   const gameLeadHandles = useGameLeadHandles()
+  const showModel = useAppStore((s) => s.worktreeCardProperties?.includes('model') === true)
   const isGameLead = (agent: DashboardAgentRowData): boolean =>
     agent.entry.terminalHandle !== undefined && gameLeadHandles.has(agent.entry.terminalHandle)
   const compactAgentListRootRef = useRef<HTMLDivElement | null>(null)
@@ -350,6 +351,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
           isFocusedPane={agent.paneKey === focusedAgentPaneKey}
           isGameLead={isGameLead(agent)}
           cacheTimerActive={cacheTimerActive}
+          showModel={showModel}
         />
         {hasChildAgents ? (
           <CompactAgentExpansion expanded={expanded}>
