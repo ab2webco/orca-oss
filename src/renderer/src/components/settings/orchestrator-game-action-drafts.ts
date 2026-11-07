@@ -1,5 +1,6 @@
 import {
   parseGameActions,
+  type GameActionIcon,
   type OrchestratorGameAction
 } from '../../../../shared/orchestrator-game-actions'
 import { GAME_LEAD_ACTIONS } from '../../../../shared/orchestrator-game-lead-actions'
@@ -14,6 +15,8 @@ export type ActionDraft = {
   server: string
   tool: string
   args: string
+  icon: GameActionIcon | null
+  pin: boolean
 }
 
 export type ActionDraftProblem =
@@ -33,7 +36,9 @@ export const EMPTY_ACTION_DRAFT: ActionDraft = {
   prompt: '',
   server: '',
   tool: '',
-  args: ''
+  args: '',
+  icon: null,
+  pin: false
 }
 
 const LEAD_COMMANDS: ReadonlySet<string> = new Set(
@@ -45,7 +50,9 @@ export function actionDraftOf(action: OrchestratorGameAction): ActionDraft {
     ...EMPTY_ACTION_DRAFT,
     label: action.label,
     command: action.command ?? '',
-    key: action.key ?? ''
+    key: action.key ?? '',
+    icon: action.icon ?? null,
+    pin: action.pin === true
   }
   if ('prompt' in action) {
     return { ...head, prompt: action.prompt }
@@ -82,7 +89,9 @@ function rawOf(draft: ActionDraft): Record<string, unknown> | 'args' {
   const head = {
     label: draft.label,
     ...(command === '' ? {} : { command }),
-    ...(key === '' ? {} : { key })
+    ...(key === '' ? {} : { key }),
+    ...(draft.icon === null ? {} : { icon: draft.icon }),
+    ...(draft.pin ? { pin: true } : {})
   }
   if (draft.kind === 'prompt') {
     return { ...head, prompt: draft.prompt }
