@@ -68,6 +68,7 @@ import {
   shouldInstallStartupManagedAgentHook
 } from './agent-hooks/managed-agent-hook-controls'
 import { claudeHookService } from './claude/hook-service'
+import { openClaudeHookService } from './openclaude/hook-service'
 import { runClaudePluginDirProbeIfRequested } from './claude/claude-plugin-dir-probe'
 import {
   configureClaudeStatusLineItemOrderSource,
@@ -365,6 +366,8 @@ import { PluginMarketplaceInstaller } from './plugins/plugin-marketplace-install
 import { PluginBundledBootstrapCoordinator } from './plugins/plugin-bundled-bootstrap-coordinator'
 import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
 import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
+import { createPluginWorkerFactory, resolvePluginWorkerHome } from './plugins/plugin-worker-home'
+import { getMainE2EConfig } from './e2e-config'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
 import { setPluginServiceForRpc } from './runtime/rpc/methods/plugins'
 import {
@@ -3071,7 +3074,14 @@ void app.whenReady().then(async () => {
       normalizePluginIdList(store?.getSettings().trustedDevPluginPaths),
     getKeybindings: () => keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
-    hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged)
+    hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged),
+    workerFactory: createPluginWorkerFactory(
+      resolvePluginWorkerHome({
+        isPackaged: app.isPackaged,
+        isE2E: getMainE2EConfig().userDataDir !== null,
+        userDataPath: app.getPath('userData')
+      })
+    )
   })
   const bundledPluginBootstrap = new PluginBundledBootstrapCoordinator({
     root: resolveBundledPluginRoot({
@@ -3224,6 +3234,11 @@ void app.whenReady().then(async () => {
     console.warn('[worktrees] Failed to sweep leftover worktree directories:', error)
   })
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
+  // Why: a dev Orca shares ~/.claude with the installed one; it must not rewrite that Orca's entries (ORCA-1113).
+  if (!app.isPackaged && getMainE2EConfig().userDataDir === null) {
+    claudeHookService.setHomeManagedHookPolicy('keep-existing')
+    openClaudeHookService.setHomeManagedHookPolicy('keep-existing')
+  }
   const startupManagedHookSettings = store.getSettings()
   const shouldReconcileStartupManagedHooks =
     shouldInstallManagedHooks(is.dev) &&
