@@ -12,6 +12,8 @@ export type PluginServiceOptions = {
   getTrustedDevPluginPaths?: () => string[]
   getKeybindings?: () => KeybindingOverrides
   getPluginKillListEntry?: (pluginKey: string) => PluginKillListEntry | null
+  /** A reason blocks every plugin that can spawn processes (dev profile on a linked vault, ORCA-1131). */
+  getSpawnCapableWorkerBlockReason?: () => string | null
   hostEntryPath?: string
   workerFactory?: PluginWorkerFactory
   maxActiveWorkers?: number
