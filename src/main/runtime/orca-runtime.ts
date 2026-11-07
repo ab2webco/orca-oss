@@ -578,6 +578,7 @@ import {
   worktreeWorkspaceKey
 } from '../../shared/workspace-scope'
 import {
+  isValidResolvedWorktreeLineageEdge,
   projectResolvedWorktreeLineage,
   sharesResolvedWorktreeLineageBoundary
 } from '../../shared/resolved-worktree-lineage'
@@ -26657,6 +26658,80 @@ export class OrcaRuntimeService {
       .accounts.some((account) => account.id === accountId)
       ? accountId
       : null
+  }
+
+  /**
+   * Nests a game member's worktree under its lead's whatever path started it (ORCA-1116).
+   * Returns why it cannot, so the launch reports it instead of a silent top-level row.
+   */
+  async nestGameMemberWorktree(
+    memberWorktreeId: string,
+    leadWorktreeId: string,
+    context: { taskId: string; runId: string; coordinatorHandle: string }
+  ): Promise<string | null> {
+    const store = this.store
+    if (memberWorktreeId === leadWorktreeId) {
+      return null
+    }
+    if (!store?.setWorktreeLineage || !store.getWorktreeLineage) {
+      return 'Orca Lab could not store worktree lineage.'
+    }
+    const member = await this.resolveWorktreeSelector(`id:${memberWorktreeId}`)
+    const lead = await this.resolveWorktreeSelector(`id:${leadWorktreeId}`)
+    const current = store.getWorktreeLineage(member.id)
+    const currentParent = current
+      ? await this.resolveWorktreeSelector(`id:${current.parentWorktreeId}`).catch(() => undefined)
+      : undefined
+    // Why keep a hand-set parent: the person chose it; any other edge follows the current lead.
+    if (
+      current &&
+      currentParent &&
+      isValidResolvedWorktreeLineageEdge(member, currentParent, current) &&
+      (currentParent.id === lead.id || current.origin === 'manual')
+    ) {
+      return null
+    }
+    try {
+      this.validateLineageParent(member, lead)
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+    // Why mint: a worktree with no meta row (often the lead's main checkout) has no instanceId,
+    // and worktree creation then records no edge at all.
+    const memberInstanceId = member.instanceId ?? store.setWorktreeMeta(member.id, {}).instanceId
+    const leadInstanceId = lead.instanceId ?? store.setWorktreeMeta(lead.id, {}).instanceId
+    if (!memberInstanceId || !leadInstanceId) {
+      return 'Worktree instance identity was unavailable.'
+    }
+    const createdAt = Date.now()
+    const capture = { source: 'orchestration-context', confidence: 'explicit' } as const
+    store.setWorktreeLineage(member.id, {
+      worktreeId: member.id,
+      worktreeInstanceId: memberInstanceId,
+      parentWorktreeId: lead.id,
+      parentWorktreeInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    store.setWorkspaceLineage?.({
+      childWorkspaceKey: worktreeWorkspaceKey(member.id),
+      childInstanceId: memberInstanceId,
+      parentWorkspaceKey: worktreeWorkspaceKey(lead.id),
+      parentInstanceId: leadInstanceId,
+      origin: 'orchestration',
+      capture,
+      orchestrationRunId: context.runId,
+      taskId: context.taskId,
+      coordinatorHandle: context.coordinatorHandle,
+      createdAt
+    })
+    this.invalidateResolvedWorktreeCache()
+    this.notifyWorktreesChanged(member.repoId)
+    return null
   }
 
   async updateManagedWorktreeMeta(
