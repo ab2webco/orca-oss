@@ -199,14 +199,21 @@ describe('TeamTabContent', () => {
     )
   })
 
-  it('gives way at narrow widths with the host, never the name, and wraps the meta line', async () => {
+  it('gives way at narrow widths with the host first, never scrolls sideways, and wraps the meta line', async () => {
     const { container } = await render(model())
     for (const card of [leadCard(container), ...memberCards(container)]) {
       const name = card.querySelector('[data-team-name]')!
       const host = card.querySelector('[data-team-host]')!
-      expect(name.className).toContain('shrink-0')
+      // Why basis-0: the host claims only what is left, so it gives way before the name does.
+      expect(host.className).toContain('basis-0')
+      expect(host.className).toContain('flex-1')
       expect(host.className).toContain('truncate')
       expect(host.className).toContain('min-w-0')
+      // ORCA-1092 row 23: a name too long for the row truncates instead of pushing the row wider.
+      expect(name.className).not.toContain('shrink-0')
+      expect(name.className).toContain('min-w-0')
+      expect(name.className).toContain('truncate')
+      expect(name.nextElementSibling?.className).toContain('shrink-0')
       const meta = card.querySelector('[data-team-meta]')!
       expect(meta.className).toContain('flex-wrap')
       expect(meta.className).not.toContain('truncate')

@@ -46,20 +46,17 @@ function LeadCardRow({
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
             {showName ? (
-              <span
-                data-team-name=""
-                className="max-w-full shrink-0 truncate text-[13px] font-medium"
-              >
+              <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
                 {lead.name}
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
               <Crown data-crown="" className="size-3" aria-hidden="true" />
               {translate('teamPanel.lead.badge', 'Lead')}
             </span>
             <span
               data-team-host=""
-              className="ml-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground"
+              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
             >
               {teamHostText(lead.host)}
             </span>

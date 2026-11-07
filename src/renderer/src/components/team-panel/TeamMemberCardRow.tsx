@@ -96,19 +96,18 @@ export function TeamMemberCardRow({
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
             {showName ? (
-              <span
-                data-team-name=""
-                className="max-w-full shrink-0 truncate text-[13px] font-medium"
-              >
+              <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
                 {card.name}
               </span>
             ) : null}
             {ticket ? (
-              <code className="font-mono text-[11.5px] text-muted-foreground">{ticket}</code>
+              <code className="shrink-0 font-mono text-[11.5px] text-muted-foreground">
+                {ticket}
+              </code>
             ) : null}
             <span
               data-team-host=""
-              className="ml-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground"
+              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
             >
               {teamHostText(card.host)}
             </span>
