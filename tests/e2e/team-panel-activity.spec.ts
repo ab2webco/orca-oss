@@ -165,7 +165,7 @@ async function reportJev(app: ElectronApplication, panes: string[], model: strin
 }
 
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
-type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __releaseMachines?: () => void }
+type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __heldMachines?: (() => void)[] }
 
 /** Holds this machine's reading so the tab's loading state stays on screen long enough to look at. */
 async function holdMachineReads(app: ElectronApplication): Promise<void> {
@@ -179,7 +179,7 @@ async function holdMachineReads(app: ElectronApplication): Promise<void> {
     ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
       if (args.method === 'diagnostics.memory' && rig.__machinesHeld) {
         await new Promise<void>((resolve) => {
-          rig.__releaseMachines = resolve
+          rig.__heldMachines = [...(rig.__heldMachines ?? []), resolve]
         })
       }
       return real(event, args)
@@ -191,8 +191,16 @@ const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
   app.evaluate(() => {
     const rig = globalThis as MachineRig
     rig.__machinesHeld = false
-    rig.__releaseMachines?.()
+    rig.__heldMachines?.forEach((release) => release())
   })
+
+/** Why: a read gives up after 15 s and lists the hosts, and a slow runner outlasts that. */
+async function reopenTeamPanel(page: Page): Promise<void> {
+  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+  await expect(page.getByTestId('team-panel')).toHaveCount(0)
+  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+  await expect(page.getByTestId('team-panel')).toBeVisible()
+}
 
 /** A session on another host, with the worktree facts a real one carries in the store. */
 async function seedSessionOn(
@@ -414,10 +422,10 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await panel.getByRole('tab', { name: COPY.en.machines }).click()
   const rows = panel.locator('[data-team-machine]')
   await capture(orcaPage, testInfo, 'machines-loading', async (language) => {
-    await expect(panel.getByRole('tab', { name: COPY[language].machines })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    )
+    await reopenTeamPanel(orcaPage)
+    const tab = panel.getByRole('tab', { name: COPY[language].machines })
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(rows).toHaveCount(0)
   })
   await releaseMachineReads(electronApp)
@@ -441,7 +449,8 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     const copy = COPY[language]
     await expect(panel.getByRole('tab', { name: copy.machines })).toBeVisible()
     await expect(rows).toHaveCount(3)
-    await expect(rows.nth(0).getByRole('img')).toBeVisible()
+    // Why this long: a read that gave up while held lands on the next 20 s poll.
+    await expect(rows.nth(0).getByRole('img')).toBeVisible({ timeout: 30_000 })
     await expect(panel.locator('[data-team-machine="mini"]')).toContainText(copy.offline)
     const box = panel.locator('[data-team-machine="box"]')
     await expect(box).toContainText(copy.oneAgent)
