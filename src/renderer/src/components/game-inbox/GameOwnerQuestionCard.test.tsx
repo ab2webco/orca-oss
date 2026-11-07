@@ -49,9 +49,35 @@ describe('GameOwnerQuestionCard', () => {
     )
   })
 
-  it('sends a free-text answer, and only a non-empty one', () => {
+  // ORCA-1095 criterion 1: V28's closed card is the question and its options, nothing to type into.
+  it('closes to the question and its options, with no answer box or Send', () => {
+    const view = render(<GameOwnerQuestionCard question={QUESTION} onAnswer={vi.fn()} />)
+
+    expect(view.queryByRole('textbox')).toBeNull()
+    expect(view.queryByRole('button', { name: 'Send' })).toBeNull()
+    expect(view.getByRole('button', { name: 'Answer' })).toBeTruthy()
+  })
+
+  it('keeps a visible way to answer a question with no options', () => {
+    const { onAnswer } = pending()
+    const view = render(
+      <GameOwnerQuestionCard question={{ ...QUESTION, options: [] }} onAnswer={onAnswer} />
+    )
+
+    expect(view.queryByRole('textbox')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: 'Answer' }))
+    fireEvent.change(view.getByRole('textbox', { name: 'Your answer' }), {
+      target: { value: 'Tomorrow' }
+    })
+    fireEvent.click(view.getByRole('button', { name: 'Send' }))
+
+    expect(onAnswer).toHaveBeenCalledWith({ text: 'Tomorrow' })
+  })
+
+  it('sends a free-text answer after Answer opens the box, and only a non-empty one', () => {
     const { onAnswer } = pending()
     const view = render(<GameOwnerQuestionCard question={QUESTION} onAnswer={onAnswer} />)
+    fireEvent.click(view.getByRole('button', { name: 'Answer' }))
     const send = view.getByRole('button', { name: 'Send' })
     expect(send.hasAttribute('disabled')).toBe(true)
 

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Crown } from 'lucide-react'
-import { StatusDot } from '@/components/StatusDot'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import type { TeamPanelLook } from './use-team-panel-look'
@@ -9,11 +8,17 @@ import type {
   TeamLeadCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamLiveText, teamModelText, teamStatusTone } from './team-card-text'
+import { teamHostText, teamLiveText, teamModelText } from './team-card-text'
+import { TeamStatusMark } from './TeamStatusMark'
+import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
+import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
+
+/** Why here: core names its advisor only in the files core-vendor-adapters.txt lists. */
+export const teamAdvisorSourceText = (): string => translate('teamPanel.advisor.source', 'Jev')
 
 function coordinatesText(count: number): string {
   return count === 1
@@ -35,51 +40,83 @@ function LeadCardRow({
       <button
         type="button"
         onClick={() => void openTeamSession(lead, lead.name)}
-        className="flex w-full min-w-0 flex-col gap-0.5 px-3 py-2 text-left hover:bg-sidebar-accent"
+        className="flex w-full min-w-0 items-start gap-2.5 px-3 py-2 text-left hover:bg-sidebar-accent"
       >
-        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-          {showName ? <span className="truncate text-[13px] font-medium">{lead.name}</span> : null}
-          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
-            <Crown data-crown="" className="size-3" aria-hidden="true" />
-            {translate('teamPanel.lead.badge', 'Lead')}
+        {showName ? (
+          <TeamCardFace
+            who={{ role: 'lead', key: 'lead', characterKey: lead.characterKey, name: lead.name }}
+          />
+        ) : null}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+            {showName ? (
+              <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
+                {lead.name}
+              </span>
+            ) : null}
+            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 text-[11px] font-medium leading-4 text-foreground">
+              <Crown data-crown="" className="size-3" aria-hidden="true" />
+              {translate('teamPanel.lead.badge', 'Lead')}
+            </span>
+            <span
+              data-team-host=""
+              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
+            >
+              {teamHostText(lead.host)}
+            </span>
           </span>
-          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-            {teamHostText(lead.host)}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <TeamStatusMark status={lead.status} />
+            {lead.ownerAsk ? (
+              <span className="truncate text-status-attention">
+                {lead.ownerAsk.ticket
+                  ? translate('teamPanel.lead.asksOn', 'Waiting for you · Question on {{ticket}}', {
+                      ticket: lead.ownerAsk.ticket
+                    })
+                  : translate('teamPanel.lead.asks', 'Waiting for you')}
+              </span>
+            ) : (
+              <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
+            )}
           </span>
+          <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <StatusDot tone={teamStatusTone(lead.status)} />
-          <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
-        </span>
-        <MetaLine parts={[teamModelText(lead.model), coordinatesText(memberCount)]} />
       </button>
     </article>
   )
 }
 
-function AdvisorCardRow({ advisor }: { advisor: TeamAdvisorRow }): React.JSX.Element {
-  const model = advisor.model
-    ? advisor.effort
-      ? `${advisor.model} · ${advisor.effort}`
-      : advisor.model
-    : null
+// Why no model line: V28's row has none, and Jev's sentence already names the model it chose.
+function AdvisorCardRow({
+  advisor,
+  showName
+}: {
+  advisor: TeamAdvisorRow
+  showName: boolean
+}): React.JSX.Element {
+  const name = translate('teamPanel.advisor.name', 'Wizard')
   return (
     <article
       data-team-card="advisor"
-      className="flex flex-col gap-0.5 border-b border-border px-3 py-2"
+      className="flex items-start gap-2.5 border-b border-border px-3 py-2"
     >
-      <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
-        <code className="font-mono text-[11.5px] text-muted-foreground">
-          {translate('teamPanel.advisor.label', 'Advisor')}
-        </code>
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {translate('teamPanel.advisor.source', 'Jev')}
-        </span>
-      </span>
-      {advisor.line ? (
-        <span className="truncate text-xs text-muted-foreground">{advisor.line}</span>
+      {showName ? (
+        <TeamCardFace who={{ role: 'advisor', key: 'advisor', characterKey: null, name }} />
       ) : null}
-      <MetaLine parts={[model]} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
+          {showName ? <span className="truncate text-[13px] font-medium">{name}</span> : null}
+          <code className="font-mono text-[11.5px] text-muted-foreground">
+            {translate('teamPanel.advisor.label', 'Advisor')}
+          </code>
+          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+            {teamAdvisorSourceText()}
+          </span>
+        </span>
+        {advisor.line ? (
+          <span className="truncate text-xs text-muted-foreground">{advisor.line}</span>
+        ) : null}
+      </span>
     </article>
   )
 }
@@ -137,7 +174,8 @@ export function TeamTabContent({
         <TeamArcadeSection arcade={model.arcade} actions={arcadeActions} />
       ) : null}
       <LeadCardRow lead={model.lead} showName={game} memberCount={model.members.length} />
-      {model.advisor ? <AdvisorCardRow advisor={model.advisor} /> : null}
+      {model.advisor ? <AdvisorCardRow advisor={model.advisor} showName={game} /> : null}
+      <TeamReadNotice />
       {model.members.length === 0 ? (
         <div className="flex flex-col gap-1 px-3 py-6 text-xs text-muted-foreground">
           <p className="text-[13px] font-medium text-foreground">

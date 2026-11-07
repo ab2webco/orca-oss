@@ -129,6 +129,34 @@ describe('tellGameLead', () => {
     expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toHaveLength(1)
   })
 
+  // Why (ORCA-1100): a lead rotated with `game lead --fresh` has no Run until it dispatches, and the
+  // adopted host refused the owner's answer, so it waited unheard until the next read retried it.
+  it("opens a Run on the lead's pane when it has none yet, so its watch hands the answer out", () => {
+    const db = adoptedDb()
+    const notify = vi.fn()
+
+    expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
+
+    expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
+    const run = db.getCurrentRunForPane(LEAD_PANE)
+    expect(run).toMatchObject({ coordinator_handle: 'term_lead', legacy: 0 })
+    // An unbound `check` refuses any unread mail filed under the legacy Run.
+    expect(db.getUnreadMessages('term_lead', [...LEAD_WATCH_TYPES])).toMatchObject([
+      { run_id: run?.id, from_handle: 'owner', type: 'escalation', subject: NOTE.subject }
+    ])
+    expect(leadDelivery(db, run!.id, run!.consumer_generation)?.messages).toHaveLength(1)
+
+    // A second answer reuses that Run.
+    expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
+    expect(db.getUnreadMessages('term_lead').map((one) => one.run_id)).toEqual([run?.id, run?.id])
+  })
+
+  it('still refuses, for a retry, a lead with no Run whose pane Orca cannot tell', () => {
+    const db = adoptedDb()
+
+    expect(tellGameLead(db, vi.fn(), { handle: 'term_lead', paneKey: null }, NOTE)).toBe(false)
+  })
+
   it('returns false instead of throwing when the database refuses the write', () => {
     const closed = new OrchestrationDb(':memory:')
     closed.close()

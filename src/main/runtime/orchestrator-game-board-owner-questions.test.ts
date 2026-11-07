@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   GameBoard,
   type GameBoardLead,
@@ -29,7 +29,8 @@ const MEMBER: GameBoardProject = { ...LEAD, isMember: true, memberTicket: 'CIN-1
 
 function board(
   project: (caller: { terminalHandle?: string }) => GameBoardProject,
-  accepts: (lead: GameBoardLead) => boolean = () => true
+  accepts: (lead: GameBoardLead) => boolean = () => true,
+  later?: (ms: number, run: () => void) => void
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-owner-'))
   dirs.push(dir)
@@ -51,7 +52,8 @@ function board(
     ownerQuestionsChanged: (projectKey) => changed.push(projectKey),
     ownerQuestionSettled: (projectKey, question) =>
       events.push(`${question.answer ? 'answered' : 'asked'} ${projectKey} ${question.id}`),
-    now: () => new Date(Date.UTC(2026, 9, 29, 10, 0, 0))
+    now: () => new Date(Date.UTC(2026, 9, 29, 10, 0, 0)),
+    ...(later ? { later } : {})
   })
   return { game, told, changed, events }
 }
@@ -219,6 +221,76 @@ describe('GameBoard owner questions', () => {
     expect(told).toMatchObject([{ lead: LEAD_TERMINAL, note: { payload: { answer: 'Yes' } } }])
     const after = await game.ownerQuestions({ terminalHandle: 'term_lead', all: true })
     expect(after.questions[0]?.answer).toEqual({ text: 'Yes', at: '2026-10-29T10:00:00.000Z' })
+  })
+
+  // Why (ORCA-1100): a held answer waited for a read nobody made, so the lead's watch slept through it.
+  it('retries a held answer on its own until the live lead takes it, without any read', async () => {
+    let lead: GameBoardLead | null = null
+    const pending: (() => void)[] = []
+    const { game, told, changed } = board(
+      () => ({ ...LEAD, lead }),
+      () => true,
+      (_ms, run) => pending.push(run)
+    )
+    const { question } = await game.askOwner(ask)
+    await expect(
+      game.answerOwner({ worktreeId: 'wt', id: question.id, text: 'Yes' })
+    ).resolves.toMatchObject({ delivered: false })
+    expect(pending).toHaveLength(1)
+
+    const tick = async (): Promise<void> => {
+      pending.shift()?.()
+      await vi.waitFor(() => expect(pending.length > 0 || told.length > 0).toBe(true))
+    }
+    await tick()
+    expect(told).toEqual([])
+
+    lead = { handle: 'term_fresh_lead', paneKey: 'tab:fresh' }
+    changed.length = 0
+    await tick()
+    await vi.waitFor(() => expect(changed).toEqual(['repo:r1']))
+
+    expect(told).toMatchObject([{ lead, note: { payload: { ownerQuestionId: question.id } } }])
+    expect(pending).toEqual([])
+  })
+
+  it('runs one retry per project however many answers are held', async () => {
+    const pending: (() => void)[] = []
+    const { game } = board(
+      () => ({ ...LEAD, lead: null }),
+      () => true,
+      (_ms, run) => pending.push(run)
+    )
+    const first = await game.askOwner(ask)
+    const second = await game.askOwner({ ...ask, question: 'And lab.112?' })
+    await game.answerOwner({ worktreeId: 'wt', id: first.question.id, text: 'Yes' })
+    await game.answerOwner({ worktreeId: 'wt', id: second.question.id, text: 'No' })
+
+    expect(pending).toHaveLength(1)
+  })
+
+  it('hands held answers to a lead that just registered', async () => {
+    let lead: GameBoardLead | null = null
+    const { game, told, changed } = board(
+      () => ({ ...LEAD, lead }),
+      () => true,
+      () => undefined
+    )
+    const { question } = await game.askOwner(ask)
+    await game.answerOwner({ worktreeId: 'wt', id: question.id, text: 'Yes' })
+
+    await expect(game.heldAnswers.deliver({ terminalHandle: 'term_nobody' })).resolves.toHaveLength(
+      1
+    )
+    lead = { handle: 'term_fresh_lead', paneKey: 'tab:fresh' }
+    changed.length = 0
+    await expect(game.heldAnswers.deliver({ terminalHandle: 'term_fresh_lead' })).resolves.toEqual(
+      []
+    )
+
+    expect(changed).toEqual(['repo:r1'])
+
+    expect(told).toMatchObject([{ lead, note: { payload: { ownerQuestionId: question.id } } }])
   })
 
   it('never delivers to a member, which only reads its own ticket', async () => {

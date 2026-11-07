@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   TeamActivityRow,
   TeamPanelModel,
   TeamPanelSoloModel
 } from '../../../../shared/team-panel-model-types'
-import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
+
+const openTeamSession = vi.hoisted(() => vi.fn())
+vi.mock('./team-session-open', () => ({ openTeamSession }))
+
+const { openTeamInboxAgent, teamInboxAgentQuestionsOf } = await import('./team-panel-inbox-agents')
 
 function row(over: Partial<TeamActivityRow>): TeamActivityRow {
   return {
@@ -47,6 +51,8 @@ const solo = (rows: TeamActivityRow[]): TeamPanelSoloModel => ({
   machines: null
 })
 
+beforeEach(() => openTeamSession.mockReset())
+
 describe('No-team Inbox from agent status', () => {
   it('lists each agent that asks the user, from any project or host', () => {
     const asking = row({
@@ -64,6 +70,7 @@ describe('No-team Inbox from agent status', () => {
     expect(teamInboxAgentQuestionsOf(solo([working, asking]))).toEqual([
       {
         paneKey: 'tab-2:leaf-1',
+        terminalHandle: null,
         worktreeId: 'wt-2',
         host: { kind: 'remote', name: 'imac', environmentId: 'env-1', reachable: true },
         repoName: 'cineco',
@@ -72,6 +79,24 @@ describe('No-team Inbox from agent status', () => {
         options: ['Yes', 'No']
       }
     ])
+  })
+
+  // Why one path: a row and its question must open the same pane on every kind of host.
+  it('opens a question the way its Activity row opens', () => {
+    const question = {
+      paneKey: 'tab-2:leaf-1',
+      terminalHandle: 'term-2',
+      worktreeId: 'wt-2',
+      host: { kind: 'local' } as const,
+      repoName: 'cineco',
+      worktreeName: 'cin-1145',
+      text: 'Apply it now?',
+      options: ['Yes', 'No']
+    }
+
+    openTeamInboxAgent(question)
+
+    expect(openTeamSession).toHaveBeenCalledWith(question, 'cin-1145')
   })
 
   // Why: with a team, the lead's board is the Inbox's source; member prompts stay on their cards.
