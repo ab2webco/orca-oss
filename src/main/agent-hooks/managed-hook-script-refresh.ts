@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { chmod, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { grantDirAclAsync, isPermissionError } from '../win32-utils'
+import { getSharedHookFilePolicy } from './shared-hook-file-policy'
 
 type ExistingScript = { exists: false } | { exists: true; content: string | null }
 
@@ -65,6 +66,9 @@ export async function refreshManagedScriptIfPresent(
   const existing = await readExistingScript(scriptPath)
   if (!existing.exists) {
     return false
+  }
+  if (getSharedHookFilePolicy() === 'keep-existing') {
+    return true
   }
   if (existing.content === content) {
     if (process.platform !== 'win32') {
