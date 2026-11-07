@@ -97,8 +97,10 @@ function runGuard(command, ghOptions, cwd = makeDir(), python = 'python3') {
     cwd,
     env,
     encoding: 'utf8',
-    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd })
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd }),
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
   const stdout = result.stdout.trim()
   if (!stdout) {
