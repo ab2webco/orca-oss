@@ -44,6 +44,7 @@ const team: TeamPanelGameModel = {
   repoId: 'repo-1',
   projectName: 'orca-oss',
   lead,
+  actions: [],
   advisor: {
     model: 'Opus 5.5',
     effort: null,
