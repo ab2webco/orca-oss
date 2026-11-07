@@ -317,6 +317,31 @@ describe('TeamPanelView scene area', () => {
     expect(scene(container)).not.toBeNull()
   })
 
+  // ORCA-1094 row 2: V28 draws the level under the project name, above the tabs, on every tab.
+  it('heads the Game look with the level and XP under the project name', async () => {
+    const leveled = { ...game, xp: { level: 3, into: 50, need: 300 } }
+    const { container } = await render(
+      { section: { kind: 'ready', value: leveled }, retry: null },
+      vi.fn(),
+      'game'
+    )
+    const row = container.querySelector('[data-team-xp]')
+    expect(row?.textContent).toContain('Lv 3')
+    expect(row?.textContent).toContain('50/300 XP')
+    const tabList = container.querySelector('[role="tablist"]')!
+    expect(row!.compareDocumentPosition(tabList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const plain = await render({ section: { kind: 'ready', value: leveled }, retry: null })
+    expect(plain.container.querySelector('[data-team-xp]')).toBeNull()
+    // No characters list from the host, no level: nothing is drawn rather than a made-up figure.
+    const unread = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'game'
+    )
+    expect(unread.container.querySelector('[data-team-xp]')).toBeNull()
+  })
+
   it('draws no scene in the Plain look or without a team', async () => {
     const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
     expect(scene(plain.container)).toBeNull()

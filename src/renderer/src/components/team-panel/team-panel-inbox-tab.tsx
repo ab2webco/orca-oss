@@ -6,6 +6,7 @@ import type {
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import type { TeamInboxCounts } from '../../../../shared/team-panel-model-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabStripEdgeCues, useTabStripCue } from './team-panel-tab-strip-cue'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
@@ -93,7 +94,10 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
   const nothing = subTabs.every(([, , count]) => count === 0) && props.undelivered.length === 0
-  if (nothing && !props.projectUnread) {
+  const empty = nothing && !props.projectUnread
+  // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
+  const cue = useTabStripCue(tab, empty ? '' : subTabs.map(([id]) => id).join())
+  if (empty) {
     return (
       <TeamPanelMessageState
         title={translate('teamPanel.tabs.inbox.emptyTitle', 'Nothing waits for you')}
@@ -111,17 +115,27 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       className="flex h-full min-h-0 flex-col gap-0"
       data-testid="team-panel-inbox"
     >
-      <TabsList
-        aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
-        className="h-auto w-full shrink-0 flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto gap-0.5 rounded-none bg-transparent px-3 pt-2.5 pb-2"
-      >
-        {subTabs.map(([id, label, count]) => (
-          <TabsTrigger key={id} value={id} className={SUB_TAB}>
-            {label}
-            <span className="tabular-nums">{count}</span>
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel scrolls them with a cue. */}
+      <div className="relative shrink-0">
+        <TabsList
+          aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
+          {...cue.stripProps}
+          className="h-auto w-full shrink-0 flex-nowrap justify-start overflow-x-auto group-data-[orientation=horizontal]/tabs:h-auto gap-1 rounded-none bg-transparent px-3 pt-2.5 pb-2 [scrollbar-width:none]"
+        >
+          {subTabs.map(([id, label, count]) => (
+            <TabsTrigger
+              key={id}
+              ref={id === tab ? cue.activeTrigger : undefined}
+              value={id}
+              className={SUB_TAB}
+            >
+              {label}
+              <span className="tabular-nums">{count}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabStripEdgeCues overflow={cue.overflow} />
+      </div>
       <TabsContent value="for-you" className={`${LIST} space-y-2`}>
         <GameInboxUndelivered questions={props.undelivered} />
         {/* Why only with none read: the tab's own read may succeed where the model's failed. */}

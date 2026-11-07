@@ -67,8 +67,10 @@ function runHook({ command, cwd, state = 'In Progress', prTitle = null }) {
       ...process.env,
       PATH: `${stubBin}:${process.env.PATH}`,
       ORCA_CLI_COMMAND: join(stubBin, 'orca')
-    }
+    },
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
   return JSON.parse(result.stdout || '{}')
 }

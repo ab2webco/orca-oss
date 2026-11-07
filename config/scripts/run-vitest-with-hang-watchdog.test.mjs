@@ -70,6 +70,24 @@ setTimeout(() => {}, 120_000)`
     expect(result.code).toBe(124)
   })
 
+  // Why: the probe signal also ends the stalled grandchild, so vitest may print a green
+  // summary during the grace period; the last line must still name the wedge (ORCA-1123).
+  it('ends with a line naming the wedged module after any late summary', async () => {
+    const fake = writeFakeVitest(
+      'late-summary.mjs',
+      `record({ event: 'run-start', atMs: Date.now(), modules: ['wedged.test.ts'] })
+record({ event: 'module-queued', atMs: Date.now(), module: 'wedged.test.ts' })
+process.on('SIGUSR2', () => console.error('      Tests  1 passed (1)'))
+setTimeout(() => {}, 120_000)`
+    )
+    const result = await runWatchdog(fake, [], 2)
+    const lastLine = result.stderr.trimEnd().split('\n').at(-1)
+    expect(result.stderr).toContain('Tests  1 passed (1)')
+    expect(lastLine).toContain('wedged.test.ts')
+    expect(lastLine).toContain('not a result')
+    expect(result.code).toBe(124)
+  })
+
   it('calls a run that ended but would not exit a teardown hang, not a red test', async () => {
     const fake = writeFakeVitest(
       'teardown.mjs',

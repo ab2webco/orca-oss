@@ -216,7 +216,8 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
 
     // At 320 the 219 px panel cannot fit five tabs: the strip must say more lie on each side.
     await setPanel(orcaPage, { look: 'plain' })
-    const strip = panel.getByRole('tablist')
+    // Why first: once Inbox opens, its sub-tab list is a second tablist inside the panel.
+    const strip = panel.getByRole('tablist').first()
     await orcaPage.setViewportSize({ width: 320, height: 900 })
     await panel.getByRole('tab', { name: 'Team' }).click()
     await orcaPage.mouse.move(0, 0)
@@ -241,6 +242,111 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     await expect(strip).toHaveAttribute('data-overflow-end', 'false')
+
+    // ORCA-1094 F9: at the default 280 sidebar and wider all five tabs fit, in either language;
+    // at 220 the strip scrolls with a cue and the selected tab is scrolled into view.
+    const edges = (): Promise<{ panel: number; scroll: number; client: number; cut: string[] }> =>
+      strip.evaluate((list) => {
+        const right = list.getBoundingClientRect().right
+        const cut = [...list.querySelectorAll<HTMLElement>('[role="tab"]')]
+          .filter((tab) => tab.getBoundingClientRect().right > right + 0.5)
+          .map(
+            (tab) =>
+              `${tab.textContent} ends ${Math.round(tab.getBoundingClientRect().right - right)} px past`
+          )
+        return { panel: right, scroll: list.scrollWidth, client: list.clientWidth, cut }
+      })
+    // Why a question: Inbox draws its sub-tabs only with something in it, and the count widens its tab.
+    await client.call('game.ownerAsk', {
+      worktreeId,
+      terminalHandle: lead,
+      ticket: 'ORCA-12',
+      question: 'Merge #923 now or wait for #915 first?',
+      options: ['Merge now', 'Wait for #915']
+    })
+    await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
+    for (const language of ['es', 'en'] as const) {
+      await orcaPage.evaluate(
+        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+        language
+      )
+      const tabs = strip.getByRole('tab')
+      await expect(tabs).toHaveCount(5)
+      for (const width of [280, 2000]) {
+        await orcaPage.evaluate(
+          (next) => window.__store!.getState().setRightSidebarWidth(next),
+          width
+        )
+        await tabs.first().click()
+        await expect
+          .poll(async () => (await edges()).cut, {
+            message: `${language} ${width}: tabs past the edge`
+          })
+          .toEqual([])
+        const fit = await edges()
+        expect(fit.scroll, `${language} ${width}: the strip scrolls`).toBeLessThanOrEqual(
+          fit.client
+        )
+        await expect(strip).toHaveAttribute('data-overflow-end', 'false')
+      }
+      await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarWidth(220))
+      await tabs.first().click()
+      await expect(strip).toHaveAttribute('data-overflow-end', 'true')
+      await tabs.last().click()
+      await expect
+        .poll(async () => {
+          const box = await tabs.last().boundingBox()
+          return box ? box.x + box.width <= (await edges()).panel + 0.5 : false
+        })
+        .toBe(true)
+
+      // The Inbox sub-tabs stay on one line at 280, as V28 `.subs` does; what does not fit scrolls
+      // behind a cue, and the selected one is scrolled into view.
+      await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarWidth(280))
+      await tabs.nth(1).click()
+      const subList = panel.getByTestId('team-panel-inbox').getByRole('tablist')
+      const subs = await subList.evaluate((list) => ({
+        tops: [...list.querySelectorAll('[role="tab"]')].map((sub) =>
+          Math.round(sub.getBoundingClientRect().top)
+        ),
+        scrolls: list.scrollWidth > list.clientWidth + 1
+      }))
+      expect(new Set(subs.tops).size, `${language}: Inbox sub-tabs wrap`).toBe(1)
+      await expect(subList).toHaveAttribute('data-overflow-end', String(subs.scrolls))
+      await subList.getByRole('tab').last().click()
+      await expect
+        .poll(() =>
+          subList.evaluate((list) => {
+            const last = [...list.querySelectorAll('[role="tab"]')].at(-1)
+            return (
+              (last?.getBoundingClientRect().right ?? Infinity) <=
+              list.getBoundingClientRect().right + 0.5
+            )
+          })
+        )
+        .toBe(true)
+      await subList.getByRole('tab').first().click()
+
+      if (!CAPTURE_EVIDENCE) {
+        continue
+      }
+      await orcaPage.mouse.move(0, 0)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await orcaPage.evaluate(async (next) => {
+            const settings = await window.api.settings.set({ theme: next })
+            window.__store?.setState({ settings })
+          }, theme)
+          await orcaPage.waitForTimeout(300)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`strip-fit-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    }
   } finally {
     agent.dispose()
   }
