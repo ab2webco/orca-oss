@@ -1,11 +1,12 @@
 import type { TerminalLineSegment } from './terminal-line-segments'
 
 // Why no length floor, unlike the transcript's: status text is cut at 160 chars, so a line can hold only a token's head.
-// A Claude OAuth token (sk-ant-oat, refresh sk-ant-ort) shows up when a member runs env or printenv.
-const BEARER_SECRET = /dcap_[A-Za-z0-9_-]+|(?<![A-Za-z0-9_-])sk-ant-o[ar]t[A-Za-z0-9_-]*/g
+// A Claude OAuth token (sk-ant-oat, refresh sk-ant-ort) or an API key (sk-ant-api) shows up when a
+// member runs env or printenv.
+const BEARER_SECRET = /dcap_[A-Za-z0-9_-]+|(?<![A-Za-z0-9_-])sk-ant-(?:o[ar]t|api)[A-Za-z0-9_-]*/g
 
 const holdsSecret = (text: string | undefined): text is string =>
-  text !== undefined && (text.includes('dcap_') || text.includes('sk-ant-o'))
+  text !== undefined && (text.includes('dcap_') || text.includes('sk-ant-'))
 
 /** A worker's own command lines carry its capability, and its env its OAuth token: bearer secrets no row may show. */
 export const redactDispatchCapability = (text: string): string =>
@@ -54,9 +55,9 @@ export function redactAgentStatusText<T extends AgentStatusText>(payload: T): T 
 
 const TOKEN_CHAR = /[A-Za-z0-9_-]/
 // A capability is 32 random bytes in base64url (orchestration db), so a match crosses rows for 43 chars at most.
-// An OAuth token runs about 95 chars past its prefix; the bound leaves room for a longer one. No left
-// boundary here: the row join drops the `=` before a token that starts the next row.
-const WRAPPED_SECRET = /dcap_[A-Za-z0-9_-]{1,43}|sk-ant-o[ar]t[A-Za-z0-9_-]{1,128}/g
+// An OAuth token or API key runs about 95 chars past its prefix; the bound leaves room for a longer
+// one. No left boundary here: the row join drops the `=` before a token that starts the next row.
+const WRAPPED_SECRET = /dcap_[A-Za-z0-9_-]{1,43}|sk-ant-(?:o[ar]t|api)[A-Za-z0-9_-]{1,128}/g
 
 /**
  * A token can run past its row by the terminal's wrap or an app's wrap under a hanging indent, at any row

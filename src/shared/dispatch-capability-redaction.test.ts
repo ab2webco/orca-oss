@@ -181,17 +181,22 @@ describe('redactTerminalSegmentRows', () => {
 // Why only Q, X, J, Z, '-' and '_' in the body: no other text here holds Q, X, J or Z.
 const OAUTH = `sk-ant-oat01-${'QXJZ'.repeat(22).slice(0, 86)}-ZJXQ_ZQX`
 const REFRESH = `sk-ant-ort01-${'ZQXJ'.repeat(24).slice(0, 95)}`
+const API_KEY = `sk-ant-api03-${'JZQX'.repeat(24).slice(0, 88)}-QX_ZJX`
 const OAUTH_BODY = /[QXJZ]/
 
 describe('Claude OAuth tokens', () => {
-  it('uses a real-length token', () => {
+  it('uses real-length tokens', () => {
     expect(OAUTH).toHaveLength(108)
+    expect(API_KEY).toHaveLength(108)
   })
 
   it.each([
     [`CLAUDE_CODE_OAUTH_TOKEN=${OAUTH}`, 'CLAUDE_CODE_OAUTH_TOKEN=[redacted]'],
     [`export CLAUDE_CODE_OAUTH_TOKEN="${OAUTH}"`, 'export CLAUDE_CODE_OAUTH_TOKEN="[redacted]"'],
     [`"refreshToken":"${REFRESH}"`, '"refreshToken":"[redacted]"'],
+    // An Anthropic API key prints the same way when ANTHROPIC_API_KEY is set.
+    [`ANTHROPIC_API_KEY=${API_KEY}`, 'ANTHROPIC_API_KEY=[redacted]'],
+    ['ANTHROPIC_API_KEY=sk-ant-api03-QX', 'ANTHROPIC_API_KEY=[redacted]'],
     // Why: status text is cut at 160 chars, so a line can hold only the token's head.
     [
       'PATH=/usr/bin CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-QX',
@@ -224,11 +229,14 @@ describe('Claude OAuth tokens', () => {
     }
     return rows
   }
-  const cases = [`CLAUDE_CODE_OAUTH_TOKEN=${OAUTH}`, `env | grep TOKEN ${OAUTH} done`].flatMap(
-    (line) =>
-      [8, 12, 20, 33, 40, 80, 120].flatMap((width) =>
-        ['', '  ', '     ', '  ⎿  ', '│ '].map((indent) => ({ line, width, indent }))
-      )
+  const cases = [
+    `CLAUDE_CODE_OAUTH_TOKEN=${OAUTH}`,
+    `env | grep TOKEN ${OAUTH} done`,
+    `ANTHROPIC_API_KEY=${API_KEY}`
+  ].flatMap((line) =>
+    [8, 12, 20, 33, 40, 80, 120].flatMap((width) =>
+      ['', '  ', '     ', '  ⎿  ', '│ '].map((indent) => ({ line, width, indent }))
+    )
   )
 
   it.each(cases)(
@@ -253,7 +261,7 @@ describe('Claude OAuth tokens', () => {
   })
 
   it('leaves other sk- text alone', () => {
-    const line = 'risk-ant-oath and sk-proj-notours stay'
+    const line = 'risk-ant-oath, mask-ant-api03 and sk-proj-notours stay'
     expect(redactDispatchCapability(line)).toBe(line)
   })
 })
