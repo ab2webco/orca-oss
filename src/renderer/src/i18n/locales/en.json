@@ -17265,5 +17265,11 @@
       "youAnsweredText": "You answered: {{text}}",
       "leadAnswered": "The lead answered"
     }
+  },
+  "claudeDeadHooks": {
+    "title": "Claude hooks are not running",
+    "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
+    "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
+    "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
   }
 }
