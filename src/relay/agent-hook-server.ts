@@ -30,6 +30,7 @@ import {
 import { buildRelayHookPtyEnv, defaultEndpointDir } from './agent-hook-endpoint-coordinates'
 import { buildRelayHookEnvelope, hookBodyEnv, hookBodyVersion } from './agent-hook-envelope-build'
 import { AgentHookResultRetryScheduler } from './agent-hook-result-retry-scheduler'
+import { ClaudeTurnEndPoller } from '../shared/claude-turn-end-transcript'
 
 export type RelayHookForward = (envelope: AgentHookRelayEnvelope) => void
 
@@ -73,6 +74,7 @@ export class RelayAgentHookServer {
   private preferredPort: number
   private portFallbackApplied = false
   private retryScheduler: AgentHookResultRetryScheduler
+  private claudeTurnEndPoller: ClaudeTurnEndPoller
 
   constructor(options: RelayHookServerOptions) {
     this.env = options.env ?? REMOTE_AGENT_HOOK_ENV
@@ -88,6 +90,11 @@ export class RelayAgentHookServer {
       applyEvent: (event, source, env, version) => {
         this.applyEvent(event, source, env, version)
       }
+    })
+    this.claudeTurnEndPoller = new ClaudeTurnEndPoller({
+      state: this.state,
+      isListening: () => this.server !== null,
+      ingestStop: (stopBody) => this.ingestHookBody('claude', stopBody)
     })
   }
 
@@ -166,6 +173,7 @@ export class RelayAgentHookServer {
     this.token = ''
     this.endpointFileWritten = false
     this.retryScheduler.clearAll()
+    this.claudeTurnEndPoller.clearAll()
     clearAllListenerCaches(this.state)
     this.lastEnvelopeMetaByPaneKey.clear()
   }
@@ -192,6 +200,7 @@ export class RelayAgentHookServer {
   clearPaneState(paneKey: string): void {
     this.retryScheduler.clearAssistantMessageRetry(paneKey)
     this.retryScheduler.clearCodexSubagentPoll(paneKey)
+    this.claudeTurnEndPoller.clear(paneKey)
     clearPaneCacheState(this.state, paneKey)
     this.lastEnvelopeMetaByPaneKey.delete(paneKey)
   }
@@ -237,18 +246,7 @@ export class RelayAgentHookServer {
         res.end()
         return
       }
-      const event = normalizeHookPayload(this.state, source, body, this.env, {
-        allowUnanchoredPreCompact: true,
-        allowUnanchoredPostCompact: true
-      })
-      if (event) {
-        // TODO: once normalizeHookPayload returns validated env/version, drop bodyEnv/bodyVersion and source them from the listener result.
-        const env = hookBodyEnv(body)
-        const version = hookBodyVersion(body)
-        this.applyEvent(event, source, env, version)
-        this.retryScheduler.scheduleAssistantMessageRetry(source, body, event, env, version)
-        this.retryScheduler.scheduleCodexSubagentPoll(source, body, event, env, version)
-      }
+      this.ingestHookBody(source, body)
       res.writeHead(204)
       res.end()
     } catch (err) {
@@ -259,6 +257,23 @@ export class RelayAgentHookServer {
       res.writeHead(204)
       res.end()
     }
+  }
+
+  private ingestHookBody(source: AgentHookSource, body: unknown): void {
+    const event = normalizeHookPayload(this.state, source, body, this.env, {
+      allowUnanchoredPreCompact: true,
+      allowUnanchoredPostCompact: true
+    })
+    if (!event) {
+      return
+    }
+    // TODO: once normalizeHookPayload returns validated env/version, drop bodyEnv/bodyVersion and source them from the listener result.
+    const env = hookBodyEnv(body)
+    const version = hookBodyVersion(body)
+    this.applyEvent(event, source, env, version)
+    this.retryScheduler.scheduleAssistantMessageRetry(source, body, event, env, version)
+    this.retryScheduler.scheduleCodexSubagentPoll(source, body, event, env, version)
+    this.claudeTurnEndPoller.schedule(source, event.paneKey, body)
   }
 
   private applyEvent(

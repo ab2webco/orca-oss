@@ -23,6 +23,7 @@ import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-m
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
 import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
+import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 
 export type TeamPanelModelSource = {
@@ -126,18 +127,19 @@ export function useTeamPanelModel(): TeamPanelModelSource {
   )
   const scope = heldKey !== null && lastTeam?.scope.key === heldKey ? lastTeam.scope : activeScope
   useEffect(() => (scope ? poller.subscribe(scope) : undefined), [scope])
-  // Why: an answer changes the Inbox count now, not at the next 20 s read.
+  // Why: an answer changes the Inbox count, and a Jev line the scene's bubble, now, not at the next 20 s read.
   useEffect(() => {
     if (!scope) {
       return
     }
     const refreshNow = (): void => poller.refresh()
-    const stopLocal = window.api.runtime.onGameOwnerQuestionsChanged?.(refreshNow)
-    const stopPaired = onGameOwnerQuestionsChanged(refreshNow)
-    return () => {
-      stopLocal?.()
-      stopPaired()
-    }
+    const stops = [
+      window.api.runtime.onGameOwnerQuestionsChanged?.(refreshNow),
+      onGameOwnerQuestionsChanged(refreshNow),
+      window.api.runtime.onGameAdvisorChanged?.(refreshNow),
+      onGameAdvisorChanged(refreshNow)
+    ]
+    return () => stops.forEach((stop) => stop?.())
   }, [scope])
   const source = useTeamPanelModelStore((s) => s.source)
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())

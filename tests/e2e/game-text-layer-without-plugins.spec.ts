@@ -21,6 +21,22 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 const NOT_RUN = 'NOT RUN: needs Claude Code 2.1.287 or newer on PATH (CI has none, ORCA-1084)'
 const BAND_MARKS = /[▤↻♥⚑▀▄▌▐]/
 
+type LeadRead = {
+  agents?: { isLeader?: boolean; displayName?: string | null }[]
+  worktree?: { displayName?: string }
+  lead?: { label?: string }
+}
+
+/** The lead's name as its Team card shows it: its own title, else its worktree's, else its label. */
+function leadNameOf(stdout: string, paneWorktreeName: string): string {
+  const parsed = JSON.parse(stdout) as LeadRead & { result?: LeadRead }
+  const state = parsed.result ?? parsed
+  const leader = state.agents?.find((one) => one.isLeader)
+  const worktreeName = state.worktree?.displayName ?? paneWorktreeName
+  const name = (leader?.displayName ?? worktreeName).split(' · ')[0]?.trim()
+  return name || state.lead?.label || 'Lead'
+}
+
 async function expectPluginSystemOff(page: Page) {
   const plugins = await page.evaluate(async () => ({
     enabled: (await window.api.settings.get()).pluginSystemEnabled,
@@ -120,6 +136,14 @@ test.describe('plugin system off, real Claude Code', () => {
       )
       expect(read.status, read.stderr).toBe(0)
       await writeFile(testInfo.outputPath('game-state.json'), read.stdout)
+      // Why the pane's worktree: this read has no worktree, while the mod's own read from the pane does.
+      const paneWorktreeName = await orcaPage.evaluate(
+        (id) =>
+          Object.values(window.__store!.getState().worktreesByRepo)
+            .flat()
+            .find((one) => one.id === id)?.displayName ?? '',
+        shown.result.terminal.worktreeId
+      )
 
       await expect
         .poll(async () => (await screenRows(orcaPage)).join('\n'), { timeout: 60_000 })
@@ -152,9 +176,9 @@ test.describe('plugin system off, real Claude Code', () => {
         )
       )
       const screen = transcript.join('\n')
-      // Why Lead: the title a live game.state read gives a lead; a failed read shows a scene card's name.
+      // Why from the read: a lead speaks as its Team card names it (ORCA-1109); a failed read shows a scene card's name.
       expect(transcript, `no lead heading:\n${screen}`).toContainEqual(
-        expect.stringMatching(/^Lead · /)
+        expect.stringMatching(new RegExp(`^${leadNameOf(read.stdout, paneWorktreeName)} · `))
       )
       expect(screen, `the band is drawn:\n${screen}`).not.toMatch(BAND_MARKS)
       expect(screen).not.toMatch(/orca: |Unknown command|ECONNREFUSED/)

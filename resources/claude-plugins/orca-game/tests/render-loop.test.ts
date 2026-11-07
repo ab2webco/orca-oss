@@ -162,11 +162,12 @@ const start = async ($: Engine, on: On, role: Role, counts: Counts) => {
 }
 
 describe('render loops', () => {
-  // Why: the team, its scene and the arcade draw in Orca's Team panel (ORCA-1055).
+  // Why: the team, its scene and the arcade draw in Orca's Team panel (ORCA-1055); the Spinner is
+  // only hidden behind the live line (ORCA-1109), which live-line.test.ts checks.
   test('the mod draws the line above the prompt and no scene or pane', () => {
     const drawn = targetsOf().map((one) => one.requestId ?? one.component)
     expect(drawn).toContain('AbovePrompt')
-    for (const gone of ['Spinner', 'orca-game-fleet', 'orca-game-arcade']) {
+    for (const gone of ['orca-game-fleet', 'orca-game-arcade']) {
       expect(drawn).not.toContain(gone)
     }
   })

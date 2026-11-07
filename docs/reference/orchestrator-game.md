@@ -600,7 +600,13 @@ members hold only while another name is free: they give way before a launch numb
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
-- `orca game lead` — the standing rules that make this session the lead (none for a member).
+- `orca game lead` — the standing rules that make this session the lead (none for a member). A
+  local Claude pane started without the game mod (no `ORCA_GAME_MODE`) is refused with `Not the lead:`
+  and told to run `/orca-game:lead` in a Claude Agent Teams tab, since it would lead with no Advisor
+  row and no `/orca-game` commands. Where the mod can never load (SSH, WSL, the game off, a Claude
+  older than 2.1.287) the pane still leads, and a first line says what it lacks. A lead that is not
+  Claude is unchanged. The rules name `ORCA_GAME_CLI`, else WSL's `ORCA_CLI_COMMAND`, before a bare
+  `orca` ([`orchestrator-game-lead-pane.ts`](../../src/cli/handlers/orchestrator-game-lead-pane.ts)).
 - `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
   project's stored lead conversation and this session becomes the new lead instead of reopening it.
   A live lead still wins, and an older host that drops the flag reopens the old one and says so.
