@@ -2,6 +2,7 @@ import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamActionsOf } from '../../../../shared/team-panel-actions'
+import { teamAdvisorRowOf } from '../../../../shared/team-panel-activity-rows'
 import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
 import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
 import type {
@@ -50,20 +51,9 @@ function inboxOf(
   }
 }
 
-// Why no calls: Jev's decisions live in the lead pane's own state, which never reaches game.state.
 function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
   const advisor = state.agents.find((one) => one.isLeader)?.advisor
-  if (!advisor) {
-    return null
-  }
-  return {
-    model: advisor.model,
-    effort: advisor.effort,
-    pinned: advisor.pinned,
-    line: advisor.line ?? null,
-    previous: advisor.previous ?? null,
-    calls: []
-  }
+  return advisor ? teamAdvisorRowOf(advisor) : null
 }
 
 // Why null when absent: a host older than the saved plays publishes none, and none is not zero.

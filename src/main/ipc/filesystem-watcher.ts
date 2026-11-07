@@ -437,8 +437,13 @@ async function createWatcher(
       throw new Error(`Watcher for ${rootKey} errored during subscribe`)
     }
   } catch (err) {
-    // Why: watcher backend can throw synchronously on a deleted root/permission error; log rather than crash the main process (§7.3).
-    console.error(`[filesystem-watcher] failed to subscribe ${rootKey}:`, err)
+    // Why: the last listener leaving mid-subscribe aborts it on purpose; the caller reports that as cancelled.
+    const cancelled =
+      signal?.aborted === true && isWatcherProcessFailure(err) && err.code === 'subscribe_aborted'
+    if (!cancelled) {
+      // Why: watcher backend can throw synchronously on a deleted root/permission error; log rather than crash the main process (§7.3).
+      console.error(`[filesystem-watcher] failed to subscribe ${rootKey}:`, err)
+    }
     throw err
   }
 

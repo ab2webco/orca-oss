@@ -286,7 +286,13 @@ describe('OrchestrationDb legacy coordinator authority', () => {
     ).not.toContain(recoveryMessageId)
   })
 
-  it('promotes retained mail on an ordinary post-settlement coordinator replacement', () => {
+  // Why pinned: messages and runs stamp whole seconds, so a clock-driven claim flips this case at a second boundary.
+  function replaceCoordinatorAfterSettledReport(claimAfterReport: string): {
+    state: ReturnType<typeof openAdoptedFixture>
+    coordinatorId: string
+    completionId: string
+    consumerGeneration: number
+  } {
     const state = openAdoptedFixture()
     const coordinator = db!.commitLegacyCompatibilityPrincipal({
       runId: state.adoptedRunId,
@@ -311,27 +317,62 @@ describe('OrchestrationDb legacy coordinator authority', () => {
       outcome: 'succeeded',
       result: 'done'
     })
-
     const run = db!.bindRun({
       runId: state.adoptedRunId,
       coordinatorHandle: 'term_current_coord',
       coordinatorPaneKey: 'tab_current:11111111-1111-4111-8111-111111111111'
     })!
+    const raw = new Database(state.fixture.dbPath)
+    raw
+      .prepare(
+        'UPDATE runs SET updated_at = datetime((SELECT created_at FROM messages WHERE id = ?), ?) WHERE id = ?'
+      )
+      .run(completion.id, claimAfterReport, state.adoptedRunId)
+    raw.close()
+    return {
+      state,
+      coordinatorId: coordinator.id,
+      completionId: completion.id,
+      consumerGeneration: run.consumer_generation
+    }
+  }
 
-    expect(db!.getLegacyCompatibilityPrincipal(coordinator.id)?.status).toBe('revoked')
-    expect(db!.getMessageById(completion.id)).toMatchObject({
+  it('promotes retained mail on an ordinary post-settlement coordinator replacement', () => {
+    const { state, coordinatorId, completionId, consumerGeneration } =
+      replaceCoordinatorAfterSettledReport('+1 second')
+
+    expect(db!.getLegacyCompatibilityPrincipal(coordinatorId)?.status).toBe('revoked')
+    expect(db!.getMessageById(completionId)).toMatchObject({
       to_handle: `run:${state.adoptedRunId}`,
       delivery_contract: 'current_delivery',
       read: 0
     })
+    // Why (ORCA-824): a finished member's report from before the claim reaches the new lead as its retired notice, not a live batch.
+    expect(db!.retireSettledRunMail(state.adoptedRunId)).toContainEqual({
+      id: completionId,
+      type: 'worker_done',
+      dispatchId: state.fixture.legacyDispatchId
+    })
+    expect(db!.getMessageById(completionId)?.read).toBe(1)
     expect(
       db!
-        .getOrCreateRunDelivery({
-          runId: state.adoptedRunId,
-          consumerGeneration: run.consumer_generation
-        })
+        .getOrCreateRunDelivery({ runId: state.adoptedRunId, consumerGeneration })
+        ?.messages.map((message) => message.id) ?? []
+    ).not.toContain(completionId)
+  })
+
+  it('keeps a promoted report from the second of the claim live', () => {
+    const { state, completionId, consumerGeneration } =
+      replaceCoordinatorAfterSettledReport('+0 seconds')
+
+    expect(db!.retireSettledRunMail(state.adoptedRunId).map((message) => message.id)).not.toContain(
+      completionId
+    )
+    expect(
+      db!
+        .getOrCreateRunDelivery({ runId: state.adoptedRunId, consumerGeneration })
         ?.messages.map((message) => message.id)
-    ).toContain(completion.id)
+    ).toContain(completionId)
   })
 
   it('acknowledges the exact current Run answer to a legacy ask after takeover', () => {

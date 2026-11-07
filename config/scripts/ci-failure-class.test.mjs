@@ -259,8 +259,8 @@ describe('resolving a job name back to its workflow definition', () => {
 
   it('does not let a caller prefix drag a job into a sibling job’s wildcard name', () => {
     // `e2e ${{ matrix.shard_name }}` matches the whole of
-    // `e2e (full) / changed e2e specs` if the caller prefix is not stripped first.
-    const definition = resolve('e2e (full) / changed e2e specs')
+    // `e2e (changed-specs) / changed e2e specs 1-of-4` if the caller prefix is not stripped first.
+    const definition = resolve('e2e (changed-specs) / changed e2e specs 1-of-4')
     expect(definition).toMatchObject({ workflowFile: 'e2e.yml', jobKey: 'changed-e2e' })
   })
 

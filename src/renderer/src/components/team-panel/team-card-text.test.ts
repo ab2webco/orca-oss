@@ -7,6 +7,7 @@ import {
   teamPhaseText,
   teamAgeText,
   teamStatusGlyph,
+  teamSoloLiveText,
   teamStatusTone
 } from './team-card-text'
 
@@ -14,6 +15,22 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''))
 }))
+
+describe('teamSoloLiveText', () => {
+  it('names the tool on a no-team row, as V28 soloNow does', () => {
+    expect(
+      teamSoloLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 912' }, 'working')
+    ).toBe('Bash · gh pr checks 912')
+    expect(teamSoloLiveText({ kind: 'tool', tool: 'Bash', detail: null }, 'working')).toBe('Bash')
+  })
+
+  it('leaves questions and links to the shared text', () => {
+    expect(
+      teamSoloLiveText({ kind: 'question', text: 'Merge #923 now?', options: ['Yes'] }, 'waiting')
+    ).toBe('Merge #923 now?')
+    expect(teamSoloLiveText(null, 'working')).toBe('Working')
+  })
+})
 
 describe('teamLiveText', () => {
   it('shows what the tool works on, as V28 does, and the tool alone without it', () => {

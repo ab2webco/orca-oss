@@ -166,7 +166,9 @@ async function relaunch(args: {
       ...args.target.pin,
       run: dispatch.runId,
       from: await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client),
-      devMode: isDevCliInvocation()
+      devMode: isDevCliInvocation(),
+      // Why: the moved member is still a game member; it keeps the brief and nests under the lead.
+      game: true
     }
   )
   if (started.result.state !== 'ready') {

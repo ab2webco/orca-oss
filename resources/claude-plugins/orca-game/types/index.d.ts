@@ -453,6 +453,8 @@ declare module 'claude-code' {
       actions: ActionRuns
       /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */
       absorbing: boolean
+      /** A beat the live line redraws on while a turn runs or waits. */
+      live: number
     }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
     'orca-jev-mod-skills': { advisor: unknown }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 import { createTeamPanelModelPoller, type TeamPanelPollDeps } from './team-panel-model-poll'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 
@@ -67,18 +68,91 @@ describe('createTeamPanelModelPoller', () => {
     expect(all.readState).not.toHaveBeenCalled()
   })
 
-  it('keeps the last team when a later read fails', async () => {
+  it('keeps the last team and offers a retry when a later read fails', async () => {
     const readState = vi
       .fn()
       .mockResolvedValueOnce({ role: 'lead' })
       .mockRejectedValueOnce(new Error('timeout'))
-    const { all, last } = deps({ readState })
+      .mockResolvedValue({ role: 'lead' })
+    const { all, sources, last } = deps({ readState })
     createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
     await flush()
+    expect(sources.at(-1)?.retry).toBeNull()
 
     await vi.advanceTimersByTimeAsync(20_000)
 
     expect(last()).toEqual({ kind: 'ready', value: MODEL })
+    expect(sources.at(-1)?.retry).toEqual(expect.any(Function))
+    sources.at(-1)?.retry?.()
+    await flush()
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+    expect(sources.at(-1)?.retry).toBeNull()
+  })
+
+  // Why: leaving the panel ends the run, and a sick host must not cost the team on the way back.
+  it('keeps the team when the first read after reopening the panel fails', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValue(new Error('timeout'))
+    const { all, sources, last } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    release()
+
+    poller.subscribe(SCOPE)
+    await flush()
+
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+    expect(sources.at(-1)?.retry).toEqual(expect.any(Function))
+  })
+
+  it('forgets the team once the host says there is no lead', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValue(new Error('timeout'))
+    const findCaller = vi
+      .fn()
+      .mockReturnValueOnce(CALLER)
+      .mockReturnValueOnce(null)
+      .mockReturnValue(CALLER)
+    const { all, last } = deps({ readState, findCaller })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(last()).toEqual({ kind: 'unavailable' })
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(last()).toEqual({ kind: 'error', message: 'timeout' })
+  })
+
+  // Why: a host older than game.leads has no game at all, which is no team, not a failed read.
+  it('says unavailable when the host has no game methods', async () => {
+    const readLeads = vi.fn().mockRejectedValue(
+      new RuntimeRpcCallError({
+        id: 'one',
+        ok: false,
+        error: { code: 'method_not_found', message: 'Unknown method: game.leads' },
+        _meta: { runtimeId: 'host' }
+      })
+    )
+    const { all, sources, last } = deps({ readLeads })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    expect(last()).toEqual({ kind: 'unavailable' })
+    expect(sources.at(-1)?.retry).toBeNull()
+  })
+
+  it('reports a failed leads read as an error, not as no team', async () => {
+    const { all, last } = deps({ readLeads: vi.fn().mockRejectedValue(new Error('host down')) })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    expect(last()).toEqual({ kind: 'error', message: 'host down' })
   })
 
   it('reports the error when the first read fails, and retries on demand', async () => {

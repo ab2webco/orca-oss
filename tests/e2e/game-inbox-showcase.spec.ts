@@ -14,6 +14,7 @@ import { demoLeadState, demoMember, sizeWindow } from './helpers/game-showcase-d
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { startMessagesApi } from './helpers/showcase-messages-api'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
 
@@ -101,13 +102,10 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
         return registered.result.registered
       })
       .toBe(true)
-    // Why: the band closes the sidebars, and the Inbox entry lives in the left one.
-    await orcaPage.evaluate(() => window.__store!.getState().setSidebarOpen(true))
-    const entry = orcaPage.getByTestId('game-inbox-entry')
-    // Why: the one-time sidebar hint fades on its own and would cover the Inbox entry.
-    await expect(orcaPage.getByText('Workspace board moved to the bottom bar')).toHaveCount(0, {
-      timeout: 15_000
-    })
+    // Why: the Team panel finds its lead by its agent row, which this showcase's pane never posts.
+    await postLeadAgentRow(electronApp, { paneKey: pane.paneKey, worktreeId })
+    // Since ORCA-1072 the Inbox is the Team panel's tab; the band closes the sidebars, so reopen it.
+    const { inboxTab, inbox } = await openTeamInbox(orcaPage)
     await orcaPage.waitForTimeout(1_000)
 
     const clip = await showcaseClip(electronApp, testInfo, 'owner-inbox')
@@ -140,21 +138,16 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
       options: ['System share sheet', 'Keep ours'],
       context: 'The lead pane has the full thread.'
     })
-    await expect(entry).toContainText('2')
-    await orcaPage.waitForTimeout(1_500)
-
-    await entry.click()
-    const sheet = orcaPage.getByTestId('game-inbox-sheet')
-    await expect(sheet.locator('[data-game-owner-question]')).toHaveCount(2)
-    await expect(sheet).toHaveAttribute('data-state', 'open')
+    await expect(inboxTab).toContainText('2')
+    await expect(inbox.locator('[data-game-owner-question]')).toHaveCount(2)
     await orcaPage.waitForTimeout(1_800)
 
-    const card = sheet.locator(`[data-game-owner-question="${release.result.question.id}"]`)
+    const card = inbox.locator(`[data-game-owner-question="${release.result.question.id}"]`)
     await card.getByRole('button', { name: 'Ship in 2.3' }).hover()
     await orcaPage.waitForTimeout(900)
     await card.getByRole('button', { name: 'Ship in 2.3' }).click()
     await expect(card).toHaveCount(0)
-    await expect(entry).toContainText('1')
+    await expect(inboxTab).toContainText('1')
 
     const leadMail = async () =>
       (
@@ -164,8 +157,6 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
       ).result.inbox.messages.map((one) => one.subject)
     await expect.poll(leadMail).toContainEqual(expect.stringContaining('Owner answered LUM-14'))
     await orcaPage.waitForTimeout(1_200)
-    await orcaPage.keyboard.press('Escape')
-    await expect(sheet).toHaveCount(0)
     if (live) {
       await expect
         .poll(async () => screenText(orcaPage), { timeout: 30_000 })
