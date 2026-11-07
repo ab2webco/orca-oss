@@ -23,7 +23,7 @@ const IGNORED_NON_RECIPE_STDOUT = '[serve] ignored non-recipe stdout'
 export function launchOrcaApp(): void {
   const overrideCommand = process.env.ORCA_OPEN_COMMAND
   if (typeof overrideCommand === 'string' && overrideCommand.trim().length > 0) {
-    spawnDetached(overrideCommand, [], { shell: true })
+    spawnDetached(overrideCommand, [], { shell: true, env: envWithoutClaudeSession() })
     return
   }
 
@@ -31,7 +31,7 @@ export function launchOrcaApp(): void {
   if (typeof overrideExecutable === 'string' && overrideExecutable.trim().length > 0) {
     spawnDetached(overrideExecutable, getExecutableAppArgs(), {
       ...getExecutableSpawnOptions(overrideExecutable),
-      env: stripElectronRunAsNode(process.env)
+      env: envWithoutClaudeSession()
     })
     return
   }
@@ -44,14 +44,14 @@ export function launchOrcaApp(): void {
         // launch failures and bypass normal bundle lifecycle. The public
         // packaged CLI should re-open the .app the same way Finder does.
         spawnDetached('open', [appBundlePath], {
-          env: stripElectronRunAsNode(process.env)
+          env: envWithoutClaudeSession()
         })
         return
       }
     }
 
     spawnDetached(process.execPath, [], {
-      env: stripElectronRunAsNode(process.env)
+      env: envWithoutClaudeSession()
     })
     return
   }
@@ -120,7 +120,7 @@ export function serveOrcaApp(
     args.recipeJson !== true && getMacAppBundlePath(executable)
       ? getServeUpdateHandoffPath(getDefaultUserDataPath())
       : null
-  const childEnv = stripElectronRunAsNode(process.env)
+  const childEnv = envWithoutClaudeSession()
   delete childEnv.ORCA_APPIMAGE_NO_SANDBOX
   if (handoffPath) {
     childEnv[SERVE_UPDATE_HANDOFF_PATH_ENV] = handoffPath
@@ -289,4 +289,19 @@ export function stripElectronRunAsNode(env: NodeJS.ProcessEnv): NodeJS.ProcessEn
   const next = { ...env }
   delete next.ELECTRON_RUN_AS_NODE
   return next
+}
+
+// The credentials an account vault's settings env carries (long-lived and custom-endpoint tokens).
+const VAULT_SESSION_CREDENTIALS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_AUTH_TOKEN']
+
+// Why: inside a Claude session these came from that session's vault, and a child would hand them
+// to every terminal or login it starts.
+export function envWithoutClaudeSession(): NodeJS.ProcessEnv {
+  const env = stripElectronRunAsNode(process.env)
+  if (env.CLAUDECODE === '1') {
+    for (const key of VAULT_SESSION_CREDENTIALS) {
+      delete env[key]
+    }
+  }
+  return env
 }

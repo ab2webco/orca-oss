@@ -171,6 +171,9 @@ async function reportJev(app: ElectronApplication, panes: string[], model: strin
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
 type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __heldMachines?: (() => void)[] }
 
+// Why each evaluate settles after setImmediate: a sync result is a settled promise V8 15.0's inspector
+// holds weakly, so a GC first answers `Promise was collected`, read as a destroyed context (ORCA-1031).
+
 /** Holds this machine's reading so the tab's loading state stays on screen long enough to look at. */
 async function holdMachineReads(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ ipcMain }) => {
@@ -188,6 +191,7 @@ async function holdMachineReads(app: ElectronApplication): Promise<void> {
       }
       return real(event, args)
     })
+    return new Promise<void>((resolve) => setImmediate(resolve))
   })
 }
 
@@ -196,6 +200,7 @@ const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
     const rig = globalThis as MachineRig
     rig.__machinesHeld = false
     rig.__heldMachines?.forEach((release) => release())
+    return new Promise<void>((resolve) => setImmediate(resolve))
   })
 
 /** Why: a read gives up after 15 s and lists the hosts, and a slow runner outlasts that. */

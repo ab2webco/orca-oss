@@ -10843,7 +10843,8 @@
           "finishSetup": "Finish setup",
           "configure": "Configure",
           "networkRestricted": "Network access is restricted to the hosts declared by this plugin.",
-          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch."
+          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch.",
+          "devSharedVaultMessage": "Not started: this dev build's accounts folder is another install's account vault, and this plugin can run processes that rewrite it. Start the dev build with {{value0}} to run it."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",
@@ -16962,10 +16963,13 @@
       "spawnAgent": "Start a new agent",
       "noLaunchableAgents": "No enabled agents detected.",
       "sleepWorkspace": "Sleep",
-      "projectCount": "{{agents}} agents · {{workspaces}} workspaces",
+      "projectCount": "{{agents}} · {{workspaces}}",
       "agentCount": "{{count}} agents",
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
+      "workspaceCount": "{{count}} workspaces",
+      "workspaceCount_one": "{{count}} workspace",
+      "workspaceCount_other": "{{count}} workspaces",
       "noWorkspaceAgents": "No agents in this workspace.",
       "status": {
         "doneSeen": "Done, seen"
@@ -17299,6 +17303,9 @@
       "minutes": "{{count}} min",
       "hours": "{{count}} h",
       "days": "{{count}} d"
+    },
+    "display": {
+      "noData": "No data"
     }
   },
   "claudeDeadHooks": {

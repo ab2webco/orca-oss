@@ -146,8 +146,10 @@ describe('no hook starts a bare orca', () => {
     const result = spawnSync(python, [join(hooksDir, 'board-state-guard.py')], {
       encoding: 'utf8',
       input: JSON.stringify({ tool_input: { command: 'gh pr create --title x' } }),
-      env: hookEnv(bin)
+      env: hookEnv(bin),
+      timeout: 20_000
     })
+    expect(result.error).toBeUndefined()
     expect(result.status, result.stderr).toBe(0)
     expect(started()).toBe('')
     expect(result.stdout).toContain('"permissionDecision": "deny"')
@@ -160,8 +162,10 @@ describe('no hook starts a bare orca', () => {
     const result = spawnSync(python, [join(hooksDir, 'post-merge-board-close.py')], {
       encoding: 'utf8',
       input: JSON.stringify({ tool_input: { command: 'gh pr merge 12 --squash' } }),
-      env: hookEnv(bin)
+      env: hookEnv(bin),
+      timeout: 20_000
     })
+    expect(result.error).toBeUndefined()
     expect(result.status, result.stderr).toBe(0)
     expect(started()).toBe('')
     expect(result.stdout).toContain('no pude mover')
@@ -202,9 +206,11 @@ describe('no hook starts a bare orca', () => {
       env: hookEnv(bin, {
         ORCA_TERMINAL_HANDLE: 'term_x',
         ORCA_WORKTREE_CLOSE_PRS_FILE: prsFile
-      })
+      }),
+      timeout: 20_000
     })
 
+    expect(result.error).toBeUndefined()
     expect(result.status, result.stderr).toBe(0)
     expect(started()).toBe('')
     expect(result.stdout).toContain('terminales de Orca')
