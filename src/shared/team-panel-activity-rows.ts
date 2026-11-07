@@ -15,6 +15,7 @@ import type {
   TeamStatus,
   TeamTicket
 } from './team-panel-model-types'
+import { teamHostKeyOf } from './team-panel-solo-machines'
 
 /** One agent session with the worktree facts the sidebar already holds for it. */
 export type TeamSoloSession = {
@@ -121,8 +122,6 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
   }
 }
 
-const hostKeyOf = (host: TeamHost): string => (host.kind === 'local' ? '' : host.name)
-
 /** The no-team panel: every session, needs-you first, opened on the selected one. */
 export function teamSoloModelOf(input: {
   sessions: readonly TeamSoloSession[]
@@ -134,7 +133,7 @@ export function teamSoloModelOf(input: {
     .sort((a, b) => STATUS_RANK[a.row.status] - STATUS_RANK[b.row.status] || a.index - b.index)
     .map(({ row }) => row)
   const selected = rows.find((one) => one.paneKey === input.selectedPaneKey) ?? rows[0]
-  const hosts = new Set(input.sessions.map((one) => hostKeyOf(one.host)))
+  const hosts = new Set(input.sessions.map((one) => teamHostKeyOf(one.host)))
   return {
     ...input.tabs,
     kind: 'solo',

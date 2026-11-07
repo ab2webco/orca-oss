@@ -203,6 +203,8 @@ export type TeamMachine = {
         loadAverage1m: number | null
       }
     | { kind: 'unreachable'; lastSeenAt: number | null }
+    /** No figures to show: an SSH target has no Orca to ask, and a saved host may not have answered yet. */
+    | { kind: 'unread' }
 }
 
 /** Display's figures; each is null when Orca has no data for it, and the page says so. */

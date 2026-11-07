@@ -17121,6 +17121,7 @@
       "lowMemory": "Low memory",
       "free": "Free",
       "running": "{{count}} agents",
+      "runningOne": "1 agent",
       "runningOfCap": "{{count}} of {{cap}} agents",
       "memoryUsed": "Memory used {{percent}}%",
       "memoryFree": "{{free}} of {{total}} GB free"

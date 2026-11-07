@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@stablyai/playwright-test'
+import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { clickWithoutFrameDependency } from './helpers/frame-independent-ui'
 import {
@@ -34,14 +34,24 @@ const COPY = {
     activity: 'Activity',
     others: 'Other sessions',
     prompt: 'Prompt',
-    count: '1 need'
+    count: '1 need',
+    inbox: 'Inbox',
+    openTerminal: 'Open terminal',
+    machines: 'Machines',
+    offline: 'Offline',
+    oneAgent: '1 agent'
   },
   es: {
     title: 'Tu trabajo',
     activity: 'Actividad',
     others: 'Otras sesiones',
     prompt: 'Pedido',
-    count: '1 te necesita'
+    count: '1 te necesita',
+    inbox: 'Bandeja',
+    openTerminal: 'Abrir terminal',
+    machines: 'Máquinas',
+    offline: 'Sin conexión',
+    oneAgent: '1 agente'
   }
 } as const
 
@@ -119,10 +129,74 @@ async function seedAgents(page: Page, panes: [string, string]): Promise<void> {
   )
 }
 
+type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
+type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __releaseMachines?: () => void }
+
+/** Holds this machine's reading so the tab's loading state stays on screen long enough to look at. */
+async function holdMachineReads(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ ipcMain }) => {
+    const rig = globalThis as MachineRig
+    rig.__machinesHeld = true
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, RuntimeCall> })
+      ._invokeHandlers
+    const real = handlers.get('runtime:call')!
+    ipcMain.removeHandler('runtime:call')
+    ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
+      if (args.method === 'diagnostics.memory' && rig.__machinesHeld) {
+        await new Promise<void>((resolve) => {
+          rig.__releaseMachines = resolve
+        })
+      }
+      return real(event, args)
+    })
+  })
+}
+
+const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
+  app.evaluate(() => {
+    const rig = globalThis as MachineRig
+    rig.__machinesHeld = false
+    rig.__releaseMachines?.()
+  })
+
+/** A session on another host, with the worktree facts a real one carries in the store. */
+async function seedSessionOn(
+  page: Page,
+  session: { worktreeId: string; hostId: string; name: string; paneKey: string }
+): Promise<void> {
+  await page.evaluate(({ worktreeId, hostId, name, paneKey }) => {
+    const store = window.__store!
+    const state = store.getState()
+    const [template] = Object.values(state.worktreesByRepo).flat()
+    // Why its own repo key: a worktree refresh replaces a real repo's list and would drop this one.
+    store.setState({
+      worktreesByRepo: {
+        ...state.worktreesByRepo,
+        [`e2e-${worktreeId}`]: [
+          { ...template!, id: worktreeId, path: `/${worktreeId}`, displayName: name, hostId }
+        ]
+      },
+      tabsByWorktree: {
+        ...state.tabsByWorktree,
+        [worktreeId]: [{ ...state.tabsByWorktree[template!.id]![0]!, id: paneKey.split(':')[0]! }]
+      }
+    })
+    store
+      .getState()
+      .setAgentStatus(
+        paneKey,
+        { state: 'working', prompt: 'Work there', agentType: 'claude' },
+        name
+      )
+  }, session)
+}
+
 // ORCA-1074: with no game team the panel is "Your work", opened on Activity, built from agent status.
 test('the no-team panel shows Activity for the selected agent and live sidebar rows', async ({
-  orcaPage
+  orcaPage,
+  electronApp
 }, testInfo) => {
+  test.setTimeout(600_000)
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
@@ -173,7 +247,19 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(panel.locator('[data-team-activity-count]')).toContainText(copy.count)
     await expect(panel.getByText(copy.others)).toBeVisible()
     await expect(panel.locator('[data-team-activity="other"]')).toHaveCount(1)
+    await expect(panel.getByRole('tab', { name: copy.machines })).toHaveCount(0)
   })
+
+  await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
+  await capture(orcaPage, testInfo, 'inbox', async (language) => {
+    const copy = COPY[language]
+    const tab = panel.getByRole('tab', { name: new RegExp(copy.inbox) })
+    await expect(tab).toHaveAttribute('aria-selected', 'true')
+    await expect(tab).toContainText('1')
+    await expect(panel).toContainText(QUESTION)
+    await expect(panel.getByRole('button', { name: copy.openTerminal })).toBeVisible()
+  })
+  await panel.getByRole('tab', { name: COPY.en.activity }).click()
 
   // Pressing the other session focuses its pane, and Activity follows that focus.
   const selected = panel.locator('[data-team-activity="selected"]')
@@ -206,6 +292,17 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     animations: 'disabled',
     path: testInfo.outputPath('team-activity-after-switch.png')
   })
+
+  // A question opens its own pane, by the same path as its Activity row.
+  const asker = panes[1]!
+  await expect(selected).not.toHaveAttribute('data-pane-key', asker)
+  await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
+  await clickWithoutFrameDependency(
+    panel.getByRole('button', { name: COPY.en.openTerminal }),
+    orcaPage
+  )
+  await panel.getByRole('tab', { name: COPY.en.activity }).click()
+  await expect(selected).toHaveAttribute('data-pane-key', asker)
 
   // The default card has no badge here, so its title is the way to the hover card.
   const title = orcaPage.locator('[data-worktree-title-inline-rename]').first()
@@ -243,5 +340,59 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await orcaPage.screenshot({
     animations: 'disabled',
     path: testInfo.outputPath('team-activity-hover-card.png')
+  })
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.updateSettings({ experimentalNewWorktreeCardStyle: false })
+    state.setRightSidebarOpen(true)
+  })
+
+  // Machines appears once sessions span a second host, here an SSH target with no Orca to read.
+  await holdMachineReads(electronApp)
+  await orcaPage.evaluate(() =>
+    window.__store!.setState({ sshTargetLabels: new Map([['box-id', 'box']]) })
+  )
+  await seedSessionOn(orcaPage, {
+    worktreeId: 'on-box',
+    hostId: 'ssh:box-id',
+    name: 'on-box',
+    paneKey: 'tab-box:44444444-4444-4444-8444-444444444444'
+  })
+  await panel.getByRole('tab', { name: COPY.en.machines }).click()
+  const rows = panel.locator('[data-team-machine]')
+  await capture(orcaPage, testInfo, 'machines-loading', async (language) => {
+    await expect(panel.getByRole('tab', { name: COPY[language].machines })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    await expect(rows).toHaveCount(0)
+  })
+  await releaseMachineReads(electronApp)
+
+  // A saved host that never answers reads offline; this machine still shows what it really has.
+  await orcaPage.evaluate(() => {
+    const store = window.__store!
+    store.setState({
+      runtimeEnvironments: [
+        { id: 'env-mini', name: 'mini', endpoints: [], preferredEndpointId: '' }
+      ]
+    } as never)
+  })
+  await seedSessionOn(orcaPage, {
+    worktreeId: 'on-mini',
+    hostId: 'runtime:env-mini',
+    name: 'on-mini',
+    paneKey: 'tab-mini:55555555-5555-4555-8555-555555555555'
+  })
+  await capture(orcaPage, testInfo, 'machines', async (language) => {
+    const copy = COPY[language]
+    await expect(panel.getByRole('tab', { name: copy.machines })).toBeVisible()
+    await expect(rows).toHaveCount(3)
+    await expect(rows.nth(0).getByRole('img')).toBeVisible()
+    await expect(panel.locator('[data-team-machine="mini"]')).toContainText(copy.offline)
+    const box = panel.locator('[data-team-machine="box"]')
+    await expect(box).toContainText(copy.oneAgent)
+    await expect(box.getByRole('img')).toHaveCount(0)
   })
 })
