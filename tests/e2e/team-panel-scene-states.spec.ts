@@ -256,6 +256,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     await expect.poll(() => agentState(true)).toBe('working')
     settleMs = REFRESH_WAIT_MS
     await capture({ lead: 'working', member: 'done' })
+    // AC3: the bubble names the step as V28 does, never the raw `Bash · …` line.
+    const sceneText = panel.locator('[data-team-scene]')
+    await expect(sceneText).toContainText('gh pr view 923')
+    await expect(sceneText).not.toContainText('Bash ·')
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
       worktreeId,
@@ -272,6 +276,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     await expect.poll(() => agentState(true)).toBe('done')
     settleMs = REFRESH_WAIT_MS
     await capture({ lead: 'done', member: 'waiting' })
+    await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
 
     const at = (style: Style, key: string): Set<string> => seen.get(`${style}:${key}`)!
     for (const style of STYLES) {
