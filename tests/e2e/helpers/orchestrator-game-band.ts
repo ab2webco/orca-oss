@@ -140,6 +140,8 @@ export async function startGameBand(
     role?: 'member'
     /** A real `orca` CLI for the mod; `state`, `reads` and pushes then do nothing. */
     cli?: string
+    /** More env for Claude, such as the Agent Teams env Orca gives a lead pane. */
+    env?: Readonly<Record<string, string>>
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -225,12 +227,13 @@ export async function startGameBand(
     ORCA_GAME_RENDER: 'hd',
     ORCA_GAME_TIMEZONE: options.timezone ?? 'UTC',
     ORCA_GAME_LOCALE: options.locale,
-    ...(options.role ? { ORCA_GAME_ROLE: options.role } : {})
+    ...(options.role ? { ORCA_GAME_ROLE: options.role } : {}),
+    ...options.env
   }
   const play = join(projectDir, 'play')
   await writeFile(
     play,
-    `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN\n${Object.entries(env)
+    `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN TMUX TMUX_PANE\n${Object.entries(env)
       .map(([key, value]) => `export ${key}='${value}'`)
       .join('\n')}\nexec claude ${pluginDirs}\n`
   )
