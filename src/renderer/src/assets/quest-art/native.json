@@ -172,7 +172,11 @@
         }
       },
       "props": {
-        "station": "figures/forge.png"
+        "station": "figures/forge.png",
+        "stationFeet": {
+          "x": 120,
+          "y": 88
+        }
       }
     },
     "office": {
@@ -340,7 +344,11 @@
         }
       },
       "props": {
-        "station": "office/desk.png"
+        "station": "office/desk.png",
+        "stationFeet": {
+          "x": 120,
+          "y": 120
+        }
       }
     }
   }

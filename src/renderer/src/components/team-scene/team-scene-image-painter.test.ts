@@ -132,6 +132,39 @@ describe('createImagePainter', () => {
     expect(sprites(calls)[0]!.args[2]).toBe(0)
   })
 
+  // ORCA-1139: with no station, a working lead hands out its scroll as V28's lead does.
+  const acting = () => {
+    const full = role(['lead.png'])
+    full.animations.give = { row: 4, frames: 4, fps: 6 }
+    full.animations.cheer = { row: 6, frames: 6, fps: 10 }
+    return painterOf(style({ roles: { lead: full, member: full } }))
+  }
+  const cellsOver = (pose: TeamSceneActor['pose']): Set<string> => {
+    const painter = acting()
+    return new Set(
+      Array.from({ length: 12 }, (_, i) => {
+        const { g, calls } = recordingContext()
+        painter.paint(g, frame({ t: i / 6, actors: [actor('lead', { pose, x: 0 })] }))
+        const [, sx, sy] = sprites(calls)[0]!.args
+        return `${String(sx)},${String(sy)}`
+      })
+    )
+  }
+
+  it('animates a working lead with no station on its give row', () => {
+    const cells = cellsOver('work')
+    expect([...cells].every((cell) => cell.endsWith(',512'))).toBe(true)
+    expect(cells.size).toBeGreaterThan(1)
+  })
+
+  it('holds a done figure still on the last cheer frame', () => {
+    expect([...cellsOver('done')]).toEqual([`${5 * 128},768`])
+  })
+
+  it('keeps an idle figure apart from a done one', () => {
+    expect([...cellsOver('idle')].every((cell) => cell.endsWith(',0'))).toBe(true)
+  })
+
   it('stands an action the art does not have on idle', () => {
     const { g, calls } = recordingContext()
     painterOf().paint(g, frame({ actors: [actor('lead', { pose: 'cheer', x: 0 })] }))

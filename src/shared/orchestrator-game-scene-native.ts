@@ -13,6 +13,7 @@ export const ORCHESTRATOR_GAME_SCENE_ART_MAX_STYLE_PIXELS = 16 * 1024 * 1024
 const MAX_LAYERS = 8
 const MAX_SHEETS = 16
 const MAX_FRAME_PX = 512
+const MAX_PROP_PX = 4096
 const MAX_ROW = 63
 const MAX_FRAMES = 32
 const MAX_FPS = 30
@@ -95,7 +96,15 @@ const styleSchema = z.object({
     /** Wears the member art when absent. */
     advisor: roleSchema.optional()
   }),
-  props: z.object({ station: artPath.optional() }).optional()
+  props: z
+    .object({
+      station: artPath.optional(),
+      /** Where the station meets the floor, in its own pixels; the bottom center when absent. */
+      stationFeet: z
+        .object({ x: wholeNumber(0, MAX_PROP_PX), y: wholeNumber(0, MAX_PROP_PX) })
+        .optional()
+    })
+    .optional()
 })
 
 // Why only these keys: Pixel is the game's own art.
