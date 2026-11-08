@@ -38606,6 +38606,23 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  // Why (ORCA-1141 F7): a folder made under a group with no parentPath had no summary, so its agents were never seen.
+  it('summarizes a folder workspace whose group has no parentPath, at its own folder', async () => {
+    const folderWorkspace = makeFolderWorkspace({ name: 'folder-ws' })
+    const projectGroup = makeFolderProjectGroup({ name: 'folder-check', parentPath: null })
+    const runtime = new OrcaRuntimeService(
+      createFolderWorkspaceRuntimeStore(folderWorkspace, projectGroup) as never
+    )
+
+    const { worktrees } = await runtime.getWorktreePs()
+
+    expect(worktrees.find((one) => one.worktreeId === TEST_FOLDER_WORKSPACE_KEY)).toMatchObject({
+      workspaceKind: 'folder-workspace',
+      repo: 'folder-check',
+      path: TEST_FOLDER_WORKSPACE_PATH
+    })
+  })
+
   it('attaches inline agent rows from the latest OSC 9999 status', async () => {
     const runtime = new OrcaRuntimeService(store)
     const leafId = '22222222-2222-4222-8222-222222222222'
