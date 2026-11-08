@@ -3975,7 +3975,9 @@ export class OrcaRuntimeService {
     worktreeOfTask: (taskId) =>
       this.getOrchestrationDbIfAvailable()?.latestWorkerWorktreeForTask(taskId) ?? null,
     worktreeExists: async (worktreeId) => (await this.getResolvedWorktreeMap()).has(worktreeId),
-    resumeSession: (member) => this.resumeGameMemberSession(member)
+    resumeSession: (member) => this.resumeGameMemberSession(member),
+    terminalOfPane: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+    runsAgent: (terminal) => this.isTerminalRunningAgent(terminal)
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),

@@ -79,7 +79,8 @@ const GameMemberRecordParams = z.object({
     agent: memberText,
     accountId: memberText,
     account: memberText,
-    lastState: memberText
+    lastState: memberText,
+    adoptedPaneKey: memberText
   })
 })
 

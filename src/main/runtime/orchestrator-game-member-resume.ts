@@ -19,6 +19,9 @@ type Deps = {
   /** Reopens the member's own conversation and returns its terminal once the agent runs; null while
    *  its woken pane is still starting; throws when it cannot. */
   resumeSession: (member: GameMemberSession) => Promise<string | null>
+  /** The terminal now in a pane, as an adopted member's tab comes back after a restart. */
+  terminalOfPane: (paneKey: string) => string | null
+  runsAgent: (terminal: string) => Promise<boolean>
   now?: () => number
 }
 
@@ -105,6 +108,9 @@ export class GameMemberResume {
         reason: `its task ${member.taskId} is still marked ${status.task} by ${status.latestDispatchId ?? 'an older dispatch'}, so no new member can take it`
       }
     }
+    if (member.adoptedPaneKey) {
+      return this.resumeAdopted(member, member.adoptedPaneKey, retryOf)
+    }
     if (member.worktreeId !== null && !(await this.deps.worktreeExists(member.worktreeId))) {
       return {
         outcome: 'missing',
@@ -132,6 +138,31 @@ export class GameMemberResume {
       const note = error instanceof Error ? error.message : String(error)
       return { outcome: 'relaunch', member: targetOf(member, retryOf), note }
     }
+  }
+
+  // Why never a relaunch: the agent is one the person started in their own tab (ORCA-1141).
+  private async resumeAdopted(
+    member: GameMemberSession,
+    paneKey: string,
+    retryOf: string | null
+  ): Promise<GameMemberResumeOutcome> {
+    const { ticket } = member
+    const terminal = this.deps.terminalOfPane(paneKey)
+    if (!terminal) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `its tab is closed; \`orca game resume-members ${ticket} --discard\` frees it`
+      }
+    }
+    if (!(await this.deps.runsAgent(terminal))) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `its tab runs no agent yet; run \`orca game resume-members ${ticket}\` again once its session is back`
+      }
+    }
+    return { outcome: 'resumed', terminal, member: targetOf(member, retryOf), adopted: true }
   }
 
   /**

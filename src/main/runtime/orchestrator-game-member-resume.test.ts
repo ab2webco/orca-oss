@@ -40,6 +40,8 @@ function setup(
     taskWorktree?: string
     resume?: (member: GameMemberSession) => Promise<string | null>
     now?: () => number
+    panes?: Record<string, string>
+    agentRuns?: boolean
   } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-resume-'))
@@ -61,6 +63,8 @@ function setup(
         resumed.push(member)
         return `term-${member.ticket}`
       }),
+    terminalOfPane: (paneKey) => over.panes?.[paneKey] ?? null,
+    runsAgent: async () => over.agentRuns ?? true,
     ...(over.now ? { now: over.now } : {})
   })
   return { dir, store, resume, resumed }
@@ -304,5 +308,49 @@ describe('GameMemberResume.discard', () => {
     expect(result.discarded).toEqual([])
     expect(result.setAside).toMatch(/\.unreadable-\d+\.json$/)
     expect(readdirSync(dir)).toHaveLength(1)
+  })
+})
+
+// Why (ORCA-1141): an adopted member lost its membership on a cold restart, while its tab came back.
+describe('GameMemberResume.resume for an adopted member', () => {
+  const adopted = (extra: Partial<GameMemberSessionPatch> = {}) =>
+    saved('MAIN-2', { name: 'main 2', sessionId: null, adoptedPaneKey: 'tab-a:leaf-a', ...extra })
+
+  it('binds its own task to the tab it was adopted in, and never opens another session', async () => {
+    const { store, resume, resumed } = setup({
+      panes: { 'tab-a:leaf-a': 'term-restored' },
+      worktrees: ['wt-MAIN-2']
+    })
+    await store.upsert('repo:r1', adopted())
+
+    await expect(resume.resume('repo:r1', 'MAIN-2')).resolves.toEqual({
+      outcome: 'resumed',
+      terminal: 'term-restored',
+      adopted: true,
+      member: expect.objectContaining({ ticket: 'MAIN-2', name: 'main 2', taskId: 'task_MAIN-2' })
+    })
+    expect(resumed).toEqual([])
+  })
+
+  it('never relaunches it: a closed tab or one with no agent yet leaves it paused', async () => {
+    const closed = setup({ worktrees: ['wt-MAIN-2'] })
+    await closed.store.upsert('repo:r1', adopted())
+    await expect(closed.resume.resume('repo:r1', 'MAIN-2')).resolves.toMatchObject({
+      outcome: 'missing',
+      reason: expect.stringContaining('tab')
+    })
+
+    const starting = setup({
+      panes: { 'tab-a:leaf-a': 'term-restored' },
+      agentRuns: false,
+      worktrees: ['wt-MAIN-2']
+    })
+    await starting.store.upsert('repo:r1', adopted())
+    await expect(starting.resume.resume('repo:r1', 'MAIN-2')).resolves.toMatchObject({
+      outcome: 'missing',
+      reason: expect.stringContaining('again')
+    })
+    expect(closed.resumed).toEqual([])
+    expect(starting.resumed).toEqual([])
   })
 })
