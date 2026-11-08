@@ -1,3 +1,4 @@
+import { workerTabTitleOf } from '../../../../shared/orchestration-worker-tab-title'
 import { DISPATCH_INPUT_WRITTEN_UNPROVEN } from '../../../../shared/dispatch-delivery-proof'
 import { describeAgentStartupBlocked } from '../../claude-startup-dialog-signal'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -183,7 +184,8 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
               ...gameMember,
               ...memberAccount?.pin,
               ...(launch.preferences ? { launchPreferences: launch.preferences } : {}),
-              title: `worker-${params.taskId}`,
+              // Why no host: this side cannot name itself as the lead's Orca knows it.
+              title: workerTabTitleOf({ displayName: params.displayName, taskId: params.taskId }),
               presentation: 'background'
             })
             terminalHandle = terminal.handle

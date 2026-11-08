@@ -88,6 +88,30 @@ describe('parseGameActions', () => {
     ])
   })
 
+  it('takes an icon and a pin per action, keeping three pinned and the button when either is bad', () => {
+    const parsed = parseGameActions([
+      { label: 'Deploy', icon: ' ship ', pin: true, prompt: 'a' },
+      { label: 'Tests', icon: 'rocket', pin: true, prompt: 'b' },
+      { label: 'Release', pin: 'yes', prompt: 'c' },
+      { label: 'Board', icon: 'list', pin: true, mcp: { server: 'plane', tool: 'list' } },
+      { label: 'Fourth', pin: true, prompt: 'd' },
+      { label: 'Off', pin: false, prompt: 'e' }
+    ])
+    expect(parsed.value).toEqual([
+      { label: 'Deploy', icon: 'ship', pin: true, prompt: 'a' },
+      { label: 'Tests', pin: true, prompt: 'b' },
+      { label: 'Release', prompt: 'c' },
+      { label: 'Board', icon: 'list', pin: true, mcp: { server: 'plane', tool: 'list' } },
+      { label: 'Fourth', prompt: 'd' },
+      { label: 'Off', pin: false, prompt: 'e' }
+    ])
+    expect(parsed.warnings).toEqual([
+      'orchestratorGame.actions[1].icon must be one of ship, flask, tag, review, scan, list, pulse, launch, play, check, stop',
+      'orchestratorGame.actions[2].pin must be true or false',
+      'orchestratorGame.actions[4].pin: the panel row holds 3 pinned actions'
+    ])
+  })
+
   it('keeps the first six and refuses a non-list', () => {
     const many = Array.from({ length: 8 }, (_, at) => ({ label: `A${at}`, prompt: 'x' }))
     expect(parseGameActions(many).value).toHaveLength(6)

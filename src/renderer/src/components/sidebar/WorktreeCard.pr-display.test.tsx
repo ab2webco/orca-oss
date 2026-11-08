@@ -170,7 +170,7 @@ describe('WorktreeCard linked PR display', () => {
     )
 
     expect(markup).toContain('Active')
-    expect(markup).toContain('bg-emerald-500')
+    expect(markup).toContain('bg-status-idle')
     expect(markup).not.toContain('PR: Open')
     expect(markup).not.toContain('Linked PR #456')
   }, 20_000)
@@ -199,7 +199,7 @@ describe('WorktreeCard linked PR display', () => {
 
     expect(unreadMarkup).toContain('aria-label="Mark as read"')
     // ORCA-1131: unread shows in the title weight, never as a bell over the status glyph.
-    expect(unreadMarkup).not.toContain('text-amber-500')
+    expect(unreadMarkup).not.toContain('text-status-attention')
     expect(getInlineRenameTitleTag(unreadMarkup)).toContain('font-semibold text-foreground')
     expect(unreadMarkup).not.toContain('PR checks: Failed · Mark read')
     expect(unreadMarkup).not.toContain('size-[13px] translate-x-px')
@@ -233,10 +233,10 @@ describe('WorktreeCard linked PR display', () => {
     expect(unreadMarkup).not.toContain('Mark read')
     expect(unreadMarkup).toContain('size-[13px] translate-x-px')
     expect(unreadMarkup).not.toContain('lucide-bell')
-    expect(unreadMarkup).not.toContain('text-amber-500')
+    expect(unreadMarkup).not.toContain('drop-shadow-sm')
     expect(unreadMarkup).toContain('data-worktree-status-lane-unread=""')
     expect(unreadMarkup).toContain('data-worktree-unread-alert=""')
-    expect(unreadMarkup).toContain('bg-amber-500')
+    expect(unreadMarkup).toContain('bg-status-attention')
     expect(getInlineRenameTitleTag(unreadMarkup)).toContain('font-semibold text-foreground')
     expect(getInlineRenameTitleTag(readMarkup)).toContain('font-normal text-foreground/80')
   }, 20_000)
@@ -308,7 +308,7 @@ describe('WorktreeCard linked PR display', () => {
     )
 
     expect(markup).toContain('PR checks: Passing')
-    expect(markup).toContain('text-emerald-500/80')
+    expect(markup).toContain('text-status-success')
     expect(markup).not.toContain('Branch')
   })
 
@@ -645,7 +645,7 @@ describe('WorktreeCard linked PR display', () => {
     )
 
     expect(markup).toContain('PR checks: Failed')
-    expect(markup).toContain('text-rose-500/85')
+    expect(markup).toContain('text-status-attention')
     expect(markup).not.toContain('Linked PR #456')
     expect(markup).not.toContain('CI checks')
   })
@@ -676,7 +676,7 @@ describe('WorktreeCard linked PR display', () => {
     )
 
     expect(markup).toContain('PR: Merged')
-    expect(markup).toContain('text-purple-600/70')
+    expect(markup).toContain('text-status-success')
     expect(markup).not.toContain('Branch')
     expect(markup).not.toContain('lucide-git-branch')
   })

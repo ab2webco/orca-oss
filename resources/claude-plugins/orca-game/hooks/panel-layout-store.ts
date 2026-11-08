@@ -1,7 +1,14 @@
 import type { EngineInterface } from 'claude-code'
 
 import { gameStrings } from './game-strings'
-import { PANEL_LAYOUT_KEY, fleetLayoutOf, withFleetLayout, type FleetLayout } from './panel-layout'
+import {
+  PANEL_LAYOUT_KEY,
+  fleetLayoutOf,
+  owesHiddenPrsTab,
+  withFleetLayout,
+  withTabsMigrated,
+  type FleetLayout
+} from './panel-layout'
 
 const HINT_KEY = 'panel-layout-hinted'
 
@@ -36,4 +43,21 @@ export async function changeFleetLayout(
   await $.store.set(PANEL_LAYOUT_KEY, next)
   $.ui.invalidate('ui.render')
   return true
+}
+
+/** One time per project: My PRs hidden in this Panel stays hidden in the native panel's tab. */
+export async function migrateHiddenReviews(
+  $: EngineInterface,
+  project: string,
+  hideTab: () => Promise<boolean>
+): Promise<void> {
+  const stored = await $.store.get(PANEL_LAYOUT_KEY).catch(() => undefined)
+  if (!owesHiddenPrsTab(stored, project) || !(await hideTab())) {
+    return
+  }
+  const fresh = await $.store.get(PANEL_LAYOUT_KEY).catch(() => undefined)
+  const next = withTabsMigrated(fresh, project)
+  if (next !== null) {
+    await $.store.set(PANEL_LAYOUT_KEY, next)
+  }
 }

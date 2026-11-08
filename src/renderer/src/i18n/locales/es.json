@@ -35,6 +35,41 @@
       "menuBarIcon": {
         "title": "Mostrar icono en la barra de menús",
         "description": "Mantén un acceso directo de Orca Lab e indicador de actividad en la barra de menús de macOS."
+      },
+      "statusColors": {
+        "title": "Colores de estado",
+        "description": "Cada color conserva su significado en todos los proyectos. Claro y oscuro tienen los suyos.",
+        "themeLabel": "Tema a editar",
+        "themeLight": "Claro",
+        "themeDark": "Oscuro",
+        "reset": "Restablecer",
+        "resetLabel": "Restablecer colores de estado",
+        "pickerLabel": "Color de {{value0}}",
+        "tooClose": "Se confunde con {{value0}}",
+        "lowContrast": "Poco contraste",
+        "keywordColor": "color",
+        "keywordStatus": "estado",
+        "keywordContrast": "contraste",
+        "attention": {
+          "name": "Te necesita",
+          "meaning": "Te necesita, o algo falló."
+        },
+        "warning": {
+          "name": "En riesgo",
+          "meaning": "Aún no te necesita."
+        },
+        "info": {
+          "name": "Trabajando",
+          "meaning": "Hay un agente en esto ahora."
+        },
+        "success": {
+          "name": "Verificado",
+          "meaning": "Terminado y comprobado."
+        },
+        "idle": {
+          "name": "En reposo",
+          "meaning": "Sin actividad, o sin dato."
+        }
       }
     }
   },
@@ -4438,7 +4473,7 @@
           "489d1c8c9f": "Buscar proyectos...",
           "ee240a39eb": "Editar filtros",
           "automationCreated": "Ocultar creados por automatizaciones",
-          "cliCreated": "Hide CLI-created",
+          "cliCreated": "Ocultar creados por la CLI",
           "detachedHead": "Ocultar HEAD desacoplado",
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
@@ -4509,7 +4544,7 @@
           "ed1611b65b": "Ocultar en reposo",
           "82594419ba": "Filtros",
           "automationCreated": "Ocultar creados por automatizaciones",
-          "cliCreated": "Hide CLI-created",
+          "cliCreated": "Ocultar creados por la CLI",
           "detachedHead": "Ocultar HEAD desacoplado",
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
@@ -4571,7 +4606,9 @@
           "219ebf1961": "Nombre de rama",
           "folderPathIdentity": "Rama / ruta de carpeta",
           "cli": "Orca Lab CLI",
-          "showSection": "Mostrar"
+          "showSection": "Mostrar",
+          "account": "Cuenta",
+          "model": "Modelo y esfuerzo"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",
@@ -10895,6 +10932,31 @@
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
           "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+        },
+        "OrchestratorGamePanelSetting": {
+          "advisor": "Advisor",
+          "advisorDescription": "Fila bajo el líder. Solo aparece si el plugin está instalado.",
+          "arcade": "Arcade",
+          "arcadeDescription": "Un merge perfecto guarda una partida.",
+          "description": "El panel de la barra derecha para tus agentes. Cada proyecto puede cambiarlo en sus propios ajustes.",
+          "look": "Apariencia del panel",
+          "lookDescription": "Los mismos datos y acciones en las tres.",
+          "lookDisplay": "Display",
+          "lookGame": "Juego",
+          "lookPlain": "Sobrio",
+          "machines": "Máquinas",
+          "machinesDescription": "Pestaña con los hosts y su memoria.",
+          "prs": "PRs",
+          "prsDescription": "Pestaña con tus PRs abiertos.",
+          "queue": "Cola",
+          "queueDescription": "Pestaña con la cola de merge.",
+          "show": "Mostrar {{label}}",
+          "style": "Estilo de la escena",
+          "styleDescription": "Todas actúan el mismo estado real.",
+          "styleFigures": "Figuras",
+          "styleOffice": "Oficina",
+          "stylePixel": "Pixel",
+          "title": "Panel"
         }
       },
       "right": {
@@ -15330,24 +15392,14 @@
         "restartNow": "Reiniciar ahora"
       },
       "game-inbox": {
-        "GameInboxSheet": {
-          "title": "Bandeja",
-          "description": "Lo que el lead te preguntó, lo que espera su respuesta y cómo habla con cada miembro.",
-          "forYou": "Para ti",
-          "empty": "No hay preguntas esperando tu respuesta.",
-          "waiting": "Esperando",
-          "threads": "Hilos",
-          "answered": "Respondidas",
-          "answerInstead": "Responde en lugar del lead"
-        },
         "GameOwnerQuestionCard": {
           "failed": "La respuesta no se envió.",
           "yourAnswer": "Tu respuesta",
           "placeholder": "Responde con tus palabras",
-          "send": "Enviar"
+          "send": "Enviar",
+          "needsYou": "Te necesita"
         },
         "SidebarGameInboxEntry": {
-          "inbox": "Bandeja",
           "noWorktree": "Abre este proyecto en Orca para responder."
         },
         "GameInboxKindTag": {
@@ -15374,7 +15426,9 @@
           "failed": "Falló",
           "back": "Todos los hilos",
           "empty": "Ningún miembro ha hablado con el lead todavía.",
-          "waiting": "{{count}} esperando"
+          "waiting": "{{count}} esperando",
+          "messageOne": "1 mensaje",
+          "messageMany": "{{count}} mensajes"
         },
         "GameMemberReplyForm": {
           "failed": "La respuesta no se envió.",
@@ -15393,6 +15447,27 @@
           "repoMissing": "Agrega el repositorio del host a esta ventana para abrir sus terminales.",
           "notMirrored": "Su worktree está abierto, pero la terminal aún no aparece en esta ventana.",
           "terminalGone": "El host ya no tiene esta terminal; puede que el miembro haya terminado o se haya liberado."
+        }
+      },
+      "team-scene": {
+        "team-scene-copy": {
+          "label": "Escena en vivo del equipo",
+          "leadAsks": "Esperándote · {{question}}",
+          "leadDone": "Listo, sin tareas pendientes",
+          "leadWaits": "Esperándote"
+        }
+      },
+      "game-arcade": {
+        "ArcadeTab": {
+          "title": "Arcade",
+          "canvasLabel": "Partida de arcade",
+          "score": "{{score}} pts",
+          "scoreOne": "1 pto",
+          "hint": "Espacio o toque para saltar",
+          "held": "En pausa · alguien te necesita",
+          "over": "Fin de la partida · {{score}} pts",
+          "overOne": "Fin de la partida · 1 pto",
+          "overHint": "Espacio o toque para volver a Claude"
         }
       }
     },
@@ -16020,6 +16095,271 @@
   "auto.components.settings.PluginConsentDialog.capability.processSpawn": "Iniciar programas como tú. Los programas que inicia no están restringidos por los permisos de archivos o red del worker del plugin.",
   "auto.components.settings.PluginConsentDialog.capability.skillsContribute": "Enseñar a cualquier agente, en cualquier proyecto, cómo usar este plugin: sus instrucciones de skill se entregan a cualquier agente que las pida",
   "auto.components.settings.PluginConsentDialog.capability.notificationsObserve": "Recibir una copia de las notificaciones que genera Orca Lab, incluso las que este equipo no muestra, con su texto, que puede citar respuestas de agentes, entradas de herramientas y títulos de terminal",
+  "teamPanel": {
+    "leadWork": {
+      "sent": "Enviado al líder: {{label}}",
+      "failed": "No se pudo enviar {{label}}"
+    },
+    "queue": {
+      "checks": "En checks",
+      "waiting": "En cola",
+      "failed": "Falló",
+      "longWait": "Lleva {{hours}} h"
+    },
+    "prs": {
+      "reason": {
+        "checksFailed": "Check falló",
+        "checksUnknown": "CI desconocido",
+        "conflict": "Conflicto",
+        "inReview": "En revisión",
+        "ready": "Listo",
+        "draft": "Borrador",
+        "merged": "Fusionado",
+        "closed": "Cerrado"
+      },
+      "viewAll": "Ver los {{count}}",
+      "providerFailed": "El proveedor no respondió. Se reintenta solo.",
+      "githubLimit": "Límite de la API de GitHub alcanzado. Se reintenta solo en {{minutes}} min."
+    },
+    "machines": {
+      "offline": "Sin conexión",
+      "lowMemory": "Poca memoria",
+      "free": "Libre",
+      "running": "{{count}} agentes",
+      "runningOne": "1 agente",
+      "runningOfCap": "{{count}} de {{cap}} agentes",
+      "memoryUsed": "Memoria usada {{percent}}%",
+      "memoryFree": "{{free}} de {{total}} GB libres"
+    },
+    "activityBar": {
+      "teamTitle": "Equipo",
+      "noTeamTitle": "Tu trabajo"
+    },
+    "arcade": {
+      "label": "Arcade",
+      "offerTitle": "Merge perfecto de #{{pr}}",
+      "offerText": "Ganaste una partida. Queda guardada hasta que quieras jugarla.",
+      "play": "Jugar",
+      "keep": "Guardar",
+      "savedOne": "1 partida guardada",
+      "savedMany": "{{count}} partidas guardadas",
+      "failed": "No se pudo contactar con el host para tu partida guardada"
+    },
+    "header": {
+      "title": "Equipo",
+      "noTeamTitle": "Tu trabajo",
+      "projectSettings": "Ajustes del proyecto",
+      "panelSettings": "Ajustes del panel"
+    },
+    "state": {
+      "loading": "Cargando",
+      "unavailableText": "Este host de Orca todavía no lo publica.",
+      "modelErrorTitle": "No se pudo leer el equipo",
+      "modelErrorText": "Orca no responde en este proyecto. Vuelve a intentarlo.",
+      "modelUnavailableTitle": "Los datos del equipo no están disponibles",
+      "retry": "Reintentar"
+    },
+    "tabs": {
+      "label": "Secciones del panel",
+      "team": {
+        "title": "Equipo",
+        "emptyTitle": "Aún no hay agentes",
+        "emptyText": "Lanza uno desde un ticket y aparecerá aquí.",
+        "viewTasks": "Ver tareas",
+        "errorTitle": "No se pudo leer el equipo"
+      },
+      "activity": {
+        "title": "Actividad",
+        "emptyTitle": "No hay agentes en marcha",
+        "emptyText": "Inicia un agente en cualquier espacio de trabajo y aparecerá aquí.",
+        "errorTitle": "No se pudieron leer tus sesiones"
+      },
+      "inbox": {
+        "title": "Bandeja",
+        "emptyTitle": "Nada te espera",
+        "emptyText": "Cuando un agente te pregunte algo, aparecerá aquí.",
+        "errorTitle": "No se pudo leer la bandeja"
+      },
+      "prs": {
+        "title": "PRs",
+        "emptyTitle": "No hay pull requests abiertos",
+        "emptyText": "Aparecen aquí cuando un agente abre uno.",
+        "errorTitle": "No se pudieron leer los pull requests"
+      },
+      "queue": {
+        "title": "Cola",
+        "emptyTitle": "La cola está vacía",
+        "emptyText": "Aquí verás cada pull request en orden hasta su merge.",
+        "errorTitle": "No se pudo leer la cola",
+        "unavailableTitle": "No hay cola de merge que mostrar",
+        "unavailableText": "Este proyecto no tiene cola de merge, o su proveedor o host no la publica."
+      },
+      "machines": {
+        "title": "Máquinas",
+        "emptyTitle": "Solo esta máquina",
+        "emptyText": "Empareja otra máquina para repartir agentes entre hosts.",
+        "errorTitle": "No se pudieron leer las máquinas"
+      }
+    },
+    "condition": {
+      "working": "Trabajando",
+      "waiting": "Esperándote",
+      "idle": "En reposo",
+      "done": "Terminado",
+      "starting": "Arrancando",
+      "queued": "En cola",
+      "paused": "En pausa",
+      "asleep": "Dormido",
+      "limited": "Límite de uso alcanzado",
+      "loggedOut": "Sesión cerrada en la cuenta",
+      "unreachable": "Host sin conexión",
+      "gone": "Sesión cerrada",
+      "startFailed": "No pudo arrancar"
+    },
+    "phase": {
+      "plan": "Planeando",
+      "docs": "Documentando",
+      "code": "Programando",
+      "tests": "Probando",
+      "pr": "En PR",
+      "merge": "En merge"
+    },
+    "host": {
+      "local": "local"
+    },
+    "card": {
+      "merged": "Mergeado",
+      "ciFailed": "CI fallando",
+      "ciRunning": "CI en curso",
+      "ciPassed": "CI en verde",
+      "answerInInbox": "Responder en Bandeja",
+      "waitingForAnswer": "Esperando tu respuesta",
+      "openTerminal": "Abrir terminal",
+      "inFolder": "En la carpeta, sin worktree"
+    },
+    "activity": {
+      "prompt": "Pedido",
+      "now": "Ahora",
+      "question": "Pregunta",
+      "last": "Final",
+      "model": "Modelo",
+      "effortPinned": "Esfuerzo fijado",
+      "modelPinned": "Modelo fijado",
+      "change": "Cambio",
+      "account": "Cuenta",
+      "cache": "Caché",
+      "pr": "PR",
+      "ticket": "Ticket",
+      "ports": "Puertos",
+      "notes": "Notas",
+      "needsYou": "Te necesita",
+      "otherSessions": "Otras sesiones",
+      "countNeedsYou_one": "{{count}} te necesita",
+      "countNeedsYou_other": "{{count}} te necesitan",
+      "countWorking": "{{count}} trabajando",
+      "countDone_one": "{{count}} terminado",
+      "countDone_other": "{{count}} terminados",
+      "agent": "Agente"
+    },
+    "lead": {
+      "badge": "Líder",
+      "coordinatesOne": "Coordina 1 agente",
+      "coordinatesMany": "Coordina {{count}} agentes",
+      "asksOn": "Te espera · Pregunta sobre {{ticket}}",
+      "asks": "Te espera"
+    },
+    "advisor": {
+      "label": "Advisor",
+      "source": "Jev",
+      "name": "Mago"
+    },
+    "xp": {
+      "level": "Nv {{level}}",
+      "progress": "{{into}}/{{need}} XP"
+    },
+    "stopped": {
+      "by": "Detenido por {{by}}",
+      "plain": "Detenido"
+    },
+    "open": {
+      "failed": "No se pudo abrir {{name}}"
+    },
+    "memberHeader": {
+      "waitingForYou": "Te espera"
+    },
+    "inbox": {
+      "sections": "Secciones de la bandeja",
+      "forYou": "Para ti",
+      "waiting": "Esperando",
+      "threads": "Hilos",
+      "answered": "Respondidas",
+      "thisProject": "este proyecto",
+      "projectUnread": "No se pudieron leer las preguntas de este proyecto.",
+      "forYouEmpty": "No hay preguntas esperando tu respuesta.",
+      "yourAnswer": "Tu respuesta",
+      "openTerminal": "Abrir terminal",
+      "youAnswered": "Respondiste",
+      "youAnsweredText": "Respondiste: {{text}}",
+      "leadAnswered": "Respondió el lead",
+      "waitingEmpty": "Ningún miembro espera respuesta.",
+      "answeredEmpty": "Todavía no hay nada respondido.",
+      "leadAnsweredText": "Respondió el lead: {{text}}",
+      "answer": "Responder",
+      "answerFailed": "No se pudo enviar la respuesta. Abre la terminal."
+    },
+    "age": {
+      "now": "ahora",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "days": "{{count}} d"
+    },
+    "display": {
+      "label": "Métricas del equipo",
+      "pause": "Pausar el carrusel",
+      "resume": "Reanudar el carrusel",
+      "previous": "Métrica anterior",
+      "next": "Métrica siguiente",
+      "page": {
+        "summary": "Resumen",
+        "delivery": "Entrega",
+        "quality": "Calidad",
+        "machines": "Máquinas",
+        "usage": "Uso"
+      },
+      "noData": "Sin datos",
+      "active": "Activos",
+      "alerts": "Alertas",
+      "queued": "En cola",
+      "merges": "Merges",
+      "merges24h": "Merges 24 h",
+      "noHourly": "Sin datos por hora",
+      "merges7d": "Merges 7 d",
+      "median": "Mediana {{time}}",
+      "noLeadTime": "Aún sin tiempo de entrega",
+      "noMerges": "Este host no publica merges",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "minutes": "{{minutes}} m",
+      "ciGreen": "CI en verde",
+      "flaky": "{{count}} inestables",
+      "days14": "14 días",
+      "noCiHistory": "Orca aún no guarda historial de CI",
+      "agents": "Agentes",
+      "cpu": "CPU",
+      "ram": "RAM",
+      "offline": "Sin conexión",
+      "noMachines": "Este host no publica máquinas",
+      "costToday": "Costo hoy",
+      "noCost": "Orca no tiene datos de costo",
+      "accounts7d": "Cuentas · 7 días",
+      "noAccounts": "Sin uso de cuentas reportado",
+      "ticker": {
+        "waiting": "{{name}} espera tu respuesta",
+        "failing": "{{pr}} con CI fallando, {{name}} lo corrige",
+        "queue": "Cola {{count}}, próximo {{pr}}",
+        "working": "{{count}} trabajando"
+      }
+    }
+  },
   "claudeDeadHooks": {
     "title": "Hay hooks de Claude que no se ejecutan",
     "one": "{{name}} no se ejecuta: falta su script {{script}}. Reinstálalo o quita el hook de settings.json.",
@@ -16044,5 +16384,9 @@
     "agentFinished": "Un agente terminó su trabajo.",
     "agent": "Agente",
     "workspace": "espacio de trabajo"
+  },
+  "agentQuestionNotification": {
+    "title": "{{context}} - {{agent}} te pregunta",
+    "body": "Abre la Bandeja para responder."
   }
 }

@@ -87,6 +87,17 @@ export const gameFleetArgvOf = (cli: string | null | undefined): readonly string
   return path === undefined ? undefined : [path, 'game', 'fleet']
 }
 
+/** Pays the old countdown's kept offers on the host; a JSON list, since an id may hold a comma. */
+export const gameArcadeMigrateArgvOf = (
+  cli: string | null | undefined,
+  offers: readonly string[]
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined
+    ? undefined
+    : [path, 'game', 'arcade', 'migrate', '--offers', JSON.stringify(offers), '--json']
+}
+
 export const gameWatchArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
   const path = cliOf(cli)
   return path === undefined ? undefined : [path, 'game', 'watch']
@@ -169,4 +180,12 @@ export const gameViewArgvOf = (
 ): readonly string[] | undefined => {
   const path = cliOf(cli)
   return path === undefined ? undefined : [path, 'game', 'view', view, '--scope', scope, '--json']
+}
+
+export const gameHideTabArgvOf = (
+  cli: string | null | undefined,
+  tab: 'prs'
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined ? undefined : [path, 'game', 'hide-tab', tab, '--json']
 }

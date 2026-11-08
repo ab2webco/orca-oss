@@ -1,7 +1,7 @@
 # Agent Teams orchestrator game
 
 Claude Agent Teams panes (`orca claude-teams`) load a Claude Code plugin that turns the session
-into a small game: a pixel-art scene on the spinner, cards per flow phase, a teammate HUD above
+into a small game: a pixel-art scene on the spinner, replies headed by phase, a teammate HUD above
 the prompt, and rewards when reviews merge, CI turns green or tickets move on (a project lead's
 own and its members'). It started as the quest mode of the
 `o` plugin in koombea/cineco-orchestrator (Jucer Orozco) and lives in
@@ -49,15 +49,11 @@ its words from it. A Raster only takes width-1 characters, so a wide character i
 
 ### A member's pane
 
-A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws a member
-band in place of the lead's: one line with its character, ticket, the phase card it shows, its PR
-and CI ([`member-band.tsx`](../../resources/claude-plugins/orca-game/hooks/member-band.tsx)). It has
-no Panel, team chips, party HUD or lead buttons, only a menu row on the pane's own colors:
-**Collapse** folds the band to that row and takes the scene off the spinner for the session,
-**Text** is the lead's text toggle, and **Refresh** reads `game state` again. While the member's
-`orca orchestration ask` waits on the lead, a line shows the question (`? Asked <lead>: …`), kept
-when collapsed and cleared when the answer returns. Its replies use the same cards as the lead's,
-and the scene still draws above the spinner unless collapsed or in text mode.
+A pane started with `ORCA_GAME_ROLE=member`, or one `game state` calls a member, draws the same
+text layer as the lead's pane, with no band
+([`text-layer.tsx`](../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)). Its ticket, host,
+model, PR and whether it waits for you show in the native header over its terminal while the Team
+panel is open (ORCA-1055).
 
 A local member draws its lead's scene file when its own worktree cannot read it: `.orca/` is often
 git-excluded, so a fresh member worktree lacks the file the lead draws, and `game state` reads the
@@ -226,6 +222,12 @@ orchestratorGame:
   openLinks: system # orca (default) | system: where the game's links open
   render: hd # classic (default) | hd | hd-compact: see "Render: classic, hd or hd-compact" below
   timezone: America/Bogota # local (default) | an IANA zone: when hd turns to night
+  panel: # the native panel; mode and render keep driving the terminal (see below)
+    look: game # game | display | plain; unset follows mode
+    style: pixel # figures | office | pixel, for the game look
+    tabs: { prs: true, queue: false, machines: true }
+    advisor: true # the Advisor row, drawn only with its plugin
+    arcade: true # saved arcade credits, game look only
 ```
 
 `openLinks: system` opens every game link (PR, CI, ticket, activity, the PR and To Do list
@@ -242,6 +244,14 @@ An invalid value is dropped and reported (Settings shows the source of every val
 For an SSH worktree the project layer is read from the host over the SSH filesystem
 ([`worktree-orca-yaml.ts`](../../src/main/worktree-orca-yaml.ts)); while the host is disconnected
 the other layers still apply.
+
+`panel` belongs to the native panel and merges key by key, `tabs` tab by tab. An unset `look`
+follows `mode` (`zen` is Display, `flat` is Plain, anything else Game) and an unset `style` is
+Pixel, so nothing changes look on update ([`orchestrator-game-panel.ts`](../../src/shared/orchestrator-game-panel.ts)).
+Soft is not a style to pick, because nothing draws it: a `style: soft` saved earlier reads as Pixel.
+It is edited in the project's game section and, as the default for every project, in Settings,
+Agents, Panel; the panel's gear opens the first with a team and the second without one. An Orca
+older than `panel` reports it as an unknown setting and ignores it.
 
 `rewardWeights` merges key by key like `orchestrator`: the project can lower one reward in
 `orca.yaml` while a dev turns another off in the project's Settings JSON. Like the lists below it
@@ -1441,6 +1451,21 @@ orchestratorGame:
   `.glow` (default: the scene's own looks) are optional. `orca game scene validate` reports a bad
   block as `scene3d.<key>: <message>` and exits 1, but the game only drops the block with a warning
   and draws the scene as 2D. An Orca build or mod older than the block ignores the key.
+- **Native art.** The optional `native` object is image art for the native Team panel's Figures
+  and Office styles, parsed apart in
+  [`orchestrator-game-scene-native.ts`](../../src/shared/orchestrator-game-scene-native.ts): for
+  each style, image `layers` and per-role `animations` over sprite `sheets`, with an optional
+  station prop. The images sit in the scene's folder, outside the 64 KB JSON, at most 2 MB each and
+  8 MB and 16 megapixels a style; paths are relative to the scene file. `orca game scene validate`
+  reads every file and reports problems as `native.<style>…: <message>`; the game drops a broken
+  block with a warning. A scene with no art for a style draws in Pixel
+  (`orchestratorGameSceneDrawnStyle`), and so does art that does not load on this machine, such as
+  a scene carried to a remote member. Quest's art ships with Orca, in
+  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json), and only that art
+  reaches the panel today: `useTeamScenePainter` picks the painter, and the panel cannot yet read a
+  file's or a plugin's images, locally or from a host, so a scene with a block validates and draws
+  in Pixel until ORCA-1085. Game state carries the block as an optional field. The
+  [scenes guide](../../skill-guides/orca-game-scenes.md#native-optional) has the format.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
 relative to the project root; a path leaving the project is refused inline) and three actions:
@@ -1567,17 +1592,19 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
   The decisions live in the game's own `$.state` `{ plugin: 'orca-game', key: 'advisor' }`
   (`{ decisions: [...] }`), written when Jev writes its value. The lead's own card draws this
   pane's Jev as a member card draws a member's (`◆ Jev Opus 5.5·high · model pinned`).
-- **Each member's Jev, on the lead's Panel.** Pane state does not cross panes, so a member pane's
-  mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
+- **Each pane's Jev, on the lead's Panel.** Pane state does not cross panes, so a lead or member
+  pane's mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
   Jev switches the main model or effort): `ORCA_GAME_ADVISOR` in the CLI's env, JSON
-  `{ version: 1, model, effort, pinned: { model, effort } }`, with `pinned` read from
+  `{ version: 1, model, effort, line, pinned: { model, effort } }`, with `pinned` read from
   `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, or `null` once Jev stops after a report. A pane
   where Jev never published sends nothing. The CLI passes it to `game.state` as an optional
   `advisor` param, the host keeps it per pane in memory (a restart refills it within one poll, a
-  report not renewed for 3 minutes expires) and puts it on that member's row of its lead's state as
-  an optional `advisor` (`{ model, effort, pinned, previous? }`, `previous` being what Jev had it on
+  report not renewed for 3 minutes expires) and puts it on that pane's row of its lead's state as
+  an optional `advisor` (`{ model, effort, line?, pinned, previous? }`, `previous` being what Jev had it on
   before its latest switch)
   ([`orchestrator-game-member-advisors.ts`](../../src/main/runtime/orchestrator-game-member-advisors.ts)).
+  The lead's own report fills the Advisor row of the native Team panel and its scene's advisor, whose
+  bubble says `line`; Jev's decisions stay in the pane, so that row lists no calls.
   The member card draws `◆ Jev Sonnet 5.5·high · model pinned` (Jev's name, then the pin, dropped
   on a narrow card; what still does not fit wraps, so the model is never cut) and, after a switch,
   `↳ Opus 5.5 → Sonnet 5.5`, naming only what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not
@@ -1708,61 +1735,45 @@ ground line reads as something to jump.
 earns no points or XP, writes nothing to Orca or the store, adds no setting, and closing the pane
 drops the run.
 
-A lead pane (`role` not `member`, rewards on) offers one run when a member's review turns
-`perfectMerge: true` between two polls
-([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The offer
-is keyed by the perfect-merge reward's id and kept under `arcade-offers` in `$.store`, so a merge
-seen again after a replay or a reload never offers twice. `/orca-game:demo offer` (or
-`/quest demo offer`) plays the same offer
-([`arcade-offer.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-offer.ts)), keeping
-nothing:
+A member's perfect merge saves one arcade play for the project on the Orca host
+([`orchestrator-game-arcade-credits.ts`](../../src/shared/orchestrator-game-arcade-credits.ts)).
+The host's game store adds the credit in the same write as the `merged` event it records, so a
+merge seen twice pays once. At most 9 plays are kept. The lead's `game state` carries them as
+`arcade: { credits, offer }`, and `game.arcade` (`orca game arcade`) reads them, or with
+`action: play | keep` spends one or dismisses the offer. Only the lead's project reads or spends
+them. The Team panel plays the run in a center tab.
 
-- The scene celebrates (the merge float and the level-up stars, drawn in the band while idle) and
-  the arcade pane opens asking for the keyboard, so `j` and `n` reach the pane and never the
-  prompt. Claude Code grants that only over an empty composer with no dialog or survey up, so text
-  the user is typing stays theirs; then the line names `ctrl+x tab, then j`, which is true there.
-- A line under the frame counts down 15 seconds. `j` (or a click on Play) starts the run; `n`, Esc
-  or the end of the countdown closes the pane and drops the offer.
-- While a teammate waits on the user (the band's "Needs you"), or a member's own question waits on
-  its lead, the countdown stands still, a run in play holds with no frames, and an offer opened then
-  leaves the keyboard to the prompt for the answer; both go on by themselves once it is answered.
-- Points a real offer's run earns stay apart from member XP; a demo offer writes none.
+Offers the old 15-second countdown made are paid once each. The terminal kept their ids under
+`arcade-offers` in `$.store` without noting which were played, so every one counts. The lead pane
+sends them once with `orca game arcade migrate`, and the host pays each id it has not seen, up to
+the cap, and records them all in the project's file, so a second migration pays nothing, after a
+restart or a repo adoption too. Only the host's answer marks them sent (`arcade-offers-migrated`);
+an Orca older than `game arcade` refuses the command, and the pane tries again in a later session.
+
+The terminal no longer offers a run. A lead pane (`role` not `member`, rewards on) only celebrates
+the merge in its scene and says the play is saved in the Team panel
+([`arcade-unlock.ts`](../../resources/claude-plugins/orca-game/hooks/arcade-unlock.ts)). The cheer
+is keyed by the perfect-merge reward's id and kept under `arcade-cheers` in `$.store`, so a merge
+seen again after a replay or a reload, or one the old countdown already offered, never cheers
+twice. `/orca-game:demo offer` (or `/quest demo offer`) plays the same cheer and saves nothing.
 
 ## Other plugins in a game pane
 
-Other Claude Code plugins keep running in a team pane; while the game is drawn (mode `on`,
-`zen` or `flat` with the band on) the mod draws what they show in the scene's style instead of
-letting each one paint its own
-([`allies-strip.tsx`](../../resources/claude-plugins/orca-game/hooks/allies-strip.tsx)):
+Other Claude Code plugins keep running in a team pane and draw their own status lines and bands;
+since ORCA-1055 the game no longer holds them in a strip. While the game is on, the mod keeps one
+thing above the prompt
+([`text-layer.tsx`](../../resources/claude-plugins/orca-game/hooks/text-layer.tsx)):
 
-- **Status lines.** A `ui.status` hook takes another plugin's `$.ui.status(text)` before Claude Code
-  sees it and keeps it as a row of the **allies strip** under the band, labeled with the plugin's
-  name; `undefined` removes the row. With the game `off` the call passes through untouched. The
-  user's own `statusLine` is not a plugin call and is never touched.
-- **Jev.** The strip reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
-  `AdvisorState`, `version: 1`) without depending on Jev: its line with model·effort, one row per
-  running subagent (title, model, verdict), its CI rows and its latest notice. Any other version, or
-  a value that is not an advisor, is ignored, so a newer Jev draws no row rather than a wrong one. The band redraws when that
-  value is written; nothing polls it. The same value puts Jev's advisor in the scene and its card
-  in the Panel ([The cast](#the-cast-a-pet-and-jevs-advisor)).
+- **Jev's alerts.** It reads `$.state` `{ plugin: 'orca-jev-mod-skills', key: 'advisor' }` (Jev's
+  `AdvisorState`, `version: 1`) without depending on Jev, and draws a `Jev · …` line for each failed
+  CI run and for Jev's latest notice when it is a stop (red) or an escalation (yellow). Jev's model
+  line, subagent rows, running CI and info notices are left to the Team panel. Any other version
+  draws nothing.
 - **Following the game.** The game publishes `{ plugin: 'orca-game', key: 'absorbing' }`, a
-  `boolean` true exactly while it draws other plugins' lines (mode not `off`, HUD on), at load and
-  on every change: the env, Orca's live config and `/orca-game:mode`. Jev reads it, so a pane where the game
-  stops drawing (`/orca-game:mode off`, the HUD turned off in Settings) shows Jev's own line again, and one
-  where it starts never shows Jev twice. `/orca-game:mode off` keeps the band (the HUD is its own switch) and
-  drops the strip, since the other plugins then draw for themselves.
-- **One bad row.** An advisor value Jev extends with a row the strip cannot read loses that row
-  only; the rest of Jev still draws. Any other `version` draws no Jev row.
-- **Stale lines.** Each session starts with no held status, so a plugin that was disabled, reloaded
-  or crashed without clearing its line leaves nothing behind.
-- **Zen** keeps one row: Jev's line, or else the latest status.
-- **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, drawn under
-  the strip, and a `ui.resolve` hook paints every other plugin's `Text` in the scene palette (a
-  highlighted run as the gold pill; red, green, yellow and the theme's error, warning and success
-  stay). A plugin loaded in the `prepend` tier draws outside the game and can hide it.
-
-The strip keeps at most six rows, the last saying how many it left out, and each row is cut to
-the band's width (the label to a third of it, the text next, the badge dropped first).
+  `boolean` true while the game is on with the HUD, at load and on every change. Jev reads it, so
+  its alerts are drawn once, by the game.
+- **Bands.** A plugin whose `AbovePrompt` hook sits beneath the game keeps its content, under the
+  game's lines.
 
 ## Narrow panes
 

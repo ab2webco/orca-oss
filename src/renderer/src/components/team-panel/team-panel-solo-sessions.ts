@@ -1,0 +1,277 @@
+import { translate } from '@/i18n/i18n'
+import type { AppState } from '@/store/types'
+import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
+import { getWorkspacePortsByWorktreeId } from '@/lib/workspace-port-groups'
+import { getWslDistroFromPath } from '@/lib/local-preflight-context'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filter'
+import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
+import { getWorktreeCardJiraIssueDisplay } from '../sidebar/worktree-card-jira-issue-display'
+import { buildWorktreeClaudeAccountChipModel } from '../sidebar/worktree-claude-account-chip-model'
+import { getPromptCacheCountdownForPane } from '../sidebar/prompt-cache-timer-selection'
+import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
+import { GAME_MEMBER_ADVISOR_PANES_MAX } from '../../../../shared/orchestrator-game-member-advisor'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import { TEAM_LOCAL_HOST_KEY } from '../../../../shared/team-panel-solo-machines'
+import { getRemoteRuntimeTerminalHandle } from '@/runtime/runtime-terminal-stream'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
+import type { Repo, Worktree } from '../../../../shared/types'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
+import type { TeamSoloSession } from '../../../../shared/team-panel-activity-rows'
+import type {
+  TeamAccount,
+  TeamHost,
+  TeamPullRequest,
+  TeamTicket
+} from '../../../../shared/team-panel-model-types'
+import type { TeamSoloAdvisorRead } from './use-team-solo-advisors'
+
+export type TeamSoloSessionsState = Pick<
+  AppState,
+  | 'agentStatusByPaneKey'
+  | 'tabsByWorktree'
+  | 'worktreesByRepo'
+  | 'repos'
+  | 'settings'
+  | 'cacheTimerByKey'
+  | 'hostedReviewCache'
+  | 'workspacePortScan'
+  | 'claudeAccountRoster'
+  | 'folderWorkspaces'
+  | 'runtimeEnvironments'
+  | 'sshTargetLabels'
+  | 'sshConnectionStates'
+  | 'terminalLayoutsByTabId'
+>
+
+function hostOf(
+  state: TeamSoloSessionsState,
+  worktree: Worktree,
+  repo: Repo | undefined
+): TeamHost {
+  const parsed = parseExecutionHostId(
+    worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : null)
+  )
+  if (parsed?.kind === 'ssh') {
+    const status = state.sshConnectionStates.get(parsed.targetId)?.status
+    return {
+      kind: 'remote',
+      name: state.sshTargetLabels.get(parsed.targetId) ?? parsed.targetId,
+      environmentId: null,
+      reachable: status === undefined || status === 'connected'
+    }
+  }
+  if (parsed?.kind === 'runtime') {
+    return {
+      kind: 'remote',
+      name:
+        state.runtimeEnvironments.find((one) => one.id === parsed.environmentId)?.name ??
+        parsed.environmentId,
+      environmentId: parsed.environmentId,
+      reachable: true
+    }
+  }
+  return { kind: 'local' }
+}
+
+function ticketOf(worktree: Worktree): TeamTicket | null {
+  const plane = worktree.linkedPlaneWorkItem
+  if (plane) {
+    return {
+      identifier: plane.identifier,
+      title: null,
+      url: plane.url ?? null,
+      statusGroup: null
+    }
+  }
+  if (worktree.linkedLinearIssue) {
+    return {
+      identifier: worktree.linkedLinearIssue,
+      title: null,
+      url: null,
+      statusGroup: null
+    }
+  }
+  const jira = getWorktreeCardJiraIssueDisplay(worktree)
+  if (jira) {
+    return { identifier: jira.identifier, title: jira.title, url: jira.url, statusGroup: null }
+  }
+  const issue = worktree.linkedIssue ?? worktree.linkedGitLabIssue
+  return issue
+    ? {
+        identifier: `#${issue}`,
+        title: null,
+        url: null,
+        statusGroup: null
+      }
+    : null
+}
+
+function pullRequestOf(
+  state: TeamSoloSessionsState,
+  worktree: Worktree,
+  repo: Repo | undefined
+): TeamPullRequest | null {
+  const identity = getWorktreeGitIdentityDisplay(worktree)
+  if (!repo || identity?.kind !== 'branch') {
+    return null
+  }
+  const key = getHostedReviewCacheKey(
+    repo.path,
+    identity.branchName,
+    state.settings,
+    repo.id,
+    repo.connectionId,
+    repo.executionHostId,
+    true
+  )
+  const review = state.hostedReviewCache[key]?.data
+  if (!review || review.provider === 'unsupported') {
+    return null
+  }
+  return {
+    provider: review.provider,
+    number: review.number,
+    title: review.title,
+    url: review.url,
+    state: review.state,
+    ci: review.status,
+    verdict: null,
+    perfectMerge: null
+  }
+}
+
+function accountOf(
+  state: TeamSoloSessionsState,
+  entry: AgentStatusEntry,
+  worktree: Worktree,
+  repo: Repo | undefined
+): TeamAccount | null {
+  // Why: only Claude panes on a host Orca manages accounts for have a known account.
+  if (
+    entry.agentType !== 'claude' ||
+    isWebClientLocation() ||
+    !canPinClaudeAccountToWorktree(worktree, repo)
+  ) {
+    return null
+  }
+  const chip = buildWorktreeClaudeAccountChipModel({
+    pinnedAccountId: worktree.claudeAccountId,
+    wslDistro: getWslDistroFromPath(worktree.path),
+    roster: state.claudeAccountRoster,
+    systemDefaultLabel: translate(
+      'auto.components.sidebar.WorktreeCardClaudeAccountChip.systemDefault',
+      'System default'
+    )
+  })
+  return chip?.label ? { provider: 'claude', email: chip.label, usedPercent: null } : null
+}
+
+function worktreeIdOf(state: TeamSoloSessionsState, entry: AgentStatusEntry): string | null {
+  if (entry.worktreeId) {
+    return entry.worktreeId
+  }
+  const tabId = parsePaneKey(entry.paneKey)?.tabId
+  if (!tabId) {
+    return null
+  }
+  for (const [worktreeId, tabs] of Object.entries(state.tabsByWorktree)) {
+    if (tabs.some((tab) => tab.id === tabId)) {
+      return worktreeId
+    }
+  }
+  return null
+}
+
+// Why the coordinator too: a member reports its lead's handle, not its own role.
+function isTeamPane(
+  state: TeamSoloSessionsState,
+  entry: AgentStatusEntry,
+  leads: ReadonlySet<string> | undefined
+): boolean {
+  const pane = parsePaneKey(entry.paneKey)
+  const ptyId = pane
+    ? state.terminalLayoutsByTabId[pane.tabId]?.ptyIdsByLeafId?.[pane.leafId]
+    : null
+  // Why the PTY id: a paired host's mirrored pane carries that host's handle only there.
+  const handles = [
+    entry.terminalHandle,
+    entry.orchestration?.coordinatorHandle,
+    entry.orchestration?.parentTerminalHandle,
+    ptyId ? getRemoteRuntimeTerminalHandle(ptyId) : null
+  ]
+  return handles.some((handle) => handle && leads?.has(handle))
+}
+
+/** Every live agent pane with the facts the sidebar already holds for its workspace. */
+export function teamSoloSessionsOf(
+  state: TeamSoloSessionsState,
+  leadsByHost: ReadonlyMap<string, ReadonlySet<string>> = new Map()
+): TeamSoloSession[] {
+  const worktrees = new Map<string, Worktree>()
+  for (const list of Object.values(state.worktreesByRepo)) {
+    for (const worktree of list) {
+      worktrees.set(worktree.id, worktree)
+    }
+  }
+  // Why: folder workspaces are absent from worktreesByRepo, and their agents still count.
+  for (const folder of state.folderWorkspaces) {
+    const worktree = folderWorkspaceToWorktree(folder)
+    worktrees.set(worktree.id, worktree)
+  }
+  const ports = getWorkspacePortsByWorktreeId(state.workspacePortScan?.result)
+  const cacheOn = state.settings?.promptCacheTimerEnabled ?? false
+  const ttlMs = state.settings?.promptCacheTtlMs ?? 0
+  return Object.values(state.agentStatusByPaneKey).flatMap((entry) => {
+    const worktreeId = worktreeIdOf(state, entry)
+    const worktree = worktreeId ? worktrees.get(worktreeId) : undefined
+    if (!worktree) {
+      return []
+    }
+    const repo = state.repos.find((one) => one.id === worktree.repoId)
+    const host = hostOf(state, worktree, repo)
+    // Why local for SSH: its panes run under this machine's runtime, which keeps its leads.
+    const hostKey =
+      host.kind === 'remote' && host.environmentId ? host.environmentId : TEAM_LOCAL_HOST_KEY
+    const cache = cacheOn
+      ? getPromptCacheCountdownForPane(entry.paneKey, state.cacheTimerByKey, ttlMs)
+      : null
+    return [
+      {
+        entry,
+        repoName: repo?.displayName ?? '',
+        worktreeName: worktree.displayName,
+        worktreeId: worktree.id,
+        isPrimary: worktree.isMainWorktree === true,
+        inTeam: isTeamPane(state, entry, leadsByHost.get(hostKey)),
+        host,
+        ticket: ticketOf(worktree),
+        pr: pullRequestOf(state, worktree, repo),
+        note: worktree.comment.trim() || null,
+        ports: (ports.get(worktree.id) ?? []).map((one) => one.port),
+        account: accountOf(state, entry, worktree, repo),
+        cacheExpiresAt: cache ? cache.startedAt + cache.ttlMs : null,
+        // Why null: only a pane running the mod reports it; `game.paneAdvisors` fills that one in.
+        advisor: null
+      }
+    ]
+  })
+}
+
+/** Each host that can hold a report, and its panes. Why no SSH: the relay drops that env var. */
+export function teamSoloAdvisorReadsOf(
+  sessions: readonly TeamSoloSession[]
+): TeamSoloAdvisorRead[] {
+  const reads = new Map<string | null, string[]>()
+  for (const { host, entry } of sessions) {
+    if (host.kind === 'remote' && !host.environmentId) {
+      continue
+    }
+    const environmentId = host.kind === 'remote' ? host.environmentId : null
+    reads.set(environmentId, [...(reads.get(environmentId) ?? []), entry.paneKey])
+  }
+  return [...reads].map(([environmentId, paneKeys]) => ({
+    environmentId,
+    paneKeys: paneKeys.slice(0, GAME_MEMBER_ADVISOR_PANES_MAX)
+  }))
+}

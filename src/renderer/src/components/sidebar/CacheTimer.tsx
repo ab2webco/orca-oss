@@ -4,9 +4,11 @@ import { Timer } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useShallow } from 'zustand/react/shallow'
 import { usePromptCacheCountdownNow } from './prompt-cache-countdown-clock'
+import { statusToneTextClass } from '@/components/status-tone'
 import {
   getMostUrgentPromptCacheStartedAt,
   getPromptCacheCountdownForPane,
+  getPromptCacheCountdownTone,
   type PromptCacheCountdownSelection
 } from './prompt-cache-timer-selection'
 
@@ -83,7 +85,6 @@ export default function CacheTimer({
   const label = `${minutes}:${seconds.toString().padStart(2, '0')}`
 
   const expired = remainingMs === 0
-  const warning = !expired && remainingMs <= 60_000
 
   const tooltipText = expired
     ? 'The next message will re-send the full context as uncached tokens'
@@ -95,7 +96,7 @@ export default function CacheTimer({
         <div
           className={cn(
             'inline-flex items-center gap-1 text-[10px] font-mono tabular-nums select-none leading-none',
-            expired ? 'text-red-400' : warning ? 'text-yellow-400' : 'text-muted-foreground'
+            statusToneTextClass(getPromptCacheCountdownTone(remainingMs))
           )}
         >
           <Timer className="size-2.5" />

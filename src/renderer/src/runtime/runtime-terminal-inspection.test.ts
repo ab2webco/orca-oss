@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   inspectRuntimeTerminalProcess,
   recordRuntimeTerminalInputForPtyId,
+  sendRuntimeAgentPrompt,
   sendRuntimePtyInput,
   sendRuntimePtyInputVerified
 } from './runtime-terminal-inspection'
@@ -96,6 +97,43 @@ describe('runtime terminal owner routing', () => {
       })
     })
     expect(localWrite).not.toHaveBeenCalled()
+  })
+
+  it('submits an agent prompt through the paste path, not as a raw write', async () => {
+    runtimeCall.mockResolvedValue({
+      ok: true,
+      result: { send: { handle: 'terminal-1', accepted: true, bytesWritten: 9 } },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+
+    await expect(
+      sendRuntimeAgentPrompt({ kind: 'environment', environmentId: 'env-1' }, 'terminal-1', 'Go')
+    ).resolves.toBe(true)
+
+    expect(runtimeCall).toHaveBeenCalledWith({
+      selector: 'env-1',
+      method: 'terminal.send',
+      params: {
+        terminal: 'terminal-1',
+        text: 'Go',
+        enter: true,
+        agentPrompt: true,
+        client: { id: 'orca-desktop', type: 'desktop' }
+      },
+      timeoutMs: 15_000
+    })
+  })
+
+  it('reads an agent prompt the terminal declined as not sent', async () => {
+    runtimeCall.mockResolvedValue({
+      ok: true,
+      result: { send: { handle: 'terminal-1', accepted: false, bytesWritten: 0 } },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+
+    await expect(
+      sendRuntimeAgentPrompt({ kind: 'environment', environmentId: 'env-1' }, 'terminal-1', 'Go')
+    ).resolves.toBe(false)
   })
 
   it('inspects the PTY owning environment instead of the active one', async () => {

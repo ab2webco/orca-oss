@@ -105,6 +105,7 @@ import type { AgentSessionContinuationRequest } from '@/lib/agent-session-contin
 import { useNotificationDispatch } from './use-notification-dispatch'
 import { connectPanePty } from './pty-connection'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
+import { terminalLayoutWithPtyBinding } from './terminal-layout-pty-ownership'
 import { shouldPreserveTerminalScrollbackBuffers } from '../../../../shared/workspace-session-terminal-buffers'
 import {
   getMobileFitOverridePtyIds,
@@ -1304,14 +1305,15 @@ function TerminalPane(
       }
 
       if (ptyId) {
-        setTabLayout(tabId, {
-          ...layoutWithoutPtyBindings,
-          // Why: PTY ownership changes after the mount-time layout snapshot, so persist the live pane→PTY binding here for correct remount attachment.
-          ptyIdsByLeafId: {
-            ...existingBindings,
-            [leafId]: ptyId
-          }
-        })
+        // Why: PTY ownership changes after the mount-time layout snapshot, so persist the live pane→PTY binding here for correct remount attachment.
+        setTabLayout(
+          tabId,
+          terminalLayoutWithPtyBinding(existingLayout, {
+            leafId,
+            ptyId,
+            focusedLeafId: managerRef.current?.getActivePane()?.leafId
+          })
+        )
         return
       }
 

@@ -4,7 +4,7 @@ description: |
   Play a scripted fake party in this pane: every phase, action and reaction and one level-up,
   without running any command or writing XP. /orca-game:mode on returns to real data. With the word
   arcade it opens a practice run of the arcade's runner instead, which keeps no points; with the
-  word offer it plays the arcade's unlock offer (celebration, countdown, play or pass) the same way.
+  word offer it plays the cheer a perfect merge gets when it saves a play for the Team panel.
   The game mod answers it, with no model turn. Run it as /orca-game:demo, /orca-game:demo arcade or
   /orca-game:demo offer.
 user_invocable: true

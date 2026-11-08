@@ -61,6 +61,22 @@ For diff status, file-tree decorations, and the changes view, use the git decora
 
 Use these _only_ for git status. Don't reuse them for unrelated state colors — that breaks the convention.
 
+### Status colors
+
+Agent, workspace, check and host state speaks one colour language. Each tone has a fixed meaning; nothing else uses these colours, so the crown, XP bars and headings stay neutral.
+
+| Token                | Tailwind           | Meaning                        |
+| -------------------- | ------------------ | ------------------------------ |
+| `--status-attention` | `status-attention` | Needs the user, or failed      |
+| `--status-warning`   | `status-warning`   | At risk; does not need you yet |
+| `--status-info`      | `status-info`      | An agent is working on it now  |
+| `--status-success`   | `status-success`   | Done and verified              |
+| `--status-idle`      | `status-idle`      | Idle, or no data               |
+
+- Draw state markers with `StatusDot` (`components/StatusDot.tsx`); map a domain state to a tone, never to a palette hue. `status-tone.ts` has the text, fill and badge classes.
+- Light and dark have their own values. Every tone keeps 4.5:1 against `--background`, so it works as text too; `status-tone.test.ts` enforces it.
+- `--status-attention` aliases `--destructive` and `--status-idle` aliases `--muted-foreground` by default, so a user-picked status colour never repaints a Delete button. `--agent-question` follows `--status-attention`.
+
 ### List rows: hover, selected, current
 
 A common point of drift. Use these conventions for any list-style row (worktrees, command palette items, settings nav):

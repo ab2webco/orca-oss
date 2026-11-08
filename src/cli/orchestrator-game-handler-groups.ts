@@ -27,7 +27,7 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'orchestrator-game-view',
-    keys: ['game view'],
+    keys: ['game view', 'game hide-tab'],
     load: async () =>
       (await import('./handlers/orchestrator-game-view.js')).ORCHESTRATOR_GAME_VIEW_HANDLERS
   },
@@ -104,6 +104,13 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () =>
       (await import('./handlers/orchestrator-game-resume-members.js'))
         .ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS
+  },
+  {
+    name: 'orchestrator-game-arcade-credits',
+    keys: ['game arcade'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-arcade-credits.js'))
+        .ORCHESTRATOR_GAME_ARCADE_CREDIT_HANDLERS
   },
   {
     name: 'orchestrator-game-inbox',

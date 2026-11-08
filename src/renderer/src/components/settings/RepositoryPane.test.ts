@@ -106,6 +106,15 @@ describe('RepositoryPane search entries', () => {
     expect(matchesSettingsSearch('worktree path', entries)).toBe(true)
   })
 
+  it('finds the game panel rows of a local, SSH or folder project', () => {
+    for (const project of [repo, { ...repo, connectionId: 'builder' }]) {
+      const entries = getRepositoryPaneSearchEntries(project)
+
+      expect(matchesSettingsSearch('scene style', entries)).toBe(true)
+      expect(matchesSettingsSearch('arcade', entries)).toBe(true)
+    }
+  })
+
   it('includes each project search section once', () => {
     const entries = getRepositoryPaneSearchEntries(repo)
 

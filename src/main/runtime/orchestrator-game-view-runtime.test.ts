@@ -28,6 +28,41 @@ function runtimeWith(settings: GameSettings) {
   return { runtime, writes }
 }
 
+describe('hiding a panel tab through the runtime', () => {
+  it("writes the caller repo's own layer and tells every Settings window", async () => {
+    const { runtime, writes } = runtimeWith({})
+
+    await expect(
+      runtime.hideOrchestratorGamePanelTab({ tab: 'prs', worktreeId: 'w1' })
+    ).resolves.toEqual({ tab: 'prs', changed: true })
+    expect(writes).toEqual([
+      [
+        { orchestratorGameProjects: { r1: { panel: { tabs: { prs: false } } } } },
+        { notifyListeners: true }
+      ]
+    ])
+  })
+
+  it('writes nothing when the project already chose', async () => {
+    const { runtime, writes } = runtimeWith({
+      orchestratorGameProjects: { r1: { panel: { tabs: { prs: true } } } }
+    })
+
+    await expect(
+      runtime.hideOrchestratorGamePanelTab({ tab: 'prs', worktreeId: 'w1' })
+    ).resolves.toEqual({ tab: 'prs', changed: false })
+    expect(writes).toEqual([])
+  })
+
+  it('refuses a caller with no repo, so the mod keeps its marker unset', async () => {
+    const { runtime } = runtimeWith({})
+
+    await expect(runtime.hideOrchestratorGamePanelTab({ tab: 'prs' })).rejects.toThrow(
+      'no_game_project'
+    )
+  })
+})
+
 describe('storing a game view through the runtime', () => {
   it("writes the caller repo's own layer and tells every Settings window", async () => {
     const { runtime, writes } = runtimeWith({ orchestratorGame: { render: 'hd' } })

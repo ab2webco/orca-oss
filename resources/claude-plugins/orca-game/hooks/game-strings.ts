@@ -58,7 +58,8 @@ export type TextStrings = {
   questDescription: string
   questModesHelp: string
   questShown: (mode: string) => string
-  questDemo: string
+  /** `/quest demo` and `arcade`: they moved to the Team panel. */
+  questInPanel: string
   unknownMode: (asked: string) => string
   questRenderShown: (render: string) => string
   /** A mode or render this session set that differs from the config, with the configured one and its layer when known. */
@@ -202,12 +203,11 @@ const EN: GameStrings = {
     perfectMerge: (review) => `${review} perfect merge`,
     memberLaunched: (member) => `${member} launched`,
     questDescription:
-      'Quest mode, short for /orca-game:quest: an animated Claude, character cards per flow phase, quiet tool rows',
+      'Quest mode, short for /orca-game:quest: an animated Claude, replies headed by phase, one-line tool steps',
     questModesHelp:
-      '/orca-game:mode on|zen|flat|off: off shows everything, on hides tool rows, zen also hides working notes, flat draws the game as text with no scene. /orca-game:render classic|hd|hd-compact picks the look, /orca-game:demo plays a scripted fake party and /orca-game:state shows the whole game state and /orca-game:layout arranges the sections of the Panel. /quest is the short form that also runs mid-turn. /orca-game:view lists every view with its cost and switches this pane, this project or every project.',
+      '/orca-game:mode on|zen|off: off shows everything, on heads replies and folds tool rows into one line, zen also hides working notes; flat reads as on. /orca-game:render and /orca-game:view still read and store their settings. /orca-game:state shows the whole game state. /quest is the short form that also runs mid-turn. The team, its scene and the arcade are in the Team panel.',
     questShown: (mode) => `Quest: ${mode}.`,
-    questDemo:
-      'Quest: demo. A scripted fake party plays every reaction; nothing is read or written. /orca-game:mode on returns to real data.',
+    questInPanel: 'The demo and the arcade play in the Team panel; this pane keeps the text.',
     unknownMode: (asked) =>
       `Unknown mode "${asked}". Use /orca-game:mode on, /orca-game:mode zen, /orca-game:mode flat, /orca-game:mode off or /orca-game:demo.`,
     questRenderShown: (render) => `Render: ${render}.`,

@@ -56,16 +56,26 @@ export async function emitCodexHookStatus(
     worktreeId: string
     state: 'working' | 'done'
     prompt?: string
+    /** Reports the agent inside this tool rather than a fresh prompt. */
+    tool?: string
+    /** The tool's raw input, e.g. `{ command }` for Bash; Orca derives the one-line preview. */
+    toolInput?: Record<string, unknown>
     lastAssistantMessage?: string
   }
 ): Promise<void> {
   const [tabId] = status.paneKey.split(':')
   const payload =
     status.state === 'working'
-      ? {
-          hook_event_name: 'UserPromptSubmit',
-          prompt: status.prompt
-        }
+      ? status.tool
+        ? {
+            hook_event_name: 'PreToolUse',
+            tool_name: status.tool,
+            tool_input: status.toolInput ?? {}
+          }
+        : {
+            hook_event_name: 'UserPromptSubmit',
+            prompt: status.prompt
+          }
       : {
           hook_event_name: 'Stop',
           last_assistant_message: status.lastAssistantMessage

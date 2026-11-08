@@ -19,14 +19,15 @@ export function gameInboxTargetOf(hostId: string | null | undefined): RuntimeCli
     : { kind: 'local' }
 }
 
-/** The open questions, and the answers the board still holds because no lead took them yet (ORCA-1100). */
+/** The open questions (with `all`, answered ones too; a host that predates `all` returns open only), and the answers the board still holds because no lead took them yet (ORCA-1100). */
 export async function readGameOwnerQuestions(
-  scope: GameInboxScope
+  scope: GameInboxScope,
+  options?: { all?: boolean }
 ): Promise<{ questions: GameOwnerQuestion[]; undelivered: GameOwnerQuestion[] }> {
   const result = await callRuntimeRpc<{ questions?: unknown; undelivered?: unknown }>(
     scope.target,
     'game.ownerQuestions',
-    { worktreeId: scope.worktreeId },
+    { worktreeId: scope.worktreeId, ...(options?.all ? { all: true } : {}) },
     { timeoutMs: GAME_INBOX_RPC_TIMEOUT_MS }
   )
   // Why parse: a paired host may run another build, and an older one sends no `undelivered`.

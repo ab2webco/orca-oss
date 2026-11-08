@@ -770,6 +770,10 @@ needed:
 - `id` is kebab-case, unique within the plugin, and never `quest` (the built-in scene). At most 8
   per plugin; each file at most 64 KB, inside the plugin folder (no absolute path, no `..`, no
   symlink out — the same containment as every other declared file).
+- A scene's optional `native` block names image files relative to the scene file. Install refuses a
+  plugin when one is missing, links out of the plugin or exceeds 2 MB. A scene with no art draws in
+  Pixel. The format is in
+  [`skill-guides/orca-game-scenes.md`](../../skill-guides/orca-game-scenes.md#native-optional).
 - The game sees the scene as **`<publisher>.<id>/<scene id>`**, e.g.
   `orca-samples.worklog/night-shift`, so two plugins, or a plugin and `quest`, never collide.
   That is the id to put in `orchestratorGame.scene` in `orca.yaml`, or to pick under

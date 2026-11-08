@@ -18,6 +18,7 @@ import { DEFAULT_APP_FONT_FAMILY } from '../../../../shared/constants'
 import {
   getLanguageEntries,
   getMenuBarIconEntries,
+  getStatusColorEntries,
   getSystemTrayEntries,
   getThemeEntries,
   getTitlebarEntries,
@@ -33,6 +34,7 @@ import { translate } from '@/i18n/i18n'
 import type { UiLanguage } from '../../../../shared/ui-language'
 import { matchesSettingsSearch, normalizeSettingsSearchQuery } from './settings-search'
 import { usePluginLanguagePacks } from '@/store/plugin-language-packs'
+import { StatusColorsSetting } from './StatusColorsSetting'
 
 type AppearanceInterfaceSectionProps = {
   settings: GlobalSettings
@@ -64,6 +66,7 @@ export function AppearanceInterfaceSection({
   const menuBarIconEntry = getMenuBarIconEntries({ showMenuBarIcon: true })[0]
   const systemTrayEntry = getSystemTrayEntries({ showSystemTray: true })[0]
   const themeEntry = getThemeEntries()[0]
+  const statusColorEntry = getStatusColorEntries()[0]
   const themeLabel = translate('auto.components.settings.AppearancePane.932ff1fbff', 'Theme')
   const titlebarEntry = getTitlebarEntries()[0]
   const typographyEntry = getTypographyEntries()[0]
@@ -111,6 +114,15 @@ export function AppearanceInterfaceSection({
             />
           }
         />
+      </SearchableSetting>
+
+      <SearchableSetting
+        title={statusColorEntry.title}
+        description={statusColorEntry.description}
+        keywords={statusColorEntry.keywords}
+        forceVisible={forceVisiblePrimary}
+      >
+        <StatusColorsSetting settings={settings} updateSettings={updateSettings} />
       </SearchableSetting>
 
       {SHOW_UI_LANGUAGE_SETTING ? (

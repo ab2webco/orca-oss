@@ -255,6 +255,25 @@ describe('Store', () => {
     expect(store.getSettings().minimizeToTrayOnClose).toBe(false)
   })
 
+  it('persists only valid status colour overrides', async () => {
+    const store = await createStore()
+    store.updateSettings({
+      statusColors: {
+        dark: { info: '#4FC3F7', success: 'url(x)' },
+        light: { warning: '#b45309' }
+      } as unknown as GlobalSettings['statusColors']
+    })
+    expect(store.getSettings().statusColors).toEqual({
+      dark: { info: '#4fc3f7' },
+      light: { warning: '#b45309' }
+    })
+    store.flush()
+    expect((readDataFile() as PersistedState).settings.statusColors).toEqual({
+      dark: { info: '#4fc3f7' },
+      light: { warning: '#b45309' }
+    })
+  })
+
   it('defaults the menu bar icon on regardless of platform', async () => {
     await withPlatform('darwin', async () => {
       const store = await createStore()

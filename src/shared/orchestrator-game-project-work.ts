@@ -40,6 +40,8 @@ export type GameProjectItem = {
   group?: GameStatusGroup
   /** What "work on" sends the lead for this ticket. */
   prompt?: string
+  /** What keeps a PR from merging besides its CI; absent from an older host or when unread. */
+  reviewBlock?: 'draft' | 'conflict'
 }
 
 /** `total` counts every open item; `items` keeps the first few, `url` opens the full list. */
@@ -54,7 +56,26 @@ export type GameProjectList = {
   actionId?: string
 }
 
-export type GameProjectWork = { reviews: GameProjectList | null; todo: GameProjectList | null }
+/** One pull request waiting to merge; `position` 1 is next. */
+export type GameQueueEntry = {
+  id: string
+  title: string
+  url: string
+  position: number
+  state: 'checks' | 'waiting' | 'failed'
+  /** When it entered the queue, ms; null when unknown. */
+  since: number | null
+}
+
+/** `entries` null is a queue Orca knows of but could not read. */
+export type GameProjectQueue = { provider: 'github'; entries: GameQueueEntry[] | null }
+
+export type GameProjectWork = {
+  reviews: GameProjectList | null
+  todo: GameProjectList | null
+  /** Absent with no merge queue, another provider, a low GitHub budget, or from an older host. */
+  queue?: GameProjectQueue
+}
 
 const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,31}$/
 const TODO_ACTION = /^[a-z][a-z0-9:-]{0,63}$/

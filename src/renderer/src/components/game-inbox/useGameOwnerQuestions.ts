@@ -27,7 +27,10 @@ type LoadedQuestions = {
 }
 
 /** The open questions the lead asked the person, and answers not yet with the lead, reread on a pushed change or window focus; pass a memoized scope. */
-export function useGameOwnerQuestions(scope: GameInboxScope | null): {
+export function useGameOwnerQuestions(
+  scope: GameInboxScope | null,
+  options?: { all?: boolean }
+): {
   questions: GameOwnerQuestion[]
   undelivered: GameOwnerQuestion[]
   answer: (id: string, reply: GameOwnerReply) => Promise<void>
@@ -35,22 +38,26 @@ export function useGameOwnerQuestions(scope: GameInboxScope | null): {
   const [loaded, setLoaded] = useState<LoadedQuestions | null>(null)
   // Why: a slower earlier read must not overwrite a later one.
   const readSeq = useRef(0)
+  const all = options?.all === true
 
-  const reload = useCallback(async (current: GameInboxScope) => {
-    const key = scopeKeyOf(current)
-    const seq = ++readSeq.current
-    try {
-      const read = await readGameOwnerQuestions(current)
-      if (seq === readSeq.current && key) {
-        setLoaded({ key, ...read })
+  const reload = useCallback(
+    async (current: GameInboxScope) => {
+      const key = scopeKeyOf(current)
+      const seq = ++readSeq.current
+      try {
+        const read = await readGameOwnerQuestions(current, { all })
+        if (seq === readSeq.current && key) {
+          setLoaded({ key, ...read })
+        }
+      } catch {
+        // Why: a host without the board (older build, offline) shows no questions, not an error.
+        if (seq === readSeq.current && key) {
+          setLoaded({ key, questions: NO_QUESTIONS, undelivered: NO_QUESTIONS })
+        }
       }
-    } catch {
-      // Why: a host without the board (older build, offline) shows no questions, not an error.
-      if (seq === readSeq.current && key) {
-        setLoaded({ key, questions: NO_QUESTIONS, undelivered: NO_QUESTIONS })
-      }
-    }
-  }, [])
+    },
+    [all]
+  )
 
   useEffect(() => {
     if (!scope) {

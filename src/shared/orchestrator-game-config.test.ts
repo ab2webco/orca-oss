@@ -233,6 +233,24 @@ describe('orchestratorGame.actions', () => {
     ).toEqual([{ label: 'B', mcp: { server: 'tambora', tool: 'list' } }])
   })
 
+  it('reads orcaActions from orca.yaml and merges them across layers', () => {
+    expect(
+      parseOrchestratorGameLayer({
+        orcaActions: { wave: { enabled: false }, stop: { enabled: false } }
+      })
+    ).toEqual({
+      layer: { orcaActions: { wave: { enabled: false }, stop: {} } },
+      warnings: ['orchestratorGame.orcaActions.stop cannot be turned off']
+    })
+    expect(resolveOrchestratorGameIntegrations({}).orcaActions).toEqual({})
+    expect(
+      resolveOrchestratorGameIntegrations({
+        project: { orcaActions: { wave: { enabled: false }, sweep: { prompt: 'a' } } },
+        local: { orcaActions: { sweep: { label: 'Close' } } }
+      }).orcaActions
+    ).toEqual({ wave: { enabled: false }, sweep: { prompt: 'a', label: 'Close' } })
+  })
+
   it("keeps the To Do's work prompt", () => {
     expect(
       parseOrchestratorGameLayer({

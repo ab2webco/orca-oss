@@ -16,8 +16,10 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 const handlers = new Map<string, (event: { sender: WebContents }, args: unknown) => unknown>()
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: (channel: string, handler: (event: { sender: WebContents }, args: unknown) => unknown) =>
-      handlers.set(channel, handler),
+    handle: (
+      channel: string,
+      handler: (event: { sender: WebContents }, args: unknown) => unknown
+    ) => handlers.set(channel, handler),
     removeHandler: (channel: string) => handlers.delete(channel)
   }
 }))
@@ -57,10 +59,73 @@ describe('normalizeAgentTerminalTailRequest', () => {
 })
 
 describe('createAgentTerminalTailReader', () => {
-  it('reads every pty in the batch and keeps request order', async () => {
+  it('shows a worker brief without its dispatch capability, in text and in colour', async () => {
+    const capability = `dcap_${'E'.repeat(43)}`
+    const line = `orca orchestration send --dispatch-capability ${capability} --type heartbeat`
+    const read = createAgentTerminalTailReader({
+      readTerminalVisibleLines: async () => [line, `--dispatch-capability=${capability}`],
+      readTerminalVisibleSegments: async () => [
+        [
+          { text: line.slice(0, 50), color: 'cyan', bold: false, dim: false },
+          { text: line.slice(50), color: 'default', bold: false, dim: false }
+        ]
+      ]
+    })
+    const [reading] = await read(['a'], 4)
+    expect(reading.tail).toEqual({
+      read: true,
+      lines: [
+        'orca orchestration send --dispatch-capability [redacted] --type heartbeat',
+        '--dispatch-capability=[redacted]'
+      ],
+      segments: [
+        [
+          {
+            text: 'orca orchestration send --dispatch-capability [redacted] --type heartbeat',
+            color: 'cyan',
+            bold: false,
+            dim: false
+          }
+        ]
+      ]
+    })
+  })
+
+  it('hides a tail whose head wrapped on a row above the ones it shows', async () => {
+    const capability = `dcap_${'K'.repeat(43)}`
+    const screen = [
+      'x'.repeat(60),
+      `  ⎿  send --dispatch-capability ${capability.slice(0, 20)}`,
+      `     ${capability.slice(20)} --type heartbeat`,
+      '✻ Working…'
+    ]
     const read = createAgentTerminalTailReader(
-      runtimeReading(async (ptyId) => [`${ptyId} line`])
+      runtimeReading(async (_ptyId, limit) => screen.slice(-limit))
     )
+    const [reading] = await read(['a'], 2)
+    expect(reading.tail).toEqual({
+      read: true,
+      lines: ['      --type heartbeat', '✻ Working…']
+    })
+  })
+
+  it('hides a Claude OAuth token that printenv wrapped across rows (ORCA-1039)', async () => {
+    const token = `sk-ant-oat01-${'QXJZ'.repeat(24)}`.slice(0, 108)
+    const line = `CLAUDE_CODE_OAUTH_TOKEN=${token}`
+    const screen = ['$ printenv', ...(line.match(/.{1,40}/g) ?? []), 'SHELL=/bin/zsh']
+    const read = createAgentTerminalTailReader(
+      runtimeReading(async (_ptyId, limit) => screen.slice(-limit))
+    )
+    const [reading] = await read(['a'], 8)
+    // Why `=/bin/zsh`: a row cannot tell a newline from a wrap, so the next row's first word goes too.
+    expect(reading.tail).toEqual({
+      read: true,
+      lines: ['$ printenv', 'CLAUDE_CODE_OAUTH_TOKEN=[redacted]', '', '', '', '=/bin/zsh']
+    })
+  })
+
+  it('reads every pty in the batch and keeps request order', async () => {
+    const read = createAgentTerminalTailReader(runtimeReading(async (ptyId) => [`${ptyId} line`]))
     await expect(read(['a', 'b'], 4)).resolves.toEqual([
       { ptyId: 'a', tail: { read: true, lines: ['a line'] } },
       { ptyId: 'b', tail: { read: true, lines: ['b line'] } }

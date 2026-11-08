@@ -28,7 +28,11 @@ export type GameAgentRow = Pick<
   | 'toolName'
   | 'lastActivityAt'
   | 'orphaned'
-> & { parentPaneKey?: string | null; stateStartedAt?: number }
+> &
+  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed'>> & {
+    parentPaneKey?: string | null
+    stateStartedAt?: number
+  }
 
 /** The account a member's agent runs on, read from its live pane and its worktree's pin. */
 export type GameMemberAccountOf = (member: {
@@ -113,7 +117,7 @@ export async function gameFleetOf(args: {
   accountOf?: GameMemberAccountOf
   globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
-  /** What a member pane's own Jev last reported; read only for members. */
+  /** What a pane's own Jev last reported; read only for the lead and members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** The model and effort Orca dispatched a member on; read only for members. */
   launchOf?: (paneKey: string) => GameMemberLaunch | null
@@ -181,7 +185,8 @@ export async function gameFleetOf(args: {
               })
             )
           : null
-      const advisor = isMember ? (args.advisorOf?.(row.paneKey) ?? null) : null
+      const advisor =
+        isMember || row.paneKey === leaderPaneKey ? (args.advisorOf?.(row.paneKey) ?? null) : null
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,
@@ -200,9 +205,36 @@ export async function gameFleetOf(args: {
         ...(advisor ? { advisor } : {}),
         ...(launch ? { launch } : {}),
         ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
-        ...(isMember && row.stateStartedAt ? { stateSince: row.stateStartedAt } : {}),
+        ...(isMember && row.stateStartedAt && !row.restoredUnconfirmed
+          ? { stateSince: row.stateStartedAt }
+          : {}),
         ...(isMember && row.orphaned ? { orphaned: true as const } : {})
       }
     })
   )
+}
+
+/**
+ * The lead's pane as an idle leader when it has no agent row. Why idle: any prompt fires a hook, so a
+ * pane that reported nothing since it started has done no work (ORCA-1130).
+ */
+export function withIdleLeader(
+  agents: GameAgent[],
+  leaderPaneKey: string | null,
+  terminalHandleOf: ((paneKey: string) => string | null) | undefined
+): GameAgent[] {
+  if (!leaderPaneKey || agents.some((one) => one.paneKey === leaderPaneKey)) {
+    return agents
+  }
+  const terminalHandle = terminalHandleOf?.(leaderPaneKey) ?? null
+  const leader: GameAgent = {
+    paneKey: leaderPaneKey,
+    displayName: null,
+    agentType: null,
+    state: 'idle',
+    toolName: null,
+    isLeader: true,
+    ...(terminalHandle ? { terminalHandle } : {})
+  }
+  return [leader, ...agents]
 }

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import {
   getMostUrgentPromptCacheStartedAt,
-  getPromptCacheCountdownForPane
+  getPromptCacheCountdownForPane,
+  getPromptCacheCountdownTone
 } from './prompt-cache-timer-selection'
 
 const LEAF_A = '11111111-1111-4111-8111-111111111111'
@@ -65,5 +66,17 @@ describe('getPromptCacheCountdownForPane', () => {
     const paneKey = makePaneKey('tab-1', LEAF_A)
 
     expect(getPromptCacheCountdownForPane(paneKey, { [paneKey]: 300 }, 0)).toBeNull()
+  })
+})
+
+describe('getPromptCacheCountdownTone', () => {
+  it('stays idle while more than a minute is left', () => {
+    expect(getPromptCacheCountdownTone(61_000)).toBe('idle')
+  })
+
+  it('warns in the last minute and marks the expired cache as needing attention', () => {
+    expect(getPromptCacheCountdownTone(60_000)).toBe('warning')
+    expect(getPromptCacheCountdownTone(1)).toBe('warning')
+    expect(getPromptCacheCountdownTone(0)).toBe('attention')
   })
 })

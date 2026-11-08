@@ -66,6 +66,22 @@ describe('gameAgentOf', () => {
       isLeader: true
     })
   })
+  it("keeps a short, clean preview of the member's tool input, and none when it has none", () => {
+    const row = {
+      paneKey: 'tab:leaf',
+      state: 'working' as const,
+      agentType: 'claude' as const,
+      displayName: 'Arthur',
+      taskTitle: null,
+      toolName: 'Bash'
+    }
+    expect(gameAgentOf({ ...row, toolInput: 'gh pr checks 912\u001b[31m' }, null).toolInput).toBe(
+      'gh pr checks 912'
+    )
+    expect(gameAgentOf({ ...row, toolInput: 'x'.repeat(500) }, null).toolInput).toHaveLength(200)
+    expect(gameAgentOf({ ...row, toolInput: null }, null)).not.toHaveProperty('toolInput')
+    expect(gameAgentOf({ ...row, toolInput: '  ' }, null)).not.toHaveProperty('toolInput')
+  })
 })
 
 describe('gameReviewOf', () => {

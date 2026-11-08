@@ -1,3 +1,4 @@
+import { redactDispatchCapability } from '../../shared/dispatch-capability-redaction'
 import type { NotificationDispatchRequest } from '../../shared/notification-settings-types'
 import { translateMain } from '../i18n/main-i18n'
 
@@ -22,12 +23,21 @@ const AGENT_TYPE_LABELS: Readonly<Record<string, string>> = {
   hermes: 'Hermes'
 }
 
-export function buildNotificationOptions(args: NotificationDispatchRequest): {
-  title: string
-  body: string
-  silent?: boolean
-  sound?: string
-} {
+type NotificationOptions = { title: string; body: string; silent?: boolean; sound?: string }
+
+/** Desktop and mobile both send what this returns, so the capability redaction lives here once. */
+export function buildNotificationOptions(args: NotificationDispatchRequest): NotificationOptions {
+  const options = buildUnredactedNotificationOptions(args)
+  return {
+    ...options,
+    title: redactDispatchCapability(options.title),
+    body: redactDispatchCapability(options.body)
+  }
+}
+
+function buildUnredactedNotificationOptions(
+  args: NotificationDispatchRequest
+): NotificationOptions {
   if (args.source === 'terminal-bell') {
     return {
       title: translateMain('agentNotification.bellTitle', 'Bell in {{workspace}}', {
@@ -80,6 +90,18 @@ function buildAgentTaskCompleteNotificationOptions(
 
   const agentLabel = formatNotificationAgentLabel(args.agentType)
   const worktreeContext = formatNotificationWorktreeContext(args)
+  // Why: the click opens the Inbox on this question, so the alert says it, never the tool's name.
+  if (args.agentQuestion !== undefined) {
+    return {
+      title: translateMain('agentQuestionNotification.title', '{{context}} - {{agent}} asks you', {
+        context: worktreeContext,
+        agent: agentLabel
+      }),
+      body:
+        normalizeNotificationText(args.agentQuestion, NOTIFICATION_BODY_PREVIEW_MAX_LENGTH) ||
+        translateMain('agentQuestionNotification.body', 'Open the Inbox to answer.')
+    }
+  }
   const status =
     args.agentState === 'blocked' || args.agentState === 'waiting'
       ? { key: 'needsInput', fallback: '{{agent}} needs input' }

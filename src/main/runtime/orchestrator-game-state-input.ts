@@ -23,6 +23,7 @@ import type {
 } from '../../shared/orchestrator-game-project-work'
 import type { GlobalSettings } from '../../shared/types'
 import type { GameMerge } from '../../shared/orchestrator-game-events'
+import type { GameArcadeCredits } from '../../shared/orchestrator-game-arcade-credits'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
@@ -52,6 +53,8 @@ export type OrchestratorGameStateInput = {
     branch: string
     displayName: string
     linkedWorkItem: WorkspaceLinkedItem | null | undefined
+    /** A folder with no git: members run in it, not in worktrees of their own. */
+    folder?: boolean
   } | null
   agents: GameAgentRow[]
   /** Sessions the lead launched in other worktrees; its own worktree's come in `agents`. */
@@ -59,6 +62,8 @@ export type OrchestratorGameStateInput = {
   /** Every other session on this machine; read only for a lead (ORCA-914). */
   found?: { row: GameAgentRow; worktree: GameMemberWorktree }[]
   leaderPaneKey: string | null
+  /** True when the leader's pane has no agent row on this host, so it has reported nothing yet. */
+  leaderUnreported?: boolean
   /** The calling pane's own launcher; set when a lead started it through orchestration. */
   callerParentPaneKey?: string | null
   /** The pane says it was launched as a member; its lead may be on another host, with no parent here. */
@@ -94,6 +99,8 @@ export type OrchestratorGameStateInput = {
   readOpenOwnerQuestions?: () => Promise<number>
   /** The members' latest recorded merges; read only for a lead. */
   readMerges?: () => Promise<GameMerge[]>
+  /** The project's saved arcade plays; read only for a lead. */
+  readArcade?: () => Promise<GameArcadeCredits | null>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */

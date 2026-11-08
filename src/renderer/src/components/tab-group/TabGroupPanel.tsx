@@ -227,7 +227,7 @@ export default function TabGroupPanel({
       {/* Why: each split group needs its own tab row because multiple groups can show at once but the titlebar has only one shared center slot. */}
       {/* Why: macOS hiddenInset titleBarStyle makes -webkit-app-region: drag the only way to move the window from this tab row. */}
       <div
-        className="h-[32px] shrink-0 border-b border-border bg-card"
+        className="@container/tab-strip h-[32px] shrink-0 border-b border-border bg-card"
         data-tab-group-strip-id={groupId}
         data-terminal-focus-release-surface="true"
         data-worktree-id={worktreeId}
@@ -246,8 +246,9 @@ export default function TabGroupPanel({
             />
           ) : null}
           <div className="min-w-0 flex-1 h-full">{tabBar}</div>
+          {/* Why hidden: beside a 280 px sidebar at 320 the strip is 40 px, all of it the toggle's. */}
           <div
-            className="ml-1.5 flex shrink-0 items-center gap-0.5"
+            className="ml-1.5 flex shrink-0 items-center gap-0.5 @max-[96px]/tab-strip:hidden"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <div className={focusedActionChromeClassName}>

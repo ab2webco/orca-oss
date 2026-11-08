@@ -197,3 +197,32 @@ export const moveSection = (
   ;[order[at], order[to]] = [order[to] as PanelSection, section]
   return { ...layout, order }
 }
+
+const projectEntryOf = (stored: unknown, project: string): StoredObject | null => {
+  const projects = storeOf(stored)?.projects
+  return isRecord(projects) && isRecord(projects[project]) ? projects[project] : null
+}
+
+/** True while a project that hid My PRs here has not told the native panel, whose PRs tab it is. */
+export const owesHiddenPrsTab = (stored: unknown, project: string): boolean => {
+  const entry = projectEntryOf(stored, project)
+  return (
+    entry !== null &&
+    entry.tabsMigrated !== true &&
+    !fleetLayoutOf(stored, project).shown.includes('reviews')
+  )
+}
+
+/** The store with the project marked, so a person who shows the tab again keeps it; null if newer. */
+export const withTabsMigrated = (stored: unknown, project: string): StoredObject | null => {
+  const store = storeOf(stored)
+  const entry = projectEntryOf(stored, project)
+  if (store === null || entry === null) {
+    return null
+  }
+  const projects = {
+    ...(store.projects as StoredObject),
+    [project]: { ...entry, tabsMigrated: true }
+  }
+  return { ...store, version: PANEL_LAYOUT_VERSION, projects }
+}
