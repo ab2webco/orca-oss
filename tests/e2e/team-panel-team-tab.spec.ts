@@ -309,6 +309,10 @@ test('the Team tab shows the live lead and its members from the lead game state'
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
+      // Display adds its metrics carousel above the tabs; Plain draws none.
+      await expect(panel.locator('[aria-roledescription="carousel"]')).toHaveCount(
+        look === 'display' ? 1 : 0
+      )
       await expect(leadCard).not.toContainText(leadName)
       // ORCA-1094 row 5: as V28 draws Plain and Display, members sit indented under the lead with
       // their status in a column of its own, left of the text, not inline under the ticket.
