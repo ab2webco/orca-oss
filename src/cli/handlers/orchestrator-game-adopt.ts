@@ -226,7 +226,7 @@ async function adoptAgent(
     }
   )
   return {
-    name,
+    name: title,
     adopted: started.result.state === 'ready',
     ...(seat.host ? { host: seat.host } : {}),
     terminal: seat.terminal,

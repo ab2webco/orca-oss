@@ -284,6 +284,8 @@ describe('orca game adopt (ORCA-943)', () => {
         ['orchestration.taskCreate', expect.objectContaining({ taskTitle: 'main 3' })],
         ['orchestration.workerStart', expect.objectContaining({ displayName: 'main 3' })]
       ])
+      // Why: the live check's second adopt printed main while the fleet said main 2.
+      expect(output()).toMatchObject({ name: 'main 3', adopted: true })
     })
 
     it("adopts a found agent that shares an adopted member's name, under a name of its own", async () => {
