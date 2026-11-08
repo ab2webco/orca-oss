@@ -267,6 +267,7 @@ describe('Team model Inbox count', () => {
     const model = {
       kind: 'team',
       lead: LEAD,
+      members: [],
       inbox: { kind: 'ready', value: { forYou: 1, waiting: 0, threads: 2, answered: 0 } }
     } as unknown as TeamPanelGameModel
     await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
@@ -304,6 +305,7 @@ describe("Team model Inbox count with the lead's own question (ORCA-1129 D4)", (
       kind: 'team',
       projectName: 'orca-oss',
       lead: { paneKey: 'tab-lead:leaf-lead', host: { kind: 'local' }, name: 'Run home' },
+      members: [],
       inbox: { kind: 'ready', value: { forYou: 0, waiting: 0, threads: 0, answered: 0 } }
     } as unknown as TeamPanelGameModel
     await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
@@ -312,6 +314,45 @@ describe("Team model Inbox count with the lead's own question (ORCA-1129 D4)", (
     expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
       kind: 'ready',
       value: { forYou: 1, waiting: 0, threads: 0, answered: 0 }
+    })
+  })
+})
+
+describe("Team model Inbox count with a member's own question (ORCA-1141 N1)", () => {
+  it("counts a member's live AskUserQuestion in For you, beside the lead's", async () => {
+    const asking = (paneKey: string) => ({
+      state: 'waiting',
+      paneKey,
+      toolName: 'AskUserQuestion',
+      interactivePrompt: JSON.stringify({
+        questions: [{ question: 'Rebase now?', options: [{ label: 'Yes' }] }]
+      })
+    })
+    appState = {
+      ...baseState(),
+      agentStatusByPaneKey: {
+        'tab-lead:leaf-lead': asking('tab-lead:leaf-lead'),
+        'tab-m:leaf-m': asking('tab-m:leaf-m')
+      }
+    }
+    let seen: TeamPanelModelSource | null = null
+    await mount(() => {
+      seen = useTeamPanelModel()
+      return null
+    })
+    const model = {
+      kind: 'team',
+      projectName: 'orca-oss',
+      lead: LEAD,
+      members: [{ paneKey: 'tab-m:leaf-m', host: { kind: 'local' }, name: 'Peach' }],
+      inbox: { kind: 'ready', value: { forYou: 0, waiting: 0, threads: 0, answered: 0 } }
+    } as unknown as TeamPanelGameModel
+    await act(async () => publish({ section: { kind: 'ready', value: model }, retry: null }))
+
+    const section = (seen as TeamPanelModelSource | null)?.section
+    expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
+      kind: 'ready',
+      value: { forYou: 2, waiting: 0, threads: 0, answered: 0 }
     })
   })
 })
