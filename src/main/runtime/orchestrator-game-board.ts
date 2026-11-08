@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { ticketInText } from '../../shared/orchestrator-game-ticket-id'
 import type { GameHistoryStore } from './orchestrator-game-history-store'
 import type { GameStopSwitch } from './orchestrator-game-stop-switch'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
@@ -111,7 +112,8 @@ export class GameBoard {
       throw new Error('This project has no live lead to answer its members through.')
     }
     const reply = this.deps.replyToMember(project.lead, { id: args.id, text: args.text })
-    const ticket = args.ticket?.trim().toUpperCase() || null
+    // Why as written when not a ticket: a member with none is keyed by its name.
+    const ticket = ticketInText(args.ticket) ?? (args.ticket?.trim() || null)
     const delivered = this.deps.tellLead(
       project.lead,
       ownerMemberReplyNote({ id: args.id, ticket, text: args.text, reply })
@@ -150,7 +152,10 @@ export class GameBoard {
     if (!key) {
       throw new Error('This member has no ticket, so it has no game inbox.')
     }
-    const found = (await this.inboxesOf(project)).find((one) => one.key === key)
+    // Why case-blind: the CLI upper-cases --ticket, and a member with no ticket is keyed by its name.
+    const found = (await this.inboxesOf(project)).find(
+      (one) => one.key.toUpperCase() === key.toUpperCase()
+    )
     const inbox = found ?? { key, unread: 0, messages: [], waiting: [], newest: 0 }
     if (args.markRead && inbox.newest > 0) {
       await this.deps.store.markInboxRead(project.key, key, inbox.newest)

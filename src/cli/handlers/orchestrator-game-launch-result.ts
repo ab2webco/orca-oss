@@ -24,6 +24,8 @@ export type GameLaunchResult = GameGlobalLoginLaunch & {
   lastError?: string
   /** workerStart's effects; a `lineage_unresolved` one says why the member is not under the lead. */
   effects?: { action?: string; warning?: string }[]
+  /** The lead's folder the member runs in, which has no git for a worktree of its own. */
+  folder?: string
 }
 
 export const formatGameLaunch = (launched: GameLaunchResult): string => {
@@ -36,8 +38,13 @@ export const formatGameLaunch = (launched: GameLaunchResult): string => {
   const what = launched.setupQueue
     ? formatSetupQueue(launched.setupQueue, who)
     : `member ${launched.dispatchId} [${launched.state}] ${who}`
-  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.accountWhy ? `\n${launched.accountWhy}` : ''}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}${unnestedNoteOf(launched)}`
+  return `${launched.ticket}${launched.name ? ` (${launched.name})` : ''}: ${what}${launched.accountWhy ? `\n${launched.accountWhy}` : ''}${launched.globalLogin ? `\n${gameGlobalLoginNoteOf(launched)}` : ''}${launched.lastError ? `\n${launched.lastError}` : ''}${unnestedNoteOf(launched)}${folderNoteOf(launched)}`
 }
+
+const folderNoteOf = (launched: GameLaunchResult): string =>
+  launched.folder
+    ? `\nRuns in the folder ${launched.folder}: a folder without git has no worktree per member.`
+    : ''
 
 const unnestedNoteOf = (launched: GameLaunchResult): string => {
   const warning = launched.effects?.find((one) => one.action === 'lineage_unresolved')?.warning

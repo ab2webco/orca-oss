@@ -91,6 +91,20 @@ for that spec (`ORCA_E2E_SHOW_INACTIVE=1`: shown inactive, not focusable, ignori
 ceiling did not change. **A cluster that the instrument's own step cannot explain is a step
 somewhere else in the system — trace the measured path before you call it contention.**
 
+### 5. A liveness wait judged by the clock instead of by the product's own steps
+
+`src/main/native-chat/transcript-watch-liveness.test.ts` waited 2 s for a 20 ms reconciliation
+poll to deliver an append (ORCA-1122). It went red once in CI at 2050 ms. The other six tests in
+the same worker ran at local speed (32–463 ms), and 1300 local samples, idle and under a full
+`src/main` run, all delivered in 8–34 ms within 2 drains. A 2.1 s stall injected into the worker
+right after the append reproduced the exact CI error 5/5: when the worker resumes, the wait's timer
+fires and throws before the poll's stat ever comes back.
+
+The product step is countable: while unbound, every drain ends with a failed `fs.watch` bind. The
+second drain counted after the append must have read it. So the wait now fails at 2 drains without
+delivery, which a mutated poll trips in ~60 ms, and keeps a 15 s clock only as a hang detector.
+**When the product exposes its own step, bound the wait in steps, not in milliseconds.**
+
 ## Two subclasses, and you must tell them apart first
 
 |  | Quantized | Contended |

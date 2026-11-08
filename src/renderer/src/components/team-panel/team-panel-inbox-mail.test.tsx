@@ -96,6 +96,7 @@ function renderSheet(
     <TeamInboxView
       projectName="orca-oss"
       projectUnread={null}
+      answerAgentOf={() => null}
       questions={[]}
       undelivered={undelivered}
       onAnswer={async () => {}}

@@ -230,3 +230,36 @@ describe('PluginSettingsRow declared settings', () => {
     unmount()
   })
 })
+
+describe('PluginSettingsRow on a dev build with a linked vault (ORCA-1131)', () => {
+  it('says why the plugin did not start instead of reporting a crash', async () => {
+    const { container, unmount } = await renderRow({
+      ...configurable,
+      status: 'errored',
+      error: 'Not started: linked vault',
+      needsSetup: false,
+      settings: undefined,
+      blockedByDevSharedVault: true
+    })
+
+    expect(container.textContent).toContain('ORCA_DEV_SHARED_VAULT_PLUGINS=1')
+    expect(container.textContent).toContain('Blocked')
+    expect(container.textContent).not.toContain('The plugin stopped after an activation')
+    unmount()
+  })
+
+  it('disables the toggle of a row that cannot start, as the kill list does', async () => {
+    const { container, unmount } = await renderRow({
+      ...configurable,
+      status: 'errored',
+      needsSetup: false,
+      settings: undefined,
+      blockedByDevSharedVault: true
+    })
+
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="Disable Webhook"]')?.disabled
+    ).toBe(true)
+    unmount()
+  })
+})
