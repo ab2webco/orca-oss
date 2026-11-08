@@ -100,7 +100,8 @@ export function TeamMemberCardRow({
           </span>
         )}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
+          {/* Why wrap: short of room, the host and then the ticket move below before the name is cut. */}
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 whitespace-nowrap">
             {showName ? (
               <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
                 {card.name}
