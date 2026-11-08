@@ -456,7 +456,8 @@ and swaps the station prop.
   only; no absolute path, no `..`, no link out of the scene's folder.
 - **`layers`.** 1 to 8, back to front. Each covers the stage from its bottom edge, so keep what
   matters low and centered: the stage is 176 px tall and as wide as the panel, from 320 px up.
-  `front: true` draws over the characters.
+  `front: true` draws over the characters. `drift` (CSS px a second, -60 to 60) scrolls a layer
+  across the stage and wraps it, for clouds: keep it transparent around what moves.
 - **`roles`.** `lead` and `member` are required; `advisor` is optional and wears the member art.
 - **`sheets`.** 1 to 16 images with the same layout. Each is one look, and a member keeps the look
   its persistent character picks, so eight members can differ.
@@ -475,6 +476,9 @@ and swaps the station prop.
   is in the file, so a seated member faces the way the sheet does. `props.stationFeet`
   (`{ "x", "y" }` in the prop's pixels) is where it meets the floor, the point placed on the seat;
   without it, the bottom center. Draw a seated `work` with the hips at the chair's seat height.
+  `props.stationScreen` (`{ "x", "y", "width", "height" }` in the prop's pixels) is a screen the
+  panel lights as V28 does: scrolling code while its worker works, amber on a question, green
+  once done, dark otherwise.
 - **Limits.** Each file at most 2 MB; each style at most 8 MB and 16 megapixels in total, which is
   what it costs in memory however well the files compress.
 

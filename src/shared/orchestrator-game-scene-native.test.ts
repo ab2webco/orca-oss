@@ -179,6 +179,14 @@ describe('the native art block', () => {
     ).toHaveLength(2)
   })
 
+  it('lets a layer drift across the stage, within a sane speed', () => {
+    const drifting = (drift: number) => ({
+      figures: { ...native().figures, layers: [{ src: 'art/sky.png', drift }] }
+    })
+    expect(parsedNative(drifting(6)).figures?.layers[0]?.drift).toBe(6)
+    expect(orchestratorGameSceneNativeOf({ native: drifting(500) }).issues).toHaveLength(1)
+  })
+
   it('names each file once, canonical and relative to the scene', () => {
     const parsed = parsedNative({
       figures: {
