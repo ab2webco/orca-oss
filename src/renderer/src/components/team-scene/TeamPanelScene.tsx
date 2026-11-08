@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
@@ -7,6 +7,7 @@ import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { useTeamScenePainter } from './use-team-scene-painter'
 import { TeamScenePainterContext } from './team-scene-painter-context'
+import { TeamSceneLeadLineContext } from './team-scene-lead-line-context'
 import { useAppStore } from '@/store'
 import { teamLeadQuestionOf } from '../team-panel/team-panel-inbox-agents'
 
@@ -27,16 +28,27 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
   const lead = question
     ? { ...model.lead, liveAction: { kind: 'question' as const, text: question, options: [] } }
     : model.lead
+  const leadLine = teamSceneLeadLineOf(lead)
+  // Why: like the advisor's, a lead's line with no room for its bubble shows in its card (ORCA-1139).
+  const [leadUnplaced, setLeadUnplaced] = useState(false)
+  const onUnplaced = useCallback((keys: string[]) => setLeadUnplaced(keys.includes('lead')), [])
   return (
     <TeamScenePainterContext.Provider value={painter}>
-      <div className="shrink-0 border-b border-border" data-team-scene={drawn}>
-        {painter ? (
-          <TeamSceneCanvas input={input} painter={painter} leadLine={teamSceneLeadLineOf(lead)} />
-        ) : (
-          <div style={{ height: TEAM_SCENE_ART_HEIGHT }} />
-        )}
-      </div>
-      {children}
+      <TeamSceneLeadLineContext.Provider value={painter && leadUnplaced ? leadLine : null}>
+        <div className="shrink-0 border-b border-border" data-team-scene={drawn}>
+          {painter ? (
+            <TeamSceneCanvas
+              input={input}
+              painter={painter}
+              leadLine={leadLine}
+              onUnplaced={onUnplaced}
+            />
+          ) : (
+            <div style={{ height: TEAM_SCENE_ART_HEIGHT }} />
+          )}
+        </div>
+        {children}
+      </TeamSceneLeadLineContext.Provider>
     </TeamScenePainterContext.Provider>
   )
 }

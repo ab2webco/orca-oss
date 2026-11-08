@@ -15,6 +15,8 @@ export type LegacyWorkerTerminalRecoveryCandidate = {
   processIncarnation: string
   ptyId: string
   incarnationId: PtyIncarnationId
+  /** Orca created its terminal; an adopted agent's tab is the user's and outlives the dispatch. */
+  terminalOwned: boolean
 }
 
 export type LegacyWorkerTerminalRecoveryPlan = {
@@ -93,7 +95,8 @@ export function planLegacyWorkerTerminalRecovery(
       leafId: pane.leafId,
       processIncarnation,
       ptyId: process.ptyId,
-      incarnationId: process.incarnationId
+      incarnationId: process.incarnationId,
+      terminalOwned: (row.terminal_ownership ?? 'owned') === 'owned'
     })
   }
 

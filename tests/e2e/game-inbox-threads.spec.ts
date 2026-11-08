@@ -5,6 +5,7 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { expectPlaceholdersFit } from './helpers/placeholder-fit'
 import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
+import { waitForRuntimeWorktree } from './helpers/game-cycle-contract'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -67,6 +68,7 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
       })
       .toBe(true)
 
+    await waitForRuntimeWorktree(client, worktreeId)
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
       objective: 'Inbox threads',
       from: lead

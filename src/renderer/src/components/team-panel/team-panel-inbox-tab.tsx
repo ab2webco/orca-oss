@@ -66,7 +66,7 @@ export type TeamInboxViewProps = {
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
   onReply: (reply: GameMemberReply) => Promise<void>
-  /** Sessions blocked on a question, read from agent status when there is no team. */
+  /** Sessions blocked on a question, read from agent status: a team's lead and members, or every solo one. */
   agentQuestions: TeamInboxAgentQuestion[]
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
@@ -80,6 +80,7 @@ export type TeamInboxViewProps = {
 /** The full questions live only here: For you across projects and hosts, then the lead's mail. */
 export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const { questions, otherGroups, threads, onReply, agentQuestions, answeredQuestions } = props
+  const teamAsks = agentQuestions.filter((question) => question.asker !== undefined)
   const [tab, setTab] = React.useState<InboxSubTab>('for-you')
   const forYou =
     agentQuestions.length +
@@ -108,6 +109,14 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
+  const agentCard = (question: TeamInboxAgentQuestion): React.JSX.Element => (
+    <TeamInboxAgentCard
+      key={question.paneKey}
+      question={question}
+      onOpen={props.onOpenAgent}
+      onAnswer={props.answerAgentOf(question)}
+    />
+  )
   const nothing = subTabs.every(([, , , count]) => count === 0) && props.undelivered.length === 0
   const empty = nothing && !props.projectUnread
   // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
@@ -169,20 +178,16 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             ) : null}
           </div>
         ) : null}
-        {agentQuestions.map((question) => (
-          <TeamInboxAgentCard
-            key={question.paneKey}
-            question={question}
-            onOpen={props.onOpenAgent}
-            onAnswer={props.answerAgentOf(question)}
-          />
-        ))}
-        {questions.length > 0 ? (
+        {agentQuestions.flatMap((question) =>
+          question.asker === undefined ? [agentCard(question)] : []
+        )}
+        {teamAsks.length + questions.length > 0 ? (
           <section className="space-y-2" data-team-inbox-project="active">
             <GroupLabel
               title={props.projectName}
               place={translate('teamPanel.inbox.thisProject', 'this project')}
             />
+            {teamAsks.map(agentCard)}
             {questions.map((question) => (
               <GameOwnerQuestionCard
                 key={question.id}

@@ -23,6 +23,8 @@ vi.mock('@/store', () => ({
       openTaskPage: vi.fn()
     })
 }))
+// Why: the dock reads the lead pane from the store; its own tests cover it, these cover the tabs.
+vi.mock('./TeamActionDockConnected', () => ({ TeamActionDockConnected: () => null }))
 let global: OrchestratorGameLayer | undefined
 vi.mock('./team-panel-setting-layers', () => ({
   useTeamPanelSettingLayers: () => ({ global, project: undefined, local: undefined })

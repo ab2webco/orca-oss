@@ -6,7 +6,12 @@ export type TeamSceneBubbleRequest = {
   height: number
   /** `end` hangs the bubble to the speaker's left, as the advisor's does, leaving room above the lead. */
   align?: 'center' | 'end'
+  /** Left out when that lets a bubble that does not yield show instead. */
+  yields?: boolean
 }
+
+/** Something on stage a bubble must not cover, such as an asking member's tag. */
+export type TeamSceneRect = { left: number; top: number; width: number; height: number }
 
 export type TeamSceneBubbleBox = {
   key: string
@@ -28,7 +33,7 @@ const END_REACH = 14
 // A cloud narrowed to share a row may wrap one more line, up to its two-line clamp.
 const EXTRA_LINE = 13
 
-const overlaps = (a: TeamSceneBubbleBox, b: TeamSceneBubbleBox): boolean =>
+const overlaps = (a: TeamSceneRect, b: TeamSceneRect): boolean =>
   a.left < b.left + b.width + GAP &&
   b.left < a.left + a.width + GAP &&
   a.top < b.top + b.height + GAP &&
@@ -37,7 +42,7 @@ const overlaps = (a: TeamSceneBubbleBox, b: TeamSceneBubbleBox): boolean =>
 type Placed = { box: TeamSceneBubbleBox; anchorTop: number }
 
 /** Whether `tail`'s line from its bubble down to its speaker passes through `box`. */
-const tailCrosses = (tail: Placed, box: TeamSceneBubbleBox): boolean => {
+const tailCrosses = (tail: Placed, box: TeamSceneRect): boolean => {
   const x = tail.box.left + tail.box.tailX
   const from = tail.box.top + tail.box.height
   return (
@@ -50,55 +55,90 @@ const tailCrosses = (tail: Placed, box: TeamSceneBubbleBox): boolean => {
 
 /**
  * Places bubbles in order, each above its speaker with a tail that lands on it. A later one
- * climbs above the ones already placed; it is left out when no spot keeps every bubble and
- * every tail clear of the others, unless `beside` lets it share a row.
+ * climbs above the ones already placed, and any bubble steps aside or climbs off an obstacle; it
+ * is left out when no spot keeps every bubble and every tail clear, unless `beside` lets it share a row.
  */
 export function layoutTeamSceneBubbles(
   requests: readonly TeamSceneBubbleRequest[],
   scene: { width: number; height: number },
   /** Pixel's cloud: its trail drifts toward the speaker, so a shared row is allowed. */
-  opts: { beside?: boolean } = {}
+  opts: { beside?: boolean; obstacles?: readonly TeamSceneRect[] } = {}
 ): TeamSceneBubbleBox[] {
+  const all = placeBubbles(requests, scene, opts)
+  const firm = requests.filter((r) => !r.yields)
+  if (all.length === requests.length || firm.length === requests.length) {
+    return all
+  }
+  // Why a second pass: placed first, a yielding bubble can take the only room (ORCA-1139).
+  const firmShown = (boxes: TeamSceneBubbleBox[]) =>
+    boxes.filter((box) => firm.some((r) => r.key === box.key)).length
+  const without = placeBubbles(firm, scene, opts)
+  return firmShown(without) > firmShown(all) ? without : all
+}
+
+function placeBubbles(
+  requests: readonly TeamSceneBubbleRequest[],
+  scene: { width: number; height: number },
+  opts: { beside?: boolean; obstacles?: readonly TeamSceneRect[] }
+): TeamSceneBubbleBox[] {
+  const obstacles = opts.obstacles ?? []
   const placed: Placed[] = []
   for (const r of requests) {
     const preferred =
       r.align === 'end' ? r.anchor.x - r.width + END_REACH : r.anchor.x - r.width / 2
-    const left = Math.max(EDGE, Math.min(scene.width - r.width - EDGE, preferred))
-    const tops = [r.anchor.top - r.height - LIFT, ...placed.map((p) => p.box.top - r.height - GAP)]
-    const fit = tops
-      .map(
-        (top): Placed => ({
-          box: {
-            key: r.key,
-            left,
-            top,
-            width: r.width,
-            height: r.height,
-            tailX: r.anchor.x - left
-          },
-          anchorTop: r.anchor.top
-        })
+    const maxLeft = scene.width - r.width - EDGE
+    const left = Math.max(EDGE, Math.min(maxLeft, preferred))
+    const lefts = [
+      left,
+      ...obstacles
+        .flatMap((o) => [o.left + o.width + GAP, o.left - GAP - r.width])
+        .filter((one) => one >= EDGE && one <= maxLeft)
+    ]
+    const tops = [
+      r.anchor.top - r.height - LIFT,
+      ...placed.map((p) => p.box.top - r.height - GAP),
+      ...obstacles.map((o) => o.top - r.height - GAP)
+    ]
+    // Why climbing first: a bubble stepped aside stays low and can block the next one's tail.
+    const fit = lefts
+      .flatMap((at) =>
+        tops.map(
+          (top): Placed => ({
+            box: {
+              key: r.key,
+              left: at,
+              top,
+              width: r.width,
+              height: r.height,
+              tailX: r.anchor.x - at
+            },
+            anchorTop: r.anchor.top
+          })
+        )
       )
       .find(
         (c) =>
           c.box.top >= 0 &&
           c.box.tailX >= TAIL_INSET &&
           c.box.tailX <= r.width - TAIL_INSET &&
-          placed.every(
-            (p) => !overlaps(c.box, p.box) && !tailCrosses(c, p.box) && !tailCrosses(p, c.box)
-          )
+          clearOf(c, placed, obstacles)
       )
     if (fit) {
       placed.push(fit)
       continue
     }
-    const row = opts.beside ? besideOf(placed, r, scene.width) : null
+    const row = opts.beside ? besideOf(placed, r, scene.width, obstacles) : null
     if (row) {
       placed.splice(placed.indexOf(row.moved), 1, row.other, row.added)
     }
   }
   return placed.map((p) => p.box)
 }
+
+const clearOf = (c: Placed, placed: readonly Placed[], obstacles: readonly TeamSceneRect[]) =>
+  placed.every(
+    (p) => !overlaps(c.box, p.box) && !tailCrosses(c, p.box) && !tailCrosses(p, c.box)
+  ) && obstacles.every((o) => !overlaps(c.box, o) && !tailCrosses(c, o))
 
 /**
  * With no room to stack, the newcomer and the last bubble share a row, each as near its
@@ -107,7 +147,8 @@ export function layoutTeamSceneBubbles(
 function besideOf(
   placed: Placed[],
   r: TeamSceneBubbleRequest,
-  width: number
+  width: number,
+  obstacles: readonly TeamSceneRect[]
 ): { moved: Placed; other: Placed; added: Placed } | null {
   const moved = placed.at(-1)
   if (!moved) {
@@ -152,7 +193,7 @@ function besideOf(
   const added = laid.find((one) => one.box.key === r.key)!
   const other = laid.find((one) => one.box.key !== r.key)!
   const rest = placed.filter((p) => p !== moved)
-  const clear = (c: Placed) =>
-    rest.every((p) => !overlaps(c.box, p.box) && !tailCrosses(c, p.box) && !tailCrosses(p, c.box))
-  return clear(added) && clear(other) ? { moved, other, added } : null
+  return clearOf(added, rest, obstacles) && clearOf(other, rest, obstacles)
+    ? { moved, other, added }
+    : null
 }
