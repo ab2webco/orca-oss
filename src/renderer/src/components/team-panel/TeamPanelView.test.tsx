@@ -318,6 +318,28 @@ describe('TeamPanelView scene area', () => {
     expect(scene(container)).not.toBeNull()
   })
 
+  it('draws the metrics carousel instead of the scene in the Display look, and only with a team', async () => {
+    const carousel = (container: HTMLElement): Element | null =>
+      container.querySelector('[aria-roledescription="carousel"]')
+    const display = await render(
+      { section: { kind: 'ready', value: game }, retry: null },
+      vi.fn(),
+      'display'
+    )
+    expect(carousel(display.container)).not.toBeNull()
+    expect(scene(display.container)).toBeNull()
+
+    const plain = await render({ section: { kind: 'ready', value: game }, retry: null })
+    expect(carousel(plain.container)).toBeNull()
+
+    const noTeam = await render(
+      { section: { kind: 'ready', value: solo }, retry: null },
+      vi.fn(),
+      'display'
+    )
+    expect(carousel(noTeam.container)).toBeNull()
+  })
+
   // ORCA-1094 row 2: V28 draws the level under the project name, above the tabs, on every tab.
   it('heads the Game look with the level and XP under the project name', async () => {
     const leveled = { ...game, xp: { level: 3, into: 50, need: 300 } }

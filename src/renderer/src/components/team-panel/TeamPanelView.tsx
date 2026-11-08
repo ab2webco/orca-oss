@@ -20,6 +20,7 @@ import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
 import { TeamXpRow } from './TeamXpRow'
 import { TeamPanelScene } from '../team-scene/TeamPanelScene'
+import { TeamDisplayCarousel } from './TeamDisplayCarousel'
 import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
 /** With a team the gear opens the project; without one, the global Panel settings. */
@@ -196,7 +197,12 @@ export function TeamPanelView({
           {body}
         </TeamPanelScene>
       ) : (
-        body
+        <>
+          {model?.kind === 'team' && look === 'display' ? (
+            <TeamDisplayCarousel model={model} />
+          ) : null}
+          {body}
+        </>
       )}
     </div>
   )
