@@ -194,6 +194,7 @@ describe("The lead's own question in its team Inbox (ORCA-1129 D4)", () => {
         host: { kind: 'local' },
         repoName: 'orca-oss',
         worktreeName: 'Run home',
+        asker: 'Run home',
         text: 'Merge #923 now?',
         options: ['Now', 'Wait']
       }
@@ -229,6 +230,73 @@ describe("The lead's own question in its team Inbox (ORCA-1129 D4)", () => {
     } as never
 
     expect(teamLeadQuestionOf(team(remoteLead), state)?.paneKey).toBe(`tab-mirror:${LEAF}`)
+  })
+})
+
+// Why (ORCA-1141 N1): the card said "Answer in Inbox" while For you listed only the lead.
+describe("A member's own question in its team Inbox", () => {
+  const member = {
+    paneKey: 'tab-m:leaf-m',
+    terminalHandle: 'term_m',
+    worktreeId: 'wt-m',
+    host: { kind: 'local' },
+    name: 'Peach'
+  }
+  const withMembers = (members: unknown[]): TeamPanelGameModel =>
+    ({ ...team(lead()), members }) as unknown as TeamPanelGameModel
+
+  it("lists a member's AskUserQuestion after the lead's, under the member's name", () => {
+    const state = {
+      ...noTabs,
+      agentStatusByPaneKey: {
+        'tab-lead:leaf-lead': asking('tab-lead:leaf-lead'),
+        'tab-m:leaf-m': asking('tab-m:leaf-m')
+      }
+    }
+
+    const shown = teamInboxAgentQuestionsOf(withMembers([member]), state)
+
+    expect(shown.map((one) => [one.paneKey, one.worktreeName])).toEqual([
+      ['tab-lead:leaf-lead', 'Run home'],
+      ['tab-m:leaf-m', 'Peach']
+    ])
+    expect(shown[1]).toMatchObject({ terminalHandle: 'term_m', options: ['Now', 'Wait'] })
+  })
+
+  // Why (ORCA-1141): V28's Needs-you card names who asks by its ticket; one with none by its name.
+  it('names each asker by its ticket, else its name', () => {
+    const state = {
+      ...noTabs,
+      agentStatusByPaneKey: {
+        'tab-m:leaf-m': asking('tab-m:leaf-m'),
+        'tab-a:leaf-a': asking('tab-a:leaf-a')
+      }
+    }
+    const ticketed = { ...member, ticket: { identifier: 'ORCA-12' } }
+    const adopted = { ...member, paneKey: 'tab-a:leaf-a', name: 'main 2', ticket: null }
+
+    const shown = teamInboxAgentQuestionsOf(withMembers([ticketed, adopted]), state)
+
+    expect(shown.map((one) => one.asker)).toEqual(['ORCA-12', 'main 2'])
+  })
+
+  it("finds a paired host's member under the tab this window mirrors it in", () => {
+    const remote = {
+      ...member,
+      host: { kind: 'remote', name: 'mini', environmentId: 'env-1', reachable: true }
+    }
+    const state = {
+      tabsByWorktree: { 'wt-mirror': [{ id: 'tab-mirror' }] },
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {
+        'tab-mirror': { ptyIdsByLeafId: { [LEAF]: toRemoteRuntimePtyId('term_m', 'env-1') } }
+      },
+      agentStatusByPaneKey: { [`tab-mirror:${LEAF}`]: asking(`tab-mirror:${LEAF}`) }
+    } as never
+
+    expect(teamInboxAgentQuestionsOf(withMembers([remote]), state)).toEqual([
+      expect.objectContaining({ paneKey: `tab-mirror:${LEAF}`, worktreeName: 'Peach' })
+    ])
   })
 })
 

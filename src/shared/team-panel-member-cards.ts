@@ -213,7 +213,8 @@ function memberCardOf(
   return {
     paneKey: agent.paneKey,
     terminalHandle: agent.terminalHandle ?? null,
-    worktreeId: agent.worktree?.id ?? null,
+    // Why: game.state omits a local member's worktree when it is the lead's.
+    worktreeId: agent.worktree?.id ?? (agent.remote ? null : (state.worktree?.id ?? null)),
     host: hostOf(agent),
     name: memberNameOf(shown) ?? shown,
     agentType: agent.agentType,
