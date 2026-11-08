@@ -9,9 +9,11 @@ import { useTeamLeadPrompt } from './use-team-lead-prompt'
 
 /** The dock fed by the lead's pane: its hook status ends a run and carries the reply. */
 export function TeamActionDockConnected({
-  model
+  model,
+  onOpenSettings
 }: {
   model: TeamPanelGameModel
+  onOpenSettings: (repoId: string) => void
 }): React.JSX.Element | null {
   const send = useTeamLeadPrompt()
   const { lead } = model
@@ -32,6 +34,8 @@ export function TeamActionDockConnected({
           : false
       }
       onOpenLead={() => void openTeamSession(lead, lead.name)}
+      onNewAction={() => onOpenSettings(model.repoId)}
+      onEditActions={() => onOpenSettings(model.repoId)}
     />
   )
 }

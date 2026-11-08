@@ -16331,6 +16331,16 @@
         "wave": "{{count}} por hacer, hay cupos",
         "push": "{{count}} detenidos",
         "sweep": "{{count}} terminados por cerrar"
+      },
+      "menu": {
+        "label": "Todas las acciones",
+        "search": "Buscar acción",
+        "now": "Ahora",
+        "project": "De este proyecto",
+        "orca": "De Orca",
+        "none": "Ninguna acción con ese nombre.",
+        "new": "Nueva acción",
+        "edit": "Editar"
       }
     },
     "age": {

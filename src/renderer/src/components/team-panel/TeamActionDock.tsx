@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useFloatingTerminalKeepOutElement } from '../floating-terminal/floating-terminal-trigger-keep-out'
 import { teamDockActionsOf, type TeamAction } from '../../../../shared/team-panel-actions'
 import { TeamActionIcon } from './team-action-icons'
+import { TeamActionMenu } from './TeamActionMenu'
 import { teamActionHint, teamActionLabel, teamActionOffText } from './team-action-words'
 
 /** The lead pane's live hook status: what ends a run and carries its reply. */
@@ -19,6 +20,8 @@ export type TeamActionDockProps = {
   lead: TeamLeadTurn | null
   onRun: (action: TeamAction) => Promise<boolean>
   onOpenLead: () => void
+  onNewAction: () => void
+  onEditActions: () => void
 }
 
 // Why 9 s: V30 keeps the result line that long, then the row stands alone again.
@@ -56,15 +59,23 @@ export function TeamActionDock({
   memberCount,
   lead,
   onRun,
-  onOpenLead
+  onOpenLead,
+  onNewAction,
+  onEditActions
 }: TeamActionDockProps): React.JSX.Element | null {
   const [confirming, setConfirming] = useState(false)
   const [running, setRunning] = useState<{ action: TeamAction; sentAt: number } | null>(null)
   const [receipt, setReceipt] = useState<{ label: string; text: string } | null>(null)
   const chips = teamDockActionsOf(actions, null)
   const [row, fit] = useChipsThatFit()
-  const [dock, setDock] = useState<HTMLElement | null>(null)
-  useFloatingTerminalKeepOutElement(dock)
+  // Why both: the menu anchors to a ref object, and the floating button's keep-out follows the mounted element.
+  const dock = useRef<HTMLElement>(null)
+  const [dockNode, setDockNode] = useState<HTMLElement | null>(null)
+  const setDock = useCallback((node: HTMLElement | null) => {
+    dock.current = node
+    setDockNode(node)
+  }, [])
+  useFloatingTerminalKeepOutElement(dockNode)
   const stop = actions.find((one) => one.orca === 'stop') ?? null
 
   // Why stateStartedAt: a state that began after the send is the lead's answer to it.
@@ -210,6 +221,15 @@ export function TeamActionDock({
                 </TooltipContent>
               </Tooltip>
             ) : null}
+            <TeamActionMenu
+              actions={actions}
+              disabled={busy}
+              anchor={dock}
+              onRun={run}
+              onStop={() => setConfirming(true)}
+              onNewAction={onNewAction}
+              onEditActions={onEditActions}
+            />
           </div>
         </>
       )}
