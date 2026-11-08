@@ -269,6 +269,24 @@ describe('teamPanelModelOf', () => {
     })
   })
 
+  it("notes the members that run in a folder lead's own folder (ORCA-1135)", () => {
+    teamCardsOf.mockReturnValue({
+      lead: { paneKey: 'lead', worktreeId: 'folder:ws-1' },
+      members: [
+        { paneKey: 'm1', worktreeId: 'folder:ws-1' },
+        { paneKey: 'm2', worktreeId: 'repo::/elsewhere' }
+      ]
+    })
+
+    expect(
+      teamPanelModelOf(args({ isFolder: true }))?.members.map((one) => one.inFolder ?? false)
+    ).toEqual([true, false])
+    expect(teamPanelModelOf(args())?.members.map((one) => one.inFolder ?? false)).toEqual([
+      false,
+      false
+    ])
+  })
+
   it('hides PRs in a folder workspace', () => {
     teamCardsOf.mockReturnValue(CARDS)
 

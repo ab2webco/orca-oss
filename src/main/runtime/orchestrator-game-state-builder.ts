@@ -195,7 +195,8 @@ export async function buildOrchestratorGameState(
           id: input.worktree.id,
           path: input.worktree.path,
           branch: input.worktree.branch,
-          displayName: input.worktree.displayName
+          displayName: input.worktree.displayName,
+          ...(input.worktree.folder ? { folder: true as const } : {})
         }
       : null,
     agents,

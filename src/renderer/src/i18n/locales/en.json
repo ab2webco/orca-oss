@@ -17226,7 +17226,8 @@
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
-      "openTerminal": "Open terminal"
+      "openTerminal": "Open terminal",
+      "inFolder": "In the folder, no worktree"
     },
     "activity": {
       "prompt": "Prompt",
