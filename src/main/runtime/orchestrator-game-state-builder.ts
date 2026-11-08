@@ -21,6 +21,7 @@ import {
   projectGameLinksOf
 } from '../../shared/orchestrator-game-links'
 import { orchestratorGameScenesOf } from '../../shared/orchestrator-game-scene'
+import { leadCharacterOf, memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
@@ -176,6 +177,15 @@ export async function buildOrchestratorGameState(
       ? fleet
       : withIdleLeader(fleet, input.leaderPaneKey, input.terminalHandleOf)
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
+  const sceneList = sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes
+  const locale = orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
+  // Why the Team card's order: a heading names the lead as its card does (ORCA-1140).
+  const leadName =
+    placed.lead.label ??
+    leadCharacterOf(
+      memberRosterOf({ lead: placed.lead, config, extensions: { scenes: sceneList } }),
+      locale
+    )
   return {
     config,
     // Why: a hidden game's mode comes from the layer that hid it, not the one that chose the view.
@@ -209,7 +219,7 @@ export async function buildOrchestratorGameState(
     ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
     review: gameReview,
     workItem,
-    extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },
+    extensions: { scenes: sceneList },
     links: gameLinksOf({
       review: gameReview,
       workItem,
@@ -225,6 +235,8 @@ export async function buildOrchestratorGameState(
     ...(arcade ? { arcade } : {}),
     ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
-    locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
+    locale,
+    ...(leadName ? { leadName } : {}),
+    ...(input.appearance ? { appearance: input.appearance } : {})
   }
 }

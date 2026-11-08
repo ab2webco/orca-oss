@@ -711,7 +711,7 @@ import {
 } from './game-member-worktree-guard'
 import { readMemoryPressure } from '../memory/memory-pressure-reading'
 import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
-import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, shell } from 'electron'
 import {
   isOrchestratorGameMemberOn,
   prepareOrchestratorGameLaunch
@@ -32326,6 +32326,10 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
+      // Why windows gate it: a headless serve has no theme of its own to report.
+      ...(BrowserWindow.getAllWindows().length > 0
+        ? { appearance: nativeTheme.shouldUseDarkColors ? ('dark' as const) : ('light' as const) }
+        : {}),
       host: gameHostProfileOfThisMachine(),
       readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree

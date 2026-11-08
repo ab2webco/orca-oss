@@ -258,6 +258,10 @@ export type OrchestratorGameState = {
   localHost?: GameHostCapacity
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
+  /** Orca's light or dark look, for the agent terminal's colours; absent where the host cannot tell. */
+  appearance?: 'dark' | 'light'
+  /** The lead's name as its Team card shows it, for its message headings; absent from an older host. */
+  leadName?: string
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
   merges?: GameMerge[]
   /** The project's saved arcade plays; only for the lead, absent from an older host. */
