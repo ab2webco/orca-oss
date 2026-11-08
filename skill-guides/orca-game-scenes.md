@@ -476,6 +476,9 @@ and swaps the station prop.
   is in the file, so a seated member faces the way the sheet does. `props.stationFeet`
   (`{ "x", "y" }` in the prop's pixels) is where it meets the floor, the point placed on the seat;
   without it, the bottom center. Draw a seated `work` with the hips at the chair's seat height.
+  `props.stationScreen` (`{ "x", "y", "width", "height" }` in the prop's pixels) is a screen the
+  panel lights as V28 does: scrolling code while its worker works, amber on a question, green
+  once done, dark otherwise.
 - **Limits.** Each file at most 2 MB; each style at most 8 MB and 16 megapixels in total, which is
   what it costs in memory however well the files compress.
 
