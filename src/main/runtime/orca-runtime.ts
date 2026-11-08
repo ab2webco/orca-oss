@@ -728,6 +728,8 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { GameLeadNames } from './orchestrator-game-lead-names'
+import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
@@ -3847,6 +3849,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameLeadNames = new GameLeadNames()
   private readonly gameSuggestedView = createGameSuggestedView()
   private readonly claudePaneSessions = new ClaudePaneLiveSessions()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
@@ -5044,8 +5047,10 @@ export class OrcaRuntimeService {
           continue
         }
         originalSessions.set(hostId, originalSessions.get(hostId) ?? session)
+        // Why: an adopted agent's tab is the user's; its dispatch ends, the tab and its resume stay (ORCA-1141).
+        const keepsTab = resolution === 'exited' && !candidate.terminalOwned
         let next =
-          resolution === 'exited'
+          resolution === 'exited' && !keepsTab
             ? retireTerminalSurfaceFromPersistence(session, {
                 worktreeId: candidate.worktreeId,
                 parentTabId: candidate.tabId,
@@ -5058,6 +5063,10 @@ export class OrcaRuntimeService {
         if (record && runtimeWorktreeIdsEqual(record.worktreeId, candidate.worktreeId)) {
           const sleepingAgentSessionsByPaneKey = { ...next.sleepingAgentSessionsByPaneKey }
           delete sleepingAgentSessionsByPaneKey[candidate.paneKey]
+          if (keepsTab) {
+            const { automaticResumeBlockedBy: _fence, ...unfenced } = record
+            sleepingAgentSessionsByPaneKey[candidate.paneKey] = unfenced
+          }
           next = { ...next, sleepingAgentSessionsByPaneKey }
         }
         if (next !== session) {
@@ -5511,7 +5520,9 @@ export class OrcaRuntimeService {
         adoptedDispatchIds.push(candidate.dispatchId)
         continue
       }
-      this.rollbackLegacyWorkerTerminalSurface(candidate)
+      if (candidate.terminalOwned) {
+        this.rollbackLegacyWorkerTerminalSurface(candidate)
+      }
       if (!this.reconcileMissingLegacyWorkerTerminal(candidate)) {
         deferredDispatchIds.add(candidate.dispatchId)
         continue
@@ -20369,7 +20380,8 @@ export class OrcaRuntimeService {
     )
     for (const folderWorkspace of this.store?.getFolderWorkspaces?.() ?? []) {
       const projectGroup = projectGroupById.get(folderWorkspace.projectGroupId)
-      if (!projectGroup?.parentPath) {
+      // Why not parentPath: a workspace may name its own folder under any group (ORCA-1141).
+      if (!projectGroup) {
         continue
       }
       const worktree = folderWorkspaceToWorktree(folderWorkspace)
@@ -32326,6 +32338,7 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
+      appearance: orcaGameAppearanceOf(),
       host: gameHostProfileOfThisMachine(),
       readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
@@ -32390,6 +32403,7 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
+      leadNames: this.gameLeadNames,
       readScenes: () => readPluginGameSceneSources(),
       // Why the lead's pane too: a scene file its checkout leaves untracked is not in a member's worktree.
       readCarriedScene: async () => {

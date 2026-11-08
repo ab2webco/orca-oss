@@ -359,6 +359,15 @@ describe('teamCardsOf', () => {
     expect(teamCardsOf(vigilante, new Set())?.lead.name).toBe('Cipher')
   })
 
+  // ORCA-1139 criterion 5: the host freezes the lead's name for the session; the card must not re-pick it.
+  it("names the lead after the host's leadName, whatever the scene or language now", () => {
+    const later = state([lead], {
+      config: { scene: 'vigilante' } as OrchestratorGameState['config'],
+      leadName: 'Elaine'
+    })
+    expect(teamCardsOf(later, new Set(), null, 'es')?.lead.name).toBe('Elaine')
+  })
+
   it('names a launched member after its character, as V28 does', () => {
     const [card] =
       cardsOf([agent({ displayName: 'Merlín · ORCA-12 Keep the look' })])?.members ?? []
