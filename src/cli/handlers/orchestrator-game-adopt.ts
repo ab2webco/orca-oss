@@ -119,7 +119,6 @@ async function hostSeatOf(
   return { terminal: terminal.handle, environmentId, host }
 }
 
-/** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
 /** A name no task in the lead's Run has: an adopted agent's mail is filed under its name (ORCA-1141). */
 async function freeAdoptedNameOf(client: Client, from: string, name: string): Promise<string> {
   type Listed = { tasks?: { task_title?: string | null; display_name?: string | null }[] }
@@ -138,6 +137,7 @@ async function freeAdoptedNameOf(client: Client, from: string, name: string): Pr
   return free
 }
 
+/** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
 async function adoptAgent(
   client: Client,
   agents: readonly GameAgent[],
