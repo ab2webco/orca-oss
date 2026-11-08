@@ -6,6 +6,7 @@ import type {
   GameAnsweredItem,
   GameWaitingItem
 } from '../../../../shared/orchestrator-game-inbox-threads'
+import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { teamAgeText, teamHostText } from './team-card-text'
 import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
 
@@ -69,11 +70,21 @@ export function TeamInboxAgentCard({
 // Why self-start: the Answer and Override buttons are buttons, not full-width rows.
 const ROW = 'flex min-w-0 flex-col gap-0.5 py-2 [&>button]:self-start'
 
-function RowHead({ ticket, at, now }: { ticket: string | null; at: string | null; now: number }) {
+// Why: a member with no ticket (an adopted agent) is keyed by its name; a raw dispatch id is never shown.
+function memberOfKey(key: string | null): { ticket: string | null; name: string | null } {
+  if (!key || key.startsWith('dispatch:')) {
+    return { ticket: null, name: null }
+  }
+  return ticketInText(key) === key ? { ticket: key, name: null } : { ticket: null, name: key }
+}
+
+function RowHead({ member, at, now }: { member: string | null; at: string | null; now: number }) {
   const since = at ? Date.parse(at) : Number.NaN
+  const { ticket, name } = memberOfKey(member)
   return (
     <span className="flex min-w-0 items-baseline gap-2 text-xs">
       {ticket ? <code className="font-mono font-semibold text-foreground">{ticket}</code> : null}
+      {name ? <span className="truncate font-medium text-foreground">{name}</span> : null}
       {Number.isNaN(since) ? null : (
         <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
           {teamAgeText(since, now)}
@@ -105,11 +116,12 @@ export function TeamInboxWaitingRows({
   return (
     <ul>
       {items.map((item) => {
-        const name = memberNames.get(item.ticket)
-        const asker = name && name !== item.ticket ? name : null
+        const { ticket, name } = memberOfKey(item.ticket)
+        const character = ticket ? memberNames.get(ticket) : undefined
+        const asker = name ?? (character && character !== ticket ? character : null)
         return (
           <li key={item.id} data-testid={`team-inbox-waiting-${item.id}`} className={ROW}>
-            <RowHead ticket={item.ticket} at={item.at} now={now} />
+            <RowHead member={ticket} at={item.at} now={now} />
             <p className="text-[13px] break-words text-muted-foreground">
               {asker ? `${asker}: ${item.body}` : item.body}
             </p>
@@ -149,7 +161,7 @@ export function TeamInboxAnsweredRows({
       {rows.map((row) =>
         row.kind === 'yours' ? (
           <li key={row.one.id} data-testid={`team-inbox-answered-${row.one.id}`} className={ROW}>
-            <RowHead ticket={row.one.ticket} at={row.at} now={now} />
+            <RowHead member={row.one.ticket} at={row.at} now={now} />
             <p className="text-[13px] break-words">{row.one.question}</p>
             <p className="text-[13px] break-words text-muted-foreground">
               {translate('teamPanel.inbox.youAnsweredText', 'You answered: {{text}}', {
@@ -159,7 +171,7 @@ export function TeamInboxAnsweredRows({
           </li>
         ) : (
           <li key={row.one.id} data-testid={`team-inbox-answered-${row.one.id}`} className={ROW}>
-            <RowHead ticket={row.one.ticket} at={row.at} now={now} />
+            <RowHead member={row.one.ticket} at={row.at} now={now} />
             <p className="text-[13px] break-words">{row.one.question}</p>
             <p className="text-[13px] break-words text-muted-foreground">
               {row.one.overriddenBy
