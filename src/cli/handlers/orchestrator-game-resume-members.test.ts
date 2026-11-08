@@ -73,6 +73,7 @@ function fakeClient(args: {
         'orchestration.workerList': { workers: args.workers ?? [] },
         'orchestration.workerStop': { state: 'stopped', processAction: 'closed_agent_terminal' },
         'terminal.close': { closed: true },
+        'orchestration.taskCreate': { task: { id: `task_new_${String(params.taskTitle)}` } },
         'orchestration.workerStart': args.start ?? {
           runId: 'run_1',
           taskId: `task_${String(params.task).replace('task_', '')}`,
@@ -257,6 +258,35 @@ describe('orca game resume-members', () => {
     expect(printed().members).toEqual([
       { ticket: 'MAIN', result: 'failed', reason: 'agent_unconfigured' }
     ])
+  })
+
+  // Why (ORCA-1141): an adopted member reports done at once and stays one until the lead releases it.
+  it('gives an adopted member whose task is done a new task under its name, in its own tab', async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('MAIN', { name: 'main' })],
+      outcomes: {
+        MAIN: {
+          outcome: 'resumed',
+          terminal: 'term_main',
+          adopted: true,
+          newTask: true,
+          member: target('MAIN', { name: 'main' })
+        } as GameMemberResumeOutcome
+      }
+    })
+
+    await run(client)
+
+    expect(calls.find(([m]) => m === 'orchestration.taskCreate')?.[1]).toMatchObject({
+      taskTitle: 'main'
+    })
+    expect(calls.find(([m]) => m === 'orchestration.workerStart')?.[1]).toMatchObject({
+      task: 'task_new_main',
+      terminal: 'term_main'
+    })
+    expect(calls.find(([m]) => m === 'game.memberRecord')?.[1]).toMatchObject({
+      member: { ticket: 'MAIN', taskId: 'task_new_main' }
+    })
   })
 
   it('closes a reopened conversation no dispatch could take, so no agent runs unowned', async () => {

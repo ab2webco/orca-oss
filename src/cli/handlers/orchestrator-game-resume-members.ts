@@ -1,3 +1,4 @@
+import { adoptedTaskOf } from './orchestrator-game-adopted-task'
 import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
@@ -64,9 +65,13 @@ async function startOnTask(
 ): Promise<WorkerStarted> {
   const { member } = outcome
   const worktree = member.worktreeId ? `id:${member.worktreeId}` : 'new-child'
+  const task =
+    outcome.outcome === 'resumed' && outcome.adopted
+      ? await adoptedTaskOf(client, from, outcome)
+      : member.taskId
   const params =
     outcome.outcome === 'resumed'
-      ? { task: member.taskId, worktree, terminal: outcome.terminal }
+      ? { task, worktree, terminal: outcome.terminal }
       : {
           task: member.taskId,
           worktree,
