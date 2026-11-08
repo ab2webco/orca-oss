@@ -3955,7 +3955,8 @@ export class OrcaRuntimeService {
       isGameMemberWorktreeGone(worktreeId, {
         reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
         scan: (repo) => this.listRepoWorktreesForResolution(repo)
-      })
+      }),
+    releasedDispatch: (dispatchId) => this.isGameWorkerReleased(dispatchId)
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({
@@ -3977,7 +3978,8 @@ export class OrcaRuntimeService {
     worktreeExists: async (worktreeId) => (await this.getResolvedWorktreeMap()).has(worktreeId),
     resumeSession: (member) => this.resumeGameMemberSession(member),
     terminalOfPane: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
-    runsAgent: (terminal) => this.isTerminalRunningAgent(terminal)
+    runsAgent: (terminal) => this.isTerminalRunningAgent(terminal),
+    releasedDispatch: (dispatchId) => this.isGameWorkerReleased(dispatchId)
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
@@ -37116,6 +37118,10 @@ export class OrcaRuntimeService {
       return undefined
     }
     return Date.now() - seenAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
+  }
+
+  private isGameWorkerReleased(dispatchId: string): boolean {
+    return this.getOrchestrationDbIfAvailable()?.getWorkerDispatch(dispatchId)?.stage === 'released'
   }
 
   private getTerminalHandleForPaneKey(paneKey: string): string | null {

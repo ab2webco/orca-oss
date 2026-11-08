@@ -38,7 +38,8 @@ const context = (ticket: string): AgentStatusOrchestrationContext => ({
 
 function setup(
   contexts: Record<string, AgentStatusOrchestrationContext> = {},
-  goneWorktrees: ReadonlySet<string> = new Set()
+  goneWorktrees: ReadonlySet<string> = new Set(),
+  released: ReadonlySet<string> = new Set()
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-paused-'))
   dirs.push(dir)
@@ -51,7 +52,8 @@ function setup(
     store,
     contextOf: (handle) => contexts[handle],
     sessionIdOf: (handle) => sessions[handle] ?? null,
-    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId)
+    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId),
+    releasedDispatch: (dispatchId) => released.has(dispatchId)
   })
   return { dir, store, paused, sessions }
 }
@@ -307,6 +309,15 @@ describe('GamePausedMembers.note for an adopted member', () => {
     ])
     expect(view.paused[0]).not.toHaveProperty('terminal')
     expect(view.unlisted).toEqual([])
+  })
+
+  it('never reads one the lead released as paused', async () => {
+    const { store, paused } = setup({}, new Set(), new Set(['ctx_main']))
+    await store.upsert('repo:a', { ...adopted, dispatchId: 'ctx_main' })
+
+    const view = await paused.note('repo:a', [lead], new Set(['wt-main']))
+
+    expect(view.paused).toEqual([])
   })
 
   it('reads it as live once a member runs in its pane', async () => {
