@@ -43,6 +43,32 @@ const SPEAKERS = (() => {
   const spot = (role: 'lead' | 'advisor') => teamSceneActors(world).find((a) => a.role === role)!
   return { lead: spot('lead'), advisor: spot('advisor') }
 })()
+// The member who asks, and its tag as TeamSceneCanvas places it: 56 px wide, 18 tall, centred
+// 38 px over the head and no nearer the edge than 32 px.
+const ASKER = (() => {
+  const world = createTeamSceneWorld()
+  applyTeamSceneInput(world, {
+    lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+    advisor: { line: null },
+    members: [
+      {
+        key: 'm',
+        name: 'ORCA-14',
+        characterKey: null,
+        activity: 'needsYou',
+        reportId: null,
+        mergedPr: null
+      }
+    ]
+  })
+  return teamSceneActors(world).find((a) => a.role === 'member')!
+})()
+const tagOn = (stage: (typeof STAGES)[number], width: number) => ({
+  left: Math.round(Math.max(ASKER.x * width, 32)) - 28,
+  top: Math.round(stage.painter.headTop(ASKER.depth, stage.painter.height) - 38),
+  width: 56,
+  height: 18
+})
 
 const overlaps = (a: TeamSceneBubbleBox, b: TeamSceneBubbleBox): boolean =>
   a.left < b.left + b.width &&
@@ -118,6 +144,105 @@ describe('layoutTeamSceneBubbles', () => {
           }
         }
       }
+    }
+  })
+
+  // ORCA-1139 criterion 8: at the 390 and 320 viewports both bubbles sat over ORCA-14's tag.
+  it("never lays a bubble or its tail over an asking member's tag", () => {
+    const sizes = (heights: number[]) =>
+      [60, 120, 170].flatMap((width) => heights.map((height) => ({ width, height })))
+    for (const stage of STAGES) {
+      for (const width of STAGE_WIDTHS) {
+        const tag = tagOn(stage, width)
+        const anchors = {
+          advisor: {
+            x: SPEAKERS.advisor.x * width,
+            top: stage.painter.headTop(SPEAKERS.advisor.depth, stage.painter.height)
+          },
+          lead: {
+            x: SPEAKERS.lead.x * width,
+            top: stage.painter.headTop(SPEAKERS.lead.depth, stage.painter.height)
+          }
+        }
+        const pairs = sizes(stage.heights).flatMap((advisor) =>
+          sizes(stage.heights).map((lead) => ({ advisor, lead }))
+        )
+        for (const { advisor, lead } of [
+          ...pairs,
+          ...sizes(stage.heights).map((one) => ({ advisor: null, lead: one }))
+        ]) {
+          const boxes = layoutTeamSceneBubbles(
+            [
+              ...(advisor
+                ? [{ key: 'advisor', anchor: anchors.advisor, ...advisor, align: 'end' as const }]
+                : []),
+              { key: 'lead', anchor: anchors.lead, ...lead }
+            ],
+            { width, height: stage.painter.height },
+            { beside: stage.beside, obstacles: [tag] }
+          )
+          const where = `${stage.style} ${width} px, advisor ${advisor ? `${advisor.width}x${advisor.height}` : 'none'}, lead ${lead.width}x${lead.height}`
+          for (const box of boxes) {
+            const anchor = anchors[box.key as 'lead' | 'advisor']
+            const tailX = box.left + box.tailX
+            expect(overlaps(box, { ...tag, key: 'tag', tailX: 0 }), `${where}: ${box.key}`).toBe(
+              false
+            )
+            const tailInColumn = tailX >= tag.left && tailX <= tag.left + tag.width
+            const tailInRows = tag.top < anchor.top && tag.top + tag.height > box.top + box.height
+            expect(tailInColumn && tailInRows, `${where}: ${box.key}'s tail`).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it("lifts the lead's one-line bubble above the tag on the 219 px stage instead of covering it", () => {
+    for (const stage of STAGES) {
+      const lineHeight = stage.heights[0]!
+      const tag = tagOn(stage, 219)
+      const anchor = {
+        x: SPEAKERS.lead.x * 219,
+        top: stage.painter.headTop(SPEAKERS.lead.depth, stage.painter.height)
+      }
+      const [box] = layoutTeamSceneBubbles(
+        [{ key: 'lead', anchor, width: 170, height: lineHeight }],
+        { width: 219, height: stage.painter.height },
+        { beside: stage.beside, obstacles: [tag] }
+      )
+      expect(box, stage.style).toBeDefined()
+      expect(box!.top + box!.height, stage.style).toBeLessThanOrEqual(tag.top)
+    }
+  })
+
+  // ORCA-1139 criterion 8, lead decision A: on the 219 px stage the tag leaves room for one bubble.
+  it("gives the lead's bubble the room when only one fits beside a tag, and both come back without it", () => {
+    const cases = [
+      { stage: STAGES[2]!, advisor: { width: 120, height: 41 }, lead: { width: 90, height: 41 } },
+      { stage: STAGES[2]!, advisor: { width: 170, height: 53 }, lead: { width: 90, height: 41 } },
+      { stage: STAGES[0]!, advisor: { width: 170, height: 39 }, lead: { width: 90, height: 25 } }
+    ]
+    for (const { stage, advisor, lead } of cases) {
+      const at = (key: 'lead' | 'advisor') => ({
+        x: SPEAKERS[key].x * 219,
+        top: stage.painter.headTop(SPEAKERS[key].depth, stage.painter.height)
+      })
+      const requests = [
+        { key: 'advisor', anchor: at('advisor'), ...advisor, align: 'end' as const, yields: true },
+        { key: 'lead', anchor: at('lead'), ...lead }
+      ]
+      const scene = { width: 219, height: stage.painter.height }
+      const where = `${stage.style}, advisor ${advisor.width}x${advisor.height}`
+      const crowded = layoutTeamSceneBubbles(requests, scene, {
+        beside: stage.beside,
+        obstacles: [tagOn(stage, 219)]
+      })
+      expect(
+        crowded.map((box) => box.key),
+        where
+      ).toEqual(['lead'])
+      const free = layoutTeamSceneBubbles(requests, scene, { beside: stage.beside })
+      expect(free.map((box) => box.key).sort(), where).toEqual(['advisor', 'lead'])
     }
   })
 

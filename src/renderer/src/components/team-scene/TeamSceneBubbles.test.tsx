@@ -4,13 +4,14 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TeamSceneBubbles } from './TeamSceneBubbles'
+import type { TeamSceneRect } from './team-scene-bubble-layout'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root
 let host: HTMLDivElement
 
-const render = (text: string): HTMLElement => {
+const render = (text: string, obstacles?: TeamSceneRect[]): HTMLElement => {
   act(() =>
     root.render(
       <TeamSceneBubbles
@@ -18,6 +19,7 @@ const render = (text: string): HTMLElement => {
         width={360}
         height={176}
         cloudPixel={3}
+        obstacles={obstacles}
       />
     )
   )
@@ -53,5 +55,44 @@ describe('TeamSceneBubbles', () => {
     const again = render('cat TeamScenePixelCloud.tsx').style.width
     expect(again).toMatch(/px$/)
     expect(again).toBe(first)
+  })
+
+  // ORCA-1139 criterion 8: the bubble sat over the asking member's tag.
+  it('lays its bubble clear of an obstacle it is given', () => {
+    const free = Number.parseFloat(render('exec_command').style.top)
+    const tag = { left: 100, top: free + 10, width: 60, height: 18 }
+    const bubble = render('exec_command', [tag])
+    expect(Number.parseFloat(bubble.style.top) + 41).toBeLessThanOrEqual(tag.top)
+  })
+
+  // Lead decision A: on Pixel's 219 px stage a member's tag leaves room for the lead's bubble only.
+  it("hides the advisor's bubble while a tag needs its room, and shows it again once the tag goes", () => {
+    const shown = (obstacles: TeamSceneRect[]) => {
+      act(() =>
+        root.render(
+          <TeamSceneBubbles
+            speeches={[
+              {
+                key: 'advisor',
+                text: 'Keep this one small',
+                anchor: { x: 162, top: 81 },
+                align: 'end',
+                yields: true
+              },
+              { key: 'lead', text: 'exec_command', anchor: { x: 184, top: 84 } }
+            ]}
+            width={219}
+            height={126}
+            cloudPixel={3}
+            obstacles={obstacles}
+          />
+        )
+      )
+      return [...host.querySelectorAll<HTMLElement>('[data-scene-bubble]')]
+        .filter((one) => one.style.visibility === 'visible')
+        .map((one) => one.dataset.sceneBubble)
+    }
+    expect(shown([{ left: 4, top: 46, width: 58, height: 18 }])).toEqual(['lead'])
+    expect(shown([])).toEqual(['advisor', 'lead'])
   })
 })
