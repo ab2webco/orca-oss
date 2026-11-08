@@ -37,6 +37,8 @@ export type AccountListEntry = {
   authMethod?: ClaudeManagedAccountAuthMethod
   endpointLabel?: string | null
   endpointModel?: string | null
+  /** A `claude setup-token` credential is stored on this host for the account. */
+  longLivedToken?: boolean
   workspaceLabel?: string | null
   /** Null when no usage snapshot exists for this account (e.g. custom-endpoint
    *  Claude accounts have no usage API, or the cache has not been filled). */
@@ -102,6 +104,7 @@ export function accountListEntriesOf(snapshot: RuntimeAccountsSnapshot): Account
       authMethod: account.authMethod,
       ...(account.endpointLabel !== undefined ? { endpointLabel: account.endpointLabel } : {}),
       ...(account.endpointModel !== undefined ? { endpointModel: account.endpointModel } : {}),
+      ...(account.longLivedTokenSetAt ? { longLivedToken: true } : {}),
       quota: findQuota(
         account.id,
         active,

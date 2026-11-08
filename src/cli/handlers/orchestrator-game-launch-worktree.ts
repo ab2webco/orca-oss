@@ -138,6 +138,11 @@ export async function memberWorktreeParamsOf(args: {
   ticket: string
   repo: string | null
 }): Promise<{ worktree: string; repo?: string }> {
+  // Why: a folder with no git cannot make worktrees, so its members share the lead's folder (ORCA-1135).
+  const lead = args.state.worktree
+  if (lead?.folder && !args.repo) {
+    return { worktree: `id:${lead.id}` }
+  }
   const reuse = await existingTicketWorktreeOf(args)
   if (reuse) {
     return { worktree: reuse }

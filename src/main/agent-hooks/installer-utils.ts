@@ -18,6 +18,7 @@ import { resolveHooksJsonWritePath } from './hook-config-write-path'
 import { writeRollingFileBackup } from '../rolling-file-backup'
 import type { HookCommandConfig, HookDefinition, HooksConfig } from './hook-config-types'
 import { hookHasManagedCommand as hookMatchesManagedCommand } from './managed-hook-command-recognition'
+import { getSharedHookFilePolicy } from './shared-hook-file-policy'
 
 export type { HookCommandConfig, HookDefinition, HooksConfig } from './hook-config-types'
 export {
@@ -192,6 +193,10 @@ export function removeManagedCommands(
 
 // Why: temp+rename so concurrent writers can't leave a torn script for an in-flight /bin/sh to source.
 export function writeManagedScript(scriptPath: string, content: string): void {
+  // Why: a dev Orca never rewrites a script the installed Orca owns (ORCA-1131).
+  if (getSharedHookFilePolicy() === 'keep-existing' && existsSync(scriptPath)) {
+    return
+  }
   const dir = dirname(scriptPath)
   mkdirSync(dir, { recursive: true })
 

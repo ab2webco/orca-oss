@@ -65,7 +65,9 @@ const threeHosts = (): Record<string, unknown> => ({
   folderWorkspaces: [],
   runtimeEnvironments: environments,
   sshTargetLabels: new Map([['box-id', 'box']]),
-  sshConnectionStates: new Map()
+  sshConnectionStates: new Map(),
+  ptyIdsByTabId: {},
+  terminalLayoutsByTabId: {}
 })
 let appState = threeHosts()
 vi.mock('@/store', () => ({
@@ -79,6 +81,15 @@ const readings = vi.hoisted(() => vi.fn())
 vi.mock('./use-team-solo-machine-readings', () => ({ useTeamSoloMachineReadings: readings }))
 const advisors = vi.hoisted(() => vi.fn())
 vi.mock('./use-team-solo-advisors', () => ({ useTeamSoloAdvisors: advisors }))
+
+let leadHandles: ReadonlySet<string> = new Set()
+vi.mock('./use-team-solo-lead-handles', () => ({
+  useTeamSoloLeadHandles: () =>
+    new Map([
+      ['', leadHandles],
+      ['env-1', leadHandles]
+    ])
+}))
 
 const { useTeamPanelSoloModel } = await import('./use-team-panel-solo-model')
 
@@ -100,6 +111,7 @@ const ok = (availableMemory: number): GameHostReading => ({
 
 beforeEach(() => {
   appState = threeHosts()
+  leadHandles = new Set()
   readings.mockReset()
   readings.mockReturnValue(null)
   advisors.mockReset()
@@ -247,5 +259,41 @@ describe('useTeamPanelSoloModel Jev', () => {
       calls: []
     })
     expect(model?.rows.filter((row) => row.advisor !== null)).toHaveLength(1)
+  })
+})
+
+describe('useTeamPanelSoloModel Inbox (ORCA-1129 D4)', () => {
+  const ASK = JSON.stringify({
+    questions: [{ question: 'Merge #923 now?', multiSelect: false, options: [{ label: 'Now' }] }]
+  })
+  const waiting = (paneKey: string, worktreeId: string, over: Partial<AgentStatusEntry>) => ({
+    ...entry(paneKey, worktreeId),
+    state: 'waiting' as const,
+    toolName: 'AskUserQuestion',
+    interactivePrompt: ASK,
+    ...over
+  })
+
+  // Why: a lead's question showed in another project's no-team Inbox, and its own said 0.
+  it("counts no question from a game lead's pane or its member's", async () => {
+    leadHandles = new Set(['term_lead'])
+    appState = {
+      ...threeHosts(),
+      agentStatusByPaneKey: {
+        [`tab-a:${LEAF_A}`]: waiting(`tab-a:${LEAF_A}`, 'here', { terminalHandle: 'term_lead' }),
+        [`tab-b:${LEAF_B}`]: waiting(`tab-b:${LEAF_B}`, 'paired', {
+          orchestration: { taskId: 't', dispatchId: 'd', coordinatorHandle: 'term_lead' }
+        }),
+        [`tab-c:${LEAF_C}`]: waiting(`tab-c:${LEAF_C}`, 'remote', {})
+      }
+    }
+
+    await mount()
+
+    expect(model?.rows.map((row) => row.inTeam)).toEqual([true, true, false])
+    expect(model?.inbox).toEqual({
+      kind: 'ready',
+      value: { forYou: 1, waiting: 0, threads: 0, answered: 0 }
+    })
   })
 })

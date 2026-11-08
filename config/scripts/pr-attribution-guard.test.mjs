@@ -13,8 +13,10 @@ afterAll(() => rmSync(cwd, { recursive: true, force: true }))
 function decide(command) {
   const result = spawnSync(process.execPath, [hook], {
     input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd }),
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   expect(result.status).toBe(0)
   return result.stdout === ''
     ? 'allow'

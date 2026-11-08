@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { selectVisibleAgentMapLabels } from './agent-map-label-declutter'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setRendererUiLanguage } from '@/i18n/i18n'
+import { agentMapProjectCountText, selectVisibleAgentMapLabels } from './agent-map-label-declutter'
 import type { AgentMapLayout, AgentMapProjectRing, AgentMapWorktreeRing } from './agent-map-layout'
 import {
   agentMapQuietCount,
@@ -117,8 +118,8 @@ describe('selectVisibleAgentMapLabels', () => {
   })
 
   it('drops the project count rather than a workspace name when they collide', () => {
-    // The workspace ring's name lands on the project's count line.
-    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 42 })], {
+    // The workspace ring's name lands on the project's count line under the ring.
+    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 96 })], {
       x: 0,
       y: 0,
       radius: 40,
@@ -137,6 +138,25 @@ describe('selectVisibleAgentMapLabels', () => {
     expect([...selectVisibleAgentMapLabels(layout, 1, 1).projectCountIds]).toEqual(['project-1'])
   })
 
+  it('drops the project count when it would reach a neighbouring cluster', () => {
+    const layout = layoutOf([worktree({ id: 'a', x: 0, y: 0 })])
+    const [project] = layout.projects
+    const below = {
+      ...project,
+      id: 'project-2',
+      worktrees: [],
+      y: project.y + 2 * project.radius + 12
+    }
+
+    const { projectCountIds } = selectVisibleAgentMapLabels(
+      { ...layout, projects: [project, below] },
+      1,
+      1
+    )
+
+    expect([...projectCountIds]).not.toContain('project-1')
+  })
+
   it('admits more labels as zooming in shrinks their world footprint', () => {
     const worktrees = Array.from({ length: 6 }, (_unused, index) =>
       worktree({ id: `w-${index}`, name: `workspace-${index}`, x: index * 90, y: 0 })
@@ -147,5 +167,30 @@ describe('selectVisibleAgentMapLabels', () => {
 
     expect(zoomedOut.size).toBeLessThan(zoomedIn.size)
     expect(zoomedIn.size).toBe(6)
+  })
+})
+
+describe('agentMapProjectCountText', () => {
+  afterEach(async () => {
+    await setRendererUiLanguage('en')
+  })
+
+  function project(agents: number, workspaces: number): AgentMapProjectRing {
+    const worktrees = Array.from({ length: workspaces }, (_unused, index) =>
+      worktree({ id: `w-${index}` })
+    )
+    return { ...layoutOf(worktrees).projects[0], agentCount: agents }
+  }
+
+  it.each([
+    ['en', 1, 1, '1 AGENT · 1 WORKSPACE'],
+    ['en', 3, 2, '3 AGENTS · 2 WORKSPACES'],
+    ['es', 1, 1, '1 AGENTE · 1 ESPACIO DE TRABAJO'],
+    ['es', 3, 1, '3 AGENTES · 1 ESPACIO DE TRABAJO'],
+    ['es', 1, 2, '1 AGENTE · 2 ESPACIOS DE TRABAJO']
+  ] as const)('%s: %i agents, %i workspaces', async (language, agents, workspaces, expected) => {
+    await setRendererUiLanguage(language)
+
+    expect(agentMapProjectCountText(project(agents, workspaces))).toBe(expected)
   })
 })

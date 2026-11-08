@@ -48,7 +48,7 @@ export type GameAnsweredItem = {
   answer: string
   askedAt: string
   answeredAt: string
-  /** The person replaced the lead's answer from the Inbox. */
+  /** The person's own answer from the Inbox: to a waiting question, or replacing the lead's. */
   overriddenBy?: { text: string; at: string }
 }
 
@@ -100,9 +100,19 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     // Why: a rejected heartbeat is a failure the person should see; a plain one is only liveness.
     .filter((row) => row.type !== 'heartbeat' || failureOf(row) !== null)
 
+  // Why the dispatch first: a terminal can host several members over time; a dispatch is one.
+  const memberOf = (row: GameInboxMail): string | undefined => {
+    const dispatchId = payloadOf(row.payload).dispatchId
+    return (
+      (typeof dispatchId === 'string' ? ticketOf.get(`dispatch:${dispatchId}`) : undefined) ??
+      ticketOf.get(row.from_handle)
+    )
+  }
+  const askerOf = (row: GameInboxMail): string => memberOf(row) ?? label(row.from_handle)
+
   const byTicket = new Map<string, GameThreadMessage[]>()
   for (const row of rows) {
-    const ticket = ticketOf.get(row.from_handle) ?? ticketOf.get(row.to_handle)
+    const ticket = memberOf(row) ?? ticketOf.get(row.to_handle)
     if (!ticket) {
       continue
     }
@@ -110,7 +120,7 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     thread.push({
       id: row.id,
       at: row.created_at,
-      from: label(row.from_handle),
+      from: ticketOf.has(row.from_handle) ? ticket : label(row.from_handle),
       to: label(row.to_handle),
       kind: row.type,
       subject: row.subject,
@@ -141,7 +151,7 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
   const waiting = waitingRows.map(
     (row): GameWaitingItem => ({
       id: row.id,
-      ticket: label(row.from_handle),
+      ticket: askerOf(row),
       kind: row.type === 'decision_gate' ? 'decision_gate' : 'question',
       subject: row.subject,
       body: row.body,
@@ -151,9 +161,14 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
   )
 
   const overrideOf = (questionId: string): GameAnsweredItem['overriddenBy'] => {
-    const latest = rows.findLast(
-      (row) => row.thread_id === questionId && payloadOf(row.payload).from === 'owner'
-    )
+    // Why the lead's note too: a waiting question the person answered has no other owner mark.
+    const latest = rows.findLast((row) => {
+      const payload = payloadOf(row.payload)
+      return (
+        (row.thread_id === questionId && payload.from === 'owner') ||
+        (row.from_handle === 'owner' && payload.ownerMemberReply === questionId)
+      )
+    })
     const text = latest ? payloadOf(latest.payload).text : undefined
     return latest && typeof text === 'string' ? { text, at: latest.created_at } : undefined
   }
@@ -165,7 +180,7 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     return [
       {
         id: row.id,
-        ticket: label(row.from_handle),
+        ticket: askerOf(row),
         kind: 'question',
         question: row.body,
         answer: row.answer_body,
@@ -181,7 +196,7 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
       ? [
           {
             id: gate.id,
-            ticket: label(gate.from_handle),
+            ticket: askerOf(gate),
             kind: 'decision_gate',
             question: gate.body,
             answer: reply.body,

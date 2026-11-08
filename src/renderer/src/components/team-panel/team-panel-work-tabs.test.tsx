@@ -256,6 +256,18 @@ describe('TeamPanelMachinesTab', () => {
     expect(fill?.style.transform).toBe('scaleX(0.125)')
   })
 
+  // Why: V28's state-empty-hosts keeps this machine's row and offers pairing below it.
+  it('offers pairing under this machine alone, and not beside another host', () => {
+    const alone = machines([machine({ host: { kind: 'local' } })])
+    expect(alone.textContent).toContain('28 of 32 GB free')
+    expect(alone.textContent).toContain('Only this machine')
+    expect(alone.textContent).toContain('Pair another machine to spread agents across hosts.')
+    act(() => root?.unmount())
+    expect(machines([machine({ host: { kind: 'local' } }), machine()]).textContent).not.toContain(
+      'Only this machine'
+    )
+  })
+
   it('draws an unreachable host as offline, with no invented figures', () => {
     const view = machines([
       machine({ status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } })

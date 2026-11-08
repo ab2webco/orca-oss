@@ -10843,7 +10843,8 @@
           "finishSetup": "Finish setup",
           "configure": "Configure",
           "networkRestricted": "Network access is restricted to the hosts declared by this plugin.",
-          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch."
+          "networkBlocked": "Network access is blocked because this plugin does not declare net:fetch.",
+          "devSharedVaultMessage": "Not started: this dev build's accounts folder is another install's account vault, and this plugin can run processes that rewrite it. Start the dev build with {{value0}} to run it."
         },
         "PluginVmRecipeConsentPreview": {
           "create": "Create",
@@ -16388,7 +16389,8 @@
         "team-scene-copy": {
           "label": "Live team scene",
           "leadAsks": "Waiting for you · {{question}}",
-          "leadDone": "Done, nothing pending"
+          "leadDone": "Done, nothing pending",
+          "leadWaits": "Waiting for you"
         }
       },
       "game-arcade": {
@@ -16961,10 +16963,13 @@
       "spawnAgent": "Start a new agent",
       "noLaunchableAgents": "No enabled agents detected.",
       "sleepWorkspace": "Sleep",
-      "projectCount": "{{agents}} agents · {{workspaces}} workspaces",
+      "projectCount": "{{agents}} · {{workspaces}}",
       "agentCount": "{{count}} agents",
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
+      "workspaceCount": "{{count}} workspaces",
+      "workspaceCount_one": "{{count}} workspace",
+      "workspaceCount_other": "{{count}} workspaces",
       "noWorkspaceAgents": "No agents in this workspace.",
       "status": {
         "doneSeen": "Done, seen"
@@ -17221,7 +17226,8 @@
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
-      "openTerminal": "Open terminal"
+      "openTerminal": "Open terminal",
+      "inFolder": "In the folder, no worktree"
     },
     "activity": {
       "prompt": "Prompt",
@@ -17290,7 +17296,8 @@
       "waitingEmpty": "No member is waiting for an answer.",
       "answeredEmpty": "Nothing answered yet.",
       "leadAnsweredText": "The lead answered: {{text}}",
-      "answer": "Answer"
+      "answer": "Answer",
+      "answerFailed": "Could not send the answer. Open the terminal."
     },
     "actions": {
       "label": "Actions",
@@ -17323,6 +17330,52 @@
       "minutes": "{{count}} min",
       "hours": "{{count}} h",
       "days": "{{count}} d"
+    },
+    "display": {
+      "label": "Team metrics",
+      "pause": "Pause the carousel",
+      "resume": "Resume the carousel",
+      "previous": "Previous metric",
+      "next": "Next metric",
+      "page": {
+        "summary": "Summary",
+        "delivery": "Delivery",
+        "quality": "Quality",
+        "machines": "Machines",
+        "usage": "Usage"
+      },
+      "noData": "No data",
+      "active": "Active",
+      "alerts": "Alerts",
+      "queued": "Queued",
+      "merges": "Merges",
+      "merges24h": "Merges 24 h",
+      "noHourly": "No hourly data",
+      "merges7d": "Merges 7 d",
+      "median": "Median {{time}}",
+      "noLeadTime": "No lead time yet",
+      "noMerges": "No merge history from this host",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "minutes": "{{minutes}} m",
+      "ciGreen": "CI green",
+      "flaky": "{{count}} flaky",
+      "days14": "14 days",
+      "noCiHistory": "Orca keeps no CI history yet",
+      "agents": "Agents",
+      "cpu": "CPU",
+      "ram": "RAM",
+      "offline": "Offline",
+      "noMachines": "No machine data from this host",
+      "costToday": "Cost today",
+      "noCost": "Orca has no cost data",
+      "accounts7d": "Accounts · 7 days",
+      "noAccounts": "No account use reported",
+      "ticker": {
+        "waiting": "{{name}} is waiting for you",
+        "failing": "{{pr}} checks failing, {{name}} on it",
+        "queue": "Queue {{count}}, next {{pr}}",
+        "working": "{{count}} working"
+      }
     }
   },
   "claudeDeadHooks": {
@@ -17330,5 +17383,9 @@
     "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
     "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
     "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
+  },
+  "agentQuestionNotification": {
+    "title": "{{context}} - {{agent}} asks you",
+    "body": "Open the Inbox to answer."
   }
 }

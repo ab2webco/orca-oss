@@ -72,9 +72,10 @@ export function TeamSceneBubbles({
   useLayoutEffect(() => {
     const requests = speeches.map((s) => {
       const el = refs.current.get(s.key)
-      // Why clear it first: a row-shared cloud keeps its narrowed width until laid out again.
+      // Why max-content: a row-shared cloud keeps its narrowed width until laid out again, and
+      // text that may break anywhere would shrink to the room left of its old spot.
       if (el) {
-        el.style.width = ''
+        el.style.width = 'max-content'
       }
       return {
         key: s.key,
@@ -117,7 +118,8 @@ export function TeamSceneBubbles({
               visibility: box ? 'visible' : 'hidden'
             }}
           >
-            <span className="line-clamp-2">{s.text}</span>
+            {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
+            <span className="line-clamp-2 [overflow-wrap:anywhere]">{s.text}</span>
             {box && cloudPixel ? (
               <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
             ) : null}
