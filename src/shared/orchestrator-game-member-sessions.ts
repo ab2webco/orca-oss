@@ -28,6 +28,8 @@ export type GameMemberSession = {
   lastState: string | null
   launchedAt: string
   updatedAt: string
+  /** Set for an agent `game adopt` took: its own tab, resumed there and never relaunched (ORCA-1141). */
+  adoptedPaneKey?: string
 }
 
 export type GameMemberSessionPatch = { ticket: string } & Partial<
@@ -80,14 +82,16 @@ function parseMember(raw: unknown): GameMemberSession | null {
   return {
     ...member,
     ticket: member.ticket.toUpperCase(),
-    worktreeId: savedWorktreeId(member.worktreeId, raw.fullWorktreeId, TEXT_MAX)
+    worktreeId: savedWorktreeId(member.worktreeId, raw.fullWorktreeId, TEXT_MAX),
+    ...(isText(raw.adoptedPaneKey) ? { adoptedPaneKey: raw.adoptedPaneKey } : {})
   }
 }
 
 const MEMBER_KEYS: ReadonlySet<string> = new Set([
   ...REQUIRED_FIELDS,
   ...NULLABLE_FIELDS,
-  'fullWorktreeId'
+  'fullWorktreeId',
+  'adoptedPaneKey'
 ])
 const FILE_KEYS: ReadonlySet<string> = new Set(['version', 'members'])
 
@@ -181,7 +185,7 @@ export type GameMemberResumeTarget = Pick<
 
 /** `resumed`: its conversation runs again in `terminal`; `relaunch`: start a new agent on its task. */
 export type GameMemberResumeOutcome =
-  | { outcome: 'resumed'; terminal: string; member: GameMemberResumeTarget }
+  | { outcome: 'resumed'; terminal: string; member: GameMemberResumeTarget; adopted?: true }
   | { outcome: 'relaunch'; member: GameMemberResumeTarget; note?: string }
   | { outcome: 'finished'; ticket: string }
   | { outcome: 'missing'; ticket: string; reason: string }
