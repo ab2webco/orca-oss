@@ -104,15 +104,7 @@ export async function startLead(
     })
     .toBe(true)
   // Why wait: a member's child worktree needs the lead's, which the first worktree scan lists.
-  await expect
-    .poll(
-      async () =>
-        (
-          await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
-        ).result.worktrees.some((one) => one.id === worktreeId),
-      { timeout: 60_000, message: "the runtime never listed the lead's worktree" }
-    )
-    .toBe(true)
+  await waitForRuntimeWorktree(client, worktreeId)
   return {
     client,
     userDataDir,
@@ -319,4 +311,20 @@ export async function writeArgvLoggingAgent(
   )
   await chmod(command, 0o755)
   return { command, launches: () => readFile(ledger, 'utf8') }
+}
+
+/** Waits for the runtime's worktree scan, which can lag launch; workerStart resolves `id:` from it. */
+export async function waitForRuntimeWorktree(
+  client: RuntimeClient,
+  worktreeId: string
+): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (
+          await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
+        ).result.worktrees.some((one) => one.id === worktreeId),
+      { timeout: 60_000, message: "the runtime never listed the lead's worktree" }
+    )
+    .toBe(true)
 }

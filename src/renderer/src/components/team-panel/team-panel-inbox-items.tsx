@@ -2,6 +2,8 @@ import React from 'react'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
+import { TeamStatusMark } from './TeamStatusMark'
 import type {
   GameAnsweredItem,
   GameWaitingItem
@@ -23,6 +25,8 @@ export function TeamInboxAgentCard({
 }): React.JSX.Element {
   // Why hold the buttons: a second tap would type its digit into the agent's next turn.
   const [sent, setSent] = React.useState(false)
+  // Why: a team's question sits under its project, so V28's card names only who asks.
+  const needsYou = question.asker !== undefined
   const place = [question.repoName, question.worktreeName]
   if (question.host.kind === 'remote') {
     place.push(teamHostText(question.host))
@@ -30,9 +34,25 @@ export function TeamInboxAgentCard({
   return (
     <article
       data-team-inbox-agent={question.paneKey}
-      className="space-y-2 rounded-xl border border-border bg-card p-4 text-card-foreground"
+      data-needs-you={needsYou ? 'true' : undefined}
+      className={cn(
+        'space-y-2 rounded-xl border p-4 text-card-foreground',
+        needsYou ? 'border-status-attention/30 bg-status-attention/10' : 'border-border bg-card'
+      )}
     >
-      <p className="truncate text-xs text-muted-foreground">{place.join(' · ')}</p>
+      {needsYou ? (
+        <div className="flex min-w-0 items-center gap-2 text-xs">
+          <span className="inline-flex shrink-0 items-center gap-1.5 font-medium text-status-attention">
+            <TeamStatusMark status="attention" />
+            {translate('auto.components.game-inbox.GameOwnerQuestionCard.needsYou', 'Needs you')}
+          </span>
+          <span className="ml-auto truncate font-mono font-medium text-muted-foreground">
+            {question.asker}
+          </span>
+        </div>
+      ) : (
+        <p className="truncate text-xs text-muted-foreground">{place.join(' · ')}</p>
+      )}
       <p className="text-sm break-words whitespace-pre-wrap">{question.text}</p>
       {question.options.length > 0 && !onAnswer ? (
         <p className="text-xs break-words text-muted-foreground">{question.options.join(' · ')}</p>
@@ -43,7 +63,7 @@ export function TeamInboxAgentCard({
               <Button
                 key={option}
                 type="button"
-                variant={index === 0 ? 'default' : 'outline'}
+                variant={index === 0 ? 'default' : needsYou ? 'secondary' : 'outline'}
                 size="sm"
                 className="h-auto min-h-8 max-w-full whitespace-normal break-words text-left"
                 disabled={sent}
@@ -57,7 +77,7 @@ export function TeamInboxAgentCard({
           type="button"
           variant="outline"
           size="sm"
-          disabled={!question.worktreeId}
+          disabled={!question.worktreeId && !question.terminalHandle}
           onClick={() => onOpen(question)}
         >
           {translate('teamPanel.inbox.openTerminal', 'Open terminal')}

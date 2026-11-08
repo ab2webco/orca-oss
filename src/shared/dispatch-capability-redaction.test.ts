@@ -146,6 +146,30 @@ describe('redactWrappedTerminalRows', () => {
     }
   )
 
+  // ORCA-1142: an agent's prompt echo of a 221-char fake capability left two Grid rows of its tail.
+  const LONG = `dcap_${'QXJZ'.repeat(54)}`
+  const longCases = [
+    `> check ${LONG}`,
+    `> check ${LONG} --type heartbeat`,
+    `> ${LONG}`,
+    `orca send --dispatch-capability=${LONG} then ${LONG.slice(0, 120)}`
+  ].flatMap((line) =>
+    [8, 12, 20, 33, 40, 48, 53, 64, 80].flatMap((width) =>
+      ['', '  ', '  ⎿  ', '│ '].map((indent) => ({ line, width, indent }))
+    )
+  )
+
+  it.each(longCases)(
+    'keeps no character of a long token wrapped at width $width, indent "$indent": $line',
+    ({ line, width, indent }) => {
+      const rows = appWrap(line, width, indent)
+      expect(rows.length).toBeGreaterThanOrEqual(3)
+      const shown = redactWrappedTerminalRows(rows).join('\n')
+      expect(shown).not.toMatch(BODY_CHAR)
+      expect(shown).not.toContain('dcap')
+    }
+  )
+
   it('leaves a pane with no token as it is', () => {
     const rows = ['x'.repeat(30), 'id abc', 'ls -la']
     expect(redactWrappedTerminalRows(rows)).toEqual(rows)

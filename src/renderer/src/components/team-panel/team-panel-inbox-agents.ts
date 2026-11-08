@@ -35,56 +35,65 @@ export type TeamInboxAgentQuestion = TeamSessionRef & {
   worktreeName: string
   text: string
   options: string[]
+  /** Set for a team's lead or member: its ticket, else its name, the only name V28's card shows. */
+  asker?: string
 }
 
 export type TeamInboxAgentState = TerminalHandleFocusState & Pick<AppState, 'agentStatusByPaneKey'>
 
-/** This window's pane key for the lead; a paired host names its pane under its own tab id. */
-function localLeadPaneKey(
-  lead: TeamPanelGameModel['lead'],
-  state: TerminalHandleFocusState
-): string {
-  if (lead.host.kind !== 'remote' || !lead.host.environmentId || !lead.terminalHandle) {
-    return lead.paneKey
+/** This window's pane key for a team agent; a paired host names its pane under its own tab id. */
+function localPaneKeyOf(agent: TeamSessionRef, state: TerminalHandleFocusState): string {
+  if (agent.host.kind !== 'remote' || !agent.host.environmentId || !agent.terminalHandle) {
+    return agent.paneKey
   }
-  const target = findTerminalHandleTarget(lead.terminalHandle, state, lead.host.environmentId)
-  return target?.leafId ? `${target.tabId}:${target.leafId}` : lead.paneKey
+  const target = findTerminalHandleTarget(agent.terminalHandle, state, agent.host.environmentId)
+  return target?.leafId ? `${target.tabId}:${target.leafId}` : agent.paneKey
 }
 
-/** The lead's own live question; game.state never carries it, so agent status does. */
-export function teamLeadQuestionOf(
-  model: TeamPanelGameModel,
+/** A team agent's live question; game.state never carries the text, so agent status does. */
+function teamAgentQuestionOf(
+  agent: TeamSessionRef & { name: string; ticket?: { identifier: string } | null },
+  projectName: string,
   state: TeamInboxAgentState
 ): TeamInboxAgentQuestion | null {
-  const { lead } = model
-  const paneKey = localLeadPaneKey(lead, state)
+  const paneKey = localPaneKeyOf(agent, state)
   const entry = state.agentStatusByPaneKey[paneKey]
   const action = entry ? teamLiveActionOfEntry(entry) : null
   return action?.kind === 'question'
     ? {
         paneKey,
-        terminalHandle: lead.terminalHandle,
-        worktreeId: lead.worktreeId,
-        host: lead.host,
-        repoName: model.projectName,
-        worktreeName: lead.name,
+        terminalHandle: agent.terminalHandle,
+        worktreeId: agent.worktreeId,
+        host: agent.host,
+        repoName: projectName,
+        worktreeName: agent.name,
+        asker: agent.ticket?.identifier ?? agent.name,
         text: action.text,
         options: action.options
       }
     : null
 }
 
+/** The lead's own live question. */
+export function teamLeadQuestionOf(
+  model: TeamPanelGameModel,
+  state: TeamInboxAgentState
+): TeamInboxAgentQuestion | null {
+  return teamAgentQuestionOf(model.lead, model.projectName, state)
+}
+
 /**
  * With no team, every session's live question except a team's, which belongs to its own Inbox.
- * With a team, the lead's; members ask the lead, and their prompts stay on their cards.
+ * With a team, the lead's and then each member's.
  */
 export function teamInboxAgentQuestionsOf(
   model: TeamPanelModel,
   state: TeamInboxAgentState
 ): TeamInboxAgentQuestion[] {
   if (model.kind !== 'solo') {
-    const lead = teamLeadQuestionOf(model, state)
-    return lead ? [lead] : []
+    return [model.lead, ...model.members].flatMap(
+      (agent) => teamAgentQuestionOf(agent, model.projectName, state) ?? []
+    )
   }
   return model.rows.flatMap((row) =>
     row.liveAction?.kind === 'question' && !row.inTeam

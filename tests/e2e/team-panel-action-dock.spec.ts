@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
@@ -6,6 +6,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { waitForRuntimeWorktree } from './helpers/game-cycle-contract'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
@@ -188,6 +189,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
 }, testInfo) => {
   test.setTimeout(CAPTURE_EVIDENCE ? 600_000 : 300_000)
   const agent = createStdinLoggingAgent()
+  let projectYaml: string | null = null
   try {
     await waitForSessionReady(orcaPage)
     // Why: the star card opens on agent counts and covered the dock in CI and in captures.
@@ -200,7 +202,8 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       (id) => window.__store!.getState().getKnownWorktreeById(id)!.path,
       worktreeId
     )
-    writeFileSync(path.join(worktreePath, 'orca.yaml'), ORCA_YAML)
+    projectYaml = path.join(worktreePath, 'orca.yaml')
+    writeFileSync(projectYaml, ORCA_YAML)
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     const client = new RuntimeClient(userDataDir, 30_000, null, null)
     const lead = (
@@ -236,17 +239,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     const leadHook = { paneKey: pane.paneKey, worktreeId }
     await emitCodexHookStatus(endpoint, { ...leadHook, state: 'working', prompt: 'Lead' })
 
-    // Why: right after launch the runtime can still hold a failed worktree scan, and `id:` misses (ORCA-1145).
-    await expect
-      .poll(
-        () =>
-          client.call('worktree.show', { worktree: `id:${worktreeId}` }).then(
-            () => 'resolved',
-            (error: Error) => error.message
-          ),
-        { timeout: 30_000 }
-      )
-      .toBe('resolved')
+    await waitForRuntimeWorktree(client, worktreeId)
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
       objective: 'Action dock',
       from: lead
@@ -514,5 +507,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     }
   } finally {
     agent.dispose()
+    // Why: the seeded repo is shared by the worker; its tracker: false left the next spec's queue null.
+    if (projectYaml) {
+      rmSync(projectYaml, { force: true })
+    }
   }
 })
