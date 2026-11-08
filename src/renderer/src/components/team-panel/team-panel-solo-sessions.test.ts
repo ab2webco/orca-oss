@@ -4,6 +4,7 @@ import type { FolderWorkspace, Repo, Worktree } from '../../../../shared/types'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import { teamSoloSessionsOf, type TeamSoloSessionsState } from './team-panel-solo-sessions'
 import { teamPanelSoloModelFrom } from './use-team-panel-solo-model'
+import { toRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'
 
 const repo = { id: 'repo-1', path: '/r', displayName: 'orca-oss' } as Repo
 
@@ -56,6 +57,7 @@ function state(overrides: Partial<TeamSoloSessionsState>): TeamSoloSessionsState
     runtimeEnvironments: [],
     sshTargetLabels: new Map(),
     sshConnectionStates: new Map(),
+    terminalLayoutsByTabId: {},
     ...overrides
   } as TeamSoloSessionsState
 }
@@ -73,6 +75,29 @@ const claudeRoster = {
     activeAccountId: 'a-1'
   }
 } as Partial<TeamSoloSessionsState>
+
+describe("teamSoloSessionsOf on each session's own host (ORCA-1129)", () => {
+  const LEAF = '11111111-1111-4111-8111-111111111111'
+  const paired = state({
+    worktreesByRepo: { 'repo-1': [worktree({ hostId: 'runtime:env-mini' } as Partial<Worktree>)] },
+    runtimeEnvironments: [{ id: 'env-mini', name: 'mini' }] as never,
+    agentStatusByPaneKey: { [`tab-1:${LEAF}`]: entry({}) },
+    terminalLayoutsByTabId: {
+      'tab-1': { ptyIdsByLeafId: { [LEAF]: toRemoteRuntimePtyId('term_lead', 'env-mini') } }
+    } as never
+  })
+
+  // Why: a mirrored pane carries its host's handle only in its PTY id, never in its status.
+  it("marks a paired host's lead by its own host's leads", () => {
+    const leads = new Map([['env-mini', new Set(['term_lead'])]])
+    expect(teamSoloSessionsOf(paired, leads)[0]?.inTeam).toBe(true)
+  })
+
+  it("never matches a handle against another host's leads", () => {
+    const leads = new Map([['', new Set(['term_lead'])]])
+    expect(teamSoloSessionsOf(paired, leads)[0]?.inTeam).toBe(false)
+  })
+})
 
 describe('teamSoloSessionsOf', () => {
   it('names each session after its workspace and project and reads its ticket and note', () => {
@@ -291,6 +316,8 @@ describe('teamPanelSoloModelFrom', () => {
           })
         }
       }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
       selectedPaneKey: null
     })
     expect(model.rows[0]?.status).toBe('attention')
@@ -317,6 +344,8 @@ describe('teamPanelSoloModelFrom', () => {
           })
         }
       }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
       selectedPaneKey: 'tab-1:11111111-1111-4111-8111-111111111111'
     })
     expect(model.rows.map((row) => row.paneKey)).toEqual([

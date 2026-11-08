@@ -11,6 +11,10 @@ import {
   type AgentStatusEntry
 } from '../../../../shared/agent-status-types'
 import { isSupersededAgentCompletionSnapshot } from './agent-completion-snapshot-staleness'
+import { parseAskFromStatus } from '../../../../shared/native-chat-ask'
+import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { environmentIdOfHost } from '@/components/game-inbox/game-owner-question-groups'
 import type {
   AgentCompletionDispatchMeta,
   AgentCompletionStatusSnapshot
@@ -50,6 +54,20 @@ function hasFreshActiveHookStatus(
     snapshot.agentType !== 'unknown' &&
     activeHookAgentForTitle !== explicitTitleAgentType
   return Boolean(isFreshNonDoneAgentStatus(snapshot) && !titleNamesDifferentKnownAgent)
+}
+
+/** The question a waiting agent asks; '' when its question tool is unreadable, null when none. */
+export function agentQuestionOfSnapshot(
+  status: Pick<AgentStatusEntry, 'state' | 'toolName' | 'interactivePrompt'>
+): string | null {
+  if (status.state !== 'waiting' && status.state !== 'blocked') {
+    return null
+  }
+  const ask = parseAskFromStatus(status.interactivePrompt, status.toolName)?.questions[0]
+  if (ask) {
+    return ask.question
+  }
+  return isAskUserQuestionTool(status.toolName) ? '' : null
 }
 
 export type TerminalNotificationEvent = {
@@ -202,6 +220,20 @@ export function dispatchTerminalNotification(
         agentInterrupted: agentStatus.interrupted
       }
     : {}
+  const agentQuestion = agentStatus ? agentQuestionOfSnapshot(agentStatus) : null
+  // Why the Inbox: it answers the question; a terminal focus left the panel closed (ORCA-1129 D6).
+  const questionTarget =
+    agentQuestion === null
+      ? {}
+      : {
+          agentQuestion,
+          gameInbox: {
+            environmentId: environmentIdOfHost(
+              worktree?.hostId ?? (repo ? getRepoExecutionHostId(repo) : null)
+            ),
+            worktreeId
+          }
+        }
   const notificationId =
     event.source === 'agent-task-complete'
       ? buildAgentNotificationId({
@@ -225,7 +257,8 @@ export function dispatchTerminalNotification(
       hasMultipleActiveRepos: countReposNeedingNotificationDisambiguation(state) > 1,
       terminalTitle: event.terminalTitle,
       isActiveWorktree: state.activeWorktreeId === worktreeId,
-      ...agentSnapshot
+      ...agentSnapshot,
+      ...questionTarget
     })
     .then((result) => {
       if (result.delivered) {

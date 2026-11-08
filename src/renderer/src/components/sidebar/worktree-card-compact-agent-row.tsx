@@ -11,8 +11,9 @@ import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
 import { AgentStallTimerControl } from './AgentStallTimerControl'
-import { teamSoloLiveText, teamModelText } from '@/components/team-panel/team-card-text'
+import { teamLiveText, teamModelText } from '@/components/team-panel/team-card-text'
 import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
+import { agentToolLabelOf } from '../../../../shared/agent-tool-label'
 import {
   teamLiveActionOfEntry,
   teamSessionModelOf
@@ -44,7 +45,7 @@ function getCompactAgentSecondary(agent: DashboardAgentRowData): string {
     return 'Interrupted by user'
   }
   if (agent.state === 'working') {
-    const toolName = agent.entry.toolName?.trim() ?? ''
+    const toolName = agentToolLabelOf(agent.entry.toolName?.trim() ?? '')
     const toolInput = agent.entry.toolInput?.trim() ?? ''
     if (toolName && toolInput) {
       return `${toolName}: ${toolInput}`
@@ -142,7 +143,7 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
     liveAction !== null &&
     (liveAction.kind === 'question' || agent.state === 'blocked' || agent.state === 'waiting')
   const primary = liveAction
-    ? teamSoloLiveText(liveAction, 'working')
+    ? teamLiveText(liveAction, 'working')
     : redactDispatchCapability(label ?? getCompactAgentPrimary(agent))
   const isLineageChild = agent.lineage?.depth === 1
   const rawSecondary = liveAction ? '' : redactDispatchCapability(getCompactAgentSecondary(agent))

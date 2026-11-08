@@ -40,7 +40,10 @@ export function gameInboxSourceOf(
   const byTicket = new Map<string, string[]>()
   for (const worker of run ? db.listWorkerTerminalResources({ runId: run.id }) : []) {
     const task = db.getTask(worker.taskId)
-    const ticket = ticketInText(task?.task_title ?? task?.display_name)
+    // Why the name: an adopted agent's task has no ticket, and its mail still needs a home.
+    const ticket =
+      ticketInText(task?.task_title ?? task?.display_name) ??
+      (task?.display_name || task?.task_title)?.trim()
     if (!ticket) {
       continue
     }

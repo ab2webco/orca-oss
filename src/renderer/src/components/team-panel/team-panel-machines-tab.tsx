@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import type { TeamMachine } from '../../../../shared/team-panel-model-types'
 import { teamHostText, teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamPanelMessageState } from './team-panel-section-state'
 import { TeamStatusMark } from './TeamStatusMark'
 
 const GB = 1024 ** 3
@@ -99,14 +100,25 @@ function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
   )
 }
 
+/** The tab's empty copy, also shown under this machine when it is the only one (V28 state-empty-hosts). */
+export const teamMachinesAloneCopy = (): { title: string; text: string } => ({
+  title: translate('teamPanel.tabs.machines.emptyTitle', 'Only this machine'),
+  text: translate(
+    'teamPanel.tabs.machines.emptyText',
+    'Pair another machine to spread agents across hosts.'
+  )
+})
+
 export function TeamPanelMachinesTab({
   value
 }: TeamPanelTabBodyProps<TeamMachine[]>): React.JSX.Element {
+  const alone = value.every((machine) => machine.host.kind === 'local')
   return (
-    <div className="flex flex-col pb-3 pt-1.5">
+    <div className={cn('flex flex-col pt-1.5', { 'pb-3': !alone })}>
       {value.map((machine) => (
         <MachineRow key={teamHostText(machine.host)} machine={machine} />
       ))}
+      {alone ? <TeamPanelMessageState {...teamMachinesAloneCopy()} /> : null}
     </div>
   )
 }

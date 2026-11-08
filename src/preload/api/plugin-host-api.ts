@@ -107,6 +107,7 @@ export type PluginHostListEntry = {
   }[]
   restarts: number
   blockedByKillList?: { reason: string; advisoryUrl?: string }
+  blockedByDevSharedVault?: true
   source?: {
     kind: 'local-path' | 'git' | 'marketplace' | 'bundled'
     reference: string

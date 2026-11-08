@@ -59,7 +59,8 @@ describe('gameInboxSourceOf', () => {
 
     expect(source.leadAddresses).toEqual(['term_lead', 'term_lead_old', 'run:run_1'])
     expect(source.members).toEqual([
-      { ticket: 'CIN-1', addresses: ['term_1', 'dispatch:d1', 'dispatch:d1b'] }
+      { ticket: 'CIN-1', addresses: ['term_1', 'dispatch:d1', 'dispatch:d1b'] },
+      { ticket: 'Docs', addresses: ['term_9', 'dispatch:d9'] }
     ])
     expect(source.mail.map((one) => one.id)).toEqual(['msg_1', 'msg_2'])
     expect(asked).toEqual([
@@ -68,8 +69,22 @@ describe('gameInboxSourceOf', () => {
       'run:run_1',
       'term_1',
       'dispatch:d1',
-      'dispatch:d1b'
+      'dispatch:d1b',
+      'term_9',
+      'dispatch:d9'
     ])
+  })
+
+  it('names a member with no ticket, like an adopted agent, so its mail and questions have a home (ORCA-1136)', () => {
+    const { db } = fakeDb()
+    db.getTask = (id) =>
+      id === 't1'
+        ? { task_title: 'CIN-1 Cartelera', display_name: null }
+        : { task_title: 'Docs', display_name: 'Pixel' }
+
+    const source = gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' })
+
+    expect(source.members).toContainEqual({ ticket: 'Pixel', addresses: ['term_9', 'dispatch:d9'] })
   })
 
   it("carries the ids of the run's questions still awaiting an answer (ORCA-746 T6)", () => {

@@ -97,6 +97,7 @@ function renderInbox(
       agentQuestions={[]}
       answeredQuestions={[]}
       onOpenAgent={vi.fn()}
+      answerAgentOf={() => null}
       memberNames={new Map([['ORCA-1033', 'Sabio']])}
       {...over}
     />
@@ -192,6 +193,33 @@ describe('Inbox tab', () => {
     expect(view.getByPlaceholderText('Your answer')).toBeTruthy()
   })
 
+  it('names a member with no ticket and never shows a raw dispatch id (ORCA-1136)', () => {
+    const item = THREADS.waiting[0]!
+    const view = renderInbox({
+      threads: {
+        ...THREADS,
+        waiting: [
+          { ...item, id: 'w-main', ticket: 'main', body: 'Reply member ready?' },
+          { ...item, id: 'w-raw', ticket: 'dispatch:ctx_1fa802c37732', body: 'Which port?' }
+        ],
+        answered: [{ ...THREADS.answered[0]!, ticket: 'main' }]
+      }
+    })
+    pick(view, /Waiting/)
+    const named = view.getByTestId('team-inbox-waiting-w-main')
+    const raw = view.getByTestId('team-inbox-waiting-w-raw')
+
+    expect(named.textContent).toContain('main: Reply member ready?')
+    expect(named.querySelector('code')).toBeNull()
+    expect(raw.textContent).not.toContain('ctx_')
+    expect(raw.textContent).toContain('Which port?')
+
+    pick(view, /Answered/)
+    const answered = view.getByTestId('team-inbox-answered-a1')
+    expect(answered.textContent).toContain('main')
+    expect(answered.querySelector('code')).toBeNull()
+  })
+
   it('lists a thread with its message count and last line, the ticket said once', () => {
     const view = renderInbox()
     pick(view, /Threads/)
@@ -255,6 +283,34 @@ describe('Inbox tab', () => {
     expect(view.getByText('Apply it now · Leave it for the release')).toBeTruthy()
     act(() => fireEvent.click(view.getByRole('button', { name: 'Open terminal' })))
     expect(onOpenAgent).toHaveBeenCalledWith(agent)
+  })
+
+  // Why (ORCA-1129 D5): V28 solo-many-inbox answers from the card; the options were text only.
+  it("answers an agent's question with its option buttons, once", () => {
+    const answer = vi.fn(() => true)
+    const agent = {
+      paneKey: 'tab-1:leaf-1',
+      terminalHandle: null,
+      worktreeId: 'wt-tooltip',
+      host: { kind: 'local' as const },
+      repoName: 'orca-oss',
+      worktreeName: 'fix-tooltip',
+      text: 'Apply the migration now?',
+      options: ['Apply it now', 'Leave it for the release']
+    }
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      agentQuestions: [agent],
+      answerAgentOf: () => answer
+    })
+
+    act(() => fireEvent.click(view.getByRole('button', { name: 'Leave it for the release' })))
+
+    expect(answer).toHaveBeenCalledWith(1)
+    const first = view.getByRole('button', { name: 'Apply it now' }) as HTMLButtonElement
+    expect(first.disabled).toBe(true)
+    expect(view.getByRole('button', { name: 'Open terminal' })).toBeTruthy()
   })
 
   it('lists what you answered beside what the lead answered', () => {

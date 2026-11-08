@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   resetClaudeKeychainMocks,
@@ -11,8 +10,9 @@ import {
   readManagedClaudeKeychainCredentials,
   writeManagedClaudeKeychainCredentials
 } from './keychain'
+import { createIsolatedTestProfilePath } from './claude-service-test-profile'
 
-const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-reauth-test')
+const CLAUDE_SERVICE_TEST_ROOT = createIsolatedTestProfilePath('orca-claude-service-reauth-test')
 
 vi.mock('electron', () => ({
   app: {

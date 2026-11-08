@@ -48,6 +48,15 @@ const args = (overrides: Partial<Parameters<typeof teamPanelModelOf>[0]> = {}) =
 })
 
 describe('teamPanelModelOf', () => {
+  // ORCA-1094 row 2: the level is the team's real character XP on the game's own curve.
+  it('levels the project from its characters XP, and draws none when it could not be read', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    expect(teamPanelModelOf(args({ xp: 350 }))?.xp).toEqual({ level: 3, into: 50, need: 300 })
+    expect(teamPanelModelOf(args({ xp: 0 }))?.xp).toEqual({ level: 1, into: 0, need: 100 })
+    expect(teamPanelModelOf(args({ xp: null }))?.xp).toBeNull()
+  })
+
   it('builds the cards with the tickets that have an open question for the user', () => {
     teamCardsOf.mockReturnValue(CARDS)
     const questions = [
@@ -258,6 +267,24 @@ describe('teamPanelModelOf', () => {
       queue: { kind: 'unavailable' },
       machines: { kind: 'unavailable' }
     })
+  })
+
+  it("notes the members that run in a folder lead's own folder (ORCA-1135)", () => {
+    teamCardsOf.mockReturnValue({
+      lead: { paneKey: 'lead', worktreeId: 'folder:ws-1' },
+      members: [
+        { paneKey: 'm1', worktreeId: 'folder:ws-1' },
+        { paneKey: 'm2', worktreeId: 'repo::/elsewhere' }
+      ]
+    })
+
+    expect(
+      teamPanelModelOf(args({ isFolder: true }))?.members.map((one) => one.inFolder ?? false)
+    ).toEqual([true, false])
+    expect(teamPanelModelOf(args())?.members.map((one) => one.inFolder ?? false)).toEqual([
+      false,
+      false
+    ])
   })
 
   it('hides PRs in a folder workspace', () => {

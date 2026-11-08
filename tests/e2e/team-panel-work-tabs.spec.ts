@@ -141,7 +141,7 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
       hosts: []
     }
   },
-  unavailable: { remove: ['project', 'hostCapacity', 'hosts', 'actions'], set: {} }
+  unavailable: { remove: ['project', 'hostCapacity', 'localHost', 'hosts', 'actions'], set: {} }
 })
 
 type RigGlobal = typeof globalThis & {

@@ -259,6 +259,10 @@ import {
   normalizeClaudeRuntimeSelection
 } from './claude-accounts/runtime-selection'
 import { codexHookService, setSystemCodexHomeHookSweepSuppressed } from './codex/hook-service'
+import {
+  resolveSharedHookFilePolicy,
+  setSharedHookFilePolicy
+} from './agent-hooks/shared-hook-file-policy'
 import { reconcileRetainedCodexHookHomes } from './codex/retained-codex-hook-state'
 import {
   ensureRealHomeCodexHookState,
@@ -367,6 +371,7 @@ import { PluginBundledBootstrapCoordinator } from './plugins/plugin-bundled-boot
 import { resolveBundledPluginRoot } from './plugins/plugin-bundled-bootstrap'
 import { resolvePluginHostEntryPath } from './plugins/plugin-host-entry-path'
 import { createPluginWorkerFactory, resolvePluginWorkerHome } from './plugins/plugin-worker-home'
+import { resolveDevSharedVaultWorkerBlockReason } from './plugins/plugin-dev-shared-vault-gate'
 import { getMainE2EConfig } from './e2e-config'
 import { startDeadClaudeHookReporter } from './claude/dead-hook-report'
 import { applyPluginConsent, applyPluginEnablement } from './plugins/plugin-enablement'
@@ -3062,6 +3067,13 @@ void app.whenReady().then(async () => {
     hostVersion: app.getVersion(),
     blockedPluginReason: (pluginKey) => pluginKillListService?.reason(pluginKey) ?? null
   })
+  // Why: decided once at launch; a dev profile on a linked vault keeps spawn-capable plugins off (ORCA-1131).
+  const devSharedVaultWorkerBlockReason = resolveDevSharedVaultWorkerBlockReason({
+    isPackaged: app.isPackaged,
+    isE2E: getMainE2EConfig().userDataDir !== null,
+    userDataPath: app.getPath('userData'),
+    env: process.env
+  })
   pluginService = new PluginService({
     userDataPath: app.getPath('userData'),
     hostVersion: app.getVersion(),
@@ -3076,6 +3088,7 @@ void app.whenReady().then(async () => {
     getKeybindings: () => keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => pluginKillListService?.find(pluginKey) ?? null,
     hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged),
+    getSpawnCapableWorkerBlockReason: () => devSharedVaultWorkerBlockReason,
     workerFactory: createPluginWorkerFactory(
       resolvePluginWorkerHome({
         isPackaged: app.isPackaged,
@@ -3235,11 +3248,14 @@ void app.whenReady().then(async () => {
     console.warn('[worktrees] Failed to sweep leftover worktree directories:', error)
   })
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
-  // Why: a dev Orca shares ~/.claude with the installed one; it must not rewrite that Orca's entries (ORCA-1113).
-  if (!app.isPackaged && getMainE2EConfig().userDataDir === null) {
-    claudeHookService.setHomeManagedHookPolicy('keep-existing')
-    openClaudeHookService.setHomeManagedHookPolicy('keep-existing')
-  }
+  // Why: a dev Orca shares ~/.claude, ~/.orca/agent-hooks and ~/.codex with the installed one; it must not rewrite that Orca's files (ORCA-1113, ORCA-1131).
+  const sharedHookFilePolicy = resolveSharedHookFilePolicy({
+    isPackaged: app.isPackaged,
+    isE2E: getMainE2EConfig().userDataDir !== null
+  })
+  setSharedHookFilePolicy(sharedHookFilePolicy)
+  claudeHookService.setHomeManagedHookPolicy(sharedHookFilePolicy)
+  openClaudeHookService.setHomeManagedHookPolicy(sharedHookFilePolicy)
   const startupManagedHookSettings = store.getSettings()
   const shouldReconcileStartupManagedHooks =
     shouldInstallManagedHooks(is.dev) &&
