@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
+import { STATION_FLOOR } from './quest-art/quest-art-stage.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const argOf = (name) => {
@@ -116,7 +117,7 @@ const roleOf = (sheets, actions, labels = {}) => ({
   )
 })
 
-const styleOf = (style, names, layers, station, actions) => ({
+const styleOf = (style, names, layers, station, stationFeet, actions) => ({
   layers,
   roles: {
     lead: roleOf([`${style}/lead.png`], actions),
@@ -126,7 +127,7 @@ const styleOf = (style, names, layers, station, actions) => ({
     ),
     advisor: roleOf([`${style}/advisor.png`], actions)
   },
-  props: { station }
+  props: { station, stationFeet }
 })
 
 const writeUrl = async (path, url) => {
@@ -172,8 +173,10 @@ async function main() {
       const url = await page.evaluate((one) => window.questArt.layer(one), paint)
       await writeUrl(join(out, style, `${name}.png`), url)
     }
-    const [paint, name, width, height] =
-      style === 'figures' ? ['paintForge', 'forge', 120, 48] : ['paintDesk', 'desk', 120, 64]
+    const [paint, name, width, height, floor] =
+      style === 'figures'
+        ? ['paintForge', 'forge', 120, 48, STATION_FLOOR.forge]
+        : ['paintDesk', 'desk', 120, 64, STATION_FLOOR.desk]
     const propUrl = await page.evaluate(
       ([one, w, h]) => window.questArt.prop(one, w, h),
       [paint, width, height]
@@ -187,6 +190,7 @@ async function main() {
         ...(layer === 'grass' ? { front: true } : {})
       })),
       `${style}/${name}.png`,
+      { x: width, y: floor * 2 },
       actions
     )
   }

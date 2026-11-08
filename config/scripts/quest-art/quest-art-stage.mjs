@@ -183,10 +183,12 @@ export function paintFiguresFront(g) {
 
 // A station prop is 120 wide with the seat at its center, so the work sits right of whoever uses it.
 export const STATION_WIDTH = 120
+// Where each station meets the floor, in stage units from its top; the shadow needs room below.
+export const STATION_FLOOR = { forge: 44, desk: 60 }
 
 export function paintForge(g) {
   g.save()
-  g.translate(STATION_WIDTH / 2 + 26, 44)
+  g.translate(STATION_WIDTH / 2 + 26, STATION_FLOOR.forge)
   g.fillStyle = 'rgb(20 20 30 / 0.3)'
   g.beginPath()
   g.ellipse(0, 0, 21, 3.4, 0, 0, TAU)
@@ -346,7 +348,7 @@ function chair(g) {
 
 export function paintDesk(g) {
   g.save()
-  g.translate(STATION_WIDTH / 2, 60)
+  g.translate(STATION_WIDTH / 2, STATION_FLOOR.desk)
   g.fillStyle = 'rgb(16 18 26 / 0.34)'
   g.beginPath()
   g.ellipse(22, 0, 38, 3.6, 0, 0, TAU)
