@@ -340,6 +340,50 @@ describe('orca game adopt (ORCA-943)', () => {
       expect(output()).toMatchObject({ name: 'main', adopted: true, reused: true })
     })
 
+    // Why (ORCA-1141): two agents adopted from `main` worktrees shared one name, so one Inbox thread.
+    it('names it apart from every task already in the Run', async () => {
+      const main = {
+        ...local(),
+        displayName: 'main',
+        worktree: { id: 'repo1::/wt/main', branch: 'main', displayName: 'main' }
+      }
+      const taken = [{ task_title: 'main' }, { task_title: 'Other', display_name: 'main 2' }]
+      const { client, calls } = clientWith([main], undefined, {
+        results: { 'orchestration.taskList': { tasks: taken } }
+      })
+
+      await adopt(client, 'main')
+
+      expect(mutations(calls)).toEqual([
+        ['orchestration.taskCreate', expect.objectContaining({ taskTitle: 'main 3' })],
+        ['orchestration.workerStart', expect.objectContaining({ displayName: 'main 3' })]
+      ])
+      // Why: the live check's second adopt printed main while the fleet said main 2.
+      expect(output()).toMatchObject({ name: 'main 3', adopted: true })
+    })
+
+    it("adopts a found agent that shares an adopted member's name, under a name of its own", async () => {
+      const worktree = { id: 'repo1::/wt/main', branch: 'main', displayName: 'main' }
+      const member = { ...local(), displayName: 'main', found: undefined, worktree }
+      const other = {
+        ...local(),
+        paneKey: 'tab-8:leaf-8',
+        terminalHandle: 'term_local_8',
+        displayName: 'main',
+        worktree
+      }
+      const { client, calls } = clientWith([member, other], undefined, {
+        results: { 'orchestration.taskList': { tasks: [{ task_title: 'main' }] } }
+      })
+
+      await adopt(client, 'main')
+
+      expect(mutations(calls)).toEqual([
+        ['orchestration.taskCreate', expect.objectContaining({ taskTitle: 'main 2' })],
+        ['orchestration.workerStart', expect.objectContaining({ terminal: 'term_local_8' })]
+      ])
+    })
+
     it('refuses it while mid-turn unless --force', async () => {
       const { client, calls } = clientWith([local('repo1', 'working')])
 

@@ -14,6 +14,7 @@ import {
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
+import { drawStationScreen, stationScreenStateOf } from './team-scene-station-screen'
 
 type RoleArt = OrchestratorGameSceneNativeStyle['roles']['lead']
 
@@ -36,16 +37,71 @@ const feetY = (depth: number, h: number): number => h - 36 + depth * 22
 // Why against the front: `size` is the drawn height at the front of the stage.
 const depthScale = (depth: number): number => teamSceneScaleAt(depth) / teamSceneScaleAt(1)
 
-/** One layer drawn to cover the stage from its bottom edge, centered across it. */
+/** One layer drawn to cover the stage from its bottom edge, centered across it, `shift` px over. */
 function coverStage(
   g: CanvasRenderingContext2D,
   image: TeamSceneArtImage,
   w: number,
-  h: number
+  h: number,
+  shift = 0
 ): void {
   const scale = Math.max(w / image.width, h / image.height)
   const drawn = { width: image.width * scale, height: image.height * scale }
-  g.drawImage(image, (w - drawn.width) / 2, h - drawn.height, drawn.width, drawn.height)
+  const left = (w - drawn.width) / 2
+  if (shift === 0) {
+    g.drawImage(image, left, h - drawn.height, drawn.width, drawn.height)
+    return
+  }
+  // Why two copies: the layer wraps, so its tail fills the gap its head leaves.
+  const offset = ((shift % drawn.width) + drawn.width) % drawn.width
+  for (const x of [left + offset, left + offset - drawn.width]) {
+    g.drawImage(image, x, h - drawn.height, drawn.width, drawn.height)
+  }
+}
+
+type Layer = OrchestratorGameSceneNativeStyle['layers'][number]
+type Backdrop = ReturnType<typeof createSceneBackdrop>
+
+/** Layers back to front: runs of still ones baked once, drifting ones drawn on the clock. */
+function createLayerStack(layers: Layer[], image: (src: string) => TeamSceneArtImage) {
+  const parts: ({ drift: number; src: string } | Backdrop)[] = []
+  let still: Layer[] = []
+  const bake = (): void => {
+    const run = still
+    if (run.length > 0) {
+      parts.push(
+        createSceneBackdrop((g, w, h) => run.forEach((one) => coverStage(g, image(one.src), w, h)))
+      )
+    }
+    still = []
+  }
+  for (const layer of layers) {
+    if (layer.drift) {
+      bake()
+      parts.push({ drift: layer.drift, src: layer.src })
+    } else {
+      still.push(layer)
+    }
+  }
+  bake()
+  return {
+    draw: (g: CanvasRenderingContext2D, f: TeamSceneFrame): void => {
+      for (const part of parts) {
+        if ('drift' in part) {
+          coverStage(g, image(part.src), f.width, f.height, part.drift * f.t)
+        } else {
+          g.drawImage(part.get(f.width, f.height, f.ratio), 0, 0, f.width, f.height)
+        }
+      }
+    },
+    clear: (): void => {
+      for (const part of parts) {
+        if (!('drift' in part)) {
+          part.clear()
+        }
+      }
+    }
+  }
 }
 
 /** Walk runs on the ground the figure covers; everything else runs on the scene's clock. */
@@ -56,8 +112,13 @@ function frameOf(
   t: number,
   sheetPx: number
 ): [number, number] {
-  // Why: `work` is drawn at a station; the lead works with no prop to be seated at.
-  const pose = a.pose === 'work' && !seated ? 'idle' : a.pose
+  if (a.pose === 'done') {
+    // Why held: done is a finished stance, apart from idle's breathing and work's loop.
+    const cheer = art.animations.cheer
+    return cheer ? [cheer.row, cheer.frames - 1] : [art.animations.idle.row, 0]
+  }
+  // Why: `work` is drawn at a station; with none, V28's lead works by handing out its scroll.
+  const pose = a.pose === 'work' && !seated ? (art.animations.give ? 'give' : 'idle') : a.pose
   const animation = art.animations[pose] ?? art.animations.idle
   if (pose !== 'walk' || !art.animations.walk) {
     return [animation.row, Math.floor((t + a.x * 7) * animation.fps) % animation.frames]
@@ -75,14 +136,14 @@ export function createImagePainter(args: {
   const { style, images } = args.art
   const { colors } = args
   const image = (src: string): TeamSceneArtImage => images.get(src)!
-  const layersOf = (front: boolean) => (g: CanvasRenderingContext2D, w: number, h: number) => {
-    for (const layer of style.layers.filter((one) => Boolean(one.front) === front)) {
-      coverStage(g, image(layer.src), w, h)
-    }
-  }
-  const backdrop = createSceneBackdrop(layersOf(false))
-  const foreground = createSceneBackdrop(layersOf(true))
-  const hasForeground = style.layers.some((one) => one.front)
+  const backdrop = createLayerStack(
+    style.layers.filter((one) => !one.front),
+    image
+  )
+  const foreground = createLayerStack(
+    style.layers.filter((one) => one.front),
+    image
+  )
   const effects = createSceneEffects(feetY)
   const roleOf = (a: Pick<TeamSceneActor, 'role'>): RoleArt =>
     a.role === 'lead'
@@ -100,17 +161,26 @@ export function createImagePainter(args: {
       return
     }
     const prop = image(station)
+    const feet = style.props?.stationFeet ?? { x: prop.width / 2, y: prop.height }
+    const screen = style.props?.stationScreen
     for (const spot of f.stations) {
       const px = sheetPxAt(style.roles.member, spot.depth)
-      const width = prop.width * px
-      const height = prop.height * px
-      g.drawImage(
-        prop,
-        spot.x * f.width - width / 2,
-        feetY(spot.depth, f.height) - height,
-        width,
-        height
-      )
+      const left = spot.x * f.width - feet.x * px
+      const top = feetY(spot.depth, f.height) - feet.y * px
+      g.drawImage(prop, left, top, prop.width * px, prop.height * px)
+      if (screen) {
+        const worker = f.actors.find(
+          (a) =>
+            a.role === 'member' && a.pose !== 'walk' && Math.abs((a.x - spot.x) * f.width) < SEAT_PX
+        )
+        const rect = {
+          x: left + screen.x * px,
+          y: top + screen.y * px,
+          width: screen.width * px,
+          height: screen.height * px
+        }
+        drawStationScreen(g, rect, stationScreenStateOf(worker?.pose ?? null), f.t)
+      }
     }
   }
 
@@ -186,16 +256,14 @@ export function createImagePainter(args: {
       return feetY(depth, h) - feetOf(art).y * sheetPxAt(art, depth)
     },
     paint: (g, f: TeamSceneFrame) => {
-      const { width: w, height: h } = f
-      g.drawImage(backdrop.get(w, h, f.ratio), 0, 0, w, h)
+      const h = f.height
+      backdrop.draw(g, f)
       effects.start(f.effects, f.actors, h)
       drawStations(g, f)
       for (const a of f.actors) {
         drawActor(g, a, f)
       }
-      if (hasForeground) {
-        g.drawImage(foreground.get(w, h, f.ratio), 0, 0, w, h)
-      }
+      foreground.draw(g, f)
       effects.draw(g, f)
       drawSceneOverflow(g, f.overflow)
     },

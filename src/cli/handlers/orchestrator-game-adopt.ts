@@ -121,6 +121,24 @@ async function hostSeatOf(
   return { terminal: terminal.handle, environmentId, host }
 }
 
+/** A name no task in the lead's Run has: an adopted agent's mail is filed under its name (ORCA-1141). */
+async function freeAdoptedNameOf(client: Client, from: string, name: string): Promise<string> {
+  type Listed = { tasks?: { task_title?: string | null; display_name?: string | null }[] }
+  const listed = await client
+    .call<Listed>('orchestration.taskList', { callerTerminalHandle: from })
+    .catch(() => null)
+  const taken = new Set(
+    (listed?.result?.tasks ?? []).flatMap((task) =>
+      [task.task_title, task.display_name].flatMap((one) => (one?.trim() ? [one.trim()] : []))
+    )
+  )
+  let free = name
+  for (let n = 2; taken.has(free); n++) {
+    free = `${name} ${n}`
+  }
+  return free
+}
+
 /** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
 async function adoptAgent(
   client: Client,
@@ -154,13 +172,17 @@ async function adoptAgent(
       (agent.worktree !== undefined &&
         isSameGameProject(agent.worktree.id, args.leadWorktreeId))) &&
     isGameAgentNamed(agent, name)
-  if (agents.some((agent) => agent.isMember && !agent.found && !agent.isLeader && ours(agent))) {
-    return { name, adopted: true, reused: true }
-  }
   const local = agents.find((agent) => agent.found && agent.terminalHandle && ours(agent))
   const found =
     local ??
     agents.find((agent) => agent.found && hostPaneOf(agent) && isGameAgentNamed(agent, name))
+  // Why found first: a member named like it must not hide another agent of that name (ORCA-1141).
+  if (
+    !found &&
+    agents.some((agent) => agent.isMember && !agent.found && !agent.isLeader && ours(agent))
+  ) {
+    return { name, adopted: true, reused: true }
+  }
   const worktreeId = found?.worktree?.id
   const hostPane = found ? hostPaneOf(found) : null
   const environmentId = found?.remote?.environmentId
@@ -194,7 +216,8 @@ async function adoptAgent(
   if (saved) {
     return resumeAdoptedMember(client, from, saved, seat.terminal)
   }
-  const title = ticketOfMember(found) ?? found.displayName ?? name
+  const title =
+    ticketOfMember(found) ?? (await freeAdoptedNameOf(client, from, found.displayName ?? name))
   const task = await client.call<{ task: { id: string; run_id?: string } }>(
     'orchestration.taskCreate',
     {
@@ -229,7 +252,7 @@ async function adoptAgent(
     })
   }
   return {
-    name,
+    name: title,
     adopted: started.result.state === 'ready',
     ...(seat.host ? { host: seat.host } : {}),
     terminal: seat.terminal,

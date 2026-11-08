@@ -11,6 +11,7 @@ import type {
 import type { TeamArcadeActions } from './TeamArcadeSection'
 import { TeamTabContent } from './TeamTabContent'
 import { TeamScenePainterContext } from '../team-scene/team-scene-painter-context'
+import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 import type { TeamScenePainter } from '../team-scene/team-scene-painter'
 import { recordingContext } from '../team-scene/team-scene-recording-context'
 
@@ -119,7 +120,8 @@ async function render(
   selectTab = vi.fn(),
   arcadeActions: TeamArcadeActions | null = null,
   openTasks = vi.fn(),
-  painter: TeamScenePainter | null = null
+  painter: TeamScenePainter | null = null,
+  sceneLeadLine: string | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -128,14 +130,16 @@ async function render(
   await act(async () => {
     root.render(
       <TeamScenePainterContext.Provider value={painter}>
-        <TeamTabContent
-          model={value}
-          look={look}
-          selectTab={selectTab}
-          now={NOW}
-          arcadeActions={arcadeActions}
-          onOpenTasks={openTasks}
-        />
+        <TeamSceneLeadLineContext.Provider value={sceneLeadLine}>
+          <TeamTabContent
+            model={value}
+            look={look}
+            selectTab={selectTab}
+            now={NOW}
+            arcadeActions={arcadeActions}
+            onOpenTasks={openTasks}
+          />
+        </TeamSceneLeadLineContext.Provider>
       </TeamScenePainterContext.Provider>
     )
   })
@@ -218,6 +222,19 @@ describe('TeamTabContent', () => {
       expect(meta.className).toContain('flex-wrap')
       expect(meta.className).not.toContain('truncate')
     }
+  })
+
+  // ORCA-1139 lead review: when the scene has no room for the lead's bubble, its card shows the line.
+  it("shows the lead's whole scene line in its card only while the scene has no room for its bubble", async () => {
+    const line = 'Waiting for you · Merge #923 now that the Windows check is green?'
+    const { container } = await render(model(), 'game', vi.fn(), null, vi.fn(), null, line)
+    const shown = leadCard(container).querySelector<HTMLElement>('[data-team-lead-line]')
+    expect(shown?.textContent).toBe(line)
+    expect(shown?.className).not.toContain('truncate')
+    expect(shown?.className).toContain('[overflow-wrap:anywhere]')
+
+    const fits = await render(model())
+    expect(leadCard(fits.container).querySelector('[data-team-lead-line]')).toBeNull()
   })
 
   it('sets the model in mono, as V28 does', async () => {

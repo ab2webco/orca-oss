@@ -6,6 +6,10 @@
           "src": "figures/sky.png"
         },
         {
+          "src": "figures/clouds.png",
+          "drift": 4
+        },
+        {
           "src": "figures/land.png"
         },
         {
@@ -172,7 +176,11 @@
         }
       },
       "props": {
-        "station": "figures/forge.png"
+        "station": "figures/forge.png",
+        "stationFeet": {
+          "x": 120,
+          "y": 88
+        }
       }
     },
     "office": {
@@ -340,7 +348,17 @@
         }
       },
       "props": {
-        "station": "office/desk.png"
+        "station": "office/desk.png",
+        "stationFeet": {
+          "x": 120,
+          "y": 120
+        },
+        "stationScreen": {
+          "x": 172,
+          "y": 24,
+          "width": 56,
+          "height": 36
+        }
       }
     }
   }
