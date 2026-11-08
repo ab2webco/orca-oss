@@ -2,20 +2,13 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
-import {
-  readCallerGameState,
-  recordGameMember,
-  setGameAgentDropped
-} from './orchestrator-game-board-call'
-import { bindRunOf, resumeOne } from './orchestrator-game-resume-members'
+import { readCallerGameState, setGameAgentDropped } from './orchestrator-game-board-call'
+import { resumeAdoptedMember, saveAdoptedMember } from './orchestrator-game-adopt-membership'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
-import {
-  adoptedMemberKeyOf,
-  type GameStatePausedMember
-} from '../../shared/orchestrator-game-adopted-members'
+import type { GameStatePausedMember } from '../../shared/orchestrator-game-adopted-members'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
@@ -128,28 +121,6 @@ async function hostSeatOf(
   return { terminal: terminal.handle, environmentId, host }
 }
 
-/** A paused adopted member resumes on its own task, so it keeps its name and Inbox thread. */
-async function resumeAdoptedMember(
-  client: Client,
-  from: string,
-  saved: GameStatePausedMember,
-  terminal: string
-): Promise<GameAdoptResult> {
-  const name = saved.name ?? saved.ticket
-  const refused = await bindRunOf(client, from, saved, 0)
-  if (refused) {
-    return { name, adopted: false, refusal: refused }
-  }
-  const resumed = await resumeOne(client, from, saved.ticket)
-  return {
-    name,
-    adopted: Boolean(resumed.dispatchId),
-    terminal,
-    ...(resumed.dispatchId ? { dispatchId: resumed.dispatchId } : {}),
-    ...(resumed.reason ? { refusal: resumed.reason } : {})
-  }
-}
-
 /** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
 async function adoptAgent(
   client: Client,
@@ -243,20 +214,16 @@ async function adoptAgent(
       devMode: isDevCliInvocation()
     }
   )
-  const runId = task.result.task.run_id
-  const key = adoptedMemberKeyOf(title)
-  // Why saved: a restart ends its dispatch, and resume-members brings it back by this record (ORCA-1141).
-  if (local && runId && key && started.result.state !== 'failed') {
-    await recordGameMember(client, {
-      ticket: key,
+  if (local) {
+    await saveAdoptedMember(client, {
       name: title,
-      runId,
+      runId: task.result.task.run_id,
       taskId: task.result.task.id,
       dispatchId: started.result.dispatchId,
       worktreeId,
-      agent: found.agentType ?? undefined,
-      lastState: started.result.state,
-      adoptedPaneKey: local.paneKey
+      agent: found.agentType,
+      state: started.result.state,
+      paneKey: local.paneKey
     })
   }
   return {
