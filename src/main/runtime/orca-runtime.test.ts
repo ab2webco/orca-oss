@@ -22898,6 +22898,117 @@ describe('OrcaRuntimeService', () => {
     expect(resolveLegacyWorkerTerminalRecovery).toHaveBeenCalledWith(secondWorkerPaneKey, 'adopted')
   })
 
+  // Why (ORCA-1141 R10): a cold restart deleted an adopted member's tab, which the user had opened.
+  it('keeps the tab of an exited worker whose terminal Orca did not create, and lets it resume', async () => {
+    const owned = {
+      paneKey: `legacy-owned:${HEADLESS_LEAF_ID}`,
+      tabId: 'legacy-owned',
+      pty: 'pty-owned'
+    }
+    const adopted = {
+      paneKey: `legacy-adopted:${HEADLESS_SECOND_LEAF_ID}`,
+      tabId: 'legacy-adopted',
+      leafId: HEADLESS_SECOND_LEAF_ID,
+      pty: 'pty-adopted'
+    }
+    const incarnationId = '66666666-6666-4666-8666-666666666666'
+    const tabOf = (tabId: string, ptyId: string) =>
+      ({ id: tabId, worktreeId: TEST_WORKTREE_ID, ptyId, title: tabId, createdAt: 1 }) as never
+    const layoutOf = (leafId: string, ptyId: string) =>
+      ({
+        root: { type: 'leaf', leafId },
+        activeLeafId: leafId,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { [leafId]: ptyId }
+      }) as never
+    const sleeping = (paneKey: string, tabId: string) => ({
+      paneKey,
+      tabId,
+      worktreeId: TEST_WORKTREE_ID,
+      agent: 'codex' as const,
+      providerSession: { key: 'session_id' as const, id: `${tabId}-session` },
+      prompt: 'continue',
+      state: 'working' as const,
+      capturedAt: 1,
+      updatedAt: 1,
+      origin: 'live' as const
+    })
+    const session: WorkspaceSessionState = {
+      ...getDefaultWorkspaceSession(),
+      tabsByWorktree: {
+        [TEST_WORKTREE_ID]: [tabOf(owned.tabId, owned.pty), tabOf(adopted.tabId, adopted.pty)]
+      },
+      terminalLayoutsByTabId: {
+        [owned.tabId]: layoutOf(HEADLESS_LEAF_ID, owned.pty),
+        [adopted.tabId]: layoutOf(adopted.leafId, adopted.pty)
+      },
+      terminalPtyIncarnationsByPaneKey: {
+        [owned.paneKey]: incarnationId,
+        [adopted.paneKey]: incarnationId
+      },
+      sleepingAgentSessionsByPaneKey: {
+        [owned.paneKey]: sleeping(owned.paneKey, owned.tabId),
+        [adopted.paneKey]: sleeping(adopted.paneKey, adopted.tabId)
+      }
+    }
+    const { runtimeStore, getSession } = makeRuntimeStoreWithWorkspaceSession(session)
+    const runtime = new OrcaRuntimeService(
+      { ...runtimeStore, flushOrThrow: vi.fn() } as never,
+      undefined,
+      { canRecoverPersistentLocalPtys: () => true }
+    )
+    const row = (id: string, paneKey: string, pty: string, ownership: string) => ({
+      dispatch_id: id,
+      task_id: `task-${id}`,
+      dispatch_status: 'dispatched',
+      contract_version: 0,
+      assignee_handle: `term_${id}`,
+      assignee_pane_key: paneKey,
+      process_incarnation: `${pty}:${incarnationId}`,
+      worker_state: 'ready',
+      worktree_id: TEST_WORKTREE_ID,
+      agent_terminal_handle: `term_${id}`,
+      terminal_ownership: ownership
+    })
+    const reconcileMissingWorkerTerminal = vi.fn()
+    runtime.setOrchestrationDb({
+      listLegacyWorkerTerminalRecoveryRows: () => [
+        row('owned', owned.paneKey, owned.pty, 'owned'),
+        row('adopted', adopted.paneKey, adopted.pty, 'external')
+      ],
+      reconcileMissingWorkerTerminal
+    } as unknown as OrchestrationDb)
+    runtime.setPtyController({
+      write: vi.fn(() => true),
+      kill: vi.fn(() => true),
+      getForegroundProcess: async () => null,
+      hasPty: () => false,
+      listProcesses: vi.fn(async () => [])
+    })
+    runtime.setNotifier({
+      revealTerminalSession: vi.fn(),
+      resolveLegacyWorkerTerminalRecovery: vi.fn()
+    } as never)
+
+    runtime.prepareLegacyWorkerTerminalRecovery()
+    await expect(runtime.reconcileLegacyWorkerTerminals()).resolves.toMatchObject({
+      exitedDispatchIds: ['owned', 'adopted'],
+      deferredDispatchIds: []
+    })
+
+    expect(reconcileMissingWorkerTerminal.mock.calls.map(([id]) => id)).toEqual([
+      'owned',
+      'adopted'
+    ])
+    expect(getSession().tabsByWorktree[TEST_WORKTREE_ID]?.map((tab) => tab.id)).toEqual([
+      adopted.tabId
+    ])
+    expect(getSession().sleepingAgentSessionsByPaneKey?.[owned.paneKey]).toBeUndefined()
+    const kept = getSession().sleepingAgentSessionsByPaneKey?.[adopted.paneKey]
+    expect(kept).toMatchObject({ tabId: adopted.tabId, agent: 'codex' })
+    expect(kept?.automaticResumeBlockedBy).toBeUndefined()
+  })
+
   it('retries inventory and unknown liveness without revealing a ghost worker', async () => {
     const workerPaneKey = `legacy-worker:${HEADLESS_LEAF_ID}`
     const incarnationId = '55555555-5555-4555-8555-555555555555'
