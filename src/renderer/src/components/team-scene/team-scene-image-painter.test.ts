@@ -255,6 +255,36 @@ describe('createImagePainter', () => {
     )
   })
 
+  // ORCA-1139: Quest's clouds were baked into the sky, so they never moved.
+  it('scrolls a drifting layer with the clock, between still layers baked once', () => {
+    IMAGES.set('clouds.png', image(1536, 352))
+    const painter = painterOf(
+      style({
+        layers: [
+          { src: 'sky.png' },
+          { src: 'clouds.png', drift: 6 },
+          { src: 'grass.png', front: true }
+        ]
+      })
+    )
+    const cloudsAt = (t: number): number[] => {
+      const { g, calls } = recordingContext()
+      painter.paint(g, frame({ t, actors: [] }))
+      return calls
+        .filter((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('clouds.png'))
+        .map((c) => Number(c.args[1]))
+    }
+    const still = cloudsAt(0)
+    const later = cloudsAt(10)
+    expect(still.length).toBeGreaterThan(0)
+    // 6 px a second over 10 s, wrapped around the drawn width.
+    expect(later[0]! - still[0]!).toBeCloseTo(60)
+    expect(backdropCalls).toHaveLength(2)
+    expect(backdropCalls[0]!.filter((c) => c.name === 'drawImage').map((c) => c.args[0])).toEqual([
+      IMAGES.get('sky.png')
+    ])
+  })
+
   it('covers a narrow stage from the bottom center and a wide one from the bottom', () => {
     const coverAt = (width: number): unknown[] => {
       backdropCalls = []
@@ -333,5 +363,37 @@ describe('createImagePainter portrait', () => {
     expect(face({ role: 'lead', key: 'lead', characterKey: null, name: 'Alfred' })[0]).toBe(
       IMAGES.get('lead.png')
     )
+  })
+})
+
+// ORCA-1139: V28's office lights each desk's screen by what its worker does.
+describe('createImagePainter station screens', () => {
+  const screen = { x: 170, y: 20, width: 60, height: 40 }
+  const screenFills = (pose: TeamSceneActor['pose'] | null, t = 0): unknown[] => {
+    const painter = painterOf(style({ props: { station: 'desk.png', stationScreen: screen } }))
+    const { g, calls } = recordingContext()
+    const spot = { x: 0.5, depth: 1 }
+    const actors = pose ? [actor('m', { pose, x: spot.x, depth: spot.depth })] : []
+    painter.paint(g, frame({ t, actors, stations: [spot] }))
+    return calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+  }
+
+  it('draws code while the worker works, amber when it asks, green when done, off when empty', () => {
+    expect(screenFills('work')[0]).toBe('#0f1826')
+    expect(screenFills('raise')[0]).toBe('#3a2d10')
+    expect(screenFills('done')[0]).toBe('#10352a')
+    expect(screenFills(null)).toEqual(['#0a0c10'])
+    expect(screenFills('done')).toContain('#4ade80')
+  })
+
+  it('scrolls the code lines while the worker works', () => {
+    const painter = painterOf(style({ props: { station: 'desk.png', stationScreen: screen } }))
+    const at = (t: number) => {
+      const { g, calls } = recordingContext()
+      const spot = { x: 0.5, depth: 1 }
+      painter.paint(g, frame({ t, actors: [actor('m', { pose: 'work' })], stations: [spot] }))
+      return JSON.stringify(calls.filter((c) => c.name === 'fillRect').map((c) => c.args))
+    }
+    expect(at(0)).not.toBe(at(0.4))
   })
 })

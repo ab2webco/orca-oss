@@ -6,6 +6,10 @@
           "src": "figures/sky.png"
         },
         {
+          "src": "figures/clouds.png",
+          "drift": 4
+        },
+        {
           "src": "figures/land.png"
         },
         {
@@ -348,6 +352,12 @@
         "stationFeet": {
           "x": 120,
           "y": 120
+        },
+        "stationScreen": {
+          "x": 172,
+          "y": 24,
+          "width": 56,
+          "height": 36
         }
       }
     }

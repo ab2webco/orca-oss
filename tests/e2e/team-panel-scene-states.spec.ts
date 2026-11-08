@@ -13,9 +13,15 @@ type Style = (typeof STYLES)[number]
 const WINDOW_MS = 1500
 // Why: Pixel's swing rests for most of its 1.15 s; sparser frames could miss it (see scene-motion).
 const MAX_FRAME_GAP_MS = 430
-// One member sits at x 0.1 (seatPlanOf); the lead stands at 0.84. Crops skip the sky, where the
-// clouds drift, and keep the head and its emote.
-const CROPS = { member: [0, 0.26], lead: [0.74, 0.96] } as const
+// [left, right, top, bottom] as fractions. One member sits at x 0.1 (seatPlanOf); the lead stands
+// at 0.84. Their crops start below Pixel's low cloud band (0.38) and keep the head and its emote.
+const CROPS = {
+  member: [0, 0.26, 0.4, 1],
+  lead: [0.74, 0.96, 0.4, 1],
+  sky: [0, 1, 0, 0.4]
+} as const
+// Why longer: Pixel's clouds step one scene pixel every 1.44 s (12 game ticks).
+const SKY_WINDOW_MS = 3000
 type Who = keyof typeof CROPS
 type Sample = { hashes: string[]; maxGapMs: number }
 
@@ -23,7 +29,7 @@ type Sample = { hashes: string[]; maxGapMs: number }
 test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
 // Hashes one actor's crop on every animation frame for a window, so the set is what was painted.
-async function sampleCrop(page: Page, who: Who): Promise<Sample> {
+async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<Sample> {
   return page.evaluate(
     ({ crop, windowMs }) =>
       new Promise<Sample>((resolve) => {
@@ -34,12 +40,12 @@ async function sampleCrop(page: Page, who: Who): Promise<Sample> {
             return 'unpainted'
           }
           const x = Math.floor(canvas.width * crop[0])
-          const top = Math.floor(canvas.height * 0.3)
+          const top = Math.floor(canvas.height * crop[2])
           const { data } = g.getImageData(
             x,
             top,
             Math.floor(canvas.width * crop[1]) - x,
-            canvas.height - top
+            Math.floor(canvas.height * crop[3]) - top
           )
           let hash = 0x811c9dc5
           for (let i = 0; i < data.length; i++) {
@@ -65,7 +71,7 @@ async function sampleCrop(page: Page, who: Who): Promise<Sample> {
           resolve({ hashes, maxGapMs: Math.max(...gaps) })
         }, windowMs)
       }),
-    { crop: CROPS[who], windowMs: WINDOW_MS }
+    { crop: CROPS[who], windowMs }
   )
 }
 
@@ -219,6 +225,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         for (const who of ['lead', 'member'] as const) {
           seen.set(`${style}:${who}:${round[who]}`, await poseFrames(orcaPage, who))
         }
+        if (round.member === 'working') {
+          const sky = await sampleCrop(orcaPage, 'sky', SKY_WINDOW_MS)
+          seen.set(`${style}:sky`, new Set(sky.hashes))
+        }
         await scene.screenshot({
           path: testInfo.outputPath(`scene-${style}-lead-${round.lead}-member-${round.member}.png`)
         })
@@ -279,6 +289,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
 
     const at = (style: Style, key: string): Set<string> => seen.get(`${style}:${key}`)!
+    // AC2: the clouds drift in the styles that have a sky.
+    for (const style of ['figures', 'pixel'] as const) {
+      expect.soft(at(style, 'sky').size, `${style}: the sky stood still`).toBeGreaterThan(1)
+    }
     for (const style of STYLES) {
       const pairs = [
         ['lead:idle', 'lead:working'],
