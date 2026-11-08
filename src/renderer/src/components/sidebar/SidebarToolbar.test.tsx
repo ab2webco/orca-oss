@@ -128,6 +128,33 @@ describe('SidebarToolbar moved workspace board hint', () => {
     expect(window.localStorage.getItem('orca.workspaceBoardMovedHintSeen.v1')).toBe('true')
   })
 
+  // ORCA-1093: a narrow window draws the Team panel over this button, and the hint then lay over the dock.
+  it('keeps the moved hint hidden while something covers the board button, and shows it once uncovered', async () => {
+    vi.useFakeTimers()
+    const panel = document.createElement('div')
+    let covering: Element | null = panel
+    const hitTest = vi.spyOn(document, 'elementFromPoint').mockImplementation(() => covering)
+    mocks.state = {
+      persistedUIReady: true,
+      featureInteractions: {
+        'workspace-board': { firstInteractedAt: 100, interactionCount: 2 }
+      }
+    }
+    try {
+      const { container } = await renderToolbar()
+      expect(hitTest).toHaveBeenCalled()
+      expect(container.textContent).not.toContain('Workspace board moved to the bottom bar')
+
+      covering = null
+      await act(async () => {
+        vi.advanceTimersByTime(250)
+      })
+      expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Why: the toolbar is a React.memo boundary whose props never change on a
   // language switch, so without its own useTranslation() subscription it keeps
   // the English copy it rendered at boot (the persisted locale is applied

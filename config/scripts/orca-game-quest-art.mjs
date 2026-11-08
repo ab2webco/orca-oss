@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import { chromium } from 'playwright'
+import { DESK_SCREEN, STATION_FLOOR } from './quest-art/quest-art-stage.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const argOf = (name) => {
@@ -97,6 +98,8 @@ window.questArt = {
 }
 `
 
+// CSS px a second, near V28's nearest cloud (0.06 x 60).
+const CLOUD_DRIFT = 4
 const SHEET_FRAME = { width: 128, height: 128 }
 // Why 60: a figure fills about 100 of the frame's 128 rows, so it stands 47 CSS px at the front.
 const SIZE = 60
@@ -116,7 +119,7 @@ const roleOf = (sheets, actions, labels = {}) => ({
   )
 })
 
-const styleOf = (style, names, layers, station, actions) => ({
+const styleOf = (style, names, layers, station, stationFeet, stationScreen, actions) => ({
   layers,
   roles: {
     lead: roleOf([`${style}/lead.png`], actions),
@@ -126,8 +129,20 @@ const styleOf = (style, names, layers, station, actions) => ({
     ),
     advisor: roleOf([`${style}/advisor.png`], actions)
   },
-  props: { station }
+  props: { station, stationFeet, ...(stationScreen ? { stationScreen } : {}) }
 })
+
+// Inside the screen's edge at 2x, so the panel never paints over the monitor's frame.
+const screenPixels = (screen) => {
+  const x = Math.ceil(screen.x * 2)
+  const y = Math.ceil(screen.y * 2)
+  return {
+    x,
+    y,
+    width: Math.floor((screen.x + screen.width) * 2) - x,
+    height: Math.floor((screen.y + screen.height) * 2) - y
+  }
+}
 
 const writeUrl = async (path, url) => {
   await writeFile(path, Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'))
@@ -164,6 +179,7 @@ async function main() {
       style === 'figures'
         ? [
             ['paintFiguresSky', 'sky'],
+            ['paintFiguresClouds', 'clouds'],
             ['paintFiguresLand', 'land'],
             ['paintFiguresFront', 'grass']
           ]
@@ -172,8 +188,10 @@ async function main() {
       const url = await page.evaluate((one) => window.questArt.layer(one), paint)
       await writeUrl(join(out, style, `${name}.png`), url)
     }
-    const [paint, name, width, height] =
-      style === 'figures' ? ['paintForge', 'forge', 120, 48] : ['paintDesk', 'desk', 120, 64]
+    const [paint, name, width, height, floor] =
+      style === 'figures'
+        ? ['paintForge', 'forge', 120, 48, STATION_FLOOR.forge]
+        : ['paintDesk', 'desk', 120, 64, STATION_FLOOR.desk]
     const propUrl = await page.evaluate(
       ([one, w, h]) => window.questArt.prop(one, w, h),
       [paint, width, height]
@@ -184,9 +202,12 @@ async function main() {
       names,
       layers.map(([, layer]) => ({
         src: `${style}/${layer}.png`,
-        ...(layer === 'grass' ? { front: true } : {})
+        ...(layer === 'grass' ? { front: true } : {}),
+        ...(layer === 'clouds' ? { drift: CLOUD_DRIFT } : {})
       })),
       `${style}/${name}.png`,
+      { x: width, y: floor * 2 },
+      style === 'office' ? screenPixels(DESK_SCREEN) : null,
       actions
     )
   }

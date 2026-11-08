@@ -5,7 +5,8 @@ import type { TeamSceneActivity, TeamSceneActor, TeamScenePose } from './team-sc
 const SEATED_POSE: Record<TeamSceneActivity, TeamScenePose> = {
   working: 'work',
   resting: 'idle',
-  needsYou: 'raise'
+  needsYou: 'raise',
+  done: 'done'
 }
 
 function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
@@ -32,7 +33,14 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
   return [...world.bodies.values()]
     .map((body): TeamSceneActor => {
       const timed = body.emote && world.t < body.emote.until ? body.emote.kind : null
-      const seatedAsk = body.plan.kind === 'seated' && body.activity === 'needsYou'
+      const seatedMark =
+        body.plan.kind !== 'seated'
+          ? null
+          : body.activity === 'needsYou'
+            ? 'alert'
+            : body.activity === 'done'
+              ? 'check'
+              : null
       const plan = body.plan
       return {
         key: body.key,
@@ -46,7 +54,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         gait: body.gait,
         stride: teamSceneStrideAt(body.depth),
         carrying: plan.kind === 'handoff' && plan.stage === 'toLead',
-        emote: timed ?? (seatedAsk ? 'alert' : null),
+        emote: timed ?? seatedMark,
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }
     })
