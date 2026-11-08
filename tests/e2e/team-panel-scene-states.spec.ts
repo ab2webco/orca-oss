@@ -197,8 +197,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     })
     const panel = orcaPage.getByTestId('team-panel')
     const seen = new Map<string, Set<string>>()
-    // Why a wait on the first round: the member walks in and greets the lead before it sits.
-    let settleMs = 9000
+    // Why: the panel reads game.state every 20 s (TEAM_REFRESH_MS), and on the first round the
+    // member also walks in and greets the lead before it sits.
+    const REFRESH_WAIT_MS = 21_000
+    let settleMs = REFRESH_WAIT_MS
     const capture = async (round: Record<Who, string>): Promise<void> => {
       for (const style of STYLES) {
         await orcaPage.evaluate(
@@ -234,6 +236,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     await emitCodexHookStatus(endpoint, { ...member, state: 'done', lastAssistantMessage: 'Done' })
     await expect.poll(() => agentState(false)).toBe('done')
     await expect.poll(() => agentState(true)).toBe('working')
+    settleMs = REFRESH_WAIT_MS
     await capture({ lead: 'working', member: 'done' })
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
@@ -249,6 +252,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       options: ['Yes', 'No']
     })
     await expect.poll(() => agentState(true)).toBe('done')
+    settleMs = REFRESH_WAIT_MS
     await capture({ lead: 'done', member: 'waiting' })
 
     const at = (style: Style, key: string): Set<string> => seen.get(`${style}:${key}`)!
