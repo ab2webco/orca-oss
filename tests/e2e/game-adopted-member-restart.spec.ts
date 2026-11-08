@@ -231,24 +231,37 @@ test('an adopted member keeps its tab, membership, name and thread across a cold
 
     // ORCA-1141 criterion 2: its agent resumes in that tab, and the lead's resume-members (run at
     // once by its rules, as for a launched member) makes it a member again, with no new adopt.
-    // Why by tab: a restored pane is listed again once its PTY binds, under a new handle.
-    const resolve = async (paneKey: string): Promise<{ handle: string; paneKey: string }> => {
+    // Why shown, then writable: a restored tab lists its terminal before its PTY binds, and CI is slower.
+    const resolve = async (
+      paneKey: string,
+      worktree: string
+    ): Promise<{ handle: string; paneKey: string }> => {
       const [tabId] = paneKey.split(':')
+      await page.evaluate(
+        ([id, tab]) => {
+          window.__store!.getState().setActiveWorktree(id)
+          window.__store!.getState().setActiveTab(tab)
+        },
+        [worktree, tabId] as const
+      )
+      await ensureTerminalVisible(page)
       let hit: { handle: string; paneKey: string } | null = null
       await expect
         .poll(
           async () => {
             const listed = await client.call<RuntimeTerminalListResult>('terminal.list')
-            const one = listed.result.terminals.find((t) => t.tabId === tabId)
+            const one = listed.result.terminals.find(
+              (t) => t.tabId === tabId && t.connected && t.writable
+            )
             hit = one ? { handle: one.handle, paneKey: `${one.tabId}:${one.leafId}` } : null
             return hit
           },
-          { timeout: 60_000, message: `no terminal came back in tab ${tabId}` }
+          { timeout: 60_000, message: `no writable terminal came back in tab ${tabId}` }
         )
         .not.toBeNull()
       return hit!
     }
-    const restoredPane = await resolve(found.result.terminal.paneKey)
+    const restoredPane = await resolve(found.result.terminal.paneKey, otherWorktreeId)
     const restored = restoredPane.handle
     writeFileSync(
       testInfo.outputPath('panes.json'),
@@ -264,7 +277,7 @@ test('an adopted member keeps its tab, membership, name and thread across a cold
         ...(state === 'working' ? { prompt: 'Back' } : { lastAssistantMessage: 'Back.' })
       })
     }
-    const leadAfter = (await resolve(pane.paneKey)).handle
+    const leadAfter = (await resolve(pane.paneKey, worktreeId)).handle
     await client.call('terminal.send', {
       terminal: leadAfter,
       text: 'node -e "setInterval(() => {}, 1e9)"',
