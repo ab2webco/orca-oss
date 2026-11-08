@@ -4728,7 +4728,9 @@
           "49f62c5665": "Workspace board",
           "5c9c7c16aa": "Add a project to create workspaces",
           "ca6f729da2": "New workspace ({{value0}})",
-          "a30e34eb5c": "Close workspace board"
+          "a30e34eb5c": "Close workspace board",
+          "projects": "Projects",
+          "workspaces": "Workspaces"
         },
         "SidebarNav": {
           "80611a8b10": "Search",
@@ -5464,7 +5466,10 @@
           "setParentFor": "Set parent for"
         },
         "WorktreeCardStatusSlot": {
-          "branchIdentity": "Branch"
+          "branchIdentity": "Branch",
+          "unread": "Unread",
+          "markAsRead": "Mark as read",
+          "markAsUnread": "Mark as unread"
         },
         "NewExternalWorktreesInboxLine": {
           "9f2d4c8b17": "Hide external worktrees permanently for {{value0}}",
@@ -17383,6 +17388,25 @@
     "one": "{{name}} is not running: its script {{script}} is missing. Reinstall it or remove the hook from settings.json.",
     "manyMore": "{{count}} hooks are not running because their scripts are missing: {{names}} and {{more}} more. See the Orca Lab log for each path.",
     "many": "{{count}} hooks are not running because their scripts are missing: {{names}}. See the Orca Lab log for each path."
+  },
+  "agentNotification": {
+    "bellTitle": "Bell in {{workspace}}",
+    "attentionRequested": "Attention requested",
+    "leadAsksProject": "{{project}}: the lead asks you",
+    "leadAsks": "The lead asks you",
+    "openInbox": "Open the Inbox to answer.",
+    "testTitle": "Orca Lab notifications are on",
+    "testBody": "This is a test notification from Orca Lab.",
+    "needsInput": "{{agent}} needs input",
+    "stopped": "{{agent}} stopped",
+    "finished": "{{agent}} finished",
+    "usingToolWithInput": "Using {{tool}}: {{input}}",
+    "usingTool": "Using {{tool}}",
+    "toolInput": "Tool input: {{input}}",
+    "taskComplete": "Task complete in {{workspace}}",
+    "agentFinished": "A coding agent finished working.",
+    "agent": "Agent",
+    "workspace": "workspace"
   },
   "agentQuestionNotification": {
     "title": "{{context}} - {{agent}} asks you",
