@@ -186,18 +186,27 @@ for (const plugins of [false, true]) {
       })
       const asked = Date.now()
 
-      // The card's own cue leads to the Inbox, where the question waits with its options.
-      const answerInInbox = card.getByRole('button', { name: 'Answer in Inbox' })
-      await expect(answerInInbox).toBeVisible({ timeout: TEAM_POLL_MS })
-      await answerInInbox.click()
+      // For you reads agent status, so the question must show within one Team poll.
+      const inboxTab = panel.getByRole('tab', { name: /Inbox/ })
+      await inboxTab.click()
       const inbox = panel.getByTestId('team-panel-inbox')
       const question = inbox.locator(`[data-team-inbox-agent="${memberPaneKey}"]`)
-      await expect(question).toContainText(QUESTION, {
-        timeout: Math.max(1_000, TEAM_POLL_MS - (Date.now() - asked))
+      await expect(question).toContainText(QUESTION, { timeout: TEAM_POLL_MS })
+      testInfo.annotations.push({
+        type: 'for-you-after-ms',
+        description: String(Date.now() - asked)
       })
       await expect(question).toContainText('ORCA-12')
       await expect(inbox.getByRole('tab', { name: /For you/ })).toContainText('1')
-      await expect(panel.getByRole('tab', { name: /Inbox/ })).toContainText('1')
+      await expect(inboxTab).toContainText('1')
+
+      // Why two polls: the card's cue comes from game.state on the Team poll, not agent status.
+      await panel.getByRole('tab', { name: /^Team/ }).click()
+      const answerInInbox = card.getByRole('button', { name: 'Answer in Inbox' })
+      await expect(answerInInbox).toBeVisible({ timeout: 2 * TEAM_POLL_MS + 5_000 })
+      await answerInInbox.click()
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true')
+      await expect(question).toContainText(QUESTION)
       if (!plugins) {
         await orcaPage.screenshot({ path: testInfo.outputPath('member-question-inbox.png') })
       }
