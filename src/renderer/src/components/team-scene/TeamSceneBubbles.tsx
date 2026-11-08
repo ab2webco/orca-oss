@@ -72,18 +72,18 @@ export function TeamSceneBubbles({
   useLayoutEffect(() => {
     const requests = speeches.map((s) => {
       const el = refs.current.get(s.key)
+      if (!el) {
+        return { key: s.key, anchor: s.anchor, align: s.align, width: 0, height: 0 }
+      }
       // Why max-content: a row-shared cloud keeps its narrowed width until laid out again, and
       // text that may break anywhere would shrink to the room left of its old spot.
-      if (el) {
-        el.style.width = 'max-content'
-      }
-      return {
-        key: s.key,
-        anchor: s.anchor,
-        align: s.align,
-        width: el?.offsetWidth ?? 0,
-        height: el?.offsetHeight ?? 0
-      }
+      const laid = el.style.width
+      el.style.width = 'max-content'
+      // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
+      const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
+      // Why restore: React skips a width equal to its last one, which would leave max-content.
+      el.style.width = laid
+      return { key: s.key, anchor: s.anchor, align: s.align, ...size }
     })
     setBoxes(layoutTeamSceneBubbles(requests, { width, height }, { beside: Boolean(cloudPixel) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches
