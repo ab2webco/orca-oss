@@ -110,6 +110,30 @@ export function withRemovedAction(
   }
 }
 
+export type HiddenRow = { action: OrchestratorGameAction; before: number }
+
+/** orca.yaml's actions hidden on this machine, each listed before the visible row it preceded. */
+export function hiddenRowsOf({ project, machine }: ScopedLists): HiddenRow[] {
+  const mine = new Map(machine.map((one) => [one.command, one]))
+  let shown = 0
+  return project.flatMap((action) => {
+    const change = action.command === undefined ? undefined : mine.get(action.command)
+    if (change === undefined || !isGameHiddenAction(change)) {
+      shown++
+      return []
+    }
+    return [{ action, before: shown }]
+  })
+}
+
+/** Drops only that command's hidden entry, so orca.yaml's action shows again here. */
+export function withShownAction(lists: ScopedLists, command: string): ScopedLists {
+  return {
+    ...lists,
+    machine: lists.machine.filter((one) => !isGameHiddenAction(one) || one.command !== command)
+  }
+}
+
 const swapped = <T>(list: readonly T[], a: T, b: T): T[] =>
   list.map((one) => (one === a ? b : one === b ? a : one))
 

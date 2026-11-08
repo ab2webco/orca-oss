@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { OrchestratorGameAction } from '../../../../shared/orchestrator-game-actions'
 import {
+  hiddenRowsOf,
   scopedListsOf,
   scopedRowsOf,
   withMovedUp,
   withRemovedAction,
-  withSavedAction
+  withSavedAction,
+  withShownAction
 } from './orchestrator-game-action-scopes'
 
 const release: OrchestratorGameAction = {
@@ -78,6 +80,16 @@ describe("Settings > Actions edits orca.yaml's list and this machine's changes a
     expect(scopes(hidden)).toEqual(['release:project'])
     const mine = withSavedAction(lists, deploy, 'machine', null)
     expect(withRemovedAction(mine, deploy, 'machine')).toEqual(lists)
+  })
+
+  it('keeps a hidden orca.yaml action listed where it stood, and shows it again alone', () => {
+    const lists = withSavedAction(scopedListsOf(YAML, undefined), deploy, 'machine', null)
+    const hidden = withRemovedAction(lists, release, 'machine')
+    expect(hiddenRowsOf(hidden)).toEqual([{ action: release, before: 0 }])
+    expect(hiddenRowsOf(withRemovedAction(lists, board, 'machine'))).toEqual([
+      { action: board, before: 1 }
+    ])
+    expect(withShownAction(hidden, 'release')).toEqual(lists)
   })
 
   it('moves a row up only within the list it is stored in', () => {

@@ -208,6 +208,43 @@ describe('Settings > Actions, as V30', () => {
     expect(container.textContent).toContain('This project · 1 of 6')
   })
 
+  it("keeps a hidden orca.yaml action listed, dimmed, and 'Show' brings back that one alone", async () => {
+    const { container, updates } = await render({
+      orchestratorGameProjects: {
+        repo1: { machineActions: [{ command: 'board', enabled: false }] }
+      }
+    })
+    expect(rows(container).slice(0, 2)).toEqual([
+      '↑Release/release · Ask the leadorca.yamlEdit',
+      'Board/board · Hidden on this machineorca.yamlShow'
+    ])
+    const pin = container.querySelector('[role="switch"][aria-label="Show Board in the row"]')!
+    expect(pin.hasAttribute('disabled')).toBe(true)
+    expect(container.textContent).toContain('This project · 1 of 6')
+    await press(container, 'Show')
+    expect(updates).toHaveLength(1)
+    expect(machineSaved(updates)?.machineActions).toBeUndefined()
+    expect(fs.writeFile).not.toHaveBeenCalled()
+    expect(rows(container).slice(0, 2)).toEqual([
+      '↑Release/release · Ask the leadorca.yamlEdit',
+      '↑Board/board · MCP planeorca.yamlEdit'
+    ])
+  })
+
+  it("refuses a new action on a hidden action's command, so orca.yaml never holds it twice", async () => {
+    const { container } = await render({
+      orchestratorGameProjects: {
+        repo1: { machineActions: [{ command: 'board', enabled: false }] }
+      }
+    })
+    await press(container, 'New action')
+    type(form(container).querySelector<HTMLInputElement>('input')!, 'Board')
+    type(form(container).querySelector<HTMLTextAreaElement>('textarea')!, 'Read it.')
+    await press(container, 'Create action')
+    expect(container.textContent).toContain('/board already exists.')
+    expect(fs.writeFile).not.toHaveBeenCalled()
+  })
+
   it('turns an old full copy of orca.yaml into the one row flipped, on the first save', async () => {
     const { container, updates } = await render({
       orchestratorGameProjects: { repo1: { actions: [release as never, board] } }

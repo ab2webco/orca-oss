@@ -83,6 +83,7 @@
       "fileChanged": "orca.yaml cambió desde que se mostró. Revísalo y vuelve a intentarlo.",
       "fileFailed": "No se pudo guardar orca.yaml: {{reason}}",
       "fileInvalid": "orca.yaml tiene un error de sintaxis. Corrígelo antes de guardar aquí.",
+      "hiddenHere": "Oculta en esta máquina",
       "icon": "Icono",
       "inherit": "Volver a la lista de orca.yaml",
       "kind": "Qué hace",
@@ -120,6 +121,7 @@
       "serverPlaceholder": "plane",
       "setup": "Crear con setup",
       "setupNoLead": "Inicia primero el líder",
+      "show": "Mostrar",
       "startWith": "Empieza con",
       "templates": {
         "deploy": {

@@ -21,7 +21,7 @@ import { Button } from '../ui/button'
 import { TeamActionIcon } from '../team-panel/team-action-icons'
 import { useTeamLeadPrompt } from '../team-panel/use-team-lead-prompt'
 import { GameActionForm, type GameActionFormState } from './GameActionForm'
-import { OrcaActionSettingsRow, ProjectActionRow } from './GameActionRows'
+import { HiddenProjectActionRow, OrcaActionSettingsRow, ProjectActionRow } from './GameActionRows'
 import {
   EMPTY_ACTION_DRAFT,
   actionDraftOf,
@@ -38,11 +38,13 @@ import {
   withPinToggled
 } from './orchestrator-game-action-list'
 import {
+  hiddenRowsOf,
   scopedListsOf,
   scopedRowsOf,
   withMovedUp,
   withRemovedAction,
   withSavedAction,
+  withShownAction,
   type ActionScope,
   type ScopedLists
 } from './orchestrator-game-action-scopes'
@@ -59,6 +61,13 @@ import { translate } from '@/i18n/i18n'
 type GameSettings = Pick<GlobalSettings, 'orchestratorGameProjects'>
 // Why: V30 starts a new action on the picker's first icon, upload, already chosen.
 const NEW_ACTION_DRAFT: ActionDraft = { ...EMPTY_ACTION_DRAFT, icon: GAME_ACTION_PICKER_ICONS[0] }
+const NEW_FORM_STATE: GameActionFormState = {
+  draft: NEW_ACTION_DRAFT,
+  isNew: true,
+  orca: false,
+  commandTouched: false,
+  scope: 'project'
+}
 type Target = number | 'new' | GameOrcaActionId
 type Form = { target: Target; state: GameActionFormState }
 const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
@@ -90,23 +99,15 @@ export function ProjectOrchestratorGameActionsSetting({
   const lists = scopedListsOf(yaml.file?.actions ?? projectLayer?.actions ?? [], localLayer)
   const rows = scopedRowsOf(lists)
   const list = rows.map((row) => actionDraftOf(row.action))
+  const hidden = hiddenRowsOf(lists)
+  // Why hidden ones count: a new action on their command would put it in orca.yaml twice.
+  const taken = [...list, ...hidden.map((one) => actionDraftOf(one.action))]
   const machineLabel = translate('settings.gameActions.machine', 'This machine')
   const localOrca = parseGameOrcaActions(localLayer?.orcaActions).value
   const orcaRows = orcaActionRowsOf(projectLayer?.orcaActions, localOrca)
   // Why a lazy initial state: the dock's request is read once, on the first render.
   const [form, setForm] = useState<Form | null>(() =>
-    takeNewGameActionRequest(repoId)
-      ? {
-          target: 'new',
-          state: {
-            draft: NEW_ACTION_DRAFT,
-            isNew: true,
-            orca: false,
-            commandTouched: false,
-            scope: 'project'
-          }
-        }
-      : null
+    takeNewGameActionRequest(repoId) ? { target: 'new', state: { ...NEW_FORM_STATE } } : null
   )
   const [problem, setProblem] = useState<ActionDraftProblem | null>(null)
   const [pinFull, setPinFull] = useState(false)
@@ -182,7 +183,7 @@ export function ProjectOrchestratorGameActionsSetting({
       setProblem(state.draft.label.trim() === '' ? 'label' : 'command')
       return
     }
-    if (isCommandTaken(list, target, command)) {
+    if (isCommandTaken(taken, target, command)) {
       setProblem('commandTaken')
       return
     }
@@ -218,9 +219,20 @@ export function ProjectOrchestratorGameActionsSetting({
         }
       />
     ) : null
+  // Why listed where it stood: hiding on this machine never makes an orca.yaml action vanish here.
+  const hiddenBefore = (at: number): React.JSX.Element[] =>
+    hidden
+      .filter((one) => Math.min(one.before, list.length) === at)
+      .map(({ action }) => (
+        <HiddenProjectActionRow
+          key={`hidden-${action.command}`}
+          draft={actionDraftOf(action)}
+          onShow={() => void persist(withShownAction(lists, action.command ?? ''))}
+        />
+      ))
   const full = list.length >= GAME_ACTIONS_MAX
   const templates = gameActionTemplates().filter(
-    (one) => !list.some((action) => action.command === one.command)
+    (one) => !taken.some((action) => action.command === one.command)
   )
   const setupLabel = translate('settings.gameActions.setup', 'Create with setup')
 
@@ -297,6 +309,7 @@ export function ProjectOrchestratorGameActionsSetting({
         const flipped = { ...row.action, pin: !draft.pin }
         return (
           <div key={`${draft.command}-${draft.label}-${at}`}>
+            {hiddenBefore(at)}
             <ProjectActionRow
               draft={draft}
               first={moved === null}
@@ -322,6 +335,7 @@ export function ProjectOrchestratorGameActionsSetting({
           </div>
         )
       })}
+      {hiddenBefore(list.length)}
       {pinFull ? (
         <p className="mt-1.5 text-xs text-destructive">
           {translate(

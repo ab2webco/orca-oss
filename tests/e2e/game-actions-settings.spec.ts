@@ -142,6 +142,17 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
     .toEqual(['Plane board'])
   expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
 
+  // Remove on "Only this machine" hides Release here: it stays listed, dimmed, with Show; orca.yaml stays.
+  await rows.nth(1).getByRole('button', { name: 'Edit' }).click()
+  await form.getByRole('radio', { name: 'Only this machine' }).click()
+  await form.getByRole('button', { name: 'Remove' }).click()
+  await expect(rows.nth(1)).toContainText('/release · Hidden on this machine')
+  await expect(rows.nth(1).getByRole('switch', { name: 'Show Release in the row' })).toBeDisabled()
+  await expect
+    .poll(async () => (await machineActions())?.map((one) => one.command))
+    .toEqual(['board', 'release'])
+  expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
+
   // Orca's Wave turns off on this machine; Stop has no switch.
   await dismissAppCards(orcaPage)
   await section.getByRole('switch', { name: 'Turn on Wave' }).click()
@@ -173,6 +184,16 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
       }
     }
   }
+
+  // Show brings back that one action and nothing else.
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  await dismissAppCards(orcaPage)
+  await rows.nth(1).getByRole('button', { name: 'Show', exact: true }).click()
+  await expect(rows.nth(1)).toContainText('/release · Ask the lead')
+  await expect
+    .poll(async () => (await machineActions())?.map((one) => one.command))
+    .toEqual(['board'])
+  expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
 
   // The same page's Scene listbox opens at its control; the trigger is read once it is in view (ORCA-1092 row 28).
   await applySettings(orcaPage, { uiLanguage: 'en' })

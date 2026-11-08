@@ -110,6 +110,7 @@
       "fileChanged": "orca.yaml changed since it was shown. Check it and try again.",
       "fileFailed": "Could not save orca.yaml: {{reason}}",
       "fileInvalid": "orca.yaml has a syntax error. Fix it before saving here.",
+      "hiddenHere": "Hidden on this machine",
       "icon": "Icon",
       "inherit": "Use orca.yaml's list again",
       "kind": "What it does",
@@ -147,6 +148,7 @@
       "serverPlaceholder": "plane",
       "setup": "Create with setup",
       "setupNoLead": "Start the lead first",
+      "show": "Show",
       "startWith": "Start with",
       "templates": {
         "deploy": {
