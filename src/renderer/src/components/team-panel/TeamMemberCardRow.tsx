@@ -79,7 +79,9 @@ export function TeamMemberCardRow({
         aria-expanded={expanded}
         onClick={onToggle}
         className={cn(
-          'flex w-full min-w-0 items-start gap-2.5 px-3 py-2 text-left hover:bg-sidebar-accent',
+          'flex w-full min-w-0 items-start gap-2.5 py-2 pr-3 text-left hover:bg-sidebar-accent',
+          // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
+          showName ? 'pl-3' : 'pl-5',
           expanded && 'bg-sidebar-accent'
         )}
       >
@@ -92,7 +94,11 @@ export function TeamMemberCardRow({
               name: card.name
             }}
           />
-        ) : null}
+        ) : (
+          <span data-team-status-column="" className="flex shrink-0 self-center">
+            <TeamStatusMark status={card.status} />
+          </span>
+        )}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
             {showName ? (
@@ -113,7 +119,7 @@ export function TeamMemberCardRow({
             </span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <TeamStatusMark status={card.status} />
+            {showName ? <TeamStatusMark status={card.status} /> : null}
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
             <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
               {card.needsYou
@@ -125,7 +131,10 @@ export function TeamMemberCardRow({
             model={teamModelText(card.model)}
             parts={[
               card.flowPhase ? teamPhaseText(card.flowPhase) : null,
-              card.since !== null ? teamAgeText(card.since, now) : null
+              card.since !== null ? teamAgeText(card.since, now) : null,
+              card.inFolder
+                ? translate('teamPanel.card.inFolder', 'In the folder, no worktree')
+                : null
             ]}
           />
         </span>

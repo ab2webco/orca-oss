@@ -259,6 +259,21 @@ describe('account CLI handlers', () => {
     expect(message).toContain(WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL)
   })
 
+  it("keeps the calling Claude session's token out of another account's login (ORCA-1039)", async () => {
+    process.env.CLAUDECODE = '1'
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = 'sk-ant-oat01-ORCA1039-login-sentinel'
+    try {
+      await ACCOUNT_HANDLERS['account add'](context('claude'))
+    } finally {
+      delete process.env.CLAUDECODE
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN
+    }
+
+    const env = spawnMock.mock.calls[0]?.[2].env as Record<string, string>
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
+    expect(env.CLAUDE_CONFIG_DIR).toEqual(expect.any(String))
+  })
+
   it('adds version-manager Node paths to the login child environment', async () => {
     const nodeBin = '/home/test/.nvm/versions/node/v22.0.0/bin'
     getVersionManagerBinPathsMock.mockReturnValue([nodeBin])

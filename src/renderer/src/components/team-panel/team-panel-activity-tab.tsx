@@ -8,7 +8,7 @@ import type { TeamActivityRow, TeamPanelSoloModel } from '../../../../shared/tea
 import {
   teamConditionText,
   teamHostText,
-  teamSoloLiveText,
+  teamLiveText,
   teamModelText,
   teamSessionStateText,
   teamStatusTone
@@ -22,7 +22,7 @@ const AGE_TICK_MS = 30_000
 /** The row's line: the question, the live tool, else the last reply or the prompt. */
 export function teamActivityLine(row: TeamActivityRow): string {
   if (row.liveAction) {
-    return teamSoloLiveText(row.liveAction, row.condition)
+    return teamLiveText(row.liveAction, row.condition)
   }
   if (row.condition === 'done' && row.lastMessage) {
     return row.lastMessage

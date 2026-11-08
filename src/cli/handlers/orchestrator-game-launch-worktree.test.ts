@@ -393,3 +393,54 @@ describe('game launch: the ticket keeps its worktree', () => {
     expect(start()).toEqual(expect.objectContaining({ worktree: 'new-child' }))
   })
 })
+
+describe('game launch: a lead in a folder with no git (ORCA-1135)', () => {
+  beforeEach(() => {
+    vi.stubEnv('ORCA_TERMINAL_HANDLE', 'h1')
+  })
+
+  afterEach(() => {
+    process.exitCode = undefined
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('runs the member in the folder, renames nothing and says so', async () => {
+    const out = vi.spyOn(console, 'log').mockReturnValue(undefined)
+    const { client, calls, start } = fakeClient([])
+    const call = client.call.bind(client)
+    client.call = (async (method: string, params: Record<string, unknown>) => {
+      const response = await call(method, params)
+      return method === 'game.state'
+        ? {
+            ...response,
+            result: {
+              ...(response.result as object),
+              worktree: {
+                id: 'folder:ws-1',
+                path: '/srv/notes',
+                branch: '',
+                displayName: 'Notes',
+                folder: true
+              }
+            }
+          }
+        : response
+    }) as RuntimeClient['call']
+
+    await ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
+      flags: new Map([['ticket', 'cin-12']]),
+      client,
+      cwd: '/srv/notes',
+      json: false
+    })
+
+    expect(start()).toEqual(expect.objectContaining({ worktree: 'id:folder:ws-1' }))
+    expect(start()).not.toHaveProperty('name')
+    expect(calls.map(([method]) => method)).not.toContain('worktree.list')
+    expect(calls.map(([method]) => method)).not.toContain('worktree.set')
+    expect(out.mock.calls.join('')).toContain(
+      'Runs in the folder /srv/notes: a folder without git has no worktree per member.'
+    )
+  })
+})

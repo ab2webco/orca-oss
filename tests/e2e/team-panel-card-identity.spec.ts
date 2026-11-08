@@ -103,7 +103,9 @@ test('Team cards carry names, live detail and V28 status marks', async ({
         defaultTuiAgent: 'codex',
         agentCmdOverrides: { codex: command },
         agentDefaultArgs: { codex: '' },
-        orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Alfred' } } }
+        orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Alfred' } } },
+        // Why: the panel draws no Jev row with the plugin system off.
+        pluginSystemEnabled: true
       })
     }, agent.command)
 

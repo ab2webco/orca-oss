@@ -6,19 +6,21 @@ import type { TeamPanelModel } from '../../../../shared/team-panel-model-types'
 /** The model with the tabs and the Advisor row the panel settings turn off removed. */
 export function teamPanelModelWithSettings(
   model: TeamPanelModel,
-  panel: Pick<OrchestratorGamePanel, 'tabs' | 'advisor'>
+  panel: Pick<OrchestratorGamePanel, 'tabs' | 'advisor'> & { pluginsOn: boolean }
 ): TeamPanelModel {
   const tabs = {
     prs: panel.tabs.prs ? model.prs : null,
     queue: panel.tabs.queue ? model.queue : null,
     machines: panel.tabs.machines ? model.machines : null
   }
+  // Why the plugin system too: Jev reaches a pane only through its plugin, and a kept report outlives it.
+  const advisor = panel.advisor && panel.pluginsOn
   if (model.kind === 'team') {
-    return { ...model, ...tabs, advisor: panel.advisor ? model.advisor : null }
+    return { ...model, ...tabs, advisor: advisor ? model.advisor : null }
   }
   return {
     ...model,
     ...tabs,
-    rows: panel.advisor ? model.rows : model.rows.map((row) => ({ ...row, advisor: null }))
+    rows: advisor ? model.rows : model.rows.map((row) => ({ ...row, advisor: null }))
   }
 }

@@ -70,12 +70,15 @@ const solo: TeamPanelSoloModel = {
   machines: { kind: 'loading' }
 }
 
-const panel = (overrides: Partial<OrchestratorGamePanel> = {}): OrchestratorGamePanel => ({
+type PanelSettings = OrchestratorGamePanel & { pluginsOn: boolean }
+
+const panel = (overrides: Partial<PanelSettings> = {}): PanelSettings => ({
   look: 'game',
   style: 'pixel',
   tabs: { prs: true, queue: true, machines: true },
   advisor: true,
   arcade: true,
+  pluginsOn: true,
   ...overrides
 })
 
@@ -115,6 +118,17 @@ describe('teamPanelModelWithSettings', () => {
     expect(hidden.kind === 'solo' ? hidden.rows[0]?.advisor : 'team').toBeNull()
     const shown = teamPanelModelWithSettings(model, panel())
     expect(shown.kind === 'solo' ? shown.rows[0]?.advisor : 'team').toEqual(advisor)
+  })
+
+  // Why: Jev reaches a pane only through its plugin, and a kept report would outlive it.
+  it('drops every Jev row and section while the plugin system is off', () => {
+    const row = { paneKey: 'pane-a', advisor } as TeamActivityRow
+    const soloRows = { ...solo, rows: [row] }
+    const off = panel({ pluginsOn: false })
+
+    expect(teamPanelModelWithSettings(team, off)).toMatchObject({ advisor: null })
+    expect(teamPanelModelWithSettings(soloRows, off)).toMatchObject({ rows: [{ advisor: null }] })
+    expect(teamPanelModelWithSettings(team, panel())).toMatchObject({ advisor })
   })
 
   it('drops the Advisor row under the lead when Advisor is off', () => {

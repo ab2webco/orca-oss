@@ -498,7 +498,8 @@ describe('wrapPosixHookCommand', () => {
       const scriptPath = join(tmpDir, 'directory-hook.sh')
       mkdirSync(scriptPath)
       const result = spawnSync('/bin/sh', ['-c', wrapPosixHookCommand(scriptPath)], {
-        input: Buffer.alloc(1_000_000, 'x')
+        input: Buffer.alloc(1_000_000, 'x'),
+        timeout: 20_000
       })
 
       expect(result.error).toBeUndefined()
@@ -513,7 +514,8 @@ describe('wrapPosixHookCommand', () => {
       writeFileSync(scriptPath, '#!/bin/sh\nexit 0\n', 'utf-8')
       chmodSync(scriptPath, 0o111)
       const result = spawnSync('/bin/sh', ['-c', wrapPosixHookCommand(scriptPath)], {
-        input: Buffer.alloc(1_000_000, 'x')
+        input: Buffer.alloc(1_000_000, 'x'),
+        timeout: 20_000
       })
 
       expect(result.error).toBeUndefined()
@@ -725,7 +727,10 @@ describe('wrapRuntimeHomeHookCommand', () => {
       process.platform === 'win32'
         ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git', 'bin', 'bash.exe')
         : '/bin/sh'
-    const result = spawnSync(shell, ['-c', command], { input: Buffer.alloc(1_000_000, 'x') })
+    const result = spawnSync(shell, ['-c', command], {
+      input: Buffer.alloc(1_000_000, 'x'),
+      timeout: 20_000
+    })
 
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)

@@ -6,7 +6,10 @@ import type {
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import type { TeamInboxCounts } from '../../../../shared/team-panel-model-types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabStripEdgeCues, useTabStripCue } from './team-panel-tab-strip-cue'
 import { translate } from '@/i18n/i18n'
+import { useShallow } from 'zustand/react/shallow'
+import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
@@ -26,6 +29,8 @@ import {
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import {
+  answerTeamInboxAgent,
+  isOneTapQuestion,
   openTeamInboxAgent,
   teamInboxAgentQuestionsOf,
   type TeamInboxAgentQuestion
@@ -66,6 +71,8 @@ export type TeamInboxViewProps = {
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
   onOpenAgent: (question: TeamInboxAgentQuestion) => void
+  /** Null when the question cannot be answered with one option from here. */
+  answerAgentOf: (question: TeamInboxAgentQuestion) => ((optionIndex: number) => boolean) | null
   /** Each member's character name by ticket, so a waiting question says who asks. */
   memberNames: ReadonlyMap<string, string>
 }
@@ -93,7 +100,10 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
   const nothing = subTabs.every(([, , count]) => count === 0) && props.undelivered.length === 0
-  if (nothing && !props.projectUnread) {
+  const empty = nothing && !props.projectUnread
+  // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
+  const cue = useTabStripCue(tab, empty ? '' : subTabs.map(([id]) => id).join())
+  if (empty) {
     return (
       <TeamPanelMessageState
         title={translate('teamPanel.tabs.inbox.emptyTitle', 'Nothing waits for you')}
@@ -111,17 +121,27 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       className="flex h-full min-h-0 flex-col gap-0"
       data-testid="team-panel-inbox"
     >
-      <TabsList
-        aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
-        className="h-auto w-full shrink-0 flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto gap-0.5 rounded-none bg-transparent px-3 pt-2.5 pb-2"
-      >
-        {subTabs.map(([id, label, count]) => (
-          <TabsTrigger key={id} value={id} className={SUB_TAB}>
-            {label}
-            <span className="tabular-nums">{count}</span>
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel scrolls them with a cue. */}
+      <div className="relative shrink-0">
+        <TabsList
+          aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
+          {...cue.stripProps}
+          className="h-auto w-full shrink-0 flex-nowrap justify-start overflow-x-auto group-data-[orientation=horizontal]/tabs:h-auto gap-1 rounded-none bg-transparent px-3 pt-2.5 pb-2 [scrollbar-width:none]"
+        >
+          {subTabs.map(([id, label, count]) => (
+            <TabsTrigger
+              key={id}
+              ref={id === tab ? cue.activeTrigger : undefined}
+              value={id}
+              className={SUB_TAB}
+            >
+              {label}
+              <span className="tabular-nums">{count}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabStripEdgeCues overflow={cue.overflow} />
+      </div>
       <TabsContent value="for-you" className={`${LIST} space-y-2`}>
         <GameInboxUndelivered questions={props.undelivered} />
         {/* Why only with none read: the tab's own read may succeed where the model's failed. */}
@@ -143,6 +163,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             key={question.paneKey}
             question={question}
             onOpen={props.onOpenAgent}
+            onAnswer={props.answerAgentOf(question)}
           />
         ))}
         {questions.length > 0 ? (
@@ -219,6 +240,21 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   )
 }
 
+function answerAgentOf(question: TeamInboxAgentQuestion): ((index: number) => boolean) | null {
+  if (!isOneTapQuestion(question)) {
+    return null
+  }
+  return (index) => {
+    const sent = answerTeamInboxAgent(question, index)
+    if (!sent) {
+      toast.error(
+        translate('teamPanel.inbox.answerFailed', 'Could not send the answer. Open the terminal.')
+      )
+    }
+    return sent
+  }
+}
+
 export function TeamPanelInboxTab({
   value,
   model
@@ -242,6 +278,18 @@ export function TeamPanelInboxTab({
   // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
+  const liveState = useAppStore(
+    useShallow((s) => ({
+      agentStatusByPaneKey: s.agentStatusByPaneKey,
+      tabsByWorktree: s.tabsByWorktree,
+      ptyIdsByTabId: s.ptyIdsByTabId,
+      terminalLayoutsByTabId: s.terminalLayoutsByTabId
+    }))
+  )
+  const agentQuestions = React.useMemo(
+    () => teamInboxAgentQuestionsOf(model, liveState),
+    [model, liveState]
+  )
   const memberNames = React.useMemo(
     () =>
       new Map(
@@ -261,9 +309,10 @@ export function TeamPanelInboxTab({
       otherGroups={otherGroups}
       threads={threads}
       onReply={threads.reply}
-      agentQuestions={teamInboxAgentQuestionsOf(model)}
+      agentQuestions={agentQuestions}
       answeredQuestions={answered}
       onOpenAgent={openTeamInboxAgent}
+      answerAgentOf={answerAgentOf}
       memberNames={memberNames}
     />
   )

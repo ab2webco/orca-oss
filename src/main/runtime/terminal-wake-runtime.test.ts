@@ -89,6 +89,21 @@ function makeRuntime(
 } {
   let session: WorkspaceSessionState = {
     ...getDefaultWorkspaceSession(),
+    // Why the tab: a restart keeps a slept pane's tab; only a closed tab loses it (ORCA-718).
+    tabsByWorktree: {
+      [WORKTREE_ID]: [
+        {
+          id: TAB_ID,
+          ptyId: null,
+          worktreeId: WORKTREE_ID,
+          title: 'Member',
+          customTitle: null,
+          color: null,
+          sortOrder: 0,
+          createdAt: 0
+        }
+      ]
+    },
     sleepingAgentSessionsByPaneKey: { [PANE_KEY]: RECORD }
   }
   const runtime = new OrcaRuntimeService({

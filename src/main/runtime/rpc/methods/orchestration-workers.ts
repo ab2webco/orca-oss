@@ -179,6 +179,7 @@ async function startWorker(
         agent: agent as TuiAgent,
         launchPreferences: launch.preferences,
         taskId: task.id,
+        displayName: params.displayName,
         claudeAccountId: params.claudeAccountId,
         codexAccountId: params.codexAccountId,
         ...(params.game ? { gameMember: true } : {}),

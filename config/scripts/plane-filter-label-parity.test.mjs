@@ -15,7 +15,7 @@ const ROOT = path.resolve(import.meta.dirname, '../..')
  *
  * Why the labels are not simply imported from the shared table here: this
  * parser only reads string literals, so a constant in that argument drops these
- * five calls out of `resolved-calls` and turns the ORCA-443 baseline red.
+ * five calls out of the ORCA-443 brand drift check, which then cannot see them.
  */
 const PRESET_KEYS = {
   everything: 'auto.components.TaskPage.planeAllPreset',
