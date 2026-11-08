@@ -232,6 +232,56 @@ describe("The lead's own question in its team Inbox (ORCA-1129 D4)", () => {
   })
 })
 
+// Why (ORCA-1141 N1): the card said "Answer in Inbox" while For you listed only the lead.
+describe("A member's own question in its team Inbox", () => {
+  const member = {
+    paneKey: 'tab-m:leaf-m',
+    terminalHandle: 'term_m',
+    worktreeId: 'wt-m',
+    host: { kind: 'local' },
+    name: 'Peach'
+  }
+  const withMembers = (members: unknown[]): TeamPanelGameModel =>
+    ({ ...team(lead()), members }) as unknown as TeamPanelGameModel
+
+  it("lists a member's AskUserQuestion after the lead's, under the member's name", () => {
+    const state = {
+      ...noTabs,
+      agentStatusByPaneKey: {
+        'tab-lead:leaf-lead': asking('tab-lead:leaf-lead'),
+        'tab-m:leaf-m': asking('tab-m:leaf-m')
+      }
+    }
+
+    const shown = teamInboxAgentQuestionsOf(withMembers([member]), state)
+
+    expect(shown.map((one) => [one.paneKey, one.worktreeName])).toEqual([
+      ['tab-lead:leaf-lead', 'Run home'],
+      ['tab-m:leaf-m', 'Peach']
+    ])
+    expect(shown[1]).toMatchObject({ terminalHandle: 'term_m', options: ['Now', 'Wait'] })
+  })
+
+  it("finds a paired host's member under the tab this window mirrors it in", () => {
+    const remote = {
+      ...member,
+      host: { kind: 'remote', name: 'mini', environmentId: 'env-1', reachable: true }
+    }
+    const state = {
+      tabsByWorktree: { 'wt-mirror': [{ id: 'tab-mirror' }] },
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {
+        'tab-mirror': { ptyIdsByLeafId: { [LEAF]: toRemoteRuntimePtyId('term_m', 'env-1') } }
+      },
+      agentStatusByPaneKey: { [`tab-mirror:${LEAF}`]: asking(`tab-mirror:${LEAF}`) }
+    } as never
+
+    expect(teamInboxAgentQuestionsOf(withMembers([remote]), state)).toEqual([
+      expect.objectContaining({ paneKey: `tab-mirror:${LEAF}`, worktreeName: 'Peach' })
+    ])
+  })
+})
+
 describe('Answering from the Inbox (ORCA-1129 D5)', () => {
   const question = {
     paneKey: `tab-1:${LEAF}`,

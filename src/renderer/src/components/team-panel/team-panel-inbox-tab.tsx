@@ -66,7 +66,7 @@ export type TeamInboxViewProps = {
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
   onReply: (reply: GameMemberReply) => Promise<void>
-  /** Sessions blocked on a question, read from agent status when there is no team. */
+  /** Sessions blocked on a question, read from agent status: a team's lead and members, or every solo one. */
   agentQuestions: TeamInboxAgentQuestion[]
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]

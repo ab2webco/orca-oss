@@ -28,7 +28,7 @@ import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-
 import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 import { teamPanelProjectOf } from './team-panel-project'
-import { teamLeadQuestionOf } from './team-panel-inbox-agents'
+import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -154,8 +154,8 @@ export function useTeamPanelModel(): TeamPanelModelSource {
     source.section.kind === 'ready' && source.section.value.kind === 'team'
       ? source.section.value
       : null
-  // Why: game.state carries no question, so the lead's own AskUserQuestion comes from agent status.
-  const leadAsks = useAppStore((s) => (team && teamLeadQuestionOf(team, s) ? 1 : 0))
+  // Why: game.state carries no question, so the team's own AskUserQuestions come from agent status.
+  const teamAsks = useAppStore((s) => (team ? teamInboxAgentQuestionsOf(team, s).length : 0))
   const otherOpen = openQuestionCountOf(useOtherGameInboxGroups())
   const everyOpen = useOpenGameOwnerQuestionCount()
   const noTeam = !scope || hasNoTeam(source.section)
@@ -167,14 +167,14 @@ export function useTeamPanelModel(): TeamPanelModelSource {
       : source
     const { section } = shown
     // Why every project: the no-team model reads agent status, so it misses this project's too.
-    const added = noTeamModel ? everyOpen : otherOpen + leadAsks
+    const added = noTeamModel ? everyOpen : otherOpen + teamAsks
     if (added === 0 || section.kind !== 'ready') {
       return shown
     }
     const model = section.value
     const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, added) }
     return { ...shown, section: { kind: 'ready', value } }
-  }, [noTeam, solo, source, otherOpen, everyOpen, leadAsks])
+  }, [noTeam, solo, source, otherOpen, everyOpen, teamAsks])
 }
 
 /** The lead's pane as the last model read it, for what the panel sends it. */
