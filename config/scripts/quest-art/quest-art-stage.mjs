@@ -51,6 +51,13 @@ function cloud(g, x, y, s) {
   g.restore()
 }
 
+// Why a layer of its own: the panel drifts it across the sky, as V28's clouds drift.
+export function paintFiguresClouds(g) {
+  cloud(g, 150, 34, 0.8)
+  cloud(g, 420, 22, 0.62)
+  cloud(g, 660, 40, 0.7)
+}
+
 export function paintFiguresSky(g) {
   const sky = g.createLinearGradient(0, 0, 0, H * 0.74)
   sky.addColorStop(0, '#27365f')
@@ -63,9 +70,6 @@ export function paintFiguresSky(g) {
     g.fillStyle = `rgb(255 255 255 / ${0.2 + noise(i) * 0.55})`
     g.fillRect(noise(i + 300) * W, noise(i + 600) * H * 0.34, 0.9, 0.9)
   }
-  cloud(g, 150, 34, 0.8)
-  cloud(g, 420, 22, 0.62)
-  cloud(g, 660, 40, 0.7)
   ridge(g, H * 0.52, 12, 1.2, '#8a83ad')
   ridge(g, H * 0.6, 9, 3.1, '#5f6f94')
 }
@@ -183,10 +187,22 @@ export function paintFiguresFront(g) {
 
 // A station prop is 120 wide with the seat at its center, so the work sits right of whoever uses it.
 export const STATION_WIDTH = 120
+// Where each station meets the floor, in stage units from its top; the shadow needs room below.
+export const STATION_FLOOR = { forge: 44, desk: 60 }
+// The desk's monitor screen, in stage units from the monitor's corner; the panel lights it.
+const DESK_MONITOR = { x: STATION_WIDTH / 2 + 14, y: STATION_FLOOR.desk }
+const SCREEN = { x: 11.6, y: -48.4, width: 28.8, height: 18.8 }
+/** The screen in the desk prop's own stage units, from its top left. */
+export const DESK_SCREEN = {
+  x: DESK_MONITOR.x + SCREEN.x,
+  y: DESK_MONITOR.y + SCREEN.y,
+  width: SCREEN.width,
+  height: SCREEN.height
+}
 
 export function paintForge(g) {
   g.save()
-  g.translate(STATION_WIDTH / 2 + 26, 44)
+  g.translate(STATION_WIDTH / 2 + 26, STATION_FLOOR.forge)
   g.fillStyle = 'rgb(20 20 30 / 0.3)'
   g.beginPath()
   g.ellipse(0, 0, 21, 3.4, 0, 0, TAU)
@@ -346,7 +362,7 @@ function chair(g) {
 
 export function paintDesk(g) {
   g.save()
-  g.translate(STATION_WIDTH / 2, 60)
+  g.translate(STATION_WIDTH / 2, STATION_FLOOR.desk)
   g.fillStyle = 'rgb(16 18 26 / 0.34)'
   g.beginPath()
   g.ellipse(22, 0, 38, 3.6, 0, 0, TAU)
@@ -369,7 +385,7 @@ export function paintDesk(g) {
   g.roundRect(10, -50, 32, 22, 1.8)
   g.fill()
   g.fillStyle = '#0f1826'
-  g.fillRect(11.6, -48.4, 28.8, 18.8)
+  g.fillRect(SCREEN.x, SCREEN.y, SCREEN.width, SCREEN.height)
   g.fillStyle = '#b9bec8'
   g.beginPath()
   g.roundRect(1, -24.8, 13, 1.8, 0.8)

@@ -1,8 +1,8 @@
 import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import { finishedSignalOf } from '../../shared/orchestrator-game-member-finished'
+import { pausedAndUnlistedMembersOf } from '../../shared/orchestrator-game-adopted-members'
 import {
-  pausedMembersOf,
   queuedMembersOf,
   type GameMemberSession,
   type GameMemberSessionPatch,
@@ -10,8 +10,7 @@ import {
   type GamePausedMember,
   type GameQueuedMember,
   type GameSetupQueueEntry,
-  type GameUnlistedMember,
-  unlistedMembersOf
+  type GameUnlistedMember
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
@@ -30,6 +29,8 @@ type Deps = {
   sessionIdOf: (terminalHandle: string) => string | null
   /** Why a saved member is not live while its terminal is open; null when the terminal is gone. */
   causeOf?: GamePausedCauseOf
+  /** Whether the lead released a dispatch's worker; a released adopted member is gone (ORCA-1141). */
+  releasedDispatch?: (dispatchId: string) => boolean
   /** True only when its repo answered without it; an unreachable host is not gone. */
   worktreeGone?: (worktreeId: string) => Promise<boolean>
 }
@@ -79,9 +80,23 @@ export class GamePausedMembers {
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     const liveNow = { tickets, worktreeIds: liveWorktreeIds }
     const gone = await this.goneWorktreesOf(read.members.filter((one) => !tickets.has(one.ticket)))
+    const livePaneKeys = new Set(
+      agents.flatMap((agent) =>
+        agent.isMember && !agent.found && !agent.remote ? [agent.paneKey] : []
+      )
+    )
     return {
-      paused: pausedMembersOf(read.members, liveNow, starting, this.deps.causeOf, gone),
-      unlisted: unlistedMembersOf(read.members, liveNow, starting),
+      ...pausedAndUnlistedMembersOf({
+        members: read.members.filter(
+          (one) =>
+            !(one.adoptedPaneKey && one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
+        ),
+        live: liveNow,
+        livePaneKeys,
+        starting,
+        causeOf: this.deps.causeOf ?? (() => null),
+        gone
+      }),
       queued: queuedMembersOf(read.members, setup.queued),
       error
     }

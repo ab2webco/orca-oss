@@ -1,7 +1,7 @@
 /**
  * Invariant: each worktree state reaches the sidebar in its status tone — working
- * blue, needs-you red, done green, unread red, open PR checks by outcome — in both
- * themes (ORCA-1070).
+ * blue, needs-you red, done green, open PR checks by outcome — in both themes (ORCA-1070).
+ * An unread row keeps its status dot and shows unread in its title weight, never in red (ORCA-1131).
  * Needs E2E: the tones are CSS variables resolved per theme class, so only a real
  * cascade shows the painted colour a user sees for each state.
  * ORCA_E2E_CAPTURE=1 also saves every width, theme and language for review.
@@ -192,8 +192,14 @@ test('worktree states reach the sidebar in their status tones', async ({
         `${theme} ${row.name} paints --status-${row.tone}`
       ).toBe(expected)
     }
-    const unreadBell = orcaPage.locator('[data-worktree-card-surface]', { hasText: 'unread' })
-    await expect(unreadBell.locator('.text-status-attention')).toHaveCount(1)
+    const unreadRow = orcaPage.locator('[data-worktree-card-surface]', { hasText: 'unread' })
+    expect(await rowMarker(orcaPage, 'unread'), `${theme} unread keeps its dot`).toMatchObject({
+      tone: 'idle'
+    })
+    await expect(unreadRow.locator('.text-status-attention')).toHaveCount(0)
+    await expect(unreadRow.locator('[data-worktree-title-inline-rename]').first()).toHaveClass(
+      /font-semibold/
+    )
     for (const [name, tone] of [
       ['pr-failing', 'attention'],
       ['pr-running', 'info']

@@ -336,7 +336,8 @@ function arm(g, look, shoulder, angle, sleeve, skin) {
 /** One character at `k` (0 to 1) through `action`; the caller places the feet. */
 export function drawCharacter(g, look, action, k) {
   const pose = poseAt(action, k, look.seatedWork === true)
-  const seatY = pose.seated ? 6.4 : 0
+  // Why 0.7: the hip lands on the chair seat's top (quest-art-stage.mjs `chair`), as in V28.
+  const seatY = pose.seated ? 0.7 : 0
   const hipY = -12.2 - pose.bob + seatY
   const top = hipY - 15.6
   const blink = action === 'idle' && k >= 0.75

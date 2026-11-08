@@ -4,7 +4,7 @@ import { MESSAGE_HEADING_WORDS } from '../hooks/message-heading-words'
 import { leadCharacterOf } from '../hooks/game-lead'
 import {
   headingNameOf,
-  headingRuleWidthOf,
+  headingFitOf,
   headingTimeOf,
   isQuestionToPerson,
   messageHeadingOf,
@@ -52,12 +52,26 @@ describe('heading time and rule', () => {
 
   it('the rule fills the row between the name and the time', () => {
     // 'Castillo · revisando' is 20 cells, '0:06' 4, a space either side of the rule.
-    expect(headingRuleWidthOf('Castillo · revisando', '0:06', 80)).toBe(80 - 1 - 20 - 4 - 2)
-    expect(headingRuleWidthOf('Castillo · revisando', '', 40)).toBe(40 - 1 - 20 - 1)
+    expect(headingFitOf('Castillo · revisando', '0:06', 80)).toEqual({
+      rule: 80 - 1 - 20 - 4 - 2,
+      isTimeShown: true
+    })
+    expect(headingFitOf('Castillo · revisando', '', 40)).toEqual({
+      rule: 40 - 1 - 20 - 1,
+      isTimeShown: false
+    })
   })
 
-  it('a narrow pane keeps a short rule', () => {
-    expect(headingRuleWidthOf('Castillo · revisando', '10 min', 20)).toBe(3)
+  // Why: a row wider than the pane wraps, and the heading broke mid-word at 390 px.
+  it('a narrow pane drops the rule, then the time, so the row never wraps', () => {
+    expect(headingFitOf('Castillo · revisando', '10 min', 30)).toEqual({
+      rule: 0,
+      isTimeShown: true
+    })
+    expect(headingFitOf('Castillo · revisando', '10 min', 20)).toEqual({
+      rule: 0,
+      isTimeShown: false
+    })
   })
 })
 

@@ -132,13 +132,20 @@ function formatPaused(fleet: GameFleet): string[] {
   if (restarted.length === 0) {
     return open
   }
+  // Why: an adopted member's key is no ticket, and it comes back in its own tab (ORCA-1141).
+  const adopted = (one: GameFleet['paused'][number]): boolean =>
+    'adoptedPane' in one && !!one.adoptedPane
   const rows = restarted.map((one) => [
-    one.ticket,
+    adopted(one) ? '-' : one.ticket,
     one.lastState ?? '-',
     one.branch ?? '-',
     one.agent ?? '-',
     one.account ?? '-',
-    one.resumable ? 'its conversation' : 'a new launch in its worktree',
+    adopted(one)
+      ? 'its own tab'
+      : one.resumable
+        ? 'its conversation'
+        : 'a new launch in its worktree',
     one.name ?? ''
   ])
   return [

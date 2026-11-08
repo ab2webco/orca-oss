@@ -20,6 +20,8 @@ export type TeamAction = {
   /** As the host sent it; a client words Orca's own when the project kept the default. */
   label: string
   icon: GameActionIcon | null
+  /** Its slash command in the lead pane, which the menu shows; null when it has none. */
+  command: string | null
   pin: boolean
   /** What the panel sends the lead as a turn; null when only the terminal can run it. */
   send: string | null
@@ -89,6 +91,7 @@ export function teamActionsOf(state: OrchestratorGameState): TeamAction[] {
       orca,
       label: action.label,
       icon: action.icon ?? (orca ? ORCA_ICONS[orca] : null),
+      command: action.command ?? null,
       pin: action.pin === true,
       send,
       ...when

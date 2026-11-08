@@ -12,6 +12,7 @@ import {
   type HdSprite
 } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-sprite'
 import { hdFrameOf } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd-land'
+import { hdSkyPixel } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd-sky'
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import type {
@@ -40,6 +41,9 @@ const TOOL = '#e8eef4'
 const PAPER = '#f4e6c0'
 const SWING_SECONDS = 1.15
 const SWING_FADE = 2.3
+// The game's SCENE_TICK_MS; its clouds and stars change at most every 6 ticks, so the sky rebakes then.
+const TICK_MS = 120
+const SKY_TICKS = 6
 
 const hex = (color: number): string => `#${(color & 0xffffff).toString(16).padStart(6, '0')}`
 
@@ -86,6 +90,13 @@ function drawTool(
     dot(0, -6 + (Math.floor(t * 6) % 2), 1, 4, TOOL)
     return
   }
+  if (a.pose === 'done') {
+    // Why shouldered: a raised tool already means asking the user.
+    dot(-1, -3, 1, 1, TOOL)
+    dot(-2, -4, 1, 1, TOOL)
+    dot(-3, -5, 1, 1, TOOL)
+    return
+  }
   if (a.pose !== 'work') {
     return
   }
@@ -114,19 +125,26 @@ export function createPixelPainter(args: {
   colors: TeamSceneStatusColors
 }): TeamScenePainter {
   const { scene, light, colors } = args
-  let backdrop: { columns: number; canvas: HTMLCanvasElement } | null = null
+  let backdrop: { columns: number; step: number; canvas: HTMLCanvasElement } | null = null
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
 
-  const backdropFor = (columns: number): HTMLCanvasElement => {
-    if (backdrop?.columns !== columns) {
+  const backdropFor = (columns: number, t: number): HTMLCanvasElement => {
+    const step = Math.floor((t * 1000) / TICK_MS / SKY_TICKS)
+    if (backdrop?.columns !== columns || backdrop.step !== step) {
       const look = scene.looks.working
-      const frame = hdFrameOf({ look, width: columns, rows: ROWS, tick: 0, scroll: 0, light })
-      const land = hdLandBakeOf(frame)
-      backdrop = {
-        columns,
-        canvas: bitmapOf(columns, PIXELS, (x, y) => hdBackdropPixel(frame, land, x, y))
+      const at = (tick: number) =>
+        hdFrameOf({ look, width: columns, rows: ROWS, tick, scroll: 0, light })
+      const still = at(0)
+      const moving = at(step * SKY_TICKS)
+      const land = hdLandBakeOf(still)
+      // Why only the sky moves: the far range's windows flicker on the tick too, and a done
+      // agent standing before them must hold still.
+      const colorAt = (x: number, y: number): number => {
+        const color = hdBackdropPixel(still, land, x, y)
+        return color === hdSkyPixel(still, x, y) ? hdSkyPixel(moving, x, y) : color
       }
+      backdrop = { columns, step, canvas: bitmapOf(columns, PIXELS, colorAt) }
     }
     return backdrop.canvas
   }
@@ -204,7 +222,7 @@ export function createPixelPainter(args: {
     paint: (g, f: TeamSceneFrame) => {
       const columns = Math.ceil(f.width / PIXEL)
       g.imageSmoothingEnabled = false
-      g.drawImage(backdropFor(columns), 0, 0, columns * PIXEL, HEIGHT)
+      g.drawImage(backdropFor(columns, f.t), 0, 0, columns * PIXEL, HEIGHT)
       effects.start(f.effects, f.actors, f.height)
       for (const a of f.actors) {
         // Why offset by x: members side by side swing out of step, as in Figures and Office.
