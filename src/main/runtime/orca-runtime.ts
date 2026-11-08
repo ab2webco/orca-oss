@@ -711,7 +711,7 @@ import {
 } from './game-member-worktree-guard'
 import { readMemoryPressure } from '../memory/memory-pressure-reading'
 import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
-import { app, BrowserWindow, ipcMain, nativeTheme, Notification, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import {
   isOrchestratorGameMemberOn,
   prepareOrchestratorGameLaunch
@@ -728,6 +728,7 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
@@ -32326,10 +32327,7 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
-      // Why windows gate it: a headless serve has no theme of its own to report.
-      ...(BrowserWindow.getAllWindows().length > 0
-        ? { appearance: nativeTheme.shouldUseDarkColors ? ('dark' as const) : ('light' as const) }
-        : {}),
+      appearance: orcaGameAppearanceOf(),
       host: gameHostProfileOfThisMachine(),
       readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
