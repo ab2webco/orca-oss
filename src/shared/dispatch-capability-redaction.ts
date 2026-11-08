@@ -62,6 +62,10 @@ const WRAPPED_SECRET = /dcap_[A-Za-z0-9_-]{1,43}|sk-ant-(?:o[ar]t|api)[A-Za-z0-9
 const MATCH_BOUND = { dcap: 48, skAnt: 138 }
 const FILLED_BY_ONE_RUN = /^[^A-Za-z0-9_-]*[A-Za-z0-9_-]+$/
 
+/** Whether the first row is a full row of one wrapped run, whose head may sit on a row above it. */
+export const rowsOpenInsideWrappedRun = (rows: readonly string[]): boolean =>
+  rows.length > 1 && FILLED_BY_ONE_RUN.test(rows[0]) && rows[0].length === rows[1].length
+
 /**
  * A token can run past its row by the terminal's wrap or an app's wrap under a hanging indent, at any row
  * length. So every row's last word is read as running on into the next row's first word, past the indent
