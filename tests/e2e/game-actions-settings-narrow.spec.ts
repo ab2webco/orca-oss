@@ -4,7 +4,7 @@
  * Needs E2E: wrapping and clipping only exist with real layout, which happy-dom does not do.
  */
 
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication, Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
@@ -56,19 +56,25 @@ async function lineFit(text: Locator): Promise<{ lines: number; clipped: boolean
   })
 }
 
+// Why: the seeded repo is shared by the worker; this test's orca.yaml must not reach the next test.
+test.afterEach(({ testRepoPath }) => {
+  rmSync(path.join(testRepoPath, 'orca.yaml'), { force: true })
+})
+
 test('Settings > Actions keeps V30 lines whole at 390 and 320', async ({
   electronApp,
-  orcaPage
+  orcaPage,
+  testRepoPath
 }, testInfo) => {
   test.setTimeout(CAPTURE_EVIDENCE ? 300_000 : 120_000)
   await waitForSessionReady(orcaPage)
   await orcaPage.evaluate(() => window.api.ui.set({ starNagCompleted: true }))
   const repo = await orcaPage.evaluate(() => {
     const first = window.__store!.getState().repos[0]
-    return first ? { id: first.id, path: first.path } : null
+    return first ? { id: first.id } : null
   })
   expect(repo, 'the fixture seeds a repo').not.toBeNull()
-  writeFileSync(path.join(repo!.path, 'orca.yaml'), ORCA_YAML)
+  writeFileSync(path.join(testRepoPath, 'orca.yaml'), ORCA_YAML)
   const sectionId = `repo-${repo!.id}-game-actions`
   await orcaPage.evaluate(
     ({ id, section }) => {
