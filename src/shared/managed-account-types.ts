@@ -74,6 +74,9 @@ export type ClaudeManagedAccount = {
   endpointLabel?: string | null
   endpointBaseUrl?: string | null
   endpointModel?: string | null
+  /** When a `claude setup-token` credential was stored in this host's vault; the token
+   *  itself lives only in the vault settings.json env (mode 600), never here. */
+  longLivedTokenSetAt?: number | null
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number
@@ -90,6 +93,7 @@ export type ClaudeManagedAccountSummary = {
   endpointLabel?: string | null
   endpointBaseUrl?: string | null
   endpointModel?: string | null
+  longLivedTokenSetAt?: number | null
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number
