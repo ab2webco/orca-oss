@@ -29,6 +29,8 @@ type Deps = {
   sessionIdOf: (terminalHandle: string) => string | null
   /** Why a saved member is not live while its terminal is open; null when the terminal is gone. */
   causeOf?: GamePausedCauseOf
+  /** Whether the lead released a dispatch's worker; a released adopted member is gone (ORCA-1141). */
+  releasedDispatch?: (dispatchId: string) => boolean
   /** True only when its repo answered without it; an unreachable host is not gone. */
   worktreeGone?: (worktreeId: string) => Promise<boolean>
 }
@@ -85,7 +87,10 @@ export class GamePausedMembers {
     )
     return {
       ...pausedAndUnlistedMembersOf({
-        members: read.members,
+        members: read.members.filter(
+          (one) =>
+            !(one.adoptedPaneKey && one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
+        ),
         live: liveNow,
         livePaneKeys,
         starting,

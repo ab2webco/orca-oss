@@ -42,6 +42,7 @@ function setup(
     now?: () => number
     panes?: Record<string, string>
     agentRuns?: boolean
+    released?: string[]
   } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-resume-'))
@@ -65,6 +66,7 @@ function setup(
       }),
     terminalOfPane: (paneKey) => over.panes?.[paneKey] ?? null,
     runsAgent: async () => over.agentRuns ?? true,
+    releasedDispatch: (id) => (over.released ?? []).includes(id),
     ...(over.now ? { now: over.now } : {})
   })
   return { dir, store, resume, resumed }
@@ -352,5 +354,45 @@ describe('GameMemberResume.resume for an adopted member', () => {
     })
     expect(closed.resumed).toEqual([])
     expect(starting.resumed).toEqual([])
+  })
+})
+
+// Why (ORCA-1141): an adopted member usually reports done at once and stays a member until released.
+describe('GameMemberResume.resume for an adopted member whose task is done', () => {
+  const adopted = saved('MAIN', { name: 'main', sessionId: null, adoptedPaneKey: 'tab-a:leaf-a' })
+
+  it('resumes it on a new task under its name while the lead never released it', async () => {
+    const { store, resume } = setup({
+      taskStatus: 'completed',
+      dispatchStatus: 'completed',
+      panes: { 'tab-a:leaf-a': 'term-restored' },
+      worktrees: ['wt-MAIN']
+    })
+    await store.upsert('repo:r1', adopted)
+
+    await expect(resume.resume('repo:r1', 'MAIN')).resolves.toMatchObject({
+      outcome: 'resumed',
+      terminal: 'term-restored',
+      adopted: true,
+      newTask: true,
+      member: { ticket: 'MAIN', name: 'main' }
+    })
+    expect(await store.read('repo:r1')).toMatchObject({ members: [{ ticket: 'MAIN' }] })
+  })
+
+  it('lets one the lead released go', async () => {
+    const { store, resume } = setup({
+      taskStatus: 'completed',
+      dispatchStatus: 'completed',
+      panes: { 'tab-a:leaf-a': 'term-restored' },
+      released: ['ctx_MAIN']
+    })
+    await store.upsert('repo:r1', adopted)
+
+    await expect(resume.resume('repo:r1', 'MAIN')).resolves.toEqual({
+      outcome: 'finished',
+      ticket: 'MAIN'
+    })
+    expect(await store.read('repo:r1')).toMatchObject({ members: [] })
   })
 })

@@ -4,6 +4,7 @@ import type {
   GameMemberSession
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
+import type { GameAdoptedResume } from '../../shared/orchestrator-game-adopted-members'
 
 type Deps = {
   store: GameMemberSessionStore
@@ -22,6 +23,8 @@ type Deps = {
   /** The terminal now in a pane, as an adopted member's tab comes back after a restart. */
   terminalOfPane: (paneKey: string) => string | null
   runsAgent: (terminal: string) => Promise<boolean>
+  /** Whether the lead released this dispatch's worker, which ends an adopted member. */
+  releasedDispatch: (dispatchId: string) => boolean
   now?: () => number
 }
 
@@ -89,7 +92,18 @@ export class GameMemberResume {
       worktreeId: saved.worktreeId ?? this.deps.worktreeOfTask(saved.taskId)
     }
     const status = this.deps.statusOf(member.taskId)
-    if (status.task === 'completed' || status.latestDispatch === 'completed') {
+    const done = status.task === 'completed' || status.latestDispatch === 'completed'
+    if (member.adoptedPaneKey) {
+      // Why: an adopted member stays one after its task is done, until the lead releases it (ORCA-1141).
+      if (member.dispatchId && this.deps.releasedDispatch(member.dispatchId)) {
+        await this.deps.store.remove(projectKey, [ticket])
+        return { outcome: 'finished', ticket }
+      }
+      if (done) {
+        return this.resumeAdopted(member, member.adoptedPaneKey, null, true)
+      }
+    }
+    if (done) {
       await this.deps.store.remove(projectKey, [ticket])
       return { outcome: 'finished', ticket }
     }
@@ -109,7 +123,7 @@ export class GameMemberResume {
       }
     }
     if (member.adoptedPaneKey) {
-      return this.resumeAdopted(member, member.adoptedPaneKey, retryOf)
+      return this.resumeAdopted(member, member.adoptedPaneKey, retryOf, false)
     }
     if (member.worktreeId !== null && !(await this.deps.worktreeExists(member.worktreeId))) {
       return {
@@ -144,7 +158,8 @@ export class GameMemberResume {
   private async resumeAdopted(
     member: GameMemberSession,
     paneKey: string,
-    retryOf: string | null
+    retryOf: string | null,
+    newTask: boolean
   ): Promise<GameMemberResumeOutcome> {
     const { ticket } = member
     const terminal = this.deps.terminalOfPane(paneKey)
@@ -162,7 +177,14 @@ export class GameMemberResume {
         reason: `its tab runs no agent yet; run \`orca game resume-members ${ticket}\` again once its session is back`
       }
     }
-    return { outcome: 'resumed', terminal, member: targetOf(member, retryOf), adopted: true }
+    const resumed: GameAdoptedResume = {
+      outcome: 'resumed',
+      terminal,
+      member: targetOf(member, retryOf),
+      adopted: true,
+      ...(newTask ? { newTask: true as const } : {})
+    }
+    return resumed
   }
 
   /**

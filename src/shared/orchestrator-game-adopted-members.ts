@@ -1,11 +1,17 @@
 import {
   pausedMembersOf,
   unlistedMembersOf,
+  type GameMemberResumeOutcome,
   type GameMemberSession,
   type GamePausedCauseOf,
   type GamePausedMember,
   type GameUnlistedMember
 } from './orchestrator-game-member-sessions'
+
+/** An adopted member's resume; `newTask` when its own task is done, so it gets another under its name. */
+export type GameAdoptedResume = Extract<GameMemberResumeOutcome, { outcome: 'resumed' }> & {
+  newTask?: true
+}
 
 /** A paused member `game adopt` took carries its pane, so adopting that agent again resumes it. */
 export type GameStatePausedMember = GamePausedMember & { adoptedPane?: string }
