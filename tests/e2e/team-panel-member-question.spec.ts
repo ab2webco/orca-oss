@@ -5,7 +5,7 @@
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
@@ -16,6 +16,43 @@ const QUESTION = 'Rebase on #1077 before the PR?'
 const OPTIONS = ['Rebase now', 'Leave it']
 // Why 20 s: the Team model's poll; acceptance is "within one poll".
 const TEAM_POLL_MS = 20_000
+// Why gated: every width and theme is evidence for a reviewer, too slow for each CI run.
+const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
+const WIDTHS = [1440, 768, 390, 320]
+
+async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+  await page.evaluate(async (next) => {
+    const settings = await window.api.settings.set({ theme: next })
+    window.__store?.setState({ settings })
+  }, theme)
+  await expect
+    .poll(() =>
+      page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
+    )
+    .toBe(theme)
+}
+
+/** The Team panel in Spanish at each width and theme, to sit beside V28's inbox-foryou. */
+async function capturePanel(page: Page, panel: Locator, name: string, testInfo: TestInfo) {
+  if (!CAPTURE) {
+    return
+  }
+  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'es' }))
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(page, theme)
+      const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+      expect(overflow, `${name} overflows at ${width}px ${theme}`).toBe(0)
+      await panel.screenshot({
+        animations: 'disabled',
+        path: testInfo.outputPath(`${name}-${width}-${theme}.png`)
+      })
+    }
+  }
+  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
 
 /** A Codex-looking agent that reads keys raw, as Claude's selector does, and logs every byte. */
 function createRawKeyAgent(): { command: string; keys: () => string; dispose: () => void } {
@@ -204,11 +241,14 @@ for (const plugins of [false, true]) {
       await panel.getByRole('tab', { name: /^Team/ }).click()
       const answerInInbox = card.getByRole('button', { name: 'Answer in Inbox' })
       await expect(answerInInbox).toBeVisible({ timeout: 2 * TEAM_POLL_MS + 5_000 })
+      if (!plugins) {
+        await capturePanel(orcaPage, panel, 'member-card-cue', testInfo)
+      }
       await answerInInbox.click()
       await expect(inboxTab).toHaveAttribute('aria-selected', 'true')
       await expect(question).toContainText(QUESTION)
       if (!plugins) {
-        await orcaPage.screenshot({ path: testInfo.outputPath('member-question-inbox.png') })
+        await capturePanel(orcaPage, panel, 'member-inbox-foryou', testInfo)
       }
 
       // Why the tail: the member's brief was typed into the same ledger before the answer.
@@ -216,6 +256,15 @@ for (const plugins of [false, true]) {
       await question.getByRole('button', { name: OPTIONS[1] }).click()
       // Why '2': Claude's selector commits on the option's 1-based number.
       await expect.poll(() => agent.keys().slice(before), { timeout: 15_000 }).toBe('2')
+
+      // Claude reports the answered tool and moves on; For you then empties.
+      await postHook({ hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion' })
+      await expect(question).toHaveCount(0, { timeout: TEAM_POLL_MS })
+      await expect(panel.getByText('Nothing waits for you')).toBeVisible()
+      await expect(inboxTab).not.toContainText('1')
+      if (!plugins) {
+        await capturePanel(orcaPage, panel, 'member-after-answer', testInfo)
+      }
     } finally {
       agent.dispose()
     }
