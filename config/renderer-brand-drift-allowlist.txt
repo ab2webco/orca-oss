@@ -1,0 +1,71 @@
+# Known stale renderer translate() fallbacks, measured against
+# src/renderer/src/i18n/locales/en.json: one `file key` per line, file relative to
+# src/renderer/src. Every call of that key in that file may keep a fallback that
+# differs from its catalog value; any other stale fallback fails CI with its file
+# and line, and rename drift fails even when listed (ORCA-1138).
+#
+# Adding a correct translate() call never touches this file. Fixing a listed
+# fallback does not require deleting its line either, so parallel PRs do not
+# conflict here; the ratchet names fixed entries for a later cleanup PR to delete.
+# Never add a line: `pnpm check:renderer-brand-drift-ratchet` rejects any entry
+# the PR base does not list. Copy the catalog value into the fallback instead.
+#
+# Test files are excluded: their translate() calls are fixtures, not product copy.
+
+components/GitHubItemDialog.tsx auto.components.GitHubItemDialog.checkActionRequiredHint
+components/PullRequestPage.tsx auto.components.PullRequestPage.checkActionRequiredHint
+components/WorktreeJumpPalette.tsx auto.components.WorktreeJumpPalette.c4afa68159
+components/artifacts/ArtifactsPage.tsx auto.components.artifacts.ArtifactsPage.signInCopy
+components/artifacts/ArtifactsPage.tsx auto.components.artifacts.ArtifactsPage.signInHeading
+components/crash-report/CrashReportDialogSurface.tsx auto.components.crash.report.CrashReportDialog.835037edc9
+components/crash-report/CrashReportDialogSurface.tsx auto.components.crash.report.CrashReportDialog.ead6fc0510
+components/editor/ReviewNotesSendMenuContent.tsx auto.components.editor.ReviewNotesSendMenuContent.50f7e753ea
+components/editor/ReviewNotesSendMenuContent.tsx auto.components.editor.ReviewNotesSendMenuContent.bb9c69a0c9
+components/editor/ReviewNotesSendMenuContent.tsx auto.components.editor.ReviewNotesSendMenuContent.f5096c6e4e
+components/feature-wall/review-animated-visual-ship-styles.tsx auto.components.feature.wall.review.animated.visual.ship.styles.90cdcd2ecc
+components/github/CommentCodeContext.tsx auto.components.GitHubItemDialog.307c98e8e3
+components/linear-project-view-surfaces.tsx auto.components.linear.project.view.surfaces.7616c986c6
+components/onboarding/GhosttyDiscoveryRow.tsx auto.components.onboarding.ThemeStep.ad19e5c916
+components/right-sidebar/ChecksPanel.tsx auto.components.right.sidebar.ChecksPanel.abf59262fb
+components/right-sidebar/checks-panel-content.tsx auto.components.right.sidebar.checks.panel.content.actionRequiredHint
+components/right-sidebar/source-control/commit/recovery-notice.tsx auto.components.right.sidebar.SourceControl.15b7f210d7
+components/right-sidebar/source-control/listing/too-many-changes-banner.tsx auto.components.right.sidebar.SourceControl.tooManyChanges
+components/right-sidebar/source-control/panel/dialog-layer.tsx auto.components.right.sidebar.SourceControl.901140f47d
+components/settings/AccountsPane.tsx auto.components.settings.AccountsPane.resyncGlobalConfigHint
+components/settings/AutoRenameBranchFromWorkSetting.tsx auto.components.settings.AutoRenameBranchFromWorkSetting.ef787db0e3
+components/settings/ExperimentalPane.tsx auto.components.settings.ExperimentalPane.newWorktreeCardStyle.copy
+components/settings/GeneralSupportSection.tsx auto.components.settings.GeneralSupportSection.511782265b
+components/settings/OrcaAccountSettingsPane.tsx auto.components.settings.orcaAccount.signedOut
+components/settings/RemoteServerUpdateDialog.tsx auto.components.settings.RemoteServerUpdateDialog.restartWarning
+components/settings/RepositoryIconTabs.tsx auto.components.settings.RepositoryIconPicker.2b7d27b93c
+components/settings/RuntimeEnvironmentsPane.tsx auto.components.settings.RuntimeEnvironmentsPane.7b5986c8df
+components/settings/RuntimePairingGeneratorForm.tsx auto.components.settings.RuntimePairingUrlGenerator.add-custom
+components/settings/SshPane.tsx auto.components.settings.SshPane.94c5284560
+components/settings/SshPane.tsx auto.components.settings.SshPane.a7d28dff81
+components/settings/auto-rename-branch-search.ts auto.components.settings.auto.rename.branch.search.427f2cd1eb
+components/settings/bitbucket-credentials-dialog.tsx auto.components.settings.bitbucket.credentials.dialog.remoteRuntime
+components/settings/repository-host-add-project-steps.tsx auto.components.settings.RepositoryPane.creatingPendingSetup
+components/settings/repository-host-add-project-steps.tsx auto.components.settings.RepositoryPane.settingUpHost
+components/settings/repository-host-add-project-steps.tsx auto.components.settings.RepositoryPane.setupHost
+components/settings/runtime-environments-search.ts auto.components.settings.runtime.environments.search.3517fb2ec0
+components/settings/runtime-environments-search.ts auto.components.settings.runtime.environments.search.4575341c77
+components/settings/ssh-search.ts auto.components.settings.ssh.search.62826efbe9
+components/settings/ssh-search.ts auto.components.settings.ssh.search.74c6d90d78
+components/sidebar/AddRemoteHostFields.tsx auto.components.sidebar.AddRemoteHostDialog.pairingCode
+components/sidebar/AddRemoteHostFields.tsx auto.components.sidebar.AddRemoteHostDialog.pairingHelpSuffix
+components/sidebar/AddRemoteHostFields.tsx auto.components.sidebar.AddRemoteHostDialog.serverName
+components/sidebar/SidebarWorkspaceOptionsMenu.tsx auto.components.sidebar.SidebarWorkspaceOptionsMenu.bc96dbd041
+components/sidebar/WorkspaceKanbanSettingsMenu.tsx auto.components.sidebar.WorkspaceKanbanSettingsMenu.b45b350eb0
+components/sidebar/WorkspaceStatusAppearancePopover.tsx auto.components.sidebar.WorkspaceStatusAppearancePopover.514be2f569
+components/sidebar/WorktreeVisibilitySourceList.tsx auto.components.sidebar.WorktreeVisibilitySourceList.sourcesDescription
+components/sidebar/add-repo-local-start-actions.ts auto.components.sidebar.add.repo.local.start.actions.a6c20dca96
+components/status-bar/WorkspaceSpaceCompactPanel.tsx auto.components.status.bar.WorkspaceSpaceCompactPanel.bef4dc0457
+components/terminal-pane/TerminalPane.tsx auto.components.terminalPane.TerminalPane.relaunchLaunched
+components/terminal-pane/TerminalPane.tsx auto.components.terminalPane.TerminalPane.relaunchResumed
+components/terminal-pane/TerminalPane.tsx auto.components.terminalPane.TerminalPane.relaunchTitle
+components/terminal-pane/terminal-native-file-drop.ts auto.components.terminal.pane.terminal.drop.handler.29c031b49a
+components/terminal-pane/use-manual-claude-account-switch.ts auto.components.terminalPane.useManualClaudeAccountSwitch.doneLaunched
+components/terminal-pane/use-manual-claude-account-switch.ts auto.components.terminalPane.useManualClaudeAccountSwitch.doneResumed
+components/workspace-cleanup/workspace-cleanup-dialog-notices.tsx auto.components.workspace.cleanup.WorkspaceCleanupDialog.47123d0108
+components/workspace-cleanup/workspace-cleanup-dialog-notices.tsx auto.components.workspace.cleanup.WorkspaceCleanupDialog.7eee951968
+components/workspace-cleanup/workspace-cleanup-scan-notice.ts auto.components.workspace.cleanup.WorkspaceCleanupDialog.4cc5b73efe

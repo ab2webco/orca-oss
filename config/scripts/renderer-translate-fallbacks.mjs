@@ -17,11 +17,11 @@ import path from 'node:path'
  * stale fallbacks and contribute the only key that resolves to nothing.
  */
 
-const RENDERER_ROOT = 'src/renderer/src'
+export const RENDERER_ROOT = 'src/renderer/src'
 const CATALOG = `${RENDERER_ROOT}/i18n/locales/en.json`
 
 // Split so this file is not itself a match for the name it searches for.
-const OLD_NAME = 'Or' + 'ca'
+export const OLD_NAME = 'Or' + 'ca'
 export const NEW_NAME = `${OLD_NAME} Lab`
 const RENAME = new RegExp(`\\b${OLD_NAME}\\b(?! Lab)`, 'g')
 
@@ -167,7 +167,7 @@ export function readCatalog(root = process.cwd()) {
 }
 
 /**
- * The three numbers the baseline pins.
+ * Sorts the parsed calls against the catalog; stale ones carry it as `expected`.
  *
  * `renameDrift` is the subset of `stale` whose catalog value is exactly the
  * fallback with the product renamed — the work ORCA-443 retires. `stale` is
@@ -191,20 +191,10 @@ export function measure(root = process.cwd()) {
     if (value === call.fallback) {
       continue
     }
-    stale.push(call)
+    stale.push({ ...call, expected: value })
     if (value === call.fallback.replaceAll(RENAME, NEW_NAME)) {
-      renameDrift.push(call)
+      renameDrift.push(stale.at(-1))
     }
   }
-  return {
-    calls,
-    unresolved,
-    stale,
-    renameDrift,
-    counts: {
-      'rename-drift': renameDrift.length,
-      'stale-fallbacks': stale.length,
-      'resolved-calls': calls.length - unresolved.length
-    }
-  }
+  return { calls, unresolved, stale, renameDrift }
 }
