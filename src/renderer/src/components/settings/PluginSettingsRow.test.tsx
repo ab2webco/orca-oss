@@ -247,4 +247,19 @@ describe('PluginSettingsRow on a dev build with a linked vault (ORCA-1131)', () 
     expect(container.textContent).not.toContain('The plugin stopped after an activation')
     unmount()
   })
+
+  it('disables the toggle of a row that cannot start, as the kill list does', async () => {
+    const { container, unmount } = await renderRow({
+      ...configurable,
+      status: 'errored',
+      needsSetup: false,
+      settings: undefined,
+      blockedByDevSharedVault: true
+    })
+
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="Disable Webhook"]')?.disabled
+    ).toBe(true)
+    unmount()
+  })
 })

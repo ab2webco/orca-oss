@@ -113,8 +113,13 @@ export function PluginSettingsRow({
     plugin.status === 'restarting' ||
     plugin.status === 'idle' ||
     plugin.status === 'errored'
+  // Why: a row that cannot start must not offer a live toggle (ORCA-1131).
   const switchDisabled =
-    busy || needsReview || plugin.status === 'invalid' || Boolean(plugin.blockedByKillList)
+    busy ||
+    needsReview ||
+    plugin.status === 'invalid' ||
+    Boolean(plugin.blockedByKillList) ||
+    Boolean(plugin.blockedByDevSharedVault)
 
   // Why: the wide primary action ("Review & enable") renders on its own footer
   // row so it never wraps the compact toggle + overflow cluster to an
