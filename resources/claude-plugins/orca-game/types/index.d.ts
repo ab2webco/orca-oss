@@ -1,5 +1,3 @@
-import type { AdvisorLog } from './advisor-log'
-
 export type GameMode = 'on' | 'zen' | 'flat' | 'off'
 
 /** `openLinks` is where links open: an Orca tab, or the system browser through Orca. */
@@ -361,12 +359,6 @@ export type GameState = {
   locale?: GameLocale
   /** Orca's light or dark look, which the agent terminal's colours follow; absent from an older host. */
   appearance?: 'dark' | 'light'
-  /** The lead's name as its Team card shows it; absent from an older host. */
-  leadName?: string
-  /** Orca's light or dark look, which the agent terminal's colours follow; absent from an older host. */
-  appearance?: 'dark' | 'light'
-  /** The lead's name as its Team card shows it; absent from an older host. */
-  leadName?: string
   /** The scopes Orca can store a view in for this pane; absent from an older host. */
   viewScopes?: ('project' | 'global')[]
   /** The view this machine's resources suggest; absent from an older host. */
@@ -405,7 +397,8 @@ export type GameHostCapacity = { host: string; running: number; cap?: number } &
 
 export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
-export type GameLead = { autostart: boolean; cap: number; label?: string }
+/** `name` is the lead's name as its Team card shows it, from the state's `leadName`; absent from an older host. */
+export type GameLead = { autostart: boolean; cap: number; label?: string; name?: string }
 
 export type GameRole = 'lead' | 'member'
 
@@ -436,16 +429,27 @@ export type RecentReward = { label: string; xp: number; at: number }
 /** A line another plugin set with `$.ui.status`, held for the allies strip while the game draws. */
 export type AllyStatus = { plugin: string; text: string }
 
-export type AlliesState = { statuses: AllyStatus[] }
+/** One of Jev's decisions as the Panel lists it; `id` null is the main conversation's model. */
+export type AdvisorLogEntry = {
+  key: string
+  id: string | null
+  title: string | null
+  model: string | null
+  effort: string | number | null
+  verdict: string
+  gesture: AdvisorGesture | null
+  at: number
+}
 
-export type { AdvisorLog, AdvisorLogEntry } from './advisor-log'
+/** Jev's latest decisions in this pane, oldest first, a few at most. */
+export type AdvisorLog = { decisions: AdvisorLogEntry[] }
 
 declare module 'claude-code' {
   // oxlint-disable-next-line typescript/consistent-type-definitions -- only an interface merges into the engine's
   interface PluginState {
     'orca-game': {
       fleet: FleetState
-      allies: AlliesState
+      allies: { statuses: AllyStatus[] }
       advisor: AdvisorLog
       actions: ActionRuns
       /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */

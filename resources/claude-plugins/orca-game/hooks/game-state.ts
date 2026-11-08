@@ -292,9 +292,6 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     ...(body.appearance === 'dark' || body.appearance === 'light'
       ? { appearance: body.appearance }
       : {}),
-    ...(typeof body.leadName === 'string' && body.leadName.trim() !== ''
-      ? { leadName: body.leadName.trim() }
-      : {}),
     ...viewSwitchOf(body),
     ...githubLowOf(body),
     ...gameMergesOf(body.merges)

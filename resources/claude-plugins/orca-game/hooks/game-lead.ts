@@ -14,13 +14,15 @@ type Shape = Record<string, unknown>
 const isShape = (value: unknown): value is Shape =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const leadOf = (value: Shape): GameLead => {
+const leadOf = (value: Shape, shownName: unknown): GameLead => {
   const cap = value.cap
   const label = typeof value.label === 'string' ? value.label.trim() : ''
+  const name = typeof shownName === 'string' ? shownName.trim() : ''
   return {
     autostart: value.autostart === true,
     cap: typeof cap === 'number' && Number.isInteger(cap) && cap >= 1 ? cap : DEFAULT_CAP,
-    ...(label !== '' && label.length <= LABEL_MAX ? { label } : {})
+    ...(label !== '' && label.length <= LABEL_MAX ? { label } : {}),
+    ...(name === '' ? {} : { name })
   }
 }
 
@@ -28,7 +30,7 @@ const leadOf = (value: Shape): GameLead => {
 export const gameLeadOf = (
   body: Shape
 ): Pick<GameState, 'lead' | 'role' | 'leadElsewhere' | 'hostCapacity' | 'metrics'> => ({
-  ...(isShape(body.lead) ? { lead: leadOf(body.lead) } : {}),
+  ...(isShape(body.lead) ? { lead: leadOf(body.lead, body.leadName) } : {}),
   ...hostCapacityOf(body),
   ...(body.role === 'lead' || body.role === 'member' ? { role: body.role } : {}),
   ...(isShape(body.leadElsewhere) && typeof body.leadElsewhere.handle === 'string'
@@ -50,7 +52,7 @@ export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): s
 // Why the paneKey and agent type: game-state fills a leader with no title with them, and the Team card skips both.
 /** The name Orca's Team card shows; from an older host, the leader's title short of its ticket, its label, else `fallback`. */
 export const leadCharacterOf = (
-  state: Pick<GameState, 'lead' | 'worktree' | 'leadName'> & {
+  state: Pick<GameState, 'lead' | 'worktree'> & {
     agents: readonly Pick<
       GameState['agents'][number],
       'paneKey' | 'agentType' | 'displayName' | 'isLeader'
@@ -58,8 +60,8 @@ export const leadCharacterOf = (
   },
   fallback: string
 ): string => {
-  if (state.leadName !== undefined) {
-    return state.leadName
+  if (state.lead?.name !== undefined) {
+    return state.lead.name
   }
   const leader = state.agents.find((one) => one.isLeader)
   const own =
