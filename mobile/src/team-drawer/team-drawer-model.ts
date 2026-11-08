@@ -30,7 +30,7 @@ export type TeamMemberRow = {
     state: HostedReviewState
     ci: CheckStatus | 'none'
     /** CI per pushed head, oldest first; empty from an older host. */
-    ciHistory: CheckStatus[]
+    ciHistory: { headSha: string; ci: CheckStatus }[]
     comments: number | null
   } | null
   ticketStatus: string | null
@@ -89,7 +89,9 @@ function prOf(raw: unknown): TeamMemberRow['pr'] {
     state: (text(raw.state) ?? 'open') as HostedReviewState,
     ci: (text(raw.ci) ?? 'none') as CheckStatus | 'none',
     ciHistory: heads.flatMap((head) =>
-      isRecord(head) && text(head.ci) ? [head.ci as CheckStatus] : []
+      isRecord(head) && text(head.ci) && text(head.headSha)
+        ? [{ headSha: head.headSha as string, ci: head.ci as CheckStatus }]
+        : []
     ),
     comments: num(raw.commentCount)
   }

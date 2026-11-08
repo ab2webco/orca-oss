@@ -248,7 +248,14 @@ describe('live card facts', () => {
       ciHistory: [{ headSha: 'a', ci: 'failure' }, { headSha: 'b', ci: 'success' }, { bad: true }],
       commentCount: 3
     }
-    expect(one({ review })?.pr).toMatchObject({ ciHistory: ['failure', 'success'], comments: 3 })
+    // Why the sha: it keys each head's dot, so a new push never reuses another head's row.
+    expect(one({ review })?.pr).toMatchObject({
+      ciHistory: [
+        { headSha: 'a', ci: 'failure' },
+        { headSha: 'b', ci: 'success' }
+      ],
+      comments: 3
+    })
   })
 })
 

@@ -101,12 +101,12 @@ export function TeamMemberCard({ member, now, onOpenLink }: Props) {
             <View
               style={styles.heads}
               accessible
-              accessibilityLabel={`CI per push: ${pr.ciHistory.join(', ')}`}
+              accessibilityLabel={`CI per push: ${pr.ciHistory.map((head) => head.ci).join(', ')}`}
             >
-              {pr.ciHistory.slice(-6).map((head, index) => (
+              {pr.ciHistory.slice(-6).map((head) => (
                 <View
-                  key={index}
-                  style={[styles.head, { backgroundColor: CI[head]?.tone ?? colors.textMuted }]}
+                  key={head.headSha}
+                  style={[styles.head, { backgroundColor: CI[head.ci]?.tone ?? colors.textMuted }]}
                 />
               ))}
             </View>
