@@ -130,7 +130,14 @@ const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
 const redactedDetailOf = (text: string | null | undefined): string | null =>
   text ? text.replace(DISPATCH_CAPABILITY, '[redacted]') : null
 
+// Why: an agent keeps its last tool after it stops; only a working or waiting one is on it now.
+const isActive = (agent: GameAgent): boolean =>
+  agent.state === 'working' || agent.state === 'waiting'
+
 const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
+  if (!isActive(agent)) {
+    return null
+  }
   if (agent.activity?.running) {
     const { name, id, url, running } = agent.activity
     return { kind: 'link', name, id, url, running }
@@ -218,7 +225,7 @@ function memberCardOf(
     account: accountOf(agent, state),
     characterKey: characterOf(roster, agent.displayName),
     ticket,
-    flowPhase: flowPhaseOf(agent, work),
+    flowPhase: isActive(agent) || isFinished(work) ? flowPhaseOf(agent, work) : null,
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
     needsYou,
