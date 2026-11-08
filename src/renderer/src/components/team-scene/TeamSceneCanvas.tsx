@@ -22,6 +22,8 @@ type Props = {
   painter: TeamScenePainter
   /** The lead's bubble, from `teamSceneLeadLineOf`; null shows none. */
   leadLine: string | null
+  /** Which speeches the last layout left without a bubble. */
+  onUnplaced?: (keys: string[]) => void
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
@@ -33,7 +35,12 @@ type TeamSceneAsker = { key: string; name: string; x: number; top: number }
 const ASKER_LIFT = 38
 const ASKER_EDGE = 32
 
-export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.Element {
+export function TeamSceneCanvas({
+  input,
+  painter,
+  leadLine,
+  onUnplaced
+}: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
   const reducedMotion = usePrefersReducedMotion()
@@ -239,6 +246,7 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
         height={painter.height}
         cloudPixel={painter.cloudPixel}
         obstacles={tags}
+        onUnplaced={onUnplaced}
       />
     </div>
   )

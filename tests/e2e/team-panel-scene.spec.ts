@@ -222,10 +222,10 @@ async function bubblesOverTag(page: Page, shown: readonly string[], forMs = 0): 
   )
 }
 
-// The advisor's whole line, read from its card: neither cut at the side nor clamped below.
-async function advisorCardLine(card: Locator): Promise<string> {
+// A card's whole scene line: neither cut at the side nor clamped below.
+async function cardLine(card: Locator, selector: string): Promise<string> {
   return card
-    .locator('[data-team-advisor-line]')
+    .locator(selector)
     .evaluate((line) =>
       line.scrollWidth > line.clientWidth || line.scrollHeight > line.clientHeight
         ? `cut: ${line.textContent}`
@@ -514,7 +514,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
       await expect(advisorCard).not.toContainText('Opus 5.5 · high')
       await expect
-        .poll(() => advisorCardLine(advisorCard), {
+        .poll(() => cardLine(advisorCard, '[data-team-advisor-line]'), {
           message: `the advisor's card does not show its whole line at ${width}px ${style} ${theme}`
         })
         .toBe(line)
@@ -648,6 +648,61 @@ test('the Team panel draws the live scene beside a member opened under its heade
           })
         }
       }
+    }
+
+    // Lead review of criterion 8: a lead's line that needs a two-line cloud has no spot beside the
+    // tag on Pixel's 219 px stage, so the lead's card shows all of it, as the advisor's card does.
+    const leadAsks = 'Waiting for you · Merge #14 now?'
+    const [leadTab] = pane.paneKey.split(':')
+    const asks = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Orca-Agent-Hook-Token': endpoint.token },
+      body: JSON.stringify({
+        paneKey: pane.paneKey,
+        tabId: leadTab,
+        worktreeId,
+        env: endpoint.env,
+        version: endpoint.version,
+        payload: {
+          hook_event_name: 'PermissionRequest',
+          tool_name: 'AskUserQuestion',
+          tool_input: {
+            questions: [
+              {
+                question: 'Merge #14 now?',
+                header: 'Merge',
+                multiSelect: false,
+                options: [{ label: 'Yes' }, { label: 'No' }]
+              }
+            ]
+          }
+        }
+      })
+    })
+    expect(asks.status).toBe(204)
+    await orcaPage.evaluate(() =>
+      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
+    )
+    await orcaPage.setViewportSize({ width: 320, height: 900 })
+    await expect(leadBubble).toHaveText(leadAsks, { timeout: 30_000 })
+    const leadCard = panel.locator('[data-team-card="lead"]')
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      await expect
+        .poll(() => cardLine(leadCard, '[data-team-lead-line]'), {
+          message: `the lead's card does not show its whole line at 320px pixel ${theme}`
+        })
+        .toBe(leadAsks)
+      expect(
+        await bubblesOverTag(orcaPage, [], 1500),
+        `no pixel bubble beside ORCA-14's tag for the lead's two-line line at 320px ${theme}`
+      ).toEqual([])
+      await scene.screenshot({
+        path: testInfo.outputPath(`team-scene-lead-line-in-card-pixel-320-${theme}.png`)
+      })
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`team-panel-lead-line-in-card-pixel-320-${theme}.png`)
+      })
     }
 
     // Lead decision A, condition 2: once the question is answered there is room again, and Pixel

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -16,6 +16,7 @@ import { openTeamSession } from './team-session-open'
 import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
+import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 
 /** Why here: core names its advisor only in the files core-vendor-adapters.txt lists. */
 export const teamAdvisorSourceText = (): string => translate('teamPanel.advisor.source', 'Jev')
@@ -35,6 +36,7 @@ function LeadCardRow({
   showName: boolean
   memberCount: number
 }): React.JSX.Element {
+  const sceneLine = useContext(TeamSceneLeadLineContext)
   return (
     <article data-team-card="lead" className="border-b border-border">
       <button
@@ -79,6 +81,14 @@ function LeadCardRow({
               <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
             )}
           </span>
+          {sceneLine ? (
+            <span
+              data-team-lead-line=""
+              className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+            >
+              {sceneLine}
+            </span>
+          ) : null}
           <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
         </span>
       </button>

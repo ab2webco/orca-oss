@@ -23,6 +23,8 @@ type Props = {
   cloudPixel?: number
   /** What no bubble may cover, such as an asking member's tag. */
   obstacles?: readonly TeamSceneRect[]
+  /** Told after each layout which speeches got no bubble, so their lines can show elsewhere. */
+  onUnplaced?: (keys: string[]) => void
 }
 
 const NONE: readonly TeamSceneRect[] = []
@@ -71,7 +73,8 @@ export function TeamSceneBubbles({
   width,
   height,
   cloudPixel,
-  obstacles = NONE
+  obstacles = NONE,
+  onUnplaced
 }: Props): React.JSX.Element {
   const refs = useRef(new Map<string, HTMLSpanElement>())
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
@@ -104,13 +107,13 @@ export function TeamSceneBubbles({
       el.style.width = laid
       return { key: s.key, anchor: s.anchor, align: s.align, yields: s.yields, ...size }
     })
-    setBoxes(
-      layoutTeamSceneBubbles(
-        requests,
-        { width, height },
-        { beside: Boolean(cloudPixel), obstacles }
-      )
+    const laid = layoutTeamSceneBubbles(
+      requests,
+      { width, height },
+      { beside: Boolean(cloudPixel), obstacles }
     )
+    setBoxes(laid)
+    onUnplaced?.(speeches.filter((s) => !laid.some((b) => b.key === s.key)).map((s) => s.key))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
   }, [layoutKey, width, height, cloudPixel])
 
