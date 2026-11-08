@@ -20372,7 +20372,8 @@ export class OrcaRuntimeService {
     )
     for (const folderWorkspace of this.store?.getFolderWorkspaces?.() ?? []) {
       const projectGroup = projectGroupById.get(folderWorkspace.projectGroupId)
-      if (!projectGroup?.parentPath) {
+      // Why not parentPath: a workspace may name its own folder under any group (ORCA-1141).
+      if (!projectGroup) {
         continue
       }
       const worktree = folderWorkspaceToWorktree(folderWorkspace)
