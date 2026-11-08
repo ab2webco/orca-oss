@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { useFloatingTerminalKeepOutElement } from '../floating-terminal/floating-terminal-trigger-keep-out'
 import { teamDockActionsOf, type TeamAction } from '../../../../shared/team-panel-actions'
 import { TeamActionIcon } from './team-action-icons'
 import { teamActionHint, teamActionLabel, teamActionOffText } from './team-action-words'
@@ -62,6 +63,8 @@ export function TeamActionDock({
   const [receipt, setReceipt] = useState<{ label: string; text: string } | null>(null)
   const chips = teamDockActionsOf(actions, null)
   const [row, fit] = useChipsThatFit()
+  const [dock, setDock] = useState<HTMLElement | null>(null)
+  useFloatingTerminalKeepOutElement(dock)
   const stop = actions.find((one) => one.orca === 'stop') ?? null
 
   // Why stateStartedAt: a state that began after the send is the lead's answer to it.
@@ -101,6 +104,7 @@ export function TeamActionDock({
     : translate('teamPanel.actions.stopAll', 'Stop every member')
   return (
     <section
+      ref={setDock}
       data-team-action-dock=""
       aria-label={translate('teamPanel.actions.label', 'Actions')}
       className="relative flex flex-none flex-col gap-1.5 border-t border-border bg-sidebar px-2.5 py-2"

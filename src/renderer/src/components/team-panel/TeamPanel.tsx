@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { openGamePanelSettings } from '@/components/settings/game-panel-settings-link'
 import { useAppStore } from '@/store'
+import { TeamActionDockConnected } from './TeamActionDockConnected'
 import { TeamPanelView } from './TeamPanelView'
 import { teamPanelModelWithSettings } from './team-panel-model-settings'
 import { useTeamPanelModel } from './use-team-panel-model'
@@ -30,5 +31,12 @@ export default function TeamPanel(): React.JSX.Element {
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettings = (repoId: string | null): void =>
     openGamePanelSettings({ openSettingsTarget, openSettingsPage }, repoId)
-  return <TeamPanelView source={source} look={panel.look} onOpenSettings={openSettings} />
+  return (
+    <TeamPanelView
+      source={source}
+      look={panel.look}
+      onOpenSettings={openSettings}
+      dock={(model) => <TeamActionDockConnected model={model} />}
+    />
+  )
 }
