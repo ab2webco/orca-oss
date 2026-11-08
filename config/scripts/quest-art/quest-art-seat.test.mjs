@@ -117,12 +117,13 @@ describe("Quest's Office seats a working member on the chair", () => {
         const draws = calls.filter((c) => c.name === 'drawImage')
         const station = draws.find((c) => c.args[0] === images.get(office.props.station))
         const sprite = draws.find((c) => c.args.length === 9)
-        const [image, sx, sy, sw, sh, dx, dy, dw] = sprite.args
+        const [image, ...placed] = sprite.args
+        const [sx, sy, sw, sh, dx, dy, dw] = placed.map(Number)
         const sheetSrc = [...images].find(([, one]) => one === image)[0]
         expect(sheetSrc).toBe(sheet)
-        const [tx, ty] = calls.findLast((c) => c.name === 'translate').args
+        const [tx, ty] = calls.findLast((c) => c.name === 'translate').args.map(Number)
         const px = dw / sw
-        const [, propX, propY, propW] = station.args
+        const [propX, propY, propW] = station.args.slice(1).map(Number)
         const propPx = propW / desk.width
         const stage = (x, y) => ({ x: propX + x * propPx, y: propY + y * propPx })
         const seatLeft = stage(seat.left, seat.top).x
