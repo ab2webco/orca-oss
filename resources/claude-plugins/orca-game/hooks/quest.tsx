@@ -37,6 +37,7 @@ import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
 import { dropScenes } from './flat-toggle'
 import { shownSpeaker } from './quest-state'
+import { storeHead, storedHeadOf, type MessageHead } from './message-heads'
 import { terminalPalette } from './terminal-palette'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
@@ -238,6 +239,17 @@ async function firstHeadOf($: EngineInterface): Promise<{ phase: ScenePhase; tim
   }
 }
 
+// Why the store first: a resumed session never timed the turns its earlier blocks were written in.
+async function headOf($: EngineInterface, key: string): Promise<MessageHead> {
+  const stored = await storedHeadOf($, key).catch(() => undefined)
+  if (stored !== undefined) {
+    return stored
+  }
+  const head = await firstHeadOf($)
+  await storeHead($, key, head).catch(() => undefined)
+  return head
+}
+
 // Why no frame or padding: a terminal selection copies every cell of the row, border included.
 const registerCards = (on: On) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
@@ -256,7 +268,7 @@ const registerCards = (on: On) => {
       return drawn
     }
     const cardKey = cardKeyOf(e.requestId, e.props.text)
-    const head = quest.cardHeads.get(cardKey) ?? (await firstHeadOf($))
+    const head = quest.cardHeads.get(cardKey) ?? (await headOf($, key))
     quest.cardHeads.set(cardKey, head)
     const name = headingNameOf(
       shownSpeaker(),

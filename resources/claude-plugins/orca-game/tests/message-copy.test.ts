@@ -66,15 +66,24 @@ const framingOf = (tree: RenderElement): string[] =>
     ...(element.type === 'Text' && BOX_CHARACTERS.test(textOf(element)) ? [textOf(element)] : [])
   ])
 
-const start = async ($: Engine, on: On, env: Record<string, string> = {}, state?: object) => {
+const start = async (
+  $: Engine,
+  on: On,
+  env: Record<string, string> = {},
+  state?: object,
+  store = new Map<string, unknown>()
+) => {
   const clock = mock.clock(on)
   mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: 'en', ...env })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
-  on('store.set', () => ({ value: undefined }))
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined }
+  })
   on(
     'ui.render',
     (_$, e) => ({ type: 'Text', props: {}, children: [`native ${e.component}`] }) as never
@@ -177,6 +186,21 @@ describe('message copy', () => {
     const row = await reply($, 'The build is green.')
     expect(await row.find({ type: 'Text', text: /\d:\d\d|min/ })).toBeUndefined()
     await row.unmount()
+  })
+
+  // Why: a resumed lead drew its earlier headings with no time (live check 2).
+  test('a resumed session redraws a heading with the time it was first drawn at', async ($, on) => {
+    const clock = await start($, on)
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const first = await reply($, 'The build is green.')
+    expect(await first.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await first.unmount()
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const resumed = await reply($, 'The build is green.')
+    expect(await resumed.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await resumed.unmount()
   })
 
   test("the lead's reply is headed by its own character, as its Team card names it", async ($, on) => {
