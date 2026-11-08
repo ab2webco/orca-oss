@@ -38,8 +38,16 @@ async function postClaudePrompt(
 
 // ORCA-1135: a lead in a project-group folder workspace (no git, no repo record) sees and adopts
 // that folder's other agents, launches a member that runs in the folder, and the panel shows it.
-for (const plugins of [false, true]) {
-  test(`a lead in a folder workspace finds, launches and shows its team (plugins ${plugins ? 'on' : 'off'})`, async ({
+// Why both groups (ORCA-1141 F7): a group made by name has no parentPath, and its folder's
+// agents were never listed, so the live check found and launched nothing there.
+const GROUPS = [
+  { kind: 'folder group', parentPath: true },
+  { kind: 'named group', parentPath: false }
+] as const
+for (const [plugins, group] of [false, true].flatMap((one) =>
+  GROUPS.map((g) => [one, g] as const)
+)) {
+  test(`a lead in a folder workspace finds, launches and shows its team (plugins ${plugins ? 'on' : 'off'}, ${group.kind})`, async ({
     electronApp,
     orcaPage
   }, testInfo) => {
@@ -60,14 +68,14 @@ for (const plugins of [false, true]) {
           agentDefaultArgs: { codex: '' }
         })
       }, agent.command)
-      const group = await client.call<{ group: { id: string } }>('projectGroup.create', {
+      const made = await client.call<{ group: { id: string } }>('projectGroup.create', {
         name: 'Folder team',
-        parentPath: folder,
+        ...(group.parentPath ? { parentPath: folder } : {}),
         createdFrom: 'manual'
       })
       const created = await client.call<{ folderWorkspace: { id: string } }>(
         'folderWorkspace.create',
-        { projectGroupId: group.result.group.id, folderPath: folder, name: 'Folder team ws' }
+        { projectGroupId: made.result.group.id, folderPath: folder, name: 'Folder team ws' }
       )
       const worktreeId = `folder:${created.result.folderWorkspace.id}`
       await orcaPage.evaluate(async (id) => {

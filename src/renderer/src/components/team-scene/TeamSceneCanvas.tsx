@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
 import {
   advisorLineShown,
@@ -14,6 +14,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { teamSceneLabel } from './team-scene-copy'
 import { createTeamSceneFrameLoop } from './team-scene-frame-loop'
 import { TeamSceneBubbles, type TeamSceneSpeech } from './TeamSceneBubbles'
+import type { TeamSceneRect } from './team-scene-bubble-layout'
 import type { TeamScenePainter } from './team-scene-painter'
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
   painter: TeamScenePainter
   /** The lead's bubble, from `teamSceneLeadLineOf`; null shows none. */
   leadLine: string | null
+  /** Which speeches the last layout left without a bubble. */
+  onUnplaced?: (keys: string[]) => void
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
@@ -32,7 +35,12 @@ type TeamSceneAsker = { key: string; name: string; x: number; top: number }
 const ASKER_LIFT = 38
 const ASKER_EDGE = 32
 
-export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.Element {
+export function TeamSceneCanvas({
+  input,
+  painter,
+  leadLine,
+  onUnplaced
+}: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
   const reducedMotion = usePrefersReducedMotion()
@@ -43,6 +51,8 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
     askers: TeamSceneAsker[]
   }>({ width: 0, advisor: null, anchors: new Map(), askers: [] })
   const speakersKeyRef = useRef('')
+  const tagRefs = useRef(new Map<string, HTMLSpanElement>())
+  const [tags, setTags] = useState<TeamSceneRect[]>([])
 
   const paint = useCallback(
     (dt: number, elapsed = dt) => {
@@ -164,11 +174,36 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
     }
   }, [painter])
 
+  // Why measured: a tag is as wide as its name, and no bubble may cover it (ORCA-1139).
+  useLayoutEffect(() => {
+    const stage = canvasRef.current?.getBoundingClientRect()
+    const next = speakers.askers.flatMap((asker) => {
+      const box = tagRefs.current.get(asker.key)?.getBoundingClientRect()
+      return stage && box && box.width > 0
+        ? [
+            {
+              left: box.left - stage.left,
+              top: box.top - stage.top,
+              width: box.width,
+              height: box.height
+            }
+          ]
+        : []
+    })
+    setTags((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next))
+  }, [speakers])
+
   const speeches: TeamSceneSpeech[] = []
   // Why the advisor first: it keeps its spot, and the lead's bubble climbs above it on a clash.
   const advisorAnchor = speakers.anchors.get('advisor')
   if (speakers.advisor && advisorAnchor) {
-    speeches.push({ key: 'advisor', text: speakers.advisor, anchor: advisorAnchor, align: 'end' })
+    speeches.push({
+      key: 'advisor',
+      text: speakers.advisor,
+      anchor: advisorAnchor,
+      align: 'end',
+      yields: true
+    })
   }
   const leadAnchor = speakers.anchors.get('lead')
   if (leadLine && leadAnchor) {
@@ -187,6 +222,13 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
       {speakers.askers.map((asker) => (
         <span
           key={asker.key}
+          ref={(el) => {
+            if (el) {
+              tagRefs.current.set(asker.key, el)
+            } else {
+              tagRefs.current.delete(asker.key)
+            }
+          }}
           data-scene-speaker={asker.key}
           aria-hidden="true"
           className="pointer-events-none absolute max-w-[96px] -translate-x-1/2 truncate rounded bg-status-attention px-1.5 py-px text-[10.5px] font-medium leading-4 text-white"
@@ -203,6 +245,8 @@ export function TeamSceneCanvas({ input, painter, leadLine }: Props): React.JSX.
         width={speakers.width}
         height={painter.height}
         cloudPixel={painter.cloudPixel}
+        obstacles={tags}
+        onUnplaced={onUnplaced}
       />
     </div>
   )
