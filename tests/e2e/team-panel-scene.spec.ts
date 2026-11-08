@@ -399,7 +399,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       }
     }
 
-    // ORCA-1129: one long unbroken path wraps or ends in an ellipsis, never cut mid-word.
+    // ORCA-1129: the bubble is never cut. ORCA-1139: it names the step, so a long path shows its file name.
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
       worktreeId,
@@ -418,13 +418,25 @@ test('the Team panel draws the live scene beside a member opened under its heade
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         // Why 30 s: game.state names the new tool at the panel's next 20 s read.
-        await expect(leadBubble).toHaveText(`exec_command · ${LONG_COMMAND}`, { timeout: 30_000 })
+        await expect(leadBubble).toHaveText('cat TeamSceneBubbles.tsx', { timeout: 30_000 })
         await expect(leadBubble).toBeVisible()
         const cut = await leadBubble
           .locator('span')
           .first()
           .evaluate((text) => text.scrollWidth - text.clientWidth)
         expect(cut, `the lead's bubble cuts its text at ${width}px ${style}`).toBeLessThanOrEqual(0)
+        const bubble = (await shownBubbles(orcaPage)).lead
+        const box = await scene.boundingBox()
+        expect(bubble, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
+        expect(box).not.toBeNull()
+        // Why 1 px: the two boxes round subpixels apart.
+        expect(
+          bubble!.left >= box!.x - 1 &&
+            bubble!.right <= box!.x + box!.width + 1 &&
+            bubble!.top >= box!.y - 1 &&
+            bubble!.bottom <= box!.y + box!.height + 1,
+          `the lead's bubble leaves the scene at ${width}px ${style}`
+        ).toBe(true)
         await scene.screenshot({
           path: testInfo.outputPath(`team-scene-long-command-${style}-${width}-dark.png`)
         })
