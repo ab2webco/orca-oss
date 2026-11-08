@@ -214,37 +214,35 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
       }
     )
 
-    // At 320 the 219 px panel cannot fit five tabs: the strip must say more lie on each side.
+    // At 320 the fit level shortens the labels so all five tabs sit whole, with no cue on either side
+    // (ORCA-1142). No panel state overflows any more; the start/end cue and the scroll-into-view are
+    // covered by tabStripOverflowOf and tabStripScrollLeftFor in team-panel-tab-strip.test.ts.
     await setPanel(orcaPage, { look: 'plain' })
     // Why first: once Inbox opens, its sub-tab list is a second tablist inside the panel.
     const strip = panel.getByRole('tablist').first()
     await orcaPage.setViewportSize({ width: 320, height: 900 })
-    await panel.getByRole('tab', { name: 'Team' }).click()
-    await orcaPage.mouse.move(0, 0)
-    await expect(strip).toHaveAttribute('data-overflow-end', 'true')
-    await expect(strip).toHaveAttribute('data-overflow-start', 'false')
-    if (CAPTURE_EVIDENCE) {
-      await panel.screenshot({
-        animations: 'disabled',
-        path: testInfo.outputPath('strip-320-start.png')
-      })
-    }
-    await panel.getByRole('tab', { name: 'Machines' }).click()
-    await orcaPage.mouse.move(0, 0)
-    await expect(strip).toHaveAttribute('data-overflow-start', 'true')
-    await expect(strip).toHaveAttribute('data-overflow-end', 'false')
-    if (CAPTURE_EVIDENCE) {
-      await panel.screenshot({
-        animations: 'disabled',
-        path: testInfo.outputPath('strip-320-end.png')
-      })
+    for (const end of ['Team', 'Machines']) {
+      await panel.getByRole('tab', { name: end }).click()
+      await orcaPage.mouse.move(0, 0)
+      await expect(strip.getByRole('tab')).toHaveCount(5)
+      await expect(strip).toHaveAttribute('data-overflow-start', 'false')
+      await expect(strip).toHaveAttribute('data-overflow-end', 'false')
+      expect(
+        await strip.evaluate((list) => list.scrollWidth <= list.clientWidth),
+        `320 ${end}: the strip scrolls`
+      ).toBe(true)
+      if (CAPTURE_EVIDENCE) {
+        await panel.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`strip-320-${end}.png`)
+        })
+      }
     }
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     await expect(strip).toHaveAttribute('data-overflow-end', 'false')
 
-    // ORCA-1094 F9: at the default 280 sidebar and wider all five tabs fit, in either language;
-    // at 220 the strip scrolls with a cue and the selected tab is scrolled into view.
+    // ORCA-1094 F9 / ORCA-1142: from the narrowest 220 sidebar up all five tabs fit, in either language.
     const edges = (): Promise<{ panel: number; scroll: number; client: number; cut: string[] }> =>
       strip.evaluate((list) => {
         const right = list.getBoundingClientRect().right
@@ -272,7 +270,7 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
       )
       const tabs = strip.getByRole('tab')
       await expect(tabs).toHaveCount(5)
-      for (const width of [280, 2000]) {
+      for (const width of [220, 280, 2000]) {
         await orcaPage.evaluate(
           (next) => window.__store!.getState().setRightSidebarWidth(next),
           width
@@ -289,16 +287,6 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
         )
         await expect(strip).toHaveAttribute('data-overflow-end', 'false')
       }
-      await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarWidth(220))
-      await tabs.first().click()
-      await expect(strip).toHaveAttribute('data-overflow-end', 'true')
-      await tabs.last().click()
-      await expect
-        .poll(async () => {
-          const box = await tabs.last().boundingBox()
-          return box ? box.x + box.width <= (await edges()).panel + 0.5 : false
-        })
-        .toBe(true)
 
       // The Inbox sub-tabs stay on one line at 280, as V28 `.subs` does; what does not fit scrolls
       // behind a cue, and the selected one is scrolled into view.
