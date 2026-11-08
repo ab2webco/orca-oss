@@ -89,7 +89,15 @@ describe('teamActionsOf', () => {
       send: 'Deploy to staging.',
       off: null
     })
-    expect(actions['action-1']).toMatchObject({ icon: null, pin: false, send: '/board', off: null })
+    expect(actions['action-1']).toMatchObject({
+      icon: null,
+      pin: false,
+      command: 'board',
+      send: '/board',
+      off: null
+    })
+    expect(actions['action-0']?.command).toBeNull()
+    expect(actions['lead:wave']?.command).toBe('wave')
     expect(actions['action-2']).toMatchObject({ send: null, off: 'noNativePath' })
   })
 

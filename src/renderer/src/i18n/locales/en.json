@@ -98,6 +98,66 @@
           "meaning": "No activity, or no data."
         }
       }
+    },
+    "gameActions": {
+      "cancel": "Cancel",
+      "command": "Command",
+      "commandPlaceholder": "deploy",
+      "create": "Create action",
+      "edit": "Edit",
+      "enable": "Turn on {{label}}",
+      "icon": "Icon",
+      "kind": "What it does",
+      "kindLead": "Ask the lead",
+      "kindMcp": "MCP tool",
+      "moveUp": "Move {{label}} up",
+      "name": "Button name",
+      "namePlaceholder": "Deploy",
+      "namePlaceholderShort": "Name",
+      "pin": "Show {{label}} in the row",
+      "pinTitle": "In the row",
+      "preview": "Preview",
+      "previewCommand": "command",
+      "problem": {
+        "command": "The command is lowercase, with no spaces, and starts with a letter.",
+        "commandTaken": "/{{command}} already exists.",
+        "hidden": "Its arguments or key in orca.yaml are not valid; fix them there.",
+        "label": "Give the button a name.",
+        "mcp": "Name the MCP server and tool.",
+        "prompt": "Write what it asks the lead."
+      },
+      "prompt": "What it asks the lead",
+      "promptPlaceholder": "What it should run and what it should report",
+      "remove": "Remove",
+      "save": "Save",
+      "server": "MCP server",
+      "serverPlaceholder": "plane",
+      "templates": {
+        "deploy": {
+          "command": "deploy",
+          "label": "Deploy",
+          "prompt": "Deploy to staging and tell me the result."
+        },
+        "redPrs": {
+          "command": "red-prs",
+          "label": "Red PRs",
+          "prompt": "Look at the red PRs and tell me which one needs a member."
+        },
+        "tests": {
+          "command": "tests",
+          "label": "Tests",
+          "prompt": "Run the whole suite and tell me only what failed."
+        }
+      },
+      "tool": "Tool",
+      "toolPlaceholder": "list_work_items",
+      "when": {
+        "push": "When members are stopped.",
+        "status": "Always, in the menu.",
+        "stop": "Always, with confirmation.",
+        "sweep": "When finished members wait to be closed.",
+        "wave": "When there is To Do and free slots."
+      }
     }
   },
   "menu": {
@@ -17331,6 +17391,16 @@
         "wave": "{{count}} to do, slots free",
         "push": "{{count}} stopped",
         "sweep": "{{count}} finished to close"
+      },
+      "menu": {
+        "label": "All actions",
+        "search": "Search actions",
+        "now": "Now",
+        "project": "This project",
+        "orca": "From Orca",
+        "none": "No action with that name.",
+        "new": "New action",
+        "edit": "Edit"
       }
     },
     "age": {
