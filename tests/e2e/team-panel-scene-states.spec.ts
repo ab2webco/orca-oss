@@ -207,7 +207,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     // member also walks in and greets the lead before it sits.
     const REFRESH_WAIT_MS = 21_000
     let settleMs = REFRESH_WAIT_MS
-    const capture = async (round: Record<Who, string>): Promise<void> => {
+    const capture = async (round: Record<'lead' | 'member', string>): Promise<void> => {
       for (const style of STYLES) {
         await orcaPage.evaluate(
           (next) =>

@@ -17,18 +17,15 @@ const LINE: Record<Exclude<ScreenState, 'off'>, string> = {
 const TEXT = '#a8b4c8'
 const LINES = 5
 
+const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
+  work: 'code',
+  raise: 'ask',
+  done: 'ok'
+}
+
 /** The screen of a desk whose worker holds `pose`; null when nobody sits there. */
 export function stationScreenStateOf(pose: TeamScenePose | null): ScreenState {
-  switch (pose) {
-    case 'work':
-      return 'code'
-    case 'raise':
-      return 'ask'
-    case 'done':
-      return 'ok'
-    default:
-      return 'off'
-  }
+  return (pose && SCREEN_OF[pose]) ?? 'off'
 }
 
 /** Fills `rect` (stage px) as V28 does; only code scrolls, so a done desk holds still. */
