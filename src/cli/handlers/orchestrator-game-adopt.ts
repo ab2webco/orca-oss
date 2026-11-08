@@ -3,10 +3,12 @@ import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
 import { readCallerGameState, setGameAgentDropped } from './orchestrator-game-board-call'
+import { resumeAdoptedMember, saveAdoptedMember } from './orchestrator-game-adopt-membership'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import type { GameStatePausedMember } from '../../shared/orchestrator-game-adopted-members'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
@@ -147,6 +149,7 @@ async function adoptAgent(
     flags: Map<string, string | boolean>
     cwd: string
     leadWorktreeId: string | null
+    paused: readonly GameStatePausedMember[]
   }
 ): Promise<GameAdoptResult> {
   const adopted = agents.find(
@@ -162,10 +165,12 @@ async function adoptAgent(
       dispatchId: remoteDispatchIdOf(adopted)!
     }
   }
+  // Why a member needs no worktree: one in the lead's own worktree is listed without one (ORCA-1141).
   const ours = (agent: GameAgent): boolean =>
     !agent.remote &&
-    agent.worktree !== undefined &&
-    isSameGameProject(agent.worktree.id, args.leadWorktreeId) &&
+    ((agent.isMember && !agent.found) ||
+      (agent.worktree !== undefined &&
+        isSameGameProject(agent.worktree.id, args.leadWorktreeId))) &&
     isGameAgentNamed(agent, name)
   const local = agents.find((agent) => agent.found && agent.terminalHandle && ours(agent))
   const found =
@@ -205,13 +210,22 @@ async function adoptAgent(
     return seat
   }
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
+  const saved = local
+    ? args.paused.find((one) => one.adoptedPane && samePane(one.adoptedPane, local.paneKey))
+    : undefined
+  if (saved) {
+    return resumeAdoptedMember(client, from, saved, seat.terminal)
+  }
   const title =
     ticketOfMember(found) ?? (await freeAdoptedNameOf(client, from, found.displayName ?? name))
-  const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
-    spec: `You are now a member of this project's lead, for ${title}. Keep working on what you were doing; report to the lead through the Orca commands below.`,
-    taskTitle: title,
-    callerTerminalHandle: from
-  })
+  const task = await client.call<{ task: { id: string; run_id?: string } }>(
+    'orchestration.taskCreate',
+    {
+      spec: `You are now a member of this project's lead, for ${title}. Keep working on what you were doing; report to the lead through the Orca commands below.`,
+      taskTitle: title,
+      callerTerminalHandle: from
+    }
+  )
   // Why worker-start (--on for a host) with --terminal: the path every paired host already serves, so no wire change.
   const started = await client.call<{ dispatchId: string; state: string }>(
     'orchestration.workerStart',
@@ -225,6 +239,18 @@ async function adoptAgent(
       devMode: isDevCliInvocation()
     }
   )
+  if (local) {
+    await saveAdoptedMember(client, {
+      name: title,
+      runId: task.result.task.run_id,
+      taskId: task.result.task.id,
+      dispatchId: started.result.dispatchId,
+      worktreeId,
+      agent: found.agentType,
+      state: started.result.state,
+      paneKey: local.paneKey
+    })
+  }
   return {
     name: title,
     adopted: started.result.state === 'ready',
@@ -264,7 +290,8 @@ export const ORCHESTRATOR_GAME_ADOPT_HANDLERS: Record<string, CommandHandler> = 
       force: flags.get('force') === true,
       flags,
       cwd,
-      leadWorktreeId
+      leadWorktreeId,
+      paused: response.result.pausedMembers ?? []
     })
     const result = dropped ? { ...adopted, restored: true as const } : adopted
     if (!result.adopted) {
