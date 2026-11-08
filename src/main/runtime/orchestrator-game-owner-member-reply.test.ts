@@ -48,6 +48,20 @@ describe('replyToMemberAsLead', () => {
     expect(notified).toEqual([`dispatch:${dispatch.id}`])
   })
 
+  it("marks the answer it records as the person's, so the Inbox never credits the lead (ORCA-1136)", () => {
+    const { db, ask, reply } = project()
+    const id = ask('Which port?')
+
+    reply(id, '3000')
+
+    const answer = db.getMessageById(db.getQuestion(id)!.answer_message_id!)
+    expect(JSON.parse(answer!.payload ?? '{}')).toEqual({
+      from: 'owner',
+      replyTo: id,
+      text: '3000'
+    })
+  })
+
   it("overrides an answered question with a follow-up on its thread that names the lead's answer", () => {
     const { db, run, dispatch, ask, reply, notified } = project()
     const id = ask('Rebase?')
