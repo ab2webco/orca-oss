@@ -86,7 +86,12 @@ describe('the live line', () => {
     const ui = await $.ui.mount(ABOVE_PROMPT)
     expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props.bold).toBe(true)
     expect(await ui.find({ type: 'Text', text: /^[·✢✳✶✻✽]$/ })).toBeDefined()
-    expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props.color).toBe('#e6e8ec')
+    // Why truncate: a pane a few columns wide broke the name and verb mid-word (live check 2).
+    expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props).toMatchObject({
+      color: '#e6e8ec',
+      wrap: 'truncate-end'
+    })
+    expect((await ui.find({ type: 'Text', text: / 0:04$/ }))?.props.wrap).toBe('truncate-end')
     expect((await ui.find({ type: 'Text', text: / 0:04$/ }))?.props.color).toBe('#8b93a1')
     expect((await ui.find({ type: 'Text', text: / · gh pr view 923$/ }))?.props.color).toBe(
       '#8b93a1'
