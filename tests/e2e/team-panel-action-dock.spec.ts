@@ -236,6 +236,17 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     const leadHook = { paneKey: pane.paneKey, worktreeId }
     await emitCodexHookStatus(endpoint, { ...leadHook, state: 'working', prompt: 'Lead' })
 
+    // Why: right after launch the runtime can still hold a failed worktree scan, and `id:` misses (ORCA-1145).
+    await expect
+      .poll(
+        () =>
+          client.call('worktree.show', { worktree: `id:${worktreeId}` }).then(
+            () => 'resolved',
+            (error: Error) => error.message
+          ),
+        { timeout: 30_000 }
+      )
+      .toBe('resolved')
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
       objective: 'Action dock',
       from: lead
@@ -413,6 +424,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     }
     await menu.getByPlaceholder('Buscar acción').fill('dep')
     await expect(menu.getByRole('menuitem')).toHaveText([/^Deploy staging/])
+    // Escape still closes it when a hint opened after it, as the board hint does when it reappears.
+    await reopenBoardHint(orcaPage)
+    await expect(orcaPage.getByRole('tooltip')).toBeVisible()
     await orcaPage.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 

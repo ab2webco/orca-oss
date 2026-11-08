@@ -4,7 +4,7 @@ import { StrictMode, act, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamAction } from '../../../../shared/team-panel-actions'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { TeamActionMenu, type TeamActionMenuProps } from './TeamActionMenu'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -182,5 +182,31 @@ describe('TeamActionMenu', () => {
       expect(wrapper?.style.getPropertyValue('--radix-popper-anchor-width')).toBe('300px')
     })
     rect.mockRestore()
+  })
+
+  it('closes on Escape from its search even when a hint opened after it is the top layer', async () => {
+    const { container, open } = await render()
+    await open()
+    const hint = document.createElement('div')
+    document.body.appendChild(hint)
+    const hintRoot = createRoot(hint)
+    roots.push(hintRoot)
+    // Why a controlled hint: like the board hint, it swallows Escape and never closes on it.
+    await act(async () =>
+      hintRoot.render(
+        <TooltipProvider>
+          <Tooltip open>
+            <TooltipTrigger>Board</TooltipTrigger>
+            <TooltipContent>Moved</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    )
+    const search = menu()!.querySelector<HTMLInputElement>('input')!
+    await act(async () => {
+      search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(menu()).toBeNull()
+    expect(container.querySelector('[aria-label="All actions"]')).not.toBeNull()
   })
 })
