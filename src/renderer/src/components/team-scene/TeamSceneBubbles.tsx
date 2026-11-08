@@ -72,17 +72,18 @@ export function TeamSceneBubbles({
   useLayoutEffect(() => {
     const requests = speeches.map((s) => {
       const el = refs.current.get(s.key)
-      // Why clear it first: a row-shared cloud keeps its narrowed width until laid out again.
-      if (el) {
-        el.style.width = ''
+      if (!el) {
+        return { key: s.key, anchor: s.anchor, align: s.align, width: 0, height: 0 }
       }
-      return {
-        key: s.key,
-        anchor: s.anchor,
-        align: s.align,
-        width: el?.offsetWidth ?? 0,
-        height: el?.offsetHeight ?? 0
-      }
+      // Why max-content: a row-shared cloud keeps its narrowed width until laid out again, and
+      // text that may break anywhere would shrink to the room left of its old spot.
+      const laid = el.style.width
+      el.style.width = 'max-content'
+      // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
+      const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
+      // Why restore: React skips a width equal to its last one, which would leave max-content.
+      el.style.width = laid
+      return { key: s.key, anchor: s.anchor, align: s.align, ...size }
     })
     setBoxes(layoutTeamSceneBubbles(requests, { width, height }, { beside: Boolean(cloudPixel) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches
@@ -117,7 +118,8 @@ export function TeamSceneBubbles({
               visibility: box ? 'visible' : 'hidden'
             }}
           >
-            <span className="line-clamp-2">{s.text}</span>
+            {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
+            <span className="line-clamp-2 [overflow-wrap:anywhere]">{s.text}</span>
             {box && cloudPixel ? (
               <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
             ) : null}

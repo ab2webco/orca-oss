@@ -52,7 +52,8 @@ describe('teamCardsOf', () => {
     )
     expect(cards?.lead).toMatchObject({
       paneKey: 'lead:leaf',
-      name: 'Castle',
+      // Why not the pane's name: with no Lead name the lead is the roster's last character (ORCA-1094).
+      name: 'Elaine',
       branch: 'main',
       worktreeId: 'repo::/w/main',
       terminalHandle: 'term_1',
@@ -199,6 +200,30 @@ describe('teamCardsOf', () => {
     })
   })
 
+  // Why (ORCA-1130 D8): the raw MCP id reached cards and the scene bubble.
+  it('names a working MCP tool in words, never by its raw id', () => {
+    const [card] =
+      cardsOf([agent({ toolName: 'mcp__plugin_engram_engram__mem_current_project' })])?.members ??
+      []
+    expect(card?.liveAction).toMatchObject({ kind: 'tool', tool: 'engram: mem current project' })
+  })
+
+  // ORCA-1139: a finished or idle agent kept its last command on the card and in the bubble.
+  it('drops the last tool and the phase once an agent stops, and keeps them while it waits', () => {
+    const tool = { toolName: 'Bash', toolInput: 'python3 check.py' }
+    const cards = cardsOf([
+      agent({ paneKey: 'done:1', state: 'done', ...tool }),
+      agent({ paneKey: 'idle:1', state: 'idle', ...tool }),
+      agent({ paneKey: 'wait:1', state: 'waiting', ...tool })
+    ])
+    const of = (key: string) => cards?.members.find((m) => m.paneKey === key)
+    expect(of('done:1')).toMatchObject({ liveAction: null, flowPhase: null })
+    expect(of('idle:1')).toMatchObject({ liveAction: null, flowPhase: null })
+    expect(of('wait:1')?.liveAction).toMatchObject({ kind: 'tool', tool: 'Bash' })
+    const doneLead = teamCardsOf(state([{ ...lead, state: 'done', ...tool }]), new Set())
+    expect(doneLead?.lead.liveAction).toBeNull()
+  })
+
   it('shows a running MCP link before the tool name', () => {
     const [card] =
       cardsOf([
@@ -316,7 +341,7 @@ describe('teamCardsOf', () => {
     expect(cards?.members.map((one) => one.characterKey)).toEqual(['arthur', null])
   })
 
-  it('names the lead after the Lead name setting before its pane or worktree', () => {
+  it('names the lead after the Lead name setting, else a roster character, never its worktree', () => {
     const named = teamCardsOf(
       state([{ ...lead, displayName: null }], {
         lead: { autostart: false, cap: 4, agent: 'claude', label: 'Alfred' }
@@ -324,7 +349,14 @@ describe('teamCardsOf', () => {
       new Set()
     )
     expect(named?.lead.name).toBe('Alfred')
-    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe('main')
+    // ORCA-1094 row 1: the quest roster's last character, the same in every launch of the project.
+    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe(
+      'Elaine'
+    )
+    const vigilante = state([lead], {
+      config: { scene: 'vigilante' } as OrchestratorGameState['config']
+    })
+    expect(teamCardsOf(vigilante, new Set())?.lead.name).toBe('Cipher')
   })
 
   it('names a launched member after its character, as V28 does', () => {

@@ -245,7 +245,11 @@ async function startGameMember(
   })
   // Why: a pane that failed to report ready may still come up under this name.
   start.hasPane = worker.result.effects?.some((one) => one.kind === 'terminal') === true
-  if (!createsWorktree && worker.result.state !== 'failed') {
+  const folder =
+    state.worktree?.folder && where.worktree === `id:${state.worktree.id}`
+      ? state.worktree.path
+      : null
+  if (!createsWorktree && !folder && worker.result.state !== 'failed') {
     await nameReusedWorktree(client, where.worktree, title)
   }
   const { account: hostAccount, globalLogin: hostGlobalLogin, ...started } = worker.result
@@ -260,6 +264,7 @@ async function startGameMember(
     ...(memberAccount.why ? { accountWhy: memberAccount.why } : {}),
     ...(hostAccount ? { account: hostAccount.email } : {}),
     ...(args.remote && hostGlobalLogin ? remoteGlobalLoginOf(args.remote.on, hostGlobalLogin) : {}),
+    ...(folder ? { folder } : {}),
     ...started
   }
   return recordGameStartOutcome(client, launched, args.remote?.on ?? null)

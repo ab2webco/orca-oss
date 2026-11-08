@@ -2,7 +2,16 @@ import type { GameBoardCaller, GameBoardProject } from './orchestrator-game-boar
 import { GameLeadDirectory } from './orchestrator-game-lead-directory'
 import type { GameLeadRecord } from './orchestrator-game-lead-roster'
 
-export type GameLeadListing = { project: string; label: string; handle: string; since: string }
+export type GameLeadListing = {
+  project: string
+  label: string
+  handle: string
+  since: string
+  paneKey?: string
+}
+
+/** A lead kept from before a restart whose pane is not back yet; `paneKey` is the pane it led from. */
+export type GameLeadRestoring = { project: string; paneKey: string }
 
 /** What reopens a project's lead conversation once its pane is gone; `accountId` is the managed account it ran on. */
 export type GameLeadSession = {
@@ -10,6 +19,8 @@ export type GameLeadSession = {
   agentArgs: string | null
   worktreeId: string
   accountId: string | null
+  /** Where Claude keeps the conversation; names its account when `accountId` was not recorded. */
+  transcriptPath?: string
 }
 
 /** `registered: false` with `live` or `resumed` names the pane that is the lead instead of the caller. */
@@ -183,20 +194,27 @@ export class GameLeads {
     return (await this.leadOf(projectKey))?.handle ?? null
   }
 
-  async list(): Promise<{ leads: GameLeadListing[] }> {
+  async list(): Promise<{ leads: GameLeadListing[]; restoring?: GameLeadRestoring[] }> {
     await this.settle()
     const live = this.directory.live(this.deps.isLive)
     const running = await Promise.all(live.map((one) => this.isRunning(one.handle)))
-    return {
-      leads: live
-        .filter((_, index) => running[index])
-        .map((one) => ({
+    // Why: an idle lead never reports agent status, so a client finds its pane only from here (ORCA-1130).
+    const leads = live
+      .filter((_, index) => running[index])
+      .map((one) => {
+        const paneKey = this.deps.paneOf?.(one.handle) ?? null
+        return {
           project: one.project,
           label: one.label,
           handle: one.handle,
-          since: one.at
-        }))
-    }
+          since: one.at,
+          ...(paneKey ? { paneKey } : {})
+        }
+      })
+    const restoring = [...this.pending.values()]
+      .filter((one) => this.restoringOf(one.projectKey, null) === one)
+      .map((one) => ({ project: one.project, paneKey: one.paneKey }))
+    return restoring.length > 0 ? { leads, restoring } : { leads }
   }
 
   /** Lead handle to label, for naming a peer lead in an inbox. */

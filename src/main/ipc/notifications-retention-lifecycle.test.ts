@@ -176,8 +176,16 @@ describe('registerNotificationHandlers', () => {
       await dispatchHandler({}, { source: 'agent-task-complete', notificationId: 'agent:replace' })
     ).toEqual({ delivered: true })
     vi.advanceTimersByTime(5001)
+    // Why: an identical replay is suppressed (ORCA-1131); a replacement carries new content.
     expect(
-      await dispatchHandler({}, { source: 'agent-task-complete', notificationId: 'agent:replace' })
+      await dispatchHandler(
+        {},
+        {
+          source: 'agent-task-complete',
+          notificationId: 'agent:replace',
+          agentLastAssistantMessage: 'Updated'
+        }
+      )
     ).toEqual({ delivered: true })
 
     expect(notificationCloseMock).toHaveBeenCalledTimes(1)

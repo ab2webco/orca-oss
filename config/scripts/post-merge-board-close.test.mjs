@@ -27,7 +27,8 @@ function run(command, { state = 'MERGED', title = 'fix: algo (ORCA-99)', statusO
       PATH: `${bin}:${process.env.PATH}`,
       ORCA_CLI_COMMAND: path.join(bin, 'orca')
     },
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: 20_000
   })
   const calls = fs.existsSync(path.join(bin, 'calls'))
     ? fs.readFileSync(path.join(bin, 'calls'), 'utf8')

@@ -343,6 +343,15 @@ describe('teamMachinesSectionOf', () => {
     expect(teamMachinesSectionOf({ state, members: [] })).toEqual({ kind: 'ready', value: [] })
   })
 
+  it('lists this machine alone for a lead with no saved host', () => {
+    const state = stateOf({ localHost: ok({ running: 2 }) })
+
+    expect(teamMachinesSectionOf({ state, members: [] })).toMatchObject({
+      kind: 'ready',
+      value: [{ host: { kind: 'local' }, running: 2, status: 'working', reading: { kind: 'ok' } }]
+    })
+  })
+
   it('is unavailable from an older host that sends neither', () => {
     expect(teamMachinesSectionOf({ state: stateOf({}), members: [] })).toEqual({
       kind: 'unavailable'

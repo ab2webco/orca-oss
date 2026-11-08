@@ -171,6 +171,9 @@ async function reportJev(app: ElectronApplication, panes: string[], model: strin
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
 type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __heldMachines?: (() => void)[] }
 
+// Why each evaluate settles after setImmediate: a sync result is a settled promise V8 15.0's inspector
+// holds weakly, so a GC first answers `Promise was collected`, read as a destroyed context (ORCA-1031).
+
 /** Holds this machine's reading so the tab's loading state stays on screen long enough to look at. */
 async function holdMachineReads(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ ipcMain }) => {
@@ -188,6 +191,7 @@ async function holdMachineReads(app: ElectronApplication): Promise<void> {
       }
       return real(event, args)
     })
+    return new Promise<void>((resolve) => setImmediate(resolve))
   })
 }
 
@@ -196,6 +200,7 @@ const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
     const rig = globalThis as MachineRig
     rig.__machinesHeld = false
     rig.__heldMachines?.forEach((release) => release())
+    return new Promise<void>((resolve) => setImmediate(resolve))
   })
 
 /** Why: a read gives up after 15 s and lists the hosts, and a slow runner outlasts that. */
@@ -339,6 +344,8 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(tab).toContainText('1')
     await expect(panel).toContainText(QUESTION)
+    // ORCA-1129 D5: V28's options are buttons that answer, not text.
+    await expect(panel.getByRole('button', { name: 'At release', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: copy.openTerminal })).toBeVisible()
   })
   await panel.getByRole('tab', { name: COPY.en.activity }).click()

@@ -83,7 +83,9 @@ export function useWorktreeCardWorkspaceActions({
     },
     [setShowRenameErrorDialog]
   )
-  const unreadTooltip = worktree.isUnread ? 'Mark read' : 'Mark unread'
+  const unreadTooltip = worktree.isUnread
+    ? translate('auto.components.sidebar.WorktreeCardStatusSlot.markAsRead', 'Mark as read')
+    : translate('auto.components.sidebar.WorktreeCardStatusSlot.markAsUnread', 'Mark as unread')
   const lineageChildAriaLabel =
     lineageChildCount === 1
       ? lineageCollapsed

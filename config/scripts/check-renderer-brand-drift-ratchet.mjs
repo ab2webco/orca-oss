@@ -1,55 +1,19 @@
 import { execFileSync } from 'node:child_process'
-import fs from 'node:fs'
-import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
-import { measure } from './renderer-translate-fallbacks.mjs'
+import {
+  ALLOWLIST_PATH,
+  checkTree,
+  parseAllowlist,
+  readAllowlist
+} from './renderer-brand-drift-allowlist.mjs'
 
-// Ratchet gate for the renderer brand-name fallback baseline.
+// Ratchet gate for the renderer brand drift allowlist.
 //
-// The vitest guard next to this file pins the baseline against TODAY's tree, so
-// a lone edit of the number goes red. What that pin cannot see is a change that
-// adds drift and raises the number in the same commit — both sides move and the
-// equality still holds. This gate closes that by reading the baseline from the
-// PR base: the counters below may only fall.
-
-const BASELINE_PATH = 'config/renderer-brand-drift-baseline.txt'
-// resolved-calls is deliberately absent: see the baseline header.
-const ONE_WAY_DOWN = ['rename-drift', 'stale-fallbacks']
-
-export function parseBaseline(text) {
-  const counts = {}
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line || line.startsWith('#')) {
-      continue
-    }
-    const [name, value] = line.split(/\s+/)
-    const parsed = Number.parseInt(value, 10)
-    if (!name || !Number.isInteger(parsed)) {
-      throw new Error(`Malformed ${BASELINE_PATH} line: ${raw}`)
-    }
-    counts[name] = parsed
-  }
-  return counts
-}
-
-/** Counters that moved in the forbidden direction, base -> head. */
-export function findIncreases(baseCounts, headCounts, names = ONE_WAY_DOWN) {
-  const increases = []
-  for (const name of names) {
-    const before = baseCounts[name]
-    const after = headCounts[name]
-    if (!Number.isInteger(before) || !Number.isInteger(after)) {
-      continue
-    }
-    if (after > before) {
-      increases.push({ name, before, after })
-    }
-  }
-  return increases
-}
+// checkTree() judges TODAY's tree, as the vitest pin does. What it cannot see is
+// a commit that adds a stale fallback and lists it in the same breath. This gate
+// closes that by reading the allowlist from the PR base: entries may only go.
 
 function git(args, cwd) {
   try {
@@ -60,7 +24,7 @@ function git(args, cwd) {
   }
 }
 
-/** The ref whose baseline this branch may not exceed. */
+/** The ref whose allowlist this branch may not extend. */
 export function resolveBaseRef(cwd = process.cwd(), env = process.env) {
   const candidates = [
     env.GITHUB_BASE_REF ? `origin/${env.GITHUB_BASE_REF}` : null,
@@ -75,27 +39,35 @@ export function resolveBaseRef(cwd = process.cwd(), env = process.env) {
   return null
 }
 
-/** The baseline as committed at `ref`, or null when the file is not there yet. */
-export function readBaselineAt(ref, cwd = process.cwd()) {
-  const text = git(['show', `${ref}:${BASELINE_PATH}`], cwd)
-  return text === null ? null : parseBaseline(text)
+/** The allowlist as committed at `ref`, or null when the file is not there yet. */
+export function readAllowlistAt(ref, cwd = process.cwd()) {
+  const text = git(['show', `${ref}:${ALLOWLIST_PATH}`], cwd)
+  return text === null ? null : parseAllowlist(text)
 }
 
-export function main(root = process.cwd(), env = process.env) {
-  const headCounts = parseBaseline(fs.readFileSync(path.join(root, BASELINE_PATH), 'utf8'))
-  const measured = measure(root).counts
+const FIX_HINT = [
+  '',
+  '  A renderer translate() fallback must match the catalog value its key',
+  '  resolves to — the catalog is what actually renders. Copy the catalog',
+  '  value verbatim into the fallback; never hand-apply the rename, or you',
+  '  will rename a branch name, a path, or a sub-brand the catalog keeps.',
+  ''
+]
 
-  const drifted = Object.keys(headCounts).filter((name) => headCounts[name] !== measured[name])
-  if (drifted.length > 0) {
-    for (const name of drifted) {
-      console.error(
-        `::error::${BASELINE_PATH} says ${name} ${headCounts[name]}, the tree measures ${measured[name]}`
-      )
+export function main(root = process.cwd(), env = process.env) {
+  const allowlist = readAllowlist(root)
+  const { violations, unused } = checkTree(root, allowlist)
+  if (violations.length > 0) {
+    for (const { path, line, message } of violations) {
+      console.error(`::error file=${path},line=${line}::${message}`)
     }
-    console.error('')
-    console.error('  The baseline must match the tree before the ratchet can judge it.')
-    console.error('  Run: pnpm vitest run --config config/vitest.config.ts \\')
-    console.error('         config/scripts/renderer-brand-name-fallback.test.mjs')
+    console.error(
+      [
+        '',
+        `  ❌  ${violations.length} renderer fallback(s) drifted from the catalog.`,
+        ...FIX_HINT
+      ].join('\n')
+    )
     return 1
   }
 
@@ -105,7 +77,7 @@ export function main(root = process.cwd(), env = process.env) {
     // release job checks out a bare SHA with no origin/main, and failing closed
     // there blocked lab.61 on a comparison that run has nothing to make -- it
     // builds already-merged main, which the PR gate judged on the way in.
-    const message = `no base ref to compare ${BASELINE_PATH} against (tried origin/<base>, origin/main, main)`
+    const message = `no base ref to compare ${ALLOWLIST_PATH} against (tried origin/<base>, origin/main, main)`
     const expectsBase =
       env.GITHUB_EVENT_NAME === 'pull_request' || env.GITHUB_EVENT_NAME === 'pull_request_target'
     if (expectsBase) {
@@ -116,46 +88,32 @@ export function main(root = process.cwd(), env = process.env) {
     return 0
   }
 
-  const baseCounts = readBaselineAt(baseRef, root)
-  if (baseCounts === null) {
+  const baseEntries = readAllowlistAt(baseRef, root)
+  if (baseEntries === null) {
     console.log(
-      `renderer brand drift ratchet OK — ${BASELINE_PATH} is new at ${baseRef}, nothing to ratchet against.`
+      `renderer brand drift ratchet OK — ${ALLOWLIST_PATH} is new at ${baseRef}, nothing to ratchet against.`
     )
     return 0
   }
 
-  const increases = findIncreases(baseCounts, headCounts)
-  if (increases.length > 0) {
-    for (const { name, before, after } of increases) {
+  const added = [...allowlist].filter((entry) => !baseEntries.has(entry))
+  if (added.length > 0) {
+    for (const entry of added) {
       console.error(
-        `::error::${name} rose from ${before} to ${after}; this baseline only goes down`
+        `::error file=${ALLOWLIST_PATH}::${entry} is not listed at ${baseRef}; this list only shrinks`
       )
     }
-    console.error('')
-    console.error('╭──────────────────────────────────────────────────────────────────────────╮')
-    console.error('│  ❌  renderer brand drift ratchet failed — the baseline went UP.          │')
-    console.error('╰──────────────────────────────────────────────────────────────────────────╯')
-    console.error('')
-    console.error(`  Compared against ${baseRef}:`)
-    console.error('')
-    for (const { name, before, after } of increases) {
-      console.error(`    • ${name}: ${before} → ${after}  (+${after - before})`)
-    }
-    console.error('')
-    console.error('  A renderer translate() fallback must match the catalog value its key')
-    console.error('  resolves to — the catalog is what actually renders. Copy the catalog')
-    console.error('  value verbatim into the fallback; never hand-apply the rename, or you')
-    console.error('  will rename a branch name, a path, or a sub-brand the catalog keeps.')
-    console.error('')
-    console.error('  ✅  Fix the new fallback(s). Raising the number is not an option.')
-    console.error('')
+    console.error(
+      ['', '  ✅  Fix the new fallback(s). Listing them is not an option.', ...FIX_HINT].join('\n')
+    )
     return 1
   }
 
+  for (const entry of unused) {
+    console.log(`renderer brand drift: "${entry}" is fixed; delete it from ${ALLOWLIST_PATH}.`)
+  }
   console.log(
-    `renderer brand drift ratchet OK — rename-drift ${headCounts['rename-drift']}, ` +
-      `stale-fallbacks ${headCounts['stale-fallbacks']} (base ${baseRef}: ` +
-      `${baseCounts['rename-drift']}/${baseCounts['stale-fallbacks']}).`
+    `renderer brand drift ratchet OK — ${allowlist.size} known stale fallback(s) (base ${baseRef}: ${baseEntries.size}).`
   )
   return 0
 }

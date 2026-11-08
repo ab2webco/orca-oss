@@ -18,8 +18,11 @@ import {
   readActiveClaudeKeychainCredentialsStrict,
   writeManagedClaudeKeychainCredentials
 } from './keychain'
+import { createIsolatedTestProfilePath } from './claude-service-test-profile'
 
-const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-custom-endpoint-test')
+const CLAUDE_SERVICE_TEST_ROOT = createIsolatedTestProfilePath(
+  'orca-claude-service-custom-endpoint-test'
+)
 
 vi.mock('electron', () => ({
   app: {

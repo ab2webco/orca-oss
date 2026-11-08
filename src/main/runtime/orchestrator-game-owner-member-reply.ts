@@ -23,6 +23,7 @@ export function replyToMemberAsLead(
   if (!run || !message || message.run_id !== run.id) {
     throw new Error(`Message ${args.id} is not in this lead's run.`)
   }
+  const owner = JSON.stringify({ from: 'owner', replyTo: args.id, text: args.text })
   const question = db.getQuestion(args.id)
   if (question?.status === 'closed') {
     throw new Error('Its member is gone, so the reply was not sent.')
@@ -32,7 +33,8 @@ export function replyToMemberAsLead(
       messageId: args.id,
       runId: run.id,
       consumerGeneration: run.consumer_generation,
-      body: args.text
+      body: args.text,
+      payload: owner
     })
     notify(answered.message.to_handle, answered.message.type)
     return { mode: 'answered', question: message.body }
@@ -50,7 +52,7 @@ export function replyToMemberAsLead(
     priority: 'high',
     threadId: args.id,
     runId: run.id,
-    payload: JSON.stringify({ from: 'owner', replyTo: args.id, text: args.text })
+    payload: owner
   })
   notify(sent.to_handle, sent.type)
   return { mode: override ? 'override' : 'reply', question: message.body }

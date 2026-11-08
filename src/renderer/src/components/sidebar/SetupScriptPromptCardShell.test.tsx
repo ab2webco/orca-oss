@@ -6,7 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { SetupScriptPromptCardShell } from './SetupScriptPromptCardShell'
 
 describe('SetupScriptPromptCardShell', () => {
-  it('floats above its anchor without reserving a sidebar background panel', () => {
+  it('sits in the sidebar flow above its anchor, without a background panel', () => {
     const view = render(
       <TooltipProvider>
         <SetupScriptPromptCardShell
@@ -32,11 +32,9 @@ describe('SetupScriptPromptCardShell', () => {
     const layer = view.container.querySelector('[data-setup-script-prompt-layer]')
     const surface = layer?.firstElementChild
 
-    expect(layer?.classList.contains('absolute')).toBe(true)
-    expect(layer?.classList.contains('inset-x-0')).toBe(true)
-    expect(layer?.classList.contains('bottom-full')).toBe(true)
-    expect(layer?.classList.contains('pointer-events-none')).toBe(true)
-    expect(surface?.classList.contains('pointer-events-auto')).toBe(true)
+    // ORCA-1131: an overlay hid the list's last rows; the card takes its own space.
+    expect(layer?.classList.contains('absolute')).toBe(false)
+    expect(layer?.classList.contains('bottom-full')).toBe(false)
     expect(surface?.classList.contains('bg-popover')).toBe(true)
     expect(surface?.classList.contains('text-popover-foreground')).toBe(true)
   })

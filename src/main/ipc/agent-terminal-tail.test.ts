@@ -109,6 +109,21 @@ describe('createAgentTerminalTailReader', () => {
     })
   })
 
+  it('hides a Claude OAuth token that printenv wrapped across rows (ORCA-1039)', async () => {
+    const token = `sk-ant-oat01-${'QXJZ'.repeat(24)}`.slice(0, 108)
+    const line = `CLAUDE_CODE_OAUTH_TOKEN=${token}`
+    const screen = ['$ printenv', ...(line.match(/.{1,40}/g) ?? []), 'SHELL=/bin/zsh']
+    const read = createAgentTerminalTailReader(
+      runtimeReading(async (_ptyId, limit) => screen.slice(-limit))
+    )
+    const [reading] = await read(['a'], 8)
+    // Why `=/bin/zsh`: a row cannot tell a newline from a wrap, so the next row's first word goes too.
+    expect(reading.tail).toEqual({
+      read: true,
+      lines: ['$ printenv', 'CLAUDE_CODE_OAUTH_TOKEN=[redacted]', '', '', '', '=/bin/zsh']
+    })
+  })
+
   it('reads every pty in the batch and keeps request order', async () => {
     const read = createAgentTerminalTailReader(runtimeReading(async (ptyId) => [`${ptyId} line`]))
     await expect(read(['a', 'b'], 4)).resolves.toEqual([

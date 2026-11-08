@@ -23,6 +23,7 @@ import {
   type ActionDraftProblem
 } from './orchestrator-game-action-drafts'
 import {
+  GAME_ACTION_PICKER_ICONS,
   isCommandTaken,
   movedUp,
   orcaActionRowsOf,
@@ -37,6 +38,8 @@ import { getRepositoryGameActionsSectionId } from './repository-settings-targets
 import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGameProjects'>
+// Why: V30 starts a new action on the picker's first icon, upload, already chosen.
+const NEW_ACTION_DRAFT: ActionDraft = { ...EMPTY_ACTION_DRAFT, icon: GAME_ACTION_PICKER_ICONS[0] }
 type Target = number | 'new' | GameOrcaActionId
 type Form = { target: Target; state: GameActionFormState }
 
@@ -69,7 +72,7 @@ export function ProjectOrchestratorGameActionsSetting({
     takeNewGameActionRequest(repoId)
       ? {
           target: 'new',
-          state: { draft: EMPTY_ACTION_DRAFT, isNew: true, orca: false, commandTouched: false }
+          state: { draft: NEW_ACTION_DRAFT, isNew: true, orca: false, commandTouched: false }
         }
       : null
   )
@@ -202,7 +205,7 @@ export function ProjectOrchestratorGameActionsSetting({
             size="sm"
             className="h-7"
             disabled={full}
-            onClick={() => open('new', EMPTY_ACTION_DRAFT)}
+            onClick={() => open('new', NEW_ACTION_DRAFT)}
           >
             {translate('settings.gameActions.new', 'New action')}
           </Button>

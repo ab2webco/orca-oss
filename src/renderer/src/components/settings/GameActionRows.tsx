@@ -45,8 +45,10 @@ export function ProjectActionRow({
       <TeamActionIcon icon={draft.icon} className="size-[15px] text-muted-foreground/70" />
       <div className="min-w-0 flex-1">
         <b className="block font-medium">{draft.label}</b>
-        <small className="block truncate text-xs text-muted-foreground">
-          {draft.command ? `/${draft.command} · ${what}` : what}
+        {/* Why it wraps at the dot: V30 shows the command line whole, never cut short. */}
+        <small className="block text-xs break-words text-muted-foreground">
+          {draft.command ? `/${draft.command} ` : null}
+          <span className="whitespace-nowrap">{draft.command ? `· ${what}` : what}</span>
         </small>
       </div>
       <span className="hidden flex-none font-mono text-[11px] text-muted-foreground sm:inline">

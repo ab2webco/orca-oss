@@ -19,6 +19,7 @@ import {
   writeManagedScript,
   type HookDefinition
 } from '../agent-hooks/installer-utils'
+import { getSharedHookFilePolicy } from '../agent-hooks/shared-hook-file-policy'
 import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
 import { resolveHooksJsonWritePath } from '../agent-hooks/hook-config-write-path'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
@@ -581,7 +582,8 @@ function removeSystemManagedHookTrustEntries(systemHomePath: string, hooksJsonPa
 }
 
 function cleanupLegacySystemManagedHooks(): void {
-  if (systemCodexHomeHookSweepSuppressed()) {
+  // Why: a dev Orca must not strip the installed Orca's entries from ~/.codex (ORCA-1131).
+  if (systemCodexHomeHookSweepSuppressed() || getSharedHookFilePolicy() === 'keep-existing') {
     return
   }
   const legacyConfigPath = getSystemConfigPath()
