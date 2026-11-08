@@ -5792,6 +5792,51 @@ describe('Store', () => {
     ])
   })
 
+  // Why (ORCA-1141 R10): create accepts a folder under a manual group, and the next load dropped it.
+  it('keeps a folder workspace that names its own folder under a group with no parentPath', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {},
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      projectGroups: [
+        {
+          id: 'manual',
+          name: 'folder-check',
+          parentPath: null,
+          parentGroupId: null,
+          createdFrom: 'manual',
+          tabOrder: 0,
+          isCollapsed: false,
+          color: null,
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ],
+      folderWorkspaces: [
+        {
+          id: 'fw-own',
+          projectGroupId: 'manual',
+          name: 'folder-ws',
+          folderPath: '/work/folder-ws'
+        },
+        { id: 'fw-none', projectGroupId: 'manual', name: 'no folder', folderPath: '' }
+      ]
+    })
+
+    const store = await createStore()
+
+    expect(store.getFolderWorkspaces()).toEqual([
+      expect.objectContaining({
+        id: 'fw-own',
+        projectGroupId: 'manual',
+        folderPath: '/work/folder-ws'
+      })
+    ])
+  })
+
   it('backfills folder-scope SSH provenance from unambiguous child repos on load', async () => {
     writeDataFile({
       schemaVersion: 1,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
   withOrchestratorGameProjectActions,
+  withOrchestratorGameProjectOrcaActions,
   withOrchestratorGameProjectField,
   withOrchestratorGameProjectLead,
   withOrchestratorGameProjectScene
@@ -108,5 +109,17 @@ describe('withOrchestratorGameProjectActions', () => {
     expect(withOrchestratorGameProjectActions({ repo1: { actions } }, 'repo1', undefined)).toEqual(
       {}
     )
+  })
+})
+
+describe('withOrchestratorGameProjectOrcaActions', () => {
+  it("sets this machine's changes to Orca's actions, and drops them to inherit orca.yaml's", () => {
+    const orcaActions = { wave: { enabled: false } }
+    expect(
+      withOrchestratorGameProjectOrcaActions({ repo1: { hud: false } }, 'repo1', orcaActions)
+    ).toEqual({ repo1: { hud: false, orcaActions } })
+    expect(
+      withOrchestratorGameProjectOrcaActions({ repo1: { orcaActions } }, 'repo1', undefined)
+    ).toEqual({})
   })
 })

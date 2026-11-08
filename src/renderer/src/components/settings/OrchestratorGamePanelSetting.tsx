@@ -1,6 +1,7 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   ORCHESTRATOR_GAME_LAYER_ORDER,
+  resolveOrchestratorGameConfig,
   type OrchestratorGameLayer,
   type OrchestratorGameSource
 } from '../../../../shared/orchestrator-game-config'
@@ -33,6 +34,7 @@ import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { translate } from '@/i18n/i18n'
+import { gameStyleFallbackNote } from './orchestrator-game-style-fallback-note'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -145,6 +147,7 @@ export function GamePanelSetting({
 }): React.JSX.Element {
   const layer = settings.orchestratorGame
   const panel = resolveOrchestratorGamePanel({ global: layer })
+  const sceneId = resolveOrchestratorGameConfig({ global: layer }).config.scene
   const text = copy()
   const [{ title, description, keywords }] = getGamePanelSearchEntries()
   const set = (field: GamePanelField, value: boolean | string): void =>
@@ -164,7 +167,12 @@ export function GamePanelSetting({
           <SettingsRow
             key={field}
             label={text[field][0]}
-            description={text[field][1]}
+            description={
+              <>
+                {text[field][1]}
+                <StyleNote field={field} style={panel.style} sceneId={sceneId} />
+              </>
+            }
             control={
               <SettingsSegmentedControl
                 value={panel[field]}
@@ -188,6 +196,12 @@ export function GamePanelSetting({
       ))}
     </SearchableSetting>
   )
+}
+
+function StyleNote(p: { field: GamePanelField; style: GamePanelStyle; sceneId: string }) {
+  const note =
+    p.field === 'style' ? gameStyleFallbackNote(p.style, p.sceneId, styleLabels()[p.style]) : null
+  return note ? <span className="block">{note}</span> : null
 }
 
 function choicesOf(field: 'look' | 'style'): { value: string; label: string }[] {
@@ -215,6 +229,7 @@ export function ProjectGamePanelRows({
   const local = settings.orchestratorGameProjects?.[repoId]
   const layers = { global: settings.orchestratorGame, project: projectLayer, local }
   const panel = resolveOrchestratorGamePanel(layers)
+  const sceneId = resolveOrchestratorGameConfig(layers).config.scene
   const text = copy()
   const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
@@ -270,6 +285,7 @@ export function ProjectGamePanelRows({
               <>
                 {text[field][1]}
                 <span className="block">{named(field, valueOf(panel, field))}</span>
+                <StyleNote field={field} style={panel.style} sceneId={sceneId} />
               </>
             }
             control={

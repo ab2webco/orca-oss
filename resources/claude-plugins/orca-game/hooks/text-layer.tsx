@@ -54,10 +54,12 @@ async function liveRow(
     <Box key="live" flexDirection="row">
       <Text color={color}>{line.glyph}</Text>
       <Text> </Text>
-      <Text bold color={color}>
+      <Text bold color={color} wrap="truncate-end">
         {line.name}
       </Text>
-      <Text color={palette.dim}>{head}</Text>
+      <Text color={palette.dim} wrap="truncate-end">
+        {head}
+      </Text>
       {line.step === '' || room < 4 ? null : (
         <Text color={palette.dim} wrap="truncate-end">{` · ${fitCells(line.step, room)}`}</Text>
       )}

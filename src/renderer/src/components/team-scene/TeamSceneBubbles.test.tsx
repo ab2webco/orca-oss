@@ -1,0 +1,98 @@
+// @vitest-environment happy-dom
+
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TeamSceneBubbles } from './TeamSceneBubbles'
+import type { TeamSceneRect } from './team-scene-bubble-layout'
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
+let root: Root
+let host: HTMLDivElement
+
+const render = (text: string, obstacles?: TeamSceneRect[]): HTMLElement => {
+  act(() =>
+    root.render(
+      <TeamSceneBubbles
+        speeches={[{ key: 'lead', text, anchor: { x: 180, top: 120 } }]}
+        width={360}
+        height={176}
+        cloudPixel={3}
+        obstacles={obstacles}
+      />
+    )
+  )
+  return host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!
+}
+
+beforeEach(() => {
+  // happy-dom has no layout: offsetWidth stands for a line measured at 119.5 to 120.5 px.
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(41)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  host.remove()
+  vi.restoreAllMocks()
+})
+
+describe('TeamSceneBubbles', () => {
+  // ORCA-1139: a cloud laid half a pixel short wrapped `cat TeamSceneBubbles.tsx` onto a second
+  // line the one-line cloud did not hold.
+  it('lays a bubble at least as wide as the line it measured', () => {
+    const bubble = render('cat TeamSceneBubbles.tsx')
+    expect(Number.parseFloat(bubble.style.width)).toBeGreaterThanOrEqual(120.5)
+  })
+
+  it('keeps its laid width when a new layout lands on the same width', () => {
+    const first = render('cat TeamSceneBubbles.tsx').style.width
+    const again = render('cat TeamScenePixelCloud.tsx').style.width
+    expect(again).toMatch(/px$/)
+    expect(again).toBe(first)
+  })
+
+  // ORCA-1139 criterion 8: the bubble sat over the asking member's tag.
+  it('lays its bubble clear of an obstacle it is given', () => {
+    const free = Number.parseFloat(render('exec_command').style.top)
+    const tag = { left: 100, top: free + 10, width: 60, height: 18 }
+    const bubble = render('exec_command', [tag])
+    expect(Number.parseFloat(bubble.style.top) + 41).toBeLessThanOrEqual(tag.top)
+  })
+
+  // Lead decision A: on Pixel's 219 px stage a member's tag leaves room for the lead's bubble only.
+  it("hides the advisor's bubble while a tag needs its room, and shows it again once the tag goes", () => {
+    const shown = (obstacles: TeamSceneRect[]) => {
+      act(() =>
+        root.render(
+          <TeamSceneBubbles
+            speeches={[
+              {
+                key: 'advisor',
+                text: 'Keep this one small',
+                anchor: { x: 162, top: 81 },
+                align: 'end',
+                yields: true
+              },
+              { key: 'lead', text: 'exec_command', anchor: { x: 184, top: 84 } }
+            ]}
+            width={219}
+            height={126}
+            cloudPixel={3}
+            obstacles={obstacles}
+          />
+        )
+      )
+      return [...host.querySelectorAll<HTMLElement>('[data-scene-bubble]')]
+        .filter((one) => one.style.visibility === 'visible')
+        .map((one) => one.dataset.sceneBubble)
+    }
+    expect(shown([{ left: 4, top: 46, width: 58, height: 18 }])).toEqual(['lead'])
+    expect(shown([])).toEqual(['advisor', 'lead'])
+  })
+})
