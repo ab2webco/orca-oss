@@ -194,6 +194,7 @@ describe("The lead's own question in its team Inbox (ORCA-1129 D4)", () => {
         host: { kind: 'local' },
         repoName: 'orca-oss',
         worktreeName: 'Run home',
+        asker: 'Run home',
         text: 'Merge #923 now?',
         options: ['Now', 'Wait']
       }
@@ -260,6 +261,23 @@ describe("A member's own question in its team Inbox", () => {
       ['tab-m:leaf-m', 'Peach']
     ])
     expect(shown[1]).toMatchObject({ terminalHandle: 'term_m', options: ['Now', 'Wait'] })
+  })
+
+  // Why (ORCA-1141): V28's Needs-you card names who asks by its ticket; one with none by its name.
+  it('names each asker by its ticket, else its name', () => {
+    const state = {
+      ...noTabs,
+      agentStatusByPaneKey: {
+        'tab-m:leaf-m': asking('tab-m:leaf-m'),
+        'tab-a:leaf-a': asking('tab-a:leaf-a')
+      }
+    }
+    const ticketed = { ...member, ticket: { identifier: 'ORCA-12' } }
+    const adopted = { ...member, paneKey: 'tab-a:leaf-a', name: 'main 2', ticket: null }
+
+    const shown = teamInboxAgentQuestionsOf(withMembers([ticketed, adopted]), state)
+
+    expect(shown.map((one) => one.asker)).toEqual(['ORCA-12', 'main 2'])
   })
 
   it("finds a paired host's member under the tab this window mirrors it in", () => {

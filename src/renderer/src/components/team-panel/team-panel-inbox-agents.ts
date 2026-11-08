@@ -35,6 +35,8 @@ export type TeamInboxAgentQuestion = TeamSessionRef & {
   worktreeName: string
   text: string
   options: string[]
+  /** Set for a team's lead or member: its ticket, else its name, the only name V28's card shows. */
+  asker?: string
 }
 
 export type TeamInboxAgentState = TerminalHandleFocusState & Pick<AppState, 'agentStatusByPaneKey'>
@@ -50,7 +52,7 @@ function localPaneKeyOf(agent: TeamSessionRef, state: TerminalHandleFocusState):
 
 /** A team agent's live question; game.state never carries the text, so agent status does. */
 function teamAgentQuestionOf(
-  agent: TeamSessionRef & { name: string },
+  agent: TeamSessionRef & { name: string; ticket?: { identifier: string } | null },
   projectName: string,
   state: TeamInboxAgentState
 ): TeamInboxAgentQuestion | null {
@@ -65,6 +67,7 @@ function teamAgentQuestionOf(
         host: agent.host,
         repoName: projectName,
         worktreeName: agent.name,
+        asker: agent.ticket?.identifier ?? agent.name,
         text: action.text,
         options: action.options
       }

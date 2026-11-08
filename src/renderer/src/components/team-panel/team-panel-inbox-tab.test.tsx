@@ -285,6 +285,36 @@ describe('Inbox tab', () => {
     expect(onOpenAgent).toHaveBeenCalledWith(agent)
   })
 
+  // Why (ORCA-1141): V28 groups a member's question under this project in the tinted Needs-you card.
+  it("shows a team agent's question under this project as V28's Needs-you card, with its asker", () => {
+    const answer = vi.fn(() => true)
+    const agent = {
+      paneKey: 'tab-m:leaf-m',
+      terminalHandle: 'term_m',
+      worktreeId: 'wt-m',
+      host: { kind: 'local' as const },
+      repoName: 'orca-oss',
+      worktreeName: 'Peach',
+      asker: 'ORCA-12',
+      text: 'Rebase on #1077 before the PR?',
+      options: ['Rebase now', 'Leave it']
+    }
+    const view = renderInbox({
+      questions: [],
+      agentQuestions: [agent],
+      answerAgentOf: () => answer
+    })
+
+    const project = view.container.querySelector('[data-team-inbox-project="active"]')
+    expect(project?.textContent).toContain('orca-oss · this project')
+    const card = project?.querySelector(`[data-team-inbox-agent="tab-m:leaf-m"]`)
+    expect(card?.getAttribute('data-needs-you')).toBe('true')
+    expect(card?.textContent).toContain('Needs you')
+    expect(card?.textContent).toContain('ORCA-12')
+    expect(card?.textContent).not.toContain('orca-oss · Peach')
+    expect(view.getByRole('button', { name: 'Open terminal' })).toBeTruthy()
+  })
+
   // Why (ORCA-1141): a paired-host member opens through its handle, with no worktree in this window.
   it("opens a member's terminal by its handle when its worktree is unknown here", () => {
     const onOpenAgent = vi.fn()
@@ -295,6 +325,7 @@ describe('Inbox tab', () => {
       host: { kind: 'remote' as const, name: 'm1', environmentId: 'env_m1', reachable: true },
       repoName: 'orca-oss',
       worktreeName: 'Arthur',
+      asker: 'ORCA-9',
       text: 'Ship it?',
       options: ['Yes', 'No']
     }
@@ -305,6 +336,9 @@ describe('Inbox tab', () => {
       onOpenAgent
     })
 
+    // Why: V28's header names the ticket only, wherever the member runs.
+    const header = view.getByText('ORCA-9')
+    expect(header.textContent).toBe('ORCA-9')
     const open = view.getByRole('button', { name: 'Open terminal' }) as HTMLButtonElement
     expect(open.disabled).toBe(false)
     act(() => fireEvent.click(open))

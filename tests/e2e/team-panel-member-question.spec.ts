@@ -234,6 +234,13 @@ for (const plugins of [false, true]) {
         description: String(Date.now() - asked)
       })
       await expect(question).toContainText('ORCA-12')
+      // Why (ORCA-1141): V28 groups it under this project in the tinted Needs-you card.
+      await expect(question).toHaveAttribute('data-needs-you', 'true')
+      await expect(
+        inbox.locator(
+          `[data-team-inbox-project="active"] [data-team-inbox-agent="${memberPaneKey}"]`
+        )
+      ).toHaveCount(1)
       await expect(inbox.getByRole('tab', { name: /For you/ })).toContainText('1')
       await expect(inboxTab).toContainText('1')
 
