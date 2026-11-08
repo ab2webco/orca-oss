@@ -83,6 +83,64 @@ async function shownBubbles(
   })
 }
 
+// Why the drawn shape: Pixel's span is larger than the cloud painted in it, so its box proves nothing.
+async function linesOffBubble(page: Page, key: string): Promise<string[]> {
+  return page.evaluate((bubbleKey) => {
+    const bubble = document.querySelector<HTMLElement>(`[data-scene-bubble="${bubbleKey}"]`)
+    const text = bubble?.querySelector('span')
+    if (!bubble || !text) {
+      return [`no ${bubbleKey} bubble`]
+    }
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    const lines = [...range.getClientRects()].filter((line) => line.width > 0)
+    const canvas = bubble.querySelector('canvas')
+    const problems: string[] = []
+    if (!canvas) {
+      const glass = bubble.getBoundingClientRect()
+      lines.forEach((line, i) => {
+        if (
+          line.left < glass.left + 1 ||
+          line.right > glass.right - 1 ||
+          line.top < glass.top + 1 ||
+          line.bottom > glass.bottom - 1
+        ) {
+          problems.push(`line ${i + 1} of ${lines.length} leaves the glass bubble`)
+        }
+      })
+      return problems
+    }
+    const drawn = canvas.getBoundingClientRect()
+    const cell = drawn.width / canvas.width
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+    // The cloud's fill colours; its outline, shaded lip and the sky around it are off the cloud.
+    const fill = new Set(['244,244,240,255', '255,255,255,255'])
+    lines.forEach((line, i) => {
+      // Why half a px: a glyph box that only touches a cell's edge does not sit on it.
+      const x0 = Math.floor((line.left - drawn.left + 0.5) / cell)
+      const x1 = Math.floor((line.right - drawn.left - 0.5) / cell)
+      const y0 = Math.floor((line.top - drawn.top + 0.5) / cell)
+      const y1 = Math.floor((line.bottom - drawn.top - 0.5) / cell)
+      let off = 0
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const at = (y * canvas.width + x) * 4
+          const inside = x >= 0 && y >= 0 && x < canvas.width && y < canvas.height
+          if (!inside || !fill.has(pixels.slice(at, at + 4).join(','))) {
+            off += 1
+          }
+        }
+      }
+      if (off > 0) {
+        problems.push(
+          `line ${i + 1} of ${lines.length} (rows ${y0}-${y1}, cols ${x0}-${x1}) has ${off} cells off a ${canvas.width}x${canvas.height} cloud; span ${bubble.style.width}, ${bubble.offsetHeight} px tall`
+        )
+      }
+    })
+    return problems
+  }, key)
+}
+
 const boxesClash = (a: BubbleBox | null, b: BubbleBox | null): boolean =>
   a !== null &&
   b !== null &&
@@ -376,6 +434,11 @@ test('the Team panel draws the live scene beside a member opened under its heade
           `lead and advisor bubbles clash at ${width}px ${style}`
         ).toBe(false)
         expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
+        await expect
+          .poll(() => linesOffBubble(orcaPage, 'lead'), {
+            message: `the lead's ${style} bubble beside the advisor's does not hold its text at ${width}px`
+          })
+          .toEqual([])
 
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${style}`).toBeLessThanOrEqual(0)
@@ -399,7 +462,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       }
     }
 
-    // ORCA-1129: one long unbroken path wraps or ends in an ellipsis, never cut mid-word.
+    // ORCA-1129: the bubble is never cut. ORCA-1139: it names the step, so a long path shows its file name.
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
       worktreeId,
@@ -418,16 +481,44 @@ test('the Team panel draws the live scene beside a member opened under its heade
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         // Why 30 s: game.state names the new tool at the panel's next 20 s read.
-        await expect(leadBubble).toHaveText(`exec_command · ${LONG_COMMAND}`, { timeout: 30_000 })
+        await expect(leadBubble).toHaveText('cat TeamSceneBubbles.tsx', { timeout: 30_000 })
         await expect(leadBubble).toBeVisible()
         const cut = await leadBubble
           .locator('span')
           .first()
           .evaluate((text) => text.scrollWidth - text.clientWidth)
         expect(cut, `the lead's bubble cuts its text at ${width}px ${style}`).toBeLessThanOrEqual(0)
-        await scene.screenshot({
-          path: testInfo.outputPath(`team-scene-long-command-${style}-${width}-dark.png`)
-        })
+        // Why poll: a new width lays the bubbles out again a frame later.
+        await expect
+          .poll(
+            async () => {
+              const bubble = (await shownBubbles(orcaPage)).lead
+              const box = await scene.boundingBox()
+              if (!bubble || !box) {
+                return 'lead bubble or scene hidden'
+              }
+              // Why 1 px: the two boxes round subpixels apart.
+              const inside =
+                bubble.left >= box.x - 1 &&
+                bubble.right <= box.x + box.width + 1 &&
+                bubble.top >= box.y - 1 &&
+                bubble.bottom <= box.y + box.height + 1
+              return inside ? 'inside' : JSON.stringify({ bubble, box })
+            },
+            { message: `the lead's bubble leaves the scene at ${width}px ${style}` }
+          )
+          .toBe('inside')
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          await expect
+            .poll(() => linesOffBubble(orcaPage, 'lead'), {
+              message: `the lead's ${style} bubble does not hold its text at ${width}px ${theme}`
+            })
+            .toEqual([])
+          await scene.screenshot({
+            path: testInfo.outputPath(`team-scene-long-command-${style}-${width}-${theme}.png`)
+          })
+        }
       }
     }
 

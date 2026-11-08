@@ -69,19 +69,27 @@ test('the Inbox names an adopted member, gives it a thread, and credits the pers
       })
       .toBe(true)
     // Why wait: workerStart and the adopt seat need both worktrees, which the first scan lists.
-    let worktrees: { id: string; repoId: string }[] = []
+    // Why by branch: earlier specs in the run leave worktrees whose folders are gone.
+    let otherWorktreeId: string | undefined
     await expect
       .poll(
         async () => {
-          worktrees = (
-            await client.call<{ worktrees: { id: string; repoId: string }[] }>('worktree.list', {})
-          ).result.worktrees
+          const { worktrees } = (
+            await client.call<{ worktrees: { id: string; repoId: string; branch: string }[] }>(
+              'worktree.list',
+              {}
+            )
+          ).result
           const repoId = worktrees.find((one) => one.id === worktreeId)?.repoId
-          return worktrees.filter((one) => one.repoId === repoId).length
+          otherWorktreeId = worktrees.find(
+            (one) =>
+              one.repoId === repoId && one.branch.replace(/^refs\/heads\//, '') === 'e2e-secondary'
+          )?.id
+          return otherWorktreeId
         },
-        { timeout: 60_000, message: "the runtime never listed the project's two worktrees" }
+        { timeout: 60_000, message: 'the runtime never listed the seeded e2e-secondary worktree' }
       )
-      .toBeGreaterThanOrEqual(2)
+      .toBeTruthy()
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
       objective: 'Adopted member Inbox',
       from: lead
@@ -110,11 +118,6 @@ test('the Inbox names an adopted member, gives it a thread, and credits the pers
     expect(busy, 'workerStart opened no agent terminal for ORCA-12').toBeTruthy()
 
     // The agent to adopt: started by hand in this project's other worktree, idle at its prompt.
-    const leadRepo = worktrees.find((one) => one.id === worktreeId)?.repoId
-    const otherWorktreeId = worktrees.find(
-      (one) => one.repoId === leadRepo && one.id !== worktreeId
-    )?.id
-    expect(otherWorktreeId, 'the E2E repo has no second worktree').toBeTruthy()
     const found = await client.call<{ terminal: { handle: string; paneKey: string } }>(
       'terminal.create',
       { worktree: `id:${otherWorktreeId}`, title: ADOPTED, command: agent.command }

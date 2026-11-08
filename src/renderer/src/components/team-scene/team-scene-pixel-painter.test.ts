@@ -65,6 +65,17 @@ describe('createPixelPainter', () => {
     expect(offscreen).toHaveLength(3)
   })
 
+  // ORCA-1139: the game's clouds drift with its tick; a backdrop baked at tick 0 froze them.
+  it('rebakes the sky as its clouds drift, and not on every frame', () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const { g } = recordingContext()
+    painter.paint(g, { ...frame([]), t: 0 })
+    painter.paint(g, { ...frame([]), t: 0.3 })
+    expect(offscreen).toHaveLength(1)
+    painter.paint(g, { ...frame([]), t: 3 })
+    expect(offscreen).toHaveLength(2)
+  })
+
   it("draws each member in the scene's own figure for its name", () => {
     const colorsDrawnFor = (name: string): string => {
       offscreen = []
