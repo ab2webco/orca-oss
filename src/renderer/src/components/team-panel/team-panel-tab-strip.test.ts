@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tabStripOverflowOf, tabStripScrollLeftFor } from './team-panel-tab-strip'
+import { tabStripFitFor, tabStripOverflowOf, tabStripScrollLeftFor } from './team-panel-tab-strip'
 
 const strip = { left: 100, right: 319 }
 
@@ -41,5 +41,41 @@ describe('tabStripOverflowOf', () => {
       start: false,
       end: false
     })
+  })
+})
+
+describe('tabStripFitFor', () => {
+  const full = { level: 0, needs: [] }
+
+  it('steps to shorter labels while the tabs overflow, keeping what each level needed', () => {
+    const short = tabStripFitFor(full, { scrollWidth: 339, clientWidth: 279 }, 3)
+    expect(short).toEqual({ level: 1, needs: [339] })
+    expect(tabStripFitFor(short, { scrollWidth: 300, clientWidth: 279 }, 3)).toEqual({
+      level: 2,
+      needs: [339, 300]
+    })
+  })
+
+  it('stays at the level that fits', () => {
+    const fits = { level: 2, needs: [339, 300] }
+    expect(tabStripFitFor(fits, { scrollWidth: 279, clientWidth: 279 }, 3)).toBe(fits)
+  })
+
+  it('stops at the last level, where the scroll cue takes over', () => {
+    const last = { level: 3, needs: [339, 300, 250] }
+    expect(tabStripFitFor(last, { scrollWidth: 240, clientWidth: 219 }, 3)).toBe(last)
+  })
+
+  it('steps back to longer labels once the strip is as wide as they need', () => {
+    const tight = { level: 2, needs: [339, 300] }
+    expect(tabStripFitFor(tight, { scrollWidth: 400, clientWidth: 400 }, 3)).toEqual({
+      level: 1,
+      needs: [339, 300]
+    })
+    expect(tabStripFitFor(tight, { scrollWidth: 298, clientWidth: 298 }, 3)).toBe(tight)
+  })
+
+  it('never fits a strip that has no shorter labels', () => {
+    expect(tabStripFitFor(full, { scrollWidth: 339, clientWidth: 279 }, 0)).toBe(full)
   })
 })

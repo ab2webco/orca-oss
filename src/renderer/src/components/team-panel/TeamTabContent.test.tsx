@@ -218,6 +218,8 @@ describe('TeamTabContent', () => {
       expect(name.className).toContain('min-w-0')
       expect(name.className).toContain('truncate')
       expect(name.nextElementSibling?.className).toContain('shrink-0')
+      // ORCA-1142: short of room, the host and then the ticket wrap below before the name is cut.
+      expect(name.parentElement!.className).toContain('flex-wrap')
       const meta = card.querySelector('[data-team-meta]')!
       expect(meta.className).toContain('flex-wrap')
       expect(meta.className).not.toContain('truncate')

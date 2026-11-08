@@ -50,7 +50,7 @@ function LeadCardRow({
           />
         ) : null}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 whitespace-nowrap">
             {showName ? (
               <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
                 {lead.name}

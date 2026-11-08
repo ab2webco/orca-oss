@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   STRIP_INSET_PX,
+  tabStripFitFor,
   tabStripOverflowOf,
   tabStripScrollLeftFor,
+  type TabStripFit,
   type TabStripOverflow
 } from './team-panel-tab-strip'
 
@@ -21,20 +23,32 @@ export type TabStripCue = {
   /** Goes on the selected trigger; its parent is the scrolling strip. */
   activeTrigger: RefObject<HTMLButtonElement | null>
   overflow: TabStripOverflow
+  /** 0 draws the full labels; each level up is shorter, up to the caller's last level. */
+  fit: number
   stripProps: {
     'data-overflow-start': boolean
     'data-overflow-end': boolean
+    'data-fit': number
     style: CSSProperties
   }
 }
 
-/** Keeps the selected tab scrolled into view and says which edges hide tabs. */
-export function useTabStripCue(activeId: string | undefined, tabIds: string): TabStripCue {
+/** Keeps the selected tab scrolled into view, says which edges hide tabs, and shortens labels to fit. */
+export function useTabStripCue(
+  activeId: string | undefined,
+  shown: string,
+  lastFitLevel = 0
+): TabStripCue {
   const activeTrigger = useRef<HTMLButtonElement>(null)
   const [overflow, setOverflow] = useState<TabStripOverflow>({ start: false, end: false })
-  // Why: a narrower window clips the selected tab too, so reveal on resize as well as on select.
+  const [fit, setFit] = useState<TabStripFit & { shown: string }>({ level: 0, needs: [], shown })
+  // Why: other labels or counts need other widths, so fitting starts again from the full labels.
+  if (fit.shown !== shown) {
+    setFit({ level: 0, needs: [], shown })
+  }
+  // Why a layout effect: a shorter level replaces the full labels before they are ever painted cut.
   // Not scrollIntoView, which would also move the shell's hidden-overflow ancestors.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const strip = activeTrigger.current?.parentElement
     if (!strip) {
       return
@@ -54,26 +68,38 @@ export function useTabStripCue(activeId: string | undefined, tabIds: string): Ta
       setOverflow((now) => (now.start === next.start && now.end === next.end ? now : next))
     }
     const update = (): void => {
+      const next = tabStripFitFor(fit, strip, lastFitLevel)
+      if (next !== fit) {
+        setFit({ ...next, shown: fit.shown })
+        return
+      }
       reveal()
       measure()
     }
     update()
+    // Why on resize too: a narrower window clips the selected tab, a wider one has room for longer labels.
+    // The tabs too: their labels can grow with no change to the strip's own size.
     const observer = new ResizeObserver(update)
     observer.observe(strip)
+    for (const tab of strip.children) {
+      observer.observe(tab)
+    }
     strip.addEventListener('scroll', measure, { passive: true })
     return () => {
       observer.disconnect()
       strip.removeEventListener('scroll', measure)
     }
-    // Why tabIds: a toggle that hides a tab changes what overflows without resizing the strip.
-  }, [activeId, tabIds])
+    // Why shown: a toggle that hides a tab changes what overflows without resizing the strip.
+  }, [activeId, shown, fit, lastFitLevel])
   const fade = stripFade(overflow)
   return {
     activeTrigger,
     overflow,
+    fit: fit.shown === shown ? fit.level : 0,
     stripProps: {
       'data-overflow-start': overflow.start,
       'data-overflow-end': overflow.end,
+      'data-fit': fit.shown === shown ? fit.level : 0,
       style: { maskImage: fade, WebkitMaskImage: fade }
     }
   }

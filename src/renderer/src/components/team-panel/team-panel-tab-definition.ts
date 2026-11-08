@@ -31,6 +31,8 @@ export type TeamPanelTabView =
 export type TeamPanelResolvedTab = {
   id: TeamTabId
   title: string
+  /** Drawn when the strip is too narrow for every full title. */
+  shortTitle: string
   /** Shown on the tab; only Inbox has one. */
   count: number | null
   copy: TeamPanelTabCopy
@@ -40,6 +42,7 @@ export type TeamPanelResolvedTab = {
 export type TeamPanelTabSpec<V> = {
   id: TeamTabId
   title: () => string
+  shortTitle?: () => string
   /** Null hides the tab. */
   section: (model: TeamPanelModel) => TeamSection<V> | null
   isEmpty: (value: V) => boolean
@@ -75,9 +78,11 @@ export function defineTeamPanelTab<V>(spec: TeamPanelTabSpec<V>): TeamPanelTabDe
       if (!section) {
         return null
       }
+      const title = spec.title()
       return {
         id: spec.id,
-        title: spec.title(),
+        title,
+        shortTitle: spec.shortTitle?.() ?? title,
         count: spec.count?.(model) ?? null,
         copy: spec.copy(),
         view: viewOf(section, model)
