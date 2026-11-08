@@ -3,6 +3,7 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { SettingsSegmentedControl } from './SettingsFormControls'
 import type { ActionDraft, ActionDraftProblem } from './orchestrator-game-action-drafts'
+import type { ActionScope } from './orchestrator-game-action-scopes'
 import { GAME_ACTION_PICKER_ICONS, actionCommandOf } from './orchestrator-game-action-list'
 import { TeamActionIcon } from '../team-panel/team-action-icons'
 import { translate } from '@/i18n/i18n'
@@ -15,6 +16,8 @@ export type GameActionFormState = {
   orca: boolean
   /** Until the person types a command, it follows the name. */
   commandTouched: boolean
+  /** Where a project action is saved; Orca's are always this machine's. */
+  scope: ActionScope
 }
 
 export function gameActionProblemText(problem: ActionDraftProblem, command: string): string {
@@ -192,6 +195,26 @@ export function GameActionForm({
               onChange={(event) => set({ tool: event.currentTarget.value })}
             />
           </label>
+        </div>
+      )}
+      {orca ? null : (
+        <div className="self-start">
+          <SettingsSegmentedControl
+            value={state.scope}
+            size="sm"
+            ariaLabel={translate('settings.gameActions.scope', 'Where it is saved')}
+            options={[
+              {
+                value: 'project',
+                label: translate('settings.gameActions.scopeProject', 'Project, orca.yaml')
+              },
+              {
+                value: 'machine',
+                label: translate('settings.gameActions.scopeMachine', 'Only this machine')
+              }
+            ]}
+            onChange={(scope) => onChange({ ...state, scope })}
+          />
         </div>
       )}
       {problem ? (

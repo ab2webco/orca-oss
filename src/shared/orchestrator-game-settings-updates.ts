@@ -2,6 +2,7 @@ import type { OrchestratorGameOrcaActions } from './orchestrator-game-orca-actio
 import type { OrchestratorGameConfig, OrchestratorGameLayer } from './orchestrator-game-config'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { OrchestratorGameAction } from './orchestrator-game-actions'
+import type { GameMachineAction } from './orchestrator-game-machine-actions'
 
 // Why: `undefined` means "inherit", so the key is removed instead of stored, letting lower layers show through.
 export function withOrchestratorGameField<K extends keyof OrchestratorGameConfig>(
@@ -110,6 +111,21 @@ export function withOrchestratorGameProjectActions(
   actions: OrchestratorGameAction[] | undefined
 ): Record<string, OrchestratorGameLayer> {
   return withProjectLayerKey(projects, repoId, 'actions', actions)
+}
+
+/** This machine's per-action changes; they replace the old whole-list override, which goes. */
+export function withOrchestratorGameProjectMachineActions(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  machine: GameMachineAction[]
+): Record<string, OrchestratorGameLayer> {
+  const cleared = withProjectLayerKey(projects, repoId, 'actions', undefined)
+  return withProjectLayerKey(
+    cleared,
+    repoId,
+    'machineActions',
+    machine.length ? machine : undefined
+  )
 }
 
 /** This machine's changes to Orca's own actions; merged over orca.yaml's field by field. */
