@@ -105,16 +105,15 @@ export function createImagePainter(args: {
       return
     }
     const prop = image(station)
+    const feet = style.props?.stationFeet ?? { x: prop.width / 2, y: prop.height }
     for (const spot of f.stations) {
       const px = sheetPxAt(style.roles.member, spot.depth)
-      const width = prop.width * px
-      const height = prop.height * px
       g.drawImage(
         prop,
-        spot.x * f.width - width / 2,
-        feetY(spot.depth, f.height) - height,
-        width,
-        height
+        spot.x * f.width - feet.x * px,
+        feetY(spot.depth, f.height) - feet.y * px,
+        prop.width * px,
+        prop.height * px
       )
     }
   }

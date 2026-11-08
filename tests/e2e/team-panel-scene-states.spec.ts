@@ -222,6 +222,24 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         await scene.screenshot({
           path: testInfo.outputPath(`scene-${style}-lead-${round.lead}-member-${round.member}.png`)
         })
+        // Evidence for the seat at every width and theme (criterion 7), read beside V28 office.
+        if (round.member === 'working') {
+          for (const width of [1440, 768, 390, 320]) {
+            await orcaPage.setViewportSize({ width, height: 900 })
+            for (const theme of ['dark', 'light'] as const) {
+              await orcaPage.evaluate(async (next) => {
+                window.__store?.setState({
+                  settings: await window.api.settings.set({ theme: next })
+                })
+              }, theme)
+              await orcaPage.waitForTimeout(400)
+              await scene.screenshot({
+                path: testInfo.outputPath(`scene-${style}-working-${width}-${theme}.png`)
+              })
+            }
+          }
+          await orcaPage.setViewportSize({ width: 1440, height: 900 })
+        }
       }
     }
 

@@ -162,6 +162,23 @@ describe('the native art block', () => {
     expect(parsed.office?.props?.station).toBe('desk.png')
   })
 
+  it('places a station by its floor point, and refuses one that is not a pixel', () => {
+    const office = (stationFeet: unknown) => ({
+      office: {
+        layers: [{ src: 'room.png' }],
+        roles: { lead: role(), member: role() },
+        props: { station: 'desk.png', stationFeet }
+      }
+    })
+    expect(parsedNative(office({ x: 120, y: 120 })).office?.props?.stationFeet).toEqual({
+      x: 120,
+      y: 120
+    })
+    expect(
+      orchestratorGameSceneNativeOf({ native: office({ x: -1, y: 2.5 }) }).issues
+    ).toHaveLength(2)
+  })
+
   it('names each file once, canonical and relative to the scene', () => {
     const parsed = parsedNative({
       figures: {
