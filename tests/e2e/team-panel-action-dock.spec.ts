@@ -89,6 +89,74 @@ async function clickPastAppCards(page: Page, target: Locator): Promise<void> {
   await target.click()
 }
 
+// Why: the board hint reopens on each toolbar mount once its seen flag is cleared (as in
+// workspace-board-hint-fit.spec.ts), so every width meets it fresh instead of racing its 12 s close.
+async function reopenBoardHint(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.localStorage.removeItem('orca.workspaceBoardMovedHintSeen.v1')
+    window.__store!.getState().setSidebarOpen(false)
+  })
+  await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(0)
+  await page.evaluate(() => window.__store!.getState().setSidebarOpen(true))
+  await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(1)
+}
+
+/** Each shown dock control is on top at its corners, edges and centre: nothing is drawn over it. */
+async function dockCoverings(dock: Locator): Promise<string[]> {
+  return dock.evaluate((node) => {
+    const describe = (el: Element): string =>
+      el.closest('[data-floating-terminal-toggle]')
+        ? 'floating terminal button'
+        : (el.textContent ?? el.tagName).trim().slice(0, 40) || el.tagName
+    // Why: tooltips are pointer-events: none, so elementFromPoint passes through them.
+    const own = new Set(
+      [...node.querySelectorAll('[aria-describedby]')].flatMap((el) =>
+        (el.getAttribute('aria-describedby') ?? '').split(' ')
+      )
+    )
+    const tips = [...document.querySelectorAll<HTMLElement>('[data-slot="tooltip-content"]')]
+      .filter((tip) => !own.has(tip.querySelector('[role="tooltip"]')?.id ?? ''))
+      .map((tip) => ({ tip, box: tip.getBoundingClientRect() }))
+    const misses: string[] = []
+    for (const control of node.querySelectorAll<HTMLElement>('button, [role="status"], span')) {
+      const box = control.getBoundingClientRect()
+      if (control.closest('[aria-hidden]') || box.width < 4 || box.height < 4) {
+        continue
+      }
+      const points = [box.left + 2, box.left + box.width / 2, box.right - 2].flatMap((x) =>
+        [box.top + 2, box.top + box.height / 2, box.bottom - 2].map((y) => [x, y] as const)
+      )
+      for (const [x, y] of points) {
+        const hit = document.elementFromPoint(x, y)
+        const tip = tips.find(
+          (one) =>
+            x >= one.box.left && x <= one.box.right && y >= one.box.top && y <= one.box.bottom
+        )
+        if (!hit || !node.contains(hit) || tip) {
+          const by = tip ? tip.tip : hit
+          misses.push(`${describe(control)} under ${by ? describe(by) : 'nothing'}`)
+          break
+        }
+      }
+    }
+    return misses
+  })
+}
+
+// Why repeated: the hint opens just after its toolbar mounts, and the floating button settles after a resize.
+async function expectDockUncovered(page: Page, dock: Locator, where: string): Promise<void> {
+  await dismissAppCards(page)
+  for (let i = 0; i < 3; i += 1) {
+    await page.waitForTimeout(200)
+    const covered = await dockCoverings(dock)
+    // Why soft: one run then names every width and state where something covers the dock.
+    expect.soft(covered, `a dock control is covered at ${where}`).toEqual([])
+    if (covered.length > 0) {
+      return
+    }
+  }
+}
+
 async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
   await dismissAppCards(page)
   const box = await panel.boundingBox()
@@ -249,6 +317,8 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         const shown = await expectOneLine(dock, `${width}px ${language}`)
+        await reopenBoardHint(orcaPage)
+        await expectDockUncovered(orcaPage, dock, `${width}px ${language}`)
         testInfo.annotations.push({
           type: 'dock',
           description: `${width} ${language}: ${shown} chips`
@@ -275,11 +345,13 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await expect(dock).toContainText(
       '¿Detener a los 2 miembros? Siguen parados hasta que los reactives.'
     )
-    if (CAPTURE_EVIDENCE) {
-      for (const theme of ['light', 'dark'] as const) {
-        await setTheme(orcaPage, theme)
-        for (const width of WIDTHS) {
-          await orcaPage.setViewportSize({ width, height: 900 })
+    for (const theme of CAPTURE_EVIDENCE ? (['light', 'dark'] as const) : (['light'] as const)) {
+      await setTheme(orcaPage, theme)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        await reopenBoardHint(orcaPage)
+        await expectDockUncovered(orcaPage, dock, `${width}px, Stop's question`)
+        if (CAPTURE_EVIDENCE) {
           await captureDock(
             orcaPage,
             panel,
@@ -288,6 +360,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         }
       }
     }
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'Cancelar' }))
     await expect(chips).toHaveCount(3)
 
@@ -295,8 +368,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     await setTheme(orcaPage, 'dark')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await clickPastAppCards(orcaPage, chips.filter({ hasText: 'Release' }))
-    await expect(chips.filter({ hasText: 'Release' }).locator('[data-agent-spinner]')).toBeVisible()
+    const release = chips.filter({ hasText: 'Release' })
+    await clickPastAppCards(orcaPage, release)
+    await expect(release.locator('[data-agent-spinner]')).toBeVisible()
     await expect(chips.filter({ hasText: 'Push' })).toBeDisabled()
     await emitCodexHookStatus(endpoint, {
       ...leadHook,
@@ -311,14 +385,15 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     const receipt = dock.getByRole('status')
     await expect(receipt).toContainText('Release: Two PRs still have to merge before the release.')
     await expect(chips.filter({ hasText: 'Push' })).toBeEnabled()
-    if (CAPTURE_EVIDENCE) {
-      for (const theme of ['dark', 'light'] as const) {
+    // Why one pass, widths outside: the reply line clears after 9 s.
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      await expect(receipt).toBeVisible()
+      await reopenBoardHint(orcaPage)
+      await expectDockUncovered(orcaPage, dock, `${width}px, the reply`)
+      for (const theme of CAPTURE_EVIDENCE ? (['dark', 'light'] as const) : []) {
         await setTheme(orcaPage, theme)
-        for (const width of WIDTHS) {
-          await orcaPage.setViewportSize({ width, height: 900 })
-          await expect(dock.getByRole('status')).toBeVisible()
-          await captureDock(orcaPage, panel, testInfo.outputPath(`reply-en-${width}-${theme}.png`))
-        }
+        await captureDock(orcaPage, panel, testInfo.outputPath(`reply-en-${width}-${theme}.png`))
       }
     }
   } finally {
