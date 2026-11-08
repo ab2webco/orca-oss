@@ -198,7 +198,9 @@ describe('WorktreeCard linked PR display', () => {
     const readTitleTag = getInlineRenameTitleTag(readMarkup)
 
     expect(unreadMarkup).toContain('aria-label="Mark as read"')
-    expect(unreadMarkup).toContain('text-status-attention')
+    // ORCA-1131: unread shows in the title weight, never as a bell over the status glyph.
+    expect(unreadMarkup).not.toContain('text-status-attention')
+    expect(getInlineRenameTitleTag(unreadMarkup)).toContain('font-semibold text-foreground')
     expect(unreadMarkup).not.toContain('PR checks: Failed · Mark read')
     expect(unreadMarkup).not.toContain('size-[13px] translate-x-px')
     expect(readTitleTag).toContain('font-normal text-foreground')

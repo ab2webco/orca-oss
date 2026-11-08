@@ -47,12 +47,10 @@ export function SetupScriptPromptCardShell({
   onImport,
   onSetupDraftChange
 }: SetupScriptPromptCardShellProps): React.JSX.Element {
+  // Why: in flow above the toolbar, so the list shrinks instead of hiding its last rows (ORCA-1131).
   return (
-    <div
-      data-setup-script-prompt-layer=""
-      className="pointer-events-none absolute inset-x-0 bottom-full z-40 px-3 pb-2"
-    >
-      <div className="pointer-events-auto rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+    <div data-setup-script-prompt-layer="" className="px-3 pb-2">
+      <div className="rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold leading-snug">
             {translate(
