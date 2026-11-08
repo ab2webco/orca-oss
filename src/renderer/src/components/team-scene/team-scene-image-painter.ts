@@ -56,8 +56,13 @@ function frameOf(
   t: number,
   sheetPx: number
 ): [number, number] {
-  // Why: `work` is drawn at a station; the lead works with no prop to be seated at.
-  const pose = a.pose === 'work' && !seated ? 'idle' : a.pose
+  if (a.pose === 'done') {
+    // Why held: done is a finished stance, apart from idle's breathing and work's loop.
+    const cheer = art.animations.cheer
+    return cheer ? [cheer.row, cheer.frames - 1] : [art.animations.idle.row, 0]
+  }
+  // Why: `work` is drawn at a station; with none, V28's lead works by handing out its scroll.
+  const pose = a.pose === 'work' && !seated ? (art.animations.give ? 'give' : 'idle') : a.pose
   const animation = art.animations[pose] ?? art.animations.idle
   if (pose !== 'walk' || !art.animations.walk) {
     return [animation.row, Math.floor((t + a.x * 7) * animation.fps) % animation.frames]

@@ -469,8 +469,8 @@ and swaps the station prop.
   to 30, default 8; `walk` ignores it, since the engine steps it by distance. `stride` on `walk` is
   how many sheet pixels the ground moves in one full cycle: set it, or feet slide at any `size` but
   the one the art was drawn for. `work` plays only at a station, so draw it for one; the lead has no
-  station and stands on `idle` instead. `label` (a name, or `{ "en", "es" }`) is what the scene
-  calls that action.
+  station and plays `give` instead (or `idle` without it). A finished agent holds the last `cheer`
+  frame. `label` (a name, or `{ "en", "es" }`) is what the scene calls that action.
 - **`props.station`.** Drawn in the member art's scale, centered on the seat, and always the way it
   is in the file, so a seated member faces the way the sheet does.
 - **Limits.** Each file at most 2 MB; each style at most 8 MB and 16 megapixels in total, which is
