@@ -85,13 +85,15 @@ describe('team scene director', () => {
       input([
         member('w'),
         member('r', { activity: 'resting' }),
-        member('q', { activity: 'needsYou' })
+        member('q', { activity: 'needsYou' }),
+        member('d', { activity: 'done' })
       ])
     )
     stepTeamScene(world, DT, { width: WIDTH })
-    expect(actor(world, 'w')?.pose).toBe('work')
-    expect(actor(world, 'r')?.pose).toBe('idle')
+    expect(actor(world, 'w')).toMatchObject({ pose: 'work', emote: null })
+    expect(actor(world, 'r')).toMatchObject({ pose: 'idle', emote: null })
     expect(actor(world, 'q')).toMatchObject({ pose: 'raise', emote: 'alert' })
+    expect(actor(world, 'd')).toMatchObject({ pose: 'done', emote: 'check' })
   })
 
   it('walks a new member in, greets it at the lead, then seats it', () => {
