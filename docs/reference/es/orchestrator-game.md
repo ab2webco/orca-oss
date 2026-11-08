@@ -619,6 +619,12 @@ elige y lo guarda en el título de la tarea en casa. La Run DB de casa no regist
 los nombres de sus miembros remotos no liberados solo retienen mientras quede otro nombre libre: ceden
 antes de que un lanzamiento numere un nombre.
 
+Sin `label`, el líder es el último nombre del roster, el que los miembros alcanzan al final. Orca
+guarda el primero que le da al pane de un líder durante toda la sesión, así que cambiar la escena o el
+idioma no le cambia el nombre. Lo lleva el `leadName` del estado del juego, y la tarjeta del Team, la
+escena y los encabezados de los mensajes del líder lo leen de ahí
+([`orchestrator-game-lead-names.ts`](../../../src/main/runtime/orchestrator-game-lead-names.ts)).
+
 Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
