@@ -12,6 +12,8 @@ const HINT = {
 async function reopenHint(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.localStorage.removeItem('orca.workspaceBoardMovedHintSeen.v1')
+    // Why: a phone-wide window lays the right sidebar over the board button, and the hint then stays hidden (ORCA-1093).
+    window.__store!.getState().setRightSidebarOpen(false)
     window.__store!.getState().setSidebarOpen(false)
   })
   await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(0)

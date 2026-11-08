@@ -13,6 +13,10 @@ export const ORCHESTRATOR_GAME_SCENE_ART_MAX_STYLE_PIXELS = 16 * 1024 * 1024
 const MAX_LAYERS = 8
 const MAX_SHEETS = 16
 const MAX_FRAME_PX = 512
+const MAX_PROP_PX = 4096
+// CSS px a second; faster reads as a glitch, not weather.
+const MAX_DRIFT = 60
+const DRIFT_ERROR = `must be a number from -${MAX_DRIFT} to ${MAX_DRIFT}`
 const MAX_ROW = 63
 const MAX_FRAMES = 32
 const MAX_FPS = 30
@@ -86,7 +90,18 @@ const roleSchema = z.object({
 const styleSchema = z.object({
   /** Back to front, each covering the stage from its bottom edge. */
   layers: z
-    .array(z.object({ src: artPath, front: z.boolean().optional() }))
+    .array(
+      z.object({
+        src: artPath,
+        front: z.boolean().optional(),
+        /** CSS px a second the layer scrolls across the stage, wrapping; negative runs leftward. */
+        drift: z
+          .number({ error: DRIFT_ERROR })
+          .min(-MAX_DRIFT, DRIFT_ERROR)
+          .max(MAX_DRIFT, DRIFT_ERROR)
+          .optional()
+      })
+    )
     .min(1)
     .max(MAX_LAYERS),
   roles: z.object({
@@ -95,7 +110,24 @@ const styleSchema = z.object({
     /** Wears the member art when absent. */
     advisor: roleSchema.optional()
   }),
-  props: z.object({ station: artPath.optional() }).optional()
+  props: z
+    .object({
+      station: artPath.optional(),
+      /** Where the station meets the floor, in its own pixels; the bottom center when absent. */
+      stationFeet: z
+        .object({ x: wholeNumber(0, MAX_PROP_PX), y: wholeNumber(0, MAX_PROP_PX) })
+        .optional(),
+      /** A screen on the station, in its own pixels, lit by what its worker does. */
+      stationScreen: z
+        .object({
+          x: wholeNumber(0, MAX_PROP_PX),
+          y: wholeNumber(0, MAX_PROP_PX),
+          width: wholeNumber(1, MAX_PROP_PX),
+          height: wholeNumber(1, MAX_PROP_PX)
+        })
+        .optional()
+    })
+    .optional()
 })
 
 // Why only these keys: Pixel is the game's own art.

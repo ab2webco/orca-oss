@@ -23,5 +23,10 @@ export function getRepositoryGameSectionId(repoId: string): string {
   return `repo-${repoId}-game`
 }
 
+/** Settings > Actions inside the project's game section, which the dock's menu opens. */
+export function getRepositoryGameActionsSectionId(repoId: string): string {
+  return `repo-${repoId}-game-actions`
+}
+
 /** The global Panel section under Agents, which the panel gear opens with no team. */
 export const GAME_PANEL_GLOBAL_SECTION_ID = 'agents-game-panel'

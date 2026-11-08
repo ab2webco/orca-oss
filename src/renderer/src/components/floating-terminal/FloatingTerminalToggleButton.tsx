@@ -20,6 +20,10 @@ import {
   type FloatingTerminalTriggerPosition,
   type FloatingTerminalTriggerPositionSource
 } from './floating-terminal-trigger-position'
+import {
+  placeFloatingTerminalTriggerClear,
+  useFloatingTerminalKeepOut
+} from './floating-terminal-trigger-keep-out'
 import { translate } from '@/i18n/i18n'
 
 const FLOATING_TERMINAL_TRIGGER_DRAG_THRESHOLD = 4
@@ -81,6 +85,10 @@ export function FloatingTerminalToggleButton({
     initialPositionState.current.committedPosition
   )
   const [position, setPosition] = useState(initialPositionState.current.position)
+  const [dragging, setDragging] = useState(false)
+  const keepOut = useFloatingTerminalKeepOut()
+  // Why: the button sits above the Team dock's question and reply instead of covering them; a drag follows the pointer.
+  const shown = dragging ? position : placeFloatingTerminalTriggerClear(position, keepOut)
   const dragRef = useRef<{
     pointerId: number
     startX: number
@@ -146,8 +154,8 @@ export function FloatingTerminalToggleButton({
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      left: position.left,
-      top: position.top,
+      left: shown.left,
+      top: shown.top,
       moved: false
     }
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -162,6 +170,9 @@ export function FloatingTerminalToggleButton({
     const dy = event.clientY - drag.startY
     if (!drag.moved && Math.hypot(dx, dy) < FLOATING_TERMINAL_TRIGGER_DRAG_THRESHOLD) {
       return
+    }
+    if (!drag.moved) {
+      setDragging(true)
     }
     drag.moved = true
     previewPosition({
@@ -180,6 +191,7 @@ export function FloatingTerminalToggleButton({
       commitPosition(stagedPositionRef.current)
     }
     dragRef.current = null
+    setDragging(false)
   }
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
@@ -198,7 +210,7 @@ export function FloatingTerminalToggleButton({
       // Why: keep the toggle/minimize control above the z-[45] panel so it stays
       // clickable where the two overlap.
       className="fixed z-[46]"
-      style={{ left: position.left, top: position.top }}
+      style={{ left: shown.left, top: shown.top }}
     >
       <Tooltip>
         <TooltipTrigger asChild>
