@@ -45,6 +45,13 @@ export function useFloatingTerminalKeepOut(): FloatingTerminalKeepOut | null {
 
 /** Publishes the element's box while it is mounted; it grows when the dock asks or replies. */
 export function useFloatingTerminalKeepOutElement(element: HTMLElement | null): void {
+  // Why every render too: the dock grows for a question or a reply, and a hidden or busy window delivers ResizeObserver late.
+  useLayoutEffect(() => {
+    if (element) {
+      const { left, top, right, bottom } = element.getBoundingClientRect()
+      setKeepOut({ left, top, right, bottom })
+    }
+  })
   useLayoutEffect(() => {
     if (!element) {
       return

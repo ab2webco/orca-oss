@@ -143,18 +143,22 @@ async function dockCoverings(dock: Locator): Promise<string[]> {
   })
 }
 
-// Why repeated: the hint opens just after its toolbar mounts, and the floating button settles after a resize.
+// Why patient, then still: a hidden CI window lays out about once a second, and the hint opens just after its toolbar mounts.
 async function expectDockUncovered(page: Page, dock: Locator, where: string): Promise<void> {
   await dismissAppCards(page)
-  for (let i = 0; i < 3; i += 1) {
+  const width = page.viewportSize()?.width
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width)
+  let covered = await dockCoverings(dock)
+  for (const settleBy = Date.now() + 3_000; covered.length > 0 && Date.now() < settleBy; ) {
     await page.waitForTimeout(200)
-    const covered = await dockCoverings(dock)
-    // Why soft: one run then names every width and state where something covers the dock.
-    expect.soft(covered, `a dock control is covered at ${where}`).toEqual([])
-    if (covered.length > 0) {
-      return
-    }
+    covered = await dockCoverings(dock)
   }
+  for (let i = 0; i < 3 && covered.length === 0; i += 1) {
+    await page.waitForTimeout(200)
+    covered = await dockCoverings(dock)
+  }
+  // Why soft: one run then names every width and state where something covers the dock.
+  expect.soft(covered, `a dock control is covered at ${where}`).toEqual([])
 }
 
 async function captureDock(page: Page, panel: Locator, file: string): Promise<void> {
