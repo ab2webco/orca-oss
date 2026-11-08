@@ -16,7 +16,7 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
-import { TeamDrawer } from './TeamDrawer'
+import { TeamSheet } from './TeamSheet'
 import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
 
 const question = {
@@ -75,23 +75,64 @@ const thread = {
   ]
 }
 
-const member = (paneKey: string, displayName: string, state: string) => ({
+const member = (
+  paneKey: string,
+  displayName: string,
+  state: string,
+  over: Record<string, unknown> = {}
+) => ({
   paneKey,
   displayName,
   agentType: 'claude',
   state,
   toolName: null,
   isLeader: false,
-  isMember: true
+  isMember: true,
+  ...over
 })
+
+const NOW = 20 * 60_000
 
 function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
   const view = teamLeadViewOf(
     {
       role: 'lead',
       lead: { autostart: false, cap: 4, agent: 'claude' },
-      agents: [member('a', 'ORCA-1 idle one', 'idle'), member('b', 'ORCA-7 asker', 'working')],
+      agents: [
+        member('a', 'ORCA-1 idle one', 'idle'),
+        member('b', 'ORCA-7 asker', 'working'),
+        member('c', 'Juno', 'working', {
+          workItem: {
+            provider: 'plane',
+            identifier: 'ORCA-9',
+            title: 't',
+            url: 'u',
+            status: 'In Progress',
+            statusGroup: 'started'
+          },
+          toolName: 'Edit',
+          toolInput: 'terminal-role.ts',
+          stateSince: 8 * 60_000,
+          launch: { model: 'opus', effort: 'high' },
+          account: { provider: 'claude', id: 'a', email: 'dev@example.com' },
+          review: {
+            provider: 'github',
+            number: 850,
+            title: 'p',
+            url: 'https://pr/850',
+            state: 'open',
+            ci: 'success',
+            ciHistory: [
+              { headSha: 'a', ci: 'failure' },
+              { headSha: 'b', ci: 'success' }
+            ],
+            commentCount: 3
+          }
+        }),
+        member('d', 'Rho', 'idle', { limit: { resetsAt: null, loggedOut: true } })
+      ],
       metrics: {
+        claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37 }],
         mergedPerDay: [{ day: '2026-11-02', merged: 4 }],
         leadTime: { medianMs: 2 * 3_600_000, measured: 4 }
       }
@@ -102,7 +143,6 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
     view,
     questions: [question],
     answerWorktreeId: 'repo::/main',
-    badge: null,
     inbox: {
       kind: 'ready',
       threads: { threads: [thread], waiting: [waiting], answered: [answered] }
@@ -130,7 +170,7 @@ function button(label: string): HTMLElement {
   return found
 }
 
-describe('TeamDrawer', () => {
+describe('TeamSheet', () => {
   let container: HTMLDivElement
   let root: Root
 
@@ -145,16 +185,58 @@ describe('TeamDrawer', () => {
     container.remove()
   })
 
-  const show = (team: TeamDrawerData, onClose = vi.fn()) => {
+  const render = (team: TeamDrawerData, open: boolean, onOpenChange = vi.fn()) => {
     act(() =>
       root.render(
         <SafeAreaProvider initialMetrics={safeArea}>
-          <TeamDrawer visible onClose={onClose} team={team} now={0} onOpenLink={() => {}} />
+          <TeamSheet
+            open={open}
+            onOpenChange={onOpenChange}
+            team={team}
+            now={NOW}
+            onOpenLink={() => {}}
+          />
         </SafeAreaProvider>
       )
     )
-    return onClose
+    return onOpenChange
   }
+  const show = (team: TeamDrawerData, onOpenChange = vi.fn()) => render(team, true, onOpenChange)
+
+  it('peeks 60 pt tall with who needs you, and opens on a tap', () => {
+    const onOpenChange = render(teamWith(), false)
+    const peek = button('Open Team, 1 needs you')
+    expect(getComputedStyle(peek).height).toBe('60px')
+    expect(texts()).toContain('1 needs you')
+    expect(document.body.querySelector('[role="tablist"]')).toBeNull()
+    act(() => peek.click())
+    expect(onOpenChange).toHaveBeenCalledWith(true)
+  })
+
+  it('peeks with who works when nobody needs you', () => {
+    render(teamWith({ questions: [] }), false)
+    expect(texts()).toContain('2 working · 4 members')
+  })
+
+  it("opens to 84% of the screen with rounded top corners, over the lead's terminal", () => {
+    show(teamWith())
+    const rounded = [...document.body.querySelectorAll<HTMLElement>('div')]
+      .filter((one) => getComputedStyle(one).borderTopLeftRadius === '14px')
+      .map((one) => getComputedStyle(one).height)
+    expect(rounded).toContain(`${Math.round(844 * 0.84)}px`)
+  })
+
+  it("shows each member's tool, time in state, model, account quota, CI per push and comments", () => {
+    show(teamWith({ questions: [] }))
+    const shown = texts()
+    expect(shown).toContain('Edit · terminal-role.ts')
+    expect(shown).toContain('opus · high · 12 min · In Progress')
+    expect(shown).toContain('dev@example.com · 37%')
+    expect(shown).toContain('CI green')
+    expect(shown).toContain('3 comments')
+    expect(button('CI per push: failure, success')).toBeDefined()
+    expect(shown).toContain('Logged out')
+  })
 
   it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
     show(teamWith())
@@ -194,7 +276,7 @@ describe('TeamDrawer', () => {
   it('opens on the Team tab when no question waits', () => {
     show(teamWith({ questions: [] }))
     expect(button('Team').getAttribute('aria-selected')).toBe('true')
-    expect(texts()).toContain('Members (2)')
+    expect(texts()).toContain('Members (4)')
   })
 
   it('says the host must update when its phone allowlist predates the Inbox', () => {
@@ -209,12 +291,12 @@ describe('TeamDrawer', () => {
     expect(texts().filter((one) => one.startsWith('Merged in'))).toEqual(['Merged in 1 d'])
   })
 
-  it('closes from the large X in the header', () => {
-    const onClose = show(teamWith())
-    const close = button('Close Team')
-    expect(getComputedStyle(close).width).toBe('44px')
+  it('closes from the peek at the top of the open sheet', () => {
+    const onOpenChange = show(teamWith())
+    const close = button('Close Team, 1 needs you')
+    expect(getComputedStyle(close).height).toBe('60px')
     act(() => close.click())
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('sends one answer through the board for a tapped option', async () => {
@@ -231,17 +313,7 @@ describe('TeamDrawer', () => {
     const shown = texts()
     expect(shown).not.toContain('Metrics')
     expect(shown.some((one) => one.startsWith('Needs your answer'))).toBe(false)
-    expect(shown).toContain('Members (2)')
-  })
-
-  // Why: a 48 px strip of the lead's terminal peeked beside the drawer on a phone.
-  it('fills the phone width with square edges', () => {
-    show(teamWith())
-    const panel = [...document.body.querySelectorAll<HTMLElement>('div')].find(
-      (one) => getComputedStyle(one).width === '390px'
-    )
-    expect(panel).toBeDefined()
-    expect(getComputedStyle(panel!).borderTopLeftRadius).toBe('0px')
+    expect(shown).toContain('Members (4)')
   })
 
   // Why: at 320 pt the tiles broke "2026-11-02" across lines and left one tile alone.

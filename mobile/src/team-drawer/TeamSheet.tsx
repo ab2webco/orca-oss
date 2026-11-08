@@ -1,21 +1,55 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
-import { X } from 'lucide-react-native'
-import { RightDrawer } from '../components/RightDrawer'
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
-import { formatLeadTime, type TeamDrawerData, type TeamMetrics } from './team-drawer-model'
+import {
+  formatLeadTime,
+  teamPeekOf,
+  type TeamDrawerData,
+  type TeamMetrics,
+  type TeamPeek
+} from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
 import { TeamInboxTab } from './TeamInboxTab'
 
 type TeamTab = 'team' | 'inbox'
 
 type Props = {
-  visible: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   team: TeamDrawerData
   now: number
   onOpenLink: (url: string) => void
+}
+
+/** V30's collapsed sheet height. */
+export const TEAM_PEEK_HEIGHT = 60
+
+function PeekBar({ peek, open, onPress }: { peek: TeamPeek; open: boolean; onPress: () => void }) {
+  const tone = { question: colors.statusRed, working: colors.statusGreen, idle: colors.textMuted }[
+    peek.tone
+  ]
+  return (
+    <Pressable
+      style={styles.peek}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${open ? 'Close' : 'Open'} Team, ${peek.text}`}
+      aria-expanded={open}
+    >
+      <View style={styles.grab} />
+      <View style={styles.peekLine}>
+        <View style={[styles.dot, { backgroundColor: tone }]} />
+        <Text
+          style={[styles.peekText, peek.tone === 'question' && { color: tone }]}
+          numberOfLines={1}
+        >
+          {peek.text}
+        </Text>
+      </View>
+    </Pressable>
+  )
 }
 
 function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
@@ -88,83 +122,115 @@ function TabBar({
   )
 }
 
-/** The lead's Team and Inbox over its terminal, which keeps running beneath. */
-export function TeamDrawer({ visible, onClose, team, now, onOpenLink }: Props) {
+/** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that opens to 84%. */
+export function TeamSheet({ open, onOpenChange, team, now, onOpenLink }: Props) {
   const { view, questions } = team
+  const insets = useSafeAreaInsets()
+  const { height } = useWindowDimensions()
   // Why null until picked: each open lands on the Inbox while a question waits, else on the Team.
   const [picked, setPicked] = useState<TeamTab | null>(null)
+  if (!view) {
+    return null
+  }
   const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
+  const peek = teamPeekOf(
+    view,
+    questions.length,
+    questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : []))
+  )
   const close = (): void => {
     setPicked(null)
-    onClose()
+    onOpenChange(false)
   }
   return (
-    <RightDrawer visible={visible} onClose={close} fillPhone>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.heading}>Team</Text>
-          <Pressable
-            style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
-            onPress={close}
-            accessibilityRole="button"
-            accessibilityLabel="Close Team"
+    <View style={[styles.dock, { paddingBottom: insets.bottom }]}>
+      <PeekBar peek={peek} open={false} onPress={() => onOpenChange(true)} />
+      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
+        {/* Why no scrim: the lead's terminal stays readable above the sheet, as in V30. */}
+        <Pressable style={styles.above} onPress={close} accessible={false} />
+        <View style={[styles.dock, styles.sheet, { height: Math.round(height * 0.84) }]}>
+          <PeekBar peek={peek} open onPress={close} />
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}
           >
-            <X size={22} color={colors.textPrimary} />
-          </Pressable>
+            <TabBar active={tab} inboxCount={questions.length} onSelect={setPicked} />
+            {tab === 'inbox' ? (
+              <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
+            ) : (
+              <>
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>{`Members (${view.members.length})`}</Text>
+                  {view.members.length > 0 ? (
+                    view.members.map((member) => (
+                      <TeamMemberCard
+                        key={member.key}
+                        member={member}
+                        now={now}
+                        onOpenLink={onOpenLink}
+                      />
+                    ))
+                  ) : (
+                    <Text style={styles.empty}>No members running.</Text>
+                  )}
+                </View>
+                {view.metrics ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Metrics</Text>
+                    <MetricsSummary metrics={view.metrics} />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
         </View>
-        <TabBar active={tab} inboxCount={questions.length} onSelect={setPicked} />
-        {tab === 'inbox' ? (
-          <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
-        ) : (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{`Members (${view?.members.length ?? 0})`}</Text>
-              {view && view.members.length > 0 ? (
-                view.members.map((member) => (
-                  <TeamMemberCard key={member.key} member={member} onOpenLink={onOpenLink} />
-                ))
-              ) : (
-                <Text style={styles.empty}>No members running.</Text>
-              )}
-            </View>
-            {view?.metrics ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Metrics</Text>
-                <MetricsSummary metrics={view.metrics} />
-              </View>
-            ) : null}
-          </>
-        )}
-      </View>
-    </RightDrawer>
+      </Modal>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  // Why: RightDrawer's paddingRight is only the safe-area inset, 0 on most phones.
-  content: {
-    paddingRight: spacing.md
+  dock: {
+    backgroundColor: colors.bgPanel,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card
   },
-  header: {
+  peek: {
+    height: TEAM_PEEK_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7
+  },
+  grab: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted
+  },
+  peekLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm
+    gap: 7,
+    paddingHorizontal: spacing.lg
   },
-  heading: {
-    color: colors.textPrimary,
-    fontSize: typography.titleSize,
-    fontWeight: '700'
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
   },
-  close: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radii.button,
-    alignItems: 'center',
-    justifyContent: 'center'
+  peekText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize + 1
   },
-  closePressed: {
-    backgroundColor: colors.bgRaised
+  above: {
+    flex: 1
+  },
+  sheet: {
+    overflow: 'hidden'
+  },
+  content: {
+    paddingHorizontal: spacing.lg
   },
   section: {
     gap: spacing.sm,

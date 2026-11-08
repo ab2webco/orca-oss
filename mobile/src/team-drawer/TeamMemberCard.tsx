@@ -1,68 +1,122 @@
 import { Pressable, StyleSheet, View } from 'react-native'
+import type { CheckStatus } from '../../../src/shared/github/pull-request-types'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
-import type { TeamMemberRow } from './team-drawer-model'
+import { teamAgeText, type TeamMemberRow } from './team-drawer-model'
 
-const STATE_TONE: Record<TeamMemberRow['state'], string> = {
-  waiting: colors.statusAmber,
-  working: colors.statusGreen,
-  idle: colors.textMuted,
-  done: colors.statusPurple
+const STATE: Record<TeamMemberRow['state'], { text: string; tone: string }> = {
+  waiting: { text: 'Waiting for you', tone: colors.statusRed },
+  working: { text: 'Working', tone: colors.statusGreen },
+  idle: { text: 'Idle', tone: colors.textMuted },
+  done: { text: 'Done', tone: colors.statusPurple }
 }
 
-const CI_TONE: Record<string, string> = {
-  success: colors.statusGreen,
-  failure: colors.statusRed,
-  pending: colors.statusAmber
+const CI: Partial<Record<CheckStatus, { text: string; tone: string }>> = {
+  success: { text: 'CI green', tone: colors.statusGreen },
+  failure: { text: 'CI failing', tone: colors.statusRed },
+  pending: { text: 'CI running', tone: colors.statusAmber }
 }
 
-type Props = { member: TeamMemberRow; onOpenLink: (url: string) => void }
+/** What the member does now; a limit or a logout outranks its tool. */
+function statusOf(member: TeamMemberRow, now: number): { text: string; tone: string } {
+  if (member.needsYou) {
+    return { text: 'Waiting for your answer', tone: colors.statusRed }
+  }
+  if (member.limit) {
+    if (member.limit.loggedOut) {
+      return { text: 'Logged out', tone: colors.statusRed }
+    }
+    const resets = member.limit.resetsAt
+    return {
+      text:
+        resets && resets > now
+          ? `Usage limit · resets in ${teamAgeText(now, resets)}`
+          : 'Usage limit reached',
+      tone: colors.statusAmber
+    }
+  }
+  return { ...STATE[member.state], text: member.live ?? STATE[member.state].text }
+}
 
-export function TeamMemberCard({ member, onOpenLink }: Props) {
-  const tone = STATE_TONE[member.state]
-  const runner = [member.host ?? 'this host', member.agent, member.model]
+type Props = { member: TeamMemberRow; now: number; onOpenLink: (url: string) => void }
+
+export function TeamMemberCard({ member, now, onOpenLink }: Props) {
+  const status = statusOf(member, now)
+  const meta = [
+    member.model,
+    member.since === null ? null : teamAgeText(member.since, now),
+    member.ticketStatus
+  ]
     .filter(Boolean)
     .join(' · ')
   const pr = member.pr
+  const account = member.account
+  const ci = pr
+    ? pr.state === 'merged'
+      ? 'Merged'
+      : (CI[pr.ci as CheckStatus]?.text ?? null)
+    : null
+  const ciTone = CI[pr?.ci as CheckStatus]?.tone ?? colors.textMuted
   return (
     <View style={[styles.card, member.needsYou && styles.needsYou]}>
       <View style={styles.top}>
-        <Text style={styles.ticket} numberOfLines={1}>
-          {member.ticket ?? member.name}
+        <Text style={styles.name} numberOfLines={1}>
+          {member.name}
         </Text>
-        <View style={[styles.pill, { borderColor: tone }]}>
-          <Text style={[styles.pillLabel, { color: tone }]}>{member.state}</Text>
-        </View>
+        {member.ticket && member.ticket !== member.name ? (
+          <Text style={styles.mono}>{member.ticket}</Text>
+        ) : null}
+        <Text style={[styles.mono, styles.host]} numberOfLines={1}>
+          {member.host ?? 'local'}
+        </Text>
       </View>
-      <Text style={styles.title} numberOfLines={2}>
-        {member.title ?? member.name}
-      </Text>
-      <Text style={styles.meta} numberOfLines={1}>
-        {runner}
-      </Text>
-      {pr || member.ticketStatus ? (
-        <View style={styles.bottom}>
-          {pr ? (
-            <Pressable
-              style={styles.prButton}
-              onPress={() => onOpenLink(pr.url)}
-              accessibilityRole="link"
-              accessibilityLabel={`Open PR ${pr.number}, CI ${pr.ci}`}
+      <View style={styles.statusLine}>
+        <View style={[styles.dot, { backgroundColor: status.tone }]} />
+        <Text style={[styles.status, member.needsYou && { color: status.tone }]} numberOfLines={1}>
+          {status.text}
+        </Text>
+      </View>
+      {meta ? (
+        <Text style={styles.meta} numberOfLines={2}>
+          {meta}
+        </Text>
+      ) : null}
+      {account ? (
+        <Text style={styles.meta} numberOfLines={1}>
+          {account.usedPercent === null
+            ? account.email
+            : `${account.email} · ${account.usedPercent}%`}
+        </Text>
+      ) : null}
+      {pr ? (
+        <Pressable
+          style={styles.prButton}
+          onPress={() => onOpenLink(pr.url)}
+          accessibilityRole="link"
+          accessibilityLabel={`Open PR ${pr.number}${ci ? `, ${ci}` : ''}`}
+        >
+          <Text style={styles.prLabel}>{`PR #${pr.number}`}</Text>
+          {ci ? <Text style={[styles.ci, { color: ciTone }]}>{ci}</Text> : null}
+          {pr.ciHistory.length > 0 ? (
+            <View
+              style={styles.heads}
+              accessible
+              accessibilityLabel={`CI per push: ${pr.ciHistory.join(', ')}`}
             >
-              <Text style={styles.prLabel}>{`PR #${pr.number}`}</Text>
-              {pr.ci === 'none' ? null : (
-                <Text style={[styles.ci, { color: CI_TONE[pr.ci] ?? colors.textMuted }]}>
-                  {pr.state === 'merged' ? 'merged' : `CI ${pr.ci}`}
-                </Text>
-              )}
-            </Pressable>
+              {pr.ciHistory.slice(-6).map((head, index) => (
+                <View
+                  key={index}
+                  style={[styles.head, { backgroundColor: CI[head]?.tone ?? colors.textMuted }]}
+                />
+              ))}
+            </View>
           ) : null}
-          {member.ticketStatus ? (
-            <Text style={styles.meta} numberOfLines={1}>
-              {member.ticketStatus}
+          {pr.comments ? (
+            <Text style={styles.meta}>
+              {`${pr.comments} comment${pr.comments === 1 ? '' : 's'}`}
             </Text>
           ) : null}
-        </View>
+        </Pressable>
       ) : null}
     </View>
   )
@@ -73,7 +127,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
     borderRadius: radii.card,
-    backgroundColor: colors.bgPanel,
+    backgroundColor: colors.bgBase,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle
   },
@@ -83,44 +137,49 @@ const styles = StyleSheet.create({
   },
   top: {
     flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm
+  },
+  name: {
+    flexShrink: 1,
+    color: colors.textPrimary,
+    fontSize: typography.bodySize + 1,
+    fontWeight: '600'
+  },
+  mono: {
+    color: colors.textMuted,
+    fontFamily: typography.monoFamily,
+    fontSize: typography.metaSize
+  },
+  host: {
+    flex: 1,
+    textAlign: 'right'
+  },
+  statusLine: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm
   },
-  ticket: {
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
+  },
+  status: {
     flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.bodySize,
-    fontWeight: '700'
-  },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1
-  },
-  pillLabel: {
-    fontSize: typography.metaSize,
-    fontWeight: '600'
-  },
-  title: {
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     fontSize: typography.bodySize
   },
   meta: {
     color: colors.textMuted,
     fontSize: typography.metaSize
   },
-  bottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm
-  },
   prButton: {
     minHeight: MIN_TOUCH_TARGET,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: spacing.sm
+    columnGap: spacing.sm
   },
   prLabel: {
     color: colors.accentBlue,
@@ -130,5 +189,14 @@ const styles = StyleSheet.create({
   ci: {
     fontSize: typography.metaSize,
     fontWeight: '600'
+  },
+  heads: {
+    flexDirection: 'row',
+    gap: 3
+  },
+  head: {
+    width: 6,
+    height: 6,
+    borderRadius: 3
   }
 })

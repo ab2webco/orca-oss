@@ -281,8 +281,7 @@ import { leadMemberRoute, leadPaneKeyOf } from '../../../../src/session/lead-mem
 import { LeadMembersStrip } from '../../../../src/session/LeadMembersStrip'
 import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
-import { TeamDrawer } from '../../../../src/team-drawer/TeamDrawer'
-import { TeamHeaderButton } from '../../../../src/team-drawer/TeamHeaderButton'
+import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
 import { openMobilePrUrl } from '../../../../src/components/mobile-pr-url'
 import { useNow } from '../../../../src/hooks/use-now'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
@@ -4204,12 +4203,15 @@ export default function SessionScreen() {
         : MOBILE_SESSION_STATUS_LABELS[connState]
 
   // Why: iOS keyboard height includes the home-indicator inset; Android IME height does not.
-  const keyboardLift =
+  const rawKeyboardLift =
     keyboardHeight > 0
       ? Platform.OS === 'ios'
         ? Math.max(0, keyboardHeight - insets.bottom)
         : keyboardHeight
       : 0
+  // Why: the Team sheet's peek sits under the dock, holds the bottom inset, and the keyboard covers it.
+  const commandDockInset = team.view ? 0 : insets.bottom
+  const keyboardLift = Math.max(0, rawKeyboardLift - (team.view ? TEAM_PEEK_HEIGHT : 0))
   const activeTerminalKeyboardLift = computeActiveTerminalKeyboardLift({
     keyboardLift,
     metrics: activeHandle ? terminalKeyboardMetrics.get(activeHandle) : undefined,
@@ -4386,9 +4388,6 @@ export default function SessionScreen() {
                 </Text>
               </Pressable>
             </View>
-            {team.view ? (
-              <TeamHeaderButton badge={team.badge} onPress={() => setTeamOpen(true)} />
-            ) : null}
             {!isFloatingWorkspaceRoute && (
               <MobileSessionHeaderIconButton
                 active={activePanel === 'files'}
@@ -4710,7 +4709,7 @@ export default function SessionScreen() {
               <View
                 style={[
                   styles.commandDock,
-                  { paddingBottom: insets.bottom, transform: [{ translateY: -keyboardLift }] }
+                  { paddingBottom: commandDockInset, transform: [{ translateY: -keyboardLift }] }
                 ]}
               >
                 <TerminalAccessoryBar
@@ -4866,6 +4865,13 @@ export default function SessionScreen() {
                 )}
               </View>
             )}
+            <TeamSheet
+              open={teamOpen}
+              onOpenChange={setTeamOpen}
+              team={team}
+              now={teamNow}
+              onOpenLink={openMobilePrUrl}
+            />
           </View>
           {canDockPanel && activePanel !== null && (
             <SessionDockColumn
@@ -4881,14 +4887,6 @@ export default function SessionScreen() {
           )}
         </View>
       </View>
-
-      <TeamDrawer
-        visible={teamOpen && team.view !== null}
-        onClose={() => setTeamOpen(false)}
-        team={team}
-        now={teamNow}
-        onOpenLink={openMobilePrUrl}
-      />
 
       <MobileSessionHeaderMoreActionsSheet
         visible={showHeaderMoreActions}
