@@ -5044,8 +5044,10 @@ export class OrcaRuntimeService {
           continue
         }
         originalSessions.set(hostId, originalSessions.get(hostId) ?? session)
+        // Why: an adopted agent's tab is the user's; its dispatch ends, the tab and its resume stay (ORCA-1141).
+        const keepsTab = resolution === 'exited' && !candidate.terminalOwned
         let next =
-          resolution === 'exited'
+          resolution === 'exited' && !keepsTab
             ? retireTerminalSurfaceFromPersistence(session, {
                 worktreeId: candidate.worktreeId,
                 parentTabId: candidate.tabId,
@@ -5058,6 +5060,10 @@ export class OrcaRuntimeService {
         if (record && runtimeWorktreeIdsEqual(record.worktreeId, candidate.worktreeId)) {
           const sleepingAgentSessionsByPaneKey = { ...next.sleepingAgentSessionsByPaneKey }
           delete sleepingAgentSessionsByPaneKey[candidate.paneKey]
+          if (keepsTab) {
+            const { automaticResumeBlockedBy: _fence, ...unfenced } = record
+            sleepingAgentSessionsByPaneKey[candidate.paneKey] = unfenced
+          }
           next = { ...next, sleepingAgentSessionsByPaneKey }
         }
         if (next !== session) {
@@ -5511,7 +5517,9 @@ export class OrcaRuntimeService {
         adoptedDispatchIds.push(candidate.dispatchId)
         continue
       }
-      this.rollbackLegacyWorkerTerminalSurface(candidate)
+      if (candidate.terminalOwned) {
+        this.rollbackLegacyWorkerTerminalSurface(candidate)
+      }
       if (!this.reconcileMissingLegacyWorkerTerminal(candidate)) {
         deferredDispatchIds.add(candidate.dispatchId)
         continue
