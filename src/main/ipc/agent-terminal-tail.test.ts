@@ -109,6 +109,23 @@ describe('createAgentTerminalTailReader', () => {
     })
   })
 
+  // ORCA-1142: CI's 390 window left the pane 11 columns wide, so a long token's head sat past the lookback.
+  it('reads back to the head of a token wrapped over more rows than the lookback', async () => {
+    const line = `> check dcap_${'QXJZ'.repeat(54)} --type heartbeat`
+    const screen = ['$ cat brief', ...(line.match(/.{1,11}/g) ?? []), 'y'.repeat(11), '$']
+    const limits: number[] = []
+    const read = createAgentTerminalTailReader(
+      runtimeReading(async (_ptyId, limit) => {
+        limits.push(limit)
+        return screen.slice(-limit)
+      })
+    )
+    const [reading] = await read(['a'], 8)
+    expect(reading.tail.read && reading.tail.lines.join('\n')).not.toMatch(/dcap|[QXJZ]{3}/)
+    expect(reading.tail.read && reading.tail.lines.at(-1)).toBe('$')
+    expect(Math.max(...limits)).toBeLessThan(200)
+  })
+
   it('hides a Claude OAuth token that printenv wrapped across rows (ORCA-1039)', async () => {
     const token = `sk-ant-oat01-${'QXJZ'.repeat(24)}`.slice(0, 108)
     const line = `CLAUDE_CODE_OAUTH_TOKEN=${token}`
