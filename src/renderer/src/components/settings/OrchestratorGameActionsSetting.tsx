@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import {
-  GAME_ACTIONS_MAX,
-  parseGameActions,
-  type OrchestratorGameAction
-} from '../../../../shared/orchestrator-game-actions'
+import { GAME_ACTIONS_MAX, parseGameActions } from '../../../../shared/orchestrator-game-actions'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
-import { withOrchestratorGameProjectActions } from '../../../../shared/orchestrator-game-settings-updates'
+import {
+  parseGameOrcaActions,
+  type GameOrcaActionId
+} from '../../../../shared/orchestrator-game-orca-actions'
+import {
+  withOrchestratorGameProjectActions,
+  withOrchestratorGameProjectOrcaActions
+} from '../../../../shared/orchestrator-game-settings-updates'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Textarea } from '../ui/textarea'
-import { SettingsSegmentedControl, SettingsSubsectionHeader } from './SettingsFormControls'
+import { TeamActionIcon } from '../team-panel/team-action-icons'
+import { useTeamLeadPrompt } from '../team-panel/use-team-lead-prompt'
+import { GameActionForm, type GameActionFormState } from './GameActionForm'
+import { OrcaActionSettingsRow, ProjectActionRow } from './GameActionRows'
 import {
   EMPTY_ACTION_DRAFT,
   actionDraftOf,
@@ -19,214 +22,30 @@ import {
   type ActionDraft,
   type ActionDraftProblem
 } from './orchestrator-game-action-drafts'
+import {
+  GAME_ACTION_PICKER_ICONS,
+  isCommandTaken,
+  movedUp,
+  orcaActionRowsOf,
+  withNewActionFirst,
+  withOrcaEnabled,
+  withOrcaWords,
+  withPinToggled
+} from './orchestrator-game-action-list'
+import { gameActionTemplates } from './orchestrator-game-action-templates'
+import { takeNewGameActionRequest } from './game-actions-settings-intent'
+import { getRepositoryGameActionsSectionId } from './repository-settings-targets'
 import { translate } from '@/i18n/i18n'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGameProjects'>
+// Why: V30 starts a new action on the picker's first icon, upload, already chosen.
+const NEW_ACTION_DRAFT: ActionDraft = { ...EMPTY_ACTION_DRAFT, icon: GAME_ACTION_PICKER_ICONS[0] }
+type Target = number | 'new' | GameOrcaActionId
+type Form = { target: Target; state: GameActionFormState }
 
-// Why: icon and pin are set by the panel's own controls, not typed into a box.
-type TextField = Exclude<keyof ActionDraft, 'icon' | 'pin' | 'kind'>
+const HEAD = 'mb-0.5 mt-4 text-xs font-medium text-muted-foreground/70'
 
-const problemText = (problem: ActionDraftProblem): string =>
-  ({
-    label: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.labelInvalid',
-      'Use 1 to 24 characters.'
-    ),
-    command: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.commandInvalid',
-      'Use a lowercase name like test-runs, up to 24 characters.'
-    ),
-    commandTaken: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.commandTaken',
-      'A lead button or another action already uses this command.'
-    ),
-    key: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.keyInvalid',
-      'Use one letter or digit the Panel does not use (r p q g t i o c w a, 1-9), once per action.'
-    ),
-    prompt: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.promptInvalid',
-      'Write a prompt of 1 to 2000 characters, with only the placeholders orca.yaml allows.'
-    ),
-    mcp: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.mcpInvalid',
-      'Name the MCP server and a tool like list_test_runs.'
-    ),
-    args: translate(
-      'auto.components.settings.OrchestratorGameActionsSetting.argsInvalid',
-      'Arguments must be a JSON object, like {"project": "CIN"}.'
-    )
-  })[problem]
-
-const PROBLEM_FIELDS = new Map<ActionDraftProblem, readonly (keyof ActionDraft)[]>([
-  ['label', ['label']],
-  ['command', ['command']],
-  ['commandTaken', ['command']],
-  ['key', ['key']],
-  ['prompt', ['prompt']],
-  ['mcp', ['server', 'tool']],
-  ['args', ['args']]
-])
-
-const summaryOf = (action: OrchestratorGameAction): string =>
-  'prompt' in action ? action.prompt : `${action.mcp.server} · ${action.mcp.tool}`
-
-function ActionRow({
-  draft,
-  index,
-  problem,
-  onChange,
-  onRemove
-}: {
-  draft: ActionDraft
-  index: number
-  problem: ActionDraftProblem | null
-  onChange: (next: ActionDraft) => void
-  onRemove: () => void
-}): React.JSX.Element {
-  const n = index + 1
-  const field = (key: TextField, label: string, placeholder: string, mono = false) => (
-    <Input
-      aria-label={`${label} ${n}`}
-      aria-invalid={problem !== null && (PROBLEM_FIELDS.get(problem) ?? []).includes(key)}
-      value={draft[key]}
-      placeholder={placeholder}
-      spellCheck={false}
-      className={`h-8 min-w-0 text-xs md:text-xs ${mono ? 'font-mono' : ''}`}
-      onChange={(event) => onChange({ ...draft, [key]: event.currentTarget.value })}
-    />
-  )
-  return (
-    <div data-slot="game-action-row" className="space-y-2 rounded-md border border-border p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        {field(
-          'label',
-          translate('auto.components.settings.OrchestratorGameActionsSetting.label', 'Label'),
-          translate(
-            'auto.components.settings.OrchestratorGameActionsSetting.labelPlaceholder',
-            'Test runs'
-          )
-        )}
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="text-xs text-muted-foreground">/</span>
-          {/* Why a flex-1 wrapper: beside the fixed key box the input would shrink to nothing. */}
-          <div className="min-w-0 flex-1">
-            {field(
-              'command',
-              translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.command',
-                'Command'
-              ),
-              translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.commandPlaceholder',
-                'test-runs'
-              ),
-              true
-            )}
-          </div>
-          <div className="w-12 shrink-0">
-            {field(
-              'key',
-              translate('auto.components.settings.OrchestratorGameActionsSetting.key', 'Key'),
-              translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.keyPlaceholder',
-                'x'
-              ),
-              true
-            )}
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-2 sm:col-span-2 xl:col-span-1">
-          <SettingsSegmentedControl
-            value={draft.kind}
-            ariaLabel={`${translate('auto.components.settings.OrchestratorGameActionsSetting.kind', 'Kind')} ${n}`}
-            size="sm"
-            options={[
-              {
-                value: 'prompt',
-                label: translate(
-                  'auto.components.settings.OrchestratorGameActionsSetting.kindPrompt',
-                  'Prompt'
-                )
-              },
-              {
-                value: 'mcp',
-                label: translate(
-                  'auto.components.settings.OrchestratorGameActionsSetting.kindMcp',
-                  'MCP'
-                )
-              }
-            ]}
-            onChange={(kind) => onChange({ ...draft, kind })}
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`${translate('auto.components.settings.OrchestratorGameActionsSetting.remove', 'Remove action')} ${n}`}
-            onClick={onRemove}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      </div>
-      {draft.kind === 'prompt' ? (
-        <Textarea
-          aria-label={`${translate('auto.components.settings.OrchestratorGameActionsSetting.prompt', 'Prompt')} ${n}`}
-          aria-invalid={problem === 'prompt'}
-          value={draft.prompt}
-          rows={2}
-          placeholder={translate(
-            'auto.components.settings.OrchestratorGameActionsSetting.promptPlaceholder',
-            'Have members run the Tambora test runs of my QA tickets'
-          )}
-          className="min-h-14 text-xs md:text-xs"
-          onChange={(event) => onChange({ ...draft, prompt: event.currentTarget.value })}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {field(
-            'server',
-            translate(
-              'auto.components.settings.OrchestratorGameActionsSetting.server',
-              'MCP server'
-            ),
-            'tambora'
-          )}
-          {field(
-            'tool',
-            translate('auto.components.settings.OrchestratorGameActionsSetting.tool', 'Tool'),
-            'list_test_runs',
-            true
-          )}
-          <div className="sm:col-span-2">
-            {field(
-              'args',
-              translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.args',
-                'Arguments (JSON)'
-              ),
-              '{"project": "CIN"}',
-              true
-            )}
-          </div>
-        </div>
-      )}
-      {problem !== null ? (
-        <p role="alert" className="text-xs text-destructive">
-          {problemText(problem)}
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-type Row = { id: number; draft: ActionDraft }
-
-let nextRowId = 0
-const rowsOf = (drafts: readonly ActionDraft[]): Row[] =>
-  drafts.map((draft) => ({ id: (nextRowId += 1), draft }))
-
-/** This machine's actions for the project; a saved list replaces orca.yaml's whole. */
+/** Prototype V30's Settings > Actions: the project's buttons and Orca's, saved on this machine. */
 export function ProjectOrchestratorGameActionsSetting({
   repoId,
   settings,
@@ -238,143 +57,258 @@ export function ProjectOrchestratorGameActionsSetting({
   projectLayer: OrchestratorGameLayer | undefined
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
-  const rawLocal = settings.orchestratorGameProjects?.[repoId]?.actions
-  const local = rawLocal === undefined ? undefined : (parseGameActions(rawLocal).value ?? [])
-  const yaml = projectLayer?.actions ?? []
-  // Why ids: a removed row must take its own inputs with it, not shift the next row's into place.
-  const [rows, setRows] = useState<Row[] | null>(
-    local === undefined ? null : rowsOf(local.map(actionDraftOf))
+  const localLayer = settings.orchestratorGameProjects?.[repoId]
+  const local =
+    localLayer?.actions === undefined
+      ? undefined
+      : (parseGameActions(localLayer.actions).value ?? [])
+  const list = (local ?? projectLayer?.actions ?? []).map(actionDraftOf)
+  const source =
+    local === undefined ? 'orca.yaml' : translate('settings.gameActions.machine', 'This machine')
+  const localOrca = parseGameOrcaActions(localLayer?.orcaActions).value
+  const orcaRows = orcaActionRowsOf(projectLayer?.orcaActions, localOrca)
+  // Why a lazy initial state: the dock's request is read once, on the first render.
+  const [form, setForm] = useState<Form | null>(() =>
+    takeNewGameActionRequest(repoId)
+      ? {
+          target: 'new',
+          state: { draft: NEW_ACTION_DRAFT, isNew: true, orca: false, commandTouched: false }
+        }
+      : null
   )
-  const drafts = rows?.map((row) => row.draft) ?? null
-  const { actions, problems } = actionsOfDrafts(drafts ?? [])
-  const saved = JSON.stringify(local ?? null)
-  const save = (next: OrchestratorGameAction[] | undefined): void =>
+  const [problem, setProblem] = useState<ActionDraftProblem | null>(null)
+  const [pinFull, setPinFull] = useState(false)
+  const sendToLead = useTeamLeadPrompt()
+
+  const saveList = (drafts: ActionDraft[], at: number): boolean => {
+    const { actions, problems } = actionsOfDrafts(drafts)
+    if (actions === null) {
+      setProblem(problems[at] ?? problems.find((one) => one !== null) ?? null)
+      return false
+    }
     updateSettings({
       orchestratorGameProjects: withOrchestratorGameProjectActions(
         settings.orchestratorGameProjects,
         repoId,
-        next
+        actions
       )
     })
-  const inherit = (): void => {
-    setRows(null)
-    if (local !== undefined) {
-      save(undefined)
+    return true
+  }
+  const open = (target: Target, draft: ActionDraft, orca = false): void => {
+    setProblem(null)
+    const isNew = target === 'new'
+    setForm({
+      target,
+      state: { draft, isNew, orca, commandTouched: !isNew || draft.command !== '' }
+    })
+  }
+  const save = (): void => {
+    if (!form) {
+      return
+    }
+    const { target, state } = form
+    if (typeof target === 'string' && target !== 'new') {
+      const next = withOrcaWords(localOrca, target, state.draft)
+      if (next === 'prompt' || next === 'label') {
+        setProblem(next)
+        return
+      }
+      updateSettings({
+        orchestratorGameProjects: withOrchestratorGameProjectOrcaActions(
+          settings.orchestratorGameProjects,
+          repoId,
+          next
+        )
+      })
+      setForm(null)
+      return
+    }
+    const command = state.draft.command.trim()
+    if (state.draft.label.trim() === '' || command === '') {
+      setProblem(state.draft.label.trim() === '' ? 'label' : 'command')
+      return
+    }
+    if (isCommandTaken(list, target, command)) {
+      setProblem('commandTaken')
+      return
+    }
+    const drafts =
+      target === 'new'
+        ? withNewActionFirst(list, state.draft)
+        : list.map((one, at) => (at === target ? state.draft : one))
+    if (saveList(drafts, target === 'new' ? 0 : target)) {
+      setForm(null)
     }
   }
+  const formFor = (target: Target): React.JSX.Element | null =>
+    form?.target === target ? (
+      <GameActionForm
+        state={form.state}
+        problem={problem}
+        onChange={(state) => setForm({ target, state })}
+        onSave={save}
+        onCancel={() => setForm(null)}
+        onRemove={
+          typeof target === 'number'
+            ? () => {
+                saveList(
+                  list.filter((_, at) => at !== target),
+                  0
+                )
+                setForm(null)
+              }
+            : null
+        }
+      />
+    ) : null
+  const full = list.length >= GAME_ACTIONS_MAX
+  const templates = gameActionTemplates().filter(
+    (one) => !list.some((action) => action.command === one.command)
+  )
+  const setupLabel = translate('settings.gameActions.setup', 'Create with setup')
 
   return (
-    <div data-slot="game-actions-settings" className="space-y-2 pt-3">
-      <SettingsSubsectionHeader
-        title={translate(
-          'auto.components.settings.OrchestratorGameActionsSetting.title',
-          'Actions'
-        )}
-        description={translate(
-          'auto.components.settings.OrchestratorGameActionsSetting.description',
-          'Buttons in the band and the Panel, each also a slash command. A list saved here replaces the one in orca.yaml on this machine.'
-        )}
-      />
-      {drafts === null ? (
-        <div className="space-y-2">
-          {yaml.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.yamlEmpty',
-                'orca.yaml sets no actions for this project.'
-              )}
-            </p>
-          ) : (
-            <ul
-              className="space-y-1"
-              aria-label={translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.yamlList',
-                'Actions from orca.yaml'
-              )}
-            >
-              {yaml.map((action, at) => (
-                <li
-                  key={`${action.label}-${at}`}
-                  className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs"
-                >
-                  <span className="font-medium">{action.label}</span>
-                  {action.command ? (
-                    <span className="font-mono text-muted-foreground">/{action.command}</span>
-                  ) : null}
-                  <span className="min-w-0 truncate text-muted-foreground">
-                    {summaryOf(action)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRows(rowsOf(yaml.map(actionDraftOf)))}
-          >
+    <div
+      id={getRepositoryGameActionsSectionId(repoId)}
+      data-slot="game-actions-settings"
+      className="pt-3"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-t border-border pb-2.5 pt-4">
+        <div className="min-w-0 flex-[1_1_240px]">
+          <b className="block text-sm font-medium">
+            {translate('settings.gameActions.title', 'Actions')}
+          </b>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {translate(
-              'auto.components.settings.OrchestratorGameActionsSetting.override',
-              'Edit on this machine'
+              'settings.gameActions.description',
+              "Orca's own show up on their own when they apply; yours go in the row or in ⋯. /orca-game:setup writes them to orca.yaml; what you change here stays on this machine."
             )}
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7"
+            disabled={!sendToLead}
+            title={
+              sendToLead
+                ? undefined
+                : translate('settings.gameActions.setupNoLead', 'Start the lead first')
+            }
+            onClick={() => void sendToLead?.('setup', '/orca-game:setup', setupLabel)}
+          >
+            {setupLabel}
+          </Button>
+          <Button
+            size="sm"
+            className="h-7"
+            disabled={full}
+            onClick={() => open('new', NEW_ACTION_DRAFT)}
+          >
+            {translate('settings.gameActions.new', 'New action')}
           </Button>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {(rows ?? []).map((row, index) => (
-            <ActionRow
-              key={row.id}
-              draft={row.draft}
-              index={index}
-              problem={problems[index] ?? null}
-              onChange={(next) =>
-                setRows(
-                  (rows ?? []).map((one) => (one.id === row.id ? { ...one, draft: next } : one))
-                )
-              }
-              onRemove={() => setRows((rows ?? []).filter((one) => one.id !== row.id))}
-            />
+      </div>
+      {formFor('new')}
+      {!full && templates.length > 0 && form?.target !== 'new' ? (
+        <div className="flex flex-wrap items-center gap-1 pb-0.5 pt-2.5 text-xs text-muted-foreground">
+          <span className="mr-1">{translate('settings.gameActions.startWith', 'Start with')}</span>
+          {templates.map((one) => (
+            <button
+              key={one.command}
+              type="button"
+              className="inline-flex h-[22px] items-center gap-1.5 rounded-[5px] bg-muted px-[7px] text-xs text-foreground hover:bg-accent"
+              onClick={() => open('new', { ...EMPTY_ACTION_DRAFT, ...one })}
+            >
+              <TeamActionIcon icon={one.icon} />
+              <span>{one.label}</span>
+            </button>
           ))}
-          {drafts.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.noneHere',
-                'No actions on this machine.'
-              )}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={drafts.length >= GAME_ACTIONS_MAX}
-              onClick={() => setRows([...(rows ?? []), ...rowsOf([EMPTY_ACTION_DRAFT])])}
-            >
-              <Plus />
-              {translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.add',
-                'Add action'
-              )}
-            </Button>
-            <Button
-              size="sm"
-              disabled={actions === null || JSON.stringify(actions) === saved}
-              onClick={() => actions !== null && save(actions)}
-            >
-              {translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.save',
-                'Save actions'
-              )}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={inherit}>
-              {translate(
-                'auto.components.settings.OrchestratorGameActionsSetting.inherit',
-                'Inherit from orca.yaml'
-              )}
-            </Button>
-          </div>
         </div>
-      )}
+      ) : null}
+      <div className={HEAD}>
+        {translate('settings.gameActions.projectHead', 'This project · {{count}} of {{max}}', {
+          count: list.length,
+          max: GAME_ACTIONS_MAX
+        })}
+      </div>
+      {list.map((draft, at) => (
+        <div key={`${draft.command}-${draft.label}-${at}`}>
+          <ProjectActionRow
+            draft={draft}
+            first={at === 0}
+            source={source}
+            onUp={() => saveList(movedUp(list, at), at)}
+            onEdit={() => open(at, draft)}
+            onPin={() => {
+              const next = withPinToggled(list, at)
+              setPinFull(next === 'full')
+              if (next !== 'full') {
+                saveList(next, at)
+              }
+            }}
+          />
+          {formFor(at)}
+        </div>
+      ))}
+      {pinFull ? (
+        <p className="mt-1.5 text-xs text-destructive">
+          {translate(
+            'settings.gameActions.pinFull',
+            'The row holds 3 of your actions. Turn another off first.'
+          )}
+        </p>
+      ) : null}
+      {local !== undefined ? (
+        <button
+          type="button"
+          className="mt-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          onClick={() =>
+            updateSettings({
+              orchestratorGameProjects: withOrchestratorGameProjectActions(
+                settings.orchestratorGameProjects,
+                repoId,
+                undefined
+              )
+            })
+          }
+        >
+          {translate('settings.gameActions.inherit', "Use orca.yaml's list again")}
+        </button>
+      ) : null}
+      <div className={HEAD}>{translate('settings.gameActions.orcaHead', 'From Orca')}</div>
+      {orcaRows.map((row) => (
+        <div key={row.id}>
+          <OrcaActionSettingsRow
+            row={row}
+            onEdit={() =>
+              open(
+                row.id,
+                {
+                  ...EMPTY_ACTION_DRAFT,
+                  label: row.label,
+                  command: row.id,
+                  icon: row.icon,
+                  prompt: row.prompt
+                },
+                true
+              )
+            }
+            onToggle={() =>
+              updateSettings({
+                orchestratorGameProjects: withOrchestratorGameProjectOrcaActions(
+                  settings.orchestratorGameProjects,
+                  repoId,
+                  withOrcaEnabled(localOrca, projectLayer?.orcaActions, row.id, !row.enabled)
+                )
+              })
+            }
+          />
+          {formFor(row.id)}
+        </div>
+      ))}
     </div>
   )
 }
