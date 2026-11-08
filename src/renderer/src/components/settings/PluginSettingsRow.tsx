@@ -113,8 +113,13 @@ export function PluginSettingsRow({
     plugin.status === 'restarting' ||
     plugin.status === 'idle' ||
     plugin.status === 'errored'
+  // Why: a row that cannot start must not offer a live toggle (ORCA-1131).
   const switchDisabled =
-    busy || needsReview || plugin.status === 'invalid' || Boolean(plugin.blockedByKillList)
+    busy ||
+    needsReview ||
+    plugin.status === 'invalid' ||
+    Boolean(plugin.blockedByKillList) ||
+    Boolean(plugin.blockedByDevSharedVault)
 
   // Why: the wide primary action ("Review & enable") renders on its own footer
   // row so it never wraps the compact toggle + overflow cluster to an
@@ -248,7 +253,18 @@ export function PluginSettingsRow({
               </span>
             </p>
           ) : null}
-          {plugin.error ? (
+          {plugin.blockedByDevSharedVault ? (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-destructive">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">
+                {translate(
+                  'auto.components.settings.PluginSettingsRow.devSharedVaultMessage',
+                  "Not started: this dev build's accounts folder is another install's account vault, and this plugin can run processes that rewrite it. Start the dev build with {{value0}} to run it.",
+                  { value0: 'ORCA_DEV_SHARED_VAULT_PLUGINS=1' }
+                )}
+              </span>
+            </p>
+          ) : plugin.error ? (
             <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-destructive">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
               <span>

@@ -11,6 +11,7 @@ import type {
 import type { TeamArcadeActions } from './TeamArcadeSection'
 import { TeamTabContent } from './TeamTabContent'
 import { TeamScenePainterContext } from '../team-scene/team-scene-painter-context'
+import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 import type { TeamScenePainter } from '../team-scene/team-scene-painter'
 import { recordingContext } from '../team-scene/team-scene-recording-context'
 
@@ -119,7 +120,8 @@ async function render(
   selectTab = vi.fn(),
   arcadeActions: TeamArcadeActions | null = null,
   openTasks = vi.fn(),
-  painter: TeamScenePainter | null = null
+  painter: TeamScenePainter | null = null,
+  sceneLeadLine: string | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -128,14 +130,16 @@ async function render(
   await act(async () => {
     root.render(
       <TeamScenePainterContext.Provider value={painter}>
-        <TeamTabContent
-          model={value}
-          look={look}
-          selectTab={selectTab}
-          now={NOW}
-          arcadeActions={arcadeActions}
-          onOpenTasks={openTasks}
-        />
+        <TeamSceneLeadLineContext.Provider value={sceneLeadLine}>
+          <TeamTabContent
+            model={value}
+            look={look}
+            selectTab={selectTab}
+            now={NOW}
+            arcadeActions={arcadeActions}
+            onOpenTasks={openTasks}
+          />
+        </TeamSceneLeadLineContext.Provider>
       </TeamScenePainterContext.Provider>
     )
   })
@@ -167,8 +171,8 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Lead')
     expect(card.querySelector('svg[data-crown]')).not.toBeNull()
     expect(card.textContent).toContain('local')
-    expect(card.textContent).toContain('gh pr checks 923')
-    expect(card.textContent).not.toContain('Bash')
+    // ORCA-1129: a command reads as every tool label does.
+    expect(card.textContent).toContain('Bash · gh pr checks 923')
     expect(card.textContent).toContain('Opus 5.5 · high')
     expect(card.textContent).toContain('Coordinates 1 agent')
   })
@@ -218,6 +222,19 @@ describe('TeamTabContent', () => {
       expect(meta.className).toContain('flex-wrap')
       expect(meta.className).not.toContain('truncate')
     }
+  })
+
+  // ORCA-1139 lead review: when the scene has no room for the lead's bubble, its card shows the line.
+  it("shows the lead's whole scene line in its card only while the scene has no room for its bubble", async () => {
+    const line = 'Waiting for you · Merge #923 now that the Windows check is green?'
+    const { container } = await render(model(), 'game', vi.fn(), null, vi.fn(), null, line)
+    const shown = leadCard(container).querySelector<HTMLElement>('[data-team-lead-line]')
+    expect(shown?.textContent).toBe(line)
+    expect(shown?.className).not.toContain('truncate')
+    expect(shown?.className).toContain('[overflow-wrap:anywhere]')
+
+    const fits = await render(model())
+    expect(leadCard(fits.container).querySelector('[data-team-lead-line]')).toBeNull()
   })
 
   it('sets the model in mono, as V28 does', async () => {
@@ -406,11 +423,11 @@ describe('TeamTabContent', () => {
     )
   })
 
-  it('shows XP only in the Game look and only when rewards report it', async () => {
+  // Why none here: the level moved under the project name, above the tabs, as V28 draws it (ORCA-1094).
+  it('leaves XP to the panel header, in either look', async () => {
     const xp = { level: 11, into: 240, need: 1100 }
-    expect((await render(model({ xp }))).container.textContent).toContain('240/1100 XP')
+    expect((await render(model({ xp }))).container.textContent).not.toContain('XP')
     expect((await render(model({ xp }), 'display')).container.textContent).not.toContain('XP')
-    expect((await render(model())).container.textContent).not.toContain('XP')
   })
 
   it('says when the lead has no members yet', async () => {

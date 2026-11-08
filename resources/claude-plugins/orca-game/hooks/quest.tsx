@@ -12,7 +12,7 @@ import {
 import { activityOf, cardKeyOf, isHumanOrigin, isWorkingNote, noteKey } from './quest-policy'
 import {
   headingNameOf,
-  headingRuleWidthOf,
+  headingFitOf,
   headingTimeOf,
   isQuestionToPerson,
   messageHeadingOf,
@@ -37,13 +37,13 @@ import { forgetFrames, rememberFrame } from './frame-gate'
 import { isSceneMode } from './quest-policy'
 import { dropScenes } from './flat-toggle'
 import { shownSpeaker } from './quest-state'
+import { storeHead, storedHeadOf, type MessageHead } from './message-heads'
+import { terminalPalette } from './terminal-palette'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
-// Why a named color: the terminal's own red reads on dark and light themes alike.
-const NEEDS_YOU_COLOR = 'red'
 
 // Why: `game state` knows only Orca's layers, so a /quest value it does not report says it is this pane's.
 const shownSetting = (key: 'mode' | 'render'): string => {
@@ -193,7 +193,7 @@ const isToolLineShown = (): boolean => gameConfig().mode !== 'zen'
 
 function toolLine($: EngineInterface, e: RenderInput, text: string) {
   const { Text } = $.ui.resolve(e)
-  return <Text dimColor>{`▸ ${text}`}</Text>
+  return <Text color={terminalPalette().dim}>{`▸ ${text}`}</Text>
 }
 
 const registerQuietRows = (on: On) => {
@@ -239,6 +239,17 @@ async function firstHeadOf($: EngineInterface): Promise<{ phase: ScenePhase; tim
   }
 }
 
+// Why the store first: a resumed session never timed the turns its earlier blocks were written in.
+async function headOf($: EngineInterface, key: string): Promise<MessageHead> {
+  const stored = await storedHeadOf($, key).catch(() => undefined)
+  if (stored !== undefined) {
+    return stored
+  }
+  const head = await firstHeadOf($)
+  await storeHead($, key, head).catch(() => undefined)
+  return head
+}
+
 // Why no frame or padding: a terminal selection copies every cell of the row, border included.
 const registerCards = (on: On) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
@@ -257,29 +268,31 @@ const registerCards = (on: On) => {
       return drawn
     }
     const cardKey = cardKeyOf(e.requestId, e.props.text)
-    const head = quest.cardHeads.get(cardKey) ?? (await firstHeadOf($))
+    const head = quest.cardHeads.get(cardKey) ?? (await headOf($, key))
     quest.cardHeads.set(cardKey, head)
     const name = headingNameOf(
       shownSpeaker(),
       localizedNameOf(currentScene().cards[head.phase].name)
     )
     const heading = messageHeadingOf(name, head.phase, isQuestion, messageHeadingWords())
-    const rule = headingRuleWidthOf(heading, head.time, e.viewport?.columns ?? 80)
-    const color = isQuestion ? NEEDS_YOU_COLOR : undefined
+    const fit = headingFitOf(heading, head.time, e.viewport?.columns ?? 80)
+    const palette = terminalPalette()
     const { Box, Text } = $.ui.resolve(e)
     // Why a top margin only: an empty row copies as nothing, and it parts the heading from the prompt.
     // Why struck spaces for the rule: a selection copies them as blanks, never as line glyphs.
     return (
       <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row">
-          <Text bold color={color}>
+          <Text bold color={isQuestion ? palette.ask : palette.head} wrap="truncate-end">
             {heading}
           </Text>
-          <Text> </Text>
-          <Text color={color} dimColor strikethrough>
-            {' '.repeat(rule)}
-          </Text>
-          {head.time === '' ? null : <Text dimColor>{` ${head.time}`}</Text>}
+          {fit.rule === 0 ? null : <Text> </Text>}
+          {fit.rule === 0 ? null : (
+            <Text color={isQuestion ? palette.askRule : palette.rule} strikethrough>
+              {' '.repeat(fit.rule)}
+            </Text>
+          )}
+          {fit.isTimeShown ? <Text color={palette.dim}>{` ${head.time}`}</Text> : null}
         </Box>
         {drawn}
       </Box>

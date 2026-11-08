@@ -3,6 +3,7 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { SettingsSegmentedControl } from './SettingsFormControls'
 import type { ActionDraft, ActionDraftProblem } from './orchestrator-game-action-drafts'
+import type { ActionScope } from './orchestrator-game-action-scopes'
 import { GAME_ACTION_PICKER_ICONS, actionCommandOf } from './orchestrator-game-action-list'
 import { TeamActionIcon } from '../team-panel/team-action-icons'
 import { translate } from '@/i18n/i18n'
@@ -15,6 +16,8 @@ export type GameActionFormState = {
   orca: boolean
   /** Until the person types a command, it follows the name. */
   commandTouched: boolean
+  /** Where a project action is saved; Orca's are always this machine's. */
+  scope: ActionScope
 }
 
 export function gameActionProblemText(problem: ActionDraftProblem, command: string): string {
@@ -74,15 +77,17 @@ export function GameActionForm({
       data-slot="game-action-form"
       className="mb-2 mt-0.5 flex flex-col gap-2.5 rounded-lg bg-muted/50 p-3"
     >
-      <div className="flex min-h-11 items-center gap-2 rounded-md bg-background p-2 text-xs text-muted-foreground">
-        <span>{translate('settings.gameActions.preview', 'Preview')}</span>
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 font-medium text-foreground">
-          <TeamActionIcon icon={draft.icon} className="text-muted-foreground" />
-          <span>
+      <div className="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-background p-2 text-xs text-muted-foreground">
+        <span className="shrink-0 whitespace-nowrap">
+          {translate('settings.gameActions.preview', 'Preview')}
+        </span>
+        <span className="inline-flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md bg-muted px-2 font-medium text-foreground">
+          <TeamActionIcon icon={draft.icon} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">
             {draft.label || translate('settings.gameActions.namePlaceholderShort', 'Name')}
           </span>
         </span>
-        <span className="ml-auto font-mono text-[11px]">
+        <span className="ml-auto whitespace-nowrap font-mono text-[11px]">
           /{draft.command || translate('settings.gameActions.previewCommand', 'command')}
         </span>
       </div>
@@ -114,7 +119,8 @@ export function GameActionForm({
       <div
         role="radiogroup"
         aria-label={translate('settings.gameActions.icon', 'Icon')}
-        className="flex flex-wrap gap-0.5"
+        // Why a grid: V30 keeps all eight on one line, so a phone-wide form shrinks them instead.
+        className="grid w-full max-w-[254px] grid-cols-8 gap-0.5"
       >
         {GAME_ACTION_PICKER_ICONS.map((icon) => (
           <button
@@ -124,7 +130,7 @@ export function GameActionForm({
             aria-checked={draft.icon === icon}
             aria-label={`${translate('settings.gameActions.icon', 'Icon')} ${icon}`}
             className={cn(
-              'grid size-[30px] place-items-center rounded-md text-muted-foreground hover:bg-muted',
+              'grid aspect-square w-full place-items-center rounded-md text-muted-foreground hover:bg-muted',
               draft.icon === icon && 'bg-accent text-foreground'
             )}
             onClick={() => set({ icon })}
@@ -189,6 +195,26 @@ export function GameActionForm({
               onChange={(event) => set({ tool: event.currentTarget.value })}
             />
           </label>
+        </div>
+      )}
+      {orca ? null : (
+        <div className="self-start">
+          <SettingsSegmentedControl
+            value={state.scope}
+            size="sm"
+            ariaLabel={translate('settings.gameActions.scope', 'Where it is saved')}
+            options={[
+              {
+                value: 'project',
+                label: translate('settings.gameActions.scopeProject', 'Project, orca.yaml')
+              },
+              {
+                value: 'machine',
+                label: translate('settings.gameActions.scopeMachine', 'Only this machine')
+              }
+            ]}
+            onChange={(scope) => onChange({ ...state, scope })}
+          />
         </div>
       )}
       {problem ? (

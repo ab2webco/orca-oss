@@ -77,9 +77,13 @@
       "command": "Comando",
       "commandPlaceholder": "deploy",
       "create": "Crear acción",
-      "description": "Las de Orca aparecen solas cuando aplican; las tuyas van en la fila o en ⋯. /orca-game:setup las escribe en orca.yaml; lo que cambies aquí queda en esta máquina.",
+      "description": "Se guarda en orca.yaml, o solo en esta máquina si lo eliges, y /orca-game:setup lo genera. Las de Orca aparecen solas cuando aplican; las tuyas van en la fila o en ⋯.",
       "edit": "Editar",
       "enable": "Activar {{label}}",
+      "fileChanged": "orca.yaml cambió desde que se mostró. Revísalo y vuelve a intentarlo.",
+      "fileFailed": "No se pudo guardar orca.yaml: {{reason}}",
+      "fileInvalid": "orca.yaml tiene un error de sintaxis. Corrígelo antes de guardar aquí.",
+      "hiddenHere": "Oculta en esta máquina",
       "icon": "Icono",
       "inherit": "Volver a la lista de orca.yaml",
       "kind": "Qué hace",
@@ -110,10 +114,14 @@
       "promptPlaceholder": "Qué debe correr y qué debe reportar",
       "remove": "Quitar",
       "save": "Guardar",
+      "scope": "Dónde se guarda",
+      "scopeMachine": "Solo esta máquina",
+      "scopeProject": "Proyecto, orca.yaml",
       "server": "Servidor MCP",
       "serverPlaceholder": "plane",
       "setup": "Crear con setup",
       "setupNoLead": "Inicia primero el líder",
+      "show": "Mostrar",
       "startWith": "Empieza con",
       "templates": {
         "deploy": {
@@ -3606,7 +3614,7 @@
             "c432278ec7": "Buffers del editor",
             "0bc756efaf": "Cambios de git",
             "e9528a89b3": "Terminales",
-            "a8d9e0de79": "Agents",
+            "a8d9e0de79": "Agentes",
             "d384a4ce9f": "Eliminar decisión",
             "7d7745bb8f": "Se puede eliminar",
             "720870a18e": "Mantener: vinculado",
@@ -4555,7 +4563,9 @@
           "5c9c7c16aa": "Agregar un proyecto para crear espacios de trabajo",
           "ca6f729da2": "Nuevo espacio de trabajo ({{value0}})",
           "a30e34eb5c": "Cerrar tablero del espacio de trabajo",
-          "25a95899c9": "Agregar proyecto"
+          "25a95899c9": "Agregar proyecto",
+          "projects": "Proyectos",
+          "workspaces": "Espacios de trabajo"
         },
         "SidebarNav": {
           "80611a8b10": "Buscar",
@@ -4749,7 +4759,7 @@
           "ef18787206": "En cola para eliminación"
         },
         "WorktreeCardAgents": {
-          "1b0a156717": "Agents"
+          "1b0a156717": "Agentes"
         },
         "WorktreeCardReviewDetailSection": {
           "reviewHeader": "{{value0}} #{{value1}}",
@@ -5327,7 +5337,10 @@
           "setParentFor": "Establecer padre para"
         },
         "WorktreeCardStatusSlot": {
-          "branchIdentity": "Rama"
+          "branchIdentity": "Rama",
+          "markAsRead": "Marcar como leído",
+          "markAsUnread": "Marcar como no leído",
+          "unread": "Sin leer"
         },
         "NewExternalWorktreesInboxLine": {
           "9f2d4c8b17": "Ocultar worktrees externos permanentemente para {{value0}}",
@@ -10469,6 +10482,7 @@
           "bundled": "Incluido",
           "noDescription": "No description provided.",
           "killListMessage": "La lista de seguridad de Orca Lab desactivó este plugin: {{value0}}",
+          "devSharedVaultMessage": "Sin iniciar: la carpeta de cuentas de este build de desarrollo es la bóveda de cuentas de otra instalación, y este plugin puede ejecutar procesos que la reescriben. Inicia el build de desarrollo con {{value0}} para ejecutarlo.",
           "viewAdvisory": "Ver aviso",
           "runtimeError": "El plugin se detuvo tras un error de activación o del proceso.",
           "restartCount": " · {{value0}} reinicios",
@@ -10989,6 +11003,9 @@
           "styleOffice": "Oficina",
           "stylePixel": "Pixel",
           "title": "Panel"
+        },
+        "orchestrator-game-style-fallback-note": {
+          "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo la dibuja en Pixel."
         }
       },
       "right": {
@@ -15485,7 +15502,8 @@
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
           "leadAsks": "Esperándote · {{question}}",
-          "leadDone": "Listo, sin tareas pendientes"
+          "leadDone": "Listo, sin tareas pendientes",
+          "leadWaits": "Esperándote"
         }
       },
       "game-arcade": {
@@ -15943,7 +15961,7 @@
       "empty": "Ninguno",
       "done": "Finalizado"
     },
-    "title": "Agents",
+    "title": "Agentes",
     "total": "{{count}} total",
     "card": {
       "you": "You",
@@ -16017,8 +16035,13 @@
       "zoomOut": "Alejar",
       "zoomIn": "Acercar",
       "fit": "Ajustar",
-      "projectCount": "{{agents}} agentes · {{workspaces}} espacios de trabajo",
+      "projectCount": "{{agents}} · {{workspaces}}",
       "agentCount": "{{count}} agentes",
+      "agentCount_one": "{{count}} agente",
+      "agentCount_other": "{{count}} agentes",
+      "workspaceCount": "{{count}} espacios de trabajo",
+      "workspaceCount_one": "{{count}} espacio de trabajo",
+      "workspaceCount_other": "{{count}} espacios de trabajo",
       "filters": {
         "orchestrationLinksHidden": "Enlaces de orquestación ocultos",
         "title": "Controles del mapa",
@@ -16260,7 +16283,8 @@
       "ciPassed": "CI en verde",
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
-      "openTerminal": "Abrir terminal"
+      "openTerminal": "Abrir terminal",
+      "inFolder": "En la carpeta, sin worktree"
     },
     "activity": {
       "prompt": "Pedido",
@@ -16329,7 +16353,8 @@
       "waitingEmpty": "Ningún miembro espera respuesta.",
       "answeredEmpty": "Todavía no hay nada respondido.",
       "leadAnsweredText": "Respondió el lead: {{text}}",
-      "answer": "Responder"
+      "answer": "Responder",
+      "answerFailed": "No se pudo enviar la respuesta. Abre la terminal."
     },
     "actions": {
       "label": "Acciones",
@@ -16372,6 +16397,52 @@
       "minutes": "{{count}} min",
       "hours": "{{count}} h",
       "days": "{{count}} d"
+    },
+    "display": {
+      "label": "Métricas del equipo",
+      "pause": "Pausar el carrusel",
+      "resume": "Reanudar el carrusel",
+      "previous": "Métrica anterior",
+      "next": "Métrica siguiente",
+      "page": {
+        "summary": "Resumen",
+        "delivery": "Entrega",
+        "quality": "Calidad",
+        "machines": "Máquinas",
+        "usage": "Uso"
+      },
+      "noData": "Sin datos",
+      "active": "Activos",
+      "alerts": "Alertas",
+      "queued": "En cola",
+      "merges": "Merges",
+      "merges24h": "Merges 24 h",
+      "noHourly": "Sin datos por hora",
+      "merges7d": "Merges 7 d",
+      "median": "Mediana {{time}}",
+      "noLeadTime": "Aún sin tiempo de entrega",
+      "noMerges": "Este host no publica merges",
+      "hoursMinutes": "{{hours}} h {{minutes}} m",
+      "minutes": "{{minutes}} m",
+      "ciGreen": "CI en verde",
+      "flaky": "{{count}} inestables",
+      "days14": "14 días",
+      "noCiHistory": "Orca aún no guarda historial de CI",
+      "agents": "Agentes",
+      "cpu": "CPU",
+      "ram": "RAM",
+      "offline": "Sin conexión",
+      "noMachines": "Este host no publica máquinas",
+      "costToday": "Costo hoy",
+      "noCost": "Orca no tiene datos de costo",
+      "accounts7d": "Cuentas · 7 días",
+      "noAccounts": "Sin uso de cuentas reportado",
+      "ticker": {
+        "waiting": "{{name}} espera tu respuesta",
+        "failing": "{{pr}} con CI fallando, {{name}} lo corrige",
+        "queue": "Cola {{count}}, próximo {{pr}}",
+        "working": "{{count}} trabajando"
+      }
     }
   },
   "claudeDeadHooks": {
@@ -16379,5 +16450,28 @@
     "one": "{{name}} no se ejecuta: falta su script {{script}}. Reinstálalo o quita el hook de settings.json.",
     "manyMore": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}} y {{more}} más. El log de Orca Lab tiene cada ruta.",
     "many": "{{count}} hooks no se ejecutan porque faltan sus scripts: {{names}}. El log de Orca Lab tiene cada ruta."
+  },
+  "agentNotification": {
+    "bellTitle": "Campana en {{workspace}}",
+    "attentionRequested": "Pide tu atención",
+    "leadAsksProject": "{{project}}: el líder te pregunta",
+    "leadAsks": "El líder te pregunta",
+    "openInbox": "Abre la Bandeja para responder.",
+    "testTitle": "Las notificaciones de Orca Lab están activas",
+    "testBody": "Esta es una notificación de prueba de Orca Lab.",
+    "needsInput": "{{agent}} necesita tu respuesta",
+    "stopped": "{{agent}} se detuvo",
+    "finished": "{{agent}} terminó",
+    "usingToolWithInput": "Usando {{tool}}: {{input}}",
+    "usingTool": "Usando {{tool}}",
+    "toolInput": "Entrada de la herramienta: {{input}}",
+    "taskComplete": "Tarea completada en {{workspace}}",
+    "agentFinished": "Un agente terminó su trabajo.",
+    "agent": "Agente",
+    "workspace": "espacio de trabajo"
+  },
+  "agentQuestionNotification": {
+    "title": "{{context}} - {{agent}} te pregunta",
+    "body": "Abre la Bandeja para responder."
   }
 }

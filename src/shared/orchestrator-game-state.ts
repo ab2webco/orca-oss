@@ -22,11 +22,8 @@ import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 import { gameToolInputOf } from './orchestrator-game-tool-input'
-import type {
-  GamePausedMember,
-  GameQueuedMember,
-  GameUnlistedMember
-} from './orchestrator-game-member-sessions'
+import type { GameQueuedMember, GameUnlistedMember } from './orchestrator-game-member-sessions'
+import type { GameStatePausedMember } from './orchestrator-game-adopted-members'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -195,7 +192,14 @@ export type OrchestratorGameState = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
   warnings: string[]
-  worktree: { id: string; path: string; branch: string; displayName: string } | null
+  worktree: {
+    id: string
+    path: string
+    branch: string
+    displayName: string
+    /** A folder with no git, where members run in the folder itself; absent from an older host. */
+    folder?: true
+  } | null
   agents: GameAgent[]
   review: GameReview | null
   workItem: GameWorkItem | null
@@ -232,7 +236,7 @@ export type OrchestratorGameState = {
   /** Questions the lead asked the person (`game ask-owner`) still unanswered; only for the lead, absent from an older host. */
   openOwnerQuestions?: number
   /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
-  pausedMembers?: GamePausedMember[]
+  pausedMembers?: GameStatePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
   queuedMembers?: GameQueuedMember[]
   /** Agents the lead dropped from its fleet, which `orca game adopt` brings back; only for the lead, when any (ORCA-943). */
@@ -247,8 +251,14 @@ export type OrchestratorGameState = {
   metrics?: GameMetricsSummary
   /** This Orca and each paired host: members, cores, free memory, load; only for a lead with a saved environment (ORCA-841). */
   hostCapacity?: GameHostCapacity[]
+  /** This Orca alone, for a lead with no saved environment, so the panel still shows it; absent from an older host. */
+  localHost?: GameHostCapacity
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
+  /** Orca's light or dark look, for the agent terminal's colours; absent where the host cannot tell. */
+  appearance?: 'dark' | 'light'
+  /** The lead's name for the session, as its Team card and headings show it; absent from an older host. */
+  leadName?: string
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
   merges?: GameMerge[]
   /** The project's saved arcade plays; only for the lead, absent from an older host. */
@@ -318,17 +328,19 @@ export function gameAgentOf(
     RuntimeWorktreeAgentRow,
     'paneKey' | 'state' | 'agentType' | 'displayName' | 'taskTitle' | 'toolName'
   > &
-    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput'>>,
+    Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed'>>,
   leaderPaneKey: string | null,
   terminalHandle: string | null = null
 ): GameAgent {
-  const toolInput = gameToolInputOf(row.toolInput)
+  // Why (ORCA-1130): a row restored from disk may describe a turn that ended while Orca was down.
+  const unconfirmed = row.restoredUnconfirmed === true
+  const toolInput = unconfirmed ? null : gameToolInputOf(row.toolInput)
   return {
     paneKey: row.paneKey,
     displayName: row.displayName ?? row.taskTitle,
     agentType: row.agentType,
-    state: gameAgentStateOf(row.state),
-    toolName: row.toolName,
+    state: unconfirmed ? 'idle' : gameAgentStateOf(row.state),
+    toolName: unconfirmed ? null : row.toolName,
     ...(toolInput ? { toolInput } : {}),
     isLeader: row.paneKey === leaderPaneKey,
     ...(terminalHandle ? { terminalHandle } : {})

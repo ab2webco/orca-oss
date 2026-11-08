@@ -22,7 +22,9 @@ import {
 } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
-type Leads = { leads: { project: string; label: string; handle: string; since: string }[] }
+type Leads = {
+  leads: { project: string; label: string; handle: string; since: string; paneKey?: string }[]
+}
 
 function fakeClaudeRunning(fakeDir: string): boolean {
   try {
@@ -118,7 +120,13 @@ test('lists a registered game lead again after Orca restarts', async ({
         timeout: 60_000
       })
       .toEqual([
-        { project: 'e2e-game', label: 'Ana', handle: expect.any(String), since: before[0].since }
+        {
+          project: 'e2e-game',
+          label: 'Ana',
+          handle: expect.any(String),
+          since: before[0].since,
+          paneKey
+        }
       ])
     const restored = (await secondClient.call<Leads>('game.leads')).result.leads[0].handle
     const paneNow = (

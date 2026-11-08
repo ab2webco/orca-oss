@@ -618,4 +618,50 @@ describe('launchOrcaApp', () => {
 
     expect(child.unref).toHaveBeenCalled()
   })
+
+  describe('from inside a Claude session (ORCA-1039)', () => {
+    const SENTINEL = 'sk-ant-oat01-ORCA1039-launch-sentinel'
+
+    beforeEach(() => {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = SENTINEL
+      process.env.ORCA_APP_EXECUTABLE = '/opt/Orca/orca'
+    })
+
+    afterEach(() => {
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN
+      delete process.env.CLAUDECODE
+    })
+
+    const spawnedEnv = (): NodeJS.ProcessEnv => spawnMock.mock.calls[0][2].env
+
+    it('does not hand the session token to the app it starts', () => {
+      process.env.CLAUDECODE = '1'
+      spawnMock.mockReturnValue(new FakeChildProcess())
+
+      launchOrcaApp()
+
+      expect(spawnedEnv().CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined()
+      expect(JSON.stringify(spawnMock.mock.calls)).not.toContain(SENTINEL)
+    })
+
+    it('does not hand it to an ORCA_OPEN_COMMAND launch or a served app either', () => {
+      process.env.CLAUDECODE = '1'
+      process.env.ORCA_OPEN_COMMAND = 'open-orca'
+      spawnMock.mockReturnValue(new FakeChildProcess())
+      launchOrcaApp()
+      delete process.env.ORCA_OPEN_COMMAND
+      void serveOrcaApp({ recipeJson: true, projectRoot: '/workspace/repo' }).catch(() => {})
+
+      expect(spawnMock).toHaveBeenCalledTimes(2)
+      expect(JSON.stringify(spawnMock.mock.calls)).not.toContain(SENTINEL)
+    })
+
+    it("keeps a token the user exported outside Claude, for the app's own unmanaged launches", () => {
+      spawnMock.mockReturnValue(new FakeChildProcess())
+
+      launchOrcaApp()
+
+      expect(spawnedEnv().CLAUDE_CODE_OAUTH_TOKEN).toBe(SENTINEL)
+    })
+  })
 })

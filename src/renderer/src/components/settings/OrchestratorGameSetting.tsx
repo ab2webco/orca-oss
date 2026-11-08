@@ -399,6 +399,9 @@ export function ProjectOrchestratorGameSetting({
         <ProjectOrchestratorGameActionsSetting
           key={repoId}
           repoId={repoId}
+          rootPath={target.path}
+          connectionId={connectionId}
+          isReachable={!connectionId || sshStatus === 'connected'}
           settings={settings}
           projectLayer={projectLayer}
           updateSettings={updateSettings}

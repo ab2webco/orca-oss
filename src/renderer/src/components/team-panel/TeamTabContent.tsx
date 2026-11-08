@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -16,6 +16,7 @@ import { openTeamSession } from './team-session-open'
 import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
+import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 
 /** Why here: core names its advisor only in the files core-vendor-adapters.txt lists. */
 export const teamAdvisorSourceText = (): string => translate('teamPanel.advisor.source', 'Jev')
@@ -35,6 +36,7 @@ function LeadCardRow({
   showName: boolean
   memberCount: number
 }): React.JSX.Element {
+  const sceneLine = useContext(TeamSceneLeadLineContext)
   return (
     <article data-team-card="lead" className="border-b border-border">
       <button
@@ -79,6 +81,14 @@ function LeadCardRow({
               <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
             )}
           </span>
+          {sceneLine ? (
+            <span
+              data-team-lead-line=""
+              className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+            >
+              {sceneLine}
+            </span>
+          ) : null}
           <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
         </span>
       </button>
@@ -113,32 +123,17 @@ function AdvisorCardRow({
             {teamAdvisorSourceText()}
           </span>
         </span>
+        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows all of it (ORCA-1139). */}
         {advisor.line ? (
-          <span className="truncate text-xs text-muted-foreground">{advisor.line}</span>
+          <span
+            data-team-advisor-line
+            className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+          >
+            {advisor.line}
+          </span>
         ) : null}
       </span>
     </article>
-  )
-}
-
-function XpRow({ xp }: { xp: NonNullable<TeamPanelGameModel['xp']> }): React.JSX.Element {
-  const ratio = xp.need > 0 ? Math.min(1, xp.into / xp.need) : 0
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 text-xs tabular-nums text-muted-foreground">
-      <span>{translate('teamPanel.xp.level', 'Lv {{level}}', { level: xp.level })}</span>
-      <span className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-        <span
-          className="block h-full origin-left bg-foreground/60"
-          style={{ transform: `scaleX(${ratio})` }}
-        />
-      </span>
-      <span>
-        {translate('teamPanel.xp.progress', '{{into}}/{{need}} XP', {
-          into: xp.into,
-          need: xp.need
-        })}
-      </span>
-    </div>
   )
 }
 
@@ -162,7 +157,6 @@ export function TeamTabContent({
   const game = look === 'game'
   return (
     <div className="flex flex-col pb-3">
-      {game && model.xp ? <XpRow xp={model.xp} /> : null}
       {model.stopped ? (
         <p className="px-3 py-1.5 text-xs font-medium text-status-attention">
           {model.stopped.by

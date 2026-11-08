@@ -1,5 +1,10 @@
 import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
 import {
+  parseGameMachineActions,
+  withGameMachineActions,
+  type GameMachineAction
+} from './orchestrator-game-machine-actions'
+import {
   mergeGameOrcaActions,
   parseGameOrcaActions,
   type OrchestratorGameOrcaActions
@@ -91,6 +96,9 @@ export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
     sceneFile?: string
     /** The native panel's look and tabs; merged key by key across layers. */
     panel?: OrchestratorGamePanelLayer
+    /** Settings' per-action changes over orca.yaml's actions, keyed by command; read only from the
+     *  local layer, so old hosts keep the whole-list `actions` override. */
+    machineActions?: GameMachineAction[]
   }
 
 export type OrchestratorGameSource = 'default' | 'global' | 'project' | 'local'
@@ -213,6 +221,10 @@ export function resolveOrchestratorGameIntegrations(
     if (todo !== undefined) {
       resolved.todo = todo
     }
+  }
+  const machine = parseGameMachineActions(layers.local?.machineActions).value
+  if (machine !== undefined) {
+    resolved.actions = withGameMachineActions(resolved.actions, machine)
   }
   resolved.orcaActions = mergeGameOrcaActions(
     ORCHESTRATOR_GAME_LAYER_ORDER.map(

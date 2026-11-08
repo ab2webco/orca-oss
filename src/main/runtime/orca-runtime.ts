@@ -328,6 +328,7 @@ import {
   isUnknownOwnerLiveSharedClaudePty
 } from '../claude-accounts/live-pty-gate'
 import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pty-account-ownership'
+import { resolveClaudeTranscriptUniverse } from '../../shared/claude-transcript-universe'
 import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
 import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
@@ -727,6 +728,8 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { GameLeadNames } from './orchestrator-game-lead-names'
+import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
@@ -836,7 +839,7 @@ import {
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
 import { GameFleetChangeSignal, type GameFleetWait } from './orchestrator-game-fleet-change'
 import { replyToMemberAsLead } from './orchestrator-game-owner-member-reply'
-import { GameLeads } from './orchestrator-game-leads'
+import { GameLeads, type GameLeadSession } from './orchestrator-game-leads'
 import { GameLeadRoster } from './orchestrator-game-lead-roster'
 import {
   GameLeadSessions,
@@ -1839,7 +1842,7 @@ export type RuntimeClaudeTerminalSwitchSnapshot = {
   wslDistro: string | null
   /** Non-null for SSH/remote-owned PTYs, whose auth and transcripts live elsewhere. */
   remoteConnectionId: string | null
-  providerSession: { agent: 'claude'; id: string } | null
+  providerSession: { agent: 'claude'; id: string; transcriptPath?: string } | null
 }
 
 type TerminalCreateOptions = {
@@ -3846,6 +3849,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameLeadNames = new GameLeadNames()
   private readonly gameSuggestedView = createGameSuggestedView()
   private readonly claudePaneSessions = new ClaudePaneLiveSessions()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
@@ -3954,7 +3958,8 @@ export class OrcaRuntimeService {
       isGameMemberWorktreeGone(worktreeId, {
         reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
         scan: (repo) => this.listRepoWorktreesForResolution(repo)
-      })
+      }),
+    releasedDispatch: (dispatchId) => this.isGameWorkerReleased(dispatchId)
   })
   private readonly gameMemberNames = new GameMemberNameReservations()
   private readonly workerSetupAdmission = new WorkerSetupAdmission({
@@ -3974,7 +3979,10 @@ export class OrcaRuntimeService {
     worktreeOfTask: (taskId) =>
       this.getOrchestrationDbIfAvailable()?.latestWorkerWorktreeForTask(taskId) ?? null,
     worktreeExists: async (worktreeId) => (await this.getResolvedWorktreeMap()).has(worktreeId),
-    resumeSession: (member) => this.resumeGameMemberSession(member)
+    resumeSession: (member) => this.resumeGameMemberSession(member),
+    terminalOfPane: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
+    runsAgent: (terminal) => this.isTerminalRunningAgent(terminal),
+    releasedDispatch: (dispatchId) => this.isGameWorkerReleased(dispatchId)
   })
   private readonly gameLeads = new GameLeads({
     projectOf: (caller) => this.gameBoardProjectOf(caller),
@@ -3995,20 +4003,25 @@ export class OrcaRuntimeService {
       const accountId = pane.remoteConnectionId
         ? null
         : getLiveInjectedClaudePtyAccountId(pane.ptyId)
+      const transcriptPath = pane.remoteConnectionId
+        ? undefined
+        : pane.providerSession.transcriptPath
       return {
         sessionId: pane.providerSession.id,
         agentArgs: leadResumeArgsOf(pane.launchConfig),
         worktreeId: pane.worktreeId,
-        accountId
+        accountId,
+        ...(transcriptPath ? { transcriptPath } : {})
       }
     },
     isRunning: (handle) => this.isGameLeadPaneRunning(handle),
-    resume: (session) =>
+    resume: async (session) =>
       this.reopenClaudeConversation({
         worktreeId: session.worktreeId,
         sessionId: session.sessionId,
         ...(session.agentArgs === null ? {} : { agentArgs: session.agentArgs }),
-        accountId: session.accountId,
+        ...(session.transcriptPath ? { transcriptPath: session.transcriptPath } : {}),
+        accountId: this.leadReopenAccountOf(session),
         presentation: 'focused'
       }),
     focus: async (handle) => {
@@ -5038,8 +5051,10 @@ export class OrcaRuntimeService {
           continue
         }
         originalSessions.set(hostId, originalSessions.get(hostId) ?? session)
+        // Why: an adopted agent's tab is the user's; its dispatch ends, the tab and its resume stay (ORCA-1141).
+        const keepsTab = resolution === 'exited' && !candidate.terminalOwned
         let next =
-          resolution === 'exited'
+          resolution === 'exited' && !keepsTab
             ? retireTerminalSurfaceFromPersistence(session, {
                 worktreeId: candidate.worktreeId,
                 parentTabId: candidate.tabId,
@@ -5052,6 +5067,10 @@ export class OrcaRuntimeService {
         if (record && runtimeWorktreeIdsEqual(record.worktreeId, candidate.worktreeId)) {
           const sleepingAgentSessionsByPaneKey = { ...next.sleepingAgentSessionsByPaneKey }
           delete sleepingAgentSessionsByPaneKey[candidate.paneKey]
+          if (keepsTab) {
+            const { automaticResumeBlockedBy: _fence, ...unfenced } = record
+            sleepingAgentSessionsByPaneKey[candidate.paneKey] = unfenced
+          }
           next = { ...next, sleepingAgentSessionsByPaneKey }
         }
         if (next !== session) {
@@ -5505,7 +5524,9 @@ export class OrcaRuntimeService {
         adoptedDispatchIds.push(candidate.dispatchId)
         continue
       }
-      this.rollbackLegacyWorkerTerminalSurface(candidate)
+      if (candidate.terminalOwned) {
+        this.rollbackLegacyWorkerTerminalSurface(candidate)
+      }
       if (!this.reconcileMissingLegacyWorkerTerminal(candidate)) {
         deferredDispatchIds.add(candidate.dispatchId)
         continue
@@ -14918,6 +14939,14 @@ export class OrcaRuntimeService {
     return this.requireAccountServices().claudeAccounts.addAccountFromConfigDir(configDir, options)
   }
 
+  // Why host-local: a long-lived token is minted per host, so it is set where it will be used.
+  setClaudeLongLivedToken(
+    accountSelector: string,
+    token: string | null
+  ): Promise<ClaudeRateLimitAccountsState> {
+    return this.requireAccountServices().claudeAccounts.setLongLivedToken(accountSelector, token)
+  }
+
   // Why this one is reachable from a remote client and addClaudeAccountFromConfigDir
   // is not: that one captures a filesystem path on the account-owning host, so a
   // paired client could point it at credentials it must never read. A custom
@@ -17491,10 +17520,19 @@ export class OrcaRuntimeService {
         continue
       }
       scannedSessions.add(session)
+      const sessionTabIds = new Set(
+        Object.values(session.tabsByWorktree ?? {}).flatMap((tabs) => tabs.map((tab) => tab.id))
+      )
       for (const [paneKey, record] of Object.entries(
         session.sleepingAgentSessionsByPaneKey ?? {}
       )) {
-        if (!worktreeIdsInScope.has(record.worktreeId) || !parsePaneKey(paneKey)) {
+        const pane = parsePaneKey(paneKey)
+        if (!worktreeIdsInScope.has(record.worktreeId) || !pane) {
+          continue
+        }
+        // Why: a live/quit record whose tab is gone was closed; listing it relisted the closed tab
+        // as sleeping (ORCA-718). The record stays so the conversation can still be resumed by hand.
+        if (record.origin !== 'worktree-sleep' && !sessionTabIds.has(record.tabId ?? pane.tabId)) {
           continue
         }
         byPaneKey.set(paneKey, record)
@@ -18621,7 +18659,13 @@ export class OrcaRuntimeService {
       remoteConnectionId: pty.connectionId,
       providerSession:
         observed?.agent === 'claude' && observed.providerSession?.id
-          ? { agent: 'claude', id: observed.providerSession.id }
+          ? {
+              agent: 'claude',
+              id: observed.providerSession.id,
+              ...(observed.providerSession.transcriptPath
+                ? { transcriptPath: observed.providerSession.transcriptPath }
+                : {})
+            }
           : null
     }
   }
@@ -20340,7 +20384,8 @@ export class OrcaRuntimeService {
     )
     for (const folderWorkspace of this.store?.getFolderWorkspaces?.() ?? []) {
       const projectGroup = projectGroupById.get(folderWorkspace.projectGroupId)
-      if (!projectGroup?.parentPath) {
+      // Why not parentPath: a workspace may name its own folder under any group (ORCA-1141).
+      if (!projectGroup) {
         continue
       }
       const worktree = folderWorkspaceToWorktree(folderWorkspace)
@@ -28457,6 +28502,8 @@ export class OrcaRuntimeService {
       env: startup.env,
       launchConfig: startup.launchConfig,
       launchAgent: request.agent,
+      // Why: the spawn picks a Claude resume's account from this session (ORCA-718).
+      ...(request.agent === 'claude' ? { resumeProviderSession: identity.providerSession } : {}),
       presentation: request.presentation ?? 'background',
       tabId: request.placement?.tabId,
       leafId: request.placement?.leafId,
@@ -31710,6 +31757,7 @@ export class OrcaRuntimeService {
     worktreeId: string
     sessionId: string
     agentArgs?: string
+    transcriptPath?: string
     accountId: string | null
     presentation: 'focused' | 'background'
     gameMember?: boolean
@@ -31720,7 +31768,12 @@ export class OrcaRuntimeService {
           kind: 'explicit',
           worktree: `id:${args.worktreeId}`,
           agent: 'claude',
-          providerSession: { key: 'session_id', id: args.sessionId },
+          providerSession: {
+            key: 'session_id',
+            id: args.sessionId,
+            // Why: the spawn finds the conversation in the shared store by this file name.
+            ...(args.transcriptPath ? { transcriptPath: args.transcriptPath } : {})
+          },
           ...(args.agentArgs === undefined ? {} : { agentArgs: args.agentArgs }),
           presentation: args.presentation
         },
@@ -31757,6 +31810,32 @@ export class OrcaRuntimeService {
       )
     }
     return handle
+  }
+
+  /**
+   * The account a reopened lead runs on: its recorded one, else the vault its transcript lives
+   * under, while that account exists. Null leaves it to the spawn, which takes what a new launch
+   * would get; the shared transcript store lets any account resume it (ORCA-718).
+   */
+  private leadReopenAccountOf(session: GameLeadSession): string | null {
+    const universe = session.transcriptPath
+      ? resolveClaudeTranscriptUniverse(session.transcriptPath)
+      : null
+    const candidates = [
+      session.accountId,
+      universe?.kind === 'managed-account' ? universe.accountId : null
+    ]
+    return candidates.find((accountId) => accountId && this.hasClaudeAccount(accountId)) ?? null
+  }
+
+  private hasClaudeAccount(accountId: string): boolean {
+    // Why present on a failed read: only a confirmed removal may drop a recorded account.
+    try {
+      const accounts = this.accountServices?.claudeAccounts.listAccounts().accounts
+      return accounts ? accounts.some((one) => one.id === accountId) : true
+    } catch {
+      return true
+    }
   }
 
   private claudeAccountLabelOf(accountId: string | null): string | null {
@@ -32222,9 +32301,20 @@ export class OrcaRuntimeService {
     if (!worktreeId && args.terminalHandle) {
       worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
     }
-    const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? null) : null
+    const folderLead =
+      worktreeId && !worktreesById.has(worktreeId) ? this.gameFolderWorkspaceOf(worktreeId) : null
+    const worktree = worktreeId
+      ? (worktreesById.get(worktreeId) ?? folderLead?.worktree ?? null)
+      : null
+    const leadRepo = worktree ? this.store?.getRepo(worktree.repoId) : undefined
+    const inFolder = folderLead !== null || (leadRepo ? isFolderRepo(leadRepo) : false)
     const summaries = (await this.getWorktreePs()).worktrees
     const summary = worktree ? summaries.find((row) => row.worktreeId === worktree.id) : undefined
+    // Why: a folder has no worktree per agent, so the lead's other unlaunched sessions there are found ones (ORCA-1135).
+    const ownRows =
+      inFolder && args.paneKey
+        ? summary?.agents.filter((row) => row.paneKey === args.paneKey || row.parentPaneKey)
+        : summary?.agents
     // Why: a member the lead launched with `orca orchestration` runs in its own child worktree.
     const members = args.paneKey
       ? summaries.flatMap((one) =>
@@ -32252,20 +32342,22 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
+      appearance: orcaGameAppearanceOf(),
       host: gameHostProfileOfThisMachine(),
       readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
         ? {
             id: worktree.id,
             repoId: worktree.repoId ?? null,
-            connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null,
+            connectionId: folderLead ? folderLead.connectionId : (leadRepo?.connectionId ?? null),
             path: worktree.path,
             branch: summary?.branch ?? worktree.branch ?? '',
             displayName: summary?.displayName ?? worktree.displayName ?? '',
-            linkedWorkItem: worktree.linkedWorkItem
+            linkedWorkItem: worktree.linkedWorkItem,
+            ...(inFolder ? { folder: true } : {})
           }
         : null,
-      agents: summary?.agents ?? [],
+      agents: ownRows ?? [],
       members,
       found: args.paneKey
         ? foundGameSessionsOf(summaries, {
@@ -32305,6 +32397,9 @@ export class OrcaRuntimeService {
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
+      leaderUnreported:
+        args.paneKey !== undefined &&
+        !summaries.some((one) => one.agents.some((row) => row.paneKey === args.paneKey)),
       callerParentPaneKey,
       callerRole,
       terminalHandleOf: (paneKey) => this.getTerminalHandleForPaneKey(paneKey),
@@ -32312,6 +32407,7 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
+      leadNames: this.gameLeadNames,
       readScenes: () => readPluginGameSceneSources(),
       // Why the lead's pane too: a scene file its checkout leaves untracked is not in a member's worktree.
       readCarriedScene: async () => {
@@ -33695,6 +33791,23 @@ export class OrcaRuntimeService {
     return parsed?.type === 'folder'
       ? folderWorkspaceKey(parsed.folderWorkspaceId)
       : this.resolveEmulatorWorkspaceId(selector)
+  }
+
+  /** A lead's folder workspace, which the repo worktree map never lists; null for anything else. */
+  private gameFolderWorkspaceOf(
+    worktreeId: string
+  ): { worktree: ResolvedWorktree; connectionId: string | null } | null {
+    try {
+      const folder = this.resolveFolderWorkspaceSelector(worktreeId)
+      return folder
+        ? {
+            worktree: this.folderWorkspaceToResolvedWorktree(folder),
+            connectionId: this.resolveFolderWorkspaceConnectionId(folder)
+          }
+        : null
+    } catch {
+      return null
+    }
   }
 
   private folderWorkspaceToResolvedWorktree(folderWorkspace: FolderWorkspace): ResolvedWorktree {
@@ -37011,6 +37124,10 @@ export class OrcaRuntimeService {
       return undefined
     }
     return Date.now() - seenAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
+  }
+
+  private isGameWorkerReleased(dispatchId: string): boolean {
+    return this.getOrchestrationDbIfAvailable()?.getWorkerDispatch(dispatchId)?.stage === 'released'
   }
 
   private getTerminalHandleForPaneKey(paneKey: string): string | null {

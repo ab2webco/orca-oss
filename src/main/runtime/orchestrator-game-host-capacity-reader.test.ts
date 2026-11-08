@@ -27,9 +27,11 @@ function readerOf(environments: { id: string; name: string }[]) {
 }
 
 describe('GameHostCapacityReader', () => {
-  it('reads nothing while no environment is saved', async () => {
+  it('reads only this Orca while no environment is saved', async () => {
     const { reader, readRemote } = readerOf([])
-    expect(await reader.read()).toBeNull()
+    expect(await reader.read()).toEqual([
+      { host: 'local', reading: { kind: 'ok', machine: machine(10) } }
+    ])
     expect(readRemote).not.toHaveBeenCalled()
   })
 

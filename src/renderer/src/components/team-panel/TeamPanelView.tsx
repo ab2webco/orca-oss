@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Settings2 } from 'lucide-react'
+import { useEffect } from 'react'
+import { Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -13,12 +13,7 @@ import { TeamReadError, TeamReadNotice, TeamReadRetryContext } from './team-pane
 import { TeamSessionCount } from './team-panel-session-count'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
-import {
-  STRIP_INSET_PX,
-  tabStripOverflowOf,
-  tabStripScrollLeftFor,
-  type TabStripOverflow
-} from './team-panel-tab-strip'
+import { TabStripEdgeCues, useTabStripCue } from './team-panel-tab-strip-cue'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import {
   TeamPanelLoadingState,
@@ -27,7 +22,9 @@ import {
 } from './team-panel-section-state'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
+import { TeamXpRow } from './TeamXpRow'
 import { TeamPanelScene } from '../team-scene/TeamPanelScene'
+import { TeamDisplayCarousel } from './TeamDisplayCarousel'
 import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
 /** With a team the gear opens the project; without one, the global Panel settings. */
@@ -101,16 +98,6 @@ function TeamPanelTabBody({
   }
 }
 
-// Why a fade: a 219 px panel cannot fit five tabs, and a clean cut hides that more exist.
-function stripFade({ start, end }: TabStripOverflow): string | undefined {
-  if (!start && !end) {
-    return undefined
-  }
-  const left = start ? `transparent, black ${STRIP_INSET_PX}px` : 'black'
-  const right = end ? `black calc(100% - ${STRIP_INSET_PX}px), transparent` : 'black'
-  return `linear-gradient(to right, ${left}, ${right})`
-}
-
 function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element | null {
   const selected = useTeamPanelTabStore((s) => s.selected)
   const select = useTeamPanelTabStore((s) => s.select)
@@ -119,45 +106,10 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
   const active = pickTeamPanelTab(tabs, selected)
   const shownId = active?.id ?? null
   useEffect(() => publishShown(shownId), [publishShown, shownId])
-  const activeTrigger = useRef<HTMLButtonElement>(null)
-  const activeId = active?.id
-  const tabIds = tabs.map((tab) => tab.id).join()
-  const [overflow, setOverflow] = useState<TabStripOverflow>({ start: false, end: false })
-  // Why: a narrower window clips the selected tab too, so reveal on resize as well as on select.
-  // Not scrollIntoView, which would also move the shell's hidden-overflow ancestors.
-  useEffect(() => {
-    const strip = activeTrigger.current?.parentElement
-    if (!strip) {
-      return
-    }
-    const reveal = (): void => {
-      const trigger = activeTrigger.current
-      if (trigger) {
-        strip.scrollLeft = tabStripScrollLeftFor(
-          strip.getBoundingClientRect(),
-          trigger.getBoundingClientRect(),
-          strip.scrollLeft
-        )
-      }
-    }
-    const measure = (): void => {
-      const next = tabStripOverflowOf(strip)
-      setOverflow((now) => (now.start === next.start && now.end === next.end ? now : next))
-    }
-    const update = (): void => {
-      reveal()
-      measure()
-    }
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(strip)
-    strip.addEventListener('scroll', measure, { passive: true })
-    return () => {
-      observer.disconnect()
-      strip.removeEventListener('scroll', measure)
-    }
-    // Why tabIds: a toggle that hides a tab changes what overflows without resizing the strip.
-  }, [activeId, tabIds])
+  const { activeTrigger, overflow, stripProps } = useTabStripCue(
+    active?.id,
+    tabs.map((tab) => tab.id).join()
+  )
   if (!active) {
     return null
   }
@@ -167,21 +119,20 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
       onValueChange={(value) => select(value as TeamTabId)}
       className="flex min-h-0 flex-1 flex-col gap-0"
     >
-      <div className="relative shrink-0">
+      {/* Why a container query: under 340 px, V28's narrow spacing and 12 px text fit five tabs at 280. */}
+      <div className="@container relative shrink-0">
         <TabsList
           variant="line"
           aria-label={translate('teamPanel.tabs.label', 'Panel sections')}
-          data-overflow-start={overflow.start}
-          data-overflow-end={overflow.end}
-          style={{ maskImage: stripFade(overflow), WebkitMaskImage: stripFade(overflow) }}
-          className="h-[35px] w-full shrink-0 justify-start gap-4 overflow-x-auto border-b border-border px-3 [scrollbar-width:none]"
+          {...stripProps}
+          className="h-[35px] w-full shrink-0 justify-start gap-2.5 overflow-x-auto border-b border-border px-2 [scrollbar-width:none] @[340px]:gap-4 @[340px]:px-3"
         >
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.id}
               ref={tab.id === active.id ? activeTrigger : undefined}
               value={tab.id}
-              className="h-full flex-none rounded-none px-0 text-[13px] after:bottom-[-1px]"
+              className="h-full flex-none gap-1 rounded-none px-0 text-[12px] after:bottom-[-1px] @[340px]:gap-1.5 @[340px]:text-[13px]"
             >
               {tab.title}
               {tab.count !== null ? (
@@ -192,23 +143,7 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
             </TabsTrigger>
           ))}
         </TabsList>
-        {/* Why: a fade alone also hides the sliver of a cut tab; an opaque chevron says more lie that way. */}
-        {overflow.start ? (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 bottom-px left-0 flex w-3.5 items-center justify-center bg-sidebar text-muted-foreground"
-          >
-            <ChevronLeft className="size-3.5" />
-          </span>
-        ) : null}
-        {overflow.end ? (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 bottom-px right-0 flex w-3.5 items-center justify-center bg-sidebar text-muted-foreground"
-          >
-            <ChevronRight className="size-3.5" />
-          </span>
-        ) : null}
+        <TabStripEdgeCues overflow={overflow} />
       </div>
       {/* Why: the floating trigger covers this corner; the last row must scroll clear of it. */}
       <TabsContent
@@ -241,6 +176,7 @@ export function TeamPanelView({
   const body = (
     <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
+      {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
         <TeamReadRetryContext.Provider value={retry}>
@@ -258,13 +194,22 @@ export function TeamPanelView({
     </>
   )
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="team-panel">
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-testid="team-panel"
+      data-team-panel-state={model?.kind ?? section.kind}
+    >
       {model?.kind === 'team' && look === 'game' ? (
         <TeamPanelScene model={model} style={sceneStyle}>
           {body}
         </TeamPanelScene>
       ) : (
-        body
+        <>
+          {model?.kind === 'team' && look === 'display' ? (
+            <TeamDisplayCarousel model={model} />
+          ) : null}
+          {body}
+        </>
       )}
       {model?.kind === 'team' && dock ? dock(model) : null}
     </div>

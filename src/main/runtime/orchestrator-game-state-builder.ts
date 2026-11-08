@@ -1,5 +1,5 @@
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
-import { gameFleetOf, liveLinkedItemOf, settle } from './orchestrator-game-fleet'
+import { gameFleetOf, liveLinkedItemOf, settle, withIdleLeader } from './orchestrator-game-fleet'
 import { readSceneFileOrCarried } from './orchestrator-game-scene-file-read'
 import { trackerWorkItemOf } from './orchestrator-game-lead-work-item'
 import type { OrchestratorGameStateInput } from './orchestrator-game-state-input'
@@ -21,6 +21,7 @@ import {
   projectGameLinksOf
 } from '../../shared/orchestrator-game-links'
 import { orchestratorGameScenesOf } from '../../shared/orchestrator-game-scene'
+import { leadCharacterOf, memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
@@ -142,7 +143,8 @@ export async function buildOrchestratorGameState(
       ...todo,
       ...listActions.todo,
       items: todo.items.map((one) => ({ ...one, prompt: renderGameWorkPrompt(workPrompt, one) }))
-    }
+    },
+    ...(projectWork.queue ? { queue: projectWork.queue } : {})
   }
   // Why: project rules first, so a repo can override what Orca's own integrations would link.
   const rules = [
@@ -153,7 +155,7 @@ export async function buildOrchestratorGameState(
     const found = input.mcpCallsOf ? gameActivityOf(input.mcpCallsOf(paneKey), rules) : null
     return input.activityMemory ? input.activityMemory.recall(paneKey, found) : found
   }
-  const agents = await gameFleetOf({
+  const fleet = await gameFleetOf({
     agents: input.agents,
     members: input.members ?? [],
     found: isMember ? [] : input.found,
@@ -170,7 +172,24 @@ export async function buildOrchestratorGameState(
     launchOf: input.launchOf,
     leadWorktreeId: input.worktree?.id ?? null
   })
+  const agents =
+    isMember || !input.leaderUnreported
+      ? fleet
+      : withIdleLeader(fleet, input.leaderPaneKey, input.terminalHandleOf)
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
+  const sceneList = sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes
+  const locale = orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
+  // Why the Team card's order: a heading names the lead as its card does (ORCA-1140).
+  const character = (): string | null =>
+    leadCharacterOf(
+      memberRosterOf({ lead: placed.lead, config, extensions: { scenes: sceneList } }),
+      locale
+    )
+  // Why the parent pane: a member's state must name its lead as the lead's own does.
+  const leadPaneKey = input.callerParentPaneKey ?? input.leaderPaneKey
+  const leadName =
+    placed.lead.label ??
+    (input.leadNames ? input.leadNames.keep(leadPaneKey, character) : character())
   return {
     config,
     // Why: a hidden game's mode comes from the layer that hid it, not the one that chose the view.
@@ -190,7 +209,8 @@ export async function buildOrchestratorGameState(
           id: input.worktree.id,
           path: input.worktree.path,
           branch: input.worktree.branch,
-          displayName: input.worktree.displayName
+          displayName: input.worktree.displayName,
+          ...(input.worktree.folder ? { folder: true as const } : {})
         }
       : null,
     agents,
@@ -203,7 +223,7 @@ export async function buildOrchestratorGameState(
     ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
     review: gameReview,
     workItem,
-    extensions: { scenes: sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes },
+    extensions: { scenes: sceneList },
     links: gameLinksOf({
       review: gameReview,
       workItem,
@@ -219,6 +239,8 @@ export async function buildOrchestratorGameState(
     ...(arcade ? { arcade } : {}),
     ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
-    locale: orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
+    locale,
+    ...(leadName ? { leadName } : {}),
+    ...(input.appearance ? { appearance: input.appearance } : {})
   }
 }

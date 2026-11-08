@@ -4,7 +4,7 @@
  * Needs E2E: the section is reached by its id in the real Settings page, and orca.yaml is read from disk.
  */
 
-import { writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
@@ -15,6 +15,7 @@ const WIDTHS = [1440, 768, 390, 320] as const
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
 
 const ORCA_YAML = [
+  '# Team buttons; Settings keeps this line',
   'orchestratorGame:',
   '  actions:',
   '    - label: Release',
@@ -58,9 +59,15 @@ async function dismissAppCards(page: Page): Promise<void> {
   }
 }
 
+// Why: the seeded repo is shared by the worker; this test's orca.yaml must not reach the next test.
+test.afterEach(({ testRepoPath }) => {
+  rmSync(path.join(testRepoPath, 'orca.yaml'), { force: true })
+})
+
 test('Settings > Actions edits the project actions and Orca ones, as V30', async ({
   electronApp,
-  orcaPage
+  orcaPage,
+  testRepoPath
 }, testInfo) => {
   test.setTimeout(CAPTURE_EVIDENCE ? 600_000 : 180_000)
   await waitForSessionReady(orcaPage)
@@ -71,7 +78,8 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
     return first ? { id: first.id, path: first.path } : null
   })
   expect(repo, 'the fixture seeds a repo').not.toBeNull()
-  writeFileSync(path.join(repo!.path, 'orca.yaml'), ORCA_YAML)
+  const orcaYaml = path.join(testRepoPath, 'orca.yaml')
+  writeFileSync(orcaYaml, ORCA_YAML)
   await applySettings(orcaPage, { uiLanguage: 'en' })
   const sectionId = `repo-${repo!.id}-game-actions`
   await orcaPage.evaluate(
@@ -90,7 +98,7 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
   await expect(rows.nth(1)).toContainText('/board · MCP plane')
   await expect(section).toContainText('This project · 2 of 6')
 
-  // A template opens the form first in the list; Create saves it on this machine, pinned.
+  // A template opens the form first in the list; Create writes it into orca.yaml, pinned, by default.
   await dismissAppCards(orcaPage)
   await section.getByRole('button', { name: 'Deploy', exact: true }).click()
   const form = section.locator('[data-slot="game-action-form"]')
@@ -111,25 +119,39 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
   await dismissAppCards(orcaPage)
   await form.getByRole('button', { name: 'Create action' }).click()
   await expect(rows.nth(0)).toContainText('Deploy')
-  await expect(rows.nth(0)).toContainText('This machine')
-  await expect
-    .poll(() =>
-      orcaPage.evaluate(
-        (id) =>
-          window
-            .__store!.getState()
-            .settings?.orchestratorGameProjects?.[id]?.actions?.map((one) => [
-              one.label,
-              one.pin === true
-            ]),
-        repo!.id
-      )
+  await expect(rows.nth(0)).toContainText('orca.yaml')
+  await expect.poll(() => readFileSync(orcaYaml, 'utf8')).toContain('- label: Deploy')
+  const written = readFileSync(orcaYaml, 'utf8')
+  expect(written.startsWith('# Team buttons; Settings keeps this line\n')).toBe(true)
+  expect(written).toContain('mcp: { server: plane, tool: list_work_items }')
+  const machineActions = () =>
+    orcaPage.evaluate(
+      (id) => window.__store!.getState().settings?.orchestratorGameProjects?.[id]?.machineActions,
+      repo!.id
     )
-    .toEqual([
-      ['Deploy', true],
-      ['Release', true],
-      ['Board', false]
-    ])
+  expect(await machineActions()).toBeUndefined()
+
+  // Board saved on "Only this machine" goes to this machine's settings; orca.yaml stays as it was.
+  await rows.nth(2).getByRole('button', { name: 'Edit' }).click()
+  await form.getByRole('radio', { name: 'Only this machine' }).click()
+  await form.getByRole('textbox', { name: /^Button name/ }).fill('Plane board')
+  await form.getByRole('button', { name: 'Save' }).click()
+  await expect(rows.nth(2)).toContainText('This machine')
+  await expect
+    .poll(async () => (await machineActions())?.map((one) => ('label' in one ? one.label : '')))
+    .toEqual(['Plane board'])
+  expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
+
+  // Remove on "Only this machine" hides Release here: it stays listed, dimmed, with Show; orca.yaml stays.
+  await rows.nth(1).getByRole('button', { name: 'Edit' }).click()
+  await form.getByRole('radio', { name: 'Only this machine' }).click()
+  await form.getByRole('button', { name: 'Remove' }).click()
+  await expect(rows.nth(1)).toContainText('/release · Hidden on this machine')
+  await expect(rows.nth(1).getByRole('switch', { name: 'Show Release in the row' })).toBeDisabled()
+  await expect
+    .poll(async () => (await machineActions())?.map((one) => one.command))
+    .toEqual(['board', 'release'])
+  expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
 
   // Orca's Wave turns off on this machine; Stop has no switch.
   await dismissAppCards(orcaPage)
@@ -162,6 +184,16 @@ test('Settings > Actions edits the project actions and Orca ones, as V30', async
       }
     }
   }
+
+  // Show brings back that one action and nothing else.
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  await dismissAppCards(orcaPage)
+  await rows.nth(1).getByRole('button', { name: 'Show', exact: true }).click()
+  await expect(rows.nth(1)).toContainText('/release · Ask the lead')
+  await expect
+    .poll(async () => (await machineActions())?.map((one) => one.command))
+    .toEqual(['board'])
+  expect(readFileSync(orcaYaml, 'utf8')).toBe(written)
 
   // The same page's Scene listbox opens at its control; the trigger is read once it is in view (ORCA-1092 row 28).
   await applySettings(orcaPage, { uiLanguage: 'en' })

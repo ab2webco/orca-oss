@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ORCHESTRATOR_GAME_BUILT_IN_ROSTERS,
   characterKeyOf,
+  leadCharacterOf,
   memberDisplayNameOf,
   memberNameOf,
   memberRosterIssues,
@@ -11,6 +12,15 @@ import {
 import { ORCHESTRATOR_GAME_BUILT_IN_SCENES } from './orchestrator-game-config'
 
 const ROSTER = [{ en: 'Arthur', es: 'Arturo' }, 'Merlin', 'Lancelot']
+
+// ORCA-1094 row 1: with no Lead name the lead is a character, never a worktree name.
+describe('leadCharacterOf', () => {
+  it("takes the roster's last character, the one members, who go in order, reach last", () => {
+    expect(leadCharacterOf(ROSTER, 'en')).toBe('Lancelot')
+    expect(leadCharacterOf([...ROSTER, { en: 'Tristan', es: 'Tristán' }], 'es')).toBe('Tristán')
+    expect(leadCharacterOf([], 'en')).toBeNull()
+  })
+})
 
 describe('nextMemberName', () => {
   it('takes the first name no live member holds', () => {

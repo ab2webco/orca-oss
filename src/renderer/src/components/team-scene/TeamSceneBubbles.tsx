@@ -1,5 +1,9 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
+import {
+  layoutTeamSceneBubbles,
+  type TeamSceneBubbleBox,
+  type TeamSceneRect
+} from './team-scene-bubble-layout'
 import { pixelCloudOf } from './team-scene-pixel-cloud'
 
 export type TeamSceneSpeech = {
@@ -7,6 +11,8 @@ export type TeamSceneSpeech = {
   text: string
   anchor: { x: number; top: number }
   align?: 'center' | 'end'
+  /** Gives its spot up when only one bubble fits, as the advisor's does (its line stays in its card). */
+  yields?: boolean
 }
 
 type Props = {
@@ -15,7 +21,13 @@ type Props = {
   height: number
   /** Pixel's scene pixel size: draw the game's thought cloud instead of the glass bubble. */
   cloudPixel?: number
+  /** What no bubble may cover, such as an asking member's tag. */
+  obstacles?: readonly TeamSceneRect[]
+  /** Told after each layout which speeches got no bubble, so their lines can show elsewhere. */
+  onUnplaced?: (keys: string[]) => void
 }
+
+const NONE: readonly TeamSceneRect[] = []
 
 // Why: the cloud carries its own trail, drawn on the scene's grid from the bubble to the head.
 function PixelCloudCanvas({
@@ -60,32 +72,49 @@ export function TeamSceneBubbles({
   speeches,
   width,
   height,
-  cloudPixel
+  cloudPixel,
+  obstacles = NONE,
+  onUnplaced
 }: Props): React.JSX.Element {
   const refs = useRef(new Map<string, HTMLSpanElement>())
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
   // Why a content key: callers rebuild the array each render, and layout sets state.
-  const layoutKey = speeches
-    .map((s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}`)
-    .join('|')
+  const layoutKey = [
+    ...speeches.map((s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}`),
+    ...obstacles.map((o) => `${o.left},${o.top},${o.width},${o.height}`)
+  ].join('|')
 
   useLayoutEffect(() => {
     const requests = speeches.map((s) => {
       const el = refs.current.get(s.key)
-      // Why clear it first: a row-shared cloud keeps its narrowed width until laid out again.
-      if (el) {
-        el.style.width = ''
+      if (!el) {
+        return {
+          key: s.key,
+          anchor: s.anchor,
+          align: s.align,
+          yields: s.yields,
+          width: 0,
+          height: 0
+        }
       }
-      return {
-        key: s.key,
-        anchor: s.anchor,
-        align: s.align,
-        width: el?.offsetWidth ?? 0,
-        height: el?.offsetHeight ?? 0
-      }
+      // Why max-content: a row-shared cloud keeps its narrowed width until laid out again, and
+      // text that may break anywhere would shrink to the room left of its old spot.
+      const laid = el.style.width
+      el.style.width = 'max-content'
+      // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
+      const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
+      // Why restore: React skips a width equal to its last one, which would leave max-content.
+      el.style.width = laid
+      return { key: s.key, anchor: s.anchor, align: s.align, yields: s.yields, ...size }
     })
-    setBoxes(layoutTeamSceneBubbles(requests, { width, height }, { beside: Boolean(cloudPixel) }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches
+    const laid = layoutTeamSceneBubbles(
+      requests,
+      { width, height },
+      { beside: Boolean(cloudPixel), obstacles }
+    )
+    setBoxes(laid)
+    onUnplaced?.(speeches.filter((s) => !laid.some((b) => b.key === s.key)).map((s) => s.key))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
   }, [layoutKey, width, height, cloudPixel])
 
   return (
@@ -117,7 +146,8 @@ export function TeamSceneBubbles({
               visibility: box ? 'visible' : 'hidden'
             }}
           >
-            <span className="line-clamp-2">{s.text}</span>
+            {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
+            <span className="line-clamp-2 [overflow-wrap:anywhere]">{s.text}</span>
             {box && cloudPixel ? (
               <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
             ) : null}

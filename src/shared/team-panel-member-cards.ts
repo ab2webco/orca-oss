@@ -1,5 +1,11 @@
+import { agentToolLabelOf } from './agent-tool-label'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
-import { characterKeyOf, memberNameOf, memberRosterOf } from './orchestrator-game-member-names'
+import {
+  characterKeyOf,
+  leadCharacterOf,
+  memberNameOf,
+  memberRosterOf
+} from './orchestrator-game-member-names'
 import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
@@ -124,13 +130,24 @@ const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
 const redactedDetailOf = (text: string | null | undefined): string | null =>
   text ? text.replace(DISPATCH_CAPABILITY, '[redacted]') : null
 
+// Why: an agent keeps its last tool after it stops; only a working or waiting one is on it now.
+const isActive = (agent: GameAgent): boolean =>
+  agent.state === 'working' || agent.state === 'waiting'
+
 const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
+  if (!isActive(agent)) {
+    return null
+  }
   if (agent.activity?.running) {
     const { name, id, url, running } = agent.activity
     return { kind: 'link', name, id, url, running }
   }
   return agent.toolName
-    ? { kind: 'tool', tool: agent.toolName, detail: redactedDetailOf(agent.toolInput) }
+    ? {
+        kind: 'tool',
+        tool: agentToolLabelOf(agent.toolName),
+        detail: redactedDetailOf(agent.toolInput)
+      }
     : null
 }
 
@@ -208,7 +225,7 @@ function memberCardOf(
     account: accountOf(agent, state),
     characterKey: characterOf(roster, agent.displayName),
     ticket,
-    flowPhase: flowPhaseOf(agent, work),
+    flowPhase: isActive(agent) || isFinished(work) ? flowPhaseOf(agent, work) : null,
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
     needsYou,
@@ -252,7 +269,8 @@ function offlineCardOf(
 export function teamCardsOf(
   state: OrchestratorGameState,
   questionTickets: ReadonlySet<string>,
-  ownerAsk: { ticket: string | null } | null = null
+  ownerAsk: { ticket: string | null } | null = null,
+  locale = 'en'
 ): TeamCards | null {
   const leader = state.agents.find((one) => one.isLeader)
   if (!leader) {
@@ -265,7 +283,14 @@ export function teamCardsOf(
     terminalHandle: leader.terminalHandle ?? null,
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
-    name: state.lead?.label ?? leader.displayName ?? state.worktree?.displayName ?? leader.paneKey,
+    // Why leadName first: the host keeps it for the session, so a scene or language change cannot rename the lead.
+    name:
+      state.leadName ??
+      state.lead?.label ??
+      leadCharacterOf(roster, locale) ??
+      leader.displayName ??
+      state.worktree?.displayName ??
+      leader.paneKey,
     agentType: leader.agentType,
     status: statusOf(condition, leader.state === 'waiting' || ownerAsk !== null, {
       review: null,

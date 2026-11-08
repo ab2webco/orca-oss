@@ -596,55 +596,53 @@ test("the project's Actions editor saves this machine's list and renders at ever
     timeout: 15_000
   })
   await expect(orcaPage.getByRole('radiogroup', { name: 'Open links in' }).first()).toBeVisible()
-  await orcaPage.getByRole('button', { name: 'Edit on this machine' }).click()
-  for (const [label, command, prompt] of [
-    ['Test runs', 'test-runs', 'Have members run the Tambora test runs of my QA tickets'],
-    ['Daily log', 'daily', 'Write the daily log of what the members did']
+  // Why "Only this machine": a new action would otherwise write orca.yaml into the shared repo.
+  const editor = orcaPage.locator('[data-slot="game-actions-settings"]')
+  const form = editor.locator('[data-slot="game-action-form"]')
+  for (const [label, prompt] of [
+    ['Test runs', 'Have members run the Tambora test runs of my QA tickets'],
+    ['Daily log', 'Write the daily log of what the members did']
   ] as const) {
-    await orcaPage.getByRole('button', { name: 'Add action' }).click()
-    const n = await orcaPage.locator('[data-slot="game-action-row"]').count()
-    await orcaPage.getByLabel(`Label ${n}`).fill(label)
-    await orcaPage.getByLabel(`Command ${n}`).fill(command)
-    await orcaPage.getByLabel(`Prompt ${n}`).fill(prompt)
+    await editor.getByRole('button', { name: 'New action', exact: true }).click()
+    await form.getByRole('radio', { name: 'Only this machine' }).click()
+    await form.getByRole('textbox', { name: /^Button name/ }).fill(label)
+    await form.getByRole('textbox', { name: /^What it asks the lead/ }).fill(prompt)
+    await form.getByRole('button', { name: 'Create action' }).click()
+    await expect(form).toHaveCount(0)
   }
-  await orcaPage.getByLabel('Key 2').fill('x')
-  await orcaPage.getByRole('button', { name: 'Save actions' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({
       [repoId as string]: {
-        actions: [
+        machineActions: [
+          {
+            label: 'Daily log',
+            command: 'daily-log',
+            prompt: 'Write the daily log of what the members did',
+            icon: 'ship',
+            pin: true
+          },
           {
             label: 'Test runs',
             command: 'test-runs',
-            prompt: 'Have members run the Tambora test runs of my QA tickets'
-          },
-          {
-            label: 'Daily log',
-            command: 'daily',
-            key: 'x',
-            prompt: 'Write the daily log of what the members did'
+            prompt: 'Have members run the Tambora test runs of my QA tickets',
+            icon: 'ship',
+            pin: true
           }
         ]
       }
     })
 
-  // An MCP row with a refused command shows the inline error the screenshots should carry.
-  await orcaPage.getByRole('button', { name: 'Add action' }).click()
-  await orcaPage.getByLabel('Label 3').fill('Runs')
-  await orcaPage.getByLabel('Command 3').fill('wave')
-  await orcaPage
-    .getByRole('radiogroup', { name: 'Kind 3' })
-    .getByRole('radio', { name: 'MCP' })
-    .click()
-  await orcaPage.getByLabel('MCP server 3').fill('tambora')
-  await orcaPage.getByLabel('Tool 3').fill('list_test_runs')
-  await expect(orcaPage.getByRole('alert')).toHaveText(
-    'A lead button or another action already uses this command.'
-  )
-  await expect(orcaPage.getByRole('button', { name: 'Save actions' })).toBeDisabled()
+  // A command a lead button already uses shows the inline error the screenshots should carry.
+  await editor.getByRole('button', { name: 'New action', exact: true }).click()
+  await form.getByRole('textbox', { name: /^Button name/ }).fill('Runs')
+  await form.getByRole('textbox', { name: /^Command/ }).fill('wave')
+  await form.getByRole('radio', { name: 'MCP tool' }).click()
+  await form.getByRole('textbox', { name: /^MCP server/ }).fill('tambora')
+  await form.getByRole('textbox', { name: /^Tool/ }).fill('list_test_runs')
+  await form.getByRole('button', { name: 'Create action' }).click()
+  await expect(form.getByRole('alert')).toHaveText('/wave already exists.')
 
-  const editor = orcaPage.locator('[data-slot="game-actions-settings"]')
   await shootAll(electronApp, orcaPage, testInfo, 'actions', editor)
   // Why a box check: at phone widths the editor is taller than the window, so no shot holds all of it.
   for (const width of WIDTHS) {

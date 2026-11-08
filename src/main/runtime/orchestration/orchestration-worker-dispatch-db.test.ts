@@ -54,6 +54,40 @@ describe('OrchestrationDb worker Dispatch state', () => {
     ])
   })
 
+  // Why (ORCA-1141): restart recovery deleted an adopted agent's tab as if Orca had made it.
+  it("reports each recovery row's terminal ownership, created or external", () => {
+    const d = createDb()
+    const start = (handle: string, ownership: 'created' | 'external') => {
+      const started = d.createStartingWorkerDispatch({
+        taskId: d.createTask({ spec: handle }).id,
+        startOptions: { topology: 'current', agent: 'codex' }
+      })
+      d.prepareStartingWorkerAuthority({
+        dispatchId: started.dispatch.id,
+        handle,
+        paneKey: `tab_${handle}:leaf_${handle}`,
+        processIncarnation: `pty_${handle}:1`,
+        worktreeId: 'repo::worktree',
+        setupState: 'not_applicable',
+        effects: [],
+        terminalOwnership: ownership
+      })
+      d.markWorkerDispatchReady(started.dispatch.id)
+      return started.dispatch.id
+    }
+    const created = start('term_created', 'created')
+    const adopted = start('term_adopted', 'external')
+
+    expect(
+      d
+        .listLegacyWorkerTerminalRecoveryRows()
+        .map((row) => [row.dispatch_id, row.terminal_ownership])
+    ).toEqual([
+      [created, 'owned'],
+      [adopted, 'external']
+    ])
+  })
+
   it('requeues an active Task before settling a worker whose terminal is missing', () => {
     const d = createDb()
     const task = d.createTask({ spec: 'recover missing worker' })
