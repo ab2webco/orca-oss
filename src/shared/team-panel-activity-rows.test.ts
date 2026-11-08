@@ -23,6 +23,7 @@ const session = (over: Partial<TeamSoloSession> = {}): TeamSoloSession => ({
   worktreeName: 'fix-tooltip',
   worktreeId: 'repo::/w/fix-tooltip',
   isPrimary: false,
+  inTeam: false,
   host: { kind: 'local' },
   ticket: null,
   pr: null,
@@ -112,6 +113,14 @@ describe('teamSoloModelOf', () => {
     const [row] = rowsOf([session({ entry: entry({ toolName: 'Bash', toolInput }) })])
     expect(JSON.stringify(row)).not.toMatch(/dcap_/)
     expect(row?.liveAction).toMatchObject({ kind: 'tool', tool: 'Bash' })
+    expect(JSON.stringify(row?.liveAction)).toContain('[redacted]')
+  })
+
+  it('never puts a Claude OAuth token on a tool line (ORCA-1039)', () => {
+    const token = `sk-ant-oat01-${'QXJZ'.repeat(24)}`.slice(0, 108)
+    const toolInput = `CLAUDE_CODE_OAUTH_TOKEN=${token} claude -p "check"`
+    const [row] = rowsOf([session({ entry: entry({ toolName: 'Bash', toolInput }) })])
+    expect(JSON.stringify(row)).not.toMatch(/sk-ant|QXJZ/)
     expect(JSON.stringify(row?.liveAction)).toContain('[redacted]')
   })
 

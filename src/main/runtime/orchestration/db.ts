@@ -4122,6 +4122,8 @@ export class OrchestrationDb {
     runId: string
     consumerGeneration: number
     body: string
+    /** Why: an answer the person typed is marked as theirs on the message the member receives. */
+    payload?: string
   }): { question: QuestionRow; message: MessageRow; duplicate: boolean } {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -4160,7 +4162,8 @@ export class OrchestrationDb {
         subject: 'Re: Question',
         body: params.body,
         threadId: question.message_id,
-        runId: params.runId
+        runId: params.runId,
+        payload: params.payload
       })
       // Why: ask returns thread state directly; leaving its answer unread would deliver it again via check.
       this.markAsRead([message.id])

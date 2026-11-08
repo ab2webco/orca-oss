@@ -1,4 +1,4 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -11,11 +11,74 @@ import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 const STYLES = ['pixel', 'figures', 'office'] as const
 // Why this long: the acceptance is a visible change within 2 s while anyone works (ORCA-1097).
 const WINDOW_MS = 2000
-const SAMPLES = 11
+// Why: Pixel's tool swing shows for 1/2.3 s ≈ 435 ms of every 1.15 s (SWING_FADE, SWING_SECONDS in
+// team-scene-pixel-painter.ts) and rests otherwise; frames closer than that over 2 s must catch
+// both. Figures and Office move continuously, so the same bound covers them.
+const MAX_FRAME_GAP_MS = 430
+// Why fresh windows, not a longer one: a stretched window would judge "within N s", not 2 s.
+const MAX_WINDOWS = 5
+// Why by role and name: Pixel's thought cloud is a canvas too.
+const sceneCanvasIn = (root: Locator): Locator => root.getByRole('img', { name: 'Live team scene' })
+
+// Why mapped: a never-shown window gets a frame only every ~1017 ms on CI (ORCA-760), too sparse
+// for any window to be judged (PR #1067 run 42408533741).
+test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
+
+type SceneWindow = { hashes: string[]; frames: number; maxGapMs: number }
+
+const describeWindow = (w: SceneWindow): string =>
+  `${new Set(w.hashes).size} distinct of ${w.frames} frames, at most ${Math.round(w.maxGapMs)} ms apart`
+
+// Why hashed inside the frame: a hash per animation frame is what the scene painted, not what a
+// Playwright poll happened to catch on a starved runner (ORCA-1132).
+async function sceneWindow(page: Page): Promise<SceneWindow> {
+  return page.evaluate(
+    (windowMs) =>
+      new Promise<SceneWindow>((resolve) => {
+        const hashOf = (): string => {
+          const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
+          const g = canvas?.getContext('2d')
+          if (!canvas || !g || canvas.width === 0) {
+            return 'unpainted'
+          }
+          const { data } = g.getImageData(0, 0, canvas.width, canvas.height)
+          let hash = 0x811c9dc5
+          for (let i = 0; i < data.length; i++) {
+            hash = Math.imul(hash ^ data[i]!, 0x01000193)
+          }
+          return (hash >>> 0).toString(16)
+        }
+        const start = performance.now()
+        const stamps = [start]
+        const hashes: string[] = []
+        let counting = true
+        const tick = (): void => {
+          if (!counting) {
+            return
+          }
+          stamps.push(performance.now())
+          hashes.push(hashOf())
+          requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+        // Why a timer resolves: a starved runner may run no frame at all before the window ends.
+        setTimeout(() => {
+          counting = false
+          stamps.push(performance.now())
+          let maxGapMs = 0
+          for (let i = 1; i < stamps.length; i++) {
+            maxGapMs = Math.max(maxGapMs, stamps[i]! - stamps[i - 1]!)
+          }
+          resolve({ hashes, frames: hashes.length, maxGapMs })
+        }, windowMs)
+      }),
+    WINDOW_MS
+  )
+}
 
 async function canvasHash(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] canvas')
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
     const g = canvas?.getContext('2d')
     if (!canvas || !g || canvas.width === 0) {
       return 'unpainted'
@@ -27,33 +90,6 @@ async function canvasHash(page: Page): Promise<string> {
     }
     return (hash >>> 0).toString(16)
   })
-}
-
-// Why counted alongside: CI renders at about 3.5 frames/s, so a still result must say whether frames ran.
-async function hashesOver(page: Page): Promise<{ hashes: string[]; frames: number }> {
-  await page.evaluate(() => {
-    const w = window as Window & { __sceneFrames?: number; __sceneCounting?: boolean }
-    w.__sceneFrames = 0
-    w.__sceneCounting = true
-    const tick = (): void => {
-      if (w.__sceneCounting) {
-        w.__sceneFrames = (w.__sceneFrames ?? 0) + 1
-        requestAnimationFrame(tick)
-      }
-    }
-    requestAnimationFrame(tick)
-  })
-  const hashes: string[] = []
-  for (let i = 0; i < SAMPLES; i++) {
-    hashes.push(await canvasHash(page))
-    await page.waitForTimeout(WINDOW_MS / (SAMPLES - 1))
-  }
-  const frames = await page.evaluate(() => {
-    const w = window as Window & { __sceneFrames?: number; __sceneCounting?: boolean }
-    w.__sceneCounting = false
-    return w.__sceneFrames ?? 0
-  })
-  return { hashes, frames }
 }
 
 // A real lead, one member working and one asking the user; nothing walks once they are seated, so
@@ -196,24 +232,40 @@ test('every Team scene style moves while its team works, with no one entering or
           }),
         style
       )
-      await expect(panel.locator(`[data-team-scene="${style}"] canvas`)).toBeVisible({
+      await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
       await expect.poll(() => canvasHash(orcaPage), { timeout: 30_000 }).not.toBe('unpainted')
       // Why a wait first: the members walked in when they joined; by now every one is seated.
       await orcaPage.waitForTimeout(8000)
-      const { hashes, frames } = await hashesOver(orcaPage)
+      const windows: SceneWindow[] = []
+      while (windows.length < MAX_WINDOWS) {
+        windows.push(await sceneWindow(orcaPage))
+        if (windows.at(-1)!.maxGapMs <= MAX_FRAME_GAP_MS) {
+          break
+        }
+      }
+      const judged = windows.at(-1)!
       testInfo.annotations.push({
         type: 'team-scene-motion',
-        description: `${style}: ${new Set(hashes).size} distinct frames in ${SAMPLES} samples over ${WINDOW_MS} ms, ${frames} animation frames`
+        description: `${style}: ${windows.map(describeWindow).join('; ')} over ${WINDOW_MS} ms each`
       })
       await panel.locator('[data-team-scene]').screenshot({
         path: testInfo.outputPath(`team-scene-motion-${style}.png`)
       })
+      if (judged.maxGapMs > MAX_FRAME_GAP_MS) {
+        expect
+          .soft(
+            judged.maxGapMs,
+            `${style} not judged: the runner starved the scene in ${windows.length} windows of ${WINDOW_MS} ms (${windows.map(describeWindow).join('; ')})`
+          )
+          .toBeLessThanOrEqual(MAX_FRAME_GAP_MS)
+        continue
+      }
       expect
         .soft(
-          new Set(hashes).size,
-          `${style} drew one still frame for ${WINDOW_MS} ms over ${frames} animation frames`
+          new Set(judged.hashes).size,
+          `${style} drew one still frame for ${WINDOW_MS} ms: ${describeWindow(judged)}`
         )
         .toBeGreaterThan(1)
     }
@@ -223,7 +275,7 @@ test('every Team scene style moves while its team works, with no one entering or
       window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
     )
     const pixel = panel.locator('[data-team-scene="pixel"]')
-    await expect(pixel.locator('canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(sceneCanvasIn(pixel)).toBeVisible({ timeout: 30_000 })
     // A sequence across one swing, so the motion can be read frame by frame.
     for (let frame = 0; frame < 6; frame++) {
       await pixel.screenshot({

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
@@ -12,8 +11,9 @@ import {
   setPlatform
 } from './claude-account-service-test-harness'
 import { readActiveClaudeKeychainCredentials } from './keychain'
+import { createIsolatedTestProfilePath } from './claude-service-test-profile'
 
-const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-login-test')
+const CLAUDE_SERVICE_TEST_ROOT = createIsolatedTestProfilePath('orca-claude-service-login-test')
 
 vi.mock('electron', () => ({
   app: {

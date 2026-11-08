@@ -11,6 +11,7 @@ function finalOf(entry: TeamSoloSession['entry']): string | null {
     worktreeName: 'w',
     worktreeId: 'wt-1',
     isPrimary: false,
+    inTeam: false,
     host: { kind: 'local' },
     ticket: null,
     pr: null,

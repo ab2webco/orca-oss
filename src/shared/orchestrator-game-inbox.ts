@@ -20,7 +20,7 @@ export type GameInboxMail = {
 export type GameInboxSource = {
   /** The lead's terminal and its run mailbox. */
   leadAddresses: readonly string[]
-  /** Each ticket's terminals and dispatch mailboxes, closed ones included. */
+  /** Each ticket's terminals and dispatch mailboxes, closed ones included; `ticket` is the name when it has none. */
   members: readonly { ticket: string; addresses: readonly string[] }[]
   mail: readonly GameInboxMail[]
   /** Other projects' lead handles to their labels, for mail a peer lead sent. */

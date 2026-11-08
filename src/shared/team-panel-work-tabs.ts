@@ -188,7 +188,7 @@ function machineOf(one: GameHostCapacity, members: readonly TeamMemberCard[]): T
   }
 }
 
-/** Null hides the tab; a lead with no paired host reads empty, an older host unavailable. */
+/** Null hides the tab; a lead with no paired host reads this machine alone, an older host unavailable. */
 export function teamMachinesSectionOf(args: {
   state: OrchestratorGameState
   members: readonly TeamMemberCard[]
@@ -197,8 +197,9 @@ export function teamMachinesSectionOf(args: {
   if (state.panel?.tabs.machines === false) {
     return null
   }
-  if (state.hostCapacity) {
-    return { kind: 'ready', value: state.hostCapacity.map((one) => machineOf(one, members)) }
+  const hosts = state.hostCapacity ?? (state.localHost ? [state.localHost] : null)
+  if (hosts) {
+    return { kind: 'ready', value: hosts.map((one) => machineOf(one, members)) }
   }
   return state.hosts ? { kind: 'ready', value: [] } : { kind: 'unavailable' }
 }

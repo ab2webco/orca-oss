@@ -11,7 +11,7 @@ import {
 } from './team-panel-tab-definition'
 import { TeamPanelActivityTab } from './team-panel-activity-tab'
 import { TeamPanelInboxTab } from './team-panel-inbox-tab'
-import { TeamPanelMachinesTab } from './team-panel-machines-tab'
+import { TeamPanelMachinesTab, teamMachinesAloneCopy } from './team-panel-machines-tab'
 import { TeamPanelPrsTab } from './team-panel-prs-tab'
 import { TeamPanelQueueTab } from './team-panel-queue-tab'
 import { TeamPanelTeamTab } from './team-panel-team-tab'
@@ -115,14 +115,14 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
     title: () => translate('teamPanel.tabs.machines.title', 'Machines'),
     section: (model) => model.machines,
     isEmpty: isEmptyList,
-    copy: () => ({
-      emptyTitle: translate('teamPanel.tabs.machines.emptyTitle', 'Only this machine'),
-      emptyText: translate(
-        'teamPanel.tabs.machines.emptyText',
-        'Pair another machine to spread agents across hosts.'
-      ),
-      errorTitle: translate('teamPanel.tabs.machines.errorTitle', 'Could not read the machines')
-    }),
+    copy: () => {
+      const alone = teamMachinesAloneCopy()
+      return {
+        emptyTitle: alone.title,
+        emptyText: alone.text,
+        errorTitle: translate('teamPanel.tabs.machines.errorTitle', 'Could not read the machines')
+      }
+    },
     Body: TeamPanelMachinesTab
   })
 ]

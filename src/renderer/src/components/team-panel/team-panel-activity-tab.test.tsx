@@ -53,6 +53,7 @@ function row(overrides: Partial<TeamActivityRow>): TeamActivityRow {
     repoName: 'orca-oss',
     worktreeName: 'main',
     isPrimary: true,
+    inTeam: false,
     prompt: 'Check the merge queue',
     ticket: null,
     pr: null,

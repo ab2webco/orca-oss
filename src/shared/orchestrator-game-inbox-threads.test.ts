@@ -206,4 +206,37 @@ describe('gameInboxThreadsOf', () => {
       overriddenBy: { text: 'Use 3000', at: override.created_at }
     })
   })
+
+  it('says you answered a waiting question you answered from the Inbox, not the lead (ORCA-1136)', () => {
+    sequence = 0
+    const question = mail('run:run_1', 'dispatch:d1', { type: 'question', body: 'Which port?' })
+    const note = mail('term_lead', 'owner', {
+      type: 'escalation',
+      payload: JSON.stringify({ ownerMemberReply: question.id, mode: 'answered', text: '3000' })
+    })
+
+    const { answered } = gameInboxThreadsOf(
+      source([question, note], {
+        answeredQuestions: [
+          { ...question, answer_body: '3000', answered_at: '2026-10-29 10:05:00' }
+        ]
+      })
+    )
+
+    expect(answered[0]?.overriddenBy).toEqual({ text: '3000', at: note.created_at })
+  })
+
+  it("files a member's mail by the dispatch it names before the terminal it came from (ORCA-1136)", () => {
+    sequence = 0
+    const row = mail('term_lead', 'term_1', {
+      type: 'question',
+      payload: JSON.stringify({ dispatchId: 'd2' })
+    })
+
+    const { threads } = gameInboxThreadsOf(source([row]))
+
+    expect(threads.map((thread) => [thread.ticket, thread.messages[0]?.from])).toEqual([
+      ['CIN-2', 'CIN-2']
+    ])
+  })
 })
