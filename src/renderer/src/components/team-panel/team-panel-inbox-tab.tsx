@@ -44,7 +44,7 @@ import {
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
 const SUB_TAB =
-  'h-[26px] flex-none gap-1 rounded-md px-1.5 text-xs font-medium data-[state=active]:bg-muted data-[state=active]:shadow-none dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted'
+  'h-[26px] flex-none rounded-md font-medium transition-colors data-[state=active]:bg-muted data-[state=active]:shadow-none dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted'
 const LIST = 'mt-0 px-3 pb-4'
 
 function GroupLabel({ title, place }: { title: string; place: string | null }): React.JSX.Element {
@@ -85,13 +85,22 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
     agentQuestions.length +
     questions.length +
     otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
-  const subTabs: [InboxSubTab, string, number][] = [
-    ['for-you', translate('teamPanel.inbox.forYou', 'For you'), forYou],
-    ['waiting', translate('teamPanel.inbox.waiting', 'Waiting'), threads.waiting.length],
-    ['threads', translate('teamPanel.inbox.threads', 'Threads'), threads.threads.length],
+  const forYouLabel = translate('teamPanel.inbox.forYou', 'For you')
+  const threadsLabel = translate('teamPanel.inbox.threads', 'Threads')
+  // Each sub-tab's full label, its short one, and its count.
+  const subTabs: [InboxSubTab, string, string, number][] = [
+    ['for-you', forYouLabel, forYouLabel, forYou],
+    [
+      'waiting',
+      translate('teamPanel.inbox.waiting', 'Waiting'),
+      translate('teamPanel.inbox.waitingShort', 'Waiting'),
+      threads.waiting.length
+    ],
+    ['threads', threadsLabel, threadsLabel, threads.threads.length],
     [
       'answered',
       translate('teamPanel.inbox.answered', 'Answered'),
+      translate('teamPanel.inbox.answeredShort', 'Done'),
       threads.answered.length + answeredQuestions.length
     ]
   ]
@@ -99,10 +108,11 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const yourAnswer = translate('teamPanel.inbox.yourAnswer', 'Your answer')
   const reply = (item: { id: string; ticket: string }) => (text: string) =>
     onReply({ id: item.id, text, ticket: item.ticket })
-  const nothing = subTabs.every(([, , count]) => count === 0) && props.undelivered.length === 0
+  const nothing = subTabs.every(([, , , count]) => count === 0) && props.undelivered.length === 0
   const empty = nothing && !props.projectUnread
   // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
-  const cue = useTabStripCue(tab, empty ? '' : subTabs.map(([id]) => id).join())
+  const cue = useTabStripCue(tab, empty ? '' : subTabs.flat().join(), 3)
+  const tight = cue.fit >= 2
   if (empty) {
     return (
       <TeamPanelMessageState
@@ -121,22 +131,23 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       className="flex h-full min-h-0 flex-col gap-0"
       data-testid="team-panel-inbox"
     >
-      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel scrolls them with a cue. */}
+      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel shortens labels, then drops counts; the Inbox tab still shows For you's. */}
       <div className="relative shrink-0">
         <TabsList
           aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
           {...cue.stripProps}
-          className="h-auto w-full shrink-0 flex-nowrap justify-start overflow-x-auto group-data-[orientation=horizontal]/tabs:h-auto gap-1 rounded-none bg-transparent px-3 pt-2.5 pb-2 [scrollbar-width:none]"
+          className={`h-auto w-full shrink-0 flex-nowrap justify-start overflow-x-auto group-data-[orientation=horizontal]/tabs:h-auto rounded-none bg-transparent pt-2.5 pb-2 [scrollbar-width:none] ${cue.fit >= 3 ? 'gap-0 px-2' : tight ? 'gap-0.5 px-2' : 'gap-1 px-3'}`}
         >
-          {subTabs.map(([id, label, count]) => (
+          {subTabs.map(([id, label, short, count]) => (
             <TabsTrigger
               key={id}
               ref={id === tab ? cue.activeTrigger : undefined}
               value={id}
-              className={SUB_TAB}
+              aria-label={cue.fit >= 1 ? `${label} ${count}` : undefined}
+              className={`${SUB_TAB} ${tight ? 'gap-0.5 px-1 text-[11px]' : 'gap-1 px-1.5 text-xs'}`}
             >
-              {label}
-              <span className="tabular-nums">{count}</span>
+              {cue.fit >= 1 ? short : label}
+              {cue.fit < 3 ? <span className="tabular-nums">{count}</span> : null}
             </TabsTrigger>
           ))}
         </TabsList>

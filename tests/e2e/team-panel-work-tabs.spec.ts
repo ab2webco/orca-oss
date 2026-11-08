@@ -398,7 +398,7 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
     await setScene(electronApp, all.full)
     await rereadPanel(orcaPage)
 
-    // Narrow, the last tab is off the strip, as in V28: the keys and a sideways wheel must reach it.
+    // Narrow, the strip shortens its labels so the last tab sits whole; the keys and a sideways wheel reach it.
     await orcaPage.setViewportSize({ width: 320, height: 900 })
     const firstTab = panel.getByRole('tab', { name: COPY.es.tabs.team })
     const lastTab = panel.getByRole('tab', { name: COPY.es.tabs.machines })

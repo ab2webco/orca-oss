@@ -41,6 +41,7 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
   defineTeamPanelTab({
     id: 'activity',
     title: () => translate('teamPanel.tabs.activity.title', 'Activity'),
+    shortTitle: () => translate('teamPanel.tabs.activity.shortTitle', 'Agents'),
     section: (model) => (model.kind === 'solo' ? ready(model) : null),
     isEmpty: (model) => model.rows.length === 0,
     copy: () => ({
@@ -113,6 +114,7 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
   defineTeamPanelTab({
     id: 'machines',
     title: () => translate('teamPanel.tabs.machines.title', 'Machines'),
+    shortTitle: () => translate('teamPanel.tabs.machines.shortTitle', 'Hosts'),
     section: (model) => model.machines,
     isEmpty: isEmptyList,
     copy: () => {

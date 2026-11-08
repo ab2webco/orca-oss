@@ -102,10 +102,12 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
   const active = pickTeamPanelTab(tabs, selected)
   const shownId = active?.id ?? null
   useEffect(() => publishShown(shownId), [publishShown, shownId])
-  const { activeTrigger, overflow, stripProps } = useTabStripCue(
+  const { activeTrigger, overflow, fit, stripProps } = useTabStripCue(
     active?.id,
-    tabs.map((tab) => tab.id).join()
+    tabs.map((tab) => `${tab.id}:${tab.title}:${tab.count}`).join(),
+    3
   )
+  const tight = fit >= 2
   if (!active) {
     return null
   }
@@ -115,22 +117,23 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
       onValueChange={(value) => select(value as TeamTabId)}
       className="flex min-h-0 flex-1 flex-col gap-0"
     >
-      {/* Why a container query: under 340 px, V28's narrow spacing and 12 px text fit five tabs at 280. */}
+      {/* Why a container query: under 340 px, V28's narrow spacing and 12 px text fit five tabs at 280; narrower, the strip shortens its labels. */}
       <div className="@container relative shrink-0">
         <TabsList
           variant="line"
           aria-label={translate('teamPanel.tabs.label', 'Panel sections')}
           {...stripProps}
-          className="h-[35px] w-full shrink-0 justify-start gap-2.5 overflow-x-auto border-b border-border px-2 [scrollbar-width:none] @[340px]:gap-4 @[340px]:px-3"
+          className={`h-[35px] w-full shrink-0 justify-start overflow-x-auto border-b border-border [scrollbar-width:none] ${fit >= 3 ? 'gap-0.5 px-1' : tight ? 'gap-1 px-1' : 'gap-2.5 px-2 @[340px]:gap-4 @[340px]:px-3'}`}
         >
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.id}
               ref={tab.id === active.id ? activeTrigger : undefined}
               value={tab.id}
-              className="h-full flex-none gap-1 rounded-none px-0 text-[12px] after:bottom-[-1px] @[340px]:gap-1.5 @[340px]:text-[13px]"
+              aria-label={fit >= 1 && tab.shortTitle !== tab.title ? tab.title : undefined}
+              className={`h-full flex-none gap-1 rounded-none px-0 transition-colors after:bottom-[-1px] ${tight ? 'text-[11px]' : 'text-[12px] @[340px]:gap-1.5 @[340px]:text-[13px]'}`}
             >
-              {tab.title}
+              {fit >= 1 ? tab.shortTitle : tab.title}
               {tab.count !== null ? (
                 <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive/15 px-1 text-[11px] font-semibold tabular-nums text-destructive">
                   {tab.count}
