@@ -325,6 +325,21 @@ describe('orca game adopt (ORCA-943)', () => {
       expect(output()).toMatchObject({ name: 'ORCA-907', adopted: true })
     })
 
+    // Why (ORCA-1141 live check): a member in the lead's own worktree is listed with no worktree.
+    it('says a member sharing the lead worktree is one already, with no new dispatch', async () => {
+      const { worktree: _worktree, ...member } = {
+        ...local(),
+        displayName: 'main',
+        found: undefined
+      }
+      const { client, calls } = clientWith([member])
+
+      await adopt(client, 'main')
+
+      expect(mutations(calls)).toEqual([])
+      expect(output()).toMatchObject({ name: 'main', adopted: true, reused: true })
+    })
+
     it('refuses it while mid-turn unless --force', async () => {
       const { client, calls } = clientWith([local('repo1', 'working')])
 

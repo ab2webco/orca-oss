@@ -92,3 +92,15 @@ describe('formatFleet with remote members (ORCA-824)', () => {
     expect(remote).toMatch(/ORCA-805 .* unknown .* imac /)
   })
 })
+
+// Why (ORCA-1141 live check): the lead read MAIN as a ticket and a relaunch it would never get.
+describe('fleet text for a paused adopted member', () => {
+  it('names it with no ticket and says it resumes in its own tab', () => {
+    const adopted = { ...paused('MAIN-2', { name: 'main 2' }), adoptedPane: 'tab-a:leaf-a' }
+    const text = fleetText([adopted])
+
+    expect(text).toMatch(/-\s+launching\s+main-2\s+claude\s+-\s+its own tab\s+main 2/)
+    expect(text).not.toContain('MAIN-2')
+    expect(text).not.toContain('a new launch')
+  })
+})

@@ -147,10 +147,12 @@ async function adoptAgent(
       dispatchId: remoteDispatchIdOf(adopted)!
     }
   }
+  // Why a member needs no worktree: one in the lead's own worktree is listed without one (ORCA-1141).
   const ours = (agent: GameAgent): boolean =>
     !agent.remote &&
-    agent.worktree !== undefined &&
-    isSameGameProject(agent.worktree.id, args.leadWorktreeId) &&
+    ((agent.isMember && !agent.found) ||
+      (agent.worktree !== undefined &&
+        isSameGameProject(agent.worktree.id, args.leadWorktreeId))) &&
     isGameAgentNamed(agent, name)
   if (agents.some((agent) => agent.isMember && !agent.found && !agent.isLeader && ours(agent))) {
     return { name, adopted: true, reused: true }
