@@ -42,7 +42,11 @@ const mail = (sequence: number, to: string, from: string): GameInboxMail => ({
   payload: null
 })
 
-function board(rows: GameInboxMail[], pendingQuestions: GameInboxMail[] = []) {
+function board(
+  rows: GameInboxMail[],
+  pendingQuestions: GameInboxMail[] = [],
+  extraMembers: { ticket: string; addresses: string[] }[] = []
+) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-inbox-'))
   dirs.push(dir)
   const asked: unknown[] = []
@@ -54,7 +58,7 @@ function board(rows: GameInboxMail[], pendingQuestions: GameInboxMail[] = []) {
       asked.push(lead)
       return {
         leadAddresses: ['term_lead', 'run:run_1'],
-        members: [{ ticket: 'CIN-1', addresses: ['term_1', 'dispatch:d1'] }],
+        members: [{ ticket: 'CIN-1', addresses: ['term_1', 'dispatch:d1'] }, ...extraMembers],
         mail: rows,
         pendingQuestions
       }
@@ -78,6 +82,21 @@ describe('GameBoard inbox', () => {
 
     const again = await game.inbox({ terminalHandle: 'term_lead', unread: true })
     expect(again.inbox).toMatchObject({ key: 'lead', unread: 0, messages: [] })
+  })
+
+  it("reads a member's inbox by its name when it has no ticket, as the CLI sends it upper-cased (ORCA-1136)", async () => {
+    const { game } = board(
+      [mail(1, 'term_lead', 'term_main')],
+      [],
+      [{ ticket: 'main', addresses: ['term_main', 'dispatch:d_main'] }]
+    )
+
+    expect((await game.inbox({ terminalHandle: 'term_lead', ticket: 'MAIN' })).inbox).toMatchObject(
+      { key: 'main', unread: 0 }
+    )
+    expect(
+      (await game.inbox({ terminalHandle: 'term_lead' })).inbox.messages.map((one) => one.from)
+    ).toEqual(['main'])
   })
 
   it("reads a ticket's inbox for the lead, and a member only ever its own", async () => {

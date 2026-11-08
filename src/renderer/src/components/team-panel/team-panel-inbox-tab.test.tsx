@@ -193,6 +193,33 @@ describe('Inbox tab', () => {
     expect(view.getByPlaceholderText('Your answer')).toBeTruthy()
   })
 
+  it('names a member with no ticket and never shows a raw dispatch id (ORCA-1136)', () => {
+    const item = THREADS.waiting[0]!
+    const view = renderInbox({
+      threads: {
+        ...THREADS,
+        waiting: [
+          { ...item, id: 'w-main', ticket: 'main', body: 'Reply member ready?' },
+          { ...item, id: 'w-raw', ticket: 'dispatch:ctx_1fa802c37732', body: 'Which port?' }
+        ],
+        answered: [{ ...THREADS.answered[0]!, ticket: 'main' }]
+      }
+    })
+    pick(view, /Waiting/)
+    const named = view.getByTestId('team-inbox-waiting-w-main')
+    const raw = view.getByTestId('team-inbox-waiting-w-raw')
+
+    expect(named.textContent).toContain('main: Reply member ready?')
+    expect(named.querySelector('code')).toBeNull()
+    expect(raw.textContent).not.toContain('ctx_')
+    expect(raw.textContent).toContain('Which port?')
+
+    pick(view, /Answered/)
+    const answered = view.getByTestId('team-inbox-answered-a1')
+    expect(answered.textContent).toContain('main')
+    expect(answered.querySelector('code')).toBeNull()
+  })
+
   it('lists a thread with its message count and last line, the ticket said once', () => {
     const view = renderInbox()
     pick(view, /Threads/)
