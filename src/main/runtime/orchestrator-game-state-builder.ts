@@ -180,12 +180,16 @@ export async function buildOrchestratorGameState(
   const sceneList = sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes
   const locale = orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   // Why the Team card's order: a heading names the lead as its card does (ORCA-1140).
-  const leadName =
-    placed.lead.label ??
+  const character = (): string | null =>
     leadCharacterOf(
       memberRosterOf({ lead: placed.lead, config, extensions: { scenes: sceneList } }),
       locale
     )
+  // Why the parent pane: a member's state must name its lead as the lead's own does.
+  const leadPaneKey = input.callerParentPaneKey ?? input.leaderPaneKey
+  const leadName =
+    placed.lead.label ??
+    (input.leadNames ? input.leadNames.keep(leadPaneKey, character) : character())
   return {
     config,
     // Why: a hidden game's mode comes from the layer that hid it, not the one that chose the view.

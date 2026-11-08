@@ -8,6 +8,7 @@ import type {
 } from './orchestrator-game-fleet'
 import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
+import type { GameLeadNames } from './orchestrator-game-lead-names'
 import type { GameHostProfile } from '../../shared/orchestrator-game-lead'
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import type { OrchestratorGameSceneSource } from '../../shared/orchestrator-game-scene'
@@ -79,6 +80,8 @@ export type OrchestratorGameStateInput = {
   mcpCallsOf?: (paneKey: string) => readonly GameActivityCall[]
   /** Keeps each pane's last match once its call leaves `mcpCallsOf`'s bounded window. */
   activityMemory?: GameActivityMemory
+  /** Keeps each lead's character name for the session (ORCA-1139). */
+  leadNames?: GameLeadNames
   readReview: () => Promise<Parameters<typeof gameReviewOf>[0]>
   readPlane: () => Promise<(TrackerItem & { stateGroup: string }) | null>
   readLinear: () => Promise<TrackerItem | null>

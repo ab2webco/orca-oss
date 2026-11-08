@@ -597,6 +597,12 @@ host (`game launch --on`) takes its name from the same pool: the lead's Orca pic
 in the home task title. The home Run DB records no project, so the names of its unreleased remote
 members hold only while another name is free: they give way before a launch numbers a name.
 
+With no `label`, the lead is the roster's last name, which members reach last. Orca keeps the first
+one it gives a lead's pane for the session, so changing the scene or the language does not rename
+the lead. The game state's `leadName` carries it, and the Team card, the scene and the lead's message
+headings all read it there
+([`orchestrator-game-lead-names.ts`](../../src/main/runtime/orchestrator-game-lead-names.ts)).
+
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 
