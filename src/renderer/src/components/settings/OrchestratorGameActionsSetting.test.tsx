@@ -106,6 +106,22 @@ describe('Settings > Actions, as V30', () => {
     expect(rows(container)[0]).toContain('This machine')
   })
 
+  it('starts a new action on the upload icon, selected and in the preview, as V30', () => {
+    const { container, updates } = render({})
+    press(container, 'New action')
+    const form = container.querySelector('[data-slot="game-action-form"]')!
+    const ship = form.querySelector('[aria-label="Icon ship"]')!
+    expect(ship.getAttribute('aria-checked')).toBe('true')
+    expect(
+      form.querySelectorAll('[aria-label="Icon"] [role="radio"][aria-checked="true"]')
+    ).toHaveLength(1)
+    expect(form.querySelector('svg')?.innerHTML).toBe(ship.querySelector('svg')?.innerHTML)
+    type(form.querySelector<HTMLInputElement>('input')!, 'Smoke')
+    type(form.querySelector<HTMLTextAreaElement>('textarea')!, 'Run it.')
+    press(container, 'Create action')
+    expect(actionsSaved(updates)?.[0]?.icon).toBe('ship')
+  })
+
   it("says what is wrong before saving, and holds the row's pins to three", () => {
     const { container, updates } = render({})
     press(container, 'New action')
