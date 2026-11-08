@@ -58,6 +58,13 @@ const TOKEN_CHAR = /[A-Za-z0-9_-]/
 // An OAuth token or API key runs about 95 chars past its prefix; the bound leaves room for a longer
 // one. No left boundary here: the row join drops the `=` before a token that starts the next row.
 const WRAPPED_SECRET = /dcap_[A-Za-z0-9_-]{1,43}|sk-ant-(?:o[ar]t|api)[A-Za-z0-9_-]{1,128}/g
+// Each kind's longest match; a run past it is longer than any real token, a fake one that wraps the same way.
+const MATCH_BOUND = { dcap: 48, skAnt: 138 }
+const FILLED_BY_ONE_RUN = /^[^A-Za-z0-9_-]*[A-Za-z0-9_-]+$/
+
+/** Whether the first row is a full row of one wrapped run, whose head may sit on a row above it. */
+export const rowsOpenInsideWrappedRun = (rows: readonly string[]): boolean =>
+  rows.length > 1 && FILLED_BY_ONE_RUN.test(rows[0]) && rows[0].length === rows[1].length
 
 /**
  * A token can run past its row by the terminal's wrap or an app's wrap under a hanging indent, at any row
@@ -85,11 +92,23 @@ export function redactWrappedTerminalRows(rows: readonly string[]): string[] {
   const hidden = rows.map(() => new Map<number, boolean>())
   for (const match of stream.matchAll(WRAPPED_SECRET)) {
     let end = match.index + match[0].length
+    const startRow = rows[origin[match.index].row]
+    const bound = match[0].startsWith('dcap_') ? MATCH_BOUND.dcap : MATCH_BOUND.skAnt
+    // Why the row lengths: rows a hard wrap breaks a run over are as long as the row it started in,
+    // where a word on the row after a real token ends is not.
+    const runsOn = (at: number): boolean => {
+      const from = rows[origin[at - 1].row]
+      const to = rows[origin[at].row]
+      return (
+        (at - match.index > bound && from.length === startRow.length) ||
+        (FILLED_BY_ONE_RUN.test(to) && to.length === from.length)
+      )
+    }
     // Inside one row a longer run is no word of the next row, so it goes whole, as on a single line.
     while (
       end < stream.length &&
-      origin[end].row === origin[end - 1].row &&
-      TOKEN_CHAR.test(stream[end])
+      TOKEN_CHAR.test(stream[end]) &&
+      (origin[end].row === origin[end - 1].row || runsOn(end))
     ) {
       end++
     }

@@ -6,7 +6,8 @@
 import { ipcMain, type WebContents } from 'electron'
 import {
   redactTerminalSegmentRows,
-  redactWrappedTerminalRows
+  redactWrappedTerminalRows,
+  rowsOpenInsideWrappedRun
 } from '../../shared/dispatch-capability-redaction'
 import {
   AGENT_TERMINAL_TAIL_MAX_PANES,
@@ -27,6 +28,8 @@ export const AGENT_TERMINAL_TAIL_MIN_READ_INTERVAL_MS = 750
 const READ_CONCURRENCY = 4
 /** A 48-char capability wrapped at a 4-column hanging indent spans 12 rows. */
 const CAPABILITY_HEAD_ROWS = 12
+/** How far back a longer wrapped token's head is looked for. */
+const WRAPPED_RUN_MAX_ROWS = 256
 
 type CachedTail = { readAtMs: number; lines: number; tail: AgentTerminalTailReading }
 
@@ -77,9 +80,19 @@ export function createAgentTerminalTailReader(
     }
     let tail: AgentTerminalTailReading
     // Why more rows than shown: a capability's head can sit above the shown rows, and its tail is only found from there.
-    const readRows = lines + CAPABILITY_HEAD_ROWS
+    let readRows = lines + CAPABILITY_HEAD_ROWS
     try {
-      const read = await runtime.readTerminalVisibleLines(ptyId, readRows)
+      let read = await runtime.readTerminalVisibleLines(ptyId, readRows)
+      // Why: on a narrow pane a long token wraps over more rows than that, so read back to its head.
+      while (
+        read &&
+        read.length === readRows &&
+        readRows < WRAPPED_RUN_MAX_ROWS &&
+        rowsOpenInsideWrappedRun(read)
+      ) {
+        readRows = Math.min(readRows * 2, WRAPPED_RUN_MAX_ROWS)
+        read = await runtime.readTerminalVisibleLines(ptyId, readRows)
+      }
       // Why after the lines: colour is an enrichment, and a pane whose emulator
       // is not here still has a readable tail.
       const segments = await runtime.readTerminalVisibleSegments?.(ptyId, readRows)
