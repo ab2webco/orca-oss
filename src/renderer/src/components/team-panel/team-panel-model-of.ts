@@ -4,7 +4,7 @@ import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-own
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamActionsOf } from '../../../../shared/team-panel-actions'
 import { teamAdvisorRowOf } from '../../../../shared/team-panel-activity-rows'
-import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
+import { teamCardsOf, type TeamCards } from '../../../../shared/team-panel-member-cards'
 import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
 import type {
   TeamAdvisorRow,
@@ -64,6 +64,16 @@ function arcadeOf(state: OrchestratorGameState): TeamPanelGameModel['arcade'] {
     : null
 }
 
+// Why: a folder has no worktree per member, so a card says where its member really runs.
+const inFolderCardsOf = (cards: TeamCards): TeamCards => ({
+  ...cards,
+  members: cards.members.map((card) =>
+    card.worktreeId === null || card.worktreeId === cards.lead.worktreeId
+      ? { ...card, inFolder: true as const }
+      : card
+  )
+})
+
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
  * XP comes from game.characters, read beside game.state, and stays empty when it is not.
@@ -89,15 +99,16 @@ export function teamPanelModelOf(args: {
   )
   const open = (questions ?? []).filter((one) => !one.answer)
   const oldest = open.toSorted((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
-  const cards = teamCardsOf(
+  const read = teamCardsOf(
     state,
     openTickets,
     oldest ? { ticket: oldest.ticket } : null,
     args.locale
   )
-  if (!cards) {
+  if (!read) {
     return null
   }
+  const cards = args.isFolder ? inFolderCardsOf(read) : read
   const work = {
     // Why no host `panel`: it lags a toggle by a poll and, on a paired host, is that host's
     // settings; teamPanelModelWithSettings applies this window's instead.
