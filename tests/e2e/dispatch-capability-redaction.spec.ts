@@ -19,6 +19,7 @@ import {
   type ActivePaneHookDescriptor
 } from './helpers/terminal'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { setTheme } from './helpers/settings-window'
 import type { AgentHookEndpoint } from '../../src/shared/agent-hook-endpoint-file'
 
 const CAPABILITY = `dcap_${'Q'.repeat(20)}e2e${'Z'.repeat(20)}`
@@ -356,5 +357,70 @@ test('a capability wrapped across rows leaves no fragment in the narrow grid', a
     expect(markup, `grid at ${width}`).not.toMatch(FRAGMENT)
     await expectNoVisibleCapability(orcaPage, `grid at ${width}`, FRAGMENT)
     await orcaPage.screenshot({ path: testInfo.outputPath(`wrapped-grid-${width}.png`) })
+  }
+})
+
+// ORCA-1142: a 221-char fake capability in a prompt echo, hard-wrapped by the terminal over 3+ rows.
+const LONG = `dcap_${'QXJZ'.repeat(54)}`
+
+test('a long token wrapped over three rows leaves no tail row in the grid', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  await waitForSessionReady(orcaPage)
+  await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActiveTerminalManager(orcaPage, 30_000)
+  await waitForPaneCount(orcaPage, 1, 30_000)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const endpoint = await readHookEndpoint(electronApp)
+  await orcaPage.evaluate(async () => {
+    const settings = await window.api.settings.set({
+      experimentalActivity: true,
+      experimentalAgentDashboardPopout: true,
+      experimentalAgentDashboardShowIdle: true
+    })
+    window.__store!.setState({ settings })
+    window.__store!.getState().setRightSidebarOpen(false)
+  })
+
+  await setWindowWidth(electronApp, orcaPage, 600)
+  const cols = await orcaPage.evaluate(() => {
+    const manager = [...(window.__paneManagers?.values() ?? [])][0]
+    return (manager?.getActivePane?.() ?? manager?.getPanes?.()[0])?.terminal.cols ?? 0
+  })
+  // Why: the token must cross at least two row ends, so it spans three rows or more.
+  expect(cols).toBeGreaterThan(30)
+  expect(cols).toBeLessThan(LONG.length / 2)
+  const file = testInfo.outputPath('long-token.txt')
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, `> check ${LONG} --type heartbeat\n${'y'.repeat(cols - 1)}\n`)
+  await execInTerminal(orcaPage, await waitForActivePanePtyId(orcaPage), `cat '${file}'`)
+  await waitForTerminalOutput(orcaPage, 'heartbeat')
+  await postClaudeHook(endpoint, pane, { hook_event_name: 'UserPromptSubmit', prompt: 'check' })
+
+  const sheet = orcaPage.locator('[data-agent-dashboard-sheet]')
+  await orcaPage.getByRole('button', { name: /Agent Dashboard/ }).click()
+  await sheet.waitFor({ state: 'visible' })
+  await sheet.getByRole('button', { name: 'Grid', exact: true }).click()
+  await settle(orcaPage)
+  const tail = sheet.locator('[data-terminal-tail]').first()
+  await expect(tail).toContainText('--type heartbeat')
+  await expect(tail).toContainText('> check [redacted]')
+  for (const width of [600, 390]) {
+    await setWindowWidth(electronApp, orcaPage, width)
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      await settle(orcaPage)
+      await expectSheetFillsViewport(orcaPage)
+      const markup = await sheet.evaluate((element) => {
+        const copy = element.cloneNode(true) as HTMLElement
+        copy.querySelectorAll('svg').forEach((svg) => svg.remove())
+        return copy.outerHTML
+      })
+      expect(markup, `grid at ${width} ${theme}`).not.toMatch(FRAGMENT)
+      await expectNoVisibleCapability(orcaPage, `grid at ${width} ${theme}`, FRAGMENT)
+      await orcaPage.screenshot({ path: testInfo.outputPath(`long-grid-${width}-${theme}.png`) })
+    }
   }
 })

@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test, expect } from './helpers/orca-app'
@@ -64,6 +64,11 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
   test.setTimeout(CAPTURE_EVIDENCE ? 900_000 : 300_000)
   // Why only origin: the seeded repo has no remote, and Orca reads the GitHub slug from it.
   execSync('git config remote.origin.url https://github.com/acme/repo.git', { cwd: testRepoPath })
+  // Why: the repo is shared by the worker, and an orca.yaml with tracker: false turns the queue read off.
+  expect(
+    existsSync(path.join(testRepoPath, 'orca.yaml')),
+    'an earlier spec in this worker left orca.yaml in the shared repo'
+  ).toBe(false)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
