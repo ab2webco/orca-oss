@@ -2,11 +2,20 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
-import { readCallerGameState, setGameAgentDropped } from './orchestrator-game-board-call'
+import {
+  readCallerGameState,
+  recordGameMember,
+  setGameAgentDropped
+} from './orchestrator-game-board-call'
+import { bindRunOf, resumeOne } from './orchestrator-game-resume-members'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { openHostRuntimeClient } from './orchestrator-game-host-client'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
+import {
+  adoptedMemberKeyOf,
+  type GameStatePausedMember
+} from '../../shared/orchestrator-game-adopted-members'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
@@ -119,6 +128,28 @@ async function hostSeatOf(
   return { terminal: terminal.handle, environmentId, host }
 }
 
+/** A paused adopted member resumes on its own task, so it keeps its name and Inbox thread. */
+async function resumeAdoptedMember(
+  client: Client,
+  from: string,
+  saved: GameStatePausedMember,
+  terminal: string
+): Promise<GameAdoptResult> {
+  const name = saved.name ?? saved.ticket
+  const refused = await bindRunOf(client, from, saved, 0)
+  if (refused) {
+    return { name, adopted: false, refusal: refused }
+  }
+  const resumed = await resumeOne(client, from, saved.ticket)
+  return {
+    name,
+    adopted: Boolean(resumed.dispatchId),
+    terminal,
+    ...(resumed.dispatchId ? { dispatchId: resumed.dispatchId } : {}),
+    ...(resumed.reason ? { refusal: resumed.reason } : {})
+  }
+}
+
 /** Gives an agent found on this machine or a paired host a dispatch on its own terminal, so mail reaches it both ways. */
 async function adoptAgent(
   client: Client,
@@ -129,6 +160,7 @@ async function adoptAgent(
     flags: Map<string, string | boolean>
     cwd: string
     leadWorktreeId: string | null
+    paused: readonly GameStatePausedMember[]
   }
 ): Promise<GameAdoptResult> {
   const adopted = agents.find(
@@ -183,12 +215,21 @@ async function adoptAgent(
     return seat
   }
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
+  const saved = local
+    ? args.paused.find((one) => one.adoptedPane && samePane(one.adoptedPane, local.paneKey))
+    : undefined
+  if (saved) {
+    return resumeAdoptedMember(client, from, saved, seat.terminal)
+  }
   const title = ticketOfMember(found) ?? found.displayName ?? name
-  const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
-    spec: `You are now a member of this project's lead, for ${title}. Keep working on what you were doing; report to the lead through the Orca commands below.`,
-    taskTitle: title,
-    callerTerminalHandle: from
-  })
+  const task = await client.call<{ task: { id: string; run_id?: string } }>(
+    'orchestration.taskCreate',
+    {
+      spec: `You are now a member of this project's lead, for ${title}. Keep working on what you were doing; report to the lead through the Orca commands below.`,
+      taskTitle: title,
+      callerTerminalHandle: from
+    }
+  )
   // Why worker-start (--on for a host) with --terminal: the path every paired host already serves, so no wire change.
   const started = await client.call<{ dispatchId: string; state: string }>(
     'orchestration.workerStart',
@@ -202,6 +243,22 @@ async function adoptAgent(
       devMode: isDevCliInvocation()
     }
   )
+  const runId = task.result.task.run_id
+  const key = adoptedMemberKeyOf(title)
+  // Why saved: a restart ends its dispatch, and resume-members brings it back by this record (ORCA-1141).
+  if (local && runId && key && started.result.state !== 'failed') {
+    await recordGameMember(client, {
+      ticket: key,
+      name: title,
+      runId,
+      taskId: task.result.task.id,
+      dispatchId: started.result.dispatchId,
+      worktreeId,
+      agent: found.agentType ?? undefined,
+      lastState: started.result.state,
+      adoptedPaneKey: local.paneKey
+    })
+  }
   return {
     name,
     adopted: started.result.state === 'ready',
@@ -241,7 +298,8 @@ export const ORCHESTRATOR_GAME_ADOPT_HANDLERS: Record<string, CommandHandler> = 
       force: flags.get('force') === true,
       flags,
       cwd,
-      leadWorktreeId
+      leadWorktreeId,
+      paused: response.result.pausedMembers ?? []
     })
     const result = dropped ? { ...adopted, restored: true as const } : adopted
     if (!result.adopted) {

@@ -64,7 +64,11 @@ const hostReads = (state = 'done', runs: unknown[] = []) => ({
   'orchestration.runList': { runs }
 })
 
-function clientWith(agents: unknown[], droppedAgents?: unknown[]) {
+function clientWith(
+  agents: unknown[],
+  droppedAgents?: unknown[],
+  extra: { state?: Record<string, unknown>; results?: Record<string, unknown> } = {}
+) {
   const calls: [string, unknown][] = []
   const all: Record<string, unknown> = {
     'game.state': {
@@ -77,13 +81,15 @@ function clientWith(agents: unknown[], droppedAgents?: unknown[]) {
         path: '/repo',
         branch: 'main',
         displayName: 'repo'
-      }
+      },
+      ...extra.state
     },
     'game.stopSwitch': { stopped: null },
     'terminal.show': { terminal: { handle: 'term_lead' } },
-    'orchestration.taskCreate': { task: { id: 'task_adopt' } },
+    'orchestration.taskCreate': { task: { id: 'task_adopt', run_id: 'run_1' } },
     'orchestration.workerStart': { dispatchId: 'ctx_adopted', state: 'ready' },
-    'game.fleetDrop': { dropped: false, count: 0 }
+    'game.fleetDrop': { dropped: false, count: 0 },
+    ...extra.results
   }
   const client = {
     call: async (method: string, params: unknown) => {
@@ -259,6 +265,64 @@ describe('orca game adopt (ORCA-943)', () => {
         adopted: true,
         terminal: 'term_local_7'
       })
+    })
+
+    // Why (ORCA-1141): a cold restart ended the adopted member's dispatch and nothing brought it back.
+    it('saves the adopted member with its pane, so a restart pauses it for resume-members', async () => {
+      const { client, calls } = clientWith([local()])
+
+      await adopt(client, 'ORCA-907')
+
+      expect(calls.find(([method]) => method === 'game.memberRecord')?.[1]).toMatchObject({
+        member: {
+          ticket: 'ORCA-907',
+          name: 'ORCA-907',
+          runId: 'run_1',
+          taskId: 'task_adopt',
+          dispatchId: 'ctx_adopted',
+          worktreeId: 'repo1::/wt/orca-907',
+          agent: 'claude',
+          adoptedPaneKey: 'tab-7:leaf-7'
+        }
+      })
+    })
+
+    it('resumes the paused member saved at its pane on its own task, never under a new name', async () => {
+      const paused = {
+        ticket: 'ORCA-907',
+        name: 'ORCA-907',
+        runId: 'run_1',
+        adoptedPane: 'tab-7:leaf-7',
+        since: '2026-11-07T00:00:00.000Z',
+        resumable: false
+      }
+      const { client, calls } = clientWith([local()], undefined, {
+        state: { pausedMembers: [paused] },
+        results: {
+          'orchestration.runCurrent': { run: { id: 'run_1' } },
+          'game.memberResume': {
+            outcome: 'resumed',
+            terminal: 'term_local_7',
+            adopted: true,
+            member: {
+              ticket: 'ORCA-907',
+              name: 'ORCA-907',
+              runId: 'run_1',
+              taskId: 'task_907',
+              worktreeId: 'repo1::/wt/orca-907'
+            }
+          }
+        }
+      })
+
+      await adopt(client, 'ORCA-907')
+
+      expect(calls.map(([method]) => method)).not.toContain('orchestration.taskCreate')
+      expect(calls.find(([method]) => method === 'orchestration.workerStart')?.[1]).toMatchObject({
+        task: 'task_907',
+        terminal: 'term_local_7'
+      })
+      expect(output()).toMatchObject({ name: 'ORCA-907', adopted: true })
     })
 
     it('refuses it while mid-turn unless --force', async () => {

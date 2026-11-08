@@ -234,6 +234,31 @@ describe('orca game resume-members', () => {
     )
   })
 
+  // Why (ORCA-1141): an adopted member's terminal is a tab the person opened, never Orca's to close.
+  it("leaves an adopted member's own tab open when its dispatch could not start", async () => {
+    const { client, calls } = fakeClient({
+      pausedMembers: [paused('MAIN')],
+      outcomes: {
+        MAIN: { outcome: 'resumed', terminal: 'term_main', adopted: true, member: target('MAIN') }
+      }
+    })
+    const answer = client.call.bind(client)
+    client.call = (async (method: string, params: Record<string, unknown>) => {
+      if (method === 'orchestration.workerStart') {
+        calls.push([method, params])
+        throw new Error('agent_unconfigured')
+      }
+      return answer(method, params)
+    }) as RuntimeClient['call']
+
+    await run(client)
+
+    expect(calls.some(([m]) => m === 'terminal.close')).toBe(false)
+    expect(printed().members).toEqual([
+      { ticket: 'MAIN', result: 'failed', reason: 'agent_unconfigured' }
+    ])
+  })
+
   it('closes a reopened conversation no dispatch could take, so no agent runs unowned', async () => {
     const { client, calls } = fakeClient({
       pausedMembers: [paused('CIN-1')],

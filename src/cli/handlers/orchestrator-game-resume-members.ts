@@ -90,14 +90,18 @@ async function startOnTask(
     return started.result
   } catch (error) {
     // Why close: an agent no dispatch owns is no member, and would hide its ticket from the fleet.
-    if (outcome.outcome === 'resumed') {
+    if (outcome.outcome === 'resumed' && !outcome.adopted) {
       await client.call('terminal.close', { terminal: outcome.terminal }).catch(() => undefined)
     }
     throw error
   }
 }
 
-async function resumeOne(client: Client, from: string, ticket: string): Promise<GameResumedMember> {
+export async function resumeOne(
+  client: Client,
+  from: string,
+  ticket: string
+): Promise<GameResumedMember> {
   const response = await client.call<GameMemberResumeOutcome>('game.memberResume', {
     ...gameBoardCaller(),
     ticket
@@ -125,7 +129,7 @@ async function resumeOne(client: Client, from: string, ticket: string): Promise<
 }
 
 /** Binds the run that owns the paused members' tasks, unless the lead already runs live members elsewhere. */
-async function bindRunOf(
+export async function bindRunOf(
   client: Client,
   from: string,
   member: GamePausedMember,
