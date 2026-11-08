@@ -40,6 +40,8 @@ export type OrchestratorGameStateInput = {
     | undefined
   /** The OS locale behind a `system` UI language. */
   systemLocale?: string
+  /** Orca's resolved look; absent where the host cannot tell, as a headless server. */
+  appearance?: 'dark' | 'light'
   /** Orca's machine, which sets the member cap no layer sets. */
   host?: GameHostProfile
   /** The paired hosts and what each publishes; read only for a lead (ORCA-888). */
