@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
   withOrchestratorGameProjectActions,
+  withOrchestratorGameProjectMachineActions,
   withOrchestratorGameProjectOrcaActions,
   withOrchestratorGameProjectField,
   withOrchestratorGameProjectLead,
@@ -109,6 +110,23 @@ describe('withOrchestratorGameProjectActions', () => {
     expect(withOrchestratorGameProjectActions({ repo1: { actions } }, 'repo1', undefined)).toEqual(
       {}
     )
+  })
+})
+
+describe('withOrchestratorGameProjectMachineActions', () => {
+  it("stores this machine's changes and drops the old whole-list override they replace", () => {
+    const old = [{ label: 'Board', command: 'board', prompt: 'Read it' }]
+    const hidden = [{ command: 'board', enabled: false as const }]
+    expect(
+      withOrchestratorGameProjectMachineActions(
+        { repo1: { hud: false, actions: old } },
+        'repo1',
+        hidden
+      )
+    ).toEqual({ repo1: { hud: false, machineActions: hidden } })
+    expect(
+      withOrchestratorGameProjectMachineActions({ repo1: { actions: old } }, 'repo1', [])
+    ).toEqual({})
   })
 })
 
