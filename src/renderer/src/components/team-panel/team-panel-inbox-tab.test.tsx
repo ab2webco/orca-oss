@@ -161,6 +161,28 @@ describe('Inbox tab', () => {
     expect(view.getByText('Ship the price change today?')).toBeTruthy()
   })
 
+  // ORCA-1142: at 219 px the strip drops its zero counts first, so a waiting count stays in sight.
+  it.each([
+    [3, ['For you2', 'Waiting', 'Threads1', 'Done']],
+    [4, ['For you', 'Waiting', 'Threads', 'Done']]
+  ])('fits a narrow strip at level %i, dropping zero counts first', (fitsAt, labels) => {
+    const strip = (node: HTMLElement): boolean => node.getAttribute('role') === 'tablist'
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
+      function (this: HTMLElement) {
+        return strip(this) ? 200 : 0
+      }
+    )
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
+      function (this: HTMLElement) {
+        return strip(this) && Number(this.dataset.fit) < fitsAt ? 300 : 0
+      }
+    )
+    const view = renderInbox({ threads: { ...THREADS, waiting: [], answered: [] } })
+
+    expect(view.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(labels)
+    vi.restoreAllMocks()
+  })
+
   it('counts and lists Waiting, Threads and Answered', () => {
     const view = renderInbox()
 

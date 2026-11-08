@@ -16219,6 +16219,7 @@
       },
       "activity": {
         "title": "Actividad",
+        "shortTitle": "Agentes",
         "emptyTitle": "No hay agentes en marcha",
         "emptyText": "Inicia un agente en cualquier espacio de trabajo y aparecerá aquí.",
         "errorTitle": "No se pudieron leer tus sesiones"
@@ -16245,6 +16246,7 @@
       },
       "machines": {
         "title": "Máquinas",
+        "shortTitle": "Hosts",
         "emptyTitle": "Solo esta máquina",
         "emptyText": "Empareja otra máquina para repartir agentes entre hosts.",
         "errorTitle": "No se pudieron leer las máquinas"
@@ -16340,8 +16342,10 @@
       "sections": "Secciones de la bandeja",
       "forYou": "Para ti",
       "waiting": "Esperando",
+      "waitingShort": "Espera",
       "threads": "Hilos",
       "answered": "Respondidas",
+      "answeredShort": "Hechas",
       "thisProject": "este proyecto",
       "projectUnread": "No se pudieron leer las preguntas de este proyecto.",
       "forYouEmpty": "No hay preguntas esperando tu respuesta.",
