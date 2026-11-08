@@ -105,6 +105,26 @@ export async function readTeamLeadState(
   return state?.role === 'lead' ? state : null
 }
 
+/** The project's characters XP summed, as `orca game characters` keeps it; null from a host with no list. */
+export async function readTeamXp(
+  target: RuntimeClientTarget,
+  caller: TeamLeadCaller
+): Promise<number | null> {
+  const result = await callRuntimeRpc<{ characters?: unknown }>(
+    target,
+    'game.characters',
+    { worktreeId: caller.worktreeId, terminalHandle: caller.terminalHandle },
+    { timeoutMs: TEAM_RPC_TIMEOUT_MS }
+  )
+  if (!Array.isArray(result.characters)) {
+    return null
+  }
+  return result.characters.reduce<number>((sum, one: unknown) => {
+    const xp = (one as { xp?: unknown } | null)?.xp
+    return typeof xp === 'number' && Number.isFinite(xp) && xp > 0 ? sum + xp : sum
+  }, 0)
+}
+
 /** Every question the lead asked the user, answered too; parsed because a host may run another build. */
 export async function readTeamOwnerQuestions(
   target: RuntimeClientTarget,

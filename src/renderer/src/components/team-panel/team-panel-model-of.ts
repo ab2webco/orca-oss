@@ -1,9 +1,10 @@
+import { gameCharacterLevelOf } from '../../../../shared/orchestrator-game-characters'
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { teamActionsOf } from '../../../../shared/team-panel-actions'
 import { teamAdvisorRowOf } from '../../../../shared/team-panel-activity-rows'
-import { teamCardsOf } from '../../../../shared/team-panel-member-cards'
+import { teamCardsOf, type TeamCards } from '../../../../shared/team-panel-member-cards'
 import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
 import type {
   TeamAdvisorRow,
@@ -63,10 +64,19 @@ function arcadeOf(state: OrchestratorGameState): TeamPanelGameModel['arcade'] {
     : null
 }
 
+// Why: a folder has no worktree per member, so a card says where its member really runs.
+const inFolderCardsOf = (cards: TeamCards): TeamCards => ({
+  ...cards,
+  members: cards.members.map((card) =>
+    card.worktreeId === null || card.worktreeId === cards.lead.worktreeId
+      ? { ...card, inFolder: true as const }
+      : card
+  )
+})
+
 /**
  * The Team model from the lead's own `game.state` and its owner questions; null with no lead.
- * Fields game.state does not publish (XP) stay empty rather than guessed:
- * their tickets fill them.
+ * XP comes from game.characters, read beside game.state, and stays empty when it is not.
  */
 export function teamPanelModelOf(args: {
   repoId: string
@@ -76,6 +86,10 @@ export function teamPanelModelOf(args: {
   questions: readonly GameOwnerQuestion[] | null
   /** A folder workspace has no remote, so no PRs or queue. */
   isFolder?: boolean
+  /** The project's characters XP summed; null when the host could not list them. */
+  xp?: number | null
+  /** The UI language, for the lead's default character name. */
+  locale?: string
 }): TeamPanelGameModel | null {
   const { state, questions } = args
   const openTickets = new Set(
@@ -85,10 +99,16 @@ export function teamPanelModelOf(args: {
   )
   const open = (questions ?? []).filter((one) => !one.answer)
   const oldest = open.toSorted((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
-  const cards = teamCardsOf(state, openTickets, oldest ? { ticket: oldest.ticket } : null)
-  if (!cards) {
+  const read = teamCardsOf(
+    state,
+    openTickets,
+    oldest ? { ticket: oldest.ticket } : null,
+    args.locale
+  )
+  if (!read) {
     return null
   }
+  const cards = args.isFolder ? inFolderCardsOf(read) : read
   const work = {
     // Why no host `panel`: it lags a toggle by a poll and, on a paired host, is that host's
     // settings; teamPanelModelWithSettings applies this window's instead.
@@ -106,7 +126,8 @@ export function teamPanelModelOf(args: {
     advisor: advisorOf(state),
     members: cards.members,
     metrics: teamMetricsOf(state),
-    xp: null,
+    // Why the game's curve: the level is what the characters earned, not a figure drawn here (ORCA-1094).
+    xp: typeof args.xp === 'number' ? gameCharacterLevelOf(args.xp) : null,
     arcade: arcadeOf(state),
     stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
     // Why guarded: a paired host on an older build may send neither.

@@ -80,6 +80,8 @@ Step 7's checkout. Do not mark the PR adopted until both parts have been answere
   grep -nE '^\+.*(metaKey|["'\''`]/["'\''`] *\+|\\\\)' /tmp/pr-<n>.diff
   ```
 - New UI strings go through `translate('key', 'Fallback')`.
+  The fallback must equal its `en.json` value; `config/renderer-brand-drift-allowlist.txt` lists the
+  known exceptions as `file key` lines, never gains one, and a fixed entry's line may simply be deleted.
 - Any new file is named for its domain concept — reject `helpers`, `utils`, `common`,
   `misc`, `shared`.
 

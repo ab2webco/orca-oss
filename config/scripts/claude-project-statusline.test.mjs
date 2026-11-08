@@ -49,7 +49,8 @@ function run({ helper, home }) {
   return spawnSync(process.execPath, [helper], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, USERPROFILE: home }
+    env: { ...process.env, HOME: home, USERPROFILE: home },
+    timeout: 20_000
   })
 }
 

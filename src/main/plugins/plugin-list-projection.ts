@@ -32,6 +32,7 @@ import {
 import { readContainedPluginArtifactText } from './plugin-artifact-validation'
 import { orchestratorGameSceneId } from '../../shared/orchestrator-game-scene'
 import { projectPluginListSource, type PluginListSource } from './plugin-list-source-projection'
+import { spawnCapableWorkerBlockReason } from './plugin-dev-shared-vault-gate'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
 
@@ -111,6 +112,8 @@ export type PluginListEntry = {
   /** A required setting has no value, so the plugin runs unconfigured. */
   needsSetup?: boolean
   blockedByKillList?: { reason: string; advisoryUrl?: string }
+  /** A dev build on a linked account vault kept this process-spawning plugin off (ORCA-1131). */
+  blockedByDevSharedVault?: true
   source?: PluginListSource
 }
 
@@ -315,6 +318,9 @@ export async function buildPluginList(
                 ...(killListEntry.advisoryUrl ? { advisoryUrl: killListEntry.advisoryUrl } : {})
               }
             }
+          : {}),
+        ...(spawnCapableWorkerBlockReason(plugin.manifest, service.options)
+          ? { blockedByDevSharedVault: true as const }
           : {}),
         ...(lockEntry ? { source: projectPluginListSource(lockEntry) } : {})
       }
