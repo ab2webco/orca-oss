@@ -85,7 +85,7 @@ describe('teamSceneInputOf', () => {
         key: 'done',
         name: 'done',
         characterKey: null,
-        activity: 'resting',
+        activity: 'done',
         reportId: null,
         mergedPr: 9
       },
@@ -112,6 +112,19 @@ describe('teamSceneInputOf', () => {
     expect(teamSceneInputOf({ lead: idle, advisor: null, members: [] }).lead.activity).toBe(
       'resting'
     )
+  })
+
+  // ORCA-1139: a finished turn reads idle on the card unless merged, yet the scene shows it done.
+  it('acts out a finished turn as done, apart from an idle agent', () => {
+    const finished = card('m', { status: 'idle', condition: 'done' })
+    const idle = card('i', { status: 'idle', condition: 'idle' })
+    const scene = teamSceneInputOf({
+      lead: lead({ status: 'idle', condition: 'done' }),
+      advisor: null,
+      members: [finished, idle]
+    })
+    expect(scene.members.map((m) => m.activity)).toEqual(['done', 'resting'])
+    expect(scene.lead.activity).toBe('done')
   })
 
   it('passes the advisor line only when the plugin row exists', () => {

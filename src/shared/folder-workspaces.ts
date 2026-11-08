@@ -21,12 +21,8 @@ export function normalizeFolderWorkspaces(
   if (!Array.isArray(value)) {
     return []
   }
-  const folderGroups = new Map<string, ProjectGroup>()
-  for (const group of projectGroups) {
-    if (group.parentPath) {
-      folderGroups.set(group.id, group)
-    }
-  }
+  // Why every group: create accepts a workspace's own folder under a group with no parentPath (ORCA-1141).
+  const groups = new Map(projectGroups.map((group) => [group.id, group]))
 
   const workspaces: FolderWorkspace[] = []
   const seen = new Set<string>()
@@ -40,11 +36,11 @@ export function normalizeFolderWorkspaces(
       raw.id.trim().length === 0 ||
       seen.has(raw.id) ||
       typeof raw.projectGroupId !== 'string' ||
-      !folderGroups.has(raw.projectGroupId)
+      !groups.has(raw.projectGroupId)
     ) {
       continue
     }
-    const group = folderGroups.get(raw.projectGroupId)
+    const group = groups.get(raw.projectGroupId)
     const folderPath =
       typeof raw.folderPath === 'string' && raw.folderPath.trim().length > 0
         ? raw.folderPath
