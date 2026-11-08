@@ -113,8 +113,14 @@ function AdvisorCardRow({
             {teamAdvisorSourceText()}
           </span>
         </span>
+        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows all of it (ORCA-1139). */}
         {advisor.line ? (
-          <span className="truncate text-xs text-muted-foreground">{advisor.line}</span>
+          <span
+            data-team-advisor-line
+            className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+          >
+            {advisor.line}
+          </span>
         ) : null}
       </span>
     </article>

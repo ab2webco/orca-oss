@@ -141,6 +141,98 @@ async function linesOffBubble(page: Page, key: string): Promise<string[]> {
   }, key)
 }
 
+// Why the drawn shape again: Pixel's span is larger than its cloud, so only painted cells cover.
+// Why one read with `shown`: the advisor's bubble fades on a timer, and a faded one covers nothing.
+// Why `forMs`: a bubble that must stay hidden is watched, since a poll would wait out its fade.
+async function bubblesOverTag(page: Page, shown: readonly string[], forMs = 0): Promise<string[]> {
+  return page.evaluate(
+    ({ expected, watchMs }) => {
+      const check = (): string[] => {
+        const tag = document.querySelector('[data-scene-speaker]')?.getBoundingClientRect()
+        if (!tag) {
+          return ['no asker tag']
+        }
+        const visible = [...document.querySelectorAll<HTMLElement>('[data-scene-bubble]')]
+          .filter((one) => getComputedStyle(one).visibility === 'visible')
+          .map((one) => one.dataset.sceneBubble ?? '')
+        if (visible.sort().join() !== [...expected].sort().join()) {
+          return [`bubbles shown: ${visible.join(', ') || 'none'}; expected ${expected.join(', ')}`]
+        }
+        const round = (r: DOMRect) =>
+          [r.left, r.top, r.right, r.bottom].map((n) => Math.round(n * 10) / 10).join(',')
+        const meets = (r: DOMRect) =>
+          r.width > 0 &&
+          r.left < tag.right &&
+          tag.left < r.right &&
+          r.top < tag.bottom &&
+          tag.top < r.bottom
+        const problems: string[] = []
+        for (const bubble of document.querySelectorAll<HTMLElement>('[data-scene-bubble]')) {
+          if (getComputedStyle(bubble).visibility !== 'visible') {
+            continue
+          }
+          const key = bubble.dataset.sceneBubble
+          const canvas = bubble.querySelector('canvas')
+          if (!canvas) {
+            const parts = [bubble, ...bubble.querySelectorAll<HTMLElement>('span.absolute')]
+            const hit = parts.map((one) => one.getBoundingClientRect()).find(meets)
+            if (hit) {
+              problems.push(`${key} bubble [${round(hit)}] covers the tag [${round(tag)}]`)
+            }
+            continue
+          }
+          const drawn = canvas.getBoundingClientRect()
+          const cell = drawn.width / canvas.width
+          const pixels = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data
+          // Why half a px: a cell that only touches the tag's edge does not cover it.
+          const x0 = Math.max(0, Math.floor((tag.left - drawn.left + 0.5) / cell))
+          const x1 = Math.min(canvas.width - 1, Math.floor((tag.right - drawn.left - 0.5) / cell))
+          const y0 = Math.max(0, Math.floor((tag.top - drawn.top + 0.5) / cell))
+          const y1 = Math.min(canvas.height - 1, Math.floor((tag.bottom - drawn.top - 0.5) / cell))
+          let painted = 0
+          for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+              painted += pixels[(y * canvas.width + x) * 4 + 3]! > 0 ? 1 : 0
+            }
+          }
+          if (painted > 0) {
+            problems.push(
+              `${key} cloud [${round(drawn)}] paints ${painted} cells over the tag [${round(tag)}]`
+            )
+          }
+        }
+        return problems
+      }
+      return new Promise<string[]>((resolve) => {
+        const start = performance.now()
+        const tick = (): void => {
+          const problems = check()
+          if (problems.length > 0 || performance.now() - start >= watchMs) {
+            resolve(problems)
+          } else {
+            setTimeout(tick, 50)
+          }
+        }
+        tick()
+      })
+    },
+    { expected: shown, watchMs: forMs }
+  )
+}
+
+// The advisor's whole line, read from its card: neither cut at the side nor clamped below.
+async function advisorCardLine(card: Locator): Promise<string> {
+  return card
+    .locator('[data-team-advisor-line]')
+    .evaluate((line) =>
+      line.scrollWidth > line.clientWidth || line.scrollHeight > line.clientHeight
+        ? `cut: ${line.textContent}`
+        : (line.textContent ?? '')
+    )
+}
+
 const boxesClash = (a: BubbleBox | null, b: BubbleBox | null): boolean =>
   a !== null &&
   b !== null &&
@@ -270,7 +362,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
         await emitCodexHookStatus(endpoint, { ...one, state: 'working', prompt: 'Work' })
       }
     }
-    await client.call('game.ownerAsk', {
+    const asked = await client.call<{ question: { id: string } }>('game.ownerAsk', {
       worktreeId,
       terminalHandle: lead,
       ticket: 'ORCA-14',
@@ -405,6 +497,69 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     testInfo.annotations.push({ type: 'team-scene-frames', description: await frameRate(orcaPage) })
     let said = 0
+    // One new advisor line at one width and theme. ORCA-1139 criterion 8, lead decision A: Pixel's
+    // 219 px stage (390 and 320) holds one bubble beside an asking member's tag, so the lead's stays
+    // and the advisor's whole line shows in its card.
+    const advisorStep = async (
+      style: (typeof ADVISOR_STYLES)[number],
+      width: number,
+      theme: 'dark' | 'light',
+      label: string
+    ): Promise<void> => {
+      await setTheme(orcaPage, theme)
+      said += 1
+      const line = `Keep this one small, step ${said}`
+      await reportJev(line)
+      await expect(advisorCard).toContainText(line, { timeout: 5_000 })
+      // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
+      await expect(advisorCard).not.toContainText('Opus 5.5 · high')
+      await expect
+        .poll(() => advisorCardLine(advisorCard), {
+          message: `the advisor's card does not show its whole line at ${width}px ${style} ${theme}`
+        })
+        .toBe(line)
+      await expect(advisorBubble).toHaveText(line)
+      const asking = (await askerTag.count()) > 0
+      const onlyLead = asking && style === 'pixel' && width <= 390
+      if (!onlyLead) {
+        await expect(advisorBubble).toBeVisible()
+        const shown = await shownBubbles(orcaPage)
+        expect(
+          shown.advisor,
+          `advisor bubble hidden at ${width}px ${style} ${label}`
+        ).not.toBeNull()
+        expect(
+          boxesClash(shown.advisor, shown.lead),
+          `lead and advisor bubbles clash at ${width}px ${style} ${label}`
+        ).toBe(false)
+      }
+      if (onlyLead) {
+        expect(
+          await bubblesOverTag(orcaPage, ['lead'], 1500),
+          `only the lead's pixel bubble beside ORCA-14's tag at ${width}px ${theme}`
+        ).toEqual([])
+      } else if (asking) {
+        await expect
+          .poll(() => bubblesOverTag(orcaPage, ['advisor', 'lead']), {
+            message: `${style} bubbles over ORCA-14's tag at ${width}px ${theme}`
+          })
+          .toEqual([])
+      }
+      await expect(leadBubble).toBeVisible()
+      await expect
+        .poll(() => linesOffBubble(orcaPage, 'lead'), {
+          message: `the lead's ${style} bubble beside the advisor's does not hold its text at ${width}px ${label}`
+        })
+        .toEqual([])
+      const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+      expect(overflow, `panel overflows at ${width}px ${style} ${label}`).toBeLessThanOrEqual(0)
+      await scene.screenshot({
+        path: testInfo.outputPath(`team-scene-advisor-${style}-${width}-${label}.png`)
+      })
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-${label}.png`)
+      })
+    }
     for (const style of ADVISOR_STYLES) {
       await orcaPage.evaluate(
         (next) =>
@@ -418,41 +573,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
-        await setTheme(orcaPage, 'dark')
-        said += 1
-        const line = `Keep this one small, step ${said}`
-        await reportJev(line)
-        await expect(advisorCard).toContainText(line, { timeout: 5_000 })
-        // Why no model line: V28's advisor row has none; Jev's sentence names the model (ORCA-1094).
-        await expect(advisorCard).not.toContainText('Opus 5.5 · high')
-        await expect(advisorBubble).toHaveText(line)
-        await expect(advisorBubble).toBeVisible()
-        const shown = await shownBubbles(orcaPage)
-        expect(shown.advisor, `advisor bubble hidden at ${width}px ${style}`).not.toBeNull()
-        expect(
-          boxesClash(shown.advisor, shown.lead),
-          `lead and advisor bubbles clash at ${width}px ${style}`
-        ).toBe(false)
-        expect(shown.lead, `lead bubble hidden at ${width}px ${style}`).not.toBeNull()
-        await expect
-          .poll(() => linesOffBubble(orcaPage, 'lead'), {
-            message: `the lead's ${style} bubble beside the advisor's does not hold its text at ${width}px`
-          })
-          .toEqual([])
-
-        const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
-        expect(overflow, `panel overflows at ${width}px ${style}`).toBeLessThanOrEqual(0)
-        await orcaPage.screenshot({
-          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-dark.png`)
-        })
-        await scene.screenshot({
-          path: testInfo.outputPath(`team-scene-advisor-${style}-${width}-dark.png`)
-        })
-        // Why no bubble check here: the row is what this capture is for, and the cloud may have faded.
-        await setTheme(orcaPage, 'light')
-        await orcaPage.screenshot({
-          path: testInfo.outputPath(`team-panel-advisor-${style}-${width}-light.png`)
-        })
+        for (const theme of ['dark', 'light'] as const) {
+          await advisorStep(style, width, theme, theme)
+        }
         // The advisor's bubble fades in 6 real seconds, however slow the frames, and the lead's stays.
         await expect(advisorBubble).toBeHidden({ timeout: 10_000 })
         await expect(leadBubble).toBeVisible()
@@ -515,11 +638,43 @@ test('the Team panel draws the live scene beside a member opened under its heade
               message: `the lead's ${style} bubble does not hold its text at ${width}px ${theme}`
             })
             .toEqual([])
+          await expect
+            .poll(() => bubblesOverTag(orcaPage, ['lead']), {
+              message: `the lead's ${style} bubble covers ORCA-14's tag at ${width}px ${theme}`
+            })
+            .toEqual([])
           await scene.screenshot({
             path: testInfo.outputPath(`team-scene-long-command-${style}-${width}-${theme}.png`)
           })
         }
       }
+    }
+
+    // Lead decision A, condition 2: once the question is answered there is room again, and Pixel
+    // shows the advisor's bubble beside the lead's at 390 and 320.
+    await emitCodexHookStatus(endpoint, {
+      paneKey: pane.paneKey,
+      worktreeId,
+      state: 'working',
+      tool: 'exec_command'
+    })
+    await client.call('game.ownerAnswer', {
+      worktreeId,
+      terminalHandle: lead,
+      id: asked.result.question.id,
+      option: 1
+    })
+    await orcaPage.evaluate(() =>
+      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
+    )
+    await expect(askerTag).toHaveCount(0, { timeout: 30_000 })
+    for (const width of [390, 320]) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      await expect(leadBubble).toHaveText('exec_command', { timeout: 30_000 })
+      for (const theme of ['dark', 'light'] as const) {
+        await advisorStep('pixel', width, theme, `${theme}-no-question`)
+      }
+      await expect(advisorBubble).toBeHidden({ timeout: 10_000 })
     }
 
     // A member opened from the Team tab gets its native header while the scene keeps drawing.
