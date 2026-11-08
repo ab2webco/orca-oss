@@ -251,6 +251,18 @@ for (const plugins of [false, true]) {
         await capturePanel(orcaPage, panel, 'member-inbox-foryou', testInfo)
       }
 
+      // Why (ORCA-1141): a member in the lead's worktree had its Open terminal button disabled.
+      await orcaPage.evaluate(
+        (tabId) => window.__store!.getState().setActiveTab(tabId),
+        pane.paneKey.split(':')[0]
+      )
+      const openTerminal = question.getByRole('button', { name: 'Open terminal' })
+      await expect(openTerminal).toBeEnabled()
+      await openTerminal.click()
+      await expect
+        .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
+        .toBe(shown.result.terminal.tabId)
+
       // Why the tail: the member's brief was typed into the same ledger before the answer.
       const before = agent.keys().length
       await question.getByRole('button', { name: OPTIONS[1] }).click()

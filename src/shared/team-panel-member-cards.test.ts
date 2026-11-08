@@ -385,6 +385,20 @@ describe('teamCardsOf', () => {
     })
   })
 
+  // Why (ORCA-1141): game.state lists no worktree for a member in the lead's, so its Inbox card could not open it.
+  it("gives a local member in the lead's worktree that worktree, and a paired one none it lacks", () => {
+    const cards = cardsOf([
+      agent({ paneKey: 'tab-2:leaf-2', displayName: 'main 2' }),
+      agent({
+        paneKey: 'remote:ctx_9',
+        displayName: 'Bea',
+        remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true }
+      })
+    ])
+
+    expect(cards?.members.map((one) => one.worktreeId)).toEqual(['repo::/w/main', null])
+  })
+
   it('leaves out agents that are neither the lead nor members', () => {
     const cards = cardsOf([agent({ paneKey: 'other', isMember: false })])
     expect(cards?.members).toEqual([])

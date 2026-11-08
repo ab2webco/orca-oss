@@ -57,7 +57,7 @@ export function TeamInboxAgentCard({
           type="button"
           variant="outline"
           size="sm"
-          disabled={!question.worktreeId}
+          disabled={!question.worktreeId && !question.terminalHandle}
           onClick={() => onOpen(question)}
         >
           {translate('teamPanel.inbox.openTerminal', 'Open terminal')}

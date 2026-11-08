@@ -285,6 +285,32 @@ describe('Inbox tab', () => {
     expect(onOpenAgent).toHaveBeenCalledWith(agent)
   })
 
+  // Why (ORCA-1141): a paired-host member opens through its handle, with no worktree in this window.
+  it("opens a member's terminal by its handle when its worktree is unknown here", () => {
+    const onOpenAgent = vi.fn()
+    const agent = {
+      paneKey: 'tab-9:leaf-9',
+      terminalHandle: 'term_m1_9',
+      worktreeId: null,
+      host: { kind: 'remote' as const, name: 'm1', environmentId: 'env_m1', reachable: true },
+      repoName: 'orca-oss',
+      worktreeName: 'Arthur',
+      text: 'Ship it?',
+      options: ['Yes', 'No']
+    }
+    const view = renderInbox({
+      questions: [],
+      otherGroups: [],
+      agentQuestions: [agent],
+      onOpenAgent
+    })
+
+    const open = view.getByRole('button', { name: 'Open terminal' }) as HTMLButtonElement
+    expect(open.disabled).toBe(false)
+    act(() => fireEvent.click(open))
+    expect(onOpenAgent).toHaveBeenCalledWith(agent)
+  })
+
   // Why (ORCA-1129 D5): V28 solo-many-inbox answers from the card; the options were text only.
   it("answers an agent's question with its option buttons, once", () => {
     const answer = vi.fn(() => true)
