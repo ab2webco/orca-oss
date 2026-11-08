@@ -728,6 +728,8 @@ import {
   type OrchestratorGameMemberLaunch
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
+import { GameLeadNames } from './orchestrator-game-lead-names'
+import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
@@ -3847,6 +3849,7 @@ export class OrcaRuntimeService {
     | null
   private readonly readGameMcpCallsFn: ((paneKey: string) => readonly GameActivityCall[]) | null
   private readonly gameActivityMemory = new GameActivityMemory()
+  private readonly gameLeadNames = new GameLeadNames()
   private readonly gameSuggestedView = createGameSuggestedView()
   private readonly claudePaneSessions = new ClaudePaneLiveSessions()
   private readonly gameMemberAdvisors = new GameMemberAdvisors(undefined, {
@@ -32327,6 +32330,7 @@ export class OrcaRuntimeService {
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
+      appearance: orcaGameAppearanceOf(),
       host: gameHostProfileOfThisMachine(),
       readPairedHosts: () => this.gamePairedHosts.read(),
       worktree: worktree
@@ -32391,6 +32395,7 @@ export class OrcaRuntimeService {
       mcpCallsOf: (paneKey) => this.readGameMcpCallsFn?.(paneKey) ?? [],
       suggestedView: this.gameSuggestedView,
       activityMemory: this.gameActivityMemory,
+      leadNames: this.gameLeadNames,
       readScenes: () => readPluginGameSceneSources(),
       // Why the lead's pane too: a scene file its checkout leaves untracked is not in a member's worktree.
       readCarriedScene: async () => {

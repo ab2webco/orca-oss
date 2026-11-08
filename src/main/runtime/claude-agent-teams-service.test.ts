@@ -324,6 +324,20 @@ describe('ClaudeAgentTeamsService', () => {
     ).resolves.toMatchObject({ ok: false, exitCode: 1 })
   })
 
+  // Claude Code drops to 256 colours under TMUX; the lead would draw other colours than a member.
+  it('keeps truecolor in a team pane, whose TMUX is Orca shim and not a real tmux', () => {
+    const launch = new ClaudeAgentTeamsService().createLaunchEnv({
+      leaderHandle: 'leader-handle',
+      baseEnv: { PATH: '/usr/bin' },
+      shimDir: '/tmp/orca-shim',
+      shimBin: '/usr/bin/orca'
+    })
+
+    expect(launch.env.TMUX).toBeTruthy()
+    expect(launch.env.COLORTERM).toBe('truecolor')
+    expect(launch.env.CLAUDE_CODE_TMUX_TRUECOLOR).toBe('1')
+  })
+
   it('keeps the inherited Windows `Path` instead of minting a truncated `PATH`', () => {
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
