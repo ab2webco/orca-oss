@@ -276,7 +276,9 @@ export function teamCardsOf(
     terminalHandle: leader.terminalHandle ?? null,
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
+    // Why leadName first: the host keeps it for the session, so a scene or language change cannot rename the lead.
     name:
+      state.leadName ??
       state.lead?.label ??
       leadCharacterOf(roster, locale) ??
       leader.displayName ??

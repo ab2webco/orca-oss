@@ -260,7 +260,7 @@ export type OrchestratorGameState = {
   locale?: SupportedUiLocale
   /** Orca's light or dark look, for the agent terminal's colours; absent where the host cannot tell. */
   appearance?: 'dark' | 'light'
-  /** The lead's name as its Team card shows it, for its message headings; absent from an older host. */
+  /** The lead's name for the session, as its Team card and headings show it; absent from an older host. */
   leadName?: string
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
   merges?: GameMerge[]
