@@ -4,7 +4,7 @@
  * the real font, the sidebar's clamp and the panel's container widths.
  */
 
-import type { ElectronApplication, Locator, Page } from '@stablyai/playwright-test'
+import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -15,87 +15,44 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
 const soft = expect.configure({ soft: true })
-const GB = 1024 ** 3
 // Why 2000: the store clamps it to the widest the window allows.
 const SIDEBARS = [220, 280, 2000] as const
 const LANGUAGES = ['en', 'es'] as const
 // Why 12 of each: two-digit counts are the widest strip a project shows.
-const COUNT = 12
-
+const twelve = <T>(make: (index: number) => T): T[] => Array.from({ length: 12 }, (_, i) => make(i))
 const at = (minute: number): string => new Date(Date.UTC(2026, 10, 7, 12, minute)).toISOString()
+// Each row's fields past its id, ticket and time.
+const MACHINE = {
+  status: 'ok',
+  cpuCoreCount: 8,
+  loadAverage1m: 1,
+  totalMemory: 2e10,
+  availableMemory: 1e10
+}
+const WAIT = { kind: 'question', subject: 'Port?', body: 'Which?', answerer: 'lead' }
+const ANSWER = { kind: 'question', question: 'Port?', answer: '5173' }
+const ASK = { question: 'Merge it?', options: ['Yes', 'No'], context: null, answer: null }
+const row = (prefix: string, i: number) => ({ id: `${prefix}${i}`, ticket: `ORCA-${100 + i}` })
+const pull = { id: '#951', title: 'Fit the tabs', url: 'https://github.com/o/r/pull/951' }
+
 const OVERLAY: Record<string, Record<string, unknown>> = {
   'game.state': {
     project: {
-      reviews: {
-        provider: 'github',
-        total: 1,
-        url: 'https://github.com/o/r/pulls',
-        items: [{ id: '#924', title: 'Fit the tabs', url: 'https://github.com/o/r/pull/924' }]
-      },
-      queue: {
-        provider: 'github',
-        entries: [
-          {
-            id: '#951',
-            title: 'Fit the tabs',
-            url: 'https://github.com/o/r/pull/951',
-            position: 1,
-            state: 'checks',
-            since: Date.now()
-          }
-        ]
-      }
+      reviews: { provider: 'github', total: 1, url: 'https://github.com/o/r/pulls', items: [pull] },
+      queue: { provider: 'github', entries: [{ ...pull, position: 1, state: 'checks', since: 1 }] }
     },
     hostCapacity: [
-      {
-        host: 'local',
-        running: 1,
-        cap: 4,
-        status: 'ok',
-        cpuCoreCount: 8,
-        totalMemory: 16 * GB,
-        availableMemory: 8 * GB,
-        loadAverage1m: 1
-      },
+      { host: 'local', running: 1, cap: 4, ...MACHINE },
       { host: 'm1', running: 0, cap: 2, status: 'unreachable' }
     ]
   },
   'game.inboxThreads': {
-    threads: Array.from({ length: COUNT }, (_, index) => ({
-      ticket: `ORCA-${100 + index}`,
-      last: at(index),
-      waiting: 0,
-      messages: []
-    })),
-    waiting: Array.from({ length: COUNT }, (_, index) => ({
-      id: `w${index}`,
-      ticket: `ORCA-${100 + index}`,
-      kind: 'question',
-      subject: 'Port?',
-      body: 'Which port?',
-      at: at(index),
-      answerer: 'lead'
-    })),
-    answered: Array.from({ length: COUNT }, (_, index) => ({
-      id: `a${index}`,
-      ticket: `ORCA-${100 + index}`,
-      kind: 'question',
-      question: 'Port?',
-      answer: '5173',
-      askedAt: at(index),
-      answeredAt: at(index + 1)
-    }))
+    threads: twelve((i) => ({ ticket: `ORCA-${100 + i}`, last: at(i), waiting: 0, messages: [] })),
+    waiting: twelve((i) => ({ ...WAIT, ...row('w', i), at: at(i) })),
+    answered: twelve((i) => ({ ...ANSWER, ...row('a', i), askedAt: at(i), answeredAt: at(i) }))
   },
   'game.ownerQuestions': {
-    questions: Array.from({ length: COUNT }, (_, index) => ({
-      id: `q${index}`,
-      ticket: `ORCA-${100 + index}`,
-      question: 'Merge it?',
-      options: ['Yes', 'No'],
-      context: null,
-      askedAt: at(index),
-      answer: null
-    })),
+    questions: twelve((i) => ({ ...ASK, ...row('q', i), askedAt: at(i) })),
     undelivered: []
   }
 }
@@ -118,15 +75,6 @@ async function overlayPanelReads(electronApp: ElectronApplication): Promise<void
   }, OVERLAY)
 }
 
-// Why two frames: a check read right after a resize can still see the wider layout.
-const settleLayout = (page: Page): Promise<void> =>
-  page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      )
-  )
-
 /** Every tab past the panel's or the strip's edge, and a strip that has to scroll. */
 function cutTabsOf(strip: Locator): Promise<string[]> {
   return strip.evaluate((node) => {
@@ -147,6 +95,73 @@ function cutTabsOf(strip: Locator): Promise<string[]> {
   })
 }
 
+/** Opens the Inbox and checks both strips in every language, window, sidebar width and theme. */
+async function sweepStrips(page: Page, testInfo: TestInfo, look: 'team' | 'solo'): Promise<void> {
+  const panel = page.getByTestId('team-panel')
+  const tabs = panel.locator('[role="tablist"]').first()
+  await expect(tabs.getByRole('tab')).toHaveCount(look === 'team' ? 5 : 3, { timeout: 60_000 })
+  const inboxTab = tabs.getByRole('tab', { name: /Inbox|Bandeja/ })
+  await inboxTab.click()
+  await expect(inboxTab).toContainText('12', { timeout: 60_000 })
+  const subTabs = panel.getByTestId('team-panel-inbox').getByRole('tablist')
+  await expect(subTabs.getByRole('tab', { name: /For you/ })).toContainText('12')
+  let cases = 0
+  for (const language of LANGUAGES) {
+    await page.evaluate(
+      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+      language
+    )
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const sidebar of SIDEBARS) {
+        await page.evaluate(
+          (next) => window.__store!.getState().setRightSidebarWidth(next),
+          sidebar
+        )
+        for (const theme of THEMES) {
+          await setTheme(page, theme)
+          const panelWidth = await panel.evaluate((node) => node.clientWidth)
+          const label = `${look} ${language} window ${width} sidebar ${sidebar} (${panelWidth} px) ${theme}`
+          // Why a poll: a level change lands a render after the resize that asked for it.
+          for (const [strip, name] of [
+            [tabs, 'panel tabs'],
+            [subTabs, 'Inbox sub-tabs']
+          ] as const) {
+            await soft
+              .poll(() => cutTabsOf(strip), { message: `${name} cut: ${label}`, timeout: 3000 })
+              .toEqual([])
+            cases++
+          }
+          if (CAPTURE) {
+            await panel.screenshot({
+              animations: 'disabled',
+              path: testInfo.outputPath(`${look}-${language}-${width}-${sidebar}-${theme}.png`)
+            })
+          }
+        }
+      }
+    }
+  }
+  expect(cases).toBe(LANGUAGES.length * WIDTHS.length * SIDEBARS.length * THEMES.length * 2)
+  // Wide again, the strips go back to the full labels.
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.evaluate(() => window.__store!.getState().setRightSidebarWidth(2000))
+  await expect(tabs).toContainText('Máquinas')
+  await expect(subTabs).toContainText('Respondidas')
+}
+
+async function openPanel(page: Page): Promise<string> {
+  await waitForSessionReady(page)
+  const worktreeId = await waitForActiveWorktree(page)
+  await ensureTerminalVisible(page)
+  await waitForActivePanePtyId(page)
+  // Why: another feature's first-run hint would sit on the narrow captures.
+  await expect(page.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
+    timeout: 15_000
+  })
+  return worktreeId
+}
+
 test('the panel tabs and Inbox sub-tabs fit whole at every sidebar and window width', async ({
   electronApp,
   orcaPage
@@ -154,10 +169,7 @@ test('the panel tabs and Inbox sub-tabs fit whole at every sidebar and window wi
   test.setTimeout(600_000)
   const agent = createStdinLoggingAgent()
   try {
-    await waitForSessionReady(orcaPage)
-    const worktreeId = await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActivePanePtyId(orcaPage)
+    const worktreeId = await openPanel(orcaPage)
     const pane = await waitForActivePaneHookDescriptor(orcaPage)
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     const client = new RuntimeClient(userDataDir, 30_000, null, null)
@@ -183,74 +195,59 @@ test('the panel tabs and Inbox sub-tabs fit whole at every sidebar and window wi
       state: 'working',
       prompt: 'Lead the team'
     })
-    // Why: another feature's first-run hint would sit on the narrow captures.
-    await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
-      timeout: 15_000
-    })
     await overlayPanelReads(electronApp)
     await orcaPage.evaluate(() => {
-      const state = window.__store!.getState()
-      state.setRightSidebarOpen(true)
-      state.setRightSidebarTab('team')
+      window.__store!.getState().setRightSidebarOpen(true)
+      window.__store!.getState().setRightSidebarTab('team')
     })
-    const panel = orcaPage.getByTestId('team-panel')
-    const tabs = panel.locator('[role="tablist"]').first()
-    await expect(tabs.getByRole('tab')).toHaveCount(5, { timeout: 60_000 })
-    await tabs.getByRole('tab', { name: /Inbox|Bandeja/ }).click()
-    const subTabs = panel.getByTestId('team-panel-inbox').getByRole('tablist')
-    await expect(subTabs.getByRole('tab', { name: /Answered/ })).toContainText(String(COUNT), {
-      timeout: 60_000
-    })
-    await expect(subTabs.getByRole('tab', { name: /For you/ })).toContainText(String(COUNT))
-
-    let cases = 0
-    for (const language of LANGUAGES) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
-      for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
-        for (const sidebar of SIDEBARS) {
-          await orcaPage.evaluate(
-            (next) => window.__store!.getState().setRightSidebarWidth(next),
-            sidebar
-          )
-          for (const theme of THEMES) {
-            await setTheme(orcaPage, theme)
-            await settleLayout(orcaPage)
-            const panelWidth = await panel.evaluate((node) => node.clientWidth)
-            const label = `${language} window ${width} sidebar ${sidebar} (${panelWidth} px) ${theme}`
-            // Why a poll: a level change lands a render after the resize that asked for it.
-            await soft
-              .poll(() => cutTabsOf(tabs), { message: `panel tabs cut: ${label}`, timeout: 3000 })
-              .toEqual([])
-            await soft
-              .poll(() => cutTabsOf(subTabs), {
-                message: `Inbox sub-tabs cut: ${label}`,
-                timeout: 3000
-              })
-              .toEqual([])
-            cases += 2
-            if (CAPTURE && sidebar === 280) {
-              await panel.screenshot({
-                animations: 'disabled',
-                path: testInfo.outputPath(`tabs-${language}-${width}-${theme}.png`)
-              })
-            }
-          }
-        }
-      }
-    }
-    expect(cases).toBe(LANGUAGES.length * WIDTHS.length * SIDEBARS.length * THEMES.length * 2)
-
-    // Wide again, the strips go back to the full labels.
-    await orcaPage.setViewportSize({ width: 1440, height: 900 })
-    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarWidth(2000))
-    await settleLayout(orcaPage)
-    await expect(tabs).toContainText('Máquinas')
-    await expect(subTabs).toContainText('Respondidas')
+    await sweepStrips(orcaPage, testInfo, 'team')
   } finally {
     agent.dispose()
   }
+})
+
+// With no team the strip holds Activity, Inbox and Machines, whose full Spanish labels overflow 219 px.
+test('the no-team panel tabs fit whole at every sidebar and window width', async ({
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(600_000)
+  const worktreeId = await openPanel(orcaPage)
+  const { paneKey } = await waitForActivePaneHookDescriptor(orcaPage)
+  // Twelve agents asking, eleven of them on an SSH host so Machines shows.
+  await orcaPage.evaluate(
+    ({ paneKey, worktreeId }) => {
+      const store = window.__store!
+      const interactivePrompt = JSON.stringify({
+        questions: [{ question: 'Merge it?', multiSelect: false, options: [{ label: 'Yes' }] }]
+      })
+      const asking = { state: 'blocked', prompt: 'Ship', agentType: 'claude', interactivePrompt }
+      const template = Object.values(store.getState().worktreesByRepo)
+        .flat()
+        .find((one) => one.id === worktreeId)!
+      store.setState({ sshTargetLabels: new Map([['box-id', 'box']]) })
+      const ask = { ...asking, toolName: 'AskUserQuestion' } as never
+      store.getState().setAgentStatus(paneKey, ask, 'here')
+      for (let i = 0; i < 11; i++) {
+        const { worktreesByRepo, tabsByWorktree } = store.getState()
+        const id = `on-box-${i}`
+        const tabId = `tab-box-${i}`
+        store.setState({
+          worktreesByRepo: {
+            ...worktreesByRepo,
+            [`e2e-${id}`]: [{ ...template, id, path: `/${id}`, hostId: 'ssh:box-id' }]
+          },
+          tabsByWorktree: {
+            ...tabsByWorktree,
+            [id]: [{ ...tabsByWorktree[worktreeId]![0]!, id: tabId }]
+          }
+        } as never)
+        const key = `${tabId}:5555555${i % 10}-5555-4555-8555-55555555555${i % 10}`
+        store.getState().setAgentStatus(key, ask, id)
+      }
+      store.getState().setRightSidebarOpen(true)
+      store.getState().setRightSidebarTab('team')
+    },
+    { paneKey, worktreeId }
+  )
+  await sweepStrips(orcaPage, testInfo, 'solo')
 })
