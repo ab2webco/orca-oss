@@ -2,8 +2,16 @@ import type { TeamAgentFacts, TeamPanelGameModel } from '../team-panel-model-typ
 import type { TeamSceneActivity, TeamSceneAgentInput, TeamSceneInput } from './team-scene-types'
 
 // Why not status 'attention': it also means failed, and a failed member has nothing to ask.
-const activityOf = (agent: TeamAgentFacts, needsYou: boolean): TeamSceneActivity =>
-  needsYou ? 'needsYou' : agent.status === 'working' ? 'working' : 'resting'
+// Why the condition too: an unmerged finished turn reads idle on the card, not done.
+const activityOf = (agent: TeamAgentFacts, needsYou: boolean): TeamSceneActivity => {
+  if (needsYou) {
+    return 'needsYou'
+  }
+  if (agent.status === 'working') {
+    return 'working'
+  }
+  return agent.status === 'done' || agent.condition === 'done' ? 'done' : 'resting'
+}
 
 const agentOf = (
   agent: TeamAgentFacts & { characterKey: string | null },

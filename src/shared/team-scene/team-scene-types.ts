@@ -1,8 +1,8 @@
 // Why: the scene reads a narrow projection of the Team model (ORCA-1049) so every style and
 // client (desktop canvas, later mobile) runs the same simulation from real state only.
 
-/** What a seated agent does: work at its station, rest, or stop for the user. */
-export type TeamSceneActivity = 'working' | 'resting' | 'needsYou'
+/** What a seated agent does: work at its station, rest, stop for the user, or stand finished. */
+export type TeamSceneActivity = 'working' | 'resting' | 'needsYou' | 'done'
 
 export type TeamSceneAgentInput = {
   key: string
@@ -37,7 +37,7 @@ export type TeamSceneEvent =
 /** A point on stage: x across the width (0 to 1), depth from back (0) to front (1). */
 export type TeamSceneSpot = { x: number; depth: number }
 
-export type TeamScenePose = 'idle' | 'work' | 'walk' | 'raise' | 'give' | 'wave' | 'cheer'
+export type TeamScenePose = 'idle' | 'work' | 'walk' | 'raise' | 'give' | 'wave' | 'cheer' | 'done'
 
 export type TeamSceneEmote = 'alert' | 'check' | 'star' | 'heart'
 

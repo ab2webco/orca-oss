@@ -66,15 +66,24 @@ const framingOf = (tree: RenderElement): string[] =>
     ...(element.type === 'Text' && BOX_CHARACTERS.test(textOf(element)) ? [textOf(element)] : [])
   ])
 
-const start = async ($: Engine, on: On, env: Record<string, string> = {}, state?: object) => {
+const start = async (
+  $: Engine,
+  on: On,
+  env: Record<string, string> = {},
+  state?: object,
+  store = new Map<string, unknown>()
+) => {
   const clock = mock.clock(on)
   mock.env(on, { ORCA_GAME_CLI: ORCA_CLI, ORCA_GAME_LOCALE: 'en', ...env })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
-  on('store.set', () => ({ value: undefined }))
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined }
+  })
   on(
     'ui.render',
     (_$, e) => ({ type: 'Text', props: {}, children: [`native ${e.component}`] }) as never
@@ -108,6 +117,15 @@ const mount = ($: Engine, component: string, props: object) =>
 const reply = ($: Engine, text: string, isFirstOfReply = true) =>
   mount($, 'AssistantMessage', { text, isFirstOfReply })
 
+const replyAt = ($: Engine, columns: number, text: string) =>
+  $.ui.mount({
+    plugin: 'orca-game',
+    surface: 'terminal',
+    component: 'AssistantMessage',
+    viewport: { ...VIEWPORT, columns },
+    props: { text, isFirstOfReply: true }
+  } as never)
+
 const call = (tool: string, input: object, extra: object = {}) => ({
   tool,
   input,
@@ -140,9 +158,14 @@ describe('message copy', () => {
     await $.turn.start({ text: 'Fix the build', turnId: 't1' })
     await clock.advance(6_000)
     const row = await reply($, 'The build is green.')
+    // Why these values: V30's --head, its rule at .28 over --term, and --term-dim.
+    expect((await row.find({ type: 'Text', text: /^Squire · working$/ }))?.props).toMatchObject({
+      bold: true,
+      color: '#e6e8ec'
+    })
     const rule = await row.find({ type: 'Text', text: /^ {3,}$/ })
-    expect(rule?.props).toMatchObject({ strikethrough: true, dimColor: true })
-    expect((await row.find({ type: 'Text', text: /^ 0:06$/ }))?.props.dimColor).toBe(true)
+    expect(rule?.props).toMatchObject({ strikethrough: true, color: '#5a5d64' })
+    expect((await row.find({ type: 'Text', text: /^ 0:06$/ }))?.props.color).toBe('#8b93a1')
     expect(framingOf(await row.drawn())).toEqual([])
     await row.unmount()
   })
@@ -165,6 +188,21 @@ describe('message copy', () => {
     await row.unmount()
   })
 
+  // Why: a resumed lead drew its earlier headings with no time (live check 2).
+  test('a resumed session redraws a heading with the time it was first drawn at', async ($, on) => {
+    const clock = await start($, on)
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const first = await reply($, 'The build is green.')
+    expect(await first.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await first.unmount()
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+    await clock.settle()
+    const resumed = await reply($, 'The build is green.')
+    expect(await resumed.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await resumed.unmount()
+  })
+
   test("the lead's reply is headed by its own character, as its Team card names it", async ($, on) => {
     await start($, on, {}, LEAD_STATE)
     const row = await reply($, 'Queued #923.')
@@ -179,15 +217,63 @@ describe('message copy', () => {
     await row.unmount()
   })
 
-  test('a question to the person has its own heading, in the needs-you colour', async ($, on) => {
+  test("a question to the person has its own heading, in V30's wait pink", async ($, on) => {
     await start($, on, { ORCA_GAME_LOCALE: 'es' })
     const row = await reply($, 'Tests en verde.\n\n¿Abro el PR?', false)
     const heading = await row.find({ type: 'Text', text: /^Escudero · te pregunta$/ })
-    expect(heading?.props.color).toBe('red')
+    expect(heading?.props.color).toBe('#ffb7b8')
     const rule = await row.find({ type: 'Text', text: /^ {3,}$/ })
-    expect(rule?.props).toMatchObject({ color: 'red', strikethrough: true, dimColor: true })
+    expect(rule?.props).toMatchObject({ color: '#614f55', strikethrough: true })
     expect(framingOf(await row.drawn())).toEqual([])
     await row.unmount()
+  })
+
+  // Why the panel's light tokens: V30 is dark only; --agent-question-text, --muted-foreground.
+  test("in Orca's light look the heading takes the panel's light colours", async ($, on) => {
+    const clock = await start($, on, {}, { ...MEMBER_STATE, appearance: 'light' })
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const answer = await reply($, 'The build is green.')
+    expect((await answer.find({ type: 'Text', text: /^Castillo · working$/ }))?.props.color).toBe(
+      '#0a0a0a'
+    )
+    expect((await answer.find({ type: 'Text', text: /^ {3,}$/ }))?.props.color).toBe('#bababa')
+    expect((await answer.find({ type: 'Text', text: /^ 0:06$/ }))?.props.color).toBe('#737373')
+    await answer.unmount()
+    const ask = await reply($, 'Green.\n\nShall I open the PR?', false)
+    expect((await ask.find({ type: 'Text', text: /^Castillo · asks you$/ }))?.props.color).toBe(
+      '#b60010'
+    )
+    expect((await ask.find({ type: 'Text', text: /^ {3,}$/ }))?.props.color).toBe('#ebb8bc')
+    await ask.unmount()
+  })
+
+  test("the lead's heading takes the name its Team card shows, not its branch", async ($, on) => {
+    const lead = {
+      ...LEAD_STATE,
+      leadName: 'Elaine',
+      agents: [{ ...LEAD_STATE.agents[0], displayName: 'main' }]
+    }
+    await start($, on, {}, lead)
+    const row = await reply($, 'Queued #923.')
+    expect(await row.find({ type: 'Text', text: /^Elaine · working$/ })).toBeDefined()
+    await row.unmount()
+  })
+
+  // Why: a pane a few columns wide wrapped the heading mid-word (live check 2, 390 px).
+  test('a narrow pane drops the rule and time before it would wrap the heading', async ($, on) => {
+    const clock = await start($, on)
+    await $.turn.start({ text: 'Fix the build', turnId: 't1' })
+    await clock.advance(6_000)
+    const fits = await replyAt($, 22, 'The build is green.')
+    expect(await fits.find({ type: 'Text', text: /^ {3,}$/ })).toBeUndefined()
+    expect(await fits.find({ type: 'Text', text: /^ 0:06$/ })).toBeDefined()
+    await fits.unmount()
+    const narrow = await replyAt($, 10, 'Still green.')
+    const heading = await narrow.find({ type: 'Text', text: /^Squire · working$/ })
+    expect(heading?.props.wrap).toBe('truncate-end')
+    expect(await narrow.find({ type: 'Text', text: /0:06/ })).toBeUndefined()
+    await narrow.unmount()
   })
 
   test("the person's own message draws as Claude Code draws it", async ($, on) => {
@@ -213,7 +299,7 @@ describe('message copy', () => {
     await row.unmount()
   })
 
-  test('a collapsed tool group draws one dim summary line', async ($, on) => {
+  test('a collapsed tool group draws one summary line in V30 --term-dim', async ($, on) => {
     await start($, on)
     const row = await mount($, 'ToolGroup', {
       calls: [call('Read', { file_path: '/w/a.ts' }), call('Read', { file_path: '/w/b.ts' })],
@@ -221,18 +307,18 @@ describe('message copy', () => {
       isExpanded: false
     })
     const line = await row.find({ type: 'Text', text: /^▸ Read 2 files$/ })
-    expect(line?.props.dimColor).toBe(true)
+    expect(line?.props.color).toBe('#8b93a1')
     await row.unmount()
   })
 
-  test('a standalone tool row draws one dim line of what it did', async ($, on) => {
+  test('a standalone tool row draws one --term-dim line of what it did', async ($, on) => {
     await start($, on)
     const row = await mount($, 'ToolUse', {
       tool_use_id: 't1',
       ...call('Edit', { file_path: '/w/src/quest.tsx' })
     })
     const line = await row.find({ type: 'Text', text: /^▸ .*quest\.tsx$/ })
-    expect(line?.props.dimColor).toBe(true)
+    expect(line?.props.color).toBe('#8b93a1')
     await row.unmount()
   })
 

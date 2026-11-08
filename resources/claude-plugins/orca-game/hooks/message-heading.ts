@@ -28,11 +28,18 @@ export const headingTimeOf = (elapsedMs: number): string => {
   return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`
 }
 
+export type HeadingFit = { rule: number; isTimeShown: boolean }
+
 // Why one column spare: a row that fills the last column wraps on some terminals.
-/** Cells of the rule between a heading and its time, a space either side. */
-export const headingRuleWidthOf = (label: string, time: string, columns: number): number => {
+// Why the rule goes first, then the time: a wrapped heading breaks mid-word.
+/** Cells of the rule between a heading and its time, a space either side; 0 when it has no room. */
+export const headingFitOf = (label: string, time: string, columns: number): HeadingFit => {
+  const room = columns - 1 - cellWidthOf(label)
   const timeCells = time === '' ? 0 : cellWidthOf(time) + 1
-  return Math.max(RULE_MIN, columns - 1 - cellWidthOf(label) - 1 - timeCells)
+  const rule = room - 1 - timeCells
+  return rule >= RULE_MIN
+    ? { rule, isTimeShown: time !== '' }
+    : { rule: 0, isTimeShown: time !== '' && room >= timeCells }
 }
 
 /** A member's character, a lead's title, else the phase card's name. */

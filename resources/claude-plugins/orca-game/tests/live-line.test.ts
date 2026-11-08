@@ -32,7 +32,12 @@ const ABOVE_PROMPT = {
 
 const TURN_END = { reason: 'answer', durationMs: 1, isAborted: false, turnId: 't1' } as const
 
-const start = async ($: Engine, on: On, env: Record<string, string> = {}) => {
+const start = async (
+  $: Engine,
+  on: On,
+  env: Record<string, string> = {},
+  state: object = MEMBER_STATE
+) => {
   const clock = mock.clock(on)
   mock.env(on, { ORCA_GAME_CLI: '/opt/orca/bin/orca', ORCA_GAME_LOCALE: 'en', ...env })
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
@@ -52,7 +57,7 @@ const start = async ($: Engine, on: On, env: Record<string, string> = {}) => {
   on('process.run', () => ({
     value: {
       exitCode: 0,
-      stdout: JSON.stringify({ id: 'x', ok: true, result: MEMBER_STATE }),
+      stdout: JSON.stringify({ id: 'x', ok: true, result: state }),
       stderr: '',
       isStdoutTruncated: false,
       isStderrTruncated: false
@@ -81,14 +86,22 @@ describe('the live line', () => {
     const ui = await $.ui.mount(ABOVE_PROMPT)
     expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props.bold).toBe(true)
     expect(await ui.find({ type: 'Text', text: /^[·✢✳✶✻✽]$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: / 0:04$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: / · gh pr view 923$/ })).toBeDefined()
+    // Why truncate: a pane a few columns wide broke the name and verb mid-word (live check 2).
+    expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props).toMatchObject({
+      color: '#e6e8ec',
+      wrap: 'truncate-end'
+    })
+    expect((await ui.find({ type: 'Text', text: / 0:04$/ }))?.props.wrap).toBe('truncate-end')
+    expect((await ui.find({ type: 'Text', text: / 0:04$/ }))?.props.color).toBe('#8b93a1')
+    expect((await ui.find({ type: 'Text', text: / · gh pr view 923$/ }))?.props.color).toBe(
+      '#8b93a1'
+    )
     await clock.advance(2_000)
     expect(await ui.find({ type: 'Text', text: / 0:06$/ })).toBeDefined()
     await ui.unmount()
   })
 
-  test('a turn ending in a question waits on the person, in red', async ($, on) => {
+  test("a turn ending in a question waits on the person, in V30's wait red", async ($, on) => {
     const clock = await start($, on)
     await $.turn.start({ text: 'Review #923', turnId: 't1' })
     await clock.advance(3_000)
@@ -97,13 +110,14 @@ describe('the live line', () => {
       ...ABOVE_PROMPT,
       props: { ...ABOVE_PROMPT.props, isWorking: false }
     })
-    expect((await ui.find({ type: 'Text', text: '◆' }))?.props.color).toBe('red')
+    expect((await ui.find({ type: 'Text', text: '◆' }))?.props.color).toBe('#ff6568')
+    expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props.color).toBe('#ff6568')
     expect(await ui.find({ type: 'Text', text: / Waiting on you/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: / · Should I merge #923\?$/ })).toBeDefined()
     await ui.unmount()
   })
 
-  test('a finished turn is done, in green, with its length', async ($, on) => {
+  test("a finished turn is done, in V30's done green, with its length", async ($, on) => {
     const clock = await start($, on)
     await $.turn.start({ text: 'Review #923', turnId: 't1' })
     await clock.advance(9_000)
@@ -113,10 +127,30 @@ describe('the live line', () => {
       ...ABOVE_PROMPT,
       props: { ...ABOVE_PROMPT.props, isWorking: false }
     })
-    expect((await ui.find({ type: 'Text', text: '✓' }))?.props.color).toBe('green')
+    expect((await ui.find({ type: 'Text', text: '✓' }))?.props.color).toBe('#8fce8f')
+    expect((await ui.find({ type: 'Text', text: 'Castillo' }))?.props.color).toBe('#8fce8f')
     expect(await ui.find({ type: 'Text', text: / Done/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: / 0:09$/ })).toBeDefined()
     await ui.unmount()
+  })
+
+  // Why the panel's light tokens: V30 is dark only, and a light pane must not read as all black.
+  test("in Orca's light look it waits in the panel's attention red and is done in its green", async ($, on) => {
+    const clock = await start($, on, {}, { ...MEMBER_STATE, appearance: 'light' })
+    const idle = { ...ABOVE_PROMPT, props: { ...ABOVE_PROMPT.props, isWorking: false } }
+    await $.turn.start({ text: 'Review #923', turnId: 't1' })
+    await clock.advance(3_000)
+    await $.turn.complete({ ...TURN_END, answer: 'Should I merge #923?' })
+    const waiting = await $.ui.mount(idle)
+    expect((await waiting.find({ type: 'Text', text: 'Castillo' }))?.props.color).toBe('#e40014')
+    expect((await waiting.find({ type: 'Text', text: / · Should/ }))?.props.color).toBe('#737373')
+    await waiting.unmount()
+    await $.turn.start({ text: 'Merge it', turnId: 't2' })
+    await clock.advance(1_000)
+    await $.turn.complete({ ...TURN_END, turnId: 't2', answer: 'Merged #923.' })
+    const done = await $.ui.mount(idle)
+    expect((await done.find({ type: 'Text', text: '✓' }))?.props.color).toBe('#15803d')
+    await done.unmount()
   })
 
   test('an interrupted turn claims neither done nor working', async ($, on) => {
