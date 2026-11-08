@@ -86,6 +86,13 @@ function drawTool(
     dot(0, -6 + (Math.floor(t * 6) % 2), 1, 4, TOOL)
     return
   }
+  if (a.pose === 'done') {
+    // Why shouldered: a raised tool already means asking the user.
+    dot(-1, -3, 1, 1, TOOL)
+    dot(-2, -4, 1, 1, TOOL)
+    dot(-3, -5, 1, 1, TOOL)
+    return
+  }
   if (a.pose !== 'work') {
     return
   }

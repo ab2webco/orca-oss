@@ -141,9 +141,15 @@ describe('createPixelPainter', () => {
       expect(over('idle').size).toBe(1)
     })
 
-    it('draws working, resting and asking apart at the same moment', () => {
-      const looks = new Set((['work', 'idle', 'raise'] as const).map((pose) => fillsAt(pose, 0.1)))
-      expect(looks.size).toBe(3)
+    it('holds a done member’s tool on the shoulder, still', () => {
+      expect(over('done').size).toBe(1)
+    })
+
+    it('draws working, resting, asking and done apart at the same moment', () => {
+      const looks = new Set(
+        (['work', 'idle', 'raise', 'done'] as const).map((pose) => fillsAt(pose, 0.1))
+      )
+      expect(looks.size).toBe(4)
     })
   })
 
