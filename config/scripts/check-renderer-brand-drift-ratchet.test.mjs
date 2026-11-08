@@ -3,168 +3,123 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 
+import { main, readAllowlistAt, resolveBaseRef } from './check-renderer-brand-drift-ratchet.mjs'
 import {
-  findIncreases,
-  main,
-  parseBaseline,
-  readBaselineAt,
-  resolveBaseRef
-} from './check-renderer-brand-drift-ratchet.mjs'
+  BASE_ALLOWLIST,
+  commitAll,
+  fixtureRepo,
+  gitIn,
+  removeFixtureRepos,
+  writeAllowlist,
+  writeRenderer
+} from './renderer-brand-drift-fixture.mjs'
 
-const BASELINE_PATH = 'config/renderer-brand-drift-baseline.txt'
+afterAll(removeFixtureRepos)
+afterEach(() => vi.restoreAllMocks())
 
-function baselineText({ rename, stale, resolved }) {
-  return [
-    '# comment line',
-    '',
-    `rename-drift ${rename}`,
-    `stale-fallbacks ${stale}`,
-    `resolved-calls ${resolved}`,
-    ''
-  ].join('\n')
+/** Runs the gate against `main` as the PR base and returns its exit code and stderr. */
+function runGate(root, env = {}) {
+  const errors = []
+  vi.spyOn(console, 'error').mockImplementation((line) => errors.push(line))
+  vi.spyOn(console, 'log').mockImplementation(() => {})
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  return { code: main(root, env), stderr: errors.join('\n') }
 }
 
-const repos = []
-
-/** A throwaway git repo whose base commit carries `base` on `main`. */
-function repoWithBase(base) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-drift-ratchet-'))
-  repos.push(root)
-  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'ignore' })
-  git('init', '-b', 'main')
-  git('config', 'user.email', 'test@example.com')
-  git('config', 'user.name', 'test')
-  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
-  fs.writeFileSync(path.join(root, BASELINE_PATH), baselineText(base))
-  git('add', '-A')
-  git('commit', '-m', 'baseline')
-  return root
-}
-
-afterAll(() => {
-  for (const root of repos) {
-    fs.rmSync(root, { recursive: true, force: true })
-  }
-})
-
-describe('renderer brand drift baseline parsing', () => {
-  it('reads the counters and ignores comments and blank lines', () => {
-    expect(parseBaseline(baselineText({ rename: 529, stale: 591, resolved: 12474 }))).toEqual({
-      'rename-drift': 529,
-      'stale-fallbacks': 591,
-      'resolved-calls': 12474
-    })
+describe('the gate on a PR that adds renderer copy', () => {
+  it('passes a new, correctly branded call with no allowlist edit', () => {
+    const root = fixtureRepo()
+    writeRenderer(root, { 'components/Added.tsx': "translate('greet', 'Hello')\n" })
+    commitAll(root, 'add a call')
+    expect(runGate(root)).toEqual({ code: 0, stderr: '' })
   })
 
-  it('rejects a line that is not a counter', () => {
-    expect(() => parseBaseline('rename-drift lots')).toThrow(/Malformed/)
+  it('fails a new stale fallback with an annotation on its file and line', () => {
+    const root = fixtureRepo()
+    writeRenderer(root, { 'components/Added.tsx': "\n\ntranslate('second', 'Wrong second')\n" })
+    commitAll(root, 'add a stale call')
+    const { code, stderr } = runGate(root)
+    expect(code).toBe(1)
+    expect(stderr).toContain('::error file=src/renderer/src/components/Added.tsx,line=3::')
   })
 })
 
-describe('the ratchet only lets the counters fall', () => {
-  // The case the equality pin cannot see: a commit that adds a drift site AND
-  // raises the baseline to match it. Both sides agree with the tree, so only the
-  // comparison against the base can reject it. If this passes, it is not a ratchet.
-  it('rejects a raise that a matching tree would otherwise justify', () => {
-    const base = { 'rename-drift': 529, 'stale-fallbacks': 591, 'resolved-calls': 12474 }
-    const head = { 'rename-drift': 530, 'stale-fallbacks': 592, 'resolved-calls': 12475 }
-    expect(findIncreases(base, head)).toEqual([
-      { name: 'rename-drift', before: 529, after: 530 },
-      { name: 'stale-fallbacks', before: 591, after: 592 }
+describe('the allowlist only shrinks against the base', () => {
+  it('rejects an entry the base did not list, even when the tree needs it', () => {
+    const root = fixtureRepo()
+    writeRenderer(root, { 'components/Added.tsx': "translate('second', 'Wrong second')\n" })
+    writeAllowlist(root, `${BASE_ALLOWLIST}components/Added.tsx second\n`)
+    commitAll(root, 'grandfather a new stale call')
+    const { code, stderr } = runGate(root)
+    expect(code).toBe(1)
+    expect(stderr).toContain('components/Added.tsx second')
+  })
+
+  it('accepts dropping an entry once its fallback is fixed', () => {
+    const root = fixtureRepo()
+    writeRenderer(root, { 'components/First.tsx': "translate('first', 'First copy')\n" })
+    writeAllowlist(root, 'components/Second.tsx second\n')
+    commitAll(root, 'fix first')
+    expect(runGate(root).code).toBe(0)
+  })
+
+  it('has nothing to ratchet against when the base predates the allowlist', () => {
+    const root = fixtureRepo({ allowlist: null })
+    writeAllowlist(root, BASE_ALLOWLIST)
+    commitAll(root, 'add allowlist')
+    expect(readAllowlistAt('main', root)).toBeNull()
+    expect(runGate(root).code).toBe(0)
+  })
+
+  it('reads the entries committed at the base', () => {
+    expect([...readAllowlistAt('main', fixtureRepo())]).toEqual([
+      'components/First.tsx first',
+      'components/Second.tsx second'
     ])
   })
-
-  it('accepts a slice that lowers them', () => {
-    const base = { 'rename-drift': 529, 'stale-fallbacks': 591, 'resolved-calls': 12474 }
-    const head = { 'rename-drift': 455, 'stale-fallbacks': 517, 'resolved-calls': 12474 }
-    expect(findIncreases(base, head)).toEqual([])
-  })
-
-  it('accepts an unchanged baseline', () => {
-    const counts = { 'rename-drift': 529, 'stale-fallbacks': 591, 'resolved-calls': 12474 }
-    expect(findIncreases(counts, { ...counts })).toEqual([])
-  })
-
-  it('leaves resolved-calls ungated in both directions', () => {
-    const base = { 'rename-drift': 529, 'stale-fallbacks': 591, 'resolved-calls': 12474 }
-    expect(findIncreases(base, { ...base, 'resolved-calls': 12999 })).toEqual([])
-    expect(findIncreases(base, { ...base, 'resolved-calls': 11000 })).toEqual([])
-  })
-
-  it('ignores a counter the base did not have yet', () => {
-    const base = { 'rename-drift': 529 }
-    expect(findIncreases(base, { 'rename-drift': 529, 'stale-fallbacks': 9999 })).toEqual([])
-  })
 })
 
-describe('reading the baseline from the base ref', () => {
-  it('returns the counters committed there', () => {
-    const root = repoWithBase({ rename: 529, stale: 591, resolved: 12474 })
-    expect(readBaselineAt('main', root)).toEqual({
-      'rename-drift': 529,
-      'stale-fallbacks': 591,
-      'resolved-calls': 12474
-    })
-  })
-
-  it('returns null when the base predates the baseline file', () => {
-    const root = repoWithBase({ rename: 1, stale: 1, resolved: 1 })
-    execFileSync('git', ['rm', '-q', BASELINE_PATH], { cwd: root })
-    execFileSync('git', ['commit', '-qm', 'drop baseline'], { cwd: root })
-    execFileSync('git', ['tag', 'before-baseline'], { cwd: root })
-    expect(readBaselineAt('before-baseline', root)).toBeNull()
-  })
-})
-
-/** A throwaway repo with a baseline but no ref to compare it against. */
+/** A repo with an allowlist but no ref to compare it against. */
 function repoWithoutBase() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-drift-ratchet-nobase-'))
-  repos.push(root)
-  execFileSync('git', ['init', '-b', 'work'], { cwd: root, stdio: 'ignore' })
-  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
-  // measure() walks src/renderer/src; empty keeps every counter at zero, so the
-  // baseline matches the tree and main() reaches the base-ref branch under test.
-  const locales = path.join(root, 'src', 'renderer', 'src', 'i18n', 'locales')
-  fs.mkdirSync(locales, { recursive: true })
-  fs.writeFileSync(path.join(locales, 'en.json'), '{}')
-  fs.writeFileSync(
-    path.join(root, BASELINE_PATH),
-    baselineText({ rename: 0, stale: 0, resolved: 0 })
-  )
+  const root = fixtureRepo()
+  gitIn(root)('branch', '-qD', 'main')
   return root
 }
 
 describe('a run with no base ref', () => {
   it('fails closed on a pull request, where the base is always fetched', () => {
-    expect(main(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'pull_request' })).toBe(1)
+    expect(runGate(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'pull_request' }).code).toBe(
+      1
+    )
   })
 
   it('skips on a release run, which checks out a bare SHA and has no base', () => {
     // Why not env.CI: that was the old condition and it blocked lab.61. A release
     // builds already-merged main, which the PR gate judged on the way in.
-    expect(main(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch' })).toBe(0)
+    expect(
+      runGate(repoWithoutBase(), { CI: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch' }).code
+    ).toBe(0)
   })
 })
 
 describe('choosing the ref to compare against', () => {
   it('prefers the PR base branch over main', () => {
-    const root = repoWithBase({ rename: 1, stale: 1, resolved: 1 })
-    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-    execFileSync('git', ['update-ref', 'refs/remotes/origin/release', head], { cwd: root })
+    const root = fixtureRepo()
+    const head = gitIn(root)('rev-parse', 'HEAD').trim()
+    gitIn(root)('update-ref', 'refs/remotes/origin/release', head)
     expect(resolveBaseRef(root, { GITHUB_BASE_REF: 'release' })).toBe('origin/release')
   })
 
   it('falls back to main when the PR base is not fetched', () => {
-    const root = repoWithBase({ rename: 1, stale: 1, resolved: 1 })
-    expect(resolveBaseRef(root, { GITHUB_BASE_REF: 'release' })).toBe('main')
+    expect(resolveBaseRef(fixtureRepo(), { GITHUB_BASE_REF: 'release' })).toBe('main')
   })
 
   it('returns null when nothing resolves', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-drift-ratchet-empty-'))
-    repos.push(root)
     execFileSync('git', ['init', '-b', 'work'], { cwd: root, stdio: 'ignore' })
     expect(resolveBaseRef(root, {})).toBeNull()
+    fs.rmSync(root, { recursive: true, force: true })
   })
 })

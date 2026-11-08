@@ -195,7 +195,14 @@ export type OrchestratorGameState = {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
   warnings: string[]
-  worktree: { id: string; path: string; branch: string; displayName: string } | null
+  worktree: {
+    id: string
+    path: string
+    branch: string
+    displayName: string
+    /** A folder with no git, where members run in the folder itself; absent from an older host. */
+    folder?: true
+  } | null
   agents: GameAgent[]
   review: GameReview | null
   workItem: GameWorkItem | null
