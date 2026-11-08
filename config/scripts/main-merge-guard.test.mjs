@@ -70,8 +70,10 @@ function runGuard(command, { cwd, ghBase, requiredChecks, workspacePath } = {}) 
     cwd: repo,
     env,
     encoding: 'utf8',
-    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd: repo })
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd: repo }),
+    timeout: 20_000
   })
+  expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
   const stdout = result.stdout.trim()
   if (!stdout) {

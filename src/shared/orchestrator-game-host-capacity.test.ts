@@ -127,6 +127,16 @@ describe('withGameHostCapacity', () => {
     expect(withGameHostCapacity(state, null)).toBe(state)
     expect(withGameHostCapacity(unplaced, readings)).toBe(unplaced)
   })
+
+  it('gives a lead with no saved host this machine alone, with its local members', () => {
+    const alone = { ...state, hosts: undefined, agents: [member('a'), member('d')] }
+    const next = withGameHostCapacity(alone, readings.slice(0, 1))
+    expect(next.hostCapacity).toBeUndefined()
+    expect(next.localHost).toEqual({ host: 'local', running: 3, cap: 10, status: 'ok', ...local })
+    expect(
+      withGameHostCapacity({ ...alone, role: 'member' }, readings.slice(0, 1))
+    ).not.toHaveProperty('localHost')
+  })
 })
 
 describe('formatGameHostCapacity', () => {

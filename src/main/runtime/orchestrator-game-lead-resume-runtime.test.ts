@@ -117,6 +117,78 @@ describe('a game lead reopened on claim', () => {
     )
   })
 
+  const LEAD_TRANSCRIPT =
+    '/home/me/orca/claude-accounts/acct-lead/auth/projects/-repo/sess-lead.jsonl'
+
+  it("records where the lead's conversation lives, which names its account", async () => {
+    const runtime = runtimeWithAccounts()
+    vi.spyOn(runtime, 'snapshotClaudeTerminalSwitchTarget').mockResolvedValue({
+      ok: true,
+      terminal: 'term_lead',
+      ptyId: 'pty-lead',
+      paneKey: 'tab-1:lead',
+      worktreeId: 'wt-lead',
+      cwd: userData.dir,
+      launchConfig: { agentCommand: 'claude --teammate-mode auto', agentArgs: '' } as never,
+      isWsl: false,
+      wslDistro: null,
+      remoteConnectionId: null,
+      providerSession: { agent: 'claude', id: 'sess-lead', transcriptPath: LEAD_TRANSCRIPT }
+    })
+
+    expect(await leadDepsOf(runtime).sessionOf('term_lead')).toEqual({
+      ...STORED,
+      accountId: null,
+      transcriptPath: LEAD_TRANSCRIPT
+    })
+  })
+
+  // ORCA-718: a lead whose pane binding was gone at registration reopened on the global login.
+  it('reopens a lead with no recorded account on the account its transcript lives under', async () => {
+    const runtime = runtimeWithAccounts()
+    const ensure = vi
+      .spyOn(runtime, 'ensureAgentSession')
+      .mockResolvedValue({ terminal: { handle: 'term_new' }, disposition: 'created' } as never)
+    vi.spyOn(runtime, 'getExactWorkerProviderSessionIdentity').mockReturnValue({
+      providerSession: { key: 'session_id', id: 'sess-lead' }
+    } as never)
+
+    await leadDepsOf(runtime).resume({
+      ...STORED,
+      accountId: null,
+      transcriptPath: LEAD_TRANSCRIPT
+    })
+
+    expect(ensure).toHaveBeenCalledWith(expect.anything(), {}, { claudeAccountId: 'acct-lead' })
+  })
+
+  // Why: the shared transcript store lets any account resume it, so the spawn picks what a new
+  // launch would get instead of naming an account that no longer exists.
+  for (const [label, stored] of [
+    [
+      'whose transcript names a removed account',
+      {
+        ...STORED,
+        accountId: null,
+        transcriptPath: LEAD_TRANSCRIPT.replace('acct-lead', 'acct-gone')
+      }
+    ],
+    ['whose recorded account was removed', { ...STORED, accountId: 'acct-gone' }]
+  ] as const) {
+    it(`reopens a lead ${label} with no account of its own, for the spawn to choose`, async () => {
+      const runtime = runtimeWithAccounts()
+      const ensure = vi
+        .spyOn(runtime, 'ensureAgentSession')
+        .mockResolvedValue({ terminal: { handle: 'term_new' }, disposition: 'created' } as never)
+      vi.spyOn(runtime, 'getExactWorkerProviderSessionIdentity').mockReturnValue({
+        providerSession: { key: 'session_id', id: 'sess-lead' }
+      } as never)
+
+      expect(await leadDepsOf(runtime).resume(stored)).toBe('term_new')
+      expect(ensure).toHaveBeenCalledWith(expect.anything(), {}, {})
+    })
+  }
+
   it("keeps the pane's last words in the error before it closes the pane Claude left", async () => {
     const runtime = runtimeWithAccounts()
     vi.spyOn(runtime, 'ensureAgentSession').mockResolvedValue({

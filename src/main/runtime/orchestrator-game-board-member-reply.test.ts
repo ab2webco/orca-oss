@@ -73,6 +73,15 @@ describe('GameBoard.replyToMember (ORCA-878)', () => {
     ])
   })
 
+  it('names a member with no ticket as written, never as a ticket (ORCA-1136)', async () => {
+    const { game, told } = board(LEAD, () => ({ mode: 'answered', question: 'Ready?' }))
+
+    await game.replyToMember({ worktreeId: 'wt', id: 'msg_3', text: 'Yes', ticket: 'main' })
+
+    expect(told[0]?.note.subject).toBe('Owner answered main: Ready?')
+    expect(told[0]?.note.payload).toMatchObject({ ticket: 'main' })
+  })
+
   it('names an override as one, so the lead does not repeat its earlier answer', async () => {
     const { game, told } = board(LEAD, () => ({ mode: 'override', question: 'Rebase?' }))
 

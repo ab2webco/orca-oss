@@ -167,8 +167,8 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Lead')
     expect(card.querySelector('svg[data-crown]')).not.toBeNull()
     expect(card.textContent).toContain('local')
-    expect(card.textContent).toContain('gh pr checks 923')
-    expect(card.textContent).not.toContain('Bash')
+    // ORCA-1129: a command reads as every tool label does.
+    expect(card.textContent).toContain('Bash · gh pr checks 923')
     expect(card.textContent).toContain('Opus 5.5 · high')
     expect(card.textContent).toContain('Coordinates 1 agent')
   })
@@ -406,11 +406,11 @@ describe('TeamTabContent', () => {
     )
   })
 
-  it('shows XP only in the Game look and only when rewards report it', async () => {
+  // Why none here: the level moved under the project name, above the tabs, as V28 draws it (ORCA-1094).
+  it('leaves XP to the panel header, in either look', async () => {
     const xp = { level: 11, into: 240, need: 1100 }
-    expect((await render(model({ xp }))).container.textContent).toContain('240/1100 XP')
+    expect((await render(model({ xp }))).container.textContent).not.toContain('XP')
     expect((await render(model({ xp }), 'display')).container.textContent).not.toContain('XP')
-    expect((await render(model())).container.textContent).not.toContain('XP')
   })
 
   it('says when the lead has no members yet', async () => {

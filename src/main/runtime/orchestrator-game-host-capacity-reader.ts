@@ -23,17 +23,14 @@ export class GameHostCapacityReader {
 
   constructor(private readonly deps: Deps) {}
 
-  /** Null while no environment is saved, so a lone Orca shows no hosts. */
-  async read(): Promise<{ host: string; reading: GameHostReading }[] | null> {
+  /** This Orca first, then each saved host; alone it is the panel's only machine. */
+  async read(): Promise<{ host: string; reading: GameHostReading }[]> {
     const environments = this.deps.list()
     const keys = new Set([LOCAL_GAME_HOST, ...environments.map((one) => one.id)])
     for (const key of this.cache.keys()) {
-      if (!keys.has(key) || environments.length === 0) {
+      if (!keys.has(key)) {
         this.cache.delete(key)
       }
-    }
-    if (environments.length === 0) {
-      return null
     }
     const remoteOf = (id: string) => async () =>
       ((await this.deps.readRemote(id)) as { host?: unknown } | null)?.host
