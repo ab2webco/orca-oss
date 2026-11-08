@@ -98,6 +98,25 @@
           "meaning": "No activity, or no data."
         }
       }
+    },
+    "gameActions": {
+      "templates": {
+        "deploy": {
+          "command": "deploy",
+          "label": "Deploy",
+          "prompt": "Deploy to staging and tell me the result."
+        },
+        "redPrs": {
+          "command": "red-prs",
+          "label": "Red PRs",
+          "prompt": "Look at the red PRs and tell me which one needs a member."
+        },
+        "tests": {
+          "command": "tests",
+          "label": "Tests",
+          "prompt": "Run the whole suite and tell me only what failed."
+        }
+      }
     }
   },
   "menu": {
