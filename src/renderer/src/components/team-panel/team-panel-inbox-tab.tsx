@@ -120,7 +120,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const nothing = subTabs.every(([, , , count]) => count === 0) && props.undelivered.length === 0
   const empty = nothing && !props.projectUnread
   // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
-  const cue = useTabStripCue(tab, empty ? '' : subTabs.flat().join(), 3)
+  const cue = useTabStripCue(tab, empty ? '' : subTabs.flat().join(), 4)
   const tight = cue.fit >= 2
   if (empty) {
     return (
@@ -140,7 +140,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       className="flex h-full min-h-0 flex-col gap-0"
       data-testid="team-panel-inbox"
     >
-      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel shortens labels, then drops counts; the Inbox tab still shows For you's. */}
+      {/* Why one line: V28 keeps the sub-tabs on one row; a narrow panel shortens labels, then drops zero counts, then all; the Inbox tab still shows For you's. */}
       <div className="relative shrink-0">
         <TabsList
           aria-label={translate('teamPanel.inbox.sections', 'Inbox sections')}
@@ -156,7 +156,9 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
               className={`${SUB_TAB} ${tight ? 'gap-0.5 px-1 text-[11px]' : 'gap-1 px-1.5 text-xs'}`}
             >
               {cue.fit >= 1 ? short : label}
-              {cue.fit < 3 ? <span className="tabular-nums">{count}</span> : null}
+              {cue.fit < 3 || (cue.fit === 3 && count > 0) ? (
+                <span className="tabular-nums">{count}</span>
+              ) : null}
             </TabsTrigger>
           ))}
         </TabsList>
