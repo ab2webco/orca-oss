@@ -10,14 +10,12 @@ import { headingNameOf } from './message-heading'
 import { messageHeadingWords } from './message-heading-words'
 import { currentScene, gameConfig, quest, ready, shownPhase } from './quest-runtime'
 import { shownSpeaker } from './quest-state'
+import { terminalPalette, type TerminalPalette } from './terminal-palette'
 
 // Why named colors: the terminal's own red, yellow and green read on dark and light themes alike.
 const TONE_COLORS = { failure: 'red', warn: 'yellow' } as const
-const LIVE_COLORS: Readonly<Record<LiveState, string | undefined>> = {
-  working: undefined,
-  waiting: 'red',
-  done: 'green'
-}
+const liveColorOf = (state: LiveState, palette: TerminalPalette): string =>
+  state === 'working' ? palette.head : state === 'waiting' ? palette.waiting : palette.done
 
 // Core's own band is left out, as the game's band did; another plugin's stays beneath.
 const beneathOf = (drawn: RenderElement): RenderElement[] =>
@@ -47,7 +45,8 @@ async function liveRow(
     },
     messageHeadingWords()
   )
-  const color = LIVE_COLORS[status.state]
+  const palette = terminalPalette()
+  const color = liveColorOf(status.state, palette)
   const head = ` ${line.verb} ${line.time}`
   const room = e.props.bodyColumns - cellWidthOf(`${line.glyph} ${line.name}${head} · `)
   const { Box, Text } = $.ui.resolve(e)
@@ -58,9 +57,9 @@ async function liveRow(
       <Text bold color={color}>
         {line.name}
       </Text>
-      <Text dimColor>{head}</Text>
+      <Text color={palette.dim}>{head}</Text>
       {line.step === '' || room < 4 ? null : (
-        <Text dimColor wrap="truncate-end">{` · ${fitCells(line.step, room)}`}</Text>
+        <Text color={palette.dim} wrap="truncate-end">{` · ${fitCells(line.step, room)}`}</Text>
       )}
     </Box>
   ]

@@ -48,9 +48,9 @@ export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): s
   state.lead?.label ?? fallback
 
 // Why the paneKey and agent type: game-state fills a leader with no title with them, and the Team card skips both.
-/** The lead's character as its Team card names it, short of its ticket; else its label, else `fallback`. */
+/** The name Orca's Team card shows; from an older host, the leader's title short of its ticket, its label, else `fallback`. */
 export const leadCharacterOf = (
-  state: Pick<GameState, 'lead' | 'worktree'> & {
+  state: Pick<GameState, 'lead' | 'worktree' | 'leadName'> & {
     agents: readonly Pick<
       GameState['agents'][number],
       'paneKey' | 'agentType' | 'displayName' | 'isLeader'
@@ -58,6 +58,9 @@ export const leadCharacterOf = (
   },
   fallback: string
 ): string => {
+  if (state.leadName !== undefined) {
+    return state.leadName
+  }
   const leader = state.agents.find((one) => one.isLeader)
   const own =
     leader === undefined || [leader.paneKey, leader.agentType, ''].includes(leader.displayName)
