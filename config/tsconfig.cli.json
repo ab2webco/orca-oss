@@ -20,6 +20,7 @@
     "../src/main/agent-hooks/managed-hook-command-recognition.ts",
     "../src/main/agent-hooks/managed-hook-script-refresh.ts",
     "../src/main/agent-hooks/runtime-home-hook-command.ts",
+    "../src/main/agent-hooks/shared-hook-file-policy.ts",
     "../src/main/amp/agent-status-plugin-source.ts",
     "../src/main/amp/hook-service.ts",
     "../src/main/amp/managed-plugin-install-status.ts",

@@ -85,9 +85,11 @@ describe('win32 attribution wrappers with a bare `-` argument', () => {
         cwd: repo,
         env,
         input: 'piped subject\n',
-        encoding: 'utf8'
+        encoding: 'utf8',
+        timeout: 20_000
       })
 
+      expect(result.error).toBeUndefined()
       expect(result.stderr).not.toContain('PSArgumentException')
       expect(result.status).toBe(0)
       expect(

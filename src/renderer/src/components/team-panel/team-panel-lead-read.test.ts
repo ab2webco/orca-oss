@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { findTeamLeadCaller, readTeamLeadState } from './team-panel-lead-read'
+import { findTeamLeadCaller, readTeamLeadState, readTeamXp } from './team-panel-lead-read'
 
 const callRuntimeRpc = vi.fn()
 vi.mock('@/runtime/runtime-rpc-client', () => ({
@@ -33,6 +33,48 @@ describe('findTeamLeadCaller', () => {
   it('finds no lead when none of the live leads runs in this project', () => {
     expect(findTeamLeadCaller({ ...base, repoWorktreeIds: new Set(['wt-member']) })).toBeNull()
     expect(findTeamLeadCaller({ ...base, leads: [] })).toBeNull()
+  })
+
+  // Why (ORCA-1130): after a restart an idle lead never reports, so its entry is missing.
+  it('finds an idle lead from the pane the host lists, with no agent status for it', () => {
+    const leads = [{ handle: 'term-lead', paneKey: PANE }]
+    expect(findTeamLeadCaller({ ...base, leads, entries: {} })).toEqual({
+      worktreeId: 'wt-main',
+      terminalHandle: 'term-lead',
+      paneKey: PANE
+    })
+  })
+
+  it('says restoring while the host is bringing back a lead of this project', () => {
+    const restoring = { leads: [], entries: {}, restoring: [PANE] }
+    expect(findTeamLeadCaller({ ...base, ...restoring })).toBe('restoring')
+    expect(
+      findTeamLeadCaller({ ...base, ...restoring, repoWorktreeIds: new Set(['wt-member']) })
+    ).toBeNull()
+  })
+})
+
+describe('readTeamXp', () => {
+  it("sums the project's characters XP as the host keeps it, skipping what it cannot read", async () => {
+    callRuntimeRpc.mockResolvedValueOnce({
+      characters: [
+        { key: 'merlin', xp: 200 },
+        { key: 'arthur', xp: 150 },
+        { key: 'x', xp: 'bad' }
+      ]
+    })
+    const caller = { worktreeId: 'wt', terminalHandle: 'term', paneKey: 'pane' }
+
+    expect(await readTeamXp({ kind: 'local' }, caller)).toBe(350)
+    expect(callRuntimeRpc).toHaveBeenLastCalledWith(
+      { kind: 'local' },
+      'game.characters',
+      { worktreeId: 'wt', terminalHandle: 'term' },
+      expect.anything()
+    )
+    // Why null: an older host has no list, and a level from nothing would be made up.
+    callRuntimeRpc.mockResolvedValueOnce({})
+    expect(await readTeamXp({ kind: 'local' }, caller)).toBeNull()
   })
 })
 

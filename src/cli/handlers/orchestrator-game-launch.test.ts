@@ -285,7 +285,14 @@ describe('orca game launch', () => {
   })
 
   it("names the member from the project's memberNames over the scene's roster", async () => {
-    const lead = { autostart: false, cap: 2, agent: 'claude', memberNames: ['Mario', 'Luigi'] }
+    // Why a label: without one the lead is the roster's last name, Luigi (ORCA-1094).
+    const lead = {
+      autostart: false,
+      cap: 2,
+      agent: 'claude',
+      label: 'Peach',
+      memberNames: ['Mario', 'Luigi']
+    }
     const holder = { paneKey: 'm', state: 'idle', displayName: 'Mario · CIN-1 Home' }
     const { client, calls } = fakeClient(
       stateWith({ config: { mode: 'on', scene: 'quest' }, lead, agents: [holder] })
@@ -322,7 +329,8 @@ describe('orca game launch', () => {
         terminalHandle: 'h1',
         ticket: 'CIN-12',
         locale: 'en',
-        taken: ['Arthur']
+        // Elaine is the lead's own character while no Lead name is set (ORCA-1094).
+        taken: ['Arthur', 'Elaine']
       })
     )
     expect(reserve.roster[0]).toEqual({ en: 'Arthur', es: 'Arturo' })

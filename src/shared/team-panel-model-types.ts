@@ -112,6 +112,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   limitResetsAt: number | null
   /** Started outside `game launch`: stopped by name, never acted on in bulk. */
   found: boolean
+  /** Runs in the lead's folder, which has no git for a worktree of its own (ORCA-1135). */
+  inFolder?: true
 }
 
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */
@@ -274,6 +276,8 @@ export type TeamActivityRow = TeamAgentFacts & {
   repoName: string
   worktreeName: string
   isPrimary: boolean
+  /** A game lead's or member's pane: its questions belong to that team's Inbox. */
+  inTeam: boolean
   /** The user's latest prompt, as written; the row shows it only while idle. */
   prompt: string | null
   ticket: TeamTicket | null

@@ -37,6 +37,11 @@ import {
   tryRunManagedClaudeAccountMutation
 } from '../claude-accounts/run-managed-claude-account-mutation'
 import { noteLegacyClaudeKeychainSlotBlob } from '../claude-accounts/claude-legacy-keychain-slot-warning'
+import { assertRefreshChainNotHeldByOtherAccount } from '../claude-accounts/claude-refresh-chain-ownership'
+import {
+  getManagedClaudeRefreshAccounts,
+  readManagedClaudeRefreshCredentials
+} from '../claude-accounts/claude-managed-refresh-chain'
 import { createOAuthUsageError, OAuthUsageError } from './claude-oauth-usage-error'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { withMacTailscaleDnsHint } from '../network/macos-tailscale-dns-diagnostic'
@@ -1180,6 +1185,13 @@ async function fetchManagedUsagePanelSupplement(input: {
     }
     const refreshedCredentials = await readStagedManagedPreviewCredentials(input.location)
     if (refreshedCredentials && refreshedCredentials !== input.credentialsJson) {
+      // Why: the staged item is the slot a CLI could fill with another account's chain (ORCA-1039).
+      await assertRefreshChainNotHeldByOtherAccount(
+        input.account.id,
+        refreshedCredentials,
+        getManagedClaudeRefreshAccounts(),
+        (other) => readManagedClaudeRefreshCredentials(other.id)
+      )
       await writeManagedCredentialsJson(input.location, refreshedCredentials)
     }
     return cliLimits

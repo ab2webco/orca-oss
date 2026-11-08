@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   resetClaudeKeychainMocks,
   restorePlatform,
   setPlatform
 } from './claude-account-service-test-harness'
+import { createIsolatedTestProfilePath } from './claude-service-test-profile'
 
-const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-add-test')
+const CLAUDE_SERVICE_TEST_ROOT = createIsolatedTestProfilePath('orca-claude-service-add-test')
 
 vi.mock('electron', () => ({
   app: {

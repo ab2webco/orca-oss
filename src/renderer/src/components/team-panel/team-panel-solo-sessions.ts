@@ -12,6 +12,8 @@ import { getPromptCacheCountdownForPane } from '../sidebar/prompt-cache-timer-se
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
 import { GAME_MEMBER_ADVISOR_PANES_MAX } from '../../../../shared/orchestrator-game-member-advisor'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import { TEAM_LOCAL_HOST_KEY } from '../../../../shared/team-panel-solo-machines'
+import { getRemoteRuntimeTerminalHandle } from '@/runtime/runtime-terminal-stream'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo, Worktree } from '../../../../shared/types'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
@@ -39,6 +41,7 @@ export type TeamSoloSessionsState = Pick<
   | 'runtimeEnvironments'
   | 'sshTargetLabels'
   | 'sshConnectionStates'
+  | 'terminalLayoutsByTabId'
 >
 
 function hostOf(
@@ -180,8 +183,31 @@ function worktreeIdOf(state: TeamSoloSessionsState, entry: AgentStatusEntry): st
   return null
 }
 
+// Why the coordinator too: a member reports its lead's handle, not its own role.
+function isTeamPane(
+  state: TeamSoloSessionsState,
+  entry: AgentStatusEntry,
+  leads: ReadonlySet<string> | undefined
+): boolean {
+  const pane = parsePaneKey(entry.paneKey)
+  const ptyId = pane
+    ? state.terminalLayoutsByTabId[pane.tabId]?.ptyIdsByLeafId?.[pane.leafId]
+    : null
+  // Why the PTY id: a paired host's mirrored pane carries that host's handle only there.
+  const handles = [
+    entry.terminalHandle,
+    entry.orchestration?.coordinatorHandle,
+    entry.orchestration?.parentTerminalHandle,
+    ptyId ? getRemoteRuntimeTerminalHandle(ptyId) : null
+  ]
+  return handles.some((handle) => handle && leads?.has(handle))
+}
+
 /** Every live agent pane with the facts the sidebar already holds for its workspace. */
-export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSession[] {
+export function teamSoloSessionsOf(
+  state: TeamSoloSessionsState,
+  leadsByHost: ReadonlyMap<string, ReadonlySet<string>> = new Map()
+): TeamSoloSession[] {
   const worktrees = new Map<string, Worktree>()
   for (const list of Object.values(state.worktreesByRepo)) {
     for (const worktree of list) {
@@ -203,6 +229,10 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
       return []
     }
     const repo = state.repos.find((one) => one.id === worktree.repoId)
+    const host = hostOf(state, worktree, repo)
+    // Why local for SSH: its panes run under this machine's runtime, which keeps its leads.
+    const hostKey =
+      host.kind === 'remote' && host.environmentId ? host.environmentId : TEAM_LOCAL_HOST_KEY
     const cache = cacheOn
       ? getPromptCacheCountdownForPane(entry.paneKey, state.cacheTimerByKey, ttlMs)
       : null
@@ -213,7 +243,8 @@ export function teamSoloSessionsOf(state: TeamSoloSessionsState): TeamSoloSessio
         worktreeName: worktree.displayName,
         worktreeId: worktree.id,
         isPrimary: worktree.isMainWorktree === true,
-        host: hostOf(state, worktree, repo),
+        inTeam: isTeamPane(state, entry, leadsByHost.get(hostKey)),
+        host,
         ticket: ticketOf(worktree),
         pr: pullRequestOf(state, worktree, repo),
         note: worktree.comment.trim() || null,

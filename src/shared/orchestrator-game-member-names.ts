@@ -207,6 +207,12 @@ export function nextMemberName(
   return null
 }
 
+/** The lead's character when no Lead name is set: the roster's last, which members reach last (ORCA-1094). */
+export function leadCharacterOf(roster: readonly GameMemberName[], locale: string): string | null {
+  const last = roster.at(-1)
+  return last === undefined ? null : shownIn(last, locale)
+}
+
 /** One key for every language variant of a roster name, so a character's progress is not split. */
 export function characterKeyOf(roster: readonly GameMemberName[], shown: string): string {
   const wanted = shown.trim().toLowerCase()

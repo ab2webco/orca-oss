@@ -37,7 +37,11 @@ for (const fileName of readdirSync(workflowsDirectory).filter((name) => /\.ya?ml
   const workflow = parse(readFileSync(join(workflowsDirectory, fileName), 'utf8'))
   for (const { jobName, label, script } of runScripts(workflow)) {
     try {
-      execFileSync('bash', ['-n'], { input: withoutGithubExpressions(script), stdio: 'pipe' })
+      execFileSync('bash', ['-n'], {
+        input: withoutGithubExpressions(script),
+        stdio: 'pipe',
+        timeout: 30_000
+      })
     } catch (error) {
       const detail = String(error.stderr ?? error.message)
         .trim()

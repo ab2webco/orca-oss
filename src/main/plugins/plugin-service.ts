@@ -1,4 +1,5 @@
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import { spawnCapableWorkerBlockReason } from './plugin-dev-shared-vault-gate'
 import {
   capabilityKinds,
   type PluginCapabilityKind
@@ -219,7 +220,8 @@ export class PluginService {
       this.contentPacksReady &&
       this.activationState(plugin) === 'approved' &&
       !this.contentPacks.error(plugin.pluginKey) &&
-      !this.options.getPluginKillListEntry?.(plugin.pluginKey)
+      !this.options.getPluginKillListEntry?.(plugin.pluginKey) &&
+      !spawnCapableWorkerBlockReason(plugin.manifest, this.options)
     )
   }
 
@@ -231,6 +233,7 @@ export class PluginService {
     const blocked = this.options.getPluginKillListEntry?.(pluginKey)
     return (
       (blocked ? `Blocked by Orca Lab's plugin safety list: ${blocked.reason}` : null) ??
+      spawnCapableWorkerBlockReason(this.findValidPlugin(pluginKey)?.manifest, this.options) ??
       this.contentPacks.error(pluginKey) ??
       this.workerController.activationError(pluginKey)
     )
