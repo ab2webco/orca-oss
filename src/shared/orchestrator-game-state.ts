@@ -22,11 +22,8 @@ import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 import { gameToolInputOf } from './orchestrator-game-tool-input'
-import type {
-  GamePausedMember,
-  GameQueuedMember,
-  GameUnlistedMember
-} from './orchestrator-game-member-sessions'
+import type { GameQueuedMember, GameUnlistedMember } from './orchestrator-game-member-sessions'
+import type { GameStatePausedMember } from './orchestrator-game-adopted-members'
 
 export type GameStatusGroup =
   | 'backlog'
@@ -239,7 +236,7 @@ export type OrchestratorGameState = {
   /** Questions the lead asked the person (`game ask-owner`) still unanswered; only for the lead, absent from an older host. */
   openOwnerQuestions?: number
   /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
-  pausedMembers?: GamePausedMember[]
+  pausedMembers?: GameStatePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
   queuedMembers?: GameQueuedMember[]
   /** Agents the lead dropped from its fleet, which `orca game adopt` brings back; only for the lead, when any (ORCA-943). */
@@ -258,6 +255,10 @@ export type OrchestratorGameState = {
   localHost?: GameHostCapacity
   /** Orca's UI language now, so a running pane follows a change; absent from an older host. */
   locale?: SupportedUiLocale
+  /** Orca's light or dark look, for the agent terminal's colours; absent where the host cannot tell. */
+  appearance?: 'dark' | 'light'
+  /** The lead's name for the session, as its Team card and headings show it; absent from an older host. */
+  leadName?: string
   /** The members' latest recorded merges, oldest first; only for the lead, absent from an older host. */
   merges?: GameMerge[]
   /** The project's saved arcade plays; only for the lead, absent from an older host. */

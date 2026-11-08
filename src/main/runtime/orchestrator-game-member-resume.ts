@@ -4,6 +4,7 @@ import type {
   GameMemberSession
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
+import type { GameAdoptedResume } from '../../shared/orchestrator-game-adopted-members'
 
 type Deps = {
   store: GameMemberSessionStore
@@ -19,6 +20,11 @@ type Deps = {
   /** Reopens the member's own conversation and returns its terminal once the agent runs; null while
    *  its woken pane is still starting; throws when it cannot. */
   resumeSession: (member: GameMemberSession) => Promise<string | null>
+  /** The terminal now in a pane, as an adopted member's tab comes back after a restart. */
+  terminalOfPane: (paneKey: string) => string | null
+  runsAgent: (terminal: string) => Promise<boolean>
+  /** Whether the lead released this dispatch's worker, which ends an adopted member. */
+  releasedDispatch: (dispatchId: string) => boolean
   now?: () => number
 }
 
@@ -86,7 +92,18 @@ export class GameMemberResume {
       worktreeId: saved.worktreeId ?? this.deps.worktreeOfTask(saved.taskId)
     }
     const status = this.deps.statusOf(member.taskId)
-    if (status.task === 'completed' || status.latestDispatch === 'completed') {
+    const done = status.task === 'completed' || status.latestDispatch === 'completed'
+    if (member.adoptedPaneKey) {
+      // Why: an adopted member stays one after its task is done, until the lead releases it (ORCA-1141).
+      if (member.dispatchId && this.deps.releasedDispatch(member.dispatchId)) {
+        await this.deps.store.remove(projectKey, [ticket])
+        return { outcome: 'finished', ticket }
+      }
+      if (done) {
+        return this.resumeAdopted(member, member.adoptedPaneKey, null, true)
+      }
+    }
+    if (done) {
       await this.deps.store.remove(projectKey, [ticket])
       return { outcome: 'finished', ticket }
     }
@@ -104,6 +121,9 @@ export class GameMemberResume {
         ticket,
         reason: `its task ${member.taskId} is still marked ${status.task} by ${status.latestDispatchId ?? 'an older dispatch'}, so no new member can take it`
       }
+    }
+    if (member.adoptedPaneKey) {
+      return this.resumeAdopted(member, member.adoptedPaneKey, retryOf, false)
     }
     if (member.worktreeId !== null && !(await this.deps.worktreeExists(member.worktreeId))) {
       return {
@@ -132,6 +152,39 @@ export class GameMemberResume {
       const note = error instanceof Error ? error.message : String(error)
       return { outcome: 'relaunch', member: targetOf(member, retryOf), note }
     }
+  }
+
+  // Why never a relaunch: the agent is one the person started in their own tab (ORCA-1141).
+  private async resumeAdopted(
+    member: GameMemberSession,
+    paneKey: string,
+    retryOf: string | null,
+    newTask: boolean
+  ): Promise<GameMemberResumeOutcome> {
+    const { ticket } = member
+    const terminal = this.deps.terminalOfPane(paneKey)
+    if (!terminal) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `its tab is closed; \`orca game resume-members ${ticket} --discard\` frees it`
+      }
+    }
+    if (!(await this.deps.runsAgent(terminal))) {
+      return {
+        outcome: 'missing',
+        ticket,
+        reason: `its tab runs no agent yet; run \`orca game resume-members ${ticket}\` again once its session is back`
+      }
+    }
+    const resumed: GameAdoptedResume = {
+      outcome: 'resumed',
+      terminal,
+      member: targetOf(member, retryOf),
+      adopted: true,
+      ...(newTask ? { newTask: true as const } : {})
+    }
+    return resumed
   }
 
   /**

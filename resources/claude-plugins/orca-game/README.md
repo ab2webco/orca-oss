@@ -10,8 +10,10 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
   `asks you` in red for a question to you). The rule is struck spaces and nothing frames the reply,
   so a copied reply is plain text. Under the conversation a live line stands in for the spinner:
   glyph, name, phase, timer and current step (`✶ Castillo Reviewing 0:04 · gh pr view 923`), then
-  `◆ … Waiting on you` with the question, or `✓ … Done` with the turn's length. Your
-  own messages draw as Claude Code draws them, and tool steps fold to one dim `▸` line, errors left
+  `◆ … Waiting on you` with the question, or `✓ … Done` with the turn's length. The colours are
+  prototype V30's in Orca's dark look and the panel's light tokens in its light look, which the game
+  state reports; a narrow pane drops the rule, then the time, before a heading would wrap. Your
+  own messages draw as Claude Code draws them, and tool steps fold to one muted `▸` line, errors left
   as they are. `on` (default), `zen` (also hides short working notes and tool lines) or `off`.
 - **Flat mode.** `flat` draws the same game as text in the scene's colors, with no scene or
   characters: one line per teammate (name, ticket, phase, PR, CI), a score line (level, XP, latest

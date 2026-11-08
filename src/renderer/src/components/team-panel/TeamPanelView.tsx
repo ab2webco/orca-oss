@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import type { TeamPanelModel, TeamTabId } from '../../../../shared/team-panel-model-types'
+import type {
+  TeamPanelGameModel,
+  TeamPanelModel,
+  TeamTabId
+} from '../../../../shared/team-panel-model-types'
 import { TeamReadError, TeamReadNotice, TeamReadRetryContext } from './team-panel-read-error'
 import { TeamSessionCount } from './team-panel-session-count'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
@@ -157,11 +161,14 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
 export function TeamPanelView({
   source,
   look,
-  onOpenSettings
+  onOpenSettings,
+  dock
 }: {
   source: TeamPanelModelSource
   look: TeamPanelLook
   onOpenSettings: (repoId: string | null) => void
+  /** The action dock at the panel's foot; a slot so this view stays free of the store. */
+  dock?: (model: TeamPanelGameModel) => React.ReactNode
 }): React.JSX.Element {
   const { section, retry } = source
   const sceneStyle = useTeamSceneStyle()
@@ -204,6 +211,7 @@ export function TeamPanelView({
           {body}
         </>
       )}
+      {model?.kind === 'team' && dock ? dock(model) : null}
     </div>
   )
 }

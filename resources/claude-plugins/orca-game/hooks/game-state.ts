@@ -289,6 +289,9 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
     ...gameLeadOf(body),
     ...rewardWeightsOf(body.rewardWeights),
     ...localeOf(body.locale),
+    ...(body.appearance === 'dark' || body.appearance === 'light'
+      ? { appearance: body.appearance }
+      : {}),
     ...viewSwitchOf(body),
     ...githubLowOf(body),
     ...gameMergesOf(body.merges)
