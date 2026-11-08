@@ -510,7 +510,7 @@ Each one either sends the lead a prompt as a turn or runs an MCP tool from the m
 ```yaml
 # orca.yaml
 orchestratorGame:
-  actions: # at most 6; a later layer replaces the whole list
+  actions: # at most 6; this machine's machineActions merge over them by command
     - label: Test runs # at most 24 characters
       command: test-runs # optional: /test-runs; lowercase, digits and -, up to 24 characters
       key: x # optional: its Panel hotkey, one letter or digit
@@ -539,8 +539,20 @@ orchestratorGame:
   sends `/orca-game:setup` to the lead, **New action** and the **Start with** templates open a form
   (name, a command that follows the name until typed, icon, a lead prompt or an MCP tool), the
   project's rows move up and pin to the dock's row (3 at most), and Orca's own rows take **Edit**
-  and an on switch (none on Stop). A change is saved on this machine and replaces `orca.yaml`'s
-  list whole; **Use orca.yaml's list again** drops it. `/orca-game:setup` is what writes `orca.yaml`.
+  and an on switch (none on Stop).
+- **Where an action is saved.** A project action's form says **Where it is saved**. *Project,
+  orca.yaml*, the default for a new one, writes only `orchestratorGame.actions` in the active
+  worktree's `orca.yaml` (else the primary's), locally or over SSH, keeping its comments and the
+  entries it did not change, and refuses when the file changed since it was shown. *Only this
+  machine* saves it in `machineActions` of `orchestratorGameProjects[repoId]`
+  ([`orchestrator-game-machine-actions.ts`](../../src/shared/orchestrator-game-machine-actions.ts)),
+  which merge over `orca.yaml`'s by command: `orca.yaml`'s come first, an entry with the same command
+  replaces one, `{ command, enabled: false }` hides one, and this machine's own follow. **Remove** on
+  *Only this machine* hides an `orca.yaml` action here; its row stays, dimmed, and **Show** brings it
+  back. An old `actions` list saved on this machine, which replaced `orca.yaml`'s whole, still
+  resolves as before and becomes `machineActions` on the next save. **Use orca.yaml's list again**
+  clears this machine's changes. Orca's own rows are this machine's only. `/orca-game:setup`
+  writes `orca.yaml`.
 - **The native panel's dock** ([`TeamActionDock.tsx`](../../src/renderer/src/components/team-panel/TeamActionDock.tsx)):
   one line under the Team panel with Orca's actions that apply now and their count (wave: To Do
   with free slots, push: stopped members, sweep: finished members; wave and sweep stand down during a

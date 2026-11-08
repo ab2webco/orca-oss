@@ -29,7 +29,7 @@ describe('the /orca-game:setup key summary', () => {
 })
 
 describe('the /orca-game:setup questions', () => {
-  // Why: the panel's dock and Settings read these; setup is the only writer of orca.yaml.
+  // Why: the panel's dock and Settings read these; setup writes them into orca.yaml.
   it("asks for each button's icon and pin, and about Orca's own actions", () => {
     const skill = readFileSync(join(REFERENCE, '../SKILL.md'), 'utf8')
     expect(skill).toContain('`icon`')
