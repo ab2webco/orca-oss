@@ -128,6 +128,13 @@ export function TeamActionMenu({
         role="menu"
         aria-label={label}
         onOpenAutoFocus={(event) => event.preventDefault()}
+        // Why: Radix sends Escape to the top layer only; a hint that opened after the menu took it.
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false)
+            setQuery('')
+          }
+        }}
         className="flex max-h-[min(440px,62vh)] w-[calc(var(--radix-popper-anchor-width)-16px)] min-w-[200px] flex-col p-0"
       >
         <input

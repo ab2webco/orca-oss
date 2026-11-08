@@ -9,7 +9,7 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { waitForRuntimeWorktree } from './helpers/game-cycle-contract'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
-import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import type { RuntimeTerminalListResult, RuntimeTerminalRead } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
 // Why: the capture matrix outruns the CI test budget; ORCA_CAPTURE_EVIDENCE=1 runs it locally.
@@ -417,6 +417,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     }
     await menu.getByPlaceholder('Buscar acción').fill('dep')
     await expect(menu.getByRole('menuitem')).toHaveText([/^Deploy staging/])
+    // Escape still closes it when a hint opened after it, as the board hint does when it reappears.
+    await reopenBoardHint(orcaPage)
+    await expect(orcaPage.getByRole('tooltip')).toBeVisible()
     await orcaPage.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 
@@ -453,6 +456,16 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await clickPastAppCards(orcaPage, release)
     await expect(release.locator('[data-agent-spinner]')).toBeVisible()
     await expect(chips.filter({ hasText: 'Push' })).toBeDisabled()
+    // Why squashed: the lead's pane wraps the prompt at its width.
+    await expect
+      .poll(async () => {
+        const read = await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
+          terminal: lead,
+          limit: 200
+        })
+        return read.result.terminal.tail.join('').replace(/\s/g, '')
+      }, 'the lead pane never got the Release prompt')
+      .toContain('Preparethereleaseandtellmewhatismissing.')
     await emitCodexHookStatus(endpoint, {
       ...leadHook,
       state: 'working',
@@ -476,6 +489,21 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         await setTheme(orcaPage, theme)
         await captureDock(orcaPage, panel, testInfo.outputPath(`reply-en-${width}-${theme}.png`))
       }
+    }
+
+    // New action opens Settings > Actions on its form; Edit opens the section with none.
+    const actionsSection = orcaPage.locator('[id$="-game-actions"]')
+    const menuEn = orcaPage.getByRole('menu', { name: 'All actions' })
+    for (const [item, form] of [
+      ['New action', 1],
+      ['Edit', 0]
+    ] as const) {
+      await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+      await clickPastAppCards(orcaPage, dock.getByRole('button', { name: 'All actions' }))
+      await clickPastAppCards(orcaPage, menuEn.getByRole('button', { name: item, exact: true }))
+      await expect(menuEn).toBeHidden()
+      await expect(actionsSection).toBeInViewport({ timeout: 15_000 })
+      await expect(actionsSection.locator('[data-slot="game-action-form"]')).toHaveCount(form)
     }
   } finally {
     agent.dispose()

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { openGamePanelSettings } from '@/components/settings/game-panel-settings-link'
+import { getRepositoryGameActionsSectionId } from '@/components/settings/repository-settings-targets'
 import { useAppStore } from '@/store'
 import { TeamActionDockConnected } from './TeamActionDockConnected'
 import { TeamPanelView } from './TeamPanelView'
@@ -36,7 +37,19 @@ export default function TeamPanel(): React.JSX.Element {
       source={source}
       look={panel.look}
       onOpenSettings={openSettings}
-      dock={(model) => <TeamActionDockConnected model={model} onOpenSettings={openSettings} />}
+      dock={(model) => (
+        <TeamActionDockConnected
+          model={model}
+          onOpenActions={(repoId) => {
+            openSettingsTarget({
+              pane: 'repo',
+              repoId,
+              sectionId: getRepositoryGameActionsSectionId(repoId)
+            })
+            openSettingsPage()
+          }}
+        />
+      )}
     />
   )
 }

@@ -44,6 +44,7 @@ function render(
     isNew: true,
     orca: false,
     commandTouched: false,
+    scope: 'project',
     ...initial
   }
   const draw = (): void =>
