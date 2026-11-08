@@ -11585,6 +11585,9 @@
           "styleOffice": "Office",
           "stylePixel": "Pixel",
           "title": "Panel"
+        },
+        "orchestrator-game-style-fallback-note": {
+          "text": "This scene has no {{style}} art, so the Team panel draws it in Pixel."
         }
       },
       "right": {
