@@ -1,14 +1,14 @@
 import { translate } from '@/i18n/i18n'
 import type { TeamLeadCard } from '../../../../shared/team-panel-model-types'
-import { teamToolText } from '../team-panel/team-card-text'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
+import { teamSceneStepLabel } from './team-scene-step-label'
 
 /** The canvas is one image to assistive tech; this is its name. */
 export const teamSceneLabel = (): string =>
   translate('auto.components.team-scene.team-scene-copy.label', 'Live team scene')
 
 /**
- * The lead's bubble: its question behind a translated prefix, what its tool works on or a link as written, a translated line once done, else none.
+ * The lead's bubble: its question behind a translated prefix, its step in a few words or a link as written, a translated line once done, else none.
  */
 export function teamSceneLeadLineOf(
   lead: Pick<TeamLeadCard, 'liveAction' | 'status'>
@@ -28,7 +28,7 @@ export function teamSceneLeadLineOf(
     return translate('auto.components.team-scene.team-scene-copy.leadWaits', 'Waiting for you')
   }
   if (action?.kind === 'tool') {
-    return teamToolText(action.tool, action.detail)
+    return teamSceneStepLabel(action.tool, action.detail)
   }
   if (action?.kind === 'link') {
     return `${action.name} ${action.id}`

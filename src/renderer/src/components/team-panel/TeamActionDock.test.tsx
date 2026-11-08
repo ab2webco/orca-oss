@@ -27,6 +27,7 @@ const action = (overrides: Partial<TeamAction>): TeamAction => ({
   orca: null,
   label: 'X',
   icon: null,
+  command: null,
   pin: false,
   send: 'x',
   now: null,
@@ -54,6 +55,8 @@ async function render(overrides: Partial<TeamActionDockProps> = {}) {
     lead: { state: 'idle', stateStartedAt: 0, reply: null },
     onRun: vi.fn(async () => true),
     onOpenLead: vi.fn(),
+    onNewAction: vi.fn(),
+    onEditActions: vi.fn(),
     ...overrides
   }
   const draw = async (next: Partial<TeamActionDockProps>) => {
@@ -161,6 +164,21 @@ describe('TeamActionDock', () => {
     } finally {
       rect.mockRestore()
     }
+  })
+
+  it("holds the rest in the menu after Stop, whose Stop asks inline like the icon's", async () => {
+    const { container, props } = await render()
+    const controls = [
+      ...container.querySelectorAll('section button[aria-label]:not([data-team-action])')
+    ].map((one) => one.getAttribute('aria-label'))
+    expect(controls).toEqual(['Stop every member', 'All actions'])
+    await click(container.querySelector('[aria-label="All actions"]'))
+    const stopRow = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+      (one) => one.textContent?.startsWith('Stop')
+    )
+    await click(stopRow)
+    expect(container.textContent).toContain('Stop all 3 members?')
+    expect(props.onRun).not.toHaveBeenCalled()
   })
 
   it('disables Stop with its reason, and draws nothing without actions', async () => {
