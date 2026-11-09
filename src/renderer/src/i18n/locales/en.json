@@ -16904,10 +16904,13 @@
       "spawnAgent": "Start a new agent",
       "noLaunchableAgents": "No enabled agents detected.",
       "sleepWorkspace": "Sleep",
-      "projectCount": "{{agents}} agents · {{workspaces}} workspaces",
+      "projectCount": "{{agents}} · {{workspaces}}",
       "agentCount": "{{count}} agents",
       "agentCount_one": "{{count}} agent",
       "agentCount_other": "{{count}} agents",
+      "workspaceCount": "{{count}} workspaces",
+      "workspaceCount_one": "{{count}} workspace",
+      "workspaceCount_other": "{{count}} workspaces",
       "noWorkspaceAgents": "No agents in this workspace.",
       "status": {
         "doneSeen": "Done, seen"

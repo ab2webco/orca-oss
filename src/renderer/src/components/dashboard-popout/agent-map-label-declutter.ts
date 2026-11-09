@@ -1,4 +1,5 @@
-import type { AgentMapLayout, AgentMapWorktreeRing } from './agent-map-layout'
+import { translate } from '@/i18n/i18n'
+import type { AgentMapLayout, AgentMapProjectRing, AgentMapWorktreeRing } from './agent-map-layout'
 
 /** Metrics for the label styles in agent-map.css. Estimating text extents from
  *  the character count avoids a per-frame DOM measure of every label. */
@@ -15,9 +16,12 @@ const PROJECT_LABEL_ICON_PX = 16
 const LABEL_GAP_X_PX = 3
 const LABEL_GAP_Y_PX = 1
 const AGENT_LABEL_CLEARANCE_PX = 3
+/** The count's 4 px halo plus a ring's stroke, kept off every ring. */
+const RING_CLEARANCE_PX = 4
 /** Baselines the scene renders at, relative to each label group's origin. */
 const WORKTREE_LABEL_BASELINE = 18
-const COUNT_BASELINE = 32
+/** Under the ring's bottom edge: inside, under the name, the chord is narrower than the line. */
+export const AGENT_MAP_PROJECT_COUNT_BASELINE = 14
 const PROJECT_NAME_TOP = 3
 const PROJECT_NAME_BOTTOM = 21
 /** Past this many candidates the pass stops admitting labels; a map that dense
@@ -146,6 +150,33 @@ function isLabelCandidate(worktree: AgentMapWorktreeRing, mapScale: number): boo
   return !worktree.quiet || worktree.radius * mapScale >= 56
 }
 
+/** The summary line the scene draws under a project's name, in the UI language. */
+export function agentMapProjectCountText(project: AgentMapProjectRing): string {
+  const agents = project.agentCount
+  const workspaces = project.worktrees.length
+  return translate('dashboardPopout.map.projectCount', '{{agents}} · {{workspaces}}', {
+    agents: translate(
+      'dashboardPopout.map.agentCount',
+      agents === 1 ? '{{count}} agent' : '{{count}} agents',
+      { count: agents }
+    ),
+    workspaces: translate(
+      'dashboardPopout.map.workspaceCount',
+      workspaces === 1 ? '{{count}} workspace' : '{{count}} workspaces',
+      { count: workspaces }
+    )
+  }).toUpperCase()
+}
+
+/** True when the box comes within clearance of any project's ring disc. */
+function touchesAnyRing(layout: AgentMapLayout, box: LabelBox, clearance: number): boolean {
+  return layout.projects.some((project) => {
+    const nearestX = Math.max(box.left, Math.min(project.x, box.right))
+    const nearestY = Math.max(box.top, Math.min(project.y, box.bottom))
+    return Math.hypot(nearestX - project.x, nearestY - project.y) < project.radius + clearance
+  })
+}
+
 function compareStable(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0
 }
@@ -240,17 +271,16 @@ export function selectVisibleAgentMapLabels(
 
   const projectCountIds = new Set<string>()
   for (const project of layout.projects) {
-    const count = `${project.agentCount} AGENTS · ${project.worktrees.length} WORKSPACES`
     const box = baselineBox(
       project.x,
-      project.y - project.radius,
+      project.y + project.radius,
       labelScale,
-      count,
+      agentMapProjectCountText(project),
       COUNT_FONT_PX,
-      COUNT_BASELINE,
+      AGENT_MAP_PROJECT_COUNT_BASELINE,
       UPPERCASE_GLYPH_WIDTH_RATIO
     )
-    if (collides(grid, box)) {
+    if (touchesAnyRing(layout, box, RING_CLEARANCE_PX * labelScale) || collides(grid, box)) {
       continue
     }
     addBox(grid, box)
