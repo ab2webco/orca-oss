@@ -18,19 +18,25 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 
 // ORCA-1005: orca-game is a Claude Code mod Orca passes with --plugin-dir, not an Orca plugin, so
 // the plugin system being off must neither drop it nor break the text layer it draws.
-const NOT_RUN = 'NOT RUN: needs Claude Code 2.1.287 or newer on PATH (CI has none, ORCA-1084)'
+const NOT_RUN = 'NOT RUN: needs Claude Code 2.1.287 or newer on PATH'
 const BAND_MARKS = /[▤↻♥⚑▀▄▌▐]/
 
 type LeadRead = {
   agents?: { isLeader?: boolean; displayName?: string | null }[]
   worktree?: { displayName?: string }
   lead?: { label?: string }
+  leadName?: string
 }
 
-/** The lead's name as its Team card shows it: its own title, else its worktree's, else its label. */
+/** The lead's name as the mod draws it: the host's shown name, else its title, worktree or label. */
 function leadNameOf(stdout: string, paneWorktreeName: string): string {
   const parsed = JSON.parse(stdout) as LeadRead & { result?: LeadRead }
   const state = parsed.result ?? parsed
+  // Why first: the host sends the name its Team card shows beside the lead record (ORCA-1140).
+  const shown = state.lead ? state.leadName?.trim() : ''
+  if (shown) {
+    return shown
+  }
   const leader = state.agents?.find((one) => one.isLeader)
   const worktreeName = state.worktree?.displayName ?? paneWorktreeName
   const name = (leader?.displayName ?? worktreeName).split(' · ')[0]?.trim()
