@@ -1,4 +1,5 @@
 import type { AccountListEntry } from './managed-account-list-entries'
+import { claudeSignInBlocksLaunch } from './claude-login-end-notice'
 import type {
   GameAccountStop,
   GameAccountUsage,
@@ -34,7 +35,9 @@ export function isAutoPickableAccount(entry: AccountListEntry): boolean {
   return (
     entry.runtime === 'host' &&
     entry.authMethod !== 'custom-endpoint' &&
-    entry.auth?.state !== 'failed'
+    (entry.provider === 'claude'
+      ? !claudeSignInBlocksLaunch(entry)
+      : entry.auth?.state !== 'failed')
   )
 }
 
