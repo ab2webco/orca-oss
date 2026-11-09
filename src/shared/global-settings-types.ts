@@ -254,7 +254,7 @@ export type GlobalSettings = {
   floatingTerminalTrustedCwds?: string[]
   /** One-shot migration marker for legacy floating workspace cwd trust grants. */
   floatingTerminalCwdMigratedToAppWorkspace?: boolean
-  /** Where the Floating Workspace toggle is shown; defaults to the floating button for discoverability. */
+  /** Where the Floating Workspace toggle is shown; defaults to the status bar so it never covers content. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
   /** One-shot marker: a never-placed floating button was moved to the status bar; after it, a choice sticks. */
   floatingTerminalTriggerLocationDefaulted?: boolean
