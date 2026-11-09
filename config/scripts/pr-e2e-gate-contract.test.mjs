@@ -157,6 +157,25 @@ describe('PR E2E gate contract', () => {
     expect(changedRun.run).not.toContain('tests/e2e/paired-startup-exec-readiness.spec.ts')
   })
 
+  // Why not --shard: it cuts the sorted list by test count, so the team-panel specs all landed in
+  // shard 8 of run 42563987741, which hit its 45-minute cap with 30 tests unrun (ORCA-1148).
+  it("runs each full-suite shard from the build job's duration plan", () => {
+    const plan = e2eWorkflow.jobs.build.steps.find((step) => step.id === 'suite-shards')
+    expect(plan.run).toBe('node config/scripts/split-e2e-suite-specs.mjs')
+    expect(e2eWorkflow.jobs.build.outputs.suite_shards).toBe(
+      '${{ steps.suite-shards.outputs.matrix }}'
+    )
+    expect(e2eWorkflow.jobs.e2e.strategy).toEqual({
+      'fail-fast': false,
+      matrix: { include: '${{ fromJSON(needs.build.outputs.suite_shards) }}' }
+    })
+    const run = e2eWorkflow.jobs.e2e.steps.find((step) => step.name?.startsWith('Run E2E tests'))
+    expect(run.name).toBe('Run E2E tests (${{ matrix.shard_name }})')
+    expect(run.env.TEST_FILES_JSON).toBe('${{ matrix.files }}')
+    expect(run.run).toContain('--test-list')
+    expect(run.run).not.toContain('--shard')
+  })
+
   it('installs zsh in every Linux lane that can run paired startup readiness', () => {
     for (const jobName of ['e2e', 'changed-e2e']) {
       const installStep = e2eWorkflow.jobs[jobName].steps.find((step) =>
