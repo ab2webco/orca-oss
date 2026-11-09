@@ -29,6 +29,7 @@ import {
   ExternalLink,
   Globe,
   HelpCircle,
+  KeyRound,
   Loader2,
   Lock,
   LockOpen,
@@ -70,6 +71,7 @@ import {
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
+import { ClaudeLongLivedTokenDialog } from './ClaudeLongLivedTokenDialog'
 import { ClaudeRefreshChainConflictNotice } from './ClaudeRefreshChainConflictNotice'
 import {
   classifyClaudeAccountBlock,
@@ -595,7 +597,9 @@ export function AccountsPane({
     | `remove:${string}`
     | `reassign:${string}`
     | `select:${string}`
+    | `token:${string}`
   >('idle')
+  const [tokenDialogAccountId, setTokenDialogAccountId] = useState<string | null>(null)
   const [addEndpointOpen, setAddEndpointOpen] = useState(false)
   // null = the dialog is in add mode; an id = editing that endpoint account.
   const [editEndpointAccountId, setEditEndpointAccountId] = useState<string | null>(null)
@@ -1025,6 +1029,21 @@ export function AccountsPane({
         (action.startsWith('reauth:') &&
           nextActiveAccountId !== null &&
           action === `reauth:${nextActiveAccountId}`)
+      if (action.startsWith('token:')) {
+        // Why: the CLI reads the vault settings env only at startup.
+        toast.info(
+          translate(
+            'auto.components.settings.AccountsPane.longLivedTokenUpdated',
+            'Long-lived token updated.'
+          ),
+          {
+            description: translate(
+              'auto.components.settings.AccountsPane.longLivedTokenRestart',
+              'Restart live Claude terminals on this account so they use it.'
+            )
+          }
+        )
+      }
       if (shouldPromptRestart) {
         toast.info(
           translate('auto.components.settings.AccountsPane.f921d32606', 'Claude account updated.'),
@@ -1127,6 +1146,18 @@ export function AccountsPane({
       accountId
     )
   }
+
+  const setClaudeLongLivedToken = async (
+    accountId: string,
+    token: string | null
+  ): Promise<void> => {
+    await runClaudeAccountAction(`token:${accountId}`, () =>
+      window.api.claudeAccounts.setLongLivedToken({ accountId, token })
+    )
+    setTokenDialogAccountId(null)
+  }
+  const tokenDialogAccount =
+    claudeAccounts.accounts.find((account) => account.id === tokenDialogAccountId) ?? null
 
   // Why the server and not this desktop's IPC: the credentials live on the
   // machine that runs the agent, so the sign-in has to run there too.
@@ -1703,6 +1734,20 @@ export function AccountsPane({
                     accountVisibilityOptions
                   )
                 const isReauthing = claudeAction === `reauth:${account.id}`
+                const hasLongLivedToken = !isCustomEndpoint && Boolean(account.longLivedTokenSetAt)
+                // Why: the token lives in a vault on the host that runs the agents; the
+                // RPC refuses remote callers so the secret never crosses the pairing wire.
+                const tokenBlockedReason = isRemoteAccountScope
+                  ? translate(
+                      'auto.components.settings.AccountsPane.longLivedTokenRemoteHint',
+                      'Set it on that host with orca account token set.'
+                    )
+                  : account.managedAuthRuntime === 'wsl'
+                    ? translate(
+                        'auto.components.settings.AccountsPane.longLivedTokenWslHint',
+                        'Long-lived tokens are not supported for WSL accounts yet.'
+                      )
+                    : null
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
                 const authStatus = resolveClaudeAccountAuthRowStatus(
                   findClaudeAccountAuthVerdict(rateLimitsState, account.id)
@@ -1739,10 +1784,12 @@ export function AccountsPane({
                           )
                         }}
                         disabled={isBusy || isCustomEndpoint}
-                        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
+                        className="flex min-w-40 flex-1 flex-col gap-0.5 text-left disabled:cursor-default max-md:w-full max-md:min-w-0"
                       >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-sm font-medium">{account.email}</span>
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="max-w-full truncate text-sm font-medium">
+                            {account.email}
+                          </span>
                           {isCustomEndpoint ? (
                             <Badge
                               variant="outline"
@@ -1772,6 +1819,21 @@ export function AccountsPane({
                               )}
                             </Badge>
                           ) : null}
+                          {hasLongLivedToken ? (
+                            <Badge
+                              variant="outline"
+                              title={translate(
+                                'auto.components.settings.AccountsPane.longLivedTokenBadgeHint',
+                                'Agents on this account use a long-lived token, not the stored login. Sign-in and quota below describe the stored login.'
+                              )}
+                              className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/80"
+                            >
+                              {translate(
+                                'auto.components.settings.AccountsPane.longLivedTokenBadge',
+                                'Token'
+                              )}
+                            </Badge>
+                          ) : null}
                         </div>
                         <span className="truncate text-[11px] text-muted-foreground">
                           {isCustomEndpoint
@@ -1788,7 +1850,7 @@ export function AccountsPane({
                           />
                         )}
                       </button>
-                      <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
+                      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 max-md:w-full">
                         {isCustomEndpoint ? (
                           // Why the span carries the reason: the disabled Button sets
                           // pointer-events-none, so its own title never surfaces.
@@ -1867,6 +1929,27 @@ export function AccountsPane({
                               'Re-authenticate'
                             )}
                           </Button>
+                        )}
+                        {isCustomEndpoint ? null : (
+                          // Why the span carries the reason: a disabled Button never shows its title.
+                          <span className="inline-flex" title={tokenBlockedReason ?? undefined}>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setTokenDialogAccountId(account.id)
+                              }}
+                              disabled={tokenBlockedReason !== null || isBusy}
+                              className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                            >
+                              <KeyRound className="size-3" />
+                              {translate(
+                                'auto.components.settings.AccountsPane.longLivedTokenAction',
+                                'Token'
+                              )}
+                            </Button>
+                          </span>
                         )}
                         <Button
                           variant="ghost"
@@ -2829,6 +2912,27 @@ export function AccountsPane({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ClaudeLongLivedTokenDialog
+        open={tokenDialogAccount !== null}
+        onOpenChange={(open) => {
+          if (!open && !claudeAction.startsWith('token:')) {
+            setTokenDialogAccountId(null)
+          }
+        }}
+        accountLabel={tokenDialogAccount?.email ?? ''}
+        hasToken={Boolean(tokenDialogAccount?.longLivedTokenSetAt)}
+        submitting={claudeAction.startsWith('token:')}
+        onSave={(token) => {
+          if (tokenDialogAccount) {
+            void setClaudeLongLivedToken(tokenDialogAccount.id, token)
+          }
+        }}
+        onClear={() => {
+          if (tokenDialogAccount) {
+            void setClaudeLongLivedToken(tokenDialogAccount.id, null)
+          }
+        }}
+      />
       <ClaudeAccountReassignDialog
         open={claudeReassign.target !== null}
         onOpenChange={(open) => !open && claudeReassign.close()}

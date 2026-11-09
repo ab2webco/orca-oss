@@ -3351,6 +3351,13 @@ function createClaudeAccountsApi(): never {
     // instead let `undefined` reach the notice and crash the Settings page.
     getRefreshChainAliasReport: () =>
       Promise.resolve({ status: 'unavailable', conflictSets: [] } as const),
+    // Why: the token RPC refuses non-local callers, so a secret never crosses the pairing wire.
+    setLongLivedToken: () =>
+      Promise.reject(
+        new Error(
+          'Set a long-lived token from the Orca desktop app on the host that runs the agents.'
+        )
+      ),
     // Why: the live-pty gate and account universes live on the desktop host, so web clients see no binding.
     getLivePtyAccount: () => Promise.resolve(null),
     copySessionForFailover: () =>

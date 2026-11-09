@@ -195,7 +195,9 @@ own sign-in, so a logout on one host is not this chain alias. It is the login's 
 `CLAUDE_CODE_OAUTH_TOKEN` above the stored /login credential
 ([Claude Code authentication](https://code.claude.com/docs/en/authentication)).
 `orca account token set --account <email|id>` reads the token from a hidden prompt or stdin, never
-from argv. It stores the token in that account's vault `settings.json` env, mode 600, and the
+from argv. Settings → Accounts offers the same through each Claude row's **Token** action, on the
+desktop app of the host that owns the vault; a row that holds a token shows a `Token` badge. A
+remote account scope, the web client and WSL accounts cannot set one there. It stores the token in that account's vault `settings.json` env, mode 600, and the
 account record keeps only `longLivedTokenSetAt`. Every launch whose `CLAUDE_CONFIG_DIR` is the
 vault applies that env: members, `--claude-account` launches, worktree pins and an in-place account
 switch, on local, SSH and paired hosts. Those launches are expected to authenticate with the token

@@ -74,6 +74,16 @@ export function registerClaudeAccountHandlers(
   ipcMain.handle('claudeAccounts:reauthenticate', (_event, args: { accountId: string }) =>
     claudeAccounts.reauthenticateAccount(args.accountId)
   )
+  ipcMain.handle('claudeAccounts:setLongLivedToken', (_event, args: unknown) => {
+    const request = args as { accountId?: unknown; token?: unknown } | null
+    if (
+      typeof request?.accountId !== 'string' ||
+      (request.token !== null && typeof request.token !== 'string')
+    ) {
+      throw new Error('Invalid long-lived token request.')
+    }
+    return claudeAccounts.setLongLivedToken(request.accountId, request.token)
+  })
   ipcMain.handle('claudeAccounts:getRefreshChainAliasReport', () =>
     reportManagedClaudeRefreshChainAliases()
   )

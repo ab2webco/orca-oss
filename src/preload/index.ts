@@ -2403,6 +2403,8 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
     reauthenticate: (args: { accountId: string }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
+    setLongLivedToken: (args: { accountId: string; token: string | null }): Promise<unknown> =>
+      ipcRenderer.invoke('claudeAccounts:setLongLivedToken', args),
     getRefreshChainAliasReport: (): Promise<ManagedClaudeRefreshChainAliasReport> =>
       ipcRenderer.invoke('claudeAccounts:getRefreshChainAliasReport'),
     remove: (args: {
