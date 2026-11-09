@@ -2,6 +2,7 @@ import {
   accountListEntriesOf,
   type AccountListEntry
 } from '../../../../shared/managed-account-list-entries'
+import { claudeSignInBlocksLaunch } from '../../../../shared/claude-login-end-notice'
 import {
   gameAccountReadingsOf,
   gameAccountUsagesOf,
@@ -87,7 +88,9 @@ function namedEntry(
       `${selector} is not a ${label} account on this host; ${ADD_HINT}, or name one \`orca account list\` shows there.`
     )
   }
-  if (named.auth?.state === 'failed') {
+  if (
+    named.provider === 'claude' ? claudeSignInBlocksLaunch(named) : named.auth?.state === 'failed'
+  ) {
     throw new OrchestrationError(
       'invalid_argument',
       `${named.email}'s sign-in failed on this host; sign it in again there or name another account.`

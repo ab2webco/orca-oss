@@ -61,4 +61,11 @@ describe('formatAccountList auth verdict', () => {
   it('formats an account that has not been checked', () => {
     expect(formatAccountList(report(null))).toContain('auth: not checked')
   })
+
+  it('says a long-lived token carries launches while the verdict describes the login', () => {
+    const tokened = report(null)
+    tokened.accounts[0] = { ...tokened.accounts[0], longLivedToken: true }
+    expect(formatAccountList(tokened)).toContain('long-lived token: launches use it')
+    expect(formatAccountList(report(null))).not.toContain('long-lived token')
+  })
 })
