@@ -230,8 +230,15 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
 
     await expect(leadRow.locator('[data-game-lead-crown]')).toBeVisible()
     await expect(leadRow.locator('[data-team-row-part="name"] b')).toHaveText('Castillo')
-    // The lead's branch prints as `main`, not the `refs/heads/main` game.state carries.
-    await expect(leadRow.locator('[data-team-row-ticket]')).toHaveText('main')
+    // The lead's branch prints short, not as the `refs/heads/…` game.state carries; CI's git seeds `master`.
+    const leadBranch = await orcaPage.evaluate(
+      (id) => window.__store!.getState().getKnownWorktreeById(id)!.branch,
+      leadWorktreeId
+    )
+    expect(leadBranch).toMatch(/^refs\/heads\//)
+    await expect(leadRow.locator('[data-team-row-ticket]')).toHaveText(
+      leadBranch.replace(/^refs\/heads\//, '')
+    )
     // The lead row carries its age, like the members.
     await expect(leadRow.locator('[data-team-row-part="age"]')).toHaveText(/\S/)
     await expect(knightRow.locator('[data-team-row-part="name"] b')).toHaveText('Caballero')
