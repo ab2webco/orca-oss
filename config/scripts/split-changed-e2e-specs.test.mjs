@@ -25,6 +25,68 @@ const PANEL_RUN = {
   'tests/e2e/team-panel-work-tabs.spec.ts': 360
 }
 const panelFiles = Object.keys(PANEL_RUN)
+// #936's 55 changed specs at panel tip c85b7b8: [seconds on CI, bytes on disk]. Seconds are from run
+// 42534345470, except work-tabs, cut off there, from #1090's run 42527729456. Shard 2 of that run hit
+// the 30-minute job limit (ORCA-1142).
+const RUN_936 = {
+  'agent-dashboard-narrow-sheet.spec.ts': [102, 13829],
+  'dispatch-capability-redaction.spec.ts': [129, 18611],
+  'folder-workspace-survives-cold-restart.spec.ts': [31, 4835],
+  'game-actions-settings-narrow.spec.ts': [32, 6387],
+  'game-actions-settings.spec.ts': [72, 10443],
+  'game-adopted-member-restart.spec.ts': [36, 14231],
+  'game-adopted-same-name-threads.spec.ts': [23, 7659],
+  'game-cycle-without-plugins.spec.ts': [46, 9847],
+  'game-folder-workspace-team.spec.ts': [133, 9941],
+  'game-inbox-across-projects.spec.ts': [37, 8043],
+  'game-inbox-showcase.spec.ts': [30, 7203],
+  'game-inbox-threads.spec.ts': [132, 11831],
+  'game-inbox.spec.ts': [72, 7348],
+  'game-lead-restart-registry.spec.ts': [22, 5854],
+  'game-owner-answer-wakes-lead.spec.ts': [84, 6223],
+  'game-panel-settings.spec.ts': [194, 8728],
+  'game-text-layer-without-plugins.spec.ts': [0, 7894],
+  'orca-game-arcade-tab.spec.ts': [42, 4616],
+  'orca-game-message-copy.spec.ts': [0, 13937],
+  'orca-game-terminal-colours.spec.ts': [0, 12863],
+  'orca-game-terminal-text-layer.spec.ts': [0, 7481],
+  'orchestrator-game-perfect-merge-toast.spec.ts': [0, 6510],
+  'settings-game-style-fallback-note.spec.ts': [42, 1763],
+  'settings-orchestrator-game.spec.ts': [529, 33690],
+  'setup-script-prompt-sidebar-rows.spec.ts': [23, 5102],
+  'sidebar-unread-row-status-glyph.spec.ts': [20, 2397],
+  'status-colors-settings.spec.ts': [19, 4763],
+  'status-tones-sidebar.spec.ts': [19, 8697],
+  'team-panel-action-dock.spec.ts': [72, 22166],
+  'team-panel-activity-final.spec.ts': [12, 3785],
+  'team-panel-activity.spec.ts': [264, 19838],
+  'team-panel-agent-questions.spec.ts': [65, 15858],
+  'team-panel-arcade.spec.ts': [108, 8150],
+  'team-panel-card-identity.spec.ts': [138, 13570],
+  'team-panel-display.spec.ts': [96, 12499],
+  'team-panel-folder-workspace-card.spec.ts': [32, 6094],
+  'team-panel-idle-lead-restart.spec.ts': [23, 3154],
+  'team-panel-inbox-adopted-member.spec.ts': [96, 11484],
+  'team-panel-inbox-tab.spec.ts': [41, 16050],
+  'team-panel-lead-defaults.spec.ts': [66, 6619],
+  'team-panel-lead-one-name.spec.ts': [90, 4216],
+  'team-panel-member-question.spec.ts': [84, 12287],
+  'team-panel-no-sideways-scroll.spec.ts': [54, 8966],
+  'team-panel-queue-machines-advisor.spec.ts': [24, 9924],
+  'team-panel-remote-member-card.spec.ts': [48, 6786],
+  'team-panel-restored-agent-idle.spec.ts': [45, 6583],
+  'team-panel-scene-motion.spec.ts': [57, 12235],
+  'team-panel-scene-states.spec.ts': [144, 12820],
+  'team-panel-scene.spec.ts': [510, 32922],
+  'team-panel-settings-toggles.spec.ts': [78, 13155],
+  'team-panel-shell.spec.ts': [30, 2837],
+  'team-panel-tab-fit.spec.ts': [81, 11038],
+  'team-panel-team-tab.spec.ts': [228, 18801],
+  'team-panel-work-tabs.spec.ts': [372, 17962],
+  'workspace-board-hint-fit.spec.ts': [29, 2674]
+}
+// Why 2 minutes: what every shard spends on checkout, install and the artifact before its first test.
+const SHARD_SETUP_SECONDS = 120
 const filesOf = (shard) => JSON.parse(shard.files)
 
 describe('splitChangedSpecs', () => {
@@ -55,6 +117,17 @@ describe('splitChangedSpecs', () => {
     expect(Math.max(...seconds)).toBeLessThanOrEqual(
       PANEL_RUN['tests/e2e/team-panel-scene.spec.ts']
     )
+  })
+
+  it("keeps every shard of #936's list under 20 minutes, split by size", () => {
+    const files = Object.keys(RUN_936)
+    const shards = splitChangedSpecs(files, (file) => RUN_936[file][1])
+    const minutes = shards.map(
+      (shard) =>
+        (filesOf(shard).reduce((sum, file) => sum + RUN_936[file][0], 0) + SHARD_SETUP_SECONDS) / 60
+    )
+    expect(shards.flatMap(filesOf).sort()).toEqual([...files].sort())
+    expect(Math.max(...minutes)).toBeLessThanOrEqual(20)
   })
 
   it('reads the specs off disk by size when no weight is given', () => {
