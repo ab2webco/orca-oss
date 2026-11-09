@@ -128,6 +128,11 @@ export type ClaudeAccountsApi = {
   }) => Promise<ClaudeRateLimitAccountsState>
   cancelPendingLogin: () => Promise<boolean>
   reauthenticate: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
+  /** Host-local only; `token: null` clears it. */
+  setLongLivedToken: (args: {
+    accountId: string
+    token: string | null
+  }) => Promise<ClaudeRateLimitAccountsState>
   select: (args: {
     accountId: string | null
     runtime?: 'host' | 'wsl'

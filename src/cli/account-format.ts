@@ -143,7 +143,11 @@ export function formatAccountList(report: AccountListReport): string {
       const pane =
         entry.provider === 'claude' && entry.id === paneAccountId ? '  <- this terminal' : ''
       const auth = entry.provider === 'claude' ? `  ${formatAuthVerdict(entry.auth ?? null)}` : ''
-      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}${pane}\n  ${formatQuota(entry.quota)}${auth}`
+      // Why say what auth covers: launches use the token, quota and checks still use the login.
+      const token = entry.longLivedToken
+        ? '\n  long-lived token: launches use it; auth and quota above describe the stored login'
+        : ''
+      return `${entry.provider}  ${entry.email}${endpoint}${kind}${wsl}  id ${entry.id}${active}${pane}\n  ${formatQuota(entry.quota)}${auth}${token}`
     })
     .join('\n')
   return `${terminal}\n\n${accounts}`
