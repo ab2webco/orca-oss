@@ -47,6 +47,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       changed_shards: ${{ steps.changed-shards.outputs.matrix }}
+      suite_shards: ${{ steps.suite-shards.outputs.matrix }}
 
     steps:
       - name: Checkout
@@ -73,6 +74,12 @@ jobs:
         env:
           TEST_FILES_JSON: ${{ inputs.test_files }}
         run: node config/scripts/split-changed-e2e-specs.mjs
+
+      # Why measured durations: --shard cuts by test count, so the slow team-panel specs, which sort
+      # together, filled one shard past its cap (ORCA-1148). The plan reads config/e2e-spec-durations.json.
+      - name: Plan full-suite shards
+        id: suite-shards
+        run: node config/scripts/split-e2e-suite-specs.mjs
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -121,42 +128,14 @@ jobs:
     needs: build
     if: inputs.test_files == ''
     runs-on: ubuntu-latest
-    # Why 45 and not 30: Playwright shards by index over the sorted spec list, not
-    # by duration, so the slowest shard carries the cost. Measured on run
-    # 31648371052 — the last green E2E on main, no sync in the tree — shard 7 took
-    # 27.0 min against the old 30, while shard 3 took 10.9 (2.5x spread). The cap
-    # was already at 90% before any PR added a spec, so it read as a red check on
-    # whichever PR happened to cross it (ORCA-215). Raising it buys margin; the real
-    # fix is balancing by duration, tracked in ORCA-215.
+    # Why 45: one shard took 27.0 min against the old 30 when --shard cut the sorted list by test
+    # count (ORCA-215), and shard 8 later hit 45 with the team-panel specs stacked on it (ORCA-1148).
+    # The build job now balances shards by measured duration; the cap stays as headroom.
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: '1/12'
-            shard_name: 1-of-12
-          - shard: '2/12'
-            shard_name: 2-of-12
-          - shard: '3/12'
-            shard_name: 3-of-12
-          - shard: '4/12'
-            shard_name: 4-of-12
-          - shard: '5/12'
-            shard_name: 5-of-12
-          - shard: '6/12'
-            shard_name: 6-of-12
-          - shard: '7/12'
-            shard_name: 7-of-12
-          - shard: '8/12'
-            shard_name: 8-of-12
-          - shard: '9/12'
-            shard_name: 9-of-12
-          - shard: '10/12'
-            shard_name: 10-of-12
-          - shard: '11/12'
-            shard_name: 11-of-12
-          - shard: '12/12'
-            shard_name: 12-of-12
+        include: ${{ fromJSON(needs.build.outputs.suite_shards) }}
 
     steps:
       - name: Checkout
@@ -224,8 +203,14 @@ jobs:
       # artifact instead of starting five concurrent electron-vite builds.
       # ORCA_E2E_FORWARD_APP_LOGS keeps startup failures visible when Electron
       # launches but never creates a BrowserWindow.
+      # Why a test list and not file arguments: arguments are regexes, so tabs.spec.ts would also
+      # pick up every *-tabs.spec.ts; list lines match one file, relative to the config's testDir.
       - name: Run E2E tests (${{ matrix.shard_name }})
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e --shard=${{ matrix.shard }}
+        env:
+          TEST_FILES_JSON: ${{ matrix.files }}
+        run: |
+          jq -r '.[] | sub("^tests/e2e/"; "")' <<<"$TEST_FILES_JSON" > "$RUNNER_TEMP/e2e-shard-specs.txt"
+          xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e --test-list "$RUNNER_TEMP/e2e-shard-specs.txt"
 
       # Why always() and why the attempt is in the name: the base failure rate needs
       # the green runs as its denominator, and re-running one shard must not overwrite
