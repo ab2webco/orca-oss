@@ -81,6 +81,46 @@ async function coveringToggle(page: Page, target: Locator): Promise<Box | null> 
   return toggles.find((toggle) => intersects(toggle, box)) ?? null
 }
 
+type Block = (typeof SCROLL_BLOCKS)[number]
+
+/** Scrolls the target to each block and reads its box and the button's at once. */
+async function sweepTarget(
+  target: Locator,
+  blocks: readonly Block[]
+): Promise<{ block: Block; target: Box; buttons: Box[] }[]> {
+  // Why one synchronous call and no frame waits: an instant scroll lays out at once, and a hidden CI window paints about once a second.
+  return target.evaluate((node, list) => {
+    const boxOfNode = (element: Element) => {
+      const { left, top, right, bottom } = element.getBoundingClientRect()
+      return { left, top, right, bottom }
+    }
+    const buttons = () =>
+      [...document.querySelectorAll('[data-floating-terminal-toggle]')]
+        .map(boxOfNode)
+        .filter((box) => box.right > box.left && box.bottom > box.top)
+    return list.map((block) => {
+      if (block === 'level with the button') {
+        // Why: a fixed button covers whatever a scroll brings under it, not only start or end.
+        const [button] = buttons()
+        let scroller = node.parentElement
+        while (
+          scroller &&
+          (scroller.scrollHeight <= scroller.clientHeight ||
+            !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+        ) {
+          scroller = scroller.parentElement
+        }
+        const rect = node.getBoundingClientRect()
+        const middle = button ? (button.top + button.bottom) / 2 : 0
+        scroller?.scrollBy({ top: rect.top + rect.height / 2 - middle, behavior: 'instant' })
+      } else {
+        node.scrollIntoView({ block, behavior: 'instant' })
+      }
+      return { block, target: boxOfNode(node), buttons: buttons() }
+    })
+  }, blocks)
+}
+
 /** Why every block: a fixed button covers whatever scrolls under it, not only the first paint. */
 async function expectClearWhileScrolled(
   page: Page,
@@ -95,40 +135,13 @@ async function expectClearWhileScrolled(
   for (let index = 0; index < count; index += 1) {
     const target = targets.nth(index)
     const label = `${(await target.getAttribute('aria-label')) ?? (await target.innerText())} at ${where}`
-    for (const block of SCROLL_BLOCKS) {
-      const buttonMiddles = (await toggleBoxes(page)).map((box) => (box.top + box.bottom) / 2)
-      // Why instant and a settled read: a smooth scroller is still moving one frame later.
-      await target.evaluate(
-        (node, { at, middle }) => {
-          if (at !== 'level with the button') {
-            node.scrollIntoView({ block: at, behavior: 'instant' })
-            return
-          }
-          // Why: a fixed button covers whatever a scroll brings under it, not only start or end.
-          let scroller = node.parentElement
-          while (
-            scroller &&
-            (scroller.scrollHeight <= scroller.clientHeight ||
-              !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
-          ) {
-            scroller = scroller.parentElement
-          }
-          const rect = node.getBoundingClientRect()
-          scroller?.scrollBy({ top: rect.top + rect.height / 2 - middle, behavior: 'instant' })
-        },
-        { at: block, middle: buttonMiddles[0] ?? 0 }
-      )
-      await expect
-        .poll(async () => {
-          const before = await boxOf(target)
-          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
-          return JSON.stringify(before) === JSON.stringify(await boxOf(target))
-        })
-        .toBe(true)
-      const covering = await coveringToggle(page, target)
+    const sweep = await sweepTarget(target, SCROLL_BLOCKS)
+    for (const { block, target: box, buttons } of sweep) {
+      const covering = buttons.find((button) => intersects(button, box)) ?? null
       expect.soft(covering, `the button covers ${label.trim()}, scrolled to ${block}`).toBeNull()
       if (capture && CAPTURE_EVIDENCE && covering && !captured) {
         captured = true
+        await sweepTarget(target, [block])
         await page.screenshot({ path: capture.testInfo.outputPath(`${capture.name}.png`) })
       }
     }
