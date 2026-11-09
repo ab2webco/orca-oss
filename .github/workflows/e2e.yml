@@ -203,7 +203,7 @@ jobs:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
         run: |
           set -euo pipefail
-          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.319
           claude --version
           bash -lc 'claude --version'
 
@@ -307,7 +307,7 @@ jobs:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
         run: |
           set -euo pipefail
-          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.319
           claude --version
           bash -lc 'claude --version'
 
