@@ -35,7 +35,7 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
   const [boardTrigger, setBoardTrigger] = React.useState<HTMLButtonElement | null>(null)
   // Why: a narrow window draws the Team panel over this button; a hint pointing at it would cover the panel's dock.
   const boardTriggerSeen = useElementUncovered(boardTrigger, workspaceBoardMovedHintOpen)
-  const sidebar = boardTrigger?.closest<HTMLElement>('[data-worktree-sidebar]') ?? null
+  const sidebar = boardTrigger?.closest<HTMLElement>('[data-worktree-sidebar-root]') ?? null
   const persistedUIReady = useAppStore((state) => state.persistedUIReady)
   const hasUsedWorkspaceBoard = useAppStore((state) =>
     hasFeatureInteraction(state.featureInteractions, 'workspace-board')

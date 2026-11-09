@@ -279,7 +279,7 @@ export function shouldContinueDeleteSiblingPositionRestore(args: {
   )
 }
 
-function preserveDeleteSiblingPosition(scope: HTMLElement | null): () => void {
+export function preserveDeleteSiblingPosition(scope: HTMLElement | null): () => void {
   const sidebar = scope?.closest('[data-worktree-sidebar]')
   const row = scope?.closest('[data-worktree-virtual-row]')
   if (!(sidebar instanceof HTMLElement) || !(row instanceof HTMLElement)) {
