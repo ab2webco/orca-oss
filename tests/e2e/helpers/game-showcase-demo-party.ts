@@ -2,7 +2,6 @@ import type { ElectronApplication } from '@stablyai/playwright-test'
 
 // Invented demo data for the README and site clips: a "Lumen" app team on example.com, no real people,
 // hosts or repositories.
-const GB = 1024 ** 3
 
 type Ci = 'pending' | 'success' | 'failure'
 type MemberState = 'working' | 'waiting' | 'idle' | 'done'
@@ -65,22 +64,6 @@ export const demoMember = (member: DemoMember) => ({
   ...(member.host ? { remote: { host: member.host, stateKnown: true } } : {})
 })
 
-export const demoHost = (
-  host: string,
-  running: number,
-  cap: number,
-  machine: { cores: number; totalGb: number; freeGb: number; load: number }
-) => ({
-  host,
-  running,
-  cap,
-  status: 'ok',
-  cpuCoreCount: machine.cores,
-  totalMemory: machine.totalGb * GB,
-  availableMemory: machine.freeGb * GB,
-  loadAverage1m: machine.load
-})
-
 /** A lead's `game state --json` for the Lumen team; `extra` adds hostCapacity, metrics, project… */
 export const demoLeadState = (
   members: ReturnType<typeof demoMember>[],
@@ -122,16 +105,4 @@ export async function sizeWindow(
     },
     { width, height }
   )
-}
-
-/** Writes the next `game state --json` and pushes a fleet change, as Orca does on a launch. */
-export function statePusher(band: {
-  setState: (state: unknown) => Promise<void>
-  pushFleetChange: (version: number) => Promise<void>
-}): (state: unknown) => Promise<void> {
-  let version = 1
-  return async (state) => {
-    await band.setState(state)
-    await band.pushFleetChange(++version)
-  }
 }

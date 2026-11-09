@@ -107,3 +107,12 @@ resources/claude-plugins/orca-game/tests/scene-pet.spec.ts # band-chips.ts Pet c
 # of the sidebar" case is gone with the entry.
 src/renderer/src/components/game-inbox/GameInboxSheet.test.tsx # moved to team-panel-inbox-mail.test.tsx
 src/renderer/src/components/game-inbox/SidebarGameInboxEntry.test.tsx # entry removed; counts tested on the tab
+
+# ORCA-1055 (#987, #1006): a Claude pane draws only the text layer; the band, its Panel and the
+# arcade moved to the native Team panel. These specs drove the removed band and arcade, and CI
+# skipped them until ORCA-1148 put Claude Code on the runner. The Inbox showcase keeps its spec.
+tests/e2e/game-fleet-hosts-showcase.spec.ts # band Panel across paired hosts (multi-host-fleet clip)
+tests/e2e/game-lead-wave-showcase.spec.ts # band Wave button (lead-wave clip)
+tests/e2e/game-panel-metrics-showcase.spec.ts # band Panel My PRs and Metrics (panel-metrics clip)
+tests/e2e/orca-game-arcade-pane.spec.ts # arcade opened in a Claude pane
+tests/e2e/orchestrator-game-band-showcase.spec.ts # band and Panel under a lead (game-band-panel clip)
