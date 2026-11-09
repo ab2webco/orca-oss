@@ -55,6 +55,10 @@ vi.mock('./SidebarToolbar', () => ({
   default: () => <div data-testid="sidebar-toolbar" />
 }))
 
+vi.mock('./SidebarTeamRosterSync', () => ({
+  SidebarTeamRosterSync: () => null
+}))
+
 vi.mock('./WorkspaceKanbanDrawer', () => ({
   default: ({
     leftSidebarStyle,

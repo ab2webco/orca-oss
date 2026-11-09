@@ -7,7 +7,7 @@ import WorktreeContextMenu from './WorktreeContextMenu'
 import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
 import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
-import { WorktreeCardParentContent } from './worktree-card-parent-content'
+import { WorktreeCardRowContent } from './worktree-card-row-content'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -68,7 +68,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
   const { titleOnlyCard, hasHoverDetails, hoverBranchName, hoverWorkspaceTitle, cardStyle } =
     presentation
 
-  const parentCardContent = <WorktreeCardParentContent card={card} presentation={presentation} />
+  const parentCardContent = <WorktreeCardRowContent card={card} presentation={presentation} />
 
   const parentHoverTriggerBody = (
     <div className="group/worktree-card w-full min-w-0" data-worktree-card-hover-trigger="">
