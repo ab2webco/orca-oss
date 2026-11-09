@@ -8,13 +8,14 @@ import {
   startGameBand,
   type GameBand
 } from './helpers/orchestrator-game-band'
+import { boxedTexts } from './helpers/terminal-box-text'
 
 // ORCA-686: the mod toasts a perfect merge only for a review the host marked
 // `perfectMerge: true`; a merge marked false or with the decision absent earns none.
 // Since ORCA-1055 the pane draws no band, so a pushed fleet change makes each read.
 const WIDTHS = [1440, 768, 390, 320] as const
 const RUNS = [
-  // `cue` is the toast's first row; a narrow window wraps the rest.
+  // `cue` opens the toast's text; a narrow pane wraps it mid-cue (Linux CI does at 320).
   { theme: 'dark', locale: 'en', cue: (label: string) => `${label} perfect` },
   { theme: 'light', locale: 'en', cue: (label: string) => `${label} perfect` },
   { theme: 'dark', locale: 'es', cue: (label: string) => `${label}: merge` }
@@ -167,11 +168,14 @@ for (const run of RUNS) {
         const numbers = numbersOf(round)
         const toast = `LUM-15 · ${run.cue(`#${numbers.juno}`)}`
         await expect
-          .poll(async () => (await screenRows(orcaPage)).some((row) => row.includes(toast)), {
-            timeout: 10_000,
-            intervals: [100],
-            message: `no "${toast}" toast at ${width}`
-          })
+          .poll(
+            async () => boxedTexts(await screenRows(orcaPage)).some((text) => text.includes(toast)),
+            {
+              timeout: 10_000,
+              intervals: [100],
+              message: `no "${toast}" toast at ${width}`
+            }
+          )
           .toBe(true)
         await orcaPage.screenshot({
           path: testInfo.outputPath(`${run.theme}-${run.locale}-${width}.png`),
