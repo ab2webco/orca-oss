@@ -10,6 +10,7 @@ import {
 import { useAppStore } from '@/store'
 import type { FloatingTerminalTriggerLocation } from '../../../../shared/ui-chrome-types'
 import { translate } from '@/i18n/i18n'
+import { useFloatingTerminalLocationDefault } from './floating-terminal-location-default'
 
 type FloatingTerminalIconContextMenuProps = {
   children: React.ReactNode
@@ -25,6 +26,7 @@ export function FloatingTerminalIconContextMenu({
   style
 }: FloatingTerminalIconContextMenuProps): React.JSX.Element {
   const updateSettings = useAppStore((s) => s.updateSettings)
+  useFloatingTerminalLocationDefault()
   const [open, setOpen] = useState(false)
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 })
   const reopenFrameRef = useRef<number | null>(null)
