@@ -35,6 +35,8 @@ import { useSidebarWorktreeSelection } from './worktree-list/navigation/use-sele
 import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-order'
 import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
+import { countWorktreesHiddenByFilters } from './sidebar-filter-hidden-count'
+import { SidebarHiddenFiltersLine } from './SidebarHiddenFiltersLine'
 
 type WorktreeListProps = {
   scrollOffsetRef: React.MutableRefObject<number>
@@ -229,6 +231,22 @@ const WorktreeList = React.memo(function WorktreeList({
     clearFilters
   })
 
+  const hiddenByFiltersCount = useMemo(
+    () =>
+      hasFilters
+        ? countWorktreesHiddenByFilters(
+            sortedIds,
+            visibleWorktrees.map((worktree) => worktree.id),
+            (id) => {
+              const worktree = worktreeMap.get(id)
+              return worktree !== undefined && !worktree.isArchived
+            }
+          )
+        : 0,
+    [hasFilters, sortedIds, visibleWorktrees, worktreeMap]
+  )
+  const requestSidebarFilterMenu = useAppStore((s) => s.requestSidebarFilterMenu)
+
   const filtersHideAllRows =
     hasFilters &&
     visibleWorktrees.length === 0 &&
@@ -334,6 +352,10 @@ const WorktreeList = React.memo(function WorktreeList({
         onReorderWorktrees={statusMutations.reorderWorktrees}
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}
+      />
+      <SidebarHiddenFiltersLine
+        count={hiddenByFiltersCount}
+        onShowFilters={requestSidebarFilterMenu}
       />
     </>
   )

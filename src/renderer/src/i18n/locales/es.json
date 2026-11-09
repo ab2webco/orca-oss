@@ -4567,6 +4567,10 @@
           "projects": "Proyectos",
           "workspaces": "Espacios de trabajo"
         },
+        "SidebarHiddenFiltersLine": {
+          "04e60bbc42": "{{count}} oculto(s) por filtros",
+          "aec1ffd95a": "Ver filtros"
+        },
         "SidebarNav": {
           "80611a8b10": "Buscar",
           "0c3395fd32": "Buscar worktrees y pestañas del navegador",
