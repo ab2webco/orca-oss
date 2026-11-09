@@ -114,7 +114,7 @@ are the only ways to keep a scene out of the repo:
 
 Native art follows the scene: the images sit in the scene's own folder, so a private scene needs
 its art excluded the same way (add the folder to the exclude file). A checkout or remote host that
-lacks the images draws the scene in Pixel.
+lacks the images draws the chosen style with Orca's default art.
 
 ## Characters for an existing scene
 
@@ -451,7 +451,7 @@ and swaps the station prop.
 ```
 
 - **Styles.** The keys are `figures` and `office`, at least one. A style with no block draws the
-  scene in Pixel.
+  scene with Orca's default art (Quest's) in that style.
 - **Paths.** `src`, `sheets` and `props.station` are relative to the scene file. `.png` or `.webp`
   only; no absolute path, no `..`, no link out of the scene's folder.
 - **`layers`.** 1 to 8, back to front. Each covers the stage from its bottom edge, so keep what
@@ -485,17 +485,17 @@ and swaps the station prop.
 `orca game scene validate` reads every file: it reports a missing one, a link out, a file that is
 not an image, an animation that runs past its sheet, and a style over its limits, each as
 `native.<style>…: <message>`, and exits 1. Orca only leaves a broken block out with a warning and
-draws the scene in Pixel. So do an Orca that predates the block and the terminal game, which ignore
-the key.
+draws the scene with its default art. An Orca that predates the block draws Pixel, and the terminal
+game ignores the key.
 
-**Not drawn in the panel yet.** Only Quest's bundled art reaches the panel today. It has no way to
-read a scene file's or a plugin's images, so any scene with a `native` block draws in Pixel there,
-however clean `validate` is. The block is checked now and drawn when the panel can read it
-(ORCA-1085).
+**Where the panel reads it.** The panel reads a scene file's images from the host that owns its
+worktree: this machine, an SSH host, or a paired host. A plugin scene's images are not read yet.
 
-**Pixel is the floor.** A built-in scene other than Quest, a plugin or private scene with no block,
-a style the block does not cover, and art that does not load on this machine all draw in Pixel,
-with no error. Quest's Figures and Office art ships with Orca.
+**The default art is the floor.** A built-in scene other than Quest, a scene with no block, a style
+the block does not cover, a plugin scene, and art that does not load on this machine all draw the
+chosen style with Quest's art, which ships with Orca, and keep the scene's names and roster. The
+panel and Settings say the default art is in use. Pixel draws only when it is picked. A scene file
+named `quest.json` is Quest, so that art is its own.
 
 Never use third-party characters in anything committed or published: see
 [Private scenes](#private-scenes) for art that must stay on your machine.

@@ -1,9 +1,9 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 
-const NOTE = 'This scene has no Figures art, so the Team panel draws it in Pixel.'
+const NOTE = 'This scene has no Figures art, so the Team panel draws it with the default art.'
 
-// ORCA-1139 criterion 4: vigilante has no Figures art, and the panel drew Pixel without a word.
+// ORCA-1139 criterion 4, ORCA-1150: vigilante has no Figures art, so the panel draws the default art.
 test('the Panel section says when the scene has no art for the chosen style', async ({
   orcaPage
 }, testInfo) => {

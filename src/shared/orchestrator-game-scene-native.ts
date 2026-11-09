@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { parseOrchestratorGameSceneFile } from './orchestrator-game-scene-file'
+import {
+  ORCHESTRATOR_GAME_SCENE_FILE_SOURCE,
+  parseOrchestratorGameSceneFile
+} from './orchestrator-game-scene-file'
 import { localizedSceneName } from './orchestrator-game-scene-values'
 import { readRasterImageDimensions } from './raster-image-dimensions'
 
@@ -281,21 +284,55 @@ export async function orchestratorGameSceneArtIssues(
   ])
 }
 
+/** Where a style's art comes from: the scene's own files, the Quest art Orca ships, or none. */
+export type OrchestratorGameSceneArtSource = 'scene' | 'bundled' | 'pixel'
+
+export type OrchestratorGameSceneArt = {
+  drawn: OrchestratorGameSceneStyle
+  art: OrchestratorGameSceneArtSource
+  /** The style draws Orca's default art because the scene has none of its own for it. */
+  defaultArt: boolean
+}
+
+const QUEST_FILE = /(?:^|\/)quest\.json$/
+
+// Why the stem: `.orca/scenes/quest.json` is Quest exported as a file, so the bundled art is its own.
+const isQuestScene = (sceneId: string): boolean => {
+  const prefix = `${ORCHESTRATOR_GAME_SCENE_FILE_SOURCE}:`
+  return (
+    sceneId === 'quest' ||
+    (sceneId.startsWith(prefix) && QUEST_FILE.test(sceneId.slice(prefix.length)))
+  )
+}
+
 /**
- * The style a scene really draws in: the one asked for when art exists for it, else Pixel, which
- * every scene has. Quest's art for Figures and Office ships with Orca, so its file needs no block.
+ * The art a style draws with: the scene's own when its block covers the style and loaded, else the
+ * Quest art Orca ships. Pixel draws only when picked, or when even the bundled art failed.
  */
-export function orchestratorGameSceneDrawnStyle(args: {
+export function orchestratorGameSceneArtOf(args: {
   style: OrchestratorGameSceneStyle
   sceneId: string
   /** The scene game state carries; absent when a file did not read or the scene is built in. */
   scene?: { native?: OrchestratorGameSceneNative }
-  /** The art did not load here, such as a carried scene whose files stayed on the lead. */
-  artFailed?: boolean
-}): OrchestratorGameSceneStyle {
-  const { style, sceneId, scene, artFailed } = args
-  if ((style !== 'figures' && style !== 'office') || artFailed) {
-    return 'pixel'
+  /** The scene's own images did not load here, such as an older host or a carried scene. */
+  sceneArtFailed?: boolean
+  bundledArtFailed?: boolean
+}): OrchestratorGameSceneArt {
+  const { style, sceneId, scene, sceneArtFailed, bundledArtFailed } = args
+  if (style !== 'figures' && style !== 'office') {
+    return { drawn: 'pixel', art: 'pixel', defaultArt: false }
   }
-  return scene?.native?.[style] || sceneId === 'quest' ? style : 'pixel'
+  if (scene?.native?.[style] && !sceneArtFailed) {
+    return { drawn: style, art: 'scene', defaultArt: false }
+  }
+  return bundledArtFailed
+    ? { drawn: 'pixel', art: 'pixel', defaultArt: false }
+    : { drawn: style, art: 'bundled', defaultArt: !isQuestScene(sceneId) }
+}
+
+/** The style a scene really draws in; see `orchestratorGameSceneArtOf` for where its art comes from. */
+export function orchestratorGameSceneDrawnStyle(
+  args: Parameters<typeof orchestratorGameSceneArtOf>[0]
+): OrchestratorGameSceneStyle {
+  return orchestratorGameSceneArtOf(args).drawn
 }

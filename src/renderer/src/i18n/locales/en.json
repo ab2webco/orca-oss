@@ -11657,7 +11657,7 @@
           "title": "Panel"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "This scene has no {{style}} art, so the Team panel draws it in Pixel."
+          "text": "This scene has no {{style}} art, so the Team panel draws it with the default art."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Long-lived token",

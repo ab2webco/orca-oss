@@ -29,6 +29,7 @@ import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 import { teamPanelProjectOf } from './team-panel-project'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
+import { publishTeamSceneArtHost } from '../team-scene/team-scene-art-host'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -72,7 +73,12 @@ const poller = createTeamPanelModelPoller(
         worktreeIdOfTab,
         repoWorktreeIds: scope.worktreeIds
       }),
-    readState: readTeamLeadState,
+    // Why: the scene reads its art from the same host and lead caller as game.state (ORCA-1150).
+    readState: (target, caller) => {
+      const { worktreeId, terminalHandle } = caller
+      publishTeamSceneArtHost({ target, caller: { worktreeId, terminalHandle } })
+      return readTeamLeadState(target, caller)
+    },
     readQuestions: readTeamOwnerQuestions,
     readXp: readTeamXp,
     modelOf: (args) => {

@@ -732,6 +732,8 @@ import { GameLeadNames } from './orchestrator-game-lead-names'
 import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
+import { readGameSceneArt } from './orchestrator-game-scene-art'
+import type { GameSceneArtImage } from '../worktree-game-scene-file'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import type { GamePanelTab } from '../../shared/orchestrator-game-panel'
 import {
@@ -32275,6 +32277,39 @@ export class OrcaRuntimeService {
         path: worktree.path,
         connectionId: this.store?.getRepo(worktree.repoId)?.connectionId ?? null
       }
+    })
+  }
+
+  /** One image of the scene file the caller's worktree draws (game.sceneArt). */
+  async readGameSceneArt(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    sceneId: string
+    src: string
+  }): Promise<GameSceneArtImage> {
+    let worktreeId = args.worktreeId
+    if (!worktreeId && args.terminalHandle) {
+      worktreeId = (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+    }
+    const worktreesById = await this.getResolvedWorktreeMap()
+    // Why the folder path too: a folder workspace's lead has no git worktree (ORCA-1135).
+    const folder =
+      worktreeId && !worktreesById.has(worktreeId) ? this.gameFolderWorkspaceOf(worktreeId) : null
+    const worktree = worktreeId ? (worktreesById.get(worktreeId) ?? folder?.worktree) : undefined
+    if (!worktree) {
+      throw new Error('No worktree for this scene art request.')
+    }
+    return readGameSceneArt({
+      settings: this.store?.getSettings?.(),
+      worktree: {
+        repoId: worktree.repoId ?? null,
+        path: worktree.path,
+        connectionId: folder
+          ? folder.connectionId
+          : (this.store?.getRepo(worktree.repoId)?.connectionId ?? null)
+      },
+      sceneId: args.sceneId,
+      src: args.src
     })
   }
 

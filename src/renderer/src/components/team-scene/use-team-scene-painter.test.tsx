@@ -11,12 +11,22 @@ import { createPixelPainter } from './team-scene-pixel-painter'
 import type { TeamScenePainter } from './team-scene-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 import {
-  teamSceneDrawnStyleOf,
+  readTeamSceneArtUrl,
+  useTeamSceneArtHostStore,
+  type TeamSceneArtHost
+} from './team-scene-art-host'
+import {
+  teamSceneArtOf,
   useTeamScenePainter,
+  type TeamSceneStage,
   type TeamScenePainterArgs
 } from './use-team-scene-painter'
 
 vi.mock('./team-scene-art-load', () => ({ loadTeamSceneArt: vi.fn() }))
+vi.mock('./team-scene-art-host', async (actual) => ({
+  ...(await actual<Record<string, unknown>>()),
+  readTeamSceneArtUrl: vi.fn()
+}))
 vi.mock('./team-scene-image-painter', () => ({ createImagePainter: vi.fn() }))
 vi.mock('./team-scene-pixel-painter', () => ({ createPixelPainter: vi.fn() }))
 vi.mock('./team-scene-pixel-scene', () => ({ teamScenePixelSceneOf: vi.fn(() => ({})) }))
@@ -36,35 +46,56 @@ const blockScene = (id: string): OrchestratorGameSceneExtension =>
 
 const QUEST = { id: 'quest', extensions: [] }
 
-describe('teamSceneDrawnStyleOf', () => {
+const HOST: TeamSceneArtHost = {
+  target: { kind: 'local' },
+  caller: { worktreeId: 'wt1', terminalHandle: 'h1' }
+}
+
+describe('teamSceneArtOf', () => {
   it('draws Quest in its bundled art', () => {
-    expect(teamSceneDrawnStyleOf({ style: 'figures', scene: QUEST })).toBe('figures')
-    expect(teamSceneDrawnStyleOf({ style: 'office', scene: QUEST })).toBe('office')
+    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toMatchObject({
+      drawn: 'figures',
+      art: 'bundled',
+      defaultArt: false
+    })
+    expect(teamSceneArtOf({ style: 'office', scene: QUEST }).drawn).toBe('office')
   })
 
   it('reads a host that named no scene as Quest, as Pixel does', () => {
-    expect(teamSceneDrawnStyleOf({ style: 'office', scene: { id: null, extensions: [] } })).toBe(
-      'office'
-    )
+    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toMatchObject({
+      drawn: 'office',
+      defaultArt: false
+    })
   })
 
   it('draws Pixel when Pixel is asked for', () => {
-    expect(teamSceneDrawnStyleOf({ style: 'pixel', scene: QUEST })).toBe('pixel')
+    expect(teamSceneArtOf({ style: 'pixel', scene: QUEST }).drawn).toBe('pixel')
   })
 
-  it('falls to Pixel for a scene with a native block, whose images the panel cannot read yet', () => {
+  it("draws a scene's own art when its block covers the style", () => {
     const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
-    expect(teamSceneDrawnStyleOf({ style: 'figures', scene })).toBe('pixel')
+    expect(teamSceneArtOf({ style: 'figures', scene })).toMatchObject({
+      drawn: 'figures',
+      art: 'scene'
+    })
   })
 
-  it('draws Pixel for another scene with no art', () => {
+  it('draws a scene with no art in the chosen style with the default art, never Pixel', () => {
     expect(
-      teamSceneDrawnStyleOf({ style: 'figures', scene: { id: 'other', extensions: [] } })
-    ).toBe('pixel')
+      teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })
+    ).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
   })
 
-  it('falls to Pixel when the bundled art failed', () => {
-    expect(teamSceneDrawnStyleOf({ style: 'figures', scene: QUEST, artFailed: true })).toBe('pixel')
+  it('draws the default art when the own art did not load, and Pixel when even that failed', () => {
+    const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
+    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toMatchObject({
+      drawn: 'figures',
+      art: 'bundled',
+      defaultArt: true
+    })
+    expect(teamSceneArtOf({ style: 'figures', scene: QUEST, bundledArtFailed: true }).drawn).toBe(
+      'pixel'
+    )
   })
 })
 
@@ -73,9 +104,12 @@ describe('useTeamScenePainter', () => {
   const IMAGE = { height: 2 } as TeamScenePainter
   let root: Root
   let seen: (TeamScenePainter | null)[]
+  let stages: TeamSceneStage[]
 
   function Probe(props: TeamScenePainterArgs): null {
-    seen.push(useTeamScenePainter(props).painter)
+    const stage = useTeamScenePainter(props)
+    stages.push(stage)
+    seen.push(stage.painter)
     return null
   }
   const render = async (style: GamePanelStyle, scene: TeamScenePainterArgs['scene']) =>
@@ -85,6 +119,9 @@ describe('useTeamScenePainter', () => {
 
   beforeEach(() => {
     seen = []
+    stages = []
+    useTeamSceneArtHostStore.setState({ host: HOST })
+    vi.mocked(readTeamSceneArtUrl).mockImplementation(async (_host, _id, src) => `data:${src}`)
     root = createRoot(document.createElement('div'))
     vi.mocked(createPixelPainter).mockReturnValue(PIXEL)
     vi.mocked(createImagePainter).mockReturnValue(IMAGE)
@@ -108,17 +145,45 @@ describe('useTeamScenePainter', () => {
     expect(vi.mocked(createImagePainter).mock.calls[0]![0].art.style).toEqual(art('figures').style)
   })
 
-  it('falls to Pixel when an image fails to load', async () => {
+  it('falls to Pixel only when the bundled art fails to load', async () => {
     vi.mocked(loadTeamSceneArt).mockRejectedValue(new Error('broken'))
     await render('figures', QUEST)
     expect(seen.at(-1)).toBe(PIXEL)
+    expect(stages.at(-1)?.drawn).toBe('pixel')
   })
 
-  it('does not load a native block, and draws that scene in Pixel', async () => {
+  it("loads a scene's own art from the lead's host and draws it", async () => {
     const id = 'file:mine.json'
     await render('figures', { id, extensions: [blockScene(id)] })
-    expect(loadTeamSceneArt).not.toHaveBeenCalled()
-    expect(seen.at(-1)).toBe(PIXEL)
+    const [style, urlOf] = vi.mocked(loadTeamSceneArt).mock.calls[0]!
+    expect(style).toEqual(teamSceneQuestArtOf('figures'))
+    await expect(urlOf('art/sky.png')).resolves.toBe('data:art/sky.png')
+    expect(readTeamSceneArtUrl).toHaveBeenCalledWith(HOST, id, 'art/sky.png')
+    expect(seen.at(-1)).toBe(IMAGE)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene', defaultArt: false })
+  })
+
+  it('draws the default art when the own art fails, as an older host does', async () => {
+    const id = 'file:mine.json'
+    vi.mocked(loadTeamSceneArt).mockRejectedValueOnce(new Error('method_not_found'))
+    await render('figures', { id, extensions: [blockScene(id)] })
+    expect(seen.at(-1)).toBe(IMAGE)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
+    expect(vi.mocked(loadTeamSceneArt).mock.calls.at(-1)![1]('scene/sky.png')).toBeUndefined()
+  })
+
+  it('draws the default art at once when no host is known to read the own art from', async () => {
+    useTeamSceneArtHostStore.setState({ host: null })
+    const id = 'file:mine.json'
+    await render('office', { id, extensions: [blockScene(id)] })
+    expect(readTeamSceneArtUrl).not.toHaveBeenCalled()
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+  })
+
+  it('draws a scene with no art in the chosen style with the default art', async () => {
+    await render('office', { id: 'file:.orca/scenes/koombea.json', extensions: [] })
+    expect(seen.at(-1)).toBe(IMAGE)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
   })
 
   it('keeps its painter across a poll that repeats the same scene', async () => {

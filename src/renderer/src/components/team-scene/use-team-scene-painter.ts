@@ -5,8 +5,18 @@ import {
 } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
-import { orchestratorGameSceneDrawnStyle } from '../../../../shared/orchestrator-game-scene-native'
+import {
+  orchestratorGameSceneArtOf,
+  type OrchestratorGameSceneArt,
+  type OrchestratorGameSceneArtSource
+} from '../../../../shared/orchestrator-game-scene-native'
 import { loadTeamSceneArt } from './team-scene-art-load'
+import {
+  readTeamSceneArtUrl,
+  teamSceneArtHostKeyOf,
+  useTeamSceneArtHost,
+  type TeamSceneArtHost
+} from './team-scene-art-host'
 import { createImagePainter, type TeamSceneImageArt } from './team-scene-image-painter'
 import type { TeamScenePainter } from './team-scene-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
@@ -29,61 +39,118 @@ export type TeamScenePainterArgs = {
   timezone: string
 }
 
-/** The style drawn for this scene: the one asked for when its art can be read here, else Pixel. */
-export function teamSceneDrawnStyleOf(args: {
+const carriedOf = (scene: TeamScenePainterScene) =>
+  scene.extensions.find((one) => one.id === (scene.id ?? QUEST))?.definition
+
+/** The style drawn for this scene and where its art comes from; Pixel only when picked or broken. */
+export function teamSceneArtOf(args: {
   style: GamePanelStyle
   scene: TeamScenePainterScene
-  artFailed?: boolean
-}): GamePanelStyle {
-  const sceneId = args.scene.id ?? QUEST
-  const carried = args.scene.extensions.find((one) => one.id === sceneId)?.definition
-  return orchestratorGameSceneDrawnStyle({
+  sceneArtFailed?: boolean
+  bundledArtFailed?: boolean
+}): OrchestratorGameSceneArt {
+  return orchestratorGameSceneArtOf({
     style: args.style,
-    sceneId,
-    scene: carried,
-    // Why: only Quest's art is bundled; the panel cannot read a scene file's images (ORCA-1085).
-    artFailed: args.artFailed || carried?.native !== undefined
+    sceneId: args.scene.id ?? QUEST,
+    scene: carriedOf(args.scene),
+    sceneArtFailed: args.sceneArtFailed,
+    bundledArtFailed: args.bundledArtFailed
   })
 }
 
-/** The style really drawn, with its painter; null only while the art decodes. */
-export type TeamSceneStage = { drawn: GamePanelStyle; painter: TeamScenePainter | null }
+/** The style really drawn, where its art came from, and its painter; null only while art decodes. */
+export type TeamSceneStage = {
+  drawn: GamePanelStyle
+  art: OrchestratorGameSceneArtSource
+  /** Orca's default art stands in for art the scene does not have; the panel says so. */
+  defaultArt: boolean
+  painter: TeamScenePainter | null
+}
+
+type ArtRequest = { key: string; own: boolean; load: () => Promise<TeamSceneImageArt> }
+
+function artRequestOf(args: {
+  art: OrchestratorGameSceneArtSource
+  style: 'figures' | 'office'
+  sceneKey: string
+  host: TeamSceneArtHost | null
+}): ArtRequest | null {
+  const { art, style, sceneKey, host } = args
+  if (art === 'bundled') {
+    return {
+      key: `bundled|${style}`,
+      own: false,
+      load: () => loadTeamSceneArt(teamSceneQuestArtOf(style), teamSceneQuestArtUrl)
+    }
+  }
+  const scene = JSON.parse(sceneKey) as TeamScenePainterScene
+  const native = carriedOf(scene)?.native?.[style]
+  if (art !== 'scene' || !native || !host) {
+    return null
+  }
+  const sceneId = scene.id ?? QUEST
+  return {
+    key: ownArtKeyOf(style, sceneKey, host),
+    own: true,
+    load: () => loadTeamSceneArt(native, (src) => readTeamSceneArtUrl(host, sceneId, src))
+  }
+}
+
+const ownArtKeyOf = (style: GamePanelStyle, sceneKey: string, host: TeamSceneArtHost | null) =>
+  `scene|${style}|${teamSceneArtHostKeyOf(host)}|${sceneKey}`
 
 /** The stage for the panel's style; while the painter is null, hold `TEAM_SCENE_ART_HEIGHT`. */
 export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage {
   const { style, scene, timezone } = args
   const colors = useTeamSceneStatusColors()
-  const [failed, setFailed] = useState<GamePanelStyle | null>(null)
-  const [loaded, setLoaded] = useState<{ style: GamePanelStyle; art: TeamSceneImageArt } | null>(
-    null
+  const host = useTeamSceneArtHost()
+  // Why by text: each poll hands a new `extensions` array, and a new painter drops the stage's caches.
+  const sceneKey = JSON.stringify(scene)
+  const [ownFailed, setOwnFailed] = useState<string | null>(null)
+  const [bundledFailed, setBundledFailed] = useState<GamePanelStyle | null>(null)
+  const [loaded, setLoaded] = useState<{ key: string; art: TeamSceneImageArt } | null>(null)
+  const art = teamSceneArtOf({
+    style,
+    scene,
+    // Why: without the lead's host there is nowhere to read the scene's own art from.
+    sceneArtFailed: host === null || ownFailed === ownArtKeyOf(style, sceneKey, host),
+    bundledArtFailed: bundledFailed === style
+  })
+  const artStyle = art.drawn === 'figures' || art.drawn === 'office' ? art.drawn : null
+
+  const request = useMemo(
+    () =>
+      artStyle === null ? null : artRequestOf({ art: art.art, style: artStyle, sceneKey, host }),
+    [art.art, artStyle, sceneKey, host]
   )
-  const drawn = teamSceneDrawnStyleOf({ style, scene, artFailed: failed === style })
-  const artStyle = drawn === 'figures' || drawn === 'office' ? drawn : null
 
   useEffect(() => {
-    if (artStyle === null) {
+    if (request === null) {
       return
     }
     let current = true
-    void loadTeamSceneArt(teamSceneQuestArtOf(artStyle), teamSceneQuestArtUrl).then(
-      (art) => {
+    void request.load().then(
+      (loadedArt) => {
         if (current) {
-          setLoaded({ style: artStyle, art })
+          setLoaded({ key: request.key, art: loadedArt })
         }
       },
       () => {
-        if (current) {
-          setFailed(artStyle)
+        if (!current) {
+          return
+        }
+        if (request.own) {
+          setOwnFailed(request.key)
+        } else if (artStyle !== null) {
+          setBundledFailed(artStyle)
         }
       }
     )
     return () => {
       current = false
     }
-  }, [artStyle])
+  }, [request, artStyle])
 
-  // Why by text: each poll hands a new `extensions` array, and a new painter drops the stage's caches.
-  const sceneKey = JSON.stringify(scene)
   const pixelScene = useMemo(() => {
     const { id, extensions } = JSON.parse(sceneKey) as TeamScenePainterScene
     const nowMs = Date.now()
@@ -98,12 +165,12 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
     }
   }, [sceneKey, timezone])
 
-  const art = loaded?.style === artStyle ? loaded?.art : null
+  const image = request !== null && loaded?.key === request.key ? loaded.art : null
   const painter = useMemo(() => {
     if (artStyle === null) {
       return createPixelPainter({ ...pixelScene, colors })
     }
-    return art ? createImagePainter({ art, colors }) : null
-  }, [artStyle, art, pixelScene, colors])
-  return { drawn, painter }
+    return image ? createImagePainter({ art: image, colors }) : null
+  }, [artStyle, image, pixelScene, colors])
+  return { drawn: art.drawn, art: art.art, defaultArt: art.defaultArt, painter }
 }

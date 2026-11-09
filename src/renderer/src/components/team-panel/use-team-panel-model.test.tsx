@@ -12,11 +12,19 @@ import { signalGameAdvisorChanged } from './game-advisor-signal'
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
 let publish: (source: TeamPanelModelSource, scope?: unknown) => void = () => {}
+type ReadState = (target: unknown, caller: unknown) => Promise<unknown>
+let readState: ReadState = async () => null
 vi.mock('./team-panel-model-poll', () => ({
-  createTeamPanelModelPoller: (deps: { publish: typeof publish }) => {
+  createTeamPanelModelPoller: (deps: { publish: typeof publish; readState: ReadState }) => {
     publish = deps.publish
+    readState = deps.readState
     return { subscribe, refresh }
   }
+}))
+const readTeamLeadState = vi.fn(async () => ({ config: { mode: 'on' } }))
+vi.mock('./team-panel-lead-read', async (actual) => ({
+  ...(await actual<Record<string, unknown>>()),
+  readTeamLeadState: (...args: unknown[]) => readTeamLeadState(...(args as []))
 }))
 const baseState = (): Record<string, unknown> => ({
   activeWorkspaceExecutionHostId: null,
@@ -51,6 +59,7 @@ vi.mock('./use-team-panel-solo-model', () => ({
 }))
 
 const { toRemoteRuntimePtyId } = await import('@/runtime/runtime-terminal-stream')
+const { useTeamSceneArtHostStore } = await import('../team-scene/team-scene-art-host')
 const { useTeamMemberOfTab, useTeamPanelKind, useTeamPanelModel } =
   await import('./use-team-panel-model')
 
@@ -80,6 +89,20 @@ async function mount(Probe: () => null): Promise<void> {
 }
 
 describe('Team model polling', () => {
+  it('hands the scene the host and lead caller game.state was read from, reading it once', async () => {
+    const target = { kind: 'environment', environmentId: 'env-1' }
+    const caller = { worktreeId: 'wt-lead', terminalHandle: 'h-lead', paneKey: 'tab:leaf' }
+
+    await expect(readState(target, caller)).resolves.toEqual({ config: { mode: 'on' } })
+
+    expect(readTeamLeadState).toHaveBeenCalledTimes(1)
+    expect(readTeamLeadState).toHaveBeenCalledWith(target, caller)
+    expect(useTeamSceneArtHostStore.getState().host).toEqual({
+      target,
+      caller: { worktreeId: 'wt-lead', terminalHandle: 'h-lead' }
+    })
+  })
+
   it('polls only for the open panel', async () => {
     await mount(() => {
       useTeamPanelModel()
