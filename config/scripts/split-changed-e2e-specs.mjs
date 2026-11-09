@@ -31,8 +31,22 @@ const sizeOf = (file) => {
 export function splitChangedSpecs(files, weightOf = sizeOf) {
   const unique = [...new Set(files)]
   const total = Math.min(MAX_SHARDS, Math.ceil(unique.length / SPECS_PER_SHARD))
+  return balanceByWeight(unique, total, weightOf).map((shard, index) => ({
+    name: `${index + 1}-of-${total}`,
+    files: JSON.stringify(shard.files)
+  }))
+}
+
+/**
+ * Heaviest first onto the lightest shard (LPT); ties break by name, so the plan is stable.
+ * @param {string[]} files
+ * @param {number} total
+ * @param {(file: string) => number} weightOf
+ * @returns {{ weight: number, files: string[] }[]} each shard's files sorted.
+ */
+export function balanceByWeight(files, total, weightOf) {
   const shards = Array.from({ length: total }, () => ({ weight: 0, files: [] }))
-  const byWeight = unique
+  const byWeight = [...new Set(files)]
     .map((file) => ({ file, weight: weightOf(file) }))
     .sort((a, b) => b.weight - a.weight || a.file.localeCompare(b.file))
   for (const { file, weight } of byWeight) {
@@ -40,10 +54,10 @@ export function splitChangedSpecs(files, weightOf = sizeOf) {
     lightest.weight += weight
     lightest.files.push(file)
   }
-  return shards.map((shard, index) => ({
-    name: `${index + 1}-of-${total}`,
-    files: JSON.stringify(shard.files.sort())
-  }))
+  for (const shard of shards) {
+    shard.files.sort()
+  }
+  return shards
 }
 
 export function main({
