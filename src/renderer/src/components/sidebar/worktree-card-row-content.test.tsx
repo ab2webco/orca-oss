@@ -14,14 +14,17 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('./worktree-card-parent-content', () => ({
   WorktreeCardParentContent: () => <div data-classic-card-content="" />
 }))
-const appState = { worktreeCardProperties: ['pr'] }
+const appState: {
+  worktreeCardProperties: string[]
+  agentStatusByPaneKey: Record<string, { stateStartedAt: number }>
+} = { worktreeCardProperties: ['pr'], agentStatusByPaneKey: {} }
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof appState) => unknown) => selector(appState)
 }))
 
 const { WorktreeCardRowContent } = await import('./worktree-card-row-content')
 const { TooltipProvider } = await import('@/components/ui/tooltip')
-const { useSidebarTeamRosterStore } = await import('./sidebar-team-roster')
+const { useSidebarTeamRosterStore, useSidebarTeamCard } = await import('./sidebar-team-roster')
 
 const roots: ReturnType<typeof createRoot>[] = []
 afterEach(async () => {
@@ -31,6 +34,7 @@ afterEach(async () => {
     }
   })
   useSidebarTeamRosterStore.setState({ model: null, look: 'game' })
+  appState.agentStatusByPaneKey = {}
 })
 
 function cardOf(
@@ -47,17 +51,28 @@ function cardOf(
   } as unknown as WorktreeCardController
 }
 
+// Mirrors WorktreeCardSurface: the row and its child flag come from useSidebarTeamCard.
+function TeamCardContent({ card }: { card: WorktreeCardController }): React.JSX.Element {
+  const team = useSidebarTeamCard(card.worktree.id)
+  return (
+    <WorktreeCardRowContent
+      card={card}
+      row={team.row}
+      child={team.child}
+      presentation={{} as WorktreeCardPresentation}
+    />
+  )
+}
+
+function contentOf(card: WorktreeCardController): React.JSX.Element {
+  return <TeamCardContent card={card} />
+}
+
 async function render(card: WorktreeCardController): Promise<HTMLElement> {
   const host = document.createElement('div')
   const root = createRoot(host)
   roots.push(root)
-  await act(async () =>
-    root.render(
-      <TooltipProvider>
-        <WorktreeCardRowContent card={card} presentation={{} as WorktreeCardPresentation} />
-      </TooltipProvider>
-    )
-  )
+  await act(async () => root.render(<TooltipProvider>{contentOf(card)}</TooltipProvider>))
   return host
 }
 
@@ -106,5 +121,41 @@ describe('WorktreeCardRowContent', () => {
       cardOf('wt-main', { showLineageChildChip: true, lineageCollapsed: true })
     )
     expect(collapsed.querySelector('[aria-expanded="false"]')).not.toBeNull()
+  })
+
+  it("gives the lead its own pane's age when game.state sends no stateSince", async () => {
+    useSidebarTeamRosterStore.setState({ model: { lead, members: [] } })
+    appState.agentStatusByPaneKey = { 'p-lead': { stateStartedAt: Date.now() - 2 * 3_600_000 } }
+    const host = await render(cardOf('wt-main'))
+
+    expect(host.querySelector('[data-team-row-part="age"]')!.textContent).toBe('2 h')
+  })
+
+  it('draws the members inside the lead as child rows', async () => {
+    const squire = {
+      ...lead,
+      paneKey: 'p-m',
+      worktreeId: 'wt-m',
+      name: 'Squire',
+      ticket: { identifier: 'ORCA-1', title: null, url: null, statusGroup: null },
+      flowPhase: null,
+      summary: null,
+      pr: null,
+      needsYou: false,
+      limitResetsAt: null,
+      found: false
+    }
+    useSidebarTeamRosterStore.setState({ model: { lead, members: [squire] } })
+    const host = await render(cardOf('wt-main', { lineageChildren: contentOf(cardOf('wt-m')) }))
+
+    const children = host.querySelector('[data-sidebar-team-children]')!
+    expect(
+      children
+        .querySelector('[data-sidebar-team-row="member"]')!
+        .hasAttribute('data-team-row-child')
+    ).toBe(true)
+    expect(
+      host.querySelector('[data-sidebar-team-row="lead"]')!.hasAttribute('data-team-row-child')
+    ).toBe(false)
   })
 })

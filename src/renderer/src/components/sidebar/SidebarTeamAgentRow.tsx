@@ -35,23 +35,33 @@ export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
   row,
   look,
   showPr,
-  now
+  now,
+  since,
+  child = false
 }: {
   row: SidebarTeamRow
   look: GamePanelLook
   /** Card display's PR/MR link option; off, the row keeps the branch icon. */
   showPr: boolean
   now: number
+  since: number | null
+  /** Under the lead: V30's `.rw.child`, drawn with the tree connector. */
+  child?: boolean
 }): React.JSX.Element {
   const { name, mono } = namePartsOf(row, look === 'game')
   const pr = row.role === 'member' && showPr ? row.card.pr : null
   const ciTone = pr ? statusToneOfCi(pr) : null
   const KindIcon = pr ? GitPullRequest : GitBranch
-  const since = row.card.since
   return (
     <div
       data-sidebar-team-row={row.role}
-      className="flex h-6 w-full min-w-0 items-center gap-[7px] text-[12.5px]"
+      data-team-row-child={child ? '' : undefined}
+      className={cn(
+        'relative flex h-6.5 w-full min-w-0 items-center gap-[7px] text-[12.5px]',
+        // Why -top-0.5: it bridges the 2 px of card borders up to the row above, as V30's rows touch.
+        child &&
+          "before:absolute before:-top-0.5 before:bottom-1/2 before:-left-[13px] before:w-[7px] before:rounded-bl-[5px] before:border-b before:border-l before:border-muted-foreground/40 before:content-['']"
+      )}
     >
       <span data-team-row-part="state" className="grid w-3.5 shrink-0 place-items-center">
         <TeamStatusMark status={row.card.status} />

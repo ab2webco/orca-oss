@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import { create } from 'zustand'
+import { useAppStore } from '@/store'
 import type { GamePanelLook } from '../../../../shared/orchestrator-game-panel'
 import type {
   TeamLeadCard,
@@ -53,4 +54,27 @@ export function useSidebarTeamRow(worktreeId: string): SidebarTeamRow | null {
 
 export function useSidebarTeamLook(): GamePanelLook {
   return useSidebarTeamRosterStore((s) => s.look)
+}
+
+/** True inside the lead's children: a member there draws as V30's child row. */
+export const SidebarTeamChildContext = createContext(false)
+
+/** The card's team row, and whether it sits under the lead as a child row. */
+export function useSidebarTeamCard(worktreeId: string): {
+  row: SidebarTeamRow | null
+  child: boolean
+} {
+  const row = useSidebarTeamRow(worktreeId)
+  const underLead = useContext(SidebarTeamChildContext)
+  return { row, child: underLead && row?.role === 'member' }
+}
+
+export function useSidebarTeamRowSince(row: SidebarTeamRow): number | null {
+  // Why: game.state sends stateSince for members only; the lead's pane holds the same stateStartedAt.
+  const leadStarted = useAppStore((s) =>
+    row.role === 'lead' && row.card.since === null
+      ? (s.agentStatusByPaneKey[row.card.paneKey]?.stateStartedAt ?? null)
+      : null
+  )
+  return row.card.since ?? leadStarted
 }

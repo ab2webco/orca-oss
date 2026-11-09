@@ -57,6 +57,35 @@ async function addPr(app: ElectronApplication): Promise<void> {
   })
 }
 
+type RowBox = { role: string | null; x: number; y: number; height: number; connector: string }
+
+// V30: members sit 12 px in from the lead with the tree connector, and every row has one height.
+async function expectV30TreeGeometry(page: Page, where: string): Promise<void> {
+  const boxes = await page.locator('[data-sidebar-team-row]').evaluateAll((list) =>
+    list.map((node): RowBox => {
+      const rect = node.getBoundingClientRect()
+      return {
+        role: node.getAttribute('data-sidebar-team-row'),
+        x: rect.x,
+        y: rect.y,
+        height: rect.height,
+        connector: getComputedStyle(node, '::before').borderLeftWidth
+      }
+    })
+  )
+  const [lead, ...members] = [...boxes].sort((a, b) => a.y - b.y)
+  expect(lead?.role, `the lead row is not first at ${where}`).toBe('lead')
+  expect(members, `members missing at ${where}`).toHaveLength(2)
+  for (const member of members) {
+    expect(Math.round(member.x - lead!.x), `child indent at ${where}`).toBe(12)
+    expect(member.connector, `tree connector at ${where}`).toBe('1px')
+  }
+  const heights = new Set(boxes.map((box) => Math.round(box.height)))
+  expect([...heights], `row heights differ at ${where}`).toHaveLength(1)
+  const pitches = [members[0]!.y - lead!.y, members[1]!.y - members[0]!.y].map(Math.round)
+  expect(pitches[0], `row pitch differs at ${where}`).toBe(pitches[1])
+}
+
 async function createBareWorktree(page: Page, client: RuntimeClient, name: string) {
   const id = await page.evaluate(async (branch) => {
     const state = window.__store!.getState()
@@ -203,6 +232,8 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
     await expect(leadRow.locator('[data-team-row-part="name"] b')).toHaveText('Castillo')
     // The lead's branch prints as `main`, not the `refs/heads/main` game.state carries.
     await expect(leadRow.locator('[data-team-row-ticket]')).toHaveText('main')
+    // The lead row carries its age, like the members.
+    await expect(leadRow.locator('[data-team-row-part="age"]')).toHaveText(/\S/)
     await expect(knightRow.locator('[data-team-row-part="name"] b')).toHaveText('Caballero')
     await expect(knightRow.locator('[data-team-row-ticket]')).toHaveText('ORCA-1142')
     await expect(knightRow.locator('[data-team-row-part="kind"]')).toHaveAttribute(
@@ -254,6 +285,7 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
               .map((node) => node.textContent)
           )
         expect(cutRows, `team rows overflow at ${where}`).toEqual([])
+        await expectV30TreeGeometry(orcaPage, where)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`rows-game-${width}-${theme}.png`)

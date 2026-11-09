@@ -114,7 +114,13 @@ describe('teamRowOfWorktree', () => {
 describe('SidebarTeamAgentRow (V30 row)', () => {
   it('draws the state dot, the kind icon, the bold name and the age, in that order', async () => {
     const host = await render(
-      <SidebarTeamAgentRow row={{ role: 'member', card: member() }} look="game" showPr now={NOW} />
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={member().since}
+      />
     )
     const row = host.querySelector('[data-sidebar-team-row="member"]')!
     const parts = [...row.children].map((child) => child.getAttribute('data-team-row-part'))
@@ -148,6 +154,7 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
         look="game"
         showPr
         now={NOW}
+        since={null}
       />
     )
     const kind = host.querySelector('[data-team-row-part="kind"]')!
@@ -172,6 +179,7 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
         look="game"
         showPr={false}
         now={NOW}
+        since={null}
       />
     )
     expect(host.querySelector('[data-team-row-part="kind"]')!.getAttribute('data-kind')).toBe(
@@ -181,7 +189,13 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
 
   it('names a member by its ticket only in plain mode', async () => {
     const host = await render(
-      <SidebarTeamAgentRow row={{ role: 'member', card: member() }} look="plain" showPr now={NOW} />
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="plain"
+        showPr
+        now={NOW}
+        since={null}
+      />
     )
     const name = host.querySelector('[data-team-row-part="name"]')!
     expect(name.querySelector('b')!.textContent).toBe('ORCA-1034')
@@ -198,6 +212,7 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
         look="game"
         showPr
         now={NOW}
+        since={null}
       />
     )
     expect(host.querySelector('[data-status-glyph="question"]')).not.toBeNull()
@@ -205,7 +220,13 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
 
   it('crowns the lead and prints its branch beside the name', async () => {
     const host = await render(
-      <SidebarTeamAgentRow row={{ role: 'lead', card: lead }} look="game" showPr now={NOW} />
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: lead }}
+        look="game"
+        showPr
+        now={NOW}
+        since={lead.since}
+      />
     )
     const row = host.querySelector('[data-sidebar-team-row="lead"]')!
     const name = row.querySelector('[data-team-row-part="name"]')!
@@ -222,14 +243,62 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
         look="game"
         showPr
         now={NOW}
+        since={null}
       />
     )
     expect(host.querySelector('[data-team-row-ticket]')!.textContent).toBe('main')
   })
 
+  it('prints the age it is given, so a lead without stateSince still shows one', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: { ...lead, since: null } }}
+        look="game"
+        showPr
+        now={NOW}
+        since={NOW - 2 * 3_600_000}
+      />
+    )
+    expect(host.querySelector('[data-team-row-part="age"]')!.textContent).toBe('2 h')
+  })
+
+  it('draws a member under the lead as a child row with the tree connector', async () => {
+    const child = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+        child
+      />
+    )
+    expect(
+      child.querySelector('[data-sidebar-team-row]')!.hasAttribute('data-team-row-child')
+    ).toBe(true)
+    const top = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: lead }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+      />
+    )
+    expect(top.querySelector('[data-sidebar-team-row]')!.hasAttribute('data-team-row-child')).toBe(
+      false
+    )
+  })
+
   it('calls the lead by its role in plain mode', async () => {
     const host = await render(
-      <SidebarTeamAgentRow row={{ role: 'lead', card: lead }} look="plain" showPr now={NOW} />
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: lead }}
+        look="plain"
+        showPr
+        now={NOW}
+        since={null}
+      />
     )
     expect(host.querySelector('[data-team-row-part="name"] b')!.textContent).toBe('Lead')
   })

@@ -8,6 +8,7 @@ import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
 import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
 import { WorktreeCardRowContent } from './worktree-card-row-content'
+import { useSidebarTeamCard } from './sidebar-team-roster'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -68,7 +69,15 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
   const { titleOnlyCard, hasHoverDetails, hoverBranchName, hoverWorkspaceTitle, cardStyle } =
     presentation
 
-  const parentCardContent = <WorktreeCardRowContent card={card} presentation={presentation} />
+  const team = useSidebarTeamCard(worktree.id)
+  const parentCardContent = (
+    <WorktreeCardRowContent
+      card={card}
+      row={team.row}
+      child={team.child}
+      presentation={presentation}
+    />
+  )
 
   const parentHoverTriggerBody = (
     <div className="group/worktree-card w-full min-w-0" data-worktree-card-hover-trigger="">
@@ -128,9 +137,13 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
   const cardBody = (
     <div
       className={cn(
-        'relative flex cursor-pointer flex-col pr-1.5 transition-[background-color,border-color,opacity,box-shadow] duration-200 outline-none select-none',
-        titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
-        flushSurface ? 'ml-1 w-[calc(100%-0.25rem)]' : 'ml-1',
+        'relative flex cursor-pointer flex-col transition-[background-color,border-color,opacity,box-shadow] duration-200 outline-none select-none',
+        // Why: V30's rows share one height, so a team card adds no padding of its own around its row.
+        team.row ? 'py-0' : titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
+        // Why: under the lead the child row takes V30's step; the tree's own insets would add to it.
+        team.child
+          ? 'w-full pl-2'
+          : ['pr-1.5', flushSurface ? 'ml-1 w-[calc(100%-0.25rem)]' : 'ml-1'],
         'rounded-lg',
         // Why: the live data attribute updates before React state during navigation,
         // so it must own the complete active style without stale utility classes.
@@ -161,7 +174,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       onDragStart={!affiliateListMode && nativeDragEnabled ? handleDragStart : undefined}
       onDragEnd={!affiliateListMode && nativeDragEnabled ? handleDragEnd : undefined}
       aria-busy={isDeleting}
-      style={cardStyle}
+      style={team.child ? undefined : cardStyle}
     >
       {isDeleting && (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/50 backdrop-blur-[1px]">
@@ -175,7 +188,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       )}
       {parentCardBodyWithHoverDetails}
 
-      {newCardStyle && lineageChildren ? (
+      {/* Why not for a team card: its content draws the children as V30's child rows. */}
+      {newCardStyle && lineageChildren && !team.row ? (
         <div
           className="mt-1.5 space-y-1"
           data-worktree-lineage-children=""
