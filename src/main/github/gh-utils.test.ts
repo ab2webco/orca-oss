@@ -288,13 +288,13 @@ describe('github owner/repo resolution', () => {
     }
   })
 
-  it('resolves PR candidates as upstream then origin and de-dupes matching slugs', async () => {
+  it('resolves PR candidates origin first and de-dupes matching slugs', async () => {
     gitExecFileAsyncMock
       .mockResolvedValueOnce({ stdout: 'git@github.com:Acme/Orca.git\n' })
       .mockResolvedValueOnce({ stdout: 'git@github.com:acme/orca.git\n' })
 
     await expect(resolvePRRepositoryCandidates('/repo')).resolves.toEqual({
-      candidates: [{ owner: 'Acme', repo: 'Orca' }],
+      candidates: [{ owner: 'acme', repo: 'orca' }],
       headRepo: { owner: 'acme', repo: 'orca' }
     })
   })

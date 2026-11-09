@@ -391,9 +391,8 @@ export type PullRequestPushTarget = {
   maintainerCanModify?: boolean
 }
 
-// Why: only an explicit `origin` preference is origin-only; `upstream`/`auto`/
-// undefined keep the multi-candidate probe ordered upstream-first, matching
-// resolvePrWorkItemSource list semantics.
+// Why: only an explicit `origin` preference is origin-only; an explicit `upstream`
+// probes upstream first, and `auto`/undefined start in the worktree's own repo (ORCA-1148).
 async function resolvePullRequestLookupCandidates(
   repoPath: string,
   preference: IssueSourcePreference | undefined,
@@ -404,8 +403,14 @@ async function resolvePullRequestLookupCandidates(
     const origin = await getOriginGitHubApiRepository(repoPath, connectionId, localGitOptions)
     return origin ? [origin] : []
   }
-  return (await resolveGitHubApiRepositoryCandidates(repoPath, connectionId, localGitOptions))
-    .candidates
+  return (
+    await resolveGitHubApiRepositoryCandidates(
+      repoPath,
+      connectionId,
+      localGitOptions,
+      preference === 'upstream'
+    )
+  ).candidates
 }
 
 export async function getPullRequestPushTarget(
@@ -3169,7 +3174,7 @@ async function lookupPRByNumber(args: {
         best = { data: linkedData, dataRepo: candidate, rank }
       }
     } catch (err) {
-      // Why: a later probe failing must not discard a PR the upstream-first lookup already found.
+      // Why: a later probe failing must not discard a PR an earlier candidate already found.
       if (shouldStopAfterExactLookupError(err) && !best) {
         throw err
       }

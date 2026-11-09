@@ -62,19 +62,21 @@ type MyOpenPrsSearch<T> = {
   items: readonly T[]
   sources: {
     prs: GitHubRepositoryIdentity | null
-    originCandidate: GitHubRepositoryIdentity | null
+    upstreamCandidate: GitHubRepositoryIdentity | null
   }
 }
 
-/** My open PRs in a repo and, for a fork, its upstream: contributions live upstream, own work on the fork. */
+/** My open PRs in a repo and, for a fork, its upstream: own work on the fork, contributions upstream. */
 export async function myOpenPullRequestsOf<T extends { type: string }>(
   search: (preference: 'upstream' | 'origin') => Promise<MyOpenPrsSearch<T>>
 ): Promise<{ repos: GitHubRepositoryIdentity[]; items: T[] }> {
-  const upstream = await search('upstream')
-  const searched = upstream.sources.prs
-  const origin = upstream.sources.originCandidate
-  const fork = origin && searched && !sameRepo(origin, searched) ? await search('origin') : null
-  const results = (fork ? [fork, upstream] : [upstream]).map((one) => ({
+  // Why (ORCA-1148): the worktree's own repo is searched first; upstream only when it is another repo.
+  const own = await search('origin')
+  const searched = own.sources.prs
+  const upstream = own.sources.upstreamCandidate
+  const parent =
+    upstream && (!searched || !sameRepo(upstream, searched)) ? await search('upstream') : null
+  const results = (parent ? [own, parent] : [own]).map((one) => ({
     repo: one.sources.prs,
     prs: one.items.filter((item) => item.type === 'pr')
   }))

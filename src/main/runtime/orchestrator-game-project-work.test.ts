@@ -658,12 +658,17 @@ describe('GameProjectWorkCache', () => {
 describe('myOpenPullRequestsOf', () => {
   const fork = { owner: 'ab2webco', repo: 'orca-oss' }
   const upstream = { owner: 'stablyai', repo: 'orca' }
-  const result = (prs: typeof fork, items: { number: number; type: 'pr' | 'issue' }[]) => ({
+  const result = (
+    prs: typeof fork,
+    items: { number: number; type: 'pr' | 'issue' }[],
+    upstreamCandidate: typeof fork | null = upstream
+  ) => ({
     items: items.map((one) => ({ ...one, url: `https://github.com/x/pull/${one.number}` })),
-    sources: { prs, originCandidate: fork }
+    sources: { prs, originCandidate: fork, upstreamCandidate }
   })
 
-  it("searches a fork's upstream, then the fork itself, keeping only PRs", async () => {
+  // ORCA-1148: the worktree's own repo is searched first, upstream second.
+  it('searches the fork itself, then its upstream, keeping only PRs', async () => {
     const asked: string[] = []
     const found = await myOpenPullRequestsOf(async (preference) => {
       asked.push(preference)
@@ -675,7 +680,7 @@ describe('myOpenPullRequestsOf', () => {
           ])
     })
 
-    expect(asked).toEqual(['upstream', 'origin'])
+    expect(asked).toEqual(['origin', 'upstream'])
     expect(found.repos).toEqual([fork, upstream])
     expect(found.items.map((one) => one.number)).toEqual([471, 90])
   })
@@ -716,10 +721,10 @@ describe('myOpenPullRequestsOf', () => {
     const asked: string[] = []
     const found = await myOpenPullRequestsOf(async (preference) => {
       asked.push(preference)
-      return result(fork, [{ number: 3, type: 'pr' }])
+      return result(fork, [{ number: 3, type: 'pr' }], null)
     })
 
-    expect(asked).toEqual(['upstream'])
+    expect(asked).toEqual(['origin'])
     expect(found).toMatchObject({ repos: [fork], items: [{ number: 3 }] })
   })
 })
@@ -746,7 +751,11 @@ describe('my open PRs link, from where my PRs live', () => {
           title: `#${number}`,
           url: `${pageOf(searched)}/pull/${number}`
         })),
-        sources: { prs: searched, originCandidate: layout.origin }
+        sources: {
+          prs: searched,
+          originCandidate: layout.origin,
+          upstreamCandidate: layout.upstream ?? null
+        }
       }
     }
     const work = await readGameProjectWork(

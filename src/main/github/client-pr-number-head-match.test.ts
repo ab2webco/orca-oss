@@ -113,7 +113,7 @@ function useForkCandidates(host?: string): { upstream: OwnerRepo; origin: OwnerR
   const upstream = { owner: 'stablyai', repo: 'orca', ...(host ? { host } : {}) }
   const origin = { owner: 'ab2webco', repo: 'orca-oss', ...(host ? { host } : {}) }
   resolvePRRepositoryCandidatesMock.mockResolvedValue({
-    candidates: [upstream, origin],
+    candidates: [origin, upstream],
     headRepo: origin
   })
   return { upstream, origin }
@@ -212,12 +212,9 @@ describe('getPRForBranchOutcome PR-number lookups in a fork that hosts its own P
     expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: origin } })
   })
 
-  it('keeps the upstream PR of a fork contributor without probing origin', async () => {
+  it('finds the upstream PR of a fork contributor once origin has none', async () => {
     const { upstream } = useForkCandidates()
-    const calls = serveRepos({
-      'stablyai/orca': { ...ORIGIN_PR, title: 'Contributor PR' },
-      'ab2webco/orca-oss': ORIGIN_PR
-    })
+    const calls = serveRepos({ 'stablyai/orca': { ...ORIGIN_PR, title: 'Contributor PR' } })
 
     const outcome = await getPRForBranchOutcome('/repo-root', BRANCH, 465)
 
@@ -225,11 +222,11 @@ describe('getPRForBranchOutcome PR-number lookups in a fork that hosts its own P
       kind: 'found',
       pr: { title: 'Contributor PR', prRepo: upstream }
     })
-    expect(viewedRepos(calls)).toEqual(['stablyai/orca'])
+    expect(viewedRepos(calls)).toEqual(['ab2webco/orca-oss', 'stablyai/orca'])
   })
 
-  it('keeps the upstream-first answer when no candidate head matches the branch', async () => {
-    const { upstream } = useForkCandidates()
+  it("keeps origin's answer when no candidate head matches the branch", async () => {
+    const { origin } = useForkCandidates()
     serveRepos({
       'stablyai/orca': UPSTREAM_PR,
       'ab2webco/orca-oss': { ...ORIGIN_PR, headRefName: 'something-else' }
@@ -237,28 +234,28 @@ describe('getPRForBranchOutcome PR-number lookups in a fork that hosts its own P
 
     const outcome = await getPRForBranchOutcome('/repo-root', 'local-name', 465)
 
-    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: upstream } })
+    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: origin } })
   })
 
-  it('keeps the upstream-first answer when probing the next candidate fails', async () => {
-    const { upstream } = useForkCandidates()
+  it("keeps origin's answer when probing the next candidate fails", async () => {
+    const { origin } = useForkCandidates()
     serveRepos(
-      { 'stablyai/orca': UPSTREAM_PR, 'ab2webco/orca-oss': ORIGIN_PR },
-      { rateLimitedRepo: 'ab2webco/orca-oss' }
+      { 'stablyai/orca': UPSTREAM_PR, 'ab2webco/orca-oss': { ...ORIGIN_PR, headRefName: 'other' } },
+      { rateLimitedRepo: 'stablyai/orca' }
     )
 
     const outcome = await getPRForBranchOutcome('/repo-root', BRANCH, 465)
 
-    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: upstream } })
+    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: origin } })
   })
 
   it('keeps the first exact match when the branch is unknown (detached HEAD)', async () => {
-    const { upstream } = useForkCandidates()
+    const { origin } = useForkCandidates()
     const calls = serveRepos({ 'stablyai/orca': UPSTREAM_PR, 'ab2webco/orca-oss': ORIGIN_PR })
 
     const outcome = await getPRForBranchOutcome('/repo-root', '', 465)
 
-    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: upstream } })
-    expect(viewedRepos(calls)).toEqual(['stablyai/orca'])
+    expect(outcome).toMatchObject({ kind: 'found', pr: { prRepo: origin } })
+    expect(viewedRepos(calls)).toEqual(['ab2webco/orca-oss'])
   })
 })

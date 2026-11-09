@@ -1,10 +1,11 @@
 import type { IssueSourcePreference } from '../../shared/repo-types'
-import { githubRepoIdentityKey } from '../../shared/github/repository-identity-key'
 import {
   getOwnerRepoForRemote,
+  githubRepoContext,
   type LocalGitExecOptions,
   type OwnerRepo
 } from './github-repository-identity'
+import { resolvePullRequestRepositoryOrder } from './pr-repository-order'
 
 export async function getOwnerRepo(
   repoPath: string,
@@ -35,21 +36,10 @@ export async function resolvePRRepositoryCandidates(
     getOwnerRepoForRemote(repoPath, 'upstream', connectionId, localGitOptions),
     getOwnerRepoForRemote(repoPath, 'origin', connectionId, localGitOptions)
   ])
-  const seen = new Set<string>()
-  const candidates: OwnerRepo[] = []
-
-  for (const candidate of [upstream, origin]) {
-    if (!candidate) {
-      continue
-    }
-    const key = githubRepoIdentityKey(candidate)
-    if (seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    candidates.push(candidate)
-  }
-
+  const candidates = await resolvePullRequestRepositoryOrder(
+    githubRepoContext(repoPath, connectionId, localGitOptions),
+    { origin, upstream }
+  )
   return { candidates, headRepo: origin }
 }
 
