@@ -1,18 +1,19 @@
-import type { PRCheckDetail } from '../../shared/github/check-types'
-import type { CheckStatus, GitHubRepositoryIdentity } from '../../shared/github/pull-request-types'
+import type { GitHubRepositoryIdentity } from '../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../shared/github/work-item-types'
 import type { GitLabWorkItem } from '../../shared/gitlab-types'
 import type { JiraIssue } from '../../shared/jira-types'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import type { PlaneWorkItem } from '../../shared/plane-types'
-import { derivePRCheckStatus } from '../../shared/pr-check-status'
 import { gameCacheTtlMs, type GameCacheTtl } from './orchestrator-game-read-cache'
 import {
-  GAME_PROJECT_ITEMS_MAX,
+  readGitHubQueue,
+  readGitHubReviews,
+  readGitLabReviews,
+  type GameProjectReviewsPort
+} from './orchestrator-game-project-reviews'
+import {
   GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
-  reviewsListUrlOf,
-  reviewToneOf,
   todoListUrlOf,
   todoToneOf,
   type GameProjectItem,
@@ -30,23 +31,12 @@ import {
 } from '../../shared/orchestrator-game-state'
 
 type TodoSource = Exclude<OrchestratorGameTodoSource, 'off'>
-type PullRequest = Pick<GitHubWorkItem, 'number' | 'title' | 'url' | 'headSha' | 'prRepo'>
 
 /** The provider calls the band's project lists need; each one may throw. */
-export type GameProjectWorkPort = {
+export type GameProjectWorkPort = GameProjectReviewsPort & {
   /** Null when the repo has no GitHub remote. */
   githubRepo: () => Promise<GitHubRepositoryIdentity | null>
-  /** My open PRs and the repos holding them, out of a fork and its upstream when it has one. */
-  githubPullRequests: () => Promise<{
-    repos: readonly GitHubRepositoryIdentity[]
-    items: readonly PullRequest[]
-  }>
-  githubChecks: (pr: PullRequest) => Promise<readonly PRCheckDetail[]>
   githubIssues: () => Promise<readonly Pick<GitHubWorkItem, 'number' | 'title' | 'url'>[]>
-  /** Null when the repo is not a GitLab project. */
-  gitlabMergeRequests: () => Promise<
-    readonly Pick<GitLabWorkItem, 'number' | 'title' | 'url' | 'state'>[] | null
-  >
   gitlabIssues: () => Promise<readonly Pick<GitLabWorkItem, 'number' | 'title' | 'url'>[]>
   planeAssigned: (args: {
     project?: string
@@ -72,19 +62,21 @@ type MyOpenPrsSearch<T> = {
   items: readonly T[]
   sources: {
     prs: GitHubRepositoryIdentity | null
-    originCandidate: GitHubRepositoryIdentity | null
+    upstreamCandidate: GitHubRepositoryIdentity | null
   }
 }
 
-/** My open PRs in a repo and, for a fork, its upstream: contributions live upstream, own work on the fork. */
+/** My open PRs in a repo and, for a fork, its upstream: own work on the fork, contributions upstream. */
 export async function myOpenPullRequestsOf<T extends { type: string }>(
   search: (preference: 'upstream' | 'origin') => Promise<MyOpenPrsSearch<T>>
 ): Promise<{ repos: GitHubRepositoryIdentity[]; items: T[] }> {
-  const upstream = await search('upstream')
-  const searched = upstream.sources.prs
-  const origin = upstream.sources.originCandidate
-  const fork = origin && searched && !sameRepo(origin, searched) ? await search('origin') : null
-  const results = (fork ? [fork, upstream] : [upstream]).map((one) => ({
+  // Why (ORCA-1148): the worktree's own repo is searched first; upstream only when it is another repo.
+  const own = await search('origin')
+  const searched = own.sources.prs
+  const upstream = own.sources.upstreamCandidate
+  const parent =
+    upstream && (!searched || !sameRepo(upstream, searched)) ? await search('upstream') : null
+  const results = (parent ? [own, parent] : [own]).map((one) => ({
     repo: one.sources.prs,
     prs: one.items.filter((item) => item.type === 'pr')
   }))
@@ -125,51 +117,6 @@ export function autoTodoSourceOf(args: {
     return { provider: 'plane' }
   }
   return args.host ? { provider: args.host } : null
-}
-
-const ciOf = async (port: GameProjectWorkPort, pr: PullRequest): Promise<CheckStatus | 'none'> => {
-  const checks = await settle(() => port.githubChecks(pr))
-  return checks === null ? 'none' : derivePRCheckStatus(checks)
-}
-
-async function readGitHubReviews(
-  port: GameProjectWorkPort,
-  repo: GitHubRepositoryIdentity
-): Promise<GameProjectList> {
-  const found = await port.githubPullRequests()
-  const prs = found.items.filter(
-    (pr, at) => found.items.findIndex((one) => one.url === pr.url) === at
-  )
-  // Why only the shown ones: each check read is a GraphQL call against the user's quota.
-  const shown = prs.slice(0, GAME_PROJECT_ITEMS_MAX)
-  const items = await Promise.all(
-    shown.map(async (pr): Promise<GameProjectItem> => {
-      const ci = await ciOf(port, pr)
-      return {
-        id: `#${pr.number}`,
-        title: pr.title,
-        url: pr.url,
-        status: ci,
-        tone: reviewToneOf(ci)
-      }
-    })
-  )
-  return gameProjectListOf(
-    'github',
-    items,
-    reviewsListUrlOf({ provider: 'github', repo, repos: found.repos }),
-    prs.length
-  )
-}
-
-async function readGitLabReviews(port: GameProjectWorkPort): Promise<GameProjectList | null> {
-  const mrs = await port.gitlabMergeRequests()
-  if (mrs === null) {
-    return null
-  }
-  const items = mrs.map((mr) => ({ id: `!${mr.number}`, title: mr.title, url: mr.url }))
-  const url = reviewsListUrlOf({ provider: 'gitlab', sampleUrl: mrs[0]?.url ?? null })
-  return gameProjectListOf('gitlab', items, url, mrs.length)
 }
 
 const DONE_PLANE_GROUPS = new Set(['completed', 'cancelled'])
@@ -292,7 +239,8 @@ export async function readGameProjectWork(
           host
         }))
   const todo = source ? await settle(() => readTodo(port, source, repo)) : null
-  return { reviews, todo }
+  const queue = repo ? await readGitHubQueue(port) : null
+  return { reviews, todo, ...(queue ? { queue } : {}) }
 }
 
 const CACHE_MAX_ENTRIES = 32

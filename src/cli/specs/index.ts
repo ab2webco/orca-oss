@@ -23,6 +23,7 @@ import { ARTIFACT_COMMAND_SPECS } from './artifacts'
 import { DASHBOARD_POPOUT_COMMAND_SPECS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_COMMAND_SPECS } from './orchestrator-game'
 import { ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS } from './orchestrator-game-board'
+import { ORCHESTRATOR_GAME_VIEW_COMMAND_SPECS } from './orchestrator-game-view'
 import { ORCHESTRATOR_GAME_WATCH_COMMAND_SPECS } from './orchestrator-game-watch'
 import { ORCHESTRATOR_GAME_REBIND_COMMAND_SPECS } from './orchestrator-game-rebind'
 import { ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS } from './orchestrator-game-adopt'
@@ -35,6 +36,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...ARTIFACT_COMMAND_SPECS,
   ...DASHBOARD_POPOUT_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_COMMAND_SPECS,
+  ...ORCHESTRATOR_GAME_VIEW_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_WATCH_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_REBIND_COMMAND_SPECS,

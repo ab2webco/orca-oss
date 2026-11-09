@@ -24,14 +24,14 @@ describe('AgentStateDot', () => {
     const lightTheme = css.match(/:root\s*\{(?<body>[\s\S]*?)\n\}/)?.groups?.body
     const darkTheme = css.match(/\.dark\s*\{(?<body>[\s\S]*?)\n\}/)?.groups?.body
 
-    expect(lightTheme).toContain('--agent-question: var(--color-orange-600)')
-    expect(darkTheme).toContain('--agent-question: var(--color-orange-500)')
+    expect(lightTheme).toContain('--agent-question: var(--status-attention)')
+    expect(darkTheme).toContain('--agent-question: var(--status-attention)')
   })
 
-  it('renders working as a yellow spinner', () => {
+  it('renders working as a blue spinner', () => {
     const markup = renderMarkup('working')
 
-    expect(markup).toContain('border-yellow-500')
+    expect(markup).toContain('border-status-info')
     expect(markup).toContain('border-t-transparent')
     // Why: rotation must come from the compositor-driven CSS animation, not a
     // JS clock writing per-element styles on the input thread (STA-3328).
@@ -39,20 +39,16 @@ describe('AgentStateDot', () => {
     expect(markup).toContain('data-agent-spinner')
     // Why: under reduced motion the top border is filled so the static ring
     // reads as a complete marker, not a broken partial spinner (#9515).
-    expect(markup).toContain('motion-reduce:border-t-yellow-500')
+    expect(markup).toContain('motion-reduce:border-t-status-info')
   })
 
-  it('renders done as an emerald check icon', () => {
+  it('renders done as a green check icon', () => {
     const markup = renderMarkup('done')
 
     // Why: 'done' renders a CircleCheck icon rather than a dot so it is
     // visually distinct from other emerald-adjacent states across surfaces.
-    // Note: the sidebar's StatusIndicator intentionally diverges and uses an
-    // emerald dot for 'done'. Assertion targets the lucide 'circle-check'
-    // class hook + emerald text color, identifying the check icon without
-    // coupling to the exact SVG path markup lucide emits.
     expect(markup).toContain('lucide-circle-check')
-    expect(markup).toContain('text-emerald-500')
+    expect(markup).toContain('text-status-success')
   })
 
   it.each(['permission', 'waiting'] satisfies AgentDotState[])(
@@ -68,12 +64,12 @@ describe('AgentStateDot', () => {
     }
   )
 
-  it.each(['blocked', 'interrupted'] satisfies AgentDotState[])(
+  it.each(['blocked', 'interrupted', 'failed'] satisfies AgentDotState[])(
     'renders %s as a red attention dot',
     (state) => {
       const classNames = renderDotClassNames(state)
 
-      expect(classNames).toContain('bg-red-500')
+      expect(classNames).toContain('bg-status-attention')
       expect(classNames).not.toContain('bg-amber-500')
     }
   )

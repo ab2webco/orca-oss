@@ -185,6 +185,8 @@ export type LegacyWorkerTerminalRecoveryRow = {
   worker_state: WorkerDispatchState
   worktree_id: string | null
   agent_terminal_handle: string | null
+  /** Its terminal resource's ownership_state; null for a dispatch that predates the resource table. */
+  terminal_ownership?: string | null
 }
 
 export type FederatedDispatchRow = {

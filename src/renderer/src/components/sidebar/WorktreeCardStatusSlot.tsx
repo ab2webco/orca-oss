@@ -4,7 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
-import { FilledBellIcon } from './WorktreeCardHelpers'
 import StatusIndicator from './StatusIndicator'
 import { useWorktreeActivityStatus } from './use-worktree-activity-status'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
@@ -38,7 +37,7 @@ const branchStatusIconClassName = `${compactReviewAndBranchStatusIconClassName} 
 // Why: a left-edge badge overlays unread on the status glyph without widening
 // the lane or indenting the title; ring-sidebar cuts the dot out from busy icons.
 const newCardUnreadAlertClassName =
-  'pointer-events-none absolute left-0 top-1/2 size-[6px] -translate-y-1/2 rounded-full bg-amber-500 ring-2 ring-sidebar'
+  'pointer-events-none absolute left-0 top-1/2 size-[6px] -translate-y-1/2 rounded-full bg-status-attention ring-2 ring-sidebar'
 
 function overlayNewCardUnreadStatus(
   status: React.JSX.Element,
@@ -120,7 +119,9 @@ export function WorktreeCardStatusSlot({
         ? (branchIdentityLabel ?? getDefaultBranchIdentityLabel())
         : statusLabel
   const passiveStatusTooltip =
-    newCardStyle && isUnread ? `${passiveStatusLabel} · Unread` : passiveStatusLabel
+    newCardStyle && isUnread
+      ? `${passiveStatusLabel} · ${translate('auto.components.sidebar.WorktreeCardStatusSlot.unread', 'Unread')}`
+      : passiveStatusLabel
   // Why: working and permission already own the new-card status lane, but
   // unread state should still surface in tooltip/sr-only copy and reappear afterward.
   const showNewCardUnreadAlert =
@@ -180,7 +181,9 @@ export function WorktreeCardStatusSlot({
     return overlayNewCardUnreadStatus(passiveStatus, showNewCardUnreadAlert)
   }
 
-  const actionLabel = isUnread ? 'Mark as read' : 'Mark as unread'
+  const actionLabel = isUnread
+    ? translate('auto.components.sidebar.WorktreeCardStatusSlot.markAsRead', 'Mark as read')
+    : translate('auto.components.sidebar.WorktreeCardStatusSlot.markAsUnread', 'Mark as unread')
   const tooltip =
     showStatus && !isUnread ? `${passiveStatusLabel} · ${unreadTooltip}` : unreadTooltip
 
@@ -220,8 +223,6 @@ export function WorktreeCardStatusSlot({
               ) : (
                 <span className="sr-only">{actionLabel}</span>
               )
-            ) : isUnread ? (
-              <FilledBellIcon className="size-[13px] text-amber-500 drop-shadow-sm" />
             ) : showStatus ? (
               <>
                 <StatusIndicator

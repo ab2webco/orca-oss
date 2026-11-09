@@ -14,7 +14,11 @@ import { setTrayAttention } from '../tray/system-tray'
 import { isMainWindowVisible } from '../window/main-window-visibility'
 import { activeNotificationsById } from './native-notification-lifecycle'
 import { deliverNativeNotification } from './native-notification-delivery'
-import { reserveNotificationCooldown } from './notification-burst-cooldown'
+import {
+  REPEATED_COMPLETION_WINDOW_MS,
+  repeatedCompletionKey,
+  reserveNotificationCooldown
+} from './notification-burst-cooldown'
 import { registerNotificationSoundHandlers } from './notification-sound-ipc'
 import { openNotificationSystemSettings } from './notification-system-settings-link'
 import {
@@ -27,6 +31,7 @@ import {
 
 export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntimeService): void {
   const recentDesktopNotifications = new Map<string, number>()
+  const recentDesktopCompletions = new Map<string, number>()
   const recentMobileNotifications = new Map<string, number>()
   resetNotificationPermissionEvidence()
 
@@ -168,6 +173,17 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
             ? (args.notificationId ?? 'game-owner-question')
             : (args.worktreeId ?? args.worktreeLabel ?? 'global')
         if (!reserveNotificationCooldown(recentDesktopNotifications, dedupeKey, Date.now())) {
+          return { delivered: false, reason: 'cooldown' }
+        }
+        if (
+          args.source === 'agent-task-complete' &&
+          !reserveNotificationCooldown(
+            recentDesktopCompletions,
+            repeatedCompletionKey(args, notificationOptions),
+            Date.now(),
+            REPEATED_COMPLETION_WINDOW_MS
+          )
+        ) {
           return { delivered: false, reason: 'cooldown' }
         }
       }

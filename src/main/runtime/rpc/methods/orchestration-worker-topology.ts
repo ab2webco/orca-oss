@@ -1,3 +1,4 @@
+import { workerTabTitleOf } from '../../../../shared/orchestration-worker-tab-title'
 import type { AgentLaunchPreferences } from '../../../../shared/agent-session-host-authority'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -59,6 +60,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   agent: TuiAgent
   launchPreferences?: AgentLaunchPreferences
   taskId: string
+  /** The worker's `name · ticket title`, which titles its tab. */
+  displayName?: string
   claudeAccountId?: string
   codexAccountId?: string
   /** A member `orca game launch` started. */
@@ -73,7 +76,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     orchestrationWorker: true,
     ...(args.gameMember ? { orchestrationGameMember: true } : {}),
     ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
-    title: `worker-${args.taskId}`,
+    // Why `local`: this path runs the member on the Orca that creates it (ORCA-1094).
+    title: workerTabTitleOf({ displayName: args.displayName, taskId: args.taskId, host: 'local' }),
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.codexAccountId ? { codexAccountId: args.codexAccountId } : {}),
     // Why: dispatching a worker is background work; it must not pull the sidebar

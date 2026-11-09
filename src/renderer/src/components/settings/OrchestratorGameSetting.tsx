@@ -63,6 +63,10 @@ import {
   ProjectOrchestratorGameViewRows
 } from './OrchestratorGameViewSetting'
 import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
+import { ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
+import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import { useAdvisorPluginPresence } from './use-advisor-plugin-presence'
+import { getRepositoryGameSectionId } from './repository-settings-targets'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type ToggleKey = 'hud' | 'rewards' | 'tracker'
@@ -202,12 +206,13 @@ export function ProjectOrchestratorGameSetting({
   projectLayer,
   updateSettings
 }: {
-  repo: Pick<Repo, 'id' | 'path' | 'connectionId'>
+  repo: Pick<Repo, 'id' | 'path' | 'connectionId' | 'executionHostId'>
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
   const repoId = repo.id
+  const advisorPlugin = useAdvisorPluginPresence(repo)
   const local = settings.orchestratorGameProjects?.[repoId]
   const { config, sources, sceneFile } = resolveOrchestratorGameConfig({
     global: settings.orchestratorGame,
@@ -292,10 +297,22 @@ export function ProjectOrchestratorGameSetting({
   }))
 
   return (
-    <SearchableSetting title={title()} description={description} keywords={keywords}>
+    <SearchableSetting
+      id={getRepositoryGameSectionId(repoId)}
+      title={title()}
+      description={description}
+      keywords={[...keywords, ...getGamePanelSearchEntries()[0].keywords]}
+    >
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
+        <ProjectGamePanelRows
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          advisorPlugin={advisorPlugin}
+          updateSettings={updateSettings}
+        />
         <ProjectOrchestratorGameViewRows
           repoId={repoId}
           settings={settings}
@@ -382,6 +399,9 @@ export function ProjectOrchestratorGameSetting({
         <ProjectOrchestratorGameActionsSetting
           key={repoId}
           repoId={repoId}
+          rootPath={target.path}
+          connectionId={connectionId}
+          isReachable={!connectionId || sshStatus === 'connected'}
           settings={settings}
           projectLayer={projectLayer}
           updateSettings={updateSettings}

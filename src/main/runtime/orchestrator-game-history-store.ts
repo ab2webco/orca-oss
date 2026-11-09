@@ -23,6 +23,12 @@ import {
   type GameStoreMigration
 } from '../../shared/orchestrator-game-store-migration'
 import { mergeAdoptedGameLog } from '../../shared/orchestrator-game-log-adoption'
+import {
+  earnGameArcadeCredit,
+  parseGameArcadeCredits,
+  type GameArcadeCredits
+} from '../../shared/orchestrator-game-arcade-credits'
+import { adoptedArcadeFields, migratedArcadeFields } from './orchestrator-game-history-arcade'
 import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Ordered steps for this store's file; empty while version 1 is the only shape. */
@@ -40,6 +46,8 @@ type ProjectLog = {
   characters: Record<string, unknown> | null
   /** What the lead asked the person; absent until the first question. */
   ownerQuestions: unknown[] | null
+  /** Saved arcade plays; absent until the first perfect merge recorded after this build. */
+  arcade: Record<string, unknown> | null
 }
 
 type LoadedLog = {
@@ -80,7 +88,8 @@ function logOf(data: GameStoreData): ProjectLog {
     events: listOf(data, 'events'),
     cursors: isRecord(data.cursors) ? data.cursors : {},
     characters: isRecord(data.characters) ? data.characters : null,
-    ownerQuestions: Array.isArray(data.ownerQuestions) ? data.ownerQuestions : null
+    ownerQuestions: Array.isArray(data.ownerQuestions) ? data.ownerQuestions : null,
+    arcade: isRecord(data.arcade) ? data.arcade : null
   }
 }
 
@@ -142,15 +151,53 @@ export class GameHistoryStore {
     return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
-  /** `added` is false when an event with the same key is already kept. */
+  /** `added` is false when an event with the same key is already kept; a new perfect merge saves a credit. */
   async appendEvent(projectKey: string, event: GameEvent): Promise<{ added: boolean }> {
     let added = false
     await this.update(projectKey, (current) => {
       const next = appendGameEvent(current.events, event)
       added = next.added
-      return next.added ? { ...current, events: next.events } : null
+      if (!next.added) {
+        return null
+      }
+      const arcade = event.merge?.perfect
+        ? earnGameArcadeCredit(parseGameArcadeCredits(current.arcade), event.merge)
+        : null
+      return { ...current, events: next.events, ...(arcade && { arcade }) }
     })
     return { added }
+  }
+
+  async arcade(projectKey: string): Promise<GameArcadeCredits> {
+    return parseGameArcadeCredits((await this.read(projectKey)).log.arcade)
+  }
+
+  /** `change` returns a null ledger to leave the file as it is. */
+  async changeArcade<R>(
+    projectKey: string,
+    change: (current: GameArcadeCredits) => { next: GameArcadeCredits | null; result: R }
+  ): Promise<R> {
+    let result: R | undefined
+    await this.update(projectKey, (current) => {
+      const changed = change(parseGameArcadeCredits(current.arcade))
+      result = changed.result
+      return changed.next ? { ...current, arcade: changed.next } : null
+    })
+    return result as R
+  }
+
+  /** Pays the terminal's kept offers once; the paid ids ride in the file, so a restart pays none again. */
+  async migrateArcadeOffers(
+    projectKey: string,
+    offers: readonly unknown[]
+  ): Promise<{ paid: number; arcade: GameArcadeCredits }> {
+    let paid = 0
+    const log = await this.update(projectKey, (current) => {
+      const migrated = migratedArcadeFields(current, offers)
+      paid = migrated.paid
+      return migrated.fields && { ...current, ...migrated.fields }
+    })
+    return { paid, arcade: parseGameArcadeCredits(log.arcade) }
   }
 
   async ownerQuestions(projectKey: string): Promise<unknown[]> {
@@ -194,7 +241,11 @@ export class GameHistoryStore {
         `The history under ${toKey} was written by a newer Orca; nothing was adopted.`
       )
     }
-    await this.update(toKey, (current) => ({ ...current, ...mergeAdoptedGameLog(current, log) }))
+    await this.update(toKey, (current) => ({
+      ...current,
+      ...mergeAdoptedGameLog(current, log),
+      ...adoptedArcadeFields(current, log)
+    }))
     await rename(from, this.besideOf(fromKey, `adopted-${fileStamp()}`))
     return { records: log.records.length, events: log.events.length }
   }
@@ -222,7 +273,10 @@ export class GameHistoryStore {
       const fits =
         ['records', 'events', 'ownerQuestions'].every(
           (key) => !(key in parsed) || Array.isArray(parsed[key])
-        ) && ['cursors', 'characters'].every((key) => !(key in parsed) || isRecord(parsed[key]))
+        ) &&
+        ['cursors', 'characters', 'arcade'].every(
+          (key) => !(key in parsed) || isRecord(parsed[key])
+        )
       return { log: logOf(parsed), before: { kind: fits ? 'none' : 'read-only' } }
     }
     return {
@@ -259,7 +313,7 @@ export class GameHistoryStore {
           // Why a copy, not a rename: until the migrated file lands, the old one stays readable.
           await copyFile(file, this.besideOf(projectKey, `v${before.from}-${fileStamp()}.backup`))
         }
-        const { data, records, events, cursors, characters, ownerQuestions } = log
+        const { data, records, events, cursors, characters, ownerQuestions, arcade } = log
         await writeFileDurable(
           durableWriteTempPath(file),
           file,
@@ -269,7 +323,8 @@ export class GameHistoryStore {
             events,
             cursors,
             ...(characters && { characters }),
-            ...(ownerQuestions && { ownerQuestions })
+            ...(ownerQuestions && { ownerQuestions }),
+            ...(arcade && { arcade })
           })
         )
         return log

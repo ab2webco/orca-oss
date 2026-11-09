@@ -1,9 +1,6 @@
 import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import type { IssueSourcePreference } from '../../shared/repo-types'
-import {
-  githubRepoIdentityKey,
-  isDefaultGitHubHost
-} from '../../shared/github/repository-identity-key'
+import { isDefaultGitHubHost } from '../../shared/github/repository-identity-key'
 import {
   getOwnerRepoForRemote,
   ghRepoExecOptions,
@@ -15,6 +12,7 @@ import {
   getEnterpriseGitHubRepoSlugForRemote,
   isGitHubHostAuthenticated
 } from './github-enterprise-repository'
+import { resolvePullRequestRepositoryOrder } from './pr-repository-order'
 
 export type GitHubApiRepository = GitHubOwnerRepo
 export type GitHubRepoExecOptions = ReturnType<typeof ghRepoExecOptions> & { host?: string }
@@ -92,7 +90,7 @@ export async function getGitHubApiRepositoryForRemote(
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {}
 ): Promise<GitHubApiRepository | null> {
-  // Why: generic PR resolution prefers upstream, but this API represents the
+  // Why: generic PR resolution orders several remotes, but this API represents the
   // caller-selected remote exactly (#7331).
   const ownerRepo = await getOwnerRepoForRemote(repoPath, remoteName, connectionId, localGitOptions)
   if (ownerRepo) {
@@ -173,29 +171,22 @@ export type GitHubApiRepositoryCandidates = {
   headRepo: GitHubApiRepository | null
 }
 
-/** Hosted mirror of resolvePRRepositoryCandidates: upstream first, then origin. */
+/** Hosted mirror of resolvePRRepositoryCandidates: gh default, then origin, then upstream. */
 export async function resolveGitHubApiRepositoryCandidates(
   repoPath: string,
   connectionId?: string | null,
-  localGitOptions: LocalGitExecOptions = {}
+  localGitOptions: LocalGitExecOptions = {},
+  preferUpstream = false
 ): Promise<GitHubApiRepositoryCandidates> {
   const [upstream, origin] = await Promise.all([
     getGitHubApiRepositoryForRemote(repoPath, 'upstream', connectionId, localGitOptions),
     getGitHubApiRepositoryForRemote(repoPath, 'origin', connectionId, localGitOptions)
   ])
-  const seen = new Set<string>()
-  const candidates: GitHubApiRepository[] = []
-  for (const candidate of [upstream, origin]) {
-    if (!candidate) {
-      continue
-    }
-    const key = githubRepoIdentityKey(candidate)
-    if (seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    candidates.push(candidate)
-  }
+  const candidates = await resolvePullRequestRepositoryOrder(
+    githubRepoContext(repoPath, connectionId, localGitOptions),
+    { origin, upstream },
+    preferUpstream
+  )
   return { candidates, headRepo: origin }
 }
 

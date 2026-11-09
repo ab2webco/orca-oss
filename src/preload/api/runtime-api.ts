@@ -57,6 +57,7 @@ export type RuntimeApi = {
     ) => () => void
     onGameOwnerQuestionsChanged?: (callback: () => void) => () => void
     onGameInboxChanged?: (callback: () => void) => () => void
+    onGameAdvisorChanged?: (callback: () => void) => () => void
   }
   runtimeEnvironments: {
     list: () => Promise<PublicKnownRuntimeEnvironment[]>

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   formatLeadTime,
   leadOwnerQuestionsOf,
-  teamButtonLabel,
-  teamBadgeOf,
+  teamAgeText,
   teamLeadViewOf,
+  teamPeekOf,
   type TeamMemberRow
 } from './team-drawer-model'
 
@@ -38,6 +38,10 @@ const row = (over: Partial<TeamMemberRow> = {}): TeamMemberRow => ({
   model: null,
   pr: null,
   ticketStatus: null,
+  live: null,
+  since: null,
+  account: null,
+  limit: null,
   ...over
 })
 
@@ -90,8 +94,19 @@ describe('teamLeadViewOf', () => {
         host: 'iMac',
         agent: 'claude',
         model: 'opus',
-        pr: { number: 850, url: 'https://pr', state: 'open', ci: 'pending' },
-        ticketStatus: 'In Progress'
+        pr: {
+          number: 850,
+          url: 'https://pr',
+          state: 'open',
+          ci: 'pending',
+          ciHistory: [],
+          comments: null
+        },
+        ticketStatus: 'In Progress',
+        live: null,
+        since: null,
+        account: null,
+        limit: null
       }
     ])
   })
@@ -151,15 +166,6 @@ describe('teamLeadViewOf', () => {
   })
 })
 
-describe('teamBadgeOf', () => {
-  it('shows open questions first, else working members, else nothing', () => {
-    const working = [row(), row({ state: 'idle' }), row()]
-    expect(teamBadgeOf(2, working)).toEqual({ tone: 'question', count: 2 })
-    expect(teamBadgeOf(0, working)).toEqual({ tone: 'working', count: 2 })
-    expect(teamBadgeOf(0, [row({ state: 'done' })])).toBeNull()
-  })
-})
-
 describe('leadOwnerQuestionsOf', () => {
   const question = {
     id: 'q1',
@@ -184,11 +190,101 @@ describe('leadOwnerQuestionsOf', () => {
   })
 })
 
-describe('teamButtonLabel', () => {
-  it('names what the badge counts for screen readers', () => {
-    expect(teamButtonLabel(null)).toBe('Open Team')
-    expect(teamButtonLabel({ tone: 'question', count: 1 })).toBe('Open Team, 1 question waiting')
-    expect(teamButtonLabel({ tone: 'working', count: 3 })).toBe('Open Team, 3 members working')
+describe('live card facts', () => {
+  const one = (over: Record<string, unknown>, state: Record<string, unknown> = {}) =>
+    teamLeadViewOf(leadState({ agents: [member(over)], ...state }))?.members[0]
+
+  it('names the running tool with its input, and a running MCP link by its id', () => {
+    expect(one({ toolName: 'Bash', toolInput: 'gh pr checks 924' })?.live).toBe(
+      'Bash · gh pr checks 924'
+    )
+    expect(one({ toolName: 'mcp__plugin_engram_engram__mem_save' })?.live).toBe('engram: mem save')
+    const activity = { name: 'Plane', id: 'ORCA-1', url: 'u', at: 1, running: true }
+    expect(one({ toolName: 'Bash', activity })?.live).toBe('Plane · ORCA-1')
+  })
+
+  // Why: a worker's Bash line carries its dispatch capability, a bearer secret.
+  it('redacts a dispatch capability from the tool input', () => {
+    expect(one({ toolName: 'Bash', toolInput: 'orca send --cap dcap_Ab-9_x ok' })?.live).toBe(
+      'Bash · orca send --cap [redacted] ok'
+    )
+  })
+
+  it('shows no tool once the member stopped, or for the question tool', () => {
+    expect(one({ state: 'idle', toolName: 'Bash' })?.live).toBeNull()
+    expect(one({ state: 'waiting', toolName: 'AskUserQuestion' })?.live).toBeNull()
+  })
+
+  it("keeps when the state began, the account's quota and a limit or logout", () => {
+    const row = one(
+      {
+        stateSince: 1_000,
+        account: { provider: 'claude', id: 'a1', email: 'dev@example.com' },
+        limit: { resetsAt: 9_000 }
+      },
+      { metrics: { claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37 }] } }
+    )
+    expect(row).toMatchObject({
+      since: 1_000,
+      account: { email: 'dev@example.com', usedPercent: 37 },
+      limit: { resetsAt: 9_000, loggedOut: false }
+    })
+    expect(one({ limit: { resetsAt: null, loggedOut: true } })?.limit).toEqual({
+      resetsAt: null,
+      loggedOut: true
+    })
+    expect(one({ account: { email: 'x@y.z' } })?.account).toEqual({
+      email: 'x@y.z',
+      usedPercent: null
+    })
+  })
+
+  it("reads the PR's CI per head and its comment threads", () => {
+    const review = {
+      number: 9,
+      url: 'https://pr',
+      state: 'open',
+      ci: 'success',
+      ciHistory: [{ headSha: 'a', ci: 'failure' }, { headSha: 'b', ci: 'success' }, { bad: true }],
+      commentCount: 3
+    }
+    // Why the sha: it keys each head's dot, so a new push never reuses another head's row.
+    expect(one({ review })?.pr).toMatchObject({
+      ciHistory: [
+        { headSha: 'a', ci: 'failure' },
+        { headSha: 'b', ci: 'success' }
+      ],
+      comments: 3
+    })
+  })
+})
+
+describe('teamPeekOf', () => {
+  it('counts who needs you first, then who works', () => {
+    const view = (members: TeamMemberRow[]) => ({ members, metrics: null })
+    expect(teamPeekOf(view([row({ state: 'waiting', needsYou: true })]), 0)).toEqual({
+      tone: 'question',
+      text: '1 needs you'
+    })
+    // Why: a waiting member on a ticket with an open question is one ask, not two.
+    expect(
+      teamPeekOf(view([row({ state: 'waiting', needsYou: true, ticket: 'ORCA-7' })]), 1, ['ORCA-7'])
+    ).toEqual({ tone: 'question', text: '1 needs you' })
+    expect(teamPeekOf(view([row({ state: 'waiting', needsYou: true })]), 2).text).toBe('3 need you')
+    expect(teamPeekOf(view([row(), row(), row({ state: 'idle' })]), 0)).toEqual({
+      tone: 'working',
+      text: '2 working · 3 members'
+    })
+    expect(teamPeekOf(view([]), 0)).toEqual({ tone: 'idle', text: 'No members running' })
+  })
+})
+
+describe('teamAgeText', () => {
+  it('reads now, minutes, hours or days since a state began', () => {
+    expect(teamAgeText(0, 30_000)).toBe('now')
+    expect(teamAgeText(0, 10 * 60_000)).toBe('10 min')
+    expect(teamAgeText(0, 13 * 3_600_000)).toBe('13 h')
+    expect(teamAgeText(0, 75 * 3_600_000)).toBe('3 d')
   })
 })
 

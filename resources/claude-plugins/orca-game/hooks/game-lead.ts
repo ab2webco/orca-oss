@@ -14,13 +14,15 @@ type Shape = Record<string, unknown>
 const isShape = (value: unknown): value is Shape =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const leadOf = (value: Shape): GameLead => {
+const leadOf = (value: Shape, shownName: unknown): GameLead => {
   const cap = value.cap
   const label = typeof value.label === 'string' ? value.label.trim() : ''
+  const name = typeof shownName === 'string' ? shownName.trim() : ''
   return {
     autostart: value.autostart === true,
     cap: typeof cap === 'number' && Number.isInteger(cap) && cap >= 1 ? cap : DEFAULT_CAP,
-    ...(label !== '' && label.length <= LABEL_MAX ? { label } : {})
+    ...(label !== '' && label.length <= LABEL_MAX ? { label } : {}),
+    ...(name === '' ? {} : { name })
   }
 }
 
@@ -28,7 +30,7 @@ const leadOf = (value: Shape): GameLead => {
 export const gameLeadOf = (
   body: Shape
 ): Pick<GameState, 'lead' | 'role' | 'leadElsewhere' | 'hostCapacity' | 'metrics'> => ({
-  ...(isShape(body.lead) ? { lead: leadOf(body.lead) } : {}),
+  ...(isShape(body.lead) ? { lead: leadOf(body.lead, body.leadName) } : {}),
   ...hostCapacityOf(body),
   ...(body.role === 'lead' || body.role === 'member' ? { role: body.role } : {}),
   ...(isShape(body.leadElsewhere) && typeof body.leadElsewhere.handle === 'string'
@@ -46,6 +48,29 @@ export const isLeadAutostart = (
 /** The crown's name in the Panel: the project's label, else the plain word. */
 export const leadTitleOf = (state: Pick<GameState, 'lead'>, fallback: string): string =>
   state.lead?.label ?? fallback
+
+// Why the paneKey and agent type: game-state fills a leader with no title with them, and the Team card skips both.
+/** The name Orca's Team card shows; from an older host, the leader's title short of its ticket, its label, else `fallback`. */
+export const leadCharacterOf = (
+  state: Pick<GameState, 'lead' | 'worktree'> & {
+    agents: readonly Pick<
+      GameState['agents'][number],
+      'paneKey' | 'agentType' | 'displayName' | 'isLeader'
+    >[]
+  },
+  fallback: string
+): string => {
+  if (state.lead?.name !== undefined) {
+    return state.lead.name
+  }
+  const leader = state.agents.find((one) => one.isLeader)
+  const own =
+    leader === undefined || [leader.paneKey, leader.agentType, ''].includes(leader.displayName)
+      ? undefined
+      : leader.displayName
+  const name = (own ?? state.worktree?.displayName ?? '').split(' · ')[0]?.trim() ?? ''
+  return name !== '' ? name : (state.lead?.label ?? fallback)
+}
 
 /** What the mod last did to this session's name, kept in the store per session. */
 export type LeadNameRecord = { applied?: string; isPersonNamed?: boolean }

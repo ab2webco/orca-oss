@@ -76,5 +76,20 @@ export const PROPERTY_OPTIONS: { id: WorktreeCardProperty; label: string }[] = [
         'Agent activity'
       )
     }
+  },
+  {
+    id: 'account',
+    get label() {
+      return translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.account', 'Account')
+    }
+  },
+  {
+    id: 'model',
+    get label() {
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.model',
+        'Model and effort'
+      )
+    }
   }
 ]

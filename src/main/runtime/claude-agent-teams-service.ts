@@ -46,6 +46,8 @@ export class ClaudeAgentTeamsService {
       TMUX_PANE: leaderPane,
       TERM: 'screen-256color',
       COLORTERM: args.baseEnv.COLORTERM || 'truecolor',
+      // Why: Claude Code clamps to 256 colours whenever TMUX is set, and this TMUX is Orca's shim.
+      CLAUDE_CODE_TMUX_TRUECOLOR: '1',
       ORCA_AGENT_TEAMS_TEAM_ID: teamId,
       ORCA_AGENT_TEAMS_TOKEN: token,
       ORCA_AGENT_TEAMS_LEADER_PANE: leaderPane,

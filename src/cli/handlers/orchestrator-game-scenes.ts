@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs'
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { CommandHandler } from '../dispatch'
 import { getRequiredStringFlag } from '../flags'
@@ -11,12 +11,51 @@ import {
 } from '../../shared/orchestrator-game-scene-authoring'
 import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_FILE_DIR } from '../../shared/orchestrator-game-scene-file'
+import {
+  ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES,
+  ORCHESTRATOR_GAME_SCENE_ART_TOO_LARGE,
+  orchestratorGameSceneArtIssues,
+  orchestratorGameSceneNativeOf,
+  type OrchestratorGameSceneArtRead
+} from '../../shared/orchestrator-game-scene-native'
 
 function writeStdout(value: string): void {
   process.stdout.write(value.endsWith('\n') ? value : `${value}\n`)
 }
 
 const slashed = (path: string): string => path.split(sep).join('/')
+
+/** One art file of a scene in `folder`; a link out of it is refused, as a scene file's is. */
+async function readArtFile(folder: string, src: string): Promise<OrchestratorGameSceneArtRead> {
+  try {
+    const [root, target] = await Promise.all([realpath(folder), realpath(join(folder, src))])
+    if (!target.startsWith(`${root}${sep}`)) {
+      return { error: 'resolves outside the scene folder' }
+    }
+    const info = await stat(target)
+    if (!info.isFile()) {
+      return { error: 'is not a file' }
+    }
+    return info.size > ORCHESTRATOR_GAME_SCENE_ART_MAX_BYTES
+      ? { error: ORCHESTRATOR_GAME_SCENE_ART_TOO_LARGE }
+      : { bytes: await readFile(target) }
+  } catch {
+    return { error: 'not found' }
+  }
+}
+
+async function artIssuesOf(file: string, text: string): Promise<string[]> {
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return []
+  }
+  const { native } = orchestratorGameSceneNativeOf(raw)
+  return native
+    ? orchestratorGameSceneArtIssues(native, (src) => readArtFile(dirname(file), src))
+    : []
+}
 
 /** The same refusals Orca applies when it reads a scene file, so a valid file here draws there. */
 async function issuesOfFile(file: string): Promise<string[]> {
@@ -27,7 +66,8 @@ async function issuesOfFile(file: string): Promise<string[]> {
   if (info.size > ORCHESTRATOR_GAME_SCENE_MAX_BYTES) {
     return [`larger than ${ORCHESTRATOR_GAME_SCENE_MAX_BYTES / 1024} KB`]
   }
-  return orchestratorGameSceneIssues(await readFile(file, 'utf8'))
+  const text = await readFile(file, 'utf8')
+  return [...orchestratorGameSceneIssues(text), ...(await artIssuesOf(file, text))]
 }
 
 // Why walk up: an agent may run this from any folder of the project.

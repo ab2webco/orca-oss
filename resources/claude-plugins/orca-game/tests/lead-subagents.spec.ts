@@ -61,12 +61,7 @@ describe('withLeadSubagents', () => {
     const running = leadSubagentsOf()
     noteSubagentCall(running, 'sub-1', 'Read', NOW)
 
-    const state = withLeadSubagents(
-      { ...STATE, agents: leadOnly() },
-      running,
-      NOW + STALE_MS,
-      true
-    )
+    const state = withLeadSubagents({ ...STATE, agents: leadOnly() }, running, NOW + STALE_MS, true)
 
     expect(countsOf(state.agents).working).toBe(0)
   })

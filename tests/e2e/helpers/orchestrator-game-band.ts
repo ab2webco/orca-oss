@@ -138,6 +138,10 @@ export async function startGameBand(
     extraPluginDirs?: readonly string[]
     /** Launch the pane as Orca launches a member, with ORCA_GAME_ROLE=member. */
     role?: 'member'
+    /** A real `orca` CLI for the mod; `state`, `reads` and pushes then do nothing. */
+    cli?: string
+    /** More env for Claude, such as the Agent Teams env Orca gives a lead pane. */
+    env?: Readonly<Record<string, string>>
   }
 ): Promise<GameBand> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-game-band-')))
@@ -215,7 +219,7 @@ export async function startGameBand(
     DISABLE_AUTOUPDATER: '1',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     CLAUDE_CODE_NO_FLICKER: '1',
-    ORCA_GAME_CLI: cli,
+    ORCA_GAME_CLI: options.cli ?? cli,
     ORCA_GAME_MODE: 'on',
     ORCA_GAME_SCENE: options.scene ?? 'quest',
     ORCA_GAME_HUD: '1',
@@ -223,12 +227,13 @@ export async function startGameBand(
     ORCA_GAME_RENDER: 'hd',
     ORCA_GAME_TIMEZONE: options.timezone ?? 'UTC',
     ORCA_GAME_LOCALE: options.locale,
-    ...(options.role ? { ORCA_GAME_ROLE: options.role } : {})
+    ...(options.role ? { ORCA_GAME_ROLE: options.role } : {}),
+    ...options.env
   }
   const play = join(projectDir, 'play')
   await writeFile(
     play,
-    `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN\n${Object.entries(env)
+    `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN TMUX TMUX_PANE\n${Object.entries(env)
       .map(([key, value]) => `export ${key}='${value}'`)
       .join('\n')}\nexec claude ${pluginDirs}\n`
   )

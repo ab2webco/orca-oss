@@ -1,6 +1,8 @@
+import type { OrchestratorGameOrcaActions } from './orchestrator-game-orca-actions'
 import type { OrchestratorGameConfig, OrchestratorGameLayer } from './orchestrator-game-config'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { OrchestratorGameAction } from './orchestrator-game-actions'
+import type { GameMachineAction } from './orchestrator-game-machine-actions'
 
 // Why: `undefined` means "inherit", so the key is removed instead of stored, letting lower layers show through.
 export function withOrchestratorGameField<K extends keyof OrchestratorGameConfig>(
@@ -80,18 +82,19 @@ export function withOrchestratorGameProjectLead<K extends keyof OrchestratorGame
   return next
 }
 
-/** Replaces a project's action list on this machine; `undefined` inherits orca.yaml's again. */
-export function withOrchestratorGameProjectActions(
+/** Sets or clears one whole key of a project's layer on this machine; an empty layer is dropped. */
+function withProjectLayerKey<K extends keyof OrchestratorGameLayer>(
   projects: Record<string, OrchestratorGameLayer> | undefined,
   repoId: string,
-  actions: OrchestratorGameAction[] | undefined
+  key: K,
+  value: OrchestratorGameLayer[K] | undefined
 ): Record<string, OrchestratorGameLayer> {
   const next = { ...projects }
   const layer: OrchestratorGameLayer = { ...next[repoId] }
-  if (actions === undefined) {
-    delete layer.actions
+  if (value === undefined) {
+    delete layer[key]
   } else {
-    layer.actions = actions
+    layer[key] = value
   }
   if (Object.keys(layer).length === 0) {
     delete next[repoId]
@@ -99,4 +102,37 @@ export function withOrchestratorGameProjectActions(
     next[repoId] = layer
   }
   return next
+}
+
+/** Replaces a project's action list on this machine; `undefined` inherits orca.yaml's again. */
+export function withOrchestratorGameProjectActions(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  actions: OrchestratorGameAction[] | undefined
+): Record<string, OrchestratorGameLayer> {
+  return withProjectLayerKey(projects, repoId, 'actions', actions)
+}
+
+/** This machine's per-action changes; they replace the old whole-list override, which goes. */
+export function withOrchestratorGameProjectMachineActions(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  machine: GameMachineAction[]
+): Record<string, OrchestratorGameLayer> {
+  const cleared = withProjectLayerKey(projects, repoId, 'actions', undefined)
+  return withProjectLayerKey(
+    cleared,
+    repoId,
+    'machineActions',
+    machine.length ? machine : undefined
+  )
+}
+
+/** This machine's changes to Orca's own actions; merged over orca.yaml's field by field. */
+export function withOrchestratorGameProjectOrcaActions(
+  projects: Record<string, OrchestratorGameLayer> | undefined,
+  repoId: string,
+  orcaActions: OrchestratorGameOrcaActions | undefined
+): Record<string, OrchestratorGameLayer> {
+  return withProjectLayerKey(projects, repoId, 'orcaActions', orcaActions)
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   withOrchestratorGameField,
   withOrchestratorGameProjectActions,
+  withOrchestratorGameProjectMachineActions,
+  withOrchestratorGameProjectOrcaActions,
   withOrchestratorGameProjectField,
   withOrchestratorGameProjectLead,
   withOrchestratorGameProjectScene
@@ -108,5 +110,34 @@ describe('withOrchestratorGameProjectActions', () => {
     expect(withOrchestratorGameProjectActions({ repo1: { actions } }, 'repo1', undefined)).toEqual(
       {}
     )
+  })
+})
+
+describe('withOrchestratorGameProjectMachineActions', () => {
+  it("stores this machine's changes and drops the old whole-list override they replace", () => {
+    const old = [{ label: 'Board', command: 'board', prompt: 'Read it' }]
+    const hidden = [{ command: 'board', enabled: false as const }]
+    expect(
+      withOrchestratorGameProjectMachineActions(
+        { repo1: { hud: false, actions: old } },
+        'repo1',
+        hidden
+      )
+    ).toEqual({ repo1: { hud: false, machineActions: hidden } })
+    expect(
+      withOrchestratorGameProjectMachineActions({ repo1: { actions: old } }, 'repo1', [])
+    ).toEqual({})
+  })
+})
+
+describe('withOrchestratorGameProjectOrcaActions', () => {
+  it("sets this machine's changes to Orca's actions, and drops them to inherit orca.yaml's", () => {
+    const orcaActions = { wave: { enabled: false } }
+    expect(
+      withOrchestratorGameProjectOrcaActions({ repo1: { hud: false } }, 'repo1', orcaActions)
+    ).toEqual({ repo1: { hud: false, orcaActions } })
+    expect(
+      withOrchestratorGameProjectOrcaActions({ repo1: { orcaActions } }, 'repo1', undefined)
+    ).toEqual({})
   })
 })

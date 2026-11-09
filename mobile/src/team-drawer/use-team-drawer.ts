@@ -6,7 +6,6 @@ import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { useGameOwnerQuestions } from '../game-inbox/use-game-owner-questions'
 import {
   leadOwnerQuestionsOf,
-  teamBadgeOf,
   teamLeadViewOf,
   type TeamDrawerData,
   type TeamInbox
@@ -115,7 +114,6 @@ export function useTeamDrawer(args: {
     view,
     questions: view ? own.questions : [],
     answerWorktreeId: own.worktreeId,
-    badge: view ? teamBadgeOf(own.questions.length, view.members) : null,
     inbox: leadInbox,
     answer
   }

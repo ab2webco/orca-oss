@@ -9,6 +9,7 @@ import type { SourceControlAiSettings } from './source-control-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { OrchestratorGameLayer } from './orchestrator-game-config'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
+import type { StatusColorOverrides } from './status-colors'
 import type { TerminalPaneActionsPosition } from './terminal-pane-actions-position'
 import type { UiLanguage } from './ui-language'
 import type { GlobalWindowsRuntimeDefault } from './project-execution-runtime'
@@ -253,8 +254,10 @@ export type GlobalSettings = {
   floatingTerminalTrustedCwds?: string[]
   /** One-shot migration marker for legacy floating workspace cwd trust grants. */
   floatingTerminalCwdMigratedToAppWorkspace?: boolean
-  /** Where the Floating Workspace toggle is shown; defaults to the floating button for discoverability. */
+  /** Where the Floating Workspace toggle is shown; defaults to the status bar so it never covers content. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
+  /** One-shot marker: a never-placed floating button was moved to the status bar; after it, a choice sticks. */
+  floatingTerminalTriggerLocationDefaulted?: boolean
   /** Legacy keyboard-shortcut overrides; new writes go to ~/.orca/keybindings.json, migrated once when present. */
   keybindings?: KeybindingOverrides
   diffDefaultView: 'inline' | 'side-by-side'
@@ -263,6 +266,8 @@ export type GlobalSettings = {
   /** Bot-marked comment-author logins (stored lowercased); escape hatch for review bots on regular accounts that defeat provider metadata/heuristics. */
   prBotAuthorOverrides: string[]
   notifications: NotificationSettings
+  /** User hues for the five status tones, per theme; absent tones use the theme default. */
+  statusColors?: StatusColorOverrides
   /** Countdown after a Claude agent goes idle showing time left before the prompt cache expires. */
   promptCacheTimerEnabled: boolean
   /** Prompt-cache TTL (ms); only 300000 (5 min standard) or 3600000 (1 hr, extended-TTL plans). */

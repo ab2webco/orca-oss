@@ -5,8 +5,16 @@ mod (a hooks module drawn inside Claude Code's terminal UI), not an Orca panel p
 
 - **Quest mode.** The spinner becomes a pixel-art scene: Clawd walks a parallax landscape dressed as
   the character of the current flow phase, with a thought bubble saying what it is doing. Each reply
-  comes in a card signed by its phase's character, your own messages in a Storyteller card, tool
-  rows are hidden unless they fail. `on` (default), `zen` (also hides short working notes) or `off`.
+  opens with one plain heading row, the pane's character (a member's, or the lead's as its Team card
+  names it) then its phase, a rule and the time into the turn (`Castillo · reviewing ——— 0:06`, or
+  `asks you` in red for a question to you). The rule is struck spaces and nothing frames the reply,
+  so a copied reply is plain text. Under the conversation a live line stands in for the spinner:
+  glyph, name, phase, timer and current step (`✶ Castillo Reviewing 0:04 · gh pr view 923`), then
+  `◆ … Waiting on you` with the question, or `✓ … Done` with the turn's length. The colours are
+  prototype V30's in Orca's dark look and the panel's light tokens in its light look, which the game
+  state reports; a narrow pane drops the rule, then the time, before a heading would wrap. Your
+  own messages draw as Claude Code draws them, and tool steps fold to one muted `▸` line, errors left
+  as they are. `on` (default), `zen` (also hides short working notes and tool lines) or `off`.
 - **Flat mode.** `flat` draws the same game as text in the scene's colors, with no scene or
   characters: one line per teammate (name, ticket, phase, PR, CI), a score line (level, XP, latest
   rewards) and the phase's card above the spinner. The band's `≡ Text` / `▦ Scene` chip and the

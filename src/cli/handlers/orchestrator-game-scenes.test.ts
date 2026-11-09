@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,6 +104,101 @@ describe('orca game scene', () => {
     expect(out).toContain('bad3d.json: 1 problem(s)')
     expect(out).toContain('  scene3d.nodes: must be a whole number from 50 to 1600')
     expect(process.exitCode).toBe(1)
+  })
+
+  describe('native art', () => {
+    /** A PNG header, padded; validate reads dimensions and never decodes the image. */
+    const png = (width: number, height: number, bytes = 33): Buffer => {
+      const out = Buffer.alloc(bytes)
+      out.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82])
+      out.writeUInt32BE(width, 16)
+      out.writeUInt32BE(height, 20)
+      return out
+    }
+    const role = {
+      sheets: ['art/hero.png'],
+      frame: { width: 32, height: 48 },
+      size: 58,
+      animations: { idle: { row: 0, frames: 2 } }
+    }
+    const withArt = {
+      ...(JSON.parse(ORCHESTRATOR_GAME_SCENE_TEMPLATE) as Record<string, unknown>),
+      native: {
+        figures: { layers: [{ src: 'art/sky.png' }], roles: { lead: role, member: role } }
+      }
+    }
+    let scenes = ''
+
+    beforeEach(() => {
+      scenes = join(dir, '.orca', 'scenes')
+      mkdirSync(join(scenes, 'art'), { recursive: true })
+      writeFileSync(join(scenes, 'art.json'), JSON.stringify(withArt))
+    })
+
+    it('passes a scene whose art sits next to it, however far past 64 KB the files run', async () => {
+      writeFileSync(join(scenes, 'art', 'sky.png'), png(960, 352, 512 * 1024))
+      writeFileSync(join(scenes, 'art', 'hero.png'), png(64, 48))
+
+      await run('game scene validate', dir, { file: '.orca/scenes/art.json' })
+
+      expect(statSync(join(scenes, 'art.json')).size).toBeLessThan(64 * 1024)
+      expect(out).toContain('art.json: valid')
+      expect(process.exitCode).toBeUndefined()
+    })
+
+    it('resolves art from the scene file, not from where the command runs', async () => {
+      writeFileSync(join(scenes, 'art', 'sky.png'), png(960, 352))
+      writeFileSync(join(scenes, 'art', 'hero.png'), png(64, 48))
+
+      await run('game scene validate', scenes, { file: 'art.json' })
+
+      expect(out).toContain('art.json: valid')
+    })
+
+    it('lists a missing file and an animation past its sheet, and exits 1', async () => {
+      writeFileSync(join(scenes, 'art', 'hero.png'), png(32, 48))
+
+      await run('game scene validate', dir, { file: '.orca/scenes/art.json' }, true)
+
+      expect(JSON.parse(out).issues).toEqual([
+        'native.figures.layers.0.src: not found',
+        'native.figures.roles.lead.animations.idle: 2 frames in row 0 need art/hero.png to be at least 64x48, it is 32x48',
+        'native.figures.roles.member.animations.idle: 2 frames in row 0 need art/hero.png to be at least 64x48, it is 32x48'
+      ])
+      expect(process.exitCode).toBe(1)
+    })
+
+    it.skipIf(process.platform === 'win32')(
+      'refuses art that links out of the scene folder',
+      async () => {
+        writeFileSync(join(dir, 'outside.png'), png(960, 352))
+        symlinkSync(join(dir, 'outside.png'), join(scenes, 'art', 'sky.png'))
+        writeFileSync(join(scenes, 'art', 'hero.png'), png(64, 48))
+
+        await run('game scene validate', dir, { file: '.orca/scenes/art.json' })
+
+        expect(out).toContain('native.figures.layers.0.src: resolves outside the scene folder')
+        expect(process.exitCode).toBe(1)
+      }
+    )
+
+    it('reads a block it cannot parse as issues and touches no file', async () => {
+      const broken = { ...withArt, native: { figures: { layers: [] } } }
+      writeFileSync(join(scenes, 'art.json'), JSON.stringify(broken))
+
+      await run('game scene validate', dir, { file: '.orca/scenes/art.json' }, true)
+
+      expect(JSON.parse(out).issues.join()).toContain('native.figures.layers')
+      expect(JSON.parse(out).issues.join()).not.toContain('not found')
+    })
+
+    it('list reports a scene with missing art as a problem', async () => {
+      await run('game scene list', dir, {}, true)
+
+      const listed = JSON.parse(out).files[0]
+      expect(listed.valid).toBe(false)
+      expect(listed.issues[0]).toContain('not found')
+    })
   })
 
   it('validate refuses a file too large for Orca to read', async () => {

@@ -1,0 +1,490 @@
+import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
+import { test, expect } from './helpers/orca-app'
+import { clickWithoutFrameDependency } from './helpers/frame-independent-ui'
+import {
+  splitActiveTerminalPane,
+  waitForActiveTerminalManager,
+  waitForPaneCount,
+  waitForPaneIdentitySnapshot
+} from './helpers/terminal'
+import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { ExecutionHostId } from '../../src/shared/execution-host'
+import { GAME_MEMBER_ADVISOR_VERSION } from '../../src/shared/orchestrator-game-member-advisor'
+
+async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+  await page.evaluate(async (next) => {
+    const settings = await window.api.settings.set({ theme: next })
+    window.__store?.setState({ settings })
+  }, theme)
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
+    )
+    .toBe(theme)
+}
+
+async function setLanguage(page: Page, uiLanguage: 'en' | 'es'): Promise<void> {
+  await page.evaluate(
+    (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
+    uiLanguage
+  )
+}
+
+const COPY = {
+  en: {
+    title: 'Your work',
+    activity: 'Activity',
+    others: 'Other sessions',
+    prompt: 'Prompt',
+    count: '1 need',
+    inbox: 'Inbox',
+    openTerminal: 'Open terminal',
+    machines: 'Machines',
+    offline: 'Offline',
+    oneAgent: '1 agent'
+  },
+  es: {
+    title: 'Tu trabajo',
+    activity: 'Actividad',
+    others: 'Otras sesiones',
+    prompt: 'Pedido',
+    count: '1 te necesita',
+    inbox: 'Bandeja',
+    openTerminal: 'Abrir terminal',
+    machines: 'Máquinas',
+    offline: 'Sin conexión',
+    oneAgent: '1 agente'
+  }
+} as const
+
+const EMPTY = { en: 'No agents running', es: 'No hay agentes en marcha' } as const
+
+const QUESTION = 'Apply the migration now or at release?'
+const PINNED = { en: 'Model pinned', es: 'Modelo fijado' } as const
+
+/** Every language, width and theme, after checking the screen means what the name says. */
+async function capture(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  check: (language: 'en' | 'es') => Promise<void>
+): Promise<void> {
+  for (const language of ['en', 'es'] as const) {
+    await setLanguage(page, language)
+    await check(language)
+    for (const width of [1440, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(page, theme)
+        await page.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`team-activity-${name}-${language}-${width}-${theme}.png`)
+        })
+      }
+    }
+  }
+  await setLanguage(page, 'en')
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
+
+async function seedAgents(
+  page: Page,
+  panes: [string, string],
+  toolInput = 'gh pr checks 912'
+): Promise<void> {
+  await page.evaluate(
+    ({ panes, question, toolInput }) => {
+      const store = window.__store!
+      const now = Date.now()
+      store.getState().setAgentStatus(
+        panes[0],
+        {
+          state: 'working',
+          prompt: 'Check how the merge queue is doing',
+          agentType: 'claude',
+          model: 'claude-opus-5-5',
+          effort: 'high',
+          toolName: 'Bash',
+          toolInput
+        },
+        'Claude main',
+        { updatedAt: now - 60_000, stateStartedAt: now - 60_000 }
+      )
+      store.getState().setAgentStatus(
+        panes[1],
+        {
+          state: 'blocked',
+          prompt: 'Fix the checks panel tooltip',
+          agentType: 'claude',
+          model: 'claude-sonnet-5-5',
+          toolName: 'AskUserQuestion',
+          interactivePrompt: JSON.stringify({
+            questions: [
+              {
+                question,
+                multiSelect: false,
+                options: [{ label: 'Now' }, { label: 'At release' }]
+              }
+            ]
+          })
+        },
+        'Claude tooltip',
+        { updatedAt: now - 120_000, stateStartedAt: now - 120_000 }
+      )
+    },
+    { panes, question: QUESTION, toolInput }
+  )
+}
+
+/** What opens the default card's hover: its title, or the plug when a port is live in the worktree. */
+async function defaultCardHover(page: Page): Promise<Locator> {
+  const plug = page.getByRole('button', { name: /live port/ }).first()
+  return (await plug.isVisible())
+    ? plug
+    : page.locator('[data-worktree-title-inline-rename]').first()
+}
+
+const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
+  page.evaluate(
+    (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
+    enabled
+  )
+
+/** What the mod's poll sends: `orca game state` with the pane's report. */
+async function reportJev(app: ElectronApplication, panes: string[], model: string): Promise<void> {
+  const userDataDir = await app.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  for (const paneKey of panes) {
+    await client.call('game.state', {
+      paneKey,
+      advisor: {
+        version: GAME_MEMBER_ADVISOR_VERSION,
+        model,
+        effort: 'high',
+        pinned: { model: true, effort: false }
+      }
+    })
+  }
+}
+
+type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
+type MachineRig = typeof globalThis & { __machinesHeld?: boolean; __heldMachines?: (() => void)[] }
+
+// Why each evaluate settles after setImmediate: a sync result is a settled promise V8 15.0's inspector
+// holds weakly, so a GC first answers `Promise was collected`, read as a destroyed context (ORCA-1031).
+
+/** Holds this machine's reading so the tab's loading state stays on screen long enough to look at. */
+async function holdMachineReads(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ ipcMain }) => {
+    const rig = globalThis as MachineRig
+    rig.__machinesHeld = true
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, RuntimeCall> })
+      ._invokeHandlers
+    const real = handlers.get('runtime:call')!
+    ipcMain.removeHandler('runtime:call')
+    ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
+      if (args.method === 'diagnostics.memory' && rig.__machinesHeld) {
+        await new Promise<void>((resolve) => {
+          rig.__heldMachines = [...(rig.__heldMachines ?? []), resolve]
+        })
+      }
+      return real(event, args)
+    })
+    return new Promise<void>((resolve) => setImmediate(resolve))
+  })
+}
+
+const releaseMachineReads = (app: ElectronApplication): Promise<void> =>
+  app.evaluate(() => {
+    const rig = globalThis as MachineRig
+    rig.__machinesHeld = false
+    rig.__heldMachines?.forEach((release) => release())
+    return new Promise<void>((resolve) => setImmediate(resolve))
+  })
+
+/** Why: a read gives up after 15 s and lists the hosts, and a slow runner outlasts that. */
+async function reopenTeamPanel(page: Page): Promise<void> {
+  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+  await expect(page.getByTestId('team-panel')).toHaveCount(0)
+  await page.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+  await expect(page.getByTestId('team-panel')).toBeVisible()
+}
+
+/** A session on another host, with the worktree facts a real one carries in the store. */
+async function seedSessionOn(
+  page: Page,
+  session: { worktreeId: string; hostId: ExecutionHostId; name: string; paneKey: string }
+): Promise<void> {
+  await page.evaluate(({ worktreeId, hostId, name, paneKey }) => {
+    const store = window.__store!
+    const state = store.getState()
+    const [template] = Object.values(state.worktreesByRepo).flat()
+    // Why its own repo key: a worktree refresh replaces a real repo's list and would drop this one.
+    store.setState({
+      worktreesByRepo: {
+        ...state.worktreesByRepo,
+        [`e2e-${worktreeId}`]: [
+          { ...template!, id: worktreeId, path: `/${worktreeId}`, displayName: name, hostId }
+        ]
+      },
+      tabsByWorktree: {
+        ...state.tabsByWorktree,
+        [worktreeId]: [{ ...state.tabsByWorktree[template!.id]![0]!, id: paneKey.split(':')[0]! }]
+      }
+    })
+    store
+      .getState()
+      .setAgentStatus(
+        paneKey,
+        { state: 'working', prompt: 'Work there', agentType: 'claude' },
+        name
+      )
+  }, session)
+}
+
+// ORCA-1074: with no game team the panel is "Your work", opened on Activity, built from agent status.
+test('the no-team panel shows Activity for the selected agent and live sidebar rows', async ({
+  orcaPage,
+  electronApp
+}, testInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  const hasPaneManager = await waitForActiveTerminalManager(orcaPage, 30_000)
+    .then(() => true)
+    .catch(() => false)
+  test.skip(!hasPaneManager, 'This Electron run never mounts the live TerminalPane manager.')
+  await waitForPaneCount(orcaPage, 1, 30_000)
+  await splitActiveTerminalPane(orcaPage, 'vertical')
+  await waitForPaneCount(orcaPage, 2)
+  const snapshot = await waitForPaneIdentitySnapshot(orcaPage, 2)
+  const panes = snapshot.panes.map((pane) => `${snapshot.tabId}:${pane.leafId}`)
+
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    if (!state.worktreeCardProperties.includes('inline-agents')) {
+      state.setWorktreeCardProperties([...state.worktreeCardProperties, 'inline-agents'])
+    }
+    state.setRightSidebarOpen(true)
+    state.setRightSidebarTab('team')
+  })
+
+  const panel = orcaPage.getByTestId('team-panel')
+  await capture(orcaPage, testInfo, 'empty', async (language) => {
+    await expect(panel.getByRole('heading', { name: COPY[language].title })).toBeVisible()
+    await expect(panel.getByRole('tabpanel')).toContainText(EMPTY[language])
+  })
+
+  await seedAgents(orcaPage, [panes[0]!, panes[1]!])
+  const summary = orcaPage.locator('.compact-agent-summary-button[aria-expanded="false"]').first()
+  if (await summary.isVisible()) {
+    await summary.click()
+  }
+  // Why: the blocked agent's question replaces its prompt in the left sidebar row.
+  await expect(orcaPage.locator('.compact-agent-row').getByText(QUESTION)).toBeVisible()
+  await expect(
+    orcaPage.locator('.compact-agent-row').getByText('Bash · gh pr checks 912')
+  ).toBeVisible()
+
+  await capture(orcaPage, testInfo, 'full', async (language) => {
+    const copy = COPY[language]
+    await expect(panel.getByRole('heading', { name: copy.title })).toBeVisible()
+    await expect(panel.getByRole('tab', { name: copy.activity })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    await expect(panel.locator('[data-team-activity="selected"]')).toContainText(copy.prompt)
+    await expect(panel.locator('[data-team-activity-count]')).toContainText(copy.count)
+    await expect(panel.getByText(copy.others)).toBeVisible()
+    await expect(panel.locator('[data-team-activity="other"]')).toHaveCount(1)
+    await expect(panel.getByRole('tab', { name: copy.machines })).toHaveCount(0)
+  })
+
+  // Why: a worker's own Bash line carries its capability, a bearer secret no screen may print.
+  const panePair: [string, string] = [panes[0]!, panes[1]!]
+  await seedAgents(
+    orcaPage,
+    panePair,
+    `orca game send --dispatch-capability dcap_${'A'.repeat(43)}`
+  )
+  await capture(orcaPage, testInfo, 'redacted', async () => {
+    await expect(panel.locator('[data-team-activity="other"]')).toContainText('[redacted]')
+    await expect(
+      orcaPage.locator('.compact-agent-row').filter({ hasText: '[redacted]' })
+    ).toHaveCount(1)
+    await expect(orcaPage.locator('body')).not.toContainText('dcap_')
+  })
+  await seedAgents(orcaPage, panePair)
+
+  await setPluginSystem(orcaPage, false)
+  await reportJev(electronApp, panes, 'Opus 5.5')
+  await reportJev(electronApp, panes, 'Sonnet 5.5')
+  const jev = panel.locator('[data-team-activity-advisor]')
+  await expect(jev).toHaveCount(0)
+  await setPluginSystem(orcaPage, true)
+  await capture(orcaPage, testInfo, 'jev', async (language) => {
+    await expect(jev).toContainText(`Sonnet 5.5 · ${PINNED[language]}`)
+    await expect(jev.getByRole('heading', { name: 'Jev' })).toBeVisible()
+    await expect(jev).toContainText('Opus 5.5 → Sonnet 5.5')
+  })
+  // Why shorter than the 20 s read: only the host's push can meet this wait (ORCA-1120).
+  await reportJev(electronApp, panes, 'Haiku 5.5')
+  await expect(jev).toContainText('Sonnet 5.5 → Haiku 5.5', { timeout: 5_000 })
+  await setPluginSystem(orcaPage, false)
+  await expect(jev).toHaveCount(0)
+  // Why: this session was seeded on Opus; a held report must not go on naming its model.
+  await expect(panel.locator('[data-team-activity="other"]')).toContainText('Opus 5.5')
+
+  await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
+  await capture(orcaPage, testInfo, 'inbox', async (language) => {
+    const copy = COPY[language]
+    const tab = panel.getByRole('tab', { name: new RegExp(copy.inbox) })
+    await expect(tab).toHaveAttribute('aria-selected', 'true')
+    await expect(tab).toContainText('1')
+    await expect(panel).toContainText(QUESTION)
+    // ORCA-1129 D5: V28's options are buttons that answer, not text.
+    await expect(panel.getByRole('button', { name: 'At release', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: copy.openTerminal })).toBeVisible()
+  })
+  await panel.getByRole('tab', { name: COPY.en.activity }).click()
+
+  // Pressing the other session focuses its pane, and Activity follows that focus.
+  const selected = panel.locator('[data-team-activity="selected"]')
+  const before = await selected.getAttribute('data-pane-key')
+  const other = panel.locator('[data-team-activity="other"]')
+  const target = await other.getAttribute('data-pane-key')
+  expect(target).not.toBe(before)
+  // Why: activateTabAndFocusPane waits one frame and a never-shown window has none; only that frame
+  // is substituted, so the click, the focus event, the pane and the panel below are all real.
+  await orcaPage.evaluate(() => {
+    window.requestAnimationFrame = (callback) =>
+      window.setTimeout(() => callback(performance.now()), 16)
+    window.cancelAnimationFrame = (id) => window.clearTimeout(id)
+  })
+  // A press on the pane the manager already holds fires no change, so the store must agree first.
+  await expect
+    .poll(() =>
+      orcaPage.evaluate(() => {
+        const state = window.__store!.getState()
+        const tabId = state.activeTabId!
+        const stored = state.terminalLayoutsByTabId[tabId]?.activeLeafId
+        return stored === window.__paneManagers?.get(tabId)?.getActivePane()?.leafId
+      })
+    )
+    .toBe(true)
+  await clickWithoutFrameDependency(other, orcaPage)
+  await expect(selected).toHaveAttribute('data-pane-key', target!)
+  await expect(other).toHaveAttribute('data-pane-key', before!)
+  await orcaPage.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('team-activity-after-switch.png')
+  })
+
+  // A question opens its own pane, by the same path as its Activity row.
+  const asker = panes[1]!
+  await expect(selected).not.toHaveAttribute('data-pane-key', asker)
+  await panel.getByRole('tab', { name: new RegExp(COPY.en.inbox) }).click()
+  await clickWithoutFrameDependency(
+    panel.getByRole('button', { name: COPY.en.openTerminal }),
+    orcaPage
+  )
+  await panel.getByRole('tab', { name: COPY.en.activity }).click()
+  await expect(selected).toHaveAttribute('data-pane-key', asker)
+
+  const defaultFacts = orcaPage.locator('[data-worktree-agent-hover]')
+  await (await defaultCardHover(orcaPage)).hover()
+  await orcaPage.waitForTimeout(600)
+  await expect(defaultFacts).toHaveCount(0)
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+  // Why retried: the host's port scan can land mid-step and move the hover to the plug.
+  await expect(async () => {
+    await orcaPage.mouse.move(700, 600)
+    await (await defaultCardHover(orcaPage)).hover()
+    await expect(defaultFacts).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(defaultFacts).toContainText('Opus 5.5 · high')
+  await orcaPage.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('team-activity-hover-default-card.png')
+  })
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
+
+  // The hover card holds what left the row; it stays off while Activity shows the same facts.
+  await orcaPage.evaluate(() =>
+    window.__store!.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
+  )
+  const card = orcaPage.locator('[data-worktree-card-hover-trigger]').first()
+  const agentFacts = orcaPage.locator('[data-worktree-agent-hover]')
+  await card.hover()
+  await orcaPage.waitForTimeout(600)
+  await expect(agentFacts).toHaveCount(0)
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+  await card.hover()
+  await expect(agentFacts).toBeVisible()
+  await expect(agentFacts).toContainText('Opus 5.5')
+  await expect(agentFacts).toContainText('Sonnet 5.5')
+  await orcaPage.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('team-activity-hover-card.png')
+  })
+  await orcaPage.mouse.move(700, 600)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.updateSettings({ experimentalNewWorktreeCardStyle: false })
+    state.setRightSidebarOpen(true)
+  })
+
+  // Machines appears once sessions span a second host, here an SSH target with no Orca to read.
+  await holdMachineReads(electronApp)
+  await orcaPage.evaluate(() =>
+    window.__store!.setState({ sshTargetLabels: new Map([['box-id', 'box']]) })
+  )
+  await seedSessionOn(orcaPage, {
+    worktreeId: 'on-box',
+    hostId: 'ssh:box-id',
+    name: 'on-box',
+    paneKey: 'tab-box:44444444-4444-4444-8444-444444444444'
+  })
+  await panel.getByRole('tab', { name: COPY.en.machines }).click()
+  const rows = panel.locator('[data-team-machine]')
+  await capture(orcaPage, testInfo, 'machines-loading', async (language) => {
+    await reopenTeamPanel(orcaPage)
+    const tab = panel.getByRole('tab', { name: COPY[language].machines })
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-selected', 'true')
+    await expect(rows).toHaveCount(0)
+  })
+  await releaseMachineReads(electronApp)
+
+  // A saved host that never answers reads offline; this machine still shows what it really has.
+  await orcaPage.evaluate(() => {
+    const store = window.__store!
+    store.setState({
+      runtimeEnvironments: [
+        { id: 'env-mini', name: 'mini', endpoints: [], preferredEndpointId: '' }
+      ]
+    } as never)
+  })
+  await seedSessionOn(orcaPage, {
+    worktreeId: 'on-mini',
+    hostId: 'runtime:env-mini',
+    name: 'on-mini',
+    paneKey: 'tab-mini:55555555-5555-4555-8555-555555555555'
+  })
+  await capture(orcaPage, testInfo, 'machines', async (language) => {
+    const copy = COPY[language]
+    await expect(panel.getByRole('tab', { name: copy.machines })).toBeVisible()
+    await expect(rows).toHaveCount(3)
+    // Why this long: a read that gave up while held lands on the next 20 s poll.
+    await expect(rows.nth(0).getByRole('img')).toBeVisible({ timeout: 30_000 })
+    await expect(panel.locator('[data-team-machine="mini"]')).toContainText(copy.offline)
+    const box = panel.locator('[data-team-machine="box"]')
+    await expect(box).toContainText(copy.oneAgent)
+    await expect(box.getByRole('img')).toHaveCount(0)
+  })
+})

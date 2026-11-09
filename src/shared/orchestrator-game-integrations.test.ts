@@ -173,6 +173,7 @@ describe('resolveOrchestratorGameIntegrations', () => {
       links: [{ label: 'Project', url: 'https://p.example' }],
       activity: [],
       actions: [],
+      orcaActions: {},
       todo: null,
       reviews: {}
     })

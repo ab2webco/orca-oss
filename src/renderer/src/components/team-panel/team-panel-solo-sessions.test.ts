@@ -1,0 +1,368 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
+import type { FolderWorkspace, Repo, Worktree } from '../../../../shared/types'
+import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { teamSoloSessionsOf, type TeamSoloSessionsState } from './team-panel-solo-sessions'
+import { teamPanelSoloModelFrom } from './use-team-panel-solo-model'
+import { toRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'
+
+const repo = { id: 'repo-1', path: '/r', displayName: 'orca-oss' } as Repo
+
+function worktree(overrides: Partial<Worktree>): Worktree {
+  return {
+    id: 'repo-1::/r/wt',
+    repoId: 'repo-1',
+    path: '/r/wt',
+    displayName: 'fix-tooltip',
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    isMainWorktree: false,
+    branch: 'refs/heads/fix-tooltip',
+    head: 'abc',
+    ...overrides
+  } as Worktree
+}
+
+function entry(overrides: Partial<AgentStatusEntry>): AgentStatusEntry {
+  return {
+    state: 'working',
+    prompt: 'Fix the tooltip',
+    updatedAt: 1,
+    stateStartedAt: 1,
+    agentType: 'claude',
+    model: 'claude-sonnet-5-5',
+    paneKey: 'tab-1:11111111-1111-4111-8111-111111111111',
+    worktreeId: 'repo-1::/r/wt',
+    stateHistory: [],
+    toolName: 'Edit',
+    toolInput: 'tooltip.tsx',
+    ...overrides
+  }
+}
+
+function state(overrides: Partial<TeamSoloSessionsState>): TeamSoloSessionsState {
+  return {
+    agentStatusByPaneKey: {},
+    tabsByWorktree: {},
+    worktreesByRepo: { 'repo-1': [worktree({})] },
+    repos: [repo],
+    settings: null,
+    cacheTimerByKey: {},
+    hostedReviewCache: {},
+    workspacePortScan: null,
+    claudeAccountRoster: { accounts: [], activeAccountId: null },
+    folderWorkspaces: [],
+    runtimeEnvironments: [],
+    sshTargetLabels: new Map(),
+    sshConnectionStates: new Map(),
+    terminalLayoutsByTabId: {},
+    ...overrides
+  } as TeamSoloSessionsState
+}
+
+const mocks = vi.hoisted(() => ({ webClient: false }))
+vi.mock('@/lib/web-client-location', () => ({ isWebClientLocation: () => mocks.webClient }))
+
+afterEach(() => {
+  mocks.webClient = false
+})
+
+const claudeRoster = {
+  claudeAccountRoster: {
+    accounts: [{ id: 'a-1', email: 'dev@example.com' }],
+    activeAccountId: 'a-1'
+  }
+} as Partial<TeamSoloSessionsState>
+
+describe("teamSoloSessionsOf on each session's own host (ORCA-1129)", () => {
+  const LEAF = '11111111-1111-4111-8111-111111111111'
+  const paired = state({
+    worktreesByRepo: { 'repo-1': [worktree({ hostId: 'runtime:env-mini' } as Partial<Worktree>)] },
+    runtimeEnvironments: [{ id: 'env-mini', name: 'mini' }] as never,
+    agentStatusByPaneKey: { [`tab-1:${LEAF}`]: entry({}) },
+    terminalLayoutsByTabId: {
+      'tab-1': { ptyIdsByLeafId: { [LEAF]: toRemoteRuntimePtyId('term_lead', 'env-mini') } }
+    } as never
+  })
+
+  // Why: a mirrored pane carries its host's handle only in its PTY id, never in its status.
+  it("marks a paired host's lead by its own host's leads", () => {
+    const leads = new Map([['env-mini', new Set(['term_lead'])]])
+    expect(teamSoloSessionsOf(paired, leads)[0]?.inTeam).toBe(true)
+  })
+
+  it("never matches a handle against another host's leads", () => {
+    const leads = new Map([['', new Set(['term_lead'])]])
+    expect(teamSoloSessionsOf(paired, leads)[0]?.inTeam).toBe(false)
+  })
+})
+
+describe('teamSoloSessionsOf', () => {
+  it('names each session after its workspace and project and reads its ticket and note', () => {
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) },
+        worktreesByRepo: {
+          'repo-1': [
+            worktree({
+              comment: ' check copy ',
+              linkedPlaneWorkItem: { identifier: 'ORCA-1012', projectId: 'p' }
+            })
+          ]
+        }
+      })
+    )
+    expect(session).toMatchObject({
+      repoName: 'orca-oss',
+      worktreeName: 'fix-tooltip',
+      isPrimary: false,
+      host: { kind: 'local' },
+      ticket: { identifier: 'ORCA-1012' },
+      note: 'check copy',
+      cacheExpiresAt: null,
+      advisor: null
+    })
+  })
+
+  it('finds the workspace from the pane tab when the entry carries no worktree id', () => {
+    const sessions = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({ worktreeId: undefined })
+        },
+        tabsByWorktree: { 'repo-1::/r/wt': [{ id: 'tab-1' }] } as never
+      })
+    )
+    expect(sessions.map((one) => one.worktreeId)).toEqual(['repo-1::/r/wt'])
+  })
+
+  it('drops a pane whose workspace Orca does not know', () => {
+    const sessions = teamSoloSessionsOf(
+      state({ agentStatusByPaneKey: { x: entry({ paneKey: 'x', worktreeId: 'gone' }) } })
+    )
+    expect(sessions).toEqual([])
+  })
+
+  it('honours promptCacheTimerEnabled for the cache countdown', () => {
+    const base = {
+      agentStatusByPaneKey: { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) },
+      cacheTimerByKey: { 'tab-1:11111111-1111-4111-8111-111111111111': 1_000 }
+    }
+    const off = teamSoloSessionsOf(
+      state({
+        ...base,
+        settings: { promptCacheTimerEnabled: false, promptCacheTtlMs: 300_000 } as never
+      })
+    )
+    expect(off[0]?.cacheExpiresAt).toBeNull()
+    const on = teamSoloSessionsOf(
+      state({
+        ...base,
+        settings: { promptCacheTimerEnabled: true, promptCacheTtlMs: 300_000 } as never
+      })
+    )
+    expect(on[0]?.cacheExpiresAt).toBe(301_000)
+  })
+
+  it('names an SSH workspace by its target label', () => {
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) },
+        repos: [{ ...repo, connectionId: 'target-1' }],
+        sshTargetLabels: new Map([['target-1', 'build server']])
+      })
+    )
+    expect(session?.host).toEqual({
+      kind: 'remote',
+      name: 'build server',
+      environmentId: null,
+      reachable: true
+    })
+  })
+})
+
+describe('teamSoloSessionsOf hosts and accounts', () => {
+  const live = { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) }
+
+  it('names a paired host by its environment, not its id', () => {
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        repos: [{ ...repo, executionHostId: 'runtime:env-1' } as Repo],
+        runtimeEnvironments: [{ id: 'env-1', name: 'imac' }] as never
+      })
+    )
+    expect(session?.host).toEqual({
+      kind: 'remote',
+      name: 'imac',
+      environmentId: 'env-1',
+      reachable: true
+    })
+  })
+
+  it('shows the same account the sidebar chip would', () => {
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))
+    expect(session?.account?.email).toBe('dev@example.com')
+  })
+
+  it('says System default like the hover card when no managed account is active', () => {
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live }))
+    expect(session?.account?.email).toBe('System default')
+  })
+
+  it('never names an account on a web client, where the sidebar hides it too', () => {
+    mocks.webClient = true
+    const [session] = teamSoloSessionsOf(state({ agentStatusByPaneKey: live, ...claudeRoster }))
+    expect(session?.account).toBeNull()
+  })
+})
+
+describe('teamSoloSessionsOf workspace kinds', () => {
+  const folder = {
+    id: 'folder-1',
+    projectGroupId: 'group-1',
+    name: 'notes',
+    folderPath: '/tmp/notes',
+    linkedTask: null,
+    comment: 'Review the copy',
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 1,
+    lastActivityAt: 1,
+    createdAt: 1,
+    updatedAt: 1
+  } as FolderWorkspace
+
+  it('keeps a folder workspace session, which worktreesByRepo never holds', () => {
+    const key = folderWorkspaceKey(folder.id)
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({ worktreeId: key })
+        },
+        folderWorkspaces: [folder],
+        ...claudeRoster
+      })
+    )
+    expect(session).toMatchObject({
+      worktreeName: 'notes',
+      worktreeId: key,
+      repoName: '',
+      host: { kind: 'local' },
+      pr: null,
+      account: null,
+      note: 'Review the copy'
+    })
+  })
+
+  it('names a folder on an SSH target by that target', () => {
+    const key = folderWorkspaceKey(folder.id)
+    const [session] = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({ worktreeId: key })
+        },
+        folderWorkspaces: [{ ...folder, connectionId: 'target-1' }],
+        sshTargetLabels: new Map([['target-1', 'build server']])
+      })
+    )
+    expect(session?.host).toMatchObject({ kind: 'remote', name: 'build server' })
+  })
+
+  it('reads a GitLab issue and a Jira issue as the ticket, not only GitHub', () => {
+    const live = { 'tab-1:11111111-1111-4111-8111-111111111111': entry({}) }
+    const gitlab = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        worktreesByRepo: { 'repo-1': [worktree({ linkedGitLabIssue: 42 })] }
+      })
+    )
+    expect(gitlab[0]?.ticket?.identifier).toBe('#42')
+    const jira = teamSoloSessionsOf(
+      state({
+        agentStatusByPaneKey: live,
+        worktreesByRepo: {
+          'repo-1': [
+            worktree({
+              linkedWorkItem: {
+                provider: 'jira',
+                type: 'issue',
+                number: 1145,
+                jiraIdentifier: 'CIN-1145',
+                title: 'Validate the booking form',
+                url: 'https://j/CIN-1145'
+              }
+            } as Partial<Worktree>)
+          ]
+        }
+      })
+    )
+    expect(jira[0]?.ticket).toMatchObject({ identifier: 'CIN-1145', url: 'https://j/CIN-1145' })
+  })
+})
+
+describe('teamPanelSoloModelFrom', () => {
+  it('counts only the questions the Inbox can list', () => {
+    const model = teamPanelSoloModelFrom({
+      ...state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({
+            state: 'blocked',
+            toolName: 'Bash',
+            toolInput: 'rm -rf dist'
+          })
+        }
+      }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
+      selectedPaneKey: null
+    })
+    expect(model.rows[0]?.status).toBe('attention')
+    expect(model.inbox).toEqual({
+      kind: 'ready',
+      value: { forYou: 0, waiting: 0, threads: 0, answered: 0 }
+    })
+  })
+
+  it('puts a blocked session first, opens on the focused pane and counts it in Inbox', () => {
+    const model = teamPanelSoloModelFrom({
+      ...state({
+        agentStatusByPaneKey: {
+          'tab-1:11111111-1111-4111-8111-111111111111': entry({}),
+          'tab-1:22222222-2222-4222-8222-222222222222': entry({
+            paneKey: 'tab-1:22222222-2222-4222-8222-222222222222',
+            state: 'blocked',
+            toolName: 'AskUserQuestion',
+            interactivePrompt: JSON.stringify({
+              questions: [
+                { question: 'Apply now?', options: [{ label: 'Now' }, { label: 'Later' }] }
+              ]
+            })
+          })
+        }
+      }),
+      ptyIdsByTabId: {},
+      terminalLayoutsByTabId: {},
+      selectedPaneKey: 'tab-1:11111111-1111-4111-8111-111111111111'
+    })
+    expect(model.rows.map((row) => row.paneKey)).toEqual([
+      'tab-1:22222222-2222-4222-8222-222222222222',
+      'tab-1:11111111-1111-4111-8111-111111111111'
+    ])
+    expect(model.rows[1]?.liveAction).toEqual({
+      kind: 'tool',
+      tool: 'Edit',
+      detail: 'tooltip.tsx'
+    })
+    expect(model.rows[1]?.model?.label).toBe('Sonnet 5.5')
+    expect(model.selectedPaneKey).toBe('tab-1:11111111-1111-4111-8111-111111111111')
+    expect(model.inbox).toEqual({
+      kind: 'ready',
+      value: { forYou: 1, waiting: 0, threads: 0, answered: 0 }
+    })
+    expect(model.machines).toBeNull()
+  })
+})

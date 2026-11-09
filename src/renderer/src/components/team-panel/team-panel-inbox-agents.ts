@@ -1,0 +1,171 @@
+import type { AppState } from '@/store/types'
+import { useAppStore } from '@/store'
+import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
+import {
+  sendNativeChatAskAnswer,
+  sendNativeChatMessage
+} from '../native-chat/native-chat-runtime-send'
+import { inferQuestionAnsweredFromCurrentStatus } from '../terminal-pane/agent-question-answered-inference'
+import {
+  findTerminalHandleTarget,
+  type TerminalHandleFocusState
+} from '../terminal-pane/terminal-handle-links'
+import {
+  buildAskAnswerKeys,
+  buildCodexAskAnswerKeys,
+  formatAskAnswer,
+  parseAskFromStatus
+} from '../../../../shared/native-chat-ask'
+import {
+  resolveNativeChatTranscriptAgent,
+  shouldStepNativeChatAskAnswer
+} from '../../../../shared/native-chat-agent-support'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import { teamLiveActionOfEntry } from '../../../../shared/team-panel-activity-rows'
+import type {
+  TeamPanelGameModel,
+  TeamPanelModel,
+  TeamSessionRef
+} from '../../../../shared/team-panel-model-types'
+import { openTeamSession } from './team-session-open'
+
+/** An agent session blocked on a question to the user, as its AgentStatusEntry reports it. */
+export type TeamInboxAgentQuestion = TeamSessionRef & {
+  repoName: string
+  worktreeName: string
+  text: string
+  options: string[]
+  /** Set for a team's lead or member: its ticket, else its name, the only name V28's card shows. */
+  asker?: string
+}
+
+export type TeamInboxAgentState = TerminalHandleFocusState & Pick<AppState, 'agentStatusByPaneKey'>
+
+/** This window's pane key for a team agent; a paired host names its pane under its own tab id. */
+function localPaneKeyOf(agent: TeamSessionRef, state: TerminalHandleFocusState): string {
+  if (agent.host.kind !== 'remote' || !agent.host.environmentId || !agent.terminalHandle) {
+    return agent.paneKey
+  }
+  const target = findTerminalHandleTarget(agent.terminalHandle, state, agent.host.environmentId)
+  return target?.leafId ? `${target.tabId}:${target.leafId}` : agent.paneKey
+}
+
+/** A team agent's live question; game.state never carries the text, so agent status does. */
+function teamAgentQuestionOf(
+  agent: TeamSessionRef & { name: string; ticket?: { identifier: string } | null },
+  projectName: string,
+  state: TeamInboxAgentState
+): TeamInboxAgentQuestion | null {
+  const paneKey = localPaneKeyOf(agent, state)
+  const entry = state.agentStatusByPaneKey[paneKey]
+  const action = entry ? teamLiveActionOfEntry(entry) : null
+  return action?.kind === 'question'
+    ? {
+        paneKey,
+        terminalHandle: agent.terminalHandle,
+        worktreeId: agent.worktreeId,
+        host: agent.host,
+        repoName: projectName,
+        worktreeName: agent.name,
+        asker: agent.ticket?.identifier ?? agent.name,
+        text: action.text,
+        options: action.options
+      }
+    : null
+}
+
+/** The lead's own live question. */
+export function teamLeadQuestionOf(
+  model: TeamPanelGameModel,
+  state: TeamInboxAgentState
+): TeamInboxAgentQuestion | null {
+  return teamAgentQuestionOf(model.lead, model.projectName, state)
+}
+
+/**
+ * With no team, every session's live question except a team's, which belongs to its own Inbox.
+ * With a team, the lead's and then each member's.
+ */
+export function teamInboxAgentQuestionsOf(
+  model: TeamPanelModel,
+  state: TeamInboxAgentState
+): TeamInboxAgentQuestion[] {
+  if (model.kind !== 'solo') {
+    return [model.lead, ...model.members].flatMap(
+      (agent) => teamAgentQuestionOf(agent, model.projectName, state) ?? []
+    )
+  }
+  return model.rows.flatMap((row) =>
+    row.liveAction?.kind === 'question' && !row.inTeam
+      ? [
+          {
+            paneKey: row.paneKey,
+            terminalHandle: row.terminalHandle,
+            worktreeId: row.worktreeId,
+            host: row.host,
+            repoName: row.repoName,
+            worktreeName: row.worktreeName,
+            text: row.liveAction.text,
+            options: row.liveAction.options
+          }
+        ]
+      : []
+  )
+}
+
+export function openTeamInboxAgent(question: TeamInboxAgentQuestion): void {
+  void openTeamSession(question, question.worktreeName)
+}
+
+/** Whether one tap can answer: a single, single-choice question with options. */
+export function isOneTapQuestion(question: TeamInboxAgentQuestion): boolean {
+  const entry = useAppStore.getState().agentStatusByPaneKey[question.paneKey]
+  const ask = entry ? parseAskFromStatus(entry.interactivePrompt, entry.toolName) : null
+  return (
+    ask?.questions.length === 1 &&
+    ask.questions[0].multiSelect !== true &&
+    ask.questions[0].options.length > 0
+  )
+}
+
+/**
+ * Answers the pane's live question with one option, through the keystrokes the chat card writes.
+ * False when the pane has no PTY in this window or its question changed.
+ */
+export function answerTeamInboxAgent(
+  question: TeamInboxAgentQuestion,
+  optionIndex: number
+): boolean {
+  const state = useAppStore.getState()
+  const pane = parsePaneKey(question.paneKey)
+  const entry = state.agentStatusByPaneKey[question.paneKey]
+  const ask = entry ? parseAskFromStatus(entry.interactivePrompt, entry.toolName) : null
+  const ptyId = pane
+    ? (state.terminalLayoutsByTabId[pane.tabId]?.ptyIdsByLeafId?.[pane.leafId] ?? null)
+    : null
+  // Why the text: a new question may have replaced the one on screen since it rendered.
+  if (!pane || !entry || !ask || !ptyId || ask.questions[0]?.question !== question.text) {
+    return false
+  }
+  const settings = getSettingsForAgentTabRuntimeOwner(pane.tabId)
+  const selections = [{ indices: [optionIndex] }]
+  if (!shouldStepNativeChatAskAnswer(entry.agentType)) {
+    sendNativeChatMessage(settings, ptyId, formatAskAnswer(ask, selections))
+    return true
+  }
+  const keys =
+    resolveNativeChatTranscriptAgent(entry.agentType) === 'codex'
+      ? buildCodexAskAnswerKeys(ask, selections)
+      : buildAskAnswerKeys(ask, selections)
+  sendNativeChatAskAnswer(settings, ptyId, keys, (delivered) => {
+    if (delivered) {
+      inferQuestionAnsweredFromCurrentStatus({
+        paneKey: question.paneKey,
+        getStatusEntry: () => entry,
+        inferQuestionAnswered: (request) =>
+          window.api.agentStatus.inferQuestionAnswered(request).catch(() => false)
+      })
+    }
+  })
+  return true
+}

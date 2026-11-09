@@ -33,6 +33,7 @@ import {
   readElectronResolvedHome
 } from './electron-home-isolation'
 import { createSeededTestRepo, isValidGitRepo } from './seeded-test-repo'
+import { restoreRepoRemotes, snapshotRepoRemotes } from './seeded-repo-remotes'
 import {
   flushQueuedRendererRecoveryEvidence,
   reportAndFlushRendererRecoveryEvidence
@@ -170,7 +171,8 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
       launchEnv,
       orcaAppExtraEnv,
       orcaAppExtraArgs,
-      registerPostElectronShutdownCleanup
+      registerPostElectronShutdownCleanup,
+      testRepoPath
     },
     provideFixture,
     testInfo
@@ -179,6 +181,9 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     // this Electron fixture has released watchers, terminals, and daemons.
     void registerPostElectronShutdownCleanup
     const mainPath = path.join(process.cwd(), 'out', 'main', 'index.js')
+    // Why: the worker's specs share the seeded repo, so a remote one test sets must not reach the next.
+    const seededRepo = isValidGitRepo(testRepoPath) ? testRepoPath : null
+    const seededRemotes = seededRepo ? snapshotRepoRemotes(seededRepo) : null
     const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-userdata-'))
 
     if (dismissOnboarding) {
@@ -264,6 +269,9 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     await cleanupE2EDaemons(userDataDir)
     await reportAndFlushRendererRecoveryEvidence(userDataDir, testInfo)
     await removeUserDataDirAfterShutdown(userDataDir)
+    if (seededRepo && seededRemotes) {
+      restoreRepoRemotes(seededRepo, seededRemotes)
+    }
   },
 
   // Default: dismiss the onboarding overlay so it doesn't intercept clicks.

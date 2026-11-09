@@ -36,10 +36,10 @@ export function SshTargetRow({
   const isConnected = status === 'connected'
   const isBusy = connecting || isConnectingSshStatus(status)
   const dotColor = isConnected
-    ? 'bg-green-500'
+    ? 'bg-status-success'
     : isBusy
-      ? 'bg-yellow-500'
-      : 'bg-muted-foreground/30'
+      ? 'bg-status-info'
+      : 'bg-status-idle/30'
 
   const handleRowClick = (): void => {
     if (isConnected) {

@@ -97,7 +97,7 @@ afterEach(() => {
 })
 
 describe('useTeamDrawer', () => {
-  it("reads the lead's state with its pane and badges its open question", async () => {
+  it("reads the lead's state with its pane and its open question", async () => {
     const sendRequest = hostReplying(leadState)
     const client = { sendRequest } as unknown as RpcClient
     await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
@@ -107,7 +107,7 @@ describe('useTeamDrawer', () => {
       terminalHandle: 'term_1',
       paneKey: 'tab:leaf'
     })
-    expect(team?.badge).toEqual({ tone: 'question', count: 1 })
+    expect(team?.questions).toHaveLength(1)
     expect(team?.view?.members[0]).toMatchObject({ ticket: 'ORCA-7', needsYou: true })
   })
 
@@ -133,7 +133,7 @@ describe('useTeamDrawer', () => {
 
     expect(sendRequest).not.toHaveBeenCalledWith('game.state', expect.anything())
     expect(team?.view).toBeNull()
-    expect(team?.badge).toBeNull()
+    expect(team?.questions).toEqual([])
   })
 
   it('shows no Team for a pane that is not the lead', async () => {

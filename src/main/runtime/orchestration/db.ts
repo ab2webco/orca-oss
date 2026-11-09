@@ -4122,6 +4122,8 @@ export class OrchestrationDb {
     runId: string
     consumerGeneration: number
     body: string
+    /** Why: an answer the person typed is marked as theirs on the message the member receives. */
+    payload?: string
   }): { question: QuestionRow; message: MessageRow; duplicate: boolean } {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -4160,7 +4162,8 @@ export class OrchestrationDb {
         subject: 'Re: Question',
         body: params.body,
         threadId: question.message_id,
-        runId: params.runId
+        runId: params.runId,
+        payload: params.payload
       })
       // Why: ask returns thread state directly; leaving its answer unread would deliver it again via check.
       this.markAsRead([message.id])
@@ -5024,9 +5027,10 @@ export class OrchestrationDb {
         `SELECT dc.id AS dispatch_id, dc.task_id, dc.status AS dispatch_status,
                 dc.contract_version, dc.assignee_handle, dc.assignee_pane_key,
                 dc.process_incarnation, wd.state AS worker_state, wd.worktree_id,
-                wd.agent_terminal_handle
+                wd.agent_terminal_handle, r.ownership_state AS terminal_ownership
          FROM dispatch_contexts dc
          INNER JOIN worker_dispatches wd ON wd.dispatch_id = dc.id
+         LEFT JOIN worker_terminal_resources r ON r.owner_dispatch_id = dc.id
          WHERE wd.state IN ('starting', 'ready', 'start_unknown', 'stopping', 'stop_unknown')
          ORDER BY dc.rowid`
       )

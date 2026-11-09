@@ -357,6 +357,8 @@ export type GameState = {
   leadElsewhere?: { handle: string }
   /** Orca's UI language now; absent from an older host, which keeps the launch language. */
   locale?: GameLocale
+  /** Orca's light or dark look, which the agent terminal's colours follow; absent from an older host. */
+  appearance?: 'dark' | 'light'
   /** The scopes Orca can store a view in for this pane; absent from an older host. */
   viewScopes?: ('project' | 'global')[]
   /** The view this machine's resources suggest; absent from an older host. */
@@ -395,7 +397,8 @@ export type GameHostCapacity = { host: string; running: number; cap?: number } &
 
 export type GameHostFigure = 'cpuCoreCount' | 'totalMemory' | 'availableMemory'
 
-export type GameLead = { autostart: boolean; cap: number; label?: string }
+/** `name` is the lead's name as its Team card shows it, from the state's `leadName`; absent from an older host. */
+export type GameLead = { autostart: boolean; cap: number; label?: string; name?: string }
 
 export type GameRole = 'lead' | 'member'
 
@@ -426,8 +429,6 @@ export type RecentReward = { label: string; xp: number; at: number }
 /** A line another plugin set with `$.ui.status`, held for the allies strip while the game draws. */
 export type AllyStatus = { plugin: string; text: string }
 
-export type AlliesState = { statuses: AllyStatus[] }
-
 /** One of Jev's decisions as the Panel lists it; `id` null is the main conversation's model. */
 export type AdvisorLogEntry = {
   key: string
@@ -448,11 +449,13 @@ declare module 'claude-code' {
   interface PluginState {
     'orca-game': {
       fleet: FleetState
-      allies: AlliesState
+      allies: { statuses: AllyStatus[] }
       advisor: AdvisorLog
       actions: ActionRuns
       /** True exactly while the game draws other plugins' lines (mode not off and HUD on). */
       absorbing: boolean
+      /** A beat the live line redraws on while a turn runs or waits. */
+      live: number
     }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
     'orca-jev-mod-skills': { advisor: unknown }

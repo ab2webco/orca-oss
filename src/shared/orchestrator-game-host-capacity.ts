@@ -1,5 +1,6 @@
 import { gameFleetReportOf } from './orchestrator-game-fleet-verbs'
-import type { GameHostLoad } from './orchestrator-game-host-load'
+import { LOCAL_GAME_HOST, type GameHostLoad } from './orchestrator-game-host-load'
+import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** The host fields of a `diagnostics.memory` snapshot, which every paired host answers. */
@@ -60,22 +61,40 @@ export function gameHostCapacitiesOf(
   })
 }
 
-/** Only a lead with per-host caps gets the rows; null readings mean no environment is saved. */
+/** A lead with per-host caps gets the rows; one with no saved host gets this machine as `localHost`. */
 export function withGameHostCapacity(
   state: OrchestratorGameState,
   readings: Readings | null
 ): OrchestratorGameState {
-  const loads = state.role === 'lead' && readings ? gameFleetReportOf(state).hosts : undefined
-  return loads ? { ...state, hostCapacity: gameHostCapacitiesOf(readings!, loads) } : state
+  if (state.role !== 'lead' || !readings) {
+    return state
+  }
+  const loads = gameFleetReportOf(state).hosts
+  if (loads) {
+    return { ...state, hostCapacity: gameHostCapacitiesOf(readings, loads) }
+  }
+  // Why only alone: a saved host whose cap could not be read is still another machine.
+  if (readings.length !== 1) {
+    return state
+  }
+  const cap = (state.lead ?? DEFAULT_GAME_LEAD).cap
+  const alone = gameFleetReportOf({
+    ...state,
+    hosts: [{ host: LOCAL_GAME_HOST, cap, status: 'ok' }]
+  })
+  const local = alone.hosts?.filter((one) => one.host === LOCAL_GAME_HOST) ?? []
+  const [localHost] = gameHostCapacitiesOf(readings, local)
+  return localHost ? { ...state, localHost } : state
 }
 
 const gbOf = (bytes: number): string =>
   bytes < 10 * GB ? (bytes / GB).toFixed(1) : String(Math.round(bytes / GB))
 
+export const gameHostMemoryIsLow = (one: GameHostMachine): boolean =>
+  one.availableMemory < LOW_MEMORY_BYTES || one.availableMemory < one.totalMemory * 0.1
+
 const flagsOf = (one: GameHostMachine): string[] => [
-  ...(one.availableMemory < LOW_MEMORY_BYTES || one.availableMemory < one.totalMemory * 0.1
-    ? ['low memory']
-    : []),
+  ...(gameHostMemoryIsLow(one) ? ['low memory'] : []),
   ...(one.loadAverage1m !== null && one.loadAverage1m >= one.cpuCoreCount ? ['busy'] : [])
 ]
 

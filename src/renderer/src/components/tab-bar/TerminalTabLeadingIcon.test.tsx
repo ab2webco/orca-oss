@@ -27,12 +27,12 @@ describe('TerminalTabLeadingIcon', () => {
     expect(markup).toContain('data-agent-icon="codex"')
   })
 
-  it('shows completion as an emerald check', () => {
+  it('shows completion as a green check', () => {
     const markup = renderStatus('done')
 
     expect(markup).toContain('data-agent-activity-status="done"')
     expect(markup).toContain('lucide-circle-check')
-    expect(markup).toContain('text-emerald-500')
+    expect(markup).toContain('text-status-success')
     expect(markup).toContain('data-agent-icon="codex"')
   })
 

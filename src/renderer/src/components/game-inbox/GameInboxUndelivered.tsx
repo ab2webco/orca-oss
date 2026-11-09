@@ -34,7 +34,7 @@ export function GameInboxUndelivered({
                 {question.ticket}
               </span>
             ) : null}
-            <span className="truncate">{question.question}</span>
+            <span className="min-w-0 break-words">{question.question}</span>
           </li>
         ))}
       </ul>

@@ -8,6 +8,8 @@ import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
 import type { GameInboxThreads } from '../../../src/shared/orchestrator-game-inbox-threads'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
+import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
+import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
 
 export type TeamMemberRow = {
@@ -22,8 +24,22 @@ export type TeamMemberRow = {
   host: string | null
   agent: string | null
   model: string | null
-  pr: { number: number; url: string; state: HostedReviewState; ci: CheckStatus | 'none' } | null
+  pr: {
+    number: number
+    url: string
+    state: HostedReviewState
+    ci: CheckStatus | 'none'
+    /** CI per pushed head, oldest first; empty from an older host. */
+    ciHistory: { headSha: string; ci: CheckStatus }[]
+    comments: number | null
+  } | null
   ticketStatus: string | null
+  /** The tool or link it is on now; null once it stopped. */
+  live: string | null
+  /** When its state began, on the host's clock. */
+  since: number | null
+  account: { email: string; usedPercent: number | null } | null
+  limit: { resetsAt: number | null; loggedOut: boolean } | null
 }
 
 export type TeamMetrics = {
@@ -34,8 +50,6 @@ export type TeamMetrics = {
 }
 
 export type TeamLeadView = { members: TeamMemberRow[]; metrics: TeamMetrics | null }
-
-export type TeamBadge = { tone: 'question' | 'working'; count: number } | null
 
 /** `unavailable`: the host's phone allowlist predates the Inbox tab. */
 export type TeamInbox =
@@ -49,7 +63,6 @@ export type TeamDrawerData = {
   questions: GameOwnerQuestion[]
   /** The worktree the owner board answers through; null when the host has none for this repo. */
   answerWorktreeId: string | null
-  badge: TeamBadge
   inbox: TeamInbox
   answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
 }
@@ -63,19 +76,70 @@ const text = (value: unknown): string | null =>
 const AGENT_STATES: readonly GameAgent['state'][] = ['waiting', 'working', 'idle', 'done']
 const STATE_ORDER = new Map(AGENT_STATES.map((state, index) => [state, index]))
 
+const num = (value: unknown): number | null => (typeof value === 'number' ? value : null)
+
 function prOf(raw: unknown): TeamMemberRow['pr'] {
   if (!isRecord(raw) || typeof raw.number !== 'number' || !text(raw.url)) {
     return null
   }
+  const heads = Array.isArray(raw.ciHistory) ? raw.ciHistory : []
   return {
     number: raw.number,
     url: raw.url as string,
     state: (text(raw.state) ?? 'open') as HostedReviewState,
-    ci: (text(raw.ci) ?? 'none') as CheckStatus | 'none'
+    ci: (text(raw.ci) ?? 'none') as CheckStatus | 'none',
+    ciHistory: heads.flatMap((head) =>
+      isRecord(head) && text(head.ci) && text(head.headSha)
+        ? [{ headSha: head.headSha as string, ci: head.ci as CheckStatus }]
+        : []
+    ),
+    comments: num(raw.commentCount)
   }
 }
 
-function memberRowOf(raw: Rec, questionTickets: ReadonlySet<string>): TeamMemberRow | null {
+// Why: a worker's Bash line carries its dispatch capability, a bearer secret no card may show.
+const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
+
+// Why only working or waiting: an agent keeps its last tool after it stops.
+function liveOf(raw: Rec, state: GameAgent['state']): string | null {
+  if (state !== 'working' && state !== 'waiting') {
+    return null
+  }
+  const activity = isRecord(raw.activity) ? raw.activity : null
+  if (activity?.running === true && text(activity.name) && text(activity.id)) {
+    return `${activity.name as string} · ${activity.id as string}`
+  }
+  const tool = text(raw.toolName)
+  if (!tool || isAskUserQuestionTool(tool)) {
+    return null
+  }
+  const input = text(raw.toolInput)?.replace(DISPATCH_CAPABILITY, '[redacted]')
+  return input ? `${agentToolLabelOf(tool)} · ${input}` : agentToolLabelOf(tool)
+}
+
+function accountUsageOf(metrics: unknown): Map<string, number> {
+  const accounts =
+    isRecord(metrics) && Array.isArray(metrics.claudeAccounts) ? metrics.claudeAccounts : []
+  return new Map(
+    accounts.flatMap((one) =>
+      isRecord(one) && text(one.email) && typeof one.sessionPercent === 'number'
+        ? [[one.email as string, one.sessionPercent] as const]
+        : []
+    )
+  )
+}
+
+function modelOf(launch: unknown): string | null {
+  const model = isRecord(launch) ? text(launch.model) : null
+  const effort = model && isRecord(launch) ? text(launch.effort) : null
+  return effort ? `${model} · ${effort}` : model
+}
+
+function memberRowOf(
+  raw: Rec,
+  questionTickets: ReadonlySet<string>,
+  usage: ReadonlyMap<string, number>
+): TeamMemberRow | null {
   const key = text(raw.paneKey)
   if (!key || raw.isMember !== true) {
     return null
@@ -88,6 +152,7 @@ function memberRowOf(raw: Rec, questionTickets: ReadonlySet<string>): TeamMember
     ? (item.identifier as string).toUpperCase()
     : (ticketInText(name) ?? ticketInText(text(worktree.branch)))
   const remote = isRecord(raw.remote) ? raw.remote : null
+  const email = isRecord(raw.account) ? text(raw.account.email) : null
   return {
     key,
     name,
@@ -97,13 +162,19 @@ function memberRowOf(raw: Rec, questionTickets: ReadonlySet<string>): TeamMember
     needsYou: state === 'waiting' || (ticket !== null && questionTickets.has(ticket)),
     host: remote ? text(remote.host) : null,
     agent: text(raw.agentType),
-    model: isRecord(raw.launch) ? text(raw.launch.model) : null,
+    model: modelOf(raw.launch),
     pr: prOf(raw.review),
     ticketStatus: item
       ? (text(item.status) ?? text(item.statusGroup))
       : remote?.ticketDone === true
         ? 'done'
-        : null
+        : null,
+    live: liveOf(raw, state),
+    since: num(raw.stateSince),
+    account: email ? { email, usedPercent: usage.get(email) ?? null } : null,
+    limit: isRecord(raw.limit)
+      ? { resetsAt: num(raw.limit.resetsAt), loggedOut: raw.limit.loggedOut === true }
+      : null
   }
 }
 
@@ -139,21 +210,14 @@ export function teamLeadViewOf(
     return null
   }
   const agents = Array.isArray(raw.agents) ? raw.agents : []
+  const usage = accountUsageOf(raw.metrics)
   const members = agents
-    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, questionTickets)] : []))
+    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, questionTickets, usage)] : []))
     .filter((one): one is TeamMemberRow => one !== null)
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
   return { members, metrics: metricsOf(raw.metrics) }
-}
-
-export function teamBadgeOf(openQuestions: number, members: readonly TeamMemberRow[]): TeamBadge {
-  if (openQuestions > 0) {
-    return { tone: 'question', count: openQuestions }
-  }
-  const working = members.filter((one) => one.state === 'working').length
-  return working > 0 ? { tone: 'working', count: working } : null
 }
 
 /** The owner board is per repo, so the lead's questions are its own repo's. */
@@ -168,14 +232,45 @@ export function leadOwnerQuestionsOf(
     : { worktreeId: null, questions: [] }
 }
 
-export function teamButtonLabel(badge: TeamBadge): string {
-  if (!badge) {
-    return 'Open Team'
+export type TeamPeek = { tone: 'question' | 'working' | 'idle'; text: string }
+
+/** The sheet's collapsed line: who needs you, else who works. */
+export function teamPeekOf(
+  view: TeamLeadView,
+  openQuestions: number,
+  questionTickets: readonly string[] = []
+): TeamPeek {
+  const asked = new Set(questionTickets)
+  // Why: a waiting member whose ticket already has an open question is that one ask.
+  const waiting = view.members.filter(
+    (one) => one.state === 'waiting' && !(one.ticket && asked.has(one.ticket))
+  ).length
+  const need = openQuestions + waiting
+  if (need > 0) {
+    return { tone: 'question', text: `${need} ${need === 1 ? 'needs' : 'need'} you` }
   }
-  const plural = badge.count === 1 ? '' : 's'
-  return badge.tone === 'question'
-    ? `Open Team, ${badge.count} question${plural} waiting`
-    : `Open Team, ${badge.count} member${plural} working`
+  const total = view.members.length
+  if (total === 0) {
+    return { tone: 'idle', text: 'No members running' }
+  }
+  const working = view.members.filter((one) => one.state === 'working').length
+  return {
+    tone: working > 0 ? 'working' : 'idle',
+    text: `${working} working · ${total} member${total === 1 ? '' : 's'}`
+  }
+}
+
+/** Time in state, as the desktop card words it: `now`, `10 min`, `13 h`, `3 d`. */
+export function teamAgeText(since: number, now: number): string {
+  const minutes = Math.floor((now - since) / 60_000)
+  if (minutes < 1) {
+    return 'now'
+  }
+  if (minutes < 60) {
+    return `${minutes} min`
+  }
+  const hours = Math.floor(minutes / 60)
+  return hours < 24 ? `${hours} h` : `${Math.floor(hours / 24)} d`
 }
 
 export function formatLeadTime(ms: number): string {

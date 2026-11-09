@@ -5,10 +5,14 @@ import {
 } from './orchestrator-game-integrations'
 
 /** A project button: a prompt the lead receives as a turn, or an MCP tool the mod calls itself. */
-export type OrchestratorGameAction = { label: string; command?: string; key?: string } & (
-  | { prompt: string }
-  | { mcp: GameMcpCall }
-)
+export type OrchestratorGameAction = {
+  label: string
+  command?: string
+  key?: string
+  icon?: GameActionIcon
+  /** Shown in the panel's action row; unpinned ones live in its menu. */
+  pin?: boolean
+} & ({ prompt: string } | { mcp: GameMcpCall })
 
 export type GameMcpCall = { server: string; tool: string; args?: Record<string, unknown> }
 
@@ -16,6 +20,22 @@ export type GameMcpCall = { server: string; tool: string; args?: Record<string, 
 export type GameAction = OrchestratorGameAction & { id: string }
 
 export const GAME_ACTIONS_MAX = 6
+export const GAME_ACTION_PINS_MAX = 3
+// Why Orca's last: play, check and stop are its own buttons' icons; Settings offers the first eight.
+export const GAME_ACTION_ICONS = [
+  'ship',
+  'flask',
+  'tag',
+  'review',
+  'scan',
+  'list',
+  'pulse',
+  'launch',
+  'play',
+  'check',
+  'stop'
+] as const
+export type GameActionIcon = (typeof GAME_ACTION_ICONS)[number]
 export const GAME_PROMPT_MAX = 2000
 const GAME_MCP_ARGS_MAX = 4096
 // Why: /mcp names servers with spaces and dots (`claude.ai Gmail`); tools are plain identifiers.
@@ -41,6 +61,14 @@ const DEFAULT_WORK_PROMPT = 'Work on {id}: {title}\n{url}'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** The icon a setting names, or the warning that costs it its icon. */
+export function gameActionIconOf(raw: unknown, at: string): GameActionIcon | { warning: string } {
+  const icon = typeof raw === 'string' ? raw.trim() : ''
+  return (GAME_ACTION_ICONS as readonly string[]).includes(icon)
+    ? (icon as GameActionIcon)
+    : { warning: `${at} must be one of ${GAME_ACTION_ICONS.join(', ')}` }
+}
 
 /** Null when every `{name}` is one the caller can fill, else the first one it cannot. */
 export function unknownPlaceholderOf(template: string, known: ReadonlySet<string>): string | null {
@@ -149,17 +177,51 @@ function actionKeysOf(raw: unknown): { keys: (string | undefined)[]; warnings: s
   return { keys, warnings }
 }
 
+// Why apart: a bad icon or pin costs the action that field, never its button.
+function withLook(
+  action: OrchestratorGameAction,
+  entry: Record<string, unknown>,
+  at: string,
+  pinned: { count: number },
+  warnings: string[]
+): OrchestratorGameAction {
+  const look: Pick<OrchestratorGameAction, 'icon' | 'pin'> = {}
+  if (entry.icon !== undefined) {
+    const icon = gameActionIconOf(entry.icon, `${at}.icon`)
+    if (typeof icon === 'string') {
+      look.icon = icon
+    } else {
+      warnings.push(icon.warning)
+    }
+  }
+  if (entry.pin !== undefined && typeof entry.pin !== 'boolean') {
+    warnings.push(`${at}.pin must be true or false`)
+  } else if (entry.pin === true && pinned.count >= GAME_ACTION_PINS_MAX) {
+    warnings.push(`${at}.pin: the panel row holds ${GAME_ACTION_PINS_MAX} pinned actions`)
+  } else if (entry.pin !== undefined) {
+    pinned.count += entry.pin ? 1 : 0
+    look.pin = entry.pin
+  }
+  return { ...action, ...look }
+}
+
 export function parseGameActions(raw: unknown): {
   value: OrchestratorGameAction[] | undefined
   warnings: string[]
 } {
   const { keys, warnings } = actionKeysOf(raw)
+  const looks: string[] = []
+  const pinned = { count: 0 }
   const parsed = parseGameList(raw, 'actions', GAME_ACTIONS_MAX, (entry, at, index) => {
     const action = parseAction(entry, at)
+    if (typeof action === 'string' || !isRecord(entry)) {
+      return action
+    }
     const key = keys[index]
-    return typeof action === 'string' || key === undefined ? action : { ...action, key }
+    const looked = withLook(action, entry, at, pinned, looks)
+    return key === undefined ? looked : { ...looked, key }
   })
-  return { value: parsed.value, warnings: [...parsed.warnings, ...warnings] }
+  return { value: parsed.value, warnings: [...parsed.warnings, ...looks, ...warnings] }
 }
 
 /** The project's actions for this worktree; a prompt whose placeholder has no value is left out. */

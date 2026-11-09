@@ -99,7 +99,12 @@ const propsOf = (component: string, i: number): Record<string, unknown> => {
     case 'AssistantMessage':
       return { text: `Step ${i} done.`, isFirstOfReply: i % 2 === 0 }
     case 'UserMessage':
-      return { text: `Do step ${i}`, origin: { kind: 'composer' }, isExpanded: false }
+      // Why the brief: the mod draws only Orca's brief line; any other prompt is Claude Code's own.
+      return {
+        text: `Read your Orca Lab brief at .orca/briefs/ctx_${i}.md (task t${i}) and follow it.`,
+        origin: { kind: 'composer' },
+        isExpanded: false
+      }
     default:
       throw new Error(`render-loop.test.ts has no props for ${component}: add a case`)
   }
@@ -157,11 +162,14 @@ const start = async ($: Engine, on: On, role: Role, counts: Counts) => {
 }
 
 describe('render loops', () => {
-  test('the mod draws at least the band, the spinner and both panes', () => {
+  // Why: the team, its scene and the arcade draw in Orca's Team panel (ORCA-1055); the Spinner is
+  // only hidden behind the live line (ORCA-1109), which live-line.test.ts checks.
+  test('the mod draws the line above the prompt and no scene or pane', () => {
     const drawn = targetsOf().map((one) => one.requestId ?? one.component)
-    expect(drawn).toEqual(
-      expect.arrayContaining(['AbovePrompt', 'Spinner', 'orca-game-fleet', 'orca-game-arcade'])
-    )
+    expect(drawn).toContain('AbovePrompt')
+    for (const gone of ['orca-game-fleet', 'orca-game-arcade']) {
+      expect(drawn).not.toContain(gone)
+    }
   })
 
   for (const role of ['lead', 'member'] as const) {

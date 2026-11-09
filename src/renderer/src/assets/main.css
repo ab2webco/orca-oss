@@ -100,7 +100,11 @@
   --color-terminal-pane-title-on-light-input-bg: var(--terminal-pane-title-on-light-input-bg);
   --color-terminal-pane-title-on-light-separator: var(--terminal-pane-title-on-light-separator);
   --color-ai-action-accent: var(--ai-action-accent);
+  --color-status-attention: var(--status-attention);
+  --color-status-warning: var(--status-warning);
+  --color-status-info: var(--status-info);
   --color-status-success: var(--status-success);
+  --color-status-idle: var(--status-idle);
   --color-status-success-background: var(--status-success-background);
   --color-status-success-border: var(--status-success-border);
   --color-workspace-status-done: var(--workspace-status-done);
@@ -184,12 +188,17 @@
   --agent-tail-cyan: var(--color-cyan-600);
   --agent-tail-white: var(--color-zinc-700);
   --ai-action-accent: var(--color-violet-500);
-  /* "An agent is asking you something" — one hue for every surface that shows
-     it (sidebar, tabs, dashboard, agent map). Orange, not amber: on the map it
-     has to stay separable from working-yellow at a glance. */
-  --agent-question: var(--color-orange-600);
+  /* Status colour language: each tone has one fixed meaning (STYLEGUIDE.md).
+     The text-on-background floor is 4.5:1 so tones also work as text. */
+  --status-attention: var(--destructive);
+  --status-warning: #b45309;
+  --status-info: #0369a1;
+  --status-idle: var(--muted-foreground);
+  /* "An agent is asking you something" is the needs-you tone on every surface
+     (sidebar, tabs, dashboard, agent map). */
+  --agent-question: var(--status-attention);
   /* Legible weight for text/glyphs on a tinted --agent-question surface. */
-  --agent-question-text: var(--color-orange-700);
+  --agent-question-text: color-mix(in srgb, var(--status-attention) 80%, black);
   --status-success: #15803d;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
@@ -306,9 +315,13 @@
   --ring: #737373;
   --terminal-pane-locate: var(--color-blue-400);
   --ai-action-accent: var(--color-violet-400);
-  --agent-question: var(--color-orange-500);
-  --agent-question-text: var(--color-orange-300);
-  --status-success: #86efac;
+  --status-attention: var(--destructive);
+  --status-warning: #f5b342;
+  --status-info: #4fc3f7;
+  --status-idle: var(--muted-foreground);
+  --agent-question: var(--status-attention);
+  --agent-question-text: color-mix(in srgb, var(--status-attention) 45%, white);
+  --status-success: #34d399;
   --status-success-background: color-mix(in srgb, var(--status-success) 10%, transparent);
   --status-success-border: color-mix(in srgb, var(--status-success) 25%, transparent);
   --workspace-status-done: #c7a594;

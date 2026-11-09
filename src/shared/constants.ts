@@ -299,7 +299,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     floatingTerminalCwd: '~',
     floatingTerminalTrustedCwds: [],
     floatingTerminalCwdMigratedToAppWorkspace: true,
-    floatingTerminalTriggerLocation: 'floating-button',
+    floatingTerminalTriggerLocation: 'status-bar',
     notifications: getDefaultNotificationSettings(),
     diffDefaultView: 'inline',
     diffWordWrap: false,

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ScrollToCurrentWorkspaceToolbarButton } from './ScrollToCurrentWorkspaceToolbarButton'
 import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
+import { useElementUncovered } from './use-element-uncovered'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { hasFeatureInteraction } from '../../../../shared/feature-interactions'
@@ -31,6 +32,10 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
   useTranslation()
   const [workspaceBoardMovedHintOpen, setWorkspaceBoardMovedHintOpen] = React.useState(false)
   const movedHintEligibleRef = React.useRef<boolean | null>(null)
+  const [boardTrigger, setBoardTrigger] = React.useState<HTMLButtonElement | null>(null)
+  // Why: a narrow window draws the Team panel over this button; a hint pointing at it would cover the panel's dock.
+  const boardTriggerSeen = useElementUncovered(boardTrigger, workspaceBoardMovedHintOpen)
+  const sidebar = boardTrigger?.closest<HTMLElement>('[data-worktree-sidebar-root]') ?? null
   const persistedUIReady = useAppStore((state) => state.persistedUIReady)
   const hasUsedWorkspaceBoard = useAppStore((state) =>
     hasFeatureInteraction(state.featureInteractions, 'workspace-board')
@@ -77,9 +82,10 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
         </div>
         <div className="flex items-center gap-1">
           <ScrollToCurrentWorkspaceToolbarButton />
-          <Tooltip open={workspaceBoardMovedHintOpen ? true : undefined}>
+          <Tooltip open={workspaceBoardMovedHintOpen ? boardTriggerSeen : undefined}>
             <TooltipTrigger asChild>
               <Button
+                ref={setBoardTrigger}
                 // Why: previewing the board from a card drag lights up the
                 // trigger so it's clear the drag is another way to open it.
                 variant={
@@ -100,7 +106,14 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
                 <Kanban className="size-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}>
+            {/* Why bounded by the sidebar: wider, the Spanish hint was cut at a 320 px window's edge and lay over the Team dock. */}
+            <TooltipContent
+              side="top"
+              sideOffset={4}
+              collisionPadding={8}
+              collisionBoundary={sidebar}
+              className="max-w-(--radix-tooltip-content-available-width)"
+            >
               {workspaceBoardMovedHintOpen
                 ? translate(
                     'auto.components.sidebar.SidebarToolbar.87d0064026',

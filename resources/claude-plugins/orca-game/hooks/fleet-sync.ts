@@ -5,10 +5,12 @@ import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
 import { readJevAdvisor } from './advisor-state'
-import { offerArcadeOnUnlock } from './arcade-unlock'
+import { celebrateArcadeOnUnlock, migrateKeptArcadeOffers } from './arcade-unlock'
 import { cliInvocationOf } from './cli-invocation'
 import {
+  gameArcadeMigrateArgvOf,
   gameFleetArgvOf,
+  gameHideTabArgvOf,
   gameStateArgvOf,
   gameViewArgvOf,
   openLinkArgvOf,
@@ -19,10 +21,13 @@ import {
 import { gameStateOf, parseGameState } from './game-state'
 import type { GameViewId } from './game-view'
 import { gameLocale, gameStrings, setGameLocale } from './game-strings'
+import { setTerminalAppearance } from './terminal-palette'
 import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
 import { isLeadStarted } from './lead-started'
 import { runningLeadSubagents, withLeadSubagents } from './lead-subagents'
+import { projectKeyOf } from './panel-layout'
+import { migrateHiddenReviews } from './panel-layout-store'
 import { teamEventsOf } from './team-events'
 import {
   clawdReact,
@@ -119,6 +124,20 @@ export async function readGameStateOutput($: EngineInterface): Promise<GameState
   return { kind: 'ok', stdout: out.stdout }
 }
 
+async function sendKeptOffers($: EngineInterface, offers: readonly string[]): Promise<boolean> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, gameArcadeMigrateArgvOf(cli, offers))
+  if (out?.exitCode !== 0) {
+    return false
+  }
+  try {
+    const reply: unknown = JSON.parse(out.stdout)
+    return typeof reply === 'object' && reply !== null && 'ok' in reply && reply.ok === true
+  } catch {
+    return false
+  }
+}
+
 /** What `orca game fleet` prints for this pane's project; undefined when Orca could not answer. */
 export async function readFleetText($: EngineInterface): Promise<string | undefined> {
   const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
@@ -180,6 +199,19 @@ export async function storeGameView(
   return out?.exitCode === 0
 }
 
+// Why once a session: an older Orca refuses the command, and the poll must not ask every 30 s.
+async function migrateTabsOnce($: EngineInterface, state: GameState): Promise<void> {
+  if (quest.isTabsMigrationAsked || state.role !== 'lead' || state.worktree === null) {
+    return
+  }
+  quest.isTabsMigrationAsked = true
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  await migrateHiddenReviews($, projectKeyOf(state.worktree.id), async () => {
+    const out = await runCli($, gameHideTabArgvOf(cli, 'prs'))
+    return out?.exitCode === 0
+  })
+}
+
 type Score = { xp: number; recent: readonly RecentReward[] }
 
 async function syncXp(
@@ -231,7 +263,11 @@ export async function refresh($: EngineInterface): Promise<void> {
       setGameLocale(next.locale)
       $.ui.invalidate('ui.render')
     }
+    if (next.appearance !== undefined && setTerminalAppearance(next.appearance)) {
+      $.ui.invalidate('ui.render')
+    }
     questLiveConfig($, next.config, next.sources)
+    await migrateTabsOnce($, next).catch(() => undefined)
   }
   const config = gameConfig()
   const kept: Score = { xp: before.xp, recent: before.recent ?? [] }
@@ -264,10 +300,12 @@ export async function refresh($: EngineInterface): Promise<void> {
     await syncActionCommands($, next.actions ?? []).catch(() => undefined)
     const waiting = next.agents.find((agent) => !agent.isLeader && agent.state === 'waiting')
     questFleet($, fleetPhaseOf(partyOf(next, config.rewards)), waiting?.displayName ?? '')
-    // Why after questFleet: a teammate waiting on the user must already hold the offer it opens.
     if (config.rewards) {
-      await offerArcadeOnUnlock($, before.state, next).catch(() => undefined)
+      await celebrateArcadeOnUnlock($, before.state, next).catch(() => undefined)
     }
+    await migrateKeptArcadeOffers($, next, (offers) => sendKeptOffers($, offers)).catch(
+      () => undefined
+    )
   }
 }
 

@@ -106,6 +106,7 @@ function Sidebar({
     <TooltipProvider delayDuration={400}>
       <div
         ref={containerRef}
+        data-worktree-sidebar-root=""
         data-native-file-drop-target={sidebarOpen ? nativeDropTarget : undefined}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
         style={leftSidebarStyle}
@@ -198,7 +199,6 @@ function Sidebar({
       {settings?.experimentalAgentDashboardPopout === true ? (
         <React.Suspense fallback={null}>
           <AgentDashboardSidebarHost
-            sidebarOpen={sidebarOpen}
             workspaceBoardOpen={workspaceBoardOpen}
             closeWorkspaceBoard={closeWorkspaceBoard}
             leftSidebarStyle={leftSidebarStyle}

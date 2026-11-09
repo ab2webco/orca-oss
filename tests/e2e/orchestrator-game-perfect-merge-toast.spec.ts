@@ -2,25 +2,22 @@ import { readdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { getTerminalContent } from './helpers/terminal'
-import type { Page } from '@stablyai/playwright-test'
 import {
   claudeVersionOk,
-  clickTerminalText,
   screenRows,
   startGameBand,
   type GameBand
 } from './helpers/orchestrator-game-band'
 
-// ORCA-686: the band toasts a perfect merge only for a review the host marked
+// ORCA-686: the mod toasts a perfect merge only for a review the host marked
 // `perfectMerge: true`; a merge marked false or with the decision absent earns none.
+// Since ORCA-1055 the pane draws no band, so a pushed fleet change makes each read.
 const WIDTHS = [1440, 768, 390, 320] as const
 const RUNS = [
-  // `cue` is the toast's first row; a narrow window wraps the rest. The band's loading
-  // chip is a bare ↻ too, so Refresh is clicked by its word.
-  { theme: 'dark', locale: 'en', refresh: 'Refresh', cue: (label: string) => `${label} perfect` },
-  { theme: 'light', locale: 'en', refresh: 'Refresh', cue: (label: string) => `${label} perfect` },
-  { theme: 'dark', locale: 'es', refresh: 'Actualizar', cue: (label: string) => `${label}: merge` }
+  // `cue` is the toast's first row; a narrow window wraps the rest.
+  { theme: 'dark', locale: 'en', cue: (label: string) => `${label} perfect` },
+  { theme: 'light', locale: 'en', cue: (label: string) => `${label} perfect` },
+  { theme: 'dark', locale: 'es', cue: (label: string) => `${label}: merge` }
 ] as const
 
 type Decision = boolean | undefined
@@ -119,28 +116,27 @@ async function awardedIds(root: string): Promise<string> {
   return texts.join('\n')
 }
 
-/** Clicks the band's Refresh until the mod reads again; a click during a refresh is dropped. */
-async function refreshUntilRead(page: Page, band: GameBand, label: string): Promise<void> {
+let fleetVersion = 1
+
+/** Pushes a fleet change, as Orca does, and waits for the read it starts. */
+async function readAgain(band: GameBand): Promise<void> {
   const before = await band.reads()
-  for (let attempt = 0; attempt < 10; attempt++) {
-    await clickTerminalText(page, label)
-    try {
-      await expect.poll(band.reads, { timeout: 3_000, intervals: [100] }).toBeGreaterThan(before)
-      return
-    } catch {
-      // The click landed during a refresh; click again.
-    }
-  }
-  throw new Error('Refresh never made the mod read again')
+  fleetVersion += 1
+  await band.pushFleetChange(fleetVersion)
+  await expect
+    .poll(band.reads, { timeout: 10_000, intervals: [100], message: 'the push never read' })
+    .toBeGreaterThan(before)
 }
 
+// Why at file level: a skip inside the test runs after the app launched, ~14 s per case on CI.
+test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
+
 for (const run of RUNS) {
-  test(`the band toasts a perfect merge only when the host decided one (${run.theme}, ${run.locale})`, async ({
+  test(`the mod toasts a perfect merge only when the host decided one (${run.theme}, ${run.locale})`, async ({
     electronApp,
     orcaPage,
     testRepoPath
   }, testInfo) => {
-    test.skip(!claudeVersionOk(), 'needs Claude Code 2.1.287 or newer on PATH')
     test.setTimeout(300_000)
     await waitForSessionReady(orcaPage)
     const band = await startGameBand(orcaPage, testRepoPath, {
@@ -150,11 +146,8 @@ for (const run of RUNS) {
     })
     try {
       await expect
-        .poll(async () => getTerminalContent(orcaPage, 20_000), {
-          timeout: 60_000,
-          message: 'the band never drew the seeded party'
-        })
-        .toContain('Juno')
+        .poll(band.reads, { timeout: 60_000, message: 'the mod never read the seeded state' })
+        .toBeGreaterThan(0)
 
       for (const [index, width] of WIDTHS.entries()) {
         const round = index + 1
@@ -169,7 +162,7 @@ for (const run of RUNS) {
         // Why one read per step: Claude Code drops a toast when four arrive in one frame.
         for (const step of ['open', 'others-merged', 'all-merged'] as const) {
           await band.setState(gameState(round, step, run.locale))
-          await refreshUntilRead(orcaPage, band, run.refresh)
+          await readAgain(band)
         }
         const numbers = numbersOf(round)
         const toast = `LUM-15 · ${run.cue(`#${numbers.juno}`)}`

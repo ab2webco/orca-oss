@@ -1,0 +1,318 @@
+import { useState } from 'react'
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Text } from '../theme/dynamic-type-text'
+import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
+import {
+  formatLeadTime,
+  teamPeekOf,
+  type TeamDrawerData,
+  type TeamMetrics,
+  type TeamPeek
+} from './team-drawer-model'
+import { TeamMemberCard } from './TeamMemberCard'
+import { TeamInboxTab } from './TeamInboxTab'
+
+type TeamTab = 'team' | 'inbox'
+
+type Props = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  team: TeamDrawerData
+  now: number
+  onOpenLink: (url: string) => void
+}
+
+/** V30's collapsed sheet height. */
+export const TEAM_PEEK_HEIGHT = 60
+
+function PeekBar({ peek, open, onPress }: { peek: TeamPeek; open: boolean; onPress: () => void }) {
+  const tone = { question: colors.statusRed, working: colors.statusGreen, idle: colors.textMuted }[
+    peek.tone
+  ]
+  return (
+    <Pressable
+      style={styles.peek}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${open ? 'Close' : 'Open'} Team, ${peek.text}`}
+      aria-expanded={open}
+    >
+      <View style={styles.grab} />
+      <View style={styles.peekLine}>
+        <View style={[styles.dot, { backgroundColor: tone }]} />
+        <Text
+          style={[styles.peekText, peek.tone === 'question' && { color: tone }]}
+          numberOfLines={1}
+        >
+          {peek.text}
+        </Text>
+      </View>
+    </Pressable>
+  )
+}
+
+function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
+  const tiles = [
+    metrics.latestDay
+      ? { label: `Merged on ${metrics.latestDay.day}`, value: metrics.latestDay.merged }
+      : null,
+    // Why the no-break space: a narrow tile wrapped the "d" alone onto its own line.
+    { label: `Merged in ${metrics.windowDays} d`, value: metrics.mergedInWindow },
+    metrics.leadTimeMedianMs === null
+      ? null
+      : { label: 'Median lead time', value: formatLeadTime(metrics.leadTimeMedianMs) }
+  ].filter((one) => one !== null)
+  return (
+    <View style={styles.metrics}>
+      {tiles.map((tile) => (
+        <View key={tile.label} style={styles.metricRow}>
+          <Text style={styles.metricLabel} numberOfLines={1}>
+            {tile.label}
+          </Text>
+          <Text style={styles.metricValue}>{String(tile.value)}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function TabBar({
+  active,
+  inboxCount,
+  onSelect
+}: {
+  active: TeamTab
+  inboxCount: number
+  onSelect: (tab: TeamTab) => void
+}) {
+  const tabs: { tab: TeamTab; label: string }[] = [
+    { tab: 'team', label: 'Team' },
+    { tab: 'inbox', label: 'Inbox' }
+  ]
+  return (
+    <View style={styles.tabs} accessibilityRole="tablist">
+      {tabs.map(({ tab, label }) => {
+        const selected = tab === active
+        return (
+          <Pressable
+            key={tab}
+            style={({ pressed }) => [
+              styles.tab,
+              selected && styles.tabActive,
+              pressed && !selected && styles.tabPressed
+            ]}
+            onPress={() => onSelect(tab)}
+            accessibilityRole="tab"
+            aria-selected={selected}
+            accessibilityLabel={label}
+          >
+            <Text style={[styles.tabText, selected && styles.tabTextActive]} numberOfLines={1}>
+              {label}
+            </Text>
+            {tab === 'inbox' && inboxCount > 0 ? (
+              <View style={styles.count}>
+                <Text style={styles.countText}>{String(inboxCount)}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that opens to 84%. */
+export function TeamSheet({ open, onOpenChange, team, now, onOpenLink }: Props) {
+  const { view, questions } = team
+  const insets = useSafeAreaInsets()
+  const { height } = useWindowDimensions()
+  // Why null until picked: each open lands on the Inbox while a question waits, else on the Team.
+  const [picked, setPicked] = useState<TeamTab | null>(null)
+  if (!view) {
+    return null
+  }
+  const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
+  const peek = teamPeekOf(
+    view,
+    questions.length,
+    questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : []))
+  )
+  const close = (): void => {
+    setPicked(null)
+    onOpenChange(false)
+  }
+  return (
+    <View style={[styles.dock, { paddingBottom: insets.bottom }]}>
+      <PeekBar peek={peek} open={false} onPress={() => onOpenChange(true)} />
+      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
+        {/* Why no scrim: the lead's terminal stays readable above the sheet, as in V30. */}
+        <Pressable style={styles.above} onPress={close} accessible={false} />
+        <View style={[styles.dock, styles.sheet, { height: Math.round(height * 0.84) }]}>
+          <PeekBar peek={peek} open onPress={close} />
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}
+          >
+            <TabBar active={tab} inboxCount={questions.length} onSelect={setPicked} />
+            {tab === 'inbox' ? (
+              <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
+            ) : (
+              <>
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>{`Members (${view.members.length})`}</Text>
+                  {view.members.length > 0 ? (
+                    view.members.map((member) => (
+                      <TeamMemberCard
+                        key={member.key}
+                        member={member}
+                        now={now}
+                        onOpenLink={onOpenLink}
+                      />
+                    ))
+                  ) : (
+                    <Text style={styles.empty}>No members running.</Text>
+                  )}
+                </View>
+                {view.metrics ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Metrics</Text>
+                    <MetricsSummary metrics={view.metrics} />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  dock: {
+    backgroundColor: colors.bgPanel,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card
+  },
+  peek: {
+    height: TEAM_PEEK_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7
+  },
+  grab: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted
+  },
+  peekLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: spacing.lg
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
+  },
+  peekText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize + 1
+  },
+  above: {
+    flex: 1
+  },
+  sheet: {
+    overflow: 'hidden'
+  },
+  content: {
+    paddingHorizontal: spacing.lg
+  },
+  section: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg
+  },
+  sectionTitle: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    fontWeight: '700',
+    textTransform: 'uppercase'
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle
+  },
+  tab: {
+    flex: 1,
+    minHeight: MIN_TOUCH_TARGET,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    // Reserved so the active underline does not shift the row.
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent'
+  },
+  tabActive: {
+    borderBottomColor: colors.textPrimary
+  },
+  tabPressed: {
+    opacity: 0.7
+  },
+  tabText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  },
+  tabTextActive: {
+    color: colors.textPrimary
+  },
+  count: {
+    minWidth: 18,
+    paddingHorizontal: spacing.xs,
+    borderRadius: 9,
+    backgroundColor: colors.statusRed,
+    alignItems: 'center'
+  },
+  countText: {
+    color: colors.onAccent,
+    fontSize: typography.metaSize - 1,
+    fontWeight: '700'
+  },
+  empty: {
+    color: colors.textMuted,
+    fontSize: typography.bodySize
+  },
+  // Why rows: side-by-side tiles at 320 pt split the date label and orphaned the third tile.
+  metrics: {
+    flexDirection: 'column',
+    borderRadius: radii.card,
+    backgroundColor: colors.bgPanel,
+    paddingHorizontal: spacing.md
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    minHeight: MIN_TOUCH_TARGET,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle
+  },
+  metricLabel: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: typography.bodySize
+  },
+  metricValue: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize,
+    fontWeight: '700'
+  }
+})

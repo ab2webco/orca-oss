@@ -45,6 +45,9 @@ export type WorktreeCardProperty =
   | 'ports'
   // Inline agent-activity list rendered in each workspace card; on by default (see DEFAULT_WORKTREE_CARD_PROPERTIES in shared/constants.ts).
   | 'inline-agents'
+  // Agent row extras the hover card holds by default (ORCA-1074).
+  | 'account'
+  | 'model'
 
 export type WorktreeCardMode = 'Default' | 'Compact'
 
@@ -97,6 +100,7 @@ export type RightSidebarTab =
   | 'source-control'
   | 'checks'
   | 'ports'
+  | 'team'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
   // static union stays closed while plugin tabs remain type-representable.
   | `plugin:${string}`

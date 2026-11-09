@@ -64,6 +64,19 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['game', 'arcade'],
+    summary:
+      "The lead's saved arcade plays: read, play or keep one, or pay the terminal's kept offers",
+    usage: 'orca game arcade [play|keep|migrate] [--offers <id,...>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'action', 'offers'],
+    positionalArgs: ['action'],
+    notes: [
+      "A member's perfect merge saves one play on the Orca host that runs the lead, at most 9. Only the lead reads or spends them.",
+      "migrate pays each offer id the terminal's old 15-second countdown kept, once; the game mod sends them by itself."
+    ],
+    examples: ['orca game arcade', 'orca game arcade play --json']
+  },
+  {
     path: ['game', 'inbox'],
     summary: "Messages to the lead or to one ticket's member, kept after the member closed",
     usage: 'orca game inbox [--ticket <id>] [--unread] [--mark-read] [--json]',

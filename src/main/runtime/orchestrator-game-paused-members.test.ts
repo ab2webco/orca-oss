@@ -38,7 +38,8 @@ const context = (ticket: string): AgentStatusOrchestrationContext => ({
 
 function setup(
   contexts: Record<string, AgentStatusOrchestrationContext> = {},
-  goneWorktrees: ReadonlySet<string> = new Set()
+  goneWorktrees: ReadonlySet<string> = new Set(),
+  released: ReadonlySet<string> = new Set()
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-paused-'))
   dirs.push(dir)
@@ -51,7 +52,8 @@ function setup(
     store,
     contextOf: (handle) => contexts[handle],
     sessionIdOf: (handle) => sessions[handle] ?? null,
-    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId)
+    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId),
+    releasedDispatch: (dispatchId) => released.has(dispatchId)
   })
   return { dir, store, paused, sessions }
 }
@@ -276,5 +278,60 @@ describe('GamePausedMembers.note with an open terminal (ORCA-754)', () => {
       terminal: 'term_9'
     })
     expect(view.paused.find((one) => one.ticket === 'ORCA-8')).not.toHaveProperty('cause')
+  })
+})
+
+// Why (ORCA-1141): an adopted agent shares its worktree, so only its own pane says whether it is live.
+describe('GamePausedMembers.note for an adopted member', () => {
+  const adopted = {
+    ticket: 'MAIN',
+    name: 'main',
+    runId: 'run_1',
+    taskId: 'task_main',
+    worktreeId: 'wt-main',
+    adoptedPaneKey: 'tab-a:leaf-a'
+  }
+  const lead = member('LEAD', {
+    paneKey: 'tab-l:leaf-l',
+    isLeader: true,
+    isMember: false,
+    worktree: { id: 'wt-main', branch: 'main', displayName: 'main' }
+  })
+
+  it('reads it as paused while the worktree runs other agents, with its pane and no open terminal', async () => {
+    const { store, paused } = setup()
+    await store.upsert('repo:a', adopted)
+
+    const view = await paused.note('repo:a', [lead], new Set(['wt-main']))
+
+    expect(view.paused).toEqual([
+      expect.objectContaining({ ticket: 'MAIN', name: 'main', adoptedPane: 'tab-a:leaf-a' })
+    ])
+    expect(view.paused[0]).not.toHaveProperty('terminal')
+    expect(view.unlisted).toEqual([])
+  })
+
+  it('never reads one the lead released as paused', async () => {
+    const { store, paused } = setup({}, new Set(), new Set(['ctx_main']))
+    await store.upsert('repo:a', { ...adopted, dispatchId: 'ctx_main' })
+
+    const view = await paused.note('repo:a', [lead], new Set(['wt-main']))
+
+    expect(view.paused).toEqual([])
+  })
+
+  it('reads it as live once a member runs in its pane', async () => {
+    const { store, paused } = setup()
+    await store.upsert('repo:a', adopted)
+    const back = member('X', {
+      paneKey: 'tab-a:leaf-a',
+      displayName: 'main',
+      worktree: { id: 'wt-main', branch: 'main', displayName: 'main' }
+    })
+
+    const view = await paused.note('repo:a', [lead, back], new Set(['wt-main']))
+
+    expect(view.paused).toEqual([])
+    expect(view.unlisted).toEqual([])
   })
 })

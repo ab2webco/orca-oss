@@ -13,8 +13,9 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 
+const safeArea = vi.hoisted(() => ({ bottom: 0 }))
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 })
+  useSafeAreaInsets: () => ({ top: 0, bottom: safeArea.bottom, left: 0, right: 0 })
 }))
 
 vi.mock('react-native-gesture-handler', () => {
@@ -72,6 +73,7 @@ type Overrides = {
   inputLockReason?: 'disconnected' | 'waiting' | null
   onSend?: (text: string) => Promise<boolean>
   pending?: Parameters<typeof MobileNativeChatView>[0]['pending']
+  keyboardInset?: number
 }
 
 function assistantTurn(id: string, text: string): NativeChatMessage {
@@ -239,6 +241,25 @@ describe('MobileNativeChatView', () => {
       expect(composer().props.placeholder).toBe('Message, @files, /commands')
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  // Why: under the Team peek the frame already ends above the home indicator, so the route takes that inset back.
+  it('pads the composer by the safe-area inset plus the lift, never below zero', async () => {
+    safeArea.bottom = 34
+    try {
+      const pad = () =>
+        renderer!.root.findAll((node) => node.type === 'View')[0].props.style[1].paddingBottom
+      await render()
+      expect(pad()).toBe(34)
+      await update({ keyboardInset: 240 })
+      expect(pad()).toBe(274)
+      await update({ keyboardInset: -34 })
+      expect(pad()).toBe(0)
+      await update({ keyboardInset: 206 })
+      expect(pad()).toBe(240)
+    } finally {
+      safeArea.bottom = 0
     }
   })
 })
