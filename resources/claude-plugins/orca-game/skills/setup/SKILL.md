@@ -42,13 +42,18 @@ Offer only what applies, in this order, and skip what they decline:
    instead of opening the tracker's page (`todo.action`).
 2. **Buttons** (`actions`, at most 6): what they repeat by hand. For each, a label, a slash
    command, and either a prompt for the lead or an MCP call. A prompt says what to run and what to
-   report; work that is not the lead's goes to members (`game launch <id> --prompt "…"`).
-3. **Activity links** (`activity`): an MCP tool whose ids should become chips (test runs, builds).
+   report; work that is not the lead's goes to members (`game launch <id> --prompt "…"`). Offer an
+   `icon` (ship flask tag review scan list pulse launch) and ask which go in the panel's row
+   (`pin: true`, at most 3; the rest live in its ⋯ menu). A new button goes first.
+3. **Orca's own** (`orcaActions`): wave, status, push, sweep and stop show in the panel on their
+   own when they apply. Ask whether to turn one off (`wave: { enabled: false }`; stop never) or change
+   its `label`, `icon` or `prompt` (no placeholders); the command stays.
+4. **Activity links** (`activity`): an MCP tool whose ids should become chips (test runs, builds).
    Ask for one real id and its page URL, and derive `match` and `url` from them.
-4. **The lead** (`orchestrator`): name, autostart, members at once (`cap`), agent and model, what a
+5. **The lead** (`orchestrator`): name, autostart, members at once (`cap`), agent and model, what a
    member is told (`launchPrompt`), and the project rules from step 1 the lead must follow
    (`rules`). The lead never does ticket work itself.
-5. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art, `hd` 9 to 14-row scene or `hd-compact` 7-row hd scene)
+6. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art, `hd` 9 to 14-row scene or `hd-compact` 7-row hd scene)
    and, for hd's day and night, `timezone` (`local` or the team's IANA zone, e.g. `America/Bogota`).
 
 ## 3. Write and check

@@ -26,3 +26,26 @@ export function tabStripOverflowOf(
     end: strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1
   }
 }
+
+/** How far a strip shortened its labels to fit, and the width each longer level needed. */
+export type TabStripFit = { level: number; needs: readonly number[] }
+
+/** The next fit: one level shorter while the tabs overflow, one longer once its width is there. */
+export function tabStripFitFor(
+  fit: TabStripFit,
+  strip: Pick<HTMLElement, 'scrollWidth' | 'clientWidth'>,
+  lastLevel: number
+): TabStripFit {
+  if (strip.scrollWidth > strip.clientWidth + 1) {
+    if (fit.level >= lastLevel) {
+      return fit
+    }
+    const needs = [...fit.needs]
+    needs[fit.level] = strip.scrollWidth
+    return { level: fit.level + 1, needs }
+  }
+  const longer = fit.needs[fit.level - 1]
+  return longer !== undefined && longer <= strip.clientWidth + 1
+    ? { level: fit.level - 1, needs: fit.needs }
+    : fit
+}

@@ -8,7 +8,8 @@
 import { appendFileSync, statSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
-export const MAX_SHARDS = 4
+// Why 6: #936's 55 specs (79 min) put 32.6 min on one of 4 shards and 21 on one of 5; 6 tops out at 18.3 (ORCA-1142).
+export const MAX_SHARDS = 6
 // Why 4: a short list stays on one runner, since every shard pays about 2 minutes of setup.
 export const SPECS_PER_SHARD = 4
 

@@ -17216,6 +17216,7 @@
       },
       "activity": {
         "title": "Activity",
+        "shortTitle": "Agents",
         "emptyTitle": "No agents running",
         "emptyText": "Start an agent in any workspace and it shows here.",
         "errorTitle": "Could not read your sessions"
@@ -17242,6 +17243,7 @@
       },
       "machines": {
         "title": "Machines",
+        "shortTitle": "Hosts",
         "emptyTitle": "Only this machine",
         "emptyText": "Pair another machine to spread agents across hosts.",
         "errorTitle": "Could not read the machines"
@@ -17337,8 +17339,10 @@
       "sections": "Inbox sections",
       "forYou": "For you",
       "waiting": "Waiting",
+      "waitingShort": "Waiting",
       "threads": "Threads",
       "answered": "Answered",
+      "answeredShort": "Done",
       "thisProject": "this project",
       "projectUnread": "Could not read this project's questions.",
       "forYouEmpty": "No questions are waiting for you.",

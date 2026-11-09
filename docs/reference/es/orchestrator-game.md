@@ -1,5 +1,5 @@
 ---
-sourceHash: ef15b6a92a158aa3
+sourceHash: 60e782e1a9cff2f4
 ---
 
 # El juego orquestador de Agent Teams
@@ -528,7 +528,7 @@ Cada uno envía al líder un prompt como un turno o ejecuta una herramienta MCP 
 ```yaml
 # orca.yaml
 orchestratorGame:
-  actions: # at most 6; a later layer replaces the whole list
+  actions: # at most 6; this machine's machineActions merge over them by command
     - label: Test runs # at most 24 characters
       command: test-runs # optional: /test-runs; lowercase, digits and -, up to 24 characters
       key: x # optional: its Panel hotkey, one letter or digit
@@ -554,10 +554,34 @@ orchestratorGame:
   lista. Un nombre que Claude Code rechaza (su propio `/status`, por ejemplo) se omite y se anota una
   vez; el botón sigue funcionando. El texto después del comando se añade al prompt: `/wave CIN-1,CIN-2`.
   Un comando MCP responde con las líneas de la herramienta.
-- **Settings.** La sección **Actions** del proyecto muestra la lista de `orca.yaml` en solo lectura;
-  **Edit on this machine** inicia la lista de esta máquina (etiqueta, comando, prompt o servidor MCP,
-  herramienta y argumentos JSON, comprobados por el mismo parser), que reemplaza entera la de
-  `orca.yaml`. **Inherit from orca.yaml** la descarta.
+- **Ajustes.** La sección **Acciones** del proyecto sigue el prototipo V30: **Crear con setup** envía
+  `/orca-game:setup` al líder, **Nueva acción** y las plantillas de **Empieza con** abren un formulario
+  (nombre, un comando que sigue al nombre hasta que se escribe, icono, una orden al líder o una
+  herramienta MCP), las filas del proyecto suben y se fijan en la fila del dock (3 como máximo), y las
+  de Orca tienen **Editar** y un interruptor (Detener no).
+- **Dónde se guarda una acción.** El formulario de una acción del proyecto dice **Dónde se guarda**.
+  *Proyecto, orca.yaml*, lo predeterminado para una nueva, escribe solo `orchestratorGame.actions` en
+  el `orca.yaml` del worktree activo (si no, el del principal), en local o por SSH, conserva sus
+  comentarios y las entradas que no cambió, y se niega si el archivo cambió desde que se mostró.
+  *Solo esta máquina* la guarda en `machineActions` de `orchestratorGameProjects[repoId]`
+  ([`orchestrator-game-machine-actions.ts`](../../../src/shared/orchestrator-game-machine-actions.ts)),
+  que se combinan sobre las de `orca.yaml` por comando: primero van las de `orca.yaml`, una entrada
+  con el mismo comando reemplaza a una, `{ command, enabled: false }` oculta una, y después van las
+  propias de esta máquina. **Quitar** con *Solo esta máquina* oculta aquí una acción de `orca.yaml`;
+  su fila se queda, atenuada, y **Mostrar** la devuelve. Una lista `actions` antigua guardada en esta
+  máquina, que reemplazaba entera la de `orca.yaml`, se resuelve como antes y pasa a `machineActions`
+  al guardar de nuevo. **Volver a la lista de orca.yaml** borra los cambios de esta máquina. Las filas
+  de Orca son solo de esta máquina. `/orca-game:setup` escribe `orca.yaml`.
+- **El dock del panel nativo**: una línea bajo el panel Equipo con las acciones de Orca que aplican
+  ahora y su número (ola: Por hacer con cupos libres, reactivar: miembros detenidos, barrer: miembros
+  terminados; ola y barrer se apartan durante un STOP), luego hasta 3 acciones fijadas del proyecto,
+  Detener con confirmación en línea y ⋯ con todas agrupadas en Ahora, De este proyecto y De Orca. Una
+  ejecución muestra la respuesta del líder desde el `lastAssistantMessage` de su panel. Una acción MCP
+  corre desde el dock como su `/command`; una sin comando solo corre desde la terminal.
+- **Cambiar las de Orca** (`orcaActions`): `wave`, `status`, `push`, `sweep` y `stop` aceptan
+  `enabled`, `label`, `icon` y `prompt`; el comando es fijo, `stop` no se puede apagar, un prompt no
+  admite placeholders y las capas se mezclan campo por campo. Las acciones del proyecto aceptan también
+  `icon` y `pin`.
 
 ## El líder del proyecto: `orchestratorGame.orchestrator`
 

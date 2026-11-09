@@ -9,6 +9,7 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
+const STYLES = ['figures', 'office', 'pixel'] as const
 const COMMAND = 'npx vitest run terminal-role'
 type Call = (
   event: unknown,
@@ -52,7 +53,7 @@ async function addAdvisorAndPr(app: ElectronApplication): Promise<void> {
                   previous: null
                 }
               }
-            : one.displayName?.includes('ORCA-12')
+            : one.displayName?.includes('ORCA-1142')
               ? {
                   ...one,
                   // Why: the audit's 320 clip was a name beside a long host name (ORCA-1098).
@@ -136,6 +137,13 @@ test('Team cards carry names, live detail and V28 status marks', async ({
       objective: 'Card identity',
       from: lead
     })
+    // Why: workerStart resolves `id:` through the runtime, which can list the worktree after the renderer.
+    await expect
+      .poll(async () => {
+        const listed = await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
+        return listed.result.worktrees.some((one) => one.id === worktreeId)
+      })
+      .toBe(true)
     const member = async (ticket: string, displayName: string) => {
       const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
         spec: `Work on ${ticket}`,
@@ -162,8 +170,9 @@ test('Team cards carry names, live detail and V28 status marks', async ({
       expect(terminal, `the ${ticket} terminal is not listed`).toBeTruthy()
       return { paneKey: `${terminal!.tabId}:${terminal!.leafId}`, worktreeId: terminal!.worktreeId }
     }
-    const runner = await member('ORCA-12', 'Merlín · ORCA-12 Keep the look')
-    const asker = await member('ORCA-14', 'Galván · ORCA-14 Ask first')
+    // Why: the scene's Spanish names beside a four-digit ticket were cut at 390 (ORCA-1142).
+    const runner = await member('ORCA-1142', 'Caballero · ORCA-1142 Keep the look')
+    const asker = await member('ORCA-1141', 'Escudero · ORCA-1141 Ask first')
     const postHooks = async (): Promise<void> => {
       await emitCodexHookStatus(endpoint, {
         ...runner,
@@ -176,7 +185,7 @@ test('Team cards carry names, live detail and V28 status marks', async ({
     await client.call('game.ownerAsk', {
       worktreeId,
       terminalHandle: lead,
-      ticket: 'ORCA-14',
+      ticket: 'ORCA-1141',
       question: '¿Mergeo #14 ahora?',
       options: ['Sí', 'No']
     })
@@ -211,36 +220,38 @@ test('Team cards carry names, live detail and V28 status marks', async ({
     await postHooks()
 
     await expect(leadCard).toContainText('Alfred')
-    // The lead asked about ORCA-14, so its card says it waits, not what its tool runs.
-    await expect(leadCard).toContainText('Te espera · Pregunta sobre ORCA-14')
+    // The lead asked about ORCA-1141, so its card says it waits, not what its tool runs.
+    await expect(leadCard).toContainText('Te espera · Pregunta sobre ORCA-1141')
     await expect(leadCard.locator('[data-team-model]')).toHaveCSS('font-family', /mono/i)
     await expect(advisor).toContainText('Mago')
     await expect(advisor.locator('[data-team-model]')).toHaveCount(0)
-    const merlin = cards.filter({ hasText: 'ORCA-12' })
-    const galvan = cards.filter({ hasText: 'ORCA-14' })
-    await expect(merlin).toContainText('Merlín')
-    await expect(merlin).not.toContainText('Keep the look')
-    await expect(merlin).toContainText(COMMAND, { timeout: 30_000 })
-    await expect(merlin.locator('[data-status-glyph]')).toHaveAttribute(
+    const knight = cards.filter({ hasText: 'ORCA-1142' })
+    const squire = cards.filter({ hasText: 'ORCA-1141' })
+    await expect(knight).toContainText('Caballero')
+    await expect(knight).not.toContainText('Keep the look')
+    await expect(knight).toContainText(COMMAND, { timeout: 30_000 })
+    await expect(knight.locator('[data-status-glyph]')).toHaveAttribute(
       'data-status-glyph',
       'spinner'
     )
-    await expect(galvan).toContainText('Galván')
-    await expect(galvan.locator('[data-status-glyph]')).toHaveAttribute(
+    await expect(squire).toContainText('Escudero')
+    await expect(squire.locator('[data-status-glyph]')).toHaveAttribute(
       'data-status-glyph',
       'question'
     )
 
-    // V28 draws each card's face as the scene draws that character, in every style.
-    const faces = panel.locator('canvas[data-team-face]')
-    for (const style of ['figures', 'office', 'pixel'] as const) {
-      await orcaPage.evaluate((next) => {
+    const setStyle = (next: (typeof STYLES)[number]) =>
+      orcaPage.evaluate((style) => {
         const state = window.__store!.getState()
         const game = state.settings?.orchestratorGame
         return state.updateSettings({
-          orchestratorGame: { ...game, panel: { ...game?.panel, style: next } }
+          orchestratorGame: { ...game, panel: { ...game?.panel, style } }
         })
-      }, style)
+      }, next)
+    // V28 draws each card's face as the scene draws that character, in every style.
+    const faces = panel.locator('canvas[data-team-face]')
+    for (const style of STYLES) {
+      await setStyle(style)
       await expect(panel.locator(`[data-team-scene="${style}"]`)).toBeVisible()
       await expect(faces).toHaveCount(4)
       await expect
@@ -260,12 +271,27 @@ test('Team cards carry names, live detail and V28 status marks', async ({
       })
     }
 
-    for (const width of WIDTHS) {
-      await orcaPage.setViewportSize({ width, height: 900 })
+    // Names stay whole in every style, and beside a scrollbar. Why the style: macOS overlays its
+    // bar; Windows, Linux and a Mac with a mouse take its width from every card.
+    await orcaPage.addStyleTag({
+      content: '[role="tabpanel"] { scrollbar-width: auto; scrollbar-color: auto }'
+    })
+    // Why: another feature's first-run hint would sit on the narrow captures.
+    await expect(orcaPage.getByText('se movió a la barra inferior').first()).toBeHidden({
+      timeout: 15_000
+    })
+    for (const [style, width] of STYLES.flatMap((one) => WIDTHS.map((w) => [one, w] as const))) {
+      await setStyle(style)
+      await orcaPage.setViewportSize({ width, height: 640 })
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
+        const where = `${style} at ${width}px ${theme}`
+        const bar = await panel
+          .getByRole('tabpanel')
+          .evaluate((node: HTMLElement) => node.offsetWidth - node.clientWidth)
+        expect(bar, `the list does not scroll: ${where}`).toBeGreaterThan(0)
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
-        expect(overflow, `panel overflows at ${width}px ${theme}`).toBeLessThanOrEqual(0)
+        expect(overflow, `panel overflows: ${where}`).toBeLessThanOrEqual(0)
         const cutNames = await panel
           .locator('[data-team-name]')
           .evaluateAll((list) =>
@@ -273,18 +299,20 @@ test('Team cards carry names, live detail and V28 status marks', async ({
               .filter((node) => node.scrollWidth > node.clientWidth)
               .map((node) => node.textContent)
           )
-        expect(cutNames, `names cut at ${width}px ${theme}`).toEqual([])
-        await orcaPage.screenshot({
+        expect(cutNames, `names cut: ${where}`).toEqual([])
+        // Why: so both members' cards show whole, clear of the floating terminal button.
+        await squire.evaluate((node) => node.scrollIntoView({ block: 'start' }))
+        await panel.screenshot({
           animations: 'disabled',
-          path: testInfo.outputPath(`cards-${width}-${theme}.png`)
+          path: testInfo.outputPath(`cards-${style}-${width}-${theme}.png`)
         })
       }
     }
 
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await setTheme(orcaPage, 'dark')
-    await merlin.locator('button[aria-expanded]').click()
-    await expect(merlin.locator('[data-team-pr-chip] [data-status-tone]')).toHaveAttribute(
+    await knight.locator('button[aria-expanded]').click()
+    await expect(knight.locator('[data-team-pr-chip] [data-status-tone]')).toHaveAttribute(
       'data-status-tone',
       'attention'
     )
