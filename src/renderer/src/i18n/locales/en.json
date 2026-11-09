@@ -4811,6 +4811,10 @@
           "projects": "Projects",
           "workspaces": "Workspaces"
         },
+        "SidebarHiddenFiltersLine": {
+          "04e60bbc42": "{{count}} hidden by filters",
+          "aec1ffd95a": "View filters"
+        },
         "SidebarNav": {
           "80611a8b10": "Search",
           "0c3395fd32": "Search worktrees and browser tabs",
