@@ -256,6 +256,8 @@ export type GlobalSettings = {
   floatingTerminalCwdMigratedToAppWorkspace?: boolean
   /** Where the Floating Workspace toggle is shown; defaults to the floating button for discoverability. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
+  /** One-shot marker: a never-placed floating button was moved to the status bar; after it, a choice sticks. */
+  floatingTerminalTriggerLocationDefaulted?: boolean
   /** Legacy keyboard-shortcut overrides; new writes go to ~/.orca/keybindings.json, migrated once when present. */
   keybindings?: KeybindingOverrides
   diffDefaultView: 'inline' | 'side-by-side'
