@@ -4694,7 +4694,7 @@ export default function SessionScreen() {
                   inputLockReason={nativeChatInputLockReason}
                   sendErrorMessage={nativeChatSendError.message}
                   onClearSendError={nativeChatSendError.clear}
-                  keyboardInset={keyboardLift}
+                  keyboardInset={keyboardLift + commandDockInset - insets.bottom}
                 />
                 {toastMessage && (
                   <Animated.View pointerEvents="none" style={[styles.toast, toastAnimatedStyle]}>

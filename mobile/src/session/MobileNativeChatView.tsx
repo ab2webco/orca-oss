@@ -162,7 +162,7 @@ export function MobileNativeChatView({
   const [toolsExpanded, setToolsExpanded] = useState(false)
   // Lift the composer clear of the keyboard, plus the bottom safe-area so it
   // never sits under the home indicator / nav bar (mirrors the terminal dock).
-  const bottomPad = keyboardInset > 0 ? keyboardInset + insets.bottom : insets.bottom
+  const bottomPad = Math.max(0, keyboardInset + insets.bottom)
   const [atBottom, setAtBottom] = useState(true)
   const sendScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { fontScale, pinchGesture } = useMobileNativeChatPinchGesture()

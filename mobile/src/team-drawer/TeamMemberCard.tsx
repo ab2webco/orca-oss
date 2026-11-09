@@ -179,6 +179,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
+    alignContent: 'center',
     columnGap: spacing.sm
   },
   prLabel: {
