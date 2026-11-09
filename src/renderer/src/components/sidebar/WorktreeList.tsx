@@ -33,6 +33,7 @@ import { useSidebarSectionRows } from './worktree-list/listing/use-section-rows'
 import { useSidebarWorktreeFilters } from './worktree-list/listing/use-filters'
 import { useSidebarWorktreeSelection } from './worktree-list/navigation/use-selection'
 import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-order'
+import { useAgentStatusGroupByWorktree } from './worktree-list/listing/agent-status-group-source'
 import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
 import { countWorktreesHiddenByFilters } from './sidebar-filter-hidden-count'
@@ -115,6 +116,7 @@ const WorktreeList = React.memo(function WorktreeList({
     settings,
     agentSendTargetWorktreeId
   })
+  const agentStatusByWorktree = useAgentStatusGroupByWorktree(groupBy, visibleWorktrees)
   const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
     collapsedGroups,
     agentSendTargetWorktreeId,
@@ -123,7 +125,7 @@ const WorktreeList = React.memo(function WorktreeList({
     worktreeMap,
     worktreeLineageById,
     prCache,
-    workspaceStatuses,
+    agentStatusByWorktree,
     settings,
     projectGroups,
     projectGrouping
@@ -154,7 +156,7 @@ const WorktreeList = React.memo(function WorktreeList({
     worktreeLineageById,
     prCache,
     settings,
-    workspaceStatuses,
+    agentStatusByWorktree,
     effectiveCollapsedGroups,
     projectGrouping,
     visibleReposForRows: visibleScope.visibleReposForRows,
@@ -334,6 +336,7 @@ const WorktreeList = React.memo(function WorktreeList({
         prCache={prCache}
         hostedReviewCache={hostedReviewCache}
         workspaceStatuses={workspaceStatuses}
+        agentStatusByWorktree={agentStatusByWorktree}
         projectGrouping={projectGrouping}
         projectGroups={projectGroups}
         onMoveWorktreeToStatus={statusMutations.moveWorktreeToStatus}

@@ -154,7 +154,7 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
     args.toggleGroup,
     args.collapsedGroups,
     args.defaultHostId,
-    args.workspaceStatuses,
+    args.agentStatusByWorktree,
     args.settings,
     pinnedDisplayPolicy,
     args.projectGrouping,

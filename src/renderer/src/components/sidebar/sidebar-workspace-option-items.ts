@@ -14,7 +14,7 @@ export const GROUP_BY_OPTIONS = [
     }
   },
   {
-    id: 'workspace-status',
+    id: 'agent-status',
     get label() {
       return translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.e029a2d775', 'Status')
     }

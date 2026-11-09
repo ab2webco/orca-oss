@@ -3,7 +3,6 @@ import type React from 'react'
 import type { WorkspaceStatus } from '../../../../../../shared/worktree/types'
 import type { HostSectionRow } from '../../host-section-rows'
 import { PINNED_GROUP_KEY } from '../grouping/group-keys'
-import type { WorktreeGroupBy } from '../grouping/row-types'
 import { hasWorkspaceDragData, readWorkspaceDragDataIds } from '../../workspace-status'
 import { useWorkspaceStatusDocumentDrop } from '../../use-workspace-status-drop'
 import type { WorktreeDropCommitContext } from './drop-commit-context'
@@ -18,18 +17,15 @@ export function useWorkspaceStatusRowDrag(args: {
   runtime: WorktreeDragRuntime
   scrollRef: React.RefObject<HTMLDivElement | null>
   rows: HostSectionRow[]
-  groupBy: WorktreeGroupBy
   onMoveWorktreeToStatus: (worktreeId: string, status: WorkspaceStatus) => void
   onPinWorktree: (worktreeId: string) => void
 }) {
-  const { ctx, session, runtime, scrollRef, rows, groupBy } = args
+  const { ctx, session, runtime, scrollRef, rows } = args
   const { setDragOverStatus, setPinDragOver, clearWorktreeDrag } = runtime
 
   const hasWorkspaceDropTargets = useMemo(
-    () =>
-      groupBy === 'workspace-status' ||
-      rows.some((row) => row.type === 'header' && row.key === PINNED_GROUP_KEY),
-    [groupBy, rows]
+    () => rows.some((row) => row.type === 'header' && row.key === PINNED_GROUP_KEY),
+    [rows]
   )
 
   const handleWorkspaceStatusDragOver = useCallback(

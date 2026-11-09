@@ -23,6 +23,7 @@ import type { WorktreeDragGroup } from '../../worktree-manual-order'
 import type { WorktreeStatusDropAtIndexArgs } from '../drag/drop-commit-context'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
+import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 
 export const EMPTY_PROJECT_GROUPS: readonly ProjectGroup[] = []
 export type VirtualizedWorktreeViewportProps = {
@@ -77,6 +78,7 @@ export type VirtualizedWorktreeViewportProps = {
   prCache: AppState['prCache'] | null
   hostedReviewCache: AppState['hostedReviewCache'] | null
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey>
   projectGrouping?: ProjectGroupingModel
   projectGroups?: readonly ProjectGroup[]
   onMoveWorktreeToStatus: (worktreeId: string, status: WorkspaceStatus) => void

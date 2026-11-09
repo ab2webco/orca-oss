@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { buildRows } from './build-rows'
-import { ALL_GROUP_META, getPRGroupKey, PINNED_GROUP_KEY } from './group-keys'
+import { ALL_GROUP_META, getPRGroupKey, getWorktreePRState, PINNED_GROUP_KEY } from './group-keys'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 import { getGroupKeyForWorktree } from './worktree-group-keys'
 import {
   REPO_HEADER_ACTION_BUTTON_CLASS,
@@ -21,16 +22,23 @@ function readSectionHeaderRowSource(): string {
 }
 
 describe('getPRGroupKey', () => {
-  it('puts merged PRs in the done group', () => {
+  it('puts a branch with any PR, even a merged one, in the with-PR group', () => {
     const prCache = {
       'repo-1::feature/super-critical': {
         data: { state: 'merged' }
       }
     }
 
-    expect(getPRGroupKey(worktree, repoMap, prCache)).toBe('done')
+    expect(getPRGroupKey(worktree, repoMap, prCache)).toBe('with-pr')
   })
 
+  it('puts a branch with no PR in the without-PR group', () => {
+    expect(getPRGroupKey(worktree, repoMap, {})).toBe('without-pr')
+    expect(getPRGroupKey(worktree, repoMap, null)).toBe('without-pr')
+  })
+})
+
+describe('getWorktreePRState', () => {
   it('prefers repo-scoped PR status over stale legacy path-scoped status', () => {
     const prCache = {
       '/tmp/orca::feature/super-critical': {
@@ -41,7 +49,7 @@ describe('getPRGroupKey', () => {
       }
     }
 
-    expect(getPRGroupKey(worktree, repoMap, prCache)).toBe('done')
+    expect(getWorktreePRState(worktree, repoMap, prCache)).toBe('merged')
   })
 
   it('falls back to legacy path-scoped PR status when no repo-scoped entry exists', () => {
@@ -51,7 +59,7 @@ describe('getPRGroupKey', () => {
       }
     }
 
-    expect(getPRGroupKey(worktree, repoMap, prCache)).toBe('closed')
+    expect(getWorktreePRState(worktree, repoMap, prCache)).toBe('closed')
   })
 
   it('uses local PR cache for a known local repo while a runtime is focused', () => {
@@ -62,10 +70,10 @@ describe('getPRGroupKey', () => {
     }
 
     expect(
-      getPRGroupKey(worktree, repoMap, prCache, {
+      getWorktreePRState(worktree, repoMap, prCache, {
         activeRuntimeEnvironmentId: 'env-1'
       } as never)
-    ).toBe('done')
+    ).toBe('merged')
   })
 
   it('uses SSH-scoped PR cache entries instead of local entries for SSH repos', () => {
@@ -80,7 +88,7 @@ describe('getPRGroupKey', () => {
       }
     }
 
-    expect(getPRGroupKey(worktree, sshRepoMap, prCache)).toBe('closed')
+    expect(getWorktreePRState(worktree, sshRepoMap, prCache)).toBe('closed')
   })
 })
 
@@ -89,9 +97,13 @@ describe('getGroupKeyForWorktree', () => {
     expect(getGroupKeyForWorktree('none', worktree, repoMap, null)).toBe('all')
   })
 
-  it('returns a workspace-status key only in status grouping mode', () => {
-    expect(getGroupKeyForWorktree('workspace-status', worktree, repoMap, null)).toBe(
-      'workspace-status:in-progress'
+  it('returns the agent status key from the per-worktree map', () => {
+    const agentStatus = new Map<string, AgentStatusGroupKey>([[worktree.id, 'working']])
+    expect(getGroupKeyForWorktree('agent-status', worktree, repoMap, null, agentStatus)).toBe(
+      'agent-status:working'
+    )
+    expect(getGroupKeyForWorktree('agent-status', worktree, repoMap, null)).toBe(
+      'agent-status:idle'
     )
   })
 })
@@ -196,18 +208,12 @@ describe('buildRows with pinned worktrees', () => {
     ])
   })
 
-  it('emits status headers for unpinned matching worktrees in groupBy workspace-status', () => {
-    const rows = buildRows(
-      'workspace-status',
-      [unpinned1, pinned, unpinned2],
-      repoMap,
-      null,
-      new Set()
-    )
+  it('emits status headers for unpinned matching worktrees in groupBy agent-status', () => {
+    const rows = buildRows('agent-status', [unpinned1, pinned, unpinned2], repoMap, null, new Set())
     expect(rows[2]).toMatchObject({
       type: 'header',
-      key: 'workspace-status:in-progress',
-      label: 'In progress',
+      key: 'agent-status:idle',
+      label: 'Idle',
       count: 2
     })
     expect(rows[3]).toMatchObject({ type: 'item', worktree: { id: 'wt-1' } })
@@ -216,7 +222,7 @@ describe('buildRows with pinned worktrees', () => {
 
   it('duplicates pinned worktrees into status groups when the policy allows it', () => {
     const rows = buildRows(
-      'workspace-status',
+      'agent-status',
       [unpinned1, pinned],
       repoMap,
       null,
@@ -233,9 +239,9 @@ describe('buildRows with pinned worktrees', () => {
     expect(rows).toMatchObject([
       { type: 'header', key: 'pinned', count: 1 },
       { type: 'item', sectionKey: PINNED_GROUP_KEY, worktree: { id: 'wt-pinned' } },
-      { type: 'header', key: 'workspace-status:in-progress', count: 2 },
-      { type: 'item', sectionKey: 'workspace-status:in-progress', worktree: { id: 'wt-1' } },
-      { type: 'item', sectionKey: 'workspace-status:in-progress', worktree: { id: 'wt-pinned' } }
+      { type: 'header', key: 'agent-status:idle', count: 2 },
+      { type: 'item', sectionKey: 'agent-status:idle', worktree: { id: 'wt-1' } },
+      { type: 'item', sectionKey: 'agent-status:idle', worktree: { id: 'wt-pinned' } }
     ])
   })
 
@@ -251,33 +257,27 @@ describe('buildRows with pinned worktrees', () => {
     }
   })
 
-  it('omits empty pinned sections in groupBy workspace-status', () => {
-    const rows = buildRows('workspace-status', [unpinned1, unpinned2], repoMap, null, new Set())
+  it('omits empty pinned sections in groupBy agent-status', () => {
+    const rows = buildRows('agent-status', [unpinned1, unpinned2], repoMap, null, new Set())
     expect(rows[0]).toMatchObject({
       type: 'header',
-      key: 'workspace-status:in-progress',
-      label: 'In progress'
+      key: 'agent-status:idle',
+      label: 'Idle'
     })
     expect(rows[1]).toMatchObject({ type: 'item', worktree: { id: 'wt-1' } })
     expect(rows[2]).toMatchObject({ type: 'item', worktree: { id: 'wt-2' } })
   })
 
   it('collapses pinned group when in collapsedGroups', () => {
-    const rows = buildRows(
-      'workspace-status',
-      [pinned, unpinned1],
-      repoMap,
-      null,
-      new Set(['pinned'])
-    )
+    const rows = buildRows('agent-status', [pinned, unpinned1], repoMap, null, new Set(['pinned']))
     expect(rows[0]).toMatchObject({ type: 'header', key: 'pinned' })
-    expect(rows[1]).toMatchObject({ type: 'header', key: 'workspace-status:in-progress' })
+    expect(rows[1]).toMatchObject({ type: 'header', key: 'agent-status:idle' })
     expect(rows[2]).toMatchObject({ type: 'item', worktree: { id: 'wt-1' } })
   })
 
   it('omits status sections when all matching worktrees are pinned', () => {
     const allPinned = { ...unpinned1, isPinned: true }
-    const rows = buildRows('workspace-status', [pinned, allPinned], repoMap, null, new Set())
+    const rows = buildRows('agent-status', [pinned, allPinned], repoMap, null, new Set())
     expect(rows.filter((r) => r.type === 'header')).toHaveLength(1)
     expect(rows[0]).toMatchObject({ type: 'header', key: 'pinned', count: 2 })
   })
@@ -323,38 +323,51 @@ describe('buildRows with pinned worktrees', () => {
     expect(rows[1]).toMatchObject({ type: 'item', worktree: { id: folderWorktree.id } })
   })
 
-  it('emits assigned workspace statuses as sections in groupBy workspace-status', () => {
-    const review = { ...worktree, id: 'wt-review', workspaceStatus: 'in-review' as const }
-    const rows = buildRows('workspace-status', [review], repoMap, null, new Set())
-
-    expect(
-      rows.filter((r) => r.type === 'header').map((r) => ({ key: r.key, label: r.label }))
-    ).toEqual([{ key: 'workspace-status:in-review', label: 'In review' }])
-  })
-
-  it('uses customized workspace status labels and order', () => {
-    const customStatuses = [
-      { id: 'blocked', label: 'Blocked' },
-      { id: 'todo', label: 'Ready' },
-      { id: 'in-progress', label: 'Doing' }
-    ]
-    const blocked = { ...worktree, id: 'wt-blocked', workspaceStatus: 'blocked' }
-    const doing = { ...worktree, id: 'wt-doing', workspaceStatus: 'in-progress' }
+  it('orders agent status sections Needs you, Working, Idle and omits empty ones', () => {
+    const waiting = { ...worktree, id: 'wt-waiting' }
+    const resting = { ...worktree, id: 'wt-resting' }
+    const busy = { ...worktree, id: 'wt-busy' }
+    const agentStatus = new Map<string, AgentStatusGroupKey>([
+      ['wt-waiting', 'needs-you'],
+      ['wt-busy', 'working']
+    ])
     const rows = buildRows(
-      'workspace-status',
-      [doing, blocked],
+      'agent-status',
+      [resting, busy, waiting],
       repoMap,
       null,
       new Set(),
       undefined,
-      customStatuses
+      agentStatus
     )
 
     expect(
       rows.filter((r) => r.type === 'header').map((r) => ({ key: r.key, label: r.label }))
     ).toEqual([
-      { key: 'workspace-status:blocked', label: 'Blocked' },
-      { key: 'workspace-status:in-progress', label: 'Doing' }
+      { key: 'agent-status:needs-you', label: 'Needs you' },
+      { key: 'agent-status:working', label: 'Working' },
+      { key: 'agent-status:idle', label: 'Idle' }
+    ])
+
+    const onlyIdle = buildRows('agent-status', [resting], repoMap, null, new Set())
+    expect(onlyIdle.filter((r) => r.type === 'header').map((r) => r.key)).toEqual([
+      'agent-status:idle'
+    ])
+  })
+
+  it('splits PR grouping into With PR and Without PR', () => {
+    const withPr = { ...worktree, id: 'wt-with-pr' }
+    const withoutPr = { ...worktree, id: 'wt-without-pr', branch: 'refs/heads/no-pr-yet' }
+    const prCache = { 'repo-1::feature/super-critical': { data: { state: 'closed' } } }
+    const rows = buildRows('pr-status', [withoutPr, withPr], repoMap, prCache, new Set())
+
+    expect(
+      rows
+        .filter((r) => r.type === 'header')
+        .map((r) => ({ key: r.key, label: r.label, count: r.type === 'header' ? r.count : 0 }))
+    ).toEqual([
+      { key: 'pr:with-pr', label: 'With PR', count: 1 },
+      { key: 'pr:without-pr', label: 'Without PR', count: 1 }
     ])
   })
 })

@@ -15,6 +15,7 @@ import { buildSidebarHostOptions } from './sidebar-host-options'
 import { getLogicalRepoOrderRankById } from './project-header-drop'
 import { getRenderedWorktreesInSidebarOrder } from './worktree-sidebar-row-preference'
 import { selectWorktreeListReviewCacheInputs } from './worktree-list/listing/review-cache-inputs'
+import { selectAgentStatusGroupByWorktree } from './worktree-list/listing/agent-status-group-source'
 import {
   filterFolderWorkspacesForVisibleHosts,
   filterProjectGroupsForVisibleHosts,
@@ -60,7 +61,7 @@ export function computeRenderedSidebarWorktreeOrder(
     prCache,
     state.collapsedGroups,
     getLogicalRepoOrderRankById(state.repos.map((repo) => repo.id)),
-    state.workspaceStatuses,
+    selectAgentStatusGroupByWorktree(state, state.groupBy, visibleWorktrees, Date.now()),
     state.projectOrderBy,
     state.worktreeLineageById,
     getWorktreeMapFromState(state),

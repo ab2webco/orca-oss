@@ -156,7 +156,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     pinnedDisplayPolicy,
     defaultHostId: props.defaultHostId,
     prCache: props.prCache,
-    workspaceStatuses,
+    agentStatusByWorktree: props.agentStatusByWorktree,
     settings,
     projectGroups,
     projectGrouping: props.projectGrouping,
@@ -235,7 +235,6 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     runtime,
     scrollRef,
     rows,
-    groupBy,
     onMoveWorktreeToStatus: props.onMoveWorktreeToStatus,
     onPinWorktree: props.onPinWorktree
   })

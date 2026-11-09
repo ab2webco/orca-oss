@@ -47,6 +47,19 @@ beforeEach(() => {
 })
 
 describe('createUISlice hydratePersistedUI', () => {
+  it('falls back a retired groupBy to project grouping', () => {
+    // Why: an offline web client hydrates from its own storage, which main never normalized.
+    const store = createUIStore()
+
+    store
+      .getState()
+      .hydratePersistedUI(
+        makePersistedUI({ groupBy: 'workspace-status' as PersistedUIState['groupBy'] })
+      )
+
+    expect(store.getState().groupBy).toBe('repo')
+  })
+
   it('does not restore the retired active-only filter from persisted UI state', () => {
     const store = createUIStore()
 

@@ -14,7 +14,6 @@ import type {
 } from '../../../../../../shared/worktree/types'
 import type { GroupHeaderRow, WorktreeGroupBy } from '../grouping/row-types'
 import { PINNED_GROUP_KEY } from '../grouping/group-keys'
-import { getWorkspaceStatusFromGroupKey } from '../../workspace-status'
 import { getVirtualRowTransform } from '../viewport/virtual-rows'
 import { resolveProjectGroupHeaderColor } from '../../project-header-color'
 import { getRepoHeaderCreateState } from '../../repo-header-create-state'
@@ -130,10 +129,6 @@ export function renderWorktreeSectionHeaderRow(args: {
     headerDrag.canReorderProjectGroupHeaders &&
     headerDrag.projectGroupDrag.state.draggingGroupId !== null &&
     headerDrag.projectGroupDrag.state.draggingGroupId === projectGroupIdForHeader
-  const headerWorkspaceStatus =
-    ctx.groupBy === 'workspace-status'
-      ? getWorkspaceStatusFromGroupKey(row.key, ctx.workspaceStatuses)
-      : null
   const isPinnedHeader = row.key === PINNED_GROUP_KEY
   const repoHeaderColor = resolveProjectGroupHeaderColor({
     groupBy: ctx.groupBy,
@@ -167,7 +162,7 @@ export function renderWorktreeSectionHeaderRow(args: {
   // Why: repo/project/status/pinned share compact section chrome; flat "All" stays a simple label.
   const showHeaderCollapseAffordance =
     row.count > 0 &&
-    (isRepoHeader || isProjectGroupHeader || headerWorkspaceStatus !== null || isPinnedHeader)
+    (isRepoHeader || isProjectGroupHeader || ctx.groupBy === 'agent-status' || isPinnedHeader)
   return (
     <div
       key={vItem.key}
@@ -218,8 +213,6 @@ export function renderWorktreeSectionHeaderRow(args: {
             : undefined
         }
         data-project-group-header-drag-handle={isDraggableProjectGroupHeader ? '' : undefined}
-        data-workspace-status-drop-target={headerWorkspaceStatus ? '' : undefined}
-        data-workspace-status={headerWorkspaceStatus ?? undefined}
         data-workspace-pin-drop-target={isPinnedHeader ? '' : undefined}
         className={cn(
           // Why: no row-level grab — only the title surface below shows the hand;
@@ -230,9 +223,6 @@ export function renderWorktreeSectionHeaderRow(args: {
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/50',
           (isDraggingThis || isDraggingThisProjectGroup) &&
             'bg-accent/80 ring-1 ring-ring/40 shadow-md rounded-md scale-[1.01]',
-          headerWorkspaceStatus &&
-            ctx.dragOverStatus === headerWorkspaceStatus &&
-            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
           isPinnedHeader &&
             ctx.pinDragOver &&
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
@@ -245,25 +235,8 @@ export function renderWorktreeSectionHeaderRow(args: {
               ? getProjectGroupHeaderPaddingLeft(row.projectGroupDepth ?? 0)
               : WORKTREE_SECTION_HEADER_PADDING_LEFT
         }}
-        onDragOver={
-          isPinnedHeader
-            ? ctx.onWorkspacePinDragOver
-            : headerWorkspaceStatus
-              ? (event) => ctx.onWorkspaceStatusDragOver(event, headerWorkspaceStatus)
-              : undefined
-        }
-        onDragLeave={
-          isPinnedHeader
-            ? ctx.onWorkspacePinDragLeave
-            : headerWorkspaceStatus
-              ? ctx.onWorkspaceStatusDragLeave
-              : undefined
-        }
-        onDrop={
-          headerWorkspaceStatus
-            ? (event) => ctx.onWorkspaceStatusDrop(event, headerWorkspaceStatus)
-            : undefined
-        }
+        onDragOver={isPinnedHeader ? ctx.onWorkspacePinDragOver : undefined}
+        onDragLeave={isPinnedHeader ? ctx.onWorkspacePinDragLeave : undefined}
         onPointerDown={
           isDraggableRepoHeader && projectIdForHeader
             ? (event) => headerDrag.repoDrag.onHandlePointerDown(event, projectIdForHeader)

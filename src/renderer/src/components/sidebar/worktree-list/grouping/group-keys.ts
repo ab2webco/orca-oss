@@ -1,13 +1,8 @@
-import { CircleX, FolderTree, List, Pin } from 'lucide-react'
+import { FolderTree, GitBranch, GitPullRequest, List, Pin } from 'lucide-react'
 import type React from 'react'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { branchName } from '../../../../lib/git-utils'
-import {
-  ConductorDoneIcon,
-  ConductorProgressIcon,
-  ConductorReviewIcon
-} from '../../workspace-status-icons'
 import { UNGROUPED_PROJECT_GROUP_KEY } from '../../../../../../shared/project-groups'
 import type { AppState } from '../../../../store/types'
 import {
@@ -16,9 +11,9 @@ import {
 } from '../../../../store/slices/github-cache-key'
 import { translate } from '@/i18n/i18n'
 
-export type PRGroupKey = 'done' | 'in-review' | 'in-progress' | 'closed'
+export type PRGroupKey = 'with-pr' | 'without-pr'
 
-export const PR_GROUP_ORDER: PRGroupKey[] = ['done', 'in-review', 'in-progress', 'closed']
+export const PR_GROUP_ORDER: PRGroupKey[] = ['with-pr', 'without-pr']
 
 export const PR_GROUP_META: Record<
   PRGroupKey,
@@ -28,33 +23,25 @@ export const PR_GROUP_META: Record<
     tone: string
   }
 > = {
-  done: {
+  'with-pr': {
     get label() {
-      return translate('auto.components.sidebar.worktree.list.groups.5076efc3d2', 'Done')
+      return translate(
+        'auto.components.sidebar.worktree.list.grouping.group.keys.26a4613f4c',
+        'With PR'
+      )
     },
-    icon: ConductorDoneIcon,
-    tone: 'text-workspace-status-done'
+    icon: GitPullRequest,
+    tone: 'text-foreground'
   },
-  'in-review': {
+  'without-pr': {
     get label() {
-      return translate('auto.components.sidebar.worktree.list.groups.6798dc7c94', 'In review')
+      return translate(
+        'auto.components.sidebar.worktree.list.grouping.group.keys.9694b028e6',
+        'Without PR'
+      )
     },
-    icon: ConductorReviewIcon,
-    tone: 'text-workspace-status-review'
-  },
-  'in-progress': {
-    get label() {
-      return translate('auto.components.sidebar.worktree.list.groups.7c2f009786', 'In progress')
-    },
-    icon: ConductorProgressIcon,
-    tone: 'text-workspace-status-progress'
-  },
-  closed: {
-    get label() {
-      return translate('auto.components.sidebar.worktree.list.groups.682ed5d551', 'Closed')
-    },
-    icon: CircleX,
-    tone: 'text-zinc-600 dark:text-zinc-300'
+    icon: GitBranch,
+    tone: 'text-muted-foreground'
   }
 }
 
@@ -99,6 +86,18 @@ export function getPRGroupKey(
   prCache: Record<string, unknown> | null,
   settings?: AppState['settings']
 ): PRGroupKey {
+  return getWorktreePRState(worktree, repoMap, prCache, settings) === null
+    ? 'without-pr'
+    : 'with-pr'
+}
+
+/** The cached PR state for a worktree's branch, or null when it has none. */
+export function getWorktreePRState(
+  worktree: Worktree,
+  repoMap: Map<string, Repo>,
+  prCache: Record<string, unknown> | null,
+  settings?: AppState['settings']
+): string | null {
   const repo = repoMap.get(worktree.repoId)
   const branch = branchName(worktree.branch)
   const repoScopedCacheKey =
@@ -131,21 +130,7 @@ export function getPRGroupKey(
         ? (prCache[legacyPathScopedCacheKey] as { data?: { state?: string } } | undefined)
         : undefined))
     : undefined
-  const pr = prEntry?.data
-
-  if (!pr) {
-    return 'in-progress'
-  }
-  if (pr.state === 'merged') {
-    return 'done'
-  }
-  if (pr.state === 'closed') {
-    return 'closed'
-  }
-  if (pr.state === 'draft') {
-    return 'in-progress'
-  }
-  return 'in-review'
+  return prEntry?.data ? (prEntry.data.state ?? 'open') : null
 }
 
 /**

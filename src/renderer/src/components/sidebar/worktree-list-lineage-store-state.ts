@@ -24,7 +24,7 @@ function makeLineage(worktree: Worktree, parent: Worktree): WorktreeLineage {
 }
 
 export function setLineageFixtureState(
-  groupBy: 'none' | 'repo' | 'workspace-status' = 'none',
+  groupBy: 'none' | 'repo' | 'agent-status' = 'none',
   options: {
     childWorktreeOverrides?: Partial<Worktree>
     deletingWorktreeIds?: string[]
@@ -147,7 +147,7 @@ export function setLineageFixtureState(
     // Why: multi-host added a host scope filter; 'all' (the store default)
     // bypasses it so the fixture's worktrees aren't dropped before rendering.
     workspaceHostScope: 'all',
-    workspaceStatuses: groupBy === 'workspace-status' ? cloneDefaultWorkspaceStatuses() : [],
+    workspaceStatuses: groupBy === 'agent-status' ? cloneDefaultWorkspaceStatuses() : [],
     worktreeCardProperties: ['status', 'inline-agents'],
     worktreeLineageById: {
       [child.id]: makeLineage(child, parent),
