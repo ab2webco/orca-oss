@@ -195,6 +195,18 @@ jobs:
       - name: Verify the relay bundle kept its version markers
         run: node config/scripts/verify-relay-version-markers.mjs
 
+      # Why: the game band and terminal specs run a real Claude Code and skip without one (ORCA-1084).
+      # Same pin as pr.yml's mod tests; the login shell is what Orca's terminals start.
+      - name: Install Claude Code
+        env:
+          DISABLE_AUTOUPDATER: '1'
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: |
+          set -euo pipefail
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          claude --version
+          bash -lc 'claude --version'
+
       # Why: the Electron suite is wall-clock constrained on OSS runners, but
       # multiple Electron apps on one Xvfb VM contend on git/Chromium resources.
       # Sharding keeps each VM at one Playwright worker while splitting the
@@ -286,6 +298,18 @@ jobs:
         with:
           name: e2e-build-out
           path: out/
+
+      # Why: the game band and terminal specs run a real Claude Code and skip without one (ORCA-1084).
+      # Same pin as pr.yml's mod tests; the login shell is what Orca's terminals start.
+      - name: Install Claude Code
+        env:
+          DISABLE_AUTOUPDATER: '1'
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: |
+          set -euo pipefail
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          claude --version
+          bash -lc 'claude --version'
 
       # Why PROJECT: electron-headless excludes @ondemand diagnostics and its
       # grepInvert wins over any --grep, so reaching one needs its own project
