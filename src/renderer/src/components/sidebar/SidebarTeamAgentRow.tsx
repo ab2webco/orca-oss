@@ -1,6 +1,7 @@
 import React from 'react'
 import { Crown, GitBranch, GitPullRequest } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { branchName } from '@/lib/git-utils'
 import { translate } from '@/i18n/i18n'
 import { statusToneTextClass } from '@/components/status-tone'
 import { TeamStatusMark } from '@/components/team-panel/TeamStatusMark'
@@ -18,7 +19,7 @@ function namePartsOf(row: SidebarTeamRow, game: boolean): NameParts {
   if (row.role === 'lead') {
     return {
       name: game ? row.card.name : translate('teamPanel.lead.badge', 'Lead'),
-      mono: row.card.branch
+      mono: row.card.branch ? branchName(row.card.branch) : null
     }
   }
   const ticket = row.card.ticket?.identifier ?? null

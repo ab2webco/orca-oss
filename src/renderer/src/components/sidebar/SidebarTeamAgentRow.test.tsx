@@ -215,6 +215,18 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
     expect(row.querySelector('[data-team-row-part="age"]')!.textContent).toBe('13 h')
   })
 
+  it('prints the lead branch without its refs/heads/ prefix', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: { ...lead, branch: 'refs/heads/main' } }}
+        look="game"
+        showPr
+        now={NOW}
+      />
+    )
+    expect(host.querySelector('[data-team-row-ticket]')!.textContent).toBe('main')
+  })
+
   it('calls the lead by its role in plain mode', async () => {
     const host = await render(
       <SidebarTeamAgentRow row={{ role: 'lead', card: lead }} look="plain" showPr now={NOW} />
