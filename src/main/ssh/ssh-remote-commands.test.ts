@@ -220,7 +220,8 @@ describe('ssh remote command builders', () => {
       const output = await runShellCommand(listRelayBaseDirsCommand(posix, root))
       const entries = output.trim().split('\n')
 
-      expect(entries).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
+      // Why sorted: find lists in directory order, which ext4 varies; the GC handles each entry alone.
+      expect([...entries].sort()).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
       expect(Buffer.byteLength(output)).toBeLessThan(1_024)
       expect(entries.length).toBeLessThanOrEqual(MAX_RELAY_GC_LISTING_ENTRIES)
     } finally {
