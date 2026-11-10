@@ -55,6 +55,14 @@ describe('TeamArcadeSection', () => {
     expect(on.play).toHaveBeenCalledTimes(1)
   })
 
+  it('rises the offer in as V30 does, only where motion is allowed', async () => {
+    const { container } = await render({ credits: 1, offerPr: 923 })
+    const offer = container.querySelector<HTMLElement>('[data-arcade-offer]')!
+
+    expect(offer.className).toContain('motion-safe:animate-in')
+    expect(offer.className).toContain('motion-safe:slide-in-from-bottom-1')
+  })
+
   it('shows the saved count with Play once the offer is gone', async () => {
     const one = await render({ credits: 1, offerPr: null })
     expect(one.container.querySelector('[data-arcade-offer]')).toBeNull()

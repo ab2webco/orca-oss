@@ -163,6 +163,50 @@ describe('TeamDisplayCarousel', () => {
   })
 })
 
+describe('TeamDisplayCarousel motion', () => {
+  const stage = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-team-display-stage]')!
+  const drag = async (container: HTMLElement, dx: number, dy = 0) => {
+    const at = (type: string, x: number, y: number) =>
+      new PointerEvent(type, { bubbles: true, pointerType: 'touch', clientX: x, clientY: y })
+    await act(async () => void stage(container).dispatchEvent(at('pointerdown', 200, 50)))
+    await act(async () => void stage(container).dispatchEvent(at('pointermove', 200 + dx, 50 + dy)))
+    await act(async () => void stage(container).dispatchEvent(at('pointerup', 200 + dx, 50 + dy)))
+  }
+
+  it('turns the page with a swipe past a fifth of the stage, and springs back short of it', async () => {
+    const container = await render(model())
+
+    await drag(container, -120)
+    expect(title(container)).toBe('Delivery')
+    await drag(container, 120)
+    expect(title(container)).toBe('Summary')
+    await drag(container, -20)
+    expect(title(container)).toBe('Summary')
+    await drag(container, -120, 200)
+    expect(title(container)).toBe('Summary')
+  })
+
+  it('pulses the ticker dot only while the line asks for you', async () => {
+    const calm = await render(model())
+    expect(calm.querySelector('[data-team-display-dot]')?.className).not.toContain('animate-pulse')
+
+    const asking = await render(
+      model({
+        members: [
+          member({
+            needsYou: true,
+            ticket: { identifier: 'ORCA-1039' } as TeamMemberCard['ticket']
+          })
+        ]
+      })
+    )
+    expect(asking.querySelector('[data-team-display-dot]')?.className).toContain(
+      'motion-safe:animate-pulse'
+    )
+  })
+})
+
 describe('TeamDisplayCarousel language', () => {
   afterEach(() => {
     language.prefix = ''

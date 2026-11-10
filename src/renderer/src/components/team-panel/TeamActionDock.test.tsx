@@ -181,6 +181,25 @@ describe('TeamActionDock', () => {
     expect(props.onRun).not.toHaveBeenCalled()
   })
 
+  it('flashes a chip whose action just appeared, twice, then lets it rest', async () => {
+    vi.useFakeTimers()
+    try {
+      const { container, draw } = await render()
+      expect(container.querySelector('[data-team-action-fresh]')).toBeNull()
+
+      const deploy = action({ id: 'action-2', label: 'Deploy', icon: 'ship', pin: true })
+      await draw({ actions: [...ACTIONS, deploy] })
+      const fresh = container.querySelector<HTMLElement>('[data-team-action-fresh]')
+      expect(fresh?.getAttribute('data-team-action')).toBe('action-2')
+      expect(fresh?.className).toContain('motion-safe:animate-[team-action-fresh_1.2s_ease-out_2]')
+
+      await act(async () => void vi.advanceTimersByTime(2600))
+      expect(container.querySelector('[data-team-action-fresh]')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('disables Stop with its reason, and draws nothing without actions', async () => {
     const stopped = ACTIONS.map((one) =>
       one.orca === 'stop' ? { ...one, off: 'alreadyStopped' as const } : one
