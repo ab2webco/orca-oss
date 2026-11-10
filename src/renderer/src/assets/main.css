@@ -1260,6 +1260,47 @@ html.native-shell .app-layout {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sidebar-ring) 18%, transparent);
 }
 
+/* Why: V30 marks the selected agent row with a fill and no border. A lead's team card wraps its
+   members' rows, so the card draws nothing and the fill goes on its own row, never on the rows
+   of the members inside it. */
+[data-worktree-card-surface][data-worktree-card-team][data-worktree-card-active] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-sidebar-team-row]::after {
+  content: '';
+  position: absolute;
+  inset: 0 -6px 0 -8px;
+  z-index: -1;
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+[data-sidebar-team-row]:hover::after {
+  background: color-mix(in srgb, var(--sidebar-foreground) 4%, transparent);
+}
+
+.dark [data-sidebar-team-row]:hover::after {
+  background: color-mix(in srgb, var(--sidebar-accent) 40%, transparent);
+}
+
+[data-worktree-card-surface][data-worktree-card-active]
+  [data-sidebar-team-row]:not(
+    [data-worktree-card-active] [data-sidebar-team-children] [data-sidebar-team-row]
+  )::after {
+  background: color-mix(in srgb, var(--worktree-sidebar-foreground) 8%, transparent);
+}
+
+.dark
+  [data-worktree-card-surface][data-worktree-card-active]
+  [data-sidebar-team-row]:not(
+    [data-worktree-card-active] [data-sidebar-team-children] [data-sidebar-team-row]
+  )::after {
+  background: color-mix(in srgb, var(--worktree-sidebar-foreground) 10%, transparent);
+}
+
 .worktree-agent-row-hover:hover {
   background: color-mix(in srgb, var(--sidebar-foreground) 1.25%, transparent);
 }

@@ -57,7 +57,8 @@ export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
       data-sidebar-team-row={row.role}
       data-team-row-child={child ? '' : undefined}
       className={cn(
-        'relative flex h-6.5 w-full min-w-0 items-center gap-[7px] text-[12.5px]',
+        // Why isolate: the selection fill (main.css `::after`) sits under the row's content.
+        'relative isolate flex h-6.5 w-full min-w-0 items-center gap-[7px] text-[12.5px]',
         // Why -top-0.5: it bridges the 2 px of card borders up to the row above, as V30's rows touch.
         child &&
           "before:absolute before:-top-0.5 before:bottom-1/2 before:-left-[13px] before:w-[7px] before:rounded-bl-[5px] before:border-b before:border-l before:border-muted-foreground/40 before:content-['']"

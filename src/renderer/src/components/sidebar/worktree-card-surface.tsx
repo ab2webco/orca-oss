@@ -70,6 +70,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     presentation
 
   const team = useSidebarTeamCard(worktree.id)
+  const teamCard = team.row !== null
+  // Why: V30 marks only the open agent's row; a lead's card wraps its members' rows, so it never
+  // lights up for an open member, and its own selection fills its row (main.css), not a card.
+  const surfaceActive = isActiveSurface && (!teamCard || card.isActive)
   const parentCardContent = (
     <WorktreeCardRowContent
       card={card}
@@ -149,12 +153,14 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         // so it must own the complete active style without stale utility classes.
         isLineageDropTarget
           ? 'border border-accent-foreground/20 bg-accent/80'
-          : isActiveSurface
+          : surfaceActive
             ? 'border border-transparent'
             : isMultiSelected
               ? 'border border-worktree-sidebar-ring/35 bg-worktree-sidebar-accent/70 ring-1 ring-worktree-sidebar-ring/30'
-              : 'border border-transparent worktree-sidebar-card-hover',
-        isActiveSurface && isMultiSelected && 'ring-1 ring-worktree-sidebar-ring/35',
+              : teamCard
+                ? 'border border-transparent'
+                : 'border border-transparent worktree-sidebar-card-hover',
+        surfaceActive && isMultiSelected && 'ring-1 ring-worktree-sidebar-ring/35',
         revealHighlight && [
           'scroll-to-current-workspace-reveal-highlight',
           revealHighlightTone === 'ai' && 'scroll-to-current-workspace-reveal-highlight--ai'
@@ -167,7 +173,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         isRuntimeDisconnected && !isDeleting && 'opacity-60'
       )}
       data-worktree-card-surface="true"
-      data-worktree-card-active={isActiveSurface ? activeSurfaceVariant : undefined}
+      data-worktree-card-active={surfaceActive ? activeSurfaceVariant : undefined}
+      data-worktree-card-team={teamCard ? '' : undefined}
       onClick={handleClick}
       onDoubleClick={affiliateListMode ? undefined : handleDoubleClick}
       draggable={!affiliateListMode && nativeDragEnabled && !isDeleting && !titleRenaming}
