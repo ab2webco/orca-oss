@@ -256,6 +256,10 @@ export async function listWslDistrosAsync(): Promise<string[]> {
     return wslDistroCache ?? []
   }
 
+  if (wslDistroCache !== null && wslDistroCache.length > 0) {
+    // Why: stamp at probe start so concurrent and empty-answer re-probes wait the full window.
+    wslDistroCachedAtMs = Date.now()
+  }
   try {
     const probeSequence = ++wslDistroProbeSequence
     const output = await execFileUtf8('wsl.exe', ['--list', '--quiet'])
