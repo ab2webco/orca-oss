@@ -151,13 +151,21 @@ describe('card words', () => {
 
 describe('teamUsageBarClass', () => {
   it('stays quiet until the window runs low, warns, and turns to a softened attention near the end', () => {
-    expect([0, 59, 60, 89, 90, 100].map(teamUsageBarClass)).toEqual([
+    expect([0, 59, 60, 89, 90, 100].map((used) => teamUsageBarClass(used).fill)).toEqual([
       'bg-status-idle',
       'bg-status-idle',
       'bg-status-warning',
       'bg-status-warning',
       'bg-status-attention/70',
       'bg-status-attention/70'
+    ])
+  })
+
+  it('draws the track as a lighter step of the fill, so the state reads across the whole bar', () => {
+    expect([0, 60, 90].map((used) => teamUsageBarClass(used).track)).toEqual([
+      'bg-status-idle/20',
+      'bg-status-warning/20',
+      'bg-status-attention/15'
     ])
   })
 })

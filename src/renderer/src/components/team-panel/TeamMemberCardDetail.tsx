@@ -72,18 +72,25 @@ function UsageBar({
   display: UsagePercentageDisplay
 }): React.JSX.Element {
   const clamped = clampUsedPercent(used)
+  const tone = teamUsageBarClass(clamped)
   const left = resetsAt != null ? formatResetDuration(resetsAt - now) : null
   return (
     <div data-team-usage={window} className="contents">
       <span className="text-muted-foreground">{label}</span>
       <div
         data-team-usage-track=""
-        className="h-1 min-w-0 overflow-hidden rounded-full bg-foreground/10"
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={clamped}
+        aria-valuetext={formatUsagePercentageLabel(clamped, display)}
+        className={`h-1 min-w-0 overflow-hidden rounded-full ${tone.track}`}
       >
         {/* Why: fill follows the chosen percentage; the colour still signals how much is used. */}
         <div
           data-team-usage-fill=""
-          className={`h-full rounded-full ${teamUsageBarClass(clamped)}`}
+          className={`h-full rounded-full ${tone.fill}`}
           style={{ width: `${getDisplayedUsagePercentage(clamped, display)}%` }}
         />
       </div>

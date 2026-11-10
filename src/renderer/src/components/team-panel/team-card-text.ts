@@ -194,12 +194,14 @@ export function teamTicketBesideName(
   return identifier && !(showName && card.name === identifier) ? identifier : null
 }
 
-/** A usage bar's fill by percent used, in the status tokens: quiet, then warning, then a softened attention. */
-export function teamUsageBarClass(usedPercent: number): string {
+/** A usage meter's fill by percent used, in the status tokens, with its track a lighter step of it. */
+export function teamUsageBarClass(usedPercent: number): { fill: string; track: string } {
   if (usedPercent < 60) {
-    return 'bg-status-idle'
+    return { fill: 'bg-status-idle', track: 'bg-status-idle/20' }
   }
-  return usedPercent < 90 ? 'bg-status-warning' : 'bg-status-attention/70'
+  return usedPercent < 90
+    ? { fill: 'bg-status-warning', track: 'bg-status-warning/20' }
+    : { fill: 'bg-status-attention/70', track: 'bg-status-attention/15' }
 }
 
 /** A branch split for a middle cut: `tail` holds the ticket part (or last segment) and stays whole longest. */

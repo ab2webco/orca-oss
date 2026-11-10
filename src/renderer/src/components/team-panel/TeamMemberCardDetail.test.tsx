@@ -154,6 +154,10 @@ describe('TeamMemberCardDetail', () => {
     // One grid: a label column, a bar column of one width with a visible track, a value column.
     const grid = container.querySelector('[data-team-usage-grid]')
     expect(grid?.querySelectorAll('[data-team-usage-track]')).toHaveLength(2)
+    // A meter with a name, so the reading is never colour alone.
+    const meter = container.querySelector('[data-team-usage="session"] [role="meter"]')
+    expect(meter?.getAttribute('aria-valuenow')).toBe('20')
+    expect(meter?.getAttribute('aria-label')).toBe('5 h')
     expect(text(container, '[data-team-usage="session"]')).toContain('80% left')
     expect(text(container, '[data-team-usage="session"]')).toContain('1h 19m')
     expect(text(container, '[data-team-usage="weekly"]')).toContain('88% left')
