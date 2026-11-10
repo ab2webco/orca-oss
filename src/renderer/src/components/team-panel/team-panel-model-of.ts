@@ -2,7 +2,7 @@ import { gameCharacterLevelOf } from '../../../../shared/orchestrator-game-chara
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
-import { teamActionsOf } from '../../../../shared/team-panel-actions'
+import { gameMembersRunningOf, teamActionsOf } from '../../../../shared/team-panel-actions'
 import { teamAdvisorRowOf } from '../../../../shared/team-panel-activity-rows'
 import { teamCardsOf, type TeamCards } from '../../../../shared/team-panel-member-cards'
 import { teamMetricsOf } from '../../../../shared/team-panel-metrics'
@@ -129,7 +129,13 @@ export function teamPanelModelOf(args: {
     // Why the game's curve: the level is what the characters earned, not a figure drawn here (ORCA-1094).
     xp: typeof args.xp === 'number' ? gameCharacterLevelOf(args.xp) : null,
     arcade: arcadeOf(state),
-    stopped: state.stopped ? { since: state.stopped.since, by: state.stopped.by } : null,
+    stopped: state.stopped
+      ? {
+          since: state.stopped.since,
+          by: state.stopped.by,
+          membersRunning: gameMembersRunningOf(state)
+        }
+      : null,
     // Why guarded: a paired host on an older build may send neither.
     scene: {
       id: typeof state.config?.scene === 'string' ? state.config.scene : null,

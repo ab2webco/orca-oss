@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
+import { GameStoreNames } from './orchestrator-game-store-names'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -54,5 +55,26 @@ describe('GameStopSwitch', () => {
     const { stops, dir } = stopSwitch()
     chmodSync(dir, 0o000)
     expect(await stops.read('repo-a')).toEqual({ since: null, by: null, unreadable: true })
+  })
+})
+
+describe('a STOP that resume cleared stays cleared across restarts (ORCA-1157)', () => {
+  it('does not come back from the repo-id file the ORCA-1011 rename keeps for a downgrade', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-game-stop-'))
+    dirs.push(dir)
+    const placeOf = () => ({ connectionId: null, path: '/work/helpdesk_netsat' })
+    const key = 'repo:r_netsat'
+    // A STOP an Orca from before ORCA-1011 wrote under the repo id's name.
+    await new GameStopSwitch(() => dir).set(key, { since: AT, by: 'lead' })
+
+    const running = new GameStopSwitch(() => dir, new GameStoreNames(placeOf))
+    expect(await running.read(key)).toEqual({ since: AT, by: 'lead' })
+    expect(await running.clear(key)).toEqual({ changed: true })
+    expect(await running.read(key)).toBeNull()
+
+    // Orca restarts: a new naming copies whatever the repo id's file still holds.
+    const restarted = new GameStopSwitch(() => dir, new GameStoreNames(placeOf))
+    expect(await restarted.read(key)).toBeNull()
+    expect(readdirSync(dir).filter((name) => name.endsWith('.stop.json'))).toEqual([])
   })
 })

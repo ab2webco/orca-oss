@@ -159,9 +159,11 @@ export function TeamTabContent({
     <div className="flex flex-col pb-3">
       {model.stopped ? (
         <p className="px-3 py-1.5 text-xs font-medium text-status-attention">
-          {model.stopped.by
-            ? translate('teamPanel.stopped.by', 'Stopped by {{by}}', { by: model.stopped.by })
-            : translate('teamPanel.stopped.plain', 'Stopped')}
+          {(model.stopped.membersRunning ?? 0) > 0
+            ? translate('teamPanel.stopped.paused', 'Launches and pushes paused')
+            : model.stopped.by
+              ? translate('teamPanel.stopped.by', 'Stopped by {{by}}', { by: model.stopped.by })
+              : translate('teamPanel.stopped.plain', 'Stopped')}
         </p>
       ) : null}
       {game && model.arcade && arcadeActions ? (
