@@ -15,6 +15,8 @@ import { hdFrameOf } from '../../../../../resources/claude-plugins/orca-game/hoo
 import { hdSkyPixel } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd-sky'
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
+import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { drawPixelCrates, drawPixelPlot, drawPixelSack } from './team-scene-pixel-garden'
 import type {
   TeamSceneFrame,
   TeamScenePainter,
@@ -125,6 +127,8 @@ export function createPixelPainter(args: {
   colors: TeamSceneStatusColors
 }): TeamScenePainter {
   const { scene, light, colors } = args
+  // Why the scene's own look: a file scene's garden must match its palette, not Quest's.
+  const garden = { leaf: hex(scene.looks.working.plant), fruit: hex(scene.looks.working.sun) }
   let backdrop: { columns: number; step: number; canvas: HTMLCanvasElement } | null = null
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
@@ -223,6 +227,13 @@ export function createPixelPainter(args: {
       const columns = Math.ceil(f.width / PIXEL)
       g.imageSmoothingEnabled = false
       g.drawImage(backdropFor(columns, f.t), 0, 0, columns * PIXEL, HEIGHT)
+      drawPixelCrates(g, f.trophies.length, feetRow(0), PIXEL, garden)
+      for (const site of f.sites) {
+        const row = feetRow(site.spot.depth)
+        const seat = site.spot.x - SITE_FROM_SEAT_X
+        drawPixelSack(g, Math.round((seat - PILE_FROM_SEAT_X) * columns), row, PIXEL)
+        drawPixelPlot(g, Math.round(site.spot.x * columns), row, PIXEL, site, f.t, garden)
+      }
       effects.start(f.effects, f.actors, f.height)
       for (const a of f.actors) {
         // Why offset by x: members side by side swing out of step, as in Figures and Office.

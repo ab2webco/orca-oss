@@ -185,4 +185,34 @@ describe('createPixelPainter', () => {
     expect(Number.isInteger(member[3] / member[0].width)).toBe(true)
     expect(member[3]).toBeLessThanOrEqual(38)
   })
+
+  const hexOf = (n: number): string => `#${n.toString(16).padStart(6, '0')}`
+  const look = QUEST_SCENE.looks.working
+  const site = (stage: 0 | 1 | 2 | 3 | 4, broken = false) => ({
+    key: 'm',
+    spot: { x: 0.155, depth: 0.5 },
+    stage,
+    broken
+  })
+
+  it("grows each seat's garden in the scene's own leaf and fruit colours", () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const rectColors = (f: TeamSceneFrame) => {
+      const r = recordingContext()
+      painter.paint(r.g, f)
+      return r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+    }
+    const sprouting = rectColors({ ...frame([]), sites: [site(2)] })
+    expect(sprouting).toContain(hexOf(look.plant))
+    expect(sprouting).not.toContain(hexOf(look.sun))
+    expect(rectColors({ ...frame([]), sites: [site(4)] })).toContain(hexOf(look.sun))
+    expect(rectColors(frame([]))).not.toContain(hexOf(look.plant))
+  })
+
+  it('keeps a harvest crate for each trophy', () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const r = recordingContext()
+    painter.paint(r.g, { ...frame([]), trophies: [{ key: 'x', name: 'x' }] })
+    expect(r.calls.some((c) => c.name === 'fillRect' && c.fillStyle === hexOf(look.sun))).toBe(true)
+  })
 })
