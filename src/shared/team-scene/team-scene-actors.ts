@@ -21,6 +21,9 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   if (atLead && (body.role === 'lead' || body.key === world.visitor)) {
     return atLead.kind === 'handoff' ? 'give' : 'wave'
   }
+  if (body.role === 'lead' && world.rounds.stage === 'giving') {
+    return 'give'
+  }
   if (body.role === 'advisor') {
     return world.t < world.advisorRaiseUntil ? 'raise' : 'idle'
   }
@@ -53,7 +56,9 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         pose: poseOf(world, body),
         gait: body.gait,
         stride: teamSceneStrideAt(body.depth),
-        carrying: plan.kind === 'handoff' && plan.stage === 'toLead',
+        carrying:
+          (plan.kind === 'handoff' && plan.stage === 'toLead') ||
+          (body.role === 'lead' && world.rounds.stage === 'toMember'),
         emote: timed ?? seatedMark,
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }
