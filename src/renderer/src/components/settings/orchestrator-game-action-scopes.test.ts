@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OrchestratorGameAction } from '../../../../shared/orchestrator-game-actions'
+import { resolveOrchestratorGameIntegrations } from '../../../../shared/orchestrator-game-config'
 import {
   hiddenRowsOf,
   scopedListsOf,
@@ -37,6 +38,24 @@ describe("Settings > Actions edits orca.yaml's list and this machine's changes a
       ]
     })
     expect(scopes(saved)).toEqual(['release:machine', 'board:machine'])
+  })
+
+  it('shows the pins the panel draws for an old copy written before pins', () => {
+    const legacy = YAML.map(({ pin: _pin, ...rest }) => rest)
+    const pins = (actions: readonly OrchestratorGameAction[]) =>
+      actions.map((one) => [one.command, one.pin === true])
+    const panel = resolveOrchestratorGameIntegrations({
+      project: { actions: YAML },
+      local: { actions: legacy }
+    }).actions
+
+    expect(
+      pins(scopedRowsOf(scopedListsOf(YAML, { actions: legacy })).map((row) => row.action))
+    ).toEqual(pins(panel))
+    expect(pins(panel)).toEqual([
+      ['release', true],
+      ['board', false]
+    ])
   })
 
   it('saves a new action first in the source its switch picks', () => {
