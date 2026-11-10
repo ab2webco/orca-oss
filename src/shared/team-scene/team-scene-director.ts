@@ -7,6 +7,12 @@ import {
   stepLeadRounds,
   type TeamSceneRounds
 } from './team-scene-lead-rounds'
+import {
+  createAdvisorWalk,
+  queueJudgment,
+  stepAdvisorWalk,
+  type TeamSceneAdvisorWalk
+} from './team-scene-advisor-walk'
 import { seatPlanOf } from './team-scene-seats'
 import {
   grownSite,
@@ -79,6 +85,7 @@ export type TeamSceneWorld = {
   /** Finished builds of merged work, oldest first; they outlive their members. */
   trophies: { key: string; name: string }[]
   layout: TeamSceneLayout
+  advisorWalk: TeamSceneAdvisorWalk
 }
 
 /** How a style seats its team: a row's length, and whether work keeps members at their desks. */
@@ -102,7 +109,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     rounds: createTeamSceneRounds(),
     sites: [],
     trophies: [],
-    layout: GROUND_LAYOUT
+    layout: GROUND_LAYOUT,
+    advisorWalk: createAdvisorWalk()
   }
 }
 
@@ -202,6 +210,8 @@ export function applyTeamSceneInput(
     } else if (event.kind === 'advisorSpoke') {
       world.advisorSaid = { line: event.line, at: world.clock }
       world.advisorRaiseUntil = world.t + ADVISOR_RAISE_SECONDS
+    } else if (event.kind === 'judged') {
+      queueJudgment(world, event.key, event.gesture)
     }
   }
   world.overflow = plan.overflow
@@ -249,6 +259,7 @@ export function stepTeamScene(
   if (!world.visitor) {
     stepLeadRounds(world, opts.width)
   }
+  stepAdvisorWalk(world, opts.width)
   for (const body of world.bodies.values()) {
     moveTeamSceneBody(body, dt, opts.width)
   }
@@ -271,7 +282,8 @@ export function settleTeamScene(world: TeamSceneWorld): void {
     visitor: null,
     cheerUntil: 0,
     effects: [],
-    rounds: createTeamSceneRounds()
+    rounds: createTeamSceneRounds(),
+    advisorWalk: createAdvisorWalk()
   })
 }
 

@@ -94,6 +94,34 @@ describe('createPixelPainter', () => {
     expect(colorsDrawnFor('Merlin')).toBe(colorsDrawnFor('Merlin'))
   })
 
+  it("plays the scene advisor's own gesture frame and holds up its mark", () => {
+    const cast = {
+      advisor: {
+        frames: [['aab', 'bba']],
+        gestures: { escalated: ['cc', 'cc'] },
+        colors: { a: 0xff0000, b: 0x00ff00, c: 0x123456 }
+      }
+    }
+    const scene = { ...QUEST_SCENE, cast }
+    const paintWith = (gesture: TeamSceneActor['gesture']) => {
+      offscreen = []
+      const r = recordingContext()
+      createPixelPainter({ scene, light: NOON, colors: COLORS }).paint(
+        r.g,
+        frame([actor('advisor', { role: 'advisor', x: 0.74, gesture })])
+      )
+      return { r, sprite: offscreen.at(-1)! }
+    }
+    const widthOf = (s: ReturnType<typeof recordingContext>) =>
+      Math.max(...s.calls.filter((c) => c.name === 'fillRect').map((c) => c.args[0] as number))
+    // The 2-wide gesture frame, not the 3-wide standing one.
+    expect(widthOf(paintWith('escalated').sprite)).toBeLessThan(widthOf(paintWith(null).sprite))
+    const fills = (r: ReturnType<typeof recordingContext>) =>
+      r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+    expect(fills(paintWith('escalated').r)).toContain(COLORS.attention)
+    expect(fills(paintWith(null).r)).not.toContain(COLORS.attention)
+  })
+
   it("draws the scene's own advisor and walks its pet beside the lead", () => {
     const cast = {
       advisor: { frames: [['aab', 'bba']], colors: { a: 0xff0000, b: 0x00ff00 } },

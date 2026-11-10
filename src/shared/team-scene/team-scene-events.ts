@@ -1,4 +1,48 @@
-import type { TeamSceneEvent, TeamSceneInput } from './team-scene-types'
+import type {
+  TeamSceneAgentInput,
+  TeamSceneEvent,
+  TeamSceneGesture,
+  TeamSceneInput
+} from './team-scene-types'
+
+type Decision = NonNullable<TeamSceneAgentInput['decisions']>[number]
+
+const GESTURES = new Set<string>([
+  'lowered',
+  'raised',
+  'approved',
+  'unsure',
+  'escalated',
+  'ciRunning',
+  'ciPassed',
+  'ciFailed',
+  'stopped',
+  'consulting',
+  'advised'
+])
+// Why by verdict: a decision with no gesture of its own still reads as its card colour.
+const VERDICT_GESTURE: Record<string, TeamSceneGesture> = {
+  deny: 'escalated',
+  ask: 'unsure',
+  allow: 'approved'
+}
+
+const gestureOf = (decision: Decision): TeamSceneGesture =>
+  decision.gesture && GESTURES.has(decision.gesture)
+    ? (decision.gesture as TeamSceneGesture)
+    : (VERDICT_GESTURE[decision.verdict] ?? 'advised')
+
+// Why only the newest: the decisions ride a 30 s poll, so several arrive at once.
+function newestDecisionOf(
+  now: TeamSceneAgentInput,
+  then: TeamSceneAgentInput | undefined
+): Decision | undefined {
+  if (!then) {
+    return undefined
+  }
+  const seen = new Set((then.decisions ?? []).map((one) => one.id))
+  return (now.decisions ?? []).findLast((one) => !seen.has(one.id))
+}
 
 /** The moments between two snapshots; the first snapshot has none, so opening replays nothing. */
 export function teamSceneEventsBetween(
@@ -30,6 +74,20 @@ export function teamSceneEventsBetween(
     }
     if (m.mergedPr !== null && m.mergedPr !== old.mergedPr) {
       events.push({ kind: 'merge', key: m.key })
+    }
+  }
+  const panes: [string, TeamSceneAgentInput, TeamSceneAgentInput | undefined][] = [
+    ['lead', next.lead, prev.lead],
+    ...next.members.map((m): [string, TeamSceneAgentInput, TeamSceneAgentInput | undefined] => [
+      m.key,
+      m,
+      before.get(m.key)
+    ])
+  ]
+  for (const [key, now, then] of panes) {
+    const judged = newestDecisionOf(now, then)
+    if (judged) {
+      events.push({ kind: 'judged', key, gesture: gestureOf(judged) })
     }
   }
   const line = next.advisor?.line ?? null

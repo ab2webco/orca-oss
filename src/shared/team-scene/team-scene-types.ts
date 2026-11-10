@@ -40,6 +40,22 @@ export type TeamSceneEvent =
   | { kind: 'finish'; key: string }
   | { kind: 'merge'; key: string }
   | { kind: 'advisorSpoke'; line: string }
+  /** Jev decided in `key`'s pane ('lead' for the lead); the advisor walks over and gestures. */
+  | { kind: 'judged'; key: string; gesture: TeamSceneGesture }
+
+/** What the advisor shows for a Jev decision, as the game's gestures name them. */
+export type TeamSceneGesture =
+  | 'lowered'
+  | 'raised'
+  | 'approved'
+  | 'unsure'
+  | 'escalated'
+  | 'ciRunning'
+  | 'ciPassed'
+  | 'ciFailed'
+  | 'stopped'
+  | 'consulting'
+  | 'advised'
 
 /** A point on stage: x across the width (0 to 1), depth from back (0) to front (1). */
 export type TeamSceneSpot = { x: number; depth: number }
@@ -66,6 +82,8 @@ export type TeamSceneActor = {
   emote: TeamSceneEmote | null
   /** Hop height in px while cheering. */
   jump: number
+  /** The advisor's gesture for a Jev decision while it stands by the judged pane. */
+  gesture?: TeamSceneGesture | null
 }
 
 /** One-shot moments a style may draw particles or a thrown item for. */

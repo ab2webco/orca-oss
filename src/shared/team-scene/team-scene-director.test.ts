@@ -274,6 +274,73 @@ describe('team scene director', () => {
     expect(actor(world, 'a')).toBeUndefined()
   })
 
+  it('walks the advisor to the member Jev judged, gestures there, then back', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a'), member('b')], ''))
+    const home = actor(world, 'advisor')!.x
+    const decided = [{ id: 'd1', verdict: 'deny', gesture: null }]
+    applyTeamSceneInput(world, input([member('a'), member('b', { decisions: decided })], ''))
+    expect(runUntil(world, () => actor(world, 'advisor')?.gesture === 'escalated', 15)).toBe(true)
+    const b = world.bodies.get('b')!.home
+    expect(Math.abs(actor(world, 'advisor')!.x - b.x)).toBeLessThan(0.1)
+    expect(actor(world, 'advisor')?.pose).toBe('raise')
+    expect(actor(world, 'b')?.pose).toBe('work')
+    expect(
+      runUntil(
+        world,
+        () => {
+          const a = actor(world, 'advisor')!
+          return a.x === home && !a.gesture
+        },
+        20
+      )
+    ).toBe(true)
+  })
+
+  it('stands on the other side from the lead when both are at the same member', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('q', { activity: 'needsYou' })], ''))
+    expect(runUntil(world, () => world.rounds.stage === 'atMember', 15)).toBe(true)
+    const decided = [{ id: 'd1', verdict: 'deny', gesture: null }]
+    applyTeamSceneInput(
+      world,
+      input([member('q', { activity: 'needsYou', decisions: decided })], '')
+    )
+    expect(runUntil(world, () => actor(world, 'advisor')?.gesture === 'escalated', 15)).toBe(true)
+    const q = world.bodies.get('q')!.x
+    const side = (key: string) => Math.sign(actor(world, key)!.x - q)
+    expect(side('advisor')).toBe(-side('lead'))
+  })
+
+  it('gestures at the lead from its own spot when Jev judged the lead', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a')], ''))
+    const judgedLead = {
+      ...input([member('a')], ''),
+      lead: { ...lead, decisions: [{ id: 'l1', verdict: 'ask', gesture: null }] }
+    }
+    applyTeamSceneInput(world, judgedLead)
+    expect(runUntil(world, () => actor(world, 'advisor')?.gesture === 'unsure', 10)).toBe(true)
+  })
+
+  it('drops a judgment whose member left before the advisor got there', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a'), member('b')], ''))
+    const decided = [{ id: 'd1', verdict: 'deny', gesture: null }]
+    applyTeamSceneInput(world, input([member('a'), member('b', { decisions: decided })], ''))
+    applyTeamSceneInput(world, input([member('a')], ''))
+    let gestured = false
+    runUntil(
+      world,
+      () => {
+        gestured ||= Boolean(actor(world, 'advisor')?.gesture)
+        return false
+      },
+      15
+    )
+    expect(gestured).toBe(false)
+  })
+
   it('shows the advisor line for six seconds after it speaks', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(world, input([], 'first'))

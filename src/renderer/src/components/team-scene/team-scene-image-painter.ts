@@ -10,7 +10,7 @@ import type {
 import {
   createSceneBackdrop,
   createSceneEffects,
-  drawSceneEmote,
+  drawActorMarks,
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
@@ -270,9 +270,7 @@ export function createImagePainter(args: {
     const beside = emoteAt(a, f)
     if (beside) {
       drawOfficeBack(g, x, y, px, backLookOf(sheetOf(art, a), art.frame), a, f.t + a.x * 7)
-      if (a.emote) {
-        drawSceneEmote(g, beside.x, beside.y, a.emote, colors)
-      }
+      drawActorMarks(g, beside.x, beside.y, a, colors)
       return
     }
     const [row, column] = frameOf(art, a, seated, f.t, px)
@@ -291,9 +289,7 @@ export function createImagePainter(args: {
       drawnHeight
     )
     g.restore()
-    if (a.emote) {
-      drawSceneEmote(g, x, y - a.jump - feet.y * px, a.emote, colors)
-    }
+    drawActorMarks(g, x, y - a.jump - feet.y * px, a, colors)
   }
 
   return {

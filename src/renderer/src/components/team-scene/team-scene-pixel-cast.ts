@@ -7,20 +7,28 @@ import {
   petFrameOf
 } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-cast'
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
-import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
+import type {
+  TeamSceneActor,
+  TeamSceneGesture
+} from '../../../../shared/team-scene/team-scene-types'
 
 // The game's SCENE_TICK_MS: the cast's frames step on the band's clock.
 const TICK_MS = 120
 
 const tickOf = (t: number): number => Math.floor((t * 1000) / TICK_MS)
 
-/** The scene's own advisor figure for the advisor, or null to draw it as a member costume. */
-export function pixelAdvisorSpriteOf(scene: SceneDefinition, t: number): HdSprite | null {
+/** The scene's own advisor figure, in its gesture's frame when it has one; null for a costume. */
+export function pixelAdvisorSpriteOf(
+  scene: SceneDefinition,
+  t: number,
+  gesture?: TeamSceneGesture | null
+): HdSprite | null {
   const advisor = scene.cast?.advisor
   if (!advisor) {
     return null
   }
-  const frame = advisorFrameOf({ sprite: advisor, age: 0, bubble: '' }, tickOf(t))
+  const pose = { sprite: advisor, age: 0, bubble: '', ...(gesture ? { gesture } : {}) }
+  const frame = advisorFrameOf(pose, tickOf(t))
   return frameSpriteOf(frame, advisor.colors)
 }
 

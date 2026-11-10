@@ -310,6 +310,16 @@ describe('createImagePainter', () => {
     expect(fills().filter((fill) => fill === COLORS.attention).length).toBeGreaterThanOrEqual(2)
   })
 
+  it("holds up the advisor's gesture for a Jev decision above its head", () => {
+    const rects = (gesture: TeamSceneActor['gesture']) => {
+      const r = recordingContext()
+      painterOf().paint(r.g, frame({ actors: [actor('advisor', { gesture })] }))
+      return r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+    }
+    expect(rects('escalated')).toContain(COLORS.attention)
+    expect(rects(null)).not.toContain(COLORS.attention)
+  })
+
   it('counts members past the seats', () => {
     const { g, calls } = recordingContext()
     painterOf().paint(g, frame({ overflow: 3 }))

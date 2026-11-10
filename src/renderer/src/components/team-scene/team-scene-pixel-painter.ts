@@ -30,7 +30,7 @@ import type {
 } from './team-scene-painter'
 import {
   createSceneEffects,
-  drawSceneEmote,
+  drawActorMarks,
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
@@ -183,8 +183,12 @@ export function createPixelPainter(args: {
     return made
   }
 
-  const imageOf = (a: TeamScenePortraitSubject, leg: number, t = 0): HTMLCanvasElement => {
-    const own = a.role === 'advisor' ? pixelAdvisorSpriteOf(scene, t) : null
+  const imageOf = (
+    a: TeamScenePortraitSubject & Pick<TeamSceneActor, 'gesture'>,
+    leg: number,
+    t = 0
+  ): HTMLCanvasElement => {
+    const own = a.role === 'advisor' ? pixelAdvisorSpriteOf(scene, t, a.gesture) : null
     if (own) {
       return spriteFor(own, false)
     }
@@ -225,15 +229,8 @@ export function createPixelPainter(args: {
       blit(g, spriteFor(pet.sprite, false), pet.left, feetRow(a.depth), a.facing)
     }
     drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
-    if (a.emote) {
-      drawSceneEmote(
-        g,
-        (left + image.width / 2) * PIXEL,
-        (bottom - image.height - 3) * PIXEL,
-        a.emote,
-        colors
-      )
-    }
+    const markX = (left + image.width / 2) * PIXEL
+    drawActorMarks(g, markX, (bottom - image.height - 3) * PIXEL, a, colors)
   }
 
   return {

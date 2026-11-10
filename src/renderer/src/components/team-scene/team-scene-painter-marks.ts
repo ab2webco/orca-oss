@@ -4,6 +4,7 @@ import type {
   TeamSceneEmote
 } from '../../../../shared/team-scene/team-scene-types'
 import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { drawSceneGesture } from './team-scene-gesture-marks'
 import type { TeamSceneFrame } from './team-scene-painter'
 
 /** Status colours resolved from the theme; the scene uses them only for what they mean. */
@@ -16,6 +17,24 @@ export type TeamSceneStatusColors = {
 }
 
 const TAU = 2 * Math.PI
+// Why stacked: an advisor cheering a merge can also hold up a gesture.
+const GESTURE_OVER_EMOTE = 18
+
+/** An actor's emote and, for the advisor, its gesture, centred at `x, y` above the head. */
+export function drawActorMarks(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  a: Pick<TeamSceneActor, 'emote' | 'gesture'>,
+  colors: TeamSceneStatusColors
+): void {
+  if (a.emote) {
+    drawSceneEmote(g, x, y, a.emote, colors)
+  }
+  if (a.gesture) {
+    drawSceneGesture(g, x, a.emote ? y - GESTURE_OVER_EMOTE : y, a.gesture, colors)
+  }
+}
 const SCROLL = '#f4e6c0'
 const SHOT_SECONDS = 0.55
 export const SCENE_DUST = '#cfc6b4'

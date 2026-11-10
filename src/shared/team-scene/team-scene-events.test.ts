@@ -55,6 +55,48 @@ describe('teamSceneEventsBetween', () => {
     expect(teamSceneEventsBetween(input([]), next)).toEqual([{ kind: 'join', key: 'a' }])
   })
 
+  it('plays a Jev decision once, in the pane it was made in, by its gesture or its verdict', () => {
+    const decision = (id: string, verdict: string, gesture: string | null = null) => ({
+      id,
+      verdict,
+      gesture
+    })
+    const prev = input([member('a', { decisions: [decision('d1', 'allow')] })])
+    const next = input([
+      member('a', {
+        decisions: [
+          decision('d1', 'allow'),
+          decision('d2', 'deny'),
+          decision('d3', 'ask', 'ciFailed')
+        ]
+      })
+    ])
+    // Only the newest of a burst: the advisor walks once per poll, not three times.
+    expect(teamSceneEventsBetween(prev, next)).toEqual([
+      { kind: 'judged', key: 'a', gesture: 'ciFailed' }
+    ])
+    expect(teamSceneEventsBetween(next, next)).toEqual([])
+    const denied = input([
+      member('a', { decisions: [decision('d1', 'allow'), decision('d4', 'deny')] })
+    ])
+    expect(teamSceneEventsBetween(prev, denied)).toEqual([
+      { kind: 'judged', key: 'a', gesture: 'escalated' }
+    ])
+    const leadJudged = {
+      ...input([]),
+      lead: { ...input([]).lead, decisions: [decision('l1', 'ask')] }
+    }
+    expect(teamSceneEventsBetween(input([]), leadJudged)).toEqual([
+      { kind: 'judged', key: 'lead', gesture: 'unsure' }
+    ])
+    expect(
+      teamSceneEventsBetween(
+        input([member('b')]),
+        input([member('b', { decisions: [decision('x', 'allow')] })])
+      )
+    ).toEqual([{ kind: 'judged', key: 'b', gesture: 'approved' }])
+  })
+
   it('lets the advisor speak only when its line changes', () => {
     expect(teamSceneEventsBetween(input([], 'a'), input([], 'b'))).toEqual([
       { kind: 'advisorSpoke', line: 'b' }
