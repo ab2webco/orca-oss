@@ -37,7 +37,9 @@ const frame = (actors: TeamSceneActor[], width = 360): TeamSceneFrame => ({
   actors,
   effects: [],
   overflow: 0,
-  stations: []
+  stations: [],
+  sites: [],
+  trophies: []
 })
 
 let offscreen: ReturnType<typeof recordingContext>[] = []

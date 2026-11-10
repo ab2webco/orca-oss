@@ -107,7 +107,9 @@ export function TeamSceneCanvas({
         actors,
         effects: drainTeamSceneEffects(world),
         overflow: world.overflow,
-        stations: world.stations
+        stations: world.stations,
+        sites: world.sites,
+        trophies: world.trophies
       })
     },
     [painter]

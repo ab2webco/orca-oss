@@ -57,7 +57,8 @@ const ASKER = (() => {
         characterKey: null,
         activity: 'needsYou',
         reportId: null,
-        mergedPr: null
+        mergedPr: null,
+        site: { stage: 0, broken: false }
       }
     ]
   })

@@ -17,7 +17,8 @@ const member = (key: string) =>
     characterKey: null,
     activity: 'working',
     reportId: null,
-    mergedPr: null
+    mergedPr: null,
+    site: { stage: 0, broken: false }
   }) as const
 const input = (keys: string[], advisorLine?: string): TeamSceneInput => ({
   lead,

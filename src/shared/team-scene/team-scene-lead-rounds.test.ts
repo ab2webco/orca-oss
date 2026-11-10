@@ -24,7 +24,8 @@ const member = (key: string, activity: TeamSceneActivity = 'working'): TeamScene
   characterKey: null,
   activity,
   reportId: null,
-  mergedPr: null
+  mergedPr: null,
+  site: { stage: 0, broken: false }
 })
 const input = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
   lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
@@ -123,7 +124,7 @@ describe('team scene lead rounds', () => {
   it('walks to a member who needs you and stays with it while it asks', () => {
     const world = scene([member('a'), member('b', 'needsYou')])
     const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
-    expect(run(world, 15, () => nearB() && !leadWalking(world)).length).toBe(0)
+    expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
     expect(nearB()).toBe(true)
     expect(handsTo(run(world, 10))).toEqual([])
     expect(nearB()).toBe(true)
