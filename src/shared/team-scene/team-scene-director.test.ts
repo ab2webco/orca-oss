@@ -275,7 +275,8 @@ describe('team scene director', () => {
   })
 
   describe('the advisor walk at a row of desks', () => {
-    const layout = { rowSize: 5, workSeated: true }
+    // The Office layout: a row of five, members at their desks, room at the row's left end.
+    const layout = { rowSize: 5, workSeated: true, firstX: 0.16 }
     const names = ['q', 'b', 'c', 'd']
     // The owner's case: the lead attends the needs-you member Jev then judges.
     const team = (decisions?: { id: string; verdict: string; gesture: null }[]) =>
@@ -329,6 +330,30 @@ describe('team scene director', () => {
         )
       }
       expect(closest).toBeGreaterThanOrEqual(BODY)
+    })
+
+    it("stands clear of the edge member's own mark beside its monitor", () => {
+      const world = judged()
+      expect(runUntil(world, () => Boolean(actor(world, 'advisor')?.gesture), 20)).toBe(true)
+      const seat = world.bodies.get('q')!.home.x
+      // The back view hangs a sitter's mark just left of its monitor, within 0.07 of its seat.
+      expect(seat - world.bodies.get('advisor')!.x).toBeGreaterThanOrEqual(0.085)
+      // And its whole body stays on the stage.
+      expect(world.bodies.get('advisor')!.x).toBeGreaterThanOrEqual(0.035)
+    })
+
+    it('never gestures off the stage, even beside a desk at its very edge', () => {
+      const world = createTeamSceneWorld()
+      const edge = { rowSize: 5, workSeated: true }
+      applyTeamSceneInput(world, input(team(), ''), edge)
+      runUntil(world, () => world.rounds.stage === 'atMember', 15)
+      applyTeamSceneInput(
+        world,
+        input(team([{ id: 'd1', verdict: 'deny', gesture: null }]), ''),
+        edge
+      )
+      expect(runUntil(world, () => Boolean(actor(world, 'advisor')?.gesture), 20)).toBe(true)
+      expect(world.bodies.get('advisor')!.x).toBeGreaterThanOrEqual(0.035)
     })
 
     it('walks behind the row and steps in front only into the gap at the judged member', () => {

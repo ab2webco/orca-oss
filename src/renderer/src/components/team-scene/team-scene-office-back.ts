@@ -7,7 +7,8 @@ export type OfficeBackSeat = { chairEnd: number }
 export const OFFICE_BACK_SEAT: OfficeBackSeat = { chairEnd: 144 }
 
 /** Desks in one row of five, members typing at them; a walk to a tray read as a bug at a desk. */
-export const OFFICE_BACK_LAYOUT = { rowSize: 5, workSeated: true } as const
+// Why first at 0.16: the advisor gestures left of the first desk, past that sitter's own mark.
+export const OFFICE_BACK_LAYOUT = { rowSize: 5, workSeated: true, firstX: 0.16 } as const
 
 export type OfficeBackLook = { hair: string; skin: string; shirt: string }
 

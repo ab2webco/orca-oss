@@ -20,10 +20,12 @@ export type TeamSceneSeatPlan = { seats: TeamSceneSeat[]; overflow: number }
 export function seatPlanOf(
   members: readonly TeamSceneMemberInput[],
   /** Seats in one row before a second opens; a style with wide desks keeps a long row. */
-  rowSize = ROW_SIZE
+  rowSize = ROW_SIZE,
+  /** Where the row starts; a style that needs room at its left end starts it further in. */
+  firstX = FIRST_X
 ): TeamSceneSeatPlan {
   const spacing = (LAST_X - FIRST_X) / (rowSize - 1)
-  const columnX = (column: number): number => FIRST_X + spacing * column
+  const columnX = (column: number): number => firstX + spacing * column
   // Why half a column: a front-row member standing right before a back-row seat hid it.
   const frontShift = spacing / 2
   const ordered = [

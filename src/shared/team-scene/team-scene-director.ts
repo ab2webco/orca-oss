@@ -90,7 +90,7 @@ export type TeamSceneWorld = {
 }
 
 /** How a style seats its team: a row's length, and whether work keeps members at their desks. */
-export type TeamSceneLayout = { rowSize: number; workSeated: boolean }
+export type TeamSceneLayout = { rowSize: number; workSeated: boolean; firstX?: number }
 const GROUND_LAYOUT: TeamSceneLayout = { rowSize: 4, workSeated: false }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -164,7 +164,7 @@ export function applyTeamSceneInput(
   }
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
-  const plan = seatPlanOf(input.members, layout.rowSize)
+  const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX)
   const byKey = new Map(input.members.map((m) => [m.key, m]))
   const seatedKeys = new Set(plan.seats.map((s) => s.key))
   for (const { key, spot } of plan.seats) {

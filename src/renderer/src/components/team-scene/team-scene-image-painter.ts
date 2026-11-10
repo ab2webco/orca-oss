@@ -310,11 +310,13 @@ export function createImagePainter(args: {
       } else if (args.builds === 'office') {
         drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat)
       }
-      // Why split: whoever walks behind the row goes under its monitors, never over them.
+      // Why split: whoever walks behind the row goes under its monitors, never over them; a
+      // gesturing advisor stands in a gap, clear of every monitor, so it shows in front.
       const row = Math.min(...f.stations.map((s) => s.depth)) - BEHIND_ROW
-      f.actors.filter((a) => a.depth < row).forEach((a) => drawActor(g, a, f))
+      const behind = (a: TeamSceneActor) => a.depth < row && !a.gesture
+      f.actors.filter(behind).forEach((a) => drawActor(g, a, f))
       drawStations(g, f)
-      f.actors.filter((a) => a.depth >= row).forEach((a) => drawActor(g, a, f))
+      f.actors.filter((a) => !behind(a)).forEach((a) => drawActor(g, a, f))
       foreground.draw(g, f)
       effects.draw(g, f)
       drawSceneOverflow(g, f.overflow)

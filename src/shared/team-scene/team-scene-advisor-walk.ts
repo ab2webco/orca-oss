@@ -8,6 +8,10 @@ const GESTURE_SECONDS = 2.4
 const QUEUE_MAX = 3
 // Half a gap beside a member with no neighbour on that side, and the room it leaves the lead.
 const BESIDE_X = 0.06
+const EDGE_X = 0.1
+// Why: the advisor's whole body stays on the stage, however close a desk sits to its edge.
+const STAGE_MIN_X = 0.04
+const STAGE_MAX_X = 0.96
 const LEAD_GAP = 0.09
 // Depths closer than this share an aisle, where the advisor keeps a body width from the lead.
 const AISLE = 0.2
@@ -55,8 +59,10 @@ function spotOf(world: TeamSceneWorld, key: string, target: TeamSceneBody): Team
   const seat = target.home
   const side = lead && lead.x > seat.x ? -1 : 1
   const next = world.stations.map((s) => (s.x - seat.x) * side).filter((d) => d > 0.001)
-  const half = Math.min(BESIDE_X, ...next.map((d) => d / 2))
-  return { x: seat.x + side * half, depth: world.bodies.get('advisor')!.home.depth }
+  // Why wider at the row's end: a sitter's mark hangs just past its monitor, where the gap is.
+  const half = next.length > 0 ? Math.min(BESIDE_X, ...next.map((d) => d / 2)) : EDGE_X
+  const x = Math.min(STAGE_MAX_X, Math.max(STAGE_MIN_X, seat.x + side * half))
+  return { x, depth: world.bodies.get('advisor')!.home.depth }
 }
 
 const MOVING_PX = 3

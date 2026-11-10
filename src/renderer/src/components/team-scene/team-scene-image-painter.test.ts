@@ -343,6 +343,20 @@ describe('createImagePainter', () => {
     expect(figures[1]).toBeGreaterThan(desk)
   })
 
+  it('draws the advisor in front of the desks while it holds up a gesture, though it stands behind', () => {
+    const { g, calls } = recordingContext()
+    const stations = [{ x: 0.3, depth: 0.55 }]
+    const advisor = actor('advisor', { x: 0.24, depth: 0.15, gesture: 'escalated' })
+    painterOf().paint(g, frame({ actors: [advisor], stations }))
+    const desk = calls.findIndex(
+      (c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png')
+    )
+    const figure = calls.findIndex(
+      (c) => c.name === 'drawImage' && c.args.length === 9 && c.args[0] !== IMAGES.get('desk.png')
+    )
+    expect(figure).toBeGreaterThan(desk)
+  })
+
   it('counts members past the seats', () => {
     const { g, calls } = recordingContext()
     painterOf().paint(g, frame({ overflow: 3 }))
@@ -556,7 +570,7 @@ describe('createImagePainter office back view', () => {
         builds: 'office',
         back
       }).layout
-    expect(at({ chairEnd: 144 })).toEqual({ rowSize: 5, workSeated: true })
+    expect(at({ chairEnd: 144 })).toEqual({ rowSize: 5, workSeated: true, firstX: 0.16 })
     expect(at(null)).toBeUndefined()
   })
 

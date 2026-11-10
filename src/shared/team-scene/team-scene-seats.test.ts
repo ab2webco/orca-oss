@@ -38,6 +38,14 @@ describe('seatPlanOf', () => {
     }
   })
 
+  it('starts a row where the style asks, keeping its spacing', () => {
+    const members = Array.from({ length: 5 }, (_, i) => member(`m${i}`))
+    const plain = seatPlanOf(members, 5).seats.map((s) => s.spot.x)
+    const shifted = seatPlanOf(members, 5, 0.16).seats.map((s) => s.spot.x)
+    expect(shifted[0]).toBeCloseTo(0.16)
+    shifted.forEach((x, i) => expect(x - plain[i]!).toBeCloseTo(0.06))
+  })
+
   it('opens a second row after four and caps at eight with +N', () => {
     const keys = Array.from({ length: 11 }, (_, i) => `m${i}`)
     const plan = seatPlanOf(keys.map((k) => member(k)))
