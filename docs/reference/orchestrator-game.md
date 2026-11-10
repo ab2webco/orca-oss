@@ -1643,16 +1643,19 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
 - **Each pane's Jev, on the lead's Panel.** Pane state does not cross panes, so a lead or member
   pane's mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
   Jev switches the main model or effort): `ORCA_GAME_ADVISOR` in the CLI's env, JSON
-  `{ version: 1, model, effort, line, pinned: { model, effort } }`, with `pinned` read from
+  `{ version: 1, model, effort, line, pinned: { model, effort }, decisions? }`, with `pinned` read from
   `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, or `null` once Jev stops after a report. A pane
   where Jev never published sends nothing. The CLI passes it to `game.state` as an optional
   `advisor` param, the host keeps it per pane in memory (a restart refills it within one poll, a
   report not renewed for 3 minutes expires) and puts it on that pane's row of its lead's state as
-  an optional `advisor` (`{ model, effort, line?, pinned, previous? }`, `previous` being what Jev had it on
-  before its latest switch)
+  an optional `advisor` (`{ model, effort, line?, pinned, previous?, decisions? }`, `previous` being what
+  Jev had it on before its latest switch)
   ([`orchestrator-game-member-advisors.ts`](../../src/main/runtime/orchestrator-game-member-advisors.ts)).
-  The lead's own report fills the Advisor row of the native Team panel and its scene's advisor, whose
-  bubble says `line`; Jev's decisions stay in the pane, so that row lists no calls.
+  `decisions` is Jev's latest five in that pane, newest last, as `{ id, verdict, gesture }` only: their
+  titles and tool text stay in the pane. It is absent while Jev has decided nothing, and an older
+  Orca drops it, reading the rest as before. The Team model carries it on the lead's and each
+  member's card for the scene. The lead's own report fills the Advisor row of the native Team panel and
+  its scene's advisor, whose bubble says `line`; that row still lists no calls.
   The member card draws `◆ Jev Sonnet 5.5·high · model pinned` (Jev's name, then the pin, dropped
   on a narrow card; what still does not fit wraps, so the model is never cut) and, after a switch,
   `↳ Opus 5.5 → Sonnet 5.5`, naming only what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not

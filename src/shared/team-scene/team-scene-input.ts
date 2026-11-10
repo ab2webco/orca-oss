@@ -27,7 +27,8 @@ const agentOf = (
   key: agent.paneKey,
   name: agent.name,
   characterKey: agent.characterKey,
-  activity: activityOf(agent, needsYou)
+  activity: activityOf(agent, needsYou),
+  ...(agent.decisions ? { decisions: agent.decisions } : {})
 })
 
 /** The scene's projection of the Team model; the summary text stands in for a report id. */

@@ -12,6 +12,8 @@ export type TeamSceneAgentInput = {
   /** The persistent game character (ORCA-1034); null draws the style's default. */
   characterKey: string | null
   activity: TeamSceneActivity
+  /** Jev's latest decisions in this pane, newest last; absent when its Jev sent none. */
+  decisions?: { id: string; verdict: string; gesture: string | null }[]
 }
 
 export type TeamSceneMemberInput = TeamSceneAgentInput & {

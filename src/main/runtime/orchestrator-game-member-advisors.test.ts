@@ -119,6 +119,18 @@ describe('GameMemberAdvisors kept copy', () => {
     }
   }
 
+  it('says a new Jev decision changes the panel, even with as many decisions as before', () => {
+    const advisors = new GameMemberAdvisors()
+    const decided = (id: string) => ({
+      ...on('Opus 5.5'),
+      decisions: [{ id, verdict: 'allow', gesture: null }]
+    })
+    expect(advisors.note('p', decided('a'), 0)).toBe(true)
+    expect(advisors.note('p', decided('a'), 1)).toBe(false)
+    expect(advisors.note('p', decided('b'), 2)).toBe(true)
+    expect(advisors.of('p', 2)?.decisions).toEqual([{ id: 'b', verdict: 'allow', gesture: null }])
+  })
+
   it('answers with the last report after it expired from memory', () => {
     const { durable } = keptIn()
     const store = new GameMemberAdvisors(undefined, durable)

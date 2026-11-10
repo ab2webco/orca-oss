@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { GameMemberAdvisor } from '../types'
+import type { AdvisorLogEntry, GameMemberAdvisor } from '../types'
 import type { Advisor } from './allies'
 
 // What this pane tells Orca about its Jev, so a lead's Panel can show it on this pane's card.
@@ -28,8 +28,16 @@ export const ownAdvisorOf = (advisor: Advisor, pins: AdvisorPins): GameMemberAdv
   pinned: pins
 })
 
-/** The report's JSON; `null` once Jev stops, so Orca forgets what it last said. */
-export const advisorReportOf = (advisor: Advisor | null, pins: AdvisorPins): string =>
+/**
+ * The report's JSON; `null` once Jev stops, so Orca forgets what it last said. Jev's latest
+ * decisions ride along as ids, verdicts and gestures, so a lead's Panel can act them out; their
+ * titles and tool text stay in this pane.
+ */
+export const advisorReportOf = (
+  advisor: Advisor | null,
+  pins: AdvisorPins,
+  decisions: readonly AdvisorLogEntry[] = []
+): string =>
   JSON.stringify(
     advisor === null
       ? null
@@ -38,6 +46,15 @@ export const advisorReportOf = (advisor: Advisor | null, pins: AdvisorPins): str
           model: advisor.model,
           effort: advisor.effort === null ? null : String(advisor.effort),
           line: advisor.line,
-          pinned: pins
+          pinned: pins,
+          ...(decisions.length > 0
+            ? {
+                decisions: decisions.map((one) => ({
+                  id: one.key,
+                  verdict: one.verdict,
+                  gesture: one.gesture
+                }))
+              }
+            : {})
         }
   )

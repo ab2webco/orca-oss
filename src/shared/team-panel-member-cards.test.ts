@@ -125,6 +125,17 @@ describe('teamCardsOf', () => {
     expect(card?.model).toEqual({ label: 'Sonnet 5.5', effort: 'low', source: 'advisor' })
   })
 
+  it("carries Jev's latest decisions in the member's pane, and none where it sent none", () => {
+    const decisions = [{ id: 'd1', verdict: 'deny', gesture: 'escalated' }]
+    const pinned = { model: false, effort: false }
+    const [card] =
+      cardsOf([agent({ advisor: { model: null, effort: null, pinned, decisions } })])?.members ?? []
+    expect(card?.decisions).toEqual(decisions)
+    const [plain] =
+      cardsOf([agent({ advisor: { model: null, effort: null, pinned } })])?.members ?? []
+    expect(plain).not.toHaveProperty('decisions')
+  })
+
   it('reads the ticket from the name when the tracker has none', () => {
     const [card] = cardsOf([agent({ displayName: 'Arthur orca-1047' })])?.members ?? []
     expect(card?.ticket).toEqual({

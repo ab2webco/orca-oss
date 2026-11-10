@@ -178,6 +178,19 @@ describe('teamSceneInputOf', () => {
     expect(scene.lead.activity).toBe('done')
   })
 
+  it("hands the scene Jev's decisions in the lead's and each member's pane", () => {
+    const mine = [{ id: 'l1', verdict: 'allow', gesture: 'approved' }]
+    const theirs = [{ id: 'm1', verdict: 'deny', gesture: 'escalated' }]
+    const input = teamSceneInputOf({
+      lead: lead({ decisions: mine }),
+      advisor: null,
+      members: [card('a', { decisions: theirs }), card('b')]
+    })
+    expect(input.lead.decisions).toEqual(mine)
+    expect(input.members[0]!.decisions).toEqual(theirs)
+    expect(input.members[1]).not.toHaveProperty('decisions')
+  })
+
   it('passes the advisor line only when the plugin row exists', () => {
     const advisor = {
       model: null,

@@ -1,5 +1,5 @@
 ---
-sourceHash: f047521251b8fcb0
+sourceHash: a1a9d6189b575c16
 ---
 
 # El juego orquestador de Agent Teams
@@ -1758,16 +1758,21 @@ burbuja es solo el comando.
 - **El Jev de cada pane, en el Panel del líder.** El estado de un pane no cruza a otros panes, así que
   el mod del pane del líder o de un miembro informa de su propio Jev en el sondeo de `orca game state` que ya ejecuta
   cada 30 s (y de inmediato cuando Jev cambia el modelo o el esfuerzo principal): `ORCA_GAME_ADVISOR` en
-  el entorno de la CLI, JSON `{ version: 1, model, effort, line, pinned: { model, effort } }`, con `pinned`
+  el entorno de la CLI, JSON `{ version: 1, model, effort, line, pinned: { model, effort }, decisions? }`, con `pinned`
   leído de `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, o `null` una vez que Jev se detiene
   después de un informe. Un pane donde Jev nunca publicó no envía nada. La CLI lo pasa a `game.state`
   como un parámetro opcional `advisor`, el host lo guarda por pane en memoria (un reinicio lo vuelve a
   llenar en un sondeo, un informe no renovado durante 3 minutos expira) y lo pone en la fila de ese
   pane dentro del estado de su líder como un `advisor` opcional
-  (`{ model, effort, line?, pinned, previous? }`, siendo `previous` lo que Jev tenía antes de su último cambio)
+  (`{ model, effort, line?, pinned, previous?, decisions? }`, siendo `previous` lo que Jev tenía antes de su
+  último cambio)
   ([`orchestrator-game-member-advisors.ts`](../../../src/main/runtime/orchestrator-game-member-advisors.ts)).
-  El informe del propio líder llena la fila Advisor del panel Team nativo y el asesor de su escena, cuya
-  burbuja dice `line`; las decisiones de Jev se quedan en el pane, así que esa fila no lista llamadas.
+  `decisions` son las cinco últimas de Jev en ese pane, la más nueva al final, solo como
+  `{ id, verdict, gesture }`: sus títulos y el texto de las herramientas se quedan en el pane. No aparece
+  mientras Jev no haya decidido nada, y un Orca anterior lo descarta y lee el resto como antes. El modelo
+  Team lo lleva en la tarjeta del líder y de cada miembro para la escena. El informe del propio líder llena
+  la fila Advisor del panel Team nativo y el asesor de su escena, cuya burbuja dice `line`; esa fila sigue
+  sin listar llamadas.
   La tarjeta del miembro dibuja `◆ Jev Sonnet 5.5·high · model pinned` (el nombre de Jev, luego el pin,
   que se omite en una tarjeta estrecha; lo que aun así no cabe pasa a la línea siguiente, así que el
   modelo nunca se corta) y, después de un cambio, `↳ Opus 5.5 → Sonnet 5.5`, nombrando solo lo que

@@ -4,7 +4,7 @@ import type { EngineInterface } from 'claude-code'
 import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
-import { readJevAdvisor } from './advisor-state'
+import { advisorLogOf, readJevAdvisor } from './advisor-state'
 import { celebrateArcadeOnUnlock, migrateKeptArcadeOffers } from './arcade-unlock'
 import { cliInvocationOf } from './cli-invocation'
 import {
@@ -91,9 +91,9 @@ async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>>
   if (advisor === null && !hasReportedAdvisor) {
     return {}
   }
-  const pins = await advisorPinsOf($)
+  const [pins, log] = await Promise.all([advisorPinsOf($), advisorLogOf($)])
   hasReportedAdvisor = advisor !== null
-  return { [ADVISOR_REPORT_ENV]: advisorReportOf(advisor, pins) }
+  return { [ADVISOR_REPORT_ENV]: advisorReportOf(advisor, pins, log.decisions) }
 }
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
