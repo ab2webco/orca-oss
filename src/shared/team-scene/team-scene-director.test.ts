@@ -114,6 +114,44 @@ describe('team scene director', () => {
     expect(runUntil(world, () => actor(world, 'a') === undefined)).toBe(true)
   })
 
+  it('walks a finished member to the lead to celebrate, then back to its seat, never off stage', () => {
+    const world = seated(['a', 'b'])
+    drainTeamSceneEffects(world)
+    applyTeamSceneInput(world, input([member('a', { activity: 'done' }), member('b')]))
+    expect(actor(world, 'a')?.emote).toBe('check')
+    let left = false
+    const watch = (until: () => boolean) =>
+      runUntil(world, () => {
+        left ||= actor(world, 'a') === undefined
+        return until()
+      })
+    expect(watch(() => actor(world, 'a')?.pose === 'walk')).toBe(true)
+    expect(watch(() => actor(world, 'a')?.emote === 'heart')).toBe(true)
+    expect(actor(world, 'a')?.pose).toBe('cheer')
+    expect(actor(world, 'lead')?.pose).toBe('cheer')
+    expect(drainTeamSceneEffects(world)).toContainEqual({
+      kind: 'burst',
+      key: 'a',
+      reason: 'finish'
+    })
+    expect(watch(() => world.bodies.get('a')?.plan.kind === 'seated')).toBe(true)
+    expect(actor(world, 'a')?.pose).toBe('done')
+    expect(actor(world, 'a')?.x).toBeCloseTo(world.bodies.get('a')!.home.x, 2)
+    expect(left).toBe(false)
+  })
+
+  it('carries a report filed with the finish to the lead in the same walk', () => {
+    const world = seated(['a'])
+    drainTeamSceneEffects(world)
+    applyTeamSceneInput(world, input([member('a', { activity: 'done', reportId: 'r1' })]))
+    expect(runUntil(world, () => actor(world, 'a')?.carrying === true)).toBe(true)
+    expect(runUntil(world, () => actor(world, 'a')?.emote === 'heart')).toBe(true)
+    const effects = drainTeamSceneEffects(world)
+    expect(effects).toContainEqual({ kind: 'handoff', from: 'a', to: 'lead' })
+    expect(effects).toContainEqual({ kind: 'burst', key: 'a', reason: 'finish' })
+    expect(world.queue).toEqual([])
+  })
+
   it('carries a report to the lead and hands it over', () => {
     const world = seated(['a'])
     drainTeamSceneEffects(world)

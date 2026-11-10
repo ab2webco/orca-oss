@@ -25,6 +25,9 @@ export function teamSceneEventsBetween(
     if (m.reportId !== null && m.reportId !== old.reportId) {
       events.push({ kind: 'handoff', key: m.key })
     }
+    if (m.activity === 'done' && old.activity !== 'done') {
+      events.push({ kind: 'finish', key: m.key })
+    }
     if (m.mergedPr !== null && m.mergedPr !== old.mergedPr) {
       events.push({ kind: 'merge', key: m.key })
     }

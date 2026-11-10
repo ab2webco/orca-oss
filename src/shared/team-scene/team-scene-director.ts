@@ -1,9 +1,5 @@
 import { teamSceneEventsBetween } from './team-scene-events'
-import {
-  moveTeamSceneBody,
-  teamSceneArrived as near,
-  type TeamSceneMover
-} from './team-scene-motion'
+import { moveTeamSceneBody, type TeamSceneMover } from './team-scene-motion'
 import {
   createTeamSceneRounds,
   LEAD_SPOT,
@@ -28,21 +24,23 @@ import type {
   TeamSceneInput,
   TeamSceneSpot
 } from './team-scene-types'
+import {
+  advanceVisit,
+  emoteFor as emote,
+  ENTRY_X,
+  queueVisit,
+  visitCanStart,
+  type TeamScenePlan
+} from './team-scene-visits'
 
 // Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
 const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
-const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
-const ENTRY_X = -0.1
-const EXIT_X = 1.14
-const AT_LEAD_SECONDS = { enter: 0.9, handoff: 0.9, leave: 1 } as const
 const CHEER_SECONDS = 2.2
+const CHECK_SECONDS = 1.2
 const ADVISOR_RAISE_SECONDS = 1.4
 const ADVISOR_BUBBLE_SECONDS = 6
 
-type VisitKind = keyof typeof AT_LEAD_SECONDS
-type Plan =
-  | { kind: 'seated' }
-  | { kind: VisitKind; stage: 'queued' | 'toLead' | 'atLead' | 'back'; at: number }
+type Plan = TeamScenePlan
 
 export type TeamSceneBody = TeamSceneMover & {
   key: string
@@ -128,22 +126,6 @@ function bodyAt(
   }
 }
 
-const emote = (
-  world: TeamSceneWorld,
-  body: TeamSceneBody,
-  kind: TeamSceneEmote,
-  seconds: number
-): void => {
-  body.emote = { kind, until: world.t + seconds }
-}
-
-const queueVisit = (world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): void => {
-  body.plan = { kind, stage: 'queued', at: world.t }
-  if (!world.queue.includes(body.key)) {
-    world.queue.push(body.key)
-  }
-}
-
 export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput): void {
   const events = teamSceneEventsBetween(world.last, input)
   world.last = input
@@ -193,6 +175,11 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
     const body = 'key' in event ? bodies.get(event.key) : undefined
     if (event.kind === 'handoff' && body?.plan.kind === 'seated') {
       queueVisit(world, body, 'handoff')
+    } else if (event.kind === 'finish' && body && visitCanStart(body.plan)) {
+      const report = body.plan.kind === 'handoff'
+      queueVisit(world, body, 'finish')
+      Object.assign(body.plan, { report })
+      emote(world, body, 'check', CHECK_SECONDS)
     } else if (event.kind === 'merge') {
       keepTrophy(world.trophies, { key: event.key, name: byKey.get(event.key)?.name ?? event.key })
       world.cheerUntil = world.t + CHEER_SECONDS
@@ -214,52 +201,12 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
   }))
 }
 
-function arrive(world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): void {
-  const lead = world.bodies.get('lead')!
-  body.facing = 1
-  lead.facing = -1
-  if (kind === 'handoff') {
-    world.effects.push({ kind: 'handoff', from: body.key, to: 'lead' })
-    emote(world, lead, 'check', 1.1)
-    return
-  }
-  world.effects.push({
-    kind: 'burst',
-    key: body.key,
-    reason: kind === 'enter' ? 'welcome' : 'goodbye'
-  })
-  emote(world, body, 'heart', 1)
-}
-
 function advancePlan(world: TeamSceneWorld, body: TeamSceneBody, width: number): void {
   const { plan } = body
   if (plan.kind === 'seated') {
     stepTeamSceneWork(world, body, width)
-    return
-  }
-  if (plan.stage === 'queued') {
-    body.target = plan.kind === 'enter' ? { x: ENTRY_X, depth: body.home.depth } : body.home
-  } else if (plan.stage === 'toLead') {
-    body.target = VISIT_SPOT
-    if (near(body, width)) {
-      Object.assign(plan, { stage: 'atLead', at: world.t })
-      arrive(world, body, plan.kind)
-    }
-  } else if (plan.stage === 'atLead') {
-    if (world.t - plan.at >= AT_LEAD_SECONDS[plan.kind]) {
-      plan.stage = 'back'
-      world.visitor = null
-    }
-  } else if (plan.kind === 'leave') {
-    body.target = { x: EXIT_X, depth: VISIT_SPOT.depth }
-    if (body.x > EXIT_X - 0.06) {
-      world.bodies.delete(body.key)
-    }
   } else {
-    body.target = body.home
-    if (near(body, width)) {
-      body.plan = { kind: 'seated' }
-    }
+    advanceVisit(world, body, plan, width)
   }
 }
 

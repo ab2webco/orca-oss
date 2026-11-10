@@ -35,6 +35,7 @@ export type TeamSceneEvent =
   | { kind: 'join'; key: string }
   | { kind: 'leave'; key: string }
   | { kind: 'handoff'; key: string }
+  | { kind: 'finish'; key: string }
   | { kind: 'merge'; key: string }
   | { kind: 'advisorSpoke'; line: string }
 
@@ -68,4 +69,8 @@ export type TeamSceneActor = {
 /** One-shot moments a style may draw particles or a thrown item for. */
 export type TeamSceneEffect =
   | { kind: 'handoff'; from: string; to: string }
-  | { kind: 'burst'; key: string; reason: 'merge' | 'welcome' | 'goodbye' | 'build' | 'repair' }
+  | {
+      kind: 'burst'
+      key: string
+      reason: 'merge' | 'welcome' | 'goodbye' | 'finish' | 'build' | 'repair'
+    }

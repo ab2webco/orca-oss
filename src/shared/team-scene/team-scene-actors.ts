@@ -21,7 +21,7 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   const visit = world.visitor ? world.bodies.get(world.visitor)?.plan : undefined
   const atLead = visit && visit.kind !== 'seated' && visit.stage === 'atLead' ? visit : null
   if (atLead && (body.role === 'lead' || body.key === world.visitor)) {
-    return atLead.kind === 'handoff' ? 'give' : 'wave'
+    return atLead.kind === 'handoff' ? 'give' : atLead.kind === 'finish' ? 'cheer' : 'wave'
   }
   if (
     body.role === 'lead' &&
@@ -68,7 +68,8 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         gait: body.gait,
         stride: teamSceneStrideAt(body.depth),
         carrying:
-          (plan.kind === 'handoff' && plan.stage === 'toLead') ||
+          ((plan.kind === 'handoff' || (plan.kind === 'finish' && plan.report === true)) &&
+            plan.stage === 'toLead') ||
           (plan.kind === 'seated' && body.work.step === 'carry') ||
           (body.role === 'lead' &&
             world.rounds.stage === 'toMember' &&

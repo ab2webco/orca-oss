@@ -47,6 +47,14 @@ describe('teamSceneEventsBetween', () => {
     expect(teamSceneEventsBetween(next, next)).toEqual([])
   })
 
+  it('marks a member finishing once, when its card turns done', () => {
+    const prev = input([member('a')])
+    const next = input([member('a', { activity: 'done' })])
+    expect(teamSceneEventsBetween(prev, next)).toEqual([{ kind: 'finish', key: 'a' }])
+    expect(teamSceneEventsBetween(next, next)).toEqual([])
+    expect(teamSceneEventsBetween(input([]), next)).toEqual([{ kind: 'join', key: 'a' }])
+  })
+
   it('lets the advisor speak only when its line changes', () => {
     expect(teamSceneEventsBetween(input([], 'a'), input([], 'b'))).toEqual([
       { kind: 'advisorSpoke', line: 'b' }
