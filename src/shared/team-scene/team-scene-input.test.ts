@@ -6,6 +6,8 @@ import type {
   TeamPullRequest
 } from '../team-panel-model-types'
 import { teamSceneInputOf } from './team-scene-input'
+import { teamSceneActors } from './team-scene-actors'
+import { applyTeamSceneInput, createTeamSceneWorld, stepTeamScene } from './team-scene-director'
 
 const facts = (paneKey: string, extra: Partial<TeamAgentFacts> = {}): TeamAgentFacts => ({
   paneKey,
@@ -50,6 +52,38 @@ const pr = (number: number, state: TeamPullRequest['state']): TeamPullRequest =>
   ci: 'none',
   verdict: null,
   perfectMerge: null
+})
+
+describe('teamSceneInputOf in the Office', () => {
+  // The owner's live team: two cards planning, one in PR, the lead finished.
+  it('keeps planning and PR cards seated, each at its own desk', () => {
+    const open = { ...pr(722, 'open'), ci: 'pending' as const }
+    const model = {
+      lead: lead({ status: 'done', condition: 'done' }),
+      advisor: null,
+      members: [
+        card('NETSA-121', { flowPhase: 'plan' }),
+        card('NETSA-222', { flowPhase: 'pr', pr: open }),
+        card('NETSA-80', { flowPhase: 'plan' })
+      ]
+    }
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, teamSceneInputOf(model), { rowSize: 5, workSeated: true })
+    const keys = model.members.map((m) => m.paneKey)
+    expect(new Set(keys.map((k) => world.bodies.get(k)!.home.x)).size).toBe(3)
+    let strayed: string | null = null
+    for (let t = 0; t < 20 && !strayed; t += 1 / 30) {
+      stepTeamScene(world, 1 / 30, { width: 390 })
+      const actors = teamSceneActors(world)
+      for (const k of keys) {
+        const a = actors.find((one) => one.key === k)!
+        if (a.x !== world.bodies.get(k)!.home.x || a.pose !== 'work') {
+          strayed = `${k} at ${t.toFixed(1)}s: ${a.pose}`
+        }
+      }
+    }
+    expect(strayed).toBeNull()
+  })
 })
 
 describe('teamSceneInputOf', () => {
