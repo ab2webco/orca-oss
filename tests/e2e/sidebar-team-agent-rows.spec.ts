@@ -86,6 +86,56 @@ async function expectV30TreeGeometry(page: Page, where: string): Promise<void> {
   expect(pitches[0], `row pitch differs at ${where}`).toBe(pitches[1])
 }
 
+const CLEAR = 'rgba(0, 0, 0, 0)'
+
+// ORCA-1148: the lead's card once drew a bordered card around the open member's own bordered card.
+async function expectOnlyMemberRowSelected(
+  page: Page,
+  leadId: string,
+  memberId: string,
+  { where }: { where: string }
+): Promise<void> {
+  const look = await page.evaluate(
+    ({ leadId, memberId }) => {
+      const surfaceOf = (id: string) =>
+        document.querySelector<HTMLElement>(
+          `[data-worktree-id="${id}"] [data-worktree-card-surface]`
+        )!
+      const lead = surfaceOf(leadId)
+      const member = surfaceOf(memberId)
+      const rowOf = (surface: HTMLElement) =>
+        surface.querySelector<HTMLElement>('[data-sidebar-team-row]')!
+      const fill = (row: HTMLElement) => getComputedStyle(row, '::after').backgroundColor
+      const leadBox = lead.getBoundingClientRect()
+      const memberRow = rowOf(member).getBoundingClientRect()
+      return {
+        leadActive: lead.hasAttribute('data-worktree-card-active'),
+        memberActive: member.hasAttribute('data-worktree-card-active'),
+        leadSurface: [
+          getComputedStyle(lead).borderTopColor,
+          getComputedStyle(lead).backgroundColor
+        ],
+        memberSurface: [
+          getComputedStyle(member).borderTopColor,
+          getComputedStyle(member).backgroundColor
+        ],
+        leadRowFill: fill(rowOf(lead)),
+        memberRowFill: fill(rowOf(member)),
+        // The member's fill reaches 6 px past its row; it must stay inside the lead's card.
+        memberFillInside: memberRow.right + 6 <= leadBox.right && memberRow.left - 8 >= leadBox.left
+      }
+    },
+    { leadId, memberId }
+  )
+  expect(look.leadActive, `lead card selected at ${where}`).toBe(false)
+  expect(look.memberActive, `member card not selected at ${where}`).toBe(true)
+  expect(look.leadSurface, `lead card drawn at ${where}`).toEqual([CLEAR, CLEAR])
+  expect(look.memberSurface, `member card drawn at ${where}`).toEqual([CLEAR, CLEAR])
+  expect(look.leadRowFill, `lead row filled at ${where}`).toBe(CLEAR)
+  expect(look.memberRowFill, `member row not filled at ${where}`).not.toBe(CLEAR)
+  expect(look.memberFillInside, `member fill leaves the lead card at ${where}`).toBe(true)
+}
+
 async function createBareWorktree(page: Page, client: RuntimeClient, name: string) {
   const id = await page.evaluate(async (branch) => {
     const state = window.__store!.getState()
@@ -284,13 +334,15 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
         const where = `${width}px ${theme}`
         const overflow = await viewport.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `sidebar list overflows at ${where}`).toBeLessThanOrEqual(0)
-        const cutRows = await orcaPage
-          .locator('[data-sidebar-team-row]')
-          .evaluateAll((list) =>
-            list
-              .filter((node) => node.scrollWidth > node.clientWidth)
-              .map((node) => node.textContent)
-          )
+        // Why the parts, not scrollWidth: the selection fill (`::after`) reaches past the row by design.
+        const cutRows = await orcaPage.locator('[data-sidebar-team-row]').evaluateAll((list) =>
+          list
+            .filter((node) => {
+              const right = node.getBoundingClientRect().right
+              return [...node.children].some((part) => part.getBoundingClientRect().right > right)
+            })
+            .map((node) => node.textContent)
+        )
         expect(cutRows, `team rows overflow at ${where}`).toEqual([])
         await expectV30TreeGeometry(orcaPage, where)
         await orcaPage.screenshot({
@@ -299,6 +351,71 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
         })
       }
     }
+
+    // V30 with a member open: only that member's row is filled; the lead's card draws no card.
+    await knightRow.click()
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeWorktreeId))
+      .toBe(knight.worktreeId)
+    // Why: opening the member offers its repo's detected setup script over the rows being captured.
+    const setupPrompt = orcaPage.locator('[data-setup-script-prompt-layer]')
+    const dismissSetup = setupPrompt.getByRole('button', {
+      name: 'Descartar scripts de configuración'
+    })
+    if (
+      await dismissSetup.waitFor({ timeout: 10_000 }).then(
+        () => true,
+        () => false
+      )
+    ) {
+      await dismissSetup.click()
+    }
+    await expect(setupPrompt).toBeHidden()
+    await orcaPage.mouse.move(0, 0)
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 720 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await expectOnlyMemberRowSelected(orcaPage, leadWorktreeId, knight.worktreeId, {
+          where: `${width}px ${theme}`
+        })
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`rows-member-open-${width}-${theme}.png`)
+        })
+      }
+    }
+
+    // V30's hoverHtml: pointing at a member opens its card alone, never the lead's behind it.
+    // Why: only the new card style gives a card its hover card; the write is not awaited in the
+    // evaluate (ORCA-895), the store is polled instead.
+    await orcaPage.evaluate(() => {
+      void window.__store!.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
+    })
+    await expect
+      .poll(() =>
+        orcaPage.evaluate(
+          () => window.__store!.getState().settings?.experimentalNewWorktreeCardStyle === true
+        )
+      )
+      .toBe(true)
+    const hoverCards = orcaPage.locator('[data-slot="hover-card-content"]')
+    for (const width of [1440, 320]) {
+      await orcaPage.setViewportSize({ width, height: 720 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.mouse.move(0, 0)
+        await expect(hoverCards).toHaveCount(0)
+        await knightRow.hover()
+        await expect(hoverCards, `hover cards at ${width}px ${theme}`).toHaveCount(1)
+        await expect(hoverCards).toContainText('orca-1142')
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`rows-member-hover-${width}-${theme}.png`)
+        })
+      }
+    }
+    await orcaPage.mouse.move(0, 0)
 
     // Plain mode names a member by its ticket only and the lead by its role.
     await orcaPage.setViewportSize({ width: 1440, height: 720 })

@@ -22,7 +22,8 @@ vi.mock('@/store', () => ({
   useAppStore: (selector: (state: typeof appState) => unknown) => selector(appState)
 }))
 
-const { WorktreeCardRowContent } = await import('./worktree-card-row-content')
+const { WorktreeCardRowContent, WorktreeCardTeamChildren } =
+  await import('./worktree-card-row-content')
 const { TooltipProvider } = await import('@/components/ui/tooltip')
 const { useSidebarTeamRosterStore, useSidebarTeamCard } = await import('./sidebar-team-roster')
 
@@ -51,16 +52,20 @@ function cardOf(
   } as unknown as WorktreeCardController
 }
 
-// Mirrors WorktreeCardSurface: the row and its child flag come from useSidebarTeamCard.
+// Mirrors WorktreeCardSurface: the row and its child flag come from useSidebarTeamCard, and a
+// team card's members follow its row.
 function TeamCardContent({ card }: { card: WorktreeCardController }): React.JSX.Element {
   const team = useSidebarTeamCard(card.worktree.id)
   return (
-    <WorktreeCardRowContent
-      card={card}
-      row={team.row}
-      child={team.child}
-      presentation={{} as WorktreeCardPresentation}
-    />
+    <>
+      <WorktreeCardRowContent
+        card={card}
+        row={team.row}
+        child={team.child}
+        presentation={{} as WorktreeCardPresentation}
+      />
+      {team.row ? <WorktreeCardTeamChildren card={card} /> : null}
+    </>
   )
 }
 
