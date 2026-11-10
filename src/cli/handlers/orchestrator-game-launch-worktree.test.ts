@@ -4,6 +4,7 @@ import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import type { RuntimeClient } from '../runtime-client'
 import { RuntimeClientError } from '../runtime-client'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+import { IN_PROJECT_REPO_SCOPE } from './orchestrator-game-launch-test-fixtures'
 
 const LEAD_WORKTREE = 'repo1::/repo'
 
@@ -84,6 +85,7 @@ function fakeClient(worktrees: unknown[], fake: Fake = {}) {
   const calls: [string, Record<string, unknown>][] = []
   const results: Record<string, unknown> = {
     'game.state': stateWith(fake.agents, fake.unlisted),
+    'game.memberRepoScope': IN_PROJECT_REPO_SCOPE,
     'worktree.list': { worktrees, totalCount: worktrees.length, truncated: false },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY] },

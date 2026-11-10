@@ -1,5 +1,6 @@
 import { ORCHESTRATOR_GAME_FLEET_HANDLERS } from './orchestrator-game-fleet'
 import type { RuntimeClient } from '../runtime-client'
+import { IN_PROJECT_REPO_SCOPE } from './orchestrator-game-launch-test-fixtures'
 
 /** Shared state, client and call filters for the `orca game fleet|wave|sweep|push|stop` handler tests. */
 export const merged = {
@@ -90,6 +91,7 @@ export function fakeClient(state: unknown, overrides: Record<string, unknown> = 
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'game.memberRepoScope': IN_PROJECT_REPO_SCOPE,
     'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'term_lead' } },
     'orchestration.runCurrent': { run: { id: 'run_1' } },

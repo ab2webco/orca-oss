@@ -6,6 +6,7 @@ import {
 } from './orchestrator-game-actions'
 import { GAME_MCP_SERVER_NAME_MAX } from './orchestrator-game-member-mcp'
 import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
+import { memberRepoKeyOf } from './orchestrator-game-member-repo-scope'
 
 /** How the project's lead orchestrates: what it launches, how many at once, and its own rules. */
 export type OrchestratorGameLead = {
@@ -38,6 +39,8 @@ export type OrchestratorGameLead = {
   memberNames?: GameMemberName[]
   /** MCP servers every member needs; launch refuses a host and account that lack one. */
   mcpServers?: string[]
+  /** Other repos members may launch into, as canonical git remotes; the lead's own is always allowed. */
+  memberRepos?: string[]
 }
 
 /** A list restricts `auto` to those accounts (emails or ids). */
@@ -55,6 +58,7 @@ const AGENT_ID = /^[a-z][a-z0-9-]{0,31}$/
 const MODEL_ID = /^[A-Za-z0-9._:[\]/-]{1,80}$/
 const EFFORT = /^[a-z]{1,16}$/
 const GAME_MCP_SERVERS_MAX = 20
+const GAME_MEMBER_REPOS_MAX = 20
 
 export const DEFAULT_GAME_LEAD: OrchestratorGameLead = { autostart: false, cap: 4, agent: 'claude' }
 
@@ -170,6 +174,16 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
       names.every((one) => one !== null)
       ? { mcpServers: [...new Set(names as string[])] }
       : `${at('mcpServers')} must be a list of 1 to ${GAME_MCP_SERVERS_MAX} MCP server names`
+  },
+  memberRepos: (value) => {
+    const keys = Array.isArray(value)
+      ? value.map((one) => (typeof one === 'string' ? memberRepoKeyOf(one) : null))
+      : []
+    return keys.length > 0 &&
+      keys.length <= GAME_MEMBER_REPOS_MAX &&
+      keys.every((one) => one !== null)
+      ? { memberRepos: [...new Set(keys as string[])] }
+      : `${at('memberRepos')} must be a list of 1 to ${GAME_MEMBER_REPOS_MAX} git remotes like github.com/org/repo`
   },
   memberNames: (value) => {
     const { roster, problems } = parseMemberRoster(value)
