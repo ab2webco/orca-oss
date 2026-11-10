@@ -87,14 +87,28 @@ const buttonNamed = (container: HTMLElement, name: string): HTMLButtonElement | 
   [...container.querySelectorAll('button')].find((one) => one.textContent === name)
 
 describe('TeamTabContent opens sessions in the center', () => {
-  it("opens a member's own terminal from its expanded card, by the name the card shows", async () => {
+  it("opens a member's terminal and expands its card in one click, by the name the card shows", async () => {
     const container = await render('plain')
-    expect(buttonNamed(container, 'Open terminal')).toBeUndefined()
+    const card = container.querySelector('[data-team-card="member"] button')
 
-    await click(container.querySelector('[data-team-card="member"] button'))
-    await click(buttonNamed(container, 'Open terminal'))
+    await click(card)
 
     expect(openTeamSession).toHaveBeenCalledWith(knight, 'ORCA-1044')
+    expect(card?.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('[data-team-card-detail]')).toBeTruthy()
+    // Why gone: the card itself opens the terminal, so a second control would only repeat it.
+    expect(buttonNamed(container, 'Open terminal')).toBeUndefined()
+  })
+
+  it('folds an open card on a second click without opening the terminal again', async () => {
+    const container = await render('plain')
+    const card = container.querySelector('[data-team-card="member"] button')
+
+    await click(card)
+    await click(card)
+
+    expect(openTeamSession).toHaveBeenCalledTimes(1)
+    expect(card?.getAttribute('aria-expanded')).toBe('false')
   })
 
   it("opens the lead's terminal from the lead card", async () => {

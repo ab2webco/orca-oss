@@ -8,7 +8,8 @@ import {
   teamPhaseText,
   teamAgeText,
   teamStatusGlyph,
-  teamStatusTone
+  teamStatusTone,
+  teamUsageBarClass
 } from './team-card-text'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -144,5 +145,18 @@ describe('card words', () => {
     expect(teamAgeText(now - 10 * 60_000, now)).toBe('10 min')
     expect(teamAgeText(now - 13 * 3_600_000, now)).toBe('13 h')
     expect(teamAgeText(now - 3 * 86_400_000, now)).toBe('3 d')
+  })
+})
+
+describe('teamUsageBarClass', () => {
+  it('colours a usage bar as the status bar does: quiet, then yellow from 60%, red from 80%', () => {
+    expect([0, 59, 60, 79, 80, 100].map(teamUsageBarClass)).toEqual([
+      'bg-muted-foreground/40',
+      'bg-muted-foreground/40',
+      'bg-yellow-500',
+      'bg-yellow-500',
+      'bg-red-500',
+      'bg-red-500'
+    ])
   })
 })

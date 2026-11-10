@@ -377,15 +377,16 @@ describe('TeamTabContent', () => {
     expect(memberCards(container)[0].textContent?.match(/ORCA-1044/g)).toHaveLength(1)
   })
 
-  it('expands a member to show its summary, pull request and account', async () => {
+  it('expands a member to show its title, pull request and account', async () => {
     const { container } = await render(model())
     const toggle = memberCards(container)[0].querySelector<HTMLButtonElement>('[aria-expanded]')!
 
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(container.textContent).not.toContain('Fixing the Windows check')
+    expect(container.querySelector('[data-team-card-detail]')).toBeNull()
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(container.textContent).toContain('Fixing the Windows check')
+    // Why not the summary: it is the last message's subject, which stays in Inbox (owner, ORCA-1148).
+    expect(container.textContent).not.toContain('Fixing the Windows check')
     expect(container.textContent).toContain('#924')
     expect(container.textContent).toContain('Remote member keeps its role')
     expect(container.textContent).toContain('CI failing')
@@ -393,7 +394,10 @@ describe('TeamTabContent', () => {
     expect(chip.querySelector('[data-status-tone]')?.getAttribute('data-status-tone')).toBe(
       'attention'
     )
-    expect(container.textContent).toContain('dev@example.test · 12%')
+    expect(container.querySelector('[data-team-account]')?.textContent).toContain(
+      'dev@example.test'
+    )
+    expect(container.querySelector('[data-team-usage="session"]')?.textContent).toContain('12%')
   })
 
   it('shows the Advisor row under the lead only when the plugin reports one', async () => {

@@ -55,6 +55,10 @@ export type TeamAccount = {
   provider: 'claude' | 'codex'
   email: string
   usedPercent: number | null
+  /** The 7-day window; absent where only the 5-hour reading is known. */
+  weeklyPercent?: number | null
+  /** The managed account id, so a client can read its own live usage; absent when unknown. */
+  id?: string
 }
 
 export type TeamTicket = {
@@ -102,6 +106,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   /** The persistent game character (ORCA-1034); null when the scene has none for it. */
   characterKey: string | null
   ticket: TeamTicket | null
+  /** The branch it works on: its own worktree's, else the lead's; null or absent when unknown. */
+  branch?: string | null
   flowPhase: TeamFlowPhase | null
   /** The member's latest report or message, as written; the live action is separate. */
   summary: string | null

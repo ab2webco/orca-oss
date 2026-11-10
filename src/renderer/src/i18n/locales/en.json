@@ -17333,7 +17333,18 @@
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
       "openTerminal": "Open terminal",
-      "inFolder": "In the folder, no worktree"
+      "inFolder": "In the folder, no worktree",
+      "detail": {
+        "branch": "Branch",
+        "model": "Model",
+        "step": "Step",
+        "since": "In state",
+        "host": "Host"
+      },
+      "usage": {
+        "session": "5 h",
+        "weekly": "Week"
+      }
     },
     "activity": {
       "prompt": "Prompt",

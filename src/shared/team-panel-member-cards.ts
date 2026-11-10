@@ -8,7 +8,6 @@ import {
 } from './orchestrator-game-member-names'
 import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
-import { ticketInText } from './orchestrator-game-ticket-id'
 import { teamFlowPhaseOf } from './team-flow-phase'
 import { memberNamesOf } from './team-panel-member-names'
 import type {
@@ -20,9 +19,9 @@ import type {
   TeamMemberCard,
   TeamModel,
   TeamPullRequest,
-  TeamStatus,
-  TeamTicket
+  TeamStatus
 } from './team-panel-model-types'
+import { ticketOf } from './team-panel-member-ticket'
 
 export type TeamCards = { lead: TeamLeadCard; members: TeamMemberCard[] }
 
@@ -141,20 +140,6 @@ const liveActionOf = (agent: GameAgent): TeamLiveAction | null => {
     : null
 }
 
-const ticketOf = (agent: GameAgent, name: string): TeamTicket | null => {
-  const item = agent.workItem
-  if (item) {
-    return {
-      identifier: item.identifier.toUpperCase(),
-      title: item.title || null,
-      url: item.url || null,
-      statusGroup: item.statusGroup
-    }
-  }
-  const identifier = ticketInText(name) ?? ticketInText(agent.worktree?.branch)
-  return identifier ? { identifier, title: null, url: null, statusGroup: null } : null
-}
-
 const pullRequestOf = (review: GameReview | null): TeamPullRequest | null =>
   review && {
     provider: review.provider,
@@ -171,9 +156,15 @@ const accountOf = (agent: GameAgent, state: OrchestratorGameState): TeamAccount 
   if (!agent.account) {
     return null
   }
-  const { provider, email } = agent.account
+  const { provider, email, id } = agent.account
   const usage = state.metrics?.claudeAccounts?.find((one) => one.email === email)
-  return { provider, email, usedPercent: usage?.sessionPercent ?? null }
+  return {
+    provider,
+    email,
+    id,
+    usedPercent: usage?.sessionPercent ?? null,
+    weeklyPercent: usage?.weeklyPercent ?? null
+  }
 }
 
 const workOf = (agent: GameAgent): Work => ({
@@ -195,7 +186,7 @@ function memberCardOf(
   given: string | null
 ): TeamMemberCard {
   const shown = agent.displayName ?? agent.worktree?.displayName ?? agent.paneKey
-  const ticket = ticketOf(agent, shown)
+  const ticket = ticketOf(agent, shown, state.project)
   const work = workOf(agent)
   const condition = conditionOf(agent)
   const needsYou =
@@ -218,6 +209,7 @@ function memberCardOf(
     account: accountOf(agent, state),
     characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
+    branch: agent.worktree?.branch ?? (agent.remote ? null : (state.worktree?.branch ?? null)),
     flowPhase: teamFlowPhaseOf(agent),
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
@@ -249,6 +241,7 @@ function offlineCardOf(
     account: null,
     characterKey: characterOf(roster, member.name),
     ticket: { identifier: member.ticket, title: null, url: null, statusGroup: null },
+    branch: null,
     flowPhase: null,
     summary: null,
     pr: null,

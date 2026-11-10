@@ -16353,7 +16353,18 @@
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
       "openTerminal": "Abrir terminal",
-      "inFolder": "En la carpeta, sin worktree"
+      "inFolder": "En la carpeta, sin worktree",
+      "detail": {
+        "branch": "Rama",
+        "model": "Modelo",
+        "step": "Paso",
+        "since": "En estado",
+        "host": "Host"
+      },
+      "usage": {
+        "session": "5 h",
+        "weekly": "Semana"
+      }
     },
     "activity": {
       "prompt": "Pedido",

@@ -192,3 +192,12 @@ export function teamTicketBesideName(
   const identifier = card.ticket?.identifier ?? null
   return identifier && !(showName && card.name === identifier) ? identifier : null
 }
+
+/** A usage bar's fill, by percent used: the status bar's thresholds and colours (tooltip.tsx barColor). */
+export function teamUsageBarClass(usedPercent: number): string {
+  // Why not import barColor: tooltip.tsx pulls the agent catalog into the panel.
+  if (usedPercent < 60) {
+    return 'bg-muted-foreground/40'
+  }
+  return usedPercent < 80 ? 'bg-yellow-500' : 'bg-red-500'
+}

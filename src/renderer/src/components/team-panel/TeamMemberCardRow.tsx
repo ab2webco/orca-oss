@@ -1,12 +1,9 @@
 import { Button } from '@/components/ui/button'
-import { StatusDot } from '@/components/StatusDot'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
-  statusToneOfCi,
   teamAgeText,
-  teamCiText,
   teamHostText,
   teamLiveText,
   teamModelText,
@@ -15,6 +12,7 @@ import {
 } from './team-card-text'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
+import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 
@@ -69,15 +67,20 @@ export function TeamMemberCardRow({
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
-  const ci = card.pr ? teamCiText(card.pr) : null
-  const ciTone = card.pr ? statusToneOfCi(card.pr) : null
   const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
+  // Why only on opening: a second click folds the card and leaves the center as it is.
+  const toggle = (): void => {
+    if (!expanded && (card.terminalHandle || card.worktreeId)) {
+      void openTeamSession(card, shownName)
+    }
+    onToggle()
+  }
   return (
     <article data-team-card="member" data-pane-key={card.paneKey}>
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={onToggle}
+        onClick={toggle}
         className={cn(
           'flex w-full min-w-0 items-start gap-2.5 py-2 pr-3 text-left hover:bg-sidebar-accent',
           // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
@@ -141,41 +144,7 @@ export function TeamMemberCardRow({
         </span>
       </button>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}
-      {expanded ? (
-        <div className="flex flex-col items-start gap-2 bg-sidebar-accent/50 px-3 pb-3 pt-1 text-xs">
-          {answer}
-          {card.ticket?.title ? (
-            <p className="break-words text-[13px] text-foreground">{card.ticket.title}</p>
-          ) : null}
-          {card.summary ? (
-            <p className="break-words text-muted-foreground">{card.summary}</p>
-          ) : null}
-          <div className="flex flex-wrap gap-1.5">
-            {card.pr ? (
-              <a
-                data-team-pr-chip=""
-                href={card.pr.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground"
-              >
-                {ciTone ? <StatusDot tone={ciTone} /> : null}
-                {`#${card.pr.number}${ci ? ` · ${ci}` : ''}`}
-              </a>
-            ) : null}
-            {card.account ? (
-              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
-                {card.account.usedPercent !== null
-                  ? `${card.account.email} · ${card.account.usedPercent}%`
-                  : card.account.email}
-              </span>
-            ) : null}
-          </div>
-          <Button size="xs" variant="outline" onClick={() => void openTeamSession(card, shownName)}>
-            {translate('teamPanel.card.openTerminal', 'Open terminal')}
-          </Button>
-        </div>
-      ) : null}
+      {expanded ? <TeamMemberCardDetail card={card} now={now} answer={answer} /> : null}
     </article>
   )
 }

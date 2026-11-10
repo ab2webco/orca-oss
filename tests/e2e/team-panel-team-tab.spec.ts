@@ -364,14 +364,29 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
 
-    // Entering a member opens its own terminal in the center under a native header; Team stays open.
+    // One click on a member opens its own terminal in the center and opens its card; Team stays open.
     await panel.getByRole('tab', { name: COPY.en.team }).click()
     const asker = cards.filter({ hasText: 'ORCA-14' })
     await asker.locator('button[aria-expanded]').click()
-    await asker.getByRole('button', { name: COPY.en.open }).click()
+    await expect(asker.locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'true')
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
       .toBe(members[1].paneKey.split(':')[0])
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'member-card-open',
+      async (language) => {
+        const detail = asker.locator('[data-team-card-detail]')
+        await expect(detail).toBeVisible()
+        // Why gone: the card itself opens the terminal, so the button would only repeat it.
+        await expect(asker.getByRole('button', { name: COPY[language].open })).toHaveCount(0)
+        await expect(detail.getByRole('button', { name: COPY[language].answer })).toBeVisible()
+        await expect(detail.locator('[data-team-detail="host"]')).toContainText('local')
+        await expect(detail.locator('[data-team-detail="branch"] code')).not.toBeEmpty()
+      }
+    )
+    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     const askerTab = members[1].paneKey.split(':')[0]
     // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
     const header = orcaPage.locator(
