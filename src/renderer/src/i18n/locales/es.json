@@ -5180,11 +5180,24 @@
           "list": {
             "groups": {
               "0ed04075b8": "Todos",
-              "4aeefc5996": "Fijados",
-              "682ed5d551": "Cerrado",
-              "7c2f009786": "En curso",
-              "6798dc7c94": "En revisión",
-              "5076efc3d2": "Hecho"
+              "4aeefc5996": "Fijados"
+            },
+            "grouping": {
+              "agent": {
+                "status": {
+                  "groups": {
+                    "48df8d3cb4": "Te necesita",
+                    "f64325a5d9": "Trabajando",
+                    "60f96eed0b": "En reposo"
+                  }
+                }
+              },
+              "group": {
+                "keys": {
+                  "26a4613f4c": "Con PR",
+                  "9694b028e6": "Sin PR"
+                }
+              }
             }
           }
         },

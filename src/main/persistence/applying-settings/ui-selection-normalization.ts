@@ -5,7 +5,7 @@ import { isPluginPanelTabKey } from '../../../shared/plugins/plugin-manifest'
 export function normalizeGroupBy(groupBy: unknown): PersistedState['ui']['groupBy'] {
   if (
     groupBy === 'none' ||
-    groupBy === 'workspace-status' ||
+    groupBy === 'agent-status' ||
     groupBy === 'repo' ||
     groupBy === 'pr-status'
   ) {

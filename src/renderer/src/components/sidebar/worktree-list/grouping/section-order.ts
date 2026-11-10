@@ -1,6 +1,6 @@
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { ProjectOrderBy } from '../../../../../../shared/ui-chrome-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AppState } from '../../../../store/types'
 import { getRepoDisplayLabelKey, getRepoDisplayLabelsByPath } from '@/lib/repo-display-labels'
 import { ALL_GROUP_KEY } from './group-keys'
@@ -10,6 +10,7 @@ import type {
   WorktreeGroupEntry
 } from './project-grouping'
 import type { WorktreeGroupBy } from './row-types'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 import { getGroupKeyForWorktree } from './worktree-group-keys'
 
 export function getRenderedNaturalAnchorRepoIds({
@@ -18,7 +19,7 @@ export function getRenderedNaturalAnchorRepoIds({
   repoMap,
   prCache,
   collapsedGroups,
-  workspaceStatuses,
+  agentStatusByWorktree,
   settings,
   projectGrouping
 }: {
@@ -27,7 +28,7 @@ export function getRenderedNaturalAnchorRepoIds({
   repoMap: Map<string, Repo>
   prCache: Record<string, unknown> | null
   collapsedGroups: ReadonlySet<string>
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree?: ReadonlyMap<string, AgentStatusGroupKey>
   settings?: AppState['settings']
   projectGrouping?: ProjectGroupingModel
 }): Set<string> {
@@ -52,7 +53,7 @@ export function getRenderedNaturalAnchorRepoIds({
       worktree,
       repoMap,
       prCache,
-      workspaceStatuses,
+      agentStatusByWorktree,
       settings,
       projectGrouping
     )

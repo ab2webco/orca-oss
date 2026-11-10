@@ -5,7 +5,8 @@ import type { PendingSidebarRowReveal, PendingSidebarWorktreeReveal } from '@/st
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
@@ -40,7 +41,7 @@ export type PendingSidebarRevealArgs = {
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy
   defaultHostId: ExecutionHostId
   prCache: AppState['prCache'] | null
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey>
   settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
@@ -100,7 +101,7 @@ export function expandGroupsForWorktreeReveal(
           targetWorktree,
           args.repoMap,
           args.prCache,
-          args.workspaceStatuses,
+          args.agentStatusByWorktree,
           args.settings,
           args.projectGroups,
           args.projectGrouping

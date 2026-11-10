@@ -1,28 +1,28 @@
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
-import { getWorkspaceStatus, getWorkspaceStatusGroupKey } from '../../workspace-status'
-import { cloneDefaultWorkspaceStatuses } from '../../../../../../shared/workspace-statuses'
+import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AppState } from '../../../../store/types'
 import { ALL_GROUP_KEY, getPRGroupKey, getProjectGroupHeaderKey } from './group-keys'
 import { buildProjectGroupingIndex, getProjectGroupingForRepo } from './project-grouping'
 import type { ProjectGroupingModel } from './project-grouping'
 import type { WorktreeGroupBy } from './row-types'
+import { getAgentStatusGroupHeaderKey } from './agent-status-groups'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 
 export function getGroupKeyForWorktree(
   groupBy: WorktreeGroupBy,
   worktree: Worktree,
   repoMap: Map<string, Repo>,
   prCache: Record<string, unknown> | null,
-  workspaceStatuses: readonly WorkspaceStatusDefinition[] = cloneDefaultWorkspaceStatuses(),
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey> = new Map(),
   settings?: AppState['settings'],
   projectGrouping?: ProjectGroupingModel
 ): string | null {
   if (groupBy === 'none') {
     return ALL_GROUP_KEY
   }
-  if (groupBy === 'workspace-status') {
-    return getWorkspaceStatusGroupKey(getWorkspaceStatus(worktree, workspaceStatuses))
+  if (groupBy === 'agent-status') {
+    return getAgentStatusGroupHeaderKey(agentStatusByWorktree.get(worktree.id) ?? 'idle')
   }
   if (groupBy === 'repo') {
     return getProjectGroupingForRepo(
@@ -39,7 +39,7 @@ export function getGroupKeysForWorktree(
   worktree: Worktree,
   repoMap: Map<string, Repo>,
   prCache: Record<string, unknown> | null,
-  workspaceStatuses: readonly WorkspaceStatusDefinition[] = cloneDefaultWorkspaceStatuses(),
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey> = new Map(),
   settings?: AppState['settings'],
   projectGroups: readonly ProjectGroup[] = [],
   projectGrouping?: ProjectGroupingModel
@@ -49,7 +49,7 @@ export function getGroupKeysForWorktree(
     worktree,
     repoMap,
     prCache,
-    workspaceStatuses,
+    agentStatusByWorktree,
     settings,
     projectGrouping
   )

@@ -907,7 +907,7 @@ export type UISlice = {
   dismissUsagePercentageDisplayChangeNotice: () => void
   usageEmptyStateDismissed: boolean
   dismissUsageEmptyState: () => void
-  groupBy: 'none' | 'workspace-status' | 'repo' | 'pr-status'
+  groupBy: 'none' | 'agent-status' | 'repo' | 'pr-status'
   setGroupBy: (g: UISlice['groupBy']) => void
   sortBy: 'name' | 'smart' | 'recent' | 'repo' | 'manual'
   setSortBy: (s: UISlice['sortBy']) => void
@@ -2552,7 +2552,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         rightSidebarOpen: typeof ui.rightSidebarOpen === 'boolean' ? ui.rightSidebarOpen : true,
         rightSidebarTab: rightSidebarRoute.rightSidebarTab,
         rightSidebarExplorerView: rightSidebarRoute.rightSidebarExplorerView,
-        groupBy: (ui.groupBy as UISlice['groupBy'] | 'parent') === 'parent' ? 'repo' : ui.groupBy,
+        // Why: offline web clients hydrate their own storage; retired values ('parent', 'workspace-status') fall back to Proyecto.
+        groupBy: (['none', 'agent-status', 'repo', 'pr-status'] as const).includes(ui.groupBy)
+          ? ui.groupBy
+          : 'repo',
         sortBy,
         // Why: main-process getUI() already normalized this (defaulting to 'manual'); read it through without migrating.
         projectOrderBy: ui.projectOrderBy,

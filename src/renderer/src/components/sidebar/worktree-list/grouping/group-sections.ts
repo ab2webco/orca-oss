@@ -1,13 +1,11 @@
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import {
-  getWorkspaceStatusFromGroupKey,
-  getWorkspaceStatusVisualMeta
-} from '../../workspace-status'
 import { PROJECT_GROUP_META, PR_GROUP_META } from './group-keys'
 import type { PRGroupKey } from './group-keys'
+import { AGENT_STATUS_GROUP_META } from './agent-status-groups'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 import { getHostWorktreeCounts, getHostWorktreeIds, getMixedHostContextLabels } from './host-labels'
 import type { OrderedGroupEntry, ProjectGroupingIndex } from './project-grouping'
 import {
@@ -30,7 +28,6 @@ export type SectionAppendContext = {
   result: Row[]
   groupBy: WorktreeGroupBy
   collapsedGroups: Set<string>
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
   repoMap: Map<string, Repo>
   defaultHostId: ExecutionHostId
   hostLabelById: ReadonlyMap<string, string> | undefined
@@ -54,7 +51,6 @@ export function appendOrderedGroups(
     result,
     groupBy,
     collapsedGroups,
-    workspaceStatuses,
     repoMap,
     defaultHostId,
     hostLabelById,
@@ -83,41 +79,23 @@ export function appendOrderedGroups(
             repo,
             projectGroupDepth
           }
-        : groupBy === 'workspace-status'
-          ? (() => {
-              const workspaceStatus =
-                getWorkspaceStatusFromGroupKey(key, workspaceStatuses) ??
-                workspaceStatuses[0]?.id ??
-                'in-progress'
-              const definition = workspaceStatuses.find((status) => status.id === workspaceStatus)
-              const meta = getWorkspaceStatusVisualMeta(definition ?? workspaceStatus)
-              return {
-                type: 'header' as const,
-                key,
-                label: definition?.label ?? workspaceStatus,
-                count: group.items.length,
-                tone: meta.tone,
-                icon: meta.icon,
-                hostWorktreeCounts: getHostWorktreeCounts(group.items, repoMap, defaultHostId),
-                hostWorktreeIds: getHostWorktreeIds(group.items, repoMap, defaultHostId),
-                worktreeIds: group.items.map((worktree) => worktree.id)
-              }
-            })()
-          : (() => {
-              const prGroup = key.replace(/^pr:/, '') as PRGroupKey
-              const meta = PR_GROUP_META[prGroup]
-              return {
-                type: 'header' as const,
-                key,
-                label: meta.label,
-                count: group.items.length,
-                tone: meta.tone,
-                icon: meta.icon,
-                hostWorktreeCounts: getHostWorktreeCounts(group.items, repoMap, defaultHostId),
-                hostWorktreeIds: getHostWorktreeIds(group.items, repoMap, defaultHostId),
-                worktreeIds: group.items.map((worktree) => worktree.id)
-              }
-            })()
+        : (() => {
+            const meta =
+              groupBy === 'agent-status'
+                ? AGENT_STATUS_GROUP_META[key.replace(/^agent-status:/, '') as AgentStatusGroupKey]
+                : PR_GROUP_META[key.replace(/^pr:/, '') as PRGroupKey]
+            return {
+              type: 'header' as const,
+              key,
+              label: meta.label,
+              count: group.items.length,
+              tone: meta.tone,
+              icon: meta.icon,
+              hostWorktreeCounts: getHostWorktreeCounts(group.items, repoMap, defaultHostId),
+              hostWorktreeIds: getHostWorktreeIds(group.items, repoMap, defaultHostId),
+              worktreeIds: group.items.map((worktree) => worktree.id)
+            }
+          })()
 
     result.push(header)
     if (!isCollapsed) {

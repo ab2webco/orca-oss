@@ -3,8 +3,8 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { ProjectOrderBy } from '../../../../../../shared/ui-chrome-types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
-import { cloneDefaultWorkspaceStatuses } from '../../../../../../shared/workspace-statuses'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 import type { AppState } from '../../../../store/types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
@@ -40,7 +40,7 @@ export function buildRows(
   prCache: Record<string, unknown> | null,
   collapsedGroups: Set<string>,
   repoOrder?: Map<string, number>,
-  workspaceStatuses: readonly WorkspaceStatusDefinition[] = cloneDefaultWorkspaceStatuses(),
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey> = new Map(),
   projectOrderBy: ProjectOrderBy = 'manual',
   lineageById: Record<string, WorktreeLineage> = {},
   worktreeMap = new Map<string, Worktree>(worktrees.map((worktree) => [worktree.id, worktree])),
@@ -98,7 +98,7 @@ export function buildRows(
     repoMap,
     prCache,
     collapsedGroups,
-    workspaceStatuses,
+    agentStatusByWorktree,
     settings,
     projectGrouping
   })
@@ -145,7 +145,7 @@ export function buildRows(
     repoMap,
     prCache,
     settings,
-    workspaceStatuses,
+    agentStatusByWorktree,
     projectIndex,
     placeholderRepoIds,
     importedWorktreesByRepo,
@@ -159,7 +159,6 @@ export function buildRows(
     result,
     groupBy,
     collapsedGroups,
-    workspaceStatuses,
     repoMap,
     defaultHostId,
     hostLabelById,

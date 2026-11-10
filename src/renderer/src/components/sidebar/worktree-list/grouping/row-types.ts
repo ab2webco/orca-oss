@@ -5,7 +5,7 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { DetectedWorktree, Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 
-export type WorktreeGroupBy = 'none' | 'workspace-status' | 'repo' | 'pr-status'
+export type WorktreeGroupBy = 'none' | 'agent-status' | 'repo' | 'pr-status'
 export type PinnedWorktreeDisplayPolicy = 'single-location' | 'duplicate-in-groups'
 
 export function getPinnedWorktreeDisplayPolicy(

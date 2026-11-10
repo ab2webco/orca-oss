@@ -173,7 +173,8 @@ const UiUpdateFields = z
     rightSidebarWidth: z.number().finite().optional(),
     markdownTocPanelWidth: z.number().finite().optional(),
     combinedDiffFileTreeWidth: z.number().finite().optional(),
-    groupBy: z.enum(['none', 'workspace-status', 'repo', 'pr-status']).optional(),
+    // Why: older phones still send the retired 'workspace-status'; normalizeGroupBy maps it to 'repo'.
+    groupBy: z.enum(['none', 'agent-status', 'repo', 'pr-status', 'workspace-status']).optional(),
     showWorkspaceLineage: z.boolean().optional(),
     sortBy: z.enum(['name', 'smart', 'recent', 'repo', 'manual']).optional(),
     projectOrderBy: z.enum(['manual', 'recent']).optional(),

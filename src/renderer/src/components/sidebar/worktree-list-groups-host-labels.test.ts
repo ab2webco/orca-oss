@@ -177,7 +177,7 @@ describe('buildRows with pinned worktrees', () => {
       repoId: secondRepo.id
     }
     const rows = buildRows(
-      'workspace-status',
+      'agent-status',
       [firstWorktree, secondWorktree],
       new Map([
         [firstRepo.id, firstRepo],

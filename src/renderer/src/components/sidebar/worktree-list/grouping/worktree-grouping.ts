@@ -1,9 +1,14 @@
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { ProjectOrderBy } from '../../../../../../shared/ui-chrome-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AppState } from '../../../../store/types'
-import { getWorkspaceStatus, getWorkspaceStatusGroupKey } from '../../workspace-status'
 import { PR_GROUP_META, PR_GROUP_ORDER, getPRGroupKey } from './group-keys'
+import {
+  AGENT_STATUS_GROUP_META,
+  AGENT_STATUS_GROUP_ORDER,
+  getAgentStatusGroupHeaderKey
+} from './agent-status-groups'
+import type { AgentStatusGroupKey } from './agent-status-groups'
 import { addRepoIdToGroup, getProjectGroupingForRepo } from './project-grouping'
 import type {
   OrderedGroupEntry,
@@ -25,7 +30,7 @@ export function buildOrderedGroups(args: {
   repoMap: Map<string, Repo>
   prCache: Record<string, unknown> | null
   settings: AppState['settings'] | undefined
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey>
   projectIndex: ProjectGroupingIndex | null
   placeholderRepoIds: ReadonlySet<string>
   importedWorktreesByRepo: ReadonlyMap<string, ImportedWorktreesCardCandidate>
@@ -40,7 +45,7 @@ export function buildOrderedGroups(args: {
     repoMap,
     prCache,
     settings,
-    workspaceStatuses,
+    agentStatusByWorktree,
     projectIndex,
     placeholderRepoIds,
     importedWorktreesByRepo,
@@ -60,11 +65,10 @@ export function buildOrderedGroups(args: {
       key = grouping.key
       label = grouping.label
       repo = grouping.repo
-    } else if (groupBy === 'workspace-status') {
-      const workspaceStatus = getWorkspaceStatus(w, workspaceStatuses)
-      key = getWorkspaceStatusGroupKey(workspaceStatus)
-      label =
-        workspaceStatuses.find((status) => status.id === workspaceStatus)?.label ?? workspaceStatus
+    } else if (groupBy === 'agent-status') {
+      const agentStatus = agentStatusByWorktree.get(w.id) ?? 'idle'
+      key = getAgentStatusGroupHeaderKey(agentStatus)
+      label = AGENT_STATUS_GROUP_META[agentStatus].label
     } else {
       const prGroup = getPRGroupKey(w, repoMap, prCache, settings)
       key = `pr:${prGroup}`
@@ -161,11 +165,10 @@ export function buildOrderedGroups(args: {
         orderedGroups.push([key, group])
       }
     }
-  } else if (groupBy === 'workspace-status') {
-    // Why: status grouping is opt-in while the board drawer remains the wider
-    // all-lanes drag target; keep the sidebar compact by omitting empty lanes.
-    for (const status of workspaceStatuses) {
-      const key = getWorkspaceStatusGroupKey(status.id)
+  } else if (groupBy === 'agent-status') {
+    // Why: V30 draws only the agent states that have workspaces.
+    for (const agentStatus of AGENT_STATUS_GROUP_ORDER) {
+      const key = getAgentStatusGroupHeaderKey(agentStatus)
       const group = grouped.get(key)
       if (group) {
         orderedGroups.push([key, group])

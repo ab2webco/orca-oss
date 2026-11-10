@@ -1496,13 +1496,13 @@ describe('Store', () => {
     expect(store.getUI().groupBy).toBe('none')
   })
 
-  it('preserves explicit workspace status grouping', async () => {
+  it('falls back a retired workspace status grouping to project', async () => {
     writeDataFile({
       schemaVersion: 1,
       ui: { groupBy: 'workspace-status' }
     })
     const store = await createStore()
-    expect(store.getUI().groupBy).toBe('workspace-status')
+    expect(store.getUI().groupBy).toBe('repo')
   })
 
   it('defaults projectOrderBy to manual when absent, even with recent sortBy', async () => {

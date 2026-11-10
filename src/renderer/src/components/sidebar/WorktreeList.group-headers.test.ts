@@ -170,12 +170,12 @@ describe('WorktreeList lineage child card renderer', () => {
     ).toEqual(['pinned'])
   })
 
-  it('renders a collapse chevron on status group headers with worktrees', async () => {
-    setLineageFixtureState('workspace-status')
+  it('renders a collapse chevron on agent status group headers with worktrees', async () => {
+    setLineageFixtureState('agent-status')
     const markup = await renderWorktreeListMarkup()
 
-    expect(markup).toContain('In progress')
-    expect(markup).toContain('data-workspace-status-drop-target=""')
+    expect(markup).toContain('Idle')
+    expect(markup).not.toContain('data-workspace-status-drop-target=""')
     expect(markup).toContain('data-repo-header-collapse-affordance=""')
     expect(markup).toContain('aria-expanded="true"')
   })

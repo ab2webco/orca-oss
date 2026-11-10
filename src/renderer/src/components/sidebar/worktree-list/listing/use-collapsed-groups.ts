@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import type { AppState } from '@/store/types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import { PINNED_GROUP_KEY, getLineageGroupKey } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
@@ -19,7 +20,7 @@ export function useEffectiveCollapsedGroups(args: {
   worktreeMap: Map<string, Worktree>
   worktreeLineageById: Record<string, WorktreeLineage>
   prCache: AppState['prCache'] | null
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey>
   settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
   projectGrouping: ProjectGroupingModel
@@ -32,7 +33,7 @@ export function useEffectiveCollapsedGroups(args: {
     worktreeMap,
     worktreeLineageById,
     prCache,
-    workspaceStatuses,
+    agentStatusByWorktree,
     settings,
     projectGroups,
     projectGrouping
@@ -54,7 +55,7 @@ export function useEffectiveCollapsedGroups(args: {
         targetWorktree,
         repoMap,
         prCache,
-        workspaceStatuses,
+        agentStatusByWorktree,
         settings,
         projectGroups,
         projectGrouping
@@ -80,7 +81,7 @@ export function useEffectiveCollapsedGroups(args: {
     projectGrouping,
     repoMap,
     settings,
-    workspaceStatuses,
+    agentStatusByWorktree,
     worktreeLineageById,
     worktreeMap
   ])

@@ -145,7 +145,7 @@ describe('buildRows with pinned worktrees', () => {
 
   it('does not emit unpinned imported worktree cards outside repo grouping', () => {
     const rows = buildRows(
-      'workspace-status',
+      'agent-status',
       [worktree],
       repoMap,
       null,
@@ -242,7 +242,7 @@ describe('buildRows with pinned worktrees', () => {
     const pinnedOneB = { ...worktree, id: 'repo-1-pinned-b', isPinned: true }
 
     const rows = buildRows(
-      'workspace-status',
+      'agent-status',
       [pinnedOneA, pinnedTwo, pinnedOneB],
       new Map([
         [repo.id, repo],
@@ -417,7 +417,7 @@ describe('buildRows with pinned worktrees', () => {
 
   it('does not emit new external worktrees inbox rows outside repo grouping', () => {
     const rows = buildRows(
-      'workspace-status',
+      'agent-status',
       [worktree],
       repoMap,
       null,

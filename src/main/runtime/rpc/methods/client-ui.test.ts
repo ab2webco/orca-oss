@@ -418,6 +418,23 @@ describe('client UI RPC methods', () => {
     expect(response).toMatchObject({ ok: true, result: { ui: updated } })
   })
 
+  it.each(['agent-status', 'workspace-status'])(
+    'accepts groupBy %s from a paired client',
+    async (groupBy) => {
+      // Why: an older phone still sends the retired 'workspace-status'; rejecting it drops the whole update.
+      const runtime = {
+        getRuntimeId: () => 'test-runtime',
+        updateUIState: vi.fn(() => getDefaultUIState())
+      } as unknown as OrcaRuntimeService
+      const dispatcher = new RpcDispatcher({ runtime, methods: CLIENT_UI_METHODS })
+
+      const response = await dispatcher.dispatch(makeRequest('ui.set', { groupBy }))
+
+      expect(runtime.updateUIState).toHaveBeenCalledWith({ groupBy })
+      expect(response).toMatchObject({ ok: true })
+    }
+  )
+
   it('lets a paired client clear the OSC 52 default-on notice', async () => {
     // Why pin this key: the update schema is strict, so an omitted field does not get
     // stripped — it rejects the whole call. The renderer only logs that failure, so the

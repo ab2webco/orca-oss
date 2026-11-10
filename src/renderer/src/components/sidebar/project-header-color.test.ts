@@ -72,7 +72,7 @@ describe('resolveProjectGroupHeaderColor', () => {
   it('does not color repo-looking keys in other grouping modes', () => {
     expect(
       resolveProjectGroupHeaderColor({
-        groupBy: 'workspace-status',
+        groupBy: 'agent-status',
         headerKey: 'repo:repo-1',
         badgeColor: REPO_COLORS[2]
       })

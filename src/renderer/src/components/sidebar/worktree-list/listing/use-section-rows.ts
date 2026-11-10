@@ -6,7 +6,8 @@ import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { ProjectOrderBy } from '../../../../../../shared/ui-chrome-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
@@ -32,7 +33,7 @@ type SectionRowsArgs = {
   worktreeLineageById: Record<string, WorktreeLineage>
   prCache: AppState['prCache'] | null
   settings: AppState['settings']
-  workspaceStatuses: readonly WorkspaceStatusDefinition[]
+  agentStatusByWorktree: ReadonlyMap<string, AgentStatusGroupKey>
   effectiveCollapsedGroups: Set<string>
   projectGrouping: ProjectGroupingModel
   visibleReposForRows: readonly Repo[]
@@ -151,7 +152,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         args.prCache,
         effectiveCollapsedGroups,
         repoOrder,
-        args.workspaceStatuses,
+        args.agentStatusByWorktree,
         args.projectOrderBy,
         args.worktreeLineageById,
         args.worktreeMap,
@@ -176,7 +177,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       effectiveCollapsedGroups,
       defaultHostId,
       repoOrder,
-      args.workspaceStatuses,
+      args.agentStatusByWorktree,
       args.projectOrderBy,
       args.worktreeLineageById,
       args.worktreeMap,

@@ -5,7 +5,6 @@ import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition
 } from '../../../../../../shared/worktree/types'
-import { getWorkspaceStatus } from '../../workspace-status'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import {
   getVirtualRowTransform,
@@ -214,10 +213,6 @@ export function renderWorktreeVirtualRow(
     })
   }
 
-  const itemWorkspaceStatus =
-    ctx.groupBy === 'workspace-status'
-      ? getWorkspaceStatus(row.worktree, ctx.workspaceStatuses)
-      : null
   const itemPreviewOffset =
     ctx.worktreeDragState.previewOffsetsByWorktreeId.get(row.worktree.id) ?? 0
 
@@ -230,25 +225,12 @@ export function renderWorktreeVirtualRow(
       data-worktree-virtual-row-start={vItem.start}
       data-index={vItem.index}
       ref={ctx.measureVirtualRowElement}
-      data-workspace-status-drop-target={itemWorkspaceStatus ? '' : undefined}
-      data-workspace-status={itemWorkspaceStatus ?? undefined}
       className={cn(
         'absolute left-0 right-0 top-0',
         ctx.worktreeDragState.draggingWorktreeId !== null &&
           'transition-transform duration-150 ease-out will-change-transform'
       )}
       style={{ transform: getWorktreeVirtualRowTransform(vItem.start, itemPreviewOffset) }}
-      onDragOver={
-        itemWorkspaceStatus
-          ? (event) => ctx.onWorkspaceStatusDragOver(event, itemWorkspaceStatus)
-          : undefined
-      }
-      onDragLeave={itemWorkspaceStatus ? ctx.onWorkspaceStatusDragLeave : undefined}
-      onDrop={
-        itemWorkspaceStatus
-          ? (event) => ctx.onWorkspaceStatusDrop(event, itemWorkspaceStatus)
-          : undefined
-      }
     >
       {renderWorktreeItemRow(ctx.item, row, false)}
     </div>

@@ -5411,11 +5411,24 @@
           "list": {
             "groups": {
               "0ed04075b8": "All",
-              "4aeefc5996": "Pinned",
-              "682ed5d551": "Closed",
-              "7c2f009786": "In progress",
-              "6798dc7c94": "In review",
-              "5076efc3d2": "Done"
+              "4aeefc5996": "Pinned"
+            },
+            "grouping": {
+              "agent": {
+                "status": {
+                  "groups": {
+                    "48df8d3cb4": "Needs you",
+                    "f64325a5d9": "Working",
+                    "60f96eed0b": "Idle"
+                  }
+                }
+              },
+              "group": {
+                "keys": {
+                  "26a4613f4c": "With PR",
+                  "9694b028e6": "Without PR"
+                }
+              }
             }
           }
         },
