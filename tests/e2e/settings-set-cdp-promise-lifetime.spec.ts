@@ -14,6 +14,7 @@
 
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const FIXED_ELECTRON_MAJOR = 44
 
@@ -101,4 +102,27 @@ test('answers an awaited settings.set when a GC lands after it settles', async (
       'Execution context was destroyed, most likely because of a navigation.'
     )
   }
+})
+
+// Why: specs write settings through the store; a GC right after the write settles must not fail the
+// step that made it (ORCA-895, team-panel-scene :454 in queue run 42740738395).
+test('lands a store settings write when a GC follows it', async ({ orcaPage }) => {
+  await orcaPage.evaluate(() => {
+    const collect = (globalThis as { gc?: () => void }).gc
+    const store = window.__store!
+    const original = store.getState().updateSettings
+    store.setState({
+      updateSettings: async (updates) => {
+        await original(updates)
+        queueMicrotask(() => queueMicrotask(() => collect?.()))
+      }
+    })
+  })
+
+  const failure = await writeSettings(orcaPage, { theme: 'light' }).then(
+    () => null,
+    (error: Error) => error.message
+  )
+  expect(failure).toBeNull()
+  expect(await persistedTheme(orcaPage)).toBe('light')
 })
