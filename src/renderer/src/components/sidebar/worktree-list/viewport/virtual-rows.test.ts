@@ -22,7 +22,8 @@ function hostRow(hostId: ExecutionHostId): RenderRow {
     detail: 'SSH',
     health: 'available',
     collapsed: false,
-    count: 1
+    count: 1,
+    worktreeIds: []
   }
 }
 

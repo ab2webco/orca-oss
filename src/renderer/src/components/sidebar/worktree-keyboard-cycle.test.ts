@@ -120,7 +120,8 @@ describe('getCyclableWorktreeIds', () => {
         detail: '',
         health: 'local',
         collapsed: true,
-        count: 1
+        count: 1,
+        worktreeIds: ['wt-1']
       },
       worktree('visible-after-host')
     ]
