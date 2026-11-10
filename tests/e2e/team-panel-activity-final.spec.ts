@@ -14,6 +14,7 @@ import { readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor } from './helpers/terminal'
 import { openTeamPanel, postClaudeHook } from './helpers/idle-lead-restart'
+import { writeSettings } from './helpers/settings-write'
 
 const SESSION = 'e2e-d9-session'
 
@@ -32,9 +33,8 @@ for (const plugins of ['off', 'on'] as const) {
         cpSync(path.join(process.cwd(), 'examples', 'plugins', 'hello-orca'), pluginDir, {
           recursive: true
         })
+        await writeSettings(orcaPage, { pluginSystemEnabled: true })
         const statuses = await orcaPage.evaluate(async (dir) => {
-          const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-          window.__store?.setState({ settings })
           await window.api.plugins.install({ kind: 'local-path', path: dir })
           await window.api.plugins.refresh()
           for (const entry of await window.api.plugins.list()) {

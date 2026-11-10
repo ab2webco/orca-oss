@@ -4,6 +4,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
@@ -237,11 +238,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
           for (const width of [1440, 768, 390, 320]) {
             await orcaPage.setViewportSize({ width, height: 900 })
             for (const theme of ['dark', 'light'] as const) {
-              await orcaPage.evaluate(async (next) => {
-                window.__store?.setState({
-                  settings: await window.api.settings.set({ theme: next })
-                })
-              }, theme)
+              await writeSettings(orcaPage, { theme })
               await orcaPage.waitForTimeout(400)
               await scene.screenshot({
                 path: testInfo.outputPath(`scene-${style}-working-${width}-${theme}.png`)

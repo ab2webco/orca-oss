@@ -7,6 +7,7 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
 import { runOrcaCli } from './helpers/orca-cli-process'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 
@@ -14,10 +15,7 @@ const WIDTHS = [1440, 768, 390, 320]
 const ADOPTED = 'Pixel'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

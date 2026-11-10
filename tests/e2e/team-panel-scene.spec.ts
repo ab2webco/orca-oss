@@ -5,6 +5,7 @@ import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
@@ -242,10 +243,7 @@ const boxesClash = (a: BubbleBox | null, b: BubbleBox | null): boolean =>
   b.top < a.bottom
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -275,16 +273,14 @@ test('the Team panel draws the live scene beside a member opened under its heade
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' },
-        // Why: the panel draws no Jev row or bubble with the plugin system off.
-        pluginSystemEnabled: true
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' },
+      // Why: the panel draws no Jev row or bubble with the plugin system off.
+      pluginSystemEnabled: true
+    })
 
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
@@ -409,10 +405,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     ).toContainText(askerName)
 
     for (const language of ['en', 'es'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       await expect(scene.getByRole('img', { name: COPY[language].label })).toBeVisible()
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
@@ -441,15 +434,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
 
     // Quest's bundled art, through the real setting. The attribute names what drew, so art that
     // failed to load in this build falls to Pixel and stops here (ORCA-1052).
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     for (const style of ART_STYLES) {
-      await orcaPage.evaluate(
-        (next) =>
-          window.__store!.getState().updateSettings({
-            orchestratorGame: { panel: { style: next } }
-          }),
-        style
-      )
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -567,13 +554,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     }
     for (const style of ADVISOR_STYLES) {
-      await orcaPage.evaluate(
-        (next) =>
-          window.__store!.getState().updateSettings({
-            orchestratorGame: { panel: { style: next } }
-          }),
-        style
-      )
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -600,13 +581,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       toolInput: { cmd: LONG_COMMAND }
     })
     for (const style of ADVISOR_STYLES) {
-      await orcaPage.evaluate(
-        (next) =>
-          window
-            .__store!.getState()
-            .updateSettings({ orchestratorGame: { panel: { style: next } } }),
-        style
-      )
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         // Why 30 s: game.state names the new tool at the panel's next 20 s read.
@@ -686,9 +661,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     })
     expect(asks.status).toBe(204)
-    await orcaPage.evaluate(() =>
-      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
-    )
+    await writeSettings(orcaPage, { orchestratorGame: { panel: { style: 'pixel' } } })
     await orcaPage.setViewportSize({ width: 320, height: 900 })
     await expect(leadBubble).toHaveText(leadAsks, { timeout: 30_000 })
     const leadCard = panel.locator('[data-team-card="lead"]')
@@ -725,9 +698,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       id: asked.result.question.id,
       option: 1
     })
-    await orcaPage.evaluate(() =>
-      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
-    )
+    await writeSettings(orcaPage, { orchestratorGame: { panel: { style: 'pixel' } } })
     await expect(askerTag).toHaveCount(0, { timeout: 30_000 })
     for (const width of [390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })
@@ -766,11 +737,8 @@ test('the Team panel draws the live scene beside a member opened under its heade
     expect(repoPath, 'the active worktree has a project').not.toBe('')
     projectYaml = path.join(repoPath, 'orca.yaml')
     writeFileSync(projectYaml, 'orchestratorGame:\n  panel:\n    style: figures\n')
-    await orcaPage.evaluate(async () => {
-      const state = window.__store!.getState()
-      await state.updateSettings({ orchestratorGame: {}, orchestratorGameProjects: {} })
-      state.setRightSidebarOpen(false)
-    })
+    await writeSettings(orcaPage, { orchestratorGame: {}, orchestratorGameProjects: {} })
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
     await expect(panel).toBeHidden()
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
     await expect(sceneCanvasIn(panel.locator('[data-team-scene="figures"]'))).toBeVisible({

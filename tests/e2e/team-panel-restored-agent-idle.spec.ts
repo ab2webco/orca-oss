@@ -15,6 +15,7 @@ import { TEST_REPO_PATH_FILE } from './global-setup'
 import { createRestartSession } from './helpers/orca-restart'
 import { waitForSessionReady } from './helpers/store'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { writeSettings } from './helpers/settings-write'
 import {
   createFakeClaude,
   expectTeamTabs,
@@ -31,9 +32,8 @@ type Leads = { leads: { handle: string; paneKey?: string }[] }
 type LeadAgent = { isLeader: boolean; state: string; toolName: string | null }
 
 async function turnPluginsOn(page: Page, pluginDir: string): Promise<string[]> {
+  await writeSettings(page, { pluginSystemEnabled: true })
   return page.evaluate(async (dir) => {
-    const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-    window.__store?.setState({ settings })
     await window.api.plugins.install({ kind: 'local-path', path: dir })
     await window.api.plugins.refresh()
     for (const entry of await window.api.plugins.list()) {
