@@ -355,6 +355,32 @@ describe('team scene director', () => {
       expect(overMonitor).toBe(false)
     })
 
+    it('never waits on a lead parked at the judged member: it gestures within 3 s of reaching it', () => {
+      const world = judged()
+      let reached: number | null = null
+      let played: number | null = null
+      runUntil(
+        world,
+        () => {
+          const advisor = world.bodies.get('advisor')!
+          const lead = world.bodies.get('lead')!
+          // The lead stays on the asker the whole time: its question never closes here.
+          expect(world.rounds.stage).toBe('atMember')
+          if (reached === null && Math.abs(advisor.x - lead.x) < 2 * BODY) {
+            reached = world.t
+          }
+          if (played === null && actor(world, 'advisor')?.gesture) {
+            played = world.t
+          }
+          return played !== null
+        },
+        30
+      )
+      expect(reached).not.toBeNull()
+      expect(played).not.toBeNull()
+      expect(played! - reached!).toBeLessThanOrEqual(3)
+    })
+
     it('puffs home at the end of its hold instead of walking back', () => {
       const world = judged()
       const home = world.bodies.get('advisor')!.home

@@ -12,7 +12,6 @@ const LEAD_GAP = 0.09
 // Depths closer than this share an aisle, where the advisor keeps a body width from the lead.
 const AISLE = 0.2
 const BODY = 0.06
-const FRONT = 0.06
 const SETTLED = 0.02
 
 /**
@@ -45,8 +44,9 @@ export function queueJudgment(world: TeamSceneWorld, key: string, gesture: TeamS
   queue.splice(0, Math.max(0, queue.length - QUEUE_MAX))
 }
 
-// Why the gap away from the lead: at the same member the lead would hide the gesture, and the
-// middle of a gap is the one place in front of the row that covers no monitor.
+// Why the gap away from the lead, behind the row: at the same member the lead would hide the
+// gesture, and a gap has no monitor, so the advisor shows there while the desks part it from
+// the lead in front.
 function spotOf(world: TeamSceneWorld, key: string, target: TeamSceneBody): TeamSceneSpot {
   const lead = world.bodies.get('lead')
   if (key === 'lead') {
@@ -56,7 +56,7 @@ function spotOf(world: TeamSceneWorld, key: string, target: TeamSceneBody): Team
   const side = lead && lead.x > seat.x ? -1 : 1
   const next = world.stations.map((s) => (s.x - seat.x) * side).filter((d) => d > 0.001)
   const half = Math.min(BESIDE_X, ...next.map((d) => d / 2))
-  return { x: seat.x + side * half, depth: seat.depth + FRONT }
+  return { x: seat.x + side * half, depth: world.bodies.get('advisor')!.home.depth }
 }
 
 const MOVING_PX = 3

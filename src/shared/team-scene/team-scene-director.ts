@@ -46,6 +46,7 @@ const CHEER_SECONDS = 2.2
 const CHECK_SECONDS = 1.2
 const ADVISOR_RAISE_SECONDS = 1.4
 const ADVISOR_BUBBLE_SECONDS = 6
+const ADVISOR_SPEED_PX = 48
 
 type Plan = TeamScenePlan
 
@@ -153,7 +154,11 @@ export function applyTeamSceneInput(
   const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
   bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
   if (input.advisor && !bodies.has('advisor')) {
-    bodies.set('advisor', bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1))
+    // Why quicker than the team: a referee hurries over, so a ruling never waits on a long walk.
+    bodies.set('advisor', {
+      ...bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1),
+      speed: ADVISOR_SPEED_PX
+    })
   } else if (!input.advisor) {
     bodies.delete('advisor')
   }
