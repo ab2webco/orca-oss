@@ -84,7 +84,7 @@ const copy = () => ({
     translate('auto.components.settings.OrchestratorGamePanelSetting.queue', 'Queue'),
     translate(
       'auto.components.settings.OrchestratorGamePanelSetting.queueDescription',
-      'Tab with the merge queue.'
+      'The merge queue at the top of PRs.'
     )
   ],
   machines: [

@@ -115,7 +115,8 @@ describe('TeamPanel settings', () => {
   it('draws the tabs and the Advisor row the settings leave on', async () => {
     const container = await render({})
 
-    expect(tabs(container)).toEqual(['Team', 'Inbox', 'PRs', 'Queue', 'Machines'])
+    // Why no Queue: V30 draws the merge queue at the top of PRs.
+    expect(tabs(container)).toEqual(['Team', 'Inbox', 'PRs', 'Machines'])
     expect(container.querySelector('[data-team-card="advisor"]')).not.toBeNull()
   })
 

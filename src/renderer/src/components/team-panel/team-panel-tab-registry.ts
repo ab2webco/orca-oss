@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type {
   TeamPanelModel,
+  TeamPrList,
   TeamSection,
   TeamTabId
 } from '../../../../shared/team-panel-model-types'
@@ -13,11 +14,12 @@ import { TeamPanelActivityTab } from './team-panel-activity-tab'
 import { TeamPanelInboxTab } from './team-panel-inbox-tab'
 import { TeamPanelMachinesTab, teamMachinesAloneCopy } from './team-panel-machines-tab'
 import { TeamPanelPrsTab } from './team-panel-prs-tab'
-import { TeamPanelQueueTab } from './team-panel-queue-tab'
+import { teamQueueEntriesOf } from './team-panel-queue-section'
 import { TeamPanelTeamTab } from './team-panel-team-tab'
 
 const ready = <V>(value: V): TeamSection<V> => ({ kind: 'ready', value })
 const isEmptyList = (rows: readonly unknown[]): boolean => rows.length === 0
+const NO_PRS: TeamPrList = { rows: [], total: 0, listUrl: null, listAction: null }
 
 // Why: one entry per tab, in the design's order; each body lives in its own file so the
 // members drawing Inbox, PRs, Queue, Machines and Activity never edit this list.
@@ -77,8 +79,14 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
   defineTeamPanelTab({
     id: 'prs',
     title: () => translate('teamPanel.tabs.prs.title', 'PRs'),
-    section: (model) => model.prs,
-    isEmpty: (list) => list.rows.length === 0,
+    // Why ready on a failed read: the merge queue still shows, and the body says the list failed.
+    section: (model) =>
+      teamQueueEntriesOf(model).length > 0 &&
+      (model.prs?.kind === 'error' || model.prs?.kind === 'unavailable')
+        ? { kind: 'ready', value: NO_PRS }
+        : model.prs,
+    // Why the queue too: V30 draws the merge queue at the top of PRs, so a queued PR is something to show.
+    isEmpty: (list, model) => list.rows.length === 0 && teamQueueEntriesOf(model).length === 0,
     copy: () => ({
       emptyTitle: translate('teamPanel.tabs.prs.emptyTitle', 'No open pull requests'),
       emptyText: translate(
@@ -88,28 +96,6 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
       errorTitle: translate('teamPanel.tabs.prs.errorTitle', 'Could not read pull requests')
     }),
     Body: TeamPanelPrsTab
-  }),
-  defineTeamPanelTab({
-    id: 'queue',
-    title: () => translate('teamPanel.tabs.queue.title', 'Queue'),
-    section: (model) => model.queue,
-    isEmpty: isEmptyList,
-    copy: () => ({
-      emptyTitle: translate('teamPanel.tabs.queue.emptyTitle', 'The queue is empty'),
-      emptyText: translate(
-        'teamPanel.tabs.queue.emptyText',
-        'Each pull request shows here in order until it merges.'
-      ),
-      errorTitle: translate('teamPanel.tabs.queue.errorTitle', 'Could not read the queue'),
-      unavailable: {
-        title: translate('teamPanel.tabs.queue.unavailableTitle', 'No merge queue to show'),
-        text: translate(
-          'teamPanel.tabs.queue.unavailableText',
-          'This project has no merge queue, or its provider or host does not publish one.'
-        )
-      }
-    }),
-    Body: TeamPanelQueueTab
   }),
   defineTeamPanelTab({
     id: 'machines',

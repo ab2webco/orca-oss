@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import type { TeamPrList, TeamPrRow } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
+import { TeamPanelQueueSection, teamQueueEntriesOf } from './team-panel-queue-section'
 import { TeamStatusMark } from './TeamStatusMark'
 import { useTeamLeadPrompt } from './use-team-lead-prompt'
 
@@ -56,13 +57,22 @@ function PrRow({ row }: { row: TeamPrRow }): React.JSX.Element {
   )
 }
 
-export function TeamPanelPrsTab({ value }: TeamPanelTabBodyProps<TeamPrList>): React.JSX.Element {
+export function TeamPanelPrsTab({
+  value,
+  model
+}: TeamPanelTabBodyProps<TeamPrList>): React.JSX.Element {
   const { rows, total, listUrl, listAction } = value
   const send = useTeamLeadPrompt()
   const more = total > rows.length
   const viewAll = translate('teamPanel.prs.viewAll', 'View all {{count}}', { count: total })
   return (
     <div className="flex flex-col pb-3 pt-1.5">
+      <TeamPanelQueueSection entries={teamQueueEntriesOf(model)} />
+      {model.prs?.kind === 'error' ? (
+        <p data-team-pr-failure="" className="px-3 py-2 text-xs text-muted-foreground">
+          {`${translate('teamPanel.tabs.prs.errorTitle', 'Could not read pull requests')} · ${model.prs.message}`}
+        </p>
+      ) : null}
       {rows.map((row) => (
         <PrRow key={row.url} row={row} />
       ))}

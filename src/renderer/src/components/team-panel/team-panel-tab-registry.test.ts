@@ -86,7 +86,8 @@ describe('resolveTeamPanelTabs', () => {
       queue: { kind: 'loading' },
       machines: { kind: 'error', message: 'host down' }
     })
-    expect(ids(resolveTeamPanelTabs(model))).toEqual(['team', 'inbox', 'prs', 'queue', 'machines'])
+    // Why no Queue: V30 draws the merge queue at the top of PRs.
+    expect(ids(resolveTeamPanelTabs(model))).toEqual(['team', 'inbox', 'prs', 'machines'])
   })
 
   it('opens on Activity instead of Team when there is no team', () => {
@@ -130,20 +131,43 @@ describe('resolveTeamPanelTabs', () => {
     const views = Object.fromEntries(
       resolveTeamPanelTabs(model).map((tab) => [tab.id, tab.view.kind])
     )
-    expect(views).toMatchObject({
+    expect(views).toEqual({
+      team: 'ready',
+      inbox: 'ready',
       prs: 'loading',
-      queue: 'error',
       machines: 'unavailable'
     })
   })
 
-  it('says a project has no queue rather than that the host is old', () => {
-    const queue = resolveTeamPanelTabs(gameModel({ queue: { kind: 'unavailable' } })).find(
-      (tab) => tab.id === 'queue'
-    )
+  it('draws PRs for a queued pull request even with no open PR to list', () => {
+    const entry = {
+      label: '#951',
+      title: 'Launch E2E waits',
+      url: 'https://example.test/951',
+      position: 1,
+      state: 'checks' as const,
+      status: 'working' as const,
+      since: null,
+      longWaitHours: null,
+      memberKey: null
+    }
+    const queued = resolveTeamPanelTabs(
+      gameModel({ prs: NO_PRS, queue: { kind: 'ready', value: [entry] } })
+    ).find((tab) => tab.id === 'prs')
+    expect(queued?.view.kind).toBe('ready')
 
-    expect(queue?.view.kind).toBe('unavailable')
-    expect(queue?.copy.unavailable?.title).toBe('No merge queue to show')
+    const failed = resolveTeamPanelTabs(
+      gameModel({
+        prs: { kind: 'error', message: 'rate limited' },
+        queue: { kind: 'ready', value: [entry] }
+      })
+    ).find((tab) => tab.id === 'prs')
+    expect(failed?.view.kind).toBe('ready')
+
+    const none = resolveTeamPanelTabs(
+      gameModel({ prs: NO_PRS, queue: { kind: 'unavailable' } })
+    ).find((tab) => tab.id === 'prs')
+    expect(none?.view.kind).toBe('empty')
   })
 
   it('draws the empty state for a ready section with nothing in it', () => {

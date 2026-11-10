@@ -56,7 +56,7 @@ test.use({ launchEnv: { PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?
 test.afterAll(() => rmSync(fakeGhDir, { recursive: true, force: true }))
 
 // The real lead's game.state, with no overlay: GitHub is the fake gh, the machine is this one.
-test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev follows the plugin system', async ({
+test('PRs opens with the GitHub merge queue, Machines lists this machine alone, and Jev follows the plugin system', async ({
   electronApp,
   orcaPage,
   testRepoPath
@@ -142,13 +142,17 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
     const panel = orcaPage.getByTestId('team-panel')
     await expect(panel.locator('[data-team-card="lead"]')).toBeVisible({ timeout: 60_000 })
 
-    await panel.getByRole('tab', { name: 'Queue' }).click()
+    // Why PRs: V30 draws the merge queue at the top of PRs, with no Queue tab.
+    await expect(panel.getByRole('tab', { name: 'Queue' })).toHaveCount(0)
+    await panel.getByRole('tab', { name: 'PRs' }).click()
+    await expect(panel.locator('[data-team-queue-title]')).toHaveText('Merge queue · 2', {
+      timeout: 60_000
+    })
     const first = panel.locator('[data-team-queue="#951"]')
     await expect(first).toContainText('Launch E2E waits', { timeout: 60_000 })
     await expect(first).toContainText('In checks')
     await expect(first).toHaveAttribute('href', 'https://github.com/acme/repo/pull/951')
     await expect(panel.locator('[data-team-queue="#952"]')).toContainText('In queue')
-    await expect(panel).not.toContainText('No merge queue to show')
 
     await panel.getByRole('tab', { name: 'Machines' }).click()
     const local = panel.locator('[data-team-machine="local"]')
@@ -165,7 +169,7 @@ test('Queue lists the GitHub merge queue, Machines this machine alone, and Jev f
       if (!CAPTURE_EVIDENCE) {
         return
       }
-      for (const tab of ['Team', 'Queue', 'Machines']) {
+      for (const tab of ['Team', 'PRs', 'Machines']) {
         await panel.getByRole('tab', { name: tab }).click()
         await orcaPage.mouse.move(0, 0)
         for (const width of WIDTHS) {

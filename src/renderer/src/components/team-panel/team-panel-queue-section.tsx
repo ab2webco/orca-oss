@@ -1,9 +1,8 @@
 import { statusToneTextClass } from '@/components/status-tone'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import type { TeamQueueEntry } from '../../../../shared/team-panel-model-types'
+import type { TeamPanelModel, TeamQueueEntry } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
-import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamStatusMark } from './TeamStatusMark'
 
 function stateText(entry: TeamQueueEntry): string {
@@ -48,12 +47,31 @@ function QueueRow({ entry }: { entry: TeamQueueEntry }): React.JSX.Element {
   )
 }
 
-export function TeamPanelQueueTab({
-  value
-}: TeamPanelTabBodyProps<TeamQueueEntry[]>): React.JSX.Element {
+// Why 4: V30's queueSection shows the next four; the rest are a merge away.
+const QUEUE_SHOWN = 4
+
+/** The merge queue's entries, when the model has any to show. */
+export function teamQueueEntriesOf(model: Pick<TeamPanelModel, 'queue'>): TeamQueueEntry[] {
+  return model.queue?.kind === 'ready' ? model.queue.value : []
+}
+
+/** V30's merge queue at the top of PRs: a count, the next four in order, then a rule. */
+export function TeamPanelQueueSection({
+  entries
+}: {
+  entries: readonly TeamQueueEntry[]
+}): React.JSX.Element | null {
+  if (entries.length === 0) {
+    return null
+  }
   return (
-    <div className="flex flex-col pb-3 pt-1.5">
-      {value.map((entry) => (
+    <div className="flex flex-col border-b border-border pb-1.5">
+      <span data-team-queue-title="" className="px-3 pb-1 pt-1.5 text-xs text-muted-foreground">
+        {translate('teamPanel.prs.queueTitle', 'Merge queue · {{count}}', {
+          count: entries.length
+        })}
+      </span>
+      {entries.slice(0, QUEUE_SHOWN).map((entry) => (
         <QueueRow key={entry.url} entry={entry} />
       ))}
     </div>

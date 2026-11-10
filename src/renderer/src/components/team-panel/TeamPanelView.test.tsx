@@ -137,7 +137,7 @@ describe('TeamPanelView', () => {
     })
 
     expect(container.querySelector('h2')?.textContent).toBe('orca-oss')
-    expect(tabs(container)).toEqual(['Team', 'Inbox2', 'PRs', 'Queue'])
+    expect(tabs(container)).toEqual(['Team', 'Inbox2', 'PRs'])
     expect(selectedTab(container)).toBe('Team')
   })
 
@@ -161,8 +161,8 @@ describe('TeamPanelView', () => {
     expect(panelText(container)).toContain('Could not read pull requests')
     expect(panelText(container)).toContain('rate limited')
 
-    await click('Queue')
-    expect(panelText(container)).toContain('The queue is empty')
+    // Why: the merge queue is part of PRs now, as V30 draws it, not a tab of its own.
+    expect(tabs(container)).not.toContain('Queue')
   })
 
   it('falls back to the first tab when the stored one is hidden', async () => {

@@ -89,19 +89,24 @@ describe('teamPanelModelWithSettings', () => {
   it('keeps every tab and the Advisor row when the settings show them', () => {
     const shown = teamPanelModelWithSettings(team, panel())
 
-    expect(tabIds(shown)).toEqual(['team', 'inbox', 'prs', 'queue', 'machines'])
+    expect(tabIds(shown)).toEqual(['team', 'inbox', 'prs', 'machines'])
+    expect(shown.queue).toEqual(team.queue)
     expect(shown.kind === 'team' && shown.advisor).toEqual(advisor)
   })
 
-  it.each(['prs', 'queue', 'machines'] as const)(
-    'hides the %s tab when its toggle is off',
-    (id) => {
-      const tabs = { prs: true, queue: true, machines: true, [id]: false }
+  it('drops the merge queue from PRs when the Queue toggle is off', () => {
+    const tabs = { prs: true, queue: false, machines: true }
 
-      expect(tabIds(teamPanelModelWithSettings(team, panel({ tabs })))).not.toContain(id)
-      expect(tabIds(teamPanelModelWithSettings(solo, panel({ tabs })))).not.toContain(id)
-    }
-  )
+    expect(teamPanelModelWithSettings(team, panel({ tabs })).queue).toBeNull()
+    expect(teamPanelModelWithSettings(solo, panel({ tabs })).queue).toBeNull()
+  })
+
+  it.each(['prs', 'machines'] as const)('hides the %s tab when its toggle is off', (id) => {
+    const tabs = { prs: true, queue: true, machines: true, [id]: false }
+
+    expect(tabIds(teamPanelModelWithSettings(team, panel({ tabs })))).not.toContain(id)
+    expect(tabIds(teamPanelModelWithSettings(solo, panel({ tabs })))).not.toContain(id)
+  })
 
   it("drops each no-team session's Jev section when Advisor is off", () => {
     const row = { paneKey: 'pane-a', advisor } as TeamActivityRow

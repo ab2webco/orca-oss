@@ -11019,7 +11019,7 @@
           "prs": "PRs",
           "prsDescription": "Pestaña con tus PRs abiertos.",
           "queue": "Cola",
-          "queueDescription": "Pestaña con la cola de merge.",
+          "queueDescription": "La cola de merge arriba de PRs.",
           "show": "Mostrar {{label}}",
           "style": "Estilo de la escena",
           "styleDescription": "Todas actúan el mismo estado real.",
@@ -16200,6 +16200,7 @@
         "closed": "Cerrado"
       },
       "viewAll": "Ver los {{count}}",
+      "queueTitle": "Cola de merge · {{count}}",
       "providerFailed": "El proveedor no respondió. Se reintenta solo.",
       "githubLimit": "Límite de la API de GitHub alcanzado. Se reintenta solo en {{minutes}} min."
     },

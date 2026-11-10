@@ -11647,7 +11647,7 @@
           "prs": "PRs",
           "prsDescription": "Tab with your open PRs.",
           "queue": "Queue",
-          "queueDescription": "Tab with the merge queue.",
+          "queueDescription": "The merge queue at the top of PRs.",
           "show": "Show {{label}}",
           "style": "Scene style",
           "styleDescription": "They all act out the same real state.",
@@ -17197,6 +17197,7 @@
         "closed": "Closed"
       },
       "viewAll": "View all {{count}}",
+      "queueTitle": "Merge queue · {{count}}",
       "providerFailed": "The provider did not answer. It retries on its own.",
       "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
     },
