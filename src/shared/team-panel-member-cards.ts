@@ -218,7 +218,8 @@ function memberCardOf(
     // Why: game.state omits a local member's worktree when it is the lead's.
     worktreeId: agent.worktree?.id ?? (agent.remote ? null : (state.worktree?.id ?? null)),
     host: hostOf(agent),
-    name: given ?? shown,
+    // Why the ticket: with no character to give, the ticket names it once, as the sidebar shows it.
+    name: given ?? ticket?.identifier ?? shown,
     agentType: agent.agentType,
     status: statusOf(condition, needsYou, work),
     condition,

@@ -396,6 +396,15 @@ describe('teamCardsOf', () => {
     expect(spanish?.members[0]?.name).toBe('Arturo')
   })
 
+  it('falls back to the ticket once, as the sidebar does, when the roster has no name to give', () => {
+    const [card] =
+      cardsOf([agent({ displayName: 'NETSA-207 Replace marketing-site' })], {
+        lead: { autostart: false, cap: 4, agent: 'claude', memberNames: [] }
+      } as never)?.members ?? []
+    expect(card?.name).toBe('NETSA-207')
+    expect(card?.ticket?.identifier).toBe('NETSA-207')
+  })
+
   it('carries the tool input as the live detail', () => {
     const [card] =
       cardsOf([agent({ toolName: 'Bash', toolInput: 'npx vitest run terminal-role' })])?.members ??
