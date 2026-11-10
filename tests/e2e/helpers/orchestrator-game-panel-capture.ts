@@ -1,19 +1,11 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect } from './orca-app'
 import { setTheme, setWindowWidth, THEMES, WIDTHS } from './settings-window'
-import { clickTerminalText, screenRows, terminalPointOf } from './orchestrator-game-band'
+import { screenRows, terminalPointOf } from './orchestrator-game-band'
 
 const HOLD_MS = 1_500
-// Why: Claude Code's terminal loses a click that lands while a pane redraws (keys are not lost),
-// so each chip is clicked once, after the redraw that drew it.
-const REDRAW_MS = 1_000
 
 export const screenText = async (page: Page) => (await screenRows(page)).join('\n')
-
-export async function clickOnceRedrawn(page: Page, chip: string): Promise<void> {
-  await page.waitForTimeout(REDRAW_MS)
-  await clickTerminalText(page, chip)
-}
 
 /** Wheels the Panel down until `heading` is on screen, so a short docked pane still shows it. */
 async function scrollPanelTo(page: Page, heading: string): Promise<void> {

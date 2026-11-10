@@ -84,6 +84,23 @@ describe('planSuiteShards', () => {
     expect(counts.every((one) => one.length > 0)).toBe(true)
   })
 
+  // Why: e2e.yml installs Claude Code now (ORCA-1148 T2), so the specs that skipped for want of it in
+  // run 42563987741 run; their skip time would underweigh them, so they weigh by size until a refresh.
+  it('carries no skip-time figure for the specs that skipped for want of Claude Code', () => {
+    // The other five tested the terminal band and arcade ORCA-1055 removed, and were deleted.
+    const skippedForClaude = [
+      'game-text-layer-without-plugins',
+      'orca-game-message-copy',
+      'orca-game-terminal-colours',
+      'orca-game-terminal-text-layer',
+      'orchestrator-game-perfect-merge-toast'
+    ].map((name) => `tests/e2e/${name}.spec.ts`)
+    for (const file of skippedForClaude) {
+      expect(readFileSync(file, 'utf8')).toContain('claudeVersionOk')
+    }
+    expect(skippedForClaude.filter((file) => file in durations)).toEqual([])
+  })
+
   it('gives the same plan for the same input, whatever the listing order', () => {
     const forward = planSuiteShards(specsOnDisk, { durations, sizeOf })
     const backward = planSuiteShards(specsOnDisk.toReversed(), { durations, sizeOf })

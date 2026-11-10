@@ -123,7 +123,9 @@ async function cellsOf(page: Page, needle: string, struck = false): Promise<Cell
           if (!line || at === -1) {
             continue
           }
-          let first = at
+          // Why past leading spaces: they only anchor the match, and the first can be a struck rule
+          // cell, whose solid line outnumbers subpixel-fringed glyph pixels on Linux (ORCA-1148).
+          let first = at + text.length - text.trimStart().length
           let last = at + text.length - 1
           if (isStruck) {
             const columns = Array.from({ length: line.length }, (_, x) => x).filter(

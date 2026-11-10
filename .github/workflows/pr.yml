@@ -620,6 +620,7 @@ jobs:
             resources/claude-plugins/orca-game/tests
 
       # Why pinned: the release the mod's engine tests were verified against (mods need 2.1.287+).
+      # e2e.yml installs the same one; 2.1.302 sent extra API requests in agent-grid-showcase (ORCA-1148).
       # The engine runs the tests in its own sandbox, with no sign-in.
       - name: Validate and test the orca-game mod
         shell: bash
@@ -629,7 +630,7 @@ jobs:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
         run: |
           set -euo pipefail
-          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.302
+          npm install --global --no-audit --no-fund @anthropic-ai/claude-code@2.1.319
           claude --version
           claude plugin validate .
           claude plugin test .

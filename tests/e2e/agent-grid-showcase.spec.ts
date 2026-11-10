@@ -168,12 +168,13 @@ test('agent grid groups live agents into buckets and filters them', async ({
         const readings = await window.api.agentTerminalTail?.readPtys(ids, 40)
         return (readings ?? []).map((r) => (r.tail && r.tail.read ? r.tail.lines.join('\n') : ''))
       }, ptyIds)
+    // Why no whitespace: a narrow pane wraps the banner, `Claude` and `Code` on two rows on Linux.
+    const banner = (index: number) =>
+      (live ? 'Claude Code' : AGENTS[index]!.answer.slice(0, 10)).replace(/\s+/g, '')
     await expect
       .poll(
         async () =>
-          (await tails()).every((tail, index) =>
-            tail.includes(live ? 'Claude Code' : AGENTS[index]!.answer.slice(0, 10))
-          ),
+          (await tails()).every((tail, index) => tail.replace(/\s+/g, '').includes(banner(index))),
         {
           timeout: 60_000,
           message: 'a pane never drew its prompt'

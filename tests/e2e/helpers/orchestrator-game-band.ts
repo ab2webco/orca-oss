@@ -3,7 +3,6 @@ import { appendFile, chmod, mkdir, mkdtemp, readFile, realpath, writeFile } from
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
-import { expect } from './orca-app'
 import { ensureTerminalVisible } from './store'
 import { attachRepoAndOpenTerminal } from './orca-restart'
 import { execInTerminal, waitForActivePanePtyId } from './terminal'
@@ -81,12 +80,6 @@ export async function terminalPointOf(
     }
     return null
   }, text)
-}
-
-export async function clickTerminalText(page: Page, text: string): Promise<void> {
-  const point = await terminalPointOf(page, text)
-  expect(point, `"${text}" is not on the terminal screen`).not.toBeNull()
-  await page.mouse.click(point!.x, point!.y)
 }
 
 /** The active terminal's visible rows, top to bottom. */

@@ -51,7 +51,7 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
   electronApp,
   orcaPage
 }, testInfo) => {
-  // Why a fallback: CI has no Claude Code, and the Inbox round trip must still run there.
+  // Why a fallback: without Claude Code on PATH the Inbox round trip must still run.
   const live = claudeVersionOk()
   test.setTimeout(240_000)
   await waitForSessionReady(orcaPage)
@@ -72,7 +72,8 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
     : null
   try {
     if (band) {
-      await expect.poll(async () => screenText(orcaPage), { timeout: 60_000 }).toContain('Juno')
+      // Since ORCA-1055 the pane draws only the text layer; the party lives in the Team panel.
+      await expect.poll(async () => screenText(orcaPage), { timeout: 60_000 }).toMatch(/❯/)
     } else {
       await attachRepoAndOpenTerminal(orcaPage, repo)
       await ensureTerminalVisible(orcaPage)

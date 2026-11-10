@@ -176,6 +176,31 @@ describe('PR E2E gate contract', () => {
     expect(run.run).not.toContain('--shard')
   })
 
+  // Why: without `claude` on PATH the game band and terminal specs skip themselves, so CI never
+  // ran them (ORCA-1084, ORCA-1148 T2). Same pin as pr.yml's mod tests, so both read one release.
+  it('installs the pinned Claude Code before every E2E run, in a login shell too', () => {
+    const pinOf = (run) => /@anthropic-ai\/claude-code@(\d+\.\d+\.\d+)/.exec(run ?? '')?.[1]
+    const prPin = Object.values(prWorkflow.jobs)
+      .flatMap((job) => job.steps ?? [])
+      .map((step) => pinOf(step.run))
+      .find(Boolean)
+    expect(prPin).toBeTruthy()
+    for (const jobName of ['e2e', 'changed-e2e']) {
+      const steps = e2eWorkflow.jobs[jobName].steps
+      const install = steps.findIndex((step) => pinOf(step.run))
+      const run = steps.findIndex((step) => step.run?.includes('test:e2e'))
+      expect(install, `${jobName} installs Claude Code`).toBeGreaterThanOrEqual(0)
+      expect(install, `${jobName} installs it before the run`).toBeLessThan(run)
+      expect(pinOf(steps[install].run)).toBe(prPin)
+      expect(steps[install].env).toMatchObject({
+        DISABLE_AUTOUPDATER: '1',
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+      })
+      // Orca's terminals start a login shell, which must still find it.
+      expect(steps[install].run).toContain("bash -lc 'claude --version'")
+    }
+  })
+
   it('installs zsh in every Linux lane that can run paired startup readiness', () => {
     for (const jobName of ['e2e', 'changed-e2e']) {
       const installStep = e2eWorkflow.jobs[jobName].steps.find((step) =>
