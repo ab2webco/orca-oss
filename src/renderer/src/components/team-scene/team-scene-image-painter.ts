@@ -262,10 +262,10 @@ export function createImagePainter(args: {
       const h = f.height
       backdrop.draw(g, f)
       effects.start(f.effects, f.actors, h)
-      drawStations(g, f)
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
       }
+      drawStations(g, f)
       for (const a of f.actors) {
         drawActor(g, a, f)
       }

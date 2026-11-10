@@ -15,6 +15,8 @@ const ROOF = '#5a3a5e'
 export const CASTLE_BANNER = '#c8414a'
 export const CASTLE_RUBBLE = '#5d5851'
 
+const TOWER_SCALE = 1.5
+const BEHIND_PX = 12
 const BLOCK_W = 6
 const BLOCK_H = 4
 const COLUMNS = 3
@@ -133,8 +135,9 @@ export function drawCastleBuilds(
     const s = teamSceneScaleAt(site.spot.depth)
     const y = feetY(site.spot.depth, f.height)
     const seat = site.spot.x - SITE_FROM_SEAT_X
-    drawCastlePile(g, (seat - PILE_FROM_SEAT_X) * f.width, y, s)
-    drawCastleSite(g, site.spot.x * f.width, y, s, site, f.t)
+    drawCastlePile(g, (seat - PILE_FROM_SEAT_X) * f.width, y, s * TOWER_SCALE)
+    // Why behind the seat and larger: a station prop drawn after it must not hide the build.
+    drawCastleSite(g, site.spot.x * f.width, y - BEHIND_PX * s, s * TOWER_SCALE, site, f.t)
   }
 }
 
