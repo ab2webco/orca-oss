@@ -45,7 +45,7 @@ export type TeamPanelTabSpec<V> = {
   shortTitle?: () => string
   /** Null hides the tab. */
   section: (model: TeamPanelModel) => TeamSection<V> | null
-  isEmpty: (value: V) => boolean
+  isEmpty: (value: V, model: TeamPanelModel) => boolean
   copy: () => TeamPanelTabCopy
   count?: (model: TeamPanelModel) => number | null
   Body: ComponentType<TeamPanelTabBodyProps<V>>
@@ -62,7 +62,7 @@ export function defineTeamPanelTab<V>(spec: TeamPanelTabSpec<V>): TeamPanelTabDe
     if (section.kind !== 'ready') {
       return section
     }
-    if (spec.isEmpty(section.value)) {
+    if (spec.isEmpty(section.value, model)) {
       return { kind: 'empty' }
     }
     const value = section.value

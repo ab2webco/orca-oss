@@ -10,7 +10,8 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 const GB = 1024 ** 3
 const HOUR_MS = 3_600_000
 const LANGUAGES = ['en', 'es'] as const
-const TABS = ['team', 'prs', 'queue', 'machines'] as const
+// Why no queue: V30 draws the merge queue at the top of PRs.
+const TABS = ['team', 'prs', 'machines'] as const
 // Why: the full capture matrix outruns the CI test budget; ORCA_CAPTURE_EVIDENCE=1 runs it locally.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
 // Why 390 on the way: a jump from 1440 straight to 320 can leave the selected tab in view by chance.
@@ -25,19 +26,19 @@ type Scene = { set: Record<string, unknown>; remove: string[] }
 
 const COPY = {
   en: {
-    tabs: { team: 'Team', prs: 'PRs', queue: 'Queue', machines: 'Machines' },
+    tabs: { team: 'Team', prs: 'PRs', machines: 'Machines' },
     prsEmpty: 'No open pull requests',
     prsError: 'Could not read pull requests',
-    queueNone: 'No merge queue to show',
+    queueTitle: 'Merge queue · 16',
     viewAll: 'View all 12',
     viewTasks: 'View tasks',
     sent: 'Sent to the lead: Review'
   },
   es: {
-    tabs: { team: 'Equipo', prs: 'PRs', queue: 'Cola', machines: 'Máquinas' },
+    tabs: { team: 'Equipo', prs: 'PRs', machines: 'Máquinas' },
     prsEmpty: 'No hay pull requests abiertos',
     prsError: 'No se pudieron leer los pull requests',
-    queueNone: 'No hay cola de merge que mostrar',
+    queueTitle: 'Cola de merge · 16',
     viewAll: 'Ver los 12',
     viewTasks: 'Ver tareas',
     sent: 'Enviado al líder: Review'
@@ -256,7 +257,7 @@ async function scrollTabToEnd(page: Page): Promise<void> {
 
 // The tabs read a real lead's `game.state` with provider data laid over it: nothing is seeded into
 // the panel's own model, and a press has to reach the lead pane's process.
-test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and reach the lead', async ({
+test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw every state and reach the lead', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -356,10 +357,12 @@ test('the PRs, Queue and Machines tabs, To Do and Actions draw every state and r
           timeout: 30_000
         })
         await expectScene(name, language)
-        if (name === 'unavailable') {
-          await panel.getByRole('tab', { name: COPY[language].tabs.queue }).click()
-          await expect(panel).toContainText(COPY[language].queueNone)
-        }
+        await expect(panel.getByRole('tab', { name: /^(Queue|Cola)$/ })).toHaveCount(0)
+        await panel.getByRole('tab', { name: COPY[language].tabs.prs }).click()
+        const queueTitle = panel.locator('[data-team-queue-title]')
+        await (name === 'full'
+          ? expect(queueTitle).toHaveText(COPY[language].queueTitle)
+          : expect(queueTitle).toHaveCount(0))
         for (const tab of TABS satisfies readonly Tab[]) {
           await panel.getByRole('tab', { name: COPY[language].tabs[tab] }).click()
           // Why: the pointer stays on the tab it pressed, and draws another tab's hover once narrow.

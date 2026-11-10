@@ -12,7 +12,7 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import { TeamPanelMachinesTab } from './team-panel-machines-tab'
 import { TeamPanelPrsTab } from './team-panel-prs-tab'
-import { TeamPanelQueueTab } from './team-panel-queue-tab'
+import { TeamPanelQueueSection } from './team-panel-queue-section'
 
 vi.mock('@/i18n/i18n', () => ({
   getIntlLocale: () => 'en-US',
@@ -156,9 +156,9 @@ const queueEntry = (over: Partial<TeamQueueEntry> = {}): TeamQueueEntry => ({
 })
 
 const queue = (value: TeamQueueEntry[]): HTMLElement =>
-  mount(<TeamPanelQueueTab value={value} model={model} selectTab={selectTab} />)
+  mount(<TeamPanelQueueSection entries={value} />)
 
-describe('TeamPanelQueueTab', () => {
+describe('TeamPanelQueueSection', () => {
   it('draws the position, the label and the title, linked to the PR', () => {
     const view = queue([queueEntry({ position: 2 })])
     const link = view.querySelector('a[data-team-queue="#915"]')

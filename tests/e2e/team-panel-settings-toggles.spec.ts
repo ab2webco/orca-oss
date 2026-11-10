@@ -108,21 +108,41 @@ async function setPanel(page: Page, panel: Record<string, unknown>): Promise<voi
   )
 }
 
+// Why queue: V30 draws the merge queue at the top of PRs; its toggle drops that part, not a tab.
 const CASES = [
-  { name: 'all-on', panel: {}, hidden: [] as string[], advisor: true },
-  { name: 'prs-off', panel: { tabs: { prs: false } }, hidden: ['PRs'], advisor: true },
-  { name: 'queue-off', panel: { tabs: { queue: false } }, hidden: ['Queue'], advisor: true },
+  { name: 'all-on', panel: {}, hidden: [] as string[], queue: true, advisor: true },
+  {
+    name: 'prs-off',
+    panel: { tabs: { prs: false } },
+    hidden: ['PRs'],
+    queue: false,
+    advisor: true
+  },
+  {
+    name: 'queue-off',
+    panel: { tabs: { queue: false } },
+    hidden: [] as string[],
+    queue: false,
+    advisor: true
+  },
   {
     name: 'machines-off',
     panel: { tabs: { machines: false } },
     hidden: ['Machines'],
+    queue: true,
     advisor: true
   },
-  { name: 'advisor-off', panel: { advisor: false }, hidden: [] as string[], advisor: false }
+  {
+    name: 'advisor-off',
+    panel: { advisor: false },
+    hidden: [] as string[],
+    queue: true,
+    advisor: false
+  }
 ] as const
 
 // A real lead's game.state drives the panel; only the global Settings layer changes between captures.
-test('each panel setting changes the Team panel: PRs, Queue and Machines tabs and the Advisor row', async ({
+test('each panel setting changes the Team panel: PRs and Machines tabs, the merge queue and the Advisor row', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -179,11 +199,18 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
       await setPanel(orcaPage, { look: 'plain', ...one.panel })
       await panel.getByRole('tab', { name: 'Team' }).click()
       for (const name of ['PRs', 'Queue', 'Machines']) {
+        // Why Queue stays listed: no setting may bring back a Queue tab.
+        const hidden = name === 'Queue' || (one.hidden as readonly string[]).includes(name)
         await expect
           .soft(panel.getByRole('tab', { name }), `${one.name}: ${name}`)
-          .toHaveCount((one.hidden as readonly string[]).includes(name) ? 0 : 1, {
-            timeout: SETTLE_MS
-          })
+          .toHaveCount(hidden ? 0 : 1, { timeout: SETTLE_MS })
+      }
+      if (!(one.hidden as readonly string[]).includes('PRs')) {
+        await panel.getByRole('tab', { name: 'PRs' }).click()
+        await expect
+          .soft(panel.locator('[data-team-queue-title]'), `${one.name}: queue`)
+          .toHaveCount(one.queue ? 1 : 0, { timeout: SETTLE_MS })
+        await panel.getByRole('tab', { name: 'Team' }).click()
       }
       await expect
         .soft(panel.locator('[data-team-card="advisor"]'), `${one.name}: advisor`)
@@ -204,8 +231,8 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
 
     // The selected tab falls back to Team when its toggle hides it, as V28 does.
     await setPanel(orcaPage, { look: 'plain' })
-    await panel.getByRole('tab', { name: 'Queue' }).click()
-    await setPanel(orcaPage, { look: 'plain', tabs: { queue: false } })
+    await panel.getByRole('tab', { name: 'Machines' }).click()
+    await setPanel(orcaPage, { look: 'plain', tabs: { machines: false } })
     await expect(panel.getByRole('tab', { name: 'Team' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -214,7 +241,7 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
       }
     )
 
-    // At 320 the fit level shortens the labels so all five tabs sit whole, with no cue on either side
+    // At 320 the fit level shortens the labels so all four tabs sit whole, with no cue on either side
     // (ORCA-1142). No panel state overflows any more; the start/end cue and the scroll-into-view are
     // covered by tabStripOverflowOf and tabStripScrollLeftFor in team-panel-tab-strip.test.ts.
     await setPanel(orcaPage, { look: 'plain' })
@@ -224,7 +251,7 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     for (const end of ['Team', 'Machines']) {
       await panel.getByRole('tab', { name: end }).click()
       await orcaPage.mouse.move(0, 0)
-      await expect(strip.getByRole('tab')).toHaveCount(5)
+      await expect(strip.getByRole('tab')).toHaveCount(4)
       await expect(strip).toHaveAttribute('data-overflow-start', 'false')
       await expect(strip).toHaveAttribute('data-overflow-end', 'false')
       expect(
@@ -242,7 +269,7 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
     await expect(strip).toHaveAttribute('data-overflow-start', 'false')
     await expect(strip).toHaveAttribute('data-overflow-end', 'false')
 
-    // ORCA-1094 F9 / ORCA-1142: from the narrowest 220 sidebar up all five tabs fit, in either language.
+    // ORCA-1094 F9 / ORCA-1142: from the narrowest 220 sidebar up all four tabs fit, in either language.
     const edges = (): Promise<{ panel: number; scroll: number; client: number; cut: string[] }> =>
       strip.evaluate((list) => {
         const right = list.getBoundingClientRect().right
@@ -269,7 +296,7 @@ test('each panel setting changes the Team panel: PRs, Queue and Machines tabs an
         language
       )
       const tabs = strip.getByRole('tab')
-      await expect(tabs).toHaveCount(5)
+      await expect(tabs).toHaveCount(4)
       for (const width of [220, 280, 2000]) {
         await orcaPage.evaluate(
           (next) => window.__store!.getState().setRightSidebarWidth(next),
