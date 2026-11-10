@@ -1536,6 +1536,14 @@ html.native-shell .app-layout {
   }
 }
 
+/* Why: V30's actfresh; a Team panel action that just appeared flashes so the eye finds it. */
+@keyframes team-action-fresh {
+  50% {
+    background-color: var(--accent);
+    color: var(--foreground);
+  }
+}
+
 /* Why: keyframes run when the content mounts already in its final state. */
 @keyframes compact-agent-expansion-reveal {
   from {

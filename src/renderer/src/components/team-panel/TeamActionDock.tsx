@@ -26,6 +26,32 @@ export type TeamActionDockProps = {
 
 // Why 9 s: V30 keeps the result line that long, then the row stands alone again.
 const RECEIPT_MS = 9000
+// Why 2.6 s: V30's actFlash, two 1.2 s flashes and a beat.
+const FRESH_MS = 2600
+
+/** The id of an action that was not in the previous render; never on the first. `key` is the ids joined by newlines. */
+function useFreshAction(key: string): string | null {
+  const seen = useRef<ReadonlySet<string> | null>(null)
+  const [fresh, setFresh] = useState<string | null>(null)
+  useEffect(() => {
+    const ids = key ? key.split('\n') : []
+    const before = seen.current
+    seen.current = new Set(ids)
+    const added = before ? ids.find((id) => !before.has(id)) : undefined
+    if (added) {
+      setFresh(added)
+    }
+  }, [key])
+  // Why its own effect: a later id change must not cancel the flash's end.
+  useEffect(() => {
+    if (!fresh) {
+      return
+    }
+    const timer = setTimeout(() => setFresh(null), FRESH_MS)
+    return () => clearTimeout(timer)
+  }, [fresh])
+  return fresh
+}
 
 /** Leading chips that fit on the one line; the rest stay laid out but invisible, for the next measure. */
 function useChipsThatFit(): [(node: HTMLDivElement | null) => void, number] {
@@ -67,6 +93,7 @@ export function TeamActionDock({
   const [running, setRunning] = useState<{ action: TeamAction; sentAt: number } | null>(null)
   const [receipt, setReceipt] = useState<{ label: string; text: string } | null>(null)
   const chips = teamDockActionsOf(actions, null)
+  const fresh = useFreshAction(actions.map((one) => one.id).join('\n'))
   const [row, fit] = useChipsThatFit()
   // Why both: the menu anchors to a ref object, and the floating button's keep-out follows the mounted element.
   const dock = useRef<HTMLElement>(null)
@@ -168,6 +195,7 @@ export function TeamActionDock({
                     key={action.id}
                     type="button"
                     data-team-action={action.id}
+                    data-team-action-fresh={action.id === fresh ? '' : undefined}
                     title={action.off ? teamActionOffText(action.off) : teamActionHint(action)}
                     aria-label={
                       now && !own
@@ -181,6 +209,8 @@ export function TeamActionDock({
                     className={cn(
                       'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent',
                       now && 'bg-muted text-foreground hover:bg-accent',
+                      action.id === fresh &&
+                        'motion-safe:animate-[team-action-fresh_1.2s_ease-out_2]',
                       hidden && 'invisible'
                     )}
                   >

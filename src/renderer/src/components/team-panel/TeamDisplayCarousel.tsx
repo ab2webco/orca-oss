@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
 import { StatusDot } from '@/components/StatusDot'
 import { translate } from '@/i18n/i18n'
@@ -15,6 +15,11 @@ const TICKER_MS = 3_600
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// Why these: V30's swipe; a fifth of the stage turns the page, and 8 px or a mostly vertical drag is no swipe.
+const SWIPE_TURN = 0.18
+const SWIPE_START_PX = 8
+const SWIPE_FALLBACK_WIDTH = 300
 
 const navButton =
   'inline-flex h-[22px] w-[18px] items-center justify-center text-muted-foreground hover:text-foreground'
@@ -49,6 +54,21 @@ export function TeamDisplayCarousel({ model }: { model: TeamPanelGameModel }): R
     const timer = window.setInterval(() => setLine((one) => one + 1), TICKER_MS)
     return () => window.clearInterval(timer)
   }, [ticker.length])
+  const swipe = useRef<{ x: number; y: number; on: boolean } | null>(null)
+  const [dragX, setDragX] = useState(0)
+  const endSwipe = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const from = swipe.current
+    swipe.current = null
+    setDragX(0)
+    if (!from?.on) {
+      return
+    }
+    const dx = event.clientX - from.x
+    const width = event.currentTarget.clientWidth || SWIPE_FALLBACK_WIDTH
+    if (Math.abs(dx) >= width * SWIPE_TURN) {
+      go(index + (dx < 0 ? 1 : -1))
+    }
+  }
   const page = pages[index]
   const message = ticker[line % ticker.length]
   return (
@@ -123,7 +143,47 @@ export function TeamDisplayCarousel({ model }: { model: TeamPanelGameModel }): R
       <div
         key={page.id}
         data-team-display-stage=""
-        className="h-[122px] overflow-hidden motion-safe:animate-in motion-safe:fade-in"
+        className={cn(
+          'h-[122px] touch-pan-y overflow-hidden motion-safe:animate-in motion-safe:fade-in',
+          dragX === 0 && 'motion-safe:transition-transform motion-safe:duration-200'
+        )}
+        style={
+          dragX === 0
+            ? undefined
+            : {
+                transform: `translateX(${dragX}px)`,
+                opacity: Math.max(0.45, 1 - Math.abs(dragX) / 420)
+              }
+        }
+        onPointerDown={(event) => {
+          if (event.pointerType !== 'mouse') {
+            swipe.current = { x: event.clientX, y: event.clientY, on: false }
+          }
+        }}
+        onPointerMove={(event) => {
+          const from = swipe.current
+          if (!from) {
+            return
+          }
+          const dx = event.clientX - from.x
+          const dy = event.clientY - from.y
+          if (!from.on) {
+            if (Math.abs(dy) > Math.abs(dx)) {
+              swipe.current = Math.abs(dy) > SWIPE_START_PX ? null : from
+              return
+            }
+            if (Math.abs(dx) < SWIPE_START_PX) {
+              return
+            }
+            from.on = true
+          }
+          setDragX(dx)
+        }}
+        onPointerUp={endSwipe}
+        onPointerCancel={() => {
+          swipe.current = null
+          setDragX(0)
+        }}
       >
         <TeamDisplayPageView page={page} />
       </div>
@@ -134,6 +194,8 @@ export function TeamDisplayCarousel({ model }: { model: TeamPanelGameModel }): R
         )}
       >
         <StatusDot
+          data-team-display-dot=""
+          className={message.alert ? 'motion-safe:animate-pulse' : undefined}
           tone={message.alert ? 'attention' : 'success'}
           glyph={message.alert ? 'question' : 'dot'}
         />

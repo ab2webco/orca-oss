@@ -12,7 +12,10 @@ export function TeamPanelLoadingState({ rows }: { rows: number }): React.JSX.Ele
       aria-label={translate('teamPanel.state.loading', 'Loading')}
     >
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="h-9 animate-pulse rounded-md bg-sidebar-accent" />
+        <div
+          key={index}
+          className="h-9 animate-pulse rounded-md bg-sidebar-accent motion-reduce:animate-none"
+        />
       ))}
     </div>
   )

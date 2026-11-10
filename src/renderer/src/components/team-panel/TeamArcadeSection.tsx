@@ -48,7 +48,7 @@ export function TeamArcadeSection({
       <section
         data-arcade-offer=""
         aria-label={translate('teamPanel.arcade.label', 'Arcade')}
-        className="mx-3 my-2 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5"
+        className="mx-3 my-2 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
       >
         <span className="text-[13px] font-semibold">
           {translate('teamPanel.arcade.offerTitle', 'Perfect merge of #{{pr}}', {
