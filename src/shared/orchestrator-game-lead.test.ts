@@ -12,6 +12,27 @@ import {
 } from './orchestrator-game-lead'
 
 describe('parseGameLead', () => {
+  // ORCA-1156: the other repos a lead may launch members into, as canonical remotes.
+  it('reads memberRepos as canonical remotes and refuses an entry that names no remote', () => {
+    expect(
+      parseGameLead({
+        memberRepos: [
+          'https://github.com/koombea/cineco-frontend.git',
+          'github.com/koombea/cineco-backend',
+          'git@github.com:koombea/cineco-backend.git'
+        ]
+      })
+    ).toEqual({
+      value: {
+        memberRepos: ['github.com/koombea/cineco-frontend', 'github.com/koombea/cineco-backend']
+      },
+      warnings: []
+    })
+    expect(parseGameLead({ memberRepos: ['cineco-frontend'] }).warnings).toEqual([
+      'orchestratorGame.orchestrator.memberRepos must be a list of 1 to 20 git remotes like github.com/org/repo'
+    ])
+  })
+
   it('keeps every valid key, trimmed', () => {
     expect(
       parseGameLead({

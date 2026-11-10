@@ -6,6 +6,7 @@ import { globalLoginHolderOf } from './orchestrator-game-launch-account'
 import type { RuntimeClient } from '../runtime-client'
 import type { OrchestratorGameLead } from '../../shared/orchestrator-game-lead'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
+import { IN_PROJECT_REPO_SCOPE } from './orchestrator-game-launch-test-fixtures'
 
 const LEAD = { autostart: false, cap: 2, agent: 'claude', launchPrompt: 'Implement {id}' }
 
@@ -23,6 +24,7 @@ function fakeClient(state: unknown, workerStart: Record<string, unknown> = {}) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'game.memberRepoScope': IN_PROJECT_REPO_SCOPE,
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [] },
     'orchestration.runCurrent': { run: { id: 'run_1' } },

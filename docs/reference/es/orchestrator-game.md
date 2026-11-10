@@ -1,5 +1,5 @@
 ---
-sourceHash: 60e782e1a9cff2f4
+sourceHash: 4f419894e3072c41
 ---
 
 # El juego orquestador de Agent Teams
@@ -612,6 +612,7 @@ orchestratorGame:
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
     mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
+    memberRepos: [github.com/koombea/cineco-frontend] # optional: other repos members may work in
 ```
 
 Un placeholder sin valor queda vacío; uno desconocido descarta la clave con una advertencia.
@@ -627,6 +628,17 @@ cuenta lo conectó alguna vez, así que `Gmail` y `claude.ai Gmail` coinciden am
 ignora mayúsculas y minúsculas. El lanzamiento imprime `Warning:` y sigue cuando el host no puede
 saberlo: un miembro Codex, un repo por SSH, un vault de WSL o un host emparejado cuyo Orca es anterior
 a `game.member-mcp-servers.v1`. `--skip-mcp-check` lanza sin leer nada.
+
+Un líder lanza miembros solo en su propio proyecto (ORCA-1156): su propio repo, o un repo cuyo remoto
+git lista `memberRepos` (una URL o `host/org/repo`). `game launch --repo`, `game wave --repo` y un
+traslado con `--on <host> --repo` leen, antes de reservar un nombre o crear nada, el repo del líder
+aquí y el repo elegido donde correría el miembro, comparados por remoto canónico
+([`orchestrator-game-member-repo-scope.ts`](../../../src/shared/orchestrator-game-member-repo-scope.ts)).
+El repo de otro proyecto se rechaza con `repo_outside_project`, nombrando el proyecto del líder. En un
+host emparejado que no tiene ningún repo del proyecto, el rechazo nombra el host y el paso: con el
+visto bueno del dueño, clónalo allí y ejecuta `orca repo add --path <ruta en el host> --environment <host>`.
+El host solo responde sus viejos `repo.list` y `repo.show`, así que se puede comprobar cualquier Orca
+emparejado.
 
 Cada miembro que inicia `game launch`/`game wave` recibe el primer nombre del roster que no tenga
 ningún miembro vivo: `memberNames`, o si no el `roster` de la escena activa (cada escena incluida trae
@@ -669,7 +681,7 @@ Los verbos del líder, ejecutados desde la terminal del líder
   primero esos PR hasta el merge. Un PR cuenta incluso después de que su miembro fue liberado, algo
   que el recuento de miembros vivos no puede ver.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — un miembro para
-  un ticket; `--repo` lo inicia en otro repo del proyecto, y `--on` en un host emparejado (consulta
+  un ticket; `--repo` lo inicia en otro repo del proyecto (el suyo o uno de `memberRepos`), y `--on` en un host emparejado (consulta
   la sección de la flota más abajo; `--repo` es entonces el repo del host y es obligatorio). `--prompt` reemplaza `launchPrompt` para ese
   miembro (mismos placeholders), para una tarea que no es implementar el ticket: una corrida de QA o
   de tests, una investigación. Sobrescrituras por lanzamiento de la configuración del líder (también

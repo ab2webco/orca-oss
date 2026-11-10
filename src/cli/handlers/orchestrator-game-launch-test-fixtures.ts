@@ -24,6 +24,16 @@ export function stateWith(overrides: Record<string, unknown> = {}) {
   }
 }
 
+const LEAD_REPO = {
+  id: 'wt1',
+  displayName: 'cineco',
+  path: '/repo',
+  remoteKey: 'github.com/koombea/cineco'
+}
+
+/** A --repo launch first checks it stays in the lead's project (ORCA-1156); this one does. */
+export const IN_PROJECT_REPO_SCOPE = { host: null, lead: LEAD_REPO, repo: LEAD_REPO, repos: [] }
+
 const ACCOUNTS = {
   claude: {
     accounts: [{ id: 'acct_ana', email: 'ana@example.com' }],
@@ -59,6 +69,7 @@ export function fakeClient(
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'game.memberRepoScope': IN_PROJECT_REPO_SCOPE,
     'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': {

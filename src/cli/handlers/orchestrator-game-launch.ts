@@ -33,6 +33,7 @@ import {
 import { callWithLaunchRetry } from './orchestrator-game-launch-retry'
 import { checkGameMemberMcpServers } from './orchestrator-game-launch-mcp'
 import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
+import { checkGameMemberRepoScope } from './orchestrator-game-launch-repo-scope'
 import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
 import { recordGameStartOutcome } from './orchestrator-game-launch-outcome'
 import { readCallerGameState, recordGameMember } from './orchestrator-game-board-call'
@@ -123,6 +124,7 @@ type GameLaunchArgs = {
 /** One member for one ticket, reporting to the calling lead; the caller owns the cap. */
 export async function launchGameMember(args: GameLaunchArgs): Promise<GameLaunchResult> {
   const { client, state, ticket, repo } = args
+  await checkGameMemberRepoScope({ client, state, repo, remote: args.remote ?? null })
   const where = args.remote
     ? { ...args.remote, worktree: 'new-top-level' }
     : await memberWorktreeParamsOf({ client, state, ticket, repo })

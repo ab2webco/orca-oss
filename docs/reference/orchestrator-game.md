@@ -593,6 +593,7 @@ orchestratorGame:
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
     mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
+    memberRepos: [github.com/koombea/cineco-frontend] # optional: other repos members may work in
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
@@ -607,6 +608,16 @@ the repo's `.mcp.json`. A claude.ai connector counts when the account has ever c
 `Gmail` and `claude.ai Gmail` both match. The match ignores case. Launch prints `Warning:` and goes on
 when the host cannot tell: a Codex member, an SSH repo, a WSL vault, or a paired host whose Orca
 predates `game.member-mcp-servers.v1`. `--skip-mcp-check` launches without reading anything.
+
+A lead launches members only into its own project (ORCA-1156): its own repo, or a repo whose git
+remote `memberRepos` lists (a URL or `host/org/repo`). `game launch --repo`, `game wave --repo` and a
+move with `--on <host> --repo` read, before they reserve a name or create anything, the lead's repo
+here and the selected repo where the member would run, matched by canonical remote
+([`orchestrator-game-member-repo-scope.ts`](../../src/shared/orchestrator-game-member-repo-scope.ts)).
+Another project's repo is refused with `repo_outside_project`, naming the lead's project. On a paired
+host that has no repo of the project, the refusal names the host and the step: with the owner's OK,
+clone it there and run `orca repo add --path <path on host> --environment <host>`. The host only
+answers its old `repo.list` and `repo.show`, so any paired Orca can be checked.
 
 Each member `game launch`/`game wave` starts is named after the first roster name no live member
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead
@@ -644,7 +655,7 @@ The lead's verbs, run from the lead's terminal
   PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
   counts even after its member was released, which the live member count cannot see.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — one member for
-  one ticket; `--repo` starts it in another repo of the project, and `--on` on a paired host (see
+  one ticket; `--repo` starts it in another repo of the project (its own or one in `memberRepos`), and `--on` on a paired host (see
   the fleet section below; `--repo` is then the host's repo and required). `--prompt` replaces `launchPrompt` for that
   member (same placeholders), for a task that is not implementing the ticket: a QA or test run, an
   investigation. Per-launch overrides of the lead config (also on `game wave`, for every member it

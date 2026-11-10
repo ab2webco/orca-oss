@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_LAUNCH_HANDLERS } from './orchestrator-game-launch'
 import { GAME_MCP_SERVERS_MISSING } from './orchestrator-game-launch-mcp'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { IN_PROJECT_REPO_SCOPE } from './orchestrator-game-launch-test-fixtures'
 
 const TODO_ITEM = { id: 'CIN-12', title: 'Cartelera page', url: '', status: 'To Do' }
 
@@ -35,6 +36,7 @@ function fakeClient(state: unknown, mcp: unknown) {
   const calls: [string, unknown][] = []
   const results: Record<string, unknown> = {
     'game.state': state,
+    'game.memberRepoScope': IN_PROJECT_REPO_SCOPE,
     'worktree.list': { worktrees: [] },
     'terminal.show': { terminal: { handle: 'h1' } },
     'status.get': { capabilities: [] },
