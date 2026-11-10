@@ -1,5 +1,5 @@
 ---
-sourceHash: fa1e71cc65b516f1
+sourceHash: f047521251b8fcb0
 ---
 
 # El juego orquestador de Agent Teams
@@ -1605,18 +1605,18 @@ orchestratorGame:
   `orca game scene validate` lee cada archivo e informa los problemas como
   `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. El panel dibuja
   un estilo con el arte propio de la escena cuando su bloque cubre ese estilo y las imágenes cargan
-  (`orchestratorGameSceneArtOf`); si no, dibuja el estilo elegido con el arte de Quest, que viene con
-  Orca en [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json), y conserva
-  los nombres y el elenco de la escena. Pixel se dibuja solo cuando se elige, o cuando incluso el arte de
-  Quest no se puede decodificar. El escenario marca el arte predeterminado con
-  `data-team-scene-default-art`, y Settings lo dice bajo el estilo. Un archivo de escena cuyo nombre es
+  (`orchestratorGameSceneArtOf`). Quest se dibuja con su arte, que viene con Orca en
+  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Cualquier otra
+  escena sin arte para el estilo se dibuja en Pixel, con sus propios personajes, asesor, mascota y
+  colores, así que una escena con tema nunca muestra los caballeros de Quest; Settings lo dice bajo el
+  estilo. Quest pasa a Pixel solo cuando ni siquiera su arte se puede decodificar. Un archivo de escena cuyo nombre es
   `quest` es Quest, así que el arte incluido es el suyo. El panel lee las imágenes de un archivo de
   escena bajo demanda con `game.sceneArt`, en el host dueño del worktree: en local, por SSH a través del
   sistema de archivos remoto del worktree, y desde un host emparejado por el RPC del runtime, con el
   caller del lead. El host sirve solo las imágenes de la escena que dibuja su worktree, contenidas en la
   carpeta del archivo de escena, con un máximo de 2 MB cada una. Un host anterior al método, una escena
-  llevada a un miembro remoto, una escena de plugin y cualquier imagen que falle dibujan el arte
-  predeterminado. El estado del juego lleva el bloque como campo opcional. La
+  llevada a un miembro remoto, una escena de plugin y cualquier imagen que falle se dibujan en Pixel
+  con los personajes de la propia escena. El estado del juego lleva el bloque como campo opcional. La
   [guía de escenas](../../../skill-guides/orca-game-scenes.md#native-optional) tiene el formato.
 
 **Settings.** El selector **Scene** del proyecto termina con **Custom file…**, que muestra la ruta

@@ -94,6 +94,39 @@ describe('createPixelPainter', () => {
     expect(colorsDrawnFor('Merlin')).toBe(colorsDrawnFor('Merlin'))
   })
 
+  it("draws the scene's own advisor and walks its pet beside the lead", () => {
+    const cast = {
+      advisor: { frames: [['aab', 'bba']], colors: { a: 0xff0000, b: 0x00ff00 } },
+      pet: { frames: [['pp']], happy: ['pp'], colors: { p: 0x0000ff } }
+    }
+    const withCast = { ...QUEST_SCENE, cast }
+    const castless = { ...QUEST_SCENE, cast: undefined }
+    const paintOf = (scene: typeof QUEST_SCENE, actors: TeamSceneActor[]) => {
+      offscreen = []
+      const r = recordingContext()
+      createPixelPainter({ scene, light: NOON, colors: COLORS }).paint(r.g, frame(actors))
+      return { images: r.calls.filter((c) => c.name === 'drawImage').length, bitmaps: offscreen }
+    }
+    const advisor = actor('advisor', { role: 'advisor', x: 0.74 })
+    const fillsOf = (scene: typeof QUEST_SCENE) =>
+      JSON.stringify(
+        paintOf(scene, [advisor])
+          .bitmaps.at(-1)!
+          .calls.map((c) => c.fillStyle)
+      )
+    expect(fillsOf(withCast)).not.toBe(fillsOf(castless))
+    // The advisor's own 3-wide frame, not a 10-wide member costume.
+    const sizes = paintOf(withCast, [advisor])
+      .bitmaps.at(-1)!
+      .calls.filter((c) => c.name === 'fillRect')
+    expect(Math.max(...sizes.map((c) => c.args[0] as number))).toBeLessThan(5)
+
+    expect(paintOf(withCast, [actor('lead')]).images).toBe(
+      paintOf(castless, [actor('lead')]).images + 1
+    )
+    expect(paintOf(withCast, []).images).toBe(paintOf(castless, []).images)
+  })
+
   it.each(Object.values(SCENES))('draws the built-in $id scene with no edits', (scene) => {
     const painter = createPixelPainter({ scene, light: NOON, colors: COLORS })
     const r = recordingContext()
@@ -101,7 +134,10 @@ describe('createPixelPainter', () => {
       r.g,
       frame([actor('lead'), actor('Merlin'), actor('advisor', { role: 'advisor' })])
     )
-    expect(r.calls.filter((c) => c.name === 'drawImage')).toHaveLength(4)
+    // Three actors and the backdrop, and the pet when the scene has one.
+    expect(r.calls.filter((c) => c.name === 'drawImage')).toHaveLength(
+      4 + (scene.cast?.pet ? 1 : 0)
+    )
     expect(offscreen.at(-1)!.calls.filter((c) => c.name === 'fillRect').length).toBeGreaterThan(20)
   })
 

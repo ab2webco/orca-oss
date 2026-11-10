@@ -21,7 +21,7 @@ type Props = {
 /** The live scene for a team in the Game look, drawn from the Team model only. */
 export function TeamPanelScene({ model, style, children }: Props): React.JSX.Element {
   const timezone = model.metrics.kind === 'ready' ? model.metrics.value.timezone : 'local'
-  const { drawn, art, defaultArt, painter } = useTeamScenePainter({
+  const { drawn, art, painter } = useTeamScenePainter({
     style,
     scene: model.scene,
     timezone
@@ -43,8 +43,6 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
           className="shrink-0 border-b border-border"
           data-team-scene={drawn}
           data-team-scene-art={art}
-          // Why exposed: the panel's own note reads it, as do the scene E2E checks.
-          data-team-scene-default-art={defaultArt ? 'true' : undefined}
         >
           {painter ? (
             <TeamSceneCanvas

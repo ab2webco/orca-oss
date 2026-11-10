@@ -88,13 +88,8 @@ let host: HTMLDivElement
 const canvasHeight = (): string | undefined => host.querySelector('canvas')?.style.height
 const shownStyle = (): string | null | undefined =>
   host.querySelector('[data-team-scene]')?.getAttribute('data-team-scene')
-const artOf = (): (string | null)[] => {
-  const stage = host.querySelector('[data-team-scene]')
-  return [
-    stage?.getAttribute('data-team-scene-art') ?? null,
-    stage?.getAttribute('data-team-scene-default-art') ?? null
-  ]
-}
+const artOf = (): string | null =>
+  host.querySelector('[data-team-scene]')?.getAttribute('data-team-scene-art') ?? null
 const stageHeight = (): string | undefined =>
   host.querySelector<HTMLElement>('[data-team-scene] > *')?.style.height
 
@@ -268,31 +263,31 @@ describe('TeamPanelScene', () => {
       )
     )
     expect(shownStyle()).toBe('figures')
-    expect(artOf()).toEqual(['scene', null])
+    expect(artOf()).toBe('scene')
     expect(loadTeamSceneArt).toHaveBeenLastCalledWith(
       teamSceneQuestArtOf('figures'),
       expect.any(Function)
     )
   })
 
-  it('draws a scene with no art for the style with the default art, and marks it', async () => {
+  it("draws a scene with no art for the style with its own characters in Pixel, never Quest's", async () => {
     await act(async () =>
       root.render(
         <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="office" />
       )
     )
-    expect(shownStyle()).toBe('office')
-    expect(artOf()).toEqual(['bundled', 'true'])
+    expect(shownStyle()).toBe('pixel')
+    expect(artOf()).toBe('pixel')
   })
 
-  it('draws Quest exported as a scene file with its bundled art, not marked as default', async () => {
+  it('draws Quest exported as a scene file with its bundled art', async () => {
     const id = 'file:.orca/scenes/quest.json'
     const file = { ...plain, id, pluginId: 'file' } as OrchestratorGameSceneExtension
     await act(async () =>
       root.render(<TeamPanelScene model={model({ id, extensions: [file] })} style="figures" />)
     )
     expect(shownStyle()).toBe('figures')
-    expect(artOf()).toEqual(['bundled', null])
+    expect(artOf()).toBe('bundled')
   })
 
   it('draws Pixel when asked, and the lead line from the model', () => {

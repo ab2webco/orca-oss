@@ -63,8 +63,6 @@ export function teamSceneArtOf(args: {
 export type TeamSceneStage = {
   drawn: GamePanelStyle
   art: OrchestratorGameSceneArtSource
-  /** Orca's default art stands in for art the scene does not have; the panel says so. */
-  defaultArt: boolean
   painter: TeamScenePainter | null
 }
 
@@ -176,5 +174,5 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
     const back = artStyle === 'office' && request?.own === false ? OFFICE_BACK_SEAT : null
     return image ? createImagePainter({ art: image, colors, builds, back }) : null
   }, [artStyle, image, pixelScene, colors, request])
-  return { drawn: art.drawn, art: art.art, defaultArt: art.defaultArt, painter }
+  return { drawn: art.drawn, art: art.art, painter }
 }

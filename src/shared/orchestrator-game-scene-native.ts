@@ -290,8 +290,6 @@ export type OrchestratorGameSceneArtSource = 'scene' | 'bundled' | 'pixel'
 export type OrchestratorGameSceneArt = {
   drawn: OrchestratorGameSceneStyle
   art: OrchestratorGameSceneArtSource
-  /** The style draws Orca's default art because the scene has none of its own for it. */
-  defaultArt: boolean
 }
 
 const QUEST_FILE = /(?:^|\/)quest\.json$/
@@ -306,8 +304,9 @@ const isQuestScene = (sceneId: string): boolean => {
 }
 
 /**
- * The art a style draws with: the scene's own when its block covers the style and loaded, else the
- * Quest art Orca ships. Pixel draws only when picked, or when even the bundled art failed.
+ * The art a style draws with: the scene's own when its block covers the style and loaded; Quest's
+ * art Orca ships for Quest; else Pixel, which draws the scene's own characters and colours, so a
+ * themed scene never shows Quest's knights.
  */
 export function orchestratorGameSceneArtOf(args: {
   style: OrchestratorGameSceneStyle
@@ -320,14 +319,14 @@ export function orchestratorGameSceneArtOf(args: {
 }): OrchestratorGameSceneArt {
   const { style, sceneId, scene, sceneArtFailed, bundledArtFailed } = args
   if (style !== 'figures' && style !== 'office') {
-    return { drawn: 'pixel', art: 'pixel', defaultArt: false }
+    return { drawn: 'pixel', art: 'pixel' }
   }
   if (scene?.native?.[style] && !sceneArtFailed) {
-    return { drawn: style, art: 'scene', defaultArt: false }
+    return { drawn: style, art: 'scene' }
   }
-  return bundledArtFailed
-    ? { drawn: 'pixel', art: 'pixel', defaultArt: false }
-    : { drawn: style, art: 'bundled', defaultArt: !isQuestScene(sceneId) }
+  return isQuestScene(sceneId) && !bundledArtFailed
+    ? { drawn: style, art: 'bundled' }
+    : { drawn: 'pixel', art: 'pixel' }
 }
 
 /** The style a scene really draws in; see `orchestratorGameSceneArtOf` for where its art comes from. */

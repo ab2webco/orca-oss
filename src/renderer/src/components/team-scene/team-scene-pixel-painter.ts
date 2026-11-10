@@ -16,6 +16,7 @@ import { hdSkyPixel } from '../../../../../resources/claude-plugins/orca-game/ho
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { pixelAdvisorSpriteOf, pixelPetOf } from './team-scene-pixel-cast'
 import {
   drawPixelCrates,
   drawPixelPlot,
@@ -182,9 +183,29 @@ export function createPixelPainter(args: {
     return made
   }
 
-  const imageOf = (a: TeamScenePortraitSubject, leg: number): HTMLCanvasElement => {
+  const imageOf = (a: TeamScenePortraitSubject, leg: number, t = 0): HTMLCanvasElement => {
+    const own = a.role === 'advisor' ? pixelAdvisorSpriteOf(scene, t) : null
+    if (own) {
+      return spriteFor(own, false)
+    }
     const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
     return spriteFor(costumeSpriteOf(costume, leg, false), a.role === 'lead')
+  }
+  const blit = (
+    g: CanvasRenderingContext2D,
+    image: HTMLCanvasElement,
+    left: number,
+    bottom: number,
+    facing: 1 | -1
+  ): void => {
+    g.save()
+    g.translate(
+      (left + (facing < 0 ? image.width : 0)) * PIXEL,
+      (bottom - image.height + 1) * PIXEL
+    )
+    g.scale(facing * PIXEL, PIXEL)
+    g.drawImage(image, 0, 0)
+    g.restore()
   }
   const drawActor = (
     g: CanvasRenderingContext2D,
@@ -193,19 +214,16 @@ export function createPixelPainter(args: {
     t: number
   ): void => {
     const leg = a.pose === 'walk' ? Math.floor(a.gait / Math.PI) % 2 : 0
-    const image = imageOf(a, leg)
+    const image = imageOf(a, leg, t)
     const left = Math.round(a.x * columns - image.width / 2)
     const bottom = feetRow(a.depth) - Math.round(a.jump / PIXEL)
     g.fillStyle = a.emote === 'alert' ? colors.attention : 'rgb(20 20 30 / 0.35)'
     g.fillRect((left + 1) * PIXEL, (feetRow(a.depth) + 1) * PIXEL, (image.width - 2) * PIXEL, PIXEL)
-    g.save()
-    g.translate(
-      (left + (a.facing < 0 ? image.width : 0)) * PIXEL,
-      (bottom - image.height + 1) * PIXEL
-    )
-    g.scale(a.facing * PIXEL, PIXEL)
-    g.drawImage(image, 0, 0)
-    g.restore()
+    blit(g, image, left, bottom, a.facing)
+    const pet = a.role === 'lead' ? pixelPetOf(scene, a, left, image.width, t) : null
+    if (pet) {
+      blit(g, spriteFor(pet.sprite, false), pet.left, feetRow(a.depth), a.facing)
+    }
     drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
     if (a.emote) {
       drawSceneEmote(

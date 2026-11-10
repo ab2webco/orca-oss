@@ -54,18 +54,17 @@ const HOST: TeamSceneArtHost = {
 
 describe('teamSceneArtOf', () => {
   it('draws Quest in its bundled art', () => {
-    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toMatchObject({
+    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toEqual({
       drawn: 'figures',
-      art: 'bundled',
-      defaultArt: false
+      art: 'bundled'
     })
     expect(teamSceneArtOf({ style: 'office', scene: QUEST }).drawn).toBe('office')
   })
 
   it('reads a host that named no scene as Quest, as Pixel does', () => {
-    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toMatchObject({
+    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toEqual({
       drawn: 'office',
-      defaultArt: false
+      art: 'bundled'
     })
   })
 
@@ -81,18 +80,18 @@ describe('teamSceneArtOf', () => {
     })
   })
 
-  it('draws a scene with no art in the chosen style with the default art, never Pixel', () => {
-    expect(
-      teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })
-    ).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
+  it("draws a scene with no art in the chosen style with its own characters in Pixel, never Quest's", () => {
+    expect(teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })).toEqual({
+      drawn: 'pixel',
+      art: 'pixel'
+    })
   })
 
-  it('draws the default art when the own art did not load, and Pixel when even that failed', () => {
+  it('draws Pixel when the own art did not load, and Quest in Pixel when even its art failed', () => {
     const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
-    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toMatchObject({
-      drawn: 'figures',
-      art: 'bundled',
-      defaultArt: true
+    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toEqual({
+      drawn: 'pixel',
+      art: 'pixel'
     })
     expect(teamSceneArtOf({ style: 'figures', scene: QUEST, bundledArtFailed: true }).drawn).toBe(
       'pixel'
@@ -161,30 +160,30 @@ describe('useTeamScenePainter', () => {
     await expect(urlOf('art/sky.png')).resolves.toBe('data:art/sky.png')
     expect(readTeamSceneArtUrl).toHaveBeenCalledWith(HOST, id, 'art/sky.png')
     expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene', defaultArt: false })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene' })
   })
 
-  it('draws the default art when the own art fails, as an older host does', async () => {
+  it("draws the scene's own characters in Pixel when its own art fails, as an older host does", async () => {
     const id = 'file:mine.json'
     vi.mocked(loadTeamSceneArt).mockRejectedValueOnce(new Error('method_not_found'))
     await render('figures', { id, extensions: [blockScene(id)] })
-    expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
-    expect(vi.mocked(loadTeamSceneArt).mock.calls.at(-1)![1]('scene/sky.png')).toBeUndefined()
+    expect(seen.at(-1)).toBe(PIXEL)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
   })
 
-  it('draws the default art at once when no host is known to read the own art from', async () => {
+  it('draws Pixel at once when no host is known to read the own art from', async () => {
     useTeamSceneArtHostStore.setState({ host: null })
     const id = 'file:mine.json'
     await render('office', { id, extensions: [blockScene(id)] })
     expect(readTeamSceneArtUrl).not.toHaveBeenCalled()
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
   })
 
-  it('draws a scene with no art in the chosen style with the default art', async () => {
+  it("draws a scene with no art in the chosen style with its own characters, never Quest's", async () => {
     await render('office', { id: 'file:.orca/scenes/koombea.json', extensions: [] })
-    expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+    expect(seen.at(-1)).toBe(PIXEL)
+    expect(loadTeamSceneArt).not.toHaveBeenCalled()
+    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
   })
 
   it("seats members from behind only at Orca's own Office desk", async () => {

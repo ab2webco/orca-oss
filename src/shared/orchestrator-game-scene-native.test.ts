@@ -314,7 +314,8 @@ describe('the art a scene draws with', () => {
     const parsed = parseOrchestratorGameScene(JSON.stringify(scene({ native: value })), 'x')
     return parsed.ok ? parsed.definition : undefined
   }
-  const PIXEL = { drawn: 'pixel', art: 'pixel', defaultArt: false }
+  // Why Pixel for a themed scene: Pixel draws the scene's own characters; Quest's art never does.
+  const PIXEL = { drawn: 'pixel', art: 'pixel' }
 
   it('keeps Pixel for every scene when Pixel is picked', () => {
     expect(orchestratorGameSceneArtOf({ style: 'pixel', sceneId: 'quest' })).toEqual(PIXEL)
@@ -331,26 +332,21 @@ describe('the art a scene draws with', () => {
     for (const style of ['figures', 'office'] as const) {
       expect(orchestratorGameSceneArtOf({ style, sceneId: 'quest' })).toEqual({
         drawn: style,
-        art: 'bundled',
-        defaultArt: false
+        art: 'bundled'
       })
     }
   })
 
   it.each(['vigilante', 'jrpg', 'tamer'])(
-    'draws the built-in %s in the chosen style with the default art, never Pixel',
+    "draws the built-in %s with its own characters in Pixel, never Quest's art",
     (sceneId) => {
       for (const style of ['figures', 'office'] as const) {
-        expect(orchestratorGameSceneArtOf({ style, sceneId })).toEqual({
-          drawn: style,
-          art: 'bundled',
-          defaultArt: true
-        })
+        expect(orchestratorGameSceneArtOf({ style, sceneId })).toEqual(PIXEL)
       }
     }
   )
 
-  it('draws a plugin scene with no art with the default art', () => {
+  it('draws a plugin scene with no art with its own characters in Pixel', () => {
     const { scenes } = orchestratorGameScenesOf([
       { pluginId: 'acme.pack', id: 'space', text: JSON.stringify(scene()) }
     ])
@@ -360,30 +356,27 @@ describe('the art a scene draws with', () => {
         sceneId: scenes[0]!.id,
         scene: scenes[0]!.definition
       })
-    ).toEqual({ drawn: 'figures', art: 'bundled', defaultArt: true })
+    ).toEqual(PIXEL)
   })
 
-  it('draws a scene file with its own art where its block covers the style, else the default', () => {
+  it('draws a scene file with its own art where its block covers the style, else in Pixel', () => {
     const scene = definition(native())
     expect(orchestratorGameSceneArtOf({ style: 'figures', sceneId: 'file:a.json', scene })).toEqual(
-      { drawn: 'figures', art: 'scene', defaultArt: false }
+      { drawn: 'figures', art: 'scene' }
     )
-    expect(orchestratorGameSceneArtOf({ style: 'office', sceneId: 'file:a.json', scene })).toEqual({
-      drawn: 'office',
-      art: 'bundled',
-      defaultArt: true
-    })
+    expect(orchestratorGameSceneArtOf({ style: 'office', sceneId: 'file:a.json', scene })).toEqual(
+      PIXEL
+    )
   })
 
-  it('draws the default art when a broken block was dropped or its own art did not load', () => {
-    const DEFAULT = { drawn: 'figures', art: 'bundled', defaultArt: true }
+  it('draws a scene in Pixel when a broken block was dropped or its own art did not load', () => {
     expect(
       orchestratorGameSceneArtOf({
         style: 'figures',
         sceneId: 'file:a.json',
         scene: definition({ figures: { layers: [] } })
       })
-    ).toEqual(DEFAULT)
+    ).toEqual(PIXEL)
     expect(
       orchestratorGameSceneArtOf({
         style: 'figures',
@@ -391,28 +384,16 @@ describe('the art a scene draws with', () => {
         scene: definition(native()),
         sceneArtFailed: true
       })
-    ).toEqual(DEFAULT)
+    ).toEqual(PIXEL)
   })
 
-  it('draws a scene file that did not read with the default art', () => {
-    expect(orchestratorGameSceneArtOf({ style: 'figures', sceneId: 'file:a.json' })).toEqual({
-      drawn: 'figures',
-      art: 'bundled',
-      defaultArt: true
-    })
+  it('draws a scene file that did not read in Pixel', () => {
+    expect(orchestratorGameSceneArtOf({ style: 'figures', sceneId: 'file:a.json' })).toEqual(PIXEL)
   })
 
-  it('falls to Pixel only when the bundled art itself failed', () => {
+  it('falls Quest to Pixel only when the bundled art itself failed', () => {
     expect(
       orchestratorGameSceneArtOf({ style: 'figures', sceneId: 'quest', bundledArtFailed: true })
-    ).toEqual(PIXEL)
-    expect(
-      orchestratorGameSceneArtOf({
-        style: 'office',
-        sceneId: 'file:a.json',
-        scene: definition(native()),
-        bundledArtFailed: true
-      })
     ).toEqual(PIXEL)
   })
 
@@ -424,7 +405,7 @@ describe('the art a scene draws with', () => {
         scene: definition(native()),
         bundledArtFailed: true
       })
-    ).toEqual({ drawn: 'figures', art: 'scene', defaultArt: false })
+    ).toEqual({ drawn: 'figures', art: 'scene' })
   })
 
   it.each(['file:.orca/scenes/quest.json', 'file:other/quest.json', 'file:quest.json'])(
@@ -432,8 +413,7 @@ describe('the art a scene draws with', () => {
     (sceneId) => {
       expect(orchestratorGameSceneArtOf({ style: 'office', sceneId })).toEqual({
         drawn: 'office',
-        art: 'bundled',
-        defaultArt: false
+        art: 'bundled'
       })
     }
   )
@@ -441,14 +421,14 @@ describe('the art a scene draws with', () => {
   it.each(['file:.orca/scenes/quests.json', 'file:.orca/quest/space.json', 'file:my-quest.json'])(
     'does not read %s as Quest',
     (sceneId) => {
-      expect(orchestratorGameSceneArtOf({ style: 'office', sceneId }).defaultArt).toBe(true)
+      expect(orchestratorGameSceneArtOf({ style: 'office', sceneId })).toEqual(PIXEL)
     }
   )
 
   it('keeps the drawn style alone for readers that need only that', () => {
+    expect(orchestratorGameSceneDrawnStyle({ style: 'figures', sceneId: 'quest' })).toBe('figures')
     expect(orchestratorGameSceneDrawnStyle({ style: 'figures', sceneId: 'vigilante' })).toBe(
-      'figures'
+      'pixel'
     )
-    expect(orchestratorGameSceneDrawnStyle({ style: 'pixel', sceneId: 'quest' })).toBe('pixel')
   })
 })
