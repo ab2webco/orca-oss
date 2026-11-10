@@ -1,7 +1,11 @@
-import type {
-  TeamSceneSite,
-  TeamSceneSiteStage
+import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
+import {
+  PILE_FROM_SEAT_X,
+  SITE_FROM_SEAT_X,
+  type TeamSceneSite,
+  type TeamSceneSiteStage
 } from '../../../../shared/team-scene/team-scene-sites'
+import type { TeamSceneFrame } from './team-scene-painter'
 
 // Scene art, not UI chrome: the Figures style paints its own stone, wood and cloth.
 const STONE = '#8f8a82'
@@ -116,6 +120,22 @@ export function drawCastlePile(g: CanvasRenderingContext2D, x: number, y: number
   g.fillStyle = STONE_DARK
   g.fillRect(-4, -8, 6, 4)
   g.restore()
+}
+
+/** Every seat's pile and tower plus the trophies, for any style that draws in scene px. */
+export function drawCastleBuilds(
+  g: CanvasRenderingContext2D,
+  f: Pick<TeamSceneFrame, 'width' | 'height' | 't' | 'sites' | 'trophies'>,
+  feetY: (depth: number, h: number) => number
+): void {
+  drawCastleTrophies(g, f.trophies.length, f.width, feetY(0, f.height) - 14, f.t)
+  for (const site of f.sites) {
+    const s = teamSceneScaleAt(site.spot.depth)
+    const y = feetY(site.spot.depth, f.height)
+    const seat = site.spot.x - SITE_FROM_SEAT_X
+    drawCastlePile(g, (seat - PILE_FROM_SEAT_X) * f.width, y, s)
+    drawCastleSite(g, site.spot.x * f.width, y, s, site, f.t)
+  }
 }
 
 /** Finished towers of merged work along the far hills, newest on the right. */

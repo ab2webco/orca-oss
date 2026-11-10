@@ -170,7 +170,9 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
     if (artStyle === null) {
       return createPixelPainter({ ...pixelScene, colors })
     }
-    return image ? createImagePainter({ art: image, colors }) : null
+    // Why only Figures: Office builds come with its own step (4c).
+    const builds = artStyle === 'figures' ? 'castle' : null
+    return image ? createImagePainter({ art: image, colors, builds }) : null
   }, [artStyle, image, pixelScene, colors])
   return { drawn: art.drawn, art: art.art, defaultArt: art.defaultArt, painter }
 }

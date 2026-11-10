@@ -22,7 +22,8 @@ const STAGES = [
     style,
     painter: createImagePainter({
       art: { style: teamSceneQuestArtOf(style), images: new Map() },
-      colors: COLORS
+      colors: COLORS,
+      builds: null
     }),
     heights: [25, 39],
     beside: false

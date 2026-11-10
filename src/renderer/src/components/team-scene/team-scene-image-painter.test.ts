@@ -8,6 +8,7 @@ import { figureSeedOf } from './team-scene-figure-looks'
 import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-painter'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
+import { CASTLE_BANNER } from './team-scene-castle-sites'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
@@ -82,7 +83,7 @@ const sprites = (calls: RecordedCall[]): RecordedCall[] =>
   calls.filter((c) => c.name === 'drawImage' && c.args.length === 9)
 
 const painterOf = (art = style()) =>
-  createImagePainter({ art: { style: art, images: IMAGES }, colors: COLORS })
+  createImagePainter({ art: { style: art, images: IMAGES }, colors: COLORS, builds: null })
 
 let backdropCalls: RecordedCall[][] = []
 beforeEach(() => {
@@ -331,7 +332,11 @@ describe('createImagePainter', () => {
 
 describe('createImagePainter portrait', () => {
   it("draws a card face from the character's idle frame, head up, covering the face", () => {
-    const painter = createImagePainter({ art: { style: style(), images: IMAGES }, colors: COLORS })
+    const painter = createImagePainter({
+      art: { style: style(), images: IMAGES },
+      colors: COLORS,
+      builds: null
+    })
     const face = (who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey' | 'name'>) => {
       const { g, calls } = recordingContext()
       painter.portrait!(g, who, 38)
@@ -397,5 +402,35 @@ describe('createImagePainter station screens', () => {
       return JSON.stringify(calls.filter((c) => c.name === 'fillRect').map((c) => c.args))
     }
     expect(at(0)).not.toBe(at(0.4))
+  })
+})
+
+describe('createImagePainter builds', () => {
+  const site = { key: 'm', spot: { x: 0.155, depth: 0.5 }, stage: 4 as const, broken: false }
+  const bannerIn = (builds: 'castle' | null, extra: Partial<TeamSceneFrame>) => {
+    const painter = createImagePainter({
+      art: { style: style(), images: IMAGES },
+      colors: COLORS,
+      builds
+    })
+    const { g, fills } = recordingContext()
+    painter.paint(g, frame(extra))
+    return fills().filter((f) => f === CASTLE_BANNER).length
+  }
+
+  it('raises a castle build at each seat in the Figures art', () => {
+    expect(bannerIn('castle', { sites: [site] })).toBe(1)
+    expect(bannerIn(null, { sites: [site] })).toBe(0)
+  })
+
+  it('keeps a finished tower for each trophy in the Figures art', () => {
+    expect(
+      bannerIn('castle', {
+        trophies: [
+          { key: 'a', name: 'a' },
+          { key: 'b', name: 'b' }
+        ]
+      })
+    ).toBe(2)
   })
 })

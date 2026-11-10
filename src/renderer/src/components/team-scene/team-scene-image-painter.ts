@@ -14,6 +14,7 @@ import {
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
+import { drawCastleBuilds } from './team-scene-castle-sites'
 import { drawStationScreen, stationScreenStateOf } from './team-scene-station-screen'
 
 type RoleArt = OrchestratorGameSceneNativeStyle['roles']['lead']
@@ -132,6 +133,8 @@ function frameOf(
 export function createImagePainter(args: {
   art: TeamSceneImageArt
   colors: TeamSceneStatusColors
+  /** What each working member builds beside its station; null draws the stations alone. */
+  builds: 'castle' | null
 }): TeamScenePainter {
   const { style, images } = args.art
   const { colors } = args
@@ -260,6 +263,9 @@ export function createImagePainter(args: {
       backdrop.draw(g, f)
       effects.start(f.effects, f.actors, h)
       drawStations(g, f)
+      if (args.builds === 'castle') {
+        drawCastleBuilds(g, f, feetY)
+      }
       for (const a of f.actors) {
         drawActor(g, a, f)
       }
