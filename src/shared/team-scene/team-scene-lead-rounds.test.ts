@@ -120,6 +120,35 @@ describe('team scene lead rounds', () => {
     expect(effects).toContainEqual({ kind: 'handoff', from: 'a', to: 'lead' })
   })
 
+  it('walks to a member who needs you and stays with it while it asks', () => {
+    const world = scene([member('a'), member('b', 'needsYou')])
+    const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
+    expect(run(world, 15, () => nearB() && !leadWalking(world)).length).toBe(0)
+    expect(nearB()).toBe(true)
+    expect(handsTo(run(world, 10))).toEqual([])
+    expect(nearB()).toBe(true)
+    expect(actor(world, 'lead').facing).toBe(actor(world, 'b').x < actor(world, 'lead').x ? -1 : 1)
+    expect(actor(world, 'b').emote).toBe('alert')
+  })
+
+  it('walks home once the member is answered', () => {
+    const world = scene([member('b', 'needsYou')])
+    const home = actor(world, 'lead').x
+    run(world, 15, () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12)
+    applyTeamSceneInput(world, input([member('b', 'resting')]))
+    run(world, 15, () => actor(world, 'lead').x === home)
+    expect(actor(world, 'lead').x).toBe(home)
+  })
+
+  it('drops a round to attend a member who starts asking', () => {
+    const world = scene([member('a'), member('b', 'resting')])
+    run(world, 6, () => leadWalking(world))
+    applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')]))
+    const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
+    expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
+    expect(nearB()).toBe(true)
+  })
+
   it('reduced motion settles the lead at home', () => {
     const world = scene([member('a')])
     const home = actor(world, 'lead').x
