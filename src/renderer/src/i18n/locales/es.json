@@ -16350,7 +16350,8 @@
       "coordinatesOne": "Coordina 1 agente",
       "coordinatesMany": "Coordina {{count}} agentes",
       "asksOn": "Te espera · Pregunta sobre {{ticket}}",
-      "asks": "Te espera"
+      "asks": "Te espera",
+      "orchestrating": "Orquestando · {{action}}"
     },
     "advisor": {
       "label": "Advisor",

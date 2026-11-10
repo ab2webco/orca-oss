@@ -17347,7 +17347,8 @@
       "coordinatesOne": "Coordinates 1 agent",
       "coordinatesMany": "Coordinates {{count}} agents",
       "asksOn": "Waiting for you · Question on {{ticket}}",
-      "asks": "Waiting for you"
+      "asks": "Waiting for you",
+      "orchestrating": "Orchestrating · {{action}}"
     },
     "advisor": {
       "label": "Advisor",
