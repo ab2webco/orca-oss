@@ -129,6 +129,32 @@ describe('useTeamPanelLook', () => {
     expect(checkRuntimeHooks).toHaveBeenCalledTimes(2)
   })
 
+  // Why: the sidebar's rows stay open in the background; a panel opening must still re-read.
+  it('reads orca.yaml again when the panel reopens while the sidebar keeps reading', async () => {
+    yaml({ panel: { look: 'display' } })
+    const sidebar: string[] = []
+    function Sidebar(): null {
+      sidebar.push(useTeamPanelLook({ background: true }))
+      return null
+    }
+    const sidebarRoot = createRoot(document.createElement('div'))
+    await act(async () => sidebarRoot.render(<Sidebar />))
+    await act(async () => {})
+    expect(sidebar.at(-1)).toBe('display')
+    expect(await looks()).toEqual(['display'])
+    await act(async () => {
+      for (const root of roots.splice(0)) {
+        root.unmount()
+      }
+    })
+
+    yaml({ panel: { look: 'plain' } })
+    expect(await looks()).toEqual(['plain'])
+    expect(sidebar.at(-1)).toBe('plain')
+    expect(checkRuntimeHooks).toHaveBeenCalledTimes(3)
+    await act(async () => sidebarRoot.unmount())
+  })
+
   // Why: a folder project has no orca.yaml to read.
   it('never reads orca.yaml for a folder project', async () => {
     repo = { id: 'repo-1', kind: 'folder', connectionId: null }

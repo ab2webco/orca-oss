@@ -151,6 +151,20 @@ describe('SidebarTeamRosterSync', () => {
     expect(reads.state).toBe(2)
   })
 
+  it('reads fresh once when the panel opens on the sidebar run, then once per 20 s', async () => {
+    withAgent()
+    reads.leadHandles = ['term-lead']
+    await mount(<SidebarTeamRosterSync />)
+    expect(reads.state).toBe(1)
+
+    await mount(<TeamPanelProbe />)
+    expect(reads.state).toBe(2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000)
+    })
+    expect(reads.state).toBe(3)
+  })
+
   it('publishes the lead and members for the rows, with the panel closed', async () => {
     withAgent()
     reads.leadHandles = ['term-lead']

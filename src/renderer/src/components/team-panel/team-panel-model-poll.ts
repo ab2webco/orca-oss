@@ -51,6 +51,8 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
   let active: {
     scope: TeamPanelScope
     refs: number
+    /** Holders that show the model, unlike the sidebar's rows. */
+    shown: number
     timer: ReturnType<typeof setInterval>
     soon: ReturnType<typeof setTimeout> | null
     reading: boolean
@@ -161,6 +163,17 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     }
   }
 
+  // Why: a panel opening on the sidebar's run reads fresh from loading, as it did with a run of its own.
+  const restart = (run: NonNullable<typeof active>): void => {
+    generation += 1
+    clearInterval(run.timer)
+    run.timer = setInterval(() => void refresh(), intervalMs)
+    run.reading = false
+    run.again = false
+    deps.publish({ section: { kind: 'loading' }, retry: null }, run.scope)
+    void refresh()
+  }
+
   const stop = (): void => {
     if (active) {
       clearInterval(active.timer)
@@ -177,27 +190,34 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     refresh(): void {
       void refresh()
     },
-    subscribe(scope: TeamPanelScope): () => void {
+    /** `background`: the holder keeps the run going without showing it, so it never re-reads on join. */
+    subscribe(scope: TeamPanelScope, options: { background?: boolean } = {}): () => void {
+      const shows = options.background !== true
       if (active?.scope.key !== scope.key) {
         stop()
         deps.publish({ section: { kind: 'loading' }, retry: null }, scope)
         active = {
           scope,
           refs: 0,
+          shown: 0,
           soon: null,
           reading: false,
           again: false,
           timer: setInterval(() => void refresh(), intervalMs)
         }
         void refresh()
+      } else if (shows && active.shown === 0 && active.refs > 0) {
+        restart(active)
       }
       const run = active
       if (!run) {
         return () => {}
       }
       run.refs += 1
+      run.shown += shows ? 1 : 0
       return () => {
         run.refs -= 1
+        run.shown -= shows ? 1 : 0
         if (run.refs === 0 && active === run) {
           stop()
         }
