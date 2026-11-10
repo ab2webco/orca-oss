@@ -122,6 +122,15 @@ describe('team scene work loop', () => {
     expect(world.sites[0]).toEqual(expect.objectContaining({ stage: 3, broken: true }))
   })
 
+  it('never takes a build down when the phase flickers between tools', () => {
+    const world = scene([member('a', 'working', { stage: 1, broken: false })])
+    applyTeamSceneInput(world, input([member('a', 'working', { stage: 0, broken: false })]))
+    expect(world.sites[0]).toEqual(expect.objectContaining({ stage: 1 }))
+    applyTeamSceneInput(world, input([member('a', 'working', { stage: 2, broken: true })]))
+    applyTeamSceneInput(world, input([member('a', 'working', { stage: 1, broken: false })]))
+    expect(world.sites[0]).toEqual(expect.objectContaining({ stage: 2, broken: false }))
+  })
+
   it('keeps a merged site as a trophy after its member leaves', () => {
     const world = scene([member('a')])
     applyTeamSceneInput(world, input([member('a', 'done', { stage: 4, broken: false }, 12)]))

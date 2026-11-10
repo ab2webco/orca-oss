@@ -81,7 +81,7 @@ describe('teamSceneInputOf', () => {
         activity: 'working',
         reportId: 'Opened #12',
         mergedPr: null,
-        site: { stage: 3, broken: false }
+        site: { stage: 2, broken: false }
       },
       {
         key: 'done',

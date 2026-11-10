@@ -12,7 +12,13 @@ import {
   type TeamSceneRounds
 } from './team-scene-lead-rounds'
 import { seatPlanOf } from './team-scene-seats'
-import { siteSpotOf, type TeamSceneSite, type TeamSceneSiteView } from './team-scene-sites'
+import {
+  grownSite,
+  keepTrophy,
+  siteSpotOf,
+  type TeamSceneSite,
+  type TeamSceneSiteView
+} from './team-scene-sites'
 import { createTeamSceneWork, stepTeamSceneWork, type TeamSceneWork } from './team-scene-work-loop'
 import type {
   TeamSceneActivity,
@@ -32,7 +38,6 @@ const AT_LEAD_SECONDS = { enter: 0.9, handoff: 0.9, leave: 1 } as const
 const CHEER_SECONDS = 2.2
 const ADVISOR_RAISE_SECONDS = 1.4
 const ADVISOR_BUBBLE_SECONDS = 6
-const MAX_TROPHIES = 6
 
 type VisitKind = keyof typeof AT_LEAD_SECONDS
 type Plan =
@@ -170,7 +175,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
       characterKey: m.characterKey,
       activity: m.activity,
       home: spot,
-      site: m.site
+      site: grownSite(body.site, m.site)
     })
   }
   for (const body of bodies.values()) {
@@ -189,10 +194,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
     if (event.kind === 'handoff' && body?.plan.kind === 'seated') {
       queueVisit(world, body, 'handoff')
     } else if (event.kind === 'merge') {
-      if (!world.trophies.some((t) => t.key === event.key)) {
-        world.trophies.push({ key: event.key, name: byKey.get(event.key)?.name ?? event.key })
-        world.trophies.splice(0, Math.max(0, world.trophies.length - MAX_TROPHIES))
-      }
+      keepTrophy(world.trophies, { key: event.key, name: byKey.get(event.key)?.name ?? event.key })
       world.cheerUntil = world.t + CHEER_SECONDS
       world.effects.push({ kind: 'burst', key: event.key, reason: 'merge' })
       for (const b of bodies.values()) {
@@ -208,7 +210,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
   world.sites = plan.seats.map(({ key, spot }) => ({
     key,
     spot: siteSpotOf(spot),
-    ...byKey.get(key)!.site
+    ...bodies.get(key)!.site
   }))
 }
 
