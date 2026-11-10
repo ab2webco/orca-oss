@@ -9,6 +9,7 @@ import {
 import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { memberNamesOf } from './team-panel-member-names'
 import type {
   TeamAccount,
   TeamCondition,
@@ -201,7 +202,8 @@ function memberCardOf(
   agent: GameAgent,
   state: OrchestratorGameState,
   questionTickets: ReadonlySet<string>,
-  roster: readonly GameMemberName[]
+  roster: readonly GameMemberName[],
+  given: string | null
 ): TeamMemberCard {
   const shown = agent.displayName ?? agent.worktree?.displayName ?? agent.paneKey
   const ticket = ticketOf(agent, shown)
@@ -216,7 +218,7 @@ function memberCardOf(
     // Why: game.state omits a local member's worktree when it is the lead's.
     worktreeId: agent.worktree?.id ?? (agent.remote ? null : (state.worktree?.id ?? null)),
     host: hostOf(agent),
-    name: memberNameOf(shown) ?? shown,
+    name: given ?? shown,
     agentType: agent.agentType,
     status: statusOf(condition, needsYou, work),
     condition,
@@ -224,7 +226,7 @@ function memberCardOf(
     liveAction: liveActionOf(agent),
     model: modelOf(agent),
     account: accountOf(agent, state),
-    characterKey: characterOf(roster, agent.displayName),
+    characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
     flowPhase: isActive(agent) || isFinished(work) ? flowPhaseOf(agent, work) : null,
     summary: inbox?.last?.subject ?? null,
@@ -306,10 +308,16 @@ export function teamCardsOf(
     branch: state.worktree?.branch ?? null,
     ownerAsk
   }
+  const live = state.agents.filter((one) => one.isMember && !one.isLeader)
+  const offline = [...(state.pausedMembers ?? []), ...(state.queuedMembers ?? [])]
+  const names = memberNamesOf(
+    live,
+    roster,
+    [lead.name, ...offline.flatMap((one) => (one.name ? [one.name] : []))],
+    locale
+  )
   const members = [
-    ...state.agents
-      .filter((one) => one.isMember && !one.isLeader)
-      .map((one) => memberCardOf(one, state, questionTickets, roster)),
+    ...live.map((one, at) => memberCardOf(one, state, questionTickets, roster, names[at] ?? null)),
     ...(state.pausedMembers ?? []).map((one) => offlineCardOf(one, 'paused', roster)),
     ...(state.queuedMembers ?? []).map((one) => offlineCardOf(one, 'queued', roster))
   ]
