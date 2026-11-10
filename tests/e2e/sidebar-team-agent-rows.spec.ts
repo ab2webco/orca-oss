@@ -386,6 +386,37 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
       }
     }
 
+    // V30's hoverHtml: pointing at a member opens its card alone, never the lead's behind it.
+    // Why: only the new card style gives a card its hover card; the write is not awaited in the
+    // evaluate (ORCA-895), the store is polled instead.
+    await orcaPage.evaluate(() => {
+      void window.__store!.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
+    })
+    await expect
+      .poll(() =>
+        orcaPage.evaluate(
+          () => window.__store!.getState().settings?.experimentalNewWorktreeCardStyle === true
+        )
+      )
+      .toBe(true)
+    const hoverCards = orcaPage.locator('[data-slot="hover-card-content"]')
+    for (const width of [1440, 320]) {
+      await orcaPage.setViewportSize({ width, height: 720 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.mouse.move(0, 0)
+        await expect(hoverCards).toHaveCount(0)
+        await knightRow.hover()
+        await expect(hoverCards, `hover cards at ${width}px ${theme}`).toHaveCount(1)
+        await expect(hoverCards).toContainText('orca-1142')
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`rows-member-hover-${width}-${theme}.png`)
+        })
+      }
+    }
+    await orcaPage.mouse.move(0, 0)
+
     // Plain mode names a member by its ticket only and the lead by its role.
     await orcaPage.setViewportSize({ width: 1440, height: 720 })
     await setTheme(orcaPage, 'dark')
