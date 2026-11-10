@@ -76,7 +76,15 @@ export function TeamMemberCardRow({
     onToggle()
   }
   return (
-    <article data-team-card="member" data-pane-key={card.paneKey}>
+    <article
+      data-team-card="member"
+      data-pane-key={card.paneKey}
+      // Why one surface: V30's .card.sel and .more read as one card, not loose text under a row.
+      className={cn(
+        expanded &&
+          'mx-2 my-1 overflow-hidden rounded-lg border border-sidebar-border bg-sidebar-accent'
+      )}
+    >
       <button
         type="button"
         aria-expanded={expanded}

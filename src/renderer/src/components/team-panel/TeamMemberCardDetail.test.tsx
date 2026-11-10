@@ -89,22 +89,27 @@ describe('TeamMemberCardDetail', () => {
     expect(text(container, '[data-team-card-title]')).toBe('SSO sign-in')
   })
 
-  it('lists branch, model and effort, step, time in state and host, branch and model in mono', async () => {
+  it('lists only what the card header lacks: the branch in mono, and the last tool', async () => {
     const container = await render(card())
-    expect(text(container, '[data-team-detail="branch"] dd')).toBe('netsa-121-auth')
+    const facts = [...container.querySelectorAll('[data-team-detail]')].map((one) =>
+      one.getAttribute('data-team-detail')
+    )
+    // Why not model, phase, time or host: the header above already shows each once (owner).
+    expect(facts).toEqual(['branch', 'tool'])
     expect(container.querySelector('[data-team-detail="branch"] dd code')).toBeTruthy()
-    expect(text(container, '[data-team-detail="model"] dd')).toBe('Opus 5.5 · high')
-    expect(container.querySelector('[data-team-detail="model"] dd code')).toBeTruthy()
-    expect(text(container, '[data-team-detail="step"] dd')).toContain('pnpm test')
-    expect(text(container, '[data-team-detail="since"] dd')).toBe('25 min')
-    expect(text(container, '[data-team-detail="host"] dd')).toBe('local')
+    expect(text(container, '[data-team-detail="tool"] dd')).toContain('pnpm test')
+  })
+
+  it('cuts a long branch in the middle, keeping the ticket part whole', async () => {
+    const container = await render(card({ branch: 'fabolivark/netsa-121-auth' }))
+    const parts = [...container.querySelectorAll('[data-team-detail="branch"] dd code > span')]
+    expect(parts.map((one) => one.textContent)).toEqual(['fabolivark/', 'netsa-121-auth'])
   })
 
   it('leaves out a fact it does not have instead of showing a blank', async () => {
-    const container = await render(card({ branch: null, model: null, since: null }))
+    const container = await render(card({ branch: null, liveAction: null }))
     expect(container.querySelector('[data-team-detail="branch"]')).toBeNull()
-    expect(container.querySelector('[data-team-detail="model"]')).toBeNull()
-    expect(container.querySelector('[data-team-detail="since"]')).toBeNull()
+    expect(container.querySelector('[data-team-detail="tool"]')).toBeNull()
   })
 
   it('shows the PR and its CI as one chip with the CI colour', async () => {
@@ -144,7 +149,11 @@ describe('TeamMemberCardDetail', () => {
       }
     })
     const container = await render(card())
-    expect(text(container, '[data-team-account]')).toContain('dev@example.com')
+    // Why the provider: the bars measure that provider's windows, which the agent's model runs on.
+    expect(text(container, '[data-team-account-label]')).toBe('Claude · dev@example.com')
+    // One grid: a label column, a bar column of one width with a visible track, a value column.
+    const grid = container.querySelector('[data-team-usage-grid]')
+    expect(grid?.querySelectorAll('[data-team-usage-track]')).toHaveLength(2)
     expect(text(container, '[data-team-usage="session"]')).toContain('80% left')
     expect(text(container, '[data-team-usage="session"]')).toContain('1h 19m')
     expect(text(container, '[data-team-usage="weekly"]')).toContain('88% left')
@@ -163,5 +172,12 @@ describe('TeamMemberCardDetail', () => {
     expect(text(container, '[data-team-usage="session"]')).toContain('20% used')
     expect(text(container, '[data-team-usage="session"]')).not.toContain('·')
     expect(container.querySelector('[data-team-usage="weekly"]')).toBeNull()
+  })
+
+  it("names a Codex member's account by its provider", async () => {
+    const container = await render(
+      card({ account: { provider: 'codex', email: 'dev@example.com', id: 'c1', usedPercent: 5 } })
+    )
+    expect(text(container, '[data-team-account-label]')).toBe('Codex · dev@example.com')
   })
 })

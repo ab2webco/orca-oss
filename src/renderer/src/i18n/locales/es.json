@@ -16356,14 +16356,13 @@
       "inFolder": "En la carpeta, sin worktree",
       "detail": {
         "branch": "Rama",
-        "model": "Modelo",
-        "step": "Paso",
-        "since": "En estado",
-        "host": "Host"
+        "tool": "Última herramienta"
       },
       "usage": {
         "session": "5 h",
-        "weekly": "Semana"
+        "weekly": "Semana",
+        "claude": "Claude",
+        "codex": "Codex"
       }
     },
     "activity": {

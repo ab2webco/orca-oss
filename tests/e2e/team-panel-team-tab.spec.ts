@@ -382,8 +382,20 @@ test('the Team tab shows the live lead and its members from the lead game state'
         // Why gone: the card itself opens the terminal, so the button would only repeat it.
         await expect(asker.getByRole('button', { name: COPY[language].open })).toHaveCount(0)
         await expect(detail.getByRole('button', { name: COPY[language].answer })).toBeVisible()
-        await expect(detail.locator('[data-team-detail="host"]')).toContainText('local')
+        // Each fact once: the header shows model, phase, time and host, so the grid does not.
+        await expect(detail.locator('[data-team-detail]')).toHaveCount(
+          (await detail.locator('[data-team-detail="tool"]').count()) + 1
+        )
+        await expect(detail.locator('[data-team-detail="branch"] code')).not.toContainText(
+          'refs/heads/'
+        )
         await expect(detail.locator('[data-team-detail="branch"] code')).not.toBeEmpty()
+        // A card wider than the panel is cut; the open card's surface must fit it too.
+        const spill = await asker.evaluate((node) => {
+          const panelBox = node.closest('[data-testid="team-panel"]')!.getBoundingClientRect()
+          return node.getBoundingClientRect().right - panelBox.right
+        })
+        expect(spill).toBeLessThanOrEqual(0)
       }
     )
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))

@@ -14,60 +14,44 @@ import {
 } from '../../../../shared/usage-percentage-display'
 import {
   statusToneOfCi,
-  teamAgeText,
+  teamBranchParts,
   teamCiText,
-  teamHostText,
   teamLiveText,
-  teamModelText,
-  teamPhaseText,
   teamPrNumberText,
   teamUsageBarClass
 } from './team-card-text'
 import { teamAccountWindowsOf } from './team-account-usage'
 
-type Fact = { key: string; label: string; value: string; mono?: boolean }
+type Fact = { key: string; label: string; value: ReactNode }
 
-function factsOf(card: TeamMemberCard, now: number): Fact[] {
-  const model = teamModelText(card.model)
-  const step = [
-    card.flowPhase ? teamPhaseText(card.flowPhase) : null,
-    teamLiveText(card.liveAction, card.condition)
-  ]
-    .filter(Boolean)
-    .join(' · ')
+/** A branch cut in the middle: the owner prefix gives way first, the ticket part stays whole. */
+function BranchText({ branch }: { branch: string }): React.JSX.Element {
+  const { head, tail } = teamBranchParts(branch)
+  return (
+    <code title={branch} className="flex min-w-0 font-mono text-[11.5px]">
+      {head ? <span className="min-w-0 shrink-[100] truncate">{head}</span> : null}
+      <span className="min-w-0 truncate">{tail}</span>
+    </code>
+  )
+}
+
+// Why only these: the header above already shows model, phase, time in state and host (owner).
+function factsOf(card: TeamMemberCard): Fact[] {
+  const tool =
+    card.liveAction && card.liveAction.kind !== 'question'
+      ? teamLiveText(card.liveAction, card.condition)
+      : null
   const facts: (Fact | null)[] = [
     card.branch
       ? {
           key: 'branch',
           label: translate('teamPanel.card.detail.branch', 'Branch'),
-          value: card.branch,
-          mono: true
+          value: <BranchText branch={card.branch} />
         }
       : null,
-    model
-      ? {
-          key: 'model',
-          label: translate('teamPanel.card.detail.model', 'Model'),
-          value: model,
-          mono: true
-        }
-      : null,
-    step
-      ? { key: 'step', label: translate('teamPanel.card.detail.step', 'Step'), value: step }
-      : null,
-    card.since !== null
-      ? {
-          key: 'since',
-          label: translate('teamPanel.card.detail.since', 'In state'),
-          value: teamAgeText(card.since, now)
-        }
-      : null,
-    {
-      key: 'host',
-      label: translate('teamPanel.card.detail.host', 'Host'),
-      value: teamHostText(card.host),
-      mono: true
-    }
+    tool
+      ? { key: 'tool', label: translate('teamPanel.card.detail.tool', 'Last tool'), value: tool }
+      : null
   ]
   return facts.filter((fact): fact is Fact => fact !== null)
 }
@@ -90,9 +74,12 @@ function UsageBar({
   const clamped = clampUsedPercent(used)
   const left = resetsAt != null ? formatResetDuration(resetsAt - now) : null
   return (
-    <div data-team-usage={window} className="flex min-w-0 items-center gap-2">
-      <span className="w-9 shrink-0 text-muted-foreground">{label}</span>
-      <div className="h-[4px] min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+    <div data-team-usage={window} className="contents">
+      <span className="text-muted-foreground">{label}</span>
+      <div
+        data-team-usage-track=""
+        className="h-1 min-w-0 overflow-hidden rounded-full bg-foreground/10"
+      >
         {/* Why: fill follows the chosen percentage; the colour still signals how much is used. */}
         <div
           data-team-usage-fill=""
@@ -100,7 +87,7 @@ function UsageBar({
           style={{ width: `${getDisplayedUsagePercentage(clamped, display)}%` }}
         />
       </div>
-      <span className="shrink-0 tabular-nums text-muted-foreground">
+      <span className="text-right tabular-nums text-muted-foreground">
         {formatUsagePercentageLabel(clamped, display)}
         {left ? ` · ${left}` : ''}
       </span>
@@ -130,28 +117,35 @@ function AccountUsage({ account, now }: { account: TeamAccount; now: number }): 
   })
   const { session, weekly } = teamAccountWindowsOf(account, limits)
   return (
-    <div data-team-account="" className="flex min-w-0 flex-col gap-1">
-      <span className="truncate text-muted-foreground">{account.email}</span>
-      {session ? (
-        <UsageBar
-          window="session"
-          label={translate('teamPanel.card.usage.session', '5 h')}
-          used={session.usedPercent}
-          resetsAt={session.resetsAt}
-          now={now}
-          display={display}
-        />
-      ) : null}
-      {weekly ? (
-        <UsageBar
-          window="weekly"
-          label={translate('teamPanel.card.usage.weekly', 'Week')}
-          used={weekly.usedPercent}
-          resetsAt={weekly.resetsAt}
-          now={now}
-          display={display}
-        />
-      ) : null}
+    <div data-team-account="" className="flex min-w-0 flex-col gap-1.5">
+      <span data-team-account-label="" className="truncate text-muted-foreground">
+        {`${account.provider === 'codex' ? translate('teamPanel.card.usage.codex', 'Codex') : translate('teamPanel.card.usage.claude', 'Claude')} · ${account.email}`}
+      </span>
+      <div
+        data-team-usage-grid=""
+        className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5"
+      >
+        {session ? (
+          <UsageBar
+            window="session"
+            label={translate('teamPanel.card.usage.session', '5 h')}
+            used={session.usedPercent}
+            resetsAt={session.resetsAt}
+            now={now}
+            display={display}
+          />
+        ) : null}
+        {weekly ? (
+          <UsageBar
+            window="weekly"
+            label={translate('teamPanel.card.usage.weekly', 'Week')}
+            used={weekly.usedPercent}
+            resetsAt={weekly.resetsAt}
+            now={now}
+            display={display}
+          />
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -171,10 +165,7 @@ export function TeamMemberCardDetail({
   const ci = card.pr ? teamCiText(card.pr) : null
   const ciTone = card.pr ? statusToneOfCi(card.pr) : null
   return (
-    <div
-      data-team-card-detail=""
-      className="flex min-w-0 flex-col gap-2.5 bg-sidebar-accent px-3 pb-3 pt-1 text-xs"
-    >
+    <div data-team-card-detail="" className="flex min-w-0 flex-col gap-2.5 px-3 pb-3 pt-1 text-xs">
       {answer}
       {title ? (
         <p data-team-card-title="" className="break-words text-[13px] font-medium text-foreground">
@@ -182,16 +173,10 @@ export function TeamMemberCardDetail({
         </p>
       ) : null}
       <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
-        {factsOf(card, now).map((fact) => (
+        {factsOf(card).map((fact) => (
           <div key={fact.key} data-team-detail={fact.key} className="contents">
             <dt className="text-muted-foreground">{fact.label}</dt>
-            <dd className="min-w-0 truncate text-foreground">
-              {fact.mono ? (
-                <code className="font-mono text-[11.5px]">{fact.value}</code>
-              ) : (
-                fact.value
-              )}
-            </dd>
+            <dd className="min-w-0 truncate text-foreground">{fact.value}</dd>
           </div>
         ))}
       </dl>

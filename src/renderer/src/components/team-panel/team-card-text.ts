@@ -1,3 +1,4 @@
+import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
@@ -193,11 +194,18 @@ export function teamTicketBesideName(
   return identifier && !(showName && card.name === identifier) ? identifier : null
 }
 
-/** A usage bar's fill, by percent used: the status bar's thresholds and colours (tooltip.tsx barColor). */
+/** A usage bar's fill by percent used, in the status tokens: quiet, then warning, then a softened attention. */
 export function teamUsageBarClass(usedPercent: number): string {
-  // Why not import barColor: tooltip.tsx pulls the agent catalog into the panel.
   if (usedPercent < 60) {
-    return 'bg-muted-foreground/40'
+    return 'bg-status-idle'
   }
-  return usedPercent < 80 ? 'bg-yellow-500' : 'bg-red-500'
+  return usedPercent < 90 ? 'bg-status-warning' : 'bg-status-attention/70'
+}
+
+/** A branch split for a middle cut: `tail` holds the ticket part (or last segment) and stays whole longest. */
+export function teamBranchParts(branch: string): { head: string; tail: string } {
+  const ticket = ticketInText(branch)
+  const at = ticket ? branch.toUpperCase().lastIndexOf(ticket) : -1
+  const cut = at >= 0 ? at : branch.lastIndexOf('/') + 1
+  return { head: branch.slice(0, cut), tail: branch.slice(cut) }
 }

@@ -209,7 +209,11 @@ function memberCardOf(
     account: accountOf(agent, state),
     characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
-    branch: agent.worktree?.branch ?? (agent.remote ? null : (state.worktree?.branch ?? null)),
+    branch:
+      (agent.worktree?.branch ?? (agent.remote ? null : state.worktree?.branch))?.replace(
+        /^refs\/heads\//,
+        ''
+      ) ?? null,
     flowPhase: teamFlowPhaseOf(agent),
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),

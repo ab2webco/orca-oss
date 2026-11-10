@@ -9,7 +9,8 @@ import {
   teamAgeText,
   teamStatusGlyph,
   teamStatusTone,
-  teamUsageBarClass
+  teamUsageBarClass,
+  teamBranchParts
 } from './team-card-text'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -149,14 +150,31 @@ describe('card words', () => {
 })
 
 describe('teamUsageBarClass', () => {
-  it('colours a usage bar as the status bar does: quiet, then yellow from 60%, red from 80%', () => {
-    expect([0, 59, 60, 79, 80, 100].map(teamUsageBarClass)).toEqual([
-      'bg-muted-foreground/40',
-      'bg-muted-foreground/40',
-      'bg-yellow-500',
-      'bg-yellow-500',
-      'bg-red-500',
-      'bg-red-500'
+  it('stays quiet until the window runs low, warns, and turns to a softened attention near the end', () => {
+    expect([0, 59, 60, 89, 90, 100].map(teamUsageBarClass)).toEqual([
+      'bg-status-idle',
+      'bg-status-idle',
+      'bg-status-warning',
+      'bg-status-warning',
+      'bg-status-attention/70',
+      'bg-status-attention/70'
     ])
+  })
+})
+
+describe('teamBranchParts', () => {
+  it('keeps the part from the ticket on, so a cut drops the owner prefix first', () => {
+    expect(teamBranchParts('fabolivark/netsa-121-sso-sign-in')).toEqual({
+      head: 'fabolivark/',
+      tail: 'netsa-121-sso-sign-in'
+    })
+  })
+
+  it('keeps the last path segment when the branch names no ticket', () => {
+    expect(teamBranchParts('fabolivark/fix-panel')).toEqual({
+      head: 'fabolivark/',
+      tail: 'fix-panel'
+    })
+    expect(teamBranchParts('main')).toEqual({ head: '', tail: 'main' })
   })
 })

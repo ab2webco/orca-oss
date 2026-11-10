@@ -141,6 +141,20 @@ describe('teamCardsOf', () => {
     expect(card?.branch).toBe('netsa-121-auth')
   })
 
+  it('names the branch without its refs/heads/ prefix', () => {
+    const [card] =
+      cardsOf([
+        agent({
+          worktree: {
+            id: 'repo::/w/121',
+            branch: 'refs/heads/fabolivark/netsa-121-sso',
+            displayName: 'netsa-121'
+          }
+        })
+      ])?.members ?? []
+    expect(card?.branch).toBe('fabolivark/netsa-121-sso')
+  })
+
   it('works on the lead branch when it has no worktree of its own', () => {
     const [card] = cardsOf([agent()])?.members ?? []
     expect(card?.branch).toBe('main')

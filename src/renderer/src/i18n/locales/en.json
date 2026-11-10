@@ -17336,14 +17336,13 @@
       "inFolder": "In the folder, no worktree",
       "detail": {
         "branch": "Branch",
-        "model": "Model",
-        "step": "Step",
-        "since": "In state",
-        "host": "Host"
+        "tool": "Last tool"
       },
       "usage": {
         "session": "5 h",
-        "weekly": "Week"
+        "weekly": "Week",
+        "claude": "Claude",
+        "codex": "Codex"
       }
     },
     "activity": {
