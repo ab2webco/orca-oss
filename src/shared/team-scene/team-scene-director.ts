@@ -77,7 +77,12 @@ export type TeamSceneWorld = {
   sites: TeamSceneSiteView[]
   /** Finished builds of merged work, oldest first; they outlive their members. */
   trophies: { key: string; name: string }[]
+  layout: TeamSceneLayout
 }
+
+/** How a style seats its team: a row's length, and whether work keeps members at their desks. */
+export type TeamSceneLayout = { rowSize: number; workSeated: boolean }
+const GROUND_LAYOUT: TeamSceneLayout = { rowSize: 4, workSeated: false }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
   return {
@@ -95,7 +100,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     stations: [],
     rounds: createTeamSceneRounds(),
     sites: [],
-    trophies: []
+    trophies: [],
+    layout: GROUND_LAYOUT
   }
 }
 
@@ -126,9 +132,14 @@ function bodyAt(
   }
 }
 
-export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput): void {
+export function applyTeamSceneInput(
+  world: TeamSceneWorld,
+  input: TeamSceneInput,
+  layout: TeamSceneLayout = GROUND_LAYOUT
+): void {
   const events = teamSceneEventsBetween(world.last, input)
   world.last = input
+  world.layout = layout
   const { bodies } = world
   const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
   bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
@@ -139,7 +150,7 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
   }
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
-  const plan = seatPlanOf(input.members)
+  const plan = seatPlanOf(input.members, layout.rowSize)
   const byKey = new Map(input.members.map((m) => [m.key, m]))
   const seatedKeys = new Set(plan.seats.map((s) => s.key))
   for (const { key, spot } of plan.seats) {

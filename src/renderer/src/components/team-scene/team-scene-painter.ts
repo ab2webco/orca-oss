@@ -4,6 +4,7 @@ import type {
   TeamSceneSpot
 } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneSiteView } from '../../../../shared/team-scene/team-scene-sites'
+import type { TeamSceneLayout } from '../../../../shared/team-scene/team-scene-director'
 
 export type TeamScenePortraitSubject = Pick<
   TeamSceneActor,
@@ -36,6 +37,13 @@ export type TeamScenePainter = {
   headTop: (depth: number, height: number) => number
   /** Pixel's grid size when its bubbles are the game's thought cloud; glass otherwise. */
   cloudPixel?: number
+  /** How this style seats the team; absent, the ground layout of Figures and Pixel. */
+  layout?: TeamSceneLayout
+  /** The centre of an actor's emote when the style moves it off the head; null keeps it there. */
+  emoteAt?: (
+    a: TeamSceneActor,
+    f: Pick<TeamSceneFrame, 'width' | 'height' | 'stations'>
+  ) => { x: number; y: number } | null
   paint: (g: CanvasRenderingContext2D, frame: TeamSceneFrame) => void
   /** A card face `size` CSS px square, drawn as this style draws the same character. */
   portrait?: (g: CanvasRenderingContext2D, who: TeamScenePortraitSubject, size: number) => void

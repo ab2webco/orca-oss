@@ -16,24 +16,27 @@ export type TeamSceneSeat = { key: string; spot: TeamSceneSpot }
 
 export type TeamSceneSeatPlan = { seats: TeamSceneSeat[]; overflow: number }
 
-const SPACING = (LAST_X - FIRST_X) / (ROW_SIZE - 1)
-const columnX = (column: number): number => FIRST_X + SPACING * column
-// Why half a column: a front-row member standing right before a back-row seat hid it.
-const FRONT_SHIFT = SPACING / 2
-
 /** Needs-you first so the +N never hides someone waiting on the user. */
-export function seatPlanOf(members: readonly TeamSceneMemberInput[]): TeamSceneSeatPlan {
+export function seatPlanOf(
+  members: readonly TeamSceneMemberInput[],
+  /** Seats in one row before a second opens; a style with wide desks keeps a long row. */
+  rowSize = ROW_SIZE
+): TeamSceneSeatPlan {
+  const spacing = (LAST_X - FIRST_X) / (rowSize - 1)
+  const columnX = (column: number): number => FIRST_X + spacing * column
+  // Why half a column: a front-row member standing right before a back-row seat hid it.
+  const frontShift = spacing / 2
   const ordered = [
     ...members.filter((m) => m.activity === 'needsYou'),
     ...members.filter((m) => m.activity !== 'needsYou')
   ]
   const shown = ordered.slice(0, TEAM_SCENE_MAX_SEATS)
-  const twoRows = shown.length > ROW_SIZE
+  const twoRows = shown.length > rowSize
   const seats = shown.map((m, i) => ({
     key: m.key,
     spot: {
-      x: columnX(i % ROW_SIZE) + (twoRows && i >= ROW_SIZE ? FRONT_SHIFT : 0),
-      depth: twoRows ? (i < ROW_SIZE ? BACK_ROW : FRONT_ROW) : SINGLE_ROW
+      x: columnX(i % rowSize) + (twoRows && i >= rowSize ? frontShift : 0),
+      depth: twoRows ? (i < rowSize ? BACK_ROW : FRONT_ROW) : SINGLE_ROW
     }
   }))
   return { seats, overflow: ordered.length - shown.length }

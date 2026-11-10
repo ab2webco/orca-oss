@@ -10,6 +10,7 @@ import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { OFFICE_NOTE } from './team-scene-office-builds'
+import { seatPlanOf } from '../../../../shared/team-scene/team-scene-seats'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
@@ -468,5 +469,133 @@ describe('createImagePainter office builds', () => {
     expect(paint(false)).toContain('#0f1826')
     expect(paint(true)).not.toContain('#0f1826')
     expect(paint(true)).toContain(COLORS.attention)
+  })
+})
+
+describe('createImagePainter office back view', () => {
+  const screen = { x: 172, y: 24, width: 56, height: 36 }
+  const spot = { x: 0.5, depth: 1 }
+  const px = 76 / 128
+  const officeStyle = style({
+    props: { station: 'desk.png', stationFeet: { x: 120, y: 120 }, stationScreen: screen }
+  })
+  const paint = (actors: TeamSceneActor[], back: { chairEnd: number } | null, sites = []) => {
+    const painter = createImagePainter({
+      art: { style: officeStyle, images: IMAGES },
+      colors: COLORS,
+      builds: 'office',
+      back
+    })
+    const r = recordingContext()
+    painter.paint(r.g, frame({ actors, stations: [spot], sites }))
+    return r
+  }
+  const memberSprites = (calls: RecordedCall[]) =>
+    sprites(calls).filter(
+      (c) => c.args[0] === IMAGES.get('m1.png') || c.args[0] === IMAGES.get('m2.png')
+    )
+  const seated = (pose: TeamSceneActor['pose']) =>
+    actor('m', { pose, x: spot.x, depth: spot.depth })
+
+  it('draws a seated member from behind, not from its sheet, and a walking one from its sheet', () => {
+    const back = { chairEnd: 144 }
+    for (const pose of ['work', 'idle', 'raise', 'done'] as const) {
+      expect(memberSprites(paint([seated(pose)], back).calls)).toHaveLength(0)
+    }
+    expect(memberSprites(paint([seated('walk')], back).calls)).toHaveLength(1)
+    expect(memberSprites(paint([seated('work')], null).calls)).toHaveLength(1)
+  })
+
+  it("drops the art's side chair and centres the screen on the seat", () => {
+    const { calls } = paint([seated('work')], { chairEnd: 144 })
+    const desk = calls.find((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))!
+    expect(desk.args[1]).toBe(144)
+    expect(desk.args[5]).toBeCloseTo(200 - (200 - 144) * px)
+    const lit = calls.find((c) => c.name === 'fillRect' && c.fillStyle === '#0f1826')!
+    expect((lit.args[0] as number) + (lit.args[2] as number) / 2).toBeCloseTo(200)
+  })
+
+  it('seats the back view in one long row of desks that keep members at them', () => {
+    const at = (back: { chairEnd: number } | null) =>
+      createImagePainter({
+        art: { style: officeStyle, images: IMAGES },
+        colors: COLORS,
+        builds: 'office',
+        back
+      }).layout
+    expect(at({ chairEnd: 144 })).toEqual({ rowSize: 5, workSeated: true })
+    expect(at(null)).toBeUndefined()
+  })
+
+  it('keeps five desks apart at the narrowest panel, so no desk covers another', () => {
+    const plan = seatPlanOf(
+      Array.from({ length: 5 }, (_, i) => ({
+        key: `m${i}`,
+        name: `m${i}`,
+        characterKey: null,
+        activity: 'working' as const,
+        reportId: null,
+        mergedPr: null,
+        site: { stage: 0 as const, broken: false }
+      })),
+      5
+    )
+    // Orca's Office people stand 60 px tall, as office/native.json draws them.
+    const real = (sheets: string[]) => ({ ...role(sheets), size: 60 })
+    const roles = { lead: real(['lead.png']), member: real(['m1.png', 'm2.png']) }
+    const painter = createImagePainter({
+      art: { style: { ...officeStyle, roles }, images: IMAGES },
+      colors: COLORS,
+      builds: null,
+      back: { chairEnd: 144 }
+    })
+    const r = recordingContext()
+    painter.paint(r.g, frame({ width: 390, actors: [], stations: plan.seats.map((s) => s.spot) }))
+    const desks = r.calls
+      .filter((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))
+      .map((c) => [c.args[5] as number, (c.args[5] as number) + (c.args[7] as number)])
+      .sort((p, q) => p[0]! - q[0]!)
+    expect(desks).toHaveLength(5)
+    for (let i = 1; i < desks.length; i++) {
+      expect(desks[i]![0]).toBeGreaterThan(desks[i - 1]![1]!)
+    }
+  })
+
+  it("says where a sitter's emote is drawn, so its name tag can hang over it", () => {
+    const asking = actor('m', { pose: 'raise', x: spot.x, depth: spot.depth, emote: 'alert' })
+    const painter = createImagePainter({
+      art: { style: officeStyle, images: IMAGES },
+      colors: COLORS,
+      builds: 'office',
+      back: { chairEnd: 144 }
+    })
+    const r = recordingContext()
+    const f = frame({ actors: [asking], stations: [spot] })
+    painter.paint(r.g, f)
+    const drawn = r.calls.findLast((c) => c.name === 'translate')!
+    expect(painter.emoteAt?.(asking, f)).toEqual({ x: drawn.args[0], y: drawn.args[1] })
+    expect(painter.emoteAt?.({ ...asking, pose: 'walk' }, f)).toBeNull()
+  })
+
+  it("hangs a sitter's emote beside its monitor, never over the screen", () => {
+    const asking = actor('m', { pose: 'raise', x: spot.x, depth: spot.depth, emote: 'alert' })
+    const { calls } = paint([asking], { chairEnd: 144 })
+    const emote = calls.findLast((c) => c.name === 'translate')!
+    const screenLeft = 200 - (screen.width / 2) * px
+    expect((emote.args[0] as number) + 7).toBeLessThan(screenLeft)
+  })
+
+  it('keeps the red screen of failing CI behind a member seen from behind', () => {
+    const site = {
+      key: 'm',
+      spot: { x: spot.x + 0.055, depth: 1 },
+      stage: 3 as const,
+      broken: true
+    }
+    const fills = paint([seated('work')], { chairEnd: 144 }, [site] as never[])
+      .calls.filter((c) => c.name === 'fillRect')
+      .map((c) => c.fillStyle)
+    expect(fills).toContain('#2a1012')
+    expect(fills).toContain(COLORS.attention)
   })
 })

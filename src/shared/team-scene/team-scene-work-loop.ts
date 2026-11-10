@@ -47,7 +47,8 @@ function stepWorking(world: TeamSceneWorld, body: TeamSceneBody, width: number):
     body.target = body.home
     if (world.t - work.at >= BUILD_SECONDS) {
       world.effects.push({ kind: 'burst', key: body.key, reason: 'build' })
-      go(world, body, 'fetch')
+      // Why: at a desk the work is typing; walking off to a tray between strikes read as a bug.
+      go(world, body, world.layout.workSeated ? 'build' : 'fetch')
     }
   } else {
     go(world, body, 'build')

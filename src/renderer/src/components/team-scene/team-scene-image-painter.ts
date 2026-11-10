@@ -17,6 +17,14 @@ import {
 import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import { drawCastleBuilds } from './team-scene-castle-sites'
 import { drawOfficeBuilds } from './team-scene-office-builds'
+import {
+  drawOfficeBack,
+  createOfficeBackLooks,
+  deskSeatXOf,
+  OFFICE_BACK_LAYOUT,
+  officeBackEmoteAt,
+  type OfficeBackSeat
+} from './team-scene-office-back'
 import { drawStationScreen, stationScreenStateOf } from './team-scene-station-screen'
 
 type RoleArt = OrchestratorGameSceneNativeStyle['roles']['lead']
@@ -137,6 +145,8 @@ export function createImagePainter(args: {
   colors: TeamSceneStatusColors
   /** What each working member builds beside its station; null draws the stations alone. */
   builds: 'castle' | 'office' | null
+  /** Seated members drawn from behind at a desk whose own chair is dropped; null keeps the art's. */
+  back?: OfficeBackSeat | null
 }): TeamScenePainter {
   const { style, images } = args.art
   const { colors } = args
@@ -160,19 +170,31 @@ export function createImagePainter(args: {
   const sheetPxAt = (art: RoleArt, depth: number): number =>
     (art.size / art.frame.height) * depthScale(depth)
 
+  const back = args.back ?? null
+  const screen = style.props?.stationScreen
+  const seatX = (prop: TeamSceneArtImage): number => deskSeatXOf(prop, style.props, back)
+  const station = style.props?.station
+  const monitorFromSeat = (depth: number): number =>
+    station && screen
+      ? (screen.x + screen.width / 2 - seatX(image(station))) * sheetPxAt(style.roles.member, depth)
+      : 0
+
   const drawStations = (g: CanvasRenderingContext2D, f: TeamSceneFrame): void => {
-    const station = style.props?.station
     if (station === undefined) {
       return
     }
     const prop = image(station)
-    const feet = style.props?.stationFeet ?? { x: prop.width / 2, y: prop.height }
-    const screen = style.props?.stationScreen
+    const feet = { x: seatX(prop), y: style.props?.stationFeet?.y ?? prop.height }
     for (const spot of f.stations) {
       const px = sheetPxAt(style.roles.member, spot.depth)
       const left = spot.x * f.width - feet.x * px
       const top = feetY(spot.depth, f.height) - feet.y * px
-      g.drawImage(prop, left, top, prop.width * px, prop.height * px)
+      if (back) {
+        const [from, sw, h] = [back.chairEnd, prop.width - back.chairEnd, prop.height]
+        g.drawImage(prop, from, 0, sw, h, left + from * px, top, sw * px, h * px)
+      } else {
+        g.drawImage(prop, left, top, prop.width * px, prop.height * px)
+      }
       if (screen) {
         const worker = f.actors.find(
           (a) =>
@@ -197,6 +219,7 @@ export function createImagePainter(args: {
 
   const sheetOf = (art: RoleArt, a: TeamScenePortraitSubject): TeamSceneArtImage =>
     image(art.sheets[figureSeedOf(a.characterKey ?? a.key) % art.sheets.length]!)
+  const backLookOf = createOfficeBackLooks()
 
   // Why these fractions: Quest's figures stand about 0.75 of a frame tall, head in the top 0.44.
   const portrait = (g: CanvasRenderingContext2D, a: TeamScenePortraitSubject, size: number) => {
@@ -221,6 +244,13 @@ export function createImagePainter(args: {
     )
   }
 
+  const seatedAt = (a: TeamSceneActor, f: Pick<TeamSceneFrame, 'width' | 'stations'>): boolean =>
+    a.pose !== 'walk' && f.stations.some((spot) => Math.abs((a.x - spot.x) * f.width) < SEAT_PX)
+  const emoteAt: NonNullable<TeamScenePainter['emoteAt']> = (a, f) =>
+    back && a.role === 'member' && seatedAt(a, f)
+      ? officeBackEmoteAt(a, a.x * f.width, feetY(a.depth, f.height), sheetPxAt(roleOf(a), a.depth))
+      : null
+
   const drawActor = (g: CanvasRenderingContext2D, a: TeamSceneActor, f: TeamSceneFrame): void => {
     const art = roleOf(a)
     const px = sheetPxAt(art, a.depth)
@@ -236,8 +266,15 @@ export function createImagePainter(args: {
     g.fill()
     g.globalAlpha = 1
     // Why: a station is drawn one way, so whoever sits at it faces the way the art does.
-    const seated =
-      a.pose !== 'walk' && f.stations.some((spot) => Math.abs((a.x - spot.x) * f.width) < SEAT_PX)
+    const seated = seatedAt(a, f)
+    const beside = emoteAt(a, f)
+    if (beside) {
+      drawOfficeBack(g, x, y, px, backLookOf(sheetOf(art, a), art.frame), a, f.t + a.x * 7)
+      if (a.emote) {
+        drawSceneEmote(g, beside.x, beside.y, a.emote, colors)
+      }
+      return
+    }
     const [row, column] = frameOf(art, a, seated, f.t, px)
     g.save()
     g.translate(x, y - a.jump)
@@ -261,6 +298,7 @@ export function createImagePainter(args: {
 
   return {
     height: TEAM_SCENE_ART_HEIGHT,
+    ...(back ? { layout: OFFICE_BACK_LAYOUT, emoteAt } : {}),
     portrait,
     headTop: (depth, h) => {
       const art = style.roles.lead
@@ -273,7 +311,7 @@ export function createImagePainter(args: {
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
       } else if (args.builds === 'office') {
-        drawOfficeBuilds(g, f, feetY, colors.attention)
+        drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat)
       }
       drawStations(g, f)
       for (const a of f.actors) {

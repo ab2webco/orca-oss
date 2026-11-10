@@ -7,6 +7,7 @@ import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
 import { loadTeamSceneArt } from './team-scene-art-load'
 import { createImagePainter } from './team-scene-image-painter'
+import { OFFICE_BACK_SEAT } from './team-scene-office-back'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import type { TeamScenePainter } from './team-scene-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
@@ -184,6 +185,23 @@ describe('useTeamScenePainter', () => {
     await render('office', { id: 'file:.orca/scenes/koombea.json', extensions: [] })
     expect(seen.at(-1)).toBe(IMAGE)
     expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+  })
+
+  it("seats members from behind only at Orca's own Office desk", async () => {
+    const backOf = () => vi.mocked(createImagePainter).mock.calls.at(-1)![0].back
+    await render('office', QUEST)
+    expect(backOf()).toEqual(OFFICE_BACK_SEAT)
+    await render('figures', QUEST)
+    expect(backOf()).toBeNull()
+    const id = 'file:mine.json'
+    const own = {
+      id,
+      pluginId: 'plugin',
+      definition: { native: { office: teamSceneQuestArtOf('office') } }
+    } as unknown as OrchestratorGameSceneExtension
+    await render('office', { id, extensions: [own] })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'scene' })
+    expect(backOf()).toBeNull()
   })
 
   it('keeps its painter across a poll that repeats the same scene', async () => {

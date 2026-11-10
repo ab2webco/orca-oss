@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { TeamSceneSiteStage } from '../../../../shared/team-scene/team-scene-sites'
+import {
+  SITE_FROM_SEAT_X,
+  type TeamSceneSiteStage
+} from '../../../../shared/team-scene/team-scene-sites'
 import {
   drawOfficeBoard,
+  drawOfficeBuilds,
   drawOfficePlaques,
   drawOfficeTray,
   OFFICE_NOTE,
@@ -49,6 +53,30 @@ describe('office builds', () => {
     const r = recordingContext()
     drawOfficeTray(r.g, 60, 150, 1)
     expect(r.calls.filter((c) => c.name === 'fillRect').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('hangs each board over its desk monitor, however far the monitor sits from the seat', () => {
+    const site = {
+      key: 'm',
+      spot: { x: 0.5 + SITE_FROM_SEAT_X, depth: 1 },
+      stage: 1 as const,
+      broken: false
+    }
+    const boardX = (monitor: number) => {
+      const r = recordingContext()
+      const f = { width: 400, height: 176, t: 0, sites: [site], trophies: [] }
+      drawOfficeBuilds(
+        r.g,
+        f,
+        () => 150,
+        ATTENTION,
+        () => monitor
+      )
+      // The tray is translated first, then the board.
+      return r.calls.filter((c) => c.name === 'translate')[1]!.args[0] as number
+    }
+    expect(boardX(0)).toBeCloseTo(200)
+    expect(boardX(30)).toBeCloseTo(230)
   })
 
   it('hangs one framed star per trophy along the top', () => {

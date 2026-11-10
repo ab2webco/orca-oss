@@ -18,6 +18,7 @@ import {
   type TeamSceneArtHost
 } from './team-scene-art-host'
 import { createImagePainter, type TeamSceneImageArt } from './team-scene-image-painter'
+import { OFFICE_BACK_SEAT } from './team-scene-office-back'
 import type { TeamScenePainter } from './team-scene-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import { teamScenePixelSceneOf } from './team-scene-pixel-scene'
@@ -171,7 +172,9 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
       return createPixelPainter({ ...pixelScene, colors })
     }
     const builds = artStyle === 'figures' ? 'castle' : 'office'
-    return image ? createImagePainter({ art: image, colors, builds }) : null
-  }, [artStyle, image, pixelScene, colors])
+    // Why only Orca's own desk: the back view knows where its art's side chair ends.
+    const back = artStyle === 'office' && request?.own === false ? OFFICE_BACK_SEAT : null
+    return image ? createImagePainter({ art: image, colors, builds, back }) : null
+  }, [artStyle, image, pixelScene, colors, request])
   return { drawn: art.drawn, art: art.art, defaultArt: art.defaultArt, painter }
 }

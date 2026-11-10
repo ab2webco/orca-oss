@@ -68,6 +68,29 @@ function scene(members: TeamSceneMemberInput[]): TeamSceneWorld {
 }
 
 describe('team scene lead rounds', () => {
+  it('stands in the gap beside a member, never on the next seat of a long row', () => {
+    const world = createTeamSceneWorld()
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    applyTeamSceneInput(world, input(keys.map((k) => member(k))), {
+      rowSize: 5,
+      workSeated: true
+    })
+    const seats = world.stations.map((s) => s.x)
+    const gap = Math.min(...seats.slice(1).map((x, i) => x - seats[i]!))
+    let visits = 0
+    let closest = Infinity
+    for (let t = 0; t < 40; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      if (world.rounds.stage === 'atMember') {
+        visits += 1
+        const x = world.bodies.get('lead')!.x
+        closest = Math.min(closest, ...seats.map((s) => Math.abs(s - x)))
+      }
+    }
+    expect(visits).toBeGreaterThan(0)
+    expect(closest).toBeGreaterThanOrEqual(gap / 2 - 0.001)
+  })
+
   it('walks to a working member, hands it work, and walks back', () => {
     const world = scene([member('a')])
     const home = actor(world, 'lead').x

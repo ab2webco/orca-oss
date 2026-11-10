@@ -79,6 +79,36 @@ describe('team scene director', () => {
     }
   })
 
+  it('keeps each working member typing at its own desk when the style works seated', () => {
+    const world = createTeamSceneWorld()
+    const keys = ['NETSA-121', 'NETSA-222', 'NETSA-80']
+    applyTeamSceneInput(
+      world,
+      input(keys.map((k) => member(k, { site: { stage: 1, broken: false } }))),
+      { rowSize: 5, workSeated: true }
+    )
+    const homes = keys.map((k) => world.bodies.get(k)!.home.x)
+    expect(new Set(homes).size).toBe(3)
+    let strayed = false
+    runUntil(
+      world,
+      () => {
+        for (const k of keys) {
+          const a = actor(world, k)!
+          strayed ||= a.x !== world.bodies.get(k)!.home.x || a.pose !== 'work'
+        }
+        return false
+      },
+      20
+    )
+    expect(strayed).toBe(false)
+  })
+
+  it('still fetches between strikes where the style builds on the ground', () => {
+    const world = seated(['a'])
+    expect(runUntil(world, () => actor(world, 'a')?.pose === 'walk', 10)).toBe(true)
+  })
+
   it('acts out each member state at its seat', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(

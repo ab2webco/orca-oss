@@ -109,7 +109,10 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
   const member = world.bodies.get(rounds.member!)!
   const side = member.home.x < LEAD_SPOT.x ? 1 : -1
   if (rounds.stage === 'toMember') {
-    lead.target = { x: member.home.x + side * BESIDE_X, depth: member.home.depth + 0.04 }
+    // Why halfway at most: past it the lead stands on the next seat, two to one desk.
+    const next = world.stations.map((s) => (s.x - member.home.x) * side).filter((d) => d > 0.001)
+    const beside = Math.min(BESIDE_X, ...next.map((d) => d / 2))
+    lead.target = { x: member.home.x + side * beside, depth: member.home.depth + 0.04 }
     if (!near(lead, width)) {
       return
     }

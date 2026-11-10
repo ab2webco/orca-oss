@@ -29,7 +29,6 @@ const NOTES: Record<TeamSceneSiteStage, [number, number, number]> = {
 }
 // Above the monitor, so the desk and its sitter never cover it.
 const ABOVE_DESK_PX = 58
-const SEAT_TO_BOARD_PX = 22
 const BOARD_SCALE = 1.2
 
 function drawStar(g: CanvasRenderingContext2D, x: number, y: number, r: number): void {
@@ -117,7 +116,9 @@ export function drawOfficeBuilds(
   g: CanvasRenderingContext2D,
   f: Pick<TeamSceneFrame, 'width' | 'height' | 't' | 'sites' | 'trophies'>,
   feetY: (depth: number, h: number) => number,
-  attention: string
+  attention: string,
+  /** Px from a seat to its desk's monitor at that depth, so the board hangs over the screen. */
+  monitorFromSeat: (depth: number) => number
 ): void {
   drawOfficePlaques(g, f.trophies.length, f.width, 4)
   for (const site of f.sites) {
@@ -125,7 +126,7 @@ export function drawOfficeBuilds(
     const y = feetY(site.spot.depth, f.height)
     const seat = (site.spot.x - SITE_FROM_SEAT_X) * f.width
     drawOfficeTray(g, seat - PILE_FROM_SEAT_X * f.width, y, s)
-    const boardX = seat + SEAT_TO_BOARD_PX * s
+    const boardX = seat + monitorFromSeat(site.spot.depth)
     drawOfficeBoard(g, boardX, y - ABOVE_DESK_PX * s, s * BOARD_SCALE, site, f.t, attention)
   }
 }

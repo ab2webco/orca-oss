@@ -161,6 +161,19 @@ describe('TeamSceneCanvas', () => {
     expect(leadX()).toBeLessThan(0.5)
   })
 
+  it("seats the team as the painter's style lays it out", () => {
+    reduced = true
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    const ground = painter()
+    render(<TeamSceneCanvas input={input(keys)} painter={ground.value} leadLine={null} />)
+    expect(new Set(ground.frames.at(-1)!.stations.map((s) => s.depth)).size).toBe(2)
+    const desks = painter()
+    const seated = { ...desks.value, layout: { rowSize: 5, workSeated: true } }
+    render(<TeamSceneCanvas input={input(keys)} painter={seated} leadLine={null} />)
+    expect(new Set(desks.frames.at(-1)!.stations.map((s) => s.depth)).size).toBe(1)
+  })
+
   it('paints the settled end state once per change under reduced motion', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
@@ -198,6 +211,21 @@ describe('TeamSceneCanvas', () => {
     ])
     // Above the head and its alert mark, never over the speaker's face.
     expect(Number.parseFloat((tags[0] as HTMLElement).style.top)).toBeLessThan(100 - 16)
+  })
+
+  it('hangs the name tag over the alert wherever the style draws it', () => {
+    reduced = true
+    const asking: TeamSceneInput = {
+      ...input([]),
+      members: [{ ...member('h'), name: 'Herrero', activity: 'needsYou' }]
+    }
+    const beside = { ...painter().value, emoteAt: () => ({ x: 150, y: 120 }) }
+    render(<TeamSceneCanvas input={asking} painter={beside} leadLine={null} />)
+    act(() => {})
+    const tag = host.querySelector('[data-scene-speaker="h"]') as HTMLElement
+    expect(Number.parseFloat(tag.style.left)).toBe(150)
+    expect(Number.parseFloat(tag.style.top)).toBeLessThan(120 - 7 - 16)
+    expect(Number.parseFloat(tag.style.top)).toBeGreaterThan(120 - 40)
   })
 
   it("draws Pixel's thought cloud instead of the glass bubble", () => {

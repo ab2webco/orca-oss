@@ -34,6 +34,8 @@ type TeamSceneAsker = { key: string; name: string; x: number; top: number }
 
 // Why: V28 names the asker in a tag above its alert mark, which sits about 20px over the head.
 const ASKER_LIFT = 38
+// From a moved mark's centre: its 7px radius, a 2px gap, then the 16px tag.
+const MARK_LIFT = 25
 const ASKER_EDGE = 32
 // How far a speaker moves before its bubble follows.
 const ANCHOR_STEP_PX = 4
@@ -88,12 +90,17 @@ export function TeamSceneCanvas({
       )
       const askers = actors
         .filter((a) => a.role === 'member' && a.emote === 'alert')
-        .map((a) => ({
-          key: a.key,
-          name: a.name,
-          x: Math.round(a.x * width),
-          top: Math.round(painter.headTop(a.depth, height) - ASKER_LIFT)
-        }))
+        .map((a) => {
+          const mark = painter.emoteAt?.(a, { width, height, stations: world.stations })
+          return {
+            key: a.key,
+            name: a.name,
+            x: Math.round(mark ? mark.x : a.x * width),
+            top: Math.round(
+              mark ? mark.y - MARK_LIFT : painter.headTop(a.depth, height) - ASKER_LIFT
+            )
+          }
+        })
       const leadAttends = teamSceneLeadAttends(world)
       // Why keyed, and by a few px: the overlay re-renders only when a line, size or speaker moves,
       // so a walking lead's bubble follows it without a render every frame.
@@ -124,7 +131,7 @@ export function TeamSceneCanvas({
 
   useEffect(() => {
     worldRef.current ??= createTeamSceneWorld()
-    applyTeamSceneInput(worldRef.current, input)
+    applyTeamSceneInput(worldRef.current, input, painter.layout)
     if (!reducedMotion) {
       return
     }
@@ -140,7 +147,7 @@ export function TeamSceneCanvas({
       paint(0)
     }, ADVISOR_BUBBLE_MS)
     return () => window.clearTimeout(timer)
-  }, [input, reducedMotion, paint])
+  }, [input, reducedMotion, paint, painter.layout])
 
   useEffect(() => {
     const canvas = canvasRef.current
