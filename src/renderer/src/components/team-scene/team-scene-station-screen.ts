@@ -1,15 +1,17 @@
 import type { TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
 
 // V28's desk screens (drawDesk): code while working, amber on a question, green once done.
-type ScreenState = 'code' | 'ask' | 'ok' | 'off'
+// 'fail': the worker's PR has red CI; its lines take the theme's attention tone.
+type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail'
 
 const BACKGROUND: Record<ScreenState, string> = {
   code: '#0f1826',
   ask: '#3a2d10',
   ok: '#10352a',
-  off: '#0a0c10'
+  off: '#0a0c10',
+  fail: '#2a1012'
 }
-const LINE: Record<Exclude<ScreenState, 'off'>, string> = {
+const LINE: Record<Exclude<ScreenState, 'off' | 'fail'>, string> = {
   code: '#7fb4ff',
   ask: '#ffd24a',
   ok: '#4ade80'
@@ -24,7 +26,10 @@ const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
 }
 
 /** The screen of a desk whose worker holds `pose`; null when nobody sits there. */
-export function stationScreenStateOf(pose: TeamScenePose | null): ScreenState {
+export function stationScreenStateOf(pose: TeamScenePose | null, failing = false): ScreenState {
+  if (failing) {
+    return 'fail'
+  }
   return (pose && SCREEN_OF[pose]) ?? 'off'
 }
 
@@ -33,7 +38,8 @@ export function drawStationScreen(
   g: CanvasRenderingContext2D,
   rect: { x: number; y: number; width: number; height: number },
   state: ScreenState,
-  t: number
+  t: number,
+  attention = '#e5484d'
 ): void {
   g.fillStyle = BACKGROUND[state]
   g.fillRect(rect.x, rect.y, rect.width, rect.height)
@@ -44,9 +50,10 @@ export function drawStationScreen(
   const ux = rect.width / 28
   const uy = rect.height / 18
   const step = state === 'code' ? Math.floor(t * 3) : 0
+  const line = state === 'fail' ? attention : LINE[state]
   for (let i = 0; i < LINES; i++) {
     const n = (step + i * 3) % 7
-    g.fillStyle = i % 2 ? LINE[state] : TEXT
+    g.fillStyle = i % 2 ? line : TEXT
     g.fillRect(
       rect.x + (1.5 + (n % 3) * 2) * ux,
       rect.y + (1.5 + i * 3.3) * uy,

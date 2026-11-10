@@ -14,7 +14,9 @@ import {
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
+import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import { drawCastleBuilds } from './team-scene-castle-sites'
+import { drawOfficeBuilds } from './team-scene-office-builds'
 import { drawStationScreen, stationScreenStateOf } from './team-scene-station-screen'
 
 type RoleArt = OrchestratorGameSceneNativeStyle['roles']['lead']
@@ -134,7 +136,7 @@ export function createImagePainter(args: {
   art: TeamSceneImageArt
   colors: TeamSceneStatusColors
   /** What each working member builds beside its station; null draws the stations alone. */
-  builds: 'castle' | null
+  builds: 'castle' | 'office' | null
 }): TeamScenePainter {
   const { style, images } = args.art
   const { colors } = args
@@ -182,7 +184,13 @@ export function createImagePainter(args: {
           width: screen.width * px,
           height: screen.height * px
         }
-        drawStationScreen(g, rect, stationScreenStateOf(worker?.pose ?? null), f.t)
+        // Why by spot: a site sits a fixed offset right of its seat (siteSpotOf).
+        const failing = f.sites.some(
+          (site) =>
+            site.broken && Math.abs((site.spot.x - SITE_FROM_SEAT_X - spot.x) * f.width) < SEAT_PX
+        )
+        const state = stationScreenStateOf(worker?.pose ?? null, failing)
+        drawStationScreen(g, rect, state, f.t, colors.attention)
       }
     }
   }
@@ -264,6 +272,8 @@ export function createImagePainter(args: {
       effects.start(f.effects, f.actors, h)
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
+      } else if (args.builds === 'office') {
+        drawOfficeBuilds(g, f, feetY, colors.attention)
       }
       drawStations(g, f)
       for (const a of f.actors) {

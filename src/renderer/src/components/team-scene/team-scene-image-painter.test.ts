@@ -9,6 +9,7 @@ import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-p
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
+import { OFFICE_NOTE } from './team-scene-office-builds'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
@@ -432,5 +433,40 @@ describe('createImagePainter builds', () => {
         ]
       })
     ).toBe(2)
+  })
+})
+
+describe('createImagePainter office builds', () => {
+  const screen = { x: 170, y: 20, width: 60, height: 40 }
+  const spot = { x: 0.5, depth: 1 }
+  const site = (broken: boolean) => ({
+    key: 'm',
+    spot: { x: spot.x + 0.055, depth: spot.depth },
+    stage: 3 as const,
+    broken
+  })
+  const paint = (broken: boolean) => {
+    const painter = createImagePainter({
+      art: {
+        style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+        images: IMAGES
+      },
+      colors: COLORS,
+      builds: 'office'
+    })
+    const { g, calls } = recordingContext()
+    const actors = [actor('m', { pose: 'work', x: spot.x, depth: spot.depth })]
+    painter.paint(g, frame({ actors, stations: [spot], sites: [site(broken)] }))
+    return calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+  }
+
+  it('pins a task board above each desk in the Office art', () => {
+    expect(paint(false)).toContain(OFFICE_NOTE)
+  })
+
+  it("turns the desk's screen to the failure while its CI is red", () => {
+    expect(paint(false)).toContain('#0f1826')
+    expect(paint(true)).not.toContain('#0f1826')
+    expect(paint(true)).toContain(COLORS.attention)
   })
 })
