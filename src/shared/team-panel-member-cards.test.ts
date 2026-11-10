@@ -396,6 +396,13 @@ describe('teamCardsOf', () => {
     expect(spanish?.members[0]?.name).toBe('Arturo')
   })
 
+  it('keeps a member name that only mentions its ticket after the name', () => {
+    const long = 'Kaelthas Sunstrider Keeper of the Very Long README Hook ORCA-957'
+    const [card] = cardsOf([agent({ displayName: long })])?.members ?? []
+    expect(card?.name).toBe(long)
+    expect(card?.ticket?.identifier).toBe('ORCA-957')
+  })
+
   it('falls back to the ticket once, as the sidebar does, when the roster has no name to give', () => {
     const [card] =
       cardsOf([agent({ displayName: 'NETSA-207 Replace marketing-site' })], {

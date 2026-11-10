@@ -398,9 +398,15 @@ test('the Team panel draws the live scene beside a member opened under its heade
     await expect(sceneCanvasIn(scene)).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)
     // V28 names the member who asks over its alert (ORCA-1097); ORCA-14 has the open question.
+    // Launched as a bare ticket, it carries a roster name (V30), the same one its card shows.
     const askerTag = scene.locator('[data-scene-speaker]')
     await expect(askerTag).toHaveCount(1, { timeout: 30_000 })
-    await expect(askerTag).toContainText('ORCA-14')
+    await expect(askerTag).toHaveText(/\S/)
+    const askerName = (await askerTag.textContent())!.trim()
+    expect(askerName).not.toContain('ORCA-14')
+    await expect(
+      panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-14' })
+    ).toContainText(askerName)
 
     for (const language of ['en', 'es'] as const) {
       await orcaPage.evaluate(

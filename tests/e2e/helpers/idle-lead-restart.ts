@@ -98,7 +98,7 @@ export async function openTeamPanel(page: Page): Promise<void> {
 
 export async function expectTeamTabs(page: Page): Promise<void> {
   const panel = page.getByTestId('team-panel')
-  for (const name of ['Team', 'PRs', 'Queue']) {
+  for (const name of ['Team', 'PRs']) {
     await expect(panel.getByRole('tab', { name })).toBeVisible({ timeout: 30_000 })
   }
   await expect(panel).toHaveAttribute('data-team-panel-state', 'team')

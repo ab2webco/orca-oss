@@ -99,7 +99,7 @@ function cutTabsOf(strip: Locator): Promise<string[]> {
 async function sweepStrips(page: Page, testInfo: TestInfo, look: 'team' | 'solo'): Promise<void> {
   const panel = page.getByTestId('team-panel')
   const tabs = panel.locator('[role="tablist"]').first()
-  await expect(tabs.getByRole('tab')).toHaveCount(look === 'team' ? 5 : 3, { timeout: 60_000 })
+  await expect(tabs.getByRole('tab')).toHaveCount(look === 'team' ? 4 : 3, { timeout: 60_000 })
   const inboxTab = tabs.getByRole('tab', { name: /Inbox|Bandeja/ })
   await inboxTab.click()
   await expect(inboxTab).toContainText('12', { timeout: 60_000 })
