@@ -7,7 +7,7 @@ import WorktreeContextMenu from './WorktreeContextMenu'
 import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
 import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
 import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
-import { WorktreeCardRowContent } from './worktree-card-row-content'
+import { WorktreeCardRowContent, WorktreeCardTeamChildren } from './worktree-card-row-content'
 import { useSidebarTeamCard } from './sidebar-team-roster'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
@@ -194,6 +194,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         </div>
       )}
       {parentCardBodyWithHoverDetails}
+      {/* Why outside the hover trigger: pointing at a member must open only that member's card. */}
+      {teamCard ? <WorktreeCardTeamChildren card={card} /> : null}
 
       {/* Why not for a team card: its content draws the children as V30's child rows. */}
       {newCardStyle && lineageChildren && !team.row ? (

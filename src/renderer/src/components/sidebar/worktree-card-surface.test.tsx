@@ -6,18 +6,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 const team = vi.hoisted(() => ({ value: { row: null as unknown, child: false } }))
+const hover = vi.hoisted(() => ({ details: false }))
 vi.mock('./sidebar-team-roster', () => ({ useSidebarTeamCard: () => team.value }))
 vi.mock('./worktree-card-row-content', () => ({
-  WorktreeCardRowContent: () => <div data-row-content="" />
+  WorktreeCardRowContent: () => <div data-row-content="" />,
+  WorktreeCardTeamChildren: () => <div data-team-children="" />
 }))
 vi.mock('./worktree-card-presentation', () => ({
-  buildWorktreeCardPresentation: () => ({ titleOnlyCard: false, hasHoverDetails: false })
+  buildWorktreeCardPresentation: () => ({ titleOnlyCard: false, hasHoverDetails: hover.details })
 }))
 vi.mock('./WorktreeContextMenu', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 vi.mock('./AutoRenameFailedDialog', () => ({ AutoRenameFailedDialog: () => null }))
-vi.mock('./WorktreeCardMeta', () => ({ WorktreeCardDetailsHover: () => null }))
+vi.mock('./WorktreeCardMeta', () => ({
+  WorktreeCardDetailsHover: ({ children }: { children: React.ReactNode }) => (
+    <div data-details-hover="">{children}</div>
+  )
+}))
 vi.mock('./WorktreeCardPorts', () => ({ WorktreeCardPortsDetails: () => null }))
 vi.mock('./WorktreeCardAgentHoverDetails', () => ({ WorktreeCardAgentHoverDetails: () => null }))
 
@@ -31,6 +37,7 @@ afterEach(async () => {
     }
   })
   team.value = { row: null, child: false }
+  hover.details = false
 })
 
 function cardOf(extra: Partial<WorktreeCardController>): WorktreeCardController {
@@ -86,5 +93,17 @@ describe('WorktreeCardSurface', () => {
     const surface = await surfaceOf(cardOf({}))
 
     expect(surface.className).not.toContain('worktree-sidebar-card-hover')
+  })
+
+  // Why: the lead's hover card must not open when the pointer is on one of its members' rows.
+  it("draws the lead's member rows outside the lead's hover trigger", async () => {
+    team.value = { row: leadRow, child: false }
+    hover.details = true
+    const surface = await surfaceOf(cardOf({}))
+
+    const children = surface.querySelector('[data-team-children]')
+    expect(children).not.toBeNull()
+    expect(children!.closest('[data-details-hover]')).toBeNull()
+    expect(surface.querySelector('[data-details-hover] [data-row-content]')).not.toBeNull()
   })
 })

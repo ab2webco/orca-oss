@@ -26,18 +26,16 @@ export function WorktreeCardRowContent({
   presentation: WorktreeCardPresentation
 }): React.JSX.Element {
   return row ? (
-    <WorktreeCardTeamContent card={card} row={row} child={child} />
+    <WorktreeCardTeamContent row={row} child={child} />
   ) : (
     <WorktreeCardParentContent card={card} presentation={presentation} />
   )
 }
 
 function WorktreeCardTeamContent({
-  card,
   row,
   child
 }: {
-  card: WorktreeCardController
   row: SidebarTeamRow
   child: boolean
 }): React.JSX.Element {
@@ -45,15 +43,6 @@ function WorktreeCardTeamContent({
   const showPr = useAppStore((s) => s.worktreeCardProperties?.includes('pr') === true)
   const now = useNow(30_000)
   const since = useSidebarTeamRowSince(row)
-  const {
-    newCardStyle,
-    lineageChildren,
-    lineageCollapsed,
-    showLineageChildChip,
-    lineageChildAriaLabel,
-    childWorkspaceShortLabel,
-    onLineageToggle
-  } = card
   return (
     <div className="flex w-full min-w-0 flex-col" data-worktree-card-team-content="">
       <SidebarTeamAgentRow
@@ -64,6 +53,27 @@ function WorktreeCardTeamContent({
         since={since}
         child={child}
       />
+    </div>
+  )
+}
+
+/** The lead's members, drawn by the card surface outside the lead's hover trigger. */
+export function WorktreeCardTeamChildren({
+  card
+}: {
+  card: WorktreeCardController
+}): React.JSX.Element | null {
+  const {
+    newCardStyle,
+    lineageChildren,
+    lineageCollapsed,
+    showLineageChildChip,
+    lineageChildAriaLabel,
+    childWorkspaceShortLabel,
+    onLineageToggle
+  } = card
+  return (
+    <>
       {/* Why only collapsed: V30 lists members under the lead, so the control shows only to reopen them. */}
       {showLineageChildChip && lineageCollapsed ? (
         <WorktreeLineageChildChip
@@ -86,6 +96,6 @@ function WorktreeCardTeamContent({
           </div>
         </SidebarTeamChildContext.Provider>
       ) : null}
-    </div>
+    </>
   )
 }
