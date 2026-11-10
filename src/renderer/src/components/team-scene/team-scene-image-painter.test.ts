@@ -320,6 +320,29 @@ describe('createImagePainter', () => {
     expect(rects(null)).not.toContain(COLORS.attention)
   })
 
+  it('draws whoever stands behind the row before the desks, so a monitor covers it', () => {
+    const { g, calls } = recordingContext()
+    const stations = [{ x: 0.3, depth: 0.55 }]
+    const actors = [
+      actor('advisor', { x: 0.3, depth: 0.15 }),
+      actor('m', { x: 0.3, depth: 0.55, pose: 'work' })
+    ]
+    painterOf().paint(g, frame({ actors, stations }))
+    const at = (image: TeamSceneArtImage | undefined) =>
+      calls.findIndex((c) => c.name === 'drawImage' && c.args[0] === image)
+    const desk = at(IMAGES.get('desk.png'))
+    // The advisor wears the member art here; the first member sheet drawn is the advisor's.
+    const figures = calls
+      .map((c, i) => ({ c, i }))
+      .filter(
+        ({ c }) =>
+          c.name === 'drawImage' && c.args.length === 9 && c.args[0] !== IMAGES.get('desk.png')
+      )
+      .map(({ i }) => i)
+    expect(figures[0]).toBeLessThan(desk)
+    expect(figures[1]).toBeGreaterThan(desk)
+  })
+
   it('counts members past the seats', () => {
     const { g, calls } = recordingContext()
     painterOf().paint(g, frame({ overflow: 3 }))

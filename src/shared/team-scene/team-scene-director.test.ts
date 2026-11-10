@@ -274,6 +274,102 @@ describe('team scene director', () => {
     expect(actor(world, 'a')).toBeUndefined()
   })
 
+  describe('the advisor walk at a row of desks', () => {
+    const layout = { rowSize: 5, workSeated: true }
+    const names = ['q', 'b', 'c', 'd']
+    // The owner's case: the lead attends the needs-you member Jev then judges.
+    const team = (decisions?: { id: string; verdict: string; gesture: null }[]) =>
+      names.map((k, i) =>
+        member(k, i === 0 ? { activity: 'needsYou', ...(decisions ? { decisions } : {}) } : {})
+      )
+    const judged = () => {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input(team(), ''), layout)
+      runUntil(world, () => world.rounds.stage === 'atMember', 15)
+      applyTeamSceneInput(
+        world,
+        input(team([{ id: 'd1', verdict: 'deny', gesture: null }]), ''),
+        layout
+      )
+      return world
+    }
+    const AISLE = 0.2
+    const BODY = 0.05
+
+    // Why both: the lead may already stand at the member, or set out with the advisor.
+    const judgedAtOnce = () => {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input(team(), ''), layout)
+      // A second in: the lead has set out for the asker when Jev's decision arrives.
+      runUntil(world, () => false, 1)
+      applyTeamSceneInput(
+        world,
+        input(team([{ id: 'd1', verdict: 'deny', gesture: null }]), ''),
+        layout
+      )
+      return world
+    }
+
+    it('keeps one body width from a walking lead, and from any lead in its aisle', () => {
+      let closest = Infinity
+      for (const world of [judged(), judgedAtOnce()]) {
+        runUntil(
+          world,
+          () => {
+            const advisor = world.bodies.get('advisor')!
+            const lead = world.bodies.get('lead')!
+            const walking = world.advisorWalk.stage !== 'home'
+            const shared = Math.abs(advisor.depth - lead.depth) < AISLE
+            if (walking && (Math.abs(lead.v) > 3 || shared)) {
+              closest = Math.min(closest, Math.abs(advisor.x - lead.x))
+            }
+            return false
+          },
+          20
+        )
+      }
+      expect(closest).toBeGreaterThanOrEqual(BODY)
+    })
+
+    it('walks behind the row and steps in front only into the gap at the judged member', () => {
+      const world = judged()
+      const row = world.stations[0]!.depth
+      const seats = world.stations.map((s) => s.x)
+      const gap = seats[1]! - seats[0]!
+      let overMonitor = false
+      let gestured = false
+      runUntil(
+        world,
+        () => {
+          const advisor = world.bodies.get('advisor')!
+          gestured ||= Boolean(actor(world, 'advisor')?.gesture)
+          if (advisor.depth > row - AISLE) {
+            // In front of the row, it stands only between two seats, never over one.
+            overMonitor ||= seats.some((s) => Math.abs(advisor.x - s) < gap / 2 - 0.02)
+          }
+          return false
+        },
+        20
+      )
+      expect(gestured).toBe(true)
+      expect(overMonitor).toBe(false)
+    })
+
+    it('puffs home at the end of its hold instead of walking back', () => {
+      const world = judged()
+      const home = world.bodies.get('advisor')!.home
+      expect(runUntil(world, () => Boolean(actor(world, 'advisor')?.gesture), 20)).toBe(true)
+      drainTeamSceneEffects(world)
+      expect(runUntil(world, () => !actor(world, 'advisor')?.gesture, 3)).toBe(true)
+      const advisor = world.bodies.get('advisor')!
+      expect([advisor.x, advisor.depth]).toEqual([home.x, home.depth])
+      const puffs = drainTeamSceneEffects(world).filter(
+        (e) => e.kind === 'burst' && e.key === 'advisor' && e.reason === 'puff'
+      )
+      expect(puffs.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
   it('walks the advisor to the member Jev judged, gestures there, then back', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(world, input([member('a'), member('b')], ''))
@@ -284,7 +380,8 @@ describe('team scene director', () => {
     const b = world.bodies.get('b')!.home
     expect(Math.abs(actor(world, 'advisor')!.x - b.x)).toBeLessThan(0.1)
     expect(actor(world, 'advisor')?.pose).toBe('raise')
-    expect(actor(world, 'b')?.pose).toBe('work')
+    // The judged member keeps its own round: the advisor's walk is no visit of its.
+    expect(world.bodies.get('b')!.plan.kind).toBe('seated')
     expect(
       runUntil(
         world,

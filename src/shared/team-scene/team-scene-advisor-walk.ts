@@ -1,17 +1,27 @@
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneArrived as near } from './team-scene-motion'
-import type { TeamSceneGesture } from './team-scene-types'
+import type { TeamSceneGesture, TeamSceneSpot } from './team-scene-types'
 
 // How long the advisor holds a gesture beside the pane Jev judged.
 const GESTURE_SECONDS = 2.4
 // Why a few: decisions ride a 30 s poll, so an older one waiting longer is no longer news.
 const QUEUE_MAX = 3
+// Half a gap beside a member with no neighbour on that side, and the room it leaves the lead.
 const BESIDE_X = 0.06
-const BEHIND = 0.08
+const LEAD_GAP = 0.09
+// Depths closer than this share an aisle, where the advisor keeps a body width from the lead.
+const AISLE = 0.2
+const BODY = 0.06
+const FRONT = 0.06
+const SETTLED = 0.02
 
-/** The advisor's own walks to the panes Jev judges, apart from the lead's queue of visits. */
+/**
+ * The advisor's own walks to the panes Jev judges, apart from the lead's queue of visits: along
+ * the back aisle behind the row, a step forward into the gap at the judged pane, a gesture there,
+ * then a puff home.
+ */
 export type TeamSceneAdvisorWalk = {
-  stage: 'home' | 'out' | 'gesture' | 'back'
+  stage: 'home' | 'aisle' | 'step' | 'gesture'
   queue: { key: string; gesture: TeamSceneGesture }[]
   key: string | null
   gesture: TeamSceneGesture | null
@@ -35,13 +45,55 @@ export function queueJudgment(world: TeamSceneWorld, key: string, gesture: TeamS
   queue.splice(0, Math.max(0, queue.length - QUEUE_MAX))
 }
 
-// Why the side away from the lead: at the same member, the lead would hide the advisor's gesture.
-const besideOf = (target: TeamSceneBody, lead: TeamSceneBody | undefined) => {
-  const side = lead && lead.x > target.x ? -1 : 1
-  return { x: target.x + side * BESIDE_X, depth: Math.max(0, target.depth - BEHIND) }
+// Why the gap away from the lead: at the same member the lead would hide the gesture, and the
+// middle of a gap is the one place in front of the row that covers no monitor.
+function spotOf(world: TeamSceneWorld, key: string, target: TeamSceneBody): TeamSceneSpot {
+  const lead = world.bodies.get('lead')
+  if (key === 'lead') {
+    return { x: target.x - LEAD_GAP, depth: target.depth }
+  }
+  const seat = target.home
+  const side = lead && lead.x > seat.x ? -1 : 1
+  const next = world.stations.map((s) => (s.x - seat.x) * side).filter((d) => d > 0.001)
+  const half = Math.min(BESIDE_X, ...next.map((d) => d / 2))
+  return { x: seat.x + side * half, depth: seat.depth + FRONT }
 }
 
-/** One step of the advisor's walk out to a judged pane, its gesture there, and its walk home. */
+const MOVING_PX = 3
+
+const isWalking = (body: TeamSceneBody): boolean => Math.abs(body.v) > MOVING_PX
+
+// Why keep its side: walking beside or through the lead reads as one blob of two people. Only a
+// lead standing still may be passed, and only behind the row, where the desks part the two.
+function clearOfLead(world: TeamSceneWorld, advisor: TeamSceneBody, x: number): number {
+  const lead = world.bodies.get('lead')
+  if (!lead || (!isWalking(lead) && Math.abs(advisor.depth - lead.depth) >= AISLE)) {
+    return x
+  }
+  const side = advisor.x >= lead.x ? 1 : -1
+  return side > 0 ? Math.max(x, lead.x + BODY) : Math.min(x, lead.x - BODY)
+}
+
+// Why wait at home: setting out beside a walking lead, at its speed, never opens the gap.
+const isLeadPassing = (world: TeamSceneWorld, advisor: TeamSceneBody): boolean => {
+  const lead = world.bodies.get('lead')
+  return Boolean(lead && isWalking(lead) && Math.abs(lead.x - advisor.x) < 2 * BODY)
+}
+
+function puffHome(world: TeamSceneWorld, advisor: TeamSceneBody): void {
+  world.effects.push({
+    kind: 'burst',
+    key: 'advisor',
+    reason: 'puff',
+    at: { x: advisor.x, depth: advisor.depth }
+  })
+  Object.assign(advisor, { x: advisor.home.x, depth: advisor.home.depth, v: 0, facing: -1 })
+  advisor.target = advisor.home
+  world.effects.push({ kind: 'burst', key: 'advisor', reason: 'puff', at: advisor.home })
+  Object.assign(world.advisorWalk, { stage: 'home', key: null, gesture: null })
+}
+
+/** One step of the advisor's walk out to a judged pane and its gesture there. */
 export function stepAdvisorWalk(world: TeamSceneWorld, width: number): void {
   const advisor = world.bodies.get('advisor')
   const walk = world.advisorWalk
@@ -52,29 +104,33 @@ export function stepAdvisorWalk(world: TeamSceneWorld, width: number): void {
   const target = walk.key ? world.bodies.get(walk.key) : undefined
   if (walk.stage === 'home') {
     advisor.target = advisor.home
-    const next = near(advisor, width) ? walk.queue.shift() : undefined
+    const ready = near(advisor, width) && !isLeadPassing(world, advisor)
+    const next = ready ? walk.queue.shift() : undefined
     if (next && world.bodies.has(next.key)) {
-      Object.assign(walk, { stage: 'out', key: next.key, gesture: next.gesture })
+      Object.assign(walk, { stage: 'aisle', key: next.key, gesture: next.gesture })
     }
-  } else if (walk.stage === 'out') {
-    if (!target) {
-      Object.assign(walk, { stage: 'back', key: null, gesture: null })
-      return
+    return
+  }
+  if (!target) {
+    puffHome(world, advisor)
+    return
+  }
+  const spot = spotOf(world, walk.key!, target)
+  if (walk.stage === 'aisle') {
+    const x = clearOfLead(world, advisor, spot.x)
+    advisor.target = { x, depth: advisor.home.depth }
+    if (x === spot.x && near(advisor, width)) {
+      walk.stage = 'step'
     }
-    advisor.target = besideOf(target, walk.key === 'lead' ? undefined : world.bodies.get('lead'))
-    if (near(advisor, width)) {
+  } else if (walk.stage === 'step') {
+    advisor.target = spot
+    if (Math.abs(advisor.depth - spot.depth) < SETTLED) {
       Object.assign(walk, { stage: 'gesture', at: world.t })
     }
-  } else if (walk.stage === 'gesture') {
-    advisor.facing = target && target.x < advisor.x ? -1 : 1
-    if (!target || world.t - walk.at >= GESTURE_SECONDS) {
-      Object.assign(walk, { stage: 'back', key: null, gesture: null })
-    }
   } else {
-    advisor.target = advisor.home
-    if (near(advisor, width)) {
-      walk.stage = 'home'
-      advisor.facing = -1
+    advisor.facing = target.x < advisor.x ? -1 : 1
+    if (world.t - walk.at >= GESTURE_SECONDS) {
+      puffHome(world, advisor)
     }
   }
 }

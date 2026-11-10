@@ -92,5 +92,7 @@ export type TeamSceneEffect =
   | {
       kind: 'burst'
       key: string
-      reason: 'merge' | 'welcome' | 'goodbye' | 'finish' | 'build' | 'repair'
+      reason: 'merge' | 'welcome' | 'goodbye' | 'finish' | 'build' | 'repair' | 'puff'
+      /** Where it bursts when not where `key` stands now, as a puff where the advisor vanished. */
+      at?: TeamSceneSpot
     }

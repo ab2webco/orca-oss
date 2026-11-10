@@ -41,6 +41,7 @@ export type TeamSceneImageArt = {
 export const TEAM_SCENE_ART_HEIGHT = 176
 const TAU = 2 * Math.PI
 const SEAT_PX = 2
+const BEHIND_ROW = 0.05
 const SHADOW_WIDTH = 0.2
 const PORTRAIT_SIDE = 0.44
 const PORTRAIT_TOP = 0.76
@@ -309,10 +310,11 @@ export function createImagePainter(args: {
       } else if (args.builds === 'office') {
         drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat)
       }
+      // Why split: whoever walks behind the row goes under its monitors, never over them.
+      const row = Math.min(...f.stations.map((s) => s.depth)) - BEHIND_ROW
+      f.actors.filter((a) => a.depth < row).forEach((a) => drawActor(g, a, f))
       drawStations(g, f)
-      for (const a of f.actors) {
-        drawActor(g, a, f)
-      }
+      f.actors.filter((a) => a.depth >= row).forEach((a) => drawActor(g, a, f))
       foreground.draw(g, f)
       effects.draw(g, f)
       drawSceneOverflow(g, f.overflow)
