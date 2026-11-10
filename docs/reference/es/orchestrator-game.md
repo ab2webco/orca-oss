@@ -1,5 +1,5 @@
 ---
-sourceHash: a1a9d6189b575c16
+sourceHash: 4fd0326e235213af
 ---
 
 # El juego orquestador de Agent Teams
@@ -1606,10 +1606,12 @@ orchestratorGame:
   `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. El panel dibuja
   un estilo con el arte propio de la escena cuando su bloque cubre ese estilo y las imágenes cargan
   (`orchestratorGameSceneArtOf`). Quest se dibuja con su arte, que viene con Orca en
-  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Cualquier otra
-  escena sin arte para el estilo se dibuja en Pixel, con sus propios personajes, asesor, mascota y
-  colores, así que una escena con tema nunca muestra los caballeros de Quest; Settings lo dice bajo el
-  estilo. Quest pasa a Pixel solo cuando ni siquiera su arte se puede decodificar. Un archivo de escena cuyo nombre es
+  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Office conserva esa
+  oficina para cualquier escena sin arte propio de Office, porque una oficina se lee como tal en
+  cualquier tema. Cualquier otra escena sin arte de Figures se dibuja en Pixel, con sus propios
+  personajes, asesor, mascota y colores, así que una escena con tema nunca muestra los caballeros de
+  Quest. Settings dice cuál bajo el estilo. Por lo demás, un estilo pasa a Pixel solo cuando ni
+  siquiera el arte de Orca se puede decodificar. Un archivo de escena cuyo nombre es
   `quest` es Quest, así que el arte incluido es el suyo. El panel lee las imágenes de un archivo de
   escena bajo demanda con `game.sceneArt`, en el host dueño del worktree: en local, por SSH a través del
   sistema de archivos remoto del worktree, y desde un host emparejado por el RPC del runtime, con el

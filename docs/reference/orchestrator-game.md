@@ -1502,10 +1502,11 @@ orchestratorGame:
   block with a warning. The panel draws a style with the scene's own art when its block covers
   that style and the images load (`orchestratorGameSceneArtOf`). Quest draws with its art, which
   ships with Orca in
-  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json). Any other scene
-  without art for the style draws in Pixel, with its own characters, advisor, pet and colours, so a
-  themed scene never shows Quest's knights; Settings says so under the style. Quest falls to Pixel
-  only when even its art fails to decode. A scene file whose stem is `quest` is Quest, so its
+  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json). Office keeps that
+  office for any scene without Office art of its own, since an office reads as one in any theme.
+  Any other scene without Figures art draws in Pixel, with its own characters, advisor, pet and
+  colours, so a themed scene never shows Quest's knights. Settings says which under the style. A
+  style falls to Pixel otherwise only when even Orca's art fails to decode. A scene file whose stem is `quest` is Quest, so its
   bundled art is its own. The
   panel reads a scene file's images on demand with `game.sceneArt`, on the host that owns the
   worktree: locally, over SSH through the worktree's remote filesystem, and from a paired host

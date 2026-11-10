@@ -171,19 +171,24 @@ describe('useTeamScenePainter', () => {
     expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
   })
 
-  it('draws Pixel at once when no host is known to read the own art from', async () => {
+  it("draws Pixel at once when no host is known to read the own figures from, and Orca's office", async () => {
     useTeamSceneArtHostStore.setState({ host: null })
     const id = 'file:mine.json'
-    await render('office', { id, extensions: [blockScene(id)] })
+    await render('figures', { id, extensions: [blockScene(id)] })
     expect(readTeamSceneArtUrl).not.toHaveBeenCalled()
     expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
+    await render('office', { id, extensions: [blockScene(id)] })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
   })
 
-  it("draws a scene with no art in the chosen style with its own characters, never Quest's", async () => {
-    await render('office', { id: 'file:.orca/scenes/koombea.json', extensions: [] })
+  it("draws a scene's figures as its own characters, never Quest's, and Orca's office", async () => {
+    const scene = { id: 'file:.orca/scenes/koombea.json', extensions: [] }
+    await render('figures', scene)
     expect(seen.at(-1)).toBe(PIXEL)
     expect(loadTeamSceneArt).not.toHaveBeenCalled()
-    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
+    await render('office', scene)
+    expect(seen.at(-1)).toBe(IMAGE)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
   })
 
   it("seats members from behind only at Orca's own Office desk", async () => {

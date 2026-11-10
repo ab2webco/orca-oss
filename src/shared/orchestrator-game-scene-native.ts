@@ -295,7 +295,7 @@ export type OrchestratorGameSceneArt = {
 const QUEST_FILE = /(?:^|\/)quest\.json$/
 
 // Why the stem: `.orca/scenes/quest.json` is Quest exported as a file, so the bundled art is its own.
-const isQuestScene = (sceneId: string): boolean => {
+export const isQuestScene = (sceneId: string): boolean => {
   const prefix = `${ORCHESTRATOR_GAME_SCENE_FILE_SOURCE}:`
   return (
     sceneId === 'quest' ||
@@ -324,7 +324,9 @@ export function orchestratorGameSceneArtOf(args: {
   if (scene?.native?.[style] && !sceneArtFailed) {
     return { drawn: style, art: 'scene' }
   }
-  return isQuestScene(sceneId) && !bundledArtFailed
+  // Why Office keeps Orca's art in any theme: an office reads as one, and picking it must show it;
+  // Quest's figures are knights, so a themed scene's figures draw in Pixel as its own characters.
+  return (style === 'office' || isQuestScene(sceneId)) && !bundledArtFailed
     ? { drawn: style, art: 'bundled' }
     : { drawn: 'pixel', art: 'pixel' }
 }

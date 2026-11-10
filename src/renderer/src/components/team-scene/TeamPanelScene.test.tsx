@@ -270,10 +270,20 @@ describe('TeamPanelScene', () => {
     )
   })
 
-  it("draws a scene with no art for the style with its own characters in Pixel, never Quest's", async () => {
+  it("draws a scene with no art of its own for Office in Orca's office", async () => {
     await act(async () =>
       root.render(
         <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="office" />
+      )
+    )
+    expect(shownStyle()).toBe('office')
+    expect(artOf()).toBe('bundled')
+  })
+
+  it("draws a scene with no Figures art as its own characters in Pixel, never Quest's", async () => {
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="figures" />
       )
     )
     expect(shownStyle()).toBe('pixel')

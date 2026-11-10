@@ -316,6 +316,8 @@ describe('the art a scene draws with', () => {
   }
   // Why Pixel for a themed scene: Pixel draws the scene's own characters; Quest's art never does.
   const PIXEL = { drawn: 'pixel', art: 'pixel' }
+  // Why Office keeps Orca's art: an office is an office in any theme, and choosing it must show one.
+  const OFFICE = { drawn: 'office', art: 'bundled' }
 
   it('keeps Pixel for every scene when Pixel is picked', () => {
     expect(orchestratorGameSceneArtOf({ style: 'pixel', sceneId: 'quest' })).toEqual(PIXEL)
@@ -338,13 +340,35 @@ describe('the art a scene draws with', () => {
   })
 
   it.each(['vigilante', 'jrpg', 'tamer'])(
-    "draws the built-in %s with its own characters in Pixel, never Quest's art",
+    "draws the built-in %s's figures in Pixel, never Quest's knights, and Orca's own office",
     (sceneId) => {
-      for (const style of ['figures', 'office'] as const) {
-        expect(orchestratorGameSceneArtOf({ style, sceneId })).toEqual(PIXEL)
-      }
+      expect(orchestratorGameSceneArtOf({ style: 'figures', sceneId })).toEqual(PIXEL)
+      expect(orchestratorGameSceneArtOf({ style: 'office', sceneId })).toEqual(OFFICE)
     }
   )
+
+  it("draws Orca's office when the scene's own did not load, and Pixel only if neither did", () => {
+    const scene = definition({ office: native().figures })
+    expect(orchestratorGameSceneArtOf({ style: 'office', sceneId: 'file:a.json', scene })).toEqual({
+      drawn: 'office',
+      art: 'scene'
+    })
+    expect(
+      orchestratorGameSceneArtOf({
+        style: 'office',
+        sceneId: 'file:a.json',
+        scene,
+        sceneArtFailed: true
+      })
+    ).toEqual(OFFICE)
+    expect(
+      orchestratorGameSceneArtOf({
+        style: 'office',
+        sceneId: 'file:a.json',
+        bundledArtFailed: true
+      })
+    ).toEqual(PIXEL)
+  })
 
   it('draws a plugin scene with no art with its own characters in Pixel', () => {
     const { scenes } = orchestratorGameScenesOf([
@@ -365,7 +389,7 @@ describe('the art a scene draws with', () => {
       { drawn: 'figures', art: 'scene' }
     )
     expect(orchestratorGameSceneArtOf({ style: 'office', sceneId: 'file:a.json', scene })).toEqual(
-      PIXEL
+      OFFICE
     )
   })
 
@@ -421,7 +445,7 @@ describe('the art a scene draws with', () => {
   it.each(['file:.orca/scenes/quests.json', 'file:.orca/quest/space.json', 'file:my-quest.json'])(
     'does not read %s as Quest',
     (sceneId) => {
-      expect(orchestratorGameSceneArtOf({ style: 'office', sceneId })).toEqual(PIXEL)
+      expect(orchestratorGameSceneArtOf({ style: 'figures', sceneId })).toEqual(PIXEL)
     }
   )
 
