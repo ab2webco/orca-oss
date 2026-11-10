@@ -2,6 +2,7 @@ import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 
@@ -93,9 +94,7 @@ test('the lead keeps the name it first had when the scene and the language chang
   for (const width of [1440, 768, 390, 320]) {
     await orcaPage.setViewportSize({ width, height: 900 })
     for (const theme of ['dark', 'light'] as const) {
-      await orcaPage.evaluate(async (next) => {
-        window.__store?.setState({ settings: await window.api.settings.set({ theme: next }) })
-      }, theme)
+      await writeSettings(orcaPage, { theme })
       await orcaPage.waitForTimeout(400)
       await panel.screenshot({
         path: testInfo.outputPath(`lead-one-name-vigilante-es-${width}-${theme}.png`)

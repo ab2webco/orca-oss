@@ -4,6 +4,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
@@ -38,10 +39,7 @@ async function sidewaysScrollers(page: Page): Promise<string[]> {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
 }
 
 async function expectNoSidewaysScroll(page: Page, where: string): Promise<void> {

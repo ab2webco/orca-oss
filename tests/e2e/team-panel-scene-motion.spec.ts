@@ -4,6 +4,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
@@ -286,10 +287,7 @@ test('every Team scene style moves while its team works, with no one entering or
     for (const width of [1440, 768, 390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
-        await orcaPage.evaluate(async (next) => {
-          const settings = await window.api.settings.set({ theme: next })
-          window.__store?.setState({ settings })
-        }, theme)
+        await writeSettings(orcaPage, { theme })
         for (const moment of ['a', 'b']) {
           await orcaPage.waitForTimeout(moment === 'a' ? 600 : 250)
           await pixel.screenshot({

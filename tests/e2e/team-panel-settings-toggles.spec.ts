@@ -5,6 +5,7 @@ import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const GB = 1024 ** 3
@@ -349,10 +350,7 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
-          await orcaPage.evaluate(async (next) => {
-            const settings = await window.api.settings.set({ theme: next })
-            window.__store?.setState({ settings })
-          }, theme)
+          await writeSettings(orcaPage, { theme })
           await orcaPage.waitForTimeout(300)
           await orcaPage.screenshot({
             animations: 'disabled',

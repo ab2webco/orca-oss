@@ -10,6 +10,7 @@ import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const QUESTION = 'Rebase on #1077 before the PR?'
@@ -21,10 +22,7 @@ const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
 const WIDTHS = [1440, 768, 390, 320]
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(() =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
