@@ -5,6 +5,7 @@ import {
   drawPixelPlot,
   drawPixelSack,
   PIXEL_WILT,
+  gardenPaletteOf,
   type PixelGardenPalette
 } from './team-scene-pixel-garden'
 import { recordingContext } from './team-scene-recording-context'
@@ -70,5 +71,18 @@ describe('pixel garden', () => {
     const none = recordingContext()
     drawPixelCrates(none.g, 0, 38, PX, PALETTE)
     expect(none.calls).toHaveLength(0)
+  })
+})
+
+describe('gardenPaletteOf', () => {
+  it("lightens the scene's plant colour so leaves read against its own grass", () => {
+    const palette = gardenPaletteOf(0x2f6b3a, 0xffd24a)
+    expect(palette.fruit).toBe('#ffd24a')
+    const channels = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16))
+    const [r, g, b] = channels(palette.leaf)
+    expect(r).toBeGreaterThan(0x2f)
+    expect(g).toBeGreaterThan(0x6b)
+    expect(b).toBeGreaterThan(0x3a)
+    expect(g).toBeGreaterThan(r)
   })
 })

@@ -14,7 +14,22 @@ export const PIXEL_WILT = '#a08a4a'
 
 // Plants stand two pixels apart in a bed seven wide; heights per stage, in scene pixels.
 const PLANTS = [-2, 0, 2]
-const HEIGHT_AT = [0, 1, 2, 3, 3] as const
+const HEIGHT_AT = [0, 2, 3, 5, 5] as const
+// Why lighter: a scene's plant colour is its grass, and leaves drawn in it vanish into it.
+const LEAF_LIFT = 0.45
+
+const hexOf = (n: number): string => `#${(n & 0xffffff).toString(16).padStart(6, '0')}`
+const lifted = (n: number): number =>
+  [16, 8, 0].reduce((out, shift) => {
+    const c = (n >> shift) & 0xff
+    return out | (Math.round(c + (255 - c) * LEAF_LIFT) << shift)
+  }, 0)
+
+/** The garden's colours from a scene look's plant and sun. */
+export const gardenPaletteOf = (plant: number, sun: number): PixelGardenPalette => ({
+  leaf: hexOf(lifted(plant)),
+  fruit: hexOf(sun)
+})
 
 type Dot = (col: number, row: number, w: number, h: number, color: string) => void
 
@@ -41,8 +56,8 @@ export function drawPixelPlot(
     dot(cx + dx, row, 1, 1, SOIL_DARK)
   }
   if (site.stage === 2 || site.stage === 3) {
-    dot(cx - 4, row - 3, 1, 3, STAKE)
-    dot(cx + 4, row - 3, 1, 3, STAKE)
+    dot(cx - 4, row - 4, 1, 4, STAKE)
+    dot(cx + 4, row - 4, 1, 4, STAKE)
   }
   const tall = HEIGHT_AT[site.stage]
   const leaf = site.broken ? PIXEL_WILT : palette.leaf
@@ -59,7 +74,7 @@ export function drawPixelPlot(
       dot(cx + dx - 1 + sway, leafRow, 1, 1, leaf)
       dot(cx + dx + 1 + sway, leafRow, 1, 1, leaf)
     }
-    if (tall >= 3 && !site.broken) {
+    if (tall >= 5 && !site.broken) {
       dot(cx + dx - 1, row - 1, 1, 1, leaf)
       dot(cx + dx + 1, row - 1, 1, 1, leaf)
     }

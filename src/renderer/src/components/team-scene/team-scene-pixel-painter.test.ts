@@ -8,6 +8,7 @@ import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/h
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
+import { gardenPaletteOf } from './team-scene-pixel-garden'
 import { recordingContext } from './team-scene-recording-context'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
@@ -203,10 +204,10 @@ describe('createPixelPainter', () => {
       return r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
     }
     const sprouting = rectColors({ ...frame([]), sites: [site(2)] })
-    expect(sprouting).toContain(hexOf(look.plant))
+    expect(sprouting).toContain(gardenPaletteOf(look.plant, look.sun).leaf)
     expect(sprouting).not.toContain(hexOf(look.sun))
     expect(rectColors({ ...frame([]), sites: [site(4)] })).toContain(hexOf(look.sun))
-    expect(rectColors(frame([]))).not.toContain(hexOf(look.plant))
+    expect(rectColors(frame([]))).not.toContain(gardenPaletteOf(look.plant, look.sun).leaf)
   })
 
   it('keeps a harvest crate for each trophy', () => {

@@ -16,7 +16,12 @@ import { hdSkyPixel } from '../../../../../resources/claude-plugins/orca-game/ho
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
-import { drawPixelCrates, drawPixelPlot, drawPixelSack } from './team-scene-pixel-garden'
+import {
+  drawPixelCrates,
+  drawPixelPlot,
+  drawPixelSack,
+  gardenPaletteOf
+} from './team-scene-pixel-garden'
 import type {
   TeamSceneFrame,
   TeamScenePainter,
@@ -37,6 +42,8 @@ const HEIGHT = PIXELS * PIXEL
 // The hd frame keeps its bottom three pixel rows as the walking strip.
 const GROUND = PIXELS - 3
 const feetRow = (depth: number): number => GROUND - 2 + Math.round(depth * 2)
+// Columns from a seat to its bed's middle: half a sprite, a gap, half the bed.
+const BED_FROM_SEAT = 9
 
 // V28's tool and paper tones, and its swing: every 1.15 s, easing out over about 0.43 s.
 const TOOL = '#e8eef4'
@@ -128,7 +135,7 @@ export function createPixelPainter(args: {
 }): TeamScenePainter {
   const { scene, light, colors } = args
   // Why the scene's own look: a file scene's garden must match its palette, not Quest's.
-  const garden = { leaf: hex(scene.looks.working.plant), fruit: hex(scene.looks.working.sun) }
+  const garden = gardenPaletteOf(scene.looks.working.plant, scene.looks.working.sun)
   let backdrop: { columns: number; step: number; canvas: HTMLCanvasElement } | null = null
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
@@ -230,9 +237,10 @@ export function createPixelPainter(args: {
       drawPixelCrates(g, f.trophies.length, feetRow(0), PIXEL, garden)
       for (const site of f.sites) {
         const row = feetRow(site.spot.depth)
-        const seat = site.spot.x - SITE_FROM_SEAT_X
-        drawPixelSack(g, Math.round((seat - PILE_FROM_SEAT_X) * columns), row, PIXEL)
-        drawPixelPlot(g, Math.round(site.spot.x * columns), row, PIXEL, site, f.t, garden)
+        // Why in columns: Pixel's sprites are ten wide, so the bed must clear the seat's own.
+        const seat = Math.round((site.spot.x - SITE_FROM_SEAT_X) * columns)
+        drawPixelSack(g, Math.round(seat - PILE_FROM_SEAT_X * columns), row, PIXEL)
+        drawPixelPlot(g, seat + BED_FROM_SEAT, row, PIXEL, site, f.t, garden)
       }
       effects.start(f.effects, f.actors, f.height)
       for (const a of f.actors) {
