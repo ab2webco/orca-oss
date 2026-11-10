@@ -106,7 +106,27 @@ describe('gameProjectListOf', () => {
     const list = gameProjectListOf('jira', items, null, 40, GAME_TODO_ITEMS_MAX)
     expect(GAME_TODO_ITEMS_MAX).toBe(30)
     expect(list.items).toHaveLength(30)
-    expect(list.items.slice(0, 20).every((one) => one.group === 'in_progress')).toBe(true)
+    // Why half for todo: a wave launches only To Do items, so they must not fall off.
+    expect(list.items.map((one) => one.group)).toEqual([
+      ...Array<string>(15).fill('in_progress'),
+      ...Array<string>(15).fill('todo')
+    ])
+  })
+
+  it('keeps the one To Do item behind thirty in progress, as the netsat board has it', () => {
+    const items = [
+      ...Array.from({ length: 34 }, (_, at) => ({
+        id: `NETSA-${300 - at}`,
+        title: 'x',
+        url: `https://plane/NETSA-${300 - at}`,
+        group: 'in_progress' as const
+      })),
+      { id: 'NETSA-195', title: 'Demo', url: 'https://plane/NETSA-195', group: 'todo' as const }
+    ]
+    const list = gameProjectListOf('plane', items, null, items.length, GAME_TODO_ITEMS_MAX)
+    expect(list.items).toHaveLength(30)
+    expect(list.items.at(-1)?.id).toBe('NETSA-195')
+    expect(list.groups).toEqual({ in_progress: 34, todo: 1 })
   })
 
   it('drops a list url that is not http(s)', () => {

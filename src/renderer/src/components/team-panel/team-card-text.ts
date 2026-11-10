@@ -85,6 +85,14 @@ export function teamSessionStateText(condition: TeamCondition): string {
     : teamConditionText(condition)
 }
 
+/** The lead's line: what it does now, led by V30's verb while it works on something. */
+export function teamLeadLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
+  const text = teamLiveText(action, condition)
+  return condition === 'working' && action !== null && action.kind !== 'question'
+    ? translate('teamPanel.lead.orchestrating', 'Orchestrating · {{action}}', { action: text })
+    : text
+}
+
 /** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`. */
 export const teamToolText = (tool: string, detail: string | null): string =>
   detail ? `${tool} · ${detail}` : tool

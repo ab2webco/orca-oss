@@ -92,11 +92,17 @@ export function gameMachineActionsOf(
   old: readonly OrchestratorGameAction[]
 ): GameMachineAction[] {
   const kept = new Set(old.map((action) => action.command))
-  const changed = old.filter((action) => {
+  const changed = old.flatMap((action) => {
     const theirs = project.find(
       (one) => one.command !== undefined && one.command === action.command
     )
-    return theirs === undefined || !isSameGameAction(theirs, action)
+    if (theirs === undefined) {
+      return [action]
+    }
+    // Why: a copy written before pins has no pin key; it takes orca.yaml's rather than unpinning.
+    const mine =
+      action.pin === undefined && theirs.pin !== undefined ? { ...action, pin: theirs.pin } : action
+    return isSameGameAction(theirs, mine) ? [] : [mine]
   })
   const hidden = project.flatMap((action): GameHiddenAction[] =>
     action.command === undefined || kept.has(action.command)

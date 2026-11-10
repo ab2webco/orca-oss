@@ -181,6 +181,18 @@ const GROUP_ORDER: readonly GameStatusGroup[] = [
 const groupRankOf = (item: GameProjectItem): number =>
   item.group === undefined ? GROUP_ORDER.length : GROUP_ORDER.indexOf(item.group)
 
+// Why half the budget held for To Do: a wave launches only To Do items, so a long in-progress
+// list must not push them past the cap; either side takes what the other leaves, in status order.
+function withinBudget(items: readonly GameProjectItem[], max: number): GameProjectItem[] {
+  const ranked = [...items].sort((left, right) => groupRankOf(left) - groupRankOf(right))
+  const todo = ranked.filter((one) => one.group === 'todo')
+  const held = Math.min(todo.length, Math.floor(max / 2))
+  const rest = ranked.filter((one) => one.group !== 'todo').slice(0, max - held)
+  return [...rest, ...todo.slice(0, max - rest.length)].sort(
+    (left, right) => groupRankOf(left) - groupRankOf(right)
+  )
+}
+
 export function gameProjectListOf(
   provider: string,
   items: readonly GameProjectItem[],
@@ -199,10 +211,10 @@ export function gameProjectListOf(
     provider,
     total,
     url: url !== null && isHttpUrl(url) ? url : null,
-    items: items
-      .filter((one) => isHttpUrl(one.url))
-      .sort((left, right) => groupRankOf(left) - groupRankOf(right))
-      .slice(0, max),
+    items: withinBudget(
+      items.filter((one) => isHttpUrl(one.url)),
+      max
+    ),
     ...(grouped.length > 0 ? { groups } : {})
   }
 }

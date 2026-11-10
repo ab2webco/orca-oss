@@ -8,7 +8,7 @@ import type {
   TeamLeadCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamLiveText, teamModelText } from './team-card-text'
+import { teamHostText, teamLeadLiveText, teamModelText } from './team-card-text'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
@@ -78,7 +78,7 @@ function LeadCardRow({
                   : translate('teamPanel.lead.asks', 'Waiting for you')}
               </span>
             ) : (
-              <span className="truncate">{teamLiveText(lead.liveAction, lead.condition)}</span>
+              <span className="truncate">{teamLeadLiveText(lead.liveAction, lead.condition)}</span>
             )}
           </span>
           {sceneLine ? (

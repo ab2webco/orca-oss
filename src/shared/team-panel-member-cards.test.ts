@@ -375,6 +375,36 @@ describe('teamCardsOf', () => {
     expect(card?.ticket?.identifier).toBe('ORCA-12')
   })
 
+  it('names a member launched without a character after a free roster one, never its ticket title', () => {
+    const members =
+      cardsOf([
+        agent({ paneKey: 'a:1', displayName: 'Arthur · ORCA-1 Keep it' }),
+        agent({ paneKey: 'b:1', displayName: 'NETSA-207 Replace marketing-site' }),
+        agent({ paneKey: 'c:1', displayName: 'NETSA-208 Fix the form' })
+      ])?.members ?? []
+    expect(members.map((one) => [one.name, one.ticket?.identifier, one.characterKey])).toEqual([
+      ['Arthur', 'ORCA-1', 'arthur'],
+      ['Merlin', 'NETSA-207', 'merlin'],
+      ['Lancelot', 'NETSA-208', 'lancelot']
+    ])
+    const spanish = teamCardsOf(
+      state([lead, agent({ displayName: 'NETSA-207 Replace marketing-site' })]),
+      new Set(),
+      null,
+      'es'
+    )
+    expect(spanish?.members[0]?.name).toBe('Arturo')
+  })
+
+  it('falls back to the ticket once, as the sidebar does, when the roster has no name to give', () => {
+    const [card] =
+      cardsOf([agent({ displayName: 'NETSA-207 Replace marketing-site' })], {
+        lead: { autostart: false, cap: 4, agent: 'claude', memberNames: [] }
+      } as never)?.members ?? []
+    expect(card?.name).toBe('NETSA-207')
+    expect(card?.ticket?.identifier).toBe('NETSA-207')
+  })
+
   it('carries the tool input as the live detail', () => {
     const [card] =
       cardsOf([agent({ toolName: 'Bash', toolInput: 'npx vitest run terminal-role' })])?.members ??

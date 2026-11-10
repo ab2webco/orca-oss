@@ -56,4 +56,32 @@ describe("this machine's project actions, merged by command over orca.yaml's", (
       }).actions
     ).toEqual([YAML[1]])
   })
+
+  it("keeps orca.yaml's pins under an old per-project copy written before pins, as the owner preview has", () => {
+    const yaml: OrchestratorGameAction[] = [
+      { label: 'Ship', command: 'ship', icon: 'ship', pin: true, prompt: 'Ship it' },
+      {
+        label: 'Scenario review',
+        command: 'scenario',
+        icon: 'review',
+        pin: true,
+        prompt: 'Review'
+      },
+      { label: 'Demo refresh', command: 'demo', icon: 'launch', prompt: 'Refresh' },
+      { label: 'Gate local', command: 'gate', icon: 'flask', pin: true, prompt: 'Gate' }
+    ]
+    const legacy = yaml.map(({ pin: _pin, ...rest }) => rest)
+    const resolved = resolveOrchestratorGameIntegrations({
+      project: { actions: yaml },
+      local: { actions: legacy }
+    }).actions
+
+    expect(resolved.map((one) => [one.command, one.pin === true])).toEqual([
+      ['ship', true],
+      ['scenario', true],
+      ['demo', false],
+      ['gate', true]
+    ])
+    expect(gameMachineActionsOf(yaml, legacy)).toEqual([])
+  })
 })

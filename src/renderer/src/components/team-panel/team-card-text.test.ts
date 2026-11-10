@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   teamConditionText,
   teamHostText,
+  teamLeadLiveText,
   teamLiveText,
   teamModelText,
   teamPhaseText,
@@ -14,6 +15,19 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''))
 }))
+
+describe('teamLeadLiveText', () => {
+  it("prefixes what a working lead does with V30's verb, and leaves every other line alone", () => {
+    expect(
+      teamLeadLiveText({ kind: 'tool', tool: 'Read', detail: 'game-state.ts' }, 'working')
+    ).toBe('Orchestrating · Read · game-state.ts')
+    expect(teamLeadLiveText(null, 'working')).toBe('Working')
+    expect(
+      teamLeadLiveText({ kind: 'question', text: 'Merge #923 now?', options: ['Yes'] }, 'waiting')
+    ).toBe('Merge #923 now?')
+    expect(teamLeadLiveText({ kind: 'tool', tool: 'Read', detail: null }, 'idle')).toBe('Read')
+  })
+})
 
 describe('teamLiveText tool labels', () => {
   it('names the tool on every row, as V28 soloNow does', () => {

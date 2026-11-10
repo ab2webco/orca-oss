@@ -1,5 +1,6 @@
 import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
 import {
+  gameMachineActionsOf,
   parseGameMachineActions,
   withGameMachineActions,
   type GameMachineAction
@@ -225,6 +226,14 @@ export function resolveOrchestratorGameIntegrations(
   const machine = parseGameMachineActions(layers.local?.machineActions).value
   if (machine !== undefined) {
     resolved.actions = withGameMachineActions(resolved.actions, machine)
+  } else if (layers.local?.actions !== undefined) {
+    // Why: an old whole-list copy reads as the changes it made, as Settings shows it, so orca.yaml
+    // keeps what it left unset; only a list whose every action has a command can be matched.
+    const project = parseGameActions(layers.project?.actions ?? layers.global?.actions).value ?? []
+    if (project.every((action) => action.command !== undefined)) {
+      const old = parseGameActions(layers.local.actions).value ?? []
+      resolved.actions = withGameMachineActions(project, gameMachineActionsOf(project, old))
+    }
   }
   resolved.orcaActions = mergeGameOrcaActions(
     ORCHESTRATOR_GAME_LAYER_ORDER.map(
