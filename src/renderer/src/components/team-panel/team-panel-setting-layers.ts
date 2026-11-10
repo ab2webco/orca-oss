@@ -25,7 +25,19 @@ export function resetTeamPanelProjectLayers(): void {
   useProjectLayers.setState({ byScope: {} })
 }
 
-function openProjectLayer(scope: string, repoId: string, hostId: ExecutionHostId): () => void {
+function openProjectLayer(
+  scope: string,
+  repoId: string,
+  hostId: ExecutionHostId,
+  background: boolean
+): () => void {
+  // Why: a background reader (the sidebar's rows) reads once but never holds off a panel's re-read.
+  if (background) {
+    if (!(scope in useProjectLayers.getState().byScope)) {
+      readProjectLayer(scope, repoId, hostId)
+    }
+    return () => {}
+  }
   const open = readers.get(scope) ?? 0
   readers.set(scope, open + 1)
   if (open === 0) {
@@ -45,7 +57,10 @@ function readProjectLayer(scope: string, repoId: string, hostId: ExecutionHostId
 }
 
 /** The active project's panel settings: global Settings, its orca.yaml and this machine's override. */
-export function useTeamPanelSettingLayers(): TeamPanelSettingLayers {
+export function useTeamPanelSettingLayers(
+  options: { background?: boolean } = {}
+): TeamPanelSettingLayers {
+  const background = options.background === true
   const repoId = useAppStore((s) =>
     s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
   )
@@ -58,8 +73,10 @@ export function useTeamPanelSettingLayers(): TeamPanelSettingLayers {
   )
   const scope = repoId && hostId ? `${hostId}|${repoId}` : null
   useEffect(() => {
-    return scope && repoId && hostId ? openProjectLayer(scope, repoId, hostId) : undefined
-  }, [hostId, repoId, scope])
+    return scope && repoId && hostId
+      ? openProjectLayer(scope, repoId, hostId, background)
+      : undefined
+  }, [background, hostId, repoId, scope])
   const project = useProjectLayers((s) => (scope ? (s.byScope[scope] ?? undefined) : undefined))
   return { global, project, local }
 }

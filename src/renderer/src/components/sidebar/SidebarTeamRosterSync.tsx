@@ -23,9 +23,9 @@ function LeadWatch(): React.JSX.Element | null {
 }
 
 function RosterSubscriber(): null {
-  // Why this hook: it joins the panel's refcounted poller, so an open panel adds no second read.
-  const { section } = useTeamPanelModel()
-  const look = useTeamPanelLook()
+  // Why background: it joins the panel's poller and orca.yaml read, and a panel opening still reads fresh.
+  const { section } = useTeamPanelModel({ background: true })
+  const look = useTeamPanelLook({ background: true })
   const team = section.kind === 'ready' && section.value.kind === 'team' ? section.value : null
   const lead = team?.lead ?? null
   const members = team?.members ?? null

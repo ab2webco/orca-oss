@@ -80,6 +80,40 @@ describe('createTeamPanelModelPoller', () => {
     expect(all.readState).toHaveBeenCalledTimes(2)
   })
 
+  // Why: the sidebar holds the run for its rows; opening the panel must still read fresh, as before it did.
+  it('re-reads from loading when the panel joins a run only the sidebar holds', async () => {
+    let finish: (state: OrchestratorGameState) => void = () => {}
+    const readState = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+      .mockResolvedValue({ role: 'lead' })
+    const { all, sources, last } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE, { background: true })
+    await flush()
+    const before = sources.length
+
+    const releasePanel = poller.subscribe(SCOPE)
+    expect(sources[before]?.section).toEqual({ kind: 'loading' })
+    await flush()
+    expect(readState).toHaveBeenCalledTimes(2)
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+
+    // The sidebar's read, still in flight when the panel opened, publishes nothing.
+    const published = sources.length
+    finish({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    expect(sources.length).toBe(published)
+
+    // The sidebar joining an open panel adds no read, and the sidebar alone keeps polling.
+    poller.subscribe(SCOPE, { background: true })
+    await flush()
+    expect(readState).toHaveBeenCalledTimes(2)
+    releasePanel()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(3)
+  })
+
   it('says unavailable when no live lead runs in the project, without reading game.state', async () => {
     const { all, last } = deps({ findCaller: vi.fn(() => null) })
 

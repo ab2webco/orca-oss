@@ -103,9 +103,11 @@ const hasNoTeam = (section: TeamSection<TeamPanelModel>): boolean => section.kin
 
 /**
  * The lead's own game.state for the active project, else the no-team view from agent status.
- * Why one poller: the activity bar and the panel both call this hook.
+ * Why one poller: the panel and the sidebar's rows both call this hook.
+ * `background`: the caller only keeps the poll going (the sidebar), so a panel opening reads fresh.
  */
-export function useTeamPanelModel(): TeamPanelModelSource {
+export function useTeamPanelModel(options: { background?: boolean } = {}): TeamPanelModelSource {
+  const background = options.background === true
   const hostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
   const repoId = useAppStore((s) =>
     s.activeWorktreeId ? (s.getKnownWorktreeById(s.activeWorktreeId)?.repoId ?? null) : null
@@ -134,7 +136,10 @@ export function useTeamPanelModel(): TeamPanelModelSource {
     lastTeam && isRemoteMemberWorktreeActive(lastTeam.members, s) ? lastTeam.scope.key : null
   )
   const scope = heldKey !== null && lastTeam?.scope.key === heldKey ? lastTeam.scope : activeScope
-  useEffect(() => (scope ? poller.subscribe(scope) : undefined), [scope])
+  useEffect(
+    () => (scope ? poller.subscribe(scope, { background }) : undefined),
+    [scope, background]
+  )
   // Why: an answer changes the Inbox count, and a Jev line the scene's bubble, now, not at the next 20 s read.
   useEffect(() => {
     if (!scope) {
