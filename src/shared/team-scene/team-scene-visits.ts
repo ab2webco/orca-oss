@@ -5,7 +5,6 @@ import type { TeamSceneEmote, TeamSceneSpot } from './team-scene-types'
 
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
 export const ENTRY_X = -0.1
-const EXIT_X = 1.14
 const AT_LEAD_SECONDS = { enter: 0.9, handoff: 0.9, finish: 1, leave: 1 } as const
 
 type VisitKind = keyof typeof AT_LEAD_SECONDS
@@ -35,6 +34,23 @@ export function queueVisit(world: TeamSceneWorld, body: TeamSceneBody, kind: Vis
   body.plan = { kind, stage: 'queued', at: world.t }
   if (!world.queue.includes(body.key)) {
     world.queue.push(body.key)
+  }
+}
+
+/**
+ * Joins and leaves walk straight to the seat or off stage, out of the lead's queue: behind
+ * other visits a relaunched team left its desks empty for a minute while its cards said working.
+ */
+export function walkStraight(
+  world: TeamSceneWorld,
+  body: TeamSceneBody,
+  kind: 'enter' | 'leave'
+): void {
+  body.plan = { kind, stage: 'back', at: world.t }
+  world.queue = world.queue.filter((key) => key !== body.key)
+  if (kind === 'leave') {
+    world.effects.push({ kind: 'burst', key: body.key, reason: 'goodbye' })
+    emoteFor(world, body, 'heart', 1)
   }
 }
 
@@ -79,13 +95,18 @@ export function advanceVisit(
       world.visitor = null
     }
   } else if (plan.kind === 'leave') {
-    body.target = { x: EXIT_X, depth: VISIT_SPOT.depth }
-    if (body.x > EXIT_X - 0.06) {
+    // Why the left edge: the seats sit left, so the door the team came in by is the near one.
+    body.target = { x: ENTRY_X, depth: body.home.depth }
+    if (body.x < ENTRY_X + 0.06) {
       world.bodies.delete(body.key)
     }
   } else {
     body.target = body.home
     if (near(body, width)) {
+      if (plan.kind === 'enter') {
+        world.effects.push({ kind: 'burst', key: body.key, reason: 'welcome' })
+        emoteFor(world, body, 'heart', 1)
+      }
       body.plan = { kind: 'seated' }
     }
   }

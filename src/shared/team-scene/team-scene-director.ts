@@ -29,6 +29,7 @@ import {
   emoteFor as emote,
   ENTRY_X,
   queueVisit,
+  walkStraight,
   visitCanStart,
   type TeamScenePlan
 } from './team-scene-visits'
@@ -160,7 +161,7 @@ export function applyTeamSceneInput(
       body = bodyAt(key, 'member', joined.has(key) ? { x: ENTRY_X, depth: spot.depth } : spot, 1)
       bodies.set(key, body)
       if (joined.has(key)) {
-        queueVisit(world, body, 'enter')
+        walkStraight(world, body, 'enter')
       }
     }
     Object.assign(body, {
@@ -178,7 +179,7 @@ export function applyTeamSceneInput(
     if (byKey.has(body.key)) {
       bodies.delete(body.key) // pushed past the seats into +N
     } else {
-      queueVisit(world, body, 'leave')
+      walkStraight(world, body, 'leave')
     }
   }
 

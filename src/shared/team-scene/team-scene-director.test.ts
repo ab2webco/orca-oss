@@ -127,21 +127,47 @@ describe('team scene director', () => {
     expect(actor(world, 'd')).toMatchObject({ pose: 'done', emote: 'check' })
   })
 
-  it('walks a new member in, greets it at the lead, then seats it', () => {
+  it('walks a new member straight to its desk and greets it there', () => {
     const world = seated(['a'])
+    drainTeamSceneEffects(world)
     applyTeamSceneInput(world, input([member('a'), member('n')]))
     expect(actor(world, 'n')?.x).toBeLessThan(0)
     expect(runUntil(world, () => actor(world, 'n')?.pose === 'walk')).toBe(true)
-    expect(runUntil(world, () => actor(world, 'n')?.emote === 'heart')).toBe(true)
-    expect(actor(world, 'lead')?.pose).toBe('wave')
-    expect(runUntil(world, () => actor(world, 'n')?.pose === 'work')).toBe(true)
+    expect(runUntil(world, () => world.bodies.get('n')?.plan.kind === 'seated', 8)).toBe(true)
+    expect(actor(world, 'n')?.pose).toBe('work')
+    expect(actor(world, 'n')?.emote).toBe('heart')
+    expect(drainTeamSceneEffects(world)).toContainEqual({
+      kind: 'burst',
+      key: 'n',
+      reason: 'welcome'
+    })
   })
 
-  it('says goodbye at the lead and walks off stage', () => {
+  it('says goodbye and walks off stage without waiting on the lead', () => {
     const world = seated(['a', 'b'])
     applyTeamSceneInput(world, input([member('b')]))
-    expect(runUntil(world, () => actor(world, 'a')?.emote === 'heart')).toBe(true)
-    expect(runUntil(world, () => actor(world, 'a') === undefined)).toBe(true)
+    expect(actor(world, 'a')?.emote).toBe('heart')
+    expect(runUntil(world, () => actor(world, 'a') === undefined, 12)).toBe(true)
+  })
+
+  it('seats a relaunched team at its desks at once, never leaving the desks empty', () => {
+    const world = createTeamSceneWorld()
+    const layout = { rowSize: 5, workSeated: true }
+    const names = ['NETSA-121', 'NETSA-222', 'NETSA-80']
+    const team = (prefix: string) => names.map((n) => member(`${prefix}${n}`, { name: n }))
+    applyTeamSceneInput(world, input(team('old-')), layout)
+    runUntil(world, () => false, 3)
+    applyTeamSceneInput(world, input([]), layout)
+    runUntil(world, () => false, 2)
+    applyTeamSceneInput(world, input(team('new-')), layout)
+    const sat = () =>
+      team('new-').every((m) => {
+        const body = world.bodies.get(m.key)!
+        return body.plan.kind === 'seated' && body.x === body.home.x
+      })
+    expect(runUntil(world, sat, 12)).toBe(true)
+    expect(new Set(team('new-').map((m) => world.bodies.get(m.key)!.home.x)).size).toBe(3)
+    expect([...world.bodies.keys()].filter((k) => k.startsWith('old-'))).toEqual([])
   })
 
   it('walks a finished member to the lead to celebrate, then back to its seat, never off stage', () => {
