@@ -106,6 +106,21 @@ describe('team scene work loop', () => {
     expect(frames.some((f) => f.pose === 'work')).toBe(false)
   })
 
+  it('a member at its usage limit stands blocked at its seat, never working', () => {
+    const world = scene([member('a')])
+    watch(world, 'a', 3)
+    applyTeamSceneInput(world, input([member('a', 'blocked')]))
+    const { frames } = watch(world, 'a', 10)
+    expect(frames.some((f) => f.pose === 'work' || f.carrying)).toBe(false)
+    expect(actor(world, 'a').x).toBe(home(world, 'a'))
+    expect(actor(world, 'a').emote).toBe('blocked')
+  })
+
+  it('a resting member never takes the work pose', () => {
+    const world = scene([member('a', 'resting')])
+    expect(watch(world, 'a', 10).frames.some((f) => f.pose === 'work')).toBe(false)
+  })
+
   it('a member who needs you stops working at its seat', () => {
     const world = scene([member('a')])
     watch(world, 'a', 3)

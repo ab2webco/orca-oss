@@ -27,8 +27,11 @@ const member = (key: string, activity: TeamSceneActivity = 'working'): TeamScene
   mergedPr: null,
   site: { stage: 0, broken: false }
 })
-const input = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
-  lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+const input = (
+  members: TeamSceneMemberInput[],
+  leadActivity: TeamSceneActivity = 'working'
+): TeamSceneInput => ({
+  lead: { key: 'lead', name: 'Lead', characterKey: null, activity: leadActivity },
   advisor: null,
   members
 })
@@ -148,6 +151,26 @@ describe('team scene lead rounds', () => {
     const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
     expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
     expect(nearB()).toBe(true)
+  })
+
+  it('a lead that is not working stays at its spot and hands nothing, as its card says', () => {
+    for (const activity of ['resting', 'done'] as const) {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')], activity))
+      const home = actor(world, 'lead').x
+      expect(handsTo(run(world, 20))).toEqual([])
+      expect(actor(world, 'lead').x).toBe(home)
+      expect(actor(world, 'lead').pose).not.toBe('give')
+    }
+  })
+
+  it('walks back home when the lead stops working mid-round', () => {
+    const world = scene([member('a')])
+    const home = actor(world, 'lead').x
+    run(world, 6, () => leadWalking(world))
+    applyTeamSceneInput(world, input([member('a')], 'resting'))
+    expect(handsTo(run(world, 15))).toEqual([])
+    expect(actor(world, 'lead').x).toBe(home)
   })
 
   it('reduced motion settles the lead at home', () => {

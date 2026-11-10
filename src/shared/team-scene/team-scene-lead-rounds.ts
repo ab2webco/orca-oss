@@ -71,8 +71,11 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     return
   }
   const rounds = world.rounds
-  const asking = membersWith(world, 'needsYou')[0]
-  if ((rounds.stage === 'toMember' || rounds.stage === 'atMember') && !stillWanted(world, asking)) {
+  // Why: the scene must never contradict the lead's card; a resting lead walks nowhere.
+  const leading = lead.activity === 'working'
+  const asking = leading ? membersWith(world, 'needsYou')[0] : undefined
+  const out = rounds.stage === 'toMember' || rounds.stage === 'atMember'
+  if (out && (!leading || !stillWanted(world, asking))) {
     Object.assign(rounds, { stage: 'home', member: null })
   }
   if (rounds.stage === 'home' && asking && world.queue.length === 0) {
@@ -80,7 +83,7 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
   }
   if (rounds.stage === 'rest') {
     lead.target = LEAD_SPOT
-    if (world.queue.length > 0) {
+    if (world.queue.length > 0 || !leading) {
       return
     }
     const giveTo = world.t - rounds.at >= REST_SECONDS ? nextWorking(world) : null

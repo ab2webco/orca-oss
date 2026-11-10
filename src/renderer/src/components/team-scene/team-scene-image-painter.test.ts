@@ -9,7 +9,7 @@ import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-p
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
 
-const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
 const role = (sheets: string[]): OrchestratorGameSceneNativeStyle['roles']['lead'] => ({
   sheets,

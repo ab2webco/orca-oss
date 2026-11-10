@@ -104,6 +104,19 @@ describe('teamSceneInputOf', () => {
     ])
   })
 
+  it('marks a member that cannot work as blocked, as its card does', () => {
+    const input = teamSceneInputOf({
+      lead: lead(),
+      advisor: null,
+      members: [
+        card('limit', { status: 'risk', condition: 'limited' }),
+        card('out', { status: 'attention', condition: 'loggedOut' }),
+        card('paused', { status: 'risk', condition: 'paused' })
+      ]
+    })
+    expect(input.members.map((m) => m.activity)).toEqual(['blocked', 'blocked', 'blocked'])
+  })
+
   it('raises the lead hand only while it asks the user', () => {
     const asking = lead({ liveAction: { kind: 'question', text: 'Merge?', options: [] } })
     expect(teamSceneInputOf({ lead: asking, advisor: null, members: [] }).lead).toEqual({

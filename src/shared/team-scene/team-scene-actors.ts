@@ -7,7 +7,8 @@ const SEATED_POSE: Record<TeamSceneActivity, TeamScenePose> = {
   working: 'work',
   resting: 'idle',
   needsYou: 'raise',
-  done: 'done'
+  done: 'done',
+  blocked: 'idle'
 }
 
 function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
@@ -51,7 +52,9 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
             ? 'alert'
             : body.activity === 'done'
               ? 'check'
-              : null
+              : body.activity === 'blocked'
+                ? 'blocked'
+                : null
       const plan = body.plan
       return {
         key: body.key,

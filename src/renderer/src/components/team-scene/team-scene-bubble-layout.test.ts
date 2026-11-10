@@ -12,7 +12,7 @@ import { createImagePainter } from './team-scene-image-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 
-const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 // The panel's stage at the 390 and 320 viewports is 219 px wide; the rest are wider panels.
 const STAGE_WIDTHS = [219, 320, 480, 768]
 // One and two lines, from TeamSceneBubbles' classes: glass is 10.5 px snug text with py-1 and a

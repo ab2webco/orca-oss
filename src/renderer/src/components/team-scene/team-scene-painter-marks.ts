@@ -7,7 +7,13 @@ import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites
 import type { TeamSceneFrame } from './team-scene-painter'
 
 /** Status colours resolved from the theme; the scene uses them only for what they mean. */
-export type TeamSceneStatusColors = { attention: string; done: string; working: string }
+export type TeamSceneStatusColors = {
+  attention: string
+  done: string
+  working: string
+  /** The card's warning tone: a member that cannot work (limit, login, pause). */
+  risk: string
+}
 
 const TAU = 2 * Math.PI
 const SCROLL = '#f4e6c0'
@@ -28,7 +34,8 @@ export function drawSceneEmote(
     alert: colors.attention,
     check: colors.done,
     star: '#ffd24a',
-    heart: '#ff8fa8'
+    heart: '#ff8fa8',
+    blocked: colors.risk
   }
   g.save()
   g.translate(x, y)
@@ -49,6 +56,11 @@ export function drawSceneEmote(
     g.lineTo(0, 0.6)
     g.stroke()
     g.fillRect(-1, 2.6, 2, 2)
+  } else if (kind === 'blocked') {
+    // A no-entry bar: stopped, not asking.
+    g.moveTo(-3.6, 0)
+    g.lineTo(3.6, 0)
+    g.stroke()
   } else if (kind === 'check') {
     g.moveTo(-3, 0.2)
     g.lineTo(-0.8, 2.6)
