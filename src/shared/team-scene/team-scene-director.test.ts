@@ -544,3 +544,37 @@ describe('team scene director', () => {
     expect(advisorLineShown(world)).toBeNull()
   })
 })
+
+describe('team scene director on a floor of the building', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+
+  it('runs a floor with no lead: nobody walks to a lead who is not there', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, { ...input([member('a')]), leadless: true }, OFFICE)
+    applyTeamSceneInput(
+      world,
+      { ...input([member('a', { reportId: 'r1', activity: 'done' })]), leadless: true },
+      OFFICE
+    )
+    for (let t = 0; t < 10; t += DT) {
+      stepTeamScene(world, DT, { width: 420 })
+    }
+    expect(actor(world, 'lead')).toBeUndefined()
+    expect(world.bodies.get('a')?.plan.kind).toBe('seated')
+  })
+
+  it('adds empty desks after the members, the taken ones marked, and none by default', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(
+      world,
+      { ...input([member('a'), member('b')]), desks: { taken: 1, free: 2 } },
+      OFFICE
+    )
+    expect(world.stations).toHaveLength(5)
+    expect(world.stations.map((s) => s.taken === true)).toEqual([false, false, true, false, false])
+    expect(world.sites.map((s) => s.key)).toEqual(['a', 'b'])
+    const plain = createTeamSceneWorld()
+    applyTeamSceneInput(plain, input([member('a'), member('b')]), OFFICE)
+    expect(plain.stations).toHaveLength(2)
+  })
+})

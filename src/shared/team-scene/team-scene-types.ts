@@ -42,6 +42,10 @@ export type TeamSceneInput = {
   members: TeamSceneMemberInput[]
   /** The project's launch STOP is set; it does not stop the members it left running. */
   stopped?: true
+  /** A floor of the building the lead does not stand on: no lead, and nobody walks to one. */
+  leadless?: true
+  /** Empty desks after the members': other sessions' (taken, drawn dim) and the cap's free ones. */
+  desks?: { taken: number; free: number }
 }
 
 export type TeamSceneEvent =
@@ -72,6 +76,9 @@ export type TeamSceneGesture =
 
 /** A point on stage: x across the width (0 to 1), depth from back (0) to front (1). */
 export type TeamSceneSpot = { x: number; depth: number }
+
+/** A desk's spot; `taken` is another session's, with nobody of this team at it. */
+export type TeamSceneStation = TeamSceneSpot & { taken?: true }
 
 export type TeamScenePose = 'idle' | 'work' | 'walk' | 'raise' | 'give' | 'wave' | 'cheer' | 'done'
 

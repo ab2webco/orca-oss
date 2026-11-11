@@ -30,7 +30,8 @@ import type {
   TeamSceneEmote,
   TeamSceneInput,
   TeamSceneSpot,
-  TeamSceneHold
+  TeamSceneHold,
+  TeamSceneStation
 } from './team-scene-types'
 import {
   advanceVisit,
@@ -83,7 +84,7 @@ export type TeamSceneWorld = {
   /** Members beyond the seats, drawn as +N. */
   overflow: number
   /** Every seat's spot, so a style draws the stations even while their members walk. */
-  stations: TeamSceneSpot[]
+  stations: TeamSceneStation[]
   /** The lead's walks to working members between real events. */
   rounds: TeamSceneRounds
   /** Each seat's build at its real stage, for styles to draw beside the station. */
@@ -160,8 +161,12 @@ export function applyTeamSceneInput(
   world.layout = layout
   world.stopped = input.stopped === true
   const { bodies } = world
-  const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
-  bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
+  if (input.leadless) {
+    bodies.delete('lead')
+  } else {
+    const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
+    bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
+  }
   if (input.advisor && !bodies.has('advisor')) {
     // Why quicker than the team: a referee hurries over, so a ruling never waits on a long walk.
     bodies.set('advisor', {
@@ -173,7 +178,7 @@ export function applyTeamSceneInput(
   }
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
-  const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX)
+  const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX, input.desks)
   const byKey = new Map(input.members.map((m) => [m.key, m]))
   const seatedKeys = new Set(plan.seats.map((s) => s.key))
   let turn = 0
@@ -211,9 +216,11 @@ export function applyTeamSceneInput(
 
   for (const event of events) {
     const body = 'key' in event ? bodies.get(event.key) : undefined
-    if (event.kind === 'handoff' && body?.plan.kind === 'seated') {
+    // Why not on a leadless floor: nobody stands there to walk to.
+    const toLead = !input.leadless
+    if (event.kind === 'handoff' && toLead && body?.plan.kind === 'seated') {
       queueVisit(world, body, 'handoff')
-    } else if (event.kind === 'finish' && body && visitCanStart(body.plan)) {
+    } else if (event.kind === 'finish' && toLead && body && visitCanStart(body.plan)) {
       const report = body.plan.kind === 'handoff'
       queueVisit(world, body, 'finish')
       Object.assign(body.plan, { report })
@@ -235,7 +242,7 @@ export function applyTeamSceneInput(
     }
   }
   world.overflow = plan.overflow
-  world.stations = plan.seats.map((s) => s.spot)
+  world.stations = [...plan.seats.map((s) => s.spot), ...plan.empty]
   world.sites = plan.seats.map(({ key, spot }) => ({
     key,
     spot: siteSpotOf(spot),

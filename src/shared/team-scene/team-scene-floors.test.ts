@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
-import { teamSceneFloorsOf } from './team-scene-floors'
+import { teamSceneFloorInputOf, teamSceneFloorsOf } from './team-scene-floors'
 
 const local: TeamHost = { kind: 'local' }
 const remote = (name: string, reachable = true): TeamHost => ({
@@ -105,5 +105,32 @@ describe('teamSceneFloorsOf', () => {
     expect(desks(null, 3, 1)).toEqual({ taken: 2, free: 0 })
     // Why: a count read before the team's own cards arrived never takes desks away from them.
     expect(desks(4, 0, 2)).toEqual({ taken: 0, free: 2 })
+  })
+})
+
+describe('teamSceneFloorInputOf', () => {
+  const base = {
+    lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
+    advisor: { line: 'ok' },
+    stopped: { since: null, by: 'lead' }
+  }
+  it('gives each floor its own members, its empty desks, and the lead, advisor and STOP only where the lead stands', () => {
+    const members = [card('a'), card('b', remote('m1'))]
+    const machines = ready([machine(local, 3, 1), machine(remote('m1'), 4, 2)])
+    const floors = teamSceneFloorsOf({ lead, members, machines })
+    const model = { ...base, members, machines } as unknown as Parameters<
+      typeof teamSceneFloorInputOf
+    >[0]
+    const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor))
+    expect(home!.members.map((m) => m.key)).toEqual(['a'])
+    expect(home!.leadless).toBeUndefined()
+    expect(home!.advisor).toEqual({ line: 'ok' })
+    expect(home!.stopped).toBe(true)
+    expect(home!.desks).toEqual({ taken: 0, free: 2 })
+    expect(away!.members.map((m) => m.key)).toEqual(['b'])
+    expect(away!.leadless).toBe(true)
+    expect(away!.advisor).toBeNull()
+    expect(away!.stopped).toBeUndefined()
+    expect(away!.desks).toEqual({ taken: 1, free: 2 })
   })
 })

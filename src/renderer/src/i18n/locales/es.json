@@ -16239,6 +16239,7 @@
       "githubLimit": "Límite de la API de GitHub alcanzado. Se reintenta solo en {{minutes}} min."
     },
     "machines": {
+      "all": "Todas",
       "offline": "Sin conexión",
       "lowMemory": "Poca memoria",
       "free": "Libre",

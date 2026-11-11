@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
+import { TeamSceneBuilding, teamSceneHasFloors } from './TeamSceneBuilding'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
 import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
@@ -21,7 +22,7 @@ type Props = {
 /** The live scene for a team in the Game look, drawn from the Team model only. */
 export function TeamPanelScene({ model, style, children }: Props): React.JSX.Element {
   const timezone = model.metrics.kind === 'ready' ? model.metrics.value.timezone : 'local'
-  const { drawn, art, painter } = useTeamScenePainter({
+  const { drawn, art, painter, makePainter } = useTeamScenePainter({
     style,
     scene: model.scene,
     timezone
@@ -44,7 +45,15 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
           data-team-scene={drawn}
           data-team-scene-art={art}
         >
-          {painter ? (
+          {/* Why Office only: the building is desks on floors, and one machine stays as today. */}
+          {painter && drawn === 'office' && teamSceneHasFloors(model) ? (
+            <TeamSceneBuilding
+              model={model}
+              makePainter={makePainter}
+              leadLine={leadLine}
+              onUnplaced={onUnplaced}
+            />
+          ) : painter ? (
             <TeamSceneCanvas
               input={input}
               painter={painter}

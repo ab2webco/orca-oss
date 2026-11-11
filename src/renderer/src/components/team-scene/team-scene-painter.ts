@@ -1,7 +1,7 @@
 import type {
   TeamSceneActor,
   TeamSceneEffect,
-  TeamSceneSpot
+  TeamSceneStation
 } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneSiteView } from '../../../../shared/team-scene/team-scene-sites'
 import type { TeamSceneLayout } from '../../../../shared/team-scene/team-scene-director'
@@ -23,7 +23,7 @@ export type TeamSceneFrame = {
   actors: TeamSceneActor[]
   effects: TeamSceneEffect[]
   overflow: number
-  stations: TeamSceneSpot[]
+  stations: TeamSceneStation[]
   /** Each seat's build at its real stage; a style without builds draws its stations instead. */
   sites: TeamSceneSiteView[]
   /** Merged work kept on stage, oldest first. */

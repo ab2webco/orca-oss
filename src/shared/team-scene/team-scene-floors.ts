@@ -1,4 +1,6 @@
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
+import { teamSceneInputOf } from './team-scene-input'
+import type { TeamSceneInput } from './team-scene-types'
 
 /** One machine the team runs on, as a floor of the Office building. */
 export type TeamSceneFloor = {
@@ -77,4 +79,22 @@ export function teamSceneFloorsOf(model: {
     floor.free = floor.cap === null ? 0 : Math.max(0, floor.cap - used)
   }
   return [...floors.values()]
+}
+
+/** One floor's scene: its own members and empty desks; the lead, advisor and STOP only on its own. */
+export function teamSceneFloorInputOf(
+  model: Parameters<typeof teamSceneInputOf>[0],
+  floor: TeamSceneFloor
+): TeamSceneInput {
+  const input = teamSceneInputOf({
+    ...model,
+    members: floor.members,
+    advisor: floor.lead ? model.advisor : null,
+    stopped: floor.lead ? model.stopped : null
+  })
+  return {
+    ...input,
+    ...(floor.lead ? {} : { leadless: true as const }),
+    desks: { taken: floor.taken, free: floor.free }
+  }
 }

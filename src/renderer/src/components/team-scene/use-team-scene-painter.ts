@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   daylightAt,
   hourOf
@@ -64,6 +64,8 @@ export type TeamSceneStage = {
   drawn: GamePanelStyle
   art: OrchestratorGameSceneArtSource
   painter: TeamScenePainter | null
+  /** A fresh painter of the same art, for a building floor that draws apart from the stage's. */
+  makePainter: () => TeamScenePainter | null
 }
 
 type ArtRequest = { key: string; own: boolean; load: () => Promise<TeamSceneImageArt> }
@@ -165,7 +167,8 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
   }, [sceneKey, timezone])
 
   const image = request !== null && loaded?.key === request.key ? loaded.art : null
-  const painter = useMemo(() => {
+  // Why a maker: each floor of the building draws with its own painter, which keeps its own effects.
+  const makePainter = useCallback((): TeamScenePainter | null => {
     if (artStyle === null) {
       return createPixelPainter({ ...pixelScene, colors })
     }
@@ -174,5 +177,6 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
     const back = artStyle === 'office' && request?.own === false ? OFFICE_BACK_SEAT : null
     return image ? createImagePainter({ art: image, colors, builds, back }) : null
   }, [artStyle, image, pixelScene, colors, request])
-  return { drawn: art.drawn, art: art.art, painter }
+  const painter = useMemo(makePainter, [makePainter])
+  return { drawn: art.drawn, art: art.art, painter, makePainter }
 }

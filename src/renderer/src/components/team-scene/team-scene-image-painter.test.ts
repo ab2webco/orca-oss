@@ -787,6 +787,37 @@ describe('createImagePainter office back view', () => {
     expect(paint([blocked], { chairEnd: 144 }).calls.map((c) => c.fillStyle)).toContain(COLORS.risk)
   })
 
+  it('dims a desk another session holds, and leaves a free one as it is', () => {
+    const alphaAtDesk = (taken: boolean) => {
+      const r = recordingContext()
+      const alphas: number[] = []
+      const g = new Proxy(r.g, {
+        get(target, prop) {
+          if (prop === 'drawImage') {
+            return (...args: unknown[]) => {
+              if (args[0] === IMAGES.get('desk.png')) {
+                alphas.push(target.globalAlpha)
+              }
+            }
+          }
+          return Reflect.get(target, prop)
+        }
+      })
+      const painter = createImagePainter({
+        art: { style: officeStyle, images: IMAGES },
+        colors: COLORS,
+        builds: 'office',
+        back: { chairEnd: 144 }
+      })
+      const station = { ...spot, ...(taken ? { taken: true as const } : {}) }
+      g.globalAlpha = 1
+      painter.paint(g, frame({ actors: [], stations: [station] }))
+      return alphas[0]
+    }
+    expect(alphaAtDesk(true)).toBeLessThan(1)
+    expect(alphaAtDesk(false)).toBe(1)
+  })
+
   it('keeps the red screen of failing CI behind a member seen from behind', () => {
     const site = {
       key: 'm',

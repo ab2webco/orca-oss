@@ -17219,6 +17219,7 @@
       "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
     },
     "machines": {
+      "all": "All",
       "offline": "Offline",
       "lowMemory": "Low memory",
       "free": "Free",

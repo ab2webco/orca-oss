@@ -49,6 +49,7 @@ export const TEAM_SCENE_ART_HEIGHT = 176
 const TAU = 2 * Math.PI
 const SEAT_PX = 2
 const [NARROW_WIDTH, NARROW_SCALE] = [360, 0.92]
+const TAKEN_ALPHA = 0.45
 const BEHIND_ROW = 0.05
 const SHADOW_WIDTH = 0.2
 const feetY = (depth: number, h: number): number => h - 36 + depth * 22
@@ -207,6 +208,8 @@ export function createImagePainter(args: {
       const virus = state === 'fail' && args.builds === 'office'
       const left = spot.x * f.width - feet.x * px + (virus ? officeVirusShakeAt(f.t, px) : 0)
       const top = feetY(spot.depth, f.height) - feet.y * px
+      // Why dim: another session holds the desk, so it shows why the host is full, not who.
+      g.globalAlpha = spot.taken ? TAKEN_ALPHA : 1
       if (back) {
         const [from, sw, h] = [back.chairEnd, prop.width - back.chairEnd, prop.height]
         g.drawImage(prop, from, 0, sw, h, left + from * px, top, sw * px, h * px)
@@ -223,6 +226,7 @@ export function createImagePainter(args: {
         }
         drawStationScreen(g, rect, state, f.t, { ...colors, virus, boot, ...show })
       }
+      g.globalAlpha = 1
     }
   }
 
