@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import { isSleepingSweepExemptionNarrowingList } from './visible-worktrees'
 import SidebarRepositoryFilterSection from './SidebarRepositoryFilterSection'
+import { popupSideThatFits } from './submenu-fit-offset'
 import SidebarWorkspaceFilterSection from './SidebarWorkspaceFilterSection'
 import { getSidebarHostVisibilityLabel, shouldShowHostScopeControls } from './sidebar-host-options'
 import { useSidebarHostScopeOptions } from './use-sidebar-host-scope-options'
@@ -31,6 +32,10 @@ type SidebarWorkspaceOptionsMenuProps = {
   preserveWorkspaceBoardOpen?: boolean
   onMenuOpenChange?: (open: boolean) => void
 }
+
+// Why: matches the content's w-72, the width the side choice reserves on screen.
+const OPTIONS_MENU_WIDTH_PX = 288
+const OPTIONS_MENU_SIDE_OFFSET = 8
 
 const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsMenu({
   preserveWorkspaceBoardOpen = false,
@@ -59,6 +64,23 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
   const sidebarFilterMenuRequest = useAppStore((s) => s.sidebarFilterMenuRequest)
   const { hostOptions } = useSidebarHostScopeOptions()
   const showHostScopeControls = shouldShowHostScopeControls(hostOptions)
+
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [menuSide, setMenuSide] = useState<'right' | 'bottom'>('right')
+  // Why on open: the trigger moves with the sidebar width, so the side that fits is measured each time.
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current
+    if (open && trigger) {
+      setMenuSide(
+        popupSideThatFits({
+          triggerRight: trigger.getBoundingClientRect().right,
+          popupWidth: OPTIONS_MENU_WIDTH_PX,
+          sideOffset: OPTIONS_MENU_SIDE_OFFSET,
+          viewportWidth: window.innerWidth
+        })
+      )
+    }
+  }, [open])
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -128,6 +150,7 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
             <Button
+              ref={triggerRef}
               variant="ghost"
               size="icon-xs"
               type="button"
@@ -174,9 +197,10 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent
-        side="right"
-        align="start"
-        sideOffset={8}
+        side={menuSide}
+        align={menuSide === 'right' ? 'start' : 'end'}
+        sideOffset={OPTIONS_MENU_SIDE_OFFSET}
+        collisionPadding={8}
         className="w-72 pb-2"
         data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
       >

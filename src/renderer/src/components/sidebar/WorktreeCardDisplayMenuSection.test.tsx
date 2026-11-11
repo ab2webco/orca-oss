@@ -64,7 +64,12 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
         {children}
       </button>
     ),
-    DropdownMenuLabel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    DropdownMenuLabel: ({
+      children,
+      ...props
+    }: { children: ReactNode } & Record<`data-${string}`, string>) => (
+      <div {...props}>{children}</div>
+    ),
     DropdownMenuRadioGroup: ({
       children,
       onValueChange,
@@ -196,6 +201,34 @@ describe('WorktreeCardDisplayMenuSection', () => {
     const [nextProperties] = setWorktreeCardProperties.mock.calls[0] as [string[]]
     expect(nextProperties).toContain('plane-issue')
     expect(nextProperties).toContain('jira-issue')
+  })
+
+  // ORCA-1163: grouped so the work an agent operator acts on comes first.
+  it('heads the new-card-style toggles with Work, Agent and Source', () => {
+    settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: true }
+
+    renderMenu()
+
+    const headings = [...document.querySelectorAll('[data-card-display-group]')].map(
+      (node) => node.textContent
+    )
+    expect(headings).toEqual(['Work', 'Agent', 'Source'])
+  })
+
+  it('offers the PR toggle the team row already reads', () => {
+    settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: true }
+
+    renderMenu()
+
+    const prButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Pull request and checks'
+    )
+    expect(prButton?.dataset.checked).toBe('true')
+    act(() => {
+      prButton?.click()
+    })
+    const [nextProperties] = setWorktreeCardProperties.mock.calls[0] as [string[]]
+    expect(nextProperties).not.toContain('pr')
   })
 
   it('keeps branch-only copy when project groups are unavailable', () => {
