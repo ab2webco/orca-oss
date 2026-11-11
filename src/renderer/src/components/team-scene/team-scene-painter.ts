@@ -28,6 +28,8 @@ export type TeamSceneFrame = {
   sites: TeamSceneSiteView[]
   /** Merged work kept on stage, oldest first. */
   trophies: { key: string; name: string }[]
+  /** The project's launch STOP is set. */
+  stopped?: boolean
 }
 
 /** A scene style: Figures, Office or Pixel. `dispose` drops its cached backdrops and sprites. */

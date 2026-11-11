@@ -123,7 +123,8 @@ export function TeamSceneCanvas({
         overflow: world.overflow,
         stations: world.stations,
         sites: world.sites,
-        trophies: world.trophies
+        trophies: world.trophies,
+        stopped: world.stopped
       })
     },
     [painter]

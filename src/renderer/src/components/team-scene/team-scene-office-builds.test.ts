@@ -87,4 +87,28 @@ describe('office builds', () => {
     drawOfficePlaques(none.g, 0, 420, 0)
     expect(none.calls).toHaveLength(0)
   })
+
+  it("hangs a STOP plaque above the lead's spot while the team is stopped, and nothing else", () => {
+    const risk = '#ffaa04'
+    const builds = (stopped: boolean) => {
+      const r = recordingContext()
+      const f = { width: 400, height: 176, t: 0, sites: [], trophies: [], stopped }
+      drawOfficeBuilds(
+        r.g,
+        f,
+        () => 150,
+        ATTENTION,
+        () => 0,
+        true,
+        risk
+      )
+      return r.calls
+    }
+    const words = (calls: ReturnType<typeof builds>) => calls.filter((c) => c.name === 'fillText')
+    const sign = words(builds(true))
+    expect(sign.map((c) => c.args[0])).toEqual(['STOP'])
+    expect(sign[0]!.args[1] as number).toBeCloseTo(400 * 0.84)
+    expect(builds(true).some((c) => c.fillStyle === risk)).toBe(true)
+    expect(words(builds(false))).toHaveLength(0)
+  })
 })

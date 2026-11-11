@@ -40,6 +40,8 @@ export type TeamSceneInput = {
   advisor: { line: string | null } | null
   /** Needs-you first, as the Team model orders them. */
   members: TeamSceneMemberInput[]
+  /** The project's launch STOP is set; it does not stop the members it left running. */
+  stopped?: true
 }
 
 export type TeamSceneEvent =

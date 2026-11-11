@@ -342,3 +342,16 @@ describe('teamSceneInputOf and CI', () => {
     expect(input.members.map((m) => m.ci ?? null)).toEqual(['pending', 'success', null, null, null])
   })
 })
+
+describe('teamSceneInputOf and the launch STOP', () => {
+  it("carries the project's STOP to the scene, and nothing while it is clear", () => {
+    const base = { lead: lead(), advisor: null, members: [card('m')] }
+    const stop = { since: null, by: 'lead', membersRunning: 1 }
+    const stopped = teamSceneInputOf({ ...base, stopped: stop })
+    expect(stopped.stopped).toBe(true)
+    expect(teamSceneInputOf({ ...base, stopped: null }).stopped).toBeUndefined()
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, stopped)
+    expect(world.stopped).toBe(true)
+  })
+})

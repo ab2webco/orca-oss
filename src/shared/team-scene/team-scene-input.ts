@@ -83,13 +83,14 @@ const deskOf = (
 /** The scene's projection of the Team model; the summary text stands in for a report id. */
 export function teamSceneInputOf(
   model: Pick<TeamPanelGameModel, 'lead' | 'advisor' | 'members'> &
-    Partial<Pick<TeamPanelGameModel, 'queue'>>
+    Partial<Pick<TeamPanelGameModel, 'queue' | 'stopped'>>
 ): TeamSceneInput {
   // Why null when not ready: a hidden or loading Queue tab says nothing about the queue.
   const queue = model.queue?.kind === 'ready' ? model.queue.value : null
   return {
     lead: agentOf(model.lead, model.lead.liveAction?.kind === 'question'),
     advisor: model.advisor ? { line: model.advisor.line } : null,
+    ...(model.stopped ? { stopped: true as const } : {}),
     members: model.members.map((m) => ({
       ...agentOf(m, m.needsYou),
       reportId: m.summary,

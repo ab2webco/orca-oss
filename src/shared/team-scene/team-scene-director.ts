@@ -90,6 +90,8 @@ export type TeamSceneWorld = {
   sites: TeamSceneSiteView[]
   /** Finished builds of merged work, oldest first; they outlive their members. */
   trophies: { key: string; name: string }[]
+  /** The launch STOP, drawn as a sign; members keep their own state. */
+  stopped: boolean
   layout: TeamSceneLayout
   advisorWalk: TeamSceneAdvisorWalk
 }
@@ -115,6 +117,7 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     rounds: createTeamSceneRounds(),
     sites: [],
     trophies: [],
+    stopped: false,
     layout: GROUND_LAYOUT,
     advisorWalk: createAdvisorWalk()
   }
@@ -155,6 +158,7 @@ export function applyTeamSceneInput(
   const events = teamSceneEventsBetween(world.last, input)
   world.last = input
   world.layout = layout
+  world.stopped = input.stopped === true
   const { bodies } = world
   const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
   bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))

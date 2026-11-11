@@ -1,3 +1,4 @@
+import { LEAD_SPOT } from '../../../../shared/team-scene/team-scene-lead-rounds'
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import {
   PILE_FROM_SEAT_X,
@@ -111,18 +112,39 @@ export function drawOfficePlaques(
   }
 }
 
+/** The launch STOP: a plaque on the wall over the lead's spot, in the card's risk colour. */
+export function drawOfficeStop(g: CanvasRenderingContext2D, width: number, risk: string): void {
+  const [x, y, w, h] = [width * LEAD_SPOT.x, 22, 34, 13]
+  g.save()
+  g.fillStyle = FRAME
+  g.fillRect(x - w / 2 - 1, y - 1, w + 2, h + 2)
+  g.fillStyle = risk
+  g.fillRect(x - w / 2, y, w, h)
+  g.fillStyle = '#1b1418'
+  g.font = 'bold 9px sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  // Why one word: the sign says the launch is stopped, as the card's STOP does, nothing more.
+  g.fillText('STOP', x, y + h / 2 + 0.5)
+  g.restore()
+}
+
 /** Every seat's tray and board plus the plaques, in the image painter's stage px. */
 export function drawOfficeBuilds(
   g: CanvasRenderingContext2D,
-  f: Pick<TeamSceneFrame, 'width' | 'height' | 't' | 'sites' | 'trophies'>,
+  f: Pick<TeamSceneFrame, 'width' | 'height' | 't' | 'sites' | 'trophies' | 'stopped'>,
   feetY: (depth: number, h: number) => number,
   attention: string,
   /** Px from a seat to its desk's monitor at that depth, so the board hangs over the screen. */
   monitorFromSeat: (depth: number) => number,
   /** False where members work seated: nobody fetches, so a tray read as litter on the floor. */
-  trays = true
+  trays = true,
+  risk = '#f5b342'
 ): void {
   drawOfficePlaques(g, f.trophies.length, f.width, 4)
+  if (f.stopped) {
+    drawOfficeStop(g, f.width, risk)
+  }
   for (const site of f.sites) {
     const s = teamSceneScaleAt(site.spot.depth)
     const y = feetY(site.spot.depth, f.height)

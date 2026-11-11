@@ -300,7 +300,7 @@ export function createImagePainter(args: {
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
       } else if (args.builds === 'office') {
-        drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat, !back)
+        drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat, !back, colors.risk)
       }
       // Why split: whoever walks behind the row goes under its monitors, never over them; a
       // gesturing advisor stands in a gap, clear of every monitor, so it shows in front.
