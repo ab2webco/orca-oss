@@ -1,5 +1,6 @@
 import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
+import { toolDisplayWords } from '../../../../shared/tool-display-words'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -94,9 +95,9 @@ export function teamLeadLiveText(action: TeamLiveAction | null, condition: TeamC
     : text
 }
 
-/** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`. */
+/** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`; alone, as words. */
 export const teamToolText = (tool: string, detail: string | null): string =>
-  detail ? `${tool} · ${detail}` : tool
+  detail ? `${tool} · ${detail}` : toolDisplayWords(tool)
 
 /** What the agent does now; agent words (tool detail, questions) are shown as written. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {

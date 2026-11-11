@@ -32,6 +32,18 @@ describe('teamLeadLiveText', () => {
 })
 
 describe('teamLiveText tool labels', () => {
+  it('reads a bare tool name as words, and keeps the tool beside its detail', () => {
+    expect(teamLiveText({ kind: 'tool', tool: 'PushNotification', detail: null }, 'working')).toBe(
+      'Push notification'
+    )
+    expect(
+      teamLiveText({ kind: 'tool', tool: 'mcp__plane__list_states', detail: null }, 'working')
+    ).toBe('List states')
+    expect(
+      teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 924' }, 'working')
+    ).toBe('Bash · gh pr checks 924')
+  })
+
   it('names the tool on every row, as V28 soloNow does', () => {
     expect(
       teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 912' }, 'working')
