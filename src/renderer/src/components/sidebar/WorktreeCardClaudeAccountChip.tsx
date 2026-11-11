@@ -1,9 +1,6 @@
 import React from 'react'
-import { AtSign, Globe, Pin } from 'lucide-react'
 import { useAppStore } from '@/store'
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
 import { isWebClientLocation } from '@/lib/web-client-location'
@@ -45,7 +42,6 @@ export function WorktreeCardClaudeAccountChip({
     return null
   }
 
-  const Icon = model.isEndpoint ? Globe : model.inherited ? AtSign : Pin
   const tooltip = model.isEndpoint
     ? translate(
         'auto.components.sidebar.WorktreeCardClaudeAccountChip.pinnedEndpoint',
@@ -64,33 +60,16 @@ export function WorktreeCardClaudeAccountChip({
           { value0: model.label }
         )
 
+  // Why plain text: V30 draws the account as a dim @account in the row, not a badge (ORCA-1149).
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge
-          variant="outline"
-          className={cn(
-            // Why: the account label is the row's least identifying text, so it gives way
-            // first (shrink-[2]) and ellipsizes rather than pushing identifier chips out of
-            // the clipped sidebar. Never shrink-0 here: that is what spilled the email.
-            'h-[16px] min-w-0 max-w-[8rem] shrink-[2] gap-1 rounded px-1.5 text-[10px] font-medium leading-none',
-            model.inherited
-              ? 'text-muted-foreground border-border/60 bg-transparent'
-              : 'text-foreground/80 border-foreground/20 bg-foreground/[0.06]'
-          )}
+        <span
+          className="min-w-0 max-w-[8rem] shrink-[2] truncate text-[11px] leading-none text-muted-foreground"
           aria-label={tooltip}
         >
-          <Icon className="size-2.5 shrink-0" />
-          <span className="truncate">{model.label}</span>
-          {model.inherited && (
-            <span className="shrink-0 opacity-60">
-              {translate(
-                'auto.components.sidebar.WorktreeCardClaudeAccountChip.globalMarker',
-                '(global)'
-              )}
-            </span>
-          )}
-        </Badge>
+          @{model.label}
+        </span>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
         {tooltip}

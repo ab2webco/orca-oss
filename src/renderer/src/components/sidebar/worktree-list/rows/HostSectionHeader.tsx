@@ -12,7 +12,7 @@ function HostActiveCount({ worktreeIds }: { worktreeIds: readonly string[] }): R
   return (
     <span
       data-host-header-active=""
-      className="ml-auto shrink-0 text-[11px] font-normal leading-none tabular-nums text-muted-foreground/70"
+      className="ml-auto shrink-0 text-[11px] font-normal leading-none tabular-nums text-muted-foreground/70 transition-opacity can-hover:group-hover/host-header:opacity-0 group-focus-within/host-header:opacity-0"
     >
       {translate('auto.components.sidebar.WorktreeList.hostActiveAgents', '{{count}} active', {
         count: active
@@ -87,7 +87,7 @@ export function HostSectionHeader({
         data-host-header-drag-id={row.hostId}
         aria-expanded={!row.collapsed}
         className={cn(
-          'group/host-header flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-worktree-sidebar-accent/50',
+          'group/host-header relative flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-worktree-sidebar-accent/50',
           onDragPointerDown && 'cursor-grab active:cursor-grabbing',
           isBlocked && 'text-destructive',
           dragging && 'pointer-events-none opacity-0'
@@ -129,14 +129,20 @@ export function HostSectionHeader({
             <HostActiveCount worktreeIds={row.worktreeIds} />
           )}
         </div>
-        <div className="flex size-4 shrink-0 items-center justify-center text-muted-foreground/60 can-hover:opacity-0 transition-opacity group-hover/host-header:opacity-100">
-          <ChevronDown
-            className={cn('size-3.5 transition-transform', row.collapsed && '-rotate-90')}
-          />
+        {/* Why an overlay: V30's count sits flush right; the hover controls must not reserve space. */}
+        <div
+          data-host-header-controls=""
+          className="absolute inset-y-0 right-1 flex items-center gap-1 can-hover:opacity-0 transition-opacity group-hover/host-header:opacity-100 group-focus-within/host-header:opacity-100 has-[[data-state=open]]:opacity-100"
+        >
+          <div className="flex size-4 shrink-0 items-center justify-center text-muted-foreground/60">
+            <ChevronDown
+              className={cn('size-3.5 transition-transform', row.collapsed && '-rotate-90')}
+            />
+          </div>
+          <span data-host-header-action="">
+            <HostSectionHeaderMenu row={row} />
+          </span>
         </div>
-        <span data-host-header-action="">
-          <HostSectionHeaderMenu row={row} />
-        </span>
       </div>
     </div>
   )

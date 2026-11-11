@@ -58,8 +58,11 @@ describe('WorktreeCardClaudeAccountChip', () => {
     const html = renderToStaticMarkup(
       <WorktreeCardClaudeAccountChip worktree={worktree()} repo={NO_REPO} />
     )
-    expect(html).toContain('active@example.com')
-    expect(html).toContain('(global)')
+    // Why: V30 draws a dim @account, not a badge with a (global) marker (ORCA-1149).
+    expect(html).toContain('@active@example.com')
+    expect(html).not.toContain('(global)')
+    expect(html).not.toContain('<svg')
+    expect(html).not.toContain('border')
   })
 
   it('renders the pinned account without the global marker', () => {
