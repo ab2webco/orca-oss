@@ -9,6 +9,7 @@ import {
   type AgentStartupShell
 } from '../../../shared/tui-agent-startup-shell'
 import { getClientLoginShell } from '@/lib/client-login-shell'
+import { getWorktreeLessWindowsRuntimeDefault } from '@/lib/worktree-less-windows-runtime-default'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { parseWslUncPath } from '../../../shared/wsl-paths'
 
@@ -53,6 +54,9 @@ export function resolveAiVaultResumeStartupShell(args: {
     ? resolveLocalWindowsTerminalShellOverrideForTab({
         explicitShellOverride: undefined,
         defaultWindowsShell: args.state.settings?.terminalWindowsShell,
+        globalWindowsRuntimeDefault: args.worktreeId
+          ? getWorktreeLessWindowsRuntimeDefault(args.state, args.worktreeId)
+          : undefined,
         isWslWorktree: Boolean(workspacePath && parseWslUncPath(workspacePath)),
         projectRuntime
       })
