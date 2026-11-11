@@ -399,3 +399,26 @@ describe('a tail behind a tag', () => {
     expect(teamSceneCellUnder({ x: 18, y: 45, size: 2 }, [tag])).toBe(false)
   })
 })
+
+// Why: a building floor crops the top of its stage, and a bubble placed there was cut under the
+// floor above ('Los mensajes quedan detrás del muro', owner, 2026-11-11).
+describe('a stage whose top is cropped', () => {
+  it('never starts a bubble above the visible top, and leaves one out that cannot fit below it', () => {
+    const scene = { width: 420, height: 176, top: 60 }
+    const lead = { key: 'lead', anchor: { x: 300, top: 120 }, width: 120, height: 25 }
+    const [box] = layoutTeamSceneBubbles([lead], scene)
+    expect(box!.top).toBeGreaterThanOrEqual(60)
+    expect(layoutTeamSceneBubbles([{ ...lead, anchor: { x: 300, top: 80 } }], scene)).toEqual([])
+    const beside = layoutTeamSceneBubbles(
+      [
+        { key: 'advisor', anchor: { x: 200, top: 110 }, width: 150, height: 41 },
+        { ...lead, height: 41 }
+      ],
+      scene,
+      { beside: true }
+    )
+    for (const one of beside) {
+      expect(one.top, one.key).toBeGreaterThanOrEqual(60)
+    }
+  })
+})

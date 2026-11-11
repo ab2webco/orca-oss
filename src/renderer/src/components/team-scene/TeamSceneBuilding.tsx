@@ -107,41 +107,44 @@ function FloorStage({
   zoomed,
   level,
   legs,
-  onBoarded
+  onBoarded,
+  topmost
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
   level: number
   legs: TeamSceneFloorLegs
   onBoarded: (rider: string) => void
+  /** The highest floor shown: nothing above it but the building's own top. */
+  topmost: boolean
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
   if (!painter) {
     return null
   }
+  const cropTop = zoomed ? 0 : Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel)
+  const crop = zoomed
+    ? undefined
+    : { top: cropTop, bottom: Math.max(0, painter.height - cropTop - STRIP.height) }
   return (
     <div
       data-team-floor={floor.key}
       data-team-floor-dark={floor.reachable ? undefined : ''}
       // Why a slab and an inner ring: floors read as storeys of one glass building, not copies.
-      className="relative overflow-hidden border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
+      // Why no overflow clip: only the canvas is cropped, so a bubble rises over the slab above.
+      className="relative border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
       style={zoomed ? undefined : { height: STRIP.height }}
     >
-      <div
-        data-team-floor-view=""
-        style={
-          zoomed
-            ? undefined
-            : { marginTop: -Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel) }
-        }
-      >
+      <div data-team-floor-view="" style={zoomed ? undefined : { marginTop: -cropTop }}>
         <TeamSceneCanvas
           input={input}
           painter={painter}
           leadLine={floor.lead ? leadLine : null}
           onUnplaced={floor.lead ? onUnplaced : undefined}
           onBoarded={onBoarded}
+          crop={crop}
+          visibleTop={topmost ? cropTop : 0}
         />
       </div>
       {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
@@ -247,6 +250,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               level={floors.indexOf(floor)}
               legs={legs}
               onBoarded={onBoarded}
+              topmost={floor === shown[0]}
             />
           ))}
         </div>

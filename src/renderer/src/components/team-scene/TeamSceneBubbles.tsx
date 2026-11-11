@@ -30,6 +30,8 @@ type Props = {
   obstacles?: readonly TeamSceneRect[]
   /** Told after each layout which speeches no bubble shows whole (none, or clamped), so their lines can show elsewhere. */
   onUnplaced?: (keys: string[]) => void
+  /** Where the stage starts to show; no bubble starts above it. 0 when the stage shows whole. */
+  visibleTop?: number
 }
 
 const NONE: readonly TeamSceneRect[] = []
@@ -87,7 +89,8 @@ export function TeamSceneBubbles({
   height,
   cloudPixel,
   obstacles = NONE,
-  onUnplaced
+  onUnplaced,
+  visibleTop = 0
 }: Props): React.JSX.Element {
   const refs = useRef(new Map<string, HTMLSpanElement>())
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
@@ -149,7 +152,7 @@ export function TeamSceneBubbles({
     })
     const laid = layoutTeamSceneBubbles(
       requests,
-      { width, height },
+      { width, height, top: visibleTop },
       { beside: Boolean(cloudPixel), obstacles }
     )
     setBoxes(laid)
@@ -157,10 +160,14 @@ export function TeamSceneBubbles({
     const whole = new Set(laid.filter((b) => !b.clamped).map((b) => b.key))
     onUnplaced?.(speeches.filter((s) => !whole.has(s.key)).map((s) => s.key))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
-  }, [layoutKey, width, height, cloudPixel])
+  }, [layoutKey, width, height, cloudPixel, visibleTop])
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden="true"
+      data-scene-visible-top={visibleTop}
+    >
       {speeches.map((s) => {
         const box = boxes.find((b) => b.key === s.key)
         const tail = box ? Math.max(4, s.anchor.top - box.top - box.height) : 0

@@ -28,6 +28,10 @@ type Props = {
   onUnplaced?: (keys: string[]) => void
   /** The lead or advisor stepped into the building's elevator. */
   onBoarded?: (rider: string) => void
+  /** Rows of the stage a building floor hides above and below; only the canvas is cut, never a bubble. */
+  crop?: { top: number; bottom: number }
+  /** Where the stage's bubbles may start: a top floor keeps them under its own cropped top. */
+  visibleTop?: number
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
@@ -48,7 +52,9 @@ export function TeamSceneCanvas({
   painter,
   leadLine,
   onUnplaced,
-  onBoarded
+  onBoarded,
+  crop,
+  visibleTop
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
@@ -252,7 +258,10 @@ export function TeamSceneCanvas({
         role="img"
         aria-label={teamSceneLabel()}
         className="block w-full"
-        style={{ height: painter.height }}
+        style={{
+          height: painter.height,
+          ...(crop ? { clipPath: `inset(${crop.top}px 0px ${crop.bottom}px)` } : {})
+        }}
       />
       {speakers.askers.map((asker) => (
         <span
@@ -282,6 +291,7 @@ export function TeamSceneCanvas({
         cloudPixel={painter.cloudPixel}
         obstacles={tags}
         onUnplaced={onUnplaced}
+        visibleTop={visibleTop}
       />
     </div>
   )
