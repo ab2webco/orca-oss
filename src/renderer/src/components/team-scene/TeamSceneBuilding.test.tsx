@@ -408,6 +408,54 @@ describe('TeamSceneBuilding', () => {
       vi.useRealTimers()
     })
 
+    // Why: a floor out of view draws no frames, so a lead there never walks to the door, and the
+    // car waited its 30 s limit before leaving (building E2E, five floors, 2026-11-11).
+    it('sends the car at once when the rider sets out from a floor out of view', () => {
+      vi.useFakeTimers()
+      motion(false)
+      vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+      const watchers: { cb: IntersectionObserverCallback; els: Element[] }[] = []
+      vi.stubGlobal(
+        'IntersectionObserver',
+        class {
+          els: Element[] = []
+          constructor(cb: IntersectionObserverCallback) {
+            watchers.push({ cb, els: this.els })
+          }
+          observe(el: Element) {
+            this.els.push(el)
+          }
+          unobserve() {}
+          disconnect() {}
+        }
+      )
+      const hosts = [local, remote('a'), remote('b'), remote('c'), remote('d')]
+      render(hosts)
+      // The lead's floor scrolls out of view.
+      act(() => {
+        for (const watcher of watchers) {
+          const entries = watcher.els
+            .filter((el) => (el as HTMLElement).dataset.teamFloor === '')
+            .map(
+              (el) =>
+                ({ target: el, isIntersecting: false }) as unknown as IntersectionObserverEntry
+            )
+          if (entries.length > 0) {
+            watcher.cb(entries, {} as IntersectionObserver)
+          }
+        }
+      })
+      const asking = model(hosts)
+      asking.members[4] = { ...asking.members[4]!, needsYou: true }
+      act(() =>
+        root.render(<TeamSceneBuilding model={asking} makePainter={make} leadLine={null} />)
+      )
+      act(() => vi.advanceTimersByTime(1_200))
+      expect(car()?.dataset.teamElevatorCar).toBe('d')
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    })
+
     it('shows where a ride ends at once under reduced motion', () => {
       motion(true)
       render([local, remote('imac')])

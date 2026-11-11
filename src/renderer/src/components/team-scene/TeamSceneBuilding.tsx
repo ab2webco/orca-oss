@@ -19,7 +19,7 @@ import { teamSceneRectsFromAbove, type TeamSceneRect } from './team-scene-bubble
 import { TeamSceneElevatorShaft } from './TeamSceneElevatorShaft'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
-import { useTeamBuildingScroll } from './use-team-building-scroll'
+import { useTeamBuildingScroll, useTeamFloorViews } from './use-team-building-scroll'
 import { useTeamSceneRideLegs } from './use-team-scene-ride-legs'
 import type { TeamScenePainter } from './team-scene-painter'
 
@@ -256,19 +256,22 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const reducedMotion = usePrefersReducedMotion()
   const envelope = useTubeEnvelope(floors, reducedMotion)
   const advisorFloor = useAdvisorRide(floors)
+  const views = useTeamFloorViews()
   const { legs, onBoarded } = useTeamSceneRideLegs(
     {
       lead: teamSceneRideOf(floors),
       advisor: advisorFloor === null ? null : { floor: advisorFloor, member: null }
     },
     leadFloor,
-    reducedMotion
+    reducedMotion,
+    views.hidden
   )
   // Why the lead's trip first: one car, and the lead's visit is the one someone waits on.
   const leadCar = teamSceneLegCar(legs.lead, leadFloor)
   const advisorCar = teamSceneLegCar(legs.advisor, leadFloor)
   const car = legs.lead.stage === 'home' ? advisorCar : leadCar
-  const floorRef = useTeamBuildingScroll({
+  useTeamBuildingScroll({
+    floors: views.floors,
     openOn: teamSceneRideOf(floors)?.floor ?? leadFloor,
     carAt: car.at,
     reducedMotion
@@ -338,7 +341,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               aboveView={scrollTop - index * (STRIP.height + STRIP.slab)}
               onAskers={onAskers}
               fromAbove={fromAboveOf(index)}
-              floorRef={floorRef(floor.key)}
+              floorRef={views.register(floor.key)}
             />
           ))}
         </div>

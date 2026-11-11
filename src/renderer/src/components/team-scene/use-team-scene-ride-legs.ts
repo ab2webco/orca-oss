@@ -12,6 +12,11 @@ type Rider = keyof TeamSceneFloorLegs
 type Wants = Record<Rider, TeamSceneLegWant>
 
 const HOME: TeamSceneFloorLegs = { lead: { stage: 'home' }, advisor: { stage: 'home' } }
+const NO_FLOORS: ReadonlySet<string> = new Set()
+
+/** A rider walking to the door on a floor nobody sees: there are no frames to walk it there. */
+const walksUnseen = (leg: TeamSceneLeg, hidden: ReadonlySet<string>): boolean =>
+  (leg.stage === 'out' && hidden.has(leg.home)) || (leg.stage === 'back' && hidden.has(leg.away))
 const nowSeconds = (): number => Date.now() / 1000
 
 // Why the end at once: under reduced motion nobody walks to a door, so a ride only shows its end.
@@ -36,28 +41,32 @@ const waitOf = (leg: TeamSceneLeg, now: number): number | null => {
 export function useTeamSceneRideLegs(
   wants: Wants,
   home: string,
-  reducedMotion: boolean
+  reducedMotion: boolean,
+  /** Floors out of view: they draw no frames, so a rider walking out there boards at once. */
+  hidden: ReadonlySet<string> = NO_FLOORS
 ): { legs: TeamSceneFloorLegs; onBoarded: (rider: string) => void } {
   const [legs, setLegs] = useState<TeamSceneFloorLegs>(HOME)
   const wantsRef = useRef(wants)
   wantsRef.current = wants
+  const hiddenRef = useRef(hidden)
+  hiddenRef.current = hidden
   const advance = useCallback(
     (boarded: string | null) =>
       setLegs((prev) => {
         const now = nowSeconds()
-        const step = (rider: Rider): TeamSceneLeg =>
-          teamSceneLegAfter(prev[rider], {
-            want: wantsRef.current[rider],
-            now,
-            home,
-            boarded: boarded === rider
-          })
+        const after = (leg: TeamSceneLeg, rider: Rider, boards: boolean): TeamSceneLeg =>
+          teamSceneLegAfter(leg, { want: wantsRef.current[rider], now, home, boarded: boards })
+        // Why twice: a rider setting out from a floor out of view boards the moment it sets out.
+        const step = (rider: Rider): TeamSceneLeg => {
+          const next = after(prev[rider], rider, boarded === rider)
+          return walksUnseen(next, hiddenRef.current) ? after(next, rider, true) : next
+        }
         const next = { lead: step('lead'), advisor: step('advisor') }
         return JSON.stringify(next) === JSON.stringify(prev) ? prev : next
       }),
     [home]
   )
-  const wantsKey = JSON.stringify(wants)
+  const wantsKey = JSON.stringify([wants, [...hidden]])
   useEffect(() => {
     if (!reducedMotion) {
       advance(null)
