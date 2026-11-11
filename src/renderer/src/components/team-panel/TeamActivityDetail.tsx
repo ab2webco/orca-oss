@@ -6,13 +6,13 @@ import CacheTimer from '../sidebar/CacheTimer'
 import type { TeamActivityRow, TeamAdvisorRow } from '../../../../shared/team-panel-model-types'
 import {
   teamCiText,
-  teamHostText,
   teamLiveText,
   teamModelText,
   teamPrNumberText,
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { teamAdvisorSourceText } from './TeamTabContent'
 
 function Fact({
@@ -103,7 +103,7 @@ export function TeamActivityDetail({
           <span className="truncate text-xs text-muted-foreground">{row.repoName}</span>
         ) : null}
         <code className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {teamHostText(row.host)}
+          <TeamHostName host={row.host} />
         </code>
       </div>
       <div className="mb-2.5 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">

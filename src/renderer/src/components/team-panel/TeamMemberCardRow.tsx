@@ -7,12 +7,12 @@ import {
   statusToneOfCi,
   teamAgeText,
   teamCiText,
-  teamHostText,
   teamLiveText,
   teamModelText,
   teamPhaseText,
   teamTicketBesideName
 } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
@@ -116,7 +116,7 @@ export function TeamMemberCardRow({
               data-team-host=""
               className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
             >
-              {teamHostText(card.host)}
+              <TeamHostName host={card.host} />
             </span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

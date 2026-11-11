@@ -8,7 +8,8 @@ import type {
   TeamLeadCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamLeadLiveText, teamModelText } from './team-card-text'
+import { teamLeadLiveText, teamModelText } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
@@ -64,7 +65,7 @@ function LeadCardRow({
               data-team-host=""
               className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
             >
-              {teamHostText(lead.host)}
+              <TeamHostName host={lead.host} />
             </span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

@@ -50,6 +50,8 @@ export function buildSidebarHostOptions(args: {
   // Why: per-host display-label overrides rename hosts everywhere the sidebar
   // options feed (host headers, scope picker, focus menu).
   hostLabelOverrides?: ReadonlyMap<ExecutionHostId, string>
+  // Why: a caller that memoizes passes the translated label so a language switch rebuilds it.
+  localLabel?: string
 }): SidebarHostOption[] {
   const configuredSshTargetIds = new Set(args.sshTargetLabels.keys())
   const projectSshTargetIds = new Set<string>()
@@ -71,7 +73,8 @@ export function buildSidebarHostOptions(args: {
     sshConnectionStates: args.sshConnectionStates,
     runtimeEnvironments: args.runtimeEnvironments,
     runtimeStatusByEnvironmentId: args.runtimeStatusByEnvironmentId,
-    hostLabelOverrides: args.hostLabelOverrides
+    hostLabelOverrides: args.hostLabelOverrides,
+    localLabel: args.localLabel
   }).map((host) => {
     if (host.kind === 'local') {
       return { ...host, presence: 'local' }

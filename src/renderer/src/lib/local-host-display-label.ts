@@ -39,7 +39,7 @@ export function buildHostDisplayRegistry(
 ): ExecutionHostRegistryEntry[] {
   return buildExecutionHostRegistry({
     ...args,
-    localLabel: localHostDisplayLabel(),
+    localLabel: args.localLabel ?? localHostDisplayLabel(),
     localDetail: localHostPlatformDetail()
   })
 }
