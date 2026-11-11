@@ -95,7 +95,7 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     })
 
     // Row 6: the member's tab names its character, ticket and host, not `worker-task_…`.
-    await expect(orcaPage.getByText('Merlín · ORCA-12 · This computer').first()).toBeVisible({
+    await expect(orcaPage.getByText('Merlín · ORCA-12 · local').first()).toBeVisible({
       timeout: 60_000
     })
     await expect(orcaPage.getByText(/worker-task_/)).toHaveCount(0)
