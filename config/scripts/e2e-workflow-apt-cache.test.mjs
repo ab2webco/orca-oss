@@ -56,4 +56,13 @@ describe('e2e workflow apt installs', () => {
       install.run.indexOf('ci-apt.sh install')
     )
   })
+
+  // Why (2026-11-11): the image already ships these packages, so a dead mirror must not fail the job.
+  it('skips every apt step when the packages are already installed', () => {
+    const [check, ...rest] = readAction().runs.steps
+    expect(check.run).toContain('bash config/scripts/ci-apt.sh installed $PACKAGES')
+    for (const step of rest) {
+      expect(step.if ?? '').toContain("steps.installed.outputs.all != 'true'")
+    }
+  })
 })
