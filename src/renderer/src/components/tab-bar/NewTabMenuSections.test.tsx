@@ -93,7 +93,7 @@ describe('NewTabMenuSections', () => {
     renderSections()
 
     expect(headings()).toEqual(['Team', 'Terminal', 'Agents'])
-    expect(screen.getByRole('menuitem', { name: 'Go to lead Alfred' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Go to lead · Alfred' })).toBeTruthy()
     expect(hiddenAgentsSeen.at(-1)).toEqual(['claude-agent-teams'])
   })
 

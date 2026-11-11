@@ -35,6 +35,9 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
   const [picked, setPicked] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const accountId = account.kind === 'picker' ? (picked ?? account.checkedId) : null
+  // Why: a lead named after its role would read "Go to lead · Lead"; the role already says it.
+  const leadName = state.kind === 'lead-live' ? state.leadName : null
+  const leadLabel = leadName && !/^lead$/i.test(leadName.trim()) ? leadName : null
 
   const accountBeside = (ariaLabel: string): React.JSX.Element | null => {
     if (account.kind === 'picker') {
@@ -76,17 +79,14 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
         <>
           <DropdownMenuItem className={ROW} onSelect={props.onGoToLead}>
             <span className="truncate">
-              {state.leadName
-                ? translate('newTabMenu.team.goToLead', 'Go to lead {{value}}', {
-                    value: state.leadName
-                  })
-                : translate('newTabMenu.team.goToLeadUnnamed', 'Go to lead')}
+              {translate('newTabMenu.team.goToLeadUnnamed', 'Go to lead')}
+              {leadLabel && <span className="text-muted-foreground"> · {leadLabel}</span>}
             </span>
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className={ROW}>
               <span className="truncate">
-                {translate('newTabMenu.team.addMember', 'Add a member to the team…')}
+                {translate('newTabMenu.team.addMember', 'Add member…')}
               </span>
             </DropdownMenuSubTrigger>
             {/* Why the account inside: beside the row its chevron doubled the row's and cut the label. */}

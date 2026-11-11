@@ -228,7 +228,7 @@ test("the + menu offers the project's lead instead of a second team", async ({
     path: shotPath('new-tab-start-fresh-confirm-1440-dark.png')
   })
 
-  // Lead live: this pane leads the project, so Go to lead and Add a member.
+  // Lead live: this pane leads the project, so Go to lead and Add member.
   const client = new RuntimeClient(userDataDir, 30_000, null, null)
   const lead = (
     await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
@@ -263,13 +263,13 @@ test("the + menu offers the project's lead instead of a second team", async ({
     })
   }).toPass({ timeout: 60_000 })
   await captureEach(orcaPage, 'lead-live', shotPath, async (menu) => {
-    await expect(menu.getByRole('menuitem', { name: 'Add a member to the team…' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Add member…' })).toBeVisible()
     await expect(menu.getByRole('menuitem', { name: 'Claude Agent Teams' })).toHaveCount(0)
   })
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   await writeSettings(orcaPage, { theme: 'dark' })
   const live = await openMenu(orcaPage)
-  await live.getByRole('menuitem', { name: 'Add a member to the team…' }).click()
+  await live.getByRole('menuitem', { name: 'Add member…' }).click()
   await expect(
     orcaPage.getByRole('menuitem', { name: /To Do is empty|ORCA-/ }).first()
   ).toBeVisible()

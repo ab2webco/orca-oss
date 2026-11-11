@@ -40,15 +40,22 @@ export function NewTabAgentAccountSubmenu({
 }: NewTabAgentAccountSubmenuProps): React.JSX.Element {
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  // Why: beside a row the whole email was cut to 'name@ko…'; its name part fits, the list shows it whole.
+  const at = triggerLabel.indexOf('@')
+  const shortLabel = at > 0 ? triggerLabel.slice(0, at) : triggerLabel
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
         aria-label={ariaLabel}
+        title={triggerLabel}
         className="min-w-0 max-w-[55%] gap-1 px-1.5 font-normal text-muted-foreground"
       >
-        <span className="truncate">{triggerLabel}</span>
+        <span className="truncate">{shortLabel}</span>
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="w-64">
+      <DropdownMenuSubContent
+        sideOffset={6}
+        className="w-max min-w-64 max-w-[min(22rem,calc(100vw-16px))]"
+      >
         <DropdownMenuLabel className="px-2 pt-1.5 pb-1 text-[11px] font-medium text-muted-foreground">
           {provider === 'claude'
             ? translate('newTabMenu.account.claudeAccounts', 'Claude accounts')
@@ -73,7 +80,7 @@ export function NewTabAgentAccountSubmenu({
                 className={cn('mt-0.5 size-3.5 shrink-0', row.id !== checkedId && 'invisible')}
               />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{labelOf(row)}</span>
+                <span className="break-all font-medium">{labelOf(row)}</span>
                 <span className="flex gap-2 whitespace-nowrap text-[11px] text-muted-foreground">
                   <span>{text.detail}</span>
                   {text.tag ? <span className="truncate">{text.tag}</span> : null}

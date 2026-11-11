@@ -17553,9 +17553,8 @@
     },
     "team": {
       "group": "Team",
-      "goToLead": "Go to lead {{value}}",
       "goToLeadUnnamed": "Go to lead",
-      "addMember": "Add a member to the team…",
+      "addMember": "Add member…",
       "chooseMember": "Choose the member's account",
       "memberAccount": "Member account",
       "todoEmpty": "To Do is empty",
