@@ -1,3 +1,4 @@
+import type { TeamSceneDesk } from './team-scene-desk'
 import type { TeamSceneSite } from './team-scene-sites'
 
 // Why: the scene reads a narrow projection of the Team model (ORCA-1049) so every style and
@@ -25,6 +26,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   site: TeamSceneSite
   /** Its session is gone or never started: the seat stays, with nobody in it. */
   away?: true
+  /** What its monitor shows while it works, from its card; absent is plain code. */
+  desk?: TeamSceneDesk
 }
 
 export type TeamSceneInput = {
@@ -93,6 +96,8 @@ export type TeamSceneActor = {
   play?: TeamScenePlay
   /** A member whose session is gone or never started; a style may leave its seat empty. */
   away?: true
+  /** What a working member's monitor shows; a style without monitors ignores it. */
+  desk?: TeamSceneDesk
 }
 
 /** One-shot moments a style may draw particles or a thrown item for. */

@@ -21,11 +21,12 @@ describe('team scene copy', () => {
     expect(teamSceneLabel()).toBe('Escena en vivo del equipo')
   })
 
-  it('words a question as waiting for the user, in the UI language', async () => {
+  // hallmark rule 10: no middle-dot joiner; the state on one line, the question under it.
+  it('words a question as waiting for the user over the question, in the UI language', async () => {
     const asking = lead({ liveAction: { kind: 'question', text: '¿Mergeo #923?', options: [] } })
-    expect(teamSceneLeadLineOf(asking)).toBe('Waiting for you · ¿Mergeo #923?')
+    expect(teamSceneLeadLineOf(asking)).toBe('Waiting for you\n¿Mergeo #923?')
     await setRendererUiLanguage('es')
-    expect(teamSceneLeadLineOf(asking)).toBe('Esperándote · ¿Mergeo #923?')
+    expect(teamSceneLeadLineOf(asking)).toBe('Esperándote\n¿Mergeo #923?')
   })
 
   // Why (ORCA-1129): with no question read, the bubble showed the raw tool name.

@@ -1,3 +1,4 @@
+import type { TeamSceneDesk } from './team-scene-desk'
 import { teamSceneEventsBetween } from './team-scene-events'
 import { moveTeamSceneBody, type TeamSceneMover } from './team-scene-motion'
 import {
@@ -61,6 +62,7 @@ export type TeamSceneBody = TeamSceneMover & {
   emote: { kind: TeamSceneEmote; until: number } | null
   site: TeamSceneSite
   away?: true
+  desk?: TeamSceneDesk
   work: TeamSceneWork
 }
 
@@ -184,6 +186,7 @@ export function applyTeamSceneInput(
       characterKey: m.characterKey,
       activity: m.activity,
       away: m.away,
+      desk: m.desk,
       home: spot,
       site: grownSite(body.site, m.site)
     })

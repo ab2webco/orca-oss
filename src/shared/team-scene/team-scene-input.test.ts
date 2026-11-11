@@ -263,3 +263,34 @@ describe('teamSceneInputOf and an empty seat', () => {
     expect(away.sort()).toEqual(['failed', 'gone'])
   })
 })
+
+describe('teamSceneInputOf and the desk', () => {
+  it("carries each card's desk, its queue place included, to the member's actor", () => {
+    const queued = { ...pr(31, 'open'), url: 'q', ci: 'pending' as const }
+    const members = [card('plan', { flowPhase: 'plan' }), card('queued', { pr: queued })]
+    const queue = [
+      {
+        label: '#31',
+        title: 't',
+        url: 'q',
+        position: 1,
+        state: 'checks' as const,
+        status: 'working' as const,
+        since: null,
+        longWaitHours: null,
+        memberKey: 'queued'
+      }
+    ]
+    const ready = { kind: 'ready' as const, value: queue }
+    const input = teamSceneInputOf({ lead: lead(), advisor: null, members, queue: ready })
+    expect(input.members.map((m) => m.desk)).toEqual([
+      { kind: 'plan' },
+      { kind: 'queue', position: 1 }
+    ])
+    const hidden = teamSceneInputOf({ lead: lead(), advisor: null, members, queue: null })
+    expect(hidden.members[1]!.desk).toEqual({ kind: 'checks' })
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input, { rowSize: 5, workSeated: true })
+    expect(teamSceneActors(world).find((a) => a.key === 'plan')?.desk).toEqual({ kind: 'plan' })
+  })
+})

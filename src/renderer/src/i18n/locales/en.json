@@ -16492,7 +16492,7 @@
       "team-scene": {
         "team-scene-copy": {
           "label": "Live team scene",
-          "leadAsks": "Waiting for you · {{question}}",
+          "leadAsks": "Waiting for you\n{{question}}",
           "leadDone": "Done, nothing pending",
           "leadWaits": "Waiting for you"
         }

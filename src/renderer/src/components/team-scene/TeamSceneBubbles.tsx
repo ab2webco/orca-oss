@@ -121,12 +121,20 @@ export function TeamSceneBubbles({
       // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
       const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
       // Why measured on one line too: an attending lead's line clamps to it when two find no room.
-      const wrap = el.style.whiteSpace
+      // Why the text too: its pre-line keeps a question's line break, which nowrap must override.
+      const text = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null
+      const wrap = [el.style.whiteSpace, text?.style.whiteSpace ?? '']
       el.style.whiteSpace = 'nowrap'
+      if (text) {
+        text.style.whiteSpace = 'nowrap'
+      }
       const oneLine = s.attending
         ? { width: el.offsetWidth + 1, height: el.offsetHeight }
         : undefined
-      el.style.whiteSpace = wrap
+      el.style.whiteSpace = wrap[0]!
+      if (text) {
+        text.style.whiteSpace = wrap[1]!
+      }
       // Why restore: React skips a width equal to its last one, which would leave max-content.
       el.style.width = laid
       return {
@@ -181,10 +189,11 @@ export function TeamSceneBubbles({
             }}
           >
             {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
+            {/* Why pre-line and three: a waiting lead's line is its state over the question; one when clamped. */}
             <span
               className={cn(
-                '[overflow-wrap:anywhere]',
-                box?.clamped ? 'line-clamp-1' : 'line-clamp-2'
+                'whitespace-pre-line [overflow-wrap:anywhere]',
+                box?.clamped ? 'line-clamp-1' : 'line-clamp-3'
               )}
             >
               {s.text}

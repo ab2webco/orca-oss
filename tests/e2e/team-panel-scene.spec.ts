@@ -639,7 +639,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     // Lead review of criterion 8, and ORCA-1150 decision A: a lead's line that needs a two-line cloud
     // has no spot beside the tag on Pixel's 219 px stage, so its bubble clamps to one line and the
     // lead's card shows all of it, as the advisor's card does.
-    const leadAsks = 'Waiting for you · Merge #14 now?'
+    const leadAsks = 'Waiting for you\nMerge #14 now?'
     const [leadTab] = pane.paneKey.split(':')
     const asks = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
       method: 'POST',

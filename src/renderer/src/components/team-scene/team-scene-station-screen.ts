@@ -1,3 +1,5 @@
+import type { TeamSceneDesk } from '../../../../shared/team-scene/team-scene-desk'
+import { drawDeskScreen } from './team-scene-desk-screens'
 import { drawOfficeVirus } from './team-scene-office-virus'
 import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import type {
@@ -10,8 +12,9 @@ import type {
 // 'fail': the worker's PR has red CI; its lines take the theme's attention tone.
 // 'game': a resting member plays a tiny runner on its own screen.
 // 'away': the member's session is gone or never started; dark, with a small warning mark.
+// 'desk': a working member's card says more than code: its plan, tests, checks, review or queue.
 type ScreenRect = { x: number; y: number; width: number; height: number }
-type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game' | 'away'
+type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game' | 'away' | 'desk'
 
 const BACKGROUND: Record<ScreenState, string> = {
   code: '#0f1826',
@@ -20,9 +23,10 @@ const BACKGROUND: Record<ScreenState, string> = {
   off: '#0a0c10',
   fail: '#2a1012',
   game: '#16112b',
-  away: '#0a0c10'
+  away: '#0a0c10',
+  desk: '#0f1826'
 }
-const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game' | 'away'>, string> = {
+const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game' | 'away' | 'desk'>, string> = {
   code: '#7fb4ff',
   ask: '#ffd24a',
   ok: '#4ade80'
@@ -40,7 +44,7 @@ const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
 
 /** The screen of a desk whose worker holds `pose`; null when nobody sits there. */
 export function stationScreenStateOf(
-  worker: { pose: TeamScenePose; play?: TeamScenePlay; away?: true } | null,
+  worker: { pose: TeamScenePose; play?: TeamScenePlay; away?: true; desk?: TeamSceneDesk } | null,
   failing = false
 ): ScreenState {
   // Why first: nobody is there to fix red CI, so the screen says the session is gone.
@@ -52,6 +56,9 @@ export function stationScreenStateOf(
   }
   if (worker?.play === 'game') {
     return 'game'
+  }
+  if (worker?.pose === 'work' && worker.desk) {
+    return 'desk'
   }
   return (worker && SCREEN_OF[worker.pose]) ?? 'off'
 }
@@ -102,13 +109,16 @@ export function drawStationScreen(
   {
     attention = '#e5484d',
     virus = false,
-    boot
+    boot,
+    desk
   }: {
     attention?: string
     /** Office's bug over a failing screen. */
     virus?: boolean
     /** 0 to 1 while a member who just sat down boots its screen; absent once booted. */
     boot?: number
+    /** What a 'desk' screen shows. */
+    desk?: TeamSceneDesk
   } = {}
 ): void {
   g.fillStyle = BACKGROUND[state]
@@ -125,6 +135,10 @@ export function drawStationScreen(
   }
   if (state === 'away') {
     drawAway(g, rect, attention)
+    return
+  }
+  if (state === 'desk' && desk) {
+    drawDeskScreen(g, rect, desk, t)
     return
   }
   // V28's lines in its 28 x 18 screen units.

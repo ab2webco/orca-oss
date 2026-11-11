@@ -1,3 +1,4 @@
+import type { TeamSceneDesk } from '../../../../shared/team-scene/team-scene-desk'
 import { describe, expect, it } from 'vitest'
 import {
   drawStationScreen,
@@ -48,5 +49,59 @@ describe('station screen', () => {
     const r = recordingContext()
     drawStationScreen(r.g, RECT, 'away', 0, { attention: '#e5484d' })
     expect(r.fills()).toContain('#e5484d')
+  })
+
+  it("shows a working member's desk, after red CI and before plain code", () => {
+    const plan = { kind: 'plan' as const }
+    expect(stationScreenStateOf({ pose: 'work', desk: plan }, false)).toBe('desk')
+    expect(stationScreenStateOf({ pose: 'work', desk: plan }, true)).toBe('fail')
+    expect(stationScreenStateOf({ pose: 'idle', desk: plan }, false)).toBe('off')
+    expect(stationScreenStateOf({ pose: 'work' }, false)).toBe('code')
+  })
+
+  it('draws each desk its own way, and the queue place as its number', () => {
+    const shape = (desk: TeamSceneDesk) => {
+      const r = recordingContext()
+      drawStationScreen(r.g, RECT, 'desk', 1, { desk })
+      return r
+    }
+    const desks = [
+      { kind: 'plan' as const },
+      { kind: 'tests' as const },
+      { kind: 'checks' as const },
+      { kind: 'review' as const, verdict: 'approved' as const },
+      { kind: 'review' as const, verdict: 'changes' as const },
+      { kind: 'review' as const, verdict: 'waiting' as const },
+      { kind: 'queue' as const, position: 3 }
+    ]
+    const drawn = desks.map((desk) => JSON.stringify(shape(desk).calls))
+    expect(new Set(drawn).size).toBe(desks.length)
+    const queue = shape({ kind: 'queue', position: 3 }).calls
+    expect(queue.some((c) => c.name === 'fillText' && c.args[0] === '#3')).toBe(true)
+  })
+
+  it('reads checks and a review at 320: a thick progress bar, and a tick or empty box as big as a ticket', () => {
+    const draw = (desk: TeamSceneDesk, t = 1.4) => {
+      const r = recordingContext()
+      drawStationScreen(r.g, RECT, 'desk', t, { desk })
+      return r.calls
+    }
+    const bar = draw({ kind: 'checks' }).find(
+      (c) => c.name === 'fillRect' && c.fillStyle === '#ffd24a'
+    )
+    expect(bar!.args[3] as number).toBeGreaterThanOrEqual(RECT.height * 0.22)
+    // The tick and the empty box are strokes across most of the screen, like the queue ticket.
+    const span = (calls: ReturnType<typeof draw>) => {
+      const xs = calls
+        .filter((c) => c.name === 'moveTo' || c.name === 'lineTo' || c.name === 'strokeRect')
+        .map((c) => c.args[0] as number)
+      return Math.max(...xs) - Math.min(...xs)
+    }
+    expect(span(draw({ kind: 'review', verdict: 'approved' }))).toBeGreaterThanOrEqual(
+      RECT.width * 0.35
+    )
+    const empty = draw({ kind: 'review', verdict: 'waiting' })
+    const box = empty.find((c) => c.name === 'strokeRect')
+    expect((box?.args[2] as number) ?? 0).toBeGreaterThanOrEqual(RECT.width * 0.3)
   })
 })

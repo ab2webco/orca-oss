@@ -15568,7 +15568,7 @@
       "team-scene": {
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
-          "leadAsks": "Esperándote · {{question}}",
+          "leadAsks": "Esperándote\n{{question}}",
           "leadDone": "Listo, sin tareas pendientes",
           "leadWaits": "Esperándote"
         }

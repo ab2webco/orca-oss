@@ -1,4 +1,11 @@
-import type { TeamAgentFacts, TeamPanelGameModel } from '../team-panel-model-types'
+import type {
+  TeamAgentFacts,
+  TeamMemberCard,
+  TeamPanelGameModel,
+  TeamQueueEntry
+} from '../team-panel-model-types'
+import type { TeamSceneDesk } from './team-scene-desk'
+import { teamSceneDeskOf } from './team-scene-desk'
 import { teamSceneSiteOf } from './team-scene-sites'
 import type { TeamSceneActivity, TeamSceneAgentInput, TeamSceneInput } from './team-scene-types'
 
@@ -40,10 +47,21 @@ const agentOf = (
   ...(agent.decisions ? { decisions: agent.decisions } : {})
 })
 
+const deskOf = (
+  m: TeamMemberCard,
+  queue: readonly TeamQueueEntry[] | null
+): { desk?: TeamSceneDesk } => {
+  const desk = teamSceneDeskOf(m, queue)
+  return desk ? { desk } : {}
+}
+
 /** The scene's projection of the Team model; the summary text stands in for a report id. */
 export function teamSceneInputOf(
-  model: Pick<TeamPanelGameModel, 'lead' | 'advisor' | 'members'>
+  model: Pick<TeamPanelGameModel, 'lead' | 'advisor' | 'members'> &
+    Partial<Pick<TeamPanelGameModel, 'queue'>>
 ): TeamSceneInput {
+  // Why null when not ready: a hidden or loading Queue tab says nothing about the queue.
+  const queue = model.queue?.kind === 'ready' ? model.queue.value : null
   return {
     lead: agentOf(model.lead, model.lead.liveAction?.kind === 'question'),
     advisor: model.advisor ? { line: model.advisor.line } : null,
@@ -52,7 +70,8 @@ export function teamSceneInputOf(
       reportId: m.summary,
       mergedPr: m.pr?.state === 'merged' ? m.pr.number : null,
       site: teamSceneSiteOf(m),
-      ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {})
+      ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {}),
+      ...deskOf(m, queue)
     }))
   }
 }

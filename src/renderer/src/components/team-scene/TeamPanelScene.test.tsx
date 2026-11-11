@@ -153,8 +153,9 @@ describe('TeamPanelScene', () => {
     })
     await act(async () => root.render(<TeamPanelScene model={asking} style="pixel" />))
 
-    const bubble = host.querySelector('[data-scene-bubble="lead"]')?.textContent
-    expect(bubble).toBe('Waiting for you · Merge #923 now?')
+    const bubble = host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')
+    expect(bubble?.textContent).toBe('Waiting for you\nMerge #923 now?')
+    expect(bubble?.innerHTML).toContain('whitespace-pre-line')
 
     act(() => useAppStore.setState({ agentStatusByPaneKey: {} }))
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Waiting for you')

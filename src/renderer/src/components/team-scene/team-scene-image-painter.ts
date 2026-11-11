@@ -215,7 +215,12 @@ export function createImagePainter(args: {
         const rect = stationScreenRectAt(screen, left, top, px)
         const state = stationScreenStateOf(worker ?? null, failing)
         const boot = boots.progressOf(worker?.key, f.t)
-        drawStationScreen(g, rect, state, f.t, { attention: colors.attention, virus, boot })
+        drawStationScreen(g, rect, state, f.t, {
+          attention: colors.attention,
+          virus,
+          boot,
+          desk: worker?.desk
+        })
       }
     }
   }
