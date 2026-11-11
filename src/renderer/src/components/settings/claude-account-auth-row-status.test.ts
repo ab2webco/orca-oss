@@ -79,6 +79,29 @@ describe('resolveClaudeAccountAuthRowStatus', () => {
       })
     ).toMatchObject({ kind: 'checking', tone: 'neutral' })
   })
+
+  it('reads a token account with an unconfirmed login as launching on the token, not as at risk', () => {
+    expect(
+      resolveClaudeAccountAuthRowStatus(
+        { ...unverifiedClaudeAccountAuthVerdict('acct_1'), undecided: 'unknown' },
+        { longLivedToken: true }
+      )
+    ).toMatchObject({ tone: 'neutral', kind: 'unchecked', launchesOnToken: true, undecided: null })
+  })
+
+  it('keeps a failed stored login on a token account but out of the negative tone', () => {
+    expect(
+      resolveClaudeAccountAuthRowStatus(
+        {
+          ...unverifiedClaudeAccountAuthVerdict('acct_1'),
+          state: 'failed',
+          failure: 'credential-rejected',
+          checkedAt: NOW
+        },
+        { longLivedToken: true }
+      )
+    ).toMatchObject({ tone: 'neutral', kind: 'credential-rejected', launchesOnToken: true })
+  })
 })
 
 describe('selectClaudeAccountUsage', () => {

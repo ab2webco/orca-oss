@@ -5522,6 +5522,31 @@
             }
           }
         },
+        "ClaudeAccountAuthStatusLine": {
+          "justNow": "justo ahora",
+          "checkedAgo": "hace {{value0}}",
+          "checking": "Comprobando el inicio de sesión…",
+          "verified": "Inicio de sesión verificado",
+          "verifiedAt": "Inicio de sesión verificado {{value0}}",
+          "rejected": "El inicio de sesión caducó: vuelve a autenticar esta cuenta",
+          "missing": "No hay credencial guardada: vuelve a autenticar esta cuenta",
+          "unchecked": "Inicio de sesión aún sin comprobar",
+          "undecidedLiveSession": "última comprobación aplazada: una sesión en curso usa este token",
+          "undecided": "la última comprobación no pudo confirmarlo",
+          "sessionUsed": "5 h: {{value0}} % usado",
+          "sessionUsedResets": "5 h: {{value0}} % usado, se restablece en {{value1}}",
+          "weeklyUsed": "7 d: {{value0}} % usado",
+          "weeklyUsedResets": "7 d: {{value0}} % usado, se restablece en {{value1}}",
+          "quotaUnknown": "cuota restante desconocida",
+          "launchesOnToken": "Se inicia con el token de larga duración",
+          "storedLoginChecking": "comprobando el inicio de sesión guardado…",
+          "storedLoginVerified": "inicio de sesión guardado verificado",
+          "storedLoginVerifiedAt": "inicio de sesión guardado verificado {{value0}}",
+          "storedLoginRejected": "el inicio de sesión guardado caducó",
+          "storedLoginMissing": "no hay inicio de sesión guardado",
+          "storedLoginUnchecked": "inicio de sesión guardado aún sin comprobar",
+          "quotaUnreadableOnToken": "la cuota no se puede leer mientras se inicia con el token"
+        },
         "AccountsPane": {
           "c2d2751587": "Eliminar cuenta",
           "dbb9626ed1": "Cancelar",

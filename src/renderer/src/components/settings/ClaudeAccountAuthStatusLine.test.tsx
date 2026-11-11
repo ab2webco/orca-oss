@@ -113,4 +113,72 @@ describe('ClaudeAccountAuthStatusLine', () => {
     expect(markup).toContain('Sign-in verified')
     expect(markup).toContain('a running session holds this token')
   })
+
+  it('says a token account launches on the token and names the stored login it checked', () => {
+    const markup = render({
+      tone: 'neutral',
+      kind: 'unchecked',
+      checkedAt: null,
+      undecided: null,
+      launchesOnToken: true
+    })
+
+    expect(markup).toContain('Launches on the long-lived token')
+    expect(markup).toContain('stored login not checked yet')
+    expect(markup).not.toContain('Sign-in not checked yet')
+    expect(markup).toContain('quota cannot be read while launching on the token')
+    expect(markup).not.toContain('remaining quota unknown')
+  })
+
+  it('keeps the quota on a token account while the stored login still reads it', () => {
+    const markup = render(
+      {
+        tone: 'neutral',
+        kind: 'verified',
+        checkedAt: NOW,
+        undecided: null,
+        launchesOnToken: true
+      },
+      okUsage()
+    )
+
+    expect(markup).toContain('stored login verified just now')
+    expect(markup).toContain('5h 12% used')
+    expect(markup).not.toContain('cannot be read')
+  })
+
+  it('shows the quota on a token account whose stored login is unchecked but still reads it', () => {
+    const markup = render(
+      {
+        tone: 'neutral',
+        kind: 'unchecked',
+        checkedAt: null,
+        undecided: null,
+        launchesOnToken: true
+      },
+      okUsage({
+        session: { usedPercent: 36, windowMinutes: 300, resetsAt: null, resetDescription: null },
+        weekly: { usedPercent: 28, windowMinutes: 10080, resetsAt: null, resetDescription: null }
+      })
+    )
+
+    expect(markup).toContain('stored login not checked yet')
+    expect(markup).toContain('5h 36% used')
+    expect(markup).toContain('7d 28% used')
+    expect(markup).not.toContain('cannot be read')
+  })
+
+  it('names an expired stored login on a token account without the re-authenticate alarm', () => {
+    const markup = render({
+      tone: 'neutral',
+      kind: 'credential-rejected',
+      checkedAt: NOW,
+      undecided: null,
+      launchesOnToken: true
+    })
+
+    expect(markup).toContain('stored login expired')
+    expect(markup).not.toContain('text-destructive')
+    expect(markup).toContain('quota cannot be read while launching on the token')
+  })
 })

@@ -18,6 +18,8 @@ export type ClaudeAccountAuthRowStatus = {
   kind: ClaudeAccountAuthRowKind
   checkedAt: number | null
   undecided: ClaudeAccountAuthUndecided | null
+  /** Launches use a long-lived token; the rest of the status describes the stored login. */
+  launchesOnToken?: true
 }
 
 export function findClaudeAccountAuthVerdict(
@@ -28,6 +30,23 @@ export function findClaudeAccountAuthVerdict(
 }
 
 export function resolveClaudeAccountAuthRowStatus(
+  verdict: ClaudeAccountAuthVerdict | null,
+  options: { longLivedToken?: boolean } = {}
+): ClaudeAccountAuthRowStatus {
+  const status = resolveStoredLoginStatus(verdict)
+  if (!options.longLivedToken || status.kind === 'checking') {
+    return status
+  }
+  // Why: launches do not depend on the stored login here, so its doubts are no warning.
+  return {
+    ...status,
+    tone: status.tone === 'negative' ? 'neutral' : status.tone,
+    undecided: null,
+    launchesOnToken: true
+  }
+}
+
+function resolveStoredLoginStatus(
   verdict: ClaudeAccountAuthVerdict | null
 ): ClaudeAccountAuthRowStatus {
   if (verdict?.checking) {

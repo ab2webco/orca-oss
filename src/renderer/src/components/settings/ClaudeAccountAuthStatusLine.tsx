@@ -1,4 +1,4 @@
-import { CheckCircle2, HelpCircle, Loader2, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, HelpCircle, KeyRound, Loader2, ShieldAlert } from 'lucide-react'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { formatResetDuration } from '../../../../shared/rate-limit-reset-format'
 import { translate } from '@/i18n/i18n'
@@ -49,6 +49,43 @@ function describeStatus(status: ClaudeAccountAuthRowStatus, now: number): string
       return translate(
         'auto.components.settings.ClaudeAccountAuthStatusLine.unchecked',
         'Sign-in not checked yet'
+      )
+  }
+}
+
+// Why "stored login": on a token row the check never reads what launches use.
+function describeStoredLogin(status: ClaudeAccountAuthRowStatus, now: number): string {
+  switch (status.kind) {
+    case 'checking':
+      return translate(
+        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginChecking',
+        'checking stored login…'
+      )
+    case 'verified':
+      return status.checkedAt === null
+        ? translate(
+            'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginVerified',
+            'stored login verified'
+          )
+        : translate(
+            'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginVerifiedAt',
+            'stored login verified {{value0}}',
+            { value0: formatCheckedAgo(status.checkedAt, now) }
+          )
+    case 'credential-rejected':
+      return translate(
+        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginRejected',
+        'stored login expired'
+      )
+    case 'no-credentials':
+      return translate(
+        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginMissing',
+        'no stored login'
+      )
+    case 'unchecked':
+      return translate(
+        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginUnchecked',
+        'stored login not checked yet'
       )
   }
 }
@@ -125,22 +162,29 @@ export function ClaudeAccountAuthStatusLine({
   const Icon =
     status.kind === 'checking'
       ? Loader2
-      : status.tone === 'positive'
-        ? CheckCircle2
-        : status.tone === 'negative'
-          ? ShieldAlert
-          : HelpCircle
+      : status.launchesOnToken
+        ? KeyRound
+        : status.tone === 'positive'
+          ? CheckCircle2
+          : status.tone === 'negative'
+            ? ShieldAlert
+            : HelpCircle
   const undecided = describeUndecided(status)
   const quota =
     describeQuota(usage, now) ??
-    // Why: a row that already states the failure explains the missing figure; on
-    // any other row silence would read as "0% used".
-    (status.tone === 'negative'
-      ? null
-      : translate(
-          'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnknown',
-          'remaining quota unknown'
-        ))
+    (status.launchesOnToken
+      ? translate(
+          'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnreadableOnToken',
+          'quota cannot be read while launching on the token'
+        )
+      : // Why: a row that already states the failure explains the missing figure; on
+        // any other row silence would read as "0% used".
+        status.tone === 'negative'
+        ? null
+        : translate(
+            'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnknown',
+            'remaining quota unknown'
+          ))
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
       <Icon
@@ -158,8 +202,16 @@ export function ClaudeAccountAuthStatusLine({
           status.tone === 'negative' ? 'text-destructive' : 'text-muted-foreground'
         )}
       >
-        {describeStatus(status, now)}
+        {status.launchesOnToken
+          ? translate(
+              'auto.components.settings.ClaudeAccountAuthStatusLine.launchesOnToken',
+              'Launches on the long-lived token'
+            )
+          : describeStatus(status, now)}
       </span>
+      {status.launchesOnToken ? (
+        <span className="truncate text-muted-foreground">· {describeStoredLogin(status, now)}</span>
+      ) : null}
       {undecided ? <span className="truncate text-muted-foreground">· {undecided}</span> : null}
       {quota ? <span className="truncate text-muted-foreground">· {quota}</span> : null}
     </span>

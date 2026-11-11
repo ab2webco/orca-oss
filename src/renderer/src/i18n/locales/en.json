@@ -11386,7 +11386,15 @@
           "sessionUsedResets": "5h {{value0}}% used, resets in {{value1}}",
           "weeklyUsed": "7d {{value0}}% used",
           "weeklyUsedResets": "7d {{value0}}% used, resets in {{value1}}",
-          "quotaUnknown": "remaining quota unknown"
+          "quotaUnknown": "remaining quota unknown",
+          "launchesOnToken": "Launches on the long-lived token",
+          "storedLoginChecking": "checking stored login…",
+          "storedLoginVerified": "stored login verified",
+          "storedLoginVerifiedAt": "stored login verified {{value0}}",
+          "storedLoginRejected": "stored login expired",
+          "storedLoginMissing": "no stored login",
+          "storedLoginUnchecked": "stored login not checked yet",
+          "quotaUnreadableOnToken": "quota cannot be read while launching on the token"
         },
         "PluginSettingsForm": {
           "requiredHint": "Required to run.",

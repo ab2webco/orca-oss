@@ -1750,7 +1750,8 @@ export function AccountsPane({
                     : null
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
                 const authStatus = resolveClaudeAccountAuthRowStatus(
-                  findClaudeAccountAuthVerdict(rateLimitsState, account.id)
+                  findClaudeAccountAuthVerdict(rateLimitsState, account.id),
+                  { longLivedToken: hasLongLivedToken }
                 )
                 const accountUsage = selectClaudeAccountUsage(rateLimitsState, account.id, isActive)
 
