@@ -171,6 +171,31 @@ function drawOfficeChair(
   g.fillRect(...ground(-14, 2), 28 * px, 3 * px)
 }
 
+export const OFFICE_COAT = '#5b4636'
+
+/** Another session's desk: its chair, with a coat over the back, and nobody of ours in it. */
+export function drawOfficeTakenChair(
+  g: CanvasRenderingContext2D,
+  x: number,
+  floor: number,
+  px: number
+): void {
+  const ground = (dx: number, u: number): Point => [x + dx * px, floor - u * px]
+  g.save()
+  g.lineWidth = 1.6 * px
+  drawOfficeChair(g, ground, px)
+  const [cx, cy] = ground(-13, 30)
+  g.beginPath()
+  g.roundRect(cx, cy, 26 * px, 15 * px, 4 * px)
+  g.fillStyle = OFFICE_COAT
+  g.fill()
+  g.strokeStyle = OUTLINE
+  g.stroke()
+  // The collar, folded over the chair's top edge.
+  g.fillRect(...ground(-6, 32), 12 * px, 3 * px)
+  g.restore()
+}
+
 /** A member at its desk seen from behind, facing the monitor; `x, floor` is under its chair. */
 export function drawOfficeBack(
   g: CanvasRenderingContext2D,

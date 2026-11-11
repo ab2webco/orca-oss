@@ -95,7 +95,7 @@ export function teamSceneFloorInputOf(
   })
   return {
     ...input,
-    ...(floor.lead ? {} : { leadless: true as const }),
+    ...(floor.lead ? { leadStays: true as const } : { leadless: true as const }),
     desks: { taken: floor.taken, free: floor.free }
   }
 }

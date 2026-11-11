@@ -20,6 +20,7 @@ import { drawOfficeBuilds, officeSceneEffects } from './team-scene-office-builds
 import { officeVirusShakeAt } from './team-scene-office-virus'
 import {
   drawOfficeBack,
+  drawOfficeTakenChair,
   createOfficeBackLooks,
   deskSeatXOf,
   OFFICE_BACK_LAYOUT,
@@ -213,6 +214,9 @@ export function createImagePainter(args: {
       if (back) {
         const [from, sw, h] = [back.chairEnd, prop.width - back.chairEnd, prop.height]
         g.drawImage(prop, from, 0, sw, h, left + from * px, top, sw * px, h * px)
+        if (spot.taken) {
+          drawOfficeTakenChair(g, spot.x * f.width, feetY(spot.depth, f.height), px)
+        }
       } else {
         g.drawImage(prop, left, top, prop.width * px, prop.height * px)
       }

@@ -166,4 +166,17 @@ describe('TeamSceneBuilding', () => {
       false
     )
   })
+
+  it("names each floor on a plate in its own button's words, and gives higher floors more sky", () => {
+    render([local, remote('imac'), remote('m1')])
+    const plates = [...host.querySelectorAll<HTMLElement>('[data-team-floor-plate]')].map(
+      (p) => p.textContent
+    )
+    expect(plates).toEqual(['m1', 'imac', 'local'])
+    // Why the crop: the top floor shows more sky than the lead's street-level floor.
+    const crops = [...host.querySelectorAll<HTMLElement>('[data-team-floor-view]')].map((v) =>
+      Number.parseFloat(v.style.marginTop)
+    )
+    expect(crops[0]!).toBeGreaterThan(crops[2]!)
+  })
 })

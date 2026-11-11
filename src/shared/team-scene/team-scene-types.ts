@@ -46,6 +46,8 @@ export type TeamSceneInput = {
   leadless?: true
   /** Empty desks after the members': other sessions' (taken, drawn dim) and the cap's free ones. */
   desks?: { taken: number; free: number }
+  /** A building floor: on a narrow stage the lead keeps to its own spot instead of its rounds. */
+  leadStays?: true
 }
 
 export type TeamSceneEvent =

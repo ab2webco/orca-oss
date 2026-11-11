@@ -11,6 +11,7 @@ import { recordingContext, type RecordedCall } from './team-scene-recording-cont
 import { SCENE_DUST } from './team-scene-painter-marks'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { OFFICE_NOTE, OFFICE_TRAY } from './team-scene-office-builds'
+import { OFFICE_COAT } from './team-scene-office-back'
 import { OFFICE_VIRUS_COLORS } from './team-scene-office-virus'
 import { STATION_SCREEN_GLOW, STATION_SCREEN_PASS } from './team-scene-station-screen'
 import { seatPlanOf } from '../../../../shared/team-scene/team-scene-seats'
@@ -816,6 +817,23 @@ describe('createImagePainter office back view', () => {
     }
     expect(alphaAtDesk(true)).toBeLessThan(1)
     expect(alphaAtDesk(false)).toBe(1)
+  })
+
+  it('leaves a coat on the chair of a desk another session holds, and a free desk clean', () => {
+    const coatAt = (taken: boolean) => {
+      const painter = createImagePainter({
+        art: { style: officeStyle, images: IMAGES },
+        colors: COLORS,
+        builds: 'office',
+        back: { chairEnd: 144 }
+      })
+      const r = recordingContext()
+      const station = { ...spot, ...(taken ? { taken: true as const } : {}) }
+      painter.paint(r.g, frame({ actors: [], stations: [station] }))
+      return r.fills()
+    }
+    expect(coatAt(true)).toContain(OFFICE_COAT)
+    expect(coatAt(false)).not.toContain(OFFICE_COAT)
   })
 
   it('keeps the red screen of failing CI behind a member seen from behind', () => {

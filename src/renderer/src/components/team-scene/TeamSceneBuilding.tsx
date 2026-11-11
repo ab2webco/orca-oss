@@ -6,6 +6,7 @@ import {
   type TeamSceneFloor
 } from '../../../../shared/team-scene/team-scene-floors'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { teamHostText } from '../team-panel/team-card-text'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
@@ -26,7 +27,8 @@ type Props = {
 }
 
 // Why these: a floor's strip is the row of desks, its sky cropped, so three floors fit a panel.
-const STRIP = { height: 112, crop: 58 }
+// Each storey up crops less, so higher floors look out over more sky than the lead's street level.
+const STRIP = { height: 112, crop: 66, perLevel: 10, minCrop: 36 }
 const SHOWN_FLOORS = 3
 
 /** True when the team spans more than one machine: the building replaces the single office. */
@@ -39,8 +41,9 @@ function FloorStage({
   makePainter,
   leadLine,
   onUnplaced,
-  zoomed
-}: Props & { floor: TeamSceneFloor; zoomed: boolean }): React.JSX.Element | null {
+  zoomed,
+  level
+}: Props & { floor: TeamSceneFloor; zoomed: boolean; level: number }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor), [model, floor])
   if (!painter) {
@@ -50,10 +53,18 @@ function FloorStage({
     <div
       data-team-floor={floor.key}
       data-team-floor-dark={floor.reachable ? undefined : ''}
-      className="relative overflow-hidden border-b border-border last:border-b-0"
+      // Why a slab and an inner ring: floors read as storeys of one glass building, not copies.
+      className="relative overflow-hidden border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
       style={zoomed ? undefined : { height: STRIP.height }}
     >
-      <div style={zoomed ? undefined : { marginTop: -STRIP.crop }}>
+      <div
+        data-team-floor-view=""
+        style={
+          zoomed
+            ? undefined
+            : { marginTop: -Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel) }
+        }
+      >
         <TeamSceneCanvas
           input={input}
           painter={painter}
@@ -61,10 +72,26 @@ function FloorStage({
           onUnplaced={floor.lead ? onUnplaced : undefined}
         />
       </div>
+      {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
+      {level > 0 && !zoomed ? (
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b to-transparent',
+            level === 1 ? 'from-black/25' : 'from-black/45'
+          )}
+        />
+      ) : null}
       {/* Why no words: the dark floor and its members' static screens say it cannot be reached. */}
       {floor.reachable ? null : (
         <div className="pointer-events-none absolute inset-0 bg-scene-bubble/80" />
       )}
+      {/* Why last: the name stays readable over a dark, unreachable floor. */}
+      <span
+        data-team-floor-plate=""
+        className="pointer-events-none absolute left-1.5 top-1.5 rounded-sm bg-scene-bubble/85 px-1.5 py-0.5 font-mono text-[10.5px] text-white"
+      >
+        {teamHostText(floor.host)}
+      </span>
     </div>
   )
 }
@@ -96,7 +123,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
       aria-label={teamSceneLabel()}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className="flex flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex flex-col border-x-4 border-border outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* Why a row on top: a side column took half the stage at 320 and crowded every desk. */}
       <nav className="flex flex-wrap gap-1 border-b border-border p-1">
@@ -123,7 +150,13 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
       </nav>
       <div className="min-w-0">
         {shown.map((floor) => (
-          <FloorStage key={floor.key} {...props} floor={floor} zoomed={zoomed !== null} />
+          <FloorStage
+            key={floor.key}
+            {...props}
+            floor={floor}
+            zoomed={zoomed !== null}
+            level={floors.indexOf(floor)}
+          />
         ))}
         {more > 0 ? (
           <div className="px-2 py-1 text-xs text-muted-foreground">{`+${more}`}</div>

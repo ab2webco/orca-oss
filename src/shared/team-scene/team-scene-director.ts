@@ -93,6 +93,8 @@ export type TeamSceneWorld = {
   trophies: { key: string; name: string }[]
   /** The launch STOP, drawn as a sign; members keep their own state. */
   stopped: boolean
+  /** A building floor whose lead keeps to its spot on a narrow stage. */
+  leadStays: boolean
   layout: TeamSceneLayout
   advisorWalk: TeamSceneAdvisorWalk
 }
@@ -119,6 +121,7 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     sites: [],
     trophies: [],
     stopped: false,
+    leadStays: false,
     layout: GROUND_LAYOUT,
     advisorWalk: createAdvisorWalk()
   }
@@ -160,6 +163,7 @@ export function applyTeamSceneInput(
   world.last = input
   world.layout = layout
   world.stopped = input.stopped === true
+  world.leadStays = input.leadStays === true
   const { bodies } = world
   if (input.leadless) {
     bodies.delete('lead')

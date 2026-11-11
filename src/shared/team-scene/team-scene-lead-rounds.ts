@@ -6,6 +6,7 @@ import type { TeamSceneActivity, TeamSceneSpot } from './team-scene-types'
 // walking work to each busy member; here the lead does it, and only to members really working.
 export const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
 const REST_SECONDS = 2
+const LEAD_STAYS_BELOW_PX = 360
 const GIVE_SECONDS = 0.9
 const BESIDE_X = 0.075
 
@@ -76,6 +77,12 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     return
   }
   const rounds = world.rounds
+  // Why: on a narrow building floor the row has no gap a lead can stand in without covering one.
+  if (world.leadStays && width < LEAD_STAYS_BELOW_PX) {
+    Object.assign(rounds, { stage: 'rest', member: null })
+    lead.target = LEAD_SPOT
+    return
+  }
   // Why: the scene must never contradict the lead's card; a resting lead walks nowhere.
   const leading = lead.activity === 'working'
   const asking = leading ? membersWith(world, 'needsYou')[0] : undefined

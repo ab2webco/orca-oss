@@ -578,3 +578,32 @@ describe('team scene director on a floor of the building', () => {
     expect(plain.stations).toHaveLength(2)
   })
 })
+
+describe('team scene director, the lead on a narrow building floor', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+  const roams = (width: number, leadStays: boolean) => {
+    const world = createTeamSceneWorld()
+    const members = [member('a'), member('b'), member('c'), member('d')]
+    applyTeamSceneInput(
+      world,
+      { ...input(members), ...(leadStays ? { leadStays: true } : {}) },
+      OFFICE
+    )
+    const home = world.bodies.get('lead')!.x
+    let farthest = 0
+    for (let t = 0; t < 20; t += DT) {
+      stepTeamScene(world, DT, { width })
+      farthest = Math.max(farthest, Math.abs(world.bodies.get('lead')!.x - home))
+    }
+    return farthest
+  }
+
+  it('keeps the lead at its own spot on a narrow floor, so it never stands over a member', () => {
+    expect(roams(320, true)).toBe(0)
+  })
+
+  it('still walks its rounds where there is room, or where the floor does not ask', () => {
+    expect(roams(420, true)).toBeGreaterThan(0.05)
+    expect(roams(320, false)).toBeGreaterThan(0.05)
+  })
+})
