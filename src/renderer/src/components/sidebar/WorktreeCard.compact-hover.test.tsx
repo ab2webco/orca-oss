@@ -379,9 +379,10 @@ describe('WorktreeCard compact hover details', () => {
     expect(markup).toContain('feature/local-branch')
   }, 30_000)
 
-  it('keeps branch identity visible on detailed cards by default', async () => {
+  // ORCA-1149: V30 draws one line; a detailed card shows its branch once the Branch prop is on.
+  it('keeps branch identity visible on detailed cards with the branch prop on', async () => {
     settings = { compactWorktreeCards: false }
-    worktreeCardProperties = ['status', 'issue', 'linear-issue', 'comment', 'ports']
+    worktreeCardProperties = ['status', 'issue', 'linear-issue', 'comment', 'ports', 'branch']
     const { default: WorktreeCard } = await import('./WorktreeCard')
 
     const markup = renderToStaticMarkup(

@@ -10,6 +10,7 @@ const member = (key: string, extra: Partial<TeamSceneMemberInput> = {}): TeamSce
   activity: 'working',
   reportId: null,
   mergedPr: null,
+  site: { stage: 0, broken: false },
   ...extra
 })
 const input = (members: TeamSceneMemberInput[], advisorLine?: string | null): TeamSceneInput => ({

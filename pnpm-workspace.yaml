@@ -38,6 +38,8 @@ overrides:
   proxy-addr@^2: 2.0.8
   # GHSA-7w5x-hrqm-74c2
   smol-toml@^1: 1.7.1
+  # 7.4.20 is a partial publish npm marks deprecated (remusao/tldts#2735); 7.4.22 is under the 3-day release age.
+  tldts-core@^7: 7.4.19
   # GHSA-68fv-2mgg-jv7q
   source-map-js@^1: 1.2.2
   # GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr (critical)
