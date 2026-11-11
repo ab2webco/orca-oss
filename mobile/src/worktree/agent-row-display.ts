@@ -87,10 +87,10 @@ export function agentIdentityLabel(agentType: string | null): string {
 }
 
 // Relative time, matching desktop formatTimeAgo thresholds (just now / Xm / Xh / Xd).
-export function formatTimeAgo(ts: number, now: number): string {
+export function formatTimeAgo(ts: number, now: number, justNow = 'just now'): string {
   const delta = now - ts
   if (delta < 60_000) {
-    return 'just now'
+    return justNow
   }
   const minutes = Math.floor(delta / 60_000)
   if (minutes < 60) {

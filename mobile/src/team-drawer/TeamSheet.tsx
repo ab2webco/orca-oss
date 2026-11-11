@@ -14,6 +14,7 @@ import {
 import { TeamMemberCard } from './TeamMemberCard'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
+import { teamInboxWordsOf } from './team-inbox-words'
 
 type TeamTab = 'team' | 'inbox'
 
@@ -172,7 +173,12 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
           >
             <TabBar active={tab} inboxCount={questions.length} words={words} onSelect={setPicked} />
             {tab === 'inbox' ? (
-              <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
+              <TeamInboxTab
+                team={team}
+                now={now}
+                words={teamInboxWordsOf(view.locale)}
+                onOpenLink={onOpenLink}
+              />
             ) : (
               <>
                 <View style={styles.section}>

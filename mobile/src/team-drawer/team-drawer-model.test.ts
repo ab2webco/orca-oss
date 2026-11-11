@@ -338,6 +338,10 @@ describe('teamPeekOf', () => {
 })
 
 describe('teamAgeText', () => {
+  it("says now in the host's language", () => {
+    expect(teamAgeText(1_000, 1_000, 'ahora')).toBe('ahora')
+  })
+
   it('reads now, minutes, hours or days since a state began', () => {
     expect(teamAgeText(0, 30_000)).toBe('now')
     expect(teamAgeText(0, 10 * 60_000)).toBe('10 min')

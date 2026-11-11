@@ -12,6 +12,8 @@ const TONE: Record<TeamMemberRow['state'], string> = {
   done: colors.statusPurple
 }
 
+const PR_HIT_SLOP = { top: 12, bottom: 12 }
+
 const CI_TONE: Partial<Record<CheckStatus, string>> = {
   success: colors.statusGreen,
   failure: colors.statusRed,
@@ -79,7 +81,7 @@ export function TeamMemberCard({
   const meta = [
     member.model,
     member.phase ? words.phase[member.phase] : null,
-    member.since === null ? null : teamAgeText(member.since, now),
+    member.since === null ? null : teamAgeText(member.since, now, words.now),
     member.ticketStatus
   ]
     .filter(Boolean)
@@ -144,6 +146,8 @@ export function TeamMemberCard({
       {pr ? (
         <Pressable
           style={styles.prButton}
+          // Why hitSlop, not minHeight: a 44 pt row left a dead band under every PR line.
+          hitSlop={PR_HIT_SLOP}
           onPress={() => onOpenLink(pr.url)}
           accessibilityRole="link"
           accessibilityLabel={`Open PR ${pr.number}${ci ? `, ${ci}` : ''}`}
@@ -244,7 +248,6 @@ const styles = StyleSheet.create({
     fontSize: typography.metaSize
   },
   prButton: {
-    minHeight: MIN_TOUCH_TARGET,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',

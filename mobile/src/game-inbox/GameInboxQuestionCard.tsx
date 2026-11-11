@@ -5,6 +5,7 @@ import { Text, TextInput } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { formatTimeAgo } from '../worktree/agent-row-display'
 import { ownerQuestionContextLink, type OwnerQuestionReply } from './game-owner-questions-rpc'
+import { QUESTION_CARD_ENGLISH, type QuestionCardWords } from '../team-drawer/team-inbox-words'
 
 type Props = {
   question: GameOwnerQuestion
@@ -13,15 +14,23 @@ type Props = {
   now: number
   onAnswer: (reply: OwnerQuestionReply) => Promise<void>
   onOpenLink: (url: string) => void
+  words?: QuestionCardWords
 }
 
-export function GameInboxQuestionCard({ question, worktreeId, now, onAnswer, onOpenLink }: Props) {
+export function GameInboxQuestionCard({
+  question,
+  worktreeId,
+  now,
+  onAnswer,
+  onOpenLink,
+  words = QUESTION_CARD_ENGLISH
+}: Props) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const answerable = worktreeId !== null
   const askedAt = Date.parse(question.askedAt)
-  const age = Number.isNaN(askedAt) ? null : formatTimeAgo(askedAt, now)
+  const age = Number.isNaN(askedAt) ? null : formatTimeAgo(askedAt, now, words.justNow)
   const link = ownerQuestionContextLink(question.context)
 
   const send = async (reply: OwnerQuestionReply, clearDraft: boolean): Promise<void> => {
@@ -52,7 +61,7 @@ export function GameInboxQuestionCard({ question, worktreeId, now, onAnswer, onO
         <Pressable
           onPress={() => onOpenLink(link)}
           accessibilityRole="link"
-          accessibilityLabel={`Open ${link}`}
+          accessibilityLabel={words.openLink(link)}
           hitSlop={8}
         >
           <Text style={styles.link} numberOfLines={2}>
@@ -75,7 +84,7 @@ export function GameInboxQuestionCard({ question, worktreeId, now, onAnswer, onO
               onPress={() => void send({ option: index + 1 }, false)}
               disabled={!answerable || busy}
               accessibilityRole="button"
-              accessibilityLabel={`Answer ${option}`}
+              accessibilityLabel={words.answerOption(option)}
               accessibilityState={{ disabled: !answerable || busy }}
             >
               <Text style={styles.optionLabel}>{option}</Text>
@@ -89,11 +98,11 @@ export function GameInboxQuestionCard({ question, worktreeId, now, onAnswer, onO
             style={styles.input}
             value={draft}
             onChangeText={setDraft}
-            placeholder="Type an answer"
+            placeholder={words.typeAnswer}
             placeholderTextColor={colors.textMuted}
             multiline
             editable={!busy}
-            accessibilityLabel="Typed answer"
+            accessibilityLabel={words.typedAnswer}
           />
           <Pressable
             style={({ pressed }) => [
@@ -104,18 +113,18 @@ export function GameInboxQuestionCard({ question, worktreeId, now, onAnswer, onO
             onPress={() => void send({ text: draft }, true)}
             disabled={busy || draft.trim() === ''}
             accessibilityRole="button"
-            accessibilityLabel="Send answer"
+            accessibilityLabel={words.sendAnswer}
             accessibilityState={{ disabled: busy || draft.trim() === '', busy }}
           >
             {busy ? (
               <ActivityIndicator size="small" color={colors.onAccent} />
             ) : (
-              <Text style={styles.sendLabel}>Send</Text>
+              <Text style={styles.sendLabel}>{words.send}</Text>
             )}
           </Pressable>
         </View>
       ) : (
-        <Text style={styles.note}>Answer this one from Orca on the desktop.</Text>
+        <Text style={styles.note}>{words.answerOnDesktop}</Text>
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>

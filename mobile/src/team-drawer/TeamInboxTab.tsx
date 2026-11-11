@@ -10,21 +10,30 @@ import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { TeamDrawerData } from './team-drawer-model'
 import { inboxMetaStyles as metaStyles, timeAgoOf } from './team-inbox-meta'
 import { TeamInboxThreadRow } from './TeamInboxThreadRow'
+import type { TeamInboxWords } from './team-inbox-words'
 
-type Props = { team: TeamDrawerData; now: number; onOpenLink: (url: string) => void }
-
-const KIND_LABEL: Record<GameWaitingItem['kind'], string> = {
-  question: 'Question',
-  decision_gate: 'Decision'
+type Props = {
+  team: TeamDrawerData
+  now: number
+  words: TeamInboxWords
+  onOpenLink: (url: string) => void
 }
 
-function WaitingCard({ item, now }: { item: GameWaitingItem; now: number }) {
+function WaitingCard({
+  item,
+  now,
+  words
+}: {
+  item: GameWaitingItem
+  now: number
+  words: TeamInboxWords
+}) {
   return (
     <View style={styles.card}>
       <View style={metaStyles.meta}>
         <Text style={metaStyles.ticket}>{item.ticket}</Text>
-        <Text style={styles.kind}>{KIND_LABEL[item.kind]}</Text>
-        <Text style={metaStyles.age}>{timeAgoOf(item.at, now) ?? ''}</Text>
+        <Text style={styles.kind}>{words.kind[item.kind]}</Text>
+        <Text style={metaStyles.age}>{timeAgoOf(item.at, now, words.justNow) ?? ''}</Text>
       </View>
       <Text style={styles.title}>{item.subject}</Text>
       {item.body && item.body !== item.subject ? (
@@ -33,19 +42,27 @@ function WaitingCard({ item, now }: { item: GameWaitingItem; now: number }) {
         </Text>
       ) : null}
       {item.answerer !== 'lead' ? (
-        <Text style={metaStyles.age}>{`Answered by ${item.answerer}`}</Text>
+        <Text style={metaStyles.age}>{words.answeredBy(item.answerer)}</Text>
       ) : null}
     </View>
   )
 }
 
-function AnsweredCard({ item, now }: { item: GameAnsweredItem; now: number }) {
+function AnsweredCard({
+  item,
+  now,
+  words
+}: {
+  item: GameAnsweredItem
+  now: number
+  words: TeamInboxWords
+}) {
   return (
     <View style={styles.card}>
       <View style={metaStyles.meta}>
         <Text style={metaStyles.ticket}>{item.ticket}</Text>
-        <Text style={styles.kind}>{KIND_LABEL[item.kind]}</Text>
-        <Text style={metaStyles.age}>{timeAgoOf(item.answeredAt, now) ?? ''}</Text>
+        <Text style={styles.kind}>{words.kind[item.kind]}</Text>
+        <Text style={metaStyles.age}>{timeAgoOf(item.answeredAt, now, words.justNow) ?? ''}</Text>
       </View>
       <Text style={styles.title} numberOfLines={4}>
         {item.question}
@@ -53,9 +70,7 @@ function AnsweredCard({ item, now }: { item: GameAnsweredItem; now: number }) {
       <Text style={styles.answer} numberOfLines={6}>
         {item.overriddenBy?.text ?? item.answer}
       </Text>
-      {item.overriddenBy ? (
-        <Text style={metaStyles.age}>You replaced the lead&apos;s answer</Text>
-      ) : null}
+      {item.overriddenBy ? <Text style={metaStyles.age}>{words.youReplaced}</Text> : null}
     </View>
   )
 }
@@ -78,12 +93,12 @@ function Section({
 }
 
 /** The lead's Inbox on the phone: the desktop sheet's lists, read-only except the owner's answers. */
-export function TeamInboxTab({ team, now, onOpenLink }: Props) {
+export function TeamInboxTab({ team, now, words, onOpenLink }: Props) {
   const { questions, inbox } = team
   return (
     <View>
       <Section
-        title={`For you (${questions.length})`}
+        title={words.forYou(questions.length)}
         tone={questions.length > 0 ? 'danger' : undefined}
       >
         {questions.length > 0 ? (
@@ -93,46 +108,41 @@ export function TeamInboxTab({ team, now, onOpenLink }: Props) {
               question={question}
               worktreeId={team.answerWorktreeId}
               now={now}
+              words={words}
               onAnswer={(reply) => team.answer(question.id, reply)}
               onOpenLink={onOpenLink}
             />
           ))
         ) : (
-          <Text style={styles.empty}>No questions are waiting for you.</Text>
+          <Text style={styles.empty}>{words.noQuestions}</Text>
         )}
       </Section>
-      {inbox.kind === 'loading' ? (
-        <Text style={styles.empty}>Reading the lead&apos;s Inbox…</Text>
-      ) : null}
-      {inbox.kind === 'unavailable' ? (
-        <Text style={styles.empty}>
-          Update Orca on this computer to read the lead&apos;s Inbox here.
-        </Text>
-      ) : null}
+      {inbox.kind === 'loading' ? <Text style={styles.empty}>{words.reading}</Text> : null}
+      {inbox.kind === 'unavailable' ? <Text style={styles.empty}>{words.updateOrca}</Text> : null}
       {inbox.kind === 'ready' ? (
         <>
-          <Section title={`Waiting on the lead (${inbox.threads.waiting.length})`}>
+          <Section title={words.waitingOnLead(inbox.threads.waiting.length)}>
             {inbox.threads.waiting.length > 0 ? (
               inbox.threads.waiting.map((item) => (
-                <WaitingCard key={item.id} item={item} now={now} />
+                <WaitingCard key={item.id} item={item} now={now} words={words} />
               ))
             ) : (
-              <Text style={styles.empty}>Nothing waits on the lead.</Text>
+              <Text style={styles.empty}>{words.nothingWaits}</Text>
             )}
           </Section>
-          <Section title={`Threads (${inbox.threads.threads.length})`}>
+          <Section title={words.threads(inbox.threads.threads.length)}>
             {inbox.threads.threads.length > 0 ? (
               inbox.threads.threads.map((thread) => (
-                <TeamInboxThreadRow key={thread.ticket} thread={thread} now={now} />
+                <TeamInboxThreadRow key={thread.ticket} thread={thread} now={now} words={words} />
               ))
             ) : (
-              <Text style={styles.empty}>No member has written yet.</Text>
+              <Text style={styles.empty}>{words.noMemberWrote}</Text>
             )}
           </Section>
           {inbox.threads.answered.length > 0 ? (
-            <Section title={`Answered (${inbox.threads.answered.length})`}>
+            <Section title={words.answered(inbox.threads.answered.length)}>
               {inbox.threads.answered.map((item) => (
-                <AnsweredCard key={item.id} item={item} now={now} />
+                <AnsweredCard key={item.id} item={item} now={now} words={words} />
               ))}
             </Section>
           ) : null}

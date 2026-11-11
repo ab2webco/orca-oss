@@ -304,6 +304,27 @@ describe('TeamSheet', () => {
     expect(button('Cerrar Equipo, 1 te necesita')).toBeDefined()
   })
 
+  it("words the Inbox tab in the host's language", () => {
+    const team = teamWith()
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    const shown = texts()
+    expect(shown).toContain('Para ti (1)')
+    expect(shown).toContain('Esperando al lead (1)')
+    expect(shown).toContain('Decisión')
+    expect(shown).toContain('Hilos (1)')
+    expect(shown).toContain('Respondidas (1)')
+    expect(shown).toContain('Enviar')
+    expect(button('Enviar respuesta')).toBeDefined()
+    act(() => button('Abrir el hilo de ORCA-1, 2 mensajes').click())
+    expect(button('Cerrar el hilo de ORCA-1, 2 mensajes')).toBeDefined()
+  })
+
+  // Why: a 44 pt minimum height left a dead band under every PR line; the touch area is hitSlop now.
+  it('keeps the PR line its own height, so the card ends as it starts', () => {
+    show(teamWith({ questions: [] }))
+    expect(getComputedStyle(button('Open PR 850, CI green')).minHeight).not.toBe('44px')
+  })
+
   it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
     show(teamWith())
     expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
