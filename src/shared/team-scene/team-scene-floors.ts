@@ -24,8 +24,8 @@ export type TeamSceneFloor = {
 const keyOf = (host: TeamHost): string => (host.kind === 'local' ? '' : host.name)
 
 /**
- * The team as one floor per machine, the lead's first. Each member's own host places it; the
- * Machines tab only adds cap, count and reach, so a hidden or missing tab still floors everyone.
+ * The team as one floor per machine it has members on, the lead's first. Each member's own host
+ * places it; the Machines tab only adds cap, count and reach, so a hidden tab still floors everyone.
  */
 export function teamSceneFloorsOf(model: {
   lead: { host: TeamHost }
@@ -78,7 +78,8 @@ export function teamSceneFloorsOf(model: {
     floor.taken = used - here
     floor.free = floor.cap === null ? 0 : Math.max(0, floor.cap - used)
   }
-  return [...floors.values()]
+  // Why only where our members sit: a machine with nobody of ours stays in the Machines tab.
+  return [...floors.values()].filter((floor) => floor.lead || floor.members.length > 0)
 }
 
 /** One floor's scene: its own members and empty desks; the lead, advisor and STOP only on its own. */

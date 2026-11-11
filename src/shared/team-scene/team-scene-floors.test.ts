@@ -69,12 +69,12 @@ describe('teamSceneFloorsOf', () => {
     }
   })
 
-  it("keeps a machine the team runs on with nobody there, and a floor's reach from its card or row", () => {
+  it("takes a floor's reach from its machine row or from its member's card", () => {
     const machines = ready([machine(local, 5), machine(remote('m1', false), 3)])
-    const floors = teamSceneFloorsOf({ lead, members: [card('a')], machines })
+    const floors = teamSceneFloorsOf({ lead, members: [card('a', remote('m1'))], machines })
     expect(summary(floors)[1]).toEqual({
       key: 'm1',
-      members: [],
+      members: ['a'],
       cap: 3,
       running: 0,
       reachable: false,
@@ -132,5 +132,46 @@ describe('teamSceneFloorInputOf', () => {
     expect(away!.advisor).toBeNull()
     expect(away!.stopped).toBeUndefined()
     expect(away!.desks).toEqual({ taken: 1, free: 2 })
+  })
+})
+
+// The owner's two real teams on 2026-11-10, hosts only: the dev runtime had no members on its
+// three machines, the installed lead had members here and on m1, with imac and orca-contabo empty.
+describe("teamSceneFloorsOf from the owner's real teams", () => {
+  const dev = {
+    lead,
+    members: [],
+    machines: ready([
+      machine(local, 4, 0),
+      machine(remote('M1'), 5, 0),
+      machine(remote('orca-contabo'), 2, 0)
+    ])
+  }
+  const real = {
+    lead,
+    members: [
+      card('toadette-2'),
+      card('toadette'),
+      card('peach-2'),
+      card('luigi', remote('m1')),
+      card('mario', remote('m1')),
+      card('wario-2', remote('m1'))
+    ],
+    machines: ready([
+      machine(local, 4, 4),
+      machine(remote('imac', false), 0, 0),
+      machine(remote('m1'), 5, 2),
+      machine(remote('orca-contabo'), 2, 0)
+    ])
+  }
+
+  it('draws the single office for a team whose members are not on two machines', () => {
+    expect(teamSceneFloorsOf(dev).map((f) => f.key)).toEqual([''])
+    const oneHost = { ...real, members: real.members.slice(0, 3) }
+    expect(teamSceneFloorsOf(oneHost).map((f) => f.key)).toEqual([''])
+  })
+
+  it('floors only the machines our members sit on, leaving empty ones to the Machines tab', () => {
+    expect(teamSceneFloorsOf(real).map((f) => f.key)).toEqual(['', 'm1'])
   })
 })
