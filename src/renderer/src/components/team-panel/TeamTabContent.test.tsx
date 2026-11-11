@@ -14,6 +14,7 @@ import { TeamScenePainterContext } from '../team-scene/team-scene-painter-contex
 import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 import type { TeamScenePainter } from '../team-scene/team-scene-painter'
 import { recordingContext } from '../team-scene/team-scene-recording-context'
+import { useAppStore } from '@/store'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -358,6 +359,30 @@ describe('TeamTabContent', () => {
 
     expect(line?.className).toContain('text-status-attention')
     expect(card.textContent).not.toContain('Edit · terminal-role.ts')
+  })
+
+  // ORCA-1148: subagents are helpers inside a member's session, not members; the row counts the live ones.
+  it('marks a member running helpers with their live count, and clears it when they stop', async () => {
+    const working = (id: string) => ({ id, state: 'working' as const, startedAt: 1 })
+    useAppStore.setState({
+      agentStatusByPaneKey: {
+        'pane-m': { subagents: [working('a1'), working('a2'), working('a3')] }
+      } as never
+    })
+    const { container } = await render(model())
+    const mark = memberCards(container)[0].querySelector('[data-team-helpers]')
+    expect(mark?.textContent).toBe('3 helpers')
+    expect(mark?.querySelector('[data-team-helpers-spinner]')).not.toBeNull()
+
+    await act(async () => {
+      useAppStore.setState({
+        agentStatusByPaneKey: {
+          'pane-m': { subagents: [{ id: 'a1', state: 'idle', startedAt: 1 }] }
+        } as never
+      })
+    })
+    expect(memberCards(container)[0].querySelector('[data-team-helpers]')).toBeNull()
+    useAppStore.setState({ agentStatusByPaneKey: {} })
   })
 
   // ORCA-1148: at 320 the waiting line read 'Waiting for your a…'; it wraps to two lines instead.

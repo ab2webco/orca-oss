@@ -16,11 +16,40 @@ import {
   statusToneOfCi,
   teamBranchParts,
   teamCiText,
+  teamHelperStateText,
   teamLiveText,
   teamPrNumberText,
   teamUsageBarClass
 } from './team-card-text'
 import { teamAccountWindowsOf } from './team-account-usage'
+import { teamHelpersOf } from './team-member-helpers'
+
+/** One line per helper (subagent) in the member's session, from the pane's live roster. */
+function HelpersList({ paneKey }: { paneKey: string }): React.JSX.Element | null {
+  const subagents = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.subagents)
+  const { helpers } = teamHelpersOf(subagents)
+  if (helpers.length === 0) {
+    return null
+  }
+  return (
+    <ul data-team-helpers-list="" className="flex min-w-0 flex-col gap-1">
+      {helpers.map((helper) => (
+        <li key={helper.id} data-team-helper="" className="flex min-w-0 justify-between gap-3">
+          <span className="min-w-0 break-words text-foreground">{helper.label}</span>
+          <span
+            className={
+              helper.state === 'working'
+                ? 'shrink-0 text-status-info'
+                : 'shrink-0 text-muted-foreground'
+            }
+          >
+            {teamHelperStateText(helper.state)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 type Fact = { key: string; label: string; value: ReactNode }
 
@@ -199,6 +228,7 @@ export function TeamMemberCardDetail({
           <span className="truncate">{`${teamPrNumberText(card.pr)}${ci ? ` · ${ci}` : ''}`}</span>
         </a>
       ) : null}
+      <HelpersList paneKey={card.paneKey} />
       {card.account ? <AccountUsage account={card.account} now={now} /> : null}
     </div>
   )

@@ -211,3 +211,15 @@ export function teamBranchParts(branch: string): { head: string; tail: string } 
   const cut = at >= 0 ? at : branch.lastIndexOf('/') + 1
   return { head: branch.slice(0, cut), tail: branch.slice(cut) }
 }
+
+export function teamHelpersCountText(count: number): string {
+  return count === 1
+    ? translate('teamPanel.card.helpers_one', '{{count}} helper', { count })
+    : translate('teamPanel.card.helpers_other', '{{count}} helpers', { count })
+}
+
+export function teamHelperStateText(state: 'working' | 'done'): string {
+  return state === 'working'
+    ? translate('teamPanel.card.helper.working', 'Working')
+    : translate('teamPanel.card.helper.done', 'Done')
+}

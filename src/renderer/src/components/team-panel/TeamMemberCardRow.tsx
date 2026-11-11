@@ -1,9 +1,12 @@
+import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
   teamAgeText,
+  teamHelpersCountText,
   teamHostText,
   teamLiveText,
   teamModelText,
@@ -15,6 +18,29 @@ import { TeamCardFace } from './TeamCardFace'
 import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
+import { teamHelpersOf } from './team-member-helpers'
+
+/** The live count of helpers (subagents) inside a member's session; nothing once they stop. */
+function HelpersMark({ paneKey }: { paneKey: string }): React.JSX.Element | null {
+  const subagents = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.subagents)
+  const { running } = teamHelpersOf(subagents)
+  if (running === 0) {
+    return null
+  }
+  return (
+    <span
+      data-team-helpers=""
+      className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground"
+    >
+      <LoaderCircle
+        data-team-helpers-spinner=""
+        className="size-3 shrink-0 motion-safe:animate-spin"
+        aria-hidden="true"
+      />
+      {teamHelpersCountText(running)}
+    </span>
+  )
+}
 
 /** A row's meta as `model · a · b`; the model is mono, as V28 sets it. */
 export function MetaLine({
@@ -153,6 +179,7 @@ export function TeamMemberCardRow({
                 : null
             ]}
           />
+          <HelpersMark paneKey={card.paneKey} />
         </span>
       </button>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}

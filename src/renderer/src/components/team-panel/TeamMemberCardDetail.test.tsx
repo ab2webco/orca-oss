@@ -185,3 +185,32 @@ describe('TeamMemberCardDetail', () => {
     expect(text(container, '[data-team-account-label]')).toBe('Codex · dev@example.com')
   })
 })
+
+describe('TeamMemberCardDetail helpers', () => {
+  afterEach(() => {
+    useAppStore.setState({ agentStatusByPaneKey: {} })
+  })
+
+  it("lists one line per helper the member's session runs, with its description and state", async () => {
+    useAppStore.setState({
+      agentStatusByPaneKey: {
+        'tab-7:leaf': {
+          subagents: [
+            { id: 'a1', description: 'Map sidebar rows', state: 'working', startedAt: 1 },
+            { id: 'a2', agentType: 'Explore', state: 'idle', startedAt: 2 }
+          ]
+        }
+      } as never
+    })
+    const container = await render(card())
+    const lines = [...container.querySelectorAll('[data-team-helper]')].map(
+      (one) => one.textContent
+    )
+    expect(lines).toEqual(['Map sidebar rowsWorking', 'ExploreDone'])
+  })
+
+  it('shows no helper lines when the session runs none', async () => {
+    const container = await render(card())
+    expect(container.querySelector('[data-team-helper]')).toBeNull()
+  })
+})

@@ -16354,6 +16354,12 @@
       "waitingForAnswer": "Esperando tu respuesta",
       "openTerminal": "Abrir terminal",
       "inFolder": "En la carpeta, sin worktree",
+      "helpers_one": "{{count}} ayudante",
+      "helpers_other": "{{count}} ayudantes",
+      "helper": {
+        "working": "Trabajando",
+        "done": "Terminado"
+      },
       "detail": {
         "branch": "Rama",
         "tool": "Última herramienta"

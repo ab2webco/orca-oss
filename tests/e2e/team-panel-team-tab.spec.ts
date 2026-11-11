@@ -398,6 +398,39 @@ test('the Team tab shows the live lead and its members from the lead game state'
         expect(spill).toBeLessThanOrEqual(0)
       }
     )
+
+    // Subagents are helpers inside the member's session: a live count on its row, a line each when open.
+    await orcaPage.evaluate((paneKey) => {
+      window.__store!.setState((state) => ({
+        agentStatusByPaneKey: {
+          ...state.agentStatusByPaneKey,
+          [paneKey]: {
+            ...state.agentStatusByPaneKey[paneKey],
+            subagents: [
+              { id: 'a1', description: 'Map sidebar rows', state: 'working', startedAt: 1 },
+              {
+                id: 'a2',
+                description: 'Inventory sidebar features',
+                state: 'working',
+                startedAt: 2
+              },
+              { id: 'a3', agentType: 'Explore', state: 'idle', startedAt: 3 }
+            ]
+          }
+        }
+      }))
+    }, members[1].paneKey)
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'member-helpers',
+      async (language) => {
+        await expect(asker.locator('[data-team-helpers]')).toHaveText(
+          language === 'en' ? '2 helpers' : '2 ayudantes'
+        )
+        await expect(asker.locator('[data-team-helper]')).toHaveCount(3)
+      }
+    )
     await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     const askerTab = members[1].paneKey.split(':')[0]
     // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
