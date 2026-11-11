@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TeamSceneFloorLegs } from '../../../../shared/team-scene/team-scene-floors'
 import {
   RIDE_BOARD_LIMIT_SECONDS,
@@ -47,9 +47,12 @@ export function useTeamSceneRideLegs(
 ): { legs: TeamSceneFloorLegs; onBoarded: (rider: string) => void } {
   const [legs, setLegs] = useState<TeamSceneFloorLegs>(HOME)
   const wantsRef = useRef(wants)
-  wantsRef.current = wants
   const hiddenRef = useRef(hidden)
-  hiddenRef.current = hidden
+  // Why in a layout effect: render stays pure, and it runs before the effects that advance a trip.
+  useLayoutEffect(() => {
+    wantsRef.current = wants
+    hiddenRef.current = hidden
+  })
   const advance = useCallback(
     (boarded: string | null) =>
       setLegs((prev) => {

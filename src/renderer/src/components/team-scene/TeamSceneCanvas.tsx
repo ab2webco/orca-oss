@@ -88,10 +88,13 @@ export function TeamSceneCanvas({
   const [tags, setTags] = useState<TeamSceneRect[]>([])
   const askersKeyRef = useRef('')
   const onAskersRef = useRef(onAskers)
-  onAskersRef.current = onAskers
-  const obstacles = useMemo(() => [...tags, ...extraObstacles], [tags, extraObstacles])
   const onBoardedRef = useRef(onBoarded)
-  onBoardedRef.current = onBoarded
+  // Why in a layout effect: render stays pure, and the latest callbacks are in place before paint.
+  useLayoutEffect(() => {
+    onAskersRef.current = onAskers
+    onBoardedRef.current = onBoarded
+  })
+  const obstacles = useMemo(() => [...tags, ...extraObstacles], [tags, extraObstacles])
 
   const paint = useCallback(
     (dt: number, elapsed = dt) => {

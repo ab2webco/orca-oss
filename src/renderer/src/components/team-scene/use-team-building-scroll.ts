@@ -14,25 +14,29 @@ export function useTeamFloorViews(): {
 } {
   const floors = useRef(new Map<string, HTMLElement>())
   const [hidden, setHidden] = useState<ReadonlySet<string>>(NONE)
-  const observer = useRef<IntersectionObserver | null>(null)
-  if (observer.current === null && typeof IntersectionObserver === 'function') {
-    observer.current = new IntersectionObserver((entries) =>
-      setHidden((old) => {
-        const next = new Set(old)
-        for (const entry of entries) {
-          const key = (entry.target as HTMLElement).dataset.teamFloor
-          if (key !== undefined) {
-            if (entry.isIntersecting) {
-              next.delete(key)
-            } else {
-              next.add(key)
-            }
-          }
-        }
-        // Why by size and members: the lead's floor key is '', which a joined string would lose.
-        return next.size === old.size && [...next].every((key) => old.has(key)) ? old : next
-      })
-    )
+  // Why undefined apart from null: where IntersectionObserver is missing, it is made once as nothing.
+  const observer = useRef<IntersectionObserver | null | undefined>(null)
+  if (observer.current === null) {
+    observer.current =
+      typeof IntersectionObserver !== 'function'
+        ? undefined
+        : new IntersectionObserver((entries) =>
+            setHidden((old) => {
+              const next = new Set(old)
+              for (const entry of entries) {
+                const key = (entry.target as HTMLElement).dataset.teamFloor
+                if (key !== undefined) {
+                  if (entry.isIntersecting) {
+                    next.delete(key)
+                  } else {
+                    next.add(key)
+                  }
+                }
+              }
+              // Why by size and members: the lead's floor key is '', which a joined string would lose.
+              return next.size === old.size && [...next].every((key) => old.has(key)) ? old : next
+            })
+          )
   }
   useEffect(() => () => observer.current?.disconnect(), [])
   const register = useCallback(
