@@ -31,14 +31,14 @@ export function planeRateLimitWait(): PlaneRateLimitWait | null {
 
 // Bounded 429 retries honoring Retry-After; the caller sees the last response, never a loop.
 export async function fetchWithPlaneRetry(
-  fetch: (url: string, init: RequestInit) => Promise<Response>,
+  send: (url: string, init: RequestInit) => Promise<Response>,
   rateLimiterKey: string,
   url: string,
   init: RequestInit
 ): Promise<Response> {
   for (let attempt = 0; ; attempt += 1) {
     await rateLimiter.acquire(rateLimiterKey, currentPlanePriority())
-    const response = await fetch(url, init)
+    const response = await send(url, init)
     rateLimiter.observe(rateLimiterKey, parsePlaneRateLimitHeaders(response.headers))
     if (response.status !== 429 || attempt >= MAX_RATE_LIMIT_RETRIES) {
       return response
