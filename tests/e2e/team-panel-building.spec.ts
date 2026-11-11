@@ -32,7 +32,8 @@ const MEMBERS = [
   { name: 'Escudero · ORCA-202 Code', host: null },
   { name: 'Mago · ORCA-203 Tests', host: 'imac' },
   // Why waiting: a member on another floor who needs you is what sends the lead up the elevator.
-  { name: 'Herrero · ORCA-204 Review', host: 'imac', state: 'waiting' },
+  // Why on the top floor: a bubble there meets the scroller's top edge once the building scrolls.
+  { name: 'Herrero · ORCA-204 Review', host: 'mbp', state: 'waiting' },
   { name: 'Arquera · ORCA-205 Docs', host: 'm1' },
   { name: 'Ginebra · ORCA-206 Infra', host: 'contabo' },
   { name: 'Merlín · ORCA-207 Build', host: 'mbp' }
@@ -199,10 +200,10 @@ test('the Team panel draws a team on five machines as a building in Office', asy
     await expect(floors.nth(4)).toHaveAttribute('data-team-floor', '')
     await expect(building).not.toContainText(/\+\d/)
     await expect(building).not.toContainText(/offline/i)
-    // The lead rides to the iMac, where a member waits on you: the car stands at that floor.
+    // The lead rides to the top floor, where a member waits on you: the car stands at that floor.
     await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
       'data-team-elevator-car',
-      'imac'
+      'mbp'
     )
 
     // The lead's step as the owner saw it: a bare tool, its bubble on the lead's floor rising over the
@@ -214,7 +215,7 @@ test('the Team panel draws a team on five machines as a building in Office', asy
       tool: 'PushNotification'
     })
     const leadBubble = building.locator('[data-scene-bubble="lead"]')
-    // The lead visits the iMac, where Herrero waits: its trip arrives and its line goes with it.
+    // The lead visits the top floor, where Herrero waits: its trip arrives and its line goes with it.
     await expect
       .poll(() => building.getAttribute('data-team-ride'), { timeout: 60_000 })
       .toMatch(/^there\|/)
@@ -227,6 +228,37 @@ test('the Team panel draws a team on five machines as a building in Office', asy
     expect(bubbleBox!.y, 'the lead bubble leaves the building').toBeGreaterThanOrEqual(
       buildingBox!.y
     )
+    // Scrolled so the visited floor's top sits above the scroller's top: its bubble stays inside the
+    // visible area, never cut by the edge ('detrás del muro' at the scroller's edge).
+    const scroller = building.locator('[data-team-floors-scroll]')
+    await scroller.evaluate((node) => {
+      node.scrollTop = 20
+    })
+    await orcaPage.waitForTimeout(500)
+    const [edgeBubble, scrollerBox] = await Promise.all([
+      leadBubble.boundingBox(),
+      scroller.boundingBox()
+    ])
+    // Inside the visible area, or yielded where no spot fits; never cut by the edge.
+    const shown = await leadBubble.isVisible()
+    testInfo.annotations.push({
+      type: 'scrolled-edge-bubble',
+      description: shown ? 'shown' : 'yielded'
+    })
+    if (shown) {
+      expect(edgeBubble!.y, 'the bubble rises past the scroller top').toBeGreaterThanOrEqual(
+        scrollerBox!.y
+      )
+    }
+    for (const theme of THEMES) {
+      await setTheme(orcaPage, theme)
+      await building.screenshot({
+        path: testInfo.outputPath(`building-scrolled-edge-${theme}.png`)
+      })
+    }
+    await scroller.evaluate((node) => {
+      node.scrollTop = 0
+    })
 
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
