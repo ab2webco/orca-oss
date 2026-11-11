@@ -202,9 +202,17 @@ test('the Team panel draws a team on three machines as a building in Office', as
     // Why reduced motion: a hidden test window runs no animation frames, so only the ride's
     // settled end (the lead beside Herrero, gone from its own floor) can be photographed.
     await orcaPage.emulateMedia({ reducedMotion: 'reduce' })
+    await expect
+      .poll(() => orcaPage.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
+      .toBe(true)
     for (const width of [420, 390, 320]) {
       await setWindowWidth(electronApp, orcaPage, width)
       await orcaPage.waitForTimeout(1500)
+      // Why recorded: a ride only shows on a stage at least 360 px wide, and the panel is not the window.
+      const stages = await building
+        .locator('[data-team-floor] canvas')
+        .evaluateAll((canvases) => canvases.map((c) => (c as HTMLCanvasElement).clientWidth))
+      await testInfo.attach(`ride-stage-widths-${width}`, { body: JSON.stringify(stages) })
       await building.screenshot({ path: testInfo.outputPath(`building-ride-reduced-${width}.png`) })
     }
     await orcaPage.emulateMedia({ reducedMotion: null })

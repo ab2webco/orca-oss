@@ -188,6 +188,36 @@ describe('TeamSceneCanvas', () => {
     expect(newcomer.x).toBeGreaterThan(0)
   })
 
+  it('paints the end of a ride under reduced motion: the away lead gone, the guest by its member', () => {
+    reduced = true
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(420)
+    const home = painter()
+    render(
+      <TeamSceneCanvas
+        input={{ ...input(['a']), leadStays: true, ride: 'away' }}
+        painter={home.value}
+        leadLine={null}
+      />
+    )
+    expect(home.frames.at(-1)!.actors.some((a) => a.key === 'lead')).toBe(false)
+    act(() => root.unmount())
+    root = createRoot(host)
+    const there = painter()
+    const floor = { ...input(['b']), leadless: true as const }
+    floor.members[0] = { ...floor.members[0]!, activity: 'needsYou' }
+    render(
+      <TeamSceneCanvas
+        input={{ ...floor, ride: { guest: 'b' } }}
+        painter={there.value}
+        leadLine={null}
+      />
+    )
+    const frame = there.frames.at(-1)!
+    const guest = frame.actors.find((a) => a.key === 'lead')
+    const b = frame.actors.find((a) => a.key === 'b')!
+    expect(Math.abs(guest!.x - b.x)).toBeLessThan(0.12)
+  })
+
   it('ties the lead line to the lead', () => {
     reduced = true
     render(
