@@ -16547,6 +16547,11 @@
     "title": "{{context}} - {{agent}} te pregunta",
     "body": "Abre la Bandeja para responder."
   },
+  "tabStrip": {
+    "hiddenTabs": "{{count}} pestañas más",
+    "hiddenTabs_one": "{{count}} pestaña más",
+    "hiddenTabs_other": "{{count}} pestañas más"
+  },
   "newTabMenu": {
     "account": {
       "inUseBy": "En uso por {{value}}",
