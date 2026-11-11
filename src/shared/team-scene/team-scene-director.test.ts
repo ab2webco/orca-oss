@@ -678,6 +678,39 @@ describe('team scene director, the lead riding between floors', () => {
   })
 })
 
+describe('team scene director, a ride under reduced motion as the canvas paints it', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+  // Why a zero step: the canvas settles, then paints, and painting steps the scene by no time.
+  const painted = (world: TeamSceneWorld, width: number): void => {
+    settleTeamScene(world)
+    stepTeamScene(world, 0, { width })
+  }
+  const floors = () => {
+    const home = createTeamSceneWorld()
+    applyTeamSceneInput(home, { ...input([member('a')]), leadStays: true, ride: 'away' }, OFFICE)
+    const there = createTeamSceneWorld()
+    const floor = { ...input([member('b', { activity: 'needsYou' })]), leadless: true as const }
+    applyTeamSceneInput(there, { ...floor, ride: { guest: 'b' } }, OFFICE)
+    return { home, there }
+  }
+
+  it('shows the end of the ride where there is room', () => {
+    const { home, there } = floors()
+    painted(home, 420)
+    painted(there, 420)
+    expect(actor(home, 'lead')).toBeUndefined()
+    expect(Math.abs(actor(there, 'lead')!.x - there.bodies.get('b')!.home.x)).toBeLessThan(0.1)
+  })
+
+  it('takes no ride on a narrow floor: the lead at its own spot, and no guest', () => {
+    const { home, there } = floors()
+    painted(home, 320)
+    painted(there, 320)
+    expect(actor(home, 'lead')?.x).toBeCloseTo(0.84, 2)
+    expect(actor(there, 'lead')).toBeUndefined()
+  })
+})
+
 describe('team scene director, the advisor riding in', () => {
   it('brings the advisor in at the elevator on a floor it rides to', () => {
     const world = createTeamSceneWorld()

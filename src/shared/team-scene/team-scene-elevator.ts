@@ -70,8 +70,10 @@ export function stepTeamSceneRide(world: TeamSceneWorld, width: number): boolean
     return true
   }
   if (lead.hidden) {
-    // Back from a ride: out of the elevator, and its rounds walk it home.
-    Object.assign(lead, { hidden: undefined, x: ELEVATOR_X })
+    // Back from a ride: out of the elevator, and its rounds walk it home. A floor gone narrow
+    // mid-ride takes none, so the lead is simply back at its spot.
+    const spot = ride === 'away' ? LEAD_SPOT : { x: ELEVATOR_X, depth: lead.depth }
+    Object.assign(lead, { hidden: undefined, x: spot.x, depth: spot.depth })
   }
   return false
 }
@@ -90,6 +92,7 @@ export function settleTeamSceneRide(world: TeamSceneWorld): void {
     const spot = member ? besideOf(member) : elevator(lead)
     Object.assign(lead, { x: spot.x, depth: spot.depth, target: spot, hidden: undefined })
   } else if (ride === 'away') {
-    lead.hidden = true
+    // Why in the elevator: the next step keeps a lead hidden only once it stands there.
+    Object.assign(lead, { x: ELEVATOR_X, target: elevator(lead), hidden: true })
   }
 }

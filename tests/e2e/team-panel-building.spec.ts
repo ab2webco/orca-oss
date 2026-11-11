@@ -199,6 +199,15 @@ test('the Team panel draws a team on three machines as a building in Office', as
         await building.screenshot({ path: testInfo.outputPath(`building-${width}-${theme}.png`) })
       }
     }
+    // Why reduced motion: a hidden test window runs no animation frames, so only the ride's
+    // settled end (the lead beside Herrero, gone from its own floor) can be photographed.
+    await orcaPage.emulateMedia({ reducedMotion: 'reduce' })
+    for (const width of [420, 390, 320]) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await orcaPage.waitForTimeout(1500)
+      await building.screenshot({ path: testInfo.outputPath(`building-ride-reduced-${width}.png`) })
+    }
+    await orcaPage.emulateMedia({ reducedMotion: null })
     await setWindowWidth(electronApp, orcaPage, 1440)
 
     // A floor button zooms into that floor; Escape on the focused scene returns; a number key zooms.

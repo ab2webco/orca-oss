@@ -32,9 +32,12 @@ export function TeamSceneElevatorShaft({
         <div
           data-team-elevator-car={carAt}
           // Why transform: the ride eases between floors without animating layout.
-          className="absolute inset-x-1 top-0 rounded-sm bg-scene-bubble ring-1 ring-ring motion-safe:transition-transform motion-safe:duration-700 motion-safe:ease-in-out"
+          // Why square with a door seam: a rounded pill beside the panel read as its scrollbar.
+          className="absolute inset-x-0.5 top-0 bg-scene-bubble ring-1 ring-ring motion-safe:transition-transform motion-safe:duration-700 motion-safe:ease-in-out"
           style={{ height: rowHeight - 16, transform: `translateY(${car * rowHeight + 8}px)` }}
-        />
+        >
+          <div className="absolute inset-y-0 left-1/2 w-px bg-ring" />
+        </div>
       ) : null}
       {envelope ? (
         <TubeEnvelope
