@@ -148,10 +148,10 @@ describe('teamCardsOf', () => {
     const byKey = Object.fromEntries((rows ?? []).map((one) => [one.paneKey, one]))
     expect(byKey.a).toMatchObject({ condition: 'unreachable', status: 'risk' })
     expect(byKey.b).toMatchObject({ condition: 'asleep', status: 'risk' })
-    expect(byKey.c).toMatchObject({ condition: 'gone', status: 'attention' })
-    expect(byKey.d).toMatchObject({ condition: 'startFailed', status: 'attention' })
+    expect(byKey.c).toMatchObject({ condition: 'gone', status: 'closed' })
+    expect(byKey.d).toMatchObject({ condition: 'startFailed', status: 'failed' })
     expect(byKey.e).toMatchObject({ condition: 'limited', status: 'risk', limitResetsAt: 9 })
-    expect(byKey.f).toMatchObject({ condition: 'loggedOut', status: 'attention' })
+    expect(byKey.f).toMatchObject({ condition: 'loggedOut', status: 'failed' })
   })
 
   it('turns red for a waiting member or an open question, green only once merged', () => {

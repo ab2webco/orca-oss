@@ -40,10 +40,12 @@ export type TeamSoloSession = {
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
-  risk: 1,
-  working: 2,
-  done: 3,
-  idle: 4
+  failed: 1,
+  risk: 2,
+  working: 3,
+  done: 4,
+  idle: 5,
+  closed: 6
 }
 
 // Why: an interrupted turn or a session boundary is not work that finished; a row restored from disk proves no live turn.

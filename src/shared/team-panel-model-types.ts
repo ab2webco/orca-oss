@@ -9,7 +9,8 @@ import type { TeamAction } from './team-panel-actions'
 // and facts only; each client translates words and maps a status to its own tokens.
 
 /** The colour language: red, amber, blue, green, grey. Meanings are fixed; hues are a setting. */
-export type TeamStatus = 'attention' | 'risk' | 'working' | 'done' | 'idle'
+/** `failed` asks for action but is no question to the person; `closed` asks for nothing. */
+export type TeamStatus = 'attention' | 'failed' | 'risk' | 'working' | 'done' | 'idle' | 'closed'
 
 /** The flow a card's phase word names: Plan, Docs, Code, Tests, PR, Merge (the mod's FlowPhase). */
 export type TeamFlowPhase = 'plan' | 'docs' | 'code' | 'tests' | 'pr' | 'merge'
