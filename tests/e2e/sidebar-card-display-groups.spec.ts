@@ -29,18 +29,29 @@ function scrolledSideways(page: Page): Promise<string[]> {
   )
 }
 
-/** The item's center once the menu stops moving, so a pointer lands where the user would see it. */
+/**
+ * The item's center once its menu's open animation has ended and a frame later it has not moved.
+ * Why not two quick reads: a slow renderer holds one frame for a second, so both reads can land
+ * mid-animation and the pointer then hits the row above (CI run 43006963175).
+ */
 async function settledCenter(item: Locator): Promise<{ x: number; y: number }> {
-  let last: { x: number; y: number; width: number; height: number } | null = null
-  await expect
-    .poll(async () => {
-      const box = await item.boundingBox()
-      const still = box !== null && last !== null && box.x === last.x && box.y === last.y
-      last = box
-      return still
-    })
-    .toBe(true)
-  return { x: last!.x + last!.width / 2, y: last!.y + last!.height / 2 }
+  const box = await item.evaluate(async (node) => {
+    const menu = node.closest('[role="menu"]') ?? node
+    await Promise.all(menu.getAnimations({ subtree: true }).map((animation) => animation.finished))
+    const nextFrame = (): Promise<void> =>
+      new Promise((resolve) => requestAnimationFrame(() => resolve()))
+    let before = node.getBoundingClientRect()
+    for (;;) {
+      await nextFrame()
+      await nextFrame()
+      const after = node.getBoundingClientRect()
+      if (after.x === before.x && after.y === before.y) {
+        return { x: after.x, y: after.y, width: after.width, height: after.height }
+      }
+      before = after
+    }
+  })
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
 test.describe('narrow-width app shell (ORCA-1163)', () => {
