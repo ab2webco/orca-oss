@@ -2867,7 +2867,7 @@ export default function SessionScreen() {
   )
   // Ref to latest switchSessionTab so fetchSessionTabs can activate a synced browser tab without a dependency cycle.
   switchSessionTabRef.current = switchSessionTab
-  useFollowHostTerminalOpen({
+  const openTeamTerminal = useFollowHostTerminalOpen({
     client,
     hostId,
     worktreeId,
@@ -4871,6 +4871,7 @@ export default function SessionScreen() {
               team={team}
               now={teamNow}
               onOpenLink={openMobilePrUrl}
+              onOpenTerminal={openTeamTerminal}
             />
           </View>
           {canDockPanel && activePanel !== null && (
