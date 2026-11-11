@@ -104,22 +104,22 @@ function PlaneWorkItemRow({
         }
       }}
       className={cn(
-        'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] lg:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]',
+        'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring @3xl:grid-cols-[90px_minmax(0,1fr)_128px_92px_80px_64px] @5xl:grid-cols-[96px_minmax(0,1.25fr)_132px_120px_136px_96px_64px] @6xl:grid-cols-[104px_minmax(0,1.45fr)_144px_132px_160px_128px_72px]',
         selected && 'bg-accent'
       )}
     >
-      <span className="block truncate font-mono text-[12px] text-muted-foreground max-md:!hidden">
+      <span className="block truncate font-mono text-[12px] text-muted-foreground @max-3xl:!hidden">
         {item.identifier}
       </span>
 
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 font-mono text-[11px] text-muted-foreground md:hidden">
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground @3xl:hidden">
             {item.identifier}
           </span>
           <h3 className="min-w-0 truncate text-[13px] font-medium text-foreground">{item.title}</h3>
         </div>
-        <div className="mt-1 flex min-w-0 items-center gap-1.5 md:!hidden">
+        <div className="mt-1 flex min-w-0 items-center gap-1.5 @3xl:!hidden">
           <span
             className={cn(
               'inline-flex min-w-0 items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium',
@@ -134,8 +134,8 @@ function PlaneWorkItemRow({
               translate('auto.components.TaskPage.42a9160321', 'Unassigned')}
           </span>
         </div>
-        <div className="mt-1 flex min-w-0 items-center gap-1 max-lg:!hidden">
-          <span className="max-w-[160px] truncate text-[10px] text-muted-foreground xl:!hidden">
+        <div className="mt-1 flex min-w-0 items-center gap-1 @max-5xl:!hidden">
+          <span className="max-w-[160px] truncate text-[10px] text-muted-foreground @6xl:!hidden">
             {contextLabel}
           </span>
           {labels.map((label) => (
@@ -154,7 +154,7 @@ function PlaneWorkItemRow({
         </div>
       </div>
 
-      <div className="flex min-w-0 max-md:!hidden">
+      <div className="flex min-w-0 @max-3xl:!hidden">
         <span
           className={cn(
             'inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
@@ -165,11 +165,11 @@ function PlaneWorkItemRow({
         </span>
       </div>
 
-      <span className="block truncate text-[12px] text-muted-foreground max-md:!hidden">
+      <span className="block truncate text-[12px] text-muted-foreground @max-3xl:!hidden">
         {priorityLabel}
       </span>
 
-      <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground max-lg:!hidden">
+      <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground @max-5xl:!hidden">
         {primaryAssignee?.avatarUrl ? (
           <img
             src={primaryAssignee.avatarUrl}
@@ -192,7 +192,7 @@ function PlaneWorkItemRow({
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="block min-w-0 truncate text-[12px] text-muted-foreground max-md:!hidden">
+          <div className="block min-w-0 truncate text-[12px] text-muted-foreground @max-3xl:!hidden">
             {formatUpdatedAt(item.updatedAt)}
           </div>
         </TooltipTrigger>
@@ -201,7 +201,7 @@ function PlaneWorkItemRow({
         </TooltipContent>
       </Tooltip>
 
-      <div className="flex shrink-0 items-center justify-end gap-1 md:opacity-0 md:transition-opacity md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100">
+      <div className="flex shrink-0 items-center justify-end gap-1 @3xl:opacity-0 @3xl:transition-opacity @3xl:group-hover/row:opacity-100 @3xl:group-focus-within/row:opacity-100">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
