@@ -39,6 +39,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
     if (account.kind === 'picker') {
       return (
         <NewTabAgentAccountSubmenu
+          provider={account.provider}
           ariaLabel={ariaLabel}
           triggerLabel={props.labelOf(account.provider, accountId)}
           rows={account.rows}

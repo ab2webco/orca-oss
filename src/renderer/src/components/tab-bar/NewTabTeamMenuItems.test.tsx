@@ -11,6 +11,14 @@ import type { NewTabAccountRow } from '../../../../shared/new-tab-account-choice
 import type { AgentRowAccount } from './new-tab-agent-row-account'
 import { NewTabTeamMenuItems, type NewTabTeamMenuItemsProps } from './NewTabTeamMenuItems'
 
+const openSettingsTarget = vi.fn()
+const openSettingsPage = vi.fn()
+
+vi.mock('@/store', () => ({
+  useAppStore: (select: (state: unknown) => unknown) =>
+    select({ openSettingsTarget, openSettingsPage })
+}))
+
 const row = (id: string, over: Partial<NewTabAccountRow> = {}): NewTabAccountRow => ({
   id,
   email: `${id}@example.test`,
@@ -97,6 +105,21 @@ describe('NewTabTeamMenuItems', () => {
     fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item(/ORCA-9/))
     expect(props.onAddMember).toHaveBeenLastCalledWith(TODO[0], 'acct-2')
+  })
+
+  it("heads the account list with its provider and links to that provider's accounts", () => {
+    renderMenu({})
+
+    fireEvent.click(item("Choose the member's account"))
+    expect(screen.getByText('Claude accounts')).toBeTruthy()
+    fireEvent.click(item('Manage accounts…'))
+
+    expect(openSettingsTarget).toHaveBeenCalledWith({
+      pane: 'accounts',
+      repoId: null,
+      sectionId: 'accounts-claude'
+    })
+    expect(openSettingsPage).toHaveBeenCalledTimes(1)
   })
 
   it('says To Do is empty instead of offering no ticket', () => {
