@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Crown, Plus, RotateCcw, UserPlus } from 'lucide-react'
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -27,6 +28,7 @@ export type NewTabTeamMenuItemsProps = {
 }
 
 const ROW = 'gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium'
+const ICON = 'size-4 shrink-0 text-muted-foreground'
 const LABEL = 'px-2 pt-1.5 pb-1 text-[11px] font-medium text-muted-foreground'
 
 /** The + menu's Team group: the project's live or kept lead, never a second team (ORCA-717). */
@@ -78,6 +80,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
       {state.kind === 'lead-live' ? (
         <>
           <DropdownMenuItem className={ROW} onSelect={props.onGoToLead}>
+            <Crown aria-hidden className={ICON} />
             <span className="truncate">
               {translate('newTabMenu.team.goToLeadUnnamed', 'Go to lead')}
               {leadLabel && <span className="text-muted-foreground"> · {leadLabel}</span>}
@@ -85,6 +88,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className={ROW}>
+              <UserPlus aria-hidden className={ICON} />
               <span className="truncate">
                 {translate('newTabMenu.team.addMember', 'Add member…')}
               </span>
@@ -126,6 +130,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
       ) : (
         <>
           <DropdownMenuItem className={ROW} onSelect={props.onReopen}>
+            <RotateCcw aria-hidden className={ICON} />
             <span className="flex-1 truncate">
               {translate('newTabMenu.team.reopen', 'Reopen team')}
             </span>
@@ -166,6 +171,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
                   setConfirming(true)
                 }}
               >
+                <Plus aria-hidden className={ICON} />
                 <span className="truncate">
                   {translate('newTabMenu.team.startFresh', 'Start fresh lead…')}
                 </span>

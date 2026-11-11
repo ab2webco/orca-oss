@@ -15,7 +15,8 @@ import {
   stubSortableTab,
   stubStatusDisplay,
   stubTabInsertion,
-  stubTabStripDragScroll
+  stubTabStripDragScroll,
+  stubUseTranslation
 } from './tab-bar-windows-shell-launch-render-stubs'
 import {
   appStoreSnapshot,
@@ -24,6 +25,7 @@ import {
 } from './tab-bar-windows-shell-launch-test-harness'
 
 vi.mock('react', async () => await stubHeadlessReact())
+vi.mock('react-i18next', async () => await stubUseTranslation())
 vi.mock('zustand/react/shallow', () => stubShallowSelector())
 vi.mock('lucide-react', async () => (await import('./lucide-icon-stub-fixture')).stubEveryIcon())
 vi.mock('@dnd-kit/sortable', () => stubSortableContext())

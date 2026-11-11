@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { stubUseTranslation } from './tab-bar-windows-shell-launch-render-stubs'
 
 const appStoreSnapshot: {
   activeTabId: string | null
@@ -49,6 +50,7 @@ const useAppStoreMock = vi.fn(
     })
 )
 
+vi.mock('react-i18next', async () => await stubUseTranslation())
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react') // eslint-disable-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()
   return {

@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTabStripOverflowNavigation } from './tab-strip-overflow-navigation'
 import { useTabStripDragScrollHandlers } from './tab-strip-drag-scroll'
 import type { TabBarProps } from './tab-bar-props'
@@ -12,6 +13,8 @@ import { useRemoteRuntimeActionPending } from '@/runtime/use-remote-runtime-acti
 import { renderTabBarSurface } from './tab-bar-surface'
 
 function TabBarInner(props: TabBarProps): React.JSX.Element {
+  // Why: the memo kept the + labelled in the old language after a switch; this re-renders on it.
+  useTranslation()
   const {
     worktreeId,
     groupId,

@@ -21,6 +21,12 @@ export async function stubHeadlessReact(): Promise<Record<string, unknown>> {
   }
 }
 
+// Why: react-i18next resolves the real React, whose useContext has no dispatcher in a headless render.
+export async function stubUseTranslation(): Promise<Record<string, unknown>> {
+  const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next') // eslint-disable-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()
+  return { ...actual, useTranslation: () => ({}) }
+}
+
 // The headless React stub above removes the dispatcher, so zustand's useShallow
 // (which calls useRef) has to be a pass-through like the store mock.
 export function stubShallowSelector(): Record<string, unknown> {
