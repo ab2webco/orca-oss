@@ -4026,6 +4026,7 @@ export class OrcaRuntimeService {
         accountId: this.leadReopenAccountOf(session),
         presentation: 'focused'
       }),
+    reopenAccountOf: (session) => this.leadReopenAccountOf(session),
     focus: async (handle) => {
       await this.focusTerminal(handle)
     },

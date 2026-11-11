@@ -38,6 +38,39 @@ describe('GameLeads.storedLeadOf', () => {
     })
   })
 
+  it('names the account the reopen will run on, not the raw recorded one', async () => {
+    const game = new GameLeads({
+      projectOf: async () => LEAD,
+      isLive: () => false,
+      sessions: {
+        read: async () => ({ ...SESSION, accountId: 'acct-removed' }),
+        write: async () => undefined,
+        clear: async () => undefined
+      },
+      reopenAccountOf: (session) =>
+        session.accountId === 'acct-removed' ? 'acct-from-transcript' : session.accountId
+    })
+
+    await expect(game.storedLeadOf({ worktreeId: 'wt-2' })).resolves.toEqual({
+      accountId: 'acct-from-transcript'
+    })
+  })
+
+  it('names no account when the reopen would run on none', async () => {
+    const game = new GameLeads({
+      projectOf: async () => LEAD,
+      isLive: () => false,
+      sessions: {
+        read: async () => SESSION,
+        write: async () => undefined,
+        clear: async () => undefined
+      },
+      reopenAccountOf: () => null
+    })
+
+    await expect(game.storedLeadOf({ worktreeId: 'wt-2' })).resolves.toEqual({ accountId: null })
+  })
+
   it('has none when the project keeps no lead conversation', async () => {
     const game = leadsWith(LEAD, new Map())
 

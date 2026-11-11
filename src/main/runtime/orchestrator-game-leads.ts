@@ -65,6 +65,8 @@ export class GameLeads {
       sessionOf?: (handle: string) => Promise<GameLeadSession | null>
       /** Reopens the conversation in a new pane and returns that pane's handle. */
       resume?: (session: GameLeadSession) => Promise<string>
+      /** The managed account `resume` reopens a conversation on; the recorded one when absent. */
+      reopenAccountOf?: (session: GameLeadSession) => string | null
       focus?: (handle: string) => Promise<void>
       roster?: {
         read: () => Promise<GameLeadRecord[]>
@@ -195,7 +197,12 @@ export class GameLeads {
       return null
     }
     const session = await this.deps.sessions?.read(project.key).catch(() => null)
-    return session ? { accountId: session.accountId ?? null } : null
+    if (!session) {
+      return null
+    }
+    // Why the reopen's account: a removed account falls back, and the menu must name the one used.
+    const reopenAccountOf = this.deps.reopenAccountOf
+    return { accountId: reopenAccountOf ? reopenAccountOf(session) : (session.accountId ?? null) }
   }
 
   /** The project's live lead, for a caller that is no terminal: the person's Inbox. */
