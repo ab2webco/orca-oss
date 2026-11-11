@@ -1,4 +1,5 @@
-import type { TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import type { TeamScenePlay, TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import { drawOfficePlay, officePlayArm, officePlayLean } from './team-scene-office-play'
 
 /** Where the desk art's own chair ends, so the station is drawn without it. */
 export type OfficeBackSeat = { chairEnd: number }
@@ -146,16 +147,20 @@ export function drawOfficeBack(
   floor: number,
   px: number,
   look: OfficeBackLook,
-  { pose, jump }: { pose: TeamScenePose; jump: number },
+  { pose, jump, play }: { pose: TeamScenePose; jump: number; play?: TeamScenePlay },
   t: number
 ): void {
   const ground = (dx: number, u: number): Point => [x + dx * px, floor - u * px]
-  const at = (dx: number, u: number): Point => [x + dx * px, floor - jump - u * px]
+  const lean = officePlayLean(play, t)
+  const at = (dx: number, u: number): Point => [x + (dx + lean) * px, floor - jump - u * px]
   g.save()
   g.lineCap = 'round'
   g.lineJoin = 'round'
   g.lineWidth = 1.6 * px
-  const arms = ([-1, 1] as const).map((side) => ({ side, arm: armOf(pose, t, side) }))
+  const arms = ([-1, 1] as const).map((side) => ({
+    side,
+    arm: (play && officePlayArm(play, t, side)) ?? armOf(pose, t, side)
+  }))
   // Why a hand over the top goes over the head: from behind, a raised hand is what shows.
   const up = (hand: Point) => hand[1] > OFFICE_BACK_HEAD_TOP
   const drawArm = (side: -1 | 1, [elbow, hand]: [Point, Point]): void => {
@@ -213,6 +218,9 @@ export function drawOfficeBack(
     if (up(arm[1])) {
       drawArm(side, arm)
     }
+  }
+  if (play) {
+    drawOfficePlay(g, play, at, px, t)
   }
   g.restore()
 }

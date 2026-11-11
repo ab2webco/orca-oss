@@ -155,3 +155,62 @@ describe('team scene work loop', () => {
     expect(world.trophies.map((t) => t.key)).toEqual(['a'])
   })
 })
+
+describe('team scene work loop at a desk', () => {
+  const DESK = { rowSize: 5, workSeated: true }
+  const desk = (members: TeamSceneMemberInput[]): TeamSceneWorld => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input(members), DESK)
+    return world
+  }
+  const playsOf = (world: TeamSceneWorld, keys: string[]) =>
+    keys.map((key) => actor(world, key).play)
+
+  it('a resting member stays in its chair and plays instead of strolling off', () => {
+    const world = desk([member('a', 'resting')])
+    const x0 = home(world, 'a')
+    const plays = new Set<unknown>()
+    for (let t = 0; t < 40; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      const a = actor(world, 'a')
+      expect(a.x).toBe(x0)
+      expect(a.pose).toBe('idle')
+      plays.add(a.play)
+    }
+    expect(plays.has(undefined)).toBe(false)
+    expect(plays.size).toBeGreaterThan(1)
+  })
+
+  it('never gives two neighbours the same play, so the row never looks copied', () => {
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    const world = desk(keys.map((key) => member(key, 'resting')))
+    for (let t = 0; t < 60; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      const plays = playsOf(world, keys)
+      plays.slice(1).forEach((play, i) => expect(play).not.toBe(plays[i]))
+    }
+  })
+
+  it('drops its play and types the instant work starts', () => {
+    const world = desk([member('a', 'resting')])
+    watch(world, 'a', 2)
+    applyTeamSceneInput(world, input([member('a', 'working')]), DESK)
+    stepTeamScene(world, DT, { width: WIDTH })
+    expect(actor(world, 'a').play).toBeUndefined()
+    expect(actor(world, 'a').pose).toBe('work')
+  })
+
+  it('plays only while truly idle: never while it needs you, is blocked or done', () => {
+    const keys = ['a', 'b', 'c']
+    const world = desk([member('a', 'needsYou'), member('b', 'blocked'), member('c', 'done')])
+    watch(world, 'a', 3)
+    expect(playsOf(world, keys)).toEqual([undefined, undefined, undefined])
+  })
+
+  it('leaves a resting member on open ground strolling, with no desk play', () => {
+    const world = scene([member('a', 'resting')])
+    const { frames } = watch(world, 'a', 15)
+    expect(frames.some((f) => Math.abs(f.x - home(world, 'a')) > 0.02)).toBe(true)
+    expect(actor(world, 'a').play).toBeUndefined()
+  })
+})

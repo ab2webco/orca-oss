@@ -212,7 +212,7 @@ export function createImagePainter(args: {
           (site) =>
             site.broken && Math.abs((site.spot.x - SITE_FROM_SEAT_X - spot.x) * f.width) < SEAT_PX
         )
-        const state = stationScreenStateOf(worker?.pose ?? null, failing)
+        const state = stationScreenStateOf(worker?.pose ?? null, failing, worker?.play)
         drawStationScreen(g, rect, state, f.t, colors.attention)
       }
     }

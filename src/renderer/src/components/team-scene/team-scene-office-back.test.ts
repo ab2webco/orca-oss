@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import type { TeamScenePlay, TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
 import {
   drawOfficeBack,
   OFFICE_BACK_FALLBACK,
   OFFICE_BACK_HEAD_TOP,
   officeBackLookOf
 } from './team-scene-office-back'
+import { OFFICE_PLAY_COLORS } from './team-scene-office-play'
 import { recordingContext } from './team-scene-recording-context'
 
 const LOOK = { hair: '#211816', skin: '#8a5a3c', shirt: '#bc743f' }
@@ -81,5 +82,52 @@ describe('office back view', () => {
     const hairY = (jump: number) =>
       discs(drawn('cheer', 0, jump)).find((d) => d.color === LOOK.hair)!.y
     expect(hairY(6)).toBeCloseTo(hairY(0) - 6)
+  })
+
+  describe('at play in the chair', () => {
+    const playing = (play: TeamScenePlay, t = 0) => {
+      const r = recordingContext()
+      drawOfficeBack(r.g, 100, FLOOR, PX, LOOK, { pose: 'idle', jump: 0, play }, t)
+      return r
+    }
+    const shows = (play: TeamScenePlay, color: string) => playing(play, 1).fills().includes(color)
+
+    it('draws each play with its own prop, and leaves the game to the screen', () => {
+      expect(shows('music', OFFICE_PLAY_COLORS.phones)).toBe(true)
+      expect(shows('music', OFFICE_PLAY_COLORS.note)).toBe(true)
+      expect(shows('sketch', OFFICE_PLAY_COLORS.pad)).toBe(true)
+      expect(shows('plane', OFFICE_PLAY_COLORS.plane)).toBe(true)
+      for (const color of Object.values(OFFICE_PLAY_COLORS)) {
+        expect(shows('game', color)).toBe(false)
+      }
+    })
+
+    it('floats its music notes up from the headphones', () => {
+      const noteYs = (t: number) =>
+        discs(playing('music', t))
+          .filter((d) => d.color === OFFICE_PLAY_COLORS.note)
+          .map((d) => d.y)
+      const [early, late] = [noteYs(0.2), noteYs(0.6)]
+      expect(late[0]!).toBeLessThan(early[0]!)
+    })
+
+    it('folds the plane over its head, then throws it off across the row', () => {
+      const planeX = (t: number) => {
+        const r = playing('plane', t)
+        const at = r.calls.findIndex(
+          (c) => c.name === 'fill' && c.fillStyle === OFFICE_PLAY_COLORS.plane
+        )
+        const start = r.calls.slice(0, at).findLast((c) => c.name === 'moveTo')!
+        return start.args[0] as number
+      }
+      expect(Math.abs(planeX(0.5) - 100)).toBeLessThan(10)
+      expect(planeX(4.4)).toBeGreaterThan(130)
+    })
+
+    it('mashes the keys for its game, faster than it types', () => {
+      const shape = (t: number) => JSON.stringify(playing('game', t).calls)
+      expect(shape(0)).not.toBe(shape(0.1))
+      expect(discs(playing('game')).filter((d) => d.y < headTopY)).toHaveLength(0)
+    })
   })
 })

@@ -1,7 +1,7 @@
 import { advisorGestureOf } from './team-scene-advisor-walk'
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneStrideAt } from './team-scene-motion'
-import { workPoseOf } from './team-scene-work-loop'
+import { seatedPlayOf, workPoseOf } from './team-scene-work-loop'
 import type { TeamSceneActivity, TeamSceneActor, TeamScenePose } from './team-scene-types'
 
 const SEATED_POSE: Record<TeamSceneActivity, TeamScenePose> = {
@@ -57,6 +57,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
                 ? 'blocked'
                 : null
       const plan = body.plan
+      const play = body.role === 'member' ? seatedPlayOf(world, body) : undefined
       return {
         key: body.key,
         role: body.role,
@@ -77,6 +78,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
             world.rounds.purpose === 'give'),
         emote: timed ?? seatedMark,
         ...(body.role === 'advisor' ? { gesture: advisorGestureOf(world) } : {}),
+        ...(play ? { play } : {}),
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }
     })

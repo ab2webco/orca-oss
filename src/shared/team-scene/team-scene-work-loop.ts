@@ -1,15 +1,18 @@
 import { teamSceneArrived as near } from './team-scene-motion'
 import { pileSpotOf } from './team-scene-sites'
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
+import type { TeamScenePlay } from './team-scene-types'
 
 // Why: one strike in place reads as drumming; V30 and builder games show a round trip instead.
 const BUILD_SECONDS = 2.6
 const REPAIR_PUFF_SECONDS = 1.2
 const PAUSE_SECONDS = 2.5
 const STROLL_X = 0.06
+const PLAY_SECONDS = 14
+const PLAYS: readonly TeamScenePlay[] = ['music', 'sketch', 'plane', 'game']
 
 export type TeamSceneWork = {
-  step: 'build' | 'fetch' | 'carry' | 'repair' | 'pause' | 'stroll' | 'still'
+  step: 'build' | 'fetch' | 'carry' | 'repair' | 'pause' | 'stroll' | 'still' | 'play'
   at: number
   strolls: number
 }
@@ -57,6 +60,14 @@ function stepWorking(world: TeamSceneWorld, body: TeamSceneBody, width: number):
 
 function stepResting(world: TeamSceneWorld, body: TeamSceneBody, width: number): void {
   const { work } = body
+  // Why: at a desk the rule is seated; a stroll stood the member up in front of its neighbour.
+  if (world.layout.workSeated) {
+    if (work.step !== 'play') {
+      go(world, body, 'play')
+    }
+    body.target = body.home
+    return
+  }
   if (work.step === 'stroll') {
     if (near(body, width)) {
       go(world, body, 'pause')
@@ -100,4 +111,27 @@ export function workPoseOf(body: TeamSceneBody): 'work' | 'idle' | null {
   // Why exact: a walker snaps onto its target on arrival (moveTeamSceneBody).
   const atSeat = body.x === body.home.x
   return (step === 'build' || step === 'repair') && atSeat ? 'work' : 'idle'
+}
+
+/** A resting member's play in its desk chair; undefined anywhere else. */
+export function seatedPlayOf(
+  world: TeamSceneWorld,
+  body: TeamSceneBody
+): TeamScenePlay | undefined {
+  if (
+    !world.layout.workSeated ||
+    body.activity !== 'resting' ||
+    body.plan.kind !== 'seated' ||
+    body.x !== body.home.x
+  ) {
+    return undefined
+  }
+  const row = [...world.bodies.values()]
+    .filter((one) => one.role === 'member' && one.home.depth === body.home.depth)
+    .sort((p, q) => p.home.x - q.home.x)
+  const seat = Math.max(0, row.indexOf(body))
+  // Why staggered: each seat switches a fifth of a turn after its left neighbour, so two
+  // neighbours sit one or two plays apart and the row never changes all at once.
+  const turn = Math.floor((world.t + ((seat % 5) * PLAY_SECONDS) / 5) / PLAY_SECONDS)
+  return PLAYS[(seat + turn) % PLAYS.length]
 }

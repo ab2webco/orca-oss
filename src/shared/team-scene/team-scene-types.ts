@@ -62,6 +62,9 @@ export type TeamSceneSpot = { x: number; depth: number }
 
 export type TeamScenePose = 'idle' | 'work' | 'walk' | 'raise' | 'give' | 'wave' | 'cheer' | 'done'
 
+/** What an idle member does in its chair at a desk, so a resting row never looks frozen. */
+export type TeamScenePlay = 'music' | 'sketch' | 'plane' | 'game'
+
 export type TeamSceneEmote = 'alert' | 'check' | 'star' | 'heart' | 'blocked'
 
 export type TeamSceneActor = {
@@ -84,6 +87,8 @@ export type TeamSceneActor = {
   jump: number
   /** The advisor's gesture for a Jev decision while it stands by the judged pane. */
   gesture?: TeamSceneGesture | null
+  /** A resting member's play in its chair, only where members work seated. */
+  play?: TeamScenePlay
 }
 
 /** One-shot moments a style may draw particles or a thrown item for. */
