@@ -777,6 +777,7 @@ import {
   gameAgentStateOf,
   statusGroupOfJira,
   type GameAgent,
+  type GameMemberAccount,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import {
@@ -31499,6 +31500,19 @@ export class OrcaRuntimeService {
         const advisor = this.gameMemberAdvisors.liveOf(paneKey, now)
         return advisor ? [{ paneKey, advisor }] : []
       })
+    }
+  }
+
+  /** Each pane's managed account as game.state names a member's; null is the host's own login. */
+  async getGamePaneAccounts(
+    panes: readonly { paneKey: string; agentType: string | null; worktreeId: string | null }[]
+  ): Promise<{ accounts: { paneKey: string; account: GameMemberAccount | null }[] }> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    return {
+      accounts: panes.map((pane) => ({
+        paneKey: pane.paneKey,
+        account: this.gameMemberAccountFor(pane, worktreesById)
+      }))
     }
   }
 

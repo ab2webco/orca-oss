@@ -49,6 +49,7 @@ import { ORCHESTRATOR_GAME_SCENE_ART_METHODS } from './orchestrator-game-scene-a
 import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
 import { ORCHESTRATOR_GAME_LEADS_METHODS } from './orchestrator-game-leads'
 import { ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS } from './orchestrator-game-pane-advisors'
+import { ORCHESTRATOR_GAME_PANE_ACCOUNTS_METHODS } from './orchestrator-game-pane-accounts'
 import { ORCHESTRATOR_GAME_MEMBER_MCP_METHODS } from './orchestrator-game-member-mcp'
 import { ORCHESTRATOR_GAME_MEMBER_REPO_SCOPE_METHODS } from './orchestrator-game-member-repo-scope'
 
@@ -65,6 +66,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ORCHESTRATOR_GAME_BOARD_METHODS,
   ...ORCHESTRATOR_GAME_LEADS_METHODS,
   ...ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS,
+  ...ORCHESTRATOR_GAME_PANE_ACCOUNTS_METHODS,
   ...ORCHESTRATOR_GAME_MEMBER_MCP_METHODS,
   ...ORCHESTRATOR_GAME_MEMBER_REPO_SCOPE_METHODS,
   ...AUTOMATION_METHODS,
