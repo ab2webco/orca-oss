@@ -327,6 +327,91 @@ describe('ClaudeAccountService credential capture', () => {
     }
   })
 
+  // ORCA-1039: Claude Code 2.1.50-2.1.75 has `auth login` but not --claudeai.
+  it('signs in with plain auth login when this Claude CLI does not know --claudeai', async () => {
+    setPlatform('linux')
+    vi.resetModules()
+    vi.mocked(readActiveClaudeKeychainCredentials).mockResolvedValue(null)
+    const childThat = (stdout: string, stderr: string, code: number) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdin: PassThrough
+        stdout: PassThrough
+        stderr: PassThrough
+        kill: ReturnType<typeof vi.fn>
+      }
+      child.stdin = new PassThrough()
+      child.stdout = new PassThrough()
+      child.stderr = new PassThrough()
+      child.kill = vi.fn()
+      queueMicrotask(() => {
+        child.stdout.write(stdout)
+        child.stderr.write(stderr)
+        queueMicrotask(() => child.emit('close', code))
+      })
+      return child
+    }
+    const spawnMock = vi.fn(
+      (_command: string, args: string[], options: { env: NodeJS.ProcessEnv }) => {
+        if (args.includes('--claudeai')) {
+          return childThat('', "error: unknown option '--claudeai'\n", 1)
+        }
+        if (args.includes('--help')) {
+          return childThat('Usage: claude auth login [options]\n', '', 0)
+        }
+        if (args[1] === 'login') {
+          writeFileSync(
+            join(options.env.CLAUDE_CONFIG_DIR!, '.credentials.json'),
+            '{"claudeAiOauth":{"email":"user@example.com","accessToken":"token"}}\n',
+            'utf-8'
+          )
+          return childThat('', '', 0)
+        }
+        return childThat('{"email":"user@example.com"}\n', '', 0)
+      }
+    )
+    vi.doMock('node:child_process', () => ({ spawn: spawnMock }))
+    try {
+      const { ClaudeAccountService } = await import('./service')
+      let settings = {
+        claudeManagedAccounts: [] as ClaudeManagedAccount[],
+        activeClaudeManagedAccountId: null,
+        activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: {} }
+      }
+      const store = {
+        getSettings: vi.fn(() => settings),
+        updateSettings: vi.fn((updates: Partial<typeof settings>) => {
+          settings = { ...settings, ...updates }
+          return settings
+        })
+      }
+      const service = new ClaudeAccountService(
+        store as never,
+        {
+          evictInactiveClaudeCache: vi.fn(),
+          clearClaudeAccountAuthVerdict: vi.fn(),
+          getActiveClaudeSessionModel: vi.fn(() => null),
+          refreshForClaudeAccountChange: vi.fn()
+        } as never,
+        {
+          clearLastWrittenCredentialsJson: vi.fn(),
+          forceMaterializeCurrentSelectionForRollback: vi.fn(async () => {})
+        } as never
+      )
+
+      await service.addAccount()
+
+      expect(spawnMock.mock.calls.map(([, args]) => args)).toEqual([
+        ['auth', 'login', '--claudeai'],
+        ['auth', 'login', '--help'],
+        ['auth', 'login'],
+        ['auth', 'status', '--json']
+      ])
+      expect(settings.claudeManagedAccounts[0]?.email).toBe('user@example.com')
+    } finally {
+      vi.doUnmock('node:child_process')
+    }
+  })
+
   it('rejects immediately when Claude sign-in is denied', async () => {
     vi.resetModules()
     const child = new EventEmitter() as EventEmitter & {
