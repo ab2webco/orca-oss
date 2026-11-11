@@ -178,25 +178,23 @@ export function TeamPanelView({
   const { section, retry } = source
   const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
-  const [activityFilter, setActivityFilter] = useState<TeamStatus | null>(null)
-  const filterState = useMemo(
-    () => ({ filter: activityFilter, setFilter: setActivityFilter }),
-    [activityFilter]
-  )
-  const shownTab = useTeamPanelTabStore((s) => s.shown)
-  // Why: the filter belongs to the list in view; another tab or a team view starts unfiltered.
-  useEffect(() => setActivityFilter(null), [shownTab, model?.kind])
+  // Why a scope, not an effect: the filter belongs to the list in view, so another tab visit or
+  // a team view reads as unfiltered at once, with no frame of the stale filter.
+  const tabVisit = useTeamPanelTabStore((s) => s.visit)
+  const scope = `${tabVisit}:${model?.kind ?? ''}`
+  const [picked, setPicked] = useState<{ status: TeamStatus; scope: string } | null>(null)
   const soloRows = model?.kind === 'solo' ? model.rows : null
-  const filterEmpty =
-    activityFilter !== null &&
-    soloRows !== null &&
-    teamActivityRowsOf(soloRows, activityFilter).length === 0
+  const candidate = picked?.scope === scope ? picked.status : null
   // Why: a live update can leave a filter with no session; the list then shows every one again.
-  useEffect(() => {
-    if (filterEmpty) {
-      setActivityFilter(null)
-    }
-  }, [filterEmpty])
+  const activityFilter =
+    candidate && soloRows && teamActivityRowsOf(soloRows, candidate).length > 0 ? candidate : null
+  const filterState = useMemo(
+    () => ({
+      filter: activityFilter,
+      setFilter: (status: TeamStatus | null) => setPicked(status ? { status, scope } : null)
+    }),
+    [activityFilter, scope]
+  )
   const body = (
     <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
