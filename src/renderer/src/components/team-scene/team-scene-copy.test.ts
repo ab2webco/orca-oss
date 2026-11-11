@@ -76,6 +76,19 @@ describe('team scene copy', () => {
     ).toBe('Plane ORCA-1051')
   })
 
+  // Why: the owner saw 'PushNotific' cut in a bubble; a bare tool reads as words, not its identifier.
+  it.each([
+    ['PushNotification', 'Push notification'],
+    ['exec_command', 'Exec command'],
+    ['WebFetch', 'Web fetch'],
+    ['mcp__plane__list_states', 'List states'],
+    ['Read', 'Read']
+  ])('words the bare tool %j as %j', (tool, label) => {
+    expect(teamSceneLeadLineOf(lead({ liveAction: { kind: 'tool', tool, detail: null } }))).toBe(
+      label
+    )
+  })
+
   it('says the lead is done in the UI language, and nothing while it idles', async () => {
     expect(teamSceneLeadLineOf(lead({ status: 'done' }))).toBe('Done, nothing pending')
     await setRendererUiLanguage('es')

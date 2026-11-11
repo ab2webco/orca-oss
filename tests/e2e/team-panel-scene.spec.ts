@@ -709,7 +709,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     await expect(askerTag).toHaveCount(0, { timeout: 30_000 })
     for (const width of [390, 320]) {
       await orcaPage.setViewportSize({ width, height: 900 })
-      await expect(leadBubble).toHaveText('exec_command', { timeout: 30_000 })
+      await expect(leadBubble).toHaveText('Exec command', { timeout: 30_000 })
       for (const theme of ['dark', 'light'] as const) {
         await advisorStep('pixel', width, theme, `${theme}-no-question`)
       }
