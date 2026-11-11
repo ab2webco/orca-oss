@@ -82,7 +82,7 @@ describe('NewTabTeamMenuItems', () => {
     const props = renderMenu({})
 
     expect(screen.getByText('Team')).toBeTruthy()
-    fireEvent.click(item('Go to lead Alfred'))
+    fireEvent.click(item('Go to lead · Alfred'))
 
     expect(props.onGoToLead).toHaveBeenCalledTimes(1)
   })
@@ -93,24 +93,55 @@ describe('NewTabTeamMenuItems', () => {
     expect(item('Go to lead')).toBeTruthy()
   })
 
+  // Why (ORCA-717): a generic lead name is the role again; the row says it once.
+  it('drops a generic lead name so the row does not repeat the word', () => {
+    renderMenu({ state: { ...LIVE, leadName: 'Lead' } })
+
+    expect(item('Go to lead')).toBeTruthy()
+    expect(screen.queryByText('Lead')).toBeNull()
+  })
+
+  it('mutes the lead name after a separator', () => {
+    renderMenu({})
+
+    expect(within(item('Go to lead · Alfred')).getByText(/Alfred/).className).toContain(
+      'text-muted-foreground'
+    )
+  })
+
   // Why: beside the row, the account's chevron doubled the row's and truncated its label.
   it('keeps the add-member row to its label and one chevron, the account inside its submenu', () => {
     renderMenu({})
 
     expect(screen.queryByRole('menuitem', { name: "Choose the member's account" })).toBeNull()
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
 
     expect(item("Choose the member's account")).toBeTruthy()
+  })
+
+  // Why (ORCA-717): a long email cut to 'name@ko…' read as broken; the trigger names it short.
+  it("names the member's account by its short form, the full email on hover and in its list", () => {
+    renderMenu({ labelOf: (_provider, id) => `${id}.long.name@example.test` })
+
+    fireEvent.click(item('Add member…'))
+    const trigger = item("Choose the member's account")
+    expect(trigger.textContent).toBe('acct-free.long.name')
+    expect(trigger.getAttribute('title')).toBe('acct-free.long.name@example.test')
+
+    fireEvent.click(trigger)
+    const label = within(item(/acct-2\.long\.name/)).getByText('acct-2.long.name@example.test')
+    expect(label.className).toContain('break-all')
+    expect(label.className).not.toContain('truncate')
   })
 
   it('adds a member for a To Do ticket on the member pick, or the account picked in its submenu', () => {
     const props = renderMenu({})
 
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
     fireEvent.click(item(/ORCA-9/))
     expect(props.onAddMember).toHaveBeenLastCalledWith(TODO[0], 'acct-free')
 
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
     fireEvent.click(item("Choose the member's account"))
     fireEvent.click(item(/Account acct-2/))
     fireEvent.click(item(/ORCA-9/))
@@ -120,7 +151,7 @@ describe('NewTabTeamMenuItems', () => {
   it("heads the account list with its provider and links to that provider's accounts", () => {
     renderMenu({})
 
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
     fireEvent.click(item("Choose the member's account"))
     expect(screen.getByText('Claude accounts')).toBeTruthy()
     fireEvent.click(item('Manage accounts…'))
@@ -136,7 +167,7 @@ describe('NewTabTeamMenuItems', () => {
   it('says To Do is empty instead of offering no ticket', () => {
     renderMenu({ state: { ...LIVE, todo: [] } })
 
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
 
     expect(item('To Do is empty').getAttribute('aria-disabled')).toBe('true')
   })
@@ -145,7 +176,7 @@ describe('NewTabTeamMenuItems', () => {
     const props = renderMenu({ account: { kind: 'host-login' } })
 
     expect(screen.queryByText('Host login')).toBeNull()
-    fireEvent.click(item('Add a member to the team…'))
+    fireEvent.click(item('Add member…'))
     expect(screen.queryByRole('menuitem', { name: /Choose the/ })).toBeNull()
     expect(screen.getByText('Host login')).toBeTruthy()
     fireEvent.click(item(/ORCA-9/))
