@@ -133,8 +133,10 @@ test.describe('Card display groups', () => {
         // Why wait for zero: a menu still animating out reads as visible for ~100 ms and swallows the click.
         await expect(orcaPage.getByRole('menu')).toHaveCount(0)
         await orcaPage.locator('button[aria-label^="Workspace options"]:visible').first().click()
-        const cardDisplay = orcaPage.getByRole('menuitem', { name: /Card display/ })
-        await cardDisplay.hover()
+        // Why the keyboard: at 390 the menu opens below, so a hover crosses Project order first and
+        // Radix's pointer grace keeps that submenu open instead (CI run 42983047371).
+        await orcaPage.getByRole('menuitem', { name: /Card display/ }).focus()
+        await orcaPage.keyboard.press('ArrowRight')
         const groups = orcaPage.locator('[data-card-display-group]')
         await expect(groups).toHaveText(['Work', 'Agent', 'Source'])
         // At 320 the options menu's left column was cut ('atus', 'branch').
