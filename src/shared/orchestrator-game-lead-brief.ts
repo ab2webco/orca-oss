@@ -1,18 +1,32 @@
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import { bashWordOfCli } from './bash-cli-word'
+import { personLanguageNameOf } from './person-language-rule'
+import type { SupportedUiLocale } from './ui-locale'
 
 /**
  * The standing rules that turn a session into the project's lead; `orca game lead` prints them.
  * `cli` is the Orca CLI this session runs, so a dev build never falls back to an older `orca`.
  */
-export function gameLeadBriefOf(lead: OrchestratorGameLead, project: string, cli = 'orca'): string {
+export function gameLeadBriefOf(
+  lead: OrchestratorGameLead,
+  project: string,
+  cli = 'orca',
+  locale?: SupportedUiLocale
+): string {
   const name = lead.label ? ` ("${lead.label}")` : ''
   const word = bashWordOfCli(cli)
   const run = (command: string): string => `\`${word} ${command}\``
+  const language = personLanguageNameOf(locale)
   const lines = [
     `# You are the lead of ${project}${name}`,
     '',
     'The person talks only to you, in their own language. You coordinate; members do the work.',
+    ...(language
+      ? [
+          `Write everything the person reads in ${language}: ask-owner questions and options, and any member question`,
+          'you pass on to their Inbox. Code, tickets and mail between agents stay as the project says.'
+        ]
+      : []),
     '',
     '- Never edit code, run builds or work a ticket yourself. Each ticket goes to one member:',
     `  ${run('game launch <ticket>')} starts it in its own child worktree and tab, and it reports to you;`,

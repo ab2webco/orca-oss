@@ -287,6 +287,31 @@ describe('orca game state', () => {
     expect(text).toContain('Use Jira CIN.')
   })
 
+  it("prints the lead brief in the person's language rule when the host reports Spanish", async () => {
+    const client = {
+      call: async () => ({
+        ok: true,
+        result: {
+          config: { mode: 'on' },
+          agents: [],
+          worktree: { id: 'wt1', path: '/Users/me/cineco', branch: 'main', displayName: 'main' },
+          lead: { autostart: true, cap: 3, agent: 'claude' },
+          role: 'lead',
+          locale: 'es'
+        }
+      })
+    } as unknown as RuntimeClient
+
+    await ORCHESTRATOR_GAME_HANDLERS['game lead']({
+      flags: new Map(),
+      client,
+      cwd: '/tmp',
+      json: false
+    })
+
+    expect(output.join('\n')).toContain('Write everything the person reads in Spanish')
+  })
+
   it('registers the lead with the host under its project name and label', async () => {
     const calls: [string, unknown][] = []
     const client = {

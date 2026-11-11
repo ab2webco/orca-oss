@@ -120,6 +120,19 @@ describe('buildDispatchPreamble', () => {
     expect(occurrences).toBe(2)
   })
 
+  // Why: a member question surfaces in the person's Team panel Inbox, so it must be in their language.
+  it('asks a member to write its questions in Spanish when the person reads Spanish', () => {
+    const result = buildDispatchPreamble(baseParams({ personLocale: 'es' }))
+
+    expect(result).toContain('write the question and its options in Spanish')
+  })
+
+  it('adds no language rule for an English reader', () => {
+    expect(buildDispatchPreamble(baseParams({ personLocale: 'en' }))).toBe(
+      buildDispatchPreamble(baseParams())
+    )
+  })
+
   it('binds every injected worker command to the dispatched terminal', () => {
     const result = buildDispatchPreamble(baseParams())
 

@@ -167,6 +167,19 @@ describe('worker-start dispatch brief', () => {
     expect(brief).toContain('=== TASK ===')
   })
 
+  it("writes a game member's brief in the person's language rule when Orca speaks Spanish", async () => {
+    mockCreatedWorktree()
+    const path = workspace()
+    vi.spyOn(runtime, 'gameMemberBriefTargetFor').mockResolvedValue({ path, connectionId: null })
+    vi.spyOn(runtime, 'gamePersonLocale').mockReturnValue('es')
+
+    const { task } = await startWorker({ game: true })
+
+    const dispatch = db.getDispatchContext(task.id)!
+    const brief = readFileSync(join(path, '.orca/briefs', `${dispatch.id}.md`), 'utf8')
+    expect(brief).toContain('write the question and its options in Spanish')
+  })
+
   it('types the full preamble to a worker that is not a game member', async () => {
     mockCreatedWorktree()
     const target = vi.spyOn(runtime, 'gameMemberBriefTargetFor')
