@@ -5,6 +5,8 @@ import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-ty
 import { createFiguresPainter } from './team-scene-figures-painter'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext } from './team-scene-recording-context'
+import { CASTLE_BANNER } from './team-scene-castle-sites'
+import { SCENE_DUST } from './team-scene-painter-marks'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
 
@@ -34,6 +36,8 @@ const frame = (extra: Partial<TeamSceneFrame> = {}): TeamSceneFrame => ({
   effects: [],
   overflow: 0,
   stations: [{ x: 0.1, depth: 0.5 }],
+  sites: [],
+  trophies: [],
   ...extra
 })
 
@@ -91,6 +95,35 @@ describe('createFiguresPainter', () => {
     const landed = recordingContext()
     painter.paint(landed.g, frame())
     expect(landed.calls.some((c) => c.name === 'rotate' && c.fillStyle === '#f4e6c0')).toBe(false)
+  })
+
+  it('draws each seat build at its stage, with its pile, instead of the bench', () => {
+    const painter = createFiguresPainter(COLORS)
+    const built = recordingContext()
+    const site = { key: 'a', spot: { x: 0.155, depth: 0.5 }, stage: 4 as const, broken: false }
+    painter.paint(built.g, frame({ sites: [site] }))
+    expect(built.fills()).toContain(CASTLE_BANNER)
+    const bench = recordingContext()
+    painter.paint(bench.g, frame())
+    expect(bench.fills()).not.toContain(CASTLE_BANNER)
+  })
+
+  it('keeps a finished tower on the far hills for each trophy', () => {
+    const painter = createFiguresPainter(COLORS)
+    const r = recordingContext()
+    painter.paint(r.g, frame({ trophies: [{ key: 'x', name: 'x' }] }))
+    expect(r.fills().filter((f) => f === CASTLE_BANNER)).toHaveLength(1)
+  })
+
+  it('puffs stone dust where a member builds or repairs', () => {
+    const painter = createFiguresPainter(COLORS)
+    painter.paint(
+      recordingContext().g,
+      frame({ effects: [{ kind: 'burst', key: 'a', reason: 'build' }] })
+    )
+    const puff = recordingContext()
+    painter.paint(puff.g, frame())
+    expect(puff.calls.some((c) => c.name === 'fillRect' && c.fillStyle === SCENE_DUST)).toBe(true)
   })
 
   it('shows members past the seats as +N', () => {

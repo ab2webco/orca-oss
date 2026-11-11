@@ -11,6 +11,11 @@ import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
 import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
 import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
+import type { TerminalOpenTarget } from '../session/host-terminal-open'
+import { teamMemberContextOf, type TeamMemberContext } from './team-drawer-member-context'
+import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
+import type { TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
+import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
   key: string
@@ -38,7 +43,13 @@ export type TeamMemberRow = {
   live: string | null
   /** When its state began, on the host's clock. */
   since: number | null
-  account: { email: string; usedPercent: number | null } | null
+  phase: TeamFlowPhase | null
+  /** Its ticket's last mail subject. */
+  summary: string | null
+  /** The session tab on this host; null for a member on a paired host. */
+  terminal: TerminalOpenTarget | null
+  /** `usedPercent` is the 5 h window, `weeklyPercent` the 7 d one. */
+  account: { email: string; usedPercent: number | null; weeklyPercent: number | null } | null
   limit: { resetsAt: number | null; loggedOut: boolean } | null
 }
 
@@ -49,7 +60,11 @@ export type TeamMetrics = {
   leadTimeMedianMs: number | null
 }
 
-export type TeamLeadView = { members: TeamMemberRow[]; metrics: TeamMetrics | null }
+export type TeamLeadView = {
+  members: TeamMemberRow[]
+  metrics: TeamMetrics | null
+  locale: SupportedUiLocale
+}
 
 /** `unavailable`: the host's phone allowlist predates the Inbox tab. */
 export type TeamInbox =
@@ -117,29 +132,14 @@ function liveOf(raw: Rec, state: GameAgent['state']): string | null {
   return input ? `${agentToolLabelOf(tool)} · ${input}` : agentToolLabelOf(tool)
 }
 
-function accountUsageOf(metrics: unknown): Map<string, number> {
-  const accounts =
-    isRecord(metrics) && Array.isArray(metrics.claudeAccounts) ? metrics.claudeAccounts : []
-  return new Map(
-    accounts.flatMap((one) =>
-      isRecord(one) && text(one.email) && typeof one.sessionPercent === 'number'
-        ? [[one.email as string, one.sessionPercent] as const]
-        : []
-    )
-  )
-}
-
 function modelOf(launch: unknown): string | null {
   const model = isRecord(launch) ? text(launch.model) : null
   const effort = model && isRecord(launch) ? text(launch.effort) : null
   return effort ? `${model} · ${effort}` : model
 }
 
-function memberRowOf(
-  raw: Rec,
-  questionTickets: ReadonlySet<string>,
-  usage: ReadonlyMap<string, number>
-): TeamMemberRow | null {
+function memberRowOf(raw: Rec, context: TeamMemberContext): TeamMemberRow | null {
+  const { questionTickets, usage } = context
   const key = text(raw.paneKey)
   if (!key || raw.isMember !== true) {
     return null
@@ -153,6 +153,8 @@ function memberRowOf(
     : (ticketInText(name) ?? ticketInText(text(worktree.branch)))
   const remote = isRecord(raw.remote) ? raw.remote : null
   const email = isRecord(raw.account) ? text(raw.account.email) : null
+  const used = email ? usage.get(email) : undefined
+  const review = isRecord(raw.review) ? raw.review : null
   return {
     key,
     name,
@@ -171,7 +173,17 @@ function memberRowOf(
         : null,
     live: liveOf(raw, state),
     since: num(raw.stateSince),
-    account: email ? { email, usedPercent: usage.get(email) ?? null } : null,
+    phase: teamFlowPhaseOf({
+      state,
+      toolName: text(raw.toolName),
+      review: review && text(review.state) ? { state: review.state as string } : null,
+      workItem: item ? { statusGroup: text(item.statusGroup) } : null
+    }),
+    summary: ticket ? (context.summaries.get(ticket) ?? null) : null,
+    terminal: context.terminalOf(raw, key),
+    account: email
+      ? { email, usedPercent: used?.session ?? null, weeklyPercent: used?.weekly ?? null }
+      : null,
     limit: isRecord(raw.limit)
       ? { resetsAt: num(raw.limit.resetsAt), loggedOut: raw.limit.loggedOut === true }
       : null
@@ -210,14 +222,18 @@ export function teamLeadViewOf(
     return null
   }
   const agents = Array.isArray(raw.agents) ? raw.agents : []
-  const usage = accountUsageOf(raw.metrics)
+  const context = teamMemberContextOf(raw, questionTickets)
   const members = agents
-    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, questionTickets, usage)] : []))
+    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, context)] : []))
     .filter((one): one is TeamMemberRow => one !== null)
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
-  return { members, metrics: metricsOf(raw.metrics) }
+  return {
+    members,
+    metrics: metricsOf(raw.metrics),
+    locale: normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+  }
 }
 
 /** The owner board is per repo, so the lead's questions are its own repo's. */
