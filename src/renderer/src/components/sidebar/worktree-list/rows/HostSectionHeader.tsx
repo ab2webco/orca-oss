@@ -1,33 +1,22 @@
 import React from 'react'
-import { AlertTriangle, ChevronDown, Loader2, Server, ServerOff } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AlertTriangle, ChevronDown, Loader2, ServerOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { HostHeaderRow } from '../../host-section-rows'
 import { HostSectionHeaderMenu } from '../../HostSectionHeaderMenu'
+import { useHostActiveAgentCount } from '../../host-header-active-count'
+import { SidebarTreeGlyph } from '../../sidebar-tree-glyphs'
 
-function formatSectionActivityLabel(count: number, label: string): string {
-  return `${count} ${label}${count === 1 ? '' : 's'}`
-}
-
-function SectionMetricsBadge({ count }: { count: number }): React.JSX.Element {
-  const totalLabel = formatSectionActivityLabel(count, 'workspace')
-
+function HostActiveCount({ worktreeIds }: { worktreeIds: readonly string[] }): React.JSX.Element {
+  const active = useHostActiveAgentCount(worktreeIds)
   return (
     <span
-      className="inline-flex h-4 shrink-0 overflow-hidden rounded-full border border-worktree-sidebar-border bg-worktree-sidebar-accent text-[9px] font-medium leading-none text-muted-foreground/90"
-      aria-label={totalLabel}
+      data-host-header-active=""
+      className="ml-auto shrink-0 text-[11px] font-normal leading-none tabular-nums text-muted-foreground/70"
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex h-full min-w-4 items-center justify-center px-1.5">
-            {count}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={6}>
-          {totalLabel}
-        </TooltipContent>
-      </Tooltip>
+      {translate('auto.components.sidebar.WorktreeList.hostActiveAgents', '{{count}} active', {
+        count: active
+      })}
     </span>
   )
 }
@@ -71,10 +60,7 @@ function getHostHeaderDetail(row: HostHeaderRow): { text: string; isWarning: boo
       isWarning: false
     }
   }
-  // Why: show the transport detail only for remote hosts; it's noise under the local label.
-  if (row.kind !== 'local') {
-    return { text: row.detail, isWarning: false }
-  }
+  // Why: V30 names a healthy host and its active count only; the transport sits in the menu.
   return null
 }
 
@@ -94,20 +80,16 @@ export function HostSectionHeader({
   const detail = getHostHeaderDetail(row)
   return (
     <div className="px-2 pt-1">
-      {/* Why: outlined card + server glyph marks hosts as machines, not mere groups. */}
+      {/* Why: V30 draws a host as a plain tree row: dim server glyph, name, active count on the right. */}
       <div
         role="button"
         tabIndex={0}
         data-host-header-drag-id={row.hostId}
         aria-expanded={!row.collapsed}
         className={cn(
-          'group/host-header flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border px-2 text-left transition-all',
+          'group/host-header flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-worktree-sidebar-accent/50',
           onDragPointerDown && 'cursor-grab active:cursor-grabbing',
-          isBlocked
-            ? 'border-destructive/40 bg-destructive/10'
-            : isDisconnected
-              ? 'border-worktree-sidebar-border/70 bg-worktree-sidebar-accent/35 text-muted-foreground'
-              : 'border-worktree-sidebar-border bg-worktree-sidebar-accent/70',
+          isBlocked && 'text-destructive',
           dragging && 'pointer-events-none opacity-0'
         )}
         onPointerDown={onDragPointerDown}
@@ -120,16 +102,15 @@ export function HostSectionHeader({
         }}
       >
         {isDisconnected ? (
-          <ServerOff className="size-3.5 shrink-0 text-muted-foreground/80" />
+          <ServerOff className="size-3.5 shrink-0 text-muted-foreground/60" strokeWidth={1.75} />
         ) : (
-          <Server className="size-3.5 shrink-0 text-muted-foreground" />
+          <SidebarTreeGlyph name="server" />
         )}
         <HostHeaderHealthIcon health={row.health} />
-        {/* Why: badge hugs the label (like repo headers) instead of floating by the hover controls. */}
-        <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span
             className={cn(
-              'min-w-0 truncate text-[12px] font-semibold leading-none',
+              'min-w-0 truncate text-[12.5px] font-medium leading-none',
               isDisconnected ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
@@ -138,14 +119,15 @@ export function HostSectionHeader({
           {detail ? (
             <span
               className={cn(
-                'shrink-0 truncate text-[10px] leading-none',
+                'shrink-0 truncate text-[11px] leading-none',
                 detail.isWarning ? 'text-destructive' : 'text-muted-foreground/70'
               )}
             >
               {detail.text}
             </span>
-          ) : null}
-          <SectionMetricsBadge count={row.count} />
+          ) : (
+            <HostActiveCount worktreeIds={row.worktreeIds} />
+          )}
         </div>
         <div className="flex size-4 shrink-0 items-center justify-center text-muted-foreground/60 can-hover:opacity-0 transition-opacity group-hover/host-header:opacity-100">
           <ChevronDown

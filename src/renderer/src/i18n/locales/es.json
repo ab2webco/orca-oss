@@ -4905,6 +4905,9 @@
           "7a8b9c0d1e": "Actualización requerida",
           "hostAuthNeeded": "Autenticación requerida",
           "hostDisconnected": "Desconectado",
+          "hostActiveAgents": "{{count}} activos",
+          "hostActiveAgents_one": "{{count}} activo",
+          "hostActiveAgents_other": "{{count}} activos",
           "failedNestWorkspace": "No se pudo anidar el espacio de trabajo",
           "sidebarRowMissing": "El destino ya no existe",
           "failedUnnestWorkspace": "Error al expandir el espacio de trabajo"

@@ -31,6 +31,8 @@ export type HostHeaderRow = {
   connectionStatus?: SshConnectionStatus
   collapsed: boolean
   count: number
+  // Why: the header counts the section's active agents from these (V30's '1 activo').
+  worktreeIds: readonly string[]
 }
 
 export type HostSectionRow = Row | HostHeaderRow
@@ -99,7 +101,7 @@ function getFallbackHost(hostId: ExecutionHostId): HostSectionOption {
   }
 }
 
-function countWorktreeRows(rows: readonly Row[]): number {
+function countWorktreeRows(rows: readonly Row[]): { count: number; worktreeIds: string[] } {
   // Why: a collapsed repo group contributes a header row but no item rows;
   // fall back to the header's own count so the host badge doesn't read 0
   // while a visibly populated project sits right under it.
@@ -138,7 +140,7 @@ function countWorktreeRows(rows: readonly Row[]): number {
     }
   }
   flushHeader()
-  return count
+  return { count, worktreeIds: [...seenWorktreeIds] }
 }
 
 function localizePendingRowsForHost(
@@ -296,6 +298,7 @@ export function addHostSectionRows(args: {
     const host = hostOptionsById.get(hostId) ?? getFallbackHost(hostId)
     const collapsed =
       args.forceCollapseHosts || (args.collapsedHostKeys?.has(`host:${host.id}`) ?? false)
+    const { count, worktreeIds } = countWorktreeRows(hostRows)
     result.push({
       type: 'host-header',
       key: `host:${host.id}`,
@@ -307,7 +310,8 @@ export function addHostSectionRows(args: {
       compatibility: host.compatibility,
       connectionStatus: host.connectionStatus,
       collapsed,
-      count: countWorktreeRows(hostRows)
+      count,
+      worktreeIds
     })
     if (!collapsed) {
       result.push(...hostRows)
