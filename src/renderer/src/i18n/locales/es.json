@@ -16554,7 +16554,10 @@
       "signedOut": "Sesión cerrada",
       "otherModel": "Otro modelo",
       "noReading": "Sin lectura",
-      "used": "{{value}}% usado"
+      "used": "{{value}}% usado",
+      "ownLogin": "Login propio",
+      "hostLogin": "Login del host",
+      "choose": "Elegir la cuenta de {{value}}"
     }
   }
 }
