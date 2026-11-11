@@ -607,3 +607,73 @@ describe('team scene director, the lead on a narrow building floor', () => {
     expect(roams(320, false)).toBeGreaterThan(0.05)
   })
 })
+
+describe('team scene director, the lead riding between floors', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+  const run = (world: TeamSceneWorld, seconds: number, width = 420) => {
+    for (let t = 0; t < seconds; t += DT) {
+      stepTeamScene(world, DT, { width })
+    }
+  }
+
+  it('walks the lead into the elevator and off its floor, and back home when the ride ends', () => {
+    const world = createTeamSceneWorld()
+    const floor = input([member('a')])
+    applyTeamSceneInput(world, floor, OFFICE)
+    applyTeamSceneInput(world, { ...floor, ride: 'away' }, OFFICE)
+    run(world, 8)
+    expect(actor(world, 'lead')).toBeUndefined()
+    applyTeamSceneInput(world, floor, OFFICE)
+    run(world, 1 / 30)
+    // Back out of the elevator, then onto the stage to its rounds.
+    expect(actor(world, 'lead')!.x).toBeGreaterThan(1)
+    run(world, 6)
+    expect(actor(world, 'lead')!.x).toBeLessThan(1)
+  })
+
+  it('brings the lead out of the elevator to the member it visits on another floor, and away again', () => {
+    const world = createTeamSceneWorld()
+    const floor = {
+      ...input([member('a'), member('b', { activity: 'needsYou' })]),
+      leadless: true as const
+    }
+    applyTeamSceneInput(world, floor, OFFICE)
+    expect(actor(world, 'lead')).toBeUndefined()
+    applyTeamSceneInput(world, { ...floor, ride: { guest: 'b' } }, OFFICE)
+    run(world, 14)
+    const lead = actor(world, 'lead')!
+    const b = world.bodies.get('b')!
+    expect(Math.abs(lead.x - b.home.x)).toBeLessThan(0.1)
+    applyTeamSceneInput(world, floor, OFFICE)
+    run(world, 14)
+    expect(actor(world, 'lead')).toBeUndefined()
+  })
+
+  it('takes no ride on a narrow floor: the lead stays home, and no guest is drawn', () => {
+    const home = createTeamSceneWorld()
+    const floor = { ...input([member('a')]), leadStays: true as const }
+    applyTeamSceneInput(home, { ...floor, ride: 'away' }, OFFICE)
+    run(home, 8, 320)
+    expect(actor(home, 'lead')?.x).toBeCloseTo(0.84, 2)
+    const away = createTeamSceneWorld()
+    const there = { ...input([member('b', { activity: 'needsYou' })]), leadless: true as const }
+    applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
+    run(away, 8, 320)
+    expect(actor(away, 'lead')).toBeUndefined()
+  })
+
+  it('places a ride at once under reduced motion: the guest beside its member, the away lead gone', () => {
+    const there = createTeamSceneWorld()
+    const floor = {
+      ...input([member('a'), member('b', { activity: 'needsYou' })]),
+      leadless: true as const
+    }
+    applyTeamSceneInput(there, { ...floor, ride: { guest: 'b' } }, OFFICE)
+    settleTeamScene(there)
+    expect(Math.abs(actor(there, 'lead')!.x - there.bodies.get('b')!.home.x)).toBeLessThan(0.1)
+    const home = createTeamSceneWorld()
+    applyTeamSceneInput(home, { ...input([member('a')]), ride: 'away' }, OFFICE)
+    settleTeamScene(home)
+    expect(actor(home, 'lead')).toBeUndefined()
+  })
+})

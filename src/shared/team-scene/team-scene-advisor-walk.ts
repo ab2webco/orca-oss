@@ -144,3 +144,19 @@ export function stepAdvisorWalk(world: TeamSceneWorld, width: number): void {
 /** The gesture the advisor holds up this frame, for styles to draw beside it. */
 export const advisorGestureOf = (world: TeamSceneWorld): TeamSceneGesture | null =>
   world.advisorWalk.stage === 'gesture' ? world.advisorWalk.gesture : null
+
+// Why quicker than the team: a referee hurries over, so a ruling never waits on a long walk.
+const ADVISOR_SPEED_PX = 48
+
+/** Keeps the advisor's body while the scene has an advisor, at its own quicker pace. */
+export function syncAdvisorBody(
+  world: TeamSceneWorld,
+  present: boolean,
+  make: () => TeamSceneBody
+): void {
+  if (!present) {
+    world.bodies.delete('advisor')
+  } else if (!world.bodies.has('advisor')) {
+    world.bodies.set('advisor', { ...make(), speed: ADVISOR_SPEED_PX })
+  }
+}

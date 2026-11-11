@@ -44,6 +44,7 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
 export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
   const cheering = world.t < world.cheerUntil
   return [...world.bodies.values()]
+    .filter((body) => !body.hidden)
     .map((body): TeamSceneActor => {
       const timed = body.emote && world.t < body.emote.until ? body.emote.kind : null
       const seatedMark =

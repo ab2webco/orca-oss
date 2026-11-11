@@ -81,6 +81,16 @@ function arrive(world: TeamSceneWorld, body: TeamSceneBody, plan: Visit): void {
   emoteFor(world, body, 'heart', 1)
 }
 
+/** Sends the next member queued for the lead on its way, once the lead is free at home. */
+export function callNextVisitor(world: TeamSceneWorld): void {
+  const next = world.queue.shift()
+  const body = next ? world.bodies.get(next) : undefined
+  if (body && body.plan.kind !== 'seated') {
+    body.plan.stage = 'toLead'
+    world.visitor = body.key
+  }
+}
+
 /** One step of a member's walk to the lead and on: back to its seat, or off stage. */
 export function advanceVisit(
   world: TeamSceneWorld,

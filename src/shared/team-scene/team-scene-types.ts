@@ -1,3 +1,4 @@
+import type { TeamSceneRide } from './team-scene-elevator'
 import type { TeamSceneDesk } from './team-scene-desk'
 import type { TeamSceneSite } from './team-scene-sites'
 
@@ -48,6 +49,8 @@ export type TeamSceneInput = {
   desks?: { taken: number; free: number }
   /** A building floor: on a narrow stage the lead keeps to its own spot instead of its rounds. */
   leadStays?: true
+  /** The lead riding to another floor, or visiting a member of this one from another. */
+  ride?: TeamSceneRide
 }
 
 export type TeamSceneEvent =

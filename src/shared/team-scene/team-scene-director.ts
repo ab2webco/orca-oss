@@ -1,4 +1,10 @@
 import type { TeamSceneDesk } from './team-scene-desk'
+import {
+  applyTeamSceneRide,
+  settleTeamSceneRide,
+  stepTeamSceneRide,
+  type TeamSceneRide
+} from './team-scene-elevator'
 import { teamSceneEventsBetween } from './team-scene-events'
 import { moveTeamSceneBody, type TeamSceneMover } from './team-scene-motion'
 import {
@@ -12,7 +18,8 @@ import {
   createAdvisorWalk,
   queueJudgment,
   stepAdvisorWalk,
-  type TeamSceneAdvisorWalk
+  type TeamSceneAdvisorWalk,
+  syncAdvisorBody
 } from './team-scene-advisor-walk'
 import { seatPlanOf } from './team-scene-seats'
 import {
@@ -40,7 +47,8 @@ import {
   queueVisit,
   walkStraight,
   visitCanStart,
-  type TeamScenePlan
+  type TeamScenePlan,
+  callNextVisitor
 } from './team-scene-visits'
 
 // Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
@@ -49,7 +57,6 @@ const CHEER_SECONDS = 2.2
 const CHECK_SECONDS = 1.2
 const ADVISOR_RAISE_SECONDS = 1.4
 const ADVISOR_BUBBLE_SECONDS = 6
-const ADVISOR_SPEED_PX = 48
 
 type Plan = TeamScenePlan
 
@@ -64,6 +71,9 @@ export type TeamSceneBody = TeamSceneMover & {
   emote: { kind: TeamSceneEmote; until: number } | null
   site: TeamSceneSite
   away?: true
+  /** On a ride: out of sight in the elevator, or walking back to it to leave this floor. */
+  hidden?: true
+  leaving?: true
   desk?: TeamSceneDesk
   hold?: TeamSceneHold
   work: TeamSceneWork
@@ -93,6 +103,7 @@ export type TeamSceneWorld = {
   trophies: { key: string; name: string }[]
   /** The launch STOP, drawn as a sign; members keep their own state. */
   stopped: boolean
+  ride: TeamSceneRide | null
   /** A building floor whose lead keeps to its spot on a narrow stage. */
   leadStays: boolean
   layout: TeamSceneLayout
@@ -121,6 +132,7 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     sites: [],
     trophies: [],
     stopped: false,
+    ride: null,
     leadStays: false,
     layout: GROUND_LAYOUT,
     advisorWalk: createAdvisorWalk()
@@ -165,21 +177,14 @@ export function applyTeamSceneInput(
   world.stopped = input.stopped === true
   world.leadStays = input.leadStays === true
   const { bodies } = world
-  if (input.leadless) {
-    bodies.delete('lead')
-  } else {
+  if (!input.leadless) {
     const lead = bodies.get('lead') ?? bodyAt('lead', 'lead', LEAD_SPOT, -1)
     bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
   }
-  if (input.advisor && !bodies.has('advisor')) {
-    // Why quicker than the team: a referee hurries over, so a ruling never waits on a long walk.
-    bodies.set('advisor', {
-      ...bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1),
-      speed: ADVISOR_SPEED_PX
-    })
-  } else if (!input.advisor) {
-    bodies.delete('advisor')
-  }
+  applyTeamSceneRide(world, input, (spot) => bodyAt('lead', 'lead', spot, -1))
+  syncAdvisorBody(world, input.advisor !== null, () =>
+    bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1)
+  )
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
   const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX, input.desks)
@@ -275,19 +280,14 @@ export function stepTeamScene(
     return
   }
   if (!world.visitor && leadIsHome(world)) {
-    const next = world.queue.shift()
-    const body = next ? world.bodies.get(next) : undefined
-    if (body && body.plan.kind !== 'seated') {
-      body.plan.stage = 'toLead'
-      world.visitor = body.key
-    }
+    callNextVisitor(world)
   }
   for (const body of world.bodies.values()) {
     if (body.role === 'member') {
       advancePlan(world, body, opts.width)
     }
   }
-  if (!world.visitor) {
+  if (!world.visitor && !stepTeamSceneRide(world, opts.width)) {
     stepLeadRounds(world, opts.width)
   }
   stepAdvisorWalk(world, opts.width)
@@ -316,6 +316,7 @@ export function settleTeamScene(world: TeamSceneWorld): void {
     rounds: createTeamSceneRounds(),
     advisorWalk: createAdvisorWalk()
   })
+  settleTeamSceneRide(world)
 }
 
 export function drainTeamSceneEffects(world: TeamSceneWorld): TeamSceneEffect[] {
