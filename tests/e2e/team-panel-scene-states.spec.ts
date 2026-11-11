@@ -14,11 +14,14 @@ type Style = (typeof STYLES)[number]
 const WINDOW_MS = 1500
 // Why: Pixel's swing rests for most of its 1.15 s; sparser frames could miss it (see scene-motion).
 const MAX_FRAME_GAP_MS = 430
-// [left, right, top, bottom] as fractions. One member sits at x 0.1 (seatPlanOf); the lead stands
-// at 0.84. Their crops start below Pixel's low cloud band (0.38) and keep the head and its emote.
+// [left, right, top, bottom] as fractions. One member sits at x 0.1 (seatPlanOf). The lead walks
+// its rounds, so its crop is centred where the scene says it stands (data-scene-lead-x), narrow
+// enough to leave out the member it may stand beside. Crops start below Pixel's low cloud band
+// (0.38) and keep the head and its emote.
+const LEAD_HALF = 0.05
 const CROPS = {
   member: [0, 0.26, 0.4, 1],
-  lead: [0.74, 0.96, 0.4, 1],
+  lead: [0, 0, 0.4, 1],
   sky: [0, 1, 0, 0.4]
 } as const
 // Why longer: Pixel's clouds step one scene pixel every 1.44 s (12 game ticks).
@@ -32,8 +35,16 @@ test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 // Hashes one actor's crop on every animation frame for a window, so the set is what was painted.
 async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<Sample> {
   return page.evaluate(
-    ({ crop, windowMs }) =>
+    ({ who, base, half, windowMs }) =>
       new Promise<Sample>((resolve) => {
+        const at = Number(
+          document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+            .sceneLeadX
+        )
+        const crop =
+          who === 'lead' && Number.isFinite(at)
+            ? [Math.max(0, at - half), Math.min(1, at + half), base[2], base[3]]
+            : base
         const hashOf = (): string => {
           const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
           const g = canvas?.getContext('2d')
@@ -72,8 +83,27 @@ async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<S
           resolve({ hashes, maxGapMs: Math.max(...gaps) })
         }, windowMs)
       }),
-    { crop: CROPS[who], windowMs }
+    { who, base: [...CROPS[who]], half: LEAD_HALF, windowMs }
   )
+}
+
+/** Waits until the lead has stood still for a second, so a held pose is sampled where it holds. */
+async function leadSettled(page: Page): Promise<void> {
+  const where = (): Promise<string | undefined> =>
+    page.evaluate(
+      () =>
+        document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+          .sceneLeadX
+    )
+  let last = await where()
+  let still = 0
+  for (let i = 0; i < 80 && still < 4; i++) {
+    await page.waitForTimeout(250)
+    const now = await where()
+    still = now !== undefined && now === last ? still + 1 : 0
+    last = now
+  }
+  expect.soft(still, 'the lead never stood still to be sampled').toBeGreaterThanOrEqual(4)
 }
 
 // Why retried: a starved runner may skip frames; a sparse window cannot judge motion.
@@ -224,6 +254,9 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         await orcaPage.waitForTimeout(settleMs)
         settleMs = 2000
         for (const who of ['lead', 'member'] as const) {
+          if (who === 'lead' && round.lead !== 'working') {
+            await leadSettled(orcaPage)
+          }
           seen.set(`${style}:${who}:${round[who]}`, await poseFrames(orcaPage, who))
         }
         if (round.member === 'working') {
