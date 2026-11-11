@@ -35,7 +35,11 @@ describe('wakeSleepingTerminal', () => {
       'term_asleep'
     )
     expect(requestWake).toHaveBeenCalledExactlyOnceWith(RECORD.paneKey)
-    expect(result).toEqual({ handle: 'term_woken', status: 'woken', paneKey: RECORD.paneKey })
+    expect(result).toEqual({
+      handle: 'term_woken',
+      status: 'woken',
+      paneKey: RECORD.paneKey
+    })
   })
 
   it('answers a running terminal as already awake without waking anything', async () => {
@@ -72,14 +76,44 @@ describe('wakeSleepingTerminal', () => {
       'term_asleep',
       { timeoutMs: 1_000 }
     )
-    expect(result).toEqual({ handle: null, status: 'waking', paneKey: RECORD.paneKey })
+    expect(result).toEqual({
+      handle: null,
+      status: 'waking',
+      paneKey: RECORD.paneKey
+    })
   })
 
-  it('reports waking while the woken pane has no running terminal yet', async () => {
+  it('reports waking while the woken pane has no running terminal by the deadline', async () => {
+    let now = 0
     const result = await wakeSleepingTerminal(
-      deps({ liveHandleOf: async () => null }),
+      deps({
+        liveHandleOf: async () => null,
+        now: () => now,
+        sleep: async (ms) => {
+          now += ms
+        }
+      }),
+      'term_asleep',
+      { timeoutMs: 1_000 }
+    )
+    expect(result).toEqual({
+      handle: null,
+      status: 'waking',
+      paneKey: RECORD.paneKey
+    })
+  })
+
+  // Why (ORCA-1167): a fresh tab is known only once its agent reports the session, after the spawn.
+  it('waits for the fresh tab to be known after the record drops', async () => {
+    let reads = 0
+    const result = await wakeSleepingTerminal(
+      deps({ liveHandleOf: async () => (++reads < 3 ? null : 'term_fresh') }),
       'term_asleep'
     )
-    expect(result).toEqual({ handle: null, status: 'waking', paneKey: RECORD.paneKey })
+    expect(result).toEqual({
+      handle: 'term_fresh',
+      status: 'woken',
+      paneKey: RECORD.paneKey
+    })
   })
 })
