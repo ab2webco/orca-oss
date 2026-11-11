@@ -236,21 +236,32 @@ describe('layoutTeamSceneBubbles', () => {
           top: stage.painter.headTop(lead.depth, stage.painter.height)
         }
         const tag = tagOn(stage, width)
-        const request = { key: 'lead', anchor, width: 120, height: stage.heights[0]! }
         const scene = { width, height: stage.painter.height }
         const opts = { beside: stage.beside, obstacles: [tag] }
-        const where = `${stage.style} ${width} px`
-        const boxes = layoutTeamSceneBubbles([{ ...request, attending: true }], scene, opts)
-        expect(
-          boxes.map((b) => b.key),
-          where
-        ).toEqual(['lead'])
-        // The tail may pass behind the tag; the bubble itself never covers it.
-        expect(overlaps(boxes[0]!, { ...tag, key: 'tag', tailX: 0 }), where).toBe(false)
-        // Behind a tag only as a last resort: where a clear spot exists, it takes that one.
-        const clear = layoutTeamSceneBubbles([request], scene, opts)
-        if (clear.length > 0) {
-          expect(boxes, where).toEqual(clear)
+        // Why every size: the lead's line runs from a short step to two lines at the cap.
+        for (const size of [60, 120, 170].flatMap((w) => stage.heights.map((h) => ({ w, h })))) {
+          // Why a one-line size: with no room for two, the attending lead's line clamps to one.
+          const oneLine = { width: size.w, height: stage.heights[0]! }
+          const request = { key: 'lead', anchor, width: size.w, height: size.h, oneLine }
+          const where = `${stage.style} ${width} px ${size.w}x${size.h}`
+          const boxes = layoutTeamSceneBubbles([{ ...request, attending: true }], scene, opts)
+          expect(
+            boxes.map((b) => b.key),
+            where
+          ).toEqual(['lead'])
+          // Clamped only where two lines found no spot.
+          if (boxes[0]!.clamped) {
+            expect(boxes[0]!.height, where).toBe(oneLine.height)
+            const unclamped = { ...request, attending: true, oneLine: undefined }
+            expect(layoutTeamSceneBubbles([unclamped], scene, opts), where).toEqual([])
+          }
+          // The tail may pass behind the tag; the bubble itself never covers it.
+          expect(overlaps(boxes[0]!, { ...tag, key: 'tag', tailX: 0 }), where).toBe(false)
+          // Behind a tag only as a last resort: where a clear spot exists, it takes that one.
+          const clear = layoutTeamSceneBubbles([request], scene, opts)
+          if (clear.length > 0) {
+            expect(boxes, where).toEqual(clear)
+          }
         }
       }
     }

@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -85,6 +86,36 @@ async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<S
       }),
     { who, base: [...CROPS[who]], half: LEAD_HALF, windowMs }
   )
+}
+
+/** The lead's crop as a PNG, cut where it is sampled, so a reviewer sees what the hashes saw. */
+async function leadCropShot(page: Page, path: string): Promise<void> {
+  const url = await page.evaluate(
+    ({ base, half }) => {
+      const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
+      const at = Number(
+        document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+          .sceneLeadX
+      )
+      if (!canvas || !Number.isFinite(at)) {
+        return null
+      }
+      const x = Math.floor(canvas.width * Math.max(0, at - half))
+      const top = Math.floor(canvas.height * base[2])
+      const w = Math.floor(canvas.width * Math.min(1, at + half)) - x
+      const h = Math.floor(canvas.height * base[3]) - top
+      const out = document.createElement('canvas')
+      out.width = w
+      out.height = h
+      out.getContext('2d')?.drawImage(canvas, x, top, w, h, 0, 0, w, h)
+      return out.toDataURL('image/png')
+    },
+    { base: [...CROPS.lead], half: LEAD_HALF }
+  )
+  expect.soft(url, 'no lead crop to show').not.toBeNull()
+  if (url) {
+    await writeFile(path, Buffer.from(url.split(',')[1]!, 'base64'))
+  }
 }
 
 /** Waits until the lead has stood still for a second, so a held pose is sampled where it holds. */
@@ -258,6 +289,12 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
             await leadSettled(orcaPage)
           }
           seen.set(`${style}:${who}:${round[who]}`, await poseFrames(orcaPage, who))
+          if (who === 'lead') {
+            await leadCropShot(
+              orcaPage,
+              testInfo.outputPath(`lead-crop-${style}-${round.lead}.png`)
+            )
+          }
         }
         if (round.member === 'working') {
           const sky = await sampleCrop(orcaPage, 'sky', SKY_WINDOW_MS)

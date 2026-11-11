@@ -95,4 +95,38 @@ describe('TeamSceneBubbles', () => {
     expect(shown([{ left: 4, top: 46, width: 58, height: 18 }])).toEqual(['lead'])
     expect(shown([])).toEqual(['advisor', 'lead'])
   })
+
+  // Why: Pixel's two-line cloud has no room by an asker's tag on a narrow stage (run 42985493201).
+  it("clamps an attending lead's line to one when two find no spot, and keeps it shown", () => {
+    // Two lines measure 53 px tall; on one line (nowrap) the same text is 41 px.
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+      function (this: HTMLElement) {
+        return this.style.whiteSpace === 'nowrap' ? 41 : 53
+      }
+    )
+    const tag = { left: 4, top: 46, width: 56, height: 18 }
+    const speech = {
+      key: 'lead',
+      text: 'Waiting for you Merge #12 now?',
+      anchor: { x: 38, top: 84 }
+    }
+    const show = (attending: boolean): HTMLElement => {
+      act(() =>
+        root.render(
+          <TeamSceneBubbles
+            speeches={[{ ...speech, attending }]}
+            width={219}
+            height={176}
+            cloudPixel={3}
+            obstacles={[tag]}
+          />
+        )
+      )
+      return host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!
+    }
+    expect(show(false).style.visibility).toBe('hidden')
+    const bubble = show(true)
+    expect(bubble.style.visibility).toBe('visible')
+    expect(bubble.querySelector('.line-clamp-1')?.textContent).toBe(speech.text)
+  })
 })

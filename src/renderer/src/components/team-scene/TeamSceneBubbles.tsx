@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import {
   layoutTeamSceneBubbles,
   type TeamSceneBubbleBox,
@@ -82,7 +83,10 @@ export function TeamSceneBubbles({
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
   // Why a content key: callers rebuild the array each render, and layout sets state.
   const layoutKey = [
-    ...speeches.map((s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}`),
+    // Why attending too: it changes where a lead's bubble may go, with no other change to see.
+    ...speeches.map(
+      (s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}:${s.attending === true}`
+    ),
     ...obstacles.map((o) => `${o.left},${o.top},${o.width},${o.height}`)
   ].join('|')
 
@@ -106,6 +110,13 @@ export function TeamSceneBubbles({
       el.style.width = 'max-content'
       // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
       const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
+      // Why measured on one line too: an attending lead's line clamps to it when two find no room.
+      const wrap = el.style.whiteSpace
+      el.style.whiteSpace = 'nowrap'
+      const oneLine = s.attending
+        ? { width: el.offsetWidth + 1, height: el.offsetHeight }
+        : undefined
+      el.style.whiteSpace = wrap
       // Why restore: React skips a width equal to its last one, which would leave max-content.
       el.style.width = laid
       return {
@@ -114,6 +125,7 @@ export function TeamSceneBubbles({
         align: s.align,
         yields: s.yields,
         attending: s.attending,
+        oneLine,
         ...size
       }
     })
@@ -157,7 +169,14 @@ export function TeamSceneBubbles({
             }}
           >
             {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
-            <span className="line-clamp-2 [overflow-wrap:anywhere]">{s.text}</span>
+            <span
+              className={cn(
+                '[overflow-wrap:anywhere]',
+                box?.clamped ? 'line-clamp-1' : 'line-clamp-2'
+              )}
+            >
+              {s.text}
+            </span>
             {box && cloudPixel ? (
               <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
             ) : null}
