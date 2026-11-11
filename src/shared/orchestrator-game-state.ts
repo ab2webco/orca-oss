@@ -235,7 +235,7 @@ export type OrchestratorGameState = {
   inboxes?: GameInboxSummary[]
   /** Questions the lead asked the person (`game ask-owner`) still unanswered; only for the lead, absent from an older host. */
   openOwnerQuestions?: number
-  /** Members this project had live that are not now (Orca or the machine restarted); only for the lead, absent from an older host. */
+  /** Members this project had live that are not now (terminal ended, Orca restarted or not reporting); only for the lead, absent from an older host. */
   pausedMembers?: GameStatePausedMember[]
   /** Members whose start waits for the setup in flight; only for the lead, absent from an older host. */
   queuedMembers?: GameQueuedMember[]
