@@ -6,13 +6,10 @@
  * the overlay layer only consumes the final parked tab set when deciding to
  * render a slot as null.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import { useAppStore } from '../../store'
-import {
-  findActivityTerminalPortal,
-  type ActivityTerminalPortalTarget
-} from '../activity/activity-terminal-portal'
+import type { ActivityTerminalPortalTarget } from '../activity/activity-terminal-portal'
 import { getTerminalTabColdParkRecheckDelayMs } from './terminal-cold-park-recheck-deadlines'
 import {
   TERMINAL_TAB_COLD_PARK_DELAY_MS,
@@ -24,13 +21,14 @@ import {
   type ParkVerdictFlipRecord
 } from './terminal-park-verdict-flip-telemetry'
 import { withholdUnparkableTerminalTabs } from './terminal-cold-park-withheld-tabs'
+import { useParkVerdictPinExpiryWake } from './use-park-verdict-pin-expiry-wake'
+import { selectParkedTerminalTabIds } from './terminal-tab-park-verdict'
 import { getTerminalParkingPolicyOverrides } from './terminal-parking-e2e-overrides'
 import {
   selectEvictionExemptTerminalTabIds,
   selectEvictionExemptTerminalTabLayoutKey
 } from './terminal-eviction-exempt-tabs'
 import { selectSleepingRecordParkExemptTabIds } from './sleeping-record-park-exemption'
-import { canWatcherCoverParkedTerminalTab } from './terminal-parked-tab-watchers'
 import { createTerminalTabActivationOrder } from './terminal-tab-activation-order'
 import { buildTerminalTabColdParkCandidates } from './terminal-tab-park-candidates'
 import {
@@ -128,6 +126,8 @@ export function useTerminalTabColdParking(args: {
   const measureParkCooldownUntilRef = useRef<number | null>(null)
   const terminalTabParkingTimersRef = useRef(new Map<string, number>())
   const parkVerdictRecordsRef = useRef(new Map<string, ParkVerdictFlipRecord>())
+  const [pinExpiryRevision, setPinExpiryRevision] = useState(0)
+  const bumpPinExpiryRevision = useCallback(() => setPinExpiryRevision((value) => value + 1), [])
   const [terminalTabParkingRevision, setTerminalTabParkingRevision] = useState(0)
   const [coldParkedTerminalTabIds, setColdParkedTerminalTabIds] = useState<ReadonlySet<string>>(
     () => new Set()
@@ -285,62 +285,39 @@ export function useTerminalTabColdParking(args: {
   // Terminal.tsx) or per-tab cold park, never portal-hosted tabs. Render and
   // the watcher-sync effect must share this exact set so watcher lifecycle
   // tracks the committed unmounts.
-  const parkedTerminalTabIds = useMemo(() => {
-    const parked = new Set<string>()
-    for (const terminalTab of terminalTabs) {
-      const assignment = assignments.get(terminalTab.id)
-      const isVisible = Boolean(isWorktreeActive && assignment && assignment.isActiveInGroup)
-      const hasActivityTerminalPortal =
-        findActivityTerminalPortal(activityTerminalPortals, {
-          worktreeId,
-          tabId: terminalTab.id
-        }) !== null
-      if (
-        (coldParkTerminalPanes ||
-          (!isVisible &&
-            coldParkedTerminalTabIds.has(terminalTab.id) &&
-            // Why: a pane owning a sleeping-session record must stay mountable
-            // on an active worktree — parked it can never cold-restore, so the
-            // agent's resume strands until the user reveals the tab. Scoped to
-            // per-tab parks: the worktree-level park clears on activation.
-            !sleepingRecordOwnedTabIds.has(terminalTab.id))) &&
-        !hasActivityTerminalPortal &&
-        // Why: a force-parked worktree's eviction-exempt tabs keep their
-        // mounted panes — a remount would orphan their live pty. Scoped to
-        // force-parks: ordinary parks never contain exempt tabs (eligibility
-        // requires every tab restorable, so the memo is empty for them).
-        !evictionExemptTerminalTabIds.has(terminalTab.id) &&
-        // Why: the hidden-measuring startup probe needs mounted panes; gate
-        // here too so the reveal lands in the same render that starts it.
-        !shouldMeasureHiddenWorktree
-      ) {
-        parked.add(terminalTab.id)
-      }
-      // Why: activation-deferred tabs render no pane regardless of the park
-      // policy, so watchers must own their side effects immediately. Targeted
-      // restrictions do not enter this set or add a new eager watcher burst.
-      if (
-        activationDeferredMountTabIds?.has(terminalTab.id) &&
-        !hasActivityTerminalPortal &&
-        canWatcherCoverParkedTerminalTab(worktreeId, terminalTab)
-      ) {
-        parked.add(terminalTab.id)
-      }
-    }
-    return parked
-  }, [
-    activityTerminalPortals,
-    assignments,
-    coldParkTerminalPanes,
-    coldParkedTerminalTabIds,
-    activationDeferredMountTabIds,
-    evictionExemptTerminalTabIds,
-    isWorktreeActive,
-    shouldMeasureHiddenWorktree,
-    sleepingRecordOwnedTabIds,
-    terminalTabs,
-    worktreeId
-  ])
+  const parkedTerminalTabIds = useMemo(
+    () =>
+      selectParkedTerminalTabIds({
+        worktreeId,
+        terminalTabs,
+        assignments,
+        isWorktreeActive,
+        coldParkTerminalPanes,
+        coldParkedTerminalTabIds,
+        sleepingRecordOwnedTabIds,
+        evictionExemptTerminalTabIds,
+        shouldMeasureHiddenWorktree,
+        activityTerminalPortals,
+        activationDeferredMountTabIds,
+        parkVerdictRecords: parkVerdictRecordsRef.current,
+        nowMs: Date.now()
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinExpiryRevision recomputes the verdict when a pin lapses.
+    [
+      activityTerminalPortals,
+      assignments,
+      coldParkTerminalPanes,
+      coldParkedTerminalTabIds,
+      activationDeferredMountTabIds,
+      evictionExemptTerminalTabIds,
+      isWorktreeActive,
+      pinExpiryRevision,
+      shouldMeasureHiddenWorktree,
+      sleepingRecordOwnedTabIds,
+      terminalTabs,
+      worktreeId
+    ]
+  )
 
   // Why: observation only — records whether the *rendered* park verdict churns,
   // so a crash bundle can confirm or refute a park-flip update loop. Watching
@@ -355,6 +332,14 @@ export function useTerminalTabColdParking(args: {
       nowMs: Date.now()
     })
   }, [parkedTerminalTabIds, terminalTabs])
+
+  useParkVerdictPinExpiryWake({
+    coldParkTerminalPanes,
+    records: parkVerdictRecordsRef,
+    terminalTabs,
+    parkedTerminalTabIds,
+    onPinExpired: bumpPinExpiryRevision
+  })
 
   // Why: runs in the same effect flush as the commit that parked/revealed the
   // panes — watcher disposal therefore lands before any PTY data IPC can
