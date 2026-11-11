@@ -6,7 +6,7 @@ const causeText = (member: Pick<GamePausedMember, 'cause' | 'terminal'>): string
       return `its terminal ${member.terminal ?? ''} is open but not reporting`
     case 'unsubmitted':
       return `its brief was never submitted in ${member.terminal ?? 'its terminal'}`
-    default:
+    case undefined:
       // Why both: a gone terminal reads the same after a restart and after the agent exited.
       return 'its terminal is gone (it ended or Orca restarted)'
   }
