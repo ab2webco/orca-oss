@@ -192,7 +192,10 @@ export function teamTicketBesideName(
   showName: boolean
 ): string | null {
   const identifier = card.ticket?.identifier ?? null
-  return identifier && !(showName && card.name === identifier) ? identifier : null
+  // Why the name's own ticket: 'Merlin · E2E-801' already says it, as the sidebar row does (#1125).
+  return identifier && !(showName && ticketInText(card.name) === identifier.toUpperCase())
+    ? identifier
+    : null
 }
 
 /** A usage meter's fill by percent used, in the status tokens, with its track a lighter step of it. */

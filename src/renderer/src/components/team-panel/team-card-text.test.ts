@@ -10,8 +10,24 @@ import {
   teamStatusGlyph,
   teamStatusTone,
   teamUsageBarClass,
-  teamBranchParts
+  teamBranchParts,
+  teamTicketBesideName
 } from './team-card-text'
+
+describe('teamTicketBesideName', () => {
+  const ticket = { identifier: 'E2E-801' } as Parameters<typeof teamTicketBesideName>[0]['ticket']
+
+  // Why: 'Merlin · E2E-801' carried its ticket again beneath, once the row wrapped at 390.
+  it('shows the ticket once when the shown name already carries it', () => {
+    expect(teamTicketBesideName({ name: 'Merlin · E2E-801', ticket }, true)).toBeNull()
+    expect(teamTicketBesideName({ name: 'E2E-801', ticket }, true)).toBeNull()
+  })
+
+  it('shows the ticket beside a name without it, or when the name is hidden', () => {
+    expect(teamTicketBesideName({ name: 'Merlin', ticket }, true)).toBe('E2E-801')
+    expect(teamTicketBesideName({ name: 'Merlin · E2E-801', ticket }, false)).toBe('E2E-801')
+  })
+})
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
