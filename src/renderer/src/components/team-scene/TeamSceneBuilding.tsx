@@ -116,7 +116,7 @@ function FloorStage({
   level,
   legs,
   onBoarded,
-  topmost,
+  aboveView,
   onAskers,
   fromAbove,
   floorRef
@@ -126,8 +126,8 @@ function FloorStage({
   level: number
   legs: TeamSceneFloorLegs
   onBoarded: (rider: string) => void
-  /** The highest floor shown: nothing above it but the building's own top. */
-  topmost: boolean
+  /** How far above the scroller's visible top this floor starts, in px; negative when below it. */
+  aboveView: number
   onAskers: (floor: string, boxes: TeamSceneRect[]) => void
   /** The floor above's asker boxes, in this floor's stage: its rising bubbles keep off them. */
   fromAbove: readonly TeamSceneRect[]
@@ -191,7 +191,9 @@ function FloorStage({
           onUnplaced={leadHere ? onUnplaced : undefined}
           onBoarded={onBoarded}
           crop={crop}
-          visibleTop={topmost ? cropTop : 0}
+          // Why from the scroller: what is above a floor scrolled to the top is not drawn, so no
+          // bubble may rise into it; lower floors may rise over the slab into the one above.
+          visibleTop={zoomed ? 0 : Math.max(0, cropTop + aboveView)}
           onAskers={(boxes) => onAskers(floor.key, boxes)}
           extraObstacles={obstacles}
         />
@@ -230,6 +232,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   // Why every floor: an owner with five machines saw three and a fold; the building scrolls instead.
   const shown = zoomed ? [zoomed] : floors.toReversed()
   const [askers, setAskers] = useState<Record<string, TeamSceneRect[]>>({})
+  const [scrollTop, setScrollTop] = useState(0)
   const onAskers = useCallback(
     (key: string, boxes: TeamSceneRect[]) =>
       setAskers((old) =>
@@ -318,6 +321,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
       </nav>
       <div
         data-team-floors-scroll=""
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         className="scrollbar-sleek flex min-w-0 overflow-y-auto"
         style={zoomed ? undefined : { maxHeight: VIEW_FLOORS * (STRIP.height + STRIP.slab) }}
       >
@@ -331,7 +335,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               level={floors.indexOf(floor)}
               legs={legs}
               onBoarded={onBoarded}
-              topmost={floor === shown[0]}
+              aboveView={scrollTop - index * (STRIP.height + STRIP.slab)}
               onAskers={onAskers}
               fromAbove={fromAboveOf(index)}
               floorRef={floorRef(floor.key)}

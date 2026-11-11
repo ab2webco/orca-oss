@@ -143,6 +143,31 @@ describe('TeamSceneBuilding', () => {
     expect(scroller.style.maxHeight).toBe(`${3 * (112 + 4)}px`)
   })
 
+  // Why: the scroller's top is what is above a floor scrolled to it, and a bubble there was cut
+  // (the owner's 'detrás del muro', again at the scroller's edge; lead, 2026-11-11).
+  it("keeps each floor's bubbles under the scroller's visible top as it scrolls", () => {
+    render([local, remote('a'), remote('b'), remote('c'), remote('d')])
+    const scroller = host.querySelector<HTMLElement>('[data-team-floors-scroll]')!
+    const tops = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-team-floor]')].map((floor) => {
+        const crop = Number(
+          /^inset\((\d+)px/.exec(floor.querySelector('canvas')!.style.clipPath)![1]
+        )
+        const top = Number(
+          floor.querySelector<HTMLElement>('[data-scene-visible-top]')!.dataset.sceneVisibleTop
+        )
+        return { crop, top }
+      })
+    // Unscrolled: the top floor keeps under its own crop, the rest may rise over the slab.
+    expect(tops().map((one) => one.top)).toEqual([tops()[0]!.crop, 0, 0, 0, 0])
+    scroller.scrollTop = 200
+    act(() => scroller.dispatchEvent(new Event('scroll')))
+    // Floor i starts at i * 116 in the scroller: the visible top is 200 - that, past its crop.
+    expect(tops().map((one) => one.top)).toEqual(
+      tops().map((one, i) => Math.max(0, one.crop + 200 - i * 116))
+    )
+  })
+
   it("opens on the floor that matters: one where a member needs you, else the lead's", () => {
     const seen: string[] = []
     vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(
