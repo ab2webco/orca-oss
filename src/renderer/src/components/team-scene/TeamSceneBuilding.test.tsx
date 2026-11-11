@@ -215,6 +215,10 @@ describe('TeamSceneBuilding', () => {
       // Why flow-root: without a block context of its own, the view's negative margin collapses
       // through the floor and lifts it over the floor above (seen in the building E2E).
       expect(floor.className).toContain('flow-root')
+      // Why: the view reaches over the floor above and the nav; it must never take their clicks.
+      expect(floor.querySelector('[data-team-floor-view]')?.className).toContain(
+        'pointer-events-none'
+      )
       const canvas = floor.querySelector<HTMLCanvasElement>('canvas')!
       expect(canvas.style.clipPath, `floor ${i}`).toMatch(
         /^inset\(\d+px 0px \d+px\)|^inset\(\d+px 0px\)/

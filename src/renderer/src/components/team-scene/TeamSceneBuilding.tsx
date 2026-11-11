@@ -152,7 +152,13 @@ function FloorStage({
       className="relative flow-root border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
       style={zoomed ? undefined : { height: STRIP.height }}
     >
-      <div data-team-floor-view="" style={zoomed ? undefined : { marginTop: -cropTop }}>
+      <div
+        data-team-floor-view=""
+        // Why no pointer: the uncropped view reaches over the floor above and the nav, whose
+        // buttons must keep their clicks; the scene itself is an image.
+        className="pointer-events-none"
+        style={zoomed ? undefined : { marginTop: -cropTop }}
+      >
         <TeamSceneCanvas
           input={input}
           painter={painter}
