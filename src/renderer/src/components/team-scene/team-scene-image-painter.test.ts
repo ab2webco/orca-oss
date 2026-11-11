@@ -850,3 +850,12 @@ describe('createImagePainter office back view', () => {
     expect(fills).toContain(COLORS.attention)
   })
 })
+
+// Why: past the backdrop's own width at the stage height, cover scales it up, the window and city
+// rise out of view and the art's edges fill the floor (building at a 1120 px panel, 2026-11-11).
+describe('the widest stage a style draws whole', () => {
+  it("is the backdrop's own width at the stage's height", () => {
+    // sky.png is 1536 x 352: at the 176 px stage, 768 px.
+    expect(painterOf().maxWidth).toBe(768)
+  })
+})

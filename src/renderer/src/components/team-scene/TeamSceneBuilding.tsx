@@ -168,7 +168,8 @@ function FloorStage({
       // Why a slab and an inner ring: floors read as storeys of one glass building, not copies.
       // Why no overflow clip: only the canvas is cropped, so a bubble rises over the slab above.
       // Why flow-root: its own block context, or the view's negative margin lifts the whole floor.
-      className="relative flow-root border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
+      // Why a dark floor: a stage capped at its art's width leaves the floor's sides showing.
+      className="relative flow-root border-b-4 border-border bg-scene-bubble ring-1 ring-inset ring-white/10 last:border-b-0"
       style={zoomed ? undefined : { height: STRIP.height }}
     >
       <div

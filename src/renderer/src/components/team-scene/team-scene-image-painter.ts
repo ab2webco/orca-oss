@@ -1,3 +1,4 @@
+import { teamSceneArtMaxWidth } from './team-scene-art-width'
 import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orchestrator-game-scene-native'
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
@@ -290,8 +291,10 @@ export function createImagePainter(args: {
     drawActorMarks(g, x, y - a.jump - feet.y * px, a, colors)
   }
 
+  const maxWidth = teamSceneArtMaxWidth(style, images, TEAM_SCENE_ART_HEIGHT)
   return {
     height: TEAM_SCENE_ART_HEIGHT,
+    ...(maxWidth ? { maxWidth } : {}),
     ...(back ? { layout: OFFICE_BACK_LAYOUT, emoteAt } : {}),
     portrait,
     headTop: (depth, h) => {

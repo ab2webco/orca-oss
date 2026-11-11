@@ -41,6 +41,8 @@ export type TeamScenePainter = {
   cloudPixel?: number
   /** How this style seats the team; absent, the ground layout of Figures and Pixel. */
   layout?: TeamSceneLayout
+  /** The widest stage it draws whole; wider, the stage is capped and centred. Absent: any width. */
+  maxWidth?: number
   /** The centre of an actor's emote when the style moves it off the head; null keeps it there. */
   emoteAt?: (
     a: TeamSceneActor,

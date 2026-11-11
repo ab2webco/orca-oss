@@ -243,6 +243,21 @@ describe('TeamSceneCanvas', () => {
     )
   })
 
+  it("caps the stage at its painter's widest and centres it, so wide panels never stretch the art", () => {
+    reduced = true
+    const p = painter()
+    render(
+      <TeamSceneCanvas
+        input={input(['a'])}
+        painter={{ ...p.value, maxWidth: 300 }}
+        leadLine={null}
+      />
+    )
+    const stage = host.querySelector<HTMLElement>('canvas')!.parentElement!
+    expect(stage.style.maxWidth).toBe('300px')
+    expect(stage.className).toContain('mx-auto')
+  })
+
   it('ties the lead line to the lead', () => {
     reduced = true
     render(

@@ -277,7 +277,8 @@ export function TeamSceneCanvas({
 
   return (
     <div
-      className="relative"
+      className="relative mx-auto"
+      style={painter.maxWidth ? { maxWidth: painter.maxWidth } : undefined}
       // Why exposed: specs crop the lead's pixels, and on its rounds it leaves its spot.
       data-scene-lead-x={
         leadAnchor && speakers.width > 0 ? (leadAnchor.x / speakers.width).toFixed(2) : undefined
