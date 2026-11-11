@@ -1,8 +1,16 @@
-import type { ProjectExecutionRuntimeResolution } from './project-execution-runtime'
+import type {
+  GlobalWindowsRuntimeDefault,
+  ProjectExecutionRuntimeResolution
+} from './project-execution-runtime'
 import type { GlobalSettings } from './global-settings-types'
 
-type LocalWindowsTerminalRuntimeSettings =
-  | Partial<Pick<GlobalSettings, 'terminalWindowsShell' | 'terminalWindowsWslDistro'>>
+export type LocalWindowsTerminalRuntimeSettings =
+  | Partial<
+      Pick<
+        GlobalSettings,
+        'terminalWindowsShell' | 'terminalWindowsWslDistro' | 'localWindowsRuntimeDefault'
+      >
+    >
   | undefined
 
 export type LocalWindowsTerminalRuntimeOptions = {
@@ -37,9 +45,20 @@ export function resolveLocalWindowsTerminalRuntimeOptions(args: {
   const settingsWslDistro = args.settings?.terminalWindowsWslDistro ?? null
   const projectRuntime = args.projectRuntime
   if (!projectRuntime) {
+    const wslDefault = args.settings?.localWindowsRuntimeDefault
+    if (wslDefault?.kind !== 'wsl') {
+      return {
+        shellOverride: args.requestedShellOverride ?? settingsShell,
+        terminalWindowsWslDistro: settingsWslDistro
+      }
+    }
+    // Why: folder and floating terminals have no project; a WSL default must reach them on both the renderer and main spawn paths.
+    const shellOverride = args.requestedShellOverride ?? 'wsl.exe'
     return {
-      shellOverride: args.requestedShellOverride ?? settingsShell,
-      terminalWindowsWslDistro: settingsWslDistro
+      shellOverride,
+      terminalWindowsWslDistro: isWslShellName(shellOverride)
+        ? (wslDefault.distro ?? settingsWslDistro)
+        : settingsWslDistro
     }
   }
 
@@ -69,6 +88,7 @@ export function resolveLocalWindowsTerminalRuntimeOptions(args: {
 export function resolveLocalWindowsTerminalShellOverrideForTab(args: {
   explicitShellOverride: string | undefined
   defaultWindowsShell: string | undefined
+  globalWindowsRuntimeDefault?: GlobalWindowsRuntimeDefault
   isWslWorktree: boolean
   projectRuntime: ProjectExecutionRuntimeResolution | undefined
   fallbackHostShell?: string
@@ -94,7 +114,7 @@ export function resolveLocalWindowsTerminalShellOverrideForTab(args: {
   if (args.explicitShellOverride !== undefined) {
     return args.explicitShellOverride
   }
-  if (args.isWslWorktree) {
+  if (args.isWslWorktree || args.globalWindowsRuntimeDefault?.kind === 'wsl') {
     return 'wsl.exe'
   }
   return args.defaultWindowsShell
