@@ -8,6 +8,7 @@ function dispatcherWith(
     register: (args: unknown) => Promise<unknown>
     list: () => unknown
     storedLeadOf?: (caller: unknown) => Promise<unknown>
+    reopen?: (args: unknown) => Promise<unknown>
   },
   delivered: unknown[] = []
 ) {
@@ -155,6 +156,29 @@ describe('game leads RPC', () => {
       result: { stored: { accountId: 'acct-glm' } }
     })
     expect(callers).toEqual([{ worktreeId: 'wt-1' }])
+  })
+
+  // Why (ORCA-717): the + menu reopens the kept lead with no pane of its own.
+  it('reopens the kept lead for a worktree and hands it held answers', async () => {
+    const delivered: unknown[] = []
+    const calls: unknown[] = []
+    const send = dispatcherWith(
+      {
+        register: async () => ({}),
+        list: () => ({ leads: [] }),
+        reopen: async (args: unknown) => {
+          calls.push(args)
+          return { registered: false, resumed: { handle: 'term_r' } }
+        }
+      },
+      delivered
+    )
+
+    await expect(
+      send('game.leadReopen', { worktreeId: 'wt-1', project: 'orca-oss', label: '' })
+    ).resolves.toMatchObject({ ok: true, result: { resumed: { handle: 'term_r' } } })
+    expect(calls).toEqual([{ worktreeId: 'wt-1', project: 'orca-oss', label: '' }])
+    expect(delivered).toEqual([{ terminalHandle: 'term_r' }])
   })
 
   it('lists the live leads', async () => {

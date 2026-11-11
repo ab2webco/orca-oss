@@ -48,6 +48,26 @@ export const ORCHESTRATOR_GAME_LEADS_METHODS: RpcMethod[] = [
       stored: await runtime.getGameLeads().storedLeadOf({ worktreeId: params.worktreeId })
     })
   }),
+  // Why no caller pane: a pane that ran /orca-game:lead would be left over beside the reopened one (ORCA-717).
+  defineMethod({
+    name: 'game.leadReopen',
+    params: z.object({
+      worktreeId: z.string(),
+      project: z.string().max(200),
+      label: z.string().max(80)
+    }),
+    handler: async (params, { runtime }) => {
+      const result = await runtime.getGameLeads().reopen(params)
+      const lead = result.resumed?.handle ?? result.live?.handle
+      if (lead) {
+        void runtime
+          .getGameBoard()
+          .heldAnswers.deliver({ terminalHandle: lead })
+          .catch(() => undefined)
+      }
+      return result
+    }
+  }),
   defineMethod({
     name: 'game.leads',
     params: null,
