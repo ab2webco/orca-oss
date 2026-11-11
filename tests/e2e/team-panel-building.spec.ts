@@ -225,20 +225,28 @@ test('the Team panel draws a team on three machines as a building in Office', as
     await expect
       .poll(() => orcaPage.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
       .toBe(true)
-    // Why the sidebar, not the window: the Team panel keeps its own width at any window width.
+    // Why a wide window first: the sidebar is clamped to the room the window leaves it, so at a
+    // 320 window every sidebar width collapses to its 220 px minimum.
+    await setWindowWidth(electronApp, orcaPage, 1440)
     const sidebarBefore = await orcaPage.evaluate(
       () => window.__store!.getState().rightSidebarWidth
     )
-    for (const width of [420, 390, 320]) {
+    // The panel's real widths: its 220 px minimum, the ride stills' widths, and the widest a
+    // 1440 window allows (it leaves the editor 320 px).
+    for (const width of [220, 320, 390, 420, 1120]) {
       await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
       await orcaPage.waitForTimeout(1500)
-      // Why recorded: a ride only shows on a floor at least 360 px wide.
       const measured = await building.evaluate((root) => ({
         building: root.clientWidth,
         stages: [...root.querySelectorAll('[data-team-floor] canvas')].map((c) => c.clientWidth)
       }))
       await writeFile(testInfo.outputPath(`ride-widths-${width}.json`), JSON.stringify(measured))
-      await building.screenshot({ path: testInfo.outputPath(`building-ride-reduced-${width}.png`) })
+      for (const theme of THEMES) {
+        await setTheme(orcaPage, theme)
+        await building.screenshot({
+          path: testInfo.outputPath(`building-sidebar-${width}-${theme}.png`)
+        })
+      }
     }
     await orcaPage.evaluate(
       (w) => window.__store!.getState().setRightSidebarWidth(w),
