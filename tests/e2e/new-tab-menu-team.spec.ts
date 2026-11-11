@@ -66,7 +66,12 @@ async function expectActiveTabReadable(page: Page): Promise<void> {
   const tab = page.locator('[data-testid="sortable-tab"][data-active="true"]').first()
   const strip = await page.locator('.terminal-tab-strip').first().boundingBox()
   const icon = await tab.locator('svg').first().boundingBox()
-  const close = await tab.locator('[data-tab-close-button="true"]').boundingBox()
+  const closeButton = tab.locator('[data-tab-close-button="true"]')
+  // Why: under a 120 px tab bar a tab is its icon alone and shows its close on hover (ORCA-717).
+  if (!(await closeButton.isVisible())) {
+    await tab.hover()
+  }
+  const close = await closeButton.boundingBox()
   expect(strip && icon && close, 'the active tab has no box').toBeTruthy()
   expect(icon!.x, "the tab's icon is cut off").toBeGreaterThanOrEqual(strip!.x)
   expect(close!.x + close!.width, "the tab's close is cut off").toBeLessThanOrEqual(
@@ -273,4 +278,51 @@ test("the + menu offers the project's lead instead of a second team", async ({
     path: shotPath('new-tab-add-member-1440-dark.png')
   })
   await orcaPage.keyboard.press('Escape')
+})
+
+// ORCA-717: beside both sidebars at 768 the strip fits one tab; a +N count lists and opens the rest.
+test('the +N count lists the hidden tabs and opens the one picked', async ({
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(120_000)
+  await waitForSessionReady(orcaPage)
+  const worktreeId = await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActivePanePtyId(orcaPage)
+  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await orcaPage.evaluate((id) => {
+    const state = window.__store!.getState()
+    state.createTab(id)
+    state.createTab(id)
+  }, worktreeId)
+  await expect(orcaPage.locator('[data-testid="sortable-tab"]')).toHaveCount(3)
+  await orcaPage.setViewportSize({ width: 768, height: 900 })
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSidebarOpen(true)
+    state.setRightSidebarOpen(true)
+  })
+  const activeTabId = () => orcaPage.evaluate(() => window.__store!.getState().activeTabId)
+  for (const theme of ['dark', 'light'] as const) {
+    await writeSettings(orcaPage, { theme })
+    const count = orcaPage.getByRole('button', { name: '2 more tabs' })
+    await expect(count).toHaveText('+2')
+    await orcaPage.mouse.move(0, 450)
+    await expect(async () => expectActiveTabReadable(orcaPage)).toPass({ timeout: 10_000 })
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath(`hidden-tabs-count-768-${theme}.png`)
+    })
+    const before = await activeTabId()
+    await count.click()
+    const rows = orcaPage.getByRole('menuitem')
+    await expect(rows).toHaveCount(2)
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath(`hidden-tabs-list-768-${theme}.png`)
+    })
+    await rows.first().click()
+    await expect.poll(activeTabId).not.toBe(before)
+    await expect(orcaPage.getByRole('menu')).toHaveCount(0)
+  }
 })
