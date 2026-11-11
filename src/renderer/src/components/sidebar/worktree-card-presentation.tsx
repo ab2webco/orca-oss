@@ -20,7 +20,6 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     repo,
     inPinnedSection,
     hideRepoBadge,
-    hostContextLabel,
     affiliateListMode,
     flushSurface,
     contentIndent,
@@ -83,30 +82,25 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
     showRepoIdentityInTitle && !!repo && !hideRepoBadge && !isFolder && !showPinnedRepoIcon
   const showRepoBadgeInMetaRow =
     !showRepoIdentityInTitle && !!repo && !hideRepoBadge && !showPinnedRepoIcon
-  const showHostContextBadge = !compactCards && !!hostContextLabel
-  const showDetachedHeadInMetaRow = !compactCards && !isFolder && detachedHeadDisplay !== null
-  const showBranch =
-    !isFolder &&
-    branch.length > 0 &&
-    !newCardStyle &&
-    (!compactCards || branch !== worktree.displayName)
   // Why: rebases already surface in source control, so dense cards skip the persistent rebase chip.
+  // Why opt-in: V30 draws one line; the branch or its detached HEAD shows only with the Branch prop (ORCA-1149).
+  const branchLineOn = cardProps.includes('branch') && !newCardStyle && !compactCards && !isFolder
+  const showBranch = branchLineOn && branch.length > 0
+  const showDetachedHeadInMetaRow = branchLineOn && !showBranch && detachedHeadDisplay !== null
   const showConflictOperationBadge =
     !!conflictOperation && conflictOperation !== 'unknown' && conflictOperation !== 'rebase'
   const hasMetadataBadge = showConflictOperationBadge
   const showUnreadQuickAction = !affiliateListMode && showStatus && !newCardStyle
   // Why: the slot owns the unread/status lane; legacy keeps the bell toggle, the new card keeps the glyph passive.
   const showCombinedStatusSlot = showStatus
-  const showTitleRowPrimary = compactCards && worktree.isMainWorktree && !isFolder
   const showMetaRowDetails = !newCardStyle && !compactCards && (hasDetails || hasPorts)
   const showTitleRowIndicators = (newCardStyle || compactCards) && (hasDetails || hasPorts)
   // Why: grouped views can hide the repo badge; don't reserve a blank metadata lane unless there's real content.
   const hasDetailedMetaRowContent = Boolean(
     (showRepoBadgeInMetaRow && repo) ||
-    showHostContextBadge ||
     folderMetaRowContent ||
-    showBranch ||
     showIdentityInNewCard ||
+    showBranch ||
     showDetachedHeadInMetaRow ||
     showConflictOperationBadge ||
     cacheStartedAt != null ||
@@ -115,14 +109,16 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
   const hasMetaRow = compactCards
     ? hasMetadataBadge || cacheStartedAt != null
     : hasDetailedMetaRowContent
-  const showHeaderActions = showTitleRowPrimary || showDeleteQuickAction
+  // Why only delete: V30 has no primary-worktree mark; the owner dropped 'principal' (ORCA-1149).
+  const showHeaderActions = showDeleteQuickAction
   // Why: normalize the title once so title/branch de-dupe and identity-only hover eligibility stay in sync.
   const trimmedVisibleCardTitle = visibleCardTitle.trim()
   const showBranchIdentityHover = newCardStyle
     ? Boolean(identityDisplay) &&
       !cardProps.includes('branch') &&
       identityDisplay !== trimmedVisibleCardTitle
-    : compactCards && showBranch
+    : // Why: the row draws no branch line (V30), so a compact card keeps it in the hover.
+      compactCards && !isFolder && branch.length > 0 && branch !== worktree.displayName
   const hoverBranchName = newCardStyle
     ? identityDisplay
     : showBranchIdentityHover
@@ -288,16 +284,13 @@ export function buildWorktreeCardPresentation(card: WorktreeCardController) {
 
   return {
     showPinnedRepoIcon,
+    showBranch,
+    showDetachedHeadInMetaRow,
     showInlineRepoBadge,
     showRepoBadgeInMetaRow,
-    showHostContextBadge,
-    showIdentityInNewCard,
-    showDetachedHeadInMetaRow,
-    showBranch,
     showConflictOperationBadge,
     showUnreadQuickAction,
     showCombinedStatusSlot,
-    showTitleRowPrimary,
     showMetaRowDetails,
     showTitleRowIndicators,
     hasMetaRow,
