@@ -4,6 +4,13 @@ import {
   teamSceneArrived as near,
   type TeamSceneMover
 } from './team-scene-motion'
+import {
+  createTeamSceneRounds,
+  LEAD_SPOT,
+  leadIsHome,
+  stepLeadRounds,
+  type TeamSceneRounds
+} from './team-scene-lead-rounds'
 import { seatPlanOf } from './team-scene-seats'
 import type {
   TeamSceneActivity,
@@ -14,7 +21,6 @@ import type {
   TeamSceneSpot
 } from './team-scene-types'
 
-const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
 // Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
 const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
@@ -57,6 +63,8 @@ export type TeamSceneWorld = {
   overflow: number
   /** Every seat's spot, so a style draws the stations even while their members walk. */
   stations: TeamSceneSpot[]
+  /** The lead's walks to working members between real events. */
+  rounds: TeamSceneRounds
 }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -72,7 +80,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     advisorRaiseUntil: 0,
     effects: [],
     overflow: 0,
-    stations: []
+    stations: [],
+    rounds: createTeamSceneRounds()
   }
 }
 
@@ -240,7 +249,7 @@ export function stepTeamScene(
   if (world.t < world.cheerUntil) {
     return
   }
-  if (!world.visitor) {
+  if (!world.visitor && leadIsHome(world)) {
     const next = world.queue.shift()
     const body = next ? world.bodies.get(next) : undefined
     if (body && body.plan.kind !== 'seated') {
@@ -252,6 +261,9 @@ export function stepTeamScene(
     if (body.role === 'member') {
       advancePlan(world, body, opts.width)
     }
+  }
+  if (!world.visitor) {
+    stepLeadRounds(world, opts.width)
   }
   for (const body of world.bodies.values()) {
     moveTeamSceneBody(body, dt, opts.width)
@@ -269,7 +281,13 @@ export function settleTeamScene(world: TeamSceneWorld): void {
     body.target = body.home
     body.emote = null
   }
-  Object.assign(world, { queue: [], visitor: null, cheerUntil: 0, effects: [] })
+  Object.assign(world, {
+    queue: [],
+    visitor: null,
+    cheerUntil: 0,
+    effects: [],
+    rounds: createTeamSceneRounds()
+  })
 }
 
 export function drainTeamSceneEffects(world: TeamSceneWorld): TeamSceneEffect[] {
