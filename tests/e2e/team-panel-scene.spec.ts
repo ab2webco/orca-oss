@@ -636,8 +636,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
       }
     }
 
-    // Lead review of criterion 8: a lead's line that needs a two-line cloud has no spot beside the
-    // tag on Pixel's 219 px stage, so the lead's card shows all of it, as the advisor's card does.
+    // Lead review of criterion 8, and ORCA-1150 decision A: a lead's line that needs a two-line cloud
+    // has no spot beside the tag on Pixel's 219 px stage, so its bubble clamps to one line and the
+    // lead's card shows all of it, as the advisor's card does.
     const leadAsks = 'Waiting for you · Merge #14 now?'
     const [leadTab] = pane.paneKey.split(':')
     const asks = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
@@ -678,9 +679,10 @@ test('the Team panel draws the live scene beside a member opened under its heade
         })
         .toBe(leadAsks)
       expect(
-        await bubblesOverTag(orcaPage, [], 1500),
-        `no pixel bubble beside ORCA-14's tag for the lead's two-line line at 320px ${theme}`
+        await bubblesOverTag(orcaPage, ['lead'], 1500),
+        `the lead's one-line pixel bubble beside ORCA-14's tag at 320px ${theme}`
       ).toEqual([])
+      await expect(leadBubble.locator('.line-clamp-1')).toHaveText(leadAsks)
       await scene.screenshot({
         path: testInfo.outputPath(`team-scene-lead-line-in-card-pixel-320-${theme}.png`)
       })

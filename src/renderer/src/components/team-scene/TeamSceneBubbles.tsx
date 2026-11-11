@@ -28,7 +28,7 @@ type Props = {
   cloudPixel?: number
   /** What no bubble may cover, such as an asking member's tag. */
   obstacles?: readonly TeamSceneRect[]
-  /** Told after each layout which speeches got no bubble, so their lines can show elsewhere. */
+  /** Told after each layout which speeches no bubble shows whole (none, or clamped), so their lines can show elsewhere. */
   onUnplaced?: (keys: string[]) => void
 }
 
@@ -144,7 +144,9 @@ export function TeamSceneBubbles({
       { beside: Boolean(cloudPixel), obstacles }
     )
     setBoxes(laid)
-    onUnplaced?.(speeches.filter((s) => !laid.some((b) => b.key === s.key)).map((s) => s.key))
+    // Why clamped too: a line cut to one in its bubble is not whole there either, so its card shows it.
+    const whole = new Set(laid.filter((b) => !b.clamped).map((b) => b.key))
+    onUnplaced?.(speeches.filter((s) => !whole.has(s.key)).map((s) => s.key))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
   }, [layoutKey, width, height, cloudPixel])
 

@@ -110,10 +110,12 @@ describe('TeamSceneBubbles', () => {
       text: 'Waiting for you Merge #12 now?',
       anchor: { x: 38, top: 84 }
     }
+    const unplaced = vi.fn()
     const show = (attending: boolean): HTMLElement => {
       act(() =>
         root.render(
           <TeamSceneBubbles
+            onUnplaced={unplaced}
             speeches={[{ ...speech, attending }]}
             width={219}
             height={176}
@@ -128,5 +130,7 @@ describe('TeamSceneBubbles', () => {
     const bubble = show(true)
     expect(bubble.style.visibility).toBe('visible')
     expect(bubble.querySelector('.line-clamp-1')?.textContent).toBe(speech.text)
+    // Clamped, the line is not whole in its bubble, so its card shows it all as for an unplaced one.
+    expect(unplaced).toHaveBeenLastCalledWith(['lead'])
   })
 })
