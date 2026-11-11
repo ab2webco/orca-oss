@@ -258,6 +258,27 @@ describe('TeamSceneCanvas', () => {
     expect(stage.className).toContain('mx-auto')
   })
 
+  // Why: capped, the stage shows its art whole, and the art's own edge cut the plant (lead, 1120 px).
+  it('fades its edges into the floor only while it is capped at its art width', () => {
+    reduced = true
+    const p = painter()
+    const capped = { ...p.value, maxWidth: 300 }
+    render(<TeamSceneCanvas input={input(['a'])} painter={capped} leadLine={null} />)
+    const canvas = () => host.querySelector<HTMLCanvasElement>('canvas')!
+    // The stage is 360 px wide in this suite, past the 300 px art.
+    expect(canvas().style.getPropertyValue('mask-image')).toContain('linear-gradient')
+    act(() => root.unmount())
+    root = createRoot(host)
+    render(
+      <TeamSceneCanvas
+        input={input(['a'])}
+        painter={{ ...capped, maxWidth: 800 }}
+        leadLine={null}
+      />
+    )
+    expect(canvas().style.getPropertyValue('mask-image')).toBe('')
+  })
+
   it('ties the lead line to the lead', () => {
     reduced = true
     render(

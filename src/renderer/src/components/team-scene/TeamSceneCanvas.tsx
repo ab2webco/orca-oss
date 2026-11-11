@@ -44,6 +44,8 @@ type Props = {
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
 const ADVISOR_BUBBLE_MS = 6000
 const NO_RECTS: readonly TeamSceneRect[] = []
+const CAPPED_EDGE_FADE =
+  'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
 
 /** `bottom`: where its alert mark ends, below the tag at `top`. */
 type TeamSceneAsker = { key: string; name: string; x: number; top: number; bottom: number }
@@ -106,6 +108,11 @@ export function TeamSceneCanvas({
         canvas.height = Math.round(height * ratio)
       }
       stepTeamScene(world, dt, { width, elapsed })
+      // Why a fade only when capped: the stage then shows its art whole, and the art's own edge
+      // would cut a prop in half; under the cap the art is a central crop and needs none.
+      const room = canvas.parentElement?.parentElement?.clientWidth ?? width
+      const capped = painter.maxWidth !== undefined && room > painter.maxWidth
+      canvas.style.setProperty('mask-image', capped ? CAPPED_EDGE_FADE : '')
       drainTeamSceneBoarded(world).forEach((rider) => onBoardedRef.current?.(rider))
       const g = canvas.getContext('2d')
       if (!g) {
