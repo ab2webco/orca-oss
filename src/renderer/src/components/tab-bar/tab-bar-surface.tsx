@@ -13,6 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { NewTabMenuSections } from './NewTabMenuSections'
 import TabBarCreateEntry from './TabBarCreateEntry'
 import { TabStripScrollIndicator } from './TabStripScrollIndicator'
+import { TabStripHiddenTabsMenu } from './TabStripHiddenTabsMenu'
+import { activateTabBarItem, tabsBesideActive } from './tab-strip-hidden-tabs'
 import { getTabStripScrollMaskClassName } from './tab-strip-scroll-metrics'
 import type { useTabStripOverflowNavigation } from './tab-strip-overflow-navigation'
 import type { useTabStripDragScrollHandlers } from './tab-strip-drag-scroll'
@@ -20,7 +22,7 @@ import type { TabBarProps } from './tab-bar-props'
 import type { TabBarRuntimeModel } from './use-tab-bar-runtime-model'
 import type { TabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
 import type { TabBarItemProjection } from './use-tab-bar-item-projection'
-import type { TabBarItem } from './tab-bar-item-model'
+import { getTabDragLabel, type TabBarItem } from './tab-bar-item-model'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { renderTabBarStaticCreateMenu } from './tab-bar-static-create-menu'
 
@@ -88,7 +90,7 @@ export function renderTabBarSurface({
     queueFocusAfterNewTabMenuClose,
     showStaticCreateMenuItems
   } = createMenu
-  const { orderedItems, sortableIds, dropIndicatorByVisibleId } = itemProjection
+  const { orderedItems, sortableIds, dropIndicatorByVisibleId, activeVisibleTabId } = itemProjection
   const { tabStripRef, tabStripOverflowState, scrollTabStrip } = tabStripNavigation
   const includeTopTabBorder = tabStripChrome !== 'floating-panel'
   const renderedItems = renderTabBarItems({
@@ -200,6 +202,19 @@ export function renderTabBarSurface({
             {translate('auto.components.tab.bar.TabBar.232e075b07', 'Scroll tabs right')}
           </TooltipContent>
         </Tooltip>
+      ) : null}
+      {tabStripOverflowState.hasOverflow ? (
+        <TabStripHiddenTabsMenu
+          tabs={tabsBesideActive(orderedItems, activeVisibleTabId, (item) =>
+            getTabDragLabel(item, runtime.generatedTabTitlesEnabled)
+          ).map(({ item, label }) => ({ id: item.id, label }))}
+          onSelect={(id) => {
+            const item = orderedItems.find((one) => one.id === id)
+            if (item) {
+              activateTabBarItem(item, props)
+            }
+          }}
+        />
       ) : null}
       <DropdownMenu
         open={newTabMenuOpen}

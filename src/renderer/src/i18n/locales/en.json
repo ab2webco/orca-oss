@@ -17527,6 +17527,11 @@
     "title": "{{context}} - {{agent}} asks you",
     "body": "Open the Inbox to answer."
   },
+  "tabStrip": {
+    "hiddenTabs": "{{count}} more tabs",
+    "hiddenTabs_one": "{{count}} more tab",
+    "hiddenTabs_other": "{{count}} more tabs"
+  },
   "newTabMenu": {
     "account": {
       "inUseBy": "In use by {{value}}",
