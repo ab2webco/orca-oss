@@ -4,6 +4,8 @@ import {
   paintFiguresBackdrop,
   paintFiguresCloud
 } from './team-scene-figures-backdrop'
+import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { drawCastlePile, drawCastleSite, drawCastleTrophies } from './team-scene-castle-sites'
 import { drawFigure } from './team-scene-figure-draw'
 import { figureLookOf } from './team-scene-figure-looks'
 import type { TeamSceneFrame, TeamScenePainter } from './team-scene-painter'
@@ -45,9 +47,19 @@ export function createFiguresPainter(colors: TeamSceneStatusColors): TeamScenePa
       const { width: w, height: h } = f
       g.drawImage(backdrop.get(w, h, f.ratio), 0, 0, w, h)
       drawFiguresSky(g, cloud.get(240, 70, 2), w, h, f.t)
-      for (const spot of f.stations) {
-        const s = teamSceneScaleAt(spot.depth)
-        drawStation(g, spot.x * w + 18 * s, feetY(spot.depth, h), s)
+      drawCastleTrophies(g, f.trophies.length, w, feetY(0, h) - 14, f.t)
+      if (f.sites.length === 0) {
+        for (const spot of f.stations) {
+          const s = teamSceneScaleAt(spot.depth)
+          drawStation(g, spot.x * w + 18 * s, feetY(spot.depth, h), s)
+        }
+      }
+      for (const site of f.sites) {
+        const s = teamSceneScaleAt(site.spot.depth)
+        const y = feetY(site.spot.depth, h)
+        const seatX = site.spot.x - SITE_FROM_SEAT_X
+        drawCastlePile(g, (seatX - PILE_FROM_SEAT_X) * w, y, s)
+        drawCastleSite(g, site.spot.x * w, y, s, site, f.t)
       }
       effects.start(f.effects, f.actors, h)
       for (const a of f.actors) {

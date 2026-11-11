@@ -1,4 +1,5 @@
 import type { TeamAgentFacts, TeamPanelGameModel } from '../team-panel-model-types'
+import { teamSceneSiteOf } from './team-scene-sites'
 import type { TeamSceneActivity, TeamSceneAgentInput, TeamSceneInput } from './team-scene-types'
 
 // Why not status 'attention': it also means failed, and a failed member has nothing to ask.
@@ -33,7 +34,8 @@ export function teamSceneInputOf(
     members: model.members.map((m) => ({
       ...agentOf(m, m.needsYou),
       reportId: m.summary,
-      mergedPr: m.pr?.state === 'merged' ? m.pr.number : null
+      mergedPr: m.pr?.state === 'merged' ? m.pr.number : null,
+      site: teamSceneSiteOf(m)
     }))
   }
 }

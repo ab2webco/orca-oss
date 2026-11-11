@@ -175,6 +175,21 @@ function getPendingRowsKey(rows: readonly Extract<Row, { type: 'header' }>[]): s
     .join('\0')
 }
 
+// Why: V30 draws orgs and projects at their host's level, so the host is the only outer step.
+function flatUnderHost(row: Row): Row {
+  if (row.type === 'header') {
+    return row.projectGroupDepth ? { ...row, projectGroupDepth: 0 } : row
+  }
+  if (row.type === 'item') {
+    return row.groupDepth ? { ...row, groupDepth: 0 } : row
+  }
+  // Why 1: a folder workspace's depth counts its own folder group, which now sits at 0.
+  if (row.type === 'folder-workspace') {
+    return row.groupDepth > 1 ? { ...row, groupDepth: 1 } : row
+  }
+  return row
+}
+
 export function addHostSectionRows(args: {
   rows: readonly Row[]
   hostOptions: readonly HostSectionOption[]
@@ -314,7 +329,7 @@ export function addHostSectionRows(args: {
       worktreeIds
     })
     if (!collapsed) {
-      result.push(...hostRows)
+      result.push(...hostRows.map(flatUnderHost))
     }
   }
 

@@ -17,6 +17,8 @@ vi.mock('expo-router', async () => {
 
 import { useFollowHostTerminalOpen } from './use-follow-host-terminal-open'
 
+let openTerminal: ReturnType<typeof useFollowHostTerminalOpen> | null = null
+
 const memberTab = {
   type: 'terminal',
   id: 'tab-member-mobile',
@@ -34,7 +36,7 @@ function Harness(props: {
   sessionTabs: MobileSessionTab[]
   selectTab: (tab: MobileSessionTab) => void
 }): null {
-  useFollowHostTerminalOpen({
+  openTerminal = useFollowHostTerminalOpen({
     hostId: 'host-1',
     ...props,
     routeTerminal: props.routeTerminal,
@@ -137,6 +139,18 @@ describe('useFollowHostTerminalOpen', () => {
       sessionTabs: [{ ...memberTab }]
     })
     expect(selectTab).toHaveBeenCalledTimes(1)
+    expect(selectTab).toHaveBeenCalledWith(memberTab)
+  })
+
+  // Why: a Team card opens a member the way the host's View does, back returning to the lead.
+  it("opens a Team card's member the same way, by its tab when it has no handle", () => {
+    render({ worktreeId: 'wt-lead', sessionTabs: [memberTab] })
+    act(() => openTerminal?.({ worktreeId: 'wt-member', tabId: 'tab-member', terminal: null }))
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/h/[hostId]/session/[worktreeId]',
+      params: { hostId: 'host-1', worktreeId: 'wt-member', tab: 'tab-member' }
+    })
+    act(() => openTerminal?.({ worktreeId: 'wt-lead', tabId: 'tab-member', terminal: null }))
     expect(selectTab).toHaveBeenCalledWith(memberTab)
   })
 })
