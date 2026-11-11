@@ -2200,8 +2200,8 @@
       },
       "UpdateCard": {
         "68b235d264": "Reiniciar para actualizar",
-        "6714206e5a": "Orca Lab v{{value0}} se descargó. Reinicia cuando estés listo.",
-        "93794ea932": "Orca Lab v{{value0}} se está descargando.",
+        "6714206e5a": "Orca Lab v{{value0}} se descargó. Reinicia cuando estés listo.",
+        "93794ea932": "Orca Lab v{{value0}} se está descargando.",
         "8acbdd3961": "Minimizar a la barra de estado",
         "17412483da": "Listo para instalar",
         "47126bcf57": "Descargar manualmente",
@@ -2858,7 +2858,7 @@
           "picker": {
             "ebcf6ba29e": "Color hexadecimal no válido.",
             "faa855a582": "Hex",
-            "1cec618bcc": "{{value0}} selector"
+            "1cec618bcc": "{{value0}} selector"
           }
         },
         "dialog": {
@@ -3063,7 +3063,7 @@
             "drop": {
               "handler": {
                 "1e072f611e": "No se pudo subir {{value0}} {{value1}}.",
-                "53f015fd85": "Se omitió {{value0}} symlink{{value1}}.",
+                "53f015fd85": "Se omitió {{value0}} symlink{{value1}}.",
                 "29c031b49a": "Subiendo {{value0}} archivo{{value1}} al host…",
                 "0c77693641": "El worktree no está listo; inténtalo de nuevo en un momento.",
                 "ce8248b835": "Ruta del worktree no disponible.",
@@ -3514,9 +3514,9 @@
             "68efc0345c": "gemini",
             "76b06d4da5": "claude",
             "a28a5dd9b1": "error",
-            "cd9d7b40ff": "Reiniciar {{value0}} sesiones",
+            "cd9d7b40ff": "Reiniciar {{value0}} sesiones",
             "6cd6650b4c": "Reiniciar sesión",
-            "1446d0d8a0": "{{value0}} sesiones de Codex siguen en la cuenta anterior.",
+            "1446d0d8a0": "{{value0}} sesiones de Codex siguen en la cuenta anterior.",
             "605901a495": "1 sesión de Codex sigue en la cuenta anterior",
             "5e5f9f5160": "1 reset de rate limit disponible",
             "5ecae9197c": "{{value0}} resets de rate limit disponibles",
@@ -3640,7 +3640,7 @@
             "1fce91d1b9": "Parada",
             "d254f04097": "cancelado",
             "265d956765": "{{value0}}. Puedes salir de esta página.",
-            "d595295d7d": "{{value0}} se puede recuperar de worktrees vinculados.",
+            "d595295d7d": "{{value0}} se puede recuperar de worktrees vinculados.",
             "34174bd83d": "{{value0}}. Puedes salir de esta página; el último resultado permanece visible.",
             "433bb7f595": "OK",
             "0ba046fbc5": "El escaneo falló.",
@@ -3735,9 +3735,9 @@
           "RemoteServerUpdateStatusSegment": {
             "updating": "Updating {{value0}}/{{value1}}",
             "updatingTooltip": "Remote Orca Lab Server updates are in progress",
-            "failed": "{{value0}} server updates failed",
+            "failed": "{{value0}} server updates failed",
             "failedTooltip": "Open Remote Orca Lab Server updates to review and retry",
-            "updated": "{{value0}} servers updated",
+            "updated": "{{value0}} servers updated",
             "updatedTooltip": "Remote Orca Lab Server updates completed",
             "failedOne": "1 server update failed",
             "updatedOne": "1 server updated"
@@ -3768,11 +3768,11 @@
           "SkillUpdateStatusSegment": {
             "runningLabel": "Updating skills",
             "runningOne": "Updating {{value0}}…",
-            "runningMany": "Updating {{value0}} skills…",
+            "runningMany": "Updating {{value0}} skills…",
             "runningAria": "Skills updating. Click to open details.",
             "successLabel": "Skills updated",
             "successOne": "Updated {{value0}}",
-            "successMany": "Updated {{value0}} skills",
+            "successMany": "Updated {{value0}} skills",
             "successAria": "Skills updated. Click to open details.",
             "errorLabel": "Update failed",
             "errorTooltip": "Skill update failed — click to see details",
@@ -4052,7 +4052,7 @@
               "9365b14a4e": "Nueva entrada",
               "3de9bf87fc": "Aún no hay modelo",
               "6762f6a682": "tokens",
-              "a7f937fb29": "{{value0}} sesiones - {{value1}} {{value2}}",
+              "a7f937fb29": "{{value0}} sesiones - {{value1}} {{value2}}",
               "c8f3a2d1e0b4": "turnos",
               "d9a4b3e2f1c5": "eventos"
             }
@@ -4118,7 +4118,7 @@
       "skills": {
         "SkillFreshnessNudge": {
           "titleOne": "Una skill de Orca Lab instalada está desactualizada",
-          "titleMany": "{{value0}} skills de Orca Lab instaladas están desactualizadas",
+          "titleMany": "{{value0}} skills de Orca Lab instaladas están desactualizadas",
           "updateOne": "Actualizar skill",
           "updateMany": "Actualizar skills",
           "description": "Actualiza {{value0}} para que los Agents sigan las instrucciones actuales de esta versión de Orca Lab."
@@ -4174,19 +4174,19 @@
           "checking": "Comprobando las skills de Orca Lab instaladas…",
           "none": "No se encontraron skills de Orca Lab instaladas.",
           "updateOne": "Se puede actualizar 1 skill de forma segura",
-          "updateMany": "Se pueden actualizar {{value0}} skills de forma segura",
+          "updateMany": "Se pueden actualizar {{value0}} skills de forma segura",
           "success": "Todas las skills de Orca Lab instaladas están actualizadas.",
           "attention": "Algunas skills de Orca Lab instaladas no se pueden actualizar automáticamente.",
           "checkNow": "Comprobar ahora",
           "close": "Cerrar",
           "blockedOne": "1 skill can't be updated automatically.",
-          "blockedMany": "{{value0}} skills can't be updated automatically.",
+          "blockedMany": "{{value0}} skills can't be updated automatically.",
           "runningOne": "Updating 1 skill…",
-          "runningMany": "Updating {{value0}} skills…",
+          "runningMany": "Updating {{value0}} skills…",
           "runningDescription": "You can close this window — it keeps running in the background.",
           "progressAria": "Updating skills",
           "updatedOne": "Updated 1 skill",
-          "updatedMany": "Updated {{value0}} skills",
+          "updatedMany": "Updated {{value0}} skills",
           "updatedPartial": "Updated {{value0}} of {{value1}} skills",
           "errorTitle": "The update didn't finish",
           "retry": "Retry",
@@ -4195,7 +4195,7 @@
           "showLog": "Show log",
           "updating": "Updating…",
           "updateActionOne": "Update 1 skill",
-          "updateActionMany": "Update {{value0}} skills",
+          "updateActionMany": "Update {{value0}} skills",
           "done": "Done",
           "stop": "Stop",
           "stopping": "Stopping…",
@@ -5388,7 +5388,7 @@
         "AddRemoteHostDialog": {
           "sshHostRequired": "Se requiere un host o alias de configuración SSH.",
           "sshPortInvalid": "El puerto debe estar entre 1 y 65535.",
-          "sshRelayGraceInvalid": "El tiempo de espera del terminal debe estar entre 60 y {{value0}} segundos.",
+          "sshRelayGraceInvalid": "El tiempo de espera del terminal debe estar entre 60 y {{value0}} segundos.",
           "sshSaved": "Se agregó el host SSH.",
           "sshSaveFailed": "No se pudo agregar el host SSH.",
           "serverFieldsRequired": "Se requieren el nombre del servidor y el código de emparejamiento.",
@@ -5475,17 +5475,17 @@
           "01d6b7c64e": "Termina todos los paneles de terminal en ejecución y reinicia el proceso del servicio. Los paneles muestran \"Process exited\" y se pueden volver a abrir inmediatamente. Se conservan las sesiones de protocolo heredado de una versión anterior de la app. Esto no se puede deshacer.",
           "922548bc66": "¿Reiniciar el servicio del terminal?",
           "2b4efdc162": "No se pudieron finalizar las sesiones.",
-          "d18f3005c2": "{{value0}} sesión{{value1}} se negó a salir.",
+          "d18f3005c2": "{{value0}} sesión{{value1}} se negó a salir.",
           "baad8cd651": "No hay sesiones en ejecución.",
           "fe2ab66d45": "Se terminaron {{value0}} de {{value1}} sesiones. {{value2}} se negó a salir.",
           "d762b41f41": "El reinicio falló.",
           "b5954e12d3": "Error al reiniciar — revisa los logs.",
           "0e9da1b98e": "Servicio reiniciado.",
-          "d6372cc797": "Se terminó {{value0}} sesión{{value1}}.",
-          "87412c2a68": "Se terminó {{value0}} sesión.",
-          "a2f040ac1c": "Se terminaron {{value0}} sesiones.",
-          "63520148e2": "La sesión {{value0}} se negó a salir.",
-          "cc0a26cb14": "{{value0}} sesiones se negaron a salir.",
+          "d6372cc797": "Se terminó {{value0}} sesión{{value1}}.",
+          "87412c2a68": "Se terminó {{value0}} sesión.",
+          "a2f040ac1c": "Se terminaron {{value0}} sesiones.",
+          "63520148e2": "La sesión {{value0}} se negó a salir.",
+          "cc0a26cb14": "{{value0}} sesiones se negaron a salir.",
           "71a8d342b0": "Pestañas de terminal ausentes: {{value0}}/{{value1}}. Intentos de cierre fallidos: {{value2}}. Solicitudes de apagado PTY exactas aceptadas: {{value3}}; fallidas: {{value4}}.",
           "2e57c1a940": "El resultado del apagado del daemon no está verificado porque su solicitud de gestión falló.",
           "993af6052c": "La gestión del daemon reportó salida: {{value0}}/{{value1}}; aún presente antes de la limpieza exacta: {{value2}}.",
@@ -7546,7 +7546,7 @@
           "2227ce47b6": "No se pudo guardar el destino",
           "f602009125": "Destino agregado",
           "b4ba0ce33d": "Destino actualizado",
-          "3879cbaa52": "El tiempo de espera del terminal debe estar entre 60 y {{value0}} segundos, o mantener los terminales activos hasta restablecer.",
+          "3879cbaa52": "El tiempo de espera del terminal debe estar entre 60 y {{value0}} segundos, o mantener los terminales activos hasta restablecer.",
           "4db9afce1c": "El puerto debe estar entre 1 y 65535",
           "0e5aa04161": "Se requiere un host o alias de configuración SSH",
           "f1fc50dad2": "No se pudieron cargar destinos SSH",
@@ -8926,7 +8926,7 @@
               "d5c5b47bb9": "actualizar",
               "fb854902d9": "conectando",
               "9a9f8d4910": "Conecta Jira Cloud para explorar, crear y vincular issues.",
-              "74f3063026": "{{value0}} sitio{{value1}} con conexión"
+              "74f3063026": "{{value0}} sitio{{value1}} con conexión"
             }
           }
         },
@@ -9781,7 +9781,7 @@
                 "60996beda6": "Agregar sitio de Jira",
                 "7ca5ffffdb": "Explora, crea y empieza a trabajar desde issues de Jira Cloud.",
                 "a1093a06c7": "Comprobando el acceso a Jira antes de mostrar las acciones de configuración.",
-                "9fa04a032e": "Conexión completada para {{value0}} sitio{{value1}}",
+                "9fa04a032e": "Conexión completada para {{value0}} sitio{{value1}}",
                 "cef18762a2": "Agrega acceso con una clave API personal desde tus ajustes de Linear. Las claves de acceso completo pueden ver todos los equipos a los que puede acceder el propietario de la clave.",
                 "6224fe9d34": "Cada workspace de Linear conectado tiene una clave almacenada por el runtime activo. Las claves de acceso completo pueden cubrir todos los equipos a los que puede acceder el propietario de la clave; las claves restringidas se pueden reemplazar en cualquier momento.",
                 "1a12e33fe5": "Agregar acceso a Linear",
@@ -9870,8 +9870,8 @@
           "remoteServerCredentials": "Las credenciales y comprobaciones de cuenta de este proveedor pertenecen a este servidor remoto. Usa Configuración > Servidores Orca Lab remotos > Avanzado para editar otro ámbito de runtime predeterminado.",
           "localMac": "Local Mac",
           "localCredentials": "Las credenciales y comprobaciones de cuenta de este proveedor pertenecen a este cliente de escritorio. Usa Configuración > Servidores Orca Lab remotos > Avanzado para editar credenciales propiedad del servidor.",
-          "remoteServerRateLimit": "El presupuesto de API de {{value0}} se obtiene desde la CLI en este servidor remoto. Usa Configuración > Servidores Orca Lab remotos > Avanzado para ver otro presupuesto de runtime predeterminado.",
-          "localRateLimit": "El presupuesto de API de {{value0}} se obtiene desde la CLI en este cliente de escritorio. Usa Configuración > Servidores Orca Lab remotos > Avanzado para ver presupuestos propiedad del servidor."
+          "remoteServerRateLimit": "El presupuesto de API de {{value0}} se obtiene desde la CLI en este servidor remoto. Usa Configuración > Servidores Orca Lab remotos > Avanzado para ver otro presupuesto de runtime predeterminado.",
+          "localRateLimit": "El presupuesto de API de {{value0}} se obtiene desde la CLI en este cliente de escritorio. Usa Configuración > Servidores Orca Lab remotos > Avanzado para ver presupuestos propiedad del servidor."
         },
         "settingOwnership": {
           "clientDefault": "Predeterminado del cliente",
@@ -10284,7 +10284,7 @@
           "empty": "No paired Remote Orca Lab Servers.",
           "checkAgain": "Check again",
           "updating": "Updating servers…",
-          "updateAll": "Update {{value0}} servers",
+          "updateAll": "Update {{value0}} servers",
           "noUpdates": "No updates available",
           "updateOne": "Update server",
           "downloadProgress": "{{value0}} download progress",
@@ -10454,7 +10454,7 @@
           "panelsOne": "1 panel",
           "panels": "{{value0}} paneles",
           "eventsOne": "1 event subscription",
-          "events": "{{value0}} suscripciones a eventos",
+          "events": "{{value0}} suscripciones a eventos",
           "worker": "Proceso en segundo plano",
           "versionLine": "v{{value0}} · {{value1}}",
           "includes": "Incluye",
@@ -12337,7 +12337,7 @@
             "jumpToWorktree": "Saltar al worktree",
             "recoverableBadge": "No guardada",
             "subagentCountSingular": "1 subagente",
-            "subagentCountPlural": "{{value0}} subagentes",
+            "subagentCountPlural": "{{value0}} subagentes",
             "delete": "Eliminar",
             "deleteReasonNonLocalHost": "Solo se pueden eliminar las sesiones de este dispositivo.",
             "deleteReasonSyntheticPath": "Esta sesión no se puede eliminar desde Orca Lab.",
@@ -15330,7 +15330,7 @@
         "failingChip": "{{value0}} fallando",
         "pendingChip": "{{value0}} pendiente",
         "needsActionChip": "{{value0}} requiere acción",
-        "unresolvedChip": "{{value0}} sin resolver"
+        "unresolvedChip": "{{value0}} sin resolver"
       },
       "PlaneWorkItemWorkspace": {
         "addAssignee": "+ Asignado",
@@ -15461,7 +15461,7 @@
       },
       "plugins": {
         "PluginPendingApprovalNotice": {
-          "updateTitle": "{{value0}} se actualizó y necesita tu aprobación otra vez",
+          "updateTitle": "{{value0}} se actualizó y necesita tu aprobación otra vez",
           "installTitle": "{{value0}} está esperando tu aprobación",
           "updateDescription": "La nueva versión cambió lo que declara el plugin, así que queda apagado hasta que lo revises. Mientras tanto aquí no se ejecuta nada.",
           "installDescription": "Revisa qué puede hacer este plugin antes de que se ejecute por primera vez. Mientras tanto aquí no se ejecuta nada.",
@@ -15799,7 +15799,7 @@
           "checkingGitRow": "Comprobando el estado de git",
           "openWorkspaceNamed": "Abrir {{value0}}",
           "openWorkspace": "Abrir espacio de trabajo",
-          "selectedCount": "{{value0}} seleccionados",
+          "selectedCount": "{{value0}} seleccionados",
           "measuringSizesProgress": "Escaneando {{value0}}/{{value1}}",
           "measuringSizes": "Escaneando tamaños",
           "measureSizes": "Escanear",
@@ -15940,7 +15940,7 @@
           "multipleErrors": "No se pudieron comprobar {{value0}} repositorios ({{value1}}{{value2}}). Puede que falten espacios de trabajo. Actualizá para reintentar.",
           "noWorkspaces": "No se encontraron espacios de trabajo.",
           "readyOneOne": "1 espacio de trabajo encontrado, con 1 sugerencia de limpieza.",
-          "readyOneMany": "1 espacio de trabajo encontrado, con {{value0}} sugerencias de limpieza.",
+          "readyOneMany": "1 espacio de trabajo encontrado, con {{value0}} sugerencias de limpieza.",
           "readyManyOne": "{{value0}} espacios de trabajo encontrados, con 1 sugerencia de limpieza.",
           "readyManyMany": "{{value0}} espacios de trabajo encontrados, con {{value1}} sugerencias de limpieza.",
           "fallbackRepository": "un repositorio",
