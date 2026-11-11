@@ -10,6 +10,8 @@ export type TeamSceneBubbleRequest = {
   yields?: boolean
   /** The lead standing by an asking member: its tail may pass behind a tag when nothing else fits. */
   attending?: boolean
+  /** Its size on one line, for an attending lead whose full line finds no spot; it clamps to it. */
+  oneLine?: { width: number; height: number }
 }
 
 /** Something on stage a bubble must not cover, such as an asking member's tag. */
@@ -23,6 +25,8 @@ export type TeamSceneBubbleBox = {
   height: number
   /** Where the tail meets the bubble, from its left edge; it drops straight onto the speaker. */
   tailX: number
+  /** Laid out on one line, so the bubble shows it clamped with an ellipsis. */
+  clamped?: true
 }
 
 const EDGE = 6
@@ -34,6 +38,8 @@ const TAIL_INSET = 10
 const END_REACH = 14
 // A cloud narrowed to share a row may wrap one more line, up to its two-line clamp.
 const EXTRA_LINE = 13
+// How far a tail stops short of a tag it passes behind.
+const TAIL_CLEAR = 1
 
 const overlaps = (a: TeamSceneRect, b: TeamSceneRect): boolean =>
   a.left < b.left + b.width + GAP &&
@@ -86,47 +92,20 @@ function placeBubbles(
   const obstacles = opts.obstacles ?? []
   const placed: Placed[] = []
   for (const r of requests) {
-    const preferred =
-      r.align === 'end' ? r.anchor.x - r.width + END_REACH : r.anchor.x - r.width / 2
-    const maxLeft = scene.width - r.width - EDGE
-    const left = Math.max(EDGE, Math.min(maxLeft, preferred))
-    const lefts = [
-      left,
-      ...obstacles
-        .flatMap((o) => [o.left + o.width + GAP, o.left - GAP - r.width])
-        .filter((one) => one >= EDGE && one <= maxLeft)
-    ]
-    const tops = [
-      r.anchor.top - r.height - LIFT,
-      ...placed.map((p) => p.box.top - r.height - GAP),
-      ...obstacles.map((o) => o.top - r.height - GAP)
-    ]
-    // Why climbing first: a bubble stepped aside stays low and can block the next one's tail.
-    const candidates = lefts
-      .flatMap((at) =>
-        tops.map(
-          (top): Placed => ({
-            box: {
-              key: r.key,
-              left: at,
-              top,
-              width: r.width,
-              height: r.height,
-              tailX: r.anchor.x - at
-            },
-            anchorTop: r.anchor.top
-          })
-        )
+    const fitOf = (req: TeamSceneBubbleRequest): Placed | undefined => {
+      const candidates = candidatesOf(req, scene, placed, obstacles)
+      // Why behind a tag only as a last resort: the lead stands under the tag of the member it attends.
+      return (
+        candidates.find((c) => clearOf(c, placed, obstacles)) ??
+        (req.attending
+          ? candidates.find((c) => clearOf(c, placed, obstacles, { tailBehindTags: true }))
+          : undefined)
       )
-      .filter(
-        (c) => c.box.top >= 0 && c.box.tailX >= TAIL_INSET && c.box.tailX <= r.width - TAIL_INSET
-      )
-    // Why behind a tag only as a last resort: the lead stands under the tag of the member it attends.
-    const fit =
-      candidates.find((c) => clearOf(c, placed, obstacles)) ??
-      (r.attending
-        ? candidates.find((c) => clearOf(c, placed, obstacles, { tailBehindTags: true }))
-        : undefined)
+    }
+    const full = fitOf(r)
+    // Why one line next: by an asker on a narrow stage two lines have no room, and the card has it all.
+    const short = !full && r.attending && r.oneLine ? fitOf({ ...r, ...r.oneLine }) : undefined
+    const fit = full ?? (short && { ...short, box: { ...short.box, clamped: true as const } })
     if (fit) {
       placed.push(fit)
       continue
@@ -137,6 +116,49 @@ function placeBubbles(
     }
   }
   return placed.map((p) => p.box)
+}
+
+/** Every spot a bubble may take, above its speaker or stepped aside, with its tail on the speaker. */
+function candidatesOf(
+  r: TeamSceneBubbleRequest,
+  scene: { width: number; height: number },
+  placed: readonly Placed[],
+  obstacles: readonly TeamSceneRect[]
+): Placed[] {
+  const preferred = r.align === 'end' ? r.anchor.x - r.width + END_REACH : r.anchor.x - r.width / 2
+  const maxLeft = scene.width - r.width - EDGE
+  const left = Math.max(EDGE, Math.min(maxLeft, preferred))
+  const lefts = [
+    left,
+    ...obstacles
+      .flatMap((o) => [o.left + o.width + GAP, o.left - GAP - r.width])
+      .filter((one) => one >= EDGE && one <= maxLeft)
+  ]
+  const tops = [
+    r.anchor.top - r.height - LIFT,
+    ...placed.map((p) => p.box.top - r.height - GAP),
+    ...obstacles.map((o) => o.top - r.height - GAP)
+  ]
+  // Why climbing first: a bubble stepped aside stays low and can block the next one's tail.
+  return lefts
+    .flatMap((at) =>
+      tops.map(
+        (top): Placed => ({
+          box: {
+            key: r.key,
+            left: at,
+            top,
+            width: r.width,
+            height: r.height,
+            tailX: r.anchor.x - at
+          },
+          anchorTop: r.anchor.top
+        })
+      )
+    )
+    .filter(
+      (c) => c.box.top >= 0 && c.box.tailX >= TAIL_INSET && c.box.tailX <= r.width - TAIL_INSET
+    )
 }
 
 const clearOf = (
@@ -206,3 +228,45 @@ function besideOf(
     ? { moved, other, added }
     : null
 }
+
+/** The stretches of a bubble's tail left to draw: the parts that run behind a tag are not. */
+export function teamSceneTailRunsOf(
+  box: TeamSceneBubbleBox,
+  anchorTop: number,
+  obstacles: readonly TeamSceneRect[]
+): { from: number; to: number }[] {
+  const x = box.left + box.tailX
+  // Why a px clear each side: the tag is measured where the tail is drawn, a fraction of a px apart.
+  const cuts = obstacles
+    .filter((o) => x >= o.left - TAIL_CLEAR && x <= o.left + o.width + TAIL_CLEAR)
+    .map((o) => ({ from: o.top - TAIL_CLEAR, to: o.top + o.height + TAIL_CLEAR }))
+    .sort((a, b) => a.from - b.from)
+  const runs: { from: number; to: number }[] = []
+  let at = box.top + box.height
+  for (const cut of cuts) {
+    if (cut.to <= at || cut.from >= anchorTop) {
+      continue
+    }
+    if (cut.from > at) {
+      runs.push({ from: at, to: cut.from })
+    }
+    at = Math.max(at, cut.to)
+  }
+  if (at < anchorTop) {
+    runs.push({ from: at, to: anchorTop })
+  }
+  return runs
+}
+
+/** Whether a square cell of a drawn cloud, in scene px, lies over a tag (touching is not). */
+export const teamSceneCellUnder = (
+  cell: { x: number; y: number; size: number },
+  obstacles: readonly TeamSceneRect[]
+): boolean =>
+  obstacles.some(
+    (o) =>
+      cell.x < o.left + o.width &&
+      o.left < cell.x + cell.size &&
+      cell.y < o.top + o.height &&
+      o.top < cell.y + cell.size
+  )
