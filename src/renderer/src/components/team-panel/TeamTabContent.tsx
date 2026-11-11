@@ -9,7 +9,7 @@ import type {
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
 import { teamLeadLiveText, teamModelText } from './team-card-text'
-import { TeamHostName } from './TeamHostName'
+import { TeamHostTag } from './TeamHostTag'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
@@ -61,12 +61,7 @@ function LeadCardRow({
               <Crown data-crown="" className="size-3" aria-hidden="true" />
               {translate('teamPanel.lead.badge', 'Lead')}
             </span>
-            <span
-              data-team-host=""
-              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
-            >
-              <TeamHostName host={lead.host} />
-            </span>
+            <TeamHostTag host={lead.host} />
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <TeamStatusMark status={lead.status} />
