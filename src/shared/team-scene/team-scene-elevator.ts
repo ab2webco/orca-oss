@@ -11,9 +11,21 @@ export type TeamSceneRide = 'away' | { guest: string }
 
 const elevator = (lead: TeamSceneBody): TeamSceneSpot => ({ x: ELEVATOR_X, depth: lead.depth })
 
-// Why in front and to one side: the visiting lead stands by the member's desk, never over it.
-const besideOf = (member: TeamSceneBody): TeamSceneSpot => {
-  const side = member.home.x + BESIDE.x > 0.92 ? -1 : 1
+const neighbourOn = (world: TeamSceneWorld, member: TeamSceneBody, side: 1 | -1): boolean =>
+  [...world.bodies.values()].some(
+    (other) =>
+      other !== member &&
+      other.role === 'member' &&
+      Math.abs(other.home.depth - member.home.depth) < BESIDE.depth &&
+      (other.home.x - member.home.x) * side > 0 &&
+      Math.abs(other.home.x - member.home.x) < 2 * BESIDE.x + 0.04
+  )
+
+// Why in front and on the free side: the visiting lead stands by the member's desk, never over it
+// or the neighbour's, which on the default panel's 195 px floor sits a figure away.
+const besideOf = (world: TeamSceneWorld, member: TeamSceneBody): TeamSceneSpot => {
+  const edge = member.home.x + BESIDE.x > 0.92
+  const side = edge || (neighbourOn(world, member, 1) && !neighbourOn(world, member, -1)) ? -1 : 1
   return { x: member.home.x + side * BESIDE.x, depth: member.home.depth + BESIDE.depth }
 }
 
@@ -53,7 +65,7 @@ export function stepTeamSceneRide(world: TeamSceneWorld): boolean {
     lead.hidden = undefined
     const member = world.bodies.get(ride.guest)
     if (member) {
-      lead.target = besideOf(member)
+      lead.target = besideOf(world, member)
     }
     return true
   }
@@ -87,7 +99,7 @@ export function settleTeamSceneRide(world: TeamSceneWorld): void {
     world.bodies.delete('lead')
   } else if (typeof ride === 'object' && ride !== null) {
     const member = world.bodies.get(ride.guest)
-    const spot = member ? besideOf(member) : elevator(lead)
+    const spot = member ? besideOf(world, member) : elevator(lead)
     Object.assign(lead, { x: spot.x, depth: spot.depth, target: spot, hidden: undefined })
   } else if (ride === 'away') {
     // Why in the elevator: the next step keeps a lead hidden only once it stands there.
