@@ -670,18 +670,20 @@ describe('team scene director, the lead riding between floors', () => {
     }
   )
 
-  it("stands on the side of its member away from a neighbour's desk, so it covers no one", () => {
-    const away = createTeamSceneWorld()
-    const there = {
-      ...input([member('b', { activity: 'needsYou' }), member('c')]),
-      leadless: true as const
+  it("stands on its member's right, clear of the needs-you mark left of the monitor", () => {
+    for (const keys of [
+      ['b', 'c'],
+      ['c', 'b']
+    ]) {
+      const away = createTeamSceneWorld()
+      const there = {
+        ...input(keys.map((k) => member(k, k === 'b' ? { activity: 'needsYou' } : {}))),
+        leadless: true as const
+      }
+      applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
+      run(away, 20, 195)
+      expect(actor(away, 'lead')!.x, keys.join()).toBeGreaterThan(away.bodies.get('b')!.home.x)
     }
-    applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
-    run(away, 20, 195)
-    const guest = actor(away, 'lead')!
-    const b = away.bodies.get('b')!.home
-    const c = away.bodies.get('c')!.home
-    expect(Math.sign(guest.x - b.x)).toBe(-Math.sign(c.x - b.x))
   })
 
   it('places a ride at once under reduced motion: the guest beside its member, the away lead gone', () => {

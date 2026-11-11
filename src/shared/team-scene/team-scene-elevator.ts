@@ -11,23 +11,14 @@ export type TeamSceneRide = 'away' | { guest: string }
 
 const elevator = (lead: TeamSceneBody): TeamSceneSpot => ({ x: ELEVATOR_X, depth: lead.depth })
 
-const neighbourOn = (world: TeamSceneWorld, member: TeamSceneBody, side: 1 | -1): boolean =>
-  [...world.bodies.values()].some(
-    (other) =>
-      other !== member &&
-      other.role === 'member' &&
-      Math.abs(other.home.depth - member.home.depth) < BESIDE.depth &&
-      (other.home.x - member.home.x) * side > 0 &&
-      Math.abs(other.home.x - member.home.x) < 2 * BESIDE.x + 0.04
-  )
-
-// Why in front and on the free side: the visiting lead stands by the member's desk, never over it
-// or the neighbour's, which on the default panel's 195 px floor sits a figure away.
-const besideOf = (world: TeamSceneWorld, member: TeamSceneBody): TeamSceneSpot => {
-  const edge = member.home.x + BESIDE.x > 0.92
-  const side = edge || (neighbourOn(world, member, 1) && !neighbourOn(world, member, -1)) ? -1 : 1
-  return { x: member.home.x + side * BESIDE.x, depth: member.home.depth + BESIDE.depth }
-}
+// Why the right side: a member's needs-you mark sits left of its monitor, and the mark keeps its spot;
+// in front of the row, the visitor only passes before a neighbour's desk. At the right edge it can
+// still stand right, short of the elevator.
+const RIGHT_MOST = 0.97
+const besideOf = (member: TeamSceneBody): TeamSceneSpot => ({
+  x: Math.min(member.home.x + BESIDE.x, RIGHT_MOST),
+  depth: member.home.depth + BESIDE.depth
+})
 
 /** Brings a visiting lead in at the elevator, or marks one whose visit is over to leave. */
 export function applyTeamSceneRide(
@@ -65,7 +56,7 @@ export function stepTeamSceneRide(world: TeamSceneWorld): boolean {
     lead.hidden = undefined
     const member = world.bodies.get(ride.guest)
     if (member) {
-      lead.target = besideOf(world, member)
+      lead.target = besideOf(member)
     }
     return true
   }
@@ -99,7 +90,7 @@ export function settleTeamSceneRide(world: TeamSceneWorld): void {
     world.bodies.delete('lead')
   } else if (typeof ride === 'object' && ride !== null) {
     const member = world.bodies.get(ride.guest)
-    const spot = member ? besideOf(world, member) : elevator(lead)
+    const spot = member ? besideOf(member) : elevator(lead)
     Object.assign(lead, { x: spot.x, depth: spot.depth, target: spot, hidden: undefined })
   } else if (ride === 'away') {
     // Why in the elevator: the next step keeps a lead hidden only once it stands there.
