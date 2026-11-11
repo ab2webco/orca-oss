@@ -25,6 +25,13 @@ export type ClaudeAccountAuthVerdict = {
   checking: boolean
   /** When the stored login can no longer be renewed (the CLI's `refreshTokenExpiresAt`). */
   loginEndsAt?: number
+  /** The account's long-lived token, checked apart from the stored login; absent until checked. */
+  token?: ClaudeLongLivedTokenCheck
+}
+
+export type ClaudeLongLivedTokenCheck = {
+  state: 'verified' | 'rejected' | 'undecided'
+  checkedAt: number
 }
 
 export type ClaudeAccountAuthProbe =
