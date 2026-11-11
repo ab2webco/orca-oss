@@ -1,9 +1,10 @@
-import { CheckCircle2, HelpCircle, KeyRound, Loader2, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, HelpCircle, Loader2, ShieldAlert } from 'lucide-react'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import { formatResetDuration } from '../../../../shared/rate-limit-reset-format'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { ClaudeAccountAuthRowStatus } from './claude-account-auth-row-status'
+import { describeQuotaParts } from './claude-account-quota-text'
 
 function formatCheckedAgo(checkedAt: number, now: number): string {
   const elapsed = Math.max(0, now - checkedAt)
@@ -53,43 +54,6 @@ function describeStatus(status: ClaudeAccountAuthRowStatus, now: number): string
   }
 }
 
-// Why "stored login": on a token row the check never reads what launches use.
-function describeStoredLogin(status: ClaudeAccountAuthRowStatus, now: number): string {
-  switch (status.kind) {
-    case 'checking':
-      return translate(
-        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginChecking',
-        'checking stored login…'
-      )
-    case 'verified':
-      return status.checkedAt === null
-        ? translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginVerified',
-            'stored login verified'
-          )
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginVerifiedAt',
-            'stored login verified {{value0}}',
-            { value0: formatCheckedAgo(status.checkedAt, now) }
-          )
-    case 'credential-rejected':
-      return translate(
-        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginRejected',
-        'stored login expired'
-      )
-    case 'no-credentials':
-      return translate(
-        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginMissing',
-        'no stored login'
-      )
-    case 'unchecked':
-      return translate(
-        'auto.components.settings.ClaudeAccountAuthStatusLine.storedLoginUnchecked',
-        'stored login not checked yet'
-      )
-  }
-}
-
 function describeUndecided(status: ClaudeAccountAuthRowStatus): string | null {
   if (!status.undecided || status.kind === 'checking') {
     return null
@@ -106,50 +70,6 @@ function describeUndecided(status: ClaudeAccountAuthRowStatus): string | null {
   )
 }
 
-function describeQuota(usage: ProviderRateLimits | null, now: number): string | null {
-  if (!usage || usage.status !== 'ok') {
-    return null
-  }
-  const parts: string[] = []
-  if (usage.session) {
-    parts.push(
-      usage.session.resetsAt === null
-        ? translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.sessionUsed',
-            '5h {{value0}}% used',
-            { value0: Math.round(usage.session.usedPercent) }
-          )
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.sessionUsedResets',
-            '5h {{value0}}% used, resets in {{value1}}',
-            {
-              value0: Math.round(usage.session.usedPercent),
-              value1: formatResetDuration(usage.session.resetsAt - now)
-            }
-          )
-    )
-  }
-  if (usage.weekly) {
-    parts.push(
-      usage.weekly.resetsAt === null
-        ? translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.weeklyUsed',
-            '7d {{value0}}% used',
-            { value0: Math.round(usage.weekly.usedPercent) }
-          )
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.weeklyUsedResets',
-            '7d {{value0}}% used, resets in {{value1}}',
-            {
-              value0: Math.round(usage.weekly.usedPercent),
-              value1: formatResetDuration(usage.weekly.resetsAt - now)
-            }
-          )
-    )
-  }
-  return parts.length > 0 ? parts.join(' · ') : null
-}
-
 export function ClaudeAccountAuthStatusLine({
   status,
   usage,
@@ -162,35 +82,28 @@ export function ClaudeAccountAuthStatusLine({
   const Icon =
     status.kind === 'checking'
       ? Loader2
-      : status.launchesOnToken
-        ? KeyRound
-        : status.tone === 'positive'
-          ? CheckCircle2
-          : status.tone === 'negative'
-            ? ShieldAlert
-            : HelpCircle
+      : status.tone === 'positive'
+        ? CheckCircle2
+        : status.tone === 'negative'
+          ? ShieldAlert
+          : HelpCircle
   const undecided = describeUndecided(status)
   const quota =
-    describeQuota(usage, now) ??
-    (status.launchesOnToken
-      ? translate(
-          'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnreadableOnToken',
-          'quota cannot be read while launching on the token'
-        )
-      : // Why: a row that already states the failure explains the missing figure; on
-        // any other row silence would read as "0% used".
-        status.tone === 'negative'
-        ? null
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnknown',
-            'remaining quota unknown'
-          ))
+    (describeQuotaParts(usage, now).join(' · ') || null) ??
+    // Why: a row that already states the failure explains the missing figure; on
+    // any other row silence would read as "0% used".
+    (status.tone === 'negative'
+      ? null
+      : translate(
+          'auto.components.settings.ClaudeAccountAuthStatusLine.quotaUnknown',
+          'remaining quota unknown'
+        ))
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
       <Icon
         className={cn(
           'size-3 shrink-0',
-          status.kind === 'checking' && 'animate-spin',
+          status.kind === 'checking' && 'motion-safe:animate-spin',
           status.tone === 'positive' && 'text-status-success',
           status.tone === 'negative' && 'text-destructive',
           status.tone === 'neutral' && 'text-muted-foreground'
@@ -202,16 +115,8 @@ export function ClaudeAccountAuthStatusLine({
           status.tone === 'negative' ? 'text-destructive' : 'text-muted-foreground'
         )}
       >
-        {status.launchesOnToken
-          ? translate(
-              'auto.components.settings.ClaudeAccountAuthStatusLine.launchesOnToken',
-              'Launches on the long-lived token'
-            )
-          : describeStatus(status, now)}
+        {describeStatus(status, now)}
       </span>
-      {status.launchesOnToken ? (
-        <span className="truncate text-muted-foreground">· {describeStoredLogin(status, now)}</span>
-      ) : null}
       {undecided ? <span className="truncate text-muted-foreground">· {undecided}</span> : null}
       {quota ? <span className="truncate text-muted-foreground">· {quota}</span> : null}
     </span>
