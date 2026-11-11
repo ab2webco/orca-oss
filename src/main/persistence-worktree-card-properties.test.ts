@@ -146,10 +146,6 @@ describe('Store', () => {
       'jira-issue',
       'plane-issue',
       'pr',
-      'automation',
-      'cli',
-      'comment',
-      'ports',
       'inline-agents'
     ])
     expect(store.getUI().worktreeCardProperties).not.toContain('branch')
@@ -445,4 +441,72 @@ describe('Store', () => {
       expect(store.getUI()._worktreeCardModeDefaulted).toBe(true)
     }
   )
+
+  // ORCA-1163: only a profile nobody customised moves to the agent-focus defaults, once.
+  const previousDefaults = [
+    'status',
+    'unread',
+    'issue',
+    'linear-issue',
+    'jira-issue',
+    'plane-issue',
+    'pr',
+    'automation',
+    'cli',
+    'comment',
+    'ports',
+    'inline-agents'
+  ]
+  const stampedBefore = {
+    _inlineAgentsDefaultedForAllUsers: true,
+    _expandedWorktreeCardPropertiesDefaulted: true,
+    _planeIssueCardPropertyDefaulted: true,
+    _jiraIssueWorktreeCardPropertyDefaulted: true
+  }
+  const loadWith = async (ui: Record<string, unknown>) => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: { compactWorktreeCards: false },
+      ui,
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    return createStore()
+  }
+
+  it('moves an untouched profile from the previous defaults to the agent-focus defaults', async () => {
+    const store = await loadWith({ worktreeCardProperties: previousDefaults, ...stampedBefore })
+
+    expect(store.getUI().worktreeCardProperties).toEqual([
+      'status',
+      'unread',
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue',
+      'pr',
+      'inline-agents'
+    ])
+    expect(store.getUI()._agentFocusWorktreeCardPropertiesDefaulted).toBe(true)
+  })
+
+  it('leaves a customised profile exactly as the person set it', async () => {
+    const customised = previousDefaults.filter((property) => property !== 'ports')
+    const store = await loadWith({ worktreeCardProperties: customised, ...stampedBefore })
+
+    expect(store.getUI().worktreeCardProperties).toEqual(customised)
+    expect(store.getUI()._agentFocusWorktreeCardPropertiesDefaulted).toBe(true)
+  })
+
+  it('runs once: toggles turned back on after the move stay on', async () => {
+    const store = await loadWith({
+      worktreeCardProperties: previousDefaults,
+      ...stampedBefore,
+      _agentFocusWorktreeCardPropertiesDefaulted: true
+    })
+
+    expect(store.getUI().worktreeCardProperties).toEqual(previousDefaults)
+  })
 })

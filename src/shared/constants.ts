@@ -48,6 +48,7 @@ export {
   getWorktreeCardModeProperties,
   getWorktreeCardModeUpdates,
   isDefaultedCompactWorktreeCardProperties,
+  isPreAgentFocusDefaultWorktreeCardProperties,
   normalizeWorktreeCardProperties
 } from './worktree/card-properties'
 

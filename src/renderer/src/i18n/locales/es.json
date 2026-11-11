@@ -4640,6 +4640,12 @@
           "newCardDisplay": {
             "title": "Visualización de tarjeta"
           },
+          "cardDisplayGroup": {
+            "work": "Trabajo",
+            "agent": "Agente",
+            "source": "Origen"
+          },
+          "prAndChecks": "Pull request y checks",
           "09faabd875": "Orden del proyecto",
           "7bada3b1ab": "Ordenar por",
           "dc0bb670bc": "Agrupar por",

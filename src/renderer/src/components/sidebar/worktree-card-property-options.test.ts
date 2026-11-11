@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { TASK_WORKTREE_CARD_PROPERTIES } from '../../../../shared/constants'
+import { WORKTREE_CARD_PROPERTIES } from '../../../../shared/worktree/card-properties'
 import {
   WORKTREE_CARD_PROPERTY_OPTIONS,
   getWorktreeCardPropertyOptions
-} from './sidebar-workspace-option-items'
+} from './worktree-card-property-options'
 
 describe('worktree card property options', () => {
   it('keeps the combined Tasks option by default', () => {
@@ -68,5 +69,38 @@ describe('worktree card property options', () => {
     })
 
     expect(options.find((option) => option.id === 'branch')?.label).toBe('Branch / folder path')
+  })
+})
+
+// ORCA-1163: the new card style's Card display groups what an agent operator needs first.
+describe('Card display groups (new card style)', () => {
+  it('groups the toggles into Work, Agent and Source, in that order', () => {
+    const options = getWorktreeCardPropertyOptions({ newCardStyle: true })
+
+    expect(options.map((option) => [option.group, option.id])).toEqual([
+      ['work', 'issue'],
+      ['work', 'linear-issue'],
+      ['work', 'jira-issue'],
+      ['work', 'plane-issue'],
+      ['work', 'pr'],
+      ['work', 'comment'],
+      ['agent', 'inline-agents'],
+      ['agent', 'account'],
+      ['agent', 'model'],
+      ['source', 'branch'],
+      ['source', 'ports'],
+      ['source', 'automation'],
+      ['source', 'cli']
+    ])
+  })
+
+  // Why: nothing the card can show today may lose its toggle in the redesign (owner, ORCA-1163).
+  it('keeps a toggle for every card property except the fixed ones and ci, which rides on the PR', () => {
+    const toggled = new Set(
+      getWorktreeCardPropertyOptions({ newCardStyle: true }).flatMap((option) => option.properties)
+    )
+    const untoggled = WORKTREE_CARD_PROPERTIES.filter((property) => !toggled.has(property))
+
+    expect(untoggled).toEqual(['status', 'unread', 'ci'])
   })
 })

@@ -4902,6 +4902,12 @@
           "newCardDisplay": {
             "title": "Card display"
           },
+          "cardDisplayGroup": {
+            "work": "Work",
+            "agent": "Agent",
+            "source": "Source"
+          },
+          "prAndChecks": "Pull request and checks",
           "09faabd875": "Project order",
           "7bada3b1ab": "Sort by",
           "dc0bb670bc": "Group by",
