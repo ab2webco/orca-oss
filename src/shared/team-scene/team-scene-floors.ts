@@ -82,20 +82,26 @@ export function teamSceneFloorsOf(model: {
   return [...floors.values()].filter((floor) => floor.lead || floor.members.length > 0)
 }
 
-/** One floor's scene: its own members and empty desks; the lead, advisor and STOP only on its own. */
+/**
+ * One floor's scene: its own members and empty desks; the lead and STOP only on its own, and the
+ * advisor there too unless it rode to `advisorFloor`, where Jev just ruled on a member.
+ */
 export function teamSceneFloorInputOf(
   model: Parameters<typeof teamSceneInputOf>[0],
   floor: TeamSceneFloor,
-  ride: TeamSceneBuildingRide | null = null
+  ride: TeamSceneBuildingRide | null = null,
+  advisorFloor: string | null = null
 ): TeamSceneInput {
+  const advisorHere = advisorFloor === null ? floor.lead : floor.key === advisorFloor
   const input = teamSceneInputOf({
     ...model,
     members: floor.members,
-    advisor: floor.lead ? model.advisor : null,
+    advisor: advisorHere ? model.advisor : null,
     stopped: floor.lead ? model.stopped : null
   })
   return {
     ...input,
+    ...(advisorHere && !floor.lead ? { advisorEnters: true as const } : {}),
     ...(floor.lead ? { leadStays: true as const } : { leadless: true as const }),
     desks: { taken: floor.taken, free: floor.free },
     ...rideOn(floor, ride)
@@ -128,4 +134,29 @@ const rideOn = (
     return { ride: 'away' }
   }
   return floor.key === ride.floor ? { ride: { guest: ride.member } } : {}
+}
+
+/**
+ * The floor the advisor rides to: one whose member Jev just ruled on, off the lead's floor and
+ * reachable. `seen` keeps the panes and decisions already read; a pane's first read replays none.
+ */
+export function teamSceneJudgedFloorOf(
+  floors: readonly TeamSceneFloor[],
+  seen: Set<string>
+): string | null {
+  let judged: string | null = null
+  for (const floor of floors) {
+    for (const member of floor.members) {
+      const pane = `pane\u0000${member.paneKey}`
+      const known = seen.has(pane)
+      seen.add(pane)
+      for (const { id } of member.decisions ?? []) {
+        if (!seen.has(id) && known && !floor.lead && floor.reachable) {
+          judged = floor.key
+        }
+        seen.add(id)
+      }
+    }
+  }
+  return judged
 }

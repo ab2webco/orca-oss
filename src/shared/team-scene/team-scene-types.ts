@@ -51,6 +51,8 @@ export type TeamSceneInput = {
   leadStays?: true
   /** The lead riding to another floor, or visiting a member of this one from another. */
   ride?: TeamSceneRide
+  /** The advisor rode here from the lead's floor for a Jev decision, so it comes in by the elevator. */
+  advisorEnters?: true
 }
 
 export type TeamSceneEvent =

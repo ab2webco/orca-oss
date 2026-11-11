@@ -232,5 +232,28 @@ describe('TeamSceneBuilding', () => {
       act(() => root.render(<TeamSceneBuilding model={filed} makePainter={make} leadLine={null} />))
       expect(host.querySelector('[data-team-tube-envelope]')).toBeNull()
     })
+
+    it('takes the car to the floor of a member Jev just ruled on, and back once the advisor is done', () => {
+      vi.useFakeTimers()
+      const ruled = (ids: string[]): TeamSceneBuildingModel => {
+        const base = model([local, remote('imac')])
+        base.members[1] = {
+          ...base.members[1]!,
+          decisions: ids.map((id) => ({ id, verdict: 'allow', gesture: null }))
+        }
+        return base
+      }
+      const show = (next: TeamSceneBuildingModel): void =>
+        act(() =>
+          root.render(<TeamSceneBuilding model={next} makePainter={make} leadLine={null} />)
+        )
+      show(ruled(['d1']))
+      expect(car()?.dataset.teamElevatorCar).toBe('')
+      show(ruled(['d1', 'd2']))
+      expect(car()?.dataset.teamElevatorCar).toBe('imac')
+      act(() => vi.advanceTimersByTime(60_000))
+      expect(car()?.dataset.teamElevatorCar).toBe('')
+      vi.useRealTimers()
+    })
   })
 })

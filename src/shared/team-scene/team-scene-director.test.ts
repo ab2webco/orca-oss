@@ -677,3 +677,19 @@ describe('team scene director, the lead riding between floors', () => {
     expect(actor(home, 'lead')).toBeUndefined()
   })
 })
+
+describe('team scene director, the advisor riding in', () => {
+  it('brings the advisor in at the elevator on a floor it rides to', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(
+      world,
+      { ...input([member('a')], 'ok'), leadless: true, advisorEnters: true },
+      {
+        rowSize: 5,
+        workSeated: true,
+        firstX: 0.16
+      }
+    )
+    expect(world.bodies.get('advisor')!.x).toBeGreaterThan(1)
+  })
+})

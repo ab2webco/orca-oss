@@ -182,9 +182,7 @@ export function applyTeamSceneInput(
     bodies.set('lead', Object.assign(lead, input.lead, { key: 'lead' }))
   }
   applyTeamSceneRide(world, input, (spot) => bodyAt('lead', 'lead', spot, -1))
-  syncAdvisorBody(world, input.advisor !== null, () =>
-    bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1)
-  )
+  syncAdvisorBody(world, input, () => bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1))
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
   const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX, input.desks)

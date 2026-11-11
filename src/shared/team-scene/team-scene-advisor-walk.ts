@@ -1,6 +1,7 @@
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneArrived as near } from './team-scene-motion'
-import type { TeamSceneGesture, TeamSceneSpot } from './team-scene-types'
+import { ELEVATOR_X } from './team-scene-elevator'
+import type { TeamSceneGesture, TeamSceneInput, TeamSceneSpot } from './team-scene-types'
 
 // How long the advisor holds a gesture beside the pane Jev judged.
 const GESTURE_SECONDS = 2.4
@@ -151,12 +152,14 @@ const ADVISOR_SPEED_PX = 48
 /** Keeps the advisor's body while the scene has an advisor, at its own quicker pace. */
 export function syncAdvisorBody(
   world: TeamSceneWorld,
-  present: boolean,
+  input: Pick<TeamSceneInput, 'advisor' | 'advisorEnters'>,
   make: () => TeamSceneBody
 ): void {
-  if (!present) {
+  if (input.advisor === null) {
     world.bodies.delete('advisor')
   } else if (!world.bodies.has('advisor')) {
-    world.bodies.set('advisor', { ...make(), speed: ADVISOR_SPEED_PX })
+    // Why from the elevator: on another floor the advisor has just ridden up to the judged pane.
+    const x = input.advisorEnters ? { x: ELEVATOR_X } : {}
+    world.bodies.set('advisor', { ...make(), ...x, speed: ADVISOR_SPEED_PX })
   }
 }

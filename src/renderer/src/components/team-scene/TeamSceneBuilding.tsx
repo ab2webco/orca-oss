@@ -3,6 +3,7 @@ import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-typ
 import {
   teamSceneFloorInputOf,
   teamSceneFloorsOf,
+  teamSceneJudgedFloorOf,
   teamSceneRideOf,
   type TeamSceneBuildingRide,
   type TeamSceneFloor
@@ -35,6 +36,28 @@ type Props = {
 // Each storey up crops less, so higher floors look out over more sky than the lead's street level.
 const STRIP = { height: 112, slab: 4, crop: 66, perLevel: 10, minCrop: 36 }
 const TUBE_SECONDS = 1.6
+// Why this long: the ride in, the walk to the judged desk and the gesture held there.
+const ADVISOR_RIDE_SECONDS = 12
+
+/** The floor the advisor rode to for a Jev decision on a member there, until it is done; else null. */
+function useAdvisorRide(floors: readonly TeamSceneFloor[]): string | null {
+  const seen = useRef(new Set<string>())
+  const [floor, setFloor] = useState<string | null>(null)
+  useEffect(() => {
+    const judged = teamSceneJudgedFloorOf(floors, seen.current)
+    if (judged !== null) {
+      setFloor(judged)
+    }
+  }, [floors])
+  useEffect(() => {
+    if (floor === null) {
+      return
+    }
+    const timer = setTimeout(() => setFloor(null), ADVISOR_RIDE_SECONDS * 1000)
+    return () => clearTimeout(timer)
+  }, [floor])
+  return floor
+}
 
 /** A report a member on another floor just filed, travelling up the tube; never under reduced motion. */
 function useTubeEnvelope(
@@ -81,15 +104,20 @@ function FloorStage({
   onUnplaced,
   zoomed,
   level,
-  ride
+  ride,
+  advisorFloor
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
   level: number
   ride: TeamSceneBuildingRide | null
+  advisorFloor: string | null
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
-  const input = useMemo(() => teamSceneFloorInputOf(model, floor, ride), [model, floor, ride])
+  const input = useMemo(
+    () => teamSceneFloorInputOf(model, floor, ride, advisorFloor),
+    [model, floor, ride, advisorFloor]
+  )
   if (!painter) {
     return null
   }
@@ -152,6 +180,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const ride = useMemo(() => JSON.parse(rideKey) as TeamSceneBuildingRide | null, [rideKey])
   const leadFloor = floors.find((floor) => floor.lead)?.key ?? ''
   const envelope = useTubeEnvelope(floors, usePrefersReducedMotion())
+  const advisorFloor = useAdvisorRide(floors)
   const onKeyDown = (event: React.KeyboardEvent): void => {
     if (event.key === 'Escape' || event.key === '0') {
       setZoom(null)
@@ -206,13 +235,14 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               zoomed={zoomed !== null}
               level={floors.indexOf(floor)}
               ride={ride}
+              advisorFloor={advisorFloor}
             />
           ))}
         </div>
         <TeamSceneElevatorShaft
           rows={shown.map((floor) => floor.key)}
           rowHeight={zoomed ? TEAM_SCENE_ART_HEIGHT : STRIP.height + STRIP.slab}
-          carAt={ride?.floor ?? leadFloor}
+          carAt={ride?.floor ?? advisorFloor ?? leadFloor}
           envelope={envelope}
           leadFloor={leadFloor}
         />

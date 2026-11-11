@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
-import { teamSceneFloorInputOf, teamSceneFloorsOf, teamSceneRideOf } from './team-scene-floors'
+import {
+  teamSceneFloorInputOf,
+  teamSceneFloorsOf,
+  teamSceneJudgedFloorOf,
+  teamSceneRideOf
+} from './team-scene-floors'
 
 const local: TeamHost = { kind: 'local' }
 const remote = (name: string, reachable = true): TeamHost => ({
@@ -209,5 +214,53 @@ describe('teamSceneRideOf', () => {
     const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor, ride))
     expect(home!.ride).toBe('away')
     expect(away!.ride).toEqual({ guest: 'c' })
+  })
+})
+
+describe('teamSceneFloorInputOf and the advisor riding', () => {
+  it("moves the advisor to the floor Jev just ruled on, entering by the elevator, and off the lead's", () => {
+    const members = [card('a'), card('c', remote('m1'))]
+    const model = {
+      lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
+      advisor: { line: 'ok' },
+      stopped: null,
+      members,
+      machines: null
+    } as unknown as Parameters<typeof teamSceneFloorInputOf>[0]
+    const floors = teamSceneFloorsOf({ lead, members, machines: null })
+    const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor, null, 'm1'))
+    expect(home!.advisor).toBeNull()
+    expect(away!.advisor).toEqual({ line: 'ok' })
+    expect(away!.advisorEnters).toBe(true)
+    const [still] = floors.map((floor) => teamSceneFloorInputOf(model, floor, null, null))
+    expect(still!.advisor).toEqual({ line: 'ok' })
+    expect(still!.advisorEnters).toBeUndefined()
+  })
+})
+
+describe('teamSceneJudgedFloorOf', () => {
+  const judged = (paneKey: string, host: TeamHost, ids: string[]) => ({
+    ...card(paneKey, host),
+    decisions: ids.map((id) => ({ id, verdict: 'allow', gesture: null }))
+  })
+  const floorsOf = (members: TeamMemberCard[]) =>
+    teamSceneFloorsOf({ lead, members, machines: null })
+
+  it('names the floor of a member Jev newly ruled on, and remembers what it saw', () => {
+    const seen = new Set<string>()
+    expect(teamSceneJudgedFloorOf(floorsOf([judged('c', remote('m1'), ['d1'])]), seen)).toBeNull()
+    expect(teamSceneJudgedFloorOf(floorsOf([judged('c', remote('m1'), ['d1', 'd2'])]), seen)).toBe(
+      'm1'
+    )
+    expect(
+      teamSceneJudgedFloorOf(floorsOf([judged('c', remote('m1'), ['d1', 'd2'])]), seen)
+    ).toBeNull()
+  })
+
+  it("never rides for a decision on the lead's own floor or an unreachable one", () => {
+    const seen = new Set<string>(['d1'])
+    const members = [judged('a', local, ['d1', 'd2']), judged('c', remote('m1', false), ['d3'])]
+    teamSceneJudgedFloorOf(floorsOf(members.map((m) => ({ ...m, decisions: [] }))), seen)
+    expect(teamSceneJudgedFloorOf(floorsOf(members), seen)).toBeNull()
   })
 })
