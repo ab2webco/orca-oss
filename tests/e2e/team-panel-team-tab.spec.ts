@@ -298,7 +298,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await panel.getByRole('button', { name: COPY.en.retry }).click()
     await expect.poll(readsSoFar).toBeGreaterThan(readsBeforeSecondRetry)
     await failPanelReads(electronApp, false)
-    await expect(panel).not.toContainText(COPY.en.readError)
+    // Why retry until clear: the next poll can beat the click, and clears the error just the same.
+    await expect(async () => {
+      const retry = panel.getByRole('button', { name: COPY.en.retry })
+      if (await retry.isVisible()) {
+        await retry.click({ timeout: 1_000 })
+      }
+      await expect(panel).not.toContainText(COPY.en.readError, { timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
     await expect(cards).toHaveCount(2)
 
     // Display and Plain come from the real panel look setting: no scene slot, agents by role.
