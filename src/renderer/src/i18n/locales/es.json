@@ -16560,6 +16560,10 @@
       "choose": "Elegir la cuenta de {{value}}",
       "systemLogin": "Login del sistema"
     },
+    "group": {
+      "terminal": "Terminal",
+      "agents": "Agentes"
+    },
     "team": {
       "group": "Equipo",
       "goToLead": "Ir al lead {{value}}",

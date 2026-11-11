@@ -8,7 +8,7 @@ import {
   stubFocusTerminalTabSurface,
   stubHeadlessReact,
   stubQuickLaunchButton,
-  stubNewTabAgentMenuItems,
+  stubNewTabMenuSections,
   stubShallowSelector,
   stubShellIcons,
   stubSortableContext,
@@ -36,7 +36,7 @@ vi.mock('./SortableTab', () => stubSortableTab())
 vi.mock('./EditorFileTab', () => stubEditorFileTab())
 vi.mock('./BrowserTab', () => stubBrowserTab())
 vi.mock('./QuickLaunchButton', () => stubQuickLaunchButton())
-vi.mock('./NewTabAgentMenuItems', () => stubNewTabAgentMenuItems())
+vi.mock('./NewTabMenuSections', () => stubNewTabMenuSections())
 vi.mock('./shell-icons', () => stubShellIcons())
 vi.mock('@/lib/focus-terminal-tab-surface', () => stubFocusTerminalTabSurface())
 vi.mock('@/components/ui/dropdown-menu', () => stubDropdownMenu())

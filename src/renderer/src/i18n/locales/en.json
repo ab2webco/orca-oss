@@ -17540,6 +17540,10 @@
       "choose": "Choose the {{value}} account",
       "systemLogin": "System login"
     },
+    "group": {
+      "terminal": "Terminal",
+      "agents": "Agents"
+    },
     "team": {
       "group": "Team",
       "goToLead": "Go to lead {{value}}",
