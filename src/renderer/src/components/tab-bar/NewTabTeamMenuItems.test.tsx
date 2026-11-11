@@ -93,16 +93,26 @@ describe('NewTabTeamMenuItems', () => {
     expect(item('Go to lead')).toBeTruthy()
   })
 
-  it('adds a member for a To Do ticket on the member pick, or the account picked beside it', () => {
+  // Why: beside the row, the account's chevron doubled the row's and truncated its label.
+  it('keeps the add-member row to its label and one chevron, the account inside its submenu', () => {
+    renderMenu({})
+
+    expect(screen.queryByRole('menuitem', { name: "Choose the member's account" })).toBeNull()
+    fireEvent.click(item('Add a member to the team…'))
+
+    expect(item("Choose the member's account")).toBeTruthy()
+  })
+
+  it('adds a member for a To Do ticket on the member pick, or the account picked in its submenu', () => {
     const props = renderMenu({})
 
     fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item(/ORCA-9/))
     expect(props.onAddMember).toHaveBeenLastCalledWith(TODO[0], 'acct-free')
 
+    fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item("Choose the member's account"))
     fireEvent.click(item(/Account acct-2/))
-    fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item(/ORCA-9/))
     expect(props.onAddMember).toHaveBeenLastCalledWith(TODO[0], 'acct-2')
   })
@@ -110,6 +120,7 @@ describe('NewTabTeamMenuItems', () => {
   it("heads the account list with its provider and links to that provider's accounts", () => {
     renderMenu({})
 
+    fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item("Choose the member's account"))
     expect(screen.getByText('Claude accounts')).toBeTruthy()
     fireEvent.click(item('Manage accounts…'))
@@ -133,9 +144,10 @@ describe('NewTabTeamMenuItems', () => {
   it("adds a member on the host's own login with no picker off this machine", () => {
     const props = renderMenu({ account: { kind: 'host-login' } })
 
+    expect(screen.queryByText('Host login')).toBeNull()
+    fireEvent.click(item('Add a member to the team…'))
     expect(screen.queryByRole('menuitem', { name: /Choose the/ })).toBeNull()
     expect(screen.getByText('Host login')).toBeTruthy()
-    fireEvent.click(item('Add a member to the team…'))
     fireEvent.click(item(/ORCA-9/))
 
     expect(props.onAddMember).toHaveBeenCalledWith(TODO[0], null)

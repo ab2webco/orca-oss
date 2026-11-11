@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
@@ -61,6 +62,10 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
     }
     return null
   }
+  const memberAccount =
+    state.kind === 'lead-live'
+      ? accountBeside(translate('newTabMenu.team.chooseMember', "Choose the member's account"))
+      : null
 
   return (
     <>
@@ -78,38 +83,45 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
                 : translate('newTabMenu.team.goToLeadUnnamed', 'Go to lead')}
             </span>
           </DropdownMenuItem>
-          <div className="flex items-center">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className={`min-w-0 flex-1 ${ROW}`}>
-                <span className="truncate">
-                  {translate('newTabMenu.team.addMember', 'Add a member to the team…')}
-                </span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-72">
-                {state.todo.length === 0 ? (
-                  <DropdownMenuItem disabled className={ROW}>
-                    {translate('newTabMenu.team.todoEmpty', 'To Do is empty')}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className={ROW}>
+              <span className="truncate">
+                {translate('newTabMenu.team.addMember', 'Add a member to the team…')}
+              </span>
+            </DropdownMenuSubTrigger>
+            {/* Why the account inside: beside the row its chevron doubled the row's and cut the label. */}
+            <DropdownMenuSubContent className="w-72">
+              {memberAccount ? (
+                <>
+                  <div className="flex items-center">
+                    <span className={`min-w-0 flex-1 truncate ${LABEL}`}>
+                      {translate('newTabMenu.team.memberAccount', 'Member account')}
+                    </span>
+                    {memberAccount}
+                  </div>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+              {state.todo.length === 0 ? (
+                <DropdownMenuItem disabled className={ROW}>
+                  {translate('newTabMenu.team.todoEmpty', 'To Do is empty')}
+                </DropdownMenuItem>
+              ) : (
+                state.todo.map((ticket) => (
+                  <DropdownMenuItem
+                    key={ticket.identifier}
+                    className={ROW}
+                    onSelect={() => props.onAddMember(ticket, accountId)}
+                  >
+                    <span className="shrink-0">{ticket.identifier}</span>
+                    <span className="truncate font-normal text-muted-foreground">
+                      {ticket.title}
+                    </span>
                   </DropdownMenuItem>
-                ) : (
-                  state.todo.map((ticket) => (
-                    <DropdownMenuItem
-                      key={ticket.identifier}
-                      className={ROW}
-                      onSelect={() => props.onAddMember(ticket, accountId)}
-                    >
-                      <span className="shrink-0">{ticket.identifier}</span>
-                      <span className="truncate font-normal text-muted-foreground">
-                        {ticket.title}
-                      </span>
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            {accountBeside(
-              translate('newTabMenu.team.chooseMember', "Choose the member's account")
-            )}
-          </div>
+                ))
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         </>
       ) : (
         <>
