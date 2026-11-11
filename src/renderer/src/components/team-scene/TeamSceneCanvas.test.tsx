@@ -17,7 +17,8 @@ const member = (key: string) =>
     characterKey: null,
     activity: 'working',
     reportId: null,
-    mergedPr: null
+    mergedPr: null,
+    site: { stage: 0, broken: false }
   }) as const
 const input = (keys: string[], advisorLine?: string): TeamSceneInput => ({
   lead,
@@ -113,6 +114,51 @@ describe('TeamSceneCanvas', () => {
     const [first, , , last] = p.frames.slice(-4)
     expect(last!.t - first!.t).toBeCloseTo(0.855, 2)
     expect(last!.dt).toBe(0.05)
+  })
+
+  // Why: the lead walks its rounds, and its bubble must go with it, not wait at its spot.
+  it("moves the lead's bubble with the lead as it walks to a member who needs you", () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    // Why sized: happy-dom lays nothing out, and a zero-wide bubble has no spot for its tail.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(60)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+    const asking = input(['n'])
+    asking.members[0] = { ...asking.members[0]!, activity: 'needsYou' }
+    render(<TeamSceneCanvas input={asking} painter={painter().value} leadLine="Busy" />)
+    const left = () =>
+      Number.parseFloat(host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!.style.left)
+    act(() => next?.(0))
+    const before = left()
+    for (let now = 50; now < 8000; now += 50) {
+      act(() => next?.(now))
+    }
+    expect(Math.abs(left() - before)).toBeGreaterThan(20)
+  })
+
+  // Why: a spec that crops the lead must find it; on its rounds it leaves its spot (run 42982825235).
+  it('says where the lead stands, as a share of the stage, and follows it as it walks', () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const asking = input(['n'])
+    asking.members[0] = { ...asking.members[0]!, activity: 'needsYou' }
+    render(<TeamSceneCanvas input={asking} painter={painter().value} leadLine={null} />)
+    const leadX = () =>
+      Number(host.querySelector<HTMLElement>('[data-scene-lead-x]')?.dataset.sceneLeadX)
+    act(() => next?.(0))
+    expect(leadX()).toBeCloseTo(0.84, 1)
+    for (let now = 50; now < 8000; now += 50) {
+      act(() => next?.(now))
+    }
+    expect(leadX()).toBeLessThan(0.5)
   })
 
   it('paints the settled end state once per change under reduced motion', () => {

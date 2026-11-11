@@ -2,7 +2,14 @@ FROM ubuntu@sha256:678c6550cc43645e08669028bc177f50be4e7c5b8cca677067b1914d4afc7
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
+COPY --from=apt-scripts apt-mirror-fallback.sh /usr/local/bin/apt-mirror-fallback
+
+# Why the fallback: apt update only warns when no Ubuntu host resolves, and the install then
+# finds no packages (2026-11-11); a failed or warned update retries on another mirror.
+RUN apt-get update > /tmp/apt-update.log 2>&1; status=$?; cat /tmp/apt-update.log; \
+  if [ "$status" -ne 0 ] || grep -q '^W: Failed to fetch' /tmp/apt-update.log; then \
+    bash /usr/local/bin/apt-mirror-fallback && apt-get update; \
+  fi \
   && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \

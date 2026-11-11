@@ -3,6 +3,7 @@ import type {
   TeamSceneEffect,
   TeamSceneEmote
 } from '../../../../shared/team-scene/team-scene-types'
+import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import type { TeamSceneFrame } from './team-scene-painter'
 
 /** Status colours resolved from the theme; the scene uses them only for what they mean. */
@@ -11,6 +12,7 @@ export type TeamSceneStatusColors = { attention: string; done: string; working: 
 const TAU = 2 * Math.PI
 const SCROLL = '#f4e6c0'
 const SHOT_SECONDS = 0.55
+export const SCENE_DUST = '#cfc6b4'
 
 type Shot = { from: TeamSceneActor; to: TeamSceneActor; p: number }
 type Spark = { x: number; y: number; vx: number; vy: number; life: number; color: string }
@@ -125,6 +127,20 @@ export function createSceneEffects(feetY: (depth: number, h: number) => number):
     }
     const at = find(effect.key)
     if (!at) {
+      return
+    }
+    if (effect.reason === 'build' || effect.reason === 'repair') {
+      // Why low and small: a puff at the build, not a celebration over the head.
+      for (let i = 0; i < 6; i++) {
+        sparks.push({
+          x: at.x + SITE_FROM_SEAT_X,
+          y: feetY(at.depth, h) - 4,
+          vx: (i - 2.5) * 9,
+          vy: -18 - (i % 3) * 8,
+          life: 0.8,
+          color: SCENE_DUST
+        })
+      }
       return
     }
     const palette =
