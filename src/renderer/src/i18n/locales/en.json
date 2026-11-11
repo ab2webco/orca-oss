@@ -17538,7 +17538,10 @@
       "ownLogin": "Own login",
       "hostLogin": "Host login",
       "choose": "Choose the {{value}} account",
-      "systemLogin": "System login"
+      "systemLogin": "System login",
+      "claudeAccounts": "Claude accounts",
+      "codexAccounts": "Codex accounts",
+      "manage": "Manage accounts…"
     },
     "group": {
       "terminal": "Terminal",

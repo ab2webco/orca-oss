@@ -16558,7 +16558,10 @@
       "ownLogin": "Login propio",
       "hostLogin": "Login del host",
       "choose": "Elegir la cuenta de {{value}}",
-      "systemLogin": "Login del sistema"
+      "systemLogin": "Login del sistema",
+      "claudeAccounts": "Cuentas de Claude",
+      "codexAccounts": "Cuentas de Codex",
+      "manage": "Administrar cuentas…"
     },
     "group": {
       "terminal": "Terminal",

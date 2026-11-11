@@ -78,6 +78,8 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
     },
     DropdownMenuShortcut: ({ children }: { children: React.ReactNode }) =>
       ReactActual.createElement('span', { 'data-dropdown-shortcut': 'true' }, children),
+    DropdownMenuLabel: passThrough,
+    DropdownMenuSeparator: () => null,
     DropdownMenuSub: passThrough,
     DropdownMenuSubContent: passThrough,
     DropdownMenuSubTrigger: ({
