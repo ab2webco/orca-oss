@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -14,11 +15,14 @@ type Style = (typeof STYLES)[number]
 const WINDOW_MS = 1500
 // Why: Pixel's swing rests for most of its 1.15 s; sparser frames could miss it (see scene-motion).
 const MAX_FRAME_GAP_MS = 430
-// [left, right, top, bottom] as fractions. One member sits at x 0.1 (seatPlanOf); the lead stands
-// at 0.84. Their crops start below Pixel's low cloud band (0.38) and keep the head and its emote.
+// [left, right, top, bottom] as fractions. One member sits at x 0.1 (seatPlanOf). The lead walks
+// its rounds, so its crop is centred where the scene says it stands (data-scene-lead-x), narrow
+// enough to leave out the member it may stand beside. Crops start below Pixel's low cloud band
+// (0.38) and keep the head and its emote.
+const LEAD_HALF = 0.05
 const CROPS = {
   member: [0, 0.26, 0.4, 1],
-  lead: [0.74, 0.96, 0.4, 1],
+  lead: [0, 0, 0.4, 1],
   sky: [0, 1, 0, 0.4]
 } as const
 // Why longer: Pixel's clouds step one scene pixel every 1.44 s (12 game ticks).
@@ -32,8 +36,16 @@ test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 // Hashes one actor's crop on every animation frame for a window, so the set is what was painted.
 async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<Sample> {
   return page.evaluate(
-    ({ crop, windowMs }) =>
+    ({ who, base, half, windowMs }) =>
       new Promise<Sample>((resolve) => {
+        const at = Number(
+          document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+            .sceneLeadX
+        )
+        const crop =
+          who === 'lead' && Number.isFinite(at)
+            ? [Math.max(0, at - half), Math.min(1, at + half), base[2], base[3]]
+            : base
         const hashOf = (): string => {
           const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
           const g = canvas?.getContext('2d')
@@ -72,8 +84,57 @@ async function sampleCrop(page: Page, who: Who, windowMs = WINDOW_MS): Promise<S
           resolve({ hashes, maxGapMs: Math.max(...gaps) })
         }, windowMs)
       }),
-    { crop: CROPS[who], windowMs }
+    { who, base: [...CROPS[who]], half: LEAD_HALF, windowMs }
   )
+}
+
+/** The lead's crop as a PNG, cut where it is sampled, so a reviewer sees what the hashes saw. */
+async function leadCropShot(page: Page, path: string): Promise<void> {
+  const url = await page.evaluate(
+    ({ base, half }) => {
+      const canvas = document.querySelector<HTMLCanvasElement>('[data-team-scene] [role="img"]')
+      const at = Number(
+        document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+          .sceneLeadX
+      )
+      if (!canvas || !Number.isFinite(at)) {
+        return null
+      }
+      const x = Math.floor(canvas.width * Math.max(0, at - half))
+      const top = Math.floor(canvas.height * base[2])
+      const w = Math.floor(canvas.width * Math.min(1, at + half)) - x
+      const h = Math.floor(canvas.height * base[3]) - top
+      const out = document.createElement('canvas')
+      out.width = w
+      out.height = h
+      out.getContext('2d')?.drawImage(canvas, x, top, w, h, 0, 0, w, h)
+      return out.toDataURL('image/png')
+    },
+    { base: [...CROPS.lead], half: LEAD_HALF }
+  )
+  expect.soft(url, 'no lead crop to show').not.toBeNull()
+  if (url) {
+    await writeFile(path, Buffer.from(url.split(',')[1]!, 'base64'))
+  }
+}
+
+/** Waits until the lead has stood still for a second, so a held pose is sampled where it holds. */
+async function leadSettled(page: Page): Promise<void> {
+  const where = (): Promise<string | undefined> =>
+    page.evaluate(
+      () =>
+        document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+          .sceneLeadX
+    )
+  let last = await where()
+  let still = 0
+  for (let i = 0; i < 80 && still < 4; i++) {
+    await page.waitForTimeout(250)
+    const now = await where()
+    still = now !== undefined && now === last ? still + 1 : 0
+    last = now
+  }
+  expect.soft(still, 'the lead never stood still to be sampled').toBeGreaterThanOrEqual(4)
 }
 
 // Why retried: a starved runner may skip frames; a sparse window cannot judge motion.
@@ -208,7 +269,16 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     // member also walks in and greets the lead before it sits.
     const REFRESH_WAIT_MS = 21_000
     let settleMs = REFRESH_WAIT_MS
-    const capture = async (round: Record<'lead' | 'member', string>): Promise<void> => {
+    const leadX = (): Promise<number> =>
+      orcaPage.evaluate(() =>
+        Number(
+          document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+            .sceneLeadX
+        )
+      )
+    // Why one side per round: a lead's pose is sampled where nobody waits, so it stands alone at
+    // its spot; with a member waiting it walks to that member on its rounds (ORCA-1150).
+    const capture = async (round: Partial<Record<'lead' | 'member', string>>): Promise<void> => {
       for (const style of STYLES) {
         await orcaPage.evaluate(
           (next) =>
@@ -224,14 +294,34 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         await orcaPage.waitForTimeout(settleMs)
         settleMs = 2000
         for (const who of ['lead', 'member'] as const) {
+          if (round[who] === undefined) {
+            continue
+          }
+          if (who === 'lead' && round.lead !== 'working') {
+            await leadSettled(orcaPage)
+          }
           seen.set(`${style}:${who}:${round[who]}`, await poseFrames(orcaPage, who))
+          if (who === 'lead') {
+            await leadCropShot(
+              orcaPage,
+              testInfo.outputPath(`lead-crop-${style}-${round.lead}.png`)
+            )
+          }
+        }
+        if (round.member === 'waiting') {
+          // The member sits at x 0.1: the lead goes over to it, wherever its pose was sampled.
+          await expect
+            .poll(leadX, { message: `${style}: the lead never went to the waiting member` })
+            .toBeLessThan(0.5)
         }
         if (round.member === 'working') {
           const sky = await sampleCrop(orcaPage, 'sky', SKY_WINDOW_MS)
           seen.set(`${style}:sky`, new Set(sky.hashes))
         }
         await scene.screenshot({
-          path: testInfo.outputPath(`scene-${style}-lead-${round.lead}-member-${round.member}.png`)
+          path: testInfo.outputPath(
+            `scene-${style}-lead-${round.lead ?? 'any'}-member-${round.member ?? 'any'}.png`
+          )
         })
         // Evidence for the seat at every width and theme (criterion 7), read beside V28 office.
         if (round.member === 'working') {
@@ -273,6 +363,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       state: 'done',
       lastAssistantMessage: 'Done'
     })
+    await expect.poll(() => agentState(true)).toBe('done')
+    settleMs = REFRESH_WAIT_MS
+    await capture({ lead: 'done' })
+    await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
     await client.call('game.ownerAsk', {
       worktreeId,
       terminalHandle: lead,
@@ -280,10 +374,8 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       question: 'Merge #12 now?',
       options: ['Yes', 'No']
     })
-    await expect.poll(() => agentState(true)).toBe('done')
     settleMs = REFRESH_WAIT_MS
-    await capture({ lead: 'done', member: 'waiting' })
-    await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
+    await capture({ member: 'waiting' })
 
     const at = (style: Style, key: string): Set<string> => seen.get(`${style}:${key}`)!
     // AC2: the clouds drift in the styles that have a sky.

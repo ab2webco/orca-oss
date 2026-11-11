@@ -51,6 +51,9 @@ try {
       platform,
       '-f',
       shutdownDockerfile,
+      // Why: the Dockerfile copies the apt mirror fallback that ci-apt.sh shares.
+      '--build-context',
+      `apt-scripts=${resolve('config', 'scripts')}`,
       '-t',
       image,
       shutdownDockerDirectory

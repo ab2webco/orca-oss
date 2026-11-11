@@ -55,14 +55,22 @@ const DEFAULT_MEMBERS = [
   member('tab-9:b', 'Alex', 'working', {
     workItem: workItem('ORCA-949', 'Panel visual redesign for the Fleet pane', 'In Progress'),
     review: review(844, 'pending'),
-    remote: { host: 'iMac', stateKnown: true }
+    remote: { host: 'iMac', stateKnown: true },
+    account: { email: 'lab-account-b' }
   }),
   member('tab-9:c', 'Nova', 'waiting', {
     workItem: workItem('ORCA-948', "Fleet lists other projects' found agents", 'In Progress')
   }),
-  member('tab-9:d', 'Juno', 'working', {
+  member('tab-1:d', 'Juno', 'working', {
     workItem: workItem('ORCA-946', 'Paired-remote pane stays recovering on restart', 'In Progress'),
-    review: review(843, 'failure')
+    review: review(843, 'failure'),
+    toolName: 'Edit',
+    toolInput: 'remote-restart.spec.ts'
+  }),
+  member('tab-9:f', 'Kiro', 'idle', {
+    workItem: workItem('ORCA-947', 'Release notes for lab.116', 'In Progress'),
+    account: { email: 'lab-account-a' },
+    limit: { resetsAt: Date.now() + 2 * 3_600_000 }
   }),
   member('tab-9:e', 'Rho', 'done', {
     workItem: workItem('ORCA-943', 'Every agent talks both ways with the lead', 'Done'),
@@ -120,8 +128,23 @@ function leadState(worktreeId: unknown): unknown {
     role: 'lead',
     lead: { autostart: false, cap: 5, agent: 'claude', label: 'Lead' },
     agents: isShowcaseScenario ? SHOWCASE_MEMBERS : DEFAULT_MEMBERS,
+    worktree: { id: worktreeId },
+    // Why: MOCK_GAME_LOCALE=es checks the cards follow the host's language.
+    locale: process.env.MOCK_GAME_LOCALE,
+    inboxes: [
+      {
+        key: 'ORCA-949',
+        unread: 0,
+        last: { at: '', from: 'ORCA-949', subject: 'Fleet pane redesign pushed, CI running' },
+        waiting: []
+      }
+    ],
     openOwnerQuestions: openQuestionCount(),
     metrics: {
+      claudeAccounts: [
+        { email: 'lab-account-a', sessionPercent: 100, weeklyPercent: 71 },
+        { email: 'lab-account-b', sessionPercent: 42, weeklyPercent: 18 }
+      ],
       computedAt: new Date().toISOString(),
       timezone: 'America/Bogota',
       mergedPerDay: isShowcaseScenario

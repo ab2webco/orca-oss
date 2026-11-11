@@ -46,6 +46,11 @@ function nextWorking(world: TeamSceneWorld): TeamSceneBody | null {
   return working[(after + 1) % working.length]!
 }
 
+/** True from when the lead sets out to a member who asks until it is answered: it stands under that tag. */
+export const teamSceneLeadAttends = (world: TeamSceneWorld): boolean =>
+  world.rounds.purpose === 'attend' &&
+  (world.rounds.stage === 'toMember' || world.rounds.stage === 'atMember')
+
 /** True while the lead is at its spot and free to take a member's visit. */
 export const leadIsHome = (world: TeamSceneWorld): boolean => world.rounds.stage === 'rest'
 
