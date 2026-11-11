@@ -11029,7 +11029,7 @@
           "title": "Panel"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo la dibuja en Pixel."
+          "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo la dibuja con el arte predeterminado."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Token de larga duración",

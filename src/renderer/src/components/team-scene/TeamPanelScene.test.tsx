@@ -15,6 +15,7 @@ import { loadTeamSceneArt } from './team-scene-art-load'
 import type { TeamSceneArtImage, TeamSceneImageArt } from './team-scene-image-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 import { recordingContext } from './team-scene-recording-context'
+import { useTeamSceneArtHostStore } from './team-scene-art-host'
 import { useAppStore } from '@/store'
 
 vi.mock('./team-scene-art-load', () => ({ loadTeamSceneArt: vi.fn() }))
@@ -63,7 +64,7 @@ const plain = {
   definition: { ...QUEST_SCENE, id: 'acme.pack/night' }
 } as unknown as OrchestratorGameSceneExtension
 
-// A scene file with a native block: its images are not readable here yet (ORCA-1085).
+// A scene file with a native block, read from the lead's host.
 const carrying = {
   id: 'file:mine.json',
   pluginId: 'file',
@@ -87,6 +88,13 @@ let host: HTMLDivElement
 const canvasHeight = (): string | undefined => host.querySelector('canvas')?.style.height
 const shownStyle = (): string | null | undefined =>
   host.querySelector('[data-team-scene]')?.getAttribute('data-team-scene')
+const artOf = (): (string | null)[] => {
+  const stage = host.querySelector('[data-team-scene]')
+  return [
+    stage?.getAttribute('data-team-scene-art') ?? null,
+    stage?.getAttribute('data-team-scene-default-art') ?? null
+  ]
+}
 const stageHeight = (): string | undefined =>
   host.querySelector<HTMLElement>('[data-team-scene] > *')?.style.height
 
@@ -105,6 +113,9 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(120)
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => recordingContext().g)
+  useTeamSceneArtHostStore.setState({
+    host: { target: { kind: 'local' }, caller: { worktreeId: 'wt1', terminalHandle: 'h1' } }
+  })
   vi.mocked(loadTeamSceneArt).mockClear()
   vi.mocked(loadTeamSceneArt).mockImplementation((style) =>
     Promise.resolve(decoded(style === teamSceneQuestArtOf('office') ? 'office' : 'figures'))
@@ -247,8 +258,8 @@ describe('TeamPanelScene', () => {
     expect(shownStyle()).toBe('pixel')
   })
 
-  it('draws a scene with a native block in Pixel, since the panel cannot read its images', () => {
-    act(() =>
+  it("draws a scene file's own art, read from the lead's host", async () => {
+    await act(async () =>
       root.render(
         <TeamPanelScene
           model={model({ id: carrying.id, extensions: [carrying] })}
@@ -256,19 +267,32 @@ describe('TeamPanelScene', () => {
         />
       )
     )
-    expect(canvasHeight()).toBe('126px')
-    expect(shownStyle()).toBe('pixel')
-    expect(loadTeamSceneArt).not.toHaveBeenCalled()
+    expect(shownStyle()).toBe('figures')
+    expect(artOf()).toEqual(['scene', null])
+    expect(loadTeamSceneArt).toHaveBeenLastCalledWith(
+      teamSceneQuestArtOf('figures'),
+      expect.any(Function)
+    )
   })
 
-  it('draws a scene with no native art in Pixel, with the game cloud', () => {
-    act(() =>
+  it('draws a scene with no art for the style with the default art, and marks it', async () => {
+    await act(async () =>
       root.render(
-        <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="figures" />
+        <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="office" />
       )
     )
-    expect(canvasHeight()).toBe('126px')
-    expect(host.querySelector('[data-scene-bubble="lead"] canvas')).not.toBeNull()
+    expect(shownStyle()).toBe('office')
+    expect(artOf()).toEqual(['bundled', 'true'])
+  })
+
+  it('draws Quest exported as a scene file with its bundled art, not marked as default', async () => {
+    const id = 'file:.orca/scenes/quest.json'
+    const file = { ...plain, id, pluginId: 'file' } as OrchestratorGameSceneExtension
+    await act(async () =>
+      root.render(<TeamPanelScene model={model({ id, extensions: [file] })} style="figures" />)
+    )
+    expect(shownStyle()).toBe('figures')
+    expect(artOf()).toEqual(['bundled', null])
   })
 
   it('draws Pixel when asked, and the lead line from the model', () => {

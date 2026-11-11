@@ -45,6 +45,7 @@ import { AGENT_SESSION_METHODS } from './agent-session'
 import { ARTIFACT_METHODS } from './artifacts'
 import { DASHBOARD_POPOUT_METHODS } from './dashboard-popout'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
+import { ORCHESTRATOR_GAME_SCENE_ART_METHODS } from './orchestrator-game-scene-art'
 import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
 import { ORCHESTRATOR_GAME_LEADS_METHODS } from './orchestrator-game-leads'
 import { ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS } from './orchestrator-game-pane-advisors'
@@ -60,6 +61,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ARTIFACT_METHODS,
   ...DASHBOARD_POPOUT_METHODS,
   ...ORCHESTRATOR_GAME_METHODS,
+  ...ORCHESTRATOR_GAME_SCENE_ART_METHODS,
   ...ORCHESTRATOR_GAME_BOARD_METHODS,
   ...ORCHESTRATOR_GAME_LEADS_METHODS,
   ...ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS,
