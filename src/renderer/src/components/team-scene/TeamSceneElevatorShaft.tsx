@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { Crown, Scale } from 'lucide-react'
+import { RIDE_TRAVEL_SECONDS } from '../../../../shared/team-scene/team-scene-ride-legs'
 
 type Props = {
   /** The floor keys drawn, top to bottom. */
@@ -6,6 +8,8 @@ type Props = {
   rowHeight: number
   /** Where the car stands: the lead's floor, or the one it rides to. */
   carAt: string
+  /** Who rides in the car now; null when it stands empty. */
+  rider: 'lead' | 'advisor' | null
   /** A report travelling up the tube from this floor to the lead's, or none. */
   envelope: { from: string; id: number } | null
   leadFloor: string
@@ -16,6 +20,7 @@ export function TeamSceneElevatorShaft({
   rows,
   rowHeight,
   carAt,
+  rider,
   envelope,
   leadFloor
 }: Props): React.JSX.Element {
@@ -33,10 +38,23 @@ export function TeamSceneElevatorShaft({
           data-team-elevator-car={carAt}
           // Why transform: the ride eases between floors without animating layout.
           // Why square with a door seam: a rounded pill beside the panel read as its scrollbar.
-          className="absolute inset-x-0.5 top-0 bg-scene-bubble ring-1 ring-ring motion-safe:transition-transform motion-safe:duration-700 motion-safe:ease-in-out"
-          style={{ height: rowHeight - 16, transform: `translateY(${car * rowHeight + 8}px)` }}
+          className="absolute inset-x-0.5 top-0 bg-scene-bubble ring-1 ring-ring motion-safe:transition-transform motion-safe:ease-in-out"
+          style={{
+            height: rowHeight - 16,
+            transform: `translateY(${car * rowHeight + 8}px)`,
+            transitionDuration: `${RIDE_TRAVEL_SECONDS}s`
+          }}
         >
           <div className="absolute inset-y-0 left-1/2 w-px bg-ring" />
+          {rider ? (
+            // Why a mark, not a figure: the 12 px car fits a glyph, and it names who rides.
+            <span
+              data-team-elevator-rider={rider}
+              className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center bg-scene-bubble py-0.5 text-white"
+            >
+              {rider === 'lead' ? <Crown className="size-2.5" /> : <Scale className="size-2.5" />}
+            </span>
+          ) : null}
         </div>
       ) : null}
       {envelope ? (

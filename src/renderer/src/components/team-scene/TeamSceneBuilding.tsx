@@ -5,9 +5,10 @@ import {
   teamSceneFloorsOf,
   teamSceneJudgedFloorOf,
   teamSceneRideOf,
-  type TeamSceneBuildingRide,
-  type TeamSceneFloor
+  type TeamSceneFloor,
+  type TeamSceneFloorLegs
 } from '../../../../shared/team-scene/team-scene-floors'
+import { teamSceneLegCar } from '../../../../shared/team-scene/team-scene-ride-legs'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,6 +18,7 @@ import { TeamSceneCanvas } from './TeamSceneCanvas'
 import { TeamSceneElevatorShaft } from './TeamSceneElevatorShaft'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
+import { useTeamSceneRideLegs } from './use-team-scene-ride-legs'
 import type { TeamScenePainter } from './team-scene-painter'
 
 export type TeamSceneBuildingModel = Pick<
@@ -104,20 +106,17 @@ function FloorStage({
   onUnplaced,
   zoomed,
   level,
-  ride,
-  advisorFloor
+  legs,
+  onBoarded
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
   level: number
-  ride: TeamSceneBuildingRide | null
-  advisorFloor: string | null
+  legs: TeamSceneFloorLegs
+  onBoarded: (rider: string) => void
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
-  const input = useMemo(
-    () => teamSceneFloorInputOf(model, floor, ride, advisorFloor),
-    [model, floor, ride, advisorFloor]
-  )
+  const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
   if (!painter) {
     return null
   }
@@ -142,6 +141,7 @@ function FloorStage({
           painter={painter}
           leadLine={floor.lead ? leadLine : null}
           onUnplaced={floor.lead ? onUnplaced : undefined}
+          onBoarded={onBoarded}
         />
       </div>
       {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
@@ -176,11 +176,22 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   // Why the lead's at the bottom: floor 1 is where the lead stands, the others above it.
   const shown = zoomed ? [zoomed] : floors.slice(0, SHOWN_FLOORS).toReversed()
   const more = zoomed ? 0 : floors.length - SHOWN_FLOORS
-  const rideKey = JSON.stringify(teamSceneRideOf(floors))
-  const ride = useMemo(() => JSON.parse(rideKey) as TeamSceneBuildingRide | null, [rideKey])
   const leadFloor = floors.find((floor) => floor.lead)?.key ?? ''
-  const envelope = useTubeEnvelope(floors, usePrefersReducedMotion())
+  const reducedMotion = usePrefersReducedMotion()
+  const envelope = useTubeEnvelope(floors, reducedMotion)
   const advisorFloor = useAdvisorRide(floors)
+  const { legs, onBoarded } = useTeamSceneRideLegs(
+    {
+      lead: teamSceneRideOf(floors),
+      advisor: advisorFloor === null ? null : { floor: advisorFloor, member: null }
+    },
+    leadFloor,
+    reducedMotion
+  )
+  // Why the lead's trip first: one car, and the lead's visit is the one someone waits on.
+  const leadCar = teamSceneLegCar(legs.lead, leadFloor)
+  const advisorCar = teamSceneLegCar(legs.advisor, leadFloor)
+  const car = legs.lead.stage === 'home' ? advisorCar : leadCar
   const onKeyDown = (event: React.KeyboardEvent): void => {
     if (event.key === 'Escape' || event.key === '0') {
       setZoom(null)
@@ -234,15 +245,16 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               floor={floor}
               zoomed={zoomed !== null}
               level={floors.indexOf(floor)}
-              ride={ride}
-              advisorFloor={advisorFloor}
+              legs={legs}
+              onBoarded={onBoarded}
             />
           ))}
         </div>
         <TeamSceneElevatorShaft
           rows={shown.map((floor) => floor.key)}
           rowHeight={zoomed ? TEAM_SCENE_ART_HEIGHT : STRIP.height + STRIP.slab}
-          carAt={ride?.floor ?? advisorFloor ?? leadFloor}
+          carAt={car.at}
+          rider={leadCar.rider ? 'lead' : advisorCar.rider ? 'advisor' : null}
           envelope={envelope}
           leadFloor={leadFloor}
         />

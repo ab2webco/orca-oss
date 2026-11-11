@@ -6,6 +6,7 @@ import {
   teamSceneJudgedFloorOf,
   teamSceneRideOf
 } from './team-scene-floors'
+import type { TeamSceneLeg } from './team-scene-ride-legs'
 
 const local: TeamHost = { kind: 'local' }
 const remote = (name: string, reachable = true): TeamHost => ({
@@ -181,8 +182,9 @@ describe("teamSceneFloorsOf from the owner's real teams", () => {
   })
 })
 
+const asking = (key: string, host: TeamHost) => ({ ...card(key, host), needsYou: true })
+
 describe('teamSceneRideOf', () => {
-  const asking = (key: string, host: TeamHost) => ({ ...card(key, host), needsYou: true })
   it('sends the lead to the first member on another floor who needs you, and nowhere else', () => {
     const members = [card('a'), card('b', remote('m1')), asking('c', remote('m1'))]
     const floors = teamSceneFloorsOf({ lead, members, machines: null })
@@ -199,42 +201,67 @@ describe('teamSceneRideOf', () => {
     const members = [card('a'), asking('c', remote('m1', false))]
     expect(teamSceneRideOf(teamSceneFloorsOf({ lead, members, machines: null }))).toBeNull()
   })
-
-  it("puts the ride on both floors' inputs: away on the lead's, the guest on the member's", () => {
-    const members = [card('a'), asking('c', remote('m1'))]
-    const model = {
-      lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
-      advisor: null,
-      stopped: null,
-      members,
-      machines: null
-    } as unknown as Parameters<typeof teamSceneFloorInputOf>[0]
-    const floors = teamSceneFloorsOf({ lead, members, machines: null })
-    const ride = teamSceneRideOf(floors)
-    const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor, ride))
-    expect(home!.ride).toBe('away')
-    expect(away!.ride).toEqual({ guest: 'c' })
-  })
 })
 
-describe('teamSceneFloorInputOf and the advisor riding', () => {
-  it("moves the advisor to the floor Jev just ruled on, entering by the elevator, and off the lead's", () => {
-    const members = [card('a'), card('c', remote('m1'))]
-    const model = {
-      lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
+describe('teamSceneFloorInputOf, riders on their trips', () => {
+  const members = [
+    card('a'),
+    { ...asking('c', remote('m1')), decisions: [{ id: 'd1', verdict: 'allow', gesture: null }] }
+  ]
+  const model = {
+    lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
+    advisor: { line: 'ok' },
+    stopped: null,
+    members,
+    machines: null
+  } as unknown as Parameters<typeof teamSceneFloorInputOf>[0]
+  const floors = teamSceneFloorsOf({ lead, members, machines: null })
+  const HOME: TeamSceneLeg = { stage: 'home' }
+  const leg = (stage: Exclude<TeamSceneLeg['stage'], 'home'>): TeamSceneLeg => ({
+    stage,
+    home: '',
+    away: 'm1',
+    member: 'c',
+    at: 0
+  })
+  const inputs = (legs: { lead: TeamSceneLeg; advisor: TeamSceneLeg }) =>
+    floors.map((floor) => teamSceneFloorInputOf(model, floor, legs))
+
+  it('keeps the lead away from its floor for the whole trip, and its guest there only on arrival', () => {
+    for (const stage of ['out', 'travel', 'there', 'back', 'return'] as const) {
+      const [home, away] = inputs({ lead: leg(stage), advisor: HOME })
+      expect(home!.ride, stage).toBe('away')
+      expect(away!.ride, stage).toEqual(stage === 'there' ? { guest: 'c' } : undefined)
+    }
+    const [home, away] = inputs({ lead: HOME, advisor: HOME })
+    expect(home!.ride).toBeUndefined()
+    expect(away!.ride).toBeUndefined()
+  })
+
+  it('walks the advisor out, keeps it off both floors in the car, and in by the elevator on arrival', () => {
+    const at = (stage: TeamSceneLeg) => {
+      const [home, away] = inputs({ lead: HOME, advisor: stage })
+      return { home, away }
+    }
+    expect(at(leg('out')).home).toMatchObject({ advisor: { line: 'ok' }, advisorLeaves: true })
+    expect(at(leg('travel')).home!.advisor).toBeNull()
+    expect(at(leg('travel')).away!.advisor).toBeNull()
+    expect(at(leg('there')).away).toMatchObject({ advisor: { line: 'ok' }, advisorEnters: true })
+    expect(at(leg('back')).away).toMatchObject({ advisor: { line: 'ok' }, advisorLeaves: true })
+    expect(at(leg('return')).home!.advisor).toBeNull()
+    expect(at({ stage: 'home', returned: true }).home).toMatchObject({
       advisor: { line: 'ok' },
-      stopped: null,
-      members,
-      machines: null
-    } as unknown as Parameters<typeof teamSceneFloorInputOf>[0]
-    const floors = teamSceneFloorsOf({ lead, members, machines: null })
-    const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor, null, 'm1'))
-    expect(home!.advisor).toBeNull()
-    expect(away!.advisor).toEqual({ line: 'ok' })
-    expect(away!.advisorEnters).toBe(true)
-    const [still] = floors.map((floor) => teamSceneFloorInputOf(model, floor, null, null))
-    expect(still!.advisor).toEqual({ line: 'ok' })
-    expect(still!.advisorEnters).toBeUndefined()
+      advisorEnters: true
+    })
+    expect(at(HOME).home!.advisorEnters).toBeUndefined()
+  })
+
+  // Why: the advisor gestures on the decision it sees arrive, so it must arrive with the advisor.
+  it("shows a remote member's Jev decisions only while the advisor stands on its floor", () => {
+    const decisionsOn = (advisor: TeamSceneLeg) =>
+      inputs({ lead: HOME, advisor })[1]!.members[0]!.decisions
+    expect(decisionsOn(leg('travel'))).toBeUndefined()
+    expect(decisionsOn(leg('there'))).toHaveLength(1)
   })
 })
 

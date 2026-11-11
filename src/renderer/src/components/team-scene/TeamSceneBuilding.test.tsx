@@ -224,9 +224,42 @@ describe('TeamSceneBuilding', () => {
           }) as unknown as MediaQueryList
       )
 
-    it("parks the car at the lead's floor, and at the floor of a member there who needs you", () => {
+    const rider = () =>
+      host.querySelector<HTMLElement>('[data-team-elevator-rider]')?.dataset.teamElevatorRider ??
+      null
+
+    it("keeps the car at the lead's floor until the lead boards, then carries it up, and back", () => {
+      vi.useFakeTimers()
+      motion(false)
       render([local, remote('imac')])
       expect(car()?.dataset.teamElevatorCar).toBe('')
+      const show = (next: TeamSceneBuildingModel): void =>
+        act(() =>
+          root.render(<TeamSceneBuilding model={next} makePainter={make} leadLine={null} />)
+        )
+      show(asking([local, remote('imac')], 1))
+      // Walking out to the elevator: the car waits for it.
+      expect(car()?.dataset.teamElevatorCar).toBe('')
+      expect(rider()).toBeNull()
+      // A scene that is not drawn never walks it there, so the car goes after its limit.
+      act(() => vi.advanceTimersByTime(8_000))
+      expect(car()?.dataset.teamElevatorCar).toBe('imac')
+      expect(rider()).toBe('lead')
+      act(() => vi.advanceTimersByTime(1_200))
+      expect(rider()).toBeNull()
+      show(model([local, remote('imac')]))
+      expect(car()?.dataset.teamElevatorCar).toBe('imac')
+      act(() => vi.advanceTimersByTime(8_000))
+      expect(car()?.dataset.teamElevatorCar).toBe('')
+      expect(rider()).toBe('lead')
+      act(() => vi.advanceTimersByTime(1_200))
+      expect(rider()).toBeNull()
+      vi.useRealTimers()
+    })
+
+    it('shows where a ride ends at once under reduced motion', () => {
+      motion(true)
+      render([local, remote('imac')])
       act(() =>
         root.render(
           <TeamSceneBuilding
@@ -237,6 +270,7 @@ describe('TeamSceneBuilding', () => {
         )
       )
       expect(car()?.dataset.teamElevatorCar).toBe('imac')
+      expect(rider()).toBeNull()
     })
 
     it('sends a report up the tube when a member on another floor files one, never under reduced motion', () => {
@@ -259,6 +293,7 @@ describe('TeamSceneBuilding', () => {
 
     it('takes the car to the floor of a member Jev just ruled on, and back once the advisor is done', () => {
       vi.useFakeTimers()
+      motion(false)
       const ruled = (ids: string[]): TeamSceneBuildingModel => {
         const base = model([local, remote('imac')])
         base.members[1] = {
@@ -274,9 +309,15 @@ describe('TeamSceneBuilding', () => {
       show(ruled(['d1']))
       expect(car()?.dataset.teamElevatorCar).toBe('')
       show(ruled(['d1', 'd2']))
+      act(() => vi.advanceTimersByTime(8_000))
       expect(car()?.dataset.teamElevatorCar).toBe('imac')
-      act(() => vi.advanceTimersByTime(60_000))
+      expect(rider()).toBe('advisor')
+      // Why a second at a time: each stage's timer is set once React commits the one before.
+      for (let second = 0; second < 60; second++) {
+        act(() => vi.advanceTimersByTime(1_000))
+      }
       expect(car()?.dataset.teamElevatorCar).toBe('')
+      expect(rider()).toBeNull()
       vi.useRealTimers()
     })
   })

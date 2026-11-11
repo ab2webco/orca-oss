@@ -1,5 +1,6 @@
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
 import { teamSceneInputOf } from './team-scene-input'
+import type { TeamSceneLeg } from './team-scene-ride-legs'
 import type { TeamSceneInput } from './team-scene-types'
 
 /** One machine the team runs on, as a floor of the Office building. */
@@ -82,30 +83,58 @@ export function teamSceneFloorsOf(model: {
   return [...floors.values()].filter((floor) => floor.lead || floor.members.length > 0)
 }
 
+/** Where each rider is on its trip between the lead's floor and another. */
+export type TeamSceneFloorLegs = { lead: TeamSceneLeg; advisor: TeamSceneLeg }
+
+const HOME_LEGS: TeamSceneFloorLegs = { lead: { stage: 'home' }, advisor: { stage: 'home' } }
+
 /**
- * One floor's scene: its own members and empty desks; the lead and STOP only on its own, and the
- * advisor there too unless it rode to `advisorFloor`, where Jev just ruled on a member.
+ * One floor's scene: its own members and empty desks, STOP on the lead's, and the lead and advisor
+ * where their trips have them: walking out, gone while the car carries them, in on arrival.
  */
 export function teamSceneFloorInputOf(
   model: Parameters<typeof teamSceneInputOf>[0],
   floor: TeamSceneFloor,
-  ride: TeamSceneBuildingRide | null = null,
-  advisorFloor: string | null = null
+  legs: TeamSceneFloorLegs = HOME_LEGS
 ): TeamSceneInput {
-  const advisorHere = advisorFloor === null ? floor.lead : floor.key === advisorFloor
+  const advisor = advisorOn(floor, legs.advisor)
   const input = teamSceneInputOf({
     ...model,
-    members: floor.members,
-    advisor: advisorHere ? model.advisor : null,
+    // Why held back: the advisor gestures on a decision it sees arrive, so it arrives with it.
+    members:
+      advisor === 'gone' && !floor.lead ? floor.members.map(withoutDecisions) : floor.members,
+    advisor: advisor === 'gone' ? null : model.advisor,
     stopped: floor.lead ? model.stopped : null
   })
   return {
     ...input,
-    ...(advisorHere && !floor.lead ? { advisorEnters: true as const } : {}),
     ...(floor.lead ? { leadStays: true as const } : { leadless: true as const }),
+    ...(advisor === 'enters' ? { advisorEnters: true as const } : {}),
+    ...(advisor === 'leaves' ? { advisorLeaves: true as const } : {}),
     desks: { taken: floor.taken, free: floor.free },
-    ...rideOn(floor, ride)
+    ...rideOn(floor, legs.lead)
   }
+}
+
+const withoutDecisions = (member: TeamMemberCard): TeamMemberCard => {
+  const { decisions: _held, ...rest } = member
+  return rest
+}
+
+function advisorOn(
+  floor: TeamSceneFloor,
+  leg: TeamSceneLeg
+): 'here' | 'enters' | 'leaves' | 'gone' {
+  if (leg.stage === 'home') {
+    return floor.lead ? (leg.returned ? 'enters' : 'here') : 'gone'
+  }
+  if (floor.lead) {
+    return leg.stage === 'out' ? 'leaves' : 'gone'
+  }
+  if (floor.key !== leg.away) {
+    return 'gone'
+  }
+  return leg.stage === 'there' ? 'enters' : leg.stage === 'back' ? 'leaves' : 'gone'
 }
 
 /** Where the lead rides: to a member on another floor it can reach who needs you. */
@@ -123,17 +152,16 @@ export function teamSceneRideOf(floors: readonly TeamSceneFloor[]): TeamSceneBui
   return null
 }
 
-const rideOn = (
-  floor: TeamSceneFloor,
-  ride: TeamSceneBuildingRide | null
-): Pick<TeamSceneInput, 'ride'> => {
-  if (!ride) {
+const rideOn = (floor: TeamSceneFloor, leg: TeamSceneLeg): Pick<TeamSceneInput, 'ride'> => {
+  if (leg.stage === 'home') {
     return {}
   }
   if (floor.lead) {
     return { ride: 'away' }
   }
-  return floor.key === ride.floor ? { ride: { guest: ride.member } } : {}
+  return leg.stage === 'there' && floor.key === leg.away && leg.member
+    ? { ride: { guest: leg.member } }
+    : {}
 }
 
 /**

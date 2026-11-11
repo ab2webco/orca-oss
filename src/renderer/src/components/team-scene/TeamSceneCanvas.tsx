@@ -10,6 +10,7 @@ import {
   type TeamSceneWorld
 } from '../../../../shared/team-scene/team-scene-director'
 import { teamSceneLeadAttends } from '../../../../shared/team-scene/team-scene-lead-rounds'
+import { drainTeamSceneBoarded } from '../../../../shared/team-scene/team-scene-elevator'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { teamSceneLabel } from './team-scene-copy'
@@ -25,6 +26,8 @@ type Props = {
   leadLine: string | null
   /** Which speeches the last layout left without a bubble. */
   onUnplaced?: (keys: string[]) => void
+  /** The lead or advisor stepped into the building's elevator. */
+  onBoarded?: (rider: string) => void
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
@@ -44,7 +47,8 @@ export function TeamSceneCanvas({
   input,
   painter,
   leadLine,
-  onUnplaced
+  onUnplaced,
+  onBoarded
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
@@ -60,6 +64,8 @@ export function TeamSceneCanvas({
   const speakersKeyRef = useRef('')
   const tagRefs = useRef(new Map<string, HTMLSpanElement>())
   const [tags, setTags] = useState<TeamSceneRect[]>([])
+  const onBoardedRef = useRef(onBoarded)
+  onBoardedRef.current = onBoarded
 
   const paint = useCallback(
     (dt: number, elapsed = dt) => {
@@ -76,6 +82,7 @@ export function TeamSceneCanvas({
         canvas.height = Math.round(height * ratio)
       }
       stepTeamScene(world, dt, { width, elapsed })
+      drainTeamSceneBoarded(world).forEach((rider) => onBoardedRef.current?.(rider))
       const g = canvas.getContext('2d')
       if (!g) {
         return
