@@ -7,6 +7,7 @@ function dispatcherWith(
   leads: {
     register: (args: unknown) => Promise<unknown>
     list: () => unknown
+    storedLeadOf?: (caller: unknown) => Promise<unknown>
   },
   delivered: unknown[] = []
 ) {
@@ -136,6 +137,24 @@ describe('game leads RPC', () => {
         fresh: true
       }
     ])
+  })
+
+  it("reads the stored lead of the worktree's project (ORCA-717)", async () => {
+    const callers: unknown[] = []
+    const send = dispatcherWith({
+      register: async () => ({}),
+      list: () => ({ leads: [] }),
+      storedLeadOf: async (caller: unknown) => {
+        callers.push(caller)
+        return { accountId: 'acct-glm' }
+      }
+    })
+
+    await expect(send('game.leadStored', { worktreeId: 'wt-1' })).resolves.toMatchObject({
+      ok: true,
+      result: { stored: { accountId: 'acct-glm' } }
+    })
+    expect(callers).toEqual([{ worktreeId: 'wt-1' }])
   })
 
   it('lists the live leads', async () => {

@@ -40,6 +40,14 @@ export const ORCHESTRATOR_GAME_LEADS_METHODS: RpcMethod[] = [
       return result
     }
   }),
+  // Why a new method: an older host answers method_not_found, which a client reads as unknown (ORCA-717).
+  defineMethod({
+    name: 'game.leadStored',
+    params: z.object({ worktreeId: z.string() }),
+    handler: async (params, { runtime }) => ({
+      stored: await runtime.getGameLeads().storedLeadOf({ worktreeId: params.worktreeId })
+    })
+  }),
   defineMethod({
     name: 'game.leads',
     params: null,

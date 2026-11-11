@@ -188,6 +188,16 @@ export class GameLeads {
     return this.leadOf(projectKey)
   }
 
+  /** The account of the project's kept lead conversation, so a client can offer to reopen the team. */
+  async storedLeadOf(caller: GameBoardCaller): Promise<{ accountId: string | null } | null> {
+    const project = await this.deps.projectOf(caller)
+    if (project.key === UNPLACED_PROJECT) {
+      return null
+    }
+    const session = await this.deps.sessions?.read(project.key).catch(() => null)
+    return session ? { accountId: session.accountId ?? null } : null
+  }
+
   /** The project's live lead, for a caller that is no terminal: the person's Inbox. */
   async liveLeadOf(projectKey: string): Promise<string | null> {
     await this.settle(projectKey)
