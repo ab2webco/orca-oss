@@ -519,8 +519,14 @@ test('the Team panel draws the live scene beside a member opened under its heade
         // its bubble and the advisor's do not both fit beside the tag only the lead's shows; the
         // advisor's whole line is in its card row, as asserted above.
         await expect(leadBubble).toBeVisible()
+        // Why the shown set, read each time: the advisor's bubble stays only where both fit.
+        const besideTag = async (): Promise<string[]> =>
+          bubblesOverTag(
+            orcaPage,
+            (await shownBubbles(orcaPage)).advisor ? ['advisor', 'lead'] : ['lead']
+          )
         await expect
-          .poll(() => bubblesOverTag(orcaPage, ['advisor', 'lead']), {
+          .poll(besideTag, {
             message: `${style} bubbles over ORCA-14's tag at ${width}px ${theme}`
           })
           .toEqual([])
