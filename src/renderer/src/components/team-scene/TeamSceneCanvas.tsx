@@ -34,6 +34,8 @@ type TeamSceneAsker = { key: string; name: string; x: number; top: number }
 // Why: V28 names the asker in a tag above its alert mark, which sits about 20px over the head.
 const ASKER_LIFT = 38
 const ASKER_EDGE = 32
+// How far a speaker moves before its bubble follows.
+const ANCHOR_STEP_PX = 4
 
 export function TeamSceneCanvas({
   input,
@@ -49,7 +51,9 @@ export function TeamSceneCanvas({
     advisor: string | null
     anchors: Map<string, TeamSceneSpeech['anchor']>
     askers: TeamSceneAsker[]
-  }>({ width: 0, advisor: null, anchors: new Map(), askers: [] })
+    /** The lead stands by a member who asks, under that member's tag. */
+    leadAttends: boolean
+  }>({ width: 0, advisor: null, anchors: new Map(), askers: [], leadAttends: false })
   const speakersKeyRef = useRef('')
   const tagRefs = useRef(new Map<string, HTMLSpanElement>())
   const [tags, setTags] = useState<TeamSceneRect[]>([])
@@ -89,13 +93,15 @@ export function TeamSceneCanvas({
           x: Math.round(a.x * width),
           top: Math.round(painter.headTop(a.depth, height) - ASKER_LIFT)
         }))
-      // Why keyed: speakers stand still, so the overlay re-renders only when a line or size changes.
-      const key = `${width}|${advisor}|${[...anchors.keys()].join()}|${askers
-        .map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`)
-        .join()}`
+      const leadAttends = world.rounds.stage === 'atMember' && world.rounds.purpose === 'attend'
+      // Why keyed, and by a few px: the overlay re-renders only when a line, size or speaker moves,
+      // so a walking lead's bubble follows it without a render every frame.
+      const key = `${width}|${advisor}|${leadAttends}|${[...anchors]
+        .map(([k, a]) => `${k}:${Math.round(a.x / ANCHOR_STEP_PX)}`)
+        .join()}|${askers.map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`).join()}`
       if (key !== speakersKeyRef.current) {
         speakersKeyRef.current = key
-        setSpeakers({ width, advisor, anchors, askers })
+        setSpeakers({ width, advisor, anchors, askers, leadAttends })
       }
       painter.paint(g, {
         width,
@@ -107,7 +113,9 @@ export function TeamSceneCanvas({
         actors,
         effects: drainTeamSceneEffects(world),
         overflow: world.overflow,
-        stations: world.stations
+        stations: world.stations,
+        sites: world.sites,
+        trophies: world.trophies
       })
     },
     [painter]
@@ -207,7 +215,12 @@ export function TeamSceneCanvas({
   }
   const leadAnchor = speakers.anchors.get('lead')
   if (leadLine && leadAnchor) {
-    speeches.push({ key: 'lead', text: leadLine, anchor: leadAnchor })
+    speeches.push({
+      key: 'lead',
+      text: leadLine,
+      anchor: leadAnchor,
+      attending: speakers.leadAttends
+    })
   }
 
   return (

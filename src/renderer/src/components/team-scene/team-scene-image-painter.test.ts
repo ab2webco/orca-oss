@@ -73,6 +73,8 @@ const frame = (extra: Partial<TeamSceneFrame> = {}): TeamSceneFrame => ({
   effects: [],
   overflow: 0,
   stations: [],
+  sites: [],
+  trophies: [],
   ...extra
 })
 

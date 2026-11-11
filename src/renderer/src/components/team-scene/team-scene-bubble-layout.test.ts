@@ -4,7 +4,8 @@ import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/h
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
 import {
   applyTeamSceneInput,
-  createTeamSceneWorld
+  createTeamSceneWorld,
+  stepTeamScene
 } from '../../../../shared/team-scene/team-scene-director'
 import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
 import { createImagePainter } from './team-scene-image-painter'
@@ -43,6 +44,15 @@ const SPEAKERS = (() => {
   const spot = (role: 'lead' | 'advisor') => teamSceneActors(world).find((a) => a.role === role)!
   return { lead: spot('lead'), advisor: spot('advisor') }
 })()
+const ASKER_INPUT = {
+  key: 'm',
+  name: 'ORCA-14',
+  characterKey: null,
+  activity: 'needsYou',
+  reportId: null,
+  mergedPr: null,
+  site: { stage: 0, broken: false }
+} as const
 // The member who asks, and its tag as TeamSceneCanvas places it: 56 px wide, 18 tall, centred
 // 38 px over the head and no nearer the edge than 32 px.
 const ASKER = (() => {
@@ -50,16 +60,7 @@ const ASKER = (() => {
   applyTeamSceneInput(world, {
     lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
     advisor: { line: null },
-    members: [
-      {
-        key: 'm',
-        name: 'ORCA-14',
-        characterKey: null,
-        activity: 'needsYou',
-        reportId: null,
-        mergedPr: null
-      }
-    ]
+    members: [{ ...ASKER_INPUT }]
   })
   return teamSceneActors(world).find((a) => a.role === 'member')!
 })()
@@ -212,6 +213,46 @@ describe('layoutTeamSceneBubbles', () => {
       )
       expect(box, stage.style).toBeDefined()
       expect(box!.top + box!.height, stage.style).toBeLessThanOrEqual(tag.top)
+    }
+  })
+
+  // Why: the lead stays beside a member who needs you (lead rounds), right under that member's tag.
+  it("shows the lead's bubble while it stands by the asking member, on every stage", () => {
+    for (const stage of STAGES) {
+      for (const width of STAGE_WIDTHS) {
+        const world = createTeamSceneWorld()
+        applyTeamSceneInput(world, {
+          lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+          advisor: null,
+          members: [{ ...ASKER_INPUT }]
+        })
+        for (let t = 0; t < 20; t += 1 / 30) {
+          stepTeamScene(world, 1 / 30, { width })
+        }
+        expect(world.rounds.stage, `${stage.style} ${width}`).toBe('atMember')
+        const lead = teamSceneActors(world).find((a) => a.role === 'lead')!
+        const anchor = {
+          x: lead.x * width,
+          top: stage.painter.headTop(lead.depth, stage.painter.height)
+        }
+        const tag = tagOn(stage, width)
+        const request = { key: 'lead', anchor, width: 120, height: stage.heights[0]! }
+        const scene = { width, height: stage.painter.height }
+        const opts = { beside: stage.beside, obstacles: [tag] }
+        const where = `${stage.style} ${width} px`
+        const boxes = layoutTeamSceneBubbles([{ ...request, attending: true }], scene, opts)
+        expect(
+          boxes.map((b) => b.key),
+          where
+        ).toEqual(['lead'])
+        // The tail may pass behind the tag; the bubble itself never covers it.
+        expect(overlaps(boxes[0]!, { ...tag, key: 'tag', tailX: 0 }), where).toBe(false)
+        // Behind a tag only as a last resort: where a clear spot exists, it takes that one.
+        const clear = layoutTeamSceneBubbles([request], scene, opts)
+        if (clear.length > 0) {
+          expect(boxes, where).toEqual(clear)
+        }
+      }
     }
   })
 
