@@ -204,6 +204,28 @@ describe('TeamSceneBuilding', () => {
     vi.useRealTimers()
   })
 
+  // Why: a floor's speech bubble was cut under the floor above ('Los mensajes quedan detrás del
+  // muro', owner, 2026-11-11). Only the canvas is cropped; bubbles may rise over the slab above.
+  it("crops each floor's canvas, not its bubbles, and keeps the top floor's under its own top", () => {
+    render([local, remote('imac'), remote('m1')])
+    const floorsShown = [...host.querySelectorAll<HTMLElement>('[data-team-floor]')]
+    expect(floorsShown).toHaveLength(3)
+    for (const [i, floor] of floorsShown.entries()) {
+      expect(floor.className, 'the floor itself clips nothing').not.toContain('overflow-hidden')
+      const canvas = floor.querySelector<HTMLCanvasElement>('canvas')!
+      expect(canvas.style.clipPath, `floor ${i}`).toMatch(
+        /^inset\(\d+px 0px \d+px\)|^inset\(\d+px 0px\)/
+      )
+      const top = Number(
+        floor.querySelector<HTMLElement>('[data-scene-visible-top]')?.dataset.sceneVisibleTop
+      )
+      // The top floor's bubbles stay under its own visible top; lower ones may rise over the slab.
+      expect(top, `floor ${i}`).toBe(
+        i === 0 ? Number(/^inset\((\d+)px/.exec(canvas.style.clipPath)![1]) : 0
+      )
+    }
+  })
+
   describe('elevator and tube', () => {
     const asking = (hosts: TeamHost[], who: number): TeamSceneBuildingModel => {
       const base = model(hosts)
