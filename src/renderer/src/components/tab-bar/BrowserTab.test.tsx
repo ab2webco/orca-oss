@@ -239,6 +239,17 @@ async function renderExpandedBrowserTab(tab: BrowserTabState): Promise<unknown> 
   return expandNode(await renderBrowserTab(tab))
 }
 
+// Why (ORCA-717): under a 120 px tab bar a tab is its icon alone; hover or focus swaps the icon for its close.
+function expectNarrowIconSwap(tree: unknown): void {
+  const icon = findElementsByType(tree, 'span').find((el) => el.props['data-tab-leading-icon'])
+  const close = findElementsByType(tree, 'button').find(
+    (el) => el.props['data-tab-close-button'] === 'true'
+  )
+  expect(String(icon?.props.className)).toContain('@max-[120px]/tab-bar:group-hover:hidden')
+  expect(String(close?.props.className)).toContain('@max-[120px]/tab-bar:hidden')
+  expect(String(close?.props.className)).toContain('@max-[120px]/tab-bar:group-hover:flex')
+}
+
 describe('BrowserTab favicon', { timeout: 30_000 }, () => {
   beforeEach(() => {
     reactHookRuntime.states = []
@@ -308,5 +319,9 @@ describe('BrowserTab favicon', { timeout: 30_000 }, () => {
     expect(images).toHaveLength(1)
     expect(images[0].props.src).toBe(nextIconUrl)
     expect(findElementsByType(resetRender, 'Globe')).toHaveLength(0)
+  })
+
+  it('shows its icon alone in a narrow tab bar and swaps it for the close on hover', async () => {
+    expectNarrowIconSwap(await renderExpandedBrowserTab(baseBrowserTab({})))
   })
 })
