@@ -51,7 +51,8 @@ export function teamSceneInputOf(
       ...agentOf(m, m.needsYou),
       reportId: m.summary,
       mergedPr: m.pr?.state === 'merged' ? m.pr.number : null,
-      site: teamSceneSiteOf(m)
+      site: teamSceneSiteOf(m),
+      ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {})
     }))
   }
 }

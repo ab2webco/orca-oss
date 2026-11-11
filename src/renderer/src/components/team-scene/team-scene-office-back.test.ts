@@ -138,4 +138,11 @@ describe('office back view', () => {
       expect(discs(playing('game')).filter((d) => d.y < headTopY)).toHaveLength(0)
     })
   })
+
+  it('leaves only the chair at a seat whose member is away', () => {
+    const r = recordingContext()
+    drawOfficeBack(r.g, 100, FLOOR, PX, LOOK, { pose: 'idle', jump: 0, away: true }, 0)
+    expect(discs(r).some((d) => d.color === LOOK.hair)).toBe(false)
+    expect(r.calls.some((c) => c.name === 'roundRect')).toBe(true)
+  })
 })

@@ -23,6 +23,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   mergedPr: number | null
   /** Its visible build, staged from its real phase, PR and CI. */
   site: TeamSceneSite
+  /** Its session is gone or never started: the seat stays, with nobody in it. */
+  away?: true
 }
 
 export type TeamSceneInput = {
@@ -89,6 +91,8 @@ export type TeamSceneActor = {
   gesture?: TeamSceneGesture | null
   /** A resting member's play in its chair, only where members work seated. */
   play?: TeamScenePlay
+  /** A member whose session is gone or never started; a style may leave its seat empty. */
+  away?: true
 }
 
 /** One-shot moments a style may draw particles or a thrown item for. */

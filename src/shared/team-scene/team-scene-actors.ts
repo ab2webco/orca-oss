@@ -79,6 +79,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         emote: timed ?? seatedMark,
         ...(body.role === 'advisor' ? { gesture: advisorGestureOf(world) } : {}),
         ...(play ? { play } : {}),
+        ...(body.away ? { away: true as const } : {}),
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }
     })

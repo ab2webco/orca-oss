@@ -148,6 +148,24 @@ function disc(g: CanvasRenderingContext2D, x: number, y: number, r: number, colo
   g.stroke()
 }
 
+/** The chair seen from behind: its back, then its stem and base on the floor. */
+function drawOfficeChair(
+  g: CanvasRenderingContext2D,
+  ground: (dx: number, u: number) => Point,
+  px: number
+): void {
+  const [cx, cy] = ground(-16, 30)
+  g.beginPath()
+  g.roundRect(cx, cy, 32 * px, 22 * px, 5 * px)
+  g.fillStyle = CHAIR
+  g.fill()
+  g.strokeStyle = CHAIR_EDGE
+  g.stroke()
+  g.fillStyle = CHAIR
+  g.fillRect(...ground(-2, 8), 4 * px, 8 * px)
+  g.fillRect(...ground(-14, 2), 28 * px, 3 * px)
+}
+
 /** A member at its desk seen from behind, facing the monitor; `x, floor` is under its chair. */
 export function drawOfficeBack(
   g: CanvasRenderingContext2D,
@@ -155,10 +173,23 @@ export function drawOfficeBack(
   floor: number,
   px: number,
   look: OfficeBackLook,
-  { pose, jump, play }: { pose: TeamScenePose; jump: number; play?: TeamScenePlay },
+  {
+    pose,
+    jump,
+    play,
+    away
+  }: { pose: TeamScenePose; jump: number; play?: TeamScenePlay; away?: true },
   t: number
 ): void {
   const ground = (dx: number, u: number): Point => [x + dx * px, floor - u * px]
+  if (away) {
+    // Why only the chair: the card says the session is gone, so nobody sits there.
+    g.save()
+    g.lineWidth = 1.6 * px
+    drawOfficeChair(g, ground, px)
+    g.restore()
+    return
+  }
   const lean = officePlayLean(play, t)
   const at = (dx: number, u: number): Point => [x + (dx + lean) * px, floor - jump - u * px]
   g.save()
@@ -211,17 +242,7 @@ export function drawOfficeBack(
     disc(g, ...at(side * (HEAD.r - 0.5), HEAD.u - 1), 2.5 * px, look.skin)
   }
   disc(g, ...at(0, HEAD.u), HEAD.r * px, look.hair)
-  // The chair from behind: its back covers the lower back, its stem and base stand on the floor.
-  const [cx, cy] = ground(-16, 30)
-  g.beginPath()
-  g.roundRect(cx, cy, 32 * px, 22 * px, 5 * px)
-  g.fillStyle = CHAIR
-  g.fill()
-  g.strokeStyle = CHAIR_EDGE
-  g.stroke()
-  g.fillStyle = CHAIR
-  g.fillRect(...ground(-2, 8), 4 * px, 8 * px)
-  g.fillRect(...ground(-14, 2), 28 * px, 3 * px)
+  drawOfficeChair(g, ground, px)
   for (const { side, arm } of arms) {
     if (up(arm[1])) {
       drawArm(side, arm)

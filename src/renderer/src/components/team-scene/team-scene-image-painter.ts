@@ -213,7 +213,7 @@ export function createImagePainter(args: {
             a.role === 'member' && a.pose !== 'walk' && Math.abs((a.x - spot.x) * f.width) < SEAT_PX
         )
         const rect = stationScreenRectAt(screen, left, top, px)
-        const state = stationScreenStateOf(worker?.pose ?? null, failing, worker?.play)
+        const state = stationScreenStateOf(worker ?? null, failing)
         const boot = boots.progressOf(worker?.key, f.t)
         drawStationScreen(g, rect, state, f.t, { attention: colors.attention, virus, boot })
       }
@@ -253,7 +253,8 @@ export function createImagePainter(args: {
     const beside = emoteAt(a, f)
     if (beside) {
       drawOfficeBack(g, x, y, px, backLookOf(sheetOf(art, a), art.frame), a, f.t + a.x * 7)
-      drawActorMarks(g, beside.x, beside.y, a, colors)
+      // Why no mark for an away seat: its warning is on the dark monitor, not over an empty chair.
+      drawActorMarks(g, beside.x, beside.y, a.away ? { ...a, emote: null } : a, colors)
       return
     }
     const [row, column] = frameOf(art, a, seated, f.t, px)

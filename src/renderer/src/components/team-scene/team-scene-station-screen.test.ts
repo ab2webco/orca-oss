@@ -10,9 +10,9 @@ const RECT = { x: 0, y: 0, width: 28, height: 18 }
 
 describe('station screen', () => {
   it('plays a game on the screen of a member at play with one, red CI still first', () => {
-    expect(stationScreenStateOf('idle', false, 'game')).toBe('game')
-    expect(stationScreenStateOf('idle', false, 'music')).toBe('off')
-    expect(stationScreenStateOf('idle', true, 'game')).toBe('fail')
+    expect(stationScreenStateOf({ pose: 'idle', play: 'game' }, false)).toBe('game')
+    expect(stationScreenStateOf({ pose: 'idle', play: 'music' }, false)).toBe('off')
+    expect(stationScreenStateOf({ pose: 'idle', play: 'game' }, true)).toBe('fail')
   })
 
   it('moves its game on the clock', () => {
@@ -40,5 +40,13 @@ describe('station screen', () => {
     expect(count(lines(0.2))).toBeLessThan(count(lines(0.7)))
     expect(count(lines(0.7))).toBeLessThanOrEqual(count(lines()))
     expect(lines().calls.map((c) => c.fillStyle)).not.toContain(STATION_SCREEN_GLOW)
+  })
+
+  it("darkens an away member's screen with a small warning mark in the card's colour", () => {
+    expect(stationScreenStateOf({ pose: 'idle', away: true }, false)).toBe('away')
+    expect(stationScreenStateOf({ pose: 'idle', away: true }, true)).toBe('away')
+    const r = recordingContext()
+    drawStationScreen(r.g, RECT, 'away', 0, { attention: '#e5484d' })
+    expect(r.fills()).toContain('#e5484d')
   })
 })

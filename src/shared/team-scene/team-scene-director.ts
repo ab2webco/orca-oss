@@ -60,6 +60,7 @@ export type TeamSceneBody = TeamSceneMover & {
   plan: Plan
   emote: { kind: TeamSceneEmote; until: number } | null
   site: TeamSceneSite
+  away?: true
   work: TeamSceneWork
 }
 
@@ -182,6 +183,7 @@ export function applyTeamSceneInput(
       name: m.name,
       characterKey: m.characterKey,
       activity: m.activity,
+      away: m.away,
       home: spot,
       site: grownSite(body.site, m.site)
     })

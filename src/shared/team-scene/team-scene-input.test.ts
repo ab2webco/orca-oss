@@ -131,6 +131,7 @@ describe('teamSceneInputOf', () => {
         name: 'failed',
         characterKey: null,
         activity: 'blocked',
+        away: true,
         reportId: null,
         mergedPr: null,
         site: { stage: 0, broken: false }
@@ -240,5 +241,25 @@ describe('teamSceneInputOf and idle play', () => {
       return teamSceneActors(world).find((a) => a.key === 'm')?.play ? [condition] : []
     })
     expect(playing).toEqual(['idle'])
+  })
+})
+
+describe('teamSceneInputOf and an empty seat', () => {
+  it('leaves the seat of a member whose session is gone or never started empty, and says so', () => {
+    const members = [
+      card('gone', { condition: 'gone', status: 'attention' }),
+      card('failed', { condition: 'startFailed', status: 'attention' }),
+      card('asleep', { condition: 'asleep', status: 'risk' }),
+      card('busy')
+    ]
+    const input = teamSceneInputOf({ lead: lead(), advisor: null, members })
+    expect(input.members.map((m) => m.away === true)).toEqual([true, true, false, false])
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input, { rowSize: 5, workSeated: true })
+    stepTeamScene(world, 1 / 30, { width: 420 })
+    const away = teamSceneActors(world)
+      .filter((a) => a.away)
+      .map((a) => a.key)
+    expect(away.sort()).toEqual(['failed', 'gone'])
   })
 })

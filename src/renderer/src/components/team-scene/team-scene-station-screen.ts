@@ -9,7 +9,9 @@ import type {
 // V28's desk screens (drawDesk): code while working, amber on a question, green once done.
 // 'fail': the worker's PR has red CI; its lines take the theme's attention tone.
 // 'game': a resting member plays a tiny runner on its own screen.
-type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game'
+// 'away': the member's session is gone or never started; dark, with a small warning mark.
+type ScreenRect = { x: number; y: number; width: number; height: number }
+type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game' | 'away'
 
 const BACKGROUND: Record<ScreenState, string> = {
   code: '#0f1826',
@@ -17,9 +19,10 @@ const BACKGROUND: Record<ScreenState, string> = {
   ok: '#10352a',
   off: '#0a0c10',
   fail: '#2a1012',
-  game: '#16112b'
+  game: '#16112b',
+  away: '#0a0c10'
 }
-const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game'>, string> = {
+const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game' | 'away'>, string> = {
   code: '#7fb4ff',
   ask: '#ffd24a',
   ok: '#4ade80'
@@ -37,17 +40,36 @@ const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
 
 /** The screen of a desk whose worker holds `pose`; null when nobody sits there. */
 export function stationScreenStateOf(
-  pose: TeamScenePose | null,
-  failing = false,
-  play?: TeamScenePlay
+  worker: { pose: TeamScenePose; play?: TeamScenePlay; away?: true } | null,
+  failing = false
 ): ScreenState {
+  // Why first: nobody is there to fix red CI, so the screen says the session is gone.
+  if (worker?.away) {
+    return 'away'
+  }
   if (failing) {
     return 'fail'
   }
-  if (play === 'game') {
+  if (worker?.play === 'game') {
     return 'game'
   }
-  return (pose && SCREEN_OF[pose]) ?? 'off'
+  return (worker && SCREEN_OF[worker.pose]) ?? 'off'
+}
+
+// A small warning triangle, centred, in the card's attention colour.
+function drawAway(g: CanvasRenderingContext2D, rect: ScreenRect, attention: string): void {
+  const s = Math.min(rect.width, rect.height) * 0.42
+  const [cx, cy] = [rect.x + rect.width / 2, rect.y + rect.height / 2]
+  g.beginPath()
+  g.moveTo(cx, cy - s / 2)
+  g.lineTo(cx + s * 0.58, cy + s / 2)
+  g.lineTo(cx - s * 0.58, cy + s / 2)
+  g.closePath()
+  g.fillStyle = attention
+  g.fill()
+  g.fillStyle = BACKGROUND.away
+  g.fillRect(cx - s * 0.05, cy - s * 0.18, s * 0.1, s * 0.36)
+  g.fillRect(cx - s * 0.05, cy + s * 0.27, s * 0.1, s * 0.1)
 }
 
 // A runner in 28 x 18 screen units: it hops over blocks scrolling in from the right.
@@ -99,6 +121,10 @@ export function drawStationScreen(
     g.globalAlpha = 1
   }
   if (state === 'off') {
+    return
+  }
+  if (state === 'away') {
+    drawAway(g, rect, attention)
     return
   }
   // V28's lines in its 28 x 18 screen units.
@@ -166,8 +192,6 @@ export function createStationBoots() {
     }
   }
 }
-
-type ScreenRect = { x: number; y: number; width: number; height: number }
 
 /** The desk art's screen in stage px, for a desk drawn at `left, top` with `px` per art px. */
 export const stationScreenRectAt = (
