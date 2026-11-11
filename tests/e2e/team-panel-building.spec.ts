@@ -22,7 +22,10 @@ const machine = (cores: number, total: number, free: number) => ({
 const HOSTS = [
   { host: 'local', running: 2, cap: 5, ...machine(14, 36, 21) },
   { host: 'imac', running: 3, cap: 4, ...machine(8, 16, 10) },
-  { host: 'm1', running: 1, cap: 3, status: 'unreachable' }
+  { host: 'm1', running: 1, cap: 3, status: 'unreachable' },
+  // Why five: every machine gets its floor, none folded (owner, five machines, 2026-11-11).
+  { host: 'contabo', running: 1, cap: 2, ...machine(4, 8, 3) },
+  { host: 'mbp', running: 1, cap: 2, ...machine(6, 16, 5) }
 ]
 const MEMBERS = [
   { name: 'Caballero · ORCA-201 Plan', host: null },
@@ -30,7 +33,9 @@ const MEMBERS = [
   { name: 'Mago · ORCA-203 Tests', host: 'imac' },
   // Why waiting: a member on another floor who needs you is what sends the lead up the elevator.
   { name: 'Herrero · ORCA-204 Review', host: 'imac', state: 'waiting' },
-  { name: 'Arquera · ORCA-205 Docs', host: 'm1' }
+  { name: 'Arquera · ORCA-205 Docs', host: 'm1' },
+  { name: 'Ginebra · ORCA-206 Infra', host: 'contabo' },
+  { name: 'Merlín · ORCA-207 Build', host: 'mbp' }
 ]
 
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<{ result?: object }>
@@ -80,7 +85,7 @@ async function spreadAcrossMachines(app: ElectronApplication): Promise<void> {
 // ever be drawn (ORCA-760; the frozen ride stills of ORCA-1150).
 test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
-test('the Team panel draws a team on three machines as a building in Office', async ({
+test('the Team panel draws a team on five machines as a building in Office', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -184,11 +189,15 @@ test('the Team panel draws a team on three machines as a building in Office', as
     const building = panel.locator('[data-team-building]')
     const floors = building.locator('[data-team-floor]')
     await expect(building).toBeVisible({ timeout: 90_000 })
-    await expect(floors).toHaveCount(3)
-    // The lead's floor at the bottom, then the iMac, the unreachable m1 on top and dark.
-    await expect(floors.nth(0)).toHaveAttribute('data-team-floor', 'm1')
-    await expect(floors.nth(0)).toHaveAttribute('data-team-floor-dark', '')
-    await expect(floors.nth(2)).toHaveAttribute('data-team-floor', '')
+    await expect(floors).toHaveCount(5)
+    // One floor per machine, none folded: the lead's at the bottom, then the iMac, the unreachable
+    // m1 dark, then the two others on top.
+    await expect(floors.nth(0)).toHaveAttribute('data-team-floor', 'mbp')
+    await expect(floors.nth(1)).toHaveAttribute('data-team-floor', 'contabo')
+    await expect(floors.nth(2)).toHaveAttribute('data-team-floor', 'm1')
+    await expect(floors.nth(2)).toHaveAttribute('data-team-floor-dark', '')
+    await expect(floors.nth(4)).toHaveAttribute('data-team-floor', '')
+    await expect(building).not.toContainText(/\+\d/)
     await expect(building).not.toContainText(/offline/i)
     // The lead rides to the iMac, where a member waits on you: the car stands at that floor.
     await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
@@ -270,16 +279,16 @@ test('the Team panel draws a team on three machines as a building in Office', as
     await building.screenshot({ path: testInfo.outputPath('building-zoom-imac.png') })
     await building.focus()
     await orcaPage.keyboard.press('Escape')
-    await expect(floors).toHaveCount(3)
+    await expect(floors).toHaveCount(5)
     await orcaPage.keyboard.press('2')
     await expect(floors.first()).toHaveAttribute('data-team-floor', 'imac')
     // Why the terminal: digits typed there belong to it, never to the scene beside it.
     await orcaPage.keyboard.press('0')
-    await expect(floors).toHaveCount(3)
+    await expect(floors).toHaveCount(5)
     await ensureTerminalVisible(orcaPage)
     await orcaPage.locator('.xterm-helper-textarea').first().focus()
     await orcaPage.keyboard.press('3')
-    await expect(floors).toHaveCount(3)
+    await expect(floors).toHaveCount(5)
   } finally {
     agent.dispose()
   }
