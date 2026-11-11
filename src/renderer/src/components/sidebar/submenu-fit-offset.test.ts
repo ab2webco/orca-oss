@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { submenuFitSideOffset } from './submenu-fit-offset'
+import { popupSideThatFits, submenuFitSideOffset } from './submenu-fit-offset'
 
 // ORCA-1163: at 320 the Card display submenu opened past the window's right edge.
 describe('submenuFitSideOffset', () => {
@@ -14,5 +14,20 @@ describe('submenuFitSideOffset', () => {
     expect(
       submenuFitSideOffset({ triggerRight: 500, submenuWidth: 224, viewportWidth: 1440 })
     ).toBe(0)
+  })
+})
+
+// ORCA-1163: the 288 px options menu opened to the right of a trigger at 200 in a 320 window.
+describe('popupSideThatFits', () => {
+  it('opens beside the trigger when the window has room', () => {
+    expect(
+      popupSideThatFits({ triggerRight: 220, popupWidth: 288, sideOffset: 8, viewportWidth: 1440 })
+    ).toBe('right')
+  })
+
+  it('opens below the trigger when it would leave the window to the right', () => {
+    expect(
+      popupSideThatFits({ triggerRight: 220, popupWidth: 288, sideOffset: 8, viewportWidth: 320 })
+    ).toBe('bottom')
   })
 })

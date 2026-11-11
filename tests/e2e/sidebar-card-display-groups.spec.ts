@@ -137,6 +137,19 @@ test.describe('Card display groups', () => {
         await cardDisplay.hover()
         const groups = orcaPage.locator('[data-card-display-group]')
         await expect(groups).toHaveText(['Work', 'Agent', 'Source'])
+        // At 320 the options menu's left column was cut ('atus', 'branch').
+        const mainMenu = orcaPage
+          .getByRole('menu')
+          .filter({ has: orcaPage.getByRole('menuitem', { name: /Card display/ }) })
+        await expect
+          .poll(
+            async () => {
+              const box = await mainMenu.boundingBox()
+              return box ? box.x >= 0 && box.x + box.width <= width : false
+            },
+            { message: `${width}px ${theme}: the options menu leaves the window` }
+          )
+          .toBe(true)
         // At 320 the submenu was cut at the window's right edge ('Pull request and ch...').
         const submenu = orcaPage.locator('[role="menu"]:has([data-card-display-group])')
         await expect
