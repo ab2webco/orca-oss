@@ -2183,7 +2183,7 @@ function App(): React.JSX.Element {
       {/* Why: Back/Forward span worktree + page history, so show the cluster wherever the shortcut is live (hidden in Settings/non-stack views). */}
       {shouldShowWorktreeHistoryControls(activeView) && (
         // With the sidebar collapsed the header shrink-wraps and ml-auto has no spare width, so keep a fixed gutter before Back.
-        <div className="ml-auto mr-3 flex items-center pl-2">
+        <div className="titlebar-history ml-auto mr-3 flex items-center pl-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <button
