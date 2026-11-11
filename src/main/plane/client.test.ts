@@ -53,6 +53,12 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
   })
 }
 
+const CLIENT = {
+  baseUrl: 'https://plane.example.com',
+  workspaceSlug: 'acme',
+  headers: { 'x-api-key': 'secret-key', 'x-workspace-slug': 'acme' }
+}
+
 const VIEWER_PAYLOAD = {
   id: 'user-1',
   email: 'viewer@example.com',
@@ -342,11 +348,11 @@ describe('connection lifecycle: disconnect/select/status/testConnection', () => 
 })
 
 describe('429 handling', () => {
-  it('retries once honoring Retry-After, then surfaces the error on a second failure', async () => {
+  it('retries a bounded number of times honoring Retry-After, then surfaces the error', async () => {
     const { connect } = await loadClientModule()
-    netFetchMock
-      .mockResolvedValueOnce(jsonResponse({}, 429, { 'retry-after': '0.01' }))
-      .mockResolvedValueOnce(jsonResponse({ error: 'Still rate limited' }, 429))
+    netFetchMock.mockImplementation(async () =>
+      jsonResponse({ error: 'Still rate limited' }, 429, { 'retry-after': '0.01' })
+    )
 
     const result = await connect({
       baseUrl: 'https://api.plane.so',
@@ -355,8 +361,46 @@ describe('429 handling', () => {
     })
 
     expect(result).toEqual({ ok: false, error: 'Still rate limited' })
-    // Exactly one retry: the original users/me call plus one bounded retry.
-    expect(netFetchMock).toHaveBeenCalledTimes(2)
+    // The original users/me call plus three bounded retries.
+    expect(netFetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('goes on once a later retry is answered', async () => {
+    const { rawClientRequest } = await loadClientModule()
+    netFetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 429, { 'retry-after': '0.01' }))
+      .mockResolvedValueOnce(jsonResponse({}, 429, { 'retry-after': '0.01' }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    const response = await rawClientRequest(CLIENT, '/api/v1/users/me/')
+
+    expect(response.status).toBe(200)
+    expect(netFetchMock).toHaveBeenCalledTimes(3)
+  })
+})
+
+// ORCA-1166: agents' calls used up a fixed 60/min, so the Tasks page waited up to a minute.
+describe('server-reported budget', () => {
+  it('answers a Tasks read at once after 60 agent calls when the server allows 300/min', async () => {
+    const { rawClientRequest } = await loadClientModule()
+    const { runWithPlanePriority } = await import('./plane-call-priority')
+    let served = 0
+    netFetchMock.mockImplementation(async () => {
+      served += 1
+      return jsonResponse([], 200, {
+        'x-ratelimit-remaining': String(300 - served),
+        'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 60)
+      })
+    })
+    await runWithPlanePriority('background', () =>
+      Promise.all(Array.from({ length: 60 }, () => rawClientRequest(CLIENT, '/api/v1/x/')))
+    )
+
+    const started = Date.now()
+    await rawClientRequest(CLIENT, '/api/v1/workspaces/acme/projects/')
+
+    expect(Date.now() - started).toBeLessThan(2_000)
+    expect(served).toBe(61)
   })
 })
 
