@@ -110,6 +110,18 @@ describe('NewTabTeamMenuItems', () => {
   })
 
   // Why: beside the row, the account's chevron doubled the row's and truncated its label.
+  // Why: icon-less Team rows broke the left edge the Terminal and Agents rows keep.
+  it('leads each Team row with its icon, as the Terminal and Agents rows do', () => {
+    renderMenu({})
+    expect(item('Go to lead · Alfred').querySelector('svg.lucide-crown')).toBeTruthy()
+    expect(item('Add member…').querySelector('svg.lucide-user-plus')).toBeTruthy()
+    cleanup()
+
+    renderMenu({ state: CLOSED })
+    expect(item(/^Reopen team/).querySelector('svg.lucide-rotate-ccw')).toBeTruthy()
+    expect(item('Start fresh lead…').querySelector('svg.lucide-plus')).toBeTruthy()
+  })
+
   it('keeps the add-member row to its label and one chevron, the account inside its submenu', () => {
     renderMenu({})
 
