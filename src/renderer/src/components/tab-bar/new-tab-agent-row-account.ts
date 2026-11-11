@@ -1,4 +1,3 @@
-import type { TuiAgent } from '../../../../shared/tui-agent'
 import type {
   NewTabAccountChoice,
   NewTabAccountRow
@@ -24,7 +23,7 @@ export type AgentRowAccount =
     }
 
 // Why string keys: a project's member agent comes from orca.yaml, which may name any CLI.
-const MANAGED_PROVIDER: Partial<Record<TuiAgent | string, 'claude' | 'codex'>> = {
+const MANAGED_PROVIDER: Partial<Record<string, 'claude' | 'codex'>> = {
   claude: 'claude',
   'claude-agent-teams': 'claude',
   codex: 'codex'
@@ -32,7 +31,7 @@ const MANAGED_PROVIDER: Partial<Record<TuiAgent | string, 'claude' | 'codex'>> =
 
 // Why checkedId is the resolved account: a plain row launches as today unless a person picks (ORCA-717).
 export function agentRowAccountOf(args: {
-  agent: TuiAgent | string
+  agent: string
   local: boolean
   providers: NewTabAgentProviders
   /** `member-default`: the team's rows check the member pick (pickGameMemberAccount) instead. */
