@@ -79,6 +79,57 @@ describe('resolveClaudeAccountAuthRowStatus', () => {
       })
     ).toMatchObject({ kind: 'checking', tone: 'neutral' })
   })
+
+  it('reads a token account with an unconfirmed login as launching on the token, not as at risk', () => {
+    expect(
+      resolveClaudeAccountAuthRowStatus(
+        { ...unverifiedClaudeAccountAuthVerdict('acct_1'), undecided: 'unknown' },
+        { longLivedToken: true }
+      )
+    ).toMatchObject({ tone: 'neutral', kind: 'unchecked', launchesOnToken: true, undecided: null })
+  })
+
+  it('carries the token check and saved date, and takes its tone from the token', () => {
+    const verified = resolveClaudeAccountAuthRowStatus(
+      {
+        ...unverifiedClaudeAccountAuthVerdict('acct_1'),
+        token: { state: 'verified', checkedAt: NOW }
+      },
+      { longLivedToken: true, longLivedTokenSetAt: NOW - 1000 }
+    )
+    expect(verified).toMatchObject({
+      tone: 'positive',
+      kind: 'unchecked',
+      tokenCheck: { state: 'verified', checkedAt: NOW },
+      tokenSavedAt: NOW - 1000
+    })
+
+    expect(
+      resolveClaudeAccountAuthRowStatus(
+        {
+          ...unverifiedClaudeAccountAuthVerdict('acct_1'),
+          state: 'authenticated',
+          checkedAt: NOW,
+          token: { state: 'rejected', checkedAt: NOW }
+        },
+        { longLivedToken: true }
+      ).tone
+    ).toBe('negative')
+  })
+
+  it('keeps a failed stored login on a token account but out of the negative tone', () => {
+    expect(
+      resolveClaudeAccountAuthRowStatus(
+        {
+          ...unverifiedClaudeAccountAuthVerdict('acct_1'),
+          state: 'failed',
+          failure: 'credential-rejected',
+          checkedAt: NOW
+        },
+        { longLivedToken: true }
+      )
+    ).toMatchObject({ tone: 'neutral', kind: 'credential-rejected', launchesOnToken: true })
+  })
 })
 
 describe('selectClaudeAccountUsage', () => {

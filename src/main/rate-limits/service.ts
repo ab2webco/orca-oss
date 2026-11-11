@@ -19,8 +19,10 @@ import {
   readClaudeAccountAuthProbe,
   readClaudeAccountAuthProbeFromFailureKind,
   unverifiedClaudeAccountAuthVerdict,
-  type ClaudeAccountAuthVerdict
+  type ClaudeAccountAuthVerdict,
+  type ClaudeLongLivedTokenCheck
 } from '../../shared/claude-account-auth-verdict'
+import { checkManagedClaudeLongLivedToken } from './claude-long-lived-token-check'
 import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
 import { resolveManagedClaudeAccountIdFromConfigDir } from '../claude-accounts/managed-config-dir-account'
 import { getClaudeManagedAccountsRoot } from '../claude-accounts/managed-auth-path'
@@ -352,6 +354,7 @@ export class RateLimitService {
   private claudeAuthChecking = new Set<string>()
   private claudeAuthRejectionRevision = new Map<string, number>()
   private claudeLoginEndsAt = new Map<string, number>()
+  private claudeTokenChecks = new Map<string, ClaudeLongLivedTokenCheck>()
   private inactiveCodexFetchInFlight = false
   private lastInactiveClaudeFetchAt = 0
   private inactiveClaudeAccountsGeneration = 0
@@ -541,6 +544,11 @@ export class RateLimitService {
           this.claudeLoginEndsAt.delete(accountId)
         }
       }
+      for (const accountId of Array.from(this.claudeTokenChecks.keys())) {
+        if (!known.has(accountId)) {
+          this.claudeTokenChecks.delete(accountId)
+        }
+      }
     }
     for (const accountId of [...this.claudeAuthChecking, ...this.claudeLoginEndsAt.keys()]) {
       if (!this.claudeAuthVerdicts.has(accountId)) {
@@ -549,10 +557,12 @@ export class RateLimitService {
     }
     return [...this.claudeAuthVerdicts.values()].map((verdict) => {
       const loginEndsAt = this.claudeLoginEndsAt.get(verdict.accountId)
+      const token = this.claudeTokenChecks.get(verdict.accountId)
       return {
         ...verdict,
         checking: this.claudeAuthChecking.has(verdict.accountId),
-        ...(loginEndsAt !== undefined ? { loginEndsAt } : {})
+        ...(loginEndsAt !== undefined ? { loginEndsAt } : {}),
+        ...(token ? { token } : {})
       }
     })
   }
@@ -1041,6 +1051,8 @@ export class RateLimitService {
     this.claudeAuthChecking.add(accountId)
     const rejectionRevision = this.claudeAuthRejectionRevision.get(accountId) ?? 0
     this.pushToRenderer()
+    // Why only here: a token check is a provider call the user asked for, never a poll.
+    const tokenCheck = checkManagedClaudeLongLivedToken(account).catch(() => null)
     try {
       const allowTokenRotation = await this.canRotateClaudeAccountToken(accountId)
       const fresh = await this.withClaudeAccountOperation(accountId, () =>
@@ -1061,6 +1073,12 @@ export class RateLimitService {
     } catch (error) {
       this.recordClaudeAuthVerdictFromError(accountId, error, rejectionRevision)
     } finally {
+      const token = await tokenCheck
+      if (token) {
+        this.claudeTokenChecks.set(accountId, token)
+      } else {
+        this.claudeTokenChecks.delete(accountId)
+      }
       this.claudeAuthChecking.delete(accountId)
       this.pushToRenderer()
     }

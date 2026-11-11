@@ -16,12 +16,13 @@ async function decodeImage(url: string): Promise<TeamSceneArtImage> {
 /** Rejects if any image is missing or broken: a style is drawn whole or falls to Pixel. */
 export async function loadTeamSceneArt(
   style: OrchestratorGameSceneNativeStyle,
-  urlOf: (src: string) => string | undefined,
+  /** Bundled art answers at once; a scene's own art is read from its host. */
+  urlOf: (src: string) => string | undefined | Promise<string | undefined>,
   decode: (url: string) => Promise<TeamSceneArtImage> = decodeImage
 ): Promise<TeamSceneImageArt> {
   const entries = await Promise.all(
     orchestratorGameSceneArtFiles({ figures: style }).map(async (src) => {
-      const url = urlOf(src)
+      const url = await urlOf(src)
       if (url === undefined) {
         throw new Error(`no image for ${src}`)
       }

@@ -67,8 +67,12 @@ export function applyLongLivedTokenToVaultSettings(
   return `${JSON.stringify(next, null, 2)}\n`
 }
 
-export function vaultSettingsHaveLongLivedToken(settingsJson: string | null): boolean {
+export function readLongLivedTokenFromVaultSettings(settingsJson: string | null): string | null {
   const settings = settingsJson === null ? null : parseSettingsObject(settingsJson)
   const value = settings ? readEnv(settings)[CLAUDE_LONG_LIVED_TOKEN_ENV] : undefined
-  return typeof value === 'string' && value.trim() !== ''
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+}
+
+export function vaultSettingsHaveLongLivedToken(settingsJson: string | null): boolean {
+  return readLongLivedTokenFromVaultSettings(settingsJson) !== null
 }

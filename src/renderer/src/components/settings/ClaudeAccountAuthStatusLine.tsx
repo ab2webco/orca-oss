@@ -4,6 +4,7 @@ import { formatResetDuration } from '../../../../shared/rate-limit-reset-format'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { ClaudeAccountAuthRowStatus } from './claude-account-auth-row-status'
+import { describeQuotaParts } from './claude-account-quota-text'
 
 function formatCheckedAgo(checkedAt: number, now: number): string {
   const elapsed = Math.max(0, now - checkedAt)
@@ -69,50 +70,6 @@ function describeUndecided(status: ClaudeAccountAuthRowStatus): string | null {
   )
 }
 
-function describeQuota(usage: ProviderRateLimits | null, now: number): string | null {
-  if (!usage || usage.status !== 'ok') {
-    return null
-  }
-  const parts: string[] = []
-  if (usage.session) {
-    parts.push(
-      usage.session.resetsAt === null
-        ? translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.sessionUsed',
-            '5h {{value0}}% used',
-            { value0: Math.round(usage.session.usedPercent) }
-          )
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.sessionUsedResets',
-            '5h {{value0}}% used, resets in {{value1}}',
-            {
-              value0: Math.round(usage.session.usedPercent),
-              value1: formatResetDuration(usage.session.resetsAt - now)
-            }
-          )
-    )
-  }
-  if (usage.weekly) {
-    parts.push(
-      usage.weekly.resetsAt === null
-        ? translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.weeklyUsed',
-            '7d {{value0}}% used',
-            { value0: Math.round(usage.weekly.usedPercent) }
-          )
-        : translate(
-            'auto.components.settings.ClaudeAccountAuthStatusLine.weeklyUsedResets',
-            '7d {{value0}}% used, resets in {{value1}}',
-            {
-              value0: Math.round(usage.weekly.usedPercent),
-              value1: formatResetDuration(usage.weekly.resetsAt - now)
-            }
-          )
-    )
-  }
-  return parts.length > 0 ? parts.join(' · ') : null
-}
-
 export function ClaudeAccountAuthStatusLine({
   status,
   usage,
@@ -132,7 +89,7 @@ export function ClaudeAccountAuthStatusLine({
           : HelpCircle
   const undecided = describeUndecided(status)
   const quota =
-    describeQuota(usage, now) ??
+    (describeQuotaParts(usage, now).join(' · ') || null) ??
     // Why: a row that already states the failure explains the missing figure; on
     // any other row silence would read as "0% used".
     (status.tone === 'negative'
@@ -146,7 +103,7 @@ export function ClaudeAccountAuthStatusLine({
       <Icon
         className={cn(
           'size-3 shrink-0',
-          status.kind === 'checking' && 'animate-spin',
+          status.kind === 'checking' && 'motion-safe:animate-spin',
           status.tone === 'positive' && 'text-status-success',
           status.tone === 'negative' && 'text-destructive',
           status.tone === 'neutral' && 'text-muted-foreground'

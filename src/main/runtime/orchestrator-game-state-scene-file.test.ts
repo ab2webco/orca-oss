@@ -12,7 +12,10 @@ import {
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
-import { orchestratorGameSceneDrawnStyle } from '../../shared/orchestrator-game-scene-native'
+import {
+  orchestratorGameSceneArtOf,
+  orchestratorGameSceneDrawnStyle
+} from '../../shared/orchestrator-game-scene-native'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const dirs: string[] = []
@@ -127,16 +130,16 @@ describe('buildOrchestratorGameState scene file', () => {
       const definition = state.extensions?.scenes[0]?.definition
       expect(definition?.native?.figures).toBeDefined()
       expect(
-        orchestratorGameSceneDrawnStyle({
+        orchestratorGameSceneArtOf({
           style: 'figures',
           sceneId: ID,
           scene: definition,
-          artFailed: true
+          sceneArtFailed: true
         })
-      ).toBe('pixel')
+      ).toEqual({ drawn: 'figures', art: 'bundled', defaultArt: true })
     })
 
-    it('draws a file with a broken block in Pixel, and says why', async () => {
+    it('draws a file with a broken block with the default art, and says why', async () => {
       const state = await build(
         checkout({
           '.orca/scenes/space.json': JSON.stringify(
@@ -148,12 +151,12 @@ describe('buildOrchestratorGameState scene file', () => {
 
       expect(state.warnings[0]).toMatch(/native\.figures\.layers.*drawn without it/)
       expect(
-        orchestratorGameSceneDrawnStyle({
+        orchestratorGameSceneArtOf({
           style: 'figures',
           sceneId: state.config.scene,
           scene: state.extensions?.scenes[0]?.definition
         })
-      ).toBe('pixel')
+      ).toEqual({ drawn: 'figures', art: 'bundled', defaultArt: true })
     })
   })
 

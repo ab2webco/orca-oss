@@ -112,6 +112,7 @@ import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import { cn } from '@/lib/utils'
 import { getClaudeAccountLabel, getEndpointHostLabel } from '@/lib/claude-account-label'
 import { ClaudeAccountAuthStatusLine } from './ClaudeAccountAuthStatusLine'
+import { ClaudeAccountTokenStatusLine } from './ClaudeAccountTokenStatusLine'
 import {
   findClaudeAccountAuthVerdict,
   resolveClaudeAccountAuthRowStatus,
@@ -1043,6 +1044,8 @@ export function AccountsPane({
             )
           }
         )
+        // Why once here: a token check is never polled; saving is the other moment it is asked for.
+        void recheckClaudeAccountAuth(action.slice('token:'.length))
       }
       if (shouldPromptRestart) {
         toast.info(
@@ -1750,7 +1753,11 @@ export function AccountsPane({
                     : null
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
                 const authStatus = resolveClaudeAccountAuthRowStatus(
-                  findClaudeAccountAuthVerdict(rateLimitsState, account.id)
+                  findClaudeAccountAuthVerdict(rateLimitsState, account.id),
+                  {
+                    longLivedToken: hasLongLivedToken,
+                    longLivedTokenSetAt: account.longLivedTokenSetAt
+                  }
                 )
                 const accountUsage = selectClaudeAccountUsage(rateLimitsState, account.id, isActive)
 
@@ -1824,7 +1831,7 @@ export function AccountsPane({
                               variant="outline"
                               title={translate(
                                 'auto.components.settings.AccountsPane.longLivedTokenBadgeHint',
-                                'Agents on this account use a long-lived token, not the stored login. Sign-in and quota below describe the stored login.'
+                                'Agents on this account launch on a long-lived token.'
                               )}
                               className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/80"
                             >
@@ -1842,7 +1849,13 @@ export function AccountsPane({
                               ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
                               : formatAccountTimestamp(account.lastAuthenticatedAt)}
                         </span>
-                        {isCustomEndpoint ? null : (
+                        {isCustomEndpoint ? null : authStatus.launchesOnToken ? (
+                          <ClaudeAccountTokenStatusLine
+                            status={authStatus}
+                            usage={accountUsage}
+                            now={authStatusNow}
+                          />
+                        ) : (
                           <ClaudeAccountAuthStatusLine
                             status={authStatus}
                             usage={accountUsage}

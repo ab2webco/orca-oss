@@ -1499,13 +1499,19 @@ orchestratorGame:
   station prop. The images sit in the scene's folder, outside the 64 KB JSON, at most 2 MB each and
   8 MB and 16 megapixels a style; paths are relative to the scene file. `orca game scene validate`
   reads every file and reports problems as `native.<style>…: <message>`; the game drops a broken
-  block with a warning. A scene with no art for a style draws in Pixel
-  (`orchestratorGameSceneDrawnStyle`), and so does art that does not load on this machine, such as
-  a scene carried to a remote member. Quest's art ships with Orca, in
-  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json), and only that art
-  reaches the panel today: `useTeamScenePainter` picks the painter, and the panel cannot yet read a
-  file's or a plugin's images, locally or from a host, so a scene with a block validates and draws
-  in Pixel until ORCA-1085. Game state carries the block as an optional field. The
+  block with a warning. The panel draws a style with the scene's own art when its block covers
+  that style and the images load (`orchestratorGameSceneArtOf`); otherwise it draws the chosen
+  style with Quest's art, which ships with Orca in
+  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json), and keeps the
+  scene's names and roster. Pixel draws only when it is picked, or when even Quest's art fails to
+  decode. The stage marks the default art with `data-team-scene-default-art`, and Settings says so
+  under the style. A scene file whose stem is `quest` is Quest, so its bundled art is its own. The
+  panel reads a scene file's images on demand with `game.sceneArt`, on the host that owns the
+  worktree: locally, over SSH through the worktree's remote filesystem, and from a paired host
+  through the runtime RPC, with the lead's caller. The host serves only the images of the scene its
+  worktree draws, contained to the scene file's folder, at most 2 MB each. A host older than the
+  method, a scene carried to a remote member, a plugin scene, and any image that fails all draw the
+  default art. Game state carries the block as an optional field. The
   [scenes guide](../../skill-guides/orca-game-scenes.md#native-optional) has the format.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,

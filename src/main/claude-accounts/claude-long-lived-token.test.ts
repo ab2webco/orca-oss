@@ -3,6 +3,7 @@ import {
   applyLongLivedTokenToVaultSettings,
   CLAUDE_LONG_LIVED_TOKEN_ENV,
   normalizeLongLivedToken,
+  readLongLivedTokenFromVaultSettings,
   vaultSettingsHaveLongLivedToken
 } from './claude-long-lived-token'
 
@@ -80,5 +81,22 @@ describe('vaultSettingsHaveLongLivedToken', () => {
     ).toBe(false)
     expect(vaultSettingsHaveLongLivedToken('{bad')).toBe(false)
     expect(vaultSettingsHaveLongLivedToken(null)).toBe(false)
+  })
+})
+
+describe('readLongLivedTokenFromVaultSettings', () => {
+  it('returns the stored token, or null when there is none to check', () => {
+    expect(
+      readLongLivedTokenFromVaultSettings(
+        JSON.stringify({ env: { [CLAUDE_LONG_LIVED_TOKEN_ENV]: ` ${FAKE_TOKEN} ` } })
+      )
+    ).toBe(FAKE_TOKEN)
+    expect(
+      readLongLivedTokenFromVaultSettings(
+        JSON.stringify({ env: { [CLAUDE_LONG_LIVED_TOKEN_ENV]: '' } })
+      )
+    ).toBeNull()
+    expect(readLongLivedTokenFromVaultSettings('{bad')).toBeNull()
+    expect(readLongLivedTokenFromVaultSettings(null)).toBeNull()
   })
 })
