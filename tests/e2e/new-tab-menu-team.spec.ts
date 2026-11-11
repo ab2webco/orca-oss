@@ -30,6 +30,23 @@ const SHOTS = [
   { width: 320, theme: 'light' }
 ] as const
 
+// Why: the desktop window's minimum is 600 px (createMainWindow MIN_WIDTH), so a narrower width exists only
+// in the paired web client, which draws no window controls; below it every OS renders as that client.
+const DESKTOP_MIN_WIDTH = 600
+
+// Why: Linux/Windows reserve 138 px for their window controls; macOS reserves none, so 600 forces Linux's.
+async function setWindowControlsWidth(page: Page, width: string | null): Promise<void> {
+  await page.evaluate((next) => {
+    const root = document.querySelector<HTMLElement>('.app-layout')!
+    root.dataset.e2eControlsWidth ??= root.style.getPropertyValue('--window-controls-width')
+    root.style.setProperty('--window-controls-width', next ?? root.dataset.e2eControlsWidth)
+    // Why: the web client draws no window controls, so on Linux/Windows the real ones would cover the +.
+    for (const controls of document.querySelectorAll<HTMLElement>('.window-controls')) {
+      controls.style.display = next === '0px' ? 'none' : ''
+    }
+  }, width)
+}
+
 // Why (ORCA-717): at 390 and 320 with the sidebar collapsed the + was clipped under the floating header.
 async function expectPlusReachable(page: Page): Promise<void> {
   const box = await page.getByRole('button', { name: 'New tab' }).first().boundingBox()
@@ -82,6 +99,7 @@ async function captureEach(
 ): Promise<void> {
   for (const shot of SHOTS) {
     await page.setViewportSize({ width: shot.width, height: 900 })
+    await setWindowControlsWidth(page, shot.width < DESKTOP_MIN_WIDTH ? '0px' : null)
     // Why: below a tablet width a person collapses both sidebars to reach the tabs.
     await page.evaluate((wide) => {
       const state = window.__store!.getState()
@@ -113,6 +131,28 @@ test('the + reaches a pointer click at every width', async ({ orcaPage }, testIn
     (file) => testInfo.outputPath(file),
     async () => expectActiveTabReadable(orcaPage)
   )
+
+  // ORCA-717: at Linux/Windows' narrowest window its 40 + 138 px right reserve lands in the tab strip
+  // once the right sidebar closes. Both sidebars open is #1141's: the right one becomes a drawer there.
+  await orcaPage.setViewportSize({ width: DESKTOP_MIN_WIDTH, height: 900 })
+  await setWindowControlsWidth(orcaPage, '138px')
+  await writeSettings(orcaPage, { theme: 'dark' })
+  for (const leftOpen of [true, false]) {
+    await orcaPage.evaluate((open) => {
+      const state = window.__store!.getState()
+      state.setSidebarOpen(open)
+      state.setRightSidebarOpen(false)
+    }, leftOpen)
+    await expect(async () => expectActiveTabReadable(orcaPage)).toPass({ timeout: 10_000 })
+    await expectPlusReachable(orcaPage)
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath(
+        `new-tab-reach-${DESKTOP_MIN_WIDTH}-dark-window-controls-${leftOpen ? 'left-open' : 'both-closed'}.png`
+      )
+    })
+  }
+  await setWindowControlsWidth(orcaPage, null)
 })
 
 // ORCA-717: the + menu offers the project's lead, live or kept, instead of starting a second team.
