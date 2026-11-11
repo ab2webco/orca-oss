@@ -3,7 +3,6 @@ import { ChevronDown } from 'lucide-react'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
 import type { AppState } from '@/store/types'
-import { RepoIconGlyph } from '@/components/repo/repo-icon'
 import { RepoForkIndicator } from '@/components/repo/repo-fork-indicator'
 import type { FolderWorkspacePathStatus } from '../../../../../../shared/folder-workspace-path-status'
 import { isConfirmedStaleFolderPathStatus } from '../../../../../../shared/folder-workspace-path-status'
@@ -15,7 +14,6 @@ import type {
 import type { GroupHeaderRow, WorktreeGroupBy } from '../grouping/row-types'
 import { PINNED_GROUP_KEY } from '../grouping/group-keys'
 import { getVirtualRowTransform } from '../viewport/virtual-rows'
-import { resolveProjectGroupHeaderColor } from '../../project-header-color'
 import { getRepoHeaderCreateState } from '../../repo-header-create-state'
 import { ProjectHeaderActions } from '../../ProjectHeaderActions'
 import {
@@ -23,6 +21,7 @@ import {
   WORKTREE_SECTION_HEADER_PADDING_LEFT
 } from './indentation'
 import { FolderPathStatusIndicator } from './FolderPathStatusIndicator'
+import { SectionHeaderGlyph } from './section-header-glyph'
 import {
   ProjectGroupCreateWorkspaceButton,
   ProjectGroupHeaderMenu
@@ -130,11 +129,6 @@ export function renderWorktreeSectionHeaderRow(args: {
     headerDrag.projectGroupDrag.state.draggingGroupId !== null &&
     headerDrag.projectGroupDrag.state.draggingGroupId === projectGroupIdForHeader
   const isPinnedHeader = row.key === PINNED_GROUP_KEY
-  const repoHeaderColor = resolveProjectGroupHeaderColor({
-    groupBy: ctx.groupBy,
-    headerKey: row.key,
-    badgeColor: row.repo?.badgeColor
-  })
   const createState = row.repo
     ? getRepoHeaderCreateState({
         repo: row.repo,
@@ -274,28 +268,22 @@ export function renderWorktreeSectionHeaderRow(args: {
           )}
         >
           {row.icon ? (
-            <div
-              className={cn(
-                'flex size-4 shrink-0 items-center justify-center rounded-[4px]',
-                repoHeaderColor ? 'text-muted-foreground' : row.tone
-              )}
-            >
-              {row.repo ? (
-                <RepoIconGlyph
-                  repoIcon={row.repo.repoIcon}
-                  color={repoHeaderColor}
-                  className="size-4"
-                  iconClassName="size-3.5"
-                />
-              ) : (
-                <row.icon className="size-3" />
-              )}
-            </div>
+            <SectionHeaderGlyph
+              icon={row.icon}
+              tone={row.tone}
+              isProject={isRepoHeader}
+              isProjectGroup={isProjectGroupHeader && !row.repo}
+            />
           ) : null}
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
-              <div className="min-w-0 truncate text-[13px] font-semibold leading-none">
+              <div
+                className={cn(
+                  'min-w-0 truncate text-[12.5px] font-medium leading-none',
+                  isProjectGroupHeader && !row.repo && 'text-muted-foreground'
+                )}
+              >
                 {row.label}
               </div>
               <RepoForkIndicator upstream={row.repo?.upstream} />

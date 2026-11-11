@@ -50,6 +50,13 @@ const orcaIdOf = (id: string): GameOrcaActionId | null => {
 const sendOf = (action: GameAction): string | null =>
   'prompt' in action ? action.prompt : action.command ? `/${action.command}` : null
 
+/** Members whose agent is still at work or waiting on the user; a launch STOP leaves them running. */
+export function gameMembersRunningOf(state: Pick<OrchestratorGameState, 'agents'>): number {
+  return (state.agents ?? []).filter(
+    (agent) => agent.isMember === true && (agent.state === 'working' || agent.state === 'waiting')
+  ).length
+}
+
 /** When each of Orca's actions applies, from one game.state read; the rest always may run. */
 function orcaStateOf(
   orca: GameOrcaActionId,
@@ -73,7 +80,11 @@ function orcaStateOf(
         ? { now: null, off: 'stopped' }
         : counted(gameSweepOf(state).length, 'nothingToClose')
     case 'stop':
-      return { now: null, off: stopped ? 'alreadyStopped' : null }
+      // Why: STOP pauses launches and pushes only; Stop must still reach members that run (ORCA-1157).
+      return {
+        now: null,
+        off: stopped && gameMembersRunningOf(state) === 0 ? 'alreadyStopped' : null
+      }
     case 'status':
       return { now: null, off: null }
   }

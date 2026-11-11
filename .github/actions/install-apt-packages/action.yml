@@ -11,9 +11,24 @@ inputs:
 runs:
   using: composite
   steps:
+    # Why first: when the image already ships every package, no apt mirror is needed at all
+    # (2026-11-11, when no *.ubuntu.com host resolved from the runners).
+    - name: Check installed apt packages
+      id: installed
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        # shellcheck disable=SC2086
+        if bash config/scripts/ci-apt.sh installed $PACKAGES; then
+          echo "apt packages already installed: $PACKAGES"
+          echo 'all=true' >> "$GITHUB_OUTPUT"
+        fi
+
     # Why keyed on the resolved archive names: the key moves on any version bump
     # and is stable across runs that would download the same set.
     - name: Resolve apt archives
+      if: steps.installed.outputs.all != 'true'
       id: resolve
       shell: bash
       env:
@@ -29,6 +44,7 @@ runs:
         echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore apt archives
+      if: steps.installed.outputs.all != 'true'
       id: restore
       uses: actions/cache/restore@v5
       with:
@@ -37,6 +53,7 @@ runs:
         restore-keys: ${{ steps.resolve.outputs.prefix }}-
 
     - name: Install apt packages
+      if: steps.installed.outputs.all != 'true'
       shell: bash
       env:
         PACKAGES: ${{ inputs.packages }}
@@ -58,7 +75,7 @@ runs:
     # Why saved here and not in a post step: a shard cancelled at its cap never
     # runs post steps, and that is the run that most needs the next one cached.
     - name: Save apt archives
-      if: steps.restore.outputs.cache-hit != 'true'
+      if: steps.installed.outputs.all != 'true' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: ${{ steps.resolve.outputs.dir }}

@@ -393,12 +393,11 @@ describe('WorktreeList header styles', () => {
     )
   })
 
-  it('resolves repo header color from project group headers only', () => {
+  it("draws project and org headers with V30's dim glyphs, not the repo avatar (ORCA-1149)", () => {
     const source = readSectionHeaderRowSource()
 
-    expect(source).toContain('resolveProjectGroupHeaderColor({')
-    expect(source).toContain('headerKey: row.key')
-    expect(source).toContain('color={repoHeaderColor}')
+    expect(source).toContain('<SectionHeaderGlyph')
+    expect(source).not.toContain('RepoIconGlyph')
   })
 
   it('adapts projected setup rows for sidebar project grouping', () => {

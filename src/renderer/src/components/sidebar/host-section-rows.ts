@@ -31,6 +31,8 @@ export type HostHeaderRow = {
   connectionStatus?: SshConnectionStatus
   collapsed: boolean
   count: number
+  // Why: the header counts the section's active agents from these (V30's '1 activo').
+  worktreeIds: readonly string[]
 }
 
 export type HostSectionRow = Row | HostHeaderRow
@@ -99,7 +101,7 @@ function getFallbackHost(hostId: ExecutionHostId): HostSectionOption {
   }
 }
 
-function countWorktreeRows(rows: readonly Row[]): number {
+function countWorktreeRows(rows: readonly Row[]): { count: number; worktreeIds: string[] } {
   // Why: a collapsed repo group contributes a header row but no item rows;
   // fall back to the header's own count so the host badge doesn't read 0
   // while a visibly populated project sits right under it.
@@ -138,7 +140,7 @@ function countWorktreeRows(rows: readonly Row[]): number {
     }
   }
   flushHeader()
-  return count
+  return { count, worktreeIds: [...seenWorktreeIds] }
 }
 
 function localizePendingRowsForHost(
@@ -171,6 +173,21 @@ function getPendingRowsKey(rows: readonly Extract<Row, { type: 'header' }>[]): s
         `${pendingRow.key}:${pendingRow.count}:${pendingRow.worktreeIds?.join(',') ?? ''}`
     )
     .join('\0')
+}
+
+// Why: V30 draws orgs and projects at their host's level, so the host is the only outer step.
+function flatUnderHost(row: Row): Row {
+  if (row.type === 'header') {
+    return row.projectGroupDepth ? { ...row, projectGroupDepth: 0 } : row
+  }
+  if (row.type === 'item') {
+    return row.groupDepth ? { ...row, groupDepth: 0 } : row
+  }
+  // Why 1: a folder workspace's depth counts its own folder group, which now sits at 0.
+  if (row.type === 'folder-workspace') {
+    return row.groupDepth > 1 ? { ...row, groupDepth: 1 } : row
+  }
+  return row
 }
 
 export function addHostSectionRows(args: {
@@ -296,6 +313,7 @@ export function addHostSectionRows(args: {
     const host = hostOptionsById.get(hostId) ?? getFallbackHost(hostId)
     const collapsed =
       args.forceCollapseHosts || (args.collapsedHostKeys?.has(`host:${host.id}`) ?? false)
+    const { count, worktreeIds } = countWorktreeRows(hostRows)
     result.push({
       type: 'host-header',
       key: `host:${host.id}`,
@@ -307,10 +325,11 @@ export function addHostSectionRows(args: {
       compatibility: host.compatibility,
       connectionStatus: host.connectionStatus,
       collapsed,
-      count: countWorktreeRows(hostRows)
+      count,
+      worktreeIds
     })
     if (!collapsed) {
-      result.push(...hostRows)
+      result.push(...hostRows.map(flatUnderHost))
     }
   }
 

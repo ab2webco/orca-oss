@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GAME_LEAD_ACTIONS } from './orchestrator-game-lead-actions'
 import type { GameAction } from './orchestrator-game-actions'
 import type { GameAgent, OrchestratorGameState } from './orchestrator-game-state'
-import { teamActionsOf, teamDockActionsOf } from './team-panel-actions'
+import { gameMembersRunningOf, teamActionsOf, teamDockActionsOf } from './team-panel-actions'
 
 const member = (paneKey: string, overrides: Partial<GameAgent> = {}): GameAgent => ({
   paneKey,
@@ -131,5 +131,35 @@ describe('teamDockActionsOf', () => {
         .map((one) => one.id)
         .slice(3)
     ).toEqual(['action-1', 'action-0'])
+  })
+})
+
+describe('Stop while a launch STOP is on (ORCA-1157)', () => {
+  const stop = { stopped: { since: '2026-10-17T10:00:00.000Z', by: 'lead' } as never }
+
+  it('stays enabled while any member runs, since that STOP blocks only launches and pushes', () => {
+    const running = byId(stateOf({ ...stop, agents: [member('a', { state: 'working' })] }))
+    expect(running['lead:stop']).toMatchObject({ off: null })
+    const waiting = byId(stateOf({ ...stop, agents: [member('a', { state: 'waiting' })] }))
+    expect(waiting['lead:stop']).toMatchObject({ off: null })
+  })
+
+  it('is off as already stopped only when no member runs', () => {
+    expect(byId(stateOf(stop))['lead:stop']).toMatchObject({ off: 'alreadyStopped' })
+  })
+
+  it('counts the members still running under it', () => {
+    expect(
+      gameMembersRunningOf(
+        stateOf({
+          agents: [
+            member('a', { state: 'working' }),
+            member('b', { state: 'waiting' }),
+            member('c', { state: 'idle' }),
+            member('lead', { state: 'working', isLeader: true, isMember: false })
+          ]
+        })
+      )
+    ).toBe(2)
   })
 })

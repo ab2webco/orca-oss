@@ -11,6 +11,21 @@ import type { GameStoreNaming } from './orchestrator-game-store-names'
 const isMissing = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 
+const legacyNameOf = (projectKey: string): string =>
+  createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+
+async function removeIfPresent(file: string): Promise<boolean> {
+  try {
+    await unlink(file)
+    return true
+  } catch (error) {
+    if (isMissing(error)) {
+      return false
+    }
+    throw error
+  }
+}
+
 /**
  * Each project's STOP, one file per project on the Orca host that runs the lead.
  * Why a file of its own: STOP fails closed, so a damaged history must never read as STOP.
@@ -57,18 +72,14 @@ export class GameStopSwitch {
     })
   }
 
-  /** Throws when the file cannot be removed, so the caller reports STOP as still set. */
+  /** Throws when a file cannot be removed, so the caller reports STOP as still set. */
   clear(projectKey: string): Promise<{ changed: boolean }> {
     return this.queued(projectKey, async () => {
-      try {
-        await unlink(this.fileOf(projectKey))
-        return { changed: true }
-      } catch (error) {
-        if (isMissing(error)) {
-          return { changed: false }
-        }
-        throw error
-      }
+      const file = this.fileOf(projectKey)
+      // Why the repo id's file too: the ORCA-1011 naming copies it back after a restart (ORCA-1157).
+      const legacy = join(this.dirOf(), `${legacyNameOf(projectKey)}.stop.json`)
+      const removed = await Promise.all([...new Set([file, legacy])].map(removeIfPresent))
+      return { changed: removed.some(Boolean) }
     })
   }
 
@@ -98,8 +109,7 @@ export class GameStopSwitch {
 
   private fileOf(projectKey: string): string {
     const name =
-      this.names?.nameIn(this.dirOf(), '.stop.json', projectKey) ??
-      createHash('sha256').update(projectKey).digest('hex').slice(0, 32)
+      this.names?.nameIn(this.dirOf(), '.stop.json', projectKey) ?? legacyNameOf(projectKey)
     return join(this.dirOf(), `${name}.stop.json`)
   }
 }

@@ -1,5 +1,6 @@
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneStrideAt } from './team-scene-motion'
+import { workPoseOf } from './team-scene-work-loop'
 import type { TeamSceneActivity, TeamSceneActor, TeamScenePose } from './team-scene-types'
 
 const SEATED_POSE: Record<TeamSceneActivity, TeamScenePose> = {
@@ -21,10 +22,20 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   if (atLead && (body.role === 'lead' || body.key === world.visitor)) {
     return atLead.kind === 'handoff' ? 'give' : 'wave'
   }
+  if (
+    body.role === 'lead' &&
+    world.rounds.stage === 'atMember' &&
+    world.rounds.purpose === 'give'
+  ) {
+    return 'give'
+  }
   if (body.role === 'advisor') {
     return world.t < world.advisorRaiseUntil ? 'raise' : 'idle'
   }
-  return body.plan.kind === 'leave' ? 'idle' : SEATED_POSE[body.activity]
+  if (body.plan.kind === 'leave') {
+    return 'idle'
+  }
+  return (body.plan.kind === 'seated' ? workPoseOf(body) : null) ?? SEATED_POSE[body.activity]
 }
 
 /** What styles draw this frame, back to front. */
@@ -53,7 +64,12 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         pose: poseOf(world, body),
         gait: body.gait,
         stride: teamSceneStrideAt(body.depth),
-        carrying: plan.kind === 'handoff' && plan.stage === 'toLead',
+        carrying:
+          (plan.kind === 'handoff' && plan.stage === 'toLead') ||
+          (plan.kind === 'seated' && body.work.step === 'carry') ||
+          (body.role === 'lead' &&
+            world.rounds.stage === 'toMember' &&
+            world.rounds.purpose === 'give'),
         emote: timed ?? seatedMark,
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }

@@ -202,6 +202,26 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
     expect(name.querySelector('[data-team-row-ticket]')).toBeNull()
   })
 
+  // Why: a member launched without a roster name carries its ticket and title as its name.
+  it('names a member with no character by its ticket once in game mode', async () => {
+    const card = member({
+      name: 'ORCA-1034 Replace marketing-site people photos',
+      ticket: { identifier: 'ORCA-1034', title: null, url: null, statusGroup: null }
+    })
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+      />
+    )
+    const name = host.querySelector('[data-team-row-part="name"]')!
+    expect(name.querySelector('b')!.textContent).toBe('ORCA-1034')
+    expect(name.querySelector('[data-team-row-ticket]')).toBeNull()
+  })
+
   it('marks a member that needs you with the question glyph', async () => {
     const host = await render(
       <SidebarTeamAgentRow

@@ -4,7 +4,16 @@ import {
   teamSceneArrived as near,
   type TeamSceneMover
 } from './team-scene-motion'
+import {
+  createTeamSceneRounds,
+  LEAD_SPOT,
+  leadIsHome,
+  stepLeadRounds,
+  type TeamSceneRounds
+} from './team-scene-lead-rounds'
 import { seatPlanOf } from './team-scene-seats'
+import { siteSpotOf, type TeamSceneSite, type TeamSceneSiteView } from './team-scene-sites'
+import { createTeamSceneWork, stepTeamSceneWork, type TeamSceneWork } from './team-scene-work-loop'
 import type {
   TeamSceneActivity,
   TeamSceneActor,
@@ -14,7 +23,6 @@ import type {
   TeamSceneSpot
 } from './team-scene-types'
 
-const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
 // Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
 const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
@@ -24,6 +32,7 @@ const AT_LEAD_SECONDS = { enter: 0.9, handoff: 0.9, leave: 1 } as const
 const CHEER_SECONDS = 2.2
 const ADVISOR_RAISE_SECONDS = 1.4
 const ADVISOR_BUBBLE_SECONDS = 6
+const MAX_TROPHIES = 6
 
 type VisitKind = keyof typeof AT_LEAD_SECONDS
 type Plan =
@@ -39,6 +48,8 @@ export type TeamSceneBody = TeamSceneMover & {
   home: TeamSceneSpot
   plan: Plan
   emote: { kind: TeamSceneEmote; until: number } | null
+  site: TeamSceneSite
+  work: TeamSceneWork
 }
 
 export type TeamSceneWorld = {
@@ -57,6 +68,12 @@ export type TeamSceneWorld = {
   overflow: number
   /** Every seat's spot, so a style draws the stations even while their members walk. */
   stations: TeamSceneSpot[]
+  /** The lead's walks to working members between real events. */
+  rounds: TeamSceneRounds
+  /** Each seat's build at its real stage, for styles to draw beside the station. */
+  sites: TeamSceneSiteView[]
+  /** Finished builds of merged work, oldest first; they outlive their members. */
+  trophies: { key: string; name: string }[]
 }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -72,7 +89,10 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     advisorRaiseUntil: 0,
     effects: [],
     overflow: 0,
-    stations: []
+    stations: [],
+    rounds: createTeamSceneRounds(),
+    sites: [],
+    trophies: []
   }
 }
 
@@ -97,7 +117,9 @@ function bodyAt(
     facing,
     gait: 0,
     plan,
-    emote: null
+    emote: null,
+    site: { stage: 0, broken: false },
+    work: createTeamSceneWork()
   }
 }
 
@@ -147,7 +169,8 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
       name: m.name,
       characterKey: m.characterKey,
       activity: m.activity,
-      home: spot
+      home: spot,
+      site: m.site
     })
   }
   for (const body of bodies.values()) {
@@ -166,6 +189,10 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
     if (event.kind === 'handoff' && body?.plan.kind === 'seated') {
       queueVisit(world, body, 'handoff')
     } else if (event.kind === 'merge') {
+      if (!world.trophies.some((t) => t.key === event.key)) {
+        world.trophies.push({ key: event.key, name: byKey.get(event.key)?.name ?? event.key })
+        world.trophies.splice(0, Math.max(0, world.trophies.length - MAX_TROPHIES))
+      }
       world.cheerUntil = world.t + CHEER_SECONDS
       world.effects.push({ kind: 'burst', key: event.key, reason: 'merge' })
       for (const b of bodies.values()) {
@@ -178,6 +205,11 @@ export function applyTeamSceneInput(world: TeamSceneWorld, input: TeamSceneInput
   }
   world.overflow = plan.overflow
   world.stations = plan.seats.map((s) => s.spot)
+  world.sites = plan.seats.map(({ key, spot }) => ({
+    key,
+    spot: siteSpotOf(spot),
+    ...byKey.get(key)!.site
+  }))
 }
 
 function arrive(world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): void {
@@ -200,7 +232,7 @@ function arrive(world: TeamSceneWorld, body: TeamSceneBody, kind: VisitKind): vo
 function advancePlan(world: TeamSceneWorld, body: TeamSceneBody, width: number): void {
   const { plan } = body
   if (plan.kind === 'seated') {
-    body.target = body.home
+    stepTeamSceneWork(world, body, width)
     return
   }
   if (plan.stage === 'queued') {
@@ -240,7 +272,7 @@ export function stepTeamScene(
   if (world.t < world.cheerUntil) {
     return
   }
-  if (!world.visitor) {
+  if (!world.visitor && leadIsHome(world)) {
     const next = world.queue.shift()
     const body = next ? world.bodies.get(next) : undefined
     if (body && body.plan.kind !== 'seated') {
@@ -252,6 +284,9 @@ export function stepTeamScene(
     if (body.role === 'member') {
       advancePlan(world, body, opts.width)
     }
+  }
+  if (!world.visitor) {
+    stepLeadRounds(world, opts.width)
   }
   for (const body of world.bodies.values()) {
     moveTeamSceneBody(body, dt, opts.width)
@@ -268,8 +303,15 @@ export function settleTeamScene(world: TeamSceneWorld): void {
     Object.assign(body, { plan: { kind: 'seated' }, x: body.home.x, depth: body.home.depth, v: 0 })
     body.target = body.home
     body.emote = null
+    body.work = createTeamSceneWork()
   }
-  Object.assign(world, { queue: [], visitor: null, cheerUntil: 0, effects: [] })
+  Object.assign(world, {
+    queue: [],
+    visitor: null,
+    cheerUntil: 0,
+    effects: [],
+    rounds: createTeamSceneRounds()
+  })
 }
 
 export function drainTeamSceneEffects(world: TeamSceneWorld): TeamSceneEffect[] {

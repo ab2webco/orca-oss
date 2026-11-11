@@ -11,6 +11,7 @@ import {
   teamTicketBesideName
 } from '@/components/team-panel/team-card-text'
 import type { GamePanelLook } from '../../../../shared/orchestrator-game-panel'
+import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import type { SidebarTeamRow } from './sidebar-team-roster'
 
 type NameParts = { name: string; mono: string | null }
@@ -24,7 +25,8 @@ function namePartsOf(row: SidebarTeamRow, game: boolean): NameParts {
   }
   const ticket = row.card.ticket?.identifier ?? null
   // Why: plain mode names a member by its ticket; game mode by its character, with the ticket beside it.
-  if (!game) {
+  // A roster name never parses as a ticket, so a name that does is the ticket and its title: no character.
+  if (!game || (ticket !== null && ticketInText(row.card.name) !== null)) {
     return { name: ticket ?? row.card.name, mono: null }
   }
   return { name: row.card.name, mono: teamTicketBesideName(row.card, true) }

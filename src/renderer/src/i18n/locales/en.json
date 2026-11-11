@@ -5133,6 +5133,9 @@
           "7a8b9c0d1e": "Update required",
           "hostAuthNeeded": "Authentication needed",
           "hostDisconnected": "Disconnected",
+          "hostActiveAgents": "{{count}} active",
+          "hostActiveAgents_one": "{{count}} active",
+          "hostActiveAgents_other": "{{count}} active",
           "d880ea0744": "Create a group and move this project into it.",
           "bc1460beb3": "Update the group name shown in the sidebar.",
           "13757c053c": "New Project Group",
@@ -17375,7 +17378,8 @@
     },
     "stopped": {
       "by": "Stopped by {{by}}",
-      "plain": "Stopped"
+      "plain": "Stopped",
+      "paused": "Launches and pushes paused"
     },
     "open": {
       "failed": "Could not open {{name}}"

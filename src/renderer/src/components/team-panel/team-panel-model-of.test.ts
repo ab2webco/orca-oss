@@ -147,6 +147,24 @@ describe('teamPanelModelOf', () => {
     })
   })
 
+  it('counts the members a STOP leaves running, so the panel never calls them stopped (ORCA-1157)', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+
+    const model = teamPanelModelOf(
+      args({
+        state: state({
+          stopped: { since: '2026-10-17', by: 'lead' },
+          agents: [
+            { paneKey: 'a', isMember: true, isLeader: false, state: 'working' },
+            { paneKey: 'b', isMember: true, isLeader: false, state: 'idle' }
+          ] as never
+        })
+      })
+    )
+
+    expect(model?.stopped).toEqual({ since: '2026-10-17', by: 'lead', membersRunning: 1 })
+  })
+
   it("fills Display's metrics from the host's published metrics", () => {
     teamCardsOf.mockReturnValue(CARDS)
     const metrics = {
