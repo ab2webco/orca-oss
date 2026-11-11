@@ -130,7 +130,7 @@ describe('teamSceneInputOf', () => {
         key: 'failed',
         name: 'failed',
         characterKey: null,
-        activity: 'resting',
+        activity: 'blocked',
         reportId: null,
         mergedPr: null,
         site: { stage: 0, broken: false }
@@ -204,5 +204,41 @@ describe('teamSceneInputOf', () => {
       line: 'Raised effort'
     })
     expect(teamSceneInputOf({ lead: lead(), advisor: null, members: [] }).advisor).toBeNull()
+  })
+})
+
+describe('teamSceneInputOf and idle play', () => {
+  // Every condition as the card builds it (team-panel-member-cards statusOf), never hand-written.
+  const CARDS: [TeamMemberCard['condition'], TeamMemberCard['status'], boolean][] = [
+    ['working', 'working', false],
+    ['starting', 'working', false],
+    ['waiting', 'attention', true],
+    ['idle', 'idle', false],
+    ['done', 'idle', false],
+    ['queued', 'idle', false],
+    ['paused', 'risk', false],
+    ['asleep', 'risk', false],
+    ['limited', 'risk', false],
+    ['unreachable', 'risk', false],
+    ['loggedOut', 'attention', false],
+    ['gone', 'attention', false],
+    ['startFailed', 'attention', false]
+  ]
+
+  it('lets only a truly idle member play at its desk', () => {
+    const playing = CARDS.flatMap(([condition, status, needsYou]) => {
+      const model = {
+        lead: lead(),
+        advisor: null,
+        members: [card('m', { condition, status, needsYou })]
+      }
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, teamSceneInputOf(model), { rowSize: 5, workSeated: true })
+      for (let i = 0; i < 30; i++) {
+        stepTeamScene(world, 1 / 30, { width: 420 })
+      }
+      return teamSceneActors(world).find((a) => a.key === 'm')?.play ? [condition] : []
+    })
+    expect(playing).toEqual(['idle'])
   })
 })

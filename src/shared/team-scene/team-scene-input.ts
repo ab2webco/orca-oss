@@ -1,23 +1,32 @@
-import type { TeamAgentFacts, TeamCondition, TeamPanelGameModel } from '../team-panel-model-types'
+import type { TeamAgentFacts, TeamPanelGameModel } from '../team-panel-model-types'
 import { teamSceneSiteOf } from './team-scene-sites'
 import type { TeamSceneActivity, TeamSceneAgentInput, TeamSceneInput } from './team-scene-types'
 
-// Why these: the card reads them as unable to work (limit, login, pause, host), never resting.
-const BLOCKED = new Set<TeamCondition>(['limited', 'loggedOut', 'paused', 'asleep', 'unreachable'])
-
-// Why not status 'attention': it also means failed, and a failed member has nothing to ask.
-// Why the condition too: an unmerged finished turn reads idle on the card, not done.
+// Why exhaustive: a fall-through to resting let a gone, failed or queued member play at its desk.
 const activityOf = (agent: TeamAgentFacts, needsYou: boolean): TeamSceneActivity => {
   if (needsYou) {
     return 'needsYou'
   }
-  if (BLOCKED.has(agent.condition)) {
-    return 'blocked'
+  switch (agent.condition) {
+    case 'working':
+    case 'starting':
+      return 'working'
+    case 'idle':
+    case 'done':
+    case 'waiting':
+      // Why the condition too: an unmerged finished turn reads idle on the card, not done.
+      return agent.status === 'done' || agent.condition === 'done' ? 'done' : 'resting'
+    case 'queued':
+    case 'paused':
+    case 'asleep':
+    case 'limited':
+    case 'unreachable':
+    case 'loggedOut':
+    case 'gone':
+    case 'startFailed':
+      // Why blocked: the card reads each as unable to work, never resting.
+      return 'blocked'
   }
-  if (agent.status === 'working') {
-    return 'working'
-  }
-  return agent.status === 'done' || agent.condition === 'done' ? 'done' : 'resting'
 }
 
 const agentOf = (
