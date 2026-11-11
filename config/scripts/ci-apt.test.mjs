@@ -9,7 +9,8 @@ const script = resolve(import.meta.dirname, 'ci-apt.sh')
 function runApt(
   result,
   args = ['install', '-y', 'build-essential', 'python3'],
-  timeoutOverride = ''
+  timeoutOverride = '',
+  installed = ''
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-ci-apt-'))
   const makeCommand = (name, body) =>
@@ -17,6 +18,10 @@ function runApt(
   makeCommand('sudo', 'exec "$@"')
   makeCommand('timeout', 'echo "$*" >> "$CI_APT_TIMEOUT_LOG"; shift 3; exec "$@"')
   makeCommand('sleep', 'exit 0')
+  makeCommand(
+    'dpkg-query',
+    `for installed in $CI_APT_INSTALLED; do [ "$installed" = "\${@: -1}" ] && { echo 'install ok installed'; exit 0; }; done; exit 1`
+  )
   makeCommand(
     'apt-get',
     `echo "$*" >> "$CI_APT_CALL_LOG"
@@ -42,7 +47,8 @@ esac`
       CI_APT_CALL_LOG: callLog,
       CI_APT_TIMEOUT_LOG: timeoutLog,
       CI_APT_TIMEOUT: timeoutOverride,
-      CI_APT_ROOT: dir
+      CI_APT_ROOT: dir,
+      CI_APT_INSTALLED: installed
     }
   })
   const lines = (path) => {
@@ -111,6 +117,39 @@ describe('bounded CI apt', () => {
     expect(result.status).toBe(0)
     expect(result.calls.map((call) => call.split(' ').at(-1))).toEqual(['zsh', 'update', 'zsh'])
     expect(result.timeouts[1]).toContain('--kill-after=10s 120s apt-get')
+  })
+
+  // Why (2026-11-11): build e2e app timed out on apt for packages the image already ships.
+  it('skips apt when every requested package is already installed', () => {
+    const result = runApt(
+      'fail',
+      ['install', '-y', 'build-essential', 'python3'],
+      '',
+      'build-essential python3'
+    )
+    expect(result.status).toBe(0)
+    expect(result.calls).toEqual([])
+    expect(result.stderr).toContain('already installed: build-essential python3')
+  })
+
+  it('reads package names past apt options', () => {
+    const result = runApt(
+      'fail',
+      ['install', '-y', '-o', 'Dir::Cache::Archives=/tmp/a/', '--no-install-recommends', 'zsh'],
+      '',
+      'zsh'
+    )
+    expect(result.calls).toEqual([])
+  })
+
+  it('installs when any requested package is missing', () => {
+    const result = runApt('success', ['install', '-y', 'zsh', 'fish'], '', 'zsh')
+    expect(result.calls).toHaveLength(1)
+  })
+
+  it('still resolves archive URIs for installed packages', () => {
+    const result = runApt('success', ['install', '--print-uris', '-qq', '-y', 'zsh'], '', 'zsh')
+    expect(result.calls).toHaveLength(1)
   })
 
   it('preserves stdout for ordinary installs', () => {
