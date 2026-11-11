@@ -138,7 +138,7 @@ describe('GamePausedMembers.note', () => {
     ])
   })
 
-  it('marks a paused member whose worktree is gone, so it is not resumed (ORCA-832)', async () => {
+  it('drops a paused member whose worktree is gone, so it is never resumed (ORCA-832)', async () => {
     const { paused, sessions } = setup(
       { 'term-ORCA-1': context('ORCA-1'), 'term-ORCA-2': context('ORCA-2') },
       new Set(['wt-ORCA-1'])
@@ -149,9 +149,9 @@ describe('GamePausedMembers.note', () => {
 
     const after = (await paused.note('repo:a', [])).paused
 
-    expect(after[0]).toMatchObject({ ticket: 'ORCA-1', resumable: false, worktreeGone: true })
-    expect(after[1]).toMatchObject({ ticket: 'ORCA-2', resumable: true })
-    expect(after[1]).not.toHaveProperty('worktreeGone')
+    expect(after).toHaveLength(1)
+    expect(after[0]).toMatchObject({ ticket: 'ORCA-2', resumable: true })
+    expect(after[0]).not.toHaveProperty('worktreeGone')
   })
 
   it('never marks a worktree gone while the member is live', async () => {
