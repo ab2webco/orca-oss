@@ -94,18 +94,28 @@ test.describe('waking a sleeping row through the runtime', () => {
       terminal: asleep!.handle
     })
 
-    expect(wake.result.wake.status).not.toBe('awake')
-    expect(wake.result.wake.paneKey).toBe(paneKey)
-    const after = await orcaPage.evaluate(
-      (id) => ({
-        activeTabId: window.__store?.getState().activeTabId ?? null,
-        tabIds: (window.__store?.getState().tabsByWorktree[id] ?? []).map((tab) => tab.id)
-      }),
-      worktreeId
-    )
+    // Why 'woken' with a handle: 'waking' also covers a resume Orca refused and tore down (ORCA-1167).
+    expect(wake.result.wake).toMatchObject({ status: 'woken', paneKey })
+    const wokenHandle = wake.result.wake.handle
+    expect(wokenHandle).toBeTruthy()
+    const readTabs = (): Promise<{ activeTabId: string | null; tabIds: string[] }> =>
+      orcaPage.evaluate(
+        (id) => ({
+          activeTabId: window.__store?.getState().activeTabId ?? null,
+          tabIds: (window.__store?.getState().tabsByWorktree[id] ?? []).map((tab) => tab.id)
+        }),
+        worktreeId
+      )
+    const newTabs = async (): Promise<string[]> =>
+      (await readTabs()).tabIds.filter((id) => !before.tabIds.includes(id))
     // The session reopened in a fresh background tab; the window kept its tab.
-    expect(after.tabIds.filter((id) => !before.tabIds.includes(id))).toHaveLength(1)
-    expect(after.activeTabId).toBe(before.activeTabId)
+    await expect.poll(newTabs).toHaveLength(1)
+    expect((await readTabs()).activeTabId).toBe(before.activeTabId)
+    // Why again: a torn-down resume shows its tab for a moment, then closes it.
+    expect(
+      (await listTerminals(client)).find((terminal) => terminal.handle === wokenHandle)?.liveness
+    ).toMatch(/^(running|starting)$/)
+    expect(await newTabs()).toHaveLength(1)
     expect(
       await orcaPage.evaluate(
         (key) => Boolean(window.__store?.getState().sleepingAgentSessionsByPaneKey[key]),
