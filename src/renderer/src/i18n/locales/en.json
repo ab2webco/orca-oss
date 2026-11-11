@@ -17552,7 +17552,11 @@
       "chooseLead": "Choose the lead's account",
       "startFreshConfirm": "Start a fresh lead?",
       "start": "Start",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "leadFallback": "the lead",
+      "reopenFailed": "Could not reopen the team: {{value}}",
+      "reopenNothingKept": "No kept lead to reopen",
+      "reopenUnsupported": "This host cannot reopen the team"
     }
   }
 }

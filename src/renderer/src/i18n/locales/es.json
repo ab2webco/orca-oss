@@ -16572,7 +16572,11 @@
       "chooseLead": "Elegir la cuenta del lead",
       "startFreshConfirm": "¿Empezar un lead nuevo?",
       "start": "Empezar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "leadFallback": "el lead",
+      "reopenFailed": "No se pudo reabrir el equipo: {{value}}",
+      "reopenNothingKept": "No hay un lead guardado para reabrir",
+      "reopenUnsupported": "Este host no puede reabrir el equipo"
     }
   }
 }
