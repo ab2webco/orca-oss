@@ -35,15 +35,27 @@ export async function wakeSleepingTerminal(
   const now = deps.now ?? Date.now
   const deadline = now() + (options.timeoutMs ?? WAKE_TIMEOUT_MS)
   deps.requestWake(record.paneKey)
+  const waking: RuntimeTerminalWake = {
+    handle: null,
+    status: 'waking',
+    paneKey: record.paneKey
+  }
   // Why the record: the renderer drops it only once the resumed agent's PTY spawned.
   while (deps.isAsleep(record)) {
     if (now() >= deadline) {
-      return { handle: null, status: 'waking', paneKey: record.paneKey }
+      return waking
     }
     await deps.sleep(WAKE_POLL_MS)
   }
-  const woken = await deps.liveHandleOf(record)
-  return woken
-    ? { handle: woken, status: 'woken', paneKey: record.paneKey }
-    : { handle: null, status: 'waking', paneKey: record.paneKey }
+  // Why poll: a fresh tab is found by the session its agent reports, which lands after the spawn (ORCA-1167).
+  for (;;) {
+    const woken = await deps.liveHandleOf(record)
+    if (woken) {
+      return { handle: woken, status: 'woken', paneKey: record.paneKey }
+    }
+    if (now() >= deadline) {
+      return waking
+    }
+    await deps.sleep(WAKE_POLL_MS)
+  }
 }
