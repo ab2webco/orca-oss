@@ -40,6 +40,9 @@ const row = (over: Partial<TeamMemberRow> = {}): TeamMemberRow => ({
   ticketStatus: null,
   live: null,
   since: null,
+  phase: null,
+  summary: null,
+  terminal: null,
   account: null,
   limit: null,
   ...over
@@ -105,6 +108,9 @@ describe('teamLeadViewOf', () => {
         ticketStatus: 'In Progress',
         live: null,
         since: null,
+        phase: 'pr',
+        summary: null,
+        terminal: null,
         account: null,
         limit: null
       }
@@ -235,7 +241,8 @@ describe('live card facts', () => {
     })
     expect(one({ account: { email: 'x@y.z' } })?.account).toEqual({
       email: 'x@y.z',
-      usedPercent: null
+      usedPercent: null,
+      weeklyPercent: null
     })
   })
 
@@ -256,6 +263,57 @@ describe('live card facts', () => {
       ],
       comments: 3
     })
+  })
+})
+
+describe('open card facts', () => {
+  const one = (over: Record<string, unknown>, state: Record<string, unknown> = {}) =>
+    teamLeadViewOf(leadState({ agents: [member(over)], ...state }))?.members[0]
+  const review = (state: string) => ({ number: 9, url: 'https://pr', state, ci: 'none' })
+
+  it('reads the phase as desktop does, only while active or finished', () => {
+    expect(one({ toolName: 'Edit' })?.phase).toBe('code')
+    expect(one({ review: review('open') })?.phase).toBe('pr')
+    expect(one({ state: 'waiting' })?.phase).toBe('plan')
+    expect(one({ state: 'idle', review: review('merged') })?.phase).toBe('merge')
+    expect(one({ state: 'idle' })?.phase).toBeNull()
+  })
+
+  it("takes the summary from its ticket's last mail", () => {
+    const workItem = { identifier: 'ORCA-5', title: 't', status: 'In Progress' }
+    const inboxes = [
+      { key: 'ORCA-5', unread: 0, last: { at: 'x', from: 'ORCA-5', subject: 'PR up' }, waiting: [] }
+    ]
+    expect(one({ workItem }, { inboxes })?.summary).toBe('PR up')
+    expect(one({ workItem })?.summary).toBeNull()
+  })
+
+  it('keeps the weekly quota beside the 5 h one', () => {
+    const claudeAccounts = [{ email: 'dev@example.com', sessionPercent: 37, weeklyPercent: 61 }]
+    expect(
+      one({ account: { email: 'dev@example.com' } }, { metrics: { claudeAccounts } })?.account
+    ).toEqual({ email: 'dev@example.com', usedPercent: 37, weeklyPercent: 61 })
+  })
+
+  it("names the tab to open a local member's terminal in, and none for a remote one", () => {
+    expect(one({ worktree: { id: 'repo::/wt' }, terminalHandle: 'term_1' })?.terminal).toEqual({
+      worktreeId: 'repo::/wt',
+      tabId: 'tab-2',
+      terminal: 'term_1'
+    })
+    // Why: game.state omits a local member's worktree when it is the lead's.
+    expect(one({}, { worktree: { id: 'repo::/lead' } })?.terminal).toEqual({
+      worktreeId: 'repo::/lead',
+      tabId: 'tab-2',
+      terminal: null
+    })
+    expect(one({ worktree: { id: 'repo::/wt' }, remote: { host: 'iMac' } })?.terminal).toBeNull()
+  })
+
+  it("follows the host's UI language, English when it sends none", () => {
+    expect(teamLeadViewOf(leadState({ locale: 'es' }))?.locale).toBe('es')
+    expect(teamLeadViewOf(leadState({ locale: 'xx' }))?.locale).toBe('en')
+    expect(teamLeadViewOf(leadState())?.locale).toBe('en')
   })
 })
 

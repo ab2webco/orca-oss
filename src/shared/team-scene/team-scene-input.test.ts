@@ -71,7 +71,8 @@ describe('teamSceneInputOf', () => {
         characterKey: null,
         activity: 'needsYou',
         reportId: null,
-        mergedPr: null
+        mergedPr: null,
+        site: { stage: 0, broken: false }
       },
       {
         key: 'busy',
@@ -79,7 +80,8 @@ describe('teamSceneInputOf', () => {
         characterKey: 'arthur',
         activity: 'working',
         reportId: 'Opened #12',
-        mergedPr: null
+        mergedPr: null,
+        site: { stage: 3, broken: false }
       },
       {
         key: 'done',
@@ -87,7 +89,8 @@ describe('teamSceneInputOf', () => {
         characterKey: null,
         activity: 'done',
         reportId: null,
-        mergedPr: 9
+        mergedPr: 9,
+        site: { stage: 4, broken: false }
       },
       {
         key: 'failed',
@@ -95,7 +98,8 @@ describe('teamSceneInputOf', () => {
         characterKey: null,
         activity: 'resting',
         reportId: null,
-        mergedPr: null
+        mergedPr: null,
+        site: { stage: 0, broken: false }
       }
     ])
   })

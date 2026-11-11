@@ -129,8 +129,9 @@ describe('host sections with project groups', () => {
       'project-group:default',
       'project-group:runtime'
     ])
+    // Why 0: under a host, V30 draws a nested org at the host's level (ORCA-1149).
     expect(sectioned.find((row) => row.type === 'header' && row.label === 'child')).toMatchObject({
-      projectGroupDepth: 1
+      projectGroupDepth: 0
     })
   })
 

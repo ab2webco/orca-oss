@@ -9,11 +9,11 @@ import {
 import type { GameMemberName } from './orchestrator-game-member-names'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { teamFlowPhaseOf } from './team-flow-phase'
 import { memberNamesOf } from './team-panel-member-names'
 import type {
   TeamAccount,
   TeamCondition,
-  TeamFlowPhase,
   TeamHost,
   TeamLeadCard,
   TeamLiveAction,
@@ -28,7 +28,6 @@ export type TeamCards = { lead: TeamLeadCard; members: TeamMemberCard[] }
 
 type Work = { review: GameReview | null; workItem: GameAgent['workItem'] | null }
 
-const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
   risk: 1,
@@ -85,16 +84,6 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
     case 'queued':
       return isFinished(work) ? 'done' : 'idle'
   }
-}
-
-const flowPhaseOf = (agent: GameAgent, work: Work): TeamFlowPhase => {
-  if (isFinished(work) || work.workItem?.statusGroup === 'review') {
-    return 'merge'
-  }
-  if (agent.toolName !== null && EDIT_TOOLS.has(agent.toolName)) {
-    return 'code'
-  }
-  return work.review?.state === 'open' || work.review?.state === 'draft' ? 'pr' : 'plan'
 }
 
 const hostOf = (agent: GameAgent): TeamHost =>
@@ -229,7 +218,7 @@ function memberCardOf(
     account: accountOf(agent, state),
     characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
-    flowPhase: isActive(agent) || isFinished(work) ? flowPhaseOf(agent, work) : null,
+    flowPhase: teamFlowPhaseOf(agent),
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
     needsYou,
