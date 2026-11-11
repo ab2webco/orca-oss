@@ -69,6 +69,15 @@ describe('HostSectionHeader as a V30 tree row (ORCA-1149)', () => {
     expect(header.querySelector('[data-host-header-active]')?.textContent).toBe('2 active')
   })
 
+  it('keeps the count flush right: the hover chevron and menu float in their own slot', () => {
+    const header = render(host())
+    const controls = header.querySelector('[data-host-header-controls]') as HTMLElement
+
+    expect(controls.className).toMatch(/\babsolute\b/)
+    expect(header.className).toMatch(/\brelative\b/)
+    expect(controls.contains(header.querySelector('[data-host-header-action]'))).toBe(true)
+  })
+
   it('still words a host that needs attention', () => {
     const header = render(host({ kind: 'ssh', health: 'disconnected', detail: 'SSH' }))
 

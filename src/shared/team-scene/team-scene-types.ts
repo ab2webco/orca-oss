@@ -1,3 +1,5 @@
+import type { TeamSceneSite } from './team-scene-sites'
+
 // Why: the scene reads a narrow projection of the Team model (ORCA-1049) so every style and
 // client (desktop canvas, later mobile) runs the same simulation from real state only.
 
@@ -17,6 +19,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   reportId: string | null
   /** The member's merged PR number; a new one is one celebration. */
   mergedPr: number | null
+  /** Its visible build, staged from its real phase, PR and CI. */
+  site: TeamSceneSite
 }
 
 export type TeamSceneInput = {
@@ -64,4 +68,4 @@ export type TeamSceneActor = {
 /** One-shot moments a style may draw particles or a thrown item for. */
 export type TeamSceneEffect =
   | { kind: 'handoff'; from: string; to: string }
-  | { kind: 'burst'; key: string; reason: 'merge' | 'welcome' | 'goodbye' }
+  | { kind: 'burst'; key: string; reason: 'merge' | 'welcome' | 'goodbye' | 'build' | 'repair' }

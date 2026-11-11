@@ -319,8 +319,9 @@ describe('WorktreeCard quick actions', () => {
     expect(markup).toContain('tabindex="0"')
   })
 
-  it('renders detached HEAD identity in detailed card metadata', () => {
-    worktreeCardProperties = []
+  // ORCA-1149: V30 draws one line, so the HEAD identity shows only with the Branch prop on.
+  it('renders detached HEAD identity in detailed card metadata when the branch prop is on', () => {
+    worktreeCardProperties = ['branch']
 
     const markup = renderToStaticMarkup(
       <WorktreeCard
@@ -374,7 +375,8 @@ describe('WorktreeCard quick actions', () => {
     expect(markup).not.toContain('text-[11px] text-muted-foreground truncate leading-none')
   })
 
-  it('uses the left status lane and primary badge when compact cards are disabled', () => {
+  // ORCA-1149: V30 marks no primary worktree, so a one-line row carries no 'primary' chip.
+  it('uses the left status lane and no primary badge when compact cards are disabled', () => {
     worktreeCardProperties = ['status']
 
     const markup = renderToStaticMarkup(
@@ -390,12 +392,12 @@ describe('WorktreeCard quick actions', () => {
       />
     )
 
-    expect(markup).toContain('primary')
+    expect(markup).not.toContain('>primary<')
     expect(markup).not.toContain('aria-label="Primary worktree"')
-    expect(markup).toContain('data-worktree-card-meta-row=""')
+    expect(markup).not.toContain('data-worktree-card-meta-row=""')
   })
 
-  it('keeps unread in the status lane and moves primary into the title row when compact cards are enabled', () => {
+  it('keeps unread in the status lane and draws no primary mark when compact cards are enabled', () => {
     worktreeCardProperties = ['status']
     settings = { compactWorktreeCards: true }
 
@@ -412,7 +414,7 @@ describe('WorktreeCard quick actions', () => {
       />
     )
 
-    expect(markup).toContain('aria-label="Primary worktree"')
+    expect(markup).not.toContain('aria-label="Primary worktree"')
     expect(markup).not.toContain('>primary<')
     expect(markup).not.toContain('data-worktree-card-meta-row=""')
   })
