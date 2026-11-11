@@ -134,7 +134,7 @@ describe('TeamSceneBuilding', () => {
     render(hosts)
     expect(floors()).toHaveLength(5)
     expect(host.textContent).not.toMatch(/\+\d/)
-    for (const name of ['local', 'a', 'b', 'c', 'd']) {
+    for (const name of ['This computer', 'a', 'b', 'c', 'd']) {
       expect(button(name)).toBeTruthy()
     }
     const scroller = host.querySelector<HTMLElement>('[data-team-floors-scroll]')!
@@ -221,7 +221,7 @@ describe('TeamSceneBuilding', () => {
     const plates = [...host.querySelectorAll<HTMLElement>('[data-team-floor-plate]')].map(
       (p) => p.textContent
     )
-    expect(plates).toEqual(['m1', 'imac', 'local'])
+    expect(plates).toEqual(['m1', 'imac', 'This computer'])
     // Why the crop: the top floor shows more sky than the lead's street-level floor.
     const crops = [...host.querySelectorAll<HTMLElement>('[data-team-floor-view]')].map((v) =>
       Number.parseFloat(v.style.marginTop)
