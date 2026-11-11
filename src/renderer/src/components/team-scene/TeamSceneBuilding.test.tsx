@@ -233,7 +233,10 @@ describe('TeamSceneBuilding', () => {
     }
   })
 
+  // Why the plate too: a bubble over a floor's name plate hid which floor it was (lead, 420 px).
   it('hands a floor the asker boxes of the floor above, so its rising bubbles keep off them', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(40)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(18)
     const hosts = [local, remote('imac'), remote('m1')]
     const base = model(hosts)
     // The iMac member asks: its floor is in the middle, the lead's below it.
@@ -245,8 +248,9 @@ describe('TeamSceneBuilding', () => {
           .querySelector(`[data-team-floor="${key}"] [data-scene-obstacles]`)
           ?.getAttribute('data-scene-obstacles')
       )
-    expect(obstaclesOn('')).toBe(1)
-    expect(obstaclesOn('m1')).toBe(0)
+    // Each floor's name plate, plus the iMac's asker box for the floor below it.
+    expect(obstaclesOn('')).toBe(2)
+    expect(obstaclesOn('m1')).toBe(1)
   })
 
   it("gives the lead's line to the floor where the lead stands, its own or the one it visits", () => {

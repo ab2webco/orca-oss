@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import {
   teamSceneFloorInputOf,
@@ -41,6 +41,8 @@ const STRIP = { height: 112, slab: 4, crop: 66, perLevel: 10, minCrop: 36 }
 const cropOf = (level: number): number =>
   Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel)
 const NO_BOXES: readonly TeamSceneRect[] = []
+// The plate's inset from the floor's corner: left-1.5 top-1.5.
+const PLATE_INSET = 6
 const TUBE_SECONDS = 1.6
 // Why this long: the ride in, the walk to the judged desk and the gesture held there.
 const ADVISOR_RIDE_SECONDS = 12
@@ -129,10 +131,27 @@ function FloorStage({
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
+  const cropTop = zoomed ? 0 : cropOf(level)
+  const plateRef = useRef<HTMLSpanElement>(null)
+  const [plate, setPlate] = useState<TeamSceneRect | null>(null)
+  // Why measured: the plate is as wide as its host's name, and no bubble may cover it.
+  useLayoutEffect(() => {
+    const el = plateRef.current
+    const next =
+      el && el.offsetWidth > 0
+        ? {
+            left: PLATE_INSET,
+            top: cropTop + PLATE_INSET,
+            width: el.offsetWidth,
+            height: el.offsetHeight
+          }
+        : null
+    setPlate((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next))
+  }, [cropTop, floor.host])
+  const obstacles = useMemo(() => (plate ? [plate, ...fromAbove] : fromAbove), [plate, fromAbove])
   if (!painter) {
     return null
   }
-  const cropTop = zoomed ? 0 : cropOf(level)
   // Why where it stands: the lead's line goes with it on a visit, and none rides in the car.
   const leg = legs.lead
   const leadHere =
@@ -168,7 +187,7 @@ function FloorStage({
           crop={crop}
           visibleTop={topmost ? cropTop : 0}
           onAskers={(boxes) => onAskers(floor.key, boxes)}
-          extraObstacles={fromAbove}
+          extraObstacles={obstacles}
         />
       </div>
       {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
@@ -186,6 +205,7 @@ function FloorStage({
       )}
       {/* Why last: the name stays readable over a dark, unreachable floor. */}
       <span
+        ref={plateRef}
         data-team-floor-plate=""
         className="pointer-events-none absolute left-1.5 top-1.5 rounded-sm bg-scene-bubble/85 px-1.5 py-0.5 font-mono text-[10.5px] text-white"
       >
