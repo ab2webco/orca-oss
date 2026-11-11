@@ -285,7 +285,7 @@ export function stepTeamScene(
       advancePlan(world, body, opts.width)
     }
   }
-  if (!world.visitor && !stepTeamSceneRide(world, opts.width)) {
+  if (!world.visitor && !stepTeamSceneRide(world)) {
     stepLeadRounds(world, opts.width)
   }
   stepAdvisorWalk(world, opts.width)

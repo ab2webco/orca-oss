@@ -649,18 +649,26 @@ describe('team scene director, the lead riding between floors', () => {
     expect(actor(world, 'lead')).toBeUndefined()
   })
 
-  it('takes no ride on a narrow floor: the lead stays home, and no guest is drawn', () => {
-    const home = createTeamSceneWorld()
-    const floor = { ...input([member('a')]), leadStays: true as const }
-    applyTeamSceneInput(home, { ...floor, ride: 'away' }, OFFICE)
-    run(home, 8, 320)
-    expect(actor(home, 'lead')?.x).toBeCloseTo(0.84, 2)
-    const away = createTeamSceneWorld()
-    const there = { ...input([member('b', { activity: 'needsYou' })]), leadless: true as const }
-    applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
-    run(away, 8, 320)
-    expect(actor(away, 'lead')).toBeUndefined()
-  })
+  // Why at 195: a floor of the building on the default Team panel is that wide (ORCA-1150 probe).
+  it.each([195, 320])(
+    'rides at %i px too: the lead leaves, and its guest stands in front of the member',
+    (width) => {
+      const home = createTeamSceneWorld()
+      const floor = { ...input([member('a')]), leadStays: true as const }
+      applyTeamSceneInput(home, { ...floor, ride: 'away' }, OFFICE)
+      run(home, 20, width)
+      expect(actor(home, 'lead')).toBeUndefined()
+      const away = createTeamSceneWorld()
+      const there = { ...input([member('b', { activity: 'needsYou' })]), leadless: true as const }
+      applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
+      run(away, 20, width)
+      const guest = actor(away, 'lead')!
+      const b = away.bodies.get('b')!
+      // In front of the member, never on top of it.
+      expect(guest.depth).toBeGreaterThan(b.home.depth + 0.1)
+      expect(Math.abs(guest.x - b.home.x)).toBeLessThan(0.1)
+    }
+  )
 
   it('places a ride at once under reduced motion: the guest beside its member, the away lead gone', () => {
     const there = createTeamSceneWorld()
@@ -702,12 +710,12 @@ describe('team scene director, a ride under reduced motion as the canvas paints 
     expect(Math.abs(actor(there, 'lead')!.x - there.bodies.get('b')!.home.x)).toBeLessThan(0.1)
   })
 
-  it('takes no ride on a narrow floor: the lead at its own spot, and no guest', () => {
+  it('shows the end of the ride on the default panel too', () => {
     const { home, there } = floors()
-    painted(home, 320)
-    painted(there, 320)
-    expect(actor(home, 'lead')?.x).toBeCloseTo(0.84, 2)
-    expect(actor(there, 'lead')).toBeUndefined()
+    painted(home, 195)
+    painted(there, 195)
+    expect(actor(home, 'lead')).toBeUndefined()
+    expect(actor(there, 'lead')!.depth).toBeGreaterThan(there.bodies.get('b')!.home.depth + 0.1)
   })
 })
 

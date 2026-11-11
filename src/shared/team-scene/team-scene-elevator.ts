@@ -4,8 +4,6 @@ import type { TeamSceneInput, TeamSceneSpot } from './team-scene-types'
 
 /** Where the building's elevator stands: just off each floor's right edge. */
 export const ELEVATOR_X = 1.04
-// Why: below this a visiting lead would stand over a member, so nobody rides on a narrow floor.
-const NARROW_PX = 360
 const BESIDE = { x: 0.07, depth: 0.12 }
 
 /** The lead leaving its floor for another, or the member it visits here from another floor. */
@@ -41,16 +39,18 @@ export function applyTeamSceneRide(
   world.ride = ride
 }
 
-/** Steers the lead on a ride; false leaves it to its rounds. */
-export function stepTeamSceneRide(world: TeamSceneWorld, width: number): boolean {
+/**
+ * Steers the lead on a ride; false leaves it to its rounds. At any width: the default Team panel's
+ * floor is 195 px, and the visitor stands in front of its member, so it never covers one.
+ */
+export function stepTeamSceneRide(world: TeamSceneWorld): boolean {
   const lead = world.bodies.get('lead')
   if (!lead) {
     return false
   }
-  const narrow = width < NARROW_PX
   const ride = world.ride
   if (typeof ride === 'object' && ride !== null) {
-    lead.hidden = narrow ? true : undefined
+    lead.hidden = undefined
     const member = world.bodies.get(ride.guest)
     if (member) {
       lead.target = besideOf(member)
@@ -64,16 +64,14 @@ export function stepTeamSceneRide(world: TeamSceneWorld, width: number): boolean
     }
     return true
   }
-  if (ride === 'away' && !narrow) {
+  if (ride === 'away') {
     lead.target = elevator(lead)
     lead.hidden = lead.x >= ELEVATOR_X - 0.01 ? true : undefined
     return true
   }
   if (lead.hidden) {
-    // Back from a ride: out of the elevator, and its rounds walk it home. A floor gone narrow
-    // mid-ride takes none, so the lead is simply back at its spot.
-    const spot = ride === 'away' ? LEAD_SPOT : { x: ELEVATOR_X, depth: lead.depth }
-    Object.assign(lead, { hidden: undefined, x: spot.x, depth: spot.depth })
+    // Back from a ride: out of the elevator, and its rounds walk it home.
+    Object.assign(lead, { hidden: undefined, x: ELEVATOR_X })
   }
   return false
 }
