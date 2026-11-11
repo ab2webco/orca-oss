@@ -6,36 +6,36 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu'
-import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { NewTabAccountRow } from '../../../../shared/new-tab-account-choice'
 import { newTabAccountRowTextOf } from './new-tab-account-row-text'
 
 export type NewTabAgentAccountSubmenuProps = {
-  agentLabel: string
+  ariaLabel: string
   /** The account the row launches on today; shown beside the agent. */
   triggerLabel: string
   rows: readonly NewTabAccountRow[]
   checkedId: string | null
   labelOf: (row: NewTabAccountRow) => string
   onPick: (accountId: string) => void
+  /** A team row only sets the account; its own item does the launch. */
+  keepOpen?: boolean
 }
 
 /** The account beside an agent row; opening it lists the provider's managed accounts (ORCA-717). */
 export function NewTabAgentAccountSubmenu({
-  agentLabel,
+  ariaLabel,
   triggerLabel,
   rows,
   checkedId,
   labelOf,
-  onPick
+  onPick,
+  keepOpen = false
 }: NewTabAgentAccountSubmenuProps): React.JSX.Element {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
-        aria-label={translate('newTabMenu.account.choose', 'Choose the {{value}} account', {
-          value: agentLabel
-        })}
+        aria-label={ariaLabel}
         className="min-w-0 max-w-[55%] gap-1 px-1.5 font-normal text-muted-foreground"
       >
         <span className="truncate">{triggerLabel}</span>
@@ -47,7 +47,12 @@ export function NewTabAgentAccountSubmenu({
             <DropdownMenuItem
               key={row.id}
               disabled={row.disabled !== null}
-              onSelect={() => onPick(row.id)}
+              onSelect={(event) => {
+                if (keepOpen) {
+                  event.preventDefault()
+                }
+                onPick(row.id)
+              }}
               className="items-start gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5"
             >
               <Check

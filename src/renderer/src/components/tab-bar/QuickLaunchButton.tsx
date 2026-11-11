@@ -255,7 +255,9 @@ function QuickLaunchAgentMenuItemsInner({
           <div key={agent} className="flex items-center">
             {launchItem}
             <NewTabAgentAccountSubmenu
-              agentLabel={label}
+              ariaLabel={translate('newTabMenu.account.choose', 'Choose the {{value}} account', {
+                value: label
+              })}
               triggerLabel={agentAccounts.labelOf(account.provider, account.checkedId)}
               rows={account.rows}
               checkedId={account.checkedId}
