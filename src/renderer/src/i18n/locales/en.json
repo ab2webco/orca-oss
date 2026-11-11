@@ -3396,8 +3396,7 @@
           "SortableTab": {
             "ab19f603eb": "Rename tab {{value0}}",
             "6df69d9388": "Close tab {{value0}}",
-            "fdb2691425": "Collapse pane",
-            "95db5f2f7d": "Close tab"
+            "fdb2691425": "Collapse pane"
           },
           "SortableTabContextMenu": {
             "35e8892fd0": "Tab Color",

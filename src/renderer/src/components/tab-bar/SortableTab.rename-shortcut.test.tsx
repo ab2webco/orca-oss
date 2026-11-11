@@ -336,6 +336,28 @@ function pressInputKey(
   return event
 }
 
+function childTexts(node: unknown): string[] {
+  if (typeof node === 'string') {
+    return [node]
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(childTexts)
+  }
+  const el = node as ReactElementLike | null
+  return el?.props ? childTexts(el.props.children) : []
+}
+
+// Why (ORCA-717): under a 120 px tab bar a tab is its icon alone; hover or focus swaps the icon for its close.
+function expectNarrowIconSwap(tree: unknown): void {
+  const icon = findElementsByType(tree, 'span').find((el) => el.props['data-tab-leading-icon'])
+  const close = findElementsByType(tree, 'button').find(
+    (el) => el.props['data-tab-close-button'] === 'true'
+  )
+  expect(String(icon?.props.className)).toContain('@max-[120px]/tab-bar:group-hover:hidden')
+  expect(String(close?.props.className)).toContain('@max-[120px]/tab-bar:hidden')
+  expect(String(close?.props.className)).toContain('@max-[120px]/tab-bar:group-hover:flex')
+}
+
 describe('SortableTab rename shortcut signal', () => {
   beforeEach(() => {
     reactHookRuntime.states = []
@@ -387,5 +409,18 @@ describe('SortableTab rename shortcut signal', () => {
     pressInputKey(input, 'Enter')
 
     expect(onSetCustomTitle).toHaveBeenCalledWith('terminal-tab-1', '日本語 terminal')
+  })
+
+  it('shows its icon alone in a narrow tab bar and swaps it for the close on hover', async () => {
+    storeState.renamingTabId = null
+    const tree = expandNode(await renderSortableTab())
+
+    expectNarrowIconSwap(tree)
+    const label = findElementsByType(tree, 'span').find(
+      (el) => el.props.children === 'Runtime terminal title'
+    )
+    expect(String(label?.props.className)).toContain('@max-[120px]/tab-bar:hidden')
+    // Why: with the label hidden, the close's tooltip is where the tab's name shows.
+    expect(childTexts(tree).join('\n')).toContain('Close tab Runtime terminal title')
   })
 })
