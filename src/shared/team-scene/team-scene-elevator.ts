@@ -9,7 +9,32 @@ const BESIDE = { x: 0.07, depth: 0.12 }
 /** The lead leaving its floor for another, or the member it visits here from another floor. */
 export type TeamSceneRide = 'away' | { guest: string }
 
-const elevator = (lead: TeamSceneBody): TeamSceneSpot => ({ x: ELEVATOR_X, depth: lead.depth })
+const elevator = (body: TeamSceneBody): TeamSceneSpot => ({ x: ELEVATOR_X, depth: body.depth })
+const atDoor = (body: TeamSceneBody): boolean => body.x >= ELEVATOR_X - 0.01
+
+// Why kept beside the world: the building moves the car only once its rider really boarded.
+const boardedOf = new WeakMap<TeamSceneWorld, string[]>()
+const board = (world: TeamSceneWorld, rider: 'lead' | 'advisor'): void => {
+  boardedOf.set(world, [...(boardedOf.get(world) ?? []), rider])
+}
+
+/** The riders that stepped into the elevator since the last call. */
+export const drainTeamSceneBoarded = (world: TeamSceneWorld): string[] =>
+  (boardedOf.get(world) ?? []).splice(0)
+
+/** Walks a leaving advisor into the elevator and off the floor; false when none is leaving. */
+export function stepAdvisorLeaving(world: TeamSceneWorld): boolean {
+  const advisor = world.bodies.get('advisor')
+  if (!advisor?.leaving) {
+    return false
+  }
+  advisor.target = elevator(advisor)
+  if (atDoor(advisor)) {
+    world.bodies.delete('advisor')
+    board(world, 'advisor')
+  }
+  return true
+}
 
 // Why the right side: a member's needs-you mark sits left of its monitor, and the mark keeps its spot;
 // in front of the row, the visitor only passes before a neighbour's desk. At the right edge it can
@@ -62,14 +87,18 @@ export function stepTeamSceneRide(world: TeamSceneWorld): boolean {
   }
   if (lead.leaving) {
     lead.target = elevator(lead)
-    if (lead.x >= ELEVATOR_X - 0.01) {
+    if (atDoor(lead)) {
       world.bodies.delete('lead')
+      board(world, 'lead')
     }
     return true
   }
   if (ride === 'away') {
     lead.target = elevator(lead)
-    lead.hidden = lead.x >= ELEVATOR_X - 0.01 ? true : undefined
+    if (atDoor(lead) && !lead.hidden) {
+      board(world, 'lead')
+    }
+    lead.hidden = atDoor(lead) ? true : undefined
     return true
   }
   if (lead.hidden) {
@@ -81,6 +110,10 @@ export function stepTeamSceneRide(world: TeamSceneWorld): boolean {
 
 /** Under reduced motion a ride shows where it ends: the guest by its member, the away lead gone. */
 export function settleTeamSceneRide(world: TeamSceneWorld): void {
+  if (world.bodies.get('advisor')?.leaving) {
+    world.bodies.delete('advisor')
+    board(world, 'advisor')
+  }
   const lead = world.bodies.get('lead')
   const ride = world.ride
   if (!lead) {
@@ -88,12 +121,16 @@ export function settleTeamSceneRide(world: TeamSceneWorld): void {
   }
   if (lead.leaving) {
     world.bodies.delete('lead')
+    board(world, 'lead')
   } else if (typeof ride === 'object' && ride !== null) {
     const member = world.bodies.get(ride.guest)
     const spot = member ? besideOf(member) : elevator(lead)
     Object.assign(lead, { x: spot.x, depth: spot.depth, target: spot, hidden: undefined })
   } else if (ride === 'away') {
     // Why in the elevator: the next step keeps a lead hidden only once it stands there.
+    if (!lead.hidden) {
+      board(world, 'lead')
+    }
     Object.assign(lead, { x: ELEVATOR_X, target: elevator(lead), hidden: true })
   }
 }

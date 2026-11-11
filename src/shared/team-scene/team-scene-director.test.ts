@@ -9,6 +9,7 @@ import {
   type TeamSceneWorld
 } from './team-scene-director'
 import { teamSceneActors } from './team-scene-actors'
+import { drainTeamSceneBoarded } from './team-scene-elevator'
 import type { TeamSceneActor, TeamSceneInput, TeamSceneMemberInput } from './team-scene-types'
 
 const WIDTH = 360
@@ -748,5 +749,47 @@ describe('team scene director, the advisor riding in', () => {
       }
     )
     expect(world.bodies.get('advisor')!.x).toBeGreaterThan(1)
+  })
+})
+
+describe('team scene director, riders boarding the elevator', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+  const run = (world: TeamSceneWorld, seconds: number) => {
+    for (let t = 0; t < seconds; t += DT) {
+      stepTeamScene(world, DT, { width: 320 })
+    }
+  }
+
+  it('says the lead boarded once it reaches the elevator, not before', () => {
+    const world = createTeamSceneWorld()
+    const floor = { ...input([member('a')]), leadStays: true as const }
+    applyTeamSceneInput(world, floor, OFFICE)
+    applyTeamSceneInput(world, { ...floor, ride: 'away' }, OFFICE)
+    run(world, 0.2)
+    expect(drainTeamSceneBoarded(world)).toEqual([])
+    run(world, 10)
+    expect(drainTeamSceneBoarded(world)).toEqual(['lead'])
+    run(world, 2)
+    expect(drainTeamSceneBoarded(world)).toEqual([])
+  })
+
+  it('walks a leaving advisor into the elevator, says it boarded, and takes it off the floor', () => {
+    const world = createTeamSceneWorld()
+    const floor = input([member('a')], 'ok')
+    applyTeamSceneInput(world, floor, OFFICE)
+    applyTeamSceneInput(world, { ...floor, advisorLeaves: true }, OFFICE)
+    run(world, 0.2)
+    expect(actor(world, 'advisor')).toBeDefined()
+    run(world, 12)
+    expect(actor(world, 'advisor')).toBeUndefined()
+    expect(drainTeamSceneBoarded(world)).toEqual(['advisor'])
+  })
+
+  it('boards at once under reduced motion', () => {
+    const world = createTeamSceneWorld()
+    const floor = { ...input([member('a')], 'ok'), leadStays: true as const }
+    applyTeamSceneInput(world, { ...floor, ride: 'away', advisorLeaves: true }, OFFICE)
+    settleTeamScene(world)
+    expect(drainTeamSceneBoarded(world).sort()).toEqual(['advisor', 'lead'])
   })
 })

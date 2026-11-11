@@ -1,6 +1,6 @@
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneArrived as near } from './team-scene-motion'
-import { ELEVATOR_X } from './team-scene-elevator'
+import { ELEVATOR_X, stepAdvisorLeaving } from './team-scene-elevator'
 import type { TeamSceneGesture, TeamSceneInput, TeamSceneSpot } from './team-scene-types'
 
 // How long the advisor holds a gesture beside the pane Jev judged.
@@ -104,7 +104,7 @@ function puffHome(world: TeamSceneWorld, advisor: TeamSceneBody): void {
 export function stepAdvisorWalk(world: TeamSceneWorld, width: number): void {
   const advisor = world.bodies.get('advisor')
   const walk = world.advisorWalk
-  if (!advisor) {
+  if (!advisor || stepAdvisorLeaving(world)) {
     Object.assign(walk, createAdvisorWalk())
     return
   }
@@ -152,14 +152,17 @@ const ADVISOR_SPEED_PX = 48
 /** Keeps the advisor's body while the scene has an advisor, at its own quicker pace. */
 export function syncAdvisorBody(
   world: TeamSceneWorld,
-  input: Pick<TeamSceneInput, 'advisor' | 'advisorEnters'>,
+  input: Pick<TeamSceneInput, 'advisor' | 'advisorEnters' | 'advisorLeaves'>,
   make: () => TeamSceneBody
 ): void {
   if (input.advisor === null) {
     world.bodies.delete('advisor')
-  } else if (!world.bodies.has('advisor')) {
-    // Why from the elevator: on another floor the advisor has just ridden up to the judged pane.
+    return
+  }
+  if (!world.bodies.has('advisor')) {
+    // Why from the elevator: the advisor has just ridden here, to a judged pane or back home.
     const x = input.advisorEnters ? { x: ELEVATOR_X } : {}
     world.bodies.set('advisor', { ...make(), ...x, speed: ADVISOR_SPEED_PX })
   }
+  world.bodies.get('advisor')!.leaving = input.advisorLeaves
 }

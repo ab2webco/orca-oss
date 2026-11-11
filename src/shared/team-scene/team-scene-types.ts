@@ -53,6 +53,8 @@ export type TeamSceneInput = {
   ride?: TeamSceneRide
   /** The advisor rode here from the lead's floor for a Jev decision, so it comes in by the elevator. */
   advisorEnters?: true
+  /** The advisor rides off this floor: it walks into the elevator and is gone. */
+  advisorLeaves?: true
 }
 
 export type TeamSceneEvent =
