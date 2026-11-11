@@ -27,16 +27,21 @@ export function hostTerminalOpenRequestFor(
   return worktreeId && terminal && tabId ? { worktreeId, terminal, tabId } : null
 }
 
+/** A Team card knows the member's tab, and its terminal handle only from a newer host. */
+export type TerminalOpenTarget = Omit<HostTerminalOpenRequest, 'terminal'> & {
+  terminal: string | null
+}
+
 export function hostTerminalOpenRoute(
   hostId: string,
-  request: HostTerminalOpenRequest
+  request: TerminalOpenTarget
 ): { pathname: '/h/[hostId]/session/[worktreeId]'; params: Record<string, string> } {
   return {
     pathname: '/h/[hostId]/session/[worktreeId]',
     params: {
       hostId,
       worktreeId: request.worktreeId,
-      terminal: request.terminal,
+      ...(request.terminal ? { terminal: request.terminal } : {}),
       tab: request.tabId
     }
   }

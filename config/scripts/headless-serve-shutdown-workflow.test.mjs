@@ -5,6 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const workflow = parse(readFileSync('.github/workflows/pr.yml', 'utf8'))
 const headlessLinuxGuide = readFileSync('docs/reference/headless-linux-server.md', 'utf8')
+const shutdownDockerfile = readFileSync('config/docker/headless-serve-shutdown/Dockerfile', 'utf8')
+const shutdownDockerRunner = readFileSync(
+  'config/scripts/run-headless-serve-shutdown-docker.mjs',
+  'utf8'
+)
 
 function readSystemdUnitBlocks(doc, unitName) {
   const escapedUnitName = unitName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -62,5 +67,19 @@ describe('headless serve shutdown PR gate', () => {
     expect(ownedXvfbUnits[0]).toMatch(/^KillMode=mixed$/m)
     expect(managedXvfbUnits).toHaveLength(1)
     expect(managedXvfbUnits[0]).not.toMatch(/^KillMode=/m)
+  })
+
+  // Why (2026-11-11): the image build could not resolve archive.ubuntu.com, apt update only
+  // warned, and the install then found no packages; the build retries on the shared fallback.
+  it('falls back to the shared apt mirror script when apt update cannot fetch', () => {
+    expect(shutdownDockerRunner).toContain("`apt-scripts=${resolve('config', 'scripts')}`")
+    expect(shutdownDockerfile).toContain(
+      'COPY --from=apt-scripts apt-mirror-fallback.sh /usr/local/bin/apt-mirror-fallback'
+    )
+    const aptRun = shutdownDockerfile.slice(shutdownDockerfile.indexOf('RUN apt-get update'))
+    expect(
+      aptRun.indexOf('bash /usr/local/bin/apt-mirror-fallback && apt-get update')
+    ).toBeLessThan(aptRun.indexOf('apt-get install'))
+    expect(aptRun).toContain("grep -q '^W: Failed to fetch'")
   })
 })

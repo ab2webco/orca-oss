@@ -1,6 +1,9 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import {
   layoutTeamSceneBubbles,
+  teamSceneCellUnder,
+  teamSceneTailRunsOf,
   type TeamSceneBubbleBox,
   type TeamSceneRect
 } from './team-scene-bubble-layout'
@@ -25,7 +28,7 @@ type Props = {
   cloudPixel?: number
   /** What no bubble may cover, such as an asking member's tag. */
   obstacles?: readonly TeamSceneRect[]
-  /** Told after each layout which speeches got no bubble, so their lines can show elsewhere. */
+  /** Told after each layout which speeches no bubble shows whole (none, or clamped), so their lines can show elsewhere. */
   onUnplaced?: (keys: string[]) => void
 }
 
@@ -35,11 +38,14 @@ const NONE: readonly TeamSceneRect[] = []
 function PixelCloudCanvas({
   box,
   anchorTop,
-  pixel
+  pixel,
+  obstacles
 }: {
   box: TeamSceneBubbleBox
   anchorTop: number
   pixel: number
+  /** Tags its trail passes behind: no cell is painted over one. */
+  obstacles: readonly TeamSceneRect[]
 }): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null)
   const width = Math.ceil(box.width / pixel)
@@ -54,8 +60,12 @@ function PixelCloudCanvas({
     }
     g.clearRect(0, 0, width, cloud.rows)
     for (const [key, color] of cloud.pixels) {
-      g.fillStyle = color
-      g.fillRect(key % 4096, Math.floor(key / 4096), 1, 1)
+      const [x, y] = [key % 4096, Math.floor(key / 4096)]
+      const cell = { x: box.left + x * pixel, y: box.top + y * pixel, size: pixel }
+      if (!teamSceneCellUnder(cell, obstacles)) {
+        g.fillStyle = color
+        g.fillRect(x, y, 1, 1)
+      }
     }
   })
   return (
@@ -82,7 +92,10 @@ export function TeamSceneBubbles({
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
   // Why a content key: callers rebuild the array each render, and layout sets state.
   const layoutKey = [
-    ...speeches.map((s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}`),
+    // Why attending too: it changes where a lead's bubble may go, with no other change to see.
+    ...speeches.map(
+      (s) => `${s.key}:${s.text}:${s.anchor.x}:${s.anchor.top}:${s.attending === true}`
+    ),
     ...obstacles.map((o) => `${o.left},${o.top},${o.width},${o.height}`)
   ].join('|')
 
@@ -106,6 +119,13 @@ export function TeamSceneBubbles({
       el.style.width = 'max-content'
       // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
       const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
+      // Why measured on one line too: an attending lead's line clamps to it when two find no room.
+      const wrap = el.style.whiteSpace
+      el.style.whiteSpace = 'nowrap'
+      const oneLine = s.attending
+        ? { width: el.offsetWidth + 1, height: el.offsetHeight }
+        : undefined
+      el.style.whiteSpace = wrap
       // Why restore: React skips a width equal to its last one, which would leave max-content.
       el.style.width = laid
       return {
@@ -114,6 +134,7 @@ export function TeamSceneBubbles({
         align: s.align,
         yields: s.yields,
         attending: s.attending,
+        oneLine,
         ...size
       }
     })
@@ -123,7 +144,9 @@ export function TeamSceneBubbles({
       { beside: Boolean(cloudPixel), obstacles }
     )
     setBoxes(laid)
-    onUnplaced?.(speeches.filter((s) => !laid.some((b) => b.key === s.key)).map((s) => s.key))
+    // Why clamped too: a line cut to one in its bubble is not whole there either, so its card shows it.
+    const whole = new Set(laid.filter((b) => !b.clamped).map((b) => b.key))
+    onUnplaced?.(speeches.filter((s) => !whole.has(s.key)).map((s) => s.key))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
   }, [layoutKey, width, height, cloudPixel])
 
@@ -157,18 +180,42 @@ export function TeamSceneBubbles({
             }}
           >
             {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
-            <span className="line-clamp-2 [overflow-wrap:anywhere]">{s.text}</span>
+            <span
+              className={cn(
+                '[overflow-wrap:anywhere]',
+                box?.clamped ? 'line-clamp-1' : 'line-clamp-2'
+              )}
+            >
+              {s.text}
+            </span>
             {box && cloudPixel ? (
-              <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
+              <PixelCloudCanvas
+                box={box}
+                anchorTop={s.anchor.top}
+                pixel={cloudPixel}
+                obstacles={obstacles}
+              />
             ) : null}
-            {box && !cloudPixel ? (
-              <span
-                className="absolute top-full w-px bg-white/50"
-                style={{ left: box.tailX, height: tail }}
-              >
-                <span className="absolute -left-[2px] bottom-0 size-[5px] rounded-full bg-white/70" />
-              </span>
-            ) : null}
+            {box && !cloudPixel
+              ? // Why in runs: where the tail passes behind a tag, that stretch is not drawn.
+                teamSceneTailRunsOf(box, box.top + box.height + tail, obstacles).map(
+                  (run, i, all) => (
+                    <span
+                      key={run.from}
+                      className="absolute w-px bg-white/50"
+                      style={{
+                        left: box.tailX,
+                        top: run.from - box.top,
+                        height: run.to - run.from
+                      }}
+                    >
+                      {i === all.length - 1 ? (
+                        <span className="absolute -left-[2px] bottom-0 size-[5px] rounded-full bg-white/70" />
+                      ) : null}
+                    </span>
+                  )
+                )
+              : null}
           </span>
         )
       })}
