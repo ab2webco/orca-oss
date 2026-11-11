@@ -134,3 +134,9 @@ export function drawOfficeBuilds(
     drawOfficeBoard(g, boardX, y - ABOVE_DESK_PX * s, s * BOARD_SCALE, site, f.t, attention)
   }
 }
+
+/** The effects Office draws: desk work is typing, so build and repair raise no floor dust. */
+export const officeSceneEffects = <E extends { kind: string; reason?: string }>(
+  effects: E[]
+): E[] =>
+  effects.filter((e) => !(e.kind === 'burst' && (e.reason === 'build' || e.reason === 'repair')))

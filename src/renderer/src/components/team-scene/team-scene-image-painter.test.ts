@@ -8,6 +8,7 @@ import { figureSeedOf } from './team-scene-figure-looks'
 import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-painter'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
+import { SCENE_DUST } from './team-scene-painter-marks'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { OFFICE_NOTE, OFFICE_TRAY } from './team-scene-office-builds'
 import { OFFICE_VIRUS_COLORS } from './team-scene-office-virus'
@@ -539,6 +540,27 @@ describe('createImagePainter office builds', () => {
     expect(greet('office')).not.toContain('#ffd24a')
     expect(greet('office')).toContain(STATION_SCREEN_GLOW)
     expect(greet('castle')).toContain('#ffd24a')
+  })
+
+  it('raises no dust on the Office floor for desk work, and keeps it for a castle build', () => {
+    const dust = (builds: 'office' | 'castle', reason: 'build' | 'repair') => {
+      const painter = createImagePainter({
+        art: {
+          style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+          images: IMAGES
+        },
+        colors: COLORS,
+        builds
+      })
+      const r = recordingContext()
+      const actors = [actor('m', { pose: 'work', x: spot.x, depth: spot.depth })]
+      const effects = [{ kind: 'burst' as const, key: 'm', reason }]
+      painter.paint(r.g, frame({ actors, effects, stations: [spot], sites: [site(false)] }))
+      return r.calls.filter((c) => c.name === 'fillRect' && c.fillStyle === SCENE_DUST).length
+    }
+    expect(dust('office', 'build')).toBe(0)
+    expect(dust('office', 'repair')).toBe(0)
+    expect(dust('castle', 'build')).toBeGreaterThan(0)
   })
 
   describe('the red-CI virus', () => {

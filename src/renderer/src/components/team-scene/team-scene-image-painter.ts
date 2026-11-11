@@ -16,7 +16,7 @@ import {
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
 import { drawCastleBuilds } from './team-scene-castle-sites'
-import { drawOfficeBuilds } from './team-scene-office-builds'
+import { drawOfficeBuilds, officeSceneEffects } from './team-scene-office-builds'
 import { officeVirusShakeAt } from './team-scene-office-virus'
 import {
   drawOfficeBack,
@@ -287,7 +287,8 @@ export function createImagePainter(args: {
       const h = f.height
       narrow = back && f.width < NARROW_WIDTH ? NARROW_SCALE : 1
       backdrop.draw(g, f)
-      const shown = args.builds === 'office' ? boots.take(f.effects, f.t) : f.effects
+      const shown =
+        args.builds === 'office' ? boots.take(officeSceneEffects(f.effects), f.t) : f.effects
       effects.start(shown, f.actors, h)
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
