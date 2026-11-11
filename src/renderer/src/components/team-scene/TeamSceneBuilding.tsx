@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import {
   teamSceneFloorInputOf,
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { teamHostText } from '../team-panel/team-card-text'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
+import { teamSceneRectsFromAbove, type TeamSceneRect } from './team-scene-bubble-layout'
 import { TeamSceneElevatorShaft } from './TeamSceneElevatorShaft'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
@@ -37,6 +38,9 @@ type Props = {
 // Why these: a floor's strip is the row of desks, its sky cropped, so three floors fit a panel.
 // Each storey up crops less, so higher floors look out over more sky than the lead's street level.
 const STRIP = { height: 112, slab: 4, crop: 66, perLevel: 10, minCrop: 36 }
+const cropOf = (level: number): number =>
+  Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel)
+const NO_BOXES: readonly TeamSceneRect[] = []
 const TUBE_SECONDS = 1.6
 // Why this long: the ride in, the walk to the judged desk and the gesture held there.
 const ADVISOR_RIDE_SECONDS = 12
@@ -108,7 +112,9 @@ function FloorStage({
   level,
   legs,
   onBoarded,
-  topmost
+  topmost,
+  onAskers,
+  fromAbove
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
@@ -117,13 +123,16 @@ function FloorStage({
   onBoarded: (rider: string) => void
   /** The highest floor shown: nothing above it but the building's own top. */
   topmost: boolean
+  onAskers: (floor: string, boxes: TeamSceneRect[]) => void
+  /** The floor above's asker boxes, in this floor's stage: its rising bubbles keep off them. */
+  fromAbove: readonly TeamSceneRect[]
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
   if (!painter) {
     return null
   }
-  const cropTop = zoomed ? 0 : Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel)
+  const cropTop = zoomed ? 0 : cropOf(level)
   const crop = zoomed
     ? undefined
     : { top: cropTop, bottom: Math.max(0, painter.height - cropTop - STRIP.height) }
@@ -145,6 +154,8 @@ function FloorStage({
           onBoarded={onBoarded}
           crop={crop}
           visibleTop={topmost ? cropTop : 0}
+          onAskers={(boxes) => onAskers(floor.key, boxes)}
+          extraObstacles={fromAbove}
         />
       </div>
       {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
@@ -178,6 +189,26 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const zoomed = floors.find((floor) => floor.key === zoom) ?? null
   // Why the lead's at the bottom: floor 1 is where the lead stands, the others above it.
   const shown = zoomed ? [zoomed] : floors.slice(0, SHOWN_FLOORS).toReversed()
+  const [askers, setAskers] = useState<Record<string, TeamSceneRect[]>>({})
+  const onAskers = useCallback(
+    (key: string, boxes: TeamSceneRect[]) =>
+      setAskers((old) =>
+        JSON.stringify(old[key] ?? []) === JSON.stringify(boxes) ? old : { ...old, [key]: boxes }
+      ),
+    []
+  )
+  // Why only the floor right above: a bubble rises at most its own crop over the slab.
+  const fromAboveOf = (index: number): readonly TeamSceneRect[] => {
+    const above = index > 0 && !zoomed ? shown[index - 1] : undefined
+    const boxes = above ? askers[above.key] : undefined
+    return boxes && boxes.length > 0
+      ? teamSceneRectsFromAbove(boxes, {
+          stripPlusSlab: STRIP.height + STRIP.slab,
+          cropHere: cropOf(floors.indexOf(shown[index]!)),
+          cropAbove: cropOf(floors.indexOf(above!))
+        })
+      : NO_BOXES
+  }
   const more = zoomed ? 0 : floors.length - SHOWN_FLOORS
   const leadFloor = floors.find((floor) => floor.lead)?.key ?? ''
   const reducedMotion = usePrefersReducedMotion()
@@ -241,7 +272,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
       </nav>
       <div className="flex min-w-0">
         <div className="min-w-0 flex-1">
-          {shown.map((floor) => (
+          {shown.map((floor, index) => (
             <FloorStage
               key={floor.key}
               {...props}
@@ -251,6 +282,8 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               legs={legs}
               onBoarded={onBoarded}
               topmost={floor === shown[0]}
+              onAskers={onAskers}
+              fromAbove={fromAboveOf(index)}
             />
           ))}
         </div>

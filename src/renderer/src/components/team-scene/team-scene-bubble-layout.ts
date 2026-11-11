@@ -279,3 +279,15 @@ export const teamSceneCellUnder = (
       cell.y < o.top + o.height &&
       o.top < cell.y + cell.size
   )
+
+/**
+ * The floor above's asker boxes in this floor's stage: this stage's y 0 lies at the floor above's
+ * `stripPlusSlab - cropHere + cropAbove`, so a bubble rising over the slab keeps clear of them.
+ */
+export const teamSceneRectsFromAbove = (
+  rects: readonly TeamSceneRect[],
+  floors: { stripPlusSlab: number; cropHere: number; cropAbove: number }
+): TeamSceneRect[] => {
+  const shift = floors.stripPlusSlab - floors.cropHere + floors.cropAbove
+  return rects.map((rect) => ({ ...rect, top: rect.top - shift }))
+}

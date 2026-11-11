@@ -218,6 +218,31 @@ describe('TeamSceneCanvas', () => {
     expect(Math.abs(guest!.x - b.x)).toBeLessThan(0.12)
   })
 
+  // Why: a building floor below keeps its bubbles clear of this stage's asker tags and marks.
+  it("reports each asker's tag-and-mark box, and lays its bubbles around boxes it is handed", () => {
+    reduced = true
+    const asking = input(['n'])
+    asking.members[0] = { ...asking.members[0]!, activity: 'needsYou' }
+    const onAskers = vi.fn()
+    const extra = [{ left: 0, top: 0, width: 50, height: 20 }]
+    render(
+      <TeamSceneCanvas
+        input={asking}
+        painter={painter().value}
+        leadLine={null}
+        onAskers={onAskers}
+        extraObstacles={extra}
+      />
+    )
+    const boxes = onAskers.mock.lastCall![0] as { top: number; height: number; width: number }[]
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0]!.height).toBeGreaterThan(0)
+    expect(boxes[0]!.width).toBeGreaterThan(0)
+    expect(host.querySelector<HTMLElement>('[data-scene-obstacles]')?.dataset.sceneObstacles).toBe(
+      '1'
+    )
+  })
+
   it('ties the lead line to the lead', () => {
     reduced = true
     render(

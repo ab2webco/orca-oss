@@ -10,6 +10,7 @@ import {
 import {
   layoutTeamSceneBubbles,
   teamSceneCellUnder,
+  teamSceneRectsFromAbove,
   teamSceneTailRunsOf,
   type TeamSceneBubbleBox
 } from './team-scene-bubble-layout'
@@ -419,6 +420,37 @@ describe('a stage whose top is cropped', () => {
     )
     for (const one of beside) {
       expect(one.top, one.key).toBeGreaterThanOrEqual(60)
+    }
+  })
+})
+
+// Why: a lower floor's bubble rises over the slab, so it must keep clear of the upper floor's tags
+// and '!' marks as it does of its own (lead review of the owner's 'detrás del muro', 2026-11-11).
+describe('obstacles from the floor above', () => {
+  it("moves the floor above's asker boxes into this floor's stage, by the strip and both crops", () => {
+    const tag = { left: 40, top: 100, width: 56, height: 30 }
+    // This floor's y 0 is the floor above's y 116 - 66 + 56 = 106.
+    expect(
+      teamSceneRectsFromAbove([tag], { stripPlusSlab: 116, cropHere: 66, cropAbove: 56 })
+    ).toEqual([{ left: 40, top: -6, width: 56, height: 30 }])
+  })
+
+  it('makes a bubble that would rise over such a box yield, as on one floor', () => {
+    const scene = { width: 420, height: 176, top: 0 }
+    const lead = { key: 'lead', anchor: { x: 68, top: 45 }, width: 120, height: 25 }
+    expect(layoutTeamSceneBubbles([lead], scene)).toHaveLength(1)
+    const above = teamSceneRectsFromAbove([{ left: 40, top: 100, width: 56, height: 30 }], {
+      stripPlusSlab: 116,
+      cropHere: 66,
+      cropAbove: 56
+    })
+    const [box] = layoutTeamSceneBubbles([lead], scene, { obstacles: above })
+    if (box) {
+      const clear =
+        box.left >= above[0]!.left + above[0]!.width ||
+        box.left + box.width <= above[0]!.left ||
+        box.top >= above[0]!.top + above[0]!.height
+      expect(clear).toBe(true)
     }
   })
 })

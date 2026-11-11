@@ -167,6 +167,7 @@ export function TeamSceneBubbles({
       className="pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden="true"
       data-scene-visible-top={visibleTop}
+      data-scene-obstacles={obstacles.length}
     >
       {speeches.map((s) => {
         const box = boxes.find((b) => b.key === s.key)

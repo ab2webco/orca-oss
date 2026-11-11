@@ -226,6 +226,22 @@ describe('TeamSceneBuilding', () => {
     }
   })
 
+  it('hands a floor the asker boxes of the floor above, so its rising bubbles keep off them', () => {
+    const hosts = [local, remote('imac'), remote('m1')]
+    const base = model(hosts)
+    // The iMac member asks: its floor is in the middle, the lead's below it.
+    base.members[1] = { ...base.members[1]!, needsYou: true }
+    act(() => root.render(<TeamSceneBuilding model={base} makePainter={make} leadLine={null} />))
+    const obstaclesOn = (key: string) =>
+      Number(
+        host
+          .querySelector(`[data-team-floor="${key}"] [data-scene-obstacles]`)
+          ?.getAttribute('data-scene-obstacles')
+      )
+    expect(obstaclesOn('')).toBe(1)
+    expect(obstaclesOn('m1')).toBe(0)
+  })
+
   describe('elevator and tube', () => {
     const asking = (hosts: TeamHost[], who: number): TeamSceneBuildingModel => {
       const base = model(hosts)
