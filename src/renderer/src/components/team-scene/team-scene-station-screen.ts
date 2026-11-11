@@ -25,6 +25,8 @@ const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game'>, string> = {
   ok: '#4ade80'
 }
 const TEXT = '#a8b4c8'
+export const STATION_SCREEN_GLOW = '#9cc4ff'
+const BOOT_SECONDS = 1.4
 const LINES = 5
 
 const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
@@ -75,12 +77,27 @@ export function drawStationScreen(
   rect: { x: number; y: number; width: number; height: number },
   state: ScreenState,
   t: number,
-  attention = '#e5484d',
-  /** Office's bug over a failing screen. */
-  virus = false
+  {
+    attention = '#e5484d',
+    virus = false,
+    boot
+  }: {
+    attention?: string
+    /** Office's bug over a failing screen. */
+    virus?: boolean
+    /** 0 to 1 while a member who just sat down boots its screen; absent once booted. */
+    boot?: number
+  } = {}
 ): void {
   g.fillStyle = BACKGROUND[state]
   g.fillRect(rect.x, rect.y, rect.width, rect.height)
+  if (boot !== undefined) {
+    // Why a glow that fades: a screen waking up greets the member without a burst over the desk.
+    g.globalAlpha = (1 - boot) * 0.55
+    g.fillStyle = STATION_SCREEN_GLOW
+    g.fillRect(rect.x, rect.y, rect.width, rect.height)
+    g.globalAlpha = 1
+  }
   if (state === 'off') {
     return
   }
@@ -93,7 +110,8 @@ export function drawStationScreen(
   }
   const step = state === 'code' ? Math.floor(t * 3) : 0
   const line = state === 'fail' ? attention : LINE[state]
-  for (let i = 0; i < LINES; i++) {
+  const shown = boot === undefined ? LINES : Math.ceil(boot * LINES)
+  for (let i = 0; i < shown; i++) {
     const n = (step + i * 3) % 7
     g.fillStyle = i % 2 ? line : TEXT
     g.fillRect(
@@ -119,3 +137,47 @@ export function stationFailingAt(
     (site) => site.broken && Math.abs((site.spot.x - SITE_FROM_SEAT_X - spot.x) * f.width) < within
   )
 }
+
+/** Screens booting for members who just sat down; their welcome replaces the burst. */
+export function createStationBoots() {
+  const started = new Map<string, number>()
+  return {
+    /** The effects left once each welcome has started its member's boot. */
+    take: <E extends { kind: string; key?: string; reason?: string }>(
+      effects: E[],
+      t: number
+    ): E[] =>
+      effects.filter((e) => {
+        if (e.kind === 'burst' && e.reason === 'welcome' && e.key) {
+          started.set(e.key, t)
+          return false
+        }
+        return true
+      }),
+    progressOf: (key: string | undefined, t: number): number | undefined => {
+      const at = key === undefined ? undefined : started.get(key)
+      if (at === undefined || t - at >= BOOT_SECONDS) {
+        if (key !== undefined) {
+          started.delete(key)
+        }
+        return undefined
+      }
+      return Math.max(0, (t - at) / BOOT_SECONDS)
+    }
+  }
+}
+
+type ScreenRect = { x: number; y: number; width: number; height: number }
+
+/** The desk art's screen in stage px, for a desk drawn at `left, top` with `px` per art px. */
+export const stationScreenRectAt = (
+  screen: ScreenRect,
+  left: number,
+  top: number,
+  px: number
+): ScreenRect => ({
+  x: left + screen.x * px,
+  y: top + screen.y * px,
+  width: screen.width * px,
+  height: screen.height * px
+})

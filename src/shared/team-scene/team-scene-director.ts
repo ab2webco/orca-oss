@@ -167,6 +167,7 @@ export function applyTeamSceneInput(
   const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX)
   const byKey = new Map(input.members.map((m) => [m.key, m]))
   const seatedKeys = new Set(plan.seats.map((s) => s.key))
+  let turn = 0
   for (const { key, spot } of plan.seats) {
     const m = byKey.get(key)!
     let body = bodies.get(key)
@@ -174,7 +175,7 @@ export function applyTeamSceneInput(
       body = bodyAt(key, 'member', joined.has(key) ? { x: ENTRY_X, depth: spot.depth } : spot, 1)
       bodies.set(key, body)
       if (joined.has(key)) {
-        walkStraight(world, body, 'enter')
+        walkStraight(world, body, 'enter', turn++)
       }
     }
     Object.assign(body, {

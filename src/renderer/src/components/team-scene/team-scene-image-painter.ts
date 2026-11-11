@@ -2,6 +2,7 @@ import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orches
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { figureSeedOf } from './team-scene-figure-looks'
+import { drawImagePortrait } from './team-scene-image-portrait'
 import type {
   TeamSceneFrame,
   TeamScenePainter,
@@ -26,8 +27,10 @@ import {
   type OfficeBackSeat
 } from './team-scene-office-back'
 import {
+  createStationBoots,
   drawStationScreen,
   stationFailingAt,
+  stationScreenRectAt,
   stationScreenStateOf
 } from './team-scene-station-screen'
 
@@ -45,10 +48,9 @@ export type TeamSceneImageArt = {
 export const TEAM_SCENE_ART_HEIGHT = 176
 const TAU = 2 * Math.PI
 const SEAT_PX = 2
+const [NARROW_WIDTH, NARROW_SCALE] = [360, 0.92]
 const BEHIND_ROW = 0.05
 const SHADOW_WIDTH = 0.2
-const PORTRAIT_SIDE = 0.44
-const PORTRAIT_TOP = 0.76
 const feetY = (depth: number, h: number): number => h - 36 + depth * 22
 // Why against the front: `size` is the drawn height at the front of the stage.
 const depthScale = (depth: number): number => teamSceneScaleAt(depth) / teamSceneScaleAt(1)
@@ -165,6 +167,7 @@ export function createImagePainter(args: {
     image
   )
   const effects = createSceneEffects(feetY)
+  const boots = createStationBoots()
   const roleOf = (a: Pick<TeamSceneActor, 'role'>): RoleArt =>
     a.role === 'lead'
       ? style.roles.lead
@@ -172,8 +175,10 @@ export function createImagePainter(args: {
         ? (style.roles.advisor ?? style.roles.member)
         : style.roles.member
   const feetOf = (art: RoleArt) => art.feet ?? { x: art.frame.width / 2, y: art.frame.height }
+  // Why: below 360 px five desks touch; a slightly smaller row keeps a gap (set on each paint).
+  let narrow = 1
   const sheetPxAt = (art: RoleArt, depth: number): number =>
-    (art.size / art.frame.height) * depthScale(depth)
+    (art.size / art.frame.height) * depthScale(depth) * narrow
 
   const back = args.back ?? null
   const screen = style.props?.stationScreen
@@ -207,14 +212,10 @@ export function createImagePainter(args: {
           (a) =>
             a.role === 'member' && a.pose !== 'walk' && Math.abs((a.x - spot.x) * f.width) < SEAT_PX
         )
-        const rect = {
-          x: left + screen.x * px,
-          y: top + screen.y * px,
-          width: screen.width * px,
-          height: screen.height * px
-        }
+        const rect = stationScreenRectAt(screen, left, top, px)
         const state = stationScreenStateOf(worker?.pose ?? null, failing, worker?.play)
-        drawStationScreen(g, rect, state, f.t, colors.attention, virus)
+        const boot = boots.progressOf(worker?.key, f.t)
+        drawStationScreen(g, rect, state, f.t, { attention: colors.attention, virus, boot })
       }
     }
   }
@@ -223,28 +224,8 @@ export function createImagePainter(args: {
     image(art.sheets[figureSeedOf(a.characterKey ?? a.key) % art.sheets.length]!)
   const backLookOf = createOfficeBackLooks()
 
-  // Why these fractions: Quest's figures stand about 0.75 of a frame tall, head in the top 0.44.
-  const portrait = (g: CanvasRenderingContext2D, a: TeamScenePortraitSubject, size: number) => {
-    const art = roleOf(a)
-    const feet = feetOf(art)
-    const side = Math.round(art.frame.height * PORTRAIT_SIDE)
-    const top = Math.max(0, Math.round(feet.y - art.frame.height * PORTRAIT_TOP))
-    const left = Math.min(Math.max(0, Math.round(feet.x - side / 2)), art.frame.width - side)
-    const idle = art.animations.idle
-    g.imageSmoothingEnabled = true
-    g.imageSmoothingQuality = 'high'
-    g.drawImage(
-      sheetOf(art, a),
-      left,
-      idle.row * art.frame.height + top,
-      side,
-      side,
-      0,
-      0,
-      size,
-      size
-    )
-  }
+  const portrait = (g: CanvasRenderingContext2D, a: TeamScenePortraitSubject, size: number) =>
+    drawImagePortrait(g, roleOf(a), sheetOf(roleOf(a), a), size)
 
   const seatedAt = (a: TeamSceneActor, f: Pick<TeamSceneFrame, 'width' | 'stations'>): boolean =>
     a.pose !== 'walk' && f.stations.some((spot) => Math.abs((a.x - spot.x) * f.width) < SEAT_PX)
@@ -304,12 +285,14 @@ export function createImagePainter(args: {
     },
     paint: (g, f: TeamSceneFrame) => {
       const h = f.height
+      narrow = back && f.width < NARROW_WIDTH ? NARROW_SCALE : 1
       backdrop.draw(g, f)
-      effects.start(f.effects, f.actors, h)
+      const shown = args.builds === 'office' ? boots.take(f.effects, f.t) : f.effects
+      effects.start(shown, f.actors, h)
       if (args.builds === 'castle') {
         drawCastleBuilds(g, f, feetY)
       } else if (args.builds === 'office') {
-        drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat)
+        drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat, !back)
       }
       // Why split: whoever walks behind the row goes under its monitors, never over them; a
       // gesturing advisor stands in a gap, clear of every monitor, so it shows in front.

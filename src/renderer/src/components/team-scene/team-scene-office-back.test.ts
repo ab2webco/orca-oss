@@ -70,6 +70,14 @@ describe('office back view', () => {
     expect(above('idle')).toHaveLength(0)
   })
 
+  it('asks with its hand up over the top of the monitor, waving, so it reads at 320', () => {
+    // Orca's desk: the monitor's top edge sits about 100 frame units over the floor.
+    const hand = (t: number) =>
+      discs(drawn('raise', t)).find((d) => d.color === LOOK.skin && d.y < headTopY)!
+    expect(hand(0).y).toBeLessThan(FLOOR - 100 * PX)
+    expect(hand(0).x).not.toBeCloseTo(hand(0.3).x)
+  })
+
   it('types while working, rests idle, and leans back with hands behind the head when done', () => {
     const shape = (pose: TeamScenePose, t = 0) => JSON.stringify(drawn(pose, t).calls)
     expect(shape('work', 0)).not.toBe(shape('work', 0.1))

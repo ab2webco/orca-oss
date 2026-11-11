@@ -10,6 +10,20 @@ export const OFFICE_VIRUS_COLORS = {
 export const officeVirusShakeAt = (t: number, px: number): number =>
   Math.sin(t * 38) * Math.max(0.6, 1.4 * px)
 
+// Why a big one each round: small hops read as a twitch at 420 px; a leap off the screen reads.
+const ROUND = { seconds: 4, big: 0.8 }
+
+/** The bug's hop in screen heights: small eased hops, then one big leap each round. */
+export function officeVirusHopAt(t: number): number {
+  const inRound = t % ROUND.seconds
+  // Why eased: a hop that rises and lands softly reads as alive; a sine bounce reads as a spring.
+  const arc = (p: number) => 4 * p * (1 - p)
+  if (inRound >= ROUND.seconds - ROUND.big) {
+    return arc((inRound - (ROUND.seconds - ROUND.big)) / ROUND.big) * 0.9
+  }
+  return arc((t * 1.6) % 1) * 0.28
+}
+
 /** The bug over `rect` (stage px), hopping across the screen on the clock. */
 export function drawOfficeVirus(
   g: CanvasRenderingContext2D,
@@ -20,12 +34,9 @@ export function drawOfficeVirus(
   g.save()
   g.fillStyle = OFFICE_VIRUS_COLORS.glow
   g.fillRect(x, y, width, height)
-  // Why eased: a hop that rises and lands softly reads as alive; a sine bounce reads as a spring.
-  const phase = (t * 1.6) % 1
-  const hop = 4 * phase * (1 - phase) * height * 0.32
-  const bx = x + width * (0.5 + Math.sin(t * 1.3) * 0.26)
-  const by = y + height * 0.66 - hop
-  const r = height * 0.19
+  const bx = x + width * (0.5 + Math.sin(t * 1.3) * 0.22)
+  const by = y + height * 0.66 - officeVirusHopAt(t) * height
+  const r = height * 0.28
   g.strokeStyle = OFFICE_VIRUS_COLORS.outline
   g.lineWidth = Math.max(0.6, r * 0.26)
   g.lineCap = 'round'

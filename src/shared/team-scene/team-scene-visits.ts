@@ -6,6 +6,9 @@ import type { TeamSceneEmote, TeamSceneSpot } from './team-scene-types'
 const VISIT_SPOT: TeamSceneSpot = { x: LEAD_SPOT.x - 0.09, depth: LEAD_SPOT.depth + 0.05 }
 export const ENTRY_X = -0.1
 const AT_LEAD_SECONDS = { enter: 0.9, handoff: 0.9, finish: 1, leave: 1 } as const
+// Why: a team that walked in at stroll speed took 12 s to fill the row; arrivals now land in turn.
+const ENTER_SECONDS = 2.2
+const ENTER_STAGGER_SECONDS = 0.15
 
 type VisitKind = keyof typeof AT_LEAD_SECONDS
 type Visit = {
@@ -14,6 +17,8 @@ type Visit = {
   at: number
   /** A finish that also carries the report filed with it. */
   report?: boolean
+  /** Seconds an entrance waits at the door, so a team that joins at once arrives in turn. */
+  delay?: number
 }
 export type TeamScenePlan = { kind: 'seated' } | Visit
 
@@ -44,9 +49,11 @@ export function queueVisit(world: TeamSceneWorld, body: TeamSceneBody, kind: Vis
 export function walkStraight(
   world: TeamSceneWorld,
   body: TeamSceneBody,
-  kind: 'enter' | 'leave'
+  kind: 'enter' | 'leave',
+  /** Its place among members joining together: each waits a beat after the one before. */
+  turn = 0
 ): void {
-  body.plan = { kind, stage: 'back', at: world.t }
+  body.plan = { kind, stage: 'back', at: world.t, delay: turn * ENTER_STAGGER_SECONDS }
   world.queue = world.queue.filter((key) => key !== body.key)
   if (kind === 'leave') {
     world.effects.push({ kind: 'burst', key: body.key, reason: 'goodbye' })
@@ -101,8 +108,15 @@ export function advanceVisit(
       world.bodies.delete(body.key)
     }
   } else {
+    if (plan.kind === 'enter') {
+      if (world.t - plan.at < (plan.delay ?? 0)) {
+        return
+      }
+      body.speed ??= Math.max(32, (Math.abs(body.home.x - body.x) * width) / ENTER_SECONDS)
+    }
     body.target = body.home
     if (near(body, width)) {
+      delete body.speed
       if (plan.kind === 'enter') {
         world.effects.push({ kind: 'burst', key: body.key, reason: 'welcome' })
         emoteFor(world, body, 'heart', 1)

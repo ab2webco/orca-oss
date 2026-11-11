@@ -9,8 +9,9 @@ import { createImagePainter, type TeamSceneArtImage } from './team-scene-image-p
 import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
-import { OFFICE_NOTE } from './team-scene-office-builds'
+import { OFFICE_NOTE, OFFICE_TRAY } from './team-scene-office-builds'
 import { OFFICE_VIRUS_COLORS } from './team-scene-office-virus'
+import { STATION_SCREEN_GLOW } from './team-scene-station-screen'
 import { seatPlanOf } from '../../../../shared/team-scene/team-scene-seats'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
@@ -519,6 +520,27 @@ describe('createImagePainter office builds', () => {
     expect(paint(true)).toContain(COLORS.attention)
   })
 
+  it('greets a member arriving at its Office desk by booting its screen, never a gold ring', () => {
+    const greet = (builds: 'office' | 'castle') => {
+      const painter = createImagePainter({
+        art: {
+          style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+          images: IMAGES
+        },
+        colors: COLORS,
+        builds
+      })
+      const r = recordingContext()
+      const actors = [actor('m', { pose: 'work', x: spot.x, depth: spot.depth })]
+      const effects = [{ kind: 'burst' as const, key: 'm', reason: 'welcome' as const }]
+      painter.paint(r.g, frame({ actors, effects, stations: [spot], sites: [site(false)] }))
+      return r.calls.map((c) => c.fillStyle)
+    }
+    expect(greet('office')).not.toContain('#ffd24a')
+    expect(greet('office')).toContain(STATION_SCREEN_GLOW)
+    expect(greet('castle')).toContain('#ffd24a')
+  })
+
   describe('the red-CI virus', () => {
     const painted = (broken: boolean, t: number, builds: 'office' | 'castle' = 'office') => {
       const painter = createImagePainter({
@@ -634,15 +656,18 @@ describe('createImagePainter office back view', () => {
       builds: null,
       back: { chairEnd: 144 }
     })
-    const r = recordingContext()
-    painter.paint(r.g, frame({ width: 390, actors: [], stations: plan.seats.map((s) => s.spot) }))
-    const desks = r.calls
-      .filter((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))
-      .map((c) => [c.args[5] as number, (c.args[5] as number) + (c.args[7] as number)])
-      .sort((p, q) => p[0]! - q[0]!)
-    expect(desks).toHaveLength(5)
-    for (let i = 1; i < desks.length; i++) {
-      expect(desks[i]![0]).toBeGreaterThan(desks[i - 1]![1]!)
+    // Why 320 too: the narrowest panel shrinks the row so its desks still keep a gap.
+    for (const width of [390, 320]) {
+      const r = recordingContext()
+      painter.paint(r.g, frame({ width, actors: [], stations: plan.seats.map((s) => s.spot) }))
+      const desks = r.calls
+        .filter((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))
+        .map((c) => [c.args[5] as number, (c.args[5] as number) + (c.args[7] as number)])
+        .sort((p, q) => p[0]! - q[0]!)
+      expect(desks).toHaveLength(5)
+      for (let i = 1; i < desks.length; i++) {
+        expect(desks[i]![0], `${width} px`).toBeGreaterThan(desks[i - 1]![1]!)
+      }
     }
   })
 
@@ -668,6 +693,21 @@ describe('createImagePainter office back view', () => {
     const emote = calls.findLast((c) => c.name === 'translate')!
     const screenLeft = 200 - (screen.width / 2) * px
     expect((emote.args[0] as number) + 7).toBeLessThan(screenLeft)
+  })
+
+  it('leaves no paper tray on the floor where members work seated, and keeps it otherwise', () => {
+    const site = {
+      key: 'm',
+      spot: { x: spot.x + 0.055, depth: 1 },
+      stage: 2 as const,
+      broken: false
+    }
+    const trays = (back: { chairEnd: number } | null) =>
+      paint([seated('work')], back, [site] as never[]).calls.filter(
+        (c) => c.name === 'fillRect' && c.fillStyle === OFFICE_TRAY
+      )
+    expect(trays({ chairEnd: 144 })).toHaveLength(0)
+    expect(trays(null)).toHaveLength(1)
   })
 
   it('keeps the red screen of failing CI behind a member seen from behind', () => {

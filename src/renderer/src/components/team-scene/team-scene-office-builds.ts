@@ -11,7 +11,7 @@ import type { TeamSceneFrame } from './team-scene-painter'
 const FRAME = '#59606b'
 const BOARD = '#eef1f4'
 const RULE = '#c3c9d1'
-const TRAY = '#3b4048'
+export const OFFICE_TRAY = '#3b4048'
 const PAPER = '#f6f3ea'
 export const OFFICE_NOTE = '#ffd86b'
 export const OFFICE_STAR = '#ffc23a'
@@ -87,7 +87,7 @@ export function drawOfficeTray(g: CanvasRenderingContext2D, x: number, y: number
   g.save()
   g.translate(x, y)
   g.scale(s, s)
-  g.fillStyle = TRAY
+  g.fillStyle = OFFICE_TRAY
   g.fillRect(-6, -6, 12, 6)
   g.fillStyle = PAPER
   g.fillRect(-5, -8, 10, 2)
@@ -118,14 +118,18 @@ export function drawOfficeBuilds(
   feetY: (depth: number, h: number) => number,
   attention: string,
   /** Px from a seat to its desk's monitor at that depth, so the board hangs over the screen. */
-  monitorFromSeat: (depth: number) => number
+  monitorFromSeat: (depth: number) => number,
+  /** False where members work seated: nobody fetches, so a tray read as litter on the floor. */
+  trays = true
 ): void {
   drawOfficePlaques(g, f.trophies.length, f.width, 4)
   for (const site of f.sites) {
     const s = teamSceneScaleAt(site.spot.depth)
     const y = feetY(site.spot.depth, f.height)
     const seat = (site.spot.x - SITE_FROM_SEAT_X) * f.width
-    drawOfficeTray(g, seat - PILE_FROM_SEAT_X * f.width, y, s)
+    if (trays) {
+      drawOfficeTray(g, seat - PILE_FROM_SEAT_X * f.width, y, s)
+    }
     const boardX = seat + monitorFromSeat(site.spot.depth)
     drawOfficeBoard(g, boardX, y - ABOVE_DESK_PX * s, s * BOARD_SCALE, site, f.t, attention)
   }

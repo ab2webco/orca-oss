@@ -143,6 +143,36 @@ describe('team scene director', () => {
     })
   })
 
+  it('seats a whole team that joins at once within about 3 s, one after another, never snapping', () => {
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([]), { rowSize: 5, workSeated: true, firstX: 0.16 })
+    applyTeamSceneInput(world, input(keys.map((k) => member(k))), {
+      rowSize: 5,
+      workSeated: true,
+      firstX: 0.16
+    })
+    const seatedAt = new Map<string, number>()
+    const last = new Map(keys.map((k) => [k, world.bodies.get(k)!.x]))
+    let fastest = 0
+    for (let t = 0; t < 4; t += DT) {
+      stepTeamScene(world, DT, { width: 420 })
+      for (const k of keys) {
+        const body = world.bodies.get(k)!
+        fastest = Math.max(fastest, Math.abs(body.x - last.get(k)!) * 420)
+        last.set(k, body.x)
+        if (body.plan.kind === 'seated' && !seatedAt.has(k)) {
+          seatedAt.set(k, t)
+        }
+      }
+    }
+    const times = keys.map((k) => seatedAt.get(k))
+    expect(times.every((t) => t !== undefined && t < 3.3)).toBe(true)
+    times.slice(1).forEach((t, i) => expect(t!).toBeGreaterThan(times[i]!))
+    expect(fastest).toBeLessThan(9)
+    expect(keys.every((k) => world.bodies.get(k)!.speed === undefined)).toBe(true)
+  })
+
   it('says goodbye and walks off stage without waiting on the lead', () => {
     const world = seated(['a', 'b'])
     applyTeamSceneInput(world, input([member('b')]))

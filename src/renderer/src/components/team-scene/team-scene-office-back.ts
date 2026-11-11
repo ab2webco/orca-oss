@@ -105,8 +105,16 @@ export function deskSeatXOf(
 type Point = [number, number]
 // Elbow then hand of the right arm, in frame units from the floor below the head; left mirrors.
 function armOf(pose: TeamScenePose, t: number, side: -1 | 1): [Point, Point] {
-  if (pose === 'cheer' || (pose === 'raise' && side === 1)) {
-    const sway = pose === 'cheer' ? Math.sin(t * 9 + side) * 2 : 0
+  if (pose === 'raise' && side === 1) {
+    // Why that high: a hand that clears the monitor's top edge is what reads as asking at 320.
+    const wave = Math.sin(t * 5) * 3
+    return [
+      [21, 72],
+      [20 + wave, 106]
+    ]
+  }
+  if (pose === 'cheer') {
+    const sway = Math.sin(t * 9 + side) * 2
     return [
       [20, 58],
       [22 + sway, 78]
