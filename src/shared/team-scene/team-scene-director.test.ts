@@ -9,7 +9,7 @@ import {
   type TeamSceneWorld
 } from './team-scene-director'
 import { teamSceneActors } from './team-scene-actors'
-import { drainTeamSceneBoarded } from './team-scene-elevator'
+import { drainTeamSceneBoarded, teamSceneGuestAttends } from './team-scene-elevator'
 import type { TeamSceneActor, TeamSceneInput, TeamSceneMemberInput } from './team-scene-types'
 
 const WIDTH = 360
@@ -791,5 +791,19 @@ describe('team scene director, riders boarding the elevator', () => {
     applyTeamSceneInput(world, { ...floor, ride: 'away', advisorLeaves: true }, OFFICE)
     settleTeamScene(world)
     expect(drainTeamSceneBoarded(world).sort()).toEqual(['advisor', 'lead'])
+  })
+})
+
+describe('team scene director, a visiting lead attends its member', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
+  // Why: it stands by the asker's tag like an attending lead, so its bubble may tail behind it.
+  it('counts a lead visiting from another floor as attending, and none at home', () => {
+    const away = createTeamSceneWorld()
+    const there = { ...input([member('b', { activity: 'needsYou' })]), leadless: true as const }
+    applyTeamSceneInput(away, { ...there, ride: { guest: 'b' } }, OFFICE)
+    expect(teamSceneGuestAttends(away)).toBe(true)
+    const home = createTeamSceneWorld()
+    applyTeamSceneInput(home, input([member('a')]), OFFICE)
+    expect(teamSceneGuestAttends(home)).toBe(false)
   })
 })

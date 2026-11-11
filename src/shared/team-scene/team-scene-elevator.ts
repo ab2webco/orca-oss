@@ -134,3 +134,7 @@ export function settleTeamSceneRide(world: TeamSceneWorld): void {
     Object.assign(lead, { x: ELEVATOR_X, target: elevator(lead), hidden: true })
   }
 }
+
+/** True while the lead visits a member here from another floor: it stands under that member's tag. */
+export const teamSceneGuestAttends = (world: TeamSceneWorld): boolean =>
+  typeof world.ride === 'object' && world.ride !== null

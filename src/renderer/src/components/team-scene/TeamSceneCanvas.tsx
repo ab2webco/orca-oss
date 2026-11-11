@@ -9,8 +9,11 @@ import {
   stepTeamScene,
   type TeamSceneWorld
 } from '../../../../shared/team-scene/team-scene-director'
+import {
+  drainTeamSceneBoarded,
+  teamSceneGuestAttends
+} from '../../../../shared/team-scene/team-scene-elevator'
 import { teamSceneLeadAttends } from '../../../../shared/team-scene/team-scene-lead-rounds'
-import { drainTeamSceneBoarded } from '../../../../shared/team-scene/team-scene-elevator'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { teamSceneLabel } from './team-scene-copy'
@@ -130,7 +133,7 @@ export function TeamSceneCanvas({
             bottom: Math.round(mark ? mark.y + MARK_R : painter.headTop(a.depth, height))
           }
         })
-      const leadAttends = teamSceneLeadAttends(world)
+      const leadAttends = teamSceneLeadAttends(world) || teamSceneGuestAttends(world)
       // Why keyed, and by a few px: the overlay re-renders only when a line, size or speaker moves,
       // so a walking lead's bubble follows it without a render every frame.
       const key = `${width}|${advisor}|${leadAttends}|${[...anchors]
