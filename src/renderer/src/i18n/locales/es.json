@@ -16546,5 +16546,15 @@
   "agentQuestionNotification": {
     "title": "{{context}} - {{agent}} te pregunta",
     "body": "Abre la Bandeja para responder."
+  },
+  "newTabMenu": {
+    "account": {
+      "inUseBy": "En uso por {{value}}",
+      "limited": "Límite alcanzado",
+      "signedOut": "Sesión cerrada",
+      "otherModel": "Otro modelo",
+      "noReading": "Sin lectura",
+      "used": "{{value}}% usado"
+    }
   }
 }
