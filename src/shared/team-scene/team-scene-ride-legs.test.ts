@@ -49,6 +49,15 @@ describe('teamSceneLegAfter, one rider between two floors', () => {
     ).toEqual({ stage: 'home', returned: true })
   })
 
+  it('turns back on arrival when the reason ended while the car travelled', () => {
+    const travel: TeamSceneLeg = { stage: 'travel', home: '', away: 'imac', member: null, at: 0 }
+    const now = RIDE_TRAVEL_SECONDS
+    expect(teamSceneLegAfter(travel, { want: null, now, home: '', boarded: false })).toMatchObject({
+      stage: 'back',
+      at: now
+    })
+  })
+
   it('never leaves when the reason ends before the rider boards', () => {
     const out = teamSceneLegAfter(HOME, { want, now: 0, home: '', boarded: false })
     expect(teamSceneLegAfter(out, { want: null, now: 1, home: '', boarded: false })).toEqual({
@@ -68,5 +77,12 @@ describe('teamSceneLegCar', () => {
     expect(teamSceneLegCar(leg('there'), '')).toEqual({ at: 'imac', rider: false })
     expect(teamSceneLegCar(leg('back'), '')).toEqual({ at: 'imac', rider: false })
     expect(teamSceneLegCar(leg('return'), '')).toEqual({ at: '', rider: true })
+  })
+})
+
+describe('the boarding limit', () => {
+  // Why: at 32 px/s a walk across a 900 px zoomed floor takes 28 s; the car must never leave a walker.
+  it('outlasts a walk across the widest floor the panel draws', () => {
+    expect(RIDE_BOARD_LIMIT_SECONDS).toBeGreaterThanOrEqual((900 * 1) / 32)
   })
 })

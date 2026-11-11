@@ -242,14 +242,14 @@ describe('TeamSceneBuilding', () => {
       expect(car()?.dataset.teamElevatorCar).toBe('')
       expect(rider()).toBeNull()
       // A scene that is not drawn never walks it there, so the car goes after its limit.
-      act(() => vi.advanceTimersByTime(8_000))
+      act(() => vi.advanceTimersByTime(30_000))
       expect(car()?.dataset.teamElevatorCar).toBe('imac')
       expect(rider()).toBe('lead')
       act(() => vi.advanceTimersByTime(1_200))
       expect(rider()).toBeNull()
       show(model([local, remote('imac')]))
       expect(car()?.dataset.teamElevatorCar).toBe('imac')
-      act(() => vi.advanceTimersByTime(8_000))
+      act(() => vi.advanceTimersByTime(30_000))
       expect(car()?.dataset.teamElevatorCar).toBe('')
       expect(rider()).toBe('lead')
       act(() => vi.advanceTimersByTime(1_200))
@@ -309,11 +309,11 @@ describe('TeamSceneBuilding', () => {
       show(ruled(['d1']))
       expect(car()?.dataset.teamElevatorCar).toBe('')
       show(ruled(['d1', 'd2']))
-      act(() => vi.advanceTimersByTime(8_000))
+      act(() => vi.advanceTimersByTime(30_000))
       expect(car()?.dataset.teamElevatorCar).toBe('imac')
       expect(rider()).toBe('advisor')
       // Why a second at a time: each stage's timer is set once React commits the one before.
-      for (let second = 0; second < 60; second++) {
+      for (let second = 0; second < 90; second++) {
         act(() => vi.advanceTimersByTime(1_000))
       }
       expect(car()?.dataset.teamElevatorCar).toBe('')

@@ -1,7 +1,8 @@
 /** How long the car takes between two floors with its rider. */
 export const RIDE_TRAVEL_SECONDS = 1.2
-// Why a limit: a scene that is not drawn (hidden, off screen) never walks its rider to the door.
-export const RIDE_BOARD_LIMIT_SECONDS = 8
+// Why a limit, and a long one: a scene that is not drawn never walks its rider to the door, and a
+// drawn one may take 28 s to cross a 900 px floor at 32 px/s.
+export const RIDE_BOARD_LIMIT_SECONDS = 30
 
 /**
  * One rider's trip between its home floor and another: out to the elevator, the car's travel,
@@ -48,7 +49,8 @@ export function teamSceneLegAfter(
       }
       return boards ? next('travel') : leg
     case 'travel':
-      return arrives ? next('there') : leg
+      // Why straight back: nothing wakes a stay once its reason ended while the car travelled.
+      return arrives ? next(want?.floor === leg.away ? 'there' : 'back') : leg
     case 'there':
       return want?.floor === leg.away ? leg : next('back')
     case 'back':
