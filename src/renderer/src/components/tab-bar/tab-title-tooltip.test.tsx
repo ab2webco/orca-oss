@@ -1,4 +1,14 @@
-import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+// @vitest-environment happy-dom
+
+import {
+  act,
+  cloneElement,
+  isValidElement,
+  Profiler,
+  type ReactElement,
+  type ReactNode
+} from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserTab as BrowserTabState } from '../../../../shared/browser-workspace-types'
@@ -92,9 +102,10 @@ vi.mock('@/lib/use-tab-agent', () => ({
   useTabAgent: () => mockTabAgent
 }))
 
+const storeWrites = vi.hoisted(() => ({ setRenamingTabId: vi.fn() }))
 vi.mock('../../store', () => ({
-  useAppStore: (selector: (state: { unreadTerminalTabs: Record<string, boolean> }) => unknown) =>
-    selector({ unreadTerminalTabs: {} })
+  useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({ unreadTerminalTabs: {}, renamingTabId: null, ...storeWrites })
 }))
 
 vi.mock('@/store', () => ({
@@ -318,6 +329,46 @@ describe('tab title tooltips', () => {
     expect(openingTag(markup, 'data-testid', 'sortable-tab')).toContain(
       'data-tab-title="Merlín · ORCA-12 · local"'
     )
+  })
+
+  // Why (ORCA-1147): SortableTab hit React #185 once; relabeling a member tab must add no update loop.
+  it('rerenders an unchanged member tab once per render, writing nothing to the store', () => {
+    const tab = makeTerminalTab({ title: 'Merlín · ORCA-12 · local' })
+    const props = {
+      unifiedTabId: 'terminal-1',
+      groupId: 'group-1',
+      tabCount: 1,
+      hasTabsToRight: false,
+      hasTabsToLeft: false,
+      isActive: true,
+      isPinned: false,
+      isExpanded: false,
+      onActivate: vi.fn(),
+      onClose: vi.fn(),
+      onCloseOthers: vi.fn(),
+      onCloseToRight: vi.fn(),
+      onCloseToLeft: vi.fn(),
+      onSetCustomTitle: vi.fn(),
+      onSetTabColor: vi.fn(),
+      onTogglePin: vi.fn(),
+      onToggleExpand: vi.fn(),
+      dragData: makeDragData('terminal', 'terminal-1')
+    }
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    let commits = 0
+    const draw = (): void =>
+      root.render(
+        <Profiler id="tab" onRender={() => (commits += 1)}>
+          <SortableTab tab={tab} {...props} />
+        </Profiler>
+      )
+    act(draw)
+    act(draw)
+    expect(commits).toBe(2)
+    expect(storeWrites.setRenamingTabId).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Merlín · ORCA-12 · This computer')
+    act(() => root.unmount())
   })
 
   it("shows the provider icon while stripping the agent's leading status glyph from the label", () => {
