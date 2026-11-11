@@ -18,6 +18,8 @@ export type NewTabAccountRow = {
   disabled: NewTabAccountDisabled | null
   inUseBy: string[]
   otherModel: boolean
+  /** The highest live window's use; null with no reading. */
+  usedPercent: number | null
 }
 
 export type NewTabAccountChoice =
@@ -44,7 +46,8 @@ export function newTabAccountChoiceOf(
       email: option.usage.email,
       disabled: disabledOf(option, now),
       inUseBy: option.usage.members,
-      otherModel: option.customEndpoint
+      otherModel: option.customEndpoint,
+      usedPercent: gameAccountStandingOf(option.usage, now).usedPercent
     }))
   }
 }

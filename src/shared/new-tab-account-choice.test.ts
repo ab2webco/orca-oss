@@ -121,4 +121,19 @@ describe('newTabAccountChoiceOf', () => {
       rows: [{ id: 'acct-logged-out', disabled: 'signed-out' }]
     })
   })
+
+  it("carries each account's used percent for the row, null with no reading", () => {
+    const read = usage('acct-read', { session: { usedPercent: 37, resetsAt: null }, weekly: null })
+    const unread = usage('acct-unread', { session: null, weekly: null })
+
+    const choice = newTabAccountChoiceOf([option(read), option(unread)], now)
+
+    expect(choice).toMatchObject({
+      kind: 'picker',
+      rows: [
+        { id: 'acct-read', usedPercent: 37 },
+        { id: 'acct-unread', usedPercent: null }
+      ]
+    })
+  })
 })
