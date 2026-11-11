@@ -3,7 +3,15 @@ import { seatPlanOf, TEAM_SCENE_MAX_SEATS } from './team-scene-seats'
 import type { TeamSceneMemberInput } from './team-scene-types'
 
 const member = (key: string, activity: TeamSceneMemberInput['activity'] = 'working') =>
-  ({ key, name: key, characterKey: null, activity, reportId: null, mergedPr: null }) as const
+  ({
+    key,
+    name: key,
+    characterKey: null,
+    activity,
+    reportId: null,
+    mergedPr: null,
+    site: { stage: 0, broken: false }
+  }) as const
 
 describe('seatPlanOf', () => {
   it('seats four in one row', () => {
