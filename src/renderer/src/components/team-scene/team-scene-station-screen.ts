@@ -1,4 +1,10 @@
-import type { TeamScenePlay, TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import { drawOfficeVirus } from './team-scene-office-virus'
+import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import type {
+  TeamScenePlay,
+  TeamScenePose,
+  TeamSceneSpot
+} from '../../../../shared/team-scene/team-scene-types'
 
 // V28's desk screens (drawDesk): code while working, amber on a question, green once done.
 // 'fail': the worker's PR has red CI; its lines take the theme's attention tone.
@@ -69,7 +75,9 @@ export function drawStationScreen(
   rect: { x: number; y: number; width: number; height: number },
   state: ScreenState,
   t: number,
-  attention = '#e5484d'
+  attention = '#e5484d',
+  /** Office's bug over a failing screen. */
+  virus = false
 ): void {
   g.fillStyle = BACKGROUND[state]
   g.fillRect(rect.x, rect.y, rect.width, rect.height)
@@ -95,4 +103,19 @@ export function drawStationScreen(
       1.4 * uy
     )
   }
+  if (virus && state === 'fail') {
+    drawOfficeVirus(g, rect, t)
+  }
+}
+
+/** Whether the desk at `spot` has a broken site: its member's PR has red CI. */
+export function stationFailingAt(
+  f: { width: number; sites: readonly { broken: boolean; spot: TeamSceneSpot }[] },
+  spot: TeamSceneSpot,
+  within: number
+): boolean {
+  // Why by spot: a site sits a fixed offset right of its seat (siteSpotOf).
+  return f.sites.some(
+    (site) => site.broken && Math.abs((site.spot.x - SITE_FROM_SEAT_X - spot.x) * f.width) < within
+  )
 }

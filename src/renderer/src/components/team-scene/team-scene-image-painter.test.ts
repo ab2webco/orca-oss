@@ -10,6 +10,7 @@ import type { TeamSceneFrame } from './team-scene-painter'
 import { recordingContext, type RecordedCall } from './team-scene-recording-context'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { OFFICE_NOTE } from './team-scene-office-builds'
+import { OFFICE_VIRUS_COLORS } from './team-scene-office-virus'
 import { seatPlanOf } from '../../../../shared/team-scene/team-scene-seats'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
@@ -516,6 +517,43 @@ describe('createImagePainter office builds', () => {
     expect(paint(false)).toContain('#0f1826')
     expect(paint(true)).not.toContain('#0f1826')
     expect(paint(true)).toContain(COLORS.attention)
+  })
+
+  describe('the red-CI virus', () => {
+    const painted = (broken: boolean, t: number, builds: 'office' | 'castle' = 'office') => {
+      const painter = createImagePainter({
+        art: {
+          style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+          images: IMAGES
+        },
+        colors: COLORS,
+        builds
+      })
+      const r = recordingContext()
+      const actors = [actor('m', { pose: 'work', x: spot.x, depth: spot.depth })]
+      painter.paint(r.g, frame({ t, actors, stations: [spot], sites: [site(broken)] }))
+      return r
+    }
+    const deskX = (r: RecordedCall[]) =>
+      r.find((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))!.args[1]
+    const bugY = (r: RecordedCall[]) => {
+      const fill = r.findIndex((c) => c.name === 'fill' && c.fillStyle === OFFICE_VIRUS_COLORS.body)
+      return r.slice(0, fill).findLast((c) => c.name === 'ellipse')?.args[1]
+    }
+
+    it('hops a bug on the red screen and shakes the desk, and both go once CI is green', () => {
+      const [a, b] = [painted(true, 0.31), painted(true, 0.58)]
+      expect(a.fills()).toContain(OFFICE_VIRUS_COLORS.body)
+      expect(bugY(a.calls)).not.toBe(bugY(b.calls))
+      expect(deskX(a.calls)).not.toBe(deskX(b.calls))
+      const green = [painted(false, 0.31), painted(false, 0.58)]
+      expect(green[0]!.fills()).not.toContain(OFFICE_VIRUS_COLORS.body)
+      expect(deskX(green[0]!.calls)).toBe(deskX(green[1]!.calls))
+    })
+
+    it('leaves red CI in a castle build to the slime, never a virus', () => {
+      expect(painted(true, 0.31, 'castle').fills()).not.toContain(OFFICE_VIRUS_COLORS.body)
+    })
   })
 })
 

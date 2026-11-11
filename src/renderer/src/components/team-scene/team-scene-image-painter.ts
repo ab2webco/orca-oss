@@ -14,9 +14,9 @@ import {
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
-import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import { drawCastleBuilds } from './team-scene-castle-sites'
 import { drawOfficeBuilds } from './team-scene-office-builds'
+import { officeVirusShakeAt } from './team-scene-office-virus'
 import {
   drawOfficeBack,
   createOfficeBackLooks,
@@ -25,7 +25,11 @@ import {
   officeBackEmoteAt,
   type OfficeBackSeat
 } from './team-scene-office-back'
-import { drawStationScreen, stationScreenStateOf } from './team-scene-station-screen'
+import {
+  drawStationScreen,
+  stationFailingAt,
+  stationScreenStateOf
+} from './team-scene-station-screen'
 
 type RoleArt = OrchestratorGameSceneNativeStyle['roles']['lead']
 
@@ -188,7 +192,9 @@ export function createImagePainter(args: {
     const feet = { x: seatX(prop), y: style.props?.stationFeet?.y ?? prop.height }
     for (const spot of f.stations) {
       const px = sheetPxAt(style.roles.member, spot.depth)
-      const left = spot.x * f.width - feet.x * px
+      const failing = stationFailingAt(f, spot, SEAT_PX)
+      const virus = failing && args.builds === 'office'
+      const left = spot.x * f.width - feet.x * px + (virus ? officeVirusShakeAt(f.t, px) : 0)
       const top = feetY(spot.depth, f.height) - feet.y * px
       if (back) {
         const [from, sw, h] = [back.chairEnd, prop.width - back.chairEnd, prop.height]
@@ -207,13 +213,8 @@ export function createImagePainter(args: {
           width: screen.width * px,
           height: screen.height * px
         }
-        // Why by spot: a site sits a fixed offset right of its seat (siteSpotOf).
-        const failing = f.sites.some(
-          (site) =>
-            site.broken && Math.abs((site.spot.x - SITE_FROM_SEAT_X - spot.x) * f.width) < SEAT_PX
-        )
         const state = stationScreenStateOf(worker?.pose ?? null, failing, worker?.play)
-        drawStationScreen(g, rect, state, f.t, colors.attention)
+        drawStationScreen(g, rect, state, f.t, colors.attention, virus)
       }
     }
   }
