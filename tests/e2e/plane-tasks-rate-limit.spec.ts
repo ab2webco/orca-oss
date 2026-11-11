@@ -114,7 +114,7 @@ test('names the rate-limit wait while the Tasks page loads Plane', async ({
       BrowserWindow.getAllWindows()[0]?.setSize(w, 900)
     }, width)
     await orcaPage.waitForTimeout(400)
-    const boxes = []
+    const boxes: { name: string; box: { x: number; width: number } }[] = []
     for (const name of ['ID', 'Work item', 'Status', 'Priority', 'Assignee', 'Updated']) {
       const header = orcaPage.getByRole('button', { name: new RegExp(`^${name}(,|$)`) })
       if (await header.isVisible()) {
