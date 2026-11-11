@@ -48,6 +48,15 @@ for attempt in 1 2; do
   fi
   if [ "$attempt" -eq 1 ]; then
     echo "apt-get $1 failed (exit $status); retrying once" >&2
+    # Why another mirror: the retry against the same list timed out again when runners could
+    # not resolve *.ubuntu.com (2026-11-11); the switch also holds for later calls in the job.
+    sudo bash "$(dirname "$0")/apt-mirror-fallback.sh" ${CI_APT_ROOT:+--root "$CI_APT_ROOT"} ||
+      echo 'apt mirror fallback failed; retrying on the same mirrors' >&2
+    if [ "$1" != update ]; then
+      # Why stderr: an install --print-uris retry prints its URIs on stdout.
+      apt_deadline=${CI_APT_TIMEOUT:-120s} run_apt update >&2 ||
+        echo 'apt-get update on the fallback mirror failed' >&2
+    fi
     sleep 5
   fi
 done

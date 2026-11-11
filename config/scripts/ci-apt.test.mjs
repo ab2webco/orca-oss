@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -28,6 +28,9 @@ case "$CI_APT_RESULT" in
   fail) exit 100 ;;
 esac`
   )
+  const mirrorList = join(dir, 'etc/apt/apt-mirrors.txt')
+  mkdirSync(join(dir, 'etc/apt'), { recursive: true })
+  writeFileSync(mirrorList, 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n')
   const callLog = join(dir, 'calls')
   const timeoutLog = join(dir, 'timeouts')
   const output = spawnSync('bash', [script, ...args], {
@@ -38,7 +41,8 @@ esac`
       CI_APT_RESULT: result,
       CI_APT_CALL_LOG: callLog,
       CI_APT_TIMEOUT_LOG: timeoutLog,
-      CI_APT_TIMEOUT: timeoutOverride
+      CI_APT_TIMEOUT: timeoutOverride,
+      CI_APT_ROOT: dir
     }
   })
   const lines = (path) => {
@@ -48,7 +52,12 @@ esac`
       return []
     }
   }
-  return { ...output, calls: lines(callLog), timeouts: lines(timeoutLog) }
+  return {
+    ...output,
+    calls: lines(callLog),
+    timeouts: lines(timeoutLog),
+    mirrors: readFileSync(mirrorList, 'utf8')
+  }
 }
 
 describe('bounded CI apt', () => {
@@ -84,6 +93,26 @@ describe('bounded CI apt', () => {
     expect(result.calls).toHaveLength(2)
   })
 
+  // Why (2026-11-11): runners could not resolve *.ubuntu.com, so a retry against the same
+  // mirror list timed out again; the retry goes to a mirror under another domain.
+  it('retries on the fallback mirror after a failed first attempt', () => {
+    const result = runApt('fail-once', ['update'])
+    expect(result.mirrors).toBe('http://mirrors.edge.kernel.org/ubuntu/\tpriority:1\n')
+    expect(result.stderr).toContain('apt-get update failed (exit 100); retrying once')
+  })
+
+  it('keeps the image mirror when the first attempt succeeds', () => {
+    const result = runApt('success', ['update'])
+    expect(result.mirrors).toBe('http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n')
+  })
+
+  it('refreshes the package lists from the fallback before retrying an install', () => {
+    const result = runApt('fail-once', ['install', '-y', 'zsh'])
+    expect(result.status).toBe(0)
+    expect(result.calls.map((call) => call.split(' ').at(-1))).toEqual(['zsh', 'update', 'zsh'])
+    expect(result.timeouts[1]).toContain('--kill-after=10s 120s apt-get')
+  })
+
   it('preserves stdout for ordinary installs', () => {
     const result = runApt('success', ['install', '-y', 'zsh'])
     expect(result.stdout).toBe('installed\n')
@@ -92,7 +121,7 @@ describe('bounded CI apt', () => {
   it('discards partial print-uris output from a failed attempt', () => {
     const result = runApt('partial-uris', ['install', '--print-uris', '-qq', '-y', 'zsh'])
     expect(result.status).toBe(0)
-    expect(result.calls).toHaveLength(2)
+    expect(result.calls).toHaveLength(3)
     expect(result.stdout).toBe('current.deb\n')
   })
 
@@ -106,6 +135,6 @@ describe('bounded CI apt', () => {
   it('preserves a non-timeout failure exit code', () => {
     const result = runApt('fail', ['install', '-y', 'zsh'])
     expect(result.status).toBe(100)
-    expect(result.calls).toHaveLength(2)
+    expect(result.calls).toHaveLength(3)
   })
 })
