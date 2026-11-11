@@ -48,6 +48,8 @@ export type QuickLaunchAgentMenuItemsProps = {
   /** Called after a prompt is queued into the agent, or immediately for argv prompt launches. */
   onPromptDelivered?: () => void
   agentAccounts?: QuickLaunchAgentAccounts
+  /** Rows another group covers, like Claude Agent Teams once the project has a lead (ORCA-717). */
+  hiddenAgents?: readonly TuiAgent[]
 }
 
 function getCatalogEntry(agent: TuiAgent): { id: TuiAgent; label: string } | null {
@@ -115,7 +117,8 @@ function QuickLaunchAgentMenuItemsInner({
   promptDelivery,
   launchSource,
   onPromptDelivered,
-  agentAccounts
+  agentAccounts,
+  hiddenAgents
 }: QuickLaunchAgentMenuItemsProps): React.JSX.Element | null {
   // Why: resolving only the SSH connectionId here made paired-runtime
   // worktrees fall back to LOCAL detection, listing the client's agents
@@ -193,7 +196,9 @@ function QuickLaunchAgentMenuItemsInner({
   )
 
   const enabledDetectedIds = detectedIds ? filterEnabledTuiAgents(detectedIds, disabledAgents) : []
-  const agents = detectedIds ? orderAgents(defaultAgent, enabledDetectedIds) : []
+  const agents = detectedIds
+    ? orderAgents(defaultAgent, enabledDetectedIds).filter((one) => !hiddenAgents?.includes(one))
+    : []
 
   return (
     <>
