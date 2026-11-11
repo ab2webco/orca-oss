@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NOON } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
@@ -83,12 +83,13 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(420)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
   const make = document.createElement.bind(document)
-  vi.spyOn(document, 'createElement').mockImplementation((tag: string, options?) => {
+  const counting = (tag: string, options?: ElementCreationOptions): HTMLElement => {
     if (tag === 'canvas') {
       canvases += 1
     }
     return make(tag, options)
-  })
+  }
+  vi.spyOn(document, 'createElement').mockImplementation(counting as typeof document.createElement)
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
