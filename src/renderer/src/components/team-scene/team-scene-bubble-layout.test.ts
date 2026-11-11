@@ -7,7 +7,12 @@ import {
   createTeamSceneWorld,
   stepTeamScene
 } from '../../../../shared/team-scene/team-scene-director'
-import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
+import {
+  layoutTeamSceneBubbles,
+  teamSceneCellUnder,
+  teamSceneTailRunsOf,
+  type TeamSceneBubbleBox
+} from './team-scene-bubble-layout'
 import { createImagePainter } from './team-scene-image-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
@@ -363,5 +368,32 @@ describe('layoutTeamSceneBubbles', () => {
     // A narrowed cloud wraps one more line, and it still clears its speaker's head.
     expect(lead!.height).toBeGreaterThan(41)
     expect(lead!.top + lead!.height).toBeLessThanOrEqual(84)
+  })
+})
+
+// Why: decision A lets an attending lead's tail run behind the asker's tag, so none of it may be
+// drawn over the tag (run on 768 Pixel: 'lead cloud paints 5 cells over the tag').
+describe('a tail behind a tag', () => {
+  const box = { key: 'lead', left: 10, top: 0, width: 80, height: 30, tailX: 30 }
+  const tag = { left: 20, top: 40, width: 56, height: 18 }
+
+  it('draws the tail only above and below the tag it passes behind', () => {
+    // From the bubble's bottom (30) to the head (90), with the tag between 40 and 58.
+    expect(teamSceneTailRunsOf(box, 90, [tag])).toEqual([
+      { from: 30, to: 40 },
+      { from: 58, to: 90 }
+    ])
+    expect(teamSceneTailRunsOf(box, 90, [])).toEqual([{ from: 30, to: 90 }])
+    expect(teamSceneTailRunsOf({ ...box, tailX: 70 }, 90, [{ ...tag, width: 10 }])).toEqual([
+      { from: 30, to: 90 }
+    ])
+  })
+
+  it('tells which scene cells lie under a tag, so a cloud leaves them unpainted', () => {
+    expect(teamSceneCellUnder({ x: 40, y: 45, size: 3 }, [tag])).toBe(true)
+    expect(teamSceneCellUnder({ x: 40, y: 36, size: 3 }, [tag])).toBe(false)
+    // A cell that only touches the tag's edge does not cover it.
+    expect(teamSceneCellUnder({ x: 19, y: 45, size: 2 }, [tag])).toBe(true)
+    expect(teamSceneCellUnder({ x: 18, y: 45, size: 2 }, [tag])).toBe(false)
   })
 })

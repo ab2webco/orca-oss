@@ -226,3 +226,44 @@ function besideOf(
     ? { moved, other, added }
     : null
 }
+
+/** The stretches of a bubble's tail left to draw: the parts that run behind a tag are not. */
+export function teamSceneTailRunsOf(
+  box: TeamSceneBubbleBox,
+  anchorTop: number,
+  obstacles: readonly TeamSceneRect[]
+): { from: number; to: number }[] {
+  const x = box.left + box.tailX
+  const cuts = obstacles
+    .filter((o) => x >= o.left && x <= o.left + o.width)
+    .map((o) => ({ from: o.top, to: o.top + o.height }))
+    .sort((a, b) => a.from - b.from)
+  const runs: { from: number; to: number }[] = []
+  let at = box.top + box.height
+  for (const cut of cuts) {
+    if (cut.to <= at || cut.from >= anchorTop) {
+      continue
+    }
+    if (cut.from > at) {
+      runs.push({ from: at, to: cut.from })
+    }
+    at = Math.max(at, cut.to)
+  }
+  if (at < anchorTop) {
+    runs.push({ from: at, to: anchorTop })
+  }
+  return runs
+}
+
+/** Whether a square cell of a drawn cloud, in scene px, lies over a tag (touching is not). */
+export const teamSceneCellUnder = (
+  cell: { x: number; y: number; size: number },
+  obstacles: readonly TeamSceneRect[]
+): boolean =>
+  obstacles.some(
+    (o) =>
+      cell.x < o.left + o.width &&
+      o.left < cell.x + cell.size &&
+      cell.y < o.top + o.height &&
+      o.top < cell.y + cell.size
+  )

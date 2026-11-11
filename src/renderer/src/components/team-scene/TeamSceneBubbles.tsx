@@ -2,6 +2,8 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   layoutTeamSceneBubbles,
+  teamSceneCellUnder,
+  teamSceneTailRunsOf,
   type TeamSceneBubbleBox,
   type TeamSceneRect
 } from './team-scene-bubble-layout'
@@ -36,11 +38,14 @@ const NONE: readonly TeamSceneRect[] = []
 function PixelCloudCanvas({
   box,
   anchorTop,
-  pixel
+  pixel,
+  obstacles
 }: {
   box: TeamSceneBubbleBox
   anchorTop: number
   pixel: number
+  /** Tags its trail passes behind: no cell is painted over one. */
+  obstacles: readonly TeamSceneRect[]
 }): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null)
   const width = Math.ceil(box.width / pixel)
@@ -55,8 +60,12 @@ function PixelCloudCanvas({
     }
     g.clearRect(0, 0, width, cloud.rows)
     for (const [key, color] of cloud.pixels) {
-      g.fillStyle = color
-      g.fillRect(key % 4096, Math.floor(key / 4096), 1, 1)
+      const [x, y] = [key % 4096, Math.floor(key / 4096)]
+      const cell = { x: box.left + x * pixel, y: box.top + y * pixel, size: pixel }
+      if (!teamSceneCellUnder(cell, obstacles)) {
+        g.fillStyle = color
+        g.fillRect(x, y, 1, 1)
+      }
     }
   })
   return (
@@ -178,16 +187,33 @@ export function TeamSceneBubbles({
               {s.text}
             </span>
             {box && cloudPixel ? (
-              <PixelCloudCanvas box={box} anchorTop={s.anchor.top} pixel={cloudPixel} />
+              <PixelCloudCanvas
+                box={box}
+                anchorTop={s.anchor.top}
+                pixel={cloudPixel}
+                obstacles={obstacles}
+              />
             ) : null}
-            {box && !cloudPixel ? (
-              <span
-                className="absolute top-full w-px bg-white/50"
-                style={{ left: box.tailX, height: tail }}
-              >
-                <span className="absolute -left-[2px] bottom-0 size-[5px] rounded-full bg-white/70" />
-              </span>
-            ) : null}
+            {box && !cloudPixel
+              ? // Why in runs: where the tail passes behind a tag, that stretch is not drawn.
+                teamSceneTailRunsOf(box, box.top + box.height + tail, obstacles).map(
+                  (run, i, all) => (
+                    <span
+                      key={run.from}
+                      className="absolute w-px bg-white/50"
+                      style={{
+                        left: box.tailX,
+                        top: run.from - box.top,
+                        height: run.to - run.from
+                      }}
+                    >
+                      {i === all.length - 1 ? (
+                        <span className="absolute -left-[2px] bottom-0 size-[5px] rounded-full bg-white/70" />
+                      ) : null}
+                    </span>
+                  )
+                )
+              : null}
           </span>
         )
       })}
