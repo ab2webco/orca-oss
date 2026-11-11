@@ -231,6 +231,9 @@ describe('TeamSceneBuilding', () => {
     it("keeps the car at the lead's floor until the lead boards, then carries it up, and back", () => {
       vi.useFakeTimers()
       motion(false)
+      // Why no frames: happy-dom runs them on the wall clock, so a rider boarding by walking would
+      // race the fake one; the board limit alone moves the car, the same on every run.
+      vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
       render([local, remote('imac')])
       expect(car()?.dataset.teamElevatorCar).toBe('')
       const show = (next: TeamSceneBuildingModel): void =>
@@ -294,6 +297,9 @@ describe('TeamSceneBuilding', () => {
     it('takes the car to the floor of a member Jev just ruled on, and back once the advisor is done', () => {
       vi.useFakeTimers()
       motion(false)
+      // Why no frames: happy-dom runs them on the wall clock, so a rider boarding by walking would
+      // race the fake one; the board limit alone moves the car, the same on every run.
+      vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
       const ruled = (ids: string[]): TeamSceneBuildingModel => {
         const base = model([local, remote('imac')])
         base.members[1] = {
