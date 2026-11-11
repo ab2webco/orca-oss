@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises'
 import type { ElectronApplication } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -205,16 +206,25 @@ test('the Team panel draws a team on three machines as a building in Office', as
     await expect
       .poll(() => orcaPage.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches))
       .toBe(true)
+    // Why the sidebar, not the window: the Team panel keeps its own width at any window width.
+    const sidebarBefore = await orcaPage.evaluate(
+      () => window.__store!.getState().rightSidebarWidth
+    )
     for (const width of [420, 390, 320]) {
-      await setWindowWidth(electronApp, orcaPage, width)
+      await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
       await orcaPage.waitForTimeout(1500)
-      // Why recorded: a ride only shows on a stage at least 360 px wide, and the panel is not the window.
-      const stages = await building
-        .locator('[data-team-floor] canvas')
-        .evaluateAll((canvases) => canvases.map((c) => (c as HTMLCanvasElement).clientWidth))
-      await testInfo.attach(`ride-stage-widths-${width}`, { body: JSON.stringify(stages) })
+      // Why recorded: a ride only shows on a floor at least 360 px wide.
+      const measured = await building.evaluate((root) => ({
+        building: root.clientWidth,
+        stages: [...root.querySelectorAll('[data-team-floor] canvas')].map((c) => c.clientWidth)
+      }))
+      await writeFile(testInfo.outputPath(`ride-widths-${width}.json`), JSON.stringify(measured))
       await building.screenshot({ path: testInfo.outputPath(`building-ride-reduced-${width}.png`) })
     }
+    await orcaPage.evaluate(
+      (w) => window.__store!.getState().setRightSidebarWidth(w),
+      sidebarBefore
+    )
     await orcaPage.emulateMedia({ reducedMotion: null })
     await setWindowWidth(electronApp, orcaPage, 1440)
 
