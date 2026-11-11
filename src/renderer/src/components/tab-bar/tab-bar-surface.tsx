@@ -10,9 +10,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { QuickLaunchAgentMenuItems } from './QuickLaunchButton'
+import { NewTabMenuSections } from './NewTabMenuSections'
 import TabBarCreateEntry from './TabBarCreateEntry'
 import { TabStripScrollIndicator } from './TabStripScrollIndicator'
+import { TabStripHiddenTabsMenu } from './TabStripHiddenTabsMenu'
+import { activateTabBarItem, tabsBesideActive } from './tab-strip-hidden-tabs'
 import { getTabStripScrollMaskClassName } from './tab-strip-scroll-metrics'
 import type { useTabStripOverflowNavigation } from './tab-strip-overflow-navigation'
 import type { useTabStripDragScrollHandlers } from './tab-strip-drag-scroll'
@@ -20,7 +22,7 @@ import type { TabBarProps } from './tab-bar-props'
 import type { TabBarRuntimeModel } from './use-tab-bar-runtime-model'
 import type { TabBarCreateMenuController } from './use-tab-bar-create-menu-controller'
 import type { TabBarItemProjection } from './use-tab-bar-item-projection'
-import type { TabBarItem } from './tab-bar-item-model'
+import { getTabDragLabel, type TabBarItem } from './tab-bar-item-model'
 import { renderTabBarItems } from './tab-bar-item-surface'
 import { renderTabBarStaticCreateMenu } from './tab-bar-static-create-menu'
 
@@ -88,7 +90,7 @@ export function renderTabBarSurface({
     queueFocusAfterNewTabMenuClose,
     showStaticCreateMenuItems
   } = createMenu
-  const { orderedItems, sortableIds, dropIndicatorByVisibleId } = itemProjection
+  const { orderedItems, sortableIds, dropIndicatorByVisibleId, activeVisibleTabId } = itemProjection
   const { tabStripRef, tabStripOverflowState, scrollTabStrip } = tabStripNavigation
   const includeTopTabBorder = tabStripChrome !== 'floating-panel'
   const renderedItems = renderTabBarItems({
@@ -121,7 +123,7 @@ export function renderTabBarSurface({
   return (
     <div
       ref={clearPendingNewTabMenuFocusOnUnmount}
-      className="flex items-stretch h-full overflow-hidden flex-1 min-w-0"
+      className="@container/tab-bar flex items-stretch h-full overflow-hidden flex-1 min-w-0"
       // Why: preload routes native OS drops by this marker — only the tab strip opens files in the editor, not terminal panes.
       data-native-file-drop-target="editor"
     >
@@ -131,7 +133,7 @@ export function renderTabBarSurface({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="mx-0.5 my-auto h-6 w-5 text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-35"
+              className="mx-0.5 my-auto h-6 w-5 text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-35 @max-[120px]/tab-bar:hidden"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               aria-label={translate(
                 'auto.components.tab.bar.TabBar.7a9b4af2af',
@@ -181,7 +183,7 @@ export function renderTabBarSurface({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="mx-0.5 my-auto h-6 w-5 text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-35"
+              className="mx-0.5 my-auto h-6 w-5 text-muted-foreground hover:bg-accent/50 hover:text-foreground disabled:opacity-35 @max-[120px]/tab-bar:hidden"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               aria-label={translate(
                 'auto.components.tab.bar.TabBar.232e075b07',
@@ -200,6 +202,19 @@ export function renderTabBarSurface({
             {translate('auto.components.tab.bar.TabBar.232e075b07', 'Scroll tabs right')}
           </TooltipContent>
         </Tooltip>
+      ) : null}
+      {tabStripOverflowState.hasOverflow ? (
+        <TabStripHiddenTabsMenu
+          tabs={tabsBesideActive(orderedItems, activeVisibleTabId, (item) =>
+            getTabDragLabel(item, runtime.generatedTabTitlesEnabled)
+          ).map(({ item, label }) => ({ id: item.id, label }))}
+          onSelect={(id) => {
+            const item = orderedItems.find((one) => one.id === id)
+            if (item) {
+              activateTabBarItem(item, props)
+            }
+          }}
+        />
       ) : null}
       <DropdownMenu
         open={newTabMenuOpen}
@@ -261,16 +276,16 @@ export function renderTabBarSurface({
               {showStaticCreateMenuItems ? <DropdownMenuSeparator /> : null}
             </>
           ) : null}
-          {showStaticCreateMenuItems ? standardCreateMenuItems : null}
           {showStaticCreateMenuItems && showAgentLaunchItems ? (
-            <>
-              <DropdownMenuSeparator />
-              <QuickLaunchAgentMenuItems
-                worktreeId={worktreeId}
-                groupId={resolvedGroupId}
-                onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
-              />
-            </>
+            <NewTabMenuSections
+              worktreeId={worktreeId}
+              groupId={resolvedGroupId}
+              onFocusTerminal={queueTerminalTabFocusAfterNewTabMenuClose}
+            >
+              {standardCreateMenuItems}
+            </NewTabMenuSections>
+          ) : showStaticCreateMenuItems ? (
+            standardCreateMenuItems
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>

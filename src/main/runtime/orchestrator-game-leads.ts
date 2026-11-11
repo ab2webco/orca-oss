@@ -1,36 +1,20 @@
-import type { GameBoardCaller, GameBoardProject } from './orchestrator-game-board'
-import { GameLeadDirectory } from './orchestrator-game-lead-directory'
+import type { GameBoardCaller } from './orchestrator-game-board'
+import { GameLeadDirectory, type GameLeadEntry } from './orchestrator-game-lead-directory'
 import type { GameLeadRecord } from './orchestrator-game-lead-roster'
+import type {
+  GameLeadListing,
+  GameLeadRegistration,
+  GameLeadRestoring,
+  GameLeadSession,
+  GameLeadsDeps
+} from './orchestrator-game-lead-types'
 
-export type GameLeadListing = {
-  project: string
-  label: string
-  handle: string
-  since: string
-  paneKey?: string
-}
-
-/** A lead kept from before a restart whose pane is not back yet; `paneKey` is the pane it led from. */
-export type GameLeadRestoring = { project: string; paneKey: string }
-
-/** What reopens a project's lead conversation once its pane is gone; `accountId` is the managed account it ran on. */
-export type GameLeadSession = {
-  sessionId: string
-  agentArgs: string | null
-  worktreeId: string
-  accountId: string | null
-  /** Where Claude keeps the conversation; names its account when `accountId` was not recorded. */
-  transcriptPath?: string
-}
-
-/** `registered: false` with `live` or `resumed` names the pane that is the lead instead of the caller. */
-export type GameLeadRegistration = {
-  registered: boolean
-  live?: { handle: string }
-  resumed?: { handle: string }
-  /** Why the stored conversation did not reopen, so the caller became a new lead. */
-  resumeError?: string
-}
+export type {
+  GameLeadListing,
+  GameLeadRegistration,
+  GameLeadRestoring,
+  GameLeadSession
+} from './orchestrator-game-lead-types'
 
 // Why: an unplaced caller shares this key with every other, so one lead there is not one per project.
 const UNPLACED_PROJECT = 'no-project'
@@ -49,34 +33,7 @@ export class GameLeads {
   private loaded: Promise<void> | null = null
   private loadedAt: number | null = null
 
-  constructor(
-    private readonly deps: {
-      projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
-      isLive: (handle: string) => boolean
-      /** False once the pane is back at its shell: a lead that ran /exit, or a resume Claude refused. */
-      isRunning?: (handle: string) => Promise<boolean>
-      now?: () => Date
-      wait?: (ms: number) => Promise<void>
-      sessions?: {
-        read: (projectKey: string) => Promise<GameLeadSession | null>
-        write: (projectKey: string, session: GameLeadSession) => Promise<void>
-        clear: (projectKey: string) => Promise<void>
-      }
-      sessionOf?: (handle: string) => Promise<GameLeadSession | null>
-      /** Reopens the conversation in a new pane and returns that pane's handle. */
-      resume?: (session: GameLeadSession) => Promise<string>
-      focus?: (handle: string) => Promise<void>
-      roster?: {
-        read: () => Promise<GameLeadRecord[]>
-        write: (records: GameLeadRecord[]) => Promise<void>
-      }
-      paneOf?: (handle: string) => string | null
-      /** The handle of a pane whose terminal is connected now; null until the pane is back. */
-      handleOfPane?: (paneKey: string) => string | null
-      /** `starting` is anything that is neither Claude nor a shell, and an unreadable pane. */
-      paneState?: (handle: string) => Promise<'running' | 'shell' | 'starting'>
-    }
-  ) {}
+  constructor(private readonly deps: GameLeadsDeps) {}
 
   /**
    * A member never leads; `registered: false` is a quiet no for it and for a caller Orca cannot place.
@@ -120,16 +77,12 @@ export class GameLeads {
       let resumeError: string | undefined
       const stored =
         live || args.fresh ? null : await this.deps.sessions?.read(project.key).catch(() => null)
-      if (stored && stored.sessionId !== mine?.sessionId && this.deps.resume) {
-        try {
-          const handle = await this.deps.resume(stored)
-          const entry = entryOf(handle)
-          this.directory.register(entry)
-          await this.remember(entry, this.deps.paneOf?.(handle) ?? null, stored)
-          return { registered: false, resumed: { handle } }
-        } catch (error) {
-          resumeError = error instanceof Error ? error.message : String(error)
+      if (stored && stored.sessionId !== mine?.sessionId) {
+        const reopened = await this.resumeStored(stored, entryOf)
+        if (reopened.resumed) {
+          return reopened
         }
+        resumeError = reopened.resumeError
       }
       const entry = entryOf(caller)
       this.directory.register(entry)
@@ -141,6 +94,54 @@ export class GameLeads {
       }
       return { registered: true, ...(resumeError === undefined ? {} : { resumeError }) }
     })
+  }
+
+  /** Reopens the project's kept lead with no caller pane, as the + menu's Reopen team does (ORCA-717). */
+  async reopen(
+    args: GameBoardCaller & { project: string; label: string }
+  ): Promise<GameLeadRegistration> {
+    const project = await this.deps.projectOf(args)
+    if (project.isMember || project.key === UNPLACED_PROJECT) {
+      return { registered: false }
+    }
+    return this.queued(project.key, async () => {
+      await this.settle(project.key)
+      const live = (await this.leadOf(project.key)) ?? (await this.afterRestore(project.key, null))
+      if (live) {
+        await this.deps.focus?.(live.handle).catch(() => undefined)
+        return { registered: false, live: { handle: live.handle } }
+      }
+      const stored = await this.deps.sessions?.read(project.key).catch(() => null)
+      const at = (this.deps.now?.() ?? new Date()).toISOString()
+      const entryOf = (handle: string): GameLeadEntry => ({
+        projectKey: project.key,
+        project: args.project,
+        handle,
+        label: args.label,
+        at
+      })
+      return stored ? this.resumeStored(stored, entryOf) : { registered: false }
+    })
+  }
+
+  /** Reopens the kept conversation in its own pane and lists that pane as the project's lead. */
+  private async resumeStored(
+    stored: GameLeadSession,
+    entryOf: (handle: string) => GameLeadEntry
+  ): Promise<GameLeadRegistration> {
+    if (!this.deps.resume) {
+      return { registered: false }
+    }
+    try {
+      const handle = await this.deps.resume(stored)
+      const entry = entryOf(handle)
+      this.directory.register(entry)
+      await this.remember(entry, this.deps.paneOf?.(handle) ?? null, stored)
+      return { registered: false, resumed: { handle } }
+    } catch (error) {
+      const resumeError = error instanceof Error ? error.message : String(error)
+      return { registered: false, resumeError }
+    }
   }
 
   private async leadOf(projectKey: string): Promise<{ handle: string } | null> {
@@ -186,6 +187,21 @@ export class GameLeads {
       await this.settle(projectKey)
     }
     return this.leadOf(projectKey)
+  }
+
+  /** The account of the project's kept lead conversation, so a client can offer to reopen the team. */
+  async storedLeadOf(caller: GameBoardCaller): Promise<{ accountId: string | null } | null> {
+    const project = await this.deps.projectOf(caller)
+    if (project.key === UNPLACED_PROJECT) {
+      return null
+    }
+    const session = await this.deps.sessions?.read(project.key).catch(() => null)
+    if (!session) {
+      return null
+    }
+    // Why the reopen's account: a removed account falls back, and the menu must name the one used.
+    const reopenAccountOf = this.deps.reopenAccountOf
+    return { accountId: reopenAccountOf ? reopenAccountOf(session) : (session.accountId ?? null) }
   }
 
   /** The project's live lead, for a caller that is no terminal: the person's Inbox. */

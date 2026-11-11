@@ -50,6 +50,10 @@ export type LaunchAgentInNewTabArgs = {
   launchPlatform?: NodeJS.Platform
   /** Called after the prompt is actually delivered to the agent input path. */
   onPromptDelivered?: () => void
+  /** Hand-picked Claude account; omitted keeps the launch id, worktree pin, global order. */
+  claudeAccountId?: string
+  /** Hand-picked Codex account; omitted keeps the worktree pin. */
+  codexAccountId?: string
 }
 
 export type LaunchAgentInNewTabResult = {
@@ -191,6 +195,8 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
     launchConfig: startupPlan.launchConfig,
     launchAgent: agent,
     ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
+    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
+    ...(args.codexAccountId !== undefined ? { codexAccountId: args.codexAccountId } : {}),
     ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
     ...(startupPlan.startupCommandDelivery
       ? { startupCommandDelivery: startupPlan.startupCommandDelivery }

@@ -3396,8 +3396,7 @@
           "SortableTab": {
             "ab19f603eb": "Rename tab {{value0}}",
             "6df69d9388": "Close tab {{value0}}",
-            "fdb2691425": "Collapse pane",
-            "95db5f2f7d": "Close tab"
+            "fdb2691425": "Collapse pane"
           },
           "SortableTabContextMenu": {
             "35e8892fd0": "Tab Color",
@@ -17526,5 +17525,50 @@
   "agentQuestionNotification": {
     "title": "{{context}} - {{agent}} asks you",
     "body": "Open the Inbox to answer."
+  },
+  "tabStrip": {
+    "hiddenTabs": "{{count}} more tabs",
+    "hiddenTabs_one": "{{count}} more tab",
+    "hiddenTabs_other": "{{count}} more tabs"
+  },
+  "newTabMenu": {
+    "account": {
+      "inUseBy": "In use by {{value}}",
+      "limited": "Limit reached",
+      "signedOut": "Signed out",
+      "otherModel": "Other model",
+      "noReading": "No reading",
+      "used": "{{value}}% used",
+      "ownLogin": "Own login",
+      "hostLogin": "Host login",
+      "choose": "Choose the {{value}} account",
+      "systemLogin": "System login",
+      "claudeAccounts": "Claude accounts",
+      "codexAccounts": "Codex accounts",
+      "manage": "Manage accounts…"
+    },
+    "group": {
+      "terminal": "Terminal",
+      "agents": "Agents"
+    },
+    "team": {
+      "group": "Team",
+      "goToLead": "Go to lead {{value}}",
+      "goToLeadUnnamed": "Go to lead",
+      "addMember": "Add a member to the team…",
+      "chooseMember": "Choose the member's account",
+      "memberAccount": "Member account",
+      "todoEmpty": "To Do is empty",
+      "reopen": "Reopen team",
+      "startFresh": "Start fresh lead…",
+      "chooseLead": "Choose the lead's account",
+      "startFreshConfirm": "Start a fresh lead?",
+      "start": "Start",
+      "cancel": "Cancel",
+      "leadFallback": "the lead",
+      "reopenFailed": "Could not reopen the team: {{value}}",
+      "reopenNothingKept": "No kept lead to reopen",
+      "reopenUnsupported": "This host cannot reopen the team"
+    }
   }
 }

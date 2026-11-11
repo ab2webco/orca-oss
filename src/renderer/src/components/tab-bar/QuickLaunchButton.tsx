@@ -15,6 +15,18 @@ import {
   filterEnabledTuiAgents
 } from '../../../../shared/tui-agent-selection'
 import { translate } from '@/i18n/i18n'
+import { agentRowAccountOf, type NewTabAgentProviders } from './new-tab-agent-row-account'
+import { NewTabAgentAccountSubmenu } from './NewTabAgentAccountSubmenu'
+
+/** The + menu's account context; other menus omit it and keep plain agent rows (ORCA-717). */
+export type QuickLaunchAgentAccounts = {
+  /** The override reaches only a local spawn; SSH, paired and remote hosts resolve their own. */
+  local: boolean
+  providers: NewTabAgentProviders
+  labelOf: (provider: 'claude' | 'codex', accountId: string | null) => string
+}
+
+type AccountPick = { provider: 'claude' | 'codex'; accountId: string }
 
 export type QuickLaunchAgentMenuItemsProps = {
   worktreeId: string
@@ -35,6 +47,9 @@ export type QuickLaunchAgentMenuItemsProps = {
   launchSource?: LaunchSource
   /** Called after a prompt is queued into the agent, or immediately for argv prompt launches. */
   onPromptDelivered?: () => void
+  agentAccounts?: QuickLaunchAgentAccounts
+  /** Rows another group covers, like Claude Agent Teams once the project has a lead (ORCA-717). */
+  hiddenAgents?: readonly TuiAgent[]
 }
 
 function getCatalogEntry(agent: TuiAgent): { id: TuiAgent; label: string } | null {
@@ -101,7 +116,9 @@ function QuickLaunchAgentMenuItemsInner({
   prompt,
   promptDelivery,
   launchSource,
-  onPromptDelivered
+  onPromptDelivered,
+  agentAccounts,
+  hiddenAgents
 }: QuickLaunchAgentMenuItemsProps): React.JSX.Element | null {
   // Why: resolving only the SSH connectionId here made paired-runtime
   // worktrees fall back to LOCAL detection, listing the client's agents
@@ -123,7 +140,7 @@ function QuickLaunchAgentMenuItemsInner({
   }, [openSettingsPage, openSettingsTarget])
 
   const runLaunch = useCallback(
-    (agent: TuiAgent) => {
+    (agent: TuiAgent, pick?: AccountPick) => {
       const entry = getCatalogEntry(agent)
       const label = entry?.label ?? agent
       const result = launchAgentInNewTab({
@@ -133,7 +150,9 @@ function QuickLaunchAgentMenuItemsInner({
         ...(prompt !== undefined ? { prompt } : {}),
         ...(promptDelivery !== undefined ? { promptDelivery } : {}),
         ...(launchSource !== undefined ? { launchSource } : {}),
-        ...(onPromptDelivered !== undefined ? { onPromptDelivered } : {})
+        ...(onPromptDelivered !== undefined ? { onPromptDelivered } : {}),
+        ...(pick?.provider === 'claude' ? { claudeAccountId: pick.accountId } : {}),
+        ...(pick?.provider === 'codex' ? { codexAccountId: pick.accountId } : {})
       })
       if (!result) {
         toast.error(
@@ -177,7 +196,9 @@ function QuickLaunchAgentMenuItemsInner({
   )
 
   const enabledDetectedIds = detectedIds ? filterEnabledTuiAgents(detectedIds, disabledAgents) : []
-  const agents = detectedIds ? orderAgents(defaultAgent, enabledDetectedIds) : []
+  const agents = detectedIds
+    ? orderAgents(defaultAgent, enabledDetectedIds).filter((one) => !hiddenAgents?.includes(one))
+    : []
 
   return (
     <>
@@ -199,11 +220,18 @@ function QuickLaunchAgentMenuItemsInner({
         const label = entry?.label ?? agent
         const showsDefaultAgentShortcut =
           newAgentShortcut !== null && defaultAgent !== 'blank' && agent === defaultAgent
-        return (
+        const account = agentAccounts
+          ? agentRowAccountOf({
+              agent,
+              local: agentAccounts.local,
+              providers: agentAccounts.providers
+            })
+          : null
+        const launchItem = (
           <DropdownMenuItem
             key={agent}
             onSelect={() => runLaunch(agent)}
-            className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
+            className="min-w-0 flex-1 gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
             title={translate(
               'auto.components.tab.bar.QuickLaunchButton.ec2adf093e',
               'Launch {{value0}} in a new terminal',
@@ -211,11 +239,38 @@ function QuickLaunchAgentMenuItemsInner({
             )}
           >
             <AgentIcon agent={agent} size={14} />
-            <span className="flex-1">{label}</span>
+            <span className="flex-1 truncate">{label}</span>
+            {account?.kind === 'own-login' || account?.kind === 'host-login' ? (
+              <span className="text-[11px] font-normal text-muted-foreground">
+                {account.kind === 'own-login'
+                  ? translate('newTabMenu.account.ownLogin', 'Own login')
+                  : translate('newTabMenu.account.hostLogin', 'Host login')}
+              </span>
+            ) : null}
             {showsDefaultAgentShortcut ? (
               <DropdownMenuShortcut>{newAgentShortcut}</DropdownMenuShortcut>
             ) : null}
           </DropdownMenuItem>
+        )
+        if (account?.kind !== 'picker' || !agentAccounts) {
+          return launchItem
+        }
+        // Why two targets: the agent name launches in one click; the account beside it opens the picker.
+        return (
+          <div key={agent} className="flex items-center">
+            {launchItem}
+            <NewTabAgentAccountSubmenu
+              provider={account.provider}
+              ariaLabel={translate('newTabMenu.account.choose', 'Choose the {{value}} account', {
+                value: label
+              })}
+              triggerLabel={agentAccounts.labelOf(account.provider, account.checkedId)}
+              rows={account.rows}
+              checkedId={account.checkedId}
+              labelOf={(row) => agentAccounts.labelOf(account.provider, row.id)}
+              onPick={(accountId) => runLaunch(agent, { provider: account.provider, accountId })}
+            />
+          </div>
         )
       })}
       <DropdownMenuItem

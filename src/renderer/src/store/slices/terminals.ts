@@ -582,6 +582,7 @@ export type TerminalSlice = {
       /** Launch-scoped Claude account override (transcript-owning universe on
        *  resume). Null forces the shared home; undefined keeps the worktree pin. */
       claudeAccountId?: string | null
+      codexAccountId?: string
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>
       /** Initial prompt-start status for agents that lack native prompt hooks. */
@@ -768,6 +769,7 @@ export type TerminalSlice = {
       launchAgent?: TuiAgent
       agentArgsOverride?: string | null
       claudeAccountId?: string | null
+      codexAccountId?: string
       draftPrompt?: string
       sessionOptions?: Record<string, SessionOptionValue>
       initialAgentStatus?: { agent: TuiAgent; prompt: string }
@@ -789,6 +791,7 @@ export type TerminalSlice = {
     launchAgent?: TuiAgent
     agentArgsOverride?: string | null
     claudeAccountId?: string | null
+    codexAccountId?: string
     draftPrompt?: string
     sessionOptions?: Record<string, SessionOptionValue>
     initialAgentStatus?: { agent: TuiAgent; prompt: string }

@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
+import { TAB_NARROW_CLOSE_CLASSES } from './tab-width-rules'
 
 export function EditorFileTabCloseButton({
   fileIsDirty,
@@ -22,7 +23,7 @@ export function EditorFileTabCloseButton({
     <Tooltip>
       <TooltipTrigger asChild>
         <button
-          className={`flex items-center justify-center w-4 h-4 rounded-sm ${
+          className={`flex items-center justify-center w-4 h-4 rounded-sm ${TAB_NARROW_CLOSE_CLASSES} ${
             fileIsDirty
               ? 'hidden group-hover:flex text-muted-foreground hover:text-foreground hover:bg-muted'
               : showsSelectionChrome

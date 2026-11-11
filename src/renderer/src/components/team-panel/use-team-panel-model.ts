@@ -10,6 +10,7 @@ import {
 } from '@/components/game-inbox/use-other-game-inbox-groups'
 import type {
   TeamMemberCard,
+  TeamPanelGameModel,
   TeamPanelModel,
   TeamSection
 } from '../../../../shared/team-panel-model-types'
@@ -18,7 +19,9 @@ import {
   readTeamLeadRoster,
   readTeamLeadState,
   readTeamOwnerQuestions,
-  readTeamXp
+  readTeamXp,
+  type TeamLeadCaller,
+  type TeamLeadRoster
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
 import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
@@ -62,17 +65,23 @@ function worktreeIdOfTab(tabId: string): string | null {
   return null
 }
 
+/** The live lead among a project's workspaces, found as the panel finds it; the + menu reuses it (ORCA-717). */
+export const teamLeadCallerOf = (
+  { leads, restoring }: TeamLeadRoster,
+  repoWorktreeIds: ReadonlySet<string>
+): TeamLeadCaller | 'restoring' | null =>
+  findTeamLeadCaller({
+    leads,
+    restoring,
+    entries: useAppStore.getState().agentStatusByPaneKey,
+    worktreeIdOfTab,
+    repoWorktreeIds
+  })
+
 const poller = createTeamPanelModelPoller(
   {
     readLeads: readTeamLeadRoster,
-    findCaller: ({ leads, restoring }, scope) =>
-      findTeamLeadCaller({
-        leads,
-        restoring,
-        entries: useAppStore.getState().agentStatusByPaneKey,
-        worktreeIdOfTab,
-        repoWorktreeIds: scope.worktreeIds
-      }),
+    findCaller: (roster, scope) => teamLeadCallerOf(roster, scope.worktreeIds),
     // Why: the scene reads its art from the same host and lead caller as game.state (ORCA-1150).
     readState: (target, caller) => {
       const { worktreeId, terminalHandle } = caller
@@ -209,6 +218,22 @@ export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
         ? 'solo'
         : null
   )
+}
+
+/** The team the panel last read when it is `repoId`'s, for the + menu; never polls (ORCA-717). */
+export function useTeamPanelGame(repoId: string | null): TeamPanelGameModel | null {
+  return useTeamPanelModelStore((s) =>
+    s.source.section.kind === 'ready' &&
+    s.source.section.value.kind === 'team' &&
+    s.source.section.value.repoId === repoId
+      ? s.source.section.value
+      : null
+  )
+}
+
+/** The members the last model read, for the + menu's in-use tags; never polls (ORCA-717). */
+export function useTeamPanelMembers(): readonly TeamMemberCard[] {
+  return useTeamPanelModelStore((s) => membersOf(s.source))
 }
 
 /** The member whose pane is in this terminal tab, from the last model the panel read; never polls. */

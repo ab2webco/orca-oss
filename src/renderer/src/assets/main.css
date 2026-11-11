@@ -859,6 +859,15 @@ html.native-shell .app-layout {
   background: var(--bg-titlebar, var(--card));
 }
 
+/* Why: in a phone-width window the floating name left the tab strip no room for its +, and Back/Forward
+   left the tab a sliver showing only its × (ORCA-717); both stay on their shortcuts. */
+@media (max-width: 480px) {
+  .titlebar-left-floating .titlebar-app-name,
+  .titlebar-left-floating .titlebar-history {
+    display: none;
+  }
+}
+
 .titlebar-traffic-light-pad {
   width: calc(80px / var(--ui-zoom-factor, 1));
   flex-shrink: 0;

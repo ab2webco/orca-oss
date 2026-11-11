@@ -91,6 +91,15 @@ export function stubQuickLaunchButton(): Record<string, unknown> {
   }
 }
 
+// Why the terminal rows still render: these suites read the shell items inside them.
+export function stubNewTabMenuSections(): Record<string, unknown> {
+  return {
+    NewTabMenuSections: function NewTabMenuSections({ children }: { children: unknown }) {
+      return children
+    }
+  }
+}
+
 export function stubShellIcons(): Record<string, unknown> {
   return {
     ShellIcon: function ShellIcon() {
