@@ -91,6 +91,14 @@ export function stubQuickLaunchButton(): Record<string, unknown> {
   }
 }
 
+export function stubNewTabAgentMenuItems(): Record<string, unknown> {
+  return {
+    NewTabAgentMenuItems: function NewTabAgentMenuItems() {
+      return null
+    }
+  }
+}
+
 export function stubShellIcons(): Record<string, unknown> {
   return {
     ShellIcon: function ShellIcon() {
