@@ -72,11 +72,15 @@ function MemoryBar({
   )
 }
 
+// Why not the shown name: it is translated, and E2E and React need an id that stays put.
+const machineId = (host: TeamMachine['host']): string =>
+  host.kind === 'local' ? 'local' : host.name
+
 function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
   const tone = teamStatusTone(machine.status)
   return (
     <div
-      data-team-machine={teamHostText(machine.host)}
+      data-team-machine={machineId(machine.host)}
       className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5 last:border-b-0"
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -116,7 +120,7 @@ export function TeamPanelMachinesTab({
   return (
     <div className={cn('flex flex-col pt-1.5', { 'pb-3': !alone })}>
       {value.map((machine) => (
-        <MachineRow key={teamHostText(machine.host)} machine={machine} />
+        <MachineRow key={machineId(machine.host)} machine={machine} />
       ))}
       {alone ? <TeamPanelMessageState {...teamMachinesAloneCopy()} /> : null}
     </div>

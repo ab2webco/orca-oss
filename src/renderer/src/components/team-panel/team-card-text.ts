@@ -12,6 +12,7 @@ import type {
   TeamStatus,
   TeamTicket
 } from '../../../../shared/team-panel-model-types'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 
 const TONE: Record<TeamStatus, StatusTone> = {
   attention: 'attention',
@@ -145,7 +146,7 @@ export function teamModelText(model: TeamModel | null): string | null {
 }
 
 export function teamHostText(host: TeamHost): string {
-  return host.kind === 'local' ? translate('teamPanel.host.local', 'local') : host.name
+  return host.kind === 'local' ? localHostDisplayLabel() : host.name
 }
 
 /** The PR chip's second half; null when there is nothing to say about its checks. */

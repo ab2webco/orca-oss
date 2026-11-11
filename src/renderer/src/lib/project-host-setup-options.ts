@@ -1,5 +1,4 @@
 import {
-  getExecutionHostLabel,
   isRuntimeOwnedSshTargetId,
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
@@ -13,6 +12,7 @@ import {
 } from '../../../shared/protocol-version'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
+import { hostDisplayLabel } from './local-host-display-label'
 
 export type ProjectHostSetupOption =
   | {
@@ -134,7 +134,7 @@ function buildReadySetupOptions({
       projectId: setup.projectId,
       hostId: setup.hostId,
       repoId: setup.repoId,
-      label: hostById.get(setup.hostId)?.label || getExecutionHostLabel(setup.hostId),
+      label: hostById.get(setup.hostId)?.label || hostDisplayLabel(setup.hostId),
       detail: setup.displayName,
       path: setup.path
     }))
@@ -179,7 +179,7 @@ function buildNeedsSetupOptions({
         kind: 'needs-setup' as const,
         projectId,
         hostId: host.id,
-        label: host.label || getExecutionHostLabel(host.id),
+        label: host.label || hostDisplayLabel(host.id),
         detail: availability.isAvailable
           ? pendingSetup
             ? getPendingSetupDetail(pendingSetup)

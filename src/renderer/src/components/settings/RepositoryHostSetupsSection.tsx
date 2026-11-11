@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import {
-  getExecutionHostLabel,
   parseExecutionHostId,
   toRuntimeExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
-import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -30,6 +28,7 @@ import {
   isConnectedRuntimeHostState,
   runtimeHostConnectionState
 } from '@/runtime/runtime-host-connection-state'
+import { buildHostDisplayRegistry, hostDisplayLabel } from '../../lib/local-host-display-label'
 
 type RepositoryHostSetupsSectionProps = {
   repo: Repo
@@ -83,7 +82,7 @@ export function RepositoryHostSetupsSection({
   const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   const hostOptions = useMemo(
     () =>
-      buildExecutionHostRegistry({
+      buildHostDisplayRegistry({
         repos,
         settings,
         hostSource: 'configured-only',
@@ -198,7 +197,7 @@ export function RepositoryHostSetupsSection({
                     <SelectItem key={setup.id} value={setup.id}>
                       <span className="block min-w-0 truncate">
                         {hostOptionById.get(setup.executionHostId ?? setup.hostId)?.label ??
-                          getExecutionHostLabel(setup.executionHostId ?? setup.hostId)}
+                          hostDisplayLabel(setup.executionHostId ?? setup.hostId)}
                       </span>
                     </SelectItem>
                   ))}
@@ -240,7 +239,7 @@ export function RepositoryHostSetupsSection({
             : null
           const runtimeOwnerHostLabel = runtimeOwnerHostId
             ? (hostOptionById.get(runtimeOwnerHostId)?.label ??
-              getExecutionHostLabel(runtimeOwnerHostId))
+              hostDisplayLabel(runtimeOwnerHostId))
             : ''
           const nestedSshStatus =
             runtimeOwnerEnvironmentId && executionHost?.kind === 'ssh'
@@ -299,10 +298,10 @@ export function RepositoryHostSetupsSection({
                       executionHost.targetId
                     ),
                     value1:
-                      hostOptionById.get(setup.hostId)?.label ?? getExecutionHostLabel(setup.hostId)
+                      hostOptionById.get(setup.hostId)?.label ?? hostDisplayLabel(setup.hostId)
                   }
                 )
-              : (hostOptionById.get(setup.hostId)?.label ?? getExecutionHostLabel(setup.hostId))
+              : (hostOptionById.get(setup.hostId)?.label ?? hostDisplayLabel(setup.hostId))
           const isCurrentSetup = setup.id === selectedProjectHostSetup?.id
           const canOpenSetup = setup.repoId.trim().length > 0
           const canRemoveSetup = !canOpenSetup && deletingSetupId !== setup.id

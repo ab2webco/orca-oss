@@ -6310,7 +6310,6 @@
           "8f22b7580d": "Profile \"{{value0}}\" created.",
           "8481ee0331": "New Browser Profile",
           "c0f85056d9": "Browser profiles on this Orca Lab server.",
-          "86b7c83fee": "This computer",
           "6480776a03": "Browser profiles for the selected host.",
           "5e19a692f7": "Host",
           "6f2584b39e": "Add Profile",
@@ -16572,6 +16571,9 @@
     }
   },
   "components": {
+    "executionHost": {
+      "thisComputer": "This computer"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",
@@ -17321,9 +17323,6 @@
       "tests": "Testing",
       "pr": "In PR",
       "merge": "Merging"
-    },
-    "host": {
-      "local": "local"
     },
     "card": {
       "merged": "Merged",

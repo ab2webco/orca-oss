@@ -22,11 +22,7 @@ import { cn } from '@/lib/utils'
 import type { Automation, AutomationRun } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import { formatAutomationSchedule } from '../../../../shared/automation-schedules'
-import {
-  getExecutionHostLabel,
-  getLocalExecutionHostLabel,
-  getRepoExecutionHostId
-} from '../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { SshConnectionState } from '../../../../shared/ssh-types'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -49,6 +45,7 @@ import {
 import { isPortaledRowMenuClick, isRowActivationKey } from './automation-list-row-interaction'
 import { AutomationListStatusCell } from './AutomationListStatusCell'
 import { translate } from '@/i18n/i18n'
+import { hostDisplayLabel, localHostDisplayLabel } from '../../lib/local-host-display-label'
 
 export function AutomationListLocalRows({
   automations,
@@ -140,8 +137,8 @@ export function AutomationListLocalRows({
           automation.runContext?.hostId ??
           (automationRepo ? getRepoExecutionHostId(automationRepo) : null)
         const hostLabel = hostId
-          ? (hostLabelById.get(hostId) ?? getExecutionHostLabel(hostId))
-          : getLocalExecutionHostLabel()
+          ? (hostLabelById.get(hostId) ?? hostDisplayLabel(hostId))
+          : localHostDisplayLabel()
         const lastRun = lastRunByAutomationId.get(automation.id)
         const lastRunSnapshot = getLocalAutomationLastRunSnapshot(automation, lastRun)
         const lastRunCost =

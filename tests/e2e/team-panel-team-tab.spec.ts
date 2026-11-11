@@ -379,7 +379,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
     )
     await expect(header).toBeVisible()
     await expect(orcaPage.locator('[data-team-member-header]:visible')).toHaveCount(1)
-    await expect(header).toContainText('local')
+    await expect(header).toContainText('This computer')
     expect((await header.innerText()).match(/ORCA-14/g)).toHaveLength(1)
     await expect(panel).toBeVisible()
     for (const language of ['en', 'es'] as const) {

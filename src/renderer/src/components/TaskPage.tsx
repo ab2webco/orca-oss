@@ -189,10 +189,7 @@ import PullRequestPage from '@/components/PullRequestPage'
 import GitLabItemDialog from '@/components/GitLabItemDialog'
 import ProjectViewWrapper from '@/components/github-project/ProjectViewWrapper'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
-import {
-  buildExecutionHostRegistry,
-  type ExecutionHostRegistryEntry
-} from '../../../shared/execution-host-registry'
+import type { ExecutionHostRegistryEntry } from '../../../shared/execution-host-registry'
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
 import LinearIssueWorkspace from '@/components/LinearIssueWorkspace'
 import {
@@ -518,6 +515,7 @@ import {
 } from '@/components/task-page-jira-create-fields'
 import { formatPRDelta } from '@/components/task-page-pr-delta-summary'
 import { getPageNumbers } from '@/components/task-page-pagination-page-numbers'
+import { buildHostDisplayRegistry } from '../lib/local-host-display-label'
 
 function isGitLabMRFilter(value: GitLabTaskFilter | GitLabIssueFilter): value is GitLabTaskFilter {
   return value === 'opened' || value === 'merged' || value === 'closed' || value === 'all'
@@ -3348,7 +3346,7 @@ export default function TaskPage(): React.JSX.Element {
   const hostRegistryById = useMemo(
     () =>
       new Map(
-        buildExecutionHostRegistry({
+        buildHostDisplayRegistry({
           repos,
           settings,
           sshTargetLabels,

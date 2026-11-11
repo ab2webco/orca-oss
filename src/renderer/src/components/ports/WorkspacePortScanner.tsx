@@ -14,7 +14,7 @@ import {
   type PortScanDebounceState
 } from '@/lib/workspace-port-scan-debounce'
 import type { WorkspacePortScanResult } from '../../../../shared/workspace-ports'
-import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
+import { buildHostDisplayRegistry } from '../../lib/local-host-display-label'
 
 const WORKSPACE_PORT_SCAN_INTERVAL_MS = 30_000
 const WORKSPACE_PORT_ADVERTISED_URL_SETTLE_MS = 1_000
@@ -54,7 +54,7 @@ export function WorkspacePortScanner({ enabled = true }: { enabled?: boolean }):
   const scanKey = workspacePortScanKeyForTarget(runtimeTarget)
   const scanTargets = useMemo(
     () =>
-      buildExecutionHostRegistry({ repos, settings })
+      buildHostDisplayRegistry({ repos, settings })
         .map((host) => runtimeTargetForExecutionHostId(host.id))
         .filter((target): target is NonNullable<typeof target> => target !== null),
     [repos, settings]

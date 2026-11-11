@@ -3,9 +3,9 @@ import {
   getTaskSourceAvailabilityNotice,
   getTaskSourceContextSummary
 } from './task-source-context-summary'
-import { getExecutionHostLabel } from '../../../shared/execution-host'
+import { hostDisplayLabel } from '../lib/local-host-display-label'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 describe('task source context summary', () => {
   it('shows provider, host, and provider identity for a single repo-backed source', () => {

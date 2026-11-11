@@ -6,15 +6,14 @@ import {
   LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
-import {
-  buildExecutionHostRegistry,
-  type ExecutionHostHealth
-} from '../../../../shared/execution-host-registry'
+
+import type { ExecutionHostHealth } from '../../../../shared/execution-host-registry'
 import type { RuntimeCompatVerdict } from '../../../../shared/protocol-compat'
 import type { SshConnectionState, SshConnectionStatus } from '../../../../shared/ssh-types'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import { translate } from '@/i18n/i18n'
+import { buildHostDisplayRegistry } from '../../lib/local-host-display-label'
 
 export type SidebarHostOption = {
   id: ExecutionHostId
@@ -65,7 +64,7 @@ export function buildSidebarHostOptions(args: {
   const activeRuntimeHostId = args.settings?.activeRuntimeEnvironmentId?.trim()
     ? (`runtime:${encodeURIComponent(args.settings.activeRuntimeEnvironmentId.trim())}` as const)
     : null
-  return buildExecutionHostRegistry({
+  return buildHostDisplayRegistry({
     repos: args.repos,
     settings: args.settings,
     sshTargetLabels: args.sshTargetLabels,

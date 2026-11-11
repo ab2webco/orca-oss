@@ -31,12 +31,13 @@ import {
   type AiVaultScope,
   type AiVaultSort
 } from '../../../../shared/ai-vault-types'
-import { getExecutionHostLabel, type ExecutionHostScope } from '../../../../shared/execution-host'
+import type { ExecutionHostScope } from '../../../../shared/execution-host'
 import { agentLabel, type AiVaultSessionGroup } from './ai-vault-session-filters'
 import { translate } from '@/i18n/i18n'
 import type { AiVaultHostScopeOption } from './ai-vault-host-scope'
 import { AiVaultSessionLimitMenu } from './AiVaultSessionLimitMenu'
 import type { AiVaultSessionLimit } from './ai-vault-session-limit'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 const VAULT_HEADER_CONTROL_CLASS = 'size-6 shrink-0'
 
@@ -164,7 +165,7 @@ export function VaultHostScopeMenu({
   onExecutionHostScopeChange: (scope: ExecutionHostScope) => void
 }): React.JSX.Element {
   const selectedOption = hostOptions.find((option) => option.id === executionHostScope)
-  const label = selectedOption?.label ?? getExecutionHostLabel(executionHostScope)
+  const label = selectedOption?.label ?? hostDisplayLabel(executionHostScope)
 
   return (
     <DropdownMenu>
