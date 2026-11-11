@@ -8,6 +8,7 @@ import {
   type TeamSceneWorld
 } from './team-scene-director'
 import { teamSceneActors } from './team-scene-actors'
+import { teamSceneLeadAttends } from './team-scene-lead-rounds'
 import type {
   TeamSceneActivity,
   TeamSceneActor,
@@ -24,7 +25,8 @@ const member = (key: string, activity: TeamSceneActivity = 'working'): TeamScene
   characterKey: null,
   activity,
   reportId: null,
-  mergedPr: null
+  mergedPr: null,
+  site: { stage: 0, broken: false }
 })
 const input = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
   lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
@@ -123,7 +125,7 @@ describe('team scene lead rounds', () => {
   it('walks to a member who needs you and stays with it while it asks', () => {
     const world = scene([member('a'), member('b', 'needsYou')])
     const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
-    expect(run(world, 15, () => nearB() && !leadWalking(world)).length).toBe(0)
+    expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
     expect(nearB()).toBe(true)
     expect(handsTo(run(world, 10))).toEqual([])
     expect(nearB()).toBe(true)
@@ -156,5 +158,34 @@ describe('team scene lead rounds', () => {
     settleTeamScene(world)
     expect(actor(world, 'lead').x).toBe(home)
     expect(actor(world, 'lead').carrying).toBe(false)
+  })
+})
+
+// Why: its bubble may tail behind the asker's tag on the way there too, or it vanishes mid-walk
+// (merge-queue run 42982825235, 'bubbles shown: none' beside ORCA-14's tag).
+describe('teamSceneLeadAttends', () => {
+  it('holds from the moment the lead sets out to a member who asks until it is answered', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a', 'needsYou')]))
+    stepTeamScene(world, DT, { width: WIDTH })
+    expect(world.rounds.stage).toBe('toMember')
+    expect(teamSceneLeadAttends(world)).toBe(true)
+    for (let t = 0; t < 20; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+    }
+    expect(world.rounds.stage).toBe('atMember')
+    expect(teamSceneLeadAttends(world)).toBe(true)
+    applyTeamSceneInput(world, input([member('a')]))
+    stepTeamScene(world, DT, { width: WIDTH })
+    expect(teamSceneLeadAttends(world)).toBe(false)
+  })
+
+  it('never holds on a round that hands out work', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a')]))
+    for (let t = 0; t < 4; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      expect(teamSceneLeadAttends(world)).toBe(false)
+    }
   })
 })

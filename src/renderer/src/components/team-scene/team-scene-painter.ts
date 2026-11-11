@@ -3,6 +3,7 @@ import type {
   TeamSceneEffect,
   TeamSceneSpot
 } from '../../../../shared/team-scene/team-scene-types'
+import type { TeamSceneSiteView } from '../../../../shared/team-scene/team-scene-sites'
 
 export type TeamScenePortraitSubject = Pick<
   TeamSceneActor,
@@ -22,6 +23,10 @@ export type TeamSceneFrame = {
   effects: TeamSceneEffect[]
   overflow: number
   stations: TeamSceneSpot[]
+  /** Each seat's build at its real stage; a style without builds draws its stations instead. */
+  sites: TeamSceneSiteView[]
+  /** Merged work kept on stage, oldest first. */
+  trophies: { key: string; name: string }[]
 }
 
 /** A scene style: Figures, Office or Pixel. `dispose` drops its cached backdrops and sprites. */

@@ -34,7 +34,9 @@ const frame = (actors: TeamSceneActor[]): TeamSceneFrame => ({
   actors,
   effects: [],
   overflow: 0,
-  stations: [SEAT]
+  stations: [SEAT],
+  sites: [],
+  trophies: []
 })
 const screenOf = (actors: TeamSceneActor[]): unknown[] => {
   const r = recordingContext()

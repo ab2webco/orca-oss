@@ -4,9 +4,15 @@ import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/h
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
 import {
   applyTeamSceneInput,
-  createTeamSceneWorld
+  createTeamSceneWorld,
+  stepTeamScene
 } from '../../../../shared/team-scene/team-scene-director'
-import { layoutTeamSceneBubbles, type TeamSceneBubbleBox } from './team-scene-bubble-layout'
+import {
+  layoutTeamSceneBubbles,
+  teamSceneCellUnder,
+  teamSceneTailRunsOf,
+  type TeamSceneBubbleBox
+} from './team-scene-bubble-layout'
 import { createImagePainter } from './team-scene-image-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
@@ -43,6 +49,15 @@ const SPEAKERS = (() => {
   const spot = (role: 'lead' | 'advisor') => teamSceneActors(world).find((a) => a.role === role)!
   return { lead: spot('lead'), advisor: spot('advisor') }
 })()
+const ASKER_INPUT = {
+  key: 'm',
+  name: 'ORCA-14',
+  characterKey: null,
+  activity: 'needsYou',
+  reportId: null,
+  mergedPr: null,
+  site: { stage: 0, broken: false }
+} as const
 // The member who asks, and its tag as TeamSceneCanvas places it: 56 px wide, 18 tall, centred
 // 38 px over the head and no nearer the edge than 32 px.
 const ASKER = (() => {
@@ -50,16 +65,7 @@ const ASKER = (() => {
   applyTeamSceneInput(world, {
     lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
     advisor: { line: null },
-    members: [
-      {
-        key: 'm',
-        name: 'ORCA-14',
-        characterKey: null,
-        activity: 'needsYou',
-        reportId: null,
-        mergedPr: null
-      }
-    ]
+    members: [{ ...ASKER_INPUT }]
   })
   return teamSceneActors(world).find((a) => a.role === 'member')!
 })()
@@ -215,6 +221,57 @@ describe('layoutTeamSceneBubbles', () => {
     }
   })
 
+  // Why: the lead stays beside a member who needs you (lead rounds), right under that member's tag.
+  it("shows the lead's bubble while it stands by the asking member, on every stage", () => {
+    for (const stage of STAGES) {
+      for (const width of STAGE_WIDTHS) {
+        const world = createTeamSceneWorld()
+        applyTeamSceneInput(world, {
+          lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+          advisor: null,
+          members: [{ ...ASKER_INPUT }]
+        })
+        for (let t = 0; t < 20; t += 1 / 30) {
+          stepTeamScene(world, 1 / 30, { width })
+        }
+        expect(world.rounds.stage, `${stage.style} ${width}`).toBe('atMember')
+        const lead = teamSceneActors(world).find((a) => a.role === 'lead')!
+        const anchor = {
+          x: lead.x * width,
+          top: stage.painter.headTop(lead.depth, stage.painter.height)
+        }
+        const tag = tagOn(stage, width)
+        const scene = { width, height: stage.painter.height }
+        const opts = { beside: stage.beside, obstacles: [tag] }
+        // Why every size: the lead's line runs from a short step to two lines at the cap.
+        for (const size of [60, 120, 170].flatMap((w) => stage.heights.map((h) => ({ w, h })))) {
+          // Why a one-line size: with no room for two, the attending lead's line clamps to one.
+          const oneLine = { width: size.w, height: stage.heights[0]! }
+          const request = { key: 'lead', anchor, width: size.w, height: size.h, oneLine }
+          const where = `${stage.style} ${width} px ${size.w}x${size.h}`
+          const boxes = layoutTeamSceneBubbles([{ ...request, attending: true }], scene, opts)
+          expect(
+            boxes.map((b) => b.key),
+            where
+          ).toEqual(['lead'])
+          // Clamped only where two lines found no spot.
+          if (boxes[0]!.clamped) {
+            expect(boxes[0]!.height, where).toBe(oneLine.height)
+            const unclamped = { ...request, attending: true, oneLine: undefined }
+            expect(layoutTeamSceneBubbles([unclamped], scene, opts), where).toEqual([])
+          }
+          // The tail may pass behind the tag; the bubble itself never covers it.
+          expect(overlaps(boxes[0]!, { ...tag, key: 'tag', tailX: 0 }), where).toBe(false)
+          // Behind a tag only as a last resort: where a clear spot exists, it takes that one.
+          const clear = layoutTeamSceneBubbles([request], scene, opts)
+          if (clear.length > 0) {
+            expect(boxes, where).toEqual(clear)
+          }
+        }
+      }
+    }
+  })
+
   // ORCA-1139 criterion 8, lead decision A: on the 219 px stage the tag leaves room for one bubble.
   it("gives the lead's bubble the room when only one fits beside a tag, and both come back without it", () => {
     const cases = [
@@ -311,5 +368,33 @@ describe('layoutTeamSceneBubbles', () => {
     // A narrowed cloud wraps one more line, and it still clears its speaker's head.
     expect(lead!.height).toBeGreaterThan(41)
     expect(lead!.top + lead!.height).toBeLessThanOrEqual(84)
+  })
+})
+
+// Why: decision A lets an attending lead's tail run behind the asker's tag, so none of it may be
+// drawn over the tag (run on 768 Pixel: 'lead cloud paints 5 cells over the tag').
+describe('a tail behind a tag', () => {
+  const box = { key: 'lead', left: 10, top: 0, width: 80, height: 30, tailX: 30 }
+  const tag = { left: 20, top: 40, width: 56, height: 18 }
+
+  it('draws the tail only above and below the tag it passes behind', () => {
+    // From the bubble's bottom (30) to the head (90), with the tag between 40 and 58, and a px clear
+    // of it each side: the tag is measured where the tail is drawn, a fraction of a px apart.
+    expect(teamSceneTailRunsOf(box, 90, [tag])).toEqual([
+      { from: 30, to: 39 },
+      { from: 59, to: 90 }
+    ])
+    expect(teamSceneTailRunsOf(box, 90, [])).toEqual([{ from: 30, to: 90 }])
+    expect(teamSceneTailRunsOf({ ...box, tailX: 70 }, 90, [{ ...tag, width: 10 }])).toEqual([
+      { from: 30, to: 90 }
+    ])
+  })
+
+  it('tells which scene cells lie under a tag, so a cloud leaves them unpainted', () => {
+    expect(teamSceneCellUnder({ x: 40, y: 45, size: 3 }, [tag])).toBe(true)
+    expect(teamSceneCellUnder({ x: 40, y: 36, size: 3 }, [tag])).toBe(false)
+    // A cell that only touches the tag's edge does not cover it.
+    expect(teamSceneCellUnder({ x: 19, y: 45, size: 2 }, [tag])).toBe(true)
+    expect(teamSceneCellUnder({ x: 18, y: 45, size: 2 }, [tag])).toBe(false)
   })
 })

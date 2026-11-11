@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -9,7 +9,8 @@ const script = resolve(import.meta.dirname, 'ci-apt.sh')
 function runApt(
   result,
   args = ['install', '-y', 'build-essential', 'python3'],
-  timeoutOverride = ''
+  timeoutOverride = '',
+  installed = ''
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-ci-apt-'))
   const makeCommand = (name, body) =>
@@ -17,6 +18,10 @@ function runApt(
   makeCommand('sudo', 'exec "$@"')
   makeCommand('timeout', 'echo "$*" >> "$CI_APT_TIMEOUT_LOG"; shift 3; exec "$@"')
   makeCommand('sleep', 'exit 0')
+  makeCommand(
+    'dpkg-query',
+    `for installed in $CI_APT_INSTALLED; do [ "$installed" = "\${@: -1}" ] && { echo 'install ok installed'; exit 0; }; done; exit 1`
+  )
   makeCommand(
     'apt-get',
     `echo "$*" >> "$CI_APT_CALL_LOG"
@@ -28,6 +33,9 @@ case "$CI_APT_RESULT" in
   fail) exit 100 ;;
 esac`
   )
+  const mirrorList = join(dir, 'etc/apt/apt-mirrors.txt')
+  mkdirSync(join(dir, 'etc/apt'), { recursive: true })
+  writeFileSync(mirrorList, 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n')
   const callLog = join(dir, 'calls')
   const timeoutLog = join(dir, 'timeouts')
   const output = spawnSync('bash', [script, ...args], {
@@ -38,7 +46,9 @@ esac`
       CI_APT_RESULT: result,
       CI_APT_CALL_LOG: callLog,
       CI_APT_TIMEOUT_LOG: timeoutLog,
-      CI_APT_TIMEOUT: timeoutOverride
+      CI_APT_TIMEOUT: timeoutOverride,
+      CI_APT_ROOT: dir,
+      CI_APT_INSTALLED: installed
     }
   })
   const lines = (path) => {
@@ -48,7 +58,12 @@ esac`
       return []
     }
   }
-  return { ...output, calls: lines(callLog), timeouts: lines(timeoutLog) }
+  return {
+    ...output,
+    calls: lines(callLog),
+    timeouts: lines(timeoutLog),
+    mirrors: readFileSync(mirrorList, 'utf8')
+  }
 }
 
 describe('bounded CI apt', () => {
@@ -84,6 +99,59 @@ describe('bounded CI apt', () => {
     expect(result.calls).toHaveLength(2)
   })
 
+  // Why (2026-11-11): runners could not resolve *.ubuntu.com, so a retry against the same
+  // mirror list timed out again; the retry goes to a mirror under another domain.
+  it('retries on the fallback mirror after a failed first attempt', () => {
+    const result = runApt('fail-once', ['update'])
+    expect(result.mirrors).toBe('http://mirrors.edge.kernel.org/ubuntu/\tpriority:1\n')
+    expect(result.stderr).toContain('apt-get update failed (exit 100); retrying once')
+  })
+
+  it('keeps the image mirror when the first attempt succeeds', () => {
+    const result = runApt('success', ['update'])
+    expect(result.mirrors).toBe('http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n')
+  })
+
+  it('refreshes the package lists from the fallback before retrying an install', () => {
+    const result = runApt('fail-once', ['install', '-y', 'zsh'])
+    expect(result.status).toBe(0)
+    expect(result.calls.map((call) => call.split(' ').at(-1))).toEqual(['zsh', 'update', 'zsh'])
+    expect(result.timeouts[1]).toContain('--kill-after=10s 120s apt-get')
+  })
+
+  // Why (2026-11-11): build e2e app timed out on apt for packages the image already ships.
+  it('skips apt when every requested package is already installed', () => {
+    const result = runApt(
+      'fail',
+      ['install', '-y', 'build-essential', 'python3'],
+      '',
+      'build-essential python3'
+    )
+    expect(result.status).toBe(0)
+    expect(result.calls).toEqual([])
+    expect(result.stderr).toContain('already installed: build-essential python3')
+  })
+
+  it('reads package names past apt options', () => {
+    const result = runApt(
+      'fail',
+      ['install', '-y', '-o', 'Dir::Cache::Archives=/tmp/a/', '--no-install-recommends', 'zsh'],
+      '',
+      'zsh'
+    )
+    expect(result.calls).toEqual([])
+  })
+
+  it('installs when any requested package is missing', () => {
+    const result = runApt('success', ['install', '-y', 'zsh', 'fish'], '', 'zsh')
+    expect(result.calls).toHaveLength(1)
+  })
+
+  it('still resolves archive URIs for installed packages', () => {
+    const result = runApt('success', ['install', '--print-uris', '-qq', '-y', 'zsh'], '', 'zsh')
+    expect(result.calls).toHaveLength(1)
+  })
+
   it('preserves stdout for ordinary installs', () => {
     const result = runApt('success', ['install', '-y', 'zsh'])
     expect(result.stdout).toBe('installed\n')
@@ -92,7 +160,7 @@ describe('bounded CI apt', () => {
   it('discards partial print-uris output from a failed attempt', () => {
     const result = runApt('partial-uris', ['install', '--print-uris', '-qq', '-y', 'zsh'])
     expect(result.status).toBe(0)
-    expect(result.calls).toHaveLength(2)
+    expect(result.calls).toHaveLength(3)
     expect(result.stdout).toBe('current.deb\n')
   })
 
@@ -106,6 +174,6 @@ describe('bounded CI apt', () => {
   it('preserves a non-timeout failure exit code', () => {
     const result = runApt('fail', ['install', '-y', 'zsh'])
     expect(result.status).toBe(100)
-    expect(result.calls).toHaveLength(2)
+    expect(result.calls).toHaveLength(3)
   })
 })
