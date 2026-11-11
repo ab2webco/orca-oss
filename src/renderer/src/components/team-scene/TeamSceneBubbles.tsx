@@ -13,6 +13,8 @@ export type TeamSceneSpeech = {
   align?: 'center' | 'end'
   /** Gives its spot up when only one bubble fits, as the advisor's does (its line stays in its card). */
   yields?: boolean
+  /** The lead by an asking member: its tail may pass behind that tag when nothing else fits. */
+  attending?: boolean
 }
 
 type Props = {
@@ -93,6 +95,7 @@ export function TeamSceneBubbles({
           anchor: s.anchor,
           align: s.align,
           yields: s.yields,
+          attending: s.attending,
           width: 0,
           height: 0
         }
@@ -105,7 +108,14 @@ export function TeamSceneBubbles({
       const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
       // Why restore: React skips a width equal to its last one, which would leave max-content.
       el.style.width = laid
-      return { key: s.key, anchor: s.anchor, align: s.align, yields: s.yields, ...size }
+      return {
+        key: s.key,
+        anchor: s.anchor,
+        align: s.align,
+        yields: s.yields,
+        attending: s.attending,
+        ...size
+      }
     })
     const laid = layoutTeamSceneBubbles(
       requests,

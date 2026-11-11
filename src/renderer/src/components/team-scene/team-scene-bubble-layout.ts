@@ -8,6 +8,8 @@ export type TeamSceneBubbleRequest = {
   align?: 'center' | 'end'
   /** Left out when that lets a bubble that does not yield show instead. */
   yields?: boolean
+  /** The lead standing by an asking member: its tail may pass behind a tag when nothing else fits. */
+  attending?: boolean
 }
 
 /** Something on stage a bubble must not cover, such as an asking member's tag. */
@@ -100,7 +102,7 @@ function placeBubbles(
       ...obstacles.map((o) => o.top - r.height - GAP)
     ]
     // Why climbing first: a bubble stepped aside stays low and can block the next one's tail.
-    const fit = lefts
+    const candidates = lefts
       .flatMap((at) =>
         tops.map(
           (top): Placed => ({
@@ -116,13 +118,15 @@ function placeBubbles(
           })
         )
       )
-      .find(
-        (c) =>
-          c.box.top >= 0 &&
-          c.box.tailX >= TAIL_INSET &&
-          c.box.tailX <= r.width - TAIL_INSET &&
-          clearOf(c, placed, obstacles)
+      .filter(
+        (c) => c.box.top >= 0 && c.box.tailX >= TAIL_INSET && c.box.tailX <= r.width - TAIL_INSET
       )
+    // Why behind a tag only as a last resort: the lead stands under the tag of the member it attends.
+    const fit =
+      candidates.find((c) => clearOf(c, placed, obstacles)) ??
+      (r.attending
+        ? candidates.find((c) => clearOf(c, placed, obstacles, { tailBehindTags: true }))
+        : undefined)
     if (fit) {
       placed.push(fit)
       continue
@@ -135,10 +139,15 @@ function placeBubbles(
   return placed.map((p) => p.box)
 }
 
-const clearOf = (c: Placed, placed: readonly Placed[], obstacles: readonly TeamSceneRect[]) =>
+const clearOf = (
+  c: Placed,
+  placed: readonly Placed[],
+  obstacles: readonly TeamSceneRect[],
+  { tailBehindTags = false } = {}
+) =>
   placed.every(
     (p) => !overlaps(c.box, p.box) && !tailCrosses(c, p.box) && !tailCrosses(p, c.box)
-  ) && obstacles.every((o) => !overlaps(c.box, o) && !tailCrosses(c, o))
+  ) && obstacles.every((o) => !overlaps(c.box, o) && (tailBehindTags || !tailCrosses(c, o)))
 
 /**
  * With no room to stack, the newcomer and the last bubble share a row, each as near its
