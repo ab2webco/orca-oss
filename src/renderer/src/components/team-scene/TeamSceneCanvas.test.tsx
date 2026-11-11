@@ -140,6 +140,27 @@ describe('TeamSceneCanvas', () => {
     expect(Math.abs(left() - before)).toBeGreaterThan(20)
   })
 
+  // Why: a spec that crops the lead must find it; on its rounds it leaves its spot (run 42982825235).
+  it('says where the lead stands, as a share of the stage, and follows it as it walks', () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const asking = input(['n'])
+    asking.members[0] = { ...asking.members[0]!, activity: 'needsYou' }
+    render(<TeamSceneCanvas input={asking} painter={painter().value} leadLine={null} />)
+    const leadX = () =>
+      Number(host.querySelector<HTMLElement>('[data-scene-lead-x]')?.dataset.sceneLeadX)
+    act(() => next?.(0))
+    expect(leadX()).toBeCloseTo(0.84, 1)
+    for (let now = 50; now < 8000; now += 50) {
+      act(() => next?.(now))
+    }
+    expect(leadX()).toBeLessThan(0.5)
+  })
+
   it('paints the settled end state once per change under reduced motion', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
