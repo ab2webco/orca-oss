@@ -378,10 +378,11 @@ describe('a tail behind a tag', () => {
   const tag = { left: 20, top: 40, width: 56, height: 18 }
 
   it('draws the tail only above and below the tag it passes behind', () => {
-    // From the bubble's bottom (30) to the head (90), with the tag between 40 and 58.
+    // From the bubble's bottom (30) to the head (90), with the tag between 40 and 58, and a px clear
+    // of it each side: the tag is measured where the tail is drawn, a fraction of a px apart.
     expect(teamSceneTailRunsOf(box, 90, [tag])).toEqual([
-      { from: 30, to: 40 },
-      { from: 58, to: 90 }
+      { from: 30, to: 39 },
+      { from: 59, to: 90 }
     ])
     expect(teamSceneTailRunsOf(box, 90, [])).toEqual([{ from: 30, to: 90 }])
     expect(teamSceneTailRunsOf({ ...box, tailX: 70 }, 90, [{ ...tag, width: 10 }])).toEqual([

@@ -38,6 +38,8 @@ const TAIL_INSET = 10
 const END_REACH = 14
 // A cloud narrowed to share a row may wrap one more line, up to its two-line clamp.
 const EXTRA_LINE = 13
+// How far a tail stops short of a tag it passes behind.
+const TAIL_CLEAR = 1
 
 const overlaps = (a: TeamSceneRect, b: TeamSceneRect): boolean =>
   a.left < b.left + b.width + GAP &&
@@ -234,9 +236,10 @@ export function teamSceneTailRunsOf(
   obstacles: readonly TeamSceneRect[]
 ): { from: number; to: number }[] {
   const x = box.left + box.tailX
+  // Why a px clear each side: the tag is measured where the tail is drawn, a fraction of a px apart.
   const cuts = obstacles
-    .filter((o) => x >= o.left && x <= o.left + o.width)
-    .map((o) => ({ from: o.top, to: o.top + o.height }))
+    .filter((o) => x >= o.left - TAIL_CLEAR && x <= o.left + o.width + TAIL_CLEAR)
+    .map((o) => ({ from: o.top - TAIL_CLEAR, to: o.top + o.height + TAIL_CLEAR }))
     .sort((a, b) => a.from - b.from)
   const runs: { from: number; to: number }[] = []
   let at = box.top + box.height
