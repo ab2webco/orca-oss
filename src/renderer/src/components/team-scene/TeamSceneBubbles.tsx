@@ -24,7 +24,7 @@ type Props = {
   speeches: TeamSceneSpeech[]
   width: number
   height: number
-  /** Pixel's scene pixel size: draw the game's thought cloud instead of the glass bubble. */
+  /** Pixel's scene pixel size: draw the game's thought cloud instead of the dark bubble. */
   cloudPixel?: number
   /** What no bubble may cover, such as an asking member's tag. */
   obstacles?: readonly TeamSceneRect[]
@@ -71,6 +71,7 @@ function PixelCloudCanvas({
   return (
     <canvas
       ref={ref}
+      aria-hidden="true"
       width={width}
       height={cloud.rows}
       className="absolute left-0 top-0 -z-10 [image-rendering:pixelated]"
@@ -79,7 +80,7 @@ function PixelCloudCanvas({
   )
 }
 
-/** Bubbles over the canvas tied to their speakers: glass with a hairline, or Pixel's cloud. */
+/** Bubbles over the canvas tied to their speakers: a dark card with a hairline, or Pixel's cloud. */
 export function TeamSceneBubbles({
   speeches,
   width,
@@ -166,11 +167,11 @@ export function TeamSceneBubbles({
               }
             }}
             data-scene-bubble={s.key}
-            // Why fixed glass: the scene sky is dark in both themes, so the bubble is too.
+            // Why fixed and solid: the scene sky is dark in both themes, so the bubble is too.
             className={
               cloudPixel
-                ? 'absolute isolate max-w-[170px] px-2 pb-3 pt-4 font-mono text-[10px] leading-tight text-[#23232b]'
-                : 'absolute max-w-[170px] rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-[10.5px] leading-snug text-white backdrop-blur-sm'
+                ? 'absolute isolate max-w-[170px] px-2 pb-3 pt-4 font-mono text-[10px] leading-tight text-scene-cloud-ink'
+                : 'absolute max-w-[170px] rounded-lg border border-white/15 bg-scene-bubble px-2 py-1 text-[10.5px] leading-snug text-white'
             }
             style={{
               left: box?.left ?? 0,
