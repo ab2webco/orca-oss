@@ -1,8 +1,10 @@
 import type { TeamSceneDesk } from '../../../../shared/team-scene/team-scene-desk'
 import { drawDeskScreen } from './team-scene-desk-screens'
+import { drawOfficeHoldScreen } from './team-scene-office-hold'
 import { drawOfficeVirus } from './team-scene-office-virus'
 import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import type {
+  TeamSceneHold,
   TeamScenePlay,
   TeamScenePose,
   TeamSceneSpot
@@ -13,8 +15,9 @@ import type {
 // 'game': a resting member plays a tiny runner on its own screen.
 // 'away': the member's session is gone or never started; dark, with a small warning mark.
 // 'desk': a working member's card says more than code: its plan, tests, checks, review or queue.
+// 'hold': the card says why the member cannot work: its limit, sleep, login, reach or launch.
 type ScreenRect = { x: number; y: number; width: number; height: number }
-type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game' | 'away' | 'desk'
+type ScreenState = 'code' | 'ask' | 'ok' | 'off' | 'fail' | 'game' | 'away' | 'desk' | 'hold'
 
 const BACKGROUND: Record<ScreenState, string> = {
   code: '#0f1826',
@@ -24,9 +27,13 @@ const BACKGROUND: Record<ScreenState, string> = {
   fail: '#2a1012',
   game: '#16112b',
   away: '#0a0c10',
-  desk: '#0f1826'
+  desk: '#0f1826',
+  hold: '#05060a'
 }
-const LINE: Record<Exclude<ScreenState, 'off' | 'fail' | 'game' | 'away' | 'desk'>, string> = {
+const LINE: Record<
+  Exclude<ScreenState, 'off' | 'fail' | 'game' | 'away' | 'desk' | 'hold'>,
+  string
+> = {
   code: '#7fb4ff',
   ask: '#ffd24a',
   ok: '#4ade80'
@@ -44,12 +51,22 @@ const SCREEN_OF: Partial<Record<TeamScenePose, ScreenState>> = {
 
 /** The screen of a desk whose worker holds `pose`; null when nobody sits there. */
 export function stationScreenStateOf(
-  worker: { pose: TeamScenePose; play?: TeamScenePlay; away?: true; desk?: TeamSceneDesk } | null,
+  worker: {
+    pose: TeamScenePose
+    play?: TeamScenePlay
+    away?: true
+    desk?: TeamSceneDesk
+    hold?: TeamSceneHold
+  } | null,
   failing = false
 ): ScreenState {
   // Why first: nobody is there to fix red CI, so the screen says the session is gone.
   if (worker?.away) {
     return 'away'
+  }
+  // Why before red CI: a held member cannot fix it, and its screen says why.
+  if (worker?.hold) {
+    return 'hold'
   }
   if (failing) {
     return 'fail'
@@ -110,7 +127,9 @@ export function drawStationScreen(
     attention = '#e5484d',
     virus = false,
     boot,
-    desk
+    desk,
+    hold,
+    risk = '#f5b342'
   }: {
     attention?: string
     /** Office's bug over a failing screen. */
@@ -119,6 +138,9 @@ export function drawStationScreen(
     boot?: number
     /** What a 'desk' screen shows. */
     desk?: TeamSceneDesk
+    /** What a 'hold' screen shows, and its risk colour for a limit. */
+    hold?: TeamSceneHold
+    risk?: string
   } = {}
 ): void {
   g.fillStyle = BACKGROUND[state]
@@ -135,6 +157,10 @@ export function drawStationScreen(
   }
   if (state === 'away') {
     drawAway(g, rect, attention)
+    return
+  }
+  if (state === 'hold' && hold) {
+    drawOfficeHoldScreen(g, rect, hold, t, { attention, risk })
     return
   }
   if (state === 'desk' && desk) {

@@ -294,3 +294,37 @@ describe('teamSceneInputOf and the desk', () => {
     expect(teamSceneActors(world).find((a) => a.key === 'plan')?.desk).toEqual({ kind: 'plan' })
   })
 })
+
+describe('teamSceneInputOf and why a member is held', () => {
+  it('names why each member cannot work, from its condition, and nothing for one that can', () => {
+    const conditions = [
+      'limited',
+      'paused',
+      'asleep',
+      'loggedOut',
+      'unreachable',
+      'queued',
+      'starting',
+      'working',
+      'idle',
+      'gone'
+    ] as const
+    const members = conditions.map((condition) => card(condition, { condition }))
+    const input = teamSceneInputOf({ lead: lead(), advisor: null, members })
+    expect(Object.fromEntries(input.members.map((m) => [m.key, m.hold ?? null]))).toEqual({
+      limited: 'limited',
+      paused: 'asleep',
+      asleep: 'asleep',
+      loggedOut: 'loggedOut',
+      unreachable: 'unreachable',
+      queued: 'queued',
+      starting: 'starting',
+      working: null,
+      idle: null,
+      gone: null
+    })
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input, { rowSize: 5, workSeated: true })
+    expect(teamSceneActors(world).find((a) => a.key === 'limited')?.hold).toBe('limited')
+  })
+})

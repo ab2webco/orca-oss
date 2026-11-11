@@ -198,7 +198,13 @@ export function createImagePainter(args: {
     for (const spot of f.stations) {
       const px = sheetPxAt(style.roles.member, spot.depth)
       const failing = stationFailingAt(f, spot, SEAT_PX)
-      const virus = failing && args.builds === 'office'
+      const worker = f.actors.find(
+        (a) =>
+          a.role === 'member' && a.pose !== 'walk' && Math.abs((a.x - spot.x) * f.width) < SEAT_PX
+      )
+      const state = stationScreenStateOf(worker ?? null, failing)
+      // Why by screen: an away or held member's screen says why, so its desk neither shakes nor bugs.
+      const virus = state === 'fail' && args.builds === 'office'
       const left = spot.x * f.width - feet.x * px + (virus ? officeVirusShakeAt(f.t, px) : 0)
       const top = feetY(spot.depth, f.height) - feet.y * px
       if (back) {
@@ -208,19 +214,10 @@ export function createImagePainter(args: {
         g.drawImage(prop, left, top, prop.width * px, prop.height * px)
       }
       if (screen) {
-        const worker = f.actors.find(
-          (a) =>
-            a.role === 'member' && a.pose !== 'walk' && Math.abs((a.x - spot.x) * f.width) < SEAT_PX
-        )
         const rect = stationScreenRectAt(screen, left, top, px)
-        const state = stationScreenStateOf(worker ?? null, failing)
         const boot = boots.progressOf(worker?.key, f.t)
-        drawStationScreen(g, rect, state, f.t, {
-          attention: colors.attention,
-          virus,
-          boot,
-          desk: worker?.desk
-        })
+        const show = { desk: worker?.desk, hold: worker?.hold }
+        drawStationScreen(g, rect, state, f.t, { ...colors, virus, boot, ...show })
       }
     }
   }
@@ -258,8 +255,8 @@ export function createImagePainter(args: {
     const beside = emoteAt(a, f)
     if (beside) {
       drawOfficeBack(g, x, y, px, backLookOf(sheetOf(art, a), art.frame), a, f.t + a.x * 7)
-      // Why no mark for an away seat: its warning is on the dark monitor, not over an empty chair.
-      drawActorMarks(g, beside.x, beside.y, a.away ? { ...a, emote: null } : a, colors)
+      // Why no mark for an away or held seat: its monitor says why, not a mark over the chair.
+      drawActorMarks(g, beside.x, beside.y, a.away || a.hold ? { ...a, emote: null } : a, colors)
       return
     }
     const [row, column] = frameOf(art, a, seated, f.t, px)

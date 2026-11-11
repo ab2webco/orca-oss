@@ -28,6 +28,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   away?: true
   /** What its monitor shows while it works, from its card; absent is plain code. */
   desk?: TeamSceneDesk
+  /** Why it cannot work yet or now, from its card's condition. */
+  hold?: TeamSceneHold
 }
 
 export type TeamSceneInput = {
@@ -70,6 +72,15 @@ export type TeamScenePose = 'idle' | 'work' | 'walk' | 'raise' | 'give' | 'wave'
 /** What an idle member does in its chair at a desk, so a resting row never looks frozen. */
 export type TeamScenePlay = 'music' | 'sketch' | 'plane' | 'game'
 
+/** Why a member is not working, as its card's condition says; a style may draw each its own way. */
+export type TeamSceneHold =
+  | 'limited'
+  | 'asleep'
+  | 'loggedOut'
+  | 'unreachable'
+  | 'queued'
+  | 'starting'
+
 export type TeamSceneEmote = 'alert' | 'check' | 'star' | 'heart' | 'blocked'
 
 export type TeamSceneActor = {
@@ -98,6 +109,8 @@ export type TeamSceneActor = {
   away?: true
   /** What a working member's monitor shows; a style without monitors ignores it. */
   desk?: TeamSceneDesk
+  /** Why the member cannot work; a style without desks keeps its blocked mark. */
+  hold?: TeamSceneHold
 }
 
 /** One-shot moments a style may draw particles or a thrown item for. */

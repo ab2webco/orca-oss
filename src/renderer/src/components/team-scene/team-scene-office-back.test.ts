@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { TeamScenePlay, TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import type {
+  TeamSceneHold,
+  TeamScenePlay,
+  TeamScenePose
+} from '../../../../shared/team-scene/team-scene-types'
 import {
   drawOfficeBack,
   OFFICE_BACK_FALLBACK,
@@ -144,5 +148,40 @@ describe('office back view', () => {
     drawOfficeBack(r.g, 100, FLOOR, PX, LOOK, { pose: 'idle', jump: 0, away: true }, 0)
     expect(discs(r).some((d) => d.color === LOOK.hair)).toBe(false)
     expect(r.calls.some((c) => c.name === 'roundRect')).toBe(true)
+  })
+
+  describe('held', () => {
+    const held = (hold: TeamSceneHold, t = 0) => {
+      const r = recordingContext()
+      drawOfficeBack(r.g, 100, FLOOR, PX, LOOK, { pose: 'idle', jump: 0, hold }, t)
+      return r
+    }
+    const headY = (r: ReturnType<typeof recordingContext>) =>
+      discs(r).find((d) => d.color === LOOK.hair)?.y
+
+    it('rests its head on the desk at its limit or asleep, and z marks rise while it sleeps', () => {
+      const up = headY(drawn('idle'))!
+      expect(headY(held('limited'))!).toBeGreaterThan(up)
+      expect(headY(held('asleep'))!).toBeGreaterThan(up)
+      expect(JSON.stringify(held('asleep', 0).calls)).not.toBe(
+        JSON.stringify(held('asleep', 0.5).calls)
+      )
+    })
+
+    it('leaves the chair empty while its launch is queued, and dims a member it cannot reach', () => {
+      expect(headY(held('queued'))).toBeUndefined()
+      const r = recordingContext()
+      const alphas: number[] = []
+      const g = new Proxy(r.g, {
+        set(target, prop, value) {
+          if (prop === 'globalAlpha') {
+            alphas.push(value as number)
+          }
+          return Reflect.set(target, prop, value)
+        }
+      })
+      drawOfficeBack(g, 100, FLOOR, PX, LOOK, { pose: 'idle', jump: 0, hold: 'unreachable' }, 0)
+      expect(Math.min(...alphas)).toBeLessThan(1)
+    })
   })
 })

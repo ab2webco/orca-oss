@@ -1,5 +1,6 @@
 import type {
   TeamAgentFacts,
+  TeamCondition,
   TeamMemberCard,
   TeamPanelGameModel,
   TeamQueueEntry
@@ -7,7 +8,12 @@ import type {
 import type { TeamSceneDesk } from './team-scene-desk'
 import { teamSceneDeskOf } from './team-scene-desk'
 import { teamSceneSiteOf } from './team-scene-sites'
-import type { TeamSceneActivity, TeamSceneAgentInput, TeamSceneInput } from './team-scene-types'
+import type {
+  TeamSceneActivity,
+  TeamSceneAgentInput,
+  TeamSceneHold,
+  TeamSceneInput
+} from './team-scene-types'
 
 // Why exhaustive: a fall-through to resting let a gone, failed or queued member play at its desk.
 const activityOf = (agent: TeamAgentFacts, needsYou: boolean): TeamSceneActivity => {
@@ -47,6 +53,17 @@ const agentOf = (
   ...(agent.decisions ? { decisions: agent.decisions } : {})
 })
 
+// Why paused reads asleep: both are a session at rest that the owner can wake, never a failure.
+const HOLD: Partial<Record<TeamCondition, TeamSceneHold>> = {
+  limited: 'limited',
+  paused: 'asleep',
+  asleep: 'asleep',
+  loggedOut: 'loggedOut',
+  unreachable: 'unreachable',
+  queued: 'queued',
+  starting: 'starting'
+}
+
 const deskOf = (
   m: TeamMemberCard,
   queue: readonly TeamQueueEntry[] | null
@@ -71,7 +88,8 @@ export function teamSceneInputOf(
       mergedPr: m.pr?.state === 'merged' ? m.pr.number : null,
       site: teamSceneSiteOf(m),
       ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {}),
-      ...deskOf(m, queue)
+      ...deskOf(m, queue),
+      ...(HOLD[m.condition] ? { hold: HOLD[m.condition] } : {})
     }))
   }
 }

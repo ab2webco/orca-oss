@@ -104,4 +104,19 @@ describe('station screen', () => {
     const box = empty.find((c) => c.name === 'strokeRect')
     expect((box?.args[2] as number) ?? 0).toBeGreaterThanOrEqual(RECT.width * 0.3)
   })
+
+  it('names why a held member cannot work on its screen, before red CI, its away seat first', () => {
+    expect(stationScreenStateOf({ pose: 'idle', hold: 'limited' }, true)).toBe('hold')
+    expect(stationScreenStateOf({ pose: 'idle', hold: 'limited', away: true }, false)).toBe('away')
+    const holds = ['limited', 'asleep', 'loggedOut', 'unreachable', 'queued', 'starting'] as const
+    const drawn = holds.map((hold) => {
+      const r = recordingContext()
+      drawStationScreen(r.g, RECT, 'hold', 1, { hold, attention: '#e5484d', risk: '#f5b342' })
+      return r
+    })
+    expect(new Set(drawn.map((r) => JSON.stringify(r.calls))).size).toBe(holds.length)
+    // The card's own colours: a limit is a risk, a lost login needs you.
+    expect(drawn[0]!.calls.map((c) => c.fillStyle)).toContain('#f5b342')
+    expect(drawn[2]!.calls.map((c) => c.fillStyle)).toContain('#e5484d')
+  })
 })

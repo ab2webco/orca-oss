@@ -1,4 +1,9 @@
-import type { TeamScenePlay, TeamScenePose } from '../../../../shared/team-scene/team-scene-types'
+import type {
+  TeamSceneHold,
+  TeamScenePlay,
+  TeamScenePose
+} from '../../../../shared/team-scene/team-scene-types'
+import { drawOfficeSleep, officeHoldAlpha, officeHoldHeadDrop } from './team-scene-office-hold'
 import { drawOfficePlay, officePlayArm, officePlayLean } from './team-scene-office-play'
 
 /** Where the desk art's own chair ends, so the station is drawn without it. */
@@ -177,13 +182,20 @@ export function drawOfficeBack(
     pose,
     jump,
     play,
-    away
-  }: { pose: TeamScenePose; jump: number; play?: TeamScenePlay; away?: true },
+    away,
+    hold
+  }: {
+    pose: TeamScenePose
+    jump: number
+    play?: TeamScenePlay
+    away?: true
+    hold?: TeamSceneHold
+  },
   t: number
 ): void {
   const ground = (dx: number, u: number): Point => [x + dx * px, floor - u * px]
-  if (away) {
-    // Why only the chair: the card says the session is gone, so nobody sits there.
+  // Why only the chair: the session is gone, or its launch still waits for a slot.
+  if (away || hold === 'queued') {
     g.save()
     g.lineWidth = 1.6 * px
     drawOfficeChair(g, ground, px)
@@ -192,7 +204,9 @@ export function drawOfficeBack(
   }
   const lean = officePlayLean(play, t)
   const at = (dx: number, u: number): Point => [x + (dx + lean) * px, floor - jump - u * px]
+  const drop = officeHoldHeadDrop(hold)
   g.save()
+  g.globalAlpha = officeHoldAlpha(hold)
   g.lineCap = 'round'
   g.lineJoin = 'round'
   g.lineWidth = 1.6 * px
@@ -239,9 +253,9 @@ export function drawOfficeBack(
   g.strokeStyle = OUTLINE
   g.stroke()
   for (const side of [-1, 1] as const) {
-    disc(g, ...at(side * (HEAD.r - 0.5), HEAD.u - 1), 2.5 * px, look.skin)
+    disc(g, ...at(side * (HEAD.r - 0.5), HEAD.u - 1 - drop), 2.5 * px, look.skin)
   }
-  disc(g, ...at(0, HEAD.u), HEAD.r * px, look.hair)
+  disc(g, ...at(0, HEAD.u - drop), HEAD.r * px, look.hair)
   drawOfficeChair(g, ground, px)
   for (const { side, arm } of arms) {
     if (up(arm[1])) {
@@ -250,6 +264,9 @@ export function drawOfficeBack(
   }
   if (play) {
     drawOfficePlay(g, play, at, px, t)
+  }
+  if (hold === 'asleep') {
+    drawOfficeSleep(g, at, px, t)
   }
   g.restore()
 }

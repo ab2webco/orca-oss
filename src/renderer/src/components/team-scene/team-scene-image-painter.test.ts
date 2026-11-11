@@ -595,6 +595,27 @@ describe('createImagePainter office builds', () => {
       expect(deskX(green[0]!.calls)).toBe(deskX(green[1]!.calls))
     })
 
+    it('neither shakes nor bugs a red-CI desk whose member is away or held, its screen saying why', () => {
+      for (const who of [{ away: true as const }, { hold: 'limited' as const }]) {
+        const at = (t: number) => {
+          const painter = createImagePainter({
+            art: {
+              style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+              images: IMAGES
+            },
+            colors: COLORS,
+            builds: 'office'
+          })
+          const r = recordingContext()
+          const actors = [actor('m', { pose: 'idle', x: spot.x, depth: spot.depth, ...who })]
+          painter.paint(r.g, frame({ t, actors, stations: [spot], sites: [site(true)] }))
+          return r
+        }
+        expect(deskX(at(0.31).calls)).toBe(deskX(at(0.58).calls))
+        expect(at(0.31).fills()).not.toContain(OFFICE_VIRUS_COLORS.body)
+      }
+    })
+
     it('leaves red CI in a castle build to the slime, never a virus', () => {
       expect(painted(true, 0.31, 'castle').fills()).not.toContain(OFFICE_VIRUS_COLORS.body)
     })
@@ -730,6 +751,20 @@ describe('createImagePainter office back view', () => {
       )
     expect(trays({ chairEnd: 144 })).toHaveLength(0)
     expect(trays(null)).toHaveLength(1)
+  })
+
+  it('drops the blocked mark over a held Office seat, its screen saying why instead', () => {
+    const asleep = actor('m', {
+      pose: 'idle',
+      x: spot.x,
+      depth: spot.depth,
+      emote: 'blocked',
+      hold: 'asleep'
+    })
+    const fills = paint([asleep], { chairEnd: 144 }).calls.map((c) => c.fillStyle)
+    expect(fills).not.toContain(COLORS.risk)
+    const blocked = actor('m', { pose: 'idle', x: spot.x, depth: spot.depth, emote: 'blocked' })
+    expect(paint([blocked], { chairEnd: 144 }).calls.map((c) => c.fillStyle)).toContain(COLORS.risk)
   })
 
   it('keeps the red screen of failing CI behind a member seen from behind', () => {

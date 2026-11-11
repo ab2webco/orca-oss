@@ -29,7 +29,8 @@ import type {
   TeamSceneEffect,
   TeamSceneEmote,
   TeamSceneInput,
-  TeamSceneSpot
+  TeamSceneSpot,
+  TeamSceneHold
 } from './team-scene-types'
 import {
   advanceVisit,
@@ -63,6 +64,7 @@ export type TeamSceneBody = TeamSceneMover & {
   site: TeamSceneSite
   away?: true
   desk?: TeamSceneDesk
+  hold?: TeamSceneHold
   work: TeamSceneWork
 }
 
@@ -187,6 +189,7 @@ export function applyTeamSceneInput(
       activity: m.activity,
       away: m.away,
       desk: m.desk,
+      hold: m.hold,
       home: spot,
       site: grownSite(body.site, m.site)
     })
