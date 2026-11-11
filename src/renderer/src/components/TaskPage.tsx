@@ -1030,14 +1030,14 @@ function getLinearIssueGridTemplate(visibleProperties: ReadonlySet<LinearDisplay
   if (visibleProperties.has('state')) {
     columns.push('138px')
   }
+  // Why 96px: these cells are icons, but 64px truncated their uppercase header labels.
   if (visibleProperties.has('assignee')) {
-    columns.push('64px')
+    columns.push('96px')
   }
   if (visibleProperties.has('updated')) {
     columns.push('104px')
   }
-  // Why: Worktrees is icon-only (open vs start); keep it narrow so issue title keeps the room.
-  columns.push('64px')
+  columns.push('96px')
   return columns.join(' ')
 }
 
@@ -12359,7 +12359,8 @@ export default function TaskPage(): React.JSX.Element {
               />
             </div>
           ) : (
-            <div className="flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm">
+            <div className="@container flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm">
+              {/* Why @container: the issue grid sizes to this pane, which the sidebar makes narrower than the window. */}
               <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3">
                 <div className="flex min-w-0 items-center gap-2">
                   {activeLinearIssueContextLabel ? (
@@ -12512,7 +12513,7 @@ export default function TaskPage(): React.JSX.Element {
 
               {linearViewMode === 'list' && linearGroupBy === 'none' ? (
                 <div
-                  className="grid h-8 flex-none items-center gap-3 border-b border-border/50 bg-muted/25 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground max-lg:!hidden lg:grid-cols-[var(--linear-grid-template)] [&>span]:min-w-0 [&>span]:truncate"
+                  className="grid h-8 flex-none items-center gap-3 border-b border-border/50 bg-muted/25 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground @max-5xl:!hidden @5xl:grid-cols-[var(--linear-grid-template)] [&>span]:min-w-0 [&>span]:truncate"
                   style={linearIssueGridStyle}
                 >
                   <span>{translate('auto.components.TaskPage.37e7ee311e', 'Key')}</span>
@@ -12881,12 +12882,12 @@ export default function TaskPage(): React.JSX.Element {
                             }
                           }}
                           className={cn(
-                            'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring lg:grid-cols-[var(--linear-grid-template)]',
+                            'group/row grid min-h-12 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring @5xl:grid-cols-[var(--linear-grid-template)]',
                             selected && 'bg-accent'
                           )}
                           style={linearIssueGridStyle}
                         >
-                          <div className="flex min-w-0 items-center gap-2 max-lg:!hidden">
+                          <div className="flex min-w-0 items-center gap-2 @max-5xl:!hidden">
                             <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground">
                               {issue.identifier}
                             </span>
@@ -12897,14 +12898,14 @@ export default function TaskPage(): React.JSX.Element {
                               {effectiveLinearDisplayProperties.has('priority') ? (
                                 <LinearPriorityIcon priority={issue.priority} />
                               ) : null}
-                              <span className="shrink-0 font-mono text-[11px] text-muted-foreground lg:hidden">
+                              <span className="shrink-0 font-mono text-[11px] text-muted-foreground @5xl:hidden">
                                 {issue.identifier}
                               </span>
                               <h3 className="min-w-0 truncate text-[13px] font-medium text-foreground">
                                 {issue.title}
                               </h3>
                             </div>
-                            <div className="mt-1 flex min-w-0 items-center gap-1.5 lg:!hidden">
+                            <div className="mt-1 flex min-w-0 items-center gap-1.5 @5xl:!hidden">
                               {effectiveLinearDisplayProperties.has('state') ? (
                                 <LinearStateCell
                                   issue={issue}
@@ -12933,7 +12934,7 @@ export default function TaskPage(): React.JSX.Element {
                           </div>
 
                           {effectiveLinearDisplayProperties.has('labels') ? (
-                            <div className="flex min-w-0 items-center gap-1 max-lg:!hidden">
+                            <div className="flex min-w-0 items-center gap-1 @max-5xl:!hidden">
                               {labels.map((label) => (
                                 <span
                                   key={label}
@@ -12951,13 +12952,13 @@ export default function TaskPage(): React.JSX.Element {
                           ) : null}
 
                           {effectiveLinearDisplayProperties.has('team') ? (
-                            <div className="block min-w-0 text-[12px] text-muted-foreground max-lg:!hidden">
+                            <div className="block min-w-0 text-[12px] text-muted-foreground @max-5xl:!hidden">
                               <div className="truncate">{teamLabel}</div>
                             </div>
                           ) : null}
 
                           {effectiveLinearDisplayProperties.has('state') ? (
-                            <div className="flex min-w-0 max-lg:!hidden">
+                            <div className="flex min-w-0 @max-5xl:!hidden">
                               <LinearStateCell
                                 issue={issue}
                                 className="max-w-full px-2 py-0.5"
@@ -12967,7 +12968,7 @@ export default function TaskPage(): React.JSX.Element {
                           ) : null}
 
                           {effectiveLinearDisplayProperties.has('assignee') ? (
-                            <div className="flex min-w-0 justify-center max-lg:!hidden">
+                            <div className="flex min-w-0 justify-center @max-5xl:!hidden">
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div
@@ -12999,7 +13000,7 @@ export default function TaskPage(): React.JSX.Element {
                           {effectiveLinearDisplayProperties.has('updated') ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="block min-w-0 truncate text-[12px] text-muted-foreground max-lg:!hidden">
+                                <div className="block min-w-0 truncate text-[12px] text-muted-foreground @max-5xl:!hidden">
                                   {formatRelativeTime(issue.updatedAt)}
                                 </div>
                               </TooltipTrigger>
