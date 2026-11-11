@@ -128,13 +128,37 @@ describe('TeamSceneBuilding', () => {
     expect(make).toHaveBeenCalledTimes(3)
   })
 
-  it('shows at most three floors and the rest as a count, while a button reaches each one', () => {
-    render([local, remote('a'), remote('b'), remote('c')])
-    expect(floors()).toHaveLength(3)
-    expect(host.textContent).toContain('+1')
-    for (const name of ['local', 'a', 'b', 'c']) {
+  // Why every floor: an owner with five machines saw three and a '+2' (owner, 2026-11-11).
+  it('draws one floor per machine, none folded, in a building that scrolls at three floors high', () => {
+    const hosts = [local, remote('a'), remote('b'), remote('c'), remote('d')]
+    render(hosts)
+    expect(floors()).toHaveLength(5)
+    expect(host.textContent).not.toMatch(/\+\d/)
+    for (const name of ['local', 'a', 'b', 'c', 'd']) {
       expect(button(name)).toBeTruthy()
     }
+    const scroller = host.querySelector<HTMLElement>('[data-team-floors-scroll]')!
+    expect(scroller.className).toContain('overflow-y-auto')
+    // Three strips and their slabs: the building's height before every floor was shown.
+    expect(scroller.style.maxHeight).toBe(`${3 * (112 + 4)}px`)
+  })
+
+  it("opens on the floor that matters: one where a member needs you, else the lead's", () => {
+    const seen: string[] = []
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(
+      function (this: HTMLElement) {
+        seen.push(this.dataset.teamFloor ?? '?')
+      }
+    )
+    const hosts = [local, remote('a'), remote('b'), remote('c'), remote('d')]
+    render(hosts)
+    expect(seen.at(-1)).toBe('')
+    act(() => root.unmount())
+    root = createRoot(host)
+    const asking = model(hosts)
+    asking.members[3] = { ...asking.members[3]!, needsYou: true }
+    act(() => root.render(<TeamSceneBuilding model={asking} makePainter={make} leadLine={null} />))
+    expect(seen.at(-1)).toBe('c')
   })
 
   it('zooms to a floor from its button or its number key, and back with All or Escape', () => {
@@ -332,6 +356,30 @@ describe('TeamSceneBuilding', () => {
       expect(rider()).toBe('lead')
       act(() => vi.advanceTimersByTime(1_200))
       expect(rider()).toBeNull()
+      vi.useRealTimers()
+    })
+
+    it('brings the floor the car rides to into view, wherever the building is scrolled', () => {
+      vi.useFakeTimers()
+      motion(false)
+      vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+      const seen: string[] = []
+      vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(
+        function (this: HTMLElement) {
+          seen.push(this.dataset.teamFloor ?? '?')
+        }
+      )
+      const hosts = [local, remote('a'), remote('b'), remote('c'), remote('d')]
+      render(hosts)
+      seen.length = 0
+      const asking = model(hosts)
+      asking.members[4] = { ...asking.members[4]!, needsYou: true }
+      act(() =>
+        root.render(<TeamSceneBuilding model={asking} makePainter={make} leadLine={null} />)
+      )
+      act(() => vi.advanceTimersByTime(30_000))
+      expect(car()?.dataset.teamElevatorCar).toBe('d')
+      expect(seen).toContain('d')
       vi.useRealTimers()
     })
 

@@ -19,6 +19,7 @@ import { teamSceneRectsFromAbove, type TeamSceneRect } from './team-scene-bubble
 import { TeamSceneElevatorShaft } from './TeamSceneElevatorShaft'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
+import { useTeamBuildingScroll } from './use-team-building-scroll'
 import { useTeamSceneRideLegs } from './use-team-scene-ride-legs'
 import type { TeamScenePainter } from './team-scene-painter'
 
@@ -98,7 +99,8 @@ function useTubeEnvelope(
   }, [envelope])
   return reducedMotion ? null : envelope
 }
-const SHOWN_FLOORS = 3
+// Why three: the building kept this height before it drew every floor, and scrolls past it.
+const VIEW_FLOORS = 3
 
 /** True when the team spans more than one machine: the building replaces the single office. */
 export const teamSceneHasFloors = (model: TeamSceneBuildingModel): boolean =>
@@ -116,7 +118,8 @@ function FloorStage({
   onBoarded,
   topmost,
   onAskers,
-  fromAbove
+  fromAbove,
+  floorRef
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
@@ -128,6 +131,7 @@ function FloorStage({
   onAskers: (floor: string, boxes: TeamSceneRect[]) => void
   /** The floor above's asker boxes, in this floor's stage: its rising bubbles keep off them. */
   fromAbove: readonly TeamSceneRect[]
+  floorRef: (el: HTMLElement | null) => void
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
@@ -163,6 +167,7 @@ function FloorStage({
     : { top: cropTop, bottom: Math.max(0, painter.height - cropTop - STRIP.height) }
   return (
     <div
+      ref={floorRef}
       data-team-floor={floor.key}
       data-team-floor-dark={floor.reachable ? undefined : ''}
       // Why a slab and an inner ring: floors read as storeys of one glass building, not copies.
@@ -222,7 +227,8 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const [zoom, setZoom] = useState<string | null>(null)
   const zoomed = floors.find((floor) => floor.key === zoom) ?? null
   // Why the lead's at the bottom: floor 1 is where the lead stands, the others above it.
-  const shown = zoomed ? [zoomed] : floors.slice(0, SHOWN_FLOORS).toReversed()
+  // Why every floor: an owner with five machines saw three and a fold; the building scrolls instead.
+  const shown = zoomed ? [zoomed] : floors.toReversed()
   const [askers, setAskers] = useState<Record<string, TeamSceneRect[]>>({})
   const onAskers = useCallback(
     (key: string, boxes: TeamSceneRect[]) =>
@@ -243,7 +249,6 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
         })
       : NO_BOXES
   }
-  const more = zoomed ? 0 : floors.length - SHOWN_FLOORS
   const leadFloor = floors.find((floor) => floor.lead)?.key ?? ''
   const reducedMotion = usePrefersReducedMotion()
   const envelope = useTubeEnvelope(floors, reducedMotion)
@@ -260,6 +265,11 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const leadCar = teamSceneLegCar(legs.lead, leadFloor)
   const advisorCar = teamSceneLegCar(legs.advisor, leadFloor)
   const car = legs.lead.stage === 'home' ? advisorCar : leadCar
+  const floorRef = useTeamBuildingScroll({
+    openOn: teamSceneRideOf(floors)?.floor ?? leadFloor,
+    carAt: car.at,
+    reducedMotion
+  })
   const onKeyDown = (event: React.KeyboardEvent): void => {
     if (event.key === 'Escape' || event.key === '0') {
       setZoom(null)
@@ -306,7 +316,11 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
           </Button>
         ))}
       </nav>
-      <div className="flex min-w-0">
+      <div
+        data-team-floors-scroll=""
+        className="scrollbar-sleek flex min-w-0 overflow-y-auto"
+        style={zoomed ? undefined : { maxHeight: VIEW_FLOORS * (STRIP.height + STRIP.slab) }}
+      >
         <div className="min-w-0 flex-1">
           {shown.map((floor, index) => (
             <FloorStage
@@ -320,6 +334,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               topmost={floor === shown[0]}
               onAskers={onAskers}
               fromAbove={fromAboveOf(index)}
+              floorRef={floorRef(floor.key)}
             />
           ))}
         </div>
@@ -332,9 +347,6 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
           leadFloor={leadFloor}
         />
       </div>
-      {more > 0 ? (
-        <div className="px-2 py-1 text-xs text-muted-foreground">{`+${more}`}</div>
-      ) : null}
     </div>
   )
 }
