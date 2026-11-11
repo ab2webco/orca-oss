@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getDefaultUIState } from '../../../shared/constants'
 import { currentPlanePriority } from '../../plane/plane-call-priority'
 import { RpcDispatcher } from './dispatcher'
-import { defineMethod, type RpcRequest } from './core'
+import { defineMethod, type RpcRequest, type RpcResponse } from './core'
 import type { OrcaRuntimeService } from '../orca-runtime'
 
 const runtime = {
@@ -18,6 +18,9 @@ const runtime = {
 
 const priorityMethod = (name: string) =>
   defineMethod({ name, params: z.object({}), handler: () => currentPlanePriority() })
+
+const resultOf = (response: RpcResponse): unknown =>
+  'result' in response ? response.result : undefined
 
 const request = (method: string): RpcRequest => ({ id: 'r', authToken: 't', method, params: {} })
 
@@ -35,7 +38,7 @@ async function streamed(method: string, pairedDeviceId?: string): Promise<unknow
 // ORCA-1166: agents' `orca plane` calls must queue behind the owner's own Plane reads.
 describe('Plane call priority by caller', () => {
   it('queues a Plane call from the local CLI as background', async () => {
-    expect((await dispatcher.dispatch(request('plane.listWorkItems'))).result).toBe('background')
+    expect(resultOf(await dispatcher.dispatch(request('plane.listWorkItems')))).toBe('background')
     expect(await streamed('plane.listWorkItems')).toBe('background')
   })
 
@@ -44,6 +47,6 @@ describe('Plane call priority by caller', () => {
   })
 
   it('leaves other methods alone', async () => {
-    expect((await dispatcher.dispatch(request('repo.list'))).result).toBe('interactive')
+    expect(resultOf(await dispatcher.dispatch(request('repo.list')))).toBe('interactive')
   })
 })
