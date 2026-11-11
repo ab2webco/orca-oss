@@ -460,6 +460,15 @@ describe('TeamTabContent', () => {
     expect(container.textContent).toContain('Stopped')
   })
 
+  it('says what a STOP pauses, not stopped, while members still run (ORCA-1157)', async () => {
+    const { container } = await render(
+      model({ stopped: { since: null, by: 'lead', membersRunning: 2 } })
+    )
+
+    expect(container.textContent).not.toContain('Stopped')
+    expect(container.textContent).toContain('Launches and pushes paused')
+  })
+
   describe('arcade', () => {
     const on = (): TeamArcadeActions => ({
       play: vi.fn(async () => {}),

@@ -17378,7 +17378,8 @@
     },
     "stopped": {
       "by": "Stopped by {{by}}",
-      "plain": "Stopped"
+      "plain": "Stopped",
+      "paused": "Launches and pushes paused"
     },
     "open": {
       "failed": "Could not open {{name}}"

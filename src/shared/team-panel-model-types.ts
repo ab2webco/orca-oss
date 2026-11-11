@@ -265,7 +265,8 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   /** Saved arcade plays and the perfect merge that offers one; null when the arcade is off. */
   arcade: { credits: number; offerPr: number | null } | null
   /** The project's STOP; null when clear. */
-  stopped: { since: string | null; by: string | null } | null
+  /** `membersRunning`: members the STOP left running, which it does not stop; absent reads as none. */
+  stopped: { since: string | null; by: string | null; membersRunning?: number } | null
   scene: TeamSceneSource
   /** Orca's and the project's actions for the dock and its menu, in game.state's order. */
   actions: TeamAction[]

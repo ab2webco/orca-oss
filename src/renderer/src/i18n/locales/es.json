@@ -16398,7 +16398,8 @@
     },
     "stopped": {
       "by": "Detenido por {{by}}",
-      "plain": "Detenido"
+      "plain": "Detenido",
+      "paused": "Lanzamientos y pushes en pausa"
     },
     "open": {
       "failed": "No se pudo abrir {{name}}"
