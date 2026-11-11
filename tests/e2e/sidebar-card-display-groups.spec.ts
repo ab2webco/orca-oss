@@ -2,7 +2,7 @@
  * ORCA-1163: the new card style's Card display heads its toggles with Work, Agent and Source,
  * and offers the PR toggle the team row already reads. Captured at every width and theme.
  */
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
@@ -27,6 +27,20 @@ function scrolledSideways(page: Page): Promise<string[]> {
       })
       .map((node) => `${node.tagName.toLowerCase()}.${String(node.className).slice(0, 80)}`)
   )
+}
+
+/** The item's center once the menu stops moving, so a pointer lands where the user would see it. */
+async function settledCenter(item: Locator): Promise<{ x: number; y: number }> {
+  let last: { x: number; y: number; width: number; height: number } | null = null
+  await expect
+    .poll(async () => {
+      const box = await item.boundingBox()
+      const still = box !== null && last !== null && box.x === last.x && box.y === last.y
+      last = box
+      return still
+    })
+    .toBe(true)
+  return { x: last!.x + last!.width / 2, y: last!.y + last!.height / 2 }
 }
 
 test.describe('narrow-width app shell (ORCA-1163)', () => {
@@ -174,6 +188,47 @@ test.describe('Card display groups', () => {
           animations: 'disabled',
           path: testInfo.outputPath(`card-display-${width}-${theme}.png`)
         })
+        await orcaPage.keyboard.press('Escape')
+        await orcaPage.keyboard.press('Escape')
+      }
+    }
+  })
+
+  // Why both paths: at 390 the menu opens below its button, so Sort by and Project order sit on the
+  // way from the button to Card display (CI run 42983047371).
+  test('opens Card display with the mouse at narrow widths and leaves Project order shut', async ({
+    orcaPage
+  }) => {
+    await waitForSessionReady(orcaPage)
+    await waitForActiveWorktree(orcaPage)
+    await writeSettings(orcaPage, { experimentalNewWorktreeCardStyle: true })
+    const cardDisplay = orcaPage.getByRole('menuitem', { name: /Card display/ })
+    const groups = orcaPage.locator('[data-card-display-group]')
+    const projectOrderMenu = orcaPage
+      .getByRole('menu')
+      .filter({ has: orcaPage.getByRole('menuitemradio', { name: 'Manual' }) })
+    for (const width of [390, 320]) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      await orcaPage.evaluate(() => {
+        const state = window.__store!.getState()
+        state.setSidebarOpen(true)
+        state.setRightSidebarOpen(false)
+      })
+      for (const path of ['direct', 'diagonal'] as const) {
+        await expect(orcaPage.getByRole('menu')).toHaveCount(0)
+        await orcaPage.locator('button[aria-label^="Workspace options"]:visible').first().click()
+        const target = await settledCenter(cardDisplay)
+        if (path === 'diagonal') {
+          const start = await settledCenter(orcaPage.getByRole('menuitem', { name: /Sort by/ }))
+          await orcaPage.mouse.move(start.x, start.y)
+          await orcaPage.mouse.move(target.x, target.y, { steps: 12 })
+        } else {
+          await orcaPage.mouse.move(target.x, target.y)
+        }
+        await expect(groups.first(), `${width}px ${path}: Card display did not open`).toBeVisible()
+        await expect(projectOrderMenu, `${width}px ${path}: Project order stayed open`).toHaveCount(
+          0
+        )
         await orcaPage.keyboard.press('Escape')
         await orcaPage.keyboard.press('Escape')
       }
