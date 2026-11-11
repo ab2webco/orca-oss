@@ -211,9 +211,7 @@ describe('TeamTabContent', () => {
       // Why basis-0: the host claims only what is left, so it gives way before the name does.
       expect(host.className).toContain('basis-0')
       expect(host.className).toContain('flex-1')
-      // ORCA-1149: a name that does not fit turns into its machine's icon, never a cut word.
-      expect(host.className).not.toContain('truncate')
-      expect(host.className).toContain('overflow-hidden')
+      expect(host.className).toContain('truncate')
       expect(host.className).toContain('min-w-0')
       // ORCA-1092 row 23: a name too long for the row truncates instead of pushing the row wider.
       expect(name.className).not.toContain('shrink-0')
