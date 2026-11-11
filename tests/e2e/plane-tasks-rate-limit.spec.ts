@@ -85,6 +85,29 @@ test('names the rate-limit wait while the Tasks page loads Plane', async ({
   const notice = orcaPage.getByRole('status').filter({ hasText: /Plane/ })
   await orcaPage.waitForTimeout(1_500)
   await expect(notice).toHaveCount(0)
+
+  // Why: at narrow widths the search ran past its card, the heading wrapped over it, and refresh sat alone.
+  for (const width of [390, 320]) {
+    await electronApp.evaluate(({ BrowserWindow }, w) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(w, 900)
+    }, width)
+    await orcaPage.waitForTimeout(400)
+    const search = await orcaPage.getByPlaceholder('Search work items by ID or title').boundingBox()
+    const card = await orcaPage
+      .getByPlaceholder('Search work items by ID or title')
+      .locator('xpath=ancestor::div[contains(@class,"rounded-b-none")][1]')
+      .boundingBox()
+    const heading = await orcaPage.getByText('Plane work items', { exact: true }).boundingBox()
+    const refresh = await orcaPage
+      .getByRole('button', { name: 'Refresh Plane work items' })
+      .boundingBox()
+    const firstPreset = await orcaPage
+      .getByRole('button', { name: 'All', exact: true })
+      .boundingBox()
+    expect(search!.x + search!.width).toBeLessThanOrEqual(card!.x + card!.width)
+    expect(heading!.height).toBeLessThan(20)
+    expect(Math.abs(refresh!.y - firstPreset!.y)).toBeLessThan(refresh!.height)
+  }
   const capture = process.env.ORCA_E2E_CAPTURE === '1'
   const shoot = async (name: string): Promise<void> => {
     if (!capture) {
