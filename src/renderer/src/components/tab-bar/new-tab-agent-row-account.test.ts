@@ -30,6 +30,15 @@ describe('agentRowAccountOf', () => {
     })
   })
 
+  it("checks the member pick for a team row, and reads a project's member agent by name", () => {
+    expect(
+      agentRowAccountOf({ agent: 'claude', local: true, providers, checked: 'member-default' })
+    ).toMatchObject({ kind: 'picker', checkedId: 'acct-free' })
+    expect(agentRowAccountOf({ agent: 'some-cli', local: true, providers })).toEqual({
+      kind: 'own-login'
+    })
+  })
+
   it('uses the Claude accounts for a Claude Agent Teams row', () => {
     expect(
       agentRowAccountOf({ agent: 'claude-agent-teams', local: true, providers })
