@@ -124,6 +124,15 @@ async function expectTeamSubmenusStay(page: Page, width: number): Promise<void> 
   await page.waitForTimeout(400)
   await expect(list, `${width}px: the account list closed under the pointer`).toBeVisible()
   await inWindow(list, 'the account list')
+  // The usual close paths still close it: Escape, and the pointer on another item of the + menu.
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu'), `${width}px: Escape left a menu open`).toHaveCount(0)
+  const again = await openMenu(page)
+  await moveTo(again.getByRole('menuitem', { name: 'Add member…' }))
+  await expect(addMember).toBeVisible()
+  await moveTo(again.getByRole('menuitem', { name: /^Go to lead/ }))
+  await expect(addMember, `${width}px: Add member stayed open on Go to lead`).toHaveCount(0)
+  await expect(again).toBeVisible()
 }
 
 async function captureEach(
