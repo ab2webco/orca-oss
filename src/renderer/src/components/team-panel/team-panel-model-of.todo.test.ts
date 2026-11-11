@@ -43,4 +43,19 @@ describe('teamPanelModelOf To Do', () => {
       { identifier: 'ORCA-2', title: 'ORCA-2', prompt: 'Work on ORCA-2' }
     ])
   })
+
+  it("carries the agent the project's members run, and none from a host that sends no lead", () => {
+    const base = { role: 'lead', agents: [], stopped: null }
+    const withLead = { ...base, lead: { autostart: false, cap: 4, agent: 'codex' } }
+    const modelOf = (state: unknown) =>
+      teamPanelModelOf({
+        repoId: 'r',
+        projectName: 'p',
+        state: state as OrchestratorGameState,
+        questions: []
+      })
+
+    expect(modelOf(withLead)?.memberAgent).toBe('codex')
+    expect(modelOf(base)).not.toHaveProperty('memberAgent')
+  })
 })

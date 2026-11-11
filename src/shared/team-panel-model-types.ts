@@ -275,6 +275,8 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   actions: TeamAction[]
   /** The project's To Do tickets no member holds; empty when the host publishes none. */
   todo: TeamTodoTicket[]
+  /** The agent members run, as orca.yaml names it; absent when the host sends no lead. */
+  memberAgent?: string
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */

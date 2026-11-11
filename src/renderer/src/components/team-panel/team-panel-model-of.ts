@@ -144,6 +144,7 @@ export function teamPanelModelOf(args: {
     },
     actions: teamActionsOf(state),
     todo: teamTodoTicketsOf(state, cards.members),
+    ...(state.lead?.agent ? { memberAgent: state.lead.agent } : {}),
     inbox: inboxOf(state, questions),
     prs: teamPrSectionOf(work),
     queue: teamQueueSectionOf(work),
