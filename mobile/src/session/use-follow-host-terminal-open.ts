@@ -5,7 +5,7 @@ import {
   hostTerminalOpenRoute,
   sessionTabForHostOpen,
   startHostTerminalOpenFollow,
-  type HostTerminalOpenRequest
+  type TerminalOpenTarget
 } from './host-terminal-open'
 import type { MobileSessionTab } from './mobile-session-route-types'
 
@@ -20,7 +20,7 @@ type FollowHostTerminalOpenArgs = {
   selectTab: (tab: MobileSessionTab) => void
 }
 
-/** Follows a host request to open a terminal (the game's View) and selects it on arrival. */
+/** Follows a host request to open a terminal (the game's View) and selects it on arrival; returns the same opener. */
 export function useFollowHostTerminalOpen({
   client,
   hostId,
@@ -29,7 +29,7 @@ export function useFollowHostTerminalOpen({
   routeTab,
   sessionTabs,
   selectTab
-}: FollowHostTerminalOpenArgs): void {
+}: FollowHostTerminalOpenArgs): (target: TerminalOpenTarget) => void {
   const router = useRouter()
   const focusedRef = useRef(false)
   const sessionTabsRef = useRef(sessionTabs)
@@ -48,6 +48,24 @@ export function useFollowHostTerminalOpen({
     }, [])
   )
 
+  const open = useCallback(
+    (target: TerminalOpenTarget) => {
+      if (target.worktreeId !== worktreeId) {
+        // Why: a push keeps this screen under the member's, so back returns to the lead.
+        router.push(hostTerminalOpenRoute(hostId, target))
+        return
+      }
+      const tab = sessionTabForHostOpen(sessionTabsRef.current, {
+        terminal: target.terminal ?? undefined,
+        tabId: target.tabId
+      })
+      if (tab) {
+        selectTabRef.current(tab)
+      }
+    },
+    [hostId, router, worktreeId]
+  )
+
   useEffect(() => {
     if (!client) {
       return
@@ -56,19 +74,9 @@ export function useFollowHostTerminalOpen({
       client,
       worktreeId,
       isFollowing: () => focusedRef.current,
-      onOpen: (request: HostTerminalOpenRequest) => {
-        if (request.worktreeId !== worktreeId) {
-          // Why: a push keeps this screen under the member's, so back returns to the lead.
-          router.push(hostTerminalOpenRoute(hostId, request))
-          return
-        }
-        const tab = sessionTabForHostOpen(sessionTabsRef.current, request)
-        if (tab) {
-          selectTabRef.current(tab)
-        }
-      }
+      onOpen: open
     })
-  }, [client, hostId, router, worktreeId])
+  }, [client, open, worktreeId])
 
   const appliedRouteTerminalRef = useRef(false)
   useEffect(() => {
@@ -82,4 +90,5 @@ export function useFollowHostTerminalOpen({
       selectTabRef.current(tab)
     }
   }, [routeTab, routeTerminal, sessionTabs])
+  return open
 }
