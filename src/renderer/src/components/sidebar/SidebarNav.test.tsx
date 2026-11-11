@@ -277,11 +277,19 @@ describe('SidebarNav', () => {
     })
     const container = await renderSidebarNav()
 
-    await waitFor(() => expect(queryButtonByText(container, 'Agent Dashboard')).not.toBeNull())
+    // Why the prefix: V30's row always ends with its working count, even 0.
+    await waitFor(() =>
+      expect(
+        Array.from(container.querySelectorAll('button')).some((button) =>
+          button.textContent?.trim().startsWith('Agent Dashboard')
+        )
+      ).toBe(true)
+    )
     expect(mocks.getAgentBucketCounts).toHaveBeenCalledTimes(1)
   })
 
-  it('uses a question glyph only for the Needs You count', async () => {
+  // ORCA-1148: V30's drawNav counts who needs you and who is working, nothing else.
+  it('counts Needs You with the question glyph and Working with the spinner', async () => {
     mocks.agentBucketCounts = { attention: 2, working: 3, done: 1, idle: 4 }
     setSidebarState({
       settings: {
@@ -300,12 +308,9 @@ describe('SidebarNav', () => {
     const done = container.querySelector('[aria-label="Done: 1"]')
     const idle = container.querySelector('[aria-label="Idle: 4"]')
     expect(attention?.querySelector('.lucide-message-circle-question-mark')).not.toBeNull()
-    expect(working?.querySelector('.rounded-full')).not.toBeNull()
-    expect(done?.querySelector('.rounded-full')).not.toBeNull()
-    expect(idle?.querySelector('.rounded-full')).not.toBeNull()
-    expect(working?.querySelector('svg')).toBeNull()
-    expect(done?.querySelector('svg')).toBeNull()
-    expect(idle?.querySelector('svg')).toBeNull()
+    expect(working?.querySelector('[data-agent-spinner]')).not.toBeNull()
+    expect(done).toBeNull()
+    expect(idle).toBeNull()
   })
 
   it('shows the Mobile entry by default for older settings', () => {
