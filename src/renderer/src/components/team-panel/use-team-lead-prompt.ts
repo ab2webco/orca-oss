@@ -17,10 +17,14 @@ export type SendToLead = (
 
 const press = createLeadPromptSender(Date.now)
 
-/** Sends the lead a turn, like the terminal band; null with no lead pane to write to. */
-export function useTeamLeadPrompt(): SendToLead | null {
+/**
+ * Sends the lead a turn, like the terminal band; null with no lead pane to write to.
+ * `leadHandle`: a lead the caller found itself, ahead of the panel's last read (ORCA-717).
+ */
+export function useTeamLeadPrompt(leadHandle?: string | null): SendToLead | null {
   const hostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
-  const handle = useTeamLeadHandle()
+  const panelHandle = useTeamLeadHandle()
+  const handle = leadHandle ?? panelHandle
   return useMemo(() => {
     if (!handle) {
       return null
