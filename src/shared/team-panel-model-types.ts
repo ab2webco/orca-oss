@@ -251,6 +251,9 @@ export type TeamSceneSource = {
   extensions: OrchestratorGameSceneExtension[]
 }
 
+/** A To Do ticket no member holds yet, with what work-on sends the lead for it (ORCA-717). */
+export type TeamTodoTicket = { identifier: string; title: string; prompt: string }
+
 export type TeamPanelGameModel = TeamPanelTabs & {
   kind: 'team'
   repoId: string
@@ -270,6 +273,10 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   scene: TeamSceneSource
   /** Orca's and the project's actions for the dock and its menu, in game.state's order. */
   actions: TeamAction[]
+  /** The project's To Do tickets no member holds; empty when the host publishes none. */
+  todo: TeamTodoTicket[]
+  /** The agent members run, as orca.yaml names it; absent when the host sends no lead. */
+  memberAgent?: string
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */
