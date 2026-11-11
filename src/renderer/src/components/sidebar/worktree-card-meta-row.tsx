@@ -21,20 +21,18 @@ export function WorktreeCardMetaRow({
   const {
     worktree,
     repo,
-    hostContextLabel,
     identityDisplay,
-    isFolder,
-    newCardStyle,
+    showIdentityInNewCard,
     branch,
     detachedHeadDisplay,
+    isFolder,
+    newCardStyle,
     conflictOperation,
     cacheStartedAt,
     cacheTtlMs
   } = card
   const {
     showRepoBadgeInMetaRow,
-    showHostContextBadge,
-    showIdentityInNewCard,
     hasHoverDetails,
     showBranch,
     showDetachedHeadInMetaRow,
@@ -55,28 +53,13 @@ export function WorktreeCardMetaRow({
           </div>
         )}
 
-        {showHostContextBadge && (
-          <Badge
-            variant="secondary"
-            className="h-[16px] max-w-[7rem] shrink-0 rounded border border-border bg-accent px-1.5 text-[10px] font-medium leading-none text-muted-foreground dark:bg-accent/80 dark:border-border/50"
-          >
-            <span className="truncate">{hostContextLabel}</span>
-          </Badge>
-        )}
-
+        {/* Why no host, and branch or HEAD only on opt-in: V30 draws the row as one line (ORCA-1149). */}
         {showIdentityInNewCard ? (
           <TruncatedSidebarLabel
             text={identityDisplay!}
             className="text-[11px] text-muted-foreground leading-none"
             tooltipEnabled={!hasHoverDetails}
           />
-        ) : isFolder && !newCardStyle ? (
-          <span
-            className="min-w-0 truncate font-mono text-[11px] leading-none text-muted-foreground"
-            title={worktree.path}
-          >
-            {getDirectoryName(worktree.path)}
-          </span>
         ) : showBranch ? (
           <TruncatedSidebarLabel
             text={branch}
@@ -91,6 +74,13 @@ export function WorktreeCardMetaRow({
             side="right"
             className="h-[16px]"
           />
+        ) : isFolder && !newCardStyle ? (
+          <span
+            className="min-w-0 truncate font-mono text-[11px] leading-none text-muted-foreground"
+            title={worktree.path}
+          >
+            {getDirectoryName(worktree.path)}
+          </span>
         ) : null}
 
         {showConflictOperationBadge && (
