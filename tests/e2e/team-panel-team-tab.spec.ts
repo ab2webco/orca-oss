@@ -49,7 +49,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
-type ReadRig = typeof globalThis & { __teamReadFails?: boolean }
+type ReadRig = typeof globalThis & { __teamReadFails?: boolean; __teamReads?: number }
 
 /** Fails the panel's game.state as a host that stopped answering does; the CLI client is untouched. */
 async function wrapPanelReads(app: ElectronApplication): Promise<void> {
@@ -60,8 +60,11 @@ async function wrapPanelReads(app: ElectronApplication): Promise<void> {
     const real = handlers.get('runtime:call')!
     ipcMain.removeHandler('runtime:call')
     ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
-      if (args.method === 'game.state' && rig.__teamReadFails) {
-        throw new Error('host did not answer')
+      if (args.method === 'game.state') {
+        rig.__teamReads = (rig.__teamReads ?? 0) + 1
+        if (rig.__teamReadFails) {
+          throw new Error('host did not answer')
+        }
       }
       return real(event, args)
     })
@@ -246,8 +249,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
       await expect(panel).not.toContainText(COPY[language].noTeam)
     }
     await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
-    await failPanelReads(electronApp, false)
+    // Why click while reads still fail: once they answer, the panel's own poll can recover and
+    // take the button away before the click lands (CI run 42985493201).
+    const readsSoFar = (): Promise<number> =>
+      electronApp.evaluate(() => (globalThis as ReadRig).__teamReads ?? 0)
+    const readsBeforeRetry = await readsSoFar()
     await panel.getByRole('button', { name: COPY.en.retry }).click()
+    await expect.poll(readsSoFar).toBeGreaterThan(readsBeforeRetry)
+    await failPanelReads(electronApp, false)
 
     await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
       timeout: 90_000
@@ -285,8 +294,10 @@ test('the Team tab shows the live lead and its members from the lead game state'
         await expect(cards).toHaveCount(2)
       }
     )
-    await failPanelReads(electronApp, false)
+    const readsBeforeSecondRetry = await readsSoFar()
     await panel.getByRole('button', { name: COPY.en.retry }).click()
+    await expect.poll(readsSoFar).toBeGreaterThan(readsBeforeSecondRetry)
+    await failPanelReads(electronApp, false)
     await expect(panel).not.toContainText(COPY.en.readError)
     await expect(cards).toHaveCount(2)
 
