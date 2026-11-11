@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
-import { teamSceneFloorInputOf, teamSceneFloorsOf } from './team-scene-floors'
+import { teamSceneFloorInputOf, teamSceneFloorsOf, teamSceneRideOf } from './team-scene-floors'
 
 const local: TeamHost = { kind: 'local' }
 const remote = (name: string, reachable = true): TeamHost => ({
@@ -173,5 +173,41 @@ describe("teamSceneFloorsOf from the owner's real teams", () => {
 
   it('floors only the machines our members sit on, leaving empty ones to the Machines tab', () => {
     expect(teamSceneFloorsOf(real).map((f) => f.key)).toEqual(['', 'm1'])
+  })
+})
+
+describe('teamSceneRideOf', () => {
+  const asking = (key: string, host: TeamHost) => ({ ...card(key, host), needsYou: true })
+  it('sends the lead to the first member on another floor who needs you, and nowhere else', () => {
+    const members = [card('a'), card('b', remote('m1')), asking('c', remote('m1'))]
+    const floors = teamSceneFloorsOf({ lead, members, machines: null })
+    expect(teamSceneRideOf(floors)).toEqual({ floor: 'm1', member: 'c' })
+    const home = teamSceneFloorsOf({
+      lead,
+      members: [asking('a', local), card('b', remote('m1'))],
+      machines: null
+    })
+    expect(teamSceneRideOf(home)).toBeNull()
+  })
+
+  it('never rides to a floor it cannot reach', () => {
+    const members = [card('a'), asking('c', remote('m1', false))]
+    expect(teamSceneRideOf(teamSceneFloorsOf({ lead, members, machines: null }))).toBeNull()
+  })
+
+  it("puts the ride on both floors' inputs: away on the lead's, the guest on the member's", () => {
+    const members = [card('a'), asking('c', remote('m1'))]
+    const model = {
+      lead: { ...lead, name: 'Lead', status: 'working', condition: 'working' },
+      advisor: null,
+      stopped: null,
+      members,
+      machines: null
+    } as unknown as Parameters<typeof teamSceneFloorInputOf>[0]
+    const floors = teamSceneFloorsOf({ lead, members, machines: null })
+    const ride = teamSceneRideOf(floors)
+    const [home, away] = floors.map((floor) => teamSceneFloorInputOf(model, floor, ride))
+    expect(home!.ride).toBe('away')
+    expect(away!.ride).toEqual({ guest: 'c' })
   })
 })

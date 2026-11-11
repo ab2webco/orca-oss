@@ -1,15 +1,20 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import {
   teamSceneFloorInputOf,
   teamSceneFloorsOf,
+  teamSceneRideOf,
+  type TeamSceneBuildingRide,
   type TeamSceneFloor
 } from '../../../../shared/team-scene/team-scene-floors'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { teamHostText } from '../team-panel/team-card-text'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
+import { TeamSceneElevatorShaft } from './TeamSceneElevatorShaft'
+import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
 import type { TeamScenePainter } from './team-scene-painter'
 
@@ -28,7 +33,40 @@ type Props = {
 
 // Why these: a floor's strip is the row of desks, its sky cropped, so three floors fit a panel.
 // Each storey up crops less, so higher floors look out over more sky than the lead's street level.
-const STRIP = { height: 112, crop: 66, perLevel: 10, minCrop: 36 }
+const STRIP = { height: 112, slab: 4, crop: 66, perLevel: 10, minCrop: 36 }
+const TUBE_SECONDS = 1.6
+
+/** A report a member on another floor just filed, travelling up the tube; never under reduced motion. */
+function useTubeEnvelope(
+  floors: readonly TeamSceneFloor[],
+  reducedMotion: boolean
+): { from: string; id: number } | null {
+  const seen = useRef(new Map<string, string | null>())
+  const [envelope, setEnvelope] = useState<{ from: string; id: number } | null>(null)
+  useEffect(() => {
+    let filed: string | null = null
+    for (const floor of floors) {
+      for (const member of floor.members) {
+        const before = seen.current.get(member.paneKey)
+        if (!floor.lead && member.summary && before !== undefined && before !== member.summary) {
+          filed = floor.key
+        }
+        seen.current.set(member.paneKey, member.summary)
+      }
+    }
+    if (filed && !reducedMotion) {
+      setEnvelope({ from: filed, id: Date.now() })
+    }
+  }, [floors, reducedMotion])
+  useEffect(() => {
+    if (!envelope) {
+      return
+    }
+    const timer = setTimeout(() => setEnvelope(null), TUBE_SECONDS * 1000)
+    return () => clearTimeout(timer)
+  }, [envelope])
+  return reducedMotion ? null : envelope
+}
 const SHOWN_FLOORS = 3
 
 /** True when the team spans more than one machine: the building replaces the single office. */
@@ -42,10 +80,16 @@ function FloorStage({
   leadLine,
   onUnplaced,
   zoomed,
-  level
-}: Props & { floor: TeamSceneFloor; zoomed: boolean; level: number }): React.JSX.Element | null {
+  level,
+  ride
+}: Props & {
+  floor: TeamSceneFloor
+  zoomed: boolean
+  level: number
+  ride: TeamSceneBuildingRide | null
+}): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
-  const input = useMemo(() => teamSceneFloorInputOf(model, floor), [model, floor])
+  const input = useMemo(() => teamSceneFloorInputOf(model, floor, ride), [model, floor, ride])
   if (!painter) {
     return null
   }
@@ -104,6 +148,10 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   // Why the lead's at the bottom: floor 1 is where the lead stands, the others above it.
   const shown = zoomed ? [zoomed] : floors.slice(0, SHOWN_FLOORS).toReversed()
   const more = zoomed ? 0 : floors.length - SHOWN_FLOORS
+  const rideKey = JSON.stringify(teamSceneRideOf(floors))
+  const ride = useMemo(() => JSON.parse(rideKey) as TeamSceneBuildingRide | null, [rideKey])
+  const leadFloor = floors.find((floor) => floor.lead)?.key ?? ''
+  const envelope = useTubeEnvelope(floors, usePrefersReducedMotion())
   const onKeyDown = (event: React.KeyboardEvent): void => {
     if (event.key === 'Escape' || event.key === '0') {
       setZoom(null)
@@ -148,20 +196,30 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
           </Button>
         ))}
       </nav>
-      <div className="min-w-0">
-        {shown.map((floor) => (
-          <FloorStage
-            key={floor.key}
-            {...props}
-            floor={floor}
-            zoomed={zoomed !== null}
-            level={floors.indexOf(floor)}
-          />
-        ))}
-        {more > 0 ? (
-          <div className="px-2 py-1 text-xs text-muted-foreground">{`+${more}`}</div>
-        ) : null}
+      <div className="flex min-w-0">
+        <div className="min-w-0 flex-1">
+          {shown.map((floor) => (
+            <FloorStage
+              key={floor.key}
+              {...props}
+              floor={floor}
+              zoomed={zoomed !== null}
+              level={floors.indexOf(floor)}
+              ride={ride}
+            />
+          ))}
+        </div>
+        <TeamSceneElevatorShaft
+          rows={shown.map((floor) => floor.key)}
+          rowHeight={zoomed ? TEAM_SCENE_ART_HEIGHT : STRIP.height + STRIP.slab}
+          carAt={ride?.floor ?? leadFloor}
+          envelope={envelope}
+          leadFloor={leadFloor}
+        />
       </div>
+      {more > 0 ? (
+        <div className="px-2 py-1 text-xs text-muted-foreground">{`+${more}`}</div>
+      ) : null}
     </div>
   )
 }

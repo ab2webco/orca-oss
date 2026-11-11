@@ -27,7 +27,8 @@ const MEMBERS = [
   { name: 'Caballero · ORCA-201 Plan', host: null },
   { name: 'Escudero · ORCA-202 Code', host: null },
   { name: 'Mago · ORCA-203 Tests', host: 'imac' },
-  { name: 'Herrero · ORCA-204 Review', host: 'imac' },
+  // Why waiting: a member on another floor who needs you is what sends the lead up the elevator.
+  { name: 'Herrero · ORCA-204 Review', host: 'imac', state: 'waiting' },
   { name: 'Arquera · ORCA-205 Docs', host: 'm1' }
 ]
 
@@ -59,7 +60,7 @@ async function spreadAcrossMachines(app: ElectronApplication): Promise<void> {
           paneKey: `building:${i}`,
           terminalHandle: null,
           displayName: one.name,
-          state: 'working',
+          state: one.state ?? 'working',
           toolName: 'Edit',
           ...(one.host ? { remote: { host: one.host, stateKnown: one.host !== 'm1' } } : {})
         }))
@@ -184,6 +185,11 @@ test('the Team panel draws a team on three machines as a building in Office', as
     await expect(floors.nth(0)).toHaveAttribute('data-team-floor-dark', '')
     await expect(floors.nth(2)).toHaveAttribute('data-team-floor', '')
     await expect(building).not.toContainText(/offline/i)
+    // The lead rides to the iMac, where a member waits on you: the car stands at that floor.
+    await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
+      'data-team-elevator-car',
+      'imac'
+    )
 
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)

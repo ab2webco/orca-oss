@@ -179,4 +179,58 @@ describe('TeamSceneBuilding', () => {
     )
     expect(crops[0]!).toBeGreaterThan(crops[2]!)
   })
+
+  describe('elevator and tube', () => {
+    const asking = (hosts: TeamHost[], who: number): TeamSceneBuildingModel => {
+      const base = model(hosts)
+      return {
+        ...base,
+        members: base.members.map((m, i) => (i === who ? { ...m, needsYou: true } : m))
+      }
+    }
+    const car = () => host.querySelector<HTMLElement>('[data-team-elevator-car]')
+    const motion = (reduced: boolean) =>
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (query) =>
+          ({
+            matches: reduced && query.includes('reduce'),
+            media: query,
+            addEventListener() {},
+            removeEventListener() {}
+          }) as unknown as MediaQueryList
+      )
+
+    it("parks the car at the lead's floor, and at the floor of a member there who needs you", () => {
+      render([local, remote('imac')])
+      expect(car()?.dataset.teamElevatorCar).toBe('')
+      act(() =>
+        root.render(
+          <TeamSceneBuilding
+            model={asking([local, remote('imac')], 1)}
+            makePainter={make}
+            leadLine={null}
+          />
+        )
+      )
+      expect(car()?.dataset.teamElevatorCar).toBe('imac')
+    })
+
+    it('sends a report up the tube when a member on another floor files one, never under reduced motion', () => {
+      motion(false)
+      render([local, remote('imac')])
+      const filed = model([local, remote('imac')])
+      filed.members[1] = { ...filed.members[1]!, summary: 'Report: #923 ready' }
+      act(() => root.render(<TeamSceneBuilding model={filed} makePainter={make} leadLine={null} />))
+      expect(
+        host.querySelector('[data-team-tube-envelope]')?.getAttribute('data-team-tube-envelope')
+      ).toBe('imac')
+      // Why a new root: the reduced-motion preference is read when the scene mounts.
+      act(() => root.unmount())
+      root = createRoot(host)
+      motion(true)
+      render([local, remote('imac')])
+      act(() => root.render(<TeamSceneBuilding model={filed} makePainter={make} leadLine={null} />))
+      expect(host.querySelector('[data-team-tube-envelope]')).toBeNull()
+    })
+  })
 })

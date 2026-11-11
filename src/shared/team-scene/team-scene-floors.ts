@@ -85,7 +85,8 @@ export function teamSceneFloorsOf(model: {
 /** One floor's scene: its own members and empty desks; the lead, advisor and STOP only on its own. */
 export function teamSceneFloorInputOf(
   model: Parameters<typeof teamSceneInputOf>[0],
-  floor: TeamSceneFloor
+  floor: TeamSceneFloor,
+  ride: TeamSceneBuildingRide | null = null
 ): TeamSceneInput {
   const input = teamSceneInputOf({
     ...model,
@@ -96,6 +97,35 @@ export function teamSceneFloorInputOf(
   return {
     ...input,
     ...(floor.lead ? { leadStays: true as const } : { leadless: true as const }),
-    desks: { taken: floor.taken, free: floor.free }
+    desks: { taken: floor.taken, free: floor.free },
+    ...rideOn(floor, ride)
   }
+}
+
+/** Where the lead rides: to a member on another floor it can reach who needs you. */
+export type TeamSceneBuildingRide = { floor: string; member: string }
+
+/** The lead's one real reason to leave its floor today: a member on another floor needs you. */
+export function teamSceneRideOf(floors: readonly TeamSceneFloor[]): TeamSceneBuildingRide | null {
+  for (const floor of floors) {
+    const asking =
+      floor.lead || !floor.reachable ? undefined : floor.members.find((m) => m.needsYou)
+    if (asking) {
+      return { floor: floor.key, member: asking.paneKey }
+    }
+  }
+  return null
+}
+
+const rideOn = (
+  floor: TeamSceneFloor,
+  ride: TeamSceneBuildingRide | null
+): Pick<TeamSceneInput, 'ride'> => {
+  if (!ride) {
+    return {}
+  }
+  if (floor.lead) {
+    return { ride: 'away' }
+  }
+  return floor.key === ride.floor ? { ride: { guest: ride.member } } : {}
 }
