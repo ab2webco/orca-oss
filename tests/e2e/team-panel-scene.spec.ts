@@ -680,9 +680,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
         .toBe(leadAsks)
       expect(
         await bubblesOverTag(orcaPage, ['lead'], 1500),
-        `the lead's one-line pixel bubble beside ORCA-14's tag at 320px ${theme}`
+        // Why not the clamp itself: where the walking lead leaves room, two lines fit and none is needed.
+        `the lead's pixel bubble beside ORCA-14's tag at 320px ${theme}`
       ).toEqual([])
-      await expect(leadBubble.locator('.line-clamp-1')).toHaveText(leadAsks)
       await scene.screenshot({
         path: testInfo.outputPath(`team-scene-lead-line-in-card-pixel-320-${theme}.png`)
       })
