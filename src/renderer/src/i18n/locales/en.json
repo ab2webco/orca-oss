@@ -17539,6 +17539,20 @@
       "hostLogin": "Host login",
       "choose": "Choose the {{value}} account",
       "systemLogin": "System login"
+    },
+    "team": {
+      "group": "Team",
+      "goToLead": "Go to lead {{value}}",
+      "goToLeadUnnamed": "Go to lead",
+      "addMember": "Add a member to the team…",
+      "chooseMember": "Choose the member's account",
+      "todoEmpty": "To Do is empty",
+      "reopen": "Reopen team",
+      "startFresh": "Start fresh lead…",
+      "chooseLead": "Choose the lead's account",
+      "startFreshConfirm": "Start a fresh lead?",
+      "start": "Start",
+      "cancel": "Cancel"
     }
   }
 }
