@@ -110,4 +110,15 @@ describe('newTabAccountChoiceOf', () => {
 
     expect(choice).toMatchObject({ kind: 'picker', defaultId: null })
   })
+
+  it('names a member stopped on a logged-out session as signed out, not as quota', () => {
+    const loggedOut = usage('acct-logged-out', { stopped: { resetsAt: null, loggedOut: true } })
+
+    const choice = newTabAccountChoiceOf([option(loggedOut)], now)
+
+    expect(choice).toMatchObject({
+      kind: 'picker',
+      rows: [{ id: 'acct-logged-out', disabled: 'signed-out' }]
+    })
+  })
 })

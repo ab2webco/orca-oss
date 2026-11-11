@@ -26,4 +26,10 @@ describe('newTabTeamMenuStateOf (ORCA-717)', () => {
       kind: 'no-team'
     })
   })
+
+  it('offers neither Reopen nor Start fresh while the lead is restoring', () => {
+    expect(
+      newTabTeamMenuStateOf({ liveLead: 'restoring', storedLead: { accountLabel: 'Claude 1' } })
+    ).toEqual({ kind: 'no-team' })
+  })
 })

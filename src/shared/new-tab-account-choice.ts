@@ -50,7 +50,8 @@ export function newTabAccountChoiceOf(
 }
 
 function disabledOf(option: NewTabAccountOption, now: number): NewTabAccountDisabled | null {
-  if (option.failedLogin) {
+  // Why: a member stopped on /login reads 'limited' in the standing, but the fix is a sign-in.
+  if (option.failedLogin || option.usage.stopped?.loggedOut) {
     return 'signed-out'
   }
   if (option.customEndpoint) {

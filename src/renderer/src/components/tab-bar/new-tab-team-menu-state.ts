@@ -5,12 +5,16 @@ export type NewTabTeamMenuState =
   | { kind: 'lead-closed'; leadAccountLabel: string | null }
 
 export type NewTabTeamMenuInput = {
-  liveLead: { name: string; paneKey: string } | null
+  // Why 'restoring': the lead is coming back, so Reopen or Start fresh would race it.
+  liveLead: { name: string; paneKey: string } | 'restoring' | null
   // Why 'unknown': a host older than ORCA-717 cannot list stored leads, so Reopen is never offered on a guess.
   storedLead: { accountLabel: string | null } | null | 'unknown'
 }
 
 export function newTabTeamMenuStateOf(input: NewTabTeamMenuInput): NewTabTeamMenuState {
+  if (input.liveLead === 'restoring') {
+    return { kind: 'no-team' }
+  }
   if (input.liveLead) {
     return { kind: 'lead-live', leadName: input.liveLead.name, leadPaneKey: input.liveLead.paneKey }
   }
