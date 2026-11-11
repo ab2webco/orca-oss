@@ -8,6 +8,7 @@ import {
   type TeamSceneWorld
 } from './team-scene-director'
 import { teamSceneActors } from './team-scene-actors'
+import { teamSceneLeadAttends } from './team-scene-lead-rounds'
 import type {
   TeamSceneActivity,
   TeamSceneActor,
@@ -157,5 +158,34 @@ describe('team scene lead rounds', () => {
     settleTeamScene(world)
     expect(actor(world, 'lead').x).toBe(home)
     expect(actor(world, 'lead').carrying).toBe(false)
+  })
+})
+
+// Why: its bubble may tail behind the asker's tag on the way there too, or it vanishes mid-walk
+// (merge-queue run 42982825235, 'bubbles shown: none' beside ORCA-14's tag).
+describe('teamSceneLeadAttends', () => {
+  it('holds from the moment the lead sets out to a member who asks until it is answered', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a', 'needsYou')]))
+    stepTeamScene(world, DT, { width: WIDTH })
+    expect(world.rounds.stage).toBe('toMember')
+    expect(teamSceneLeadAttends(world)).toBe(true)
+    for (let t = 0; t < 20; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+    }
+    expect(world.rounds.stage).toBe('atMember')
+    expect(teamSceneLeadAttends(world)).toBe(true)
+    applyTeamSceneInput(world, input([member('a')]))
+    stepTeamScene(world, DT, { width: WIDTH })
+    expect(teamSceneLeadAttends(world)).toBe(false)
+  })
+
+  it('never holds on a round that hands out work', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a')]))
+    for (let t = 0; t < 4; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      expect(teamSceneLeadAttends(world)).toBe(false)
+    }
   })
 })
