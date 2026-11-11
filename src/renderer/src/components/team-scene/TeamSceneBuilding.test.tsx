@@ -180,6 +180,30 @@ describe('TeamSceneBuilding', () => {
     expect(crops[0]!).toBeGreaterThan(crops[2]!)
   })
 
+  // Why: Blink memory grew ~120 MB/min with the building shown (2026-11-11); a poll hands a new
+  // model each time, and nothing it draws may pile up or remake its painters.
+  it('keeps its DOM and painters flat across many polls, reports and rides included', () => {
+    vi.useFakeTimers()
+    const hosts = [local, remote('imac'), remote('m1')]
+    render(hosts)
+    const nodes = host.querySelectorAll('*').length
+    const painters = make.mock.calls.length
+    for (let poll = 0; poll < 300; poll++) {
+      const next = model(hosts)
+      next.members[1] = {
+        ...next.members[1]!,
+        summary: `Report ${poll}`,
+        needsYou: poll % 2 === 0,
+        decisions: [{ id: `d${poll}`, verdict: 'allow', gesture: null }]
+      }
+      act(() => root.render(<TeamSceneBuilding model={next} makePainter={make} leadLine={null} />))
+      act(() => vi.advanceTimersByTime(20_000))
+    }
+    expect(make.mock.calls.length).toBe(painters)
+    expect(host.querySelectorAll('*').length).toBe(nodes)
+    vi.useRealTimers()
+  })
+
   describe('elevator and tube', () => {
     const asking = (hosts: TeamHost[], who: number): TeamSceneBuildingModel => {
       const base = model(hosts)
