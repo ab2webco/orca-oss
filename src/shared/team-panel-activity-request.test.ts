@@ -47,7 +47,11 @@ describe('the request a row shows', () => {
   it('names a dispatched task by its title, never by its brief', () => {
     const row = rowOf({
       prompt: BRIEF,
-      orchestration: { taskId: 'task_9', taskTitle: 'WAINBOX-121 Answer the inbox thread' }
+      orchestration: {
+        taskId: 'task_9',
+        dispatchId: 'ctx_9',
+        taskTitle: 'WAINBOX-121 Answer the inbox thread'
+      }
     })
     expect(row.prompt).toBe('WAINBOX-121 Answer the inbox thread')
   })
