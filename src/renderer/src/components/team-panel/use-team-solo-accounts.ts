@@ -42,7 +42,7 @@ export function teamSoloAccountReadsOf(
 /** Parsed because a paired host may run another build. */
 function accountsIn(result: { accounts?: unknown } | null): [string, GameMemberAccount | null][] {
   const listed = Array.isArray(result?.accounts) ? (result.accounts as unknown[]) : []
-  return listed.flatMap((one) => {
+  return listed.flatMap((one): [string, GameMemberAccount | null][] => {
     const { paneKey, account } = (one ?? {}) as { paneKey?: unknown; account?: unknown }
     if (typeof paneKey !== 'string') {
       return []
