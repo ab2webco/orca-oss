@@ -12,7 +12,7 @@ import { SCENE_DUST } from './team-scene-painter-marks'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { OFFICE_NOTE, OFFICE_TRAY } from './team-scene-office-builds'
 import { OFFICE_VIRUS_COLORS } from './team-scene-office-virus'
-import { STATION_SCREEN_GLOW } from './team-scene-station-screen'
+import { STATION_SCREEN_GLOW, STATION_SCREEN_PASS } from './team-scene-station-screen'
 import { seatPlanOf } from '../../../../shared/team-scene/team-scene-seats'
 
 const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
@@ -561,6 +561,26 @@ describe('createImagePainter office builds', () => {
     expect(dust('office', 'build')).toBe(0)
     expect(dust('office', 'repair')).toBe(0)
     expect(dust('castle', 'build')).toBeGreaterThan(0)
+  })
+
+  it("flashes the member's Office screen green as its CI passes, and leaves a castle alone", () => {
+    const flash = (builds: 'office' | 'castle') => {
+      const painter = createImagePainter({
+        art: {
+          style: style({ props: { station: 'desk.png', stationScreen: screen } }),
+          images: IMAGES
+        },
+        colors: COLORS,
+        builds
+      })
+      const r = recordingContext()
+      const actors = [actor('m', { pose: 'work', x: spot.x, depth: spot.depth })]
+      const effects = [{ kind: 'ciGreen' as const, key: 'm' }]
+      painter.paint(r.g, frame({ actors, effects, stations: [spot], sites: [site(false)] }))
+      return r.calls.map((c) => c.fillStyle)
+    }
+    expect(flash('office')).toContain(STATION_SCREEN_PASS)
+    expect(flash('castle')).not.toContain(STATION_SCREEN_PASS)
   })
 
   describe('the red-CI virus', () => {

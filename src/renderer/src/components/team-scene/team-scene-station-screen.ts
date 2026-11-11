@@ -40,6 +40,7 @@ const LINE: Record<
 }
 const TEXT = '#a8b4c8'
 export const STATION_SCREEN_GLOW = '#9cc4ff'
+export const STATION_SCREEN_PASS = '#4ade80'
 const BOOT_SECONDS = 1.4
 const LINES = 5
 
@@ -80,6 +81,27 @@ export function stationScreenStateOf(
   return (worker && SCREEN_OF[worker.pose]) ?? 'off'
 }
 
+// Why fading: CI passing is a moment, so the green washes in and out with a tick held over it.
+function drawPass(g: CanvasRenderingContext2D, rect: ScreenRect, p: number): void {
+  const [ux, uy] = [rect.width / 28, rect.height / 18]
+  const rise = Math.sin(p * Math.PI)
+  g.save()
+  g.globalAlpha = rise * 0.55
+  g.fillStyle = STATION_SCREEN_PASS
+  g.fillRect(rect.x, rect.y, rect.width, rect.height)
+  g.globalAlpha = Math.min(1, rise * 1.6)
+  g.strokeStyle = '#ffffff'
+  g.lineWidth = Math.max(1.5, 2.2 * uy)
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+  g.beginPath()
+  g.moveTo(rect.x + 8 * ux, rect.y + 6.5 * uy)
+  g.lineTo(rect.x + 12.5 * ux, rect.y + 11 * uy)
+  g.lineTo(rect.x + 20.5 * ux, rect.y + 3 * uy)
+  g.stroke()
+  g.restore()
+}
+
 // A small warning triangle, centred, in the card's attention colour.
 function drawAway(g: CanvasRenderingContext2D, rect: ScreenRect, attention: string): void {
   const s = Math.min(rect.width, rect.height) * 0.42
@@ -117,31 +139,42 @@ function drawGame(
   g.fillRect(x + 2 * ux, y + 2 * uy, (2 + (Math.floor(t) % 6)) * ux, 1.2 * uy)
 }
 
-/** Fills `rect` (stage px) as V28 does; only code scrolls, so a done desk holds still. */
+type ScreenOptions = {
+  attention?: string
+  /** Office's bug over a failing screen. */
+  virus?: boolean
+  /** 0 to 1 while a member who just sat down boots its screen; absent once booted. */
+  boot?: number
+  /** What a 'desk' screen shows. */
+  desk?: TeamSceneDesk
+  /** What a 'hold' screen shows, and its risk colour for a limit. */
+  hold?: TeamSceneHold
+  risk?: string
+  /** 0 to 1 while the member's CI has just passed; absent otherwise. */
+  green?: number
+}
+
+/** Fills `rect` (stage px) as V28 does, then any CI pass flashing over it. */
 export function drawStationScreen(
   g: CanvasRenderingContext2D,
-  rect: { x: number; y: number; width: number; height: number },
+  rect: ScreenRect,
   state: ScreenState,
   t: number,
-  {
-    attention = '#e5484d',
-    virus = false,
-    boot,
-    desk,
-    hold,
-    risk = '#f5b342'
-  }: {
-    attention?: string
-    /** Office's bug over a failing screen. */
-    virus?: boolean
-    /** 0 to 1 while a member who just sat down boots its screen; absent once booted. */
-    boot?: number
-    /** What a 'desk' screen shows. */
-    desk?: TeamSceneDesk
-    /** What a 'hold' screen shows, and its risk colour for a limit. */
-    hold?: TeamSceneHold
-    risk?: string
-  } = {}
+  options: ScreenOptions = {}
+): void {
+  drawScreenBody(g, rect, state, t, options)
+  if (options.green !== undefined && state !== 'away' && state !== 'hold') {
+    drawPass(g, rect, options.green)
+  }
+}
+
+// Only code scrolls, so a done desk holds still.
+function drawScreenBody(
+  g: CanvasRenderingContext2D,
+  rect: ScreenRect,
+  state: ScreenState,
+  t: number,
+  { attention = '#e5484d', virus = false, boot, desk, hold, risk = '#f5b342' }: ScreenOptions
 ): void {
   g.fillStyle = BACKGROUND[state]
   g.fillRect(rect.x, rect.y, rect.width, rect.height)
@@ -204,32 +237,48 @@ export function stationFailingAt(
   )
 }
 
-/** Screens booting for members who just sat down; their welcome replaces the burst. */
+const PASS_SECONDS = 1.6
+
+/** How far a moment that started then has run, 0 to 1; undefined once over, and forgotten. */
+function momentOf(
+  started: Map<string, number>,
+  key: string | undefined,
+  t: number,
+  seconds: number
+): number | undefined {
+  const at = key === undefined ? undefined : started.get(key)
+  if (at === undefined || t - at >= seconds) {
+    if (key !== undefined) {
+      started.delete(key)
+    }
+    return undefined
+  }
+  return Math.max(0, (t - at) / seconds)
+}
+
+/** Screen moments: a boot for a member who just sat down, a green flash for CI that passed. */
 export function createStationBoots() {
-  const started = new Map<string, number>()
+  const boots = new Map<string, number>()
+  const passes = new Map<string, number>()
   return {
-    /** The effects left once each welcome has started its member's boot. */
+    /** The effects left once each welcome and CI pass has started its member's moment. */
     take: <E extends { kind: string; key?: string; reason?: string }>(
       effects: E[],
       t: number
     ): E[] =>
       effects.filter((e) => {
         if (e.kind === 'burst' && e.reason === 'welcome' && e.key) {
-          started.set(e.key, t)
+          boots.set(e.key, t)
+          return false
+        }
+        if (e.kind === 'ciGreen' && e.key) {
+          passes.set(e.key, t)
           return false
         }
         return true
       }),
-    progressOf: (key: string | undefined, t: number): number | undefined => {
-      const at = key === undefined ? undefined : started.get(key)
-      if (at === undefined || t - at >= BOOT_SECONDS) {
-        if (key !== undefined) {
-          started.delete(key)
-        }
-        return undefined
-      }
-      return Math.max(0, (t - at) / BOOT_SECONDS)
-    }
+    progressOf: (key: string | undefined, t: number) => momentOf(boots, key, t, BOOT_SECONDS),
+    passOf: (key: string | undefined, t: number) => momentOf(passes, key, t, PASS_SECONDS)
   }
 }
 

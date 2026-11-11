@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   drawStationScreen,
   STATION_SCREEN_GLOW,
+  STATION_SCREEN_PASS,
   stationScreenStateOf
 } from './team-scene-station-screen'
 import { recordingContext } from './team-scene-recording-context'
@@ -118,5 +119,15 @@ describe('station screen', () => {
     // The card's own colours: a limit is a risk, a lost login needs you.
     expect(drawn[0]!.calls.map((c) => c.fillStyle)).toContain('#f5b342')
     expect(drawn[2]!.calls.map((c) => c.fillStyle)).toContain('#e5484d')
+  })
+
+  it('flashes a screen green with a tick for a moment as its CI passes', () => {
+    const fills = (green?: number) => {
+      const r = recordingContext()
+      drawStationScreen(r.g, RECT, 'code', 0, green === undefined ? {} : { green })
+      return r.calls.map((c) => c.fillStyle)
+    }
+    expect(fills(0.1)).toContain(STATION_SCREEN_PASS)
+    expect(fills()).not.toContain(STATION_SCREEN_PASS)
   })
 })

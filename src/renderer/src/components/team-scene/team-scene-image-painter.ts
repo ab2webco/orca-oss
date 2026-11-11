@@ -216,7 +216,11 @@ export function createImagePainter(args: {
       if (screen) {
         const rect = stationScreenRectAt(screen, left, top, px)
         const boot = boots.progressOf(worker?.key, f.t)
-        const show = { desk: worker?.desk, hold: worker?.hold }
+        const show = {
+          desk: worker?.desk,
+          hold: worker?.hold,
+          green: boots.passOf(worker?.key, f.t)
+        }
         drawStationScreen(g, rect, state, f.t, { ...colors, virus, boot, ...show })
       }
     }

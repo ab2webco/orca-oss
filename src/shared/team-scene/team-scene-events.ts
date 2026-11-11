@@ -75,6 +75,10 @@ export function teamSceneEventsBetween(
     if (m.mergedPr !== null && m.mergedPr !== old.mergedPr) {
       events.push({ kind: 'merge', key: m.key })
     }
+    // Why only from running or red: an unread or already green PR has nothing that just passed.
+    if (m.ci === 'success' && (old.ci === 'pending' || old.ci === 'failure')) {
+      events.push({ kind: 'ciGreen', key: m.key })
+    }
   }
   const panes: [string, TeamSceneAgentInput, TeamSceneAgentInput | undefined][] = [
     ['lead', next.lead, prev.lead],

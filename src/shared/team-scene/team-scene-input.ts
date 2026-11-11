@@ -12,7 +12,8 @@ import type {
   TeamSceneActivity,
   TeamSceneAgentInput,
   TeamSceneHold,
-  TeamSceneInput
+  TeamSceneInput,
+  TeamSceneMemberInput
 } from './team-scene-types'
 
 // Why exhaustive: a fall-through to resting let a gone, failed or queued member play at its desk.
@@ -64,6 +65,13 @@ const HOLD: Partial<Record<TeamCondition, TeamSceneHold>> = {
   starting: 'starting'
 }
 
+// Why open only: a merged PR's checks are history, and none or neutral is no reading.
+const ciOf = (m: TeamMemberCard): Pick<TeamSceneMemberInput, 'ci'> => {
+  const open = m.pr?.state === 'open' || m.pr?.state === 'draft'
+  const ci = open ? m.pr?.ci : undefined
+  return ci === 'pending' || ci === 'failure' || ci === 'success' ? { ci } : {}
+}
+
 const deskOf = (
   m: TeamMemberCard,
   queue: readonly TeamQueueEntry[] | null
@@ -89,7 +97,8 @@ export function teamSceneInputOf(
       site: teamSceneSiteOf(m),
       ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {}),
       ...deskOf(m, queue),
-      ...(HOLD[m.condition] ? { hold: HOLD[m.condition] } : {})
+      ...(HOLD[m.condition] ? { hold: HOLD[m.condition] } : {}),
+      ...ciOf(m)
     }))
   }
 }

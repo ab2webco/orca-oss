@@ -30,6 +30,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   desk?: TeamSceneDesk
   /** Why it cannot work yet or now, from its card's condition. */
   hold?: TeamSceneHold
+  /** Its open PR's CI reading; absent with no open PR or no reading. */
+  ci?: 'pending' | 'failure' | 'success'
 }
 
 export type TeamSceneInput = {
@@ -46,6 +48,8 @@ export type TeamSceneEvent =
   | { kind: 'handoff'; key: string }
   | { kind: 'finish'; key: string }
   | { kind: 'merge'; key: string }
+  /** An open PR's CI turned green from running or red. */
+  | { kind: 'ciGreen'; key: string }
   | { kind: 'advisorSpoke'; line: string }
   /** Jev decided in `key`'s pane ('lead' for the lead); the advisor walks over and gestures. */
   | { kind: 'judged'; key: string; gesture: TeamSceneGesture }
@@ -116,6 +120,8 @@ export type TeamSceneActor = {
 /** One-shot moments a style may draw particles or a thrown item for. */
 export type TeamSceneEffect =
   | { kind: 'handoff'; from: string; to: string }
+  /** A member's CI just turned green; a style with monitors flashes that one. */
+  | { kind: 'ciGreen'; key: string }
   | {
       kind: 'burst'
       key: string

@@ -328,3 +328,17 @@ describe('teamSceneInputOf and why a member is held', () => {
     expect(teamSceneActors(world).find((a) => a.key === 'limited')?.hold).toBe('limited')
   })
 })
+
+describe('teamSceneInputOf and CI', () => {
+  it("carries an open PR's CI reading, and none for a merged or missing PR", () => {
+    const members = [
+      card('running', { pr: { ...pr(1, 'open'), ci: 'pending' } }),
+      card('draft', { pr: { ...pr(2, 'draft'), ci: 'success' } }),
+      card('merged', { pr: { ...pr(3, 'merged'), ci: 'success' } }),
+      card('unread', { pr: { ...pr(4, 'open'), ci: 'none' } }),
+      card('none')
+    ]
+    const input = teamSceneInputOf({ lead: lead(), advisor: null, members })
+    expect(input.members.map((m) => m.ci ?? null)).toEqual(['pending', 'success', null, null, null])
+  })
+})

@@ -107,3 +107,20 @@ describe('teamSceneEventsBetween', () => {
     ])
   })
 })
+
+describe('teamSceneEventsBetween and CI turning green', () => {
+  const at = (ci?: TeamSceneMemberInput['ci']) => input([member('m', ci ? { ci } : {})])
+  const greens = (from: TeamSceneInput | null, to: TeamSceneInput) =>
+    teamSceneEventsBetween(from, to).filter((e) => e.kind === 'ciGreen')
+
+  it('marks CI going green from running or red, once', () => {
+    expect(greens(at('pending'), at('success'))).toEqual([{ kind: 'ciGreen', key: 'm' }])
+    expect(greens(at('failure'), at('success'))).toEqual([{ kind: 'ciGreen', key: 'm' }])
+    expect(greens(at('success'), at('success'))).toEqual([])
+  })
+
+  it('never on opening, nor for a PR that was green or unread before', () => {
+    expect(greens(null, at('success'))).toEqual([])
+    expect(greens(at(), at('success'))).toEqual([])
+  })
+})

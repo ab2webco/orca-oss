@@ -214,6 +214,8 @@ export function applyTeamSceneInput(
       queueVisit(world, body, 'finish')
       Object.assign(body.plan, { report })
       emote(world, body, 'check', CHECK_SECONDS)
+    } else if (event.kind === 'ciGreen') {
+      world.effects.push({ kind: 'ciGreen', key: event.key })
     } else if (event.kind === 'merge') {
       keepTrophy(world.trophies, { key: event.key, name: byKey.get(event.key)?.name ?? event.key })
       world.cheerUntil = world.t + CHEER_SECONDS
