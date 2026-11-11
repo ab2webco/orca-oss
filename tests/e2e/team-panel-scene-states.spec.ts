@@ -269,7 +269,16 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     // member also walks in and greets the lead before it sits.
     const REFRESH_WAIT_MS = 21_000
     let settleMs = REFRESH_WAIT_MS
-    const capture = async (round: Record<'lead' | 'member', string>): Promise<void> => {
+    const leadX = (): Promise<number> =>
+      orcaPage.evaluate(() =>
+        Number(
+          document.querySelector<HTMLElement>('[data-team-scene] [data-scene-lead-x]')?.dataset
+            .sceneLeadX
+        )
+      )
+    // Why one side per round: a lead's pose is sampled where nobody waits, so it stands alone at
+    // its spot; with a member waiting it walks to that member on its rounds (ORCA-1150).
+    const capture = async (round: Partial<Record<'lead' | 'member', string>>): Promise<void> => {
       for (const style of STYLES) {
         await orcaPage.evaluate(
           (next) =>
@@ -285,6 +294,9 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         await orcaPage.waitForTimeout(settleMs)
         settleMs = 2000
         for (const who of ['lead', 'member'] as const) {
+          if (round[who] === undefined) {
+            continue
+          }
           if (who === 'lead' && round.lead !== 'working') {
             await leadSettled(orcaPage)
           }
@@ -296,12 +308,20 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
             )
           }
         }
+        if (round.member === 'waiting') {
+          // The member sits at x 0.1: the lead goes over to it, wherever its pose was sampled.
+          await expect
+            .poll(leadX, { message: `${style}: the lead never went to the waiting member` })
+            .toBeLessThan(0.5)
+        }
         if (round.member === 'working') {
           const sky = await sampleCrop(orcaPage, 'sky', SKY_WINDOW_MS)
           seen.set(`${style}:sky`, new Set(sky.hashes))
         }
         await scene.screenshot({
-          path: testInfo.outputPath(`scene-${style}-lead-${round.lead}-member-${round.member}.png`)
+          path: testInfo.outputPath(
+            `scene-${style}-lead-${round.lead ?? 'any'}-member-${round.member ?? 'any'}.png`
+          )
         })
         // Evidence for the seat at every width and theme (criterion 7), read beside V28 office.
         if (round.member === 'working') {
@@ -343,6 +363,10 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       state: 'done',
       lastAssistantMessage: 'Done'
     })
+    await expect.poll(() => agentState(true)).toBe('done')
+    settleMs = REFRESH_WAIT_MS
+    await capture({ lead: 'done' })
+    await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
     await client.call('game.ownerAsk', {
       worktreeId,
       terminalHandle: lead,
@@ -350,10 +374,8 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       question: 'Merge #12 now?',
       options: ['Yes', 'No']
     })
-    await expect.poll(() => agentState(true)).toBe('done')
     settleMs = REFRESH_WAIT_MS
-    await capture({ lead: 'done', member: 'waiting' })
-    await expect(sceneText, 'a stopped lead keeps no old step').not.toContainText('gh pr view')
+    await capture({ member: 'waiting' })
 
     const at = (style: Style, key: string): Set<string> => seen.get(`${style}:${key}`)!
     // AC2: the clouds drift in the styles that have a sky.

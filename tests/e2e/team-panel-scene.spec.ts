@@ -490,9 +490,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     testInfo.annotations.push({ type: 'team-scene-frames', description: await frameRate(orcaPage) })
     let said = 0
-    // One new advisor line at one width and theme. ORCA-1139 criterion 8, lead decision A: Pixel's
-    // 219 px stage (390 and 320) holds one bubble beside an asking member's tag, so the lead's stays
-    // and the advisor's whole line shows in its card.
+    // One new advisor line at one width and theme. ORCA-1139 criterion 8, lead decision A: beside an
+    // asking member's tag, where only one bubble fits, the lead's stays and the advisor's whole line
+    // shows in its card.
     const advisorStep = async (
       style: (typeof ADVISOR_STYLES)[number],
       width: number,
@@ -513,30 +513,29 @@ test('the Team panel draws the live scene beside a member opened under its heade
         .toBe(line)
       await expect(advisorBubble).toHaveText(line)
       const asking = (await askerTag.count()) > 0
-      const onlyLead = asking && style === 'pixel' && width <= 390
-      if (!onlyLead) {
-        await expect(advisorBubble).toBeVisible()
-        const shown = await shownBubbles(orcaPage)
-        expect(
-          shown.advisor,
-          `advisor bubble hidden at ${width}px ${style} ${label}`
-        ).not.toBeNull()
-        expect(
-          boxesClash(shown.advisor, shown.lead),
-          `lead and advisor bubbles clash at ${width}px ${style} ${label}`
-        ).toBe(false)
-      }
-      if (onlyLead) {
-        expect(
-          await bubblesOverTag(orcaPage, ['lead'], 1500),
-          `only the lead's pixel bubble beside ORCA-14's tag at ${width}px ${theme}`
-        ).toEqual([])
-      } else if (asking) {
+      const shown = await shownBubbles(orcaPage)
+      if (asking) {
+        // ORCA-1139 decision A, at any width: the lead stands by the asker on its rounds, so where
+        // its bubble and the advisor's do not both fit beside the tag only the lead's shows; the
+        // advisor's whole line is in its card row, as asserted above.
+        await expect(leadBubble).toBeVisible()
         await expect
           .poll(() => bubblesOverTag(orcaPage, ['advisor', 'lead']), {
             message: `${style} bubbles over ORCA-14's tag at ${width}px ${theme}`
           })
           .toEqual([])
+      } else {
+        await expect(advisorBubble).toBeVisible()
+        expect(
+          shown.advisor,
+          `advisor bubble hidden at ${width}px ${style} ${label}`
+        ).not.toBeNull()
+      }
+      if (shown.advisor) {
+        expect(
+          boxesClash(shown.advisor, shown.lead),
+          `lead and advisor bubbles clash at ${width}px ${style} ${label}`
+        ).toBe(false)
       }
       await expect(leadBubble).toBeVisible()
       await expect
