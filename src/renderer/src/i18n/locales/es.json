@@ -16557,7 +16557,8 @@
       "used": "{{value}}% usado",
       "ownLogin": "Login propio",
       "hostLogin": "Login del host",
-      "choose": "Elegir la cuenta de {{value}}"
+      "choose": "Elegir la cuenta de {{value}}",
+      "systemLogin": "Login del sistema"
     }
   }
 }

@@ -17537,7 +17537,8 @@
       "used": "{{value}}% used",
       "ownLogin": "Own login",
       "hostLogin": "Host login",
-      "choose": "Choose the {{value}} account"
+      "choose": "Choose the {{value}} account",
+      "systemLogin": "System login"
     }
   }
 }
