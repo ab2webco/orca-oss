@@ -30695,6 +30695,10 @@ export class OrcaRuntimeService {
         canWake: () =>
           Boolean(this.getAvailableAuthoritativeWindow() && this.notifier?.wakeSleepingAgentPane),
         requestWake: (paneKey) => this.notifier?.wakeSleepingAgentPane?.(paneKey),
+        tabIdsOf: (worktreeId) =>
+          (this.getWorkspaceSessionForWorktree(worktreeId)?.tabsByWorktree?.[worktreeId] ?? []).map(
+            (tab) => tab.id
+          ),
         isAsleep: (record) =>
           Boolean(
             this.getWorkspaceSessionForWorktree(record.worktreeId)
