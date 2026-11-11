@@ -96,6 +96,36 @@ async function openMenu(page: Page): Promise<ReturnType<Page['getByRole']>> {
   return menu
 }
 
+// Why (ORCA-717): at 390/320 the Add member submenu opened off the window's left, and at 768 a
+// pointer leaving toward its left-side submenu closed it; a stepped path is a person's mouse.
+async function expectTeamSubmenusStay(page: Page, width: number): Promise<void> {
+  const inWindow = async (menu: ReturnType<Page['getByRole']>, name: string): Promise<void> => {
+    const box = await menu.boundingBox()
+    expect(box, `${width}px: ${name} has no box`).not.toBeNull()
+    expect(box!.x, `${width}px: ${name} leaves the window`).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width, `${width}px: ${name} leaves the window`).toBeLessThanOrEqual(width)
+  }
+  const moveTo = async (target: ReturnType<Page['getByRole']>): Promise<void> => {
+    const box = (await target.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 12 })
+  }
+  const menu = await openMenu(page)
+  await moveTo(menu.getByRole('menuitem', { name: 'Add member…' }))
+  const addMember = page.getByRole('menu').filter({ hasText: 'Member account' })
+  await expect(addMember).toBeVisible()
+  const account = addMember.getByRole('menuitem', { name: "Choose the member's account" })
+  await moveTo(account)
+  await page.waitForTimeout(400)
+  await expect(addMember, `${width}px: Add member closed under the pointer`).toBeVisible()
+  await inWindow(addMember, 'Add member')
+  await account.click()
+  const list = page.getByRole('menu').filter({ hasText: 'Claude accounts' })
+  await expect(list).toBeVisible()
+  await page.waitForTimeout(400)
+  await expect(list, `${width}px: the account list closed under the pointer`).toBeVisible()
+  await inWindow(list, 'the account list')
+}
+
 async function captureEach(
   page: Page,
   name: string,
@@ -277,6 +307,21 @@ test("the + menu offers the project's lead instead of a second team", async ({
     animations: 'disabled',
     path: shotPath('new-tab-add-member-1440-dark.png')
   })
+  for (const width of [768, 320]) {
+    await orcaPage.setViewportSize({ width, height: 900 })
+    await setWindowControlsWidth(orcaPage, width < DESKTOP_MIN_WIDTH ? '0px' : null)
+    await orcaPage.evaluate((wide) => {
+      const state = window.__store!.getState()
+      state.setSidebarOpen(wide)
+      state.setRightSidebarOpen(wide)
+    }, width >= 768)
+    await expectTeamSubmenusStay(orcaPage, width)
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      path: shotPath(`new-tab-add-member-accounts-${width}-dark.png`)
+    })
+  }
+  await setWindowControlsWidth(orcaPage, null)
   await orcaPage.keyboard.press('Escape')
 })
 
