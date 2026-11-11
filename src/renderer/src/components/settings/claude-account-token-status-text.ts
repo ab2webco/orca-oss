@@ -34,7 +34,13 @@ export function describeTokenCheck(
   check: ClaudeLongLivedTokenCheck | undefined,
   now: number
 ): string {
-  switch (check?.state) {
+  if (!check) {
+    return translate(
+      'auto.components.settings.ClaudeAccountAuthStatusLine.launchesOnToken',
+      'Launches on the token'
+    )
+  }
+  switch (check.state) {
     case 'verified':
       return translate(
         'auto.components.settings.ClaudeAccountAuthStatusLine.tokenVerifiedAt',
@@ -52,11 +58,6 @@ export function describeTokenCheck(
       return translate(
         'auto.components.settings.ClaudeAccountAuthStatusLine.tokenUndecided',
         'Token check inconclusive'
-      )
-    default:
-      return translate(
-        'auto.components.settings.ClaudeAccountAuthStatusLine.launchesOnToken',
-        'Launches on the token'
       )
   }
 }
