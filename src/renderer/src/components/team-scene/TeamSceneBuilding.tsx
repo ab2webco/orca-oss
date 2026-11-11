@@ -248,6 +248,8 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   return (
     <div
       data-team-building=""
+      // Why exposed: where each rider is on its trip, for specs and for a reader of the DOM.
+      data-team-ride={`${legs.lead.stage}|${legs.advisor.stage}`}
       role="group"
       aria-label={teamSceneLabel()}
       tabIndex={0}

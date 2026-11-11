@@ -205,6 +205,10 @@ test('the Team panel draws a team on three machines as a building in Office', as
       tool: 'PushNotification'
     })
     const leadBubble = building.locator('[data-scene-bubble="lead"]')
+    // The lead visits the iMac, where Herrero waits: its trip arrives and its line goes with it.
+    await expect
+      .poll(() => building.getAttribute('data-team-ride'), { timeout: 60_000 })
+      .toMatch(/^there\|/)
     await expect(leadBubble).toHaveText('Push notification', { timeout: 30_000 })
     await expect(leadBubble).toBeVisible()
     const [bubbleBox, buildingBox] = await Promise.all([
