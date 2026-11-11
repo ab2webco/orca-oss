@@ -60,12 +60,16 @@ const hex = (color: number): string => `#${(color & 0xffffff).toString(16).padSt
 function bitmapOf(
   width: number,
   height: number,
-  colorAt: (x: number, y: number) => number | undefined
+  colorAt: (x: number, y: number) => number | undefined,
+  /** Repainted in place when its size matches, so a moving sky makes no new canvas each step. */
+  reuse?: HTMLCanvasElement
 ): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
+  const canvas =
+    reuse?.width === width && reuse.height === height ? reuse : document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const g = canvas.getContext('2d')
+  g?.clearRect(0, 0, width, height)
   for (let y = 0; g && y < height; y++) {
     for (let x = 0; x < width; x++) {
       const color = colorAt(x, y)
@@ -156,7 +160,7 @@ export function createPixelPainter(args: {
         const color = hdBackdropPixel(still, land, x, y)
         return color === hdSkyPixel(still, x, y) ? hdSkyPixel(moving, x, y) : color
       }
-      backdrop = { columns, step, canvas: bitmapOf(columns, PIXELS, colorAt) }
+      backdrop = { columns, step, canvas: bitmapOf(columns, PIXELS, colorAt, backdrop?.canvas) }
     }
     return backdrop.canvas
   }
