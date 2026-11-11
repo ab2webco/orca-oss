@@ -13,18 +13,61 @@ const ORCA_DISPATCH_STATUS_TASK_ID_MARKER = 'Your task ID is:'
 // normal single-line budget so the task body is still reachable for compacting.
 const ORCA_DISPATCH_STATUS_SOURCE_SCAN_LIMIT = 24_576
 
-export function isOrcaDispatchStatusPrompt(value: string): boolean {
+// Why both: the Lab brand renamed the preamble (ORCA-392); an older host still sends the first.
+const ORCA_DISPATCH_PREAMBLE_PREFIXES = [
+  ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX,
+  'You are working inside Orca Lab, a multi-agent IDE.'
+]
+// Why: a brief pasted into an agent arrives wrapped in this tag, so the preamble no longer leads.
+const PASTED_CONTENT_OPEN = /^<pasted_content\b[^>]{0,120}>/
+
+const skipWhitespace = (value: string, from: number, end: number): number => {
+  let index = from
+  while (index < end && isEcmaTrimWhitespace(value.charCodeAt(index))) {
+    index++
+  }
+  return index
+}
+
+/** Where a dispatch preamble starts, past whitespace and a pasted-content tag; -1 when none. */
+function dispatchPreambleStartOf(value: string): number {
   // Why: status payloads cross a trust boundary. Keep dispatch detection
   // bounded too, or leading whitespace can bypass the normalizer's scan cap.
   const scanEnd = Math.min(value.length, ORCA_DISPATCH_STATUS_SOURCE_SCAN_LIMIT)
-  let start = 0
-  while (start < scanEnd && isEcmaTrimWhitespace(value.charCodeAt(start))) {
-    start++
+  let start = skipWhitespace(value, 0, scanEnd)
+  const tag = PASTED_CONTENT_OPEN.exec(value.slice(start, Math.min(scanEnd, start + 160)))
+  if (tag) {
+    start = skipWhitespace(value, start + tag[0].length, scanEnd)
   }
-  return (
-    start + ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX.length <= scanEnd &&
-    value.startsWith(ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX, start)
+  return ORCA_DISPATCH_PREAMBLE_PREFIXES.some(
+    (prefix) => start + prefix.length <= scanEnd && value.startsWith(prefix, start)
   )
+    ? start
+    : -1
+}
+
+export function isOrcaDispatchStatusPrompt(value: string): boolean {
+  return dispatchPreambleStartOf(value) !== -1
+}
+
+/** The first line of a dispatch's task body, or null when the prompt carries none. */
+export function orcaDispatchTaskBodyOf(value: string): string | null {
+  const start = dispatchPreambleStartOf(value)
+  if (start === -1) {
+    return null
+  }
+  const scan = value.slice(start, Math.min(value.length, ORCA_DISPATCH_STATUS_SOURCE_SCAN_LIMIT))
+  const marker = findOrcaDispatchTaskMarkerIndex(scan)
+  if (marker === -1) {
+    return null
+  }
+  for (const line of scan.slice(marker + ORCA_DISPATCH_STATUS_TASK_MARKER.length).split(/\r?\n/)) {
+    const text = line.trim().replace(/\s+/g, ' ')
+    if (text) {
+      return text
+    }
+  }
+  return null
 }
 
 /**
@@ -40,10 +83,8 @@ export function compactDispatchPromptForStatus(
   const scanEnd = Math.min(value.length, ORCA_DISPATCH_STATUS_SOURCE_SCAN_LIMIT)
   // Bound leading trim to the scan window so a multi-MB paste of pure
   // whitespace cannot walk the entire string before we give up.
-  let start = 0
-  while (start < scanEnd && isEcmaTrimWhitespace(value.charCodeAt(start))) {
-    start++
-  }
+  const preambleStart = dispatchPreambleStartOf(value)
+  const start = preambleStart === -1 ? skipWhitespace(value, 0, scanEnd) : preambleStart
   const scan = value.slice(start, scanEnd)
 
   let taskId = ''
