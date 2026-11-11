@@ -288,6 +288,38 @@ describe('tab title tooltips', () => {
     expectTabContainerWidth(markup, root)
   })
 
+  // Why (ORCA-1149): main stores a member's tab as `name · ticket · local`; the label names the machine.
+  it("names this machine in a game member's tab label and keeps the stored title", () => {
+    const markup = renderToStaticMarkup(
+      <SortableTab
+        tab={makeTerminalTab({ title: 'Merlín · ORCA-12 · local' })}
+        unifiedTabId="terminal-1"
+        groupId="group-1"
+        tabCount={1}
+        hasTabsToRight={false}
+        hasTabsToLeft={false}
+        isActive={true}
+        isPinned={false}
+        isExpanded={false}
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCloseOthers={vi.fn()}
+        onCloseToRight={vi.fn()}
+        onCloseToLeft={vi.fn()}
+        onSetCustomTitle={vi.fn()}
+        onSetTabColor={vi.fn()}
+        onTogglePin={vi.fn()}
+        onToggleExpand={vi.fn()}
+        dragData={makeDragData('terminal', 'terminal-1')}
+      />
+    )
+
+    expectTooltipContent(markup, 'Merlín · ORCA-12 · This computer')
+    expect(openingTag(markup, 'data-testid', 'sortable-tab')).toContain(
+      'data-tab-title="Merlín · ORCA-12 · local"'
+    )
+  })
+
   it("shows the provider icon while stripping the agent's leading status glyph from the label", () => {
     mockTabAgent = 'claude'
     const markup = renderToStaticMarkup(
