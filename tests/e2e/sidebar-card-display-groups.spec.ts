@@ -137,6 +137,17 @@ test.describe('Card display groups', () => {
         await cardDisplay.hover()
         const groups = orcaPage.locator('[data-card-display-group]')
         await expect(groups).toHaveText(['Work', 'Agent', 'Source'])
+        // At 320 the submenu was cut at the window's right edge ('Pull request and ch...').
+        const submenu = orcaPage.locator('[role="menu"]:has([data-card-display-group])')
+        await expect
+          .poll(
+            async () => {
+              const box = await submenu.boundingBox()
+              return box ? box.x >= 0 && box.x + box.width <= width : false
+            },
+            { message: `${width}px ${theme}: the Card display submenu leaves the window` }
+          )
+          .toBe(true)
         await expect(
           orcaPage.getByRole('menuitemcheckbox', { name: 'Pull request and checks' })
         ).toBeVisible()
