@@ -76,6 +76,10 @@ async function spreadAcrossMachines(app: ElectronApplication): Promise<void> {
 }
 
 // ORCA-1150: an Office team on several machines is a building, one floor per machine.
+// Why test.use: a never-shown window paints no animation frames, so no ride and no bubble would
+// ever be drawn (ORCA-760; the frozen ride stills of ORCA-1150).
+test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
+
 test('the Team panel draws a team on three machines as a building in Office', async ({
   electronApp,
   orcaPage
