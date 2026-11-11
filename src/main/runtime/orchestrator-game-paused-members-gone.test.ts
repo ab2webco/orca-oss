@@ -12,7 +12,7 @@ afterEach(() => {
   }
 })
 
-function setup(goneWorktrees: ReadonlySet<string>) {
+function setup(goneWorktrees: ReadonlySet<string>, released: ReadonlySet<string> = new Set()) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-game-paused-gone-'))
   dirs.push(dir)
   const store = new GameMemberSessionStore(
@@ -23,7 +23,8 @@ function setup(goneWorktrees: ReadonlySet<string>) {
     store,
     contextOf: () => undefined,
     sessionIdOf: () => null,
-    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId)
+    worktreeGone: async (worktreeId) => goneWorktrees.has(worktreeId),
+    releasedDispatch: (dispatchId) => released.has(dispatchId)
   })
   return { store, paused }
 }
@@ -67,6 +68,16 @@ describe('paused members whose worktree is gone', () => {
 
     expect((await paused.note('repo:a', [])).paused.map((one) => one.ticket)).toEqual(['ORCA-1'])
     expect(await ticketsOf(store)).toEqual(['ORCA-1'])
+  })
+
+  // Why: worker-release after a verified worker_done is how a lead ends a member; it stayed paused.
+  it('drops a launched member whose worker the lead released', async () => {
+    const { store, paused } = setup(new Set(), new Set(['ctx_1']))
+    await paused.record('repo:a', { ...saved('ORCA-1', 'repo-a::/w/orca-1'), dispatchId: 'ctx_1' })
+    await paused.record('repo:a', { ...saved('ORCA-2', 'repo-a::/w/orca-2'), dispatchId: 'ctx_2' })
+
+    expect((await paused.note('repo:a', [])).paused.map((one) => one.ticket)).toEqual(['ORCA-2'])
+    expect(await ticketsOf(store)).toEqual(['ORCA-2'])
   })
 
   it('frees the members of a removed worktree and nothing else', async () => {

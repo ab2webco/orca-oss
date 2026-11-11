@@ -142,7 +142,7 @@ describe('orca game fleet verbs', () => {
     })
 
     const text = output.join('\n')
-    expect(text).toContain('Paused since Orca or the machine restarted: 2')
+    expect(text).toContain('Paused, terminal gone (it ended or Orca restarted): 2')
     expect(text).toContain('game resume-members')
     expect(text).toMatch(/CIN-7\s+working\s+cin-7\s+claude\s+ana@example\.com\s+its conversation/)
     expect(text).toMatch(/CIN-8\s+launching\s+-\s+codex\s+-\s+a new launch in its worktree/)

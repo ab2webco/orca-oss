@@ -216,7 +216,7 @@ describe('orca game launch', () => {
     ])
   })
 
-  it('refuses a ticket paused by a restart, so it never gets a second member', async () => {
+  it('refuses a paused ticket, so it never gets a second member', async () => {
     const pausedMember = {
       ticket: 'CIN-12',
       name: null,
@@ -231,7 +231,7 @@ describe('orca game launch', () => {
     const { client, calls } = fakeClient(stateWith({ pausedMembers: [pausedMember] }))
 
     await expect(launch(client)).rejects.toThrow(
-      'CIN-12 is paused since Orca restarted: `orca game resume-members CIN-12` resumes it, `orca game resume-members CIN-12 --discard` frees it.'
+      'CIN-12 is paused, its terminal is gone (it ended or Orca restarted): `orca game resume-members CIN-12` resumes it, `orca game resume-members CIN-12 --discard` frees it.'
     )
     expect(calls.map(([method]) => method)).toEqual(['game.state'])
   })

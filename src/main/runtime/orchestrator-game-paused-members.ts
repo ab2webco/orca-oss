@@ -82,7 +82,10 @@ export class GamePausedMembers {
     const gone = await this.goneWorktreesOf(read.members.filter((one) => !tickets.has(one.ticket)))
     // Why drop and not only mark: nothing is left to resume, and a lead's cleanup never runs discard.
     const dropped = read.members.filter(
-      (one) => !tickets.has(one.ticket) && one.worktreeId !== null && gone.has(one.worktreeId)
+      (one) =>
+        !tickets.has(one.ticket) &&
+        ((one.worktreeId !== null && gone.has(one.worktreeId)) ||
+          (one.dispatchId !== null && this.deps.releasedDispatch?.(one.dispatchId) === true))
     )
     let members = read.members
     if (dropped.length > 0) {
@@ -103,9 +106,9 @@ export class GamePausedMembers {
     )
     return {
       ...pausedAndUnlistedMembersOf({
+        // Why again: a release must hide the member even when dropping it from the store failed.
         members: members.filter(
-          (one) =>
-            !(one.adoptedPaneKey && one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
+          (one) => !(one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
         ),
         live: liveNow,
         livePaneKeys,
