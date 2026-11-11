@@ -133,6 +133,12 @@ function FloorStage({
     return null
   }
   const cropTop = zoomed ? 0 : cropOf(level)
+  // Why where it stands: the lead's line goes with it on a visit, and none rides in the car.
+  const leg = legs.lead
+  const leadHere =
+    leg.stage === 'home' || leg.stage === 'out'
+      ? floor.lead
+      : (leg.stage === 'there' || leg.stage === 'back') && floor.key === leg.away
   const crop = zoomed
     ? undefined
     : { top: cropTop, bottom: Math.max(0, painter.height - cropTop - STRIP.height) }
@@ -142,15 +148,16 @@ function FloorStage({
       data-team-floor-dark={floor.reachable ? undefined : ''}
       // Why a slab and an inner ring: floors read as storeys of one glass building, not copies.
       // Why no overflow clip: only the canvas is cropped, so a bubble rises over the slab above.
-      className="relative border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
+      // Why flow-root: its own block context, or the view's negative margin lifts the whole floor.
+      className="relative flow-root border-b-4 border-border ring-1 ring-inset ring-white/10 last:border-b-0"
       style={zoomed ? undefined : { height: STRIP.height }}
     >
       <div data-team-floor-view="" style={zoomed ? undefined : { marginTop: -cropTop }}>
         <TeamSceneCanvas
           input={input}
           painter={painter}
-          leadLine={floor.lead ? leadLine : null}
-          onUnplaced={floor.lead ? onUnplaced : undefined}
+          leadLine={leadHere ? leadLine : null}
+          onUnplaced={leadHere ? onUnplaced : undefined}
           onBoarded={onBoarded}
           crop={crop}
           visibleTop={topmost ? cropTop : 0}

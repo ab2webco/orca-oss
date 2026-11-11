@@ -212,6 +212,9 @@ describe('TeamSceneBuilding', () => {
     expect(floorsShown).toHaveLength(3)
     for (const [i, floor] of floorsShown.entries()) {
       expect(floor.className, 'the floor itself clips nothing').not.toContain('overflow-hidden')
+      // Why flow-root: without a block context of its own, the view's negative margin collapses
+      // through the floor and lifts it over the floor above (seen in the building E2E).
+      expect(floor.className).toContain('flow-root')
       const canvas = floor.querySelector<HTMLCanvasElement>('canvas')!
       expect(canvas.style.clipPath, `floor ${i}`).toMatch(
         /^inset\(\d+px 0px \d+px\)|^inset\(\d+px 0px\)/
@@ -240,6 +243,32 @@ describe('TeamSceneBuilding', () => {
       )
     expect(obstaclesOn('')).toBe(1)
     expect(obstaclesOn('m1')).toBe(0)
+  })
+
+  it("gives the lead's line to the floor where the lead stands, its own or the one it visits", () => {
+    vi.useFakeTimers()
+    const lines = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-team-floor]')]
+        .filter((floor) => floor.querySelector('[data-scene-bubble="lead"]'))
+        .map((floor) => floor.dataset.teamFloor)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(60)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+    const asking = model([local, remote('imac')])
+    asking.members[1] = { ...asking.members[1]!, needsYou: true }
+    act(() => root.render(<TeamSceneBuilding model={asking} makePainter={make} leadLine="Busy" />))
+    // Reduced motion: the ride shows its end, the lead by the member on the iMac floor.
+    expect(lines()).toEqual(['imac'])
+    act(() =>
+      root.render(
+        <TeamSceneBuilding
+          model={model([local, remote('imac')])}
+          makePainter={make}
+          leadLine="Busy"
+        />
+      )
+    )
+    expect(lines()).toEqual([''])
+    vi.useRealTimers()
   })
 
   describe('elevator and tube', () => {
