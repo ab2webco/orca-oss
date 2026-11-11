@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 
-import React from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -9,11 +8,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import type { NewTabAccountRow } from '../../../../shared/new-tab-account-choice'
+import type { AgentRowAccount } from './new-tab-agent-row-account'
 import { NewTabTeamMenuItems, type NewTabTeamMenuItemsProps } from './NewTabTeamMenuItems'
 
 const row = (id: string, over: Partial<NewTabAccountRow> = {}): NewTabAccountRow => ({
   id,
-  email: null,
+  email: `${id}@example.test`,
   disabled: null,
   inUseBy: [],
   otherModel: false,
@@ -21,12 +21,12 @@ const row = (id: string, over: Partial<NewTabAccountRow> = {}): NewTabAccountRow
   ...over
 })
 
-const PICKER = {
+const PICKER: AgentRowAccount = {
   kind: 'picker',
   provider: 'claude',
   rows: [row('acct-free'), row('acct-2', { inUseBy: ['ORCA-3'] })],
   checkedId: 'acct-free'
-} as const
+}
 const TODO = [{ identifier: 'ORCA-9', title: 'Fix the menu', prompt: 'Work on ORCA-9' }]
 const LIVE = {
   kind: 'lead-live',
