@@ -859,6 +859,13 @@ html.native-shell .app-layout {
   background: var(--bg-titlebar, var(--card));
 }
 
+/* Why: in a phone-width window the floating name left the tab strip no room for its + (ORCA-717). */
+@media (max-width: 480px) {
+  .titlebar-left-floating .titlebar-app-name {
+    display: none;
+  }
+}
+
 .titlebar-traffic-light-pad {
   width: calc(80px / var(--ui-zoom-factor, 1));
   flex-shrink: 0;
