@@ -208,11 +208,11 @@ describe('TeamTabContent', () => {
     for (const card of [leadCard(container), ...memberCards(container)]) {
       const name = card.querySelector('[data-team-name]')!
       const host = card.querySelector('[data-team-host]')!
-      // Why basis-0: the host claims only what is left, so it gives way before the name does.
-      expect(host.className).toContain('basis-0')
-      expect(host.className).toContain('flex-1')
-      expect(host.className).toContain('truncate')
-      expect(host.className).toContain('min-w-0')
+      // ORCA-1148: at 320 a cut host read 'loc…'; short of room it drops to its own line whole.
+      expect(host.className).toContain('shrink-0')
+      expect(host.className).toContain('ml-auto')
+      expect(host.className).not.toContain('truncate')
+      expect(host.className).not.toContain('basis-0')
       // ORCA-1092 row 23: a name too long for the row truncates instead of pushing the row wider.
       expect(name.className).not.toContain('shrink-0')
       expect(name.className).toContain('min-w-0')
@@ -358,6 +358,29 @@ describe('TeamTabContent', () => {
 
     expect(line?.className).toContain('text-status-attention')
     expect(card.textContent).not.toContain('Edit · terminal-role.ts')
+  })
+
+  // ORCA-1148: at 320 the waiting line read 'Waiting for your a…'; it wraps to two lines instead.
+  it('wraps the waiting line on a member and on the lead instead of cutting it', async () => {
+    const { container } = await render(
+      model({
+        lead: { ...lead, status: 'attention', ownerAsk: { ticket: 'ORCA-14' } },
+        members: [member({ needsYou: true, status: 'attention' })]
+      })
+    )
+    const waiting = [
+      [...memberCards(container)[0].querySelectorAll('span')].findLast(
+        (node) => node.textContent === 'Waiting for your answer'
+      ),
+      [...leadCard(container).querySelectorAll('span')].findLast(
+        (node) => node.textContent === 'Waiting for you · Question on ORCA-14'
+      )
+    ]
+
+    for (const line of waiting) {
+      expect(line?.className).not.toContain('truncate')
+      expect(line?.className).toContain('line-clamp-2')
+    }
   })
 
   // Why: a question appears in full only in Inbox (ORCA-1048).

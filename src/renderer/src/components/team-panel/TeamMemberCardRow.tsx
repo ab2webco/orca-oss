@@ -125,7 +125,7 @@ export function TeamMemberCardRow({
             ) : null}
             <span
               data-team-host=""
-              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
+              className="ml-auto shrink-0 text-right font-mono text-[11px] text-muted-foreground"
             >
               {teamHostText(card.host)}
             </span>
@@ -133,7 +133,11 @@ export function TeamMemberCardRow({
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {showName ? <TeamStatusMark status={card.status} /> : null}
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
-            <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
+            <span
+              className={cn(
+                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
+              )}
+            >
               {card.needsYou
                 ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
                 : teamLiveText(card.liveAction, card.condition)}
