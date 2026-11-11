@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DropdownMenu,
@@ -120,6 +120,18 @@ describe('NewTabTeamMenuItems', () => {
     renderMenu({ state: CLOSED })
     expect(item(/^Reopen team/).querySelector('svg.lucide-rotate-ccw')).toBeTruthy()
     expect(item('Start fresh lead…').querySelector('svg.lucide-plus')).toBeTruthy()
+  })
+
+  // Why: Radix focuses the + menu itself when the pointer leaves Add member toward a left-side or
+  // pulled-in submenu (768, 390, 320), and that closed the submenu under the pointer.
+  it('keeps the Add member submenu open when focus lands on the + menu itself', async () => {
+    renderMenu({})
+    fireEvent.click(item('Add member…'))
+    expect(await screen.findByText('Member account')).toBeTruthy()
+
+    act(() => screen.getAllByRole('menu')[0].focus())
+
+    expect(screen.queryByText('Member account')).toBeTruthy()
   })
 
   it('keeps the add-member row to its label and one chevron, the account inside its submenu', () => {

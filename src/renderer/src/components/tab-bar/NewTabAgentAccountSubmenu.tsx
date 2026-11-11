@@ -13,6 +13,11 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { NewTabAccountRow } from '../../../../shared/new-tab-account-choice'
 import { newTabAccountRowTextOf } from './new-tab-account-row-text'
+import { keepSubmenuOpenOnParentMenuFocus } from './new-tab-submenu-fit'
+import { useSubmenuOffsetsInWindow } from './use-submenu-offsets-in-window'
+
+// Why: the list's widest, max-w 22rem; reserving it keeps any narrower list inside the window too.
+const ACCOUNT_LIST_MAX_WIDTH_PX = 352
 
 export type NewTabAgentAccountSubmenuProps = {
   provider: 'claude' | 'codex'
@@ -40,12 +45,14 @@ export function NewTabAgentAccountSubmenu({
 }: NewTabAgentAccountSubmenuProps): React.JSX.Element {
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  const listFit = useSubmenuOffsetsInWindow(ACCOUNT_LIST_MAX_WIDTH_PX, 6)
   // Why: beside a row the whole email was cut to 'name@ko…'; its name part fits, the list shows it whole.
   const at = triggerLabel.indexOf('@')
   const shortLabel = at > 0 ? triggerLabel.slice(0, at) : triggerLabel
   return (
-    <DropdownMenuSub>
+    <DropdownMenuSub onOpenChange={listFit.onOpenChange}>
       <DropdownMenuSubTrigger
+        ref={listFit.triggerRef}
         aria-label={ariaLabel}
         title={triggerLabel}
         className="min-w-0 max-w-[55%] gap-1 px-1.5 font-normal text-muted-foreground"
@@ -53,7 +60,8 @@ export function NewTabAgentAccountSubmenu({
         <span className="truncate">{shortLabel}</span>
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent
-        sideOffset={6}
+        {...listFit.offsets}
+        onFocusOutside={keepSubmenuOpenOnParentMenuFocus}
         className="w-max min-w-64 max-w-[min(22rem,calc(100vw-16px))]"
       >
         <DropdownMenuLabel className="px-2 pt-1.5 pb-1 text-[11px] font-medium text-muted-foreground">

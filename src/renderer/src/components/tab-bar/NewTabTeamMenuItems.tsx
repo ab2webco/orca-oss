@@ -12,6 +12,8 @@ import { translate } from '@/i18n/i18n'
 import type { TeamTodoTicket } from '../../../../shared/team-panel-model-types'
 import type { AgentRowAccount } from './new-tab-agent-row-account'
 import { NewTabAgentAccountSubmenu } from './NewTabAgentAccountSubmenu'
+import { keepSubmenuOpenOnParentMenuFocus } from './new-tab-submenu-fit'
+import { useSubmenuOffsetsInWindow } from './use-submenu-offsets-in-window'
 import type { NewTabTeamMenuState } from './new-tab-team-menu-state'
 
 type Provider = 'claude' | 'codex'
@@ -29,6 +31,8 @@ export type NewTabTeamMenuItemsProps = {
 
 const ROW = 'gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium'
 const ICON = 'size-4 shrink-0 text-muted-foreground'
+// Why: the Add member submenu's w-72, the width it needs beside the + menu.
+const ADD_MEMBER_WIDTH_PX = 288
 const LABEL = 'px-2 pt-1.5 pb-1 text-[11px] font-medium text-muted-foreground'
 
 /** The + menu's Team group: the project's live or kept lead, never a second team (ORCA-717). */
@@ -36,6 +40,7 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
   const { state, account } = props
   const [picked, setPicked] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const addMemberFit = useSubmenuOffsetsInWindow(ADD_MEMBER_WIDTH_PX, 0)
   const accountId = account.kind === 'picker' ? (picked ?? account.checkedId) : null
   // Why: a lead named after its role would read "Go to lead · Lead"; the role already says it.
   const leadName = state.kind === 'lead-live' ? state.leadName : null
@@ -86,15 +91,19 @@ export function NewTabTeamMenuItems(props: NewTabTeamMenuItemsProps): React.JSX.
               {leadLabel && <span className="text-muted-foreground"> · {leadLabel}</span>}
             </span>
           </DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className={ROW}>
+          <DropdownMenuSub onOpenChange={addMemberFit.onOpenChange}>
+            <DropdownMenuSubTrigger ref={addMemberFit.triggerRef} className={ROW}>
               <UserPlus aria-hidden className={ICON} />
               <span className="truncate">
                 {translate('newTabMenu.team.addMember', 'Add member…')}
               </span>
             </DropdownMenuSubTrigger>
             {/* Why the account inside: beside the row its chevron doubled the row's and cut the label. */}
-            <DropdownMenuSubContent className="w-72">
+            <DropdownMenuSubContent
+              className="w-72"
+              {...addMemberFit.offsets}
+              onFocusOutside={keepSubmenuOpenOnParentMenuFocus}
+            >
               {memberAccount ? (
                 <>
                   <div className="flex items-center">
