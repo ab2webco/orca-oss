@@ -192,6 +192,25 @@ test('the Team panel draws a team on three machines as a building in Office', as
       'imac'
     )
 
+    // The lead's step as the owner saw it: a bare tool, its bubble on the lead's floor rising over the
+    // slab above in words, never cut behind it ('Los mensajes quedan detrás del muro').
+    await emitCodexHookStatus(endpoint, {
+      paneKey: pane.paneKey,
+      worktreeId,
+      state: 'working',
+      tool: 'PushNotification'
+    })
+    const leadBubble = building.locator('[data-scene-bubble="lead"]')
+    await expect(leadBubble).toHaveText('Push notification', { timeout: 30_000 })
+    await expect(leadBubble).toBeVisible()
+    const [bubbleBox, buildingBox] = await Promise.all([
+      leadBubble.boundingBox(),
+      building.boundingBox()
+    ])
+    expect(bubbleBox!.y, 'the lead bubble leaves the building').toBeGreaterThanOrEqual(
+      buildingBox!.y
+    )
+
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
       for (const width of WIDTHS) {
