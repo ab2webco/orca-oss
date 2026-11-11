@@ -213,6 +213,7 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import PlaneWorkItemWorkspace from '@/components/PlaneWorkItemWorkspace'
 import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
 import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
+import { TaskPagePlaneRateLimitNotice } from '@/components/task-page-plane-rate-limit-notice'
 import {
   TaskPagePlaneBoardSkeleton,
   resolvePlaneLoadingSkeleton
@@ -12028,6 +12029,10 @@ export default function TaskPage(): React.JSX.Element {
                         onOpenChange={setPlaneErrorDetailsOpen}
                       />
                     </div>
+                  ) : null}
+
+                  {planeLoading ? (
+                    <TaskPagePlaneRateLimitNotice settings={planeBoardProviderSettings} />
                   ) : null}
 
                   {/* Why view-gated: the board branch swaps in its own board-shaped skeleton; row shimmer over columns read as a broken table. */}

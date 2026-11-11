@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { connect } from '../plane/client'
+import { connect, planeRateLimitWait } from '../plane/client'
 import { withPlaneChangeBroadcast } from '../plane/plane-change-broadcast'
 import {
   disconnect,
@@ -117,6 +117,8 @@ export function registerPlaneHandlers(): void {
   ipcMain.handle('plane:status', async () => {
     return status()
   })
+
+  ipcMain.handle('plane:rateLimitWait', () => planeRateLimitWait())
 
   ipcMain.handle('plane:testConnection', async (_event, args?: { workspaceId?: string }) => {
     return testConnection({ workspaceId: normalizeOptionalString(args?.workspaceId) })

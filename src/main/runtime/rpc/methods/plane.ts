@@ -1,5 +1,6 @@
 import type { PlaneMember, PlaneUser } from '../../../../shared/plane-types'
 import { defineMethod, type RpcMethod } from '../core'
+import { planeRateLimitWait } from '../../../plane/client'
 import {
   AddWorkItemComment,
   Connect,
@@ -52,6 +53,11 @@ const PLANE_BASE_METHODS: RpcMethod[] = [
     name: 'plane.status',
     params: null,
     handler: async (_params, { runtime }) => runtime.planeStatus()
+  }),
+  defineMethod({
+    name: 'plane.rateLimitWait',
+    params: null,
+    handler: () => planeRateLimitWait()
   }),
   defineMethod({
     name: 'plane.getMe',

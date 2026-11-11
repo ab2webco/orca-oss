@@ -379,6 +379,25 @@ describe('429 handling', () => {
   })
 })
 
+describe('planeRateLimitWait', () => {
+  it('reports a 429 retry while it waits, and nothing after', async () => {
+    const { rawClientRequest, planeRateLimitWait } = await loadClientModule()
+    let seen: ReturnType<typeof planeRateLimitWait> = null
+    netFetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 429, { 'retry-after': '0.05' }))
+      .mockImplementationOnce(async () => {
+        seen = planeRateLimitWait()
+        return jsonResponse({ ok: true })
+      })
+    const pending = rawClientRequest(CLIENT, '/api/v1/users/me/')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(planeRateLimitWait()).toMatchObject({ reason: 'retry' })
+    await pending
+    expect(seen).toBeNull()
+    expect(planeRateLimitWait()).toBeNull()
+  })
+})
+
 // ORCA-1166: agents' calls used up a fixed 60/min, so the Tasks page waited up to a minute.
 describe('server-reported budget', () => {
   it('answers a Tasks read at once after 60 agent calls when the server allows 300/min', async () => {

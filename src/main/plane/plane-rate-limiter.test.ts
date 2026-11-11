@@ -133,6 +133,28 @@ describe('PlaneRateLimiter budget from the server', () => {
   })
 })
 
+describe('PlaneRateLimiter waitingUntilMs', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('says until when a queued call waits, and nothing once it went', async () => {
+    const limiter = new PlaneRateLimiter(1, 1_000)
+    expect(limiter.waitingUntilMs()).toBeNull()
+    await limiter.acquire('a')
+    const queued = limiter.acquire('a')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(limiter.waitingUntilMs()).toBe(Date.now() + 1_000)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await queued
+    expect(limiter.waitingUntilMs()).toBeNull()
+  })
+})
+
 describe('parsePlaneRateLimitHeaders', () => {
   it("reads Plane's remaining count and unix-seconds reset", () => {
     const headers = new Headers({
