@@ -830,7 +830,11 @@ import {
   GameMemberNameReservations,
   liveProjectMemberNamesOf
 } from './orchestrator-game-member-name-reservations'
-import { characterKeyOf, type GameMemberName } from '../../shared/orchestrator-game-member-names'
+import {
+  characterKeyOf,
+  memberNameOf,
+  type GameMemberName
+} from '../../shared/orchestrator-game-member-names'
 import { wakeSleepingTerminal } from './terminal-wake'
 import { sleepingTerminalOwnerOf } from './sleeping-terminal-owner'
 import { GameMemberResume } from './orchestrator-game-member-resume'
@@ -871,7 +875,6 @@ import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestr
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
 import { gameLessonSignalOfHistory, type GameLesson } from '../../shared/orchestrator-game-lessons'
 import { freedCharacterOf } from '../../shared/orchestrator-game-characters'
-import { memberNameOf } from '../../shared/orchestrator-game-member-names'
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import {
   GAME_MEMBER_ADVISOR_VERSION,
