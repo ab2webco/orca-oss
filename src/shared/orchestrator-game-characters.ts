@@ -237,6 +237,35 @@ export function creditGameMerge(
   return { ...stored, [character.key]: next }
 }
 
+const closedKeyOf = (ticket: string, number: number): string => `closed:${prKeyOf(ticket, number)}`
+
+/** Whether a PR no longer needs a look: paid to the character, or closed unmerged. */
+export function isReviewSettled(
+  stored: Record<string, unknown>,
+  characterKey: string,
+  review: { ticket: string; number: number }
+): boolean {
+  const settled = parseCharacter(stored[characterKey])?.settled ?? []
+  return (
+    settled.includes(prKeyOf(review.ticket, review.number) ?? '') ||
+    settled.includes(closedKeyOf(review.ticket, review.number))
+  )
+}
+
+/** The stored characters with a PR that closed unmerged marked, so it is not looked at again. */
+export function settleClosedReview(
+  stored: Record<string, unknown>,
+  character: { key: string; name: string },
+  review: { ticket: string; number: number }
+): Record<string, unknown> {
+  const before = parseCharacter(stored[character.key])
+  if (!before || isReviewSettled(stored, character.key, review)) {
+    return stored
+  }
+  const settled = [...before.settled, closedKeyOf(review.ticket, review.number)]
+  return { ...stored, [character.key]: { ...before, settled: settled.slice(-SETTLED_MAX) } }
+}
+
 /**
  * Another store's characters added to these: a character only one side has is kept as it was, and
  * one both have is summed unless a task of the other is already applied here (adopted before).
