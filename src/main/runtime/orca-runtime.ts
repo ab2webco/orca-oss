@@ -32793,8 +32793,12 @@ export class OrcaRuntimeService {
         }
         return { ...shown.terminal, agent: parseRemoteMemberAgent(shown.agent) }
       },
-      reviewOf: async (branch) =>
-        repoId ? await this.getGameReviewForBranch({ repoSelector: `id:${repoId}`, branch }) : null
+      reviewOf: async (branch, memberRepo) => {
+        // Why the member's repo first: a --repo member's PR lives there, never in the lead's (ORCA-1170).
+        const own = memberRepo ? await this.resolveRepoSelector(memberRepo).catch(() => null) : null
+        const id = own?.id ?? repoId
+        return id ? await this.getGameReviewForBranch({ repoSelector: `id:${id}`, branch }) : null
+      }
     })
     return { ...state, agents: [...state.agents, ...remote] }
   }
