@@ -1,3 +1,4 @@
+import { memberRosterOf } from '../../../../shared/orchestrator-game-member-names'
 import { observedMergesOf } from '../../../../shared/orchestrator-game-observed-events'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -21,7 +22,7 @@ export async function recordGameMerges(
   }
   const recorded = recordedByRuntime.get(runtime) ?? new Set<string>()
   recordedByRuntime.set(runtime, recorded)
-  for (const one of observedMergesOf(state.agents)) {
+  for (const { character, ...one } of observedMergesOf(state.agents, memberRosterOf(state))) {
     const id = `${caller.worktreeId ?? ''}\n${caller.terminalHandle ?? ''}\n${one.key}`
     if (recorded.has(id)) {
       continue
@@ -29,7 +30,9 @@ export async function recordGameMerges(
     // Why claim before the await: the panel and the mod poll at once, and both would post it.
     recorded.add(id)
     try {
-      await runtime.getGameBoard().postEvent({ ...caller, ...one })
+      // Why here: auto-release frees the member next and leaves no record its character could earn from.
+      const credit = character ? { credit: { character, number: one.merge.number } } : {}
+      await runtime.getGameBoard().postEvent({ ...caller, ...one, ...credit })
     } catch {
       // Why: a board that cannot be written must cost the merge its rewards, never the lead its state.
       recorded.delete(id)

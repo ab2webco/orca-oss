@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ticketInText } from '../../shared/orchestrator-game-ticket-id'
-import type { GameHistoryStore } from './orchestrator-game-history-store'
+import type { GameHistoryStore, GameMergeCredit } from './orchestrator-game-history-store'
 import type { GameStopSwitch } from './orchestrator-game-stop-switch'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import {
@@ -74,6 +74,8 @@ export type GameEventPost = GameBoardCaller & {
   /** Kept once per project: what sweep and fleet observe on every run. */
   key?: string
   merge?: GameEventMerge
+  /** The member's character a merged event pays; only the host's own merge reads set it (ORCA-1170). */
+  credit?: GameMergeCredit
 }
 
 /** A project's shared board on the Orca host: its events, read and written by lead and members. */
@@ -344,7 +346,8 @@ export class GameBoard {
       // Why not over RPC: only the host's own read of the review may call a merge perfect.
       ...(args.merge && args.kind === 'merged' ? { merge: args.merge } : {})
     }
-    const { added } = await this.deps.store.appendEvent(project.key, event)
+    const credit = project.isMember ? undefined : args.credit
+    const { added } = await this.deps.store.appendEvent(project.key, event, credit)
     return { posted: added, event }
   }
 }

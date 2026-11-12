@@ -13,10 +13,14 @@ import {
   type GameEvent
 } from '../../shared/orchestrator-game-events'
 import {
+  creditGameMerge,
   foldFreedMember,
   listGameCharacters,
   type GameCharacter
 } from '../../shared/orchestrator-game-characters'
+
+/** Whose character a merged event pays, and for which PR. */
+export type GameMergeCredit = { character: { key: string; name: string }; number: number }
 import {
   migrateGameStore,
   type GameStoreData,
@@ -151,8 +155,15 @@ export class GameHistoryStore {
     return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
-  /** `added` is false when an event with the same key is already kept; a new perfect merge saves a credit. */
-  async appendEvent(projectKey: string, event: GameEvent): Promise<{ added: boolean }> {
+  /**
+   * `added` is false when an event with the same key is already kept. A new perfect merge saves a
+   * credit, and a new merged event with `credit` pays that PR to its character (ORCA-1170).
+   */
+  async appendEvent(
+    projectKey: string,
+    event: GameEvent,
+    credit?: GameMergeCredit
+  ): Promise<{ added: boolean }> {
     let added = false
     await this.update(projectKey, (current) => {
       const next = appendGameEvent(current.events, event)
@@ -163,7 +174,20 @@ export class GameHistoryStore {
       const arcade = event.merge?.perfect
         ? earnGameArcadeCredit(parseGameArcadeCredits(current.arcade), event.merge)
         : null
-      return { ...current, events: next.events, ...(arcade && { arcade }) }
+      const paid =
+        credit && event.kind === 'merged' && event.ticket
+          ? creditGameMerge(current.characters ?? {}, credit.character, {
+              ticket: event.ticket,
+              number: credit.number,
+              at: event.at
+            })
+          : null
+      return {
+        ...current,
+        events: next.events,
+        ...(arcade && { arcade }),
+        ...(paid && { characters: paid })
+      }
     })
     return { added }
   }
