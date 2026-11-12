@@ -10947,7 +10947,9 @@
           "sceneFileSshOffline": "Conecta este proyecto SSH para leer su archivo de escena.",
           "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
           "sceneFileNotText": "no es un archivo de texto",
-          "terminalBand": "Banda del terminal"
+          "terminalBand": "Banda del terminal",
+          "band": "Mostrar la banda",
+          "bandDescription": "La escena pixel y el HUD en los paneles de Agent Teams."
         },
         "OrchestratorGameMemberNamesRow": {
           "label": "Nombres de los miembros",

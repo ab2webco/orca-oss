@@ -1,12 +1,20 @@
 import { translate } from '@/i18n/i18n'
 
-export type ToggleKey = 'hud' | 'rewards' | 'tracker'
+export type ToggleKey = 'band' | 'hud' | 'rewards' | 'tracker'
 
 export const orchestratorGameSwitches = (): {
   key: ToggleKey
   label: string
   description: string
 }[] => [
+  {
+    key: 'band',
+    label: translate('auto.components.settings.OrchestratorGameSetting.band', 'Show the band'),
+    description: translate(
+      'auto.components.settings.OrchestratorGameSetting.bandDescription',
+      'The pixel scene and HUD in Agent Teams panes.'
+    )
+  },
   {
     key: 'hud',
     label: translate('auto.components.settings.OrchestratorGameSetting.hud', 'Teammate HUD'),
@@ -36,5 +44,6 @@ export const orchestratorGameSwitches = (): {
   }
 ]
 
-/** The switch that draws in the terminal band, so it sits in that group. */
-export const isBandToggle = (key: ToggleKey): boolean => key === 'hud'
+/** Where a switch sits: the band's own switch, what the band draws, or the game itself. */
+export const switchPlaceOf = (key: ToggleKey): 'band' | 'drawn' | 'game' =>
+  key === 'band' ? 'band' : key === 'hud' ? 'drawn' : 'game'

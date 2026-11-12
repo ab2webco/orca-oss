@@ -4,7 +4,7 @@ import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 
 const none = async () => null
 
-const stateWith = (orchestratorGame: { mode?: 'zen'; show?: boolean }) =>
+const stateWith = (orchestratorGame: { mode?: 'zen'; show?: boolean; band?: boolean }) =>
   buildOrchestratorGameState({
     settings: { orchestratorGame },
     worktree: null,
@@ -25,7 +25,7 @@ describe('Show the game in the state the mod reads', () => {
   })
 
   it('hands the chosen mode while the game is shown', async () => {
-    const state = await stateWith({ mode: 'zen' })
+    const state = await stateWith({ mode: 'zen', band: true })
 
     expect(state.config.mode).toBe('zen')
     expect(state.config.show).toBe(true)

@@ -149,15 +149,15 @@ Los botones del proyecto (`actions[].command`) conservan los nombres que eligió
 Cada campo se resuelve por separado; una capa posterior gana
 ([`orchestrator-game-config.ts`](../../../src/shared/orchestrator-game-config.ts)):
 
-1. Valores predeterminados de Orca: `mode: on`, `show: true`, `scene: quest`, `hud`, `rewards` y
-   `tracker` todos en `true`, `render: classic`, `timezone: local`.
+1. Valores predeterminados de Orca: `mode: on`, `show: true`, `band: false`, `scene: quest`, `hud`,
+   `rewards` y `tracker` todos en `true`, `render: classic`, `timezone: local`.
 2. Settings globales → Agents → **Agent Teams game** (`orchestratorGame`).
 3. El `orca.yaml` versionado del proyecto, que pertenece a quien sea dueño del repo, un dev o una empresa.
 4. Settings → el proyecto → **Agent Teams game**, solo en esta máquina
    (`orchestratorGameProjects[repoId]`). Cada fila puede decir **Inherit**.
 
-Ambas páginas de Settings agrupan los controles del juego (**Show the game**, **Default view** con el costo de cada vista, escena, HUD de compañeros, recompensas, seguimiento
-del work item, dónde se abren los enlaces, render y zona horaria) bajo un encabezado **Agent Teams game** que indica que solo se aplican a los panes de Claude
+Ambas páginas de Settings agrupan los controles del juego (**Show the game**, **Default view** con el costo de cada vista, recompensas, seguimiento
+del work item, dónde se abren los enlaces y el grupo **Terminal band** con el interruptor de la banda, escena, render, zona horaria y HUD de compañeros) bajo un encabezado **Agent Teams game** que indica que solo se aplican a los panes de Claude
 Agent Teams. Bajo el selector de escena, una vista previa pinta la escena efectiva con el propio
 código de dibujo del mod
 ([`OrchestratorGameScenePreview.tsx`](../../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
@@ -181,6 +181,29 @@ escena de plugin muestra una nota en su lugar, porque su definición solo llega 
 `show: false` (**Show the game**) oculta el juego y conserva `mode` como la vista a la que vuelve:
 el pane se lanza como Claude a secas y `orca game state` informa `mode: off`, con la capa que fijó
 `show` como origen.
+
+### La banda del terminal
+
+`band` (**Show the band**, `false` por defecto) es el pixel art dentro de un pane de Agent Teams: la
+escena del spinner y el HUD sobre el prompt. El juego se dibuja en el panel del equipo, así que la
+banda está apagada salvo que una capa la encienda. Apagada, el pane no dibuja píxeles y conserva el
+juego en sí (encabezados de fase, recompensas, comandos, el flujo del lead y los miembros): el
+lanzador pasa `ORCA_GAME_MODE=flat` (`off` sigue en `off`) y `ORCA_GAME_HUD=0`, y `orca game state`
+informa el mismo `mode` y `hud`, mediante `shownOrchestratorGameTerminalOf`
+([`orchestrator-game-view.ts`](../../../src/shared/orchestrator-game-view.ts)). Con `band: true` el
+pane recibe `mode` y `hud` tal como están. Guardar una vista que dibuja (`zen`, `2d-classic`,
+`2d-hd`) desde Settings, `orca game view` o `/orca-game:view` también fija `band: true` en esa capa;
+si no, la elección no cambiaría nada en pantalla. `mode` nunca se reescribe, así que el aspecto del
+Panel, que lo sigue, no cambia.
+
+En Settings, el grupo **Terminal band** tiene el interruptor y el selector de escena, que también
+da el reparto del panel del equipo; la vista previa de la escena, el render, la zona horaria y el HUD
+de compañeros solo aparecen con la banda encendida.
+
+Versiones mezcladas: todo mod desde flat (ORCA-689) lee `ORCA_GAME_MODE=flat` y `ORCA_GAME_HUD`; un
+mod anterior lee `flat` como desconocido y sigue dibujando, como antes. Un host emparejado anterior a
+`band` resuelve su propia configuración sin ella, así que los miembros que lanza conservan la banda de
+hoy; `band` es una clave opcional nueva, que ese host informa como desconocida e ignora.
 
 ### Vistas
 

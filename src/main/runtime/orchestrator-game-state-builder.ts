@@ -23,7 +23,7 @@ import {
 import { orchestratorGameScenesOf } from '../../shared/orchestrator-game-scene'
 import { leadCharacterOf, memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
-import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
+import { shownOrchestratorGameTerminalOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
 import {
   gameReviewOf,
@@ -96,7 +96,7 @@ export async function buildOrchestratorGameState(
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
     ...resolved.config,
-    mode: shownOrchestratorGameModeOf(resolved.config),
+    ...shownOrchestratorGameTerminalOf(resolved.config),
     ...(sceneFile?.scene
       ? { scene: sceneFile.scene.id }
       : sceneFile?.warning === undefined

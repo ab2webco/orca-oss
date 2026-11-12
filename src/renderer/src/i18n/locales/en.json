@@ -11558,7 +11558,9 @@
           "sceneFileNotText": "not a text file",
           "flat": "Flat",
           "previewFlat": "Flat draws the game as text, with no scene or characters.",
-          "terminalBand": "Terminal band"
+          "terminalBand": "Terminal band",
+          "band": "Show the band",
+          "bandDescription": "The pixel scene and HUD in Agent Teams panes."
         },
         "OrchestratorGameLeadSetting": {
           "cap": "Member cap",

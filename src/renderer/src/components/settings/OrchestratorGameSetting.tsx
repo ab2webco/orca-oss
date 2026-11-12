@@ -68,7 +68,7 @@ import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { useAdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { getRepositoryGameSectionId } from './repository-settings-targets'
 import {
-  isBandToggle,
+  switchPlaceOf,
   orchestratorGameSwitches,
   type ToggleKey
 } from './orchestrator-game-switches'
@@ -124,6 +124,10 @@ export function OrchestratorGameSetting({
       onChange={() => set(toggle.key, !config[toggle.key])}
     />
   )
+  const switchesAt = (place: ReturnType<typeof switchPlaceOf>): React.JSX.Element[] =>
+    orchestratorGameSwitches()
+      .filter((toggle) => switchPlaceOf(toggle.key) === place)
+      .map(switchRow)
 
   return (
     <section>
@@ -135,15 +139,14 @@ export function OrchestratorGameSetting({
       >
         {sectionHeader()}
         <OrchestratorGameViewRows settings={settings} updateSettings={updateSettings} />
-        {orchestratorGameSwitches()
-          .filter((toggle) => !isBandToggle(toggle.key))
-          .map(switchRow)}
+        {switchesAt('game')}
         <OrchestratorGameOpenLinksRow
           value={config.openLinks}
           disabled={config.mode === 'off'}
           onChange={(next) => set('openLinks', next)}
         />
         <TerminalBandGroup>
+          {switchesAt('band')}
           <SettingsRow
             label={sceneTitle()}
             description={translate(
@@ -159,17 +162,19 @@ export function OrchestratorGameSetting({
               />
             }
           />
-          <OrchestratorGameScenePreview config={config} />
-          <OrchestratorGameLookRows
-            layer={layer}
-            disabled={config.mode === 'off'}
-            onChange={(key, value) =>
-              updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
-            }
-          />
-          {orchestratorGameSwitches()
-            .filter((toggle) => isBandToggle(toggle.key))
-            .map(switchRow)}
+          {config.band ? (
+            <>
+              <OrchestratorGameScenePreview config={config} />
+              <OrchestratorGameLookRows
+                layer={layer}
+                disabled={config.mode === 'off'}
+                onChange={(key, value) =>
+                  updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
+                }
+              />
+              {switchesAt('drawn')}
+            </>
+          ) : null}
         </TerminalBandGroup>
       </SearchableSetting>
       <OrchestratorGameScenesSkillCard />
@@ -325,21 +330,14 @@ export function ProjectOrchestratorGameSetting({
           projectLayer={projectLayer}
           updateSettings={updateSettings}
         />
-        {rows.filter((row) => !isBandToggle(row.key)).map(toggleRow)}
+        {rows.filter((row) => switchPlaceOf(row.key) === 'game').map(toggleRow)}
         <OrchestratorGameOpenLinksRow
           value={local?.openLinks ?? 'inherit'}
           effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
           onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
         />
         <TerminalBandGroup>
-          <OrchestratorGameLookRows
-            layer={local}
-            effective={{
-              render: effective('render', orchestratorGameRenderLabels()[config.render]),
-              timezone: effective('timezone', config.timezone)
-            }}
-            onChange={set}
-          />
+          {rows.filter((row) => switchPlaceOf(row.key) === 'band').map(toggleRow)}
           <SettingsRow
             label={sceneTitle()}
             description={effective('scene', sceneFile ?? config.scene)}
@@ -374,11 +372,23 @@ export function ProjectOrchestratorGameSetting({
           ) : (
             <OrchestratorGameSceneFileStatus read={file.state} />
           )}
-          <OrchestratorGameScenePreview
-            config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
-            fileScene={file.state}
-          />
-          {rows.filter((row) => isBandToggle(row.key)).map(toggleRow)}
+          {config.band ? (
+            <>
+              <OrchestratorGameScenePreview
+                config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
+                fileScene={file.state}
+              />
+              <OrchestratorGameLookRows
+                layer={local}
+                effective={{
+                  render: effective('render', orchestratorGameRenderLabels()[config.render]),
+                  timezone: effective('timezone', config.timezone)
+                }}
+                onChange={set}
+              />
+              {rows.filter((row) => switchPlaceOf(row.key) === 'drawn').map(toggleRow)}
+            </>
+          ) : null}
         </TerminalBandGroup>
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}

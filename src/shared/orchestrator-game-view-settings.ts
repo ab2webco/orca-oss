@@ -4,6 +4,7 @@ import {
   type OrchestratorGameLayer
 } from './orchestrator-game-config'
 import {
+  isOrchestratorGamePixelView,
   orchestratorGameViewPatchOf,
   type OrchestratorGameViewId,
   type OrchestratorGameViewScope
@@ -19,7 +20,7 @@ export type OrchestratorGameViewWrite = {
 
 type GameSettings = Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>>
 
-/** The layer with a view stored in it; picking a view other than off also shows a hidden game. */
+/** The layer with a view stored in it; a view other than off shows a hidden game, one that draws turns the band on. */
 function withView(
   layer: OrchestratorGameLayer | undefined,
   view: OrchestratorGameViewId,
@@ -28,7 +29,8 @@ function withView(
   return {
     ...layer,
     ...orchestratorGameViewPatchOf(view, now),
-    ...(view !== 'off' && !now.show ? { show: true } : {})
+    ...(view !== 'off' && !now.show ? { show: true } : {}),
+    ...(isOrchestratorGamePixelView(view) && !now.band ? { band: true } : {})
   }
 }
 

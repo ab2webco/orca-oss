@@ -86,7 +86,10 @@ describe('storing a game view through the runtime', () => {
 
     expect(readWorktreeOrcaYaml).toHaveBeenCalledWith('/repo/w1', null)
     expect(writes).toEqual([
-      [{ orchestratorGameProjects: { r1: { mode: 'zen', show: true } } }, { notifyListeners: true }]
+      [
+        { orchestratorGameProjects: { r1: { mode: 'zen', show: true, band: true } } },
+        { notifyListeners: true }
+      ]
     ])
   })
 
@@ -96,7 +99,7 @@ describe('storing a game view through the runtime', () => {
     await runtime.setOrchestratorGameView({ view: '2d-hd', scope: 'global' })
 
     expect(writes).toEqual([
-      [{ orchestratorGame: { mode: 'on', render: 'hd' } }, { notifyListeners: true }]
+      [{ orchestratorGame: { mode: 'on', render: 'hd', band: true } }, { notifyListeners: true }]
     ])
   })
 

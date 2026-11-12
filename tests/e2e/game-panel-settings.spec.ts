@@ -278,3 +278,55 @@ test('the panel preview draws the chosen style, and the terminal band stays its 
     await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
   }
 })
+
+test('the terminal band is off by default, and its switch shows what it draws', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const band = orcaPage.locator('[role="group"][aria-label="Terminal band"]')
+  const drawn = [
+    band.locator('[data-slot="game-scene-preview"]'),
+    band.locator('[aria-label="Render"]'),
+    band.locator('[aria-label="Time zone"]'),
+    band.locator('[aria-label="Teammate HUD"]')
+  ]
+
+  await openTarget(orcaPage, null)
+  await expect(band).toBeVisible({ timeout: 15_000 })
+  for (const state of ['off', 'on'] as const) {
+    if (state === 'on') {
+      await band.getByRole('switch', { name: 'Show the band' }).click()
+      await expect
+        .poll(() =>
+          orcaPage.evaluate(
+            async () =>
+              ((await window.api.settings.get()) as { orchestratorGame?: { band?: boolean } })
+                .orchestratorGame?.band
+          )
+        )
+        .toBe(true)
+    }
+    await expect(band.getByRole('switch', { name: 'Show the band' })).toHaveAttribute(
+      'aria-checked',
+      state === 'on' ? 'true' : 'false'
+    )
+    for (const row of drawn) {
+      await expect(row).toHaveCount(state === 'on' ? 1 : 0)
+    }
+    for (const theme of THEMES) {
+      await applySettings(orcaPage, { theme })
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        await band.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`band-${state}-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+  }
+  await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+})

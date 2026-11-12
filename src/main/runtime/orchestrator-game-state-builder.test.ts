@@ -59,7 +59,7 @@ function worktree(path: string) {
 describe('buildOrchestratorGameState', () => {
   it('collects config, fleet, review and the Plane work item', async () => {
     const state = await buildOrchestratorGameState({
-      settings: { orchestratorGame: { hud: false } },
+      settings: { orchestratorGame: { hud: false, band: true } },
       worktree: worktree(checkout('orchestratorGame:\n  mode: zen\n  scene: 7\n')),
       agents: [
         {
@@ -457,7 +457,7 @@ describe('buildOrchestratorGameState', () => {
     })
 
     expect(state.worktree).toBeNull()
-    expect(state.config.mode).toBe('on')
+    expect(state.config.mode).toBe('flat')
     expect(state.extensions).toEqual({ scenes: [] })
   })
 
@@ -499,14 +499,14 @@ describe('buildOrchestratorGameState', () => {
     })
 
     expect(state.extensions).toEqual({ scenes: [] })
-    expect(state.config.mode).toBe('on')
+    expect(state.config.mode).toBe('flat')
   })
 
   it('reads the project layer of an SSH worktree from its host, not the local disk', async () => {
     const reads: string[] = []
     registerSshFilesystemProvider(
       'ssh-1',
-      remoteHost({ '/srv/repo/orca.yaml': 'orchestratorGame:\n  mode: zen\n' }, reads)
+      remoteHost({ '/srv/repo/orca.yaml': 'orchestratorGame:\n  mode: zen\n  band: true\n' }, reads)
     )
     const state = await buildOrchestratorGameState({
       settings: undefined,
@@ -525,7 +525,7 @@ describe('buildOrchestratorGameState', () => {
 
   it('falls back to the other layers while the SSH host is disconnected', async () => {
     const state = await buildOrchestratorGameState({
-      settings: { orchestratorGame: { hud: false } },
+      settings: { orchestratorGame: { hud: false, band: true } },
       worktree: { ...worktree('/srv/repo'), connectionId: 'ssh-1' },
       agents: [],
       leaderPaneKey: null,

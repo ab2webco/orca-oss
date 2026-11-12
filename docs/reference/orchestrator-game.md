@@ -139,15 +139,15 @@ names the project chose.
 Each field resolves on its own; a later layer wins
 ([`orchestrator-game-config.ts`](../../src/shared/orchestrator-game-config.ts)):
 
-1. Orca defaults: `mode: on`, `show: true`, `scene: quest`, `hud`, `rewards` and `tracker` all `true`,
-   `render: classic`, `timezone: local`.
+1. Orca defaults: `mode: on`, `show: true`, `band: false`, `scene: quest`, `hud`, `rewards` and
+   `tracker` all `true`, `render: classic`, `timezone: local`.
 2. Global Settings → Agents → **Agent Teams game** (`orchestratorGame`).
 3. The project's committed `orca.yaml` — owned by whoever owns the repo, a dev or a company.
 4. Settings → the project → **Agent Teams game**, this machine only
    (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
 
-Both Settings pages group the game's controls (**Show the game**, **Default view** with each view's cost, scene, teammate HUD, rewards, work item
-tracking, where links open, render and time zone) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
+Both Settings pages group the game's controls (**Show the game**, **Default view** with each view's cost, rewards, work item
+tracking, where links open, and the **Terminal band** group with the band switch, scene, render, time zone and teammate HUD) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
 panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
 imports `hooks/scene.ts`, `scenery.ts`, `scenes/` and, for `render: hd`, `scene-hd.ts`), so it
@@ -170,6 +170,28 @@ renderer. The renderer build strips the mod's TypeScript with its own plugin
 `show: false` (**Show the game**) hides the game and keeps `mode` as the view it comes back to:
 the pane launches as plain Claude and `orca game state` reports `mode: off`, sourced from the layer
 that set `show`.
+
+### The terminal band
+
+`band` (**Show the band**, default `false`) is the pixel art inside an Agent Teams pane: the spinner
+scene and the HUD above the prompt. The Team panel is where the game is drawn, so the band is off
+unless a layer turns it on. While it is off the pane draws no pixels and keeps the game itself
+(phase headers, rewards, commands, the lead and member flow): the launcher passes
+`ORCA_GAME_MODE=flat` (`off` stays `off`) and `ORCA_GAME_HUD=0`, and `orca game state` reports the
+same `mode` and `hud`, through `shownOrchestratorGameTerminalOf`
+([`orchestrator-game-view.ts`](../../src/shared/orchestrator-game-view.ts)). With `band: true` the
+pane gets `mode` and `hud` as set. Storing a view that draws (`zen`, `2d-classic`, `2d-hd`) from
+Settings, `orca game view` or `/orca-game:view` also sets `band: true` in that layer, or the pick
+would change nothing on screen. `mode` itself is never rewritten, so the Panel's look, which follows
+it, stays put.
+
+In Settings the **Terminal band** group holds the switch and the scene picker, which also casts the
+Team panel; the scene preview, render, time zone and teammate HUD show only while the band is on.
+
+Mixed versions: every mod since flat (ORCA-689) reads `ORCA_GAME_MODE=flat` and `ORCA_GAME_HUD`; an
+older mod reads `flat` as unknown and keeps drawing, as before. A paired host older than `band`
+resolves its own config without it, so the members it launches keep today's band; `band` is a new
+optional key, which such a host reports as unknown and ignores.
 
 ### Views
 
