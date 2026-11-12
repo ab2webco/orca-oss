@@ -30,12 +30,18 @@ export type GameMemberAdvisor = GameMemberAdvisorReport & { previous?: GameMembe
 export const GAME_MEMBER_ADVISOR_VERSION = 1
 export const GAME_MEMBER_ADVISOR_PANES_MAX = 64
 const WORDS_MAX = 64
+// Why longer: Jev's line is a sentence (model, effort and why), not a name, and the card shows it whole.
+const LINE_MAX = 240
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // Why a number only for effort: Jev's effort may be a level number, its model never is.
-const wordsOf = (value: unknown, isNumberOk = false): string | null | undefined => {
+const wordsOf = (
+  value: unknown,
+  isNumberOk = false,
+  max = WORDS_MAX
+): string | null | undefined => {
   if (value === null) {
     return null
   }
@@ -43,7 +49,7 @@ const wordsOf = (value: unknown, isNumberOk = false): string | null | undefined 
     return undefined
   }
   const words = stripTerminalControl(String(value)).replace(/\s+/g, ' ').trim()
-  return words === '' ? null : words.slice(0, WORDS_MAX)
+  return words === '' ? null : words.slice(0, max)
 }
 
 /** Null when Jev stopped publishing; undefined for a value this build cannot read, which is ignored. */
@@ -64,7 +70,10 @@ export function parseGameMemberAdvisorReport(
   const pinned = isRecord(value.pinned) ? value.pinned : {}
   const detail: GameMemberAdvisorDetail = {}
   for (const key of GAME_MEMBER_ADVISOR_DETAIL_KEYS) {
-    const text = key in value ? wordsOf(value[key], key === 'confidence') : undefined
+    const text =
+      key in value
+        ? wordsOf(value[key], key === 'confidence', key === 'line' ? LINE_MAX : WORDS_MAX)
+        : undefined
     if (text !== undefined) {
       detail[key] = text
     }

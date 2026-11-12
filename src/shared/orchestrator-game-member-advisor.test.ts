@@ -47,6 +47,14 @@ describe('parseGameMemberAdvisorReport', () => {
     expect(parsed?.model).toHaveLength(64)
     expect(parsed?.effort).toBeNull()
   })
+
+  // Why (ORCA-1173): the card showed 'piso de código (Jev: c', Jev's sentence cut at the model's 64.
+  it("keeps Jev's whole sentence, bounding it apart from the short fields", () => {
+    const line = 'jev · mediría: Opus 5.5 · esfuerzo alto · piso de código (Jev: código)'
+    expect(parseGameMemberAdvisorReport(report({ line }))?.line).toBe(line)
+    const long = parseGameMemberAdvisorReport(report({ line: 'y'.repeat(1000) }))?.line
+    expect(long).toHaveLength(240)
+  })
 })
 
 describe('parseGameMemberAdvisorReport detail fields', () => {
