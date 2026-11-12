@@ -47,7 +47,9 @@ download() {
     "$ORCA_FISH4_DOWNLOAD_COMMAND" "$1" "$2"
     return
   fi
-  curl -fsSL --retry 4 --retry-delay 5 --retry-all-errors -o "$1" "$2"
+  # Why bounded (ORCA-1179): a stalled host would otherwise hold the job; worst case about 4 minutes.
+  curl -fsSL --connect-timeout 10 --max-time 45 --retry 4 --retry-delay 5 --retry-all-errors \
+    -o "$1" "$2"
 }
 
 sha256_of() {
