@@ -10,6 +10,7 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import { teamHostText, teamLeadLiveText, teamModelText } from './team-card-text'
 import { TeamStatusMark } from './TeamStatusMark'
+import { TeamAdvisorLine } from './TeamAdvisorLine'
 import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
@@ -123,15 +124,8 @@ function AdvisorCardRow({
             {teamAdvisorSourceText()}
           </span>
         </span>
-        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows all of it (ORCA-1139). */}
-        {advisor.line ? (
-          <span
-            data-team-advisor-line
-            className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
-          >
-            {advisor.line}
-          </span>
-        ) : null}
+        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows it (ORCA-1139). */}
+        {advisor.line ? <TeamAdvisorLine line={advisor.line} /> : null}
       </span>
     </article>
   )
