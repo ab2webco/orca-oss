@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 import { getPaletteHostBadge } from './palette-host-badge'
 import { buildSidebarHostOptions } from '../sidebar/sidebar-host-options'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+// Why the desktop label (ORCA-1149): Cmd+J names this machine as the sidebar does, 'This computer'.
+const LOCAL_HOST_LABEL = localHostDisplayLabel()
 
 // Why: a connected SSH state makes the target a live remote, which is what the
 // palette badge now requires before disambiguating rows with a host label.
