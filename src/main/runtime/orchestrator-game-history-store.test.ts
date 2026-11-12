@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameHistoryStore } from './orchestrator-game-history-store'
 import type { GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import type { GameEvent } from '../../shared/orchestrator-game-events'
+import type { GameLateReviewCheck } from '../../shared/orchestrator-game-late-merges'
 import type { GameStoreMigration } from '../../shared/orchestrator-game-store-migration'
 
 const dirs: string[] = []
@@ -332,5 +333,36 @@ describe('GameHistoryStore owner questions', () => {
     ])
     expect(await again.ownerQuestions('repo-b')).toEqual([])
     expect((await again.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1'])
+  })
+})
+
+// Why (ORCA-1170): a stopped member's PR that merges later pays its character on the host's next look.
+describe('GameHistoryStore late merges', () => {
+  const freed = (ticket: string, pr: string): GameHistoryRecord => ({
+    ...record(ticket),
+    branch: `refs/heads/${ticket.toLowerCase()}`,
+    pr,
+    character: 'Merlín'
+  })
+  const keyOf = (): string => 'merlin'
+
+  it('lists open PRs until a merge pays one or a close settles it, across a restart', async () => {
+    const { store: history, dir } = store()
+    const merlin = { key: 'merlin', name: 'Merlín' }
+    await history.append('repo-a', freed('WAINBOX-79', '#98 open'), merlin)
+    await history.append('repo-a', freed('WAINBOX-80', '#99 open'), merlin)
+    const checks = await history.lateReviewChecks('repo-a', keyOf)
+    expect(checks.map((one) => one.ticket)).toEqual(['WAINBOX-80', 'WAINBOX-79'])
+    const [newest, oldest] = checks as [GameLateReviewCheck, GameLateReviewCheck]
+
+    await history.payMerge('repo-a', oldest, '2026-11-12T03:00:00.000Z')
+    await history.payMerge('repo-a', oldest, '2026-11-12T03:05:00.000Z')
+    await history.settleClosed('repo-a', newest)
+
+    const again = new GameHistoryStore(() => dir)
+    expect(await again.lateReviewChecks('repo-a', keyOf)).toEqual([])
+    expect((await again.characters('repo-a')).map((one) => [one.key, one.xp])).toEqual([
+      ['merlin', 100]
+    ])
   })
 })
