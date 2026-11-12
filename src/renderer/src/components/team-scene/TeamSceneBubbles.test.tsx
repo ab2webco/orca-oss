@@ -147,10 +147,14 @@ describe('TeamSceneBubbles', () => {
       )
       return host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!
     }
-    expect(show(false).style.visibility).toBe('hidden')
+    const left = show(false)
+    expect(left.style.visibility).toBe('hidden')
+    expect(left.dataset.sceneClamped).toBeUndefined()
     const bubble = show(true)
     expect(bubble.style.visibility).toBe('visible')
     expect(bubble.querySelector('.line-clamp-1')?.textContent).toBe(speech.text)
+    // Marked, so a check can tell a clamped line from one shown whole.
+    expect(bubble.dataset.sceneClamped).toBe('')
     // Clamped, the line is not whole in its bubble, so its card shows it all as for an unplaced one.
     expect(unplaced).toHaveBeenLastCalledWith(['lead'])
   })

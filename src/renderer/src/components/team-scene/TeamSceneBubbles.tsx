@@ -183,6 +183,7 @@ export function TeamSceneBubbles({
               }
             }}
             data-scene-bubble={s.key}
+            data-scene-clamped={box?.clamped ? '' : undefined}
             // Why fixed and solid: the scene sky is dark in both themes, so the bubble is too.
             className={
               cloudPixel

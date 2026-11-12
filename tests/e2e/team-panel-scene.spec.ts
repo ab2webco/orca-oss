@@ -637,8 +637,8 @@ test('the Team panel draws the live scene beside a member opened under its heade
     }
 
     // Lead review of criterion 8, and ORCA-1150 decision A: a lead's line that needs a two-line cloud
-    // has no spot beside the tag on Pixel's 219 px stage, so its bubble clamps to one line and the
-    // lead's card shows all of it, as the advisor's card does.
+    // may have no spot beside the tag on Pixel's 219 px stage; its bubble then clamps to one line and
+    // the lead's card shows all of it, as the advisor's card does.
     const leadAsks = 'Waiting for you\nMerge #14 now?'
     const [leadTab] = pane.paneKey.split(':')
     const asks = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
@@ -673,10 +673,17 @@ test('the Team panel draws the live scene beside a member opened under its heade
     const leadCard = panel.locator('[data-team-card="lead"]')
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
+      // Why by the bubble's state: a walking lead can leave room for both lines, and then the card needs none.
       await expect
-        .poll(() => cardLine(leadCard, '[data-team-lead-line]'), {
-          message: `the lead's card does not show its whole line at 320px pixel ${theme}`
-        })
+        .poll(
+          async () =>
+            (await leadBubble.getAttribute('data-scene-clamped')) === null
+              ? (await linesOffBubble(orcaPage, 'lead')).join('; ') || leadAsks
+              : cardLine(leadCard, '[data-team-lead-line]'),
+          {
+            message: `the lead's whole line shows in neither its bubble nor its card at 320px pixel ${theme}`
+          }
+        )
         .toBe(leadAsks)
       expect(
         await bubblesOverTag(orcaPage, ['lead'], 1500),
