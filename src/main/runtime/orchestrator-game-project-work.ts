@@ -38,10 +38,11 @@ export type GameProjectWorkPort = GameProjectReviewsPort & {
   githubRepo: () => Promise<GitHubRepositoryIdentity | null>
   githubIssues: () => Promise<readonly Pick<GitHubWorkItem, 'number' | 'title' | 'url'>[]>
   gitlabIssues: () => Promise<readonly Pick<GitLabWorkItem, 'number' | 'title' | 'url'>[]>
-  planeAssigned: (args: {
-    project?: string
-    workspace?: string
-  }) => Promise<readonly Pick<PlaneWorkItem, 'identifier' | 'title' | 'url' | 'state'>[]>
+  /** The open items in one fetch, with the viewer they are read for (null when unknown). */
+  planeOpen: (args: { project?: string; workspace?: string }) => Promise<{
+    viewerId: string | null
+    items: readonly PlaneTodoItem[]
+  }>
   jiraSearch: (
     jql: string,
     site?: string
@@ -49,6 +50,10 @@ export type GameProjectWorkPort = GameProjectReviewsPort & {
   linearAssigned: (
     workspace?: string
   ) => Promise<readonly Pick<LinearIssue, 'identifier' | 'title' | 'url' | 'state' | 'team'>[]>
+}
+
+type PlaneTodoItem = Pick<PlaneWorkItem, 'identifier' | 'title' | 'url' | 'state'> & {
+  assignees?: readonly { id: string }[]
 }
 
 // Why: a tracker that is offline, unauthenticated or rate limited costs its own list, never the other.
@@ -121,6 +126,21 @@ export function autoTodoSourceOf(args: {
 
 const DONE_PLANE_GROUPS = new Set(['completed', 'cancelled'])
 
+/** My open items and, in a known project, its unstarted ones whoever holds them (ORCA-1168). */
+const planeTodoOf = (
+  items: readonly PlaneTodoItem[],
+  viewerId: string | null,
+  projectKnown: boolean
+): PlaneTodoItem[] =>
+  items.filter((one) => {
+    if (DONE_PLANE_GROUPS.has(one.state.group)) {
+      return false
+    }
+    // Why null reads as mine: like Plane's own assigned filter, no viewer degrades to every open item.
+    const mine = viewerId === null || one.assignees?.some((who) => who.id === viewerId) === true
+    return mine || (projectKnown && one.state.group === 'unstarted')
+  })
+
 const ticketOf = (
   id: string,
   one: { title: string; url: string },
@@ -156,9 +176,8 @@ async function readTodo(
     )
   switch (source.provider) {
     case 'plane': {
-      const open = (
-        await port.planeAssigned({ project: source.project, workspace: source.workspace })
-      ).filter((one) => !DONE_PLANE_GROUPS.has(one.state.group))
+      const read = await port.planeOpen({ project: source.project, workspace: source.workspace })
+      const open = planeTodoOf(read.items, read.viewerId, source.project !== undefined)
       return listOf(
         'plane',
         open.map((one) =>

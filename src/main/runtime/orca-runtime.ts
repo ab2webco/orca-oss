@@ -32846,13 +32846,17 @@ export class OrcaRuntimeService {
       },
       gitlabIssues: async () =>
         (await this.listGitLabRepoIssues(selector, 'opened', '@me', 20)).items,
-      planeAssigned: ({ project, workspace }) =>
-        this.planeListWorkItems({
+      planeOpen: async ({ project, workspace }) => {
+        const workspaceId = planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace)
+        // Why one fetch: Plane's 60/min limiter is the bottleneck (ORCA-1166); the viewer is cached.
+        const items = await this.planeListWorkItems({
           projectId: project,
-          filter: 'assigned',
-          workspaceId: planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace),
+          filter: 'all',
+          workspaceId,
           omitDescription: true
-        }),
+        })
+        return { items, viewerId: (await this.planeGetMe(workspaceId))?.id || null }
+      },
       jiraSearch: (jql, site) => this.jiraSearchIssues(jql, 50, site),
       linearAssigned: async (workspace) =>
         (await this.linearListIssues('assigned', 50, workspace)).items

@@ -32,7 +32,7 @@ const port = (overrides: Partial<GameProjectWorkPort>): GameProjectWorkPort => (
   githubBudgetLow: async () => false,
   gitlabMergeRequests: async () => null,
   gitlabIssues: unused,
-  planeAssigned: unused,
+  planeOpen: unused,
   jiraSearch: unused,
   linearAssigned: unused,
   ...overrides
@@ -376,14 +376,17 @@ describe('readGameProjectWork', () => {
     })
     const work = await readGameProjectWork(
       port({
-        planeAssigned: async (args) => {
+        planeOpen: async (args) => {
           asked.push(args)
-          return [
-            item('ORCA-1', 'started', 'In Progress'),
-            item('ORCA-2', 'completed', 'Done'),
-            item('ORCA-3', 'unstarted', 'Todo'),
-            item('ORCA-4', 'cancelled', 'Cancelled')
-          ]
+          return {
+            viewerId: null,
+            items: [
+              item('ORCA-1', 'started', 'In Progress'),
+              item('ORCA-2', 'completed', 'Done'),
+              item('ORCA-3', 'unstarted', 'Todo'),
+              item('ORCA-4', 'cancelled', 'Cancelled')
+            ]
+          }
         }
       }),
       { todo: { provider: 'plane', project: 'p1', workspace: 'w1' }, workItem: null }
