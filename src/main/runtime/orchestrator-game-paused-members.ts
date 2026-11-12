@@ -35,6 +35,29 @@ type Deps = {
   worktreeGone?: (worktreeId: string) => Promise<boolean>
 }
 
+const REMOTE_PANE = 'remote:'
+
+/**
+ * The saved member this agent's own launch made: its task here, its dispatch on a paired host.
+ * Why before the name: a queued launch saved no worktree, and a ticket like CHECK-MAIN has no number to read back (ORCA-1172).
+ */
+function launchedTicketOf(
+  agent: GameAgent,
+  members: readonly GameMemberSession[],
+  taskIdOf: (terminalHandle: string) => string | undefined
+): string | null {
+  if (agent.remote) {
+    const dispatchId = agent.paneKey.startsWith(REMOTE_PANE)
+      ? agent.paneKey.slice(REMOTE_PANE.length)
+      : null
+    return dispatchId
+      ? (members.find((one) => one.dispatchId === dispatchId)?.ticket ?? null)
+      : null
+  }
+  const taskId = agent.terminalHandle ? taskIdOf(agent.terminalHandle) : undefined
+  return taskId ? (members.find((one) => one.taskId === taskId)?.ticket ?? null) : null
+}
+
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message.replace(/^Members not saved: /, '') : String(error)
 
@@ -55,9 +78,15 @@ export class GamePausedMembers {
       starting: []
     }
   ): Promise<GamePausedMembersView> {
+    const saved = await this.deps.store.read(projectKey)
+    const taskIdOf = (handle: string): string | undefined => this.deps.contextOf(handle)?.taskId
     // Why not found ones: no launch of this lead started them, so there is nothing of its own to resume (ORCA-914).
     const live = agents.flatMap((agent) => {
-      const ticket = agent.isMember && !agent.found ? ticketOfMember(agent) : null
+      const ticket =
+        agent.isMember && !agent.found
+          ? (launchedTicketOf(agent, saved.ok ? saved.members : [], taskIdOf) ??
+            ticketOfMember(agent))
+          : null
       return ticket ? [{ agent, ticket }] : []
     })
     let error: string | null = null
