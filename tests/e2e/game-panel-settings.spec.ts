@@ -259,12 +259,20 @@ test('the panel preview draws the chosen style, and the terminal band stays its 
       await applySettings(orcaPage, { theme })
       for (const width of WIDTHS) {
         await setWindowWidth(electronApp, orcaPage, width)
-        const section = orcaPage.locator(`[id="${projectSection}"]`)
-        await section.scrollIntoViewIfNeeded()
-        await section.screenshot({
-          path: testInfo.outputPath(`${style}-project-${theme}-${width}.png`),
-          animations: 'disabled'
-        })
+        // Why the window: the project section outgrows it, and an element shot of it paints blank.
+        for (const [name, target] of [
+          ['project-panel', preview(projectSection)],
+          [
+            'project-band',
+            orcaPage.locator(`[id="${projectSection}"] [role="group"][aria-label="Terminal band"]`)
+          ]
+        ] as const) {
+          await target.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`${style}-${name}-${theme}-${width}.png`),
+            animations: 'disabled'
+          })
+        }
       }
     }
     await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
