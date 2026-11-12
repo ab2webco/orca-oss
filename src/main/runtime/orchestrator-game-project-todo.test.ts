@@ -108,13 +108,12 @@ describe('the To Do of every connected tracker', () => {
       }),
       {
         todo: { provider: 'plane', project: 'p1' },
-        workItem: null,
-        connected: { jira: true, linear: false }
+        workItem: { provider: 'jira', identifier: 'MPP-325' }
       }
     )
 
     expect(jql).toEqual([
-      'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC'
+      'project = MPP AND assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC'
     ])
     expect(work.todo?.provider).toBe('plane')
     expect(work.todo?.url).toBe('https://app.plane.so/ab2web/workspace-views/assigned/')
@@ -136,8 +135,7 @@ describe('the To Do of every connected tracker', () => {
       }),
       {
         todo: { provider: 'plane', project: 'p1' },
-        workItem: null,
-        connected: { jira: true, linear: false }
+        workItem: null
       }
     )
 
@@ -155,8 +153,7 @@ describe('the To Do of every connected tracker', () => {
       }),
       {
         todo: { provider: 'plane', project: 'p1' },
-        workItem: null,
-        connected: { jira: true, linear: false }
+        workItem: { provider: 'jira', identifier: 'MPP-1' }
       }
     )
 
@@ -178,8 +175,7 @@ describe('the To Do of every connected tracker', () => {
       }),
       {
         todo: { provider: 'jira', project: 'CIN' },
-        workItem: { provider: 'jira', identifier: 'MPP-1' },
-        connected: { jira: true, linear: false }
+        workItem: { provider: 'jira', identifier: 'MPP-1' }
       }
     )
 
@@ -190,8 +186,7 @@ describe('the To Do of every connected tracker', () => {
   it('reads nothing when orca.yaml turns the To Do off', async () => {
     const work = await readGameProjectWork(port({}), {
       todo: 'off',
-      workItem: null,
-      connected: { jira: true, linear: true }
+      workItem: null
     })
 
     expect(work.todo).toBeNull()
@@ -199,14 +194,12 @@ describe('the To Do of every connected tracker', () => {
 })
 
 describe('todoSourcesOf', () => {
-  const none = { jira: false, linear: false }
   const of = (args: Partial<Parameters<typeof todoSourcesOf>[0]>) =>
     todoSourcesOf({
       configured: null,
       planeProject: null,
       workItem: null,
       host: null,
-      connected: none,
       ...args
     })
 
@@ -229,13 +222,27 @@ describe('todoSourcesOf', () => {
     expect(of({})).toEqual([])
   })
 
-  it('adds a connected Jira and Linear, and lets orca.yaml name a tracker first and once', () => {
+  it('reads only trackers linked to this project, never every globally connected account', () => {
     expect(
       of({
         configured: { provider: 'jira', project: 'CIN' },
-        workItem: { provider: 'jira', identifier: 'MPP-1' },
-        connected: { jira: true, linear: true }
+        workItem: { provider: 'jira', identifier: 'MPP-1' }
       })
-    ).toEqual([{ provider: 'jira', project: 'CIN' }, { provider: 'linear' }])
+    ).toEqual([{ provider: 'jira', project: 'CIN' }])
+    expect(of({ planeProject: null, workItem: null })).toEqual([])
+  })
+
+  it('reads a project list in one tracker, and merges configured with linked trackers', () => {
+    expect(
+      of({
+        configured: { provider: 'jira', project: ['CIN', 'MPP'] },
+        workItem: { provider: 'linear', identifier: 'ENG-3' },
+        host: 'github'
+      })
+    ).toEqual([
+      { provider: 'jira', project: ['CIN', 'MPP'] },
+      { provider: 'linear', project: 'ENG' },
+      { provider: 'github' }
+    ])
   })
 })
