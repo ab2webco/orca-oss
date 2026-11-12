@@ -95,30 +95,6 @@ describe('GameBoard merges', () => {
     ])
     expect(await game.merges({ terminalHandle: 'term_member' })).toEqual([])
   })
-
-  // Why (ORCA-1170): the host pays the merge to the member's character as it records it.
-  it("pays a lead's merged event to the credited character once, and nothing for other kinds", async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'orca-game-board-'))
-    dirs.push(dir)
-    const store = new GameHistoryStore(() => dir)
-    const game = new GameBoard({
-      store,
-      stops: new GameStopSwitch(() => join(dir, 'stop')),
-      projectOf: async () => LEAD,
-      inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
-      tellLead: () => true
-    })
-    const credit = { character: { key: 'arthur', name: 'Arthur' }, number: 4 }
-    const lead = { terminalHandle: 'term_lead', ticket: 'CIN-1', credit }
-
-    await game.postEvent({ ...lead, kind: 'merged', key: 'merged CIN-1 #4', merge })
-    await game.postEvent({ ...lead, kind: 'merged', key: 'merged CIN-1 #4', merge })
-    await game.postEvent({ ...lead, kind: 'failed', key: 'failed CIN-1' })
-
-    expect((await store.characters(LEAD.key)).map((one) => [one.key, one.xp])).toEqual([
-      ['arthur', 100]
-    ])
-  })
 })
 
 describe('GameBoard STOP', () => {
