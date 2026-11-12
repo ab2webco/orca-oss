@@ -49,7 +49,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
-type ReadRig = typeof globalThis & { __teamReadFails?: boolean }
+type ReadRig = typeof globalThis & { __teamReadFails?: boolean; __teamReads?: number }
 
 /** Fails the panel's game.state as a host that stopped answering does; the CLI client is untouched. */
 async function wrapPanelReads(app: ElectronApplication): Promise<void> {
@@ -60,6 +60,9 @@ async function wrapPanelReads(app: ElectronApplication): Promise<void> {
     const real = handlers.get('runtime:call')!
     ipcMain.removeHandler('runtime:call')
     ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
+      if (args.method === 'game.state') {
+        rig.__teamReads = (rig.__teamReads ?? 0) + 1
+      }
       if (args.method === 'game.state' && rig.__teamReadFails) {
         throw new Error('host did not answer')
       }
@@ -72,6 +75,10 @@ const failPanelReads = (app: ElectronApplication, fails: boolean): Promise<void>
   app.evaluate((_, next) => {
     ;(globalThis as ReadRig).__teamReadFails = next
   }, fails)
+
+/** How many game.state reads the panel has made, failed or not. */
+const panelReads = (app: ElectronApplication): Promise<number> =>
+  app.evaluate(() => (globalThis as ReadRig).__teamReads ?? 0)
 
 /** Every language, width and theme, after checking the screen means what the name says. */
 async function captureEvery(
@@ -246,8 +253,18 @@ test('the Team tab shows the live lead and its members from the lead game state'
       await expect(panel).not.toContainText(COPY[language].noTeam)
     }
     await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
-    await failPanelReads(electronApp, false)
+    // Why Retry while reads still fail: the panel also re-reads on its 20 s poll and on main's change
+    // events, so once reads succeed it recovers on its own; the read within a second is Retry's (ORCA-1184).
+    const readsBefore = await panelReads(electronApp)
     await panel.getByRole('button', { name: COPY.en.retry }).click()
+    await expect
+      .poll(() => panelReads(electronApp), {
+        timeout: 1_000,
+        message: 'Retry made no game.state read'
+      })
+      .toBe(readsBefore + 1)
+    await expect(panel).toContainText(COPY.en.readError)
+    await failPanelReads(electronApp, false)
 
     await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
       timeout: 90_000
