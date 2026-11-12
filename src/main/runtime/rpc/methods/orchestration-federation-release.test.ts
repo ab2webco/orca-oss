@@ -451,7 +451,8 @@ describe('releasing a remote worker through the relay', () => {
             remote: { host: 'windows', stateKnown: true, ticketDone: true },
             stateSince
           }
-        ]
+        ],
+        config: { scene: 'quest' }
       } as OrchestratorGameState)
       const method = ORCHESTRATOR_GAME_METHODS.find((one) => one.name === 'game.state')!
       const read = (await method.handler(method.params!.parse({ worktreeId: 'wt-lead' }), {
