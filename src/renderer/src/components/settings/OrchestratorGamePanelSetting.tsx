@@ -1,6 +1,7 @@
 import { Fragment, useMemo } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
+  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   ORCHESTRATOR_GAME_LAYER_ORDER,
   resolveOrchestratorGameConfig,
   type OrchestratorGameLayer,
@@ -39,7 +40,6 @@ import { gameStyleFallbackNote } from './orchestrator-game-style-fallback-note'
 import { GamePanelStylePreview } from './GamePanelStylePreview'
 import { OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
-import { DEFAULT_ORCHESTRATOR_GAME_CONFIG } from '../../../../shared/orchestrator-game-config'
 import { withOrchestratorGameField } from '../../../../shared/orchestrator-game-settings-updates'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
