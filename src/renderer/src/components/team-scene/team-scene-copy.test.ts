@@ -21,11 +21,12 @@ describe('team scene copy', () => {
     expect(teamSceneLabel()).toBe('Escena en vivo del equipo')
   })
 
-  it('words a question as waiting for the user, in the UI language', async () => {
+  // hallmark rule 10: no middle-dot joiner; the state on one line, the question under it.
+  it('words a question as waiting for the user over the question, in the UI language', async () => {
     const asking = lead({ liveAction: { kind: 'question', text: '¿Mergeo #923?', options: [] } })
-    expect(teamSceneLeadLineOf(asking)).toBe('Waiting for you · ¿Mergeo #923?')
+    expect(teamSceneLeadLineOf(asking)).toBe('Waiting for you\n¿Mergeo #923?')
     await setRendererUiLanguage('es')
-    expect(teamSceneLeadLineOf(asking)).toBe('Esperándote · ¿Mergeo #923?')
+    expect(teamSceneLeadLineOf(asking)).toBe('Esperándote\n¿Mergeo #923?')
   })
 
   // Why (ORCA-1129): with no question read, the bubble showed the raw tool name.
@@ -73,6 +74,19 @@ describe('team scene copy', () => {
         })
       )
     ).toBe('Plane ORCA-1051')
+  })
+
+  // Why: the owner saw 'PushNotific' cut in a bubble; a bare tool reads as words, not its identifier.
+  it.each([
+    ['PushNotification', 'Push notification'],
+    ['exec_command', 'Exec command'],
+    ['WebFetch', 'Web fetch'],
+    ['mcp__plane__list_states', 'List states'],
+    ['Read', 'Read']
+  ])('words the bare tool %j as %j', (tool, label) => {
+    expect(teamSceneLeadLineOf(lead({ liveAction: { kind: 'tool', tool, detail: null } }))).toBe(
+      label
+    )
   })
 
   it('says the lead is done in the UI language, and nothing while it idles', async () => {

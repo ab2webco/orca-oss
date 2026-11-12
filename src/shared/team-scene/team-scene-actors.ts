@@ -1,13 +1,15 @@
+import { advisorGestureOf } from './team-scene-advisor-walk'
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneStrideAt } from './team-scene-motion'
-import { workPoseOf } from './team-scene-work-loop'
+import { seatedPlayOf, workPoseOf } from './team-scene-work-loop'
 import type { TeamSceneActivity, TeamSceneActor, TeamScenePose } from './team-scene-types'
 
 const SEATED_POSE: Record<TeamSceneActivity, TeamScenePose> = {
   working: 'work',
   resting: 'idle',
   needsYou: 'raise',
-  done: 'done'
+  done: 'done',
+  blocked: 'idle'
 }
 
 function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
@@ -20,7 +22,7 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   const visit = world.visitor ? world.bodies.get(world.visitor)?.plan : undefined
   const atLead = visit && visit.kind !== 'seated' && visit.stage === 'atLead' ? visit : null
   if (atLead && (body.role === 'lead' || body.key === world.visitor)) {
-    return atLead.kind === 'handoff' ? 'give' : 'wave'
+    return atLead.kind === 'handoff' ? 'give' : atLead.kind === 'finish' ? 'cheer' : 'wave'
   }
   if (
     body.role === 'lead' &&
@@ -30,7 +32,7 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
     return 'give'
   }
   if (body.role === 'advisor') {
-    return world.t < world.advisorRaiseUntil ? 'raise' : 'idle'
+    return world.t < world.advisorRaiseUntil || advisorGestureOf(world) ? 'raise' : 'idle'
   }
   if (body.plan.kind === 'leave') {
     return 'idle'
@@ -42,6 +44,7 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
 export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
   const cheering = world.t < world.cheerUntil
   return [...world.bodies.values()]
+    .filter((body) => !body.hidden)
     .map((body): TeamSceneActor => {
       const timed = body.emote && world.t < body.emote.until ? body.emote.kind : null
       const seatedMark =
@@ -51,8 +54,11 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
             ? 'alert'
             : body.activity === 'done'
               ? 'check'
-              : null
+              : body.activity === 'blocked'
+                ? 'blocked'
+                : null
       const plan = body.plan
+      const play = body.role === 'member' ? seatedPlayOf(world, body) : undefined
       return {
         key: body.key,
         role: body.role,
@@ -65,12 +71,18 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         gait: body.gait,
         stride: teamSceneStrideAt(body.depth),
         carrying:
-          (plan.kind === 'handoff' && plan.stage === 'toLead') ||
+          ((plan.kind === 'handoff' || (plan.kind === 'finish' && plan.report === true)) &&
+            plan.stage === 'toLead') ||
           (plan.kind === 'seated' && body.work.step === 'carry') ||
           (body.role === 'lead' &&
             world.rounds.stage === 'toMember' &&
             world.rounds.purpose === 'give'),
         emote: timed ?? seatedMark,
+        ...(body.role === 'advisor' ? { gesture: advisorGestureOf(world) } : {}),
+        ...(play ? { play } : {}),
+        ...(body.away ? { away: true as const } : {}),
+        ...(body.desk ? { desk: body.desk } : {}),
+        ...(body.hold ? { hold: body.hold } : {}),
         jump: cheering ? Math.abs(Math.sin(world.t * 6.5 + body.x * 9)) * 8 : 0
       }
     })

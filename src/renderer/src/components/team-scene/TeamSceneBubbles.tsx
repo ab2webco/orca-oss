@@ -24,12 +24,14 @@ type Props = {
   speeches: TeamSceneSpeech[]
   width: number
   height: number
-  /** Pixel's scene pixel size: draw the game's thought cloud instead of the glass bubble. */
+  /** Pixel's scene pixel size: draw the game's thought cloud instead of the dark bubble. */
   cloudPixel?: number
   /** What no bubble may cover, such as an asking member's tag. */
   obstacles?: readonly TeamSceneRect[]
   /** Told after each layout which speeches no bubble shows whole (none, or clamped), so their lines can show elsewhere. */
   onUnplaced?: (keys: string[]) => void
+  /** Where the stage starts to show; no bubble starts above it. 0 when the stage shows whole. */
+  visibleTop?: number
 }
 
 const NONE: readonly TeamSceneRect[] = []
@@ -71,6 +73,7 @@ function PixelCloudCanvas({
   return (
     <canvas
       ref={ref}
+      aria-hidden="true"
       width={width}
       height={cloud.rows}
       className="absolute left-0 top-0 -z-10 [image-rendering:pixelated]"
@@ -79,14 +82,15 @@ function PixelCloudCanvas({
   )
 }
 
-/** Bubbles over the canvas tied to their speakers: glass with a hairline, or Pixel's cloud. */
+/** Bubbles over the canvas tied to their speakers: a dark card with a hairline, or Pixel's cloud. */
 export function TeamSceneBubbles({
   speeches,
   width,
   height,
   cloudPixel,
   obstacles = NONE,
-  onUnplaced
+  onUnplaced,
+  visibleTop = 0
 }: Props): React.JSX.Element {
   const refs = useRef(new Map<string, HTMLSpanElement>())
   const [boxes, setBoxes] = useState<TeamSceneBubbleBox[]>([])
@@ -120,12 +124,20 @@ export function TeamSceneBubbles({
       // Why +1: offsetWidth rounds, and a box half a pixel short wraps the line its cloud was sized for.
       const size = { width: el.offsetWidth + 1, height: el.offsetHeight }
       // Why measured on one line too: an attending lead's line clamps to it when two find no room.
-      const wrap = el.style.whiteSpace
+      // Why the text too: its pre-line keeps a question's line break, which nowrap must override.
+      const text = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null
+      const wrap = [el.style.whiteSpace, text?.style.whiteSpace ?? '']
       el.style.whiteSpace = 'nowrap'
+      if (text) {
+        text.style.whiteSpace = 'nowrap'
+      }
       const oneLine = s.attending
         ? { width: el.offsetWidth + 1, height: el.offsetHeight }
         : undefined
-      el.style.whiteSpace = wrap
+      el.style.whiteSpace = wrap[0]!
+      if (text) {
+        text.style.whiteSpace = wrap[1]!
+      }
       // Why restore: React skips a width equal to its last one, which would leave max-content.
       el.style.width = laid
       return {
@@ -140,7 +152,7 @@ export function TeamSceneBubbles({
     })
     const laid = layoutTeamSceneBubbles(
       requests,
-      { width, height },
+      { width, height, top: visibleTop },
       { beside: Boolean(cloudPixel), obstacles }
     )
     setBoxes(laid)
@@ -148,10 +160,15 @@ export function TeamSceneBubbles({
     const whole = new Set(laid.filter((b) => !b.clamped).map((b) => b.key))
     onUnplaced?.(speeches.filter((s) => !whole.has(s.key)).map((s) => s.key))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey stands for speeches and obstacles
-  }, [layoutKey, width, height, cloudPixel])
+  }, [layoutKey, width, height, cloudPixel, visibleTop])
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden="true"
+      data-scene-visible-top={visibleTop}
+      data-scene-obstacles={obstacles.length}
+    >
       {speeches.map((s) => {
         const box = boxes.find((b) => b.key === s.key)
         const tail = box ? Math.max(4, s.anchor.top - box.top - box.height) : 0
@@ -166,11 +183,12 @@ export function TeamSceneBubbles({
               }
             }}
             data-scene-bubble={s.key}
-            // Why fixed glass: the scene sky is dark in both themes, so the bubble is too.
+            data-scene-clamped={box?.clamped ? '' : undefined}
+            // Why fixed and solid: the scene sky is dark in both themes, so the bubble is too.
             className={
               cloudPixel
-                ? 'absolute isolate max-w-[170px] px-2 pb-3 pt-4 font-mono text-[10px] leading-tight text-[#23232b]'
-                : 'absolute max-w-[170px] rounded-lg border border-white/15 bg-black/55 px-2 py-1 text-[10.5px] leading-snug text-white backdrop-blur-sm'
+                ? 'absolute isolate max-w-[170px] px-2 pb-3 pt-4 font-mono text-[10px] leading-tight text-scene-cloud-ink'
+                : 'absolute max-w-[170px] rounded-lg border border-white/15 bg-scene-bubble px-2 py-1 text-[10.5px] leading-snug text-white'
             }
             style={{
               left: box?.left ?? 0,
@@ -180,10 +198,11 @@ export function TeamSceneBubbles({
             }}
           >
             {/* Why anywhere: a long path or command has no space to break at, and was cut mid-word. */}
+            {/* Why pre-line and three: a waiting lead's line is its state over the question; one when clamped. */}
             <span
               className={cn(
-                '[overflow-wrap:anywhere]',
-                box?.clamped ? 'line-clamp-1' : 'line-clamp-2'
+                'whitespace-pre-line [overflow-wrap:anywhere]',
+                box?.clamped ? 'line-clamp-1' : 'line-clamp-3'
               )}
             >
               {s.text}

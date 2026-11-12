@@ -7,6 +7,7 @@ import type { GamePanelStyle } from '../../../../shared/orchestrator-game-panel'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
 import { loadTeamSceneArt } from './team-scene-art-load'
 import { createImagePainter } from './team-scene-image-painter'
+import { OFFICE_BACK_SEAT } from './team-scene-office-back'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import type { TeamScenePainter } from './team-scene-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
@@ -53,18 +54,17 @@ const HOST: TeamSceneArtHost = {
 
 describe('teamSceneArtOf', () => {
   it('draws Quest in its bundled art', () => {
-    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toMatchObject({
+    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toEqual({
       drawn: 'figures',
-      art: 'bundled',
-      defaultArt: false
+      art: 'bundled'
     })
     expect(teamSceneArtOf({ style: 'office', scene: QUEST }).drawn).toBe('office')
   })
 
   it('reads a host that named no scene as Quest, as Pixel does', () => {
-    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toMatchObject({
+    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toEqual({
       drawn: 'office',
-      defaultArt: false
+      art: 'bundled'
     })
   })
 
@@ -80,18 +80,18 @@ describe('teamSceneArtOf', () => {
     })
   })
 
-  it('draws a scene with no art in the chosen style with the default art, never Pixel', () => {
-    expect(
-      teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })
-    ).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
+  it("draws a scene with no art in the chosen style with its own characters in Pixel, never Quest's", () => {
+    expect(teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })).toEqual({
+      drawn: 'pixel',
+      art: 'pixel'
+    })
   })
 
-  it('draws the default art when the own art did not load, and Pixel when even that failed', () => {
+  it('draws Pixel when the own art did not load, and Quest in Pixel when even its art failed', () => {
     const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
-    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toMatchObject({
-      drawn: 'figures',
-      art: 'bundled',
-      defaultArt: true
+    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toEqual({
+      drawn: 'pixel',
+      art: 'pixel'
     })
     expect(teamSceneArtOf({ style: 'figures', scene: QUEST, bundledArtFailed: true }).drawn).toBe(
       'pixel'
@@ -160,30 +160,52 @@ describe('useTeamScenePainter', () => {
     await expect(urlOf('art/sky.png')).resolves.toBe('data:art/sky.png')
     expect(readTeamSceneArtUrl).toHaveBeenCalledWith(HOST, id, 'art/sky.png')
     expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene', defaultArt: false })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene' })
   })
 
-  it('draws the default art when the own art fails, as an older host does', async () => {
+  it("draws the scene's own characters in Pixel when its own art fails, as an older host does", async () => {
     const id = 'file:mine.json'
     vi.mocked(loadTeamSceneArt).mockRejectedValueOnce(new Error('method_not_found'))
     await render('figures', { id, extensions: [blockScene(id)] })
-    expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'bundled', defaultArt: true })
-    expect(vi.mocked(loadTeamSceneArt).mock.calls.at(-1)![1]('scene/sky.png')).toBeUndefined()
+    expect(seen.at(-1)).toBe(PIXEL)
+    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
   })
 
-  it('draws the default art at once when no host is known to read the own art from', async () => {
+  it("draws Pixel at once when no host is known to read the own figures from, and Orca's office", async () => {
     useTeamSceneArtHostStore.setState({ host: null })
     const id = 'file:mine.json'
-    await render('office', { id, extensions: [blockScene(id)] })
+    await render('figures', { id, extensions: [blockScene(id)] })
     expect(readTeamSceneArtUrl).not.toHaveBeenCalled()
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
+    await render('office', { id, extensions: [blockScene(id)] })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
   })
 
-  it('draws a scene with no art in the chosen style with the default art', async () => {
-    await render('office', { id: 'file:.orca/scenes/koombea.json', extensions: [] })
+  it("draws a scene's figures as its own characters, never Quest's, and Orca's office", async () => {
+    const scene = { id: 'file:.orca/scenes/koombea.json', extensions: [] }
+    await render('figures', scene)
+    expect(seen.at(-1)).toBe(PIXEL)
+    expect(loadTeamSceneArt).not.toHaveBeenCalled()
+    await render('office', scene)
     expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled', defaultArt: true })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
+  })
+
+  it("seats members from behind only at Orca's own Office desk", async () => {
+    const backOf = () => vi.mocked(createImagePainter).mock.calls.at(-1)![0].back
+    await render('office', QUEST)
+    expect(backOf()).toEqual(OFFICE_BACK_SEAT)
+    await render('figures', QUEST)
+    expect(backOf()).toBeNull()
+    const id = 'file:mine.json'
+    const own = {
+      id,
+      pluginId: 'plugin',
+      definition: { native: { office: teamSceneQuestArtOf('office') } }
+    } as unknown as OrchestratorGameSceneExtension
+    await render('office', { id, extensions: [own] })
+    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'scene' })
+    expect(backOf()).toBeNull()
   })
 
   it('keeps its painter across a poll that repeats the same scene', async () => {

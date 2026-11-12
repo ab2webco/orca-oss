@@ -229,12 +229,13 @@ describe('TeamTabContent', () => {
 
   // ORCA-1139 lead review: when the scene has no room for the lead's bubble, its card shows the line.
   it("shows the lead's whole scene line in its card only while the scene has no room for its bubble", async () => {
-    const line = 'Waiting for you · Merge #923 now that the Windows check is green?'
+    const line = 'Waiting for you\nMerge #923 now that the Windows check is green?'
     const { container } = await render(model(), 'game', vi.fn(), null, vi.fn(), null, line)
     const shown = leadCard(container).querySelector<HTMLElement>('[data-team-lead-line]')
     expect(shown?.textContent).toBe(line)
     expect(shown?.className).not.toContain('truncate')
     expect(shown?.className).toContain('[overflow-wrap:anywhere]')
+    expect(shown?.className).toContain('whitespace-pre-line')
 
     const fits = await render(model())
     expect(leadCard(fits.container).querySelector('[data-team-lead-line]')).toBeNull()

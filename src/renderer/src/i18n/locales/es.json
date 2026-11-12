@@ -11068,7 +11068,8 @@
           "title": "Panel"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo la dibuja con el arte predeterminado."
+          "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo dibuja los personajes de la propia escena en Pixel.",
+          "office": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo dibuja la oficina de Orca."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Token de larga duración",
@@ -15573,7 +15574,7 @@
       "team-scene": {
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
-          "leadAsks": "Esperándote · {{question}}",
+          "leadAsks": "Esperándote\n{{question}}",
           "leadDone": "Listo, sin tareas pendientes",
           "leadWaits": "Esperándote"
         }
@@ -16244,6 +16245,7 @@
       "githubLimit": "Límite de la API de GitHub alcanzado. Se reintenta solo en {{minutes}} min."
     },
     "machines": {
+      "all": "Todas",
       "offline": "Sin conexión",
       "lowMemory": "Poca memoria",
       "free": "Libre",

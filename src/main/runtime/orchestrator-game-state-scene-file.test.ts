@@ -136,10 +136,10 @@ describe('buildOrchestratorGameState scene file', () => {
           scene: definition,
           sceneArtFailed: true
         })
-      ).toEqual({ drawn: 'figures', art: 'bundled', defaultArt: true })
+      ).toEqual({ drawn: 'pixel', art: 'pixel' })
     })
 
-    it('draws a file with a broken block with the default art, and says why', async () => {
+    it('draws a file with a broken block with its own characters in Pixel, and says why', async () => {
       const state = await build(
         checkout({
           '.orca/scenes/space.json': JSON.stringify(
@@ -156,7 +156,7 @@ describe('buildOrchestratorGameState scene file', () => {
           sceneId: state.config.scene,
           scene: state.extensions?.scenes[0]?.definition
         })
-      ).toEqual({ drawn: 'figures', art: 'bundled', defaultArt: true })
+      ).toEqual({ drawn: 'pixel', art: 'pixel' })
     })
   })
 

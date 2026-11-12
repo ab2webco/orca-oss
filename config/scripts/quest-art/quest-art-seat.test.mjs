@@ -112,7 +112,9 @@ describe("Quest's Office seats a working member on the chair", () => {
           ],
           effects: [],
           overflow: 0,
-          stations: [spot]
+          stations: [spot],
+          sites: [],
+          trophies: []
         })
         const draws = calls.filter((c) => c.name === 'drawImage')
         const station = draws.find((c) => c.args[0] === images.get(office.props.station))

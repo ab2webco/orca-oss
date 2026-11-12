@@ -268,7 +268,7 @@ for (const plugins of [false, true]) {
 
       // The scene's bubble says the question, never the tool's name, and fits its box.
       const bubble = panel.locator('[data-scene-bubble="lead"]')
-      await expect(bubble).toHaveText(`Waiting for you · ${QUESTION}`, { timeout: TEAM_POLL_MS })
+      await expect(bubble).toHaveText(`Waiting for you\n${QUESTION}`, { timeout: TEAM_POLL_MS })
       await expectBubblesFit(orcaPage, label)
       if (!plugins) {
         await captureScene(orcaPage, panel, testInfo)

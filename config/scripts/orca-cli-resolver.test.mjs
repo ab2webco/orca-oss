@@ -121,102 +121,127 @@ function toolsWithoutOrca() {
   return tools
 }
 
-describe('no hook starts a bare orca', () => {
-  const tools = toolsWithoutOrca()
+// Why not on macOS or Windows: there a bare `orca` is Orca's own CLI and the resolver accepts it
+// (see 'accepts a bare orca on darwin'), so the fake reader would be started by design.
+describe.runIf(!['darwin', 'win32'].includes(process.platform))(
+  'no hook starts a bare orca',
+  () => {
+    const tools = toolsWithoutOrca()
 
-  /** What every hook runs under: the reader first on PATH, and no Orca env to be saved by. */
-  function hookEnv(bin, extra = {}) {
-    return { HOME: bin, PATH: `${bin}:${tools}`, ...extra }
-  }
+    /** What every hook runs under: the reader first on PATH, and no Orca env to be saved by. */
+    function hookEnv(bin, extra = {}) {
+      return { HOME: bin, PATH: `${bin}:${tools}`, ...extra }
+    }
 
-  it('session-start-plane-board', () => {
-    const { bin, started } = fakeReader()
-    const result = spawnSync(python, [join(hooksDir, 'session-start-plane-board.py')], {
-      encoding: 'utf8',
-      env: hookEnv(bin)
+    it('session-start-plane-board', () => {
+      const { bin, started } = fakeReader()
+      const result = spawnSync(python, [join(hooksDir, 'session-start-plane-board.py')], {
+        encoding: 'utf8',
+        env: hookEnv(bin)
+      })
+      expect(result.status, result.stderr).toBe(0)
+      expect(started()).toBe('')
+      expect(result.stdout).toContain('NO se pudo leer')
     })
-    expect(result.status, result.stderr).toBe(0)
-    expect(started()).toBe('')
-    expect(result.stdout).toContain('NO se pudo leer')
-  })
 
-  it('board-state-guard, which denies at once instead of waiting on the reader', () => {
-    const { bin, started } = fakeReader()
-    stub(bin, 'git', 'echo fabolivark/orca-1018')
-    const result = spawnSync(python, [join(hooksDir, 'board-state-guard.py')], {
-      encoding: 'utf8',
-      input: JSON.stringify({ tool_input: { command: 'gh pr create --title x' } }),
-      env: hookEnv(bin),
-      timeout: 20_000
+    it('board-state-guard, which denies at once instead of waiting on the reader', () => {
+      const { bin, started } = fakeReader()
+      stub(bin, 'git', 'echo fabolivark/orca-1018')
+      const result = spawnSync(python, [join(hooksDir, 'board-state-guard.py')], {
+        encoding: 'utf8',
+        input: JSON.stringify({ tool_input: { command: 'gh pr create --title x' } }),
+        env: hookEnv(bin),
+        timeout: 20_000
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.status, result.stderr).toBe(0)
+      expect(started()).toBe('')
+      expect(result.stdout).toContain('"permissionDecision": "deny"')
+      expect(result.stdout).toContain('No se pudo leer el estado de ORCA-1018')
     })
-    expect(result.error).toBeUndefined()
-    expect(result.status, result.stderr).toBe(0)
-    expect(started()).toBe('')
-    expect(result.stdout).toContain('"permissionDecision": "deny"')
-    expect(result.stdout).toContain('No se pudo leer el estado de ORCA-1018')
-  })
 
-  it('post-merge-board-close, which says it could not move the ticket', () => {
-    const { bin, started } = fakeReader()
-    stub(bin, 'gh', `echo '{"state":"MERGED","title":"fix: x (ORCA-99)"}'`)
-    const result = spawnSync(python, [join(hooksDir, 'post-merge-board-close.py')], {
-      encoding: 'utf8',
-      input: JSON.stringify({ tool_input: { command: 'gh pr merge 12 --squash' } }),
-      env: hookEnv(bin),
-      timeout: 20_000
+    it('post-merge-board-close, which says it could not move the ticket', () => {
+      const { bin, started } = fakeReader()
+      stub(bin, 'gh', `echo '{"state":"MERGED","title":"fix: x (ORCA-99)"}'`)
+      const result = spawnSync(python, [join(hooksDir, 'post-merge-board-close.py')], {
+        encoding: 'utf8',
+        input: JSON.stringify({ tool_input: { command: 'gh pr merge 12 --squash' } }),
+        env: hookEnv(bin),
+        timeout: 20_000
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.status, result.stderr).toBe(0)
+      expect(started()).toBe('')
+      expect(result.stdout).toContain('no pude mover')
     })
-    expect(result.error).toBeUndefined()
-    expect(result.status, result.stderr).toBe(0)
-    expect(started()).toBe('')
-    expect(result.stdout).toContain('no pude mover')
-  })
 
-  it('coordinator-sweep', () => {
-    const { bin, started } = fakeReader()
-    stub(bin, 'gh', `echo '[]'`)
-    const result = spawnSync('bash', [join(hooksDir, 'coordinator-sweep.sh'), '--tick'], {
-      encoding: 'utf8',
-      env: hookEnv(bin, { ORCA_SWEEP_ROOT: resolve(hooksDir, '../..') })
+    it('coordinator-sweep', () => {
+      const { bin, started } = fakeReader()
+      stub(bin, 'gh', `echo '[]'`)
+      const result = spawnSync('bash', [join(hooksDir, 'coordinator-sweep.sh'), '--tick'], {
+        encoding: 'utf8',
+        env: hookEnv(bin, { ORCA_SWEEP_ROOT: resolve(hooksDir, '../..') })
+      })
+      expect(result.stdout).toContain('SWEEP')
+      expect(started()).toBe('')
     })
-    expect(result.stdout).toContain('SWEEP')
-    expect(started()).toBe('')
-  })
 
-  it('merged-worktree-close-hook inside an Orca terminal, which keeps worktrees closed off', () => {
-    const { bin, started } = fakeReader()
-    const repo = join(bin, 'repo')
-    const git = (...args) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
-    mkdirSync(repo)
-    git('init', '-q')
-    git('-c', 'user.name=t', '-c', 'user.email=t@e.co', 'commit', '-q', '--allow-empty', '-m', 'b')
-    const worktree = join(bin, 'fix-a')
-    git('worktree', 'add', '-q', '-b', 'fix/a', worktree)
-    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
-    const prsFile = join(bin, 'prs.json')
-    writeFileSync(prsFile, JSON.stringify({ 'fix/a': [{ number: 12, headRefOid: head }] }))
-
-    const result = spawnSync(process.execPath, [join(hooksDir, 'merged-worktree-close-hook.mjs')], {
-      cwd: repo,
-      encoding: 'utf8',
-      input: JSON.stringify({
-        hook_event_name: 'PreToolUse',
+    it('merged-worktree-close-hook inside an Orca terminal, which keeps worktrees closed off', () => {
+      const { bin, started } = fakeReader()
+      const repo = join(bin, 'repo')
+      const git = (...args) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
+      mkdirSync(repo)
+      git('init', '-q')
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@e.co',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'b'
+      )
+      const worktree = join(bin, 'fix-a')
+      git('worktree', 'add', '-q', '-b', 'fix/a', worktree)
+      const head = execFileSync('git', ['rev-parse', 'HEAD'], {
         cwd: repo,
-        tool_input: { command: 'gh workflow run x' }
-      }),
-      env: hookEnv(bin, {
-        ORCA_TERMINAL_HANDLE: 'term_x',
-        ORCA_WORKTREE_CLOSE_PRS_FILE: prsFile
-      }),
-      timeout: 20_000
+        encoding: 'utf8'
+      }).trim()
+      const prsFile = join(bin, 'prs.json')
+      writeFileSync(prsFile, JSON.stringify({ 'fix/a': [{ number: 12, headRefOid: head }] }))
+
+      const result = spawnSync(
+        process.execPath,
+        [join(hooksDir, 'merged-worktree-close-hook.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          input: JSON.stringify({
+            hook_event_name: 'PreToolUse',
+            cwd: repo,
+            tool_input: { command: 'gh workflow run x' }
+          }),
+          env: hookEnv(bin, {
+            ORCA_TERMINAL_HANDLE: 'term_x',
+            ORCA_WORKTREE_CLOSE_PRS_FILE: prsFile
+          }),
+          timeout: 20_000
+        }
+      )
+
+      expect(result.error).toBeUndefined()
+      expect(result.status, result.stderr).toBe(0)
+      expect(started()).toBe('')
+      expect(result.stdout).toContain('terminales de Orca')
+      expect(existsSync(worktree)).toBe(true)
     })
+  }
+)
 
-    expect(result.error).toBeUndefined()
-    expect(result.status, result.stderr).toBe(0)
-    expect(started()).toBe('')
-    expect(result.stdout).toContain('terminales de Orca')
-    expect(existsSync(worktree)).toBe(true)
-  })
-
+// Why outside: reading the sources needs no platform, so it guards macOS and Windows too.
+describe('every hook source', () => {
   // Why static too: the watchdog has no entry point cheap enough to run here, and a new hook
   // would add its bare call without any test of its own.
   it('leaves no way to a bare orca in any hook source', () => {

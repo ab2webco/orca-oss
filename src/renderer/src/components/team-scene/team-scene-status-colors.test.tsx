@@ -22,10 +22,12 @@ describe('readTeamSceneStatusColors', () => {
     root.style.setProperty('--status-attention', '#aa0001')
     root.style.setProperty('--status-success', '#00aa02')
     root.style.setProperty('--status-info', '#0000a3')
+    root.style.setProperty('--status-warning', '#aa7704')
     expect(readTeamSceneStatusColors()).toEqual({
       attention: '#aa0001',
       done: '#00aa02',
-      working: '#0000a3'
+      working: '#0000a3',
+      risk: '#aa7704'
     })
   })
 
@@ -34,7 +36,8 @@ describe('readTeamSceneStatusColors', () => {
     expect(readTeamSceneStatusColors()).toEqual({
       attention: STATUS_COLOR_DEFAULTS.dark.attention,
       done: STATUS_COLOR_DEFAULTS.dark.success,
-      working: STATUS_COLOR_DEFAULTS.dark.info
+      working: STATUS_COLOR_DEFAULTS.dark.info,
+      risk: STATUS_COLOR_DEFAULTS.dark.warning
     })
   })
 })

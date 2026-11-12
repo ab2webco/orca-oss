@@ -68,7 +68,8 @@ const tailCrosses = (tail: Placed, box: TeamSceneRect): boolean => {
  */
 export function layoutTeamSceneBubbles(
   requests: readonly TeamSceneBubbleRequest[],
-  scene: { width: number; height: number },
+  /** `top`: where the stage starts to show, as a building floor crops its sky; 0 when whole. */
+  scene: { width: number; height: number; top?: number },
   /** Pixel's cloud: its trail drifts toward the speaker, so a shared row is allowed. */
   opts: { beside?: boolean; obstacles?: readonly TeamSceneRect[] } = {}
 ): TeamSceneBubbleBox[] {
@@ -86,7 +87,7 @@ export function layoutTeamSceneBubbles(
 
 function placeBubbles(
   requests: readonly TeamSceneBubbleRequest[],
-  scene: { width: number; height: number },
+  scene: { width: number; height: number; top?: number },
   opts: { beside?: boolean; obstacles?: readonly TeamSceneRect[] }
 ): TeamSceneBubbleBox[] {
   const obstacles = opts.obstacles ?? []
@@ -110,7 +111,7 @@ function placeBubbles(
       placed.push(fit)
       continue
     }
-    const row = opts.beside ? besideOf(placed, r, scene.width, obstacles) : null
+    const row = opts.beside ? besideOf(placed, r, scene, obstacles) : null
     if (row) {
       placed.splice(placed.indexOf(row.moved), 1, row.other, row.added)
     }
@@ -121,7 +122,7 @@ function placeBubbles(
 /** Every spot a bubble may take, above its speaker or stepped aside, with its tail on the speaker. */
 function candidatesOf(
   r: TeamSceneBubbleRequest,
-  scene: { width: number; height: number },
+  scene: { width: number; height: number; top?: number },
   placed: readonly Placed[],
   obstacles: readonly TeamSceneRect[]
 ): Placed[] {
@@ -157,7 +158,10 @@ function candidatesOf(
       )
     )
     .filter(
-      (c) => c.box.top >= 0 && c.box.tailX >= TAIL_INSET && c.box.tailX <= r.width - TAIL_INSET
+      (c) =>
+        c.box.top >= (scene.top ?? 0) &&
+        c.box.tailX >= TAIL_INSET &&
+        c.box.tailX <= r.width - TAIL_INSET
     )
 }
 
@@ -178,9 +182,10 @@ const clearOf = (
 function besideOf(
   placed: Placed[],
   r: TeamSceneBubbleRequest,
-  width: number,
+  scene: { width: number; top?: number },
   obstacles: readonly TeamSceneRect[]
 ): { moved: Placed; other: Placed; added: Placed } | null {
+  const { width } = scene
   const moved = placed.at(-1)
   if (!moved) {
     return null
@@ -221,6 +226,10 @@ function besideOf(
     return { box: { ...one.box, left, top, tailX }, anchorTop: one.top }
   }
   const laid = [at(first, firstLeft), at(second, secondLeft)]
+  // Why: a row that starts above a cropped stage's visible top would be cut under the floor above.
+  if (laid.some((one) => one.box.top < (scene.top ?? 0))) {
+    return null
+  }
   const added = laid.find((one) => one.box.key === r.key)!
   const other = laid.find((one) => one.box.key !== r.key)!
   const rest = placed.filter((p) => p !== moved)
@@ -270,3 +279,15 @@ export const teamSceneCellUnder = (
       cell.y < o.top + o.height &&
       o.top < cell.y + cell.size
   )
+
+/**
+ * The floor above's asker boxes in this floor's stage: this stage's y 0 lies at the floor above's
+ * `stripPlusSlab - cropHere + cropAbove`, so a bubble rising over the slab keeps clear of them.
+ */
+export const teamSceneRectsFromAbove = (
+  rects: readonly TeamSceneRect[],
+  floors: { stripPlusSlab: number; cropHere: number; cropAbove: number }
+): TeamSceneRect[] => {
+  const shift = floors.stripPlusSlab - floors.cropHere + floors.cropAbove
+  return rects.map((rect) => ({ ...rect, top: rect.top - shift }))
+}

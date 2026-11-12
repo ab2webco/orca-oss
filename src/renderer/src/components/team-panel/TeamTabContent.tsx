@@ -84,7 +84,7 @@ function LeadCardRow({
           {sceneLine ? (
             <span
               data-team-lead-line=""
-              className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+              className="whitespace-pre-line text-xs text-muted-foreground [overflow-wrap:anywhere]"
             >
               {sceneLine}
             </span>

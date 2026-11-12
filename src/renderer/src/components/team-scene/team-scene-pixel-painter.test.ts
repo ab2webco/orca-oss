@@ -8,9 +8,10 @@ import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/h
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneFrame } from './team-scene-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
+import { gardenPaletteOf } from './team-scene-pixel-garden'
 import { recordingContext } from './team-scene-recording-context'
 
-const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
 const actor = (key: string, extra: Partial<TeamSceneActor> = {}): TeamSceneActor => ({
   key,
@@ -93,6 +94,67 @@ describe('createPixelPainter', () => {
     expect(colorsDrawnFor('Merlin')).toBe(colorsDrawnFor('Merlin'))
   })
 
+  it("plays the scene advisor's own gesture frame and holds up its mark", () => {
+    const cast = {
+      advisor: {
+        frames: [['aab', 'bba']],
+        gestures: { escalated: ['cc', 'cc'] },
+        colors: { a: 0xff0000, b: 0x00ff00, c: 0x123456 }
+      }
+    }
+    const scene = { ...QUEST_SCENE, cast }
+    const paintWith = (gesture: TeamSceneActor['gesture']) => {
+      offscreen = []
+      const r = recordingContext()
+      createPixelPainter({ scene, light: NOON, colors: COLORS }).paint(
+        r.g,
+        frame([actor('advisor', { role: 'advisor', x: 0.74, gesture })])
+      )
+      return { r, sprite: offscreen.at(-1)! }
+    }
+    const widthOf = (s: ReturnType<typeof recordingContext>) =>
+      Math.max(...s.calls.filter((c) => c.name === 'fillRect').map((c) => c.args[0] as number))
+    // The 2-wide gesture frame, not the 3-wide standing one.
+    expect(widthOf(paintWith('escalated').sprite)).toBeLessThan(widthOf(paintWith(null).sprite))
+    const fills = (r: ReturnType<typeof recordingContext>) =>
+      r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+    expect(fills(paintWith('escalated').r)).toContain(COLORS.attention)
+    expect(fills(paintWith(null).r)).not.toContain(COLORS.attention)
+  })
+
+  it("draws the scene's own advisor and walks its pet beside the lead", () => {
+    const cast = {
+      advisor: { frames: [['aab', 'bba']], colors: { a: 0xff0000, b: 0x00ff00 } },
+      pet: { frames: [['pp']], happy: ['pp'], colors: { p: 0x0000ff } }
+    }
+    const withCast = { ...QUEST_SCENE, cast }
+    const castless = { ...QUEST_SCENE, cast: undefined }
+    const paintOf = (scene: typeof QUEST_SCENE, actors: TeamSceneActor[]) => {
+      offscreen = []
+      const r = recordingContext()
+      createPixelPainter({ scene, light: NOON, colors: COLORS }).paint(r.g, frame(actors))
+      return { images: r.calls.filter((c) => c.name === 'drawImage').length, bitmaps: offscreen }
+    }
+    const advisor = actor('advisor', { role: 'advisor', x: 0.74 })
+    const fillsOf = (scene: typeof QUEST_SCENE) =>
+      JSON.stringify(
+        paintOf(scene, [advisor])
+          .bitmaps.at(-1)!
+          .calls.map((c) => c.fillStyle)
+      )
+    expect(fillsOf(withCast)).not.toBe(fillsOf(castless))
+    // The advisor's own 3-wide frame, not a 10-wide member costume.
+    const sizes = paintOf(withCast, [advisor])
+      .bitmaps.at(-1)!
+      .calls.filter((c) => c.name === 'fillRect')
+    expect(Math.max(...sizes.map((c) => c.args[0] as number))).toBeLessThan(5)
+
+    expect(paintOf(withCast, [actor('lead')]).images).toBe(
+      paintOf(castless, [actor('lead')]).images + 1
+    )
+    expect(paintOf(withCast, []).images).toBe(paintOf(castless, []).images)
+  })
+
   it.each(Object.values(SCENES))('draws the built-in $id scene with no edits', (scene) => {
     const painter = createPixelPainter({ scene, light: NOON, colors: COLORS })
     const r = recordingContext()
@@ -100,7 +162,10 @@ describe('createPixelPainter', () => {
       r.g,
       frame([actor('lead'), actor('Merlin'), actor('advisor', { role: 'advisor' })])
     )
-    expect(r.calls.filter((c) => c.name === 'drawImage')).toHaveLength(4)
+    // Three actors and the backdrop, and the pet when the scene has one.
+    expect(r.calls.filter((c) => c.name === 'drawImage')).toHaveLength(
+      4 + (scene.cast?.pet ? 1 : 0)
+    )
     expect(offscreen.at(-1)!.calls.filter((c) => c.name === 'fillRect').length).toBeGreaterThan(20)
   })
 
@@ -184,5 +249,35 @@ describe('createPixelPainter', () => {
     // Why integer: every sprite pixel must land on whole device pixels.
     expect(Number.isInteger(member[3] / member[0].width)).toBe(true)
     expect(member[3]).toBeLessThanOrEqual(38)
+  })
+
+  const hexOf = (n: number): string => `#${n.toString(16).padStart(6, '0')}`
+  const look = QUEST_SCENE.looks.working
+  const site = (stage: 0 | 1 | 2 | 3 | 4, broken = false) => ({
+    key: 'm',
+    spot: { x: 0.155, depth: 0.5 },
+    stage,
+    broken
+  })
+
+  it("grows each seat's garden in the scene's own leaf and fruit colours", () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const rectColors = (f: TeamSceneFrame) => {
+      const r = recordingContext()
+      painter.paint(r.g, f)
+      return r.calls.filter((c) => c.name === 'fillRect').map((c) => c.fillStyle)
+    }
+    const sprouting = rectColors({ ...frame([]), sites: [site(2)] })
+    expect(sprouting).toContain(gardenPaletteOf(look.plant, look.sun).leaf)
+    expect(sprouting).not.toContain(hexOf(look.sun))
+    expect(rectColors({ ...frame([]), sites: [site(4)] })).toContain(hexOf(look.sun))
+    expect(rectColors(frame([]))).not.toContain(gardenPaletteOf(look.plant, look.sun).leaf)
+  })
+
+  it('keeps a harvest crate for each trophy', () => {
+    const painter = createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS })
+    const r = recordingContext()
+    painter.paint(r.g, { ...frame([]), trophies: [{ key: 'x', name: 'x' }] })
+    expect(r.calls.some((c) => c.name === 'fillRect' && c.fillStyle === hexOf(look.sun))).toBe(true)
   })
 })

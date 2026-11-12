@@ -22,6 +22,30 @@ describe('seatPlanOf', () => {
     expect([...xs].sort((p, q) => p - q)).toEqual(xs)
   })
 
+  it('seats up to a row of five in one even row, each at its own x', () => {
+    for (const n of [3, 4, 5]) {
+      const plan = seatPlanOf(
+        Array.from({ length: n }, (_, i) => member(`m${i}`, i === 1 ? 'needsYou' : 'working')),
+        5
+      )
+      expect(new Set(plan.seats.map((s) => s.spot.depth)).size).toBe(1)
+      const xs = plan.seats.map((s) => s.spot.x).sort((p, q) => p - q)
+      const gaps = xs.slice(1).map((x, i) => x - xs[i]!)
+      expect(Math.min(...gaps)).toBeGreaterThan(0.1)
+      for (const gap of gaps) {
+        expect(gap).toBeCloseTo(gaps[0]!)
+      }
+    }
+  })
+
+  it('starts a row where the style asks, keeping its spacing', () => {
+    const members = Array.from({ length: 5 }, (_, i) => member(`m${i}`))
+    const plain = seatPlanOf(members, 5).seats.map((s) => s.spot.x)
+    const shifted = seatPlanOf(members, 5, 0.16).seats.map((s) => s.spot.x)
+    expect(shifted[0]).toBeCloseTo(0.16)
+    shifted.forEach((x, i) => expect(x - plain[i]!).toBeCloseTo(0.06))
+  })
+
   it('opens a second row after four and caps at eight with +N', () => {
     const keys = Array.from({ length: 11 }, (_, i) => `m${i}`)
     const plan = seatPlanOf(keys.map((k) => member(k)))
