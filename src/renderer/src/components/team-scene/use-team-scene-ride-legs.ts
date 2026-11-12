@@ -46,6 +46,8 @@ export function useTeamSceneRideLegs(
   hidden: ReadonlySet<string> = NO_FLOORS
 ): { legs: TeamSceneFloorLegs; onBoarded: (rider: string) => void } {
   const [legs, setLegs] = useState<TeamSceneFloorLegs>(HOME)
+  // Why a tick: a timer that fires a hair early leaves legs unchanged, and must still set the next one.
+  const [tick, setTick] = useState(0)
   const wantsRef = useRef(wants)
   const hiddenRef = useRef(hidden)
   // Why in a layout effect: render stays pure, and it runs before the effects that advance a trip.
@@ -83,9 +85,15 @@ export function useTeamSceneRideLegs(
     if (reducedMotion || waits.length === 0) {
       return
     }
-    const timer = setTimeout(() => advance(null), Math.min(...waits) * 1000)
+    const timer = setTimeout(
+      () => {
+        advance(null)
+        setTick((one) => one + 1)
+      },
+      Math.round(Math.min(...waits) * 1000)
+    )
     return () => clearTimeout(timer)
-  }, [legs, advance, reducedMotion])
+  }, [legs, tick, advance, reducedMotion])
   const onBoarded = useCallback((rider: string) => advance(rider), [advance])
   if (reducedMotion) {
     return {
