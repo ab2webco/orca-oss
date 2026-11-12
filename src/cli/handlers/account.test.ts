@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -257,6 +258,58 @@ describe('account CLI handlers', () => {
     expect(message).not.toBe(WINDOWS_BATCH_UNSAFE_ARGUMENTS_ERROR)
     expect(message).toContain('C:\\Users\\A&B\\codex.cmd')
     expect(message).toContain(WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL)
+  })
+
+  // ORCA-1039: Claude Code 2.1.50-2.1.75 has `auth login` without --claudeai; 1.0.73 has no `auth`.
+  describe('on an older Claude CLI', () => {
+    const childThat = (stdout: string, stderr: string, code: number) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new PassThrough(),
+        stderr: new PassThrough()
+      })
+      queueMicrotask(() => {
+        child.stdout.end(stdout)
+        child.stderr.end(stderr)
+        queueMicrotask(() => {
+          child.emit('exit', code)
+          child.emit('close', code)
+        })
+      })
+      return child
+    }
+
+    it('signs in with plain auth login when the CLI does not know --claudeai', async () => {
+      spawnMock.mockImplementation((_command: string, args: string[]) =>
+        args.includes('--claudeai')
+          ? childThat('', "error: unknown option '--claudeai'\n", 1)
+          : args.includes('--help')
+            ? childThat('Usage: claude auth login [options]\n', '', 0)
+            : successfulChild()
+      )
+
+      await ACCOUNT_HANDLERS['account add'](context('claude'))
+
+      expect(spawnMock.mock.calls.map(([, args]) => args)).toEqual([
+        ['auth', 'login', '--claudeai'],
+        ['auth', 'login', '--help'],
+        ['auth', 'login']
+      ])
+    })
+
+    it('tells the person to update Claude Code when it has no auth login at all', async () => {
+      // Why another path: what a binary takes is remembered per binary, and this is an older one.
+      resolveCliCommandMock.mockImplementation(() => '/opt/claude-1.0.73/claude')
+      spawnMock.mockImplementation((_command: string, args: string[]) =>
+        args.includes('--help')
+          ? childThat('Usage: claude [options] [command] [prompt]\n', '', 0)
+          : childThat('', "error: unknown option '--claudeai'\n", 1)
+      )
+
+      await expect(ACCOUNT_HANDLERS['account add'](context('claude'))).rejects.toThrow(
+        /update Claude Code/
+      )
+      expect(spawnMock).toHaveBeenCalledTimes(2)
+    })
   })
 
   it("keeps the calling Claude session's token out of another account's login (ORCA-1039)", async () => {
