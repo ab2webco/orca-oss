@@ -144,7 +144,7 @@ const isBuiltIn = (scene: string): scene is OrchestratorGameBuiltInScene =>
   Object.hasOwn(ORCHESTRATOR_GAME_BUILT_IN_ROSTERS, scene)
 
 type RosterSource = {
-  config: { scene?: string }
+  config?: { scene?: string }
   lead?: Pick<OrchestratorGameLead, 'memberNames'>
   extensions?: {
     scenes: readonly { id: string; definition: { roster?: readonly GameMemberName[] } }[]
@@ -156,7 +156,7 @@ export function memberRosterOf(state: RosterSource): readonly GameMemberName[] {
   if (state.lead?.memberNames !== undefined) {
     return state.lead.memberNames
   }
-  const scene = state.config.scene ?? 'quest'
+  const scene = state.config?.scene ?? 'quest'
   if (isBuiltIn(scene)) {
     return ORCHESTRATOR_GAME_BUILT_IN_ROSTERS[scene]
   }
