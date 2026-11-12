@@ -1,5 +1,5 @@
 ---
-sourceHash: ddb58c8195779ec7
+sourceHash: 0932257d9b7014b5
 ---
 
 # El juego orquestador de Agent Teams
@@ -157,7 +157,7 @@ Cada campo se resuelve por separado; una capa posterior gana
    (`orchestratorGameProjects[repoId]`). Cada fila puede decir **Inherit**.
 
 Ambas páginas de Settings agrupan los controles del juego (**Show the game**, **Default view** con el costo de cada vista, recompensas, seguimiento
-del work item, dónde se abren los enlaces y el grupo **Terminal band** con el interruptor de la banda, escena, render, zona horaria y HUD de compañeros) bajo un encabezado **Agent Teams game** que indica que solo se aplican a los panes de Claude
+del work item, dónde se abren los enlaces y el grupo **Terminal band** con el interruptor de la banda, render, zona horaria y HUD de compañeros; la escena encabeza el grupo Panel) bajo un encabezado **Agent Teams game** que indica que solo se aplican a los panes de Claude
 Agent Teams. Bajo el selector de escena, una vista previa pinta la escena efectiva con el propio
 código de dibujo del mod
 ([`OrchestratorGameScenePreview.tsx`](../../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
@@ -196,9 +196,11 @@ pane recibe `mode` y `hud` tal como están. Guardar una vista que dibuja (`zen`,
 si no, la elección no cambiaría nada en pantalla. `mode` nunca se reescribe, así que el aspecto del
 Panel, que lo sigue, no cambia.
 
-En Settings, el grupo **Terminal band** tiene el interruptor y el selector de escena, que también
-da el reparto del panel del equipo; la vista previa de la escena, el render, la zona horaria y el HUD
-de compañeros solo aparecen con la banda encendida.
+En Settings, la escena (integrada o un archivo del proyecto) encabeza el grupo **Panel**, sobre el
+aspecto y el estilo, y la vista previa del panel la dibuja en el estilo elegido, porque el panel del
+equipo es donde se ve por defecto. El grupo **Terminal band** tiene el interruptor de la banda; la
+vista previa de 5 filas, el render, la zona horaria y el HUD de compañeros solo aparecen con la banda
+encendida.
 
 Versiones mezcladas: todo mod desde flat (ORCA-689) lee `ORCA_GAME_MODE=flat` y `ORCA_GAME_HUD`; un
 mod anterior lee `flat` como desconocido y sigue dibujando, como antes. Un host emparejado anterior a

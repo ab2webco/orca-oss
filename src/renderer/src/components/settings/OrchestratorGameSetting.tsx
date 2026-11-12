@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import {
-  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   resolveOrchestratorGameConfig,
   type OrchestratorGameBuiltInScene,
@@ -147,21 +146,6 @@ export function OrchestratorGameSetting({
         />
         <TerminalBandGroup>
           {switchesAt('band')}
-          <SettingsRow
-            label={sceneTitle()}
-            description={translate(
-              'auto.components.settings.OrchestratorGameSetting.sceneDescription',
-              'The art the game draws. Installed plugins can add scenes.'
-            )}
-            control={
-              <OrchestratorGameSceneSelect
-                value={config.scene}
-                ariaLabel={sceneTitle()}
-                disabled={config.mode === 'off'}
-                onChange={(scene) => set('scene', scene ?? DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene)}
-              />
-            }
-          />
           {config.band ? (
             <>
               <OrchestratorGameScenePreview config={config} />
@@ -221,6 +205,14 @@ export function ProjectOrchestratorGameSetting({
     isReachable: !connectionId || sshStatus === 'connected',
     path: sceneFile
   })
+  // Why the file's definition: the panel draws a custom scene's own cast, as the band does.
+  const panelScene = {
+    id: config.scene,
+    extensions:
+      sceneFile !== null && file.state?.status === 'ok'
+        ? [{ id: config.scene, pluginId: 'file', definition: file.state.definition }]
+        : []
+  }
   const projectFiles = useOrchestratorGameProjectSceneFiles({
     rootPath: target.path,
     connectionId,
@@ -317,8 +309,41 @@ export function ProjectOrchestratorGameSetting({
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
+        <SettingsRow
+          label={sceneTitle()}
+          description={effective('scene', sceneFile ?? config.scene)}
+          control={
+            <OrchestratorGameSceneSelect
+              value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
+              ariaLabel={sceneTitle()}
+              inheritLabel={inherit}
+              projectFiles={projectFiles}
+              onChange={(scene) => {
+                const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
+                setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
+              }}
+              onCustomFile={() => setIsCustomPicked(true)}
+            />
+          }
+        />
+        {isCustom ? (
+          <OrchestratorGameSceneFileField
+            key={local?.sceneFile ?? ''}
+            path={local?.sceneFile}
+            rootPath={target.path}
+            worktreeId={target.id}
+            connectionId={connectionId}
+            baseScene={builtInOf(config.scene)}
+            read={local?.sceneFile === undefined ? null : file.state}
+            onPath={(path) => setScene({ sceneFile: path })}
+            onFileWritten={file.reload}
+          />
+        ) : (
+          <OrchestratorGameSceneFileStatus read={file.state} />
+        )}
         <ProjectGamePanelRows
           repoId={repoId}
+          scene={panelScene}
           settings={settings}
           projectLayer={projectLayer}
           advisorPlugin={advisorPlugin}
@@ -338,40 +363,6 @@ export function ProjectOrchestratorGameSetting({
         />
         <TerminalBandGroup>
           {rows.filter((row) => switchPlaceOf(row.key) === 'band').map(toggleRow)}
-          <SettingsRow
-            label={sceneTitle()}
-            description={effective('scene', sceneFile ?? config.scene)}
-            control={
-              <OrchestratorGameSceneSelect
-                value={
-                  listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))
-                }
-                ariaLabel={sceneTitle()}
-                inheritLabel={inherit}
-                projectFiles={projectFiles}
-                onChange={(scene) => {
-                  const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
-                  setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
-                }}
-                onCustomFile={() => setIsCustomPicked(true)}
-              />
-            }
-          />
-          {isCustom ? (
-            <OrchestratorGameSceneFileField
-              key={local?.sceneFile ?? ''}
-              path={local?.sceneFile}
-              rootPath={target.path}
-              worktreeId={target.id}
-              connectionId={connectionId}
-              baseScene={builtInOf(config.scene)}
-              read={local?.sceneFile === undefined ? null : file.state}
-              onPath={(path) => setScene({ sceneFile: path })}
-              onFileWritten={file.reload}
-            />
-          ) : (
-            <OrchestratorGameSceneFileStatus read={file.state} />
-          )}
           {config.band ? (
             <>
               <OrchestratorGameScenePreview

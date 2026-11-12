@@ -147,7 +147,7 @@ Each field resolves on its own; a later layer wins
    (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
 
 Both Settings pages group the game's controls (**Show the game**, **Default view** with each view's cost, rewards, work item
-tracking, where links open, and the **Terminal band** group with the band switch, scene, render, time zone and teammate HUD) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
+tracking, where links open, and the **Terminal band** group with the band switch, render, time zone and teammate HUD; the scene heads the Panel group) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
 panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
 imports `hooks/scene.ts`, `scenery.ts`, `scenes/` and, for `render: hd`, `scene-hd.ts`), so it
@@ -185,8 +185,10 @@ Settings, `orca game view` or `/orca-game:view` also sets `band: true` in that l
 would change nothing on screen. `mode` itself is never rewritten, so the Panel's look, which follows
 it, stays put.
 
-In Settings the **Terminal band** group holds the switch and the scene picker, which also casts the
-Team panel; the scene preview, render, time zone and teammate HUD show only while the band is on.
+In Settings the scene (built-in or a project's file) heads the **Panel** group, above the look and
+style, and the panel preview draws it in the chosen style, since the Team panel is where it shows by
+default. The **Terminal band** group holds the band switch; the 5-row scene preview, render, time
+zone and teammate HUD show only while the band is on.
 
 Mixed versions: every mod since flat (ORCA-689) reads `ORCA_GAME_MODE=flat` and `ORCA_GAME_HUD`; an
 older mod reads `flat` as unknown and keeps drawing, as before. A paired host older than `band`

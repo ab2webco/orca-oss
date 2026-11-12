@@ -7,6 +7,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PluginHostListEntry } from '../../../../preload/api/plugin-host-api'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
 import { OrchestratorGameSetting, ProjectOrchestratorGameSetting } from './OrchestratorGameSetting'
+import { GamePanelSetting } from './OrchestratorGamePanelSetting'
 
 // Why never settles: the panel preview's art loads from assets happy-dom cannot decode.
 vi.mock('../team-scene/team-scene-art-load', () => ({
@@ -244,7 +245,7 @@ describe('game scene picker', () => {
   it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
-      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+      <GamePanelSetting settings={{}} updateSettings={(update) => updates.push(update)} />
     )
 
     const select = sceneSelect(view.container)
@@ -263,7 +264,7 @@ describe('game scene picker', () => {
 
   it('keeps a scene nothing installed serves selected and says so', () => {
     const view = render(
-      <OrchestratorGameSetting
+      <GamePanelSetting
         settings={{ orchestratorGame: { scene: 'acme.gone/orbit' } }}
         updateSettings={() => undefined}
       />
@@ -472,6 +473,10 @@ describe('the terminal band group', () => {
       updateSettings={() => undefined}
     />
   ]
+  const hasSceneSelect = (root: HTMLElement | null): boolean =>
+    Array.from(root?.querySelectorAll('select') ?? []).some((one) =>
+      Array.from(one.options).some((option) => option.value === 'quest')
+    )
   const bandOf = (container: HTMLElement) =>
     container.querySelector<HTMLElement>('[role="group"][aria-label="Terminal band"]')
   const drawnRows = (band: HTMLElement | null) => [
@@ -487,7 +492,7 @@ describe('the terminal band group', () => {
       const band = bandOf(view.container)
 
       expect(band?.querySelector('h3')?.textContent).toBe('Terminal band')
-      expect(band?.contains(sceneSelect(view.container))).toBe(true)
+      expect(hasSceneSelect(band)).toBe(false)
       expect(drawnRows(band).every(Boolean)).toBe(true)
       expect(band?.querySelector('[aria-label="Scene style"]')).toBeNull()
       expect(band?.querySelector('[data-slot="game-panel-style-preview"]')).toBeNull()
@@ -495,13 +500,13 @@ describe('the terminal band group', () => {
     }
   })
 
-  it('is off by default: its switch and the scene stay, what the band draws hides', () => {
+  it('is off by default: only its switch shows, what the band draws hides', () => {
     for (const page of pages(undefined)) {
       const view = render(page)
       const band = bandOf(view.container)
 
       expect(band?.querySelector('[aria-label="Show the band"]')).toBeTruthy()
-      expect(band?.contains(sceneSelect(view.container))).toBe(true)
+      expect(hasSceneSelect(band)).toBe(false)
       expect(drawnRows(band).some(Boolean)).toBe(false)
       view.unmount()
     }
@@ -529,5 +534,48 @@ describe('the terminal band group', () => {
       { orchestratorGame: { band: true } },
       { orchestratorGameProjects: { repo1: { band: true } } }
     ])
+  })
+})
+
+describe('the scene leads the Panel group', () => {
+  const before = (first: Element | null, second: Element | null): boolean =>
+    Boolean(
+      first && second && first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  const preview = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-slot="game-panel-style-preview"]')
+
+  it('sits above the look and style globally and draws the panel preview of the chosen scene', () => {
+    const view = render(
+      <GamePanelSetting
+        settings={{ orchestratorGame: { scene: 'tamer' } }}
+        updateSettings={() => undefined}
+      />
+    )
+
+    const scene = sceneSelect(view.container)
+    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
+    expect(before(scene, view.container.querySelector('[aria-label="Scene style"]'))).toBe(true)
+    expect(preview(view.container)?.dataset.scene).toBe('tamer')
+    view.unmount()
+  })
+
+  it('sits above the look and style per project, outside the terminal band', () => {
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={{ scene: 'jrpg' }}
+        updateSettings={() => undefined}
+      />
+    )
+
+    const scene = sceneSelect(view.container)
+    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
+    expect(
+      view.container.querySelector('[role="group"][aria-label="Terminal band"]')?.contains(scene)
+    ).toBe(false)
+    expect(preview(view.container)?.dataset.scene).toBe('jrpg')
+    view.unmount()
   })
 })

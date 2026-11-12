@@ -4,9 +4,16 @@
  * Needs E2E: the scroll to a section id happens in the real Settings page after navigation.
  */
 
-import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import {
+  byScenePhase,
+  sceneFile,
+  sceneLook
+} from '../../src/shared/__fixtures__/orchestrator-game-scene'
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
@@ -329,4 +336,79 @@ test('the terminal band is off by default, and its switch shows what it draws', 
     }
   }
   await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+})
+
+test('the scene heads the Panel group, and the preview draws a built-in or custom scene in each style', async ({
+  electronApp,
+  orcaPage,
+  testRepoPath
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  // Why a magenta sky: a preview that paints it is drawing the file, never Quest.
+  const scenesDir = join(testRepoPath, '.orca', 'scenes')
+  mkdirSync(scenesDir, { recursive: true })
+  writeFileSync(
+    join(scenesDir, 'space.json'),
+    JSON.stringify(sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }) }), null, 2)
+  )
+  const preview = (section: Locator) => section.locator('[data-slot="game-panel-style-preview"]')
+  const sweep = async (section: Locator, name: string): Promise<void> => {
+    for (const style of ['Office', 'Figures', 'Pixel'] as const) {
+      await section
+        .locator('[aria-label="Scene style"] button')
+        .filter({ hasText: new RegExp(`^${style}$`) })
+        .click()
+      await expect(preview(section).locator('canvas')).toBeVisible({ timeout: 15_000 })
+      for (const theme of THEMES) {
+        await applySettings(orcaPage, { theme })
+        for (const width of WIDTHS) {
+          await setWindowWidth(electronApp, orcaPage, width)
+          await section
+            .getByRole('combobox', { name: 'Scene', exact: true })
+            .evaluate((node) => node.scrollIntoView({ block: 'start' }))
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`${name}-${style.toLowerCase()}-${theme}-${width}.png`),
+            animations: 'disabled'
+          })
+        }
+      }
+    }
+  }
+
+  try {
+    await openTarget(orcaPage, null)
+    const global = orcaPage.locator('[id="agents-game-panel"]')
+    await expect(global).toBeVisible({ timeout: 15_000 })
+    await global.getByRole('combobox', { name: 'Scene', exact: true }).click()
+    await orcaPage.getByRole('option', { name: 'Night Watch (built-in)' }).click()
+    await expect(preview(global)).toHaveAttribute('data-scene', 'vigilante')
+    await sweep(global, 'global-built-in')
+    await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+
+    const projectId = await openTarget(orcaPage, repoId)
+    const project = orcaPage.locator(`[id="${projectId}"]`)
+    await expect(project).toBeVisible({ timeout: 15_000 })
+    const projectScene = project.getByRole('combobox', { name: 'Scene', exact: true })
+    await expect(
+      project.locator('[role="group"][aria-label="Terminal band"]').getByRole('combobox', {
+        name: 'Scene',
+        exact: true
+      })
+    ).toHaveCount(0)
+    await projectScene.click()
+    await orcaPage.getByRole('option', { name: 'Custom file…' }).click()
+    const path = project.getByRole('textbox', { name: 'Scene file' })
+    await path.fill('.orca/scenes/space.json')
+    await path.press('Enter')
+    await expect(preview(project)).not.toHaveAttribute('data-scene', 'vigilante')
+    await expect(preview(project)).not.toHaveAttribute('data-scene', 'quest')
+    await sweep(project, 'project-custom')
+    await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+  } finally {
+    rmSync(join(testRepoPath, '.orca'), { recursive: true, force: true })
+  }
 })
