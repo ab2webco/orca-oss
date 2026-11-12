@@ -513,7 +513,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
         .toBe(line)
       await expect(advisorBubble).toHaveText(line)
       const asking = (await askerTag.count()) > 0
-      const shown = await shownBubbles(orcaPage)
+      let shown = await shownBubbles(orcaPage)
       if (asking) {
         // ORCA-1139 decision A, at any width: the lead stands by the asker on its rounds, so where
         // its bubble and the advisor's do not both fit beside the tag only the lead's shows; the
@@ -531,11 +531,16 @@ test('the Team panel draws the live scene beside a member opened under its heade
           })
           .toEqual([])
       } else {
-        await expect(advisorBubble).toBeVisible()
-        expect(
-          shown.advisor,
-          `advisor bubble hidden at ${width}px ${style} ${label}`
-        ).not.toBeNull()
+        // Why polled: a walking lead re-lays the bubbles out, and the advisor's yields while both do not fit.
+        await expect
+          .poll(
+            async () => {
+              shown = await shownBubbles(orcaPage)
+              return shown.advisor !== null
+            },
+            { message: `advisor bubble hidden at ${width}px ${style} ${label}` }
+          )
+          .toBe(true)
       }
       if (shown.advisor) {
         expect(
