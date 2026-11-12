@@ -32497,19 +32497,9 @@ export class OrcaRuntimeService {
         const trackerKey = workItem
           ? `${workItem.provider}:${workItem.identifier.split('-')[0]}`
           : ''
-        // Why local reads: both answer from stored tokens, so asking costs no tracker call (ORCA-1168).
-        const connected = {
-          jira: this.jiraReadStatus().connected,
-          linear: this.linearStatus().connected
-        }
-        const key = JSON.stringify([repoId, todo, planeProject, trackerKey, connected])
+        const key = JSON.stringify([repoId, todo, planeProject, trackerKey])
         return await this.gameProjectWork.read(key, () =>
-          readGameProjectWork(this.gameProjectWorkPortFor(repoId), {
-            todo,
-            workItem,
-            planeProject,
-            connected
-          })
+          readGameProjectWork(this.gameProjectWorkPortFor(repoId), { todo, workItem, planeProject })
         )
       },
       readReview: async () =>

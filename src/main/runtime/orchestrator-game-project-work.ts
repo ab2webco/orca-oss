@@ -14,6 +14,8 @@ import {
 import {
   GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
+  jiraScopeOf,
+  keysOfProject,
   todoListUrlOf,
   todoToneOf,
   type GameProjectItem,
@@ -30,12 +32,7 @@ import {
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
 
-import {
-  mergeTodoLists,
-  todoSourcesOf,
-  type GameTodoConnections,
-  type TodoSource
-} from './orchestrator-game-todo-sources'
+import { mergeTodoLists, todoSourcesOf, type TodoSource } from './orchestrator-game-todo-sources'
 
 /** The provider calls the band's project lists need; each one may throw. */
 export type GameProjectWorkPort = GameProjectReviewsPort & {
@@ -150,7 +147,7 @@ async function readTodo(
         todoListUrlOf({
           provider,
           sampleUrl: items[0]?.url ?? null,
-          project: source.project,
+          project: typeof source.project === 'string' ? source.project : undefined,
           repo
         }),
       items.length,
@@ -158,8 +155,9 @@ async function readTodo(
     )
   switch (source.provider) {
     case 'plane': {
-      const read = await port.planeOpen({ project: source.project, workspace: source.workspace })
-      const open = planeTodoOf(read.items, read.viewerId, source.project !== undefined)
+      const project = typeof source.project === 'string' ? source.project : undefined
+      const read = await port.planeOpen({ project, workspace: source.workspace })
+      const open = planeTodoOf(read.items, read.viewerId, project !== undefined)
       return listOf(
         'plane',
         open.map((one) =>
@@ -173,7 +171,7 @@ async function readTodo(
       )
     }
     case 'jira': {
-      const scope = source.project ? `project = ${source.project} AND ` : ''
+      const scope = jiraScopeOf(source.project)
       const jql = `${scope}assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC`
       const issues = await port.jiraSearch(jql, source.workspace)
       return listOf(
@@ -190,7 +188,7 @@ async function readTodo(
     }
     case 'linear': {
       const issues = (await port.linearAssigned(source.workspace)).filter(
-        (one) => !source.project || one.team.key === source.project
+        (one) => !source.project || keysOfProject(source.project).includes(one.team.key)
       )
       return listOf(
         'linear',
@@ -223,7 +221,6 @@ export async function readGameProjectWork(
     todo: OrchestratorGameTodoSource | null
     workItem: Pick<GameWorkItem, 'provider' | 'identifier'> | null
     planeProject?: string | null
-    connected?: GameTodoConnections
   }
 ): Promise<GameProjectWork> {
   const repo = await settle(port.githubRepo)
@@ -238,8 +235,7 @@ export async function readGameProjectWork(
           configured: args.todo,
           planeProject: args.planeProject ?? null,
           workItem: args.workItem,
-          host,
-          connected: args.connected ?? { jira: false, linear: false }
+          host
         })
   const todo =
     sources.length > 0

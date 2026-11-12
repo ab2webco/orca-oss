@@ -9,29 +9,26 @@ import type { GameStatusGroup, GameWorkItem } from '../../shared/orchestrator-ga
 
 export type TodoSource = Exclude<OrchestratorGameTodoSource, 'off'>
 
-/** The trackers connected in Orca, read locally from their stored tokens. */
-export type GameTodoConnections = { jira: boolean; linear: boolean }
-
 const keyPrefixOf = (identifier: string): string | undefined =>
   /^([A-Za-z][A-Za-z0-9_]*)-\d+$/.exec(identifier)?.[1]
 
 /**
- * Every tracker the To Do reads (ORCA-1168): orca.yaml's first, then the linked Plane project, a
- * connected Jira or Linear, and the repo's host. One source per tracker; orca.yaml's wins.
+ * Every tracker the To Do reads (ORCA-1168): orca.yaml's first, then the linked Plane project, the
+ * worktree's own ticket tracker and the repo's host. Only trackers linked to this project, never
+ * every account Orca is connected to. One source per tracker; orca.yaml's wins.
  */
 export function todoSourcesOf(args: {
   configured: TodoSource | null
   planeProject: string | null
   workItem: Pick<GameWorkItem, 'provider' | 'identifier'> | null
   host: 'github' | 'gitlab' | null
-  connected: GameTodoConnections
 }): TodoSource[] {
   const item = args.workItem
   const trackerOf = (provider: 'jira' | 'linear'): TodoSource | null => {
-    if (!args.connected[provider] && item?.provider !== provider) {
+    if (item?.provider !== provider) {
       return null
     }
-    const project = item?.provider === provider ? keyPrefixOf(item.identifier) : undefined
+    const project = keyPrefixOf(item.identifier)
     return project ? { provider, project } : { provider }
   }
   // Why no Plane without a project: that read fans out over every project, past Plane's limiter.
