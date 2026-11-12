@@ -45,7 +45,7 @@ exit 0
   return { dir, callLog, counter }
 }
 
-function run(dir, statusFile) {
+function run(dir, statusFile, extraEnv = {}) {
   try {
     // 2>&1 inside the shell: the script logs progress to stderr, and
     // execFileSync returns only stdout on success.
@@ -58,7 +58,8 @@ function run(dir, statusFile) {
         ORCA_FISH4_SOURCE_STATUS_FILE: statusFile,
         // Zero-second backoff: the schedule's LENGTH is what matters here, not
         // the wall clock, and a test must not sleep through 155s.
-        ORCA_FISH4_BACKOFF_SECONDS: '0 0 0 0'
+        ORCA_FISH4_BACKOFF_SECONDS: '0 0 0 0',
+        ...extraEnv
       }
     })
     return { status: 0, output: stderr }
@@ -135,6 +136,34 @@ describe.skipIf(!harnessProbe.usable)(
       expect(await attemptsMade(counter)).toBe(5)
       expect((await fs.readFile(statusFile, 'utf8')).trim()).toBe('unavailable')
     })
+
+    // ORCA-1179: Launchpad held one key lookup for 7 minutes before its 500, and three such
+    // attempts ate the job's 15 minutes; a hung call must count as a failed attempt.
+    it('gives up on a hung add-apt-repository within its bound and reports the source unavailable', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'orca-fish4-hang-'))
+      // Why exec: the killed process must be the sleep itself, or it would hold the pipes open.
+      await fs.writeFile(
+        path.join(dir, 'sudo'),
+        `#!/usr/bin/env bash
+if [ "$1" = 'add-apt-repository' ] && [ "$2" = '-y' ] && [ "$3" != '-r' ]; then
+  exec sleep 30
+fi
+exit 0
+`,
+        { mode: 0o755 }
+      )
+      const statusFile = path.join(dir, 'status')
+      const started = Date.now()
+      const { status, output } = run(dir, statusFile, {
+        ORCA_FISH4_ADD_TIMEOUT: '1',
+        ORCA_FISH4_BACKOFF_SECONDS: '0'
+      })
+
+      expect(status).toBe(75)
+      expect(output).toContain('attempt 1 failed')
+      expect((await fs.readFile(statusFile, 'utf8')).trim()).toBe('unavailable')
+      expect(Date.now() - started).toBeLessThan(15_000)
+    }, 25_000)
 
     it('drops the half-added PPA between attempts', async () => {
       const { dir, callLog } = await fakeSudo(1)
