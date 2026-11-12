@@ -25,12 +25,23 @@ const FLEET = [
 
 const STARTED = 'lead-started-sessions'
 
+// Why one id per test: a session rearms its lead once per process, and every test here is its own session.
+let sessions = 0
+
 const start = async (
   $: Engine,
   on: On,
-  args: { state?: Record<string, unknown>; started?: string[]; fleetExit?: number }
+  args: {
+    state?: Record<string, unknown>
+    started?: string[]
+    fleetExit?: number
+    /** The lead rules ran after this process started the session, as before a compaction. */
+    startedLater?: true
+  }
 ) => {
-  const store = new Map<string, unknown>([[STARTED, args.started ?? ['s1']]])
+  const session = `s${++sessions}`
+  const started = args.started ?? [session]
+  const store = new Map<string, unknown>([[STARTED, args.startedLater ? [] : started]])
   const runs: string[][] = []
   const commands: string[] = []
   const clock = mock.clock(on)
@@ -38,7 +49,7 @@ const start = async (
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
-  on('session.id', () => ({ value: 's1' }))
+  on('session.id', () => ({ value: session }))
   on('store.get', ($s, e) => ({ value: store.get(String(Reflect.get(e, 'key'))) }) as never)
   on('store.set', ($s, e) => {
     store.set(String(Reflect.get(e, 'key')), Reflect.get(e, 'value'))
@@ -71,6 +82,9 @@ const start = async (
   })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
   await clock.settle()
+  if (args.startedLater) {
+    store.set(STARTED, started)
+  }
   return { runs, commands, clock, toasts, store }
 }
 
@@ -102,7 +116,7 @@ describe('lead brief', () => {
   })
 
   test('leaves the lead skill alone after a compaction, which keeps the session running', async ($, on) => {
-    const { commands, clock } = await start($, on, {})
+    const { commands, clock } = await start($, on, { startedLater: true })
     await $.classic.SessionStart({ source: 'compact' })
     await clock.settle()
     expect(commands).toEqual([])
@@ -149,6 +163,43 @@ describe('lead brief', () => {
   test('says nothing to a member session', async ($, on) => {
     await start($, on, { state: { ...STATE, role: 'member' } })
     expect(contextOf(await $.classic.SessionStart({ source: 'compact' }))).toBe('')
+  })
+
+  // ORCA-1175: another plugin can take classic.SessionStart first and never pass it on.
+  test('rearms a resumed lead whose SessionStart hook another plugin never passed on', async ($, on) => {
+    const { commands, clock } = await start($, on, {})
+    await clock.settle()
+    expect(commands).toEqual(['orca-game:lead'])
+  })
+
+  test('rearms a resumed lead once when its SessionStart hook runs too', async ($, on) => {
+    const { commands, clock } = await start($, on, {})
+    await $.classic.SessionStart({ source: 'resume' })
+    await $.classic.SessionStart({ source: 'resume' })
+    await clock.settle()
+    expect(commands).toEqual(['orca-game:lead'])
+  })
+
+  test('rearms a resumed lead once in a project that autostarts its lead', async ($, on) => {
+    const { commands, clock } = await start($, on, {
+      state: { ...STATE, lead: { autostart: true, cap: 3 } }
+    })
+    await clock.settle()
+    expect(commands).toEqual(['orca-game:lead'])
+  })
+
+  test('rearms no session that another pane now leads, hook or not', async ($, on) => {
+    const { commands, clock } = await start($, on, {
+      state: { ...STATE, leadElsewhere: { handle: 'term_other' } }
+    })
+    await clock.settle()
+    expect(commands).toEqual([])
+  })
+
+  test('rearms no fresh session, which never ran the lead rules', async ($, on) => {
+    const { commands, clock } = await start($, on, { started: [] })
+    await clock.settle()
+    expect(commands).toEqual([])
   })
 
   test('starts the session without a brief when Orca cannot list the fleet', async ($, on) => {
