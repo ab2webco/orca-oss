@@ -74,16 +74,18 @@ const THREADS: GameInboxThreads = {
   ]
 }
 
+const otherGroup = (): GameInboxQuestionGroup => ({
+  key: 'env-imac\u0000repo-web',
+  title: 'Ab2Web',
+  host: 'imac',
+  questions: [question('q-web', 'Ship the price change today?', 'WEB-212')],
+  onAnswer: vi.fn(async () => {})
+})
+
 function renderInbox(
   over: Partial<React.ComponentProps<typeof TeamInboxView>> = {}
 ): ReturnType<typeof render> {
-  const other: GameInboxQuestionGroup = {
-    key: 'env-imac\u0000repo-web',
-    title: 'Ab2Web',
-    host: 'imac',
-    questions: [question('q-web', 'Ship the price change today?', 'WEB-212')],
-    onAnswer: vi.fn(async () => {})
-  }
+  const other = otherGroup()
   return render(
     <TeamInboxView
       projectName="orca-oss"
@@ -104,6 +106,12 @@ function renderInbox(
   )
 }
 
+const openOthers = (view: ReturnType<typeof render>): void => {
+  act(() => {
+    fireEvent.click(view.getByRole('button', { name: /Other projects/ }))
+  })
+}
+
 const pick = (view: ReturnType<typeof render>, name: RegExp): void => {
   const trigger = view.getByRole('tab', { name })
   act(() => {
@@ -113,19 +121,69 @@ const pick = (view: ReturnType<typeof render>, name: RegExp): void => {
 }
 
 describe('Inbox tab', () => {
-  it('opens on For you with this project and every other project and host', () => {
+  // ORCA-1169: another project's question read as this one's; it now waits folded under its own heading.
+  it('opens on For you with this project first and other projects folded below', () => {
     const view = renderInbox()
 
     expect(view.getByRole('tab', { name: /For you/ }).getAttribute('data-state')).toBe('active')
-    expect(view.getByRole('tab', { name: /For you/ }).textContent).toContain('2')
+    expect(view.getByRole('tab', { name: /For you/ }).textContent).toBe('For you1')
     expect(view.getByText('orca-oss · this project')).toBeTruthy()
     expect(view.getByText('Merge #923 now or wait for #915?')).toBeTruthy()
+    const others = view.getByRole('button', { name: /Other projects/ })
+    expect(others.textContent).toBe('Other projects1')
+    expect(others.getAttribute('aria-expanded')).toBe('false')
+    expect(view.queryByText('Ship the price change today?')).toBeNull()
+    const sections = [...view.container.querySelectorAll('[data-team-inbox-project]')]
+    expect(sections.map((one) => one.getAttribute('data-team-inbox-project'))).toEqual([
+      'active',
+      'others'
+    ])
+  })
+
+  it('opens other projects, each titled with its project and host, still answerable', async () => {
+    const onAnswer = vi.fn(async () => {})
+    const local: GameInboxQuestionGroup = {
+      key: 'local\u0000repo-wa',
+      title: 'orca-wa-inbox',
+      host: null,
+      questions: [question('q-wa', 'Retry the webhook?', 'WAINBOX-79')],
+      onAnswer
+    }
+    const view = renderInbox({ otherGroups: [local, otherGroup()] })
+
+    const others = view.getByRole('button', { name: /Other projects/ })
+    expect(others.textContent).toBe('Other projects2')
+    openOthers(view)
+
+    expect(others.getAttribute('aria-expanded')).toBe('true')
+    expect(view.getByText('orca-wa-inbox')).toBeTruthy()
     expect(view.getByText('Ab2Web · imac')).toBeTruthy()
-    expect(view.getByText('Ship the price change today?')).toBeTruthy()
+    const card = view.container.querySelector('[data-game-owner-question="q-wa"]')
+    await act(async () => fireEvent.click(card?.querySelector('button') as HTMLButtonElement))
+    expect(onAnswer).toHaveBeenCalledWith('q-wa', { option: 1 })
+  })
+
+  it('says nothing waits here, above the folded other projects', () => {
+    const view = renderInbox({ questions: [] })
+
+    expect(view.getByRole('tab', { name: /For you/ }).textContent).toBe('For you0')
+    const empty = view.getByText('No questions are waiting for you.')
+    const others = view.getByRole('button', { name: /Other projects/ })
+    expect(empty.compareDocumentPosition(others) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(view.queryByText('Ship the price change today?')).toBeNull()
+  })
+
+  // Why: with one project there is nothing to fold, so no heading appears.
+  it('draws no other-projects heading when only this project asks', () => {
+    const view = renderInbox({ otherGroups: [] })
+
+    expect(view.queryByRole('button', { name: /Other projects/ })).toBeNull()
+    expect(view.getByText('Merge #923 now or wait for #915?')).toBeTruthy()
   })
 
   it("marks this project's question as the one to act on, as V28 does", () => {
     const view = renderInbox()
+    openOthers(view)
     const mine = view.container.querySelector<HTMLElement>('[data-game-owner-question="q-1"]')!
     const other = view.container.querySelector<HTMLElement>('[data-game-owner-question="q-web"]')!
 
@@ -158,12 +216,13 @@ describe('Inbox tab', () => {
 
     expect(view.getByText(/Could not read this project's questions/)).toBeTruthy()
     expect(view.getByText('Host offline')).toBeTruthy()
+    openOthers(view)
     expect(view.getByText('Ship the price change today?')).toBeTruthy()
   })
 
   // ORCA-1142: at 219 px the strip drops its zero counts first, so a waiting count stays in sight.
   it.each([
-    [3, ['For you2', 'Waiting', 'Threads1', 'Done']],
+    [3, ['For you1', 'Waiting', 'Threads1', 'Done']],
     [4, ['For you', 'Waiting', 'Threads', 'Done']]
   ])('fits a narrow strip at level %i, dropping zero counts first', (fitsAt, labels) => {
     const strip = (node: HTMLElement): boolean => node.getAttribute('role') === 'tablist'

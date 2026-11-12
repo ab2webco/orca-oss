@@ -40,20 +40,13 @@ import {
   TeamInboxAnsweredRows,
   TeamInboxWaitingRows
 } from './team-panel-inbox-items'
+import { TeamInboxGroupLabel, TeamInboxOtherProjects } from './team-panel-inbox-other-projects'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
 const SUB_TAB =
   'h-[26px] flex-none rounded-md font-medium transition-colors data-[state=active]:bg-muted data-[state=active]:shadow-none dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted'
 const LIST = 'mt-0 px-3 pb-4'
-
-function GroupLabel({ title, place }: { title: string; place: string | null }): React.JSX.Element {
-  return (
-    <h3 className="truncate pt-2 pb-1.5 text-xs font-medium text-muted-foreground">
-      {place ? `${title} · ${place}` : title}
-    </h3>
-  )
-}
 
 export type TeamInboxViewProps = {
   projectName: string
@@ -82,10 +75,9 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   const { questions, otherGroups, threads, onReply, agentQuestions, answeredQuestions } = props
   const teamAsks = agentQuestions.filter((question) => question.asker !== undefined)
   const [tab, setTab] = React.useState<InboxSubTab>('for-you')
-  const forYou =
-    agentQuestions.length +
-    questions.length +
-    otherGroups.reduce((sum, group) => sum + group.questions.length, 0)
+  // ORCA-1169: For you counts this project; other projects show theirs on their own heading.
+  const forYou = agentQuestions.length + questions.length
+  const elsewhere = otherGroups.some((group) => group.questions.length > 0)
   const forYouLabel = translate('teamPanel.inbox.forYou', 'For you')
   const threadsLabel = translate('teamPanel.inbox.threads', 'Threads')
   // Each sub-tab's full label, its short one, and its count.
@@ -117,7 +109,8 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       onAnswer={props.answerAgentOf(question)}
     />
   )
-  const nothing = subTabs.every(([, , , count]) => count === 0) && props.undelivered.length === 0
+  const nothing =
+    subTabs.every(([, , , count]) => count === 0) && props.undelivered.length === 0 && !elsewhere
   const empty = nothing && !props.projectUnread
   // Why empty in the key: the strip mounts when the first item arrives, with the same tab selected.
   const cue = useTabStripCue(tab, empty ? '' : subTabs.flat().join(), 4)
@@ -185,7 +178,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
         )}
         {teamAsks.length + questions.length > 0 ? (
           <section className="space-y-2" data-team-inbox-project="active">
-            <GroupLabel
+            <TeamInboxGroupLabel
               title={props.projectName}
               place={translate('teamPanel.inbox.thisProject', 'this project')}
             />
@@ -201,24 +194,12 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
             ))}
           </section>
         ) : null}
-        {otherGroups.map((group) => (
-          <section key={group.key} className="space-y-2" data-team-inbox-project={group.key}>
-            <GroupLabel title={group.title} place={group.host} />
-            {group.questions.map((question) => (
-              <GameOwnerQuestionCard
-                key={question.id}
-                question={question}
-                placeholder={yourAnswer}
-                onAnswer={(answer) => group.onAnswer(question.id, answer)}
-              />
-            ))}
-          </section>
-        ))}
         {forYou === 0 && !props.projectUnread ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
             {translate('teamPanel.inbox.forYouEmpty', 'No questions are waiting for you.')}
           </p>
         ) : null}
+        <TeamInboxOtherProjects groups={otherGroups} placeholder={yourAnswer} />
       </TabsContent>
       <TabsContent value="waiting" className={LIST}>
         <TeamInboxWaitingRows
