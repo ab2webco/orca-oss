@@ -97,7 +97,12 @@ export type TeamAgentFacts = TeamSessionRef & {
   liveAction: TeamLiveAction | null
   model: TeamModel | null
   account: TeamAccount | null
+  /** Jev's latest decisions in this pane, newest last; absent when its Jev sent none. */
+  decisions?: TeamAdvisorDecision[]
 }
+
+/** One decision Jev made in a pane: its id, verdict and the gesture the game plays for it. */
+export type TeamAdvisorDecision = { id: string; verdict: string; gesture: string | null }
 
 export type TeamMemberCard = TeamAgentFacts & {
   /** The persistent game character (ORCA-1034); null when the scene has none for it. */

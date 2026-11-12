@@ -8,7 +8,7 @@ export const teamSceneLabel = (): string =>
   translate('auto.components.team-scene.team-scene-copy.label', 'Live team scene')
 
 /**
- * The lead's bubble: its question behind a translated prefix, its step in a few words or a link as written, a translated line once done, else none.
+ * The lead's bubble: a translated line over its question, its step in a few words or a link as written, a translated line once done, else none.
  */
 export function teamSceneLeadLineOf(
   lead: Pick<TeamLeadCard, 'liveAction' | 'status'>
@@ -17,7 +17,7 @@ export function teamSceneLeadLineOf(
   if (action?.kind === 'question') {
     return translate(
       'auto.components.team-scene.team-scene-copy.leadAsks',
-      'Waiting for you · {{question}}',
+      'Waiting for you\n{{question}}',
       {
         question: action.text
       }

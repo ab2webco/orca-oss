@@ -105,6 +105,8 @@
   --color-status-info: var(--status-info);
   --color-status-success: var(--status-success);
   --color-status-idle: var(--status-idle);
+  --color-scene-bubble: var(--scene-bubble);
+  --color-scene-cloud-ink: var(--scene-cloud-ink);
   --color-status-success-background: var(--status-success-background);
   --color-status-success-border: var(--status-success-border);
   --color-workspace-status-done: var(--workspace-status-done);
@@ -194,6 +196,9 @@
   --status-warning: #b45309;
   --status-info: #0369a1;
   --status-idle: var(--muted-foreground);
+  /* The team scene's sky is dark in both themes: its bubble and Pixel cloud ink stay fixed. */
+  --scene-bubble: #17171d;
+  --scene-cloud-ink: #23232b;
   /* "An agent is asking you something" is the needs-you tone on every surface
      (sidebar, tabs, dashboard, agent map). */
   --agent-question: var(--status-attention);

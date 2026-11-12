@@ -15,6 +15,14 @@ import { hdFrameOf } from '../../../../../resources/claude-plugins/orca-game/hoo
 import { hdSkyPixel } from '../../../../../resources/claude-plugins/orca-game/hooks/scene-hd-sky'
 import type { SceneDefinition } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/scene-definition'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
+import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { pixelAdvisorSpriteOf, pixelPetOf } from './team-scene-pixel-cast'
+import {
+  drawPixelCrates,
+  drawPixelPlot,
+  drawPixelSack,
+  gardenPaletteOf
+} from './team-scene-pixel-garden'
 import type {
   TeamSceneFrame,
   TeamScenePainter,
@@ -22,7 +30,7 @@ import type {
 } from './team-scene-painter'
 import {
   createSceneEffects,
-  drawSceneEmote,
+  drawActorMarks,
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
@@ -35,6 +43,8 @@ const HEIGHT = PIXELS * PIXEL
 // The hd frame keeps its bottom three pixel rows as the walking strip.
 const GROUND = PIXELS - 3
 const feetRow = (depth: number): number => GROUND - 2 + Math.round(depth * 2)
+// Columns from a seat to its bed's middle: half a sprite, a gap, half the bed.
+const BED_FROM_SEAT = 9
 
 // V28's tool and paper tones, and its swing: every 1.15 s, easing out over about 0.43 s.
 const TOOL = '#e8eef4'
@@ -50,12 +60,16 @@ const hex = (color: number): string => `#${(color & 0xffffff).toString(16).padSt
 function bitmapOf(
   width: number,
   height: number,
-  colorAt: (x: number, y: number) => number | undefined
+  colorAt: (x: number, y: number) => number | undefined,
+  /** Repainted in place when its size matches, so a moving sky makes no new canvas each step. */
+  reuse?: HTMLCanvasElement
 ): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
+  const canvas =
+    reuse?.width === width && reuse.height === height ? reuse : document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const g = canvas.getContext('2d')
+  g?.clearRect(0, 0, width, height)
   for (let y = 0; g && y < height; y++) {
     for (let x = 0; x < width; x++) {
       const color = colorAt(x, y)
@@ -125,6 +139,8 @@ export function createPixelPainter(args: {
   colors: TeamSceneStatusColors
 }): TeamScenePainter {
   const { scene, light, colors } = args
+  // Why the scene's own look: a file scene's garden must match its palette, not Quest's.
+  const garden = gardenPaletteOf(scene.looks.working.plant, scene.looks.working.sun)
   let backdrop: { columns: number; step: number; canvas: HTMLCanvasElement } | null = null
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
@@ -144,7 +160,7 @@ export function createPixelPainter(args: {
         const color = hdBackdropPixel(still, land, x, y)
         return color === hdSkyPixel(still, x, y) ? hdSkyPixel(moving, x, y) : color
       }
-      backdrop = { columns, step, canvas: bitmapOf(columns, PIXELS, colorAt) }
+      backdrop = { columns, step, canvas: bitmapOf(columns, PIXELS, colorAt, backdrop?.canvas) }
     }
     return backdrop.canvas
   }
@@ -171,9 +187,33 @@ export function createPixelPainter(args: {
     return made
   }
 
-  const imageOf = (a: TeamScenePortraitSubject, leg: number): HTMLCanvasElement => {
+  const imageOf = (
+    a: TeamScenePortraitSubject & Pick<TeamSceneActor, 'gesture'>,
+    leg: number,
+    t = 0
+  ): HTMLCanvasElement => {
+    const own = a.role === 'advisor' ? pixelAdvisorSpriteOf(scene, t, a.gesture) : null
+    if (own) {
+      return spriteFor(own, false)
+    }
     const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
     return spriteFor(costumeSpriteOf(costume, leg, false), a.role === 'lead')
+  }
+  const blit = (
+    g: CanvasRenderingContext2D,
+    image: HTMLCanvasElement,
+    left: number,
+    bottom: number,
+    facing: 1 | -1
+  ): void => {
+    g.save()
+    g.translate(
+      (left + (facing < 0 ? image.width : 0)) * PIXEL,
+      (bottom - image.height + 1) * PIXEL
+    )
+    g.scale(facing * PIXEL, PIXEL)
+    g.drawImage(image, 0, 0)
+    g.restore()
   }
   const drawActor = (
     g: CanvasRenderingContext2D,
@@ -182,29 +222,19 @@ export function createPixelPainter(args: {
     t: number
   ): void => {
     const leg = a.pose === 'walk' ? Math.floor(a.gait / Math.PI) % 2 : 0
-    const image = imageOf(a, leg)
+    const image = imageOf(a, leg, t)
     const left = Math.round(a.x * columns - image.width / 2)
     const bottom = feetRow(a.depth) - Math.round(a.jump / PIXEL)
     g.fillStyle = a.emote === 'alert' ? colors.attention : 'rgb(20 20 30 / 0.35)'
     g.fillRect((left + 1) * PIXEL, (feetRow(a.depth) + 1) * PIXEL, (image.width - 2) * PIXEL, PIXEL)
-    g.save()
-    g.translate(
-      (left + (a.facing < 0 ? image.width : 0)) * PIXEL,
-      (bottom - image.height + 1) * PIXEL
-    )
-    g.scale(a.facing * PIXEL, PIXEL)
-    g.drawImage(image, 0, 0)
-    g.restore()
-    drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
-    if (a.emote) {
-      drawSceneEmote(
-        g,
-        (left + image.width / 2) * PIXEL,
-        (bottom - image.height - 3) * PIXEL,
-        a.emote,
-        colors
-      )
+    blit(g, image, left, bottom, a.facing)
+    const pet = a.role === 'lead' ? pixelPetOf(scene, a, left, image.width, t) : null
+    if (pet) {
+      blit(g, spriteFor(pet.sprite, false), pet.left, feetRow(a.depth), a.facing)
     }
+    drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
+    const markX = (left + image.width / 2) * PIXEL
+    drawActorMarks(g, markX, (bottom - image.height - 3) * PIXEL, a, colors)
   }
 
   return {
@@ -223,6 +253,14 @@ export function createPixelPainter(args: {
       const columns = Math.ceil(f.width / PIXEL)
       g.imageSmoothingEnabled = false
       g.drawImage(backdropFor(columns, f.t), 0, 0, columns * PIXEL, HEIGHT)
+      drawPixelCrates(g, f.trophies.length, feetRow(0), PIXEL, garden)
+      for (const site of f.sites) {
+        const row = feetRow(site.spot.depth)
+        // Why in columns: Pixel's sprites are ten wide, so the bed must clear the seat's own.
+        const seat = Math.round((site.spot.x - SITE_FROM_SEAT_X) * columns)
+        drawPixelSack(g, Math.round(seat - PILE_FROM_SEAT_X * columns), row, PIXEL)
+        drawPixelPlot(g, seat + BED_FROM_SEAT, row, PIXEL, site, f.t, garden)
+      }
       effects.start(f.effects, f.actors, f.height)
       for (const a of f.actors) {
         // Why offset by x: members side by side swing out of step, as in Figures and Office.
