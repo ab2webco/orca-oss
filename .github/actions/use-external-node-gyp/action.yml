@@ -1,0 +1,16 @@
+name: Use external node-gyp
+description: Installs a pinned node-gyp for pnpm's native builds and fetches the Node headers once.
+
+runs:
+  using: composite
+  steps:
+    # pnpm's bundled gyp_main.py is not executable on fresh Linux runners.
+    # Why the header fetch: pnpm builds node-pty and cpu-features in parallel, and both downloaded
+    # the headers into one cache dir; a half-written common.gypi failed gyp with "SyntaxError".
+    - name: Install node-gyp and fetch Node headers
+      shell: bash
+      run: |
+        npm install -g node-gyp@11.5.0
+        node_gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+        echo "npm_config_node_gyp=$node_gyp" >> "$GITHUB_ENV"
+        node "$node_gyp" install

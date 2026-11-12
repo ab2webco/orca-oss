@@ -26,16 +26,18 @@ import { TerminalRenderingSection } from './TerminalRenderingSection'
 import { TerminalSetupScriptSection } from './TerminalSetupScriptSection'
 import { TerminalWindowsShellSection } from './TerminalWindowsShellSection'
 
+const NO_WSL_DISTROS: string[] = []
+
 type TerminalPaneProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
   scrollbackMode: 'preset' | 'custom'
   setScrollbackMode: (mode: 'preset' | 'custom') => void
-  /** Deprecated: WSL selection now belongs to Project Runtime settings. */
+  /** Whether this desktop is a Windows host that can run the WSL default project runtime. */
+  wslSupportedPlatform?: boolean
+  /** Local WSL capabilities for the default project runtime control. */
   wslAvailable?: boolean
-  /** Deprecated: WSL selection now belongs to Project Runtime settings. */
   wslDistros?: string[]
-  /** Deprecated: WSL selection now belongs to Project Runtime settings. */
   wslCapabilitiesLoading?: boolean
   /** Whether PowerShell 7+ (pwsh.exe) is installed on this Windows machine. */
   pwshAvailable?: boolean
@@ -50,6 +52,10 @@ export function TerminalPane({
   updateSettings,
   scrollbackMode,
   setScrollbackMode,
+  wslSupportedPlatform = false,
+  wslAvailable = false,
+  wslDistros = NO_WSL_DISTROS,
+  wslCapabilitiesLoading = false,
   pwshAvailable,
   gitBashAvailable = false,
   isWindowsTerminalHost
@@ -70,6 +76,11 @@ export function TerminalPane({
         updateSettings={updateSettings}
         windowsShell={windowsShell}
         gitBashAvailable={gitBashAvailable}
+        settings={settings}
+        wslSupportedPlatform={wslSupportedPlatform}
+        wslAvailable={wslAvailable}
+        wslDistros={wslDistros}
+        wslCapabilitiesLoading={wslCapabilitiesLoading}
       />
     ) : null,
     matchesSettingsSearch(searchQuery, getTerminalRenderingSearchEntries()) ? (

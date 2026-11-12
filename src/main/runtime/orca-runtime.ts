@@ -777,6 +777,7 @@ import {
   gameAgentStateOf,
   statusGroupOfJira,
   type GameAgent,
+  type GameMemberAccount,
   type OrchestratorGameState
 } from '../../shared/orchestrator-game-state'
 import {
@@ -3959,7 +3960,8 @@ export class OrcaRuntimeService {
     worktreeGone: (worktreeId) =>
       isGameMemberWorktreeGone(worktreeId, {
         reposWithId: (repoId) => (this.store?.getRepos() ?? []).filter((one) => one.id === repoId),
-        scan: (repo) => this.listRepoWorktreesForResolution(repo)
+        scan: (repo) => this.listRepoWorktreesForResolution(repo),
+        pathExists
       }),
     releasedDispatch: (dispatchId) => this.isGameWorkerReleased(dispatchId)
   })
@@ -4026,6 +4028,7 @@ export class OrcaRuntimeService {
         accountId: this.leadReopenAccountOf(session),
         presentation: 'focused'
       }),
+    reopenAccountOf: (session) => this.leadReopenAccountOf(session),
     focus: async (handle) => {
       await this.focusTerminal(handle)
     },
@@ -6565,6 +6568,25 @@ export class OrcaRuntimeService {
       this.invalidateWorktreeScanCacheForRepo(repoId)
     }
     this.invalidateResolvedWorktreeCache()
+    if (event.kind === 'removed') {
+      this.freeGameMembersOfRemovedWorktree(event.worktreeId)
+    }
+  }
+
+  // Why: a paused member of a removed worktree has nothing left to resume, and only discard freed it.
+  private freeGameMembersOfRemovedWorktree(worktreeId: string): void {
+    const repoId = splitWorktreeIdForFilesystem(worktreeId)?.repoId
+    if (!repoId) {
+      return
+    }
+    void this.gamePausedMembers
+      .forgetWorktree(`repo:${repoId}`, worktreeId)
+      .then((tickets) => {
+        if (tickets.length > 0) {
+          this.gameFleetChange.changed()
+        }
+      })
+      .catch(() => undefined)
   }
 
   notifyWorktreesChangedForRemoteClients(repoId: string): void {
@@ -28163,6 +28185,7 @@ export class OrcaRuntimeService {
         worktreeId: removalTarget.id,
         path: removalTarget.path
       })
+      this.freeGameMembersOfRemovedWorktree(removalTarget.id)
       return result
     } finally {
       if (this.removeManagedWorktreeInFlight.get(removalTarget.id)?.promise === removal) {
@@ -31498,6 +31521,19 @@ export class OrcaRuntimeService {
         const advisor = this.gameMemberAdvisors.liveOf(paneKey, now)
         return advisor ? [{ paneKey, advisor }] : []
       })
+    }
+  }
+
+  /** Each pane's managed account as game.state names a member's; null is the host's own login. */
+  async getGamePaneAccounts(
+    panes: readonly { paneKey: string; agentType: string | null; worktreeId: string | null }[]
+  ): Promise<{ accounts: { paneKey: string; account: GameMemberAccount | null }[] }> {
+    const worktreesById = await this.getResolvedWorktreeMap()
+    return {
+      accounts: panes.map((pane) => ({
+        paneKey: pane.paneKey,
+        account: this.gameMemberAccountFor(pane, worktreesById)
+      }))
     }
   }
 

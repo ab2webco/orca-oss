@@ -30,10 +30,12 @@ type Work = { review: GameReview | null; workItem: GameAgent['workItem'] | null 
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
-  risk: 1,
-  working: 2,
-  done: 3,
-  idle: 4
+  failed: 1,
+  risk: 2,
+  working: 3,
+  done: 4,
+  idle: 5,
+  closed: 6
 }
 
 const conditionOf = (agent: GameAgent): TeamCondition => {
@@ -66,10 +68,12 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
     return 'attention'
   }
   switch (condition) {
+    // Why not attention: the owner read a closed session as 'needs me' and expected the lead to come.
     case 'gone':
+      return 'closed'
     case 'startFailed':
     case 'loggedOut':
-      return 'attention'
+      return 'failed'
     case 'unreachable':
     case 'asleep':
     case 'limited':

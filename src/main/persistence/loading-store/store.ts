@@ -92,7 +92,9 @@ import {
   getDefaultVoiceSettings,
   getDefaultWorkspaceSession,
   getWorktreeCardModeProperties,
+  DEFAULT_WORKTREE_CARD_PROPERTIES,
   isDefaultedCompactWorktreeCardProperties,
+  isPreAgentFocusDefaultWorktreeCardProperties,
   normalizeWorktreeCardProperties,
   TASK_WORKTREE_CARD_PROPERTIES
 } from '../../../shared/constants'
@@ -1359,6 +1361,8 @@ export class Store {
             const planeCardPropMigrated = parsed.ui?._planeIssueCardPropertyDefaulted === true
             const jiraIssueCardPropDefaulted =
               parsed.ui?._jiraIssueWorktreeCardPropertyDefaulted === true
+            const agentFocusCardPropsDefaulted =
+              parsed.ui?._agentFocusWorktreeCardPropertiesDefaulted === true
             const hadExperimentOn = readDeprecatedExperimentFlag(parsed)
             const deliberateUncheck =
               hadExperimentOn &&
@@ -1415,7 +1419,13 @@ export class Store {
                 jiraIssueCardPropDefaulted || planeCandidate.includes('jira-issue')
                   ? planeCandidate
                   : [...planeCandidate, 'jira-issue' as const]
-              const normalized = normalizeWorktreeCardProperties(jiraCandidate)
+              const backfilled = normalizeWorktreeCardProperties(jiraCandidate)
+              // Why last: older backfills first bring an untouched profile up to the previous defaults.
+              const normalized =
+                !agentFocusCardPropsDefaulted &&
+                isPreAgentFocusDefaultWorktreeCardProperties(backfilled)
+                  ? normalizeWorktreeCardProperties(DEFAULT_WORKTREE_CARD_PROPERTIES)
+                  : backfilled
               const changed =
                 normalized.length !== rawCardProps.length ||
                 normalized.some((property, index) => property !== rawCardProps[index])
@@ -1426,7 +1436,8 @@ export class Store {
               !inlineAgentsMigrated ||
               !expandedCardPropsMigrated ||
               !planeCardPropMigrated ||
-              !jiraIssueCardPropDefaulted
+              !jiraIssueCardPropDefaulted ||
+              !agentFocusCardPropsDefaulted
             ) {
               this.loadNeedsSave = true
             }
@@ -1496,7 +1507,8 @@ export class Store {
               _inlineAgentsDefaultedForAllUsers: true,
               _expandedWorktreeCardPropertiesDefaulted: true,
               _planeIssueCardPropertyDefaulted: true,
-              _jiraIssueWorktreeCardPropertyDefaulted: true
+              _jiraIssueWorktreeCardPropertyDefaulted: true,
+              _agentFocusWorktreeCardPropertiesDefaulted: true
             }
           })(),
           // Why: volatile schema; zod-validate workspaceSession at read so a bad payload falls to defaults, not a renderer crash.

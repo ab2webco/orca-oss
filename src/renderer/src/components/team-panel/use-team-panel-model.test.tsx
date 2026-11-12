@@ -254,8 +254,8 @@ describe('a paired host member', () => {
 })
 
 describe('Team model Inbox count', () => {
-  // Why: only the Inbox tab has a count, and it must cover every project and host.
-  it('adds other projects open questions to the Inbox For you count', async () => {
+  // ORCA-1169: the tab count is this project's alone; other projects wait under their own heading.
+  it("leaves other projects' open questions out of the Inbox For you count", async () => {
     useGameInboxAppState.setState({
       hosts: [
         {
@@ -298,7 +298,7 @@ describe('Team model Inbox count', () => {
     const section = (seen as TeamPanelModelSource | null)?.section
     expect(section?.kind === 'ready' ? section.value.inbox : null).toEqual({
       kind: 'ready',
-      value: { forYou: 2, waiting: 0, threads: 2, answered: 0 }
+      value: { forYou: 1, waiting: 0, threads: 2, answered: 0 }
     })
   })
 })
@@ -382,7 +382,7 @@ describe("Team model Inbox count with a member's own question (ORCA-1141 N1)", (
 
 describe('Team model Inbox count with no team', () => {
   // Why: the no-team model reads agent status alone, and the Sheet counted the project's questions.
-  it("adds this project's own open questions to the agents that ask", async () => {
+  it("adds this project's own open questions to the agents that ask, never another project's", async () => {
     appState = { ...baseState(), activeWorktreeId: 'repo-1::/wt' }
     useGameInboxAppState.setState({
       hosts: [
@@ -399,6 +399,22 @@ describe('Team model Inbox count with no team', () => {
                   id: 'q-own',
                   ticket: 'ORCA-940',
                   question: 'Ship the arcade in lab.111?',
+                  options: [],
+                  context: null,
+                  askedAt: '2026-11-06T10:00:00.000Z',
+                  answer: null
+                }
+              ]
+            },
+            {
+              repoId: 'repo-wa',
+              repoName: 'orca-wa-inbox',
+              worktreeId: 'repo-wa::/wt',
+              questions: [
+                {
+                  id: 'q-wa',
+                  ticket: 'WAINBOX-79',
+                  question: 'Retry the webhook?',
                   options: [],
                   context: null,
                   askedAt: '2026-11-06T10:00:00.000Z',

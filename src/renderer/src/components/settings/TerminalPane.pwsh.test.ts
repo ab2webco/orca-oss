@@ -118,6 +118,18 @@ vi.mock('./SettingsFormControls', () => ({
   }
 }))
 
+vi.mock('./DefaultWindowsProjectRuntimeSetting', () => ({
+  DefaultWindowsProjectRuntimeSetting: function DefaultWindowsProjectRuntimeSetting({
+    wslSupportedPlatform,
+    wslDistros
+  }: {
+    wslSupportedPlatform: boolean
+    wslDistros: string[]
+  }) {
+    return wslSupportedPlatform ? `[runtime:${wslDistros.join(',')}]` : null
+  }
+}))
+
 vi.mock('./TerminalThemeSections', () => ({
   TerminalThemeCatalogSection: function TerminalThemeCatalogSection() {
     return null
@@ -317,6 +329,28 @@ describe('TerminalPane PowerShell version setting', () => {
     expect(text).toContain('PowerShell')
     expect(text).toContain('Command Prompt')
     expect(text).not.toContain('WSL')
+  })
+
+  it('shows the local default project runtime under the Windows shell when WSL is supported', () => {
+    const element = TerminalPane({
+      settings: {
+        terminalScrollbackRows: 5_000,
+        terminalWindowsShell: 'powershell.exe',
+        terminalWindowsPowerShellImplementation: 'auto',
+        terminalWordSeparator: '',
+        localWindowsRuntimeDefault: { kind: 'windows-host' }
+      } as never,
+      updateSettings: () => {},
+      scrollbackMode: 'preset',
+      setScrollbackMode: () => {},
+      wslSupportedPlatform: true,
+      wslAvailable: true,
+      wslDistros: ['Ubuntu-24.04'],
+      pwshAvailable: false,
+      gitBashAvailable: false
+    })
+
+    expect(collectText(element)).toContain('[runtime:Ubuntu-24.04]')
   })
 
   it('shows Windows shell controls for a remote Windows host on a non-Windows client', () => {

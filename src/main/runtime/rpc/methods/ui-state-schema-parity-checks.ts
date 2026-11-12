@@ -13,6 +13,7 @@ type MainOwnedUIState =
   | '_expandedWorktreeCardPropertiesDefaulted'
   | '_planeIssueCardPropertyDefaulted'
   | '_jiraIssueWorktreeCardPropertyDefaulted'
+  | '_agentFocusWorktreeCardPropertiesDefaulted'
   | 'starNagBaselineAgents'
   | 'starNagAppVersion'
   | 'starNagNextThreshold'

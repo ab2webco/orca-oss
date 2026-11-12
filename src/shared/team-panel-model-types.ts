@@ -9,7 +9,8 @@ import type { TeamAction } from './team-panel-actions'
 // and facts only; each client translates words and maps a status to its own tokens.
 
 /** The colour language: red, amber, blue, green, grey. Meanings are fixed; hues are a setting. */
-export type TeamStatus = 'attention' | 'risk' | 'working' | 'done' | 'idle'
+/** `failed` asks for action but is no question to the person; `closed` asks for nothing. */
+export type TeamStatus = 'attention' | 'failed' | 'risk' | 'working' | 'done' | 'idle' | 'closed'
 
 /** The flow a card's phase word names: Plan, Docs, Code, Tests, PR, Merge (the mod's FlowPhase). */
 export type TeamFlowPhase = 'plan' | 'docs' | 'code' | 'tests' | 'pr' | 'merge'
@@ -251,6 +252,9 @@ export type TeamSceneSource = {
   extensions: OrchestratorGameSceneExtension[]
 }
 
+/** A To Do ticket no member holds yet, with what work-on sends the lead for it (ORCA-717). */
+export type TeamTodoTicket = { identifier: string; title: string; prompt: string }
+
 export type TeamPanelGameModel = TeamPanelTabs & {
   kind: 'team'
   repoId: string
@@ -270,6 +274,10 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   scene: TeamSceneSource
   /** Orca's and the project's actions for the dock and its menu, in game.state's order. */
   actions: TeamAction[]
+  /** The project's To Do tickets no member holds; empty when the host publishes none. */
+  todo: TeamTodoTicket[]
+  /** The agent members run, as orca.yaml names it; absent when the host sends no lead. */
+  memberAgent?: string
 }
 
 /** A row of the no-team Activity view, read from AgentStatusEntry and the worktree. */

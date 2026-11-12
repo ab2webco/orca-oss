@@ -29,6 +29,7 @@ import { OrchestrationLegacyCompatibility } from './orchestration-legacy-compati
 import type { RpcDispatchStreamingOptions } from './dispatcher-stream-options'
 import { mapDispatcherError } from './dispatcher-error-response'
 import { parseDispatchParams } from './dispatcher-params'
+import { runPlaneCall } from '../../plane/plane-call-priority'
 
 export type DispatcherOptions = { runtime: OrcaRuntimeService; methods?: readonly RpcAnyMethod[] }
 
@@ -121,11 +122,13 @@ export class RpcDispatcher {
           orchestrationCompatibilityEvidence: request.orchestrationCompatibilityEvidence
         })
       }
-      const result = await this.orchestrationMutations.run(
-        request,
-        effectiveParams,
-        invoke,
-        legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
+      const result = await runPlaneCall(request.method, undefined, () =>
+        this.orchestrationMutations.run(
+          request,
+          effectiveParams,
+          invoke,
+          legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
+        )
       )
       recordRuntimeFeatureInteraction(
         this.runtime,
@@ -227,11 +230,13 @@ export class RpcDispatcher {
             orchestrationCompatibilityEvidence: request.orchestrationCompatibilityEvidence
           })
         }
-        const result = await this.orchestrationMutations.run(
-          request,
-          effectiveParams,
-          invoke,
-          legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
+        const result = await runPlaneCall(request.method, options?.pairedDeviceId, () =>
+          this.orchestrationMutations.run(
+            request,
+            effectiveParams,
+            invoke,
+            legacyCoordinator?.mutationCallerFingerprint ?? authenticatedCallerFingerprint
+          )
         )
         recordRuntimeFeatureInteraction(
           this.runtime,

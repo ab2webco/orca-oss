@@ -38,6 +38,8 @@ export type PtyConnectionDeps = {
     /** Launch-scoped Claude account override (transcript-owning universe on
      *  resume). Null forces the shared home; undefined keeps the worktree pin. */
     claudeAccountId?: string | null
+    /** Launch-scoped Codex account override; undefined keeps the worktree pin. */
+    codexAccountId?: string
     draftPrompt?: string
     sessionOptions?: Record<string, SessionOptionValue>
     /** Telemetry payload for `agent_started`. Forwarded to `pty:spawn`

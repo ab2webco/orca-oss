@@ -38,6 +38,7 @@ const lead: TeamLeadCard = {
 function gameModel(overrides: Partial<TeamPanelGameModel> = {}): TeamPanelGameModel {
   return {
     kind: 'team',
+    todo: [],
     repoId: 'repo-1',
     projectName: 'orca-oss',
     lead,

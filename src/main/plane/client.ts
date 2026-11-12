@@ -16,7 +16,12 @@ import {
 } from '../integration-account-persistence-limits'
 import { boundedIntegrationErrorMessage } from '../integration-error-message'
 import { extractPlaneErrorDetail } from './plane-error-detail'
-import { PlaneRateLimiter, parsePlaneRetryAfterMs } from './plane-rate-limiter'
+import {
+  PlaneRateLimiter,
+  parsePlaneRateLimitHeaders,
+  parsePlaneRetryAfterMs
+} from './plane-rate-limiter'
+import { currentPlanePriority } from './plane-call-priority'
 import {
   assertWorkspaceFileBounds,
   deleteWorkspaceToken,
@@ -38,8 +43,9 @@ export { getClients } from './plane-workspace-store'
 const MAX_CONCURRENT = 4
 const concurrencyGate = new IntegrationApiConcurrencyGate(MAX_CONCURRENT)
 const rateLimiter = new PlaneRateLimiter()
-// Bounded 429 fallback when the response carries no usable Retry-After.
+// Bounded 429 fallback when the response carries no usable Retry-After; doubles per retry.
 const DEFAULT_RETRY_DELAY_MS = 1000
+const MAX_RATE_LIMIT_RETRIES = 3
 // Exported: plane-connection-lifecycle.ts's testConnection() hits the same path.
 export const USERS_ME_PATH = '/api/v1/users/me/'
 
@@ -157,23 +163,25 @@ export async function planeFetch(url: string, init: RequestInit): Promise<Respon
   )
 }
 
-// Bounded single retry on 429, honoring Retry-After. If the retry also fails
-// the caller sees that second response (and throws) — no unbounded looping.
+// Bounded 429 retries honoring Retry-After; the caller sees the last response, never a loop.
 async function planeFetchWithRetry(
   rateLimiterKey: string,
   url: string,
   init: RequestInit
 ): Promise<Response> {
-  await rateLimiter.acquire(rateLimiterKey)
-  const response = await planeFetch(url, init)
-  if (response.status !== 429) {
-    return response
+  for (let attempt = 0; ; attempt += 1) {
+    await rateLimiter.acquire(rateLimiterKey, currentPlanePriority())
+    const response = await planeFetch(url, init)
+    rateLimiter.observe(rateLimiterKey, parsePlaneRateLimitHeaders(response.headers))
+    if (response.status !== 429 || attempt >= MAX_RATE_LIMIT_RETRIES) {
+      return response
+    }
+    rateLimiter.forget(rateLimiterKey)
+    const retryAfterMs =
+      parsePlaneRetryAfterMs(response.headers.get('retry-after')) ??
+      DEFAULT_RETRY_DELAY_MS * 2 ** attempt
+    await sleep(retryAfterMs)
   }
-  const retryAfterMs =
-    parsePlaneRetryAfterMs(response.headers.get('retry-after')) ?? DEFAULT_RETRY_DELAY_MS
-  await sleep(retryAfterMs)
-  await rateLimiter.acquire(rateLimiterKey)
-  return planeFetch(url, init)
 }
 
 export async function readPlaneError(response: Response): Promise<string> {

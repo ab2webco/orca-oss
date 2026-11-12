@@ -22,7 +22,11 @@ readonly PPA='ppa:fish-shell/release-4'
 
 STATUS_FILE="${ORCA_FISH4_SOURCE_STATUS_FILE:-}"
 # Overridable so the test can exercise every retry without sleeping through it.
-BACKOFF_SECONDS="${ORCA_FISH4_BACKOFF_SECONDS:-5 15 45 90}"
+BACKOFF_SECONDS="${ORCA_FISH4_BACKOFF_SECONDS:-5 15 45}"
+# Why a bound per call (ORCA-1179): Launchpad held one key lookup 7 minutes before its 500, and
+# three such attempts ate the job. Worst case with the defaults: 4 attempts x (45s + 10s kill)
+# + 65s of backoff, about 5 minutes.
+ADD_TIMEOUT="${ORCA_FISH4_ADD_TIMEOUT:-45}"
 
 log() {
   printf '%s\n' "$*" >&2
@@ -34,16 +38,36 @@ record_status() {
   fi
 }
 
+# Runs a command for at most ADD_TIMEOUT seconds; a timeout returns non-zero like any failure.
+# Why the bash fallback: macOS, where this suite also runs, ships no coreutils timeout.
+bounded() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --kill-after=10s "${ADD_TIMEOUT}s" "$@"
+    return
+  fi
+  "$@" &
+  local pid=$!
+  # Why its output detached and its sleep killed: a live sleep would hold the caller's pipes open.
+  (sleep "$ADD_TIMEOUT" && kill -TERM "$pid" 2>/dev/null) >/dev/null 2>&1 &
+  local watcher=$!
+  local status=0
+  wait "$pid" || status=$?
+  pkill -P "$watcher" 2>/dev/null
+  kill "$watcher" 2>/dev/null
+  wait "$watcher" 2>/dev/null
+  return "$status"
+}
+
 # Why removed on failure: a half-added PPA leaves its list entry behind, and the
 # next `apt-get update` then exits non-zero for a reason unrelated to the PR.
 drop_partial_ppa() {
-  sudo add-apt-repository -y -r "$PPA" >/dev/null 2>&1 || true
+  bounded sudo add-apt-repository -y -r "$PPA" >/dev/null 2>&1 || true
 }
 
 attempt=0
 for delay in $BACKOFF_SECONDS; do
   attempt=$((attempt + 1))
-  if sudo add-apt-repository -y "$PPA"; then
+  if bounded sudo add-apt-repository -y "$PPA"; then
     log "add-apt-repository succeeded on attempt ${attempt}"
     record_status 'ppa'
     exit 0
@@ -54,9 +78,9 @@ for delay in $BACKOFF_SECONDS; do
 done
 
 # One last attempt after the final backoff, so the longest wait is not spent for
-# nothing: with the default schedule the source has had ~155s to come back.
+# nothing: with the default schedule the source has had ~65s of backoff to come back.
 attempt=$((attempt + 1))
-if sudo add-apt-repository -y "$PPA"; then
+if bounded sudo add-apt-repository -y "$PPA"; then
   log "add-apt-repository succeeded on attempt ${attempt}"
   record_status 'ppa'
   exit 0

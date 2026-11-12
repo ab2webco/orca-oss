@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   COMPACT_WORKTREE_CARD_PROPERTIES,
   DEFAULT_WORKTREE_CARD_PROPERTIES,
+  PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES,
   TASK_WORKTREE_CARD_PROPERTIES,
+  isPreAgentFocusDefaultWorktreeCardProperties,
   getWorktreeCardModeProperties,
   getWorktreeCardModeUpdates,
   isDefaultedCompactWorktreeCardProperties,
@@ -16,7 +18,7 @@ describe('worktree card properties', () => {
     expect(props).toContain('inline-agents')
     expect(props).not.toContain('branch')
     expect(props).toContain('pr')
-    expect(props).toContain('automation')
+    expect(props).not.toContain('automation')
     expect(props).toEqual(DEFAULT_WORKTREE_CARD_PROPERTIES)
   })
 
@@ -94,5 +96,57 @@ describe('worktree card properties', () => {
     expect(isDefaultedCompactWorktreeCardProperties(['status', 'unread', 'automation'])).toBe(true)
     expect(isDefaultedCompactWorktreeCardProperties(['automation', 'status'])).toBe(false)
     expect(isDefaultedCompactWorktreeCardProperties(['status', 'automation', 'pr'])).toBe(false)
+  })
+})
+
+// ORCA-1163: defaults show only what an agent operator acts on; the rest is opt-in.
+describe('agent-focus defaults', () => {
+  it('turns on status, the linked issue, the PR and agent statuses, and nothing else', () => {
+    expect(DEFAULT_WORKTREE_CARD_PROPERTIES).toEqual([
+      'status',
+      'unread',
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue',
+      'pr',
+      'inline-agents'
+    ])
+  })
+
+  it('keeps the previous defaults, which notes, automation, CLI and ports were part of', () => {
+    expect(PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES).toEqual([
+      'status',
+      'unread',
+      'issue',
+      'linear-issue',
+      'jira-issue',
+      'plane-issue',
+      'pr',
+      'automation',
+      'cli',
+      'comment',
+      'ports',
+      'inline-agents'
+    ])
+  })
+
+  it('recognizes an untouched profile in any order, and nothing a person changed', () => {
+    expect(
+      isPreAgentFocusDefaultWorktreeCardProperties(
+        PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES.toReversed()
+      )
+    ).toBe(true)
+    expect(
+      isPreAgentFocusDefaultWorktreeCardProperties(
+        PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES.filter((one) => one !== 'ports')
+      )
+    ).toBe(false)
+    expect(
+      isPreAgentFocusDefaultWorktreeCardProperties([
+        ...PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES,
+        'model'
+      ])
+    ).toBe(false)
   })
 })

@@ -23,6 +23,12 @@ import {
 } from './team-panel-solo-sessions'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 import { useTeamSoloAdvisors } from './use-team-solo-advisors'
+import {
+  teamSoloAccountReadsOf,
+  useTeamSoloAccounts,
+  type TeamSoloPaneAccounts
+} from './use-team-solo-accounts'
+import { translate } from '@/i18n/i18n'
 import { useTeamSoloMachineReadings } from './use-team-solo-machine-readings'
 import { useTeamSoloLeadHandles } from './use-team-solo-lead-handles'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
@@ -73,6 +79,35 @@ function machinesOf(
   }
 }
 
+// Why the host's read first: a member launched on a managed account has no worktree pin to show.
+function withHostAccount(
+  session: TeamSoloSession,
+  accounts?: TeamSoloPaneAccounts
+): TeamSoloSession {
+  if (!accounts?.has(session.entry.paneKey)) {
+    return session
+  }
+  const account = accounts.get(session.entry.paneKey)
+  if (account) {
+    return {
+      ...session,
+      account: { provider: account.provider, email: account.email, usedPercent: null }
+    }
+  }
+  return session.account
+    ? {
+        ...session,
+        account: {
+          ...session.account,
+          email: translate(
+            'auto.components.sidebar.WorktreeCardClaudeAccountChip.systemDefault',
+            'System default'
+          )
+        }
+      }
+    : session
+}
+
 /** The no-team model from the agent status Orca already holds; needs no game or plugin. */
 export function teamPanelSoloModelFrom(
   inputs: SoloInputs,
@@ -80,11 +115,13 @@ export function teamPanelSoloModelFrom(
     sessions?: readonly TeamSoloSession[]
     readings?: MachineReadings | null
     advisors?: ReadonlyMap<string, GameMemberAdvisor>
+    accounts?: TeamSoloPaneAccounts
   } = {}
 ): TeamPanelSoloModel {
   const sessions = (reads.sessions ?? teamSoloSessionsOf(inputs)).map((session) => {
     const advisor = reads.advisors?.get(session.entry.paneKey)
-    return advisor ? { ...session, advisor: teamAdvisorRowOf(advisor) } : session
+    const withAdvisor = advisor ? { ...session, advisor: teamAdvisorRowOf(advisor) } : session
+    return withHostAccount(withAdvisor, reads.accounts)
   })
   const model = teamSoloModelOf({
     sessions,
@@ -130,9 +167,15 @@ export function useTeamPanelSoloModel(active: boolean): TeamPanelSoloModel | nul
   )
   // Why not only the read: reports held from before the switch would go on naming the model.
   const reports = pluginsOn ? advisors : undefined
+  const accounts = useTeamSoloAccounts(
+    JSON.stringify(teamSoloAccountReadsOf(sessions)),
+    active && shownTab === 'activity'
+  )
   return useMemo(
     () =>
-      inputs ? teamPanelSoloModelFrom(inputs, { sessions, readings, advisors: reports }) : null,
-    [inputs, sessions, readings, reports]
+      inputs
+        ? teamPanelSoloModelFrom(inputs, { sessions, readings, advisors: reports, accounts })
+        : null,
+    [inputs, sessions, readings, reports, accounts]
   )
 }

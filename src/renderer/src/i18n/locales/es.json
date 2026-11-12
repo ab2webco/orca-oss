@@ -4640,6 +4640,12 @@
           "newCardDisplay": {
             "title": "Visualización de tarjeta"
           },
+          "cardDisplayGroup": {
+            "work": "Trabajo",
+            "agent": "Agente",
+            "source": "Origen"
+          },
+          "prAndChecks": "Pull request y checks",
           "09faabd875": "Orden del proyecto",
           "7bada3b1ab": "Ordenar por",
           "dc0bb670bc": "Agrupar por",
@@ -16417,6 +16423,7 @@
       "thisProject": "este proyecto",
       "projectUnread": "No se pudieron leer las preguntas de este proyecto.",
       "forYouEmpty": "No hay preguntas esperando tu respuesta.",
+      "otherProjects": "Otros proyectos",
       "yourAnswer": "Tu respuesta",
       "openTerminal": "Abrir terminal",
       "youAnswered": "Respondiste",
@@ -16545,5 +16552,19 @@
   "agentQuestionNotification": {
     "title": "{{context}} - {{agent}} te pregunta",
     "body": "Abre la Bandeja para responder."
+  },
+  "newTabMenu": {
+    "account": {
+      "inUseBy": "En uso por {{value}}",
+      "limited": "Límite alcanzado",
+      "signedOut": "Sesión cerrada",
+      "otherModel": "Otro modelo",
+      "noReading": "Sin lectura",
+      "used": "{{value}}% usado",
+      "ownLogin": "Login propio",
+      "hostLogin": "Login del host",
+      "choose": "Elegir la cuenta de {{value}}",
+      "systemLogin": "Login del sistema"
+    }
   }
 }

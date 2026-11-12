@@ -19,16 +19,25 @@ const TONE: Record<TeamStatus, StatusTone> = {
   risk: 'warning',
   working: 'info',
   done: 'success',
-  idle: 'idle'
+  idle: 'idle',
+  failed: 'attention',
+  closed: 'idle'
 }
 
 export function teamStatusTone(status: TeamStatus): StatusTone {
   return TONE[status]
 }
 
-/** V28's marks: a question for needs-you or failed, a spinner while working, else a dot. */
+const GLYPH: Partial<Record<TeamStatus, StatusDotGlyph>> = {
+  attention: 'question',
+  failed: 'alert',
+  working: 'spinner',
+  closed: 'closed'
+}
+
+/** V28's marks: a question only for needs-you, a spinner while working, else a dot. */
 export function teamStatusGlyph(status: TeamStatus): StatusDotGlyph {
-  return status === 'attention' ? 'question' : status === 'working' ? 'spinner' : 'dot'
+  return GLYPH[status] ?? 'dot'
 }
 
 const MINUTE = 60_000

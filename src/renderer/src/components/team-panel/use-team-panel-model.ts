@@ -23,7 +23,7 @@ import {
 import { teamPanelModelOf } from './team-panel-model-of'
 import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
-import { withOtherProjectQuestions } from './team-panel-inbox-overlay'
+import { withAddedInboxQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { onGameAdvisorChanged } from './game-advisor-signal'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
@@ -177,13 +177,13 @@ export function useTeamPanelModel(options: { background?: boolean } = {}): TeamP
       ? { section: { kind: 'ready', value: noTeamModel }, retry: null }
       : source
     const { section } = shown
-    // Why every project: the no-team model reads agent status, so it misses this project's too.
-    const added = noTeamModel ? everyOpen : otherOpen + teamAsks
-    if (added === 0 || section.kind !== 'ready') {
+    // Why: the no-team model reads agent status alone, so it misses this project's own questions.
+    const added = noTeamModel ? everyOpen - otherOpen : teamAsks
+    if (added + otherOpen === 0 || section.kind !== 'ready') {
       return shown
     }
     const model = section.value
-    const value = { ...model, inbox: withOtherProjectQuestions(model.inbox, added) }
+    const value = { ...model, inbox: withAddedInboxQuestions(model.inbox, added, otherOpen) }
     return { ...shown, section: { kind: 'ready', value } }
   }, [noTeam, solo, source, otherOpen, everyOpen, teamAsks])
 }
@@ -209,6 +209,11 @@ export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
         ? 'solo'
         : null
   )
+}
+
+/** The members the last model read, for the + menu's in-use tags; never polls (ORCA-717). */
+export function useTeamPanelMembers(): readonly TeamMemberCard[] {
+  return useTeamPanelModelStore((s) => membersOf(s.source))
 }
 
 /** The member whose pane is in this terminal tab, from the last model the panel read; never polls. */

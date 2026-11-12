@@ -274,6 +274,16 @@ describe('createIpcPtyTransport', () => {
     }
   )
 
+  it('forwards a launch-scoped Codex account override to the PTY spawn (ORCA-717)', async () => {
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const spawn = window.api.pty.spawn as unknown as ReturnType<typeof vi.fn>
+    const transport = createIpcPtyTransport({ codexAccountId: 'acct-codex' })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ codexAccountId: 'acct-codex' }))
+  })
+
   it('forwards automatic resume provenance to the PTY spawn', async () => {
     const { createIpcPtyTransport } = await import('./pty-transport')
     const spawn = window.api.pty.spawn as unknown as ReturnType<typeof vi.fn>

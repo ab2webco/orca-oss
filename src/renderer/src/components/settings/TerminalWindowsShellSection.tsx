@@ -8,11 +8,17 @@ import {
 import { SearchableSetting } from './SearchableSetting'
 import { translate } from '@/i18n/i18n'
 import { ShellIcon } from '../tab-bar/shell-icons'
+import { DefaultWindowsProjectRuntimeSetting } from './DefaultWindowsProjectRuntimeSetting'
 
 type TerminalWindowsShellSectionProps = {
   updateSettings: (updates: Partial<GlobalSettings>) => void
   windowsShell: string
   gitBashAvailable: boolean
+  settings: Pick<GlobalSettings, 'localWindowsRuntimeDefault'>
+  wslSupportedPlatform: boolean
+  wslAvailable: boolean
+  wslDistros: string[]
+  wslCapabilitiesLoading: boolean
 }
 
 function windowsShellLabel(shell: string, label: string): React.JSX.Element {
@@ -27,7 +33,12 @@ function windowsShellLabel(shell: string, label: string): React.JSX.Element {
 export function TerminalWindowsShellSection({
   updateSettings,
   windowsShell,
-  gitBashAvailable
+  gitBashAvailable,
+  settings,
+  wslSupportedPlatform,
+  wslAvailable,
+  wslDistros,
+  wslCapabilitiesLoading
 }: TerminalWindowsShellSectionProps): React.JSX.Element {
   const showGitBashOption = gitBashAvailable || windowsShell === WINDOWS_GIT_BASH_SHELL
   // Why: selecting WSL here would omit its required distro, but an existing WSL default must stay visible.
@@ -142,6 +153,15 @@ export function TerminalWindowsShellSection({
             }
           />
         </SearchableSetting>
+        {/* Why: WSL is a runtime, not a shell; surface the one runtime default where users look for it. */}
+        <DefaultWindowsProjectRuntimeSetting
+          settings={settings}
+          updateSettings={updateSettings}
+          wslSupportedPlatform={wslSupportedPlatform}
+          wslAvailable={wslAvailable}
+          wslDistros={wslDistros}
+          wslCapabilitiesLoading={wslCapabilitiesLoading}
+        />
       </div>
     </section>
   )

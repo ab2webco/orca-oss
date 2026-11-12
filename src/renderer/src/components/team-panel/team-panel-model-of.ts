@@ -18,6 +18,7 @@ import {
   teamQueueSectionOf,
   type TeamPrFailureTexts
 } from '../../../../shared/team-panel-work-tabs'
+import { teamTodoTicketsOf } from './team-panel-todo'
 
 const prFailureTexts = (): TeamPrFailureTexts => ({
   providerFailed: translate(
@@ -142,6 +143,8 @@ export function teamPanelModelOf(args: {
       extensions: state.extensions?.scenes ?? []
     },
     actions: teamActionsOf(state),
+    todo: teamTodoTicketsOf(state, cards.members),
+    ...(state.lead?.agent ? { memberAgent: state.lead.agent } : {}),
     inbox: inboxOf(state, questions),
     prs: teamPrSectionOf(work),
     queue: teamQueueSectionOf(work),

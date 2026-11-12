@@ -50,6 +50,7 @@ const lead: TeamLeadCard = {
 
 const team: TeamPanelGameModel = {
   kind: 'team',
+  todo: [],
   repoId: 'repo-1',
   projectName: 'orca-oss',
   lead,

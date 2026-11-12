@@ -80,6 +80,25 @@ export class GamePausedMembers {
     const starting = new Set([...setup.starting, ...setup.queued.map((entry) => entry.taskId)])
     const liveNow = { tickets, worktreeIds: liveWorktreeIds }
     const gone = await this.goneWorktreesOf(read.members.filter((one) => !tickets.has(one.ticket)))
+    // Why drop and not only mark: nothing is left to resume, and a lead's cleanup never runs discard.
+    const dropped = read.members.filter(
+      (one) =>
+        !tickets.has(one.ticket) &&
+        ((one.worktreeId !== null && gone.has(one.worktreeId)) ||
+          (one.dispatchId !== null && this.deps.releasedDispatch?.(one.dispatchId) === true))
+    )
+    let members = read.members
+    if (dropped.length > 0) {
+      try {
+        await this.deps.store.remove(
+          projectKey,
+          dropped.map((one) => one.ticket)
+        )
+        members = members.filter((one) => !dropped.includes(one))
+      } catch (failure) {
+        error = errorText(failure)
+      }
+    }
     const livePaneKeys = new Set(
       agents.flatMap((agent) =>
         agent.isMember && !agent.found && !agent.remote ? [agent.paneKey] : []
@@ -87,9 +106,9 @@ export class GamePausedMembers {
     )
     return {
       ...pausedAndUnlistedMembersOf({
-        members: read.members.filter(
-          (one) =>
-            !(one.adoptedPaneKey && one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
+        // Why again: a release must hide the member even when dropping it from the store failed.
+        members: members.filter(
+          (one) => !(one.dispatchId && this.deps.releasedDispatch?.(one.dispatchId))
         ),
         live: liveNow,
         livePaneKeys,
@@ -97,7 +116,7 @@ export class GamePausedMembers {
         causeOf: this.deps.causeOf ?? (() => null),
         gone
       }),
-      queued: queuedMembersOf(read.members, setup.queued),
+      queued: queuedMembersOf(members, setup.queued),
       error
     }
   }
@@ -109,6 +128,18 @@ export class GamePausedMembers {
 
   async forget(projectKey: string, tickets: readonly string[]): Promise<void> {
     await this.deps.store.remove(projectKey, tickets)
+  }
+
+  /** Frees the members saved for a worktree Orca just removed; returns their tickets. */
+  async forgetWorktree(projectKey: string, worktreeId: string): Promise<string[]> {
+    const read = await this.deps.store.read(projectKey)
+    const tickets = read.ok
+      ? read.members.filter((one) => one.worktreeId === worktreeId).map((one) => one.ticket)
+      : []
+    if (tickets.length > 0) {
+      await this.deps.store.remove(projectKey, tickets)
+    }
+    return tickets
   }
 
   private async goneWorktreesOf(members: readonly GameMemberSession[]): Promise<Set<string>> {

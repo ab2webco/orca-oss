@@ -3903,6 +3903,9 @@ export function connectPanePty(
     ...(runtimeEnvironmentId === null && !connectionId && paneStartup?.claudeAccountId !== undefined
       ? { claudeAccountId: paneStartup.claudeAccountId }
       : {}),
+    ...(runtimeEnvironmentId === null && !connectionId && paneStartup?.codexAccountId !== undefined
+      ? { codexAccountId: paneStartup.codexAccountId }
+      : {}),
     ...(agentLaunchPreferences ? { agentLaunchPreferences } : {}),
     ...(launchToken ? { launchToken } : {}),
     ...(paneStartup?.launchAgent ? { launchAgent: paneStartup.launchAgent } : {}),

@@ -41,6 +41,7 @@ const lead: TeamLeadCard = {
 }
 const model = (scene: TeamPanelGameModel['scene']): TeamPanelGameModel => ({
   kind: 'team',
+  todo: [],
   repoId: 'repo-1',
   projectName: 'orca-oss',
   lead,
