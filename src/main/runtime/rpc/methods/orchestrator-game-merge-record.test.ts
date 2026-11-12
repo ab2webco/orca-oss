@@ -10,12 +10,23 @@ const MERGE = {
   key: 'merged ORCA-923 #923',
   merge: { provider: 'github' as const, number: 923, worktreeId: 'wt-m', perfect: true }
 }
+const ARTHUR = { key: 'arthur', name: 'Arthur' }
 
+const rosters: unknown[] = []
 vi.mock('../../../../shared/orchestrator-game-observed-events', () => ({
-  observedMergesOf: () => [MERGE]
+  observedMergesOf: (agents: readonly unknown[], roster: unknown) => {
+    rosters.push(roster)
+    return agents.length > 0
+      ? [{ ...MERGE, key: 'merged ORCA-924 #924', character: ARTHUR }]
+      : [MERGE]
+  }
 }))
 
-const leadState = { role: 'lead', agents: [] } as unknown as OrchestratorGameState
+const leadState = {
+  role: 'lead',
+  agents: [],
+  config: { scene: 'quest' }
+} as unknown as OrchestratorGameState
 
 function runtimeWith(postEvent: (args: unknown) => Promise<unknown>): OrcaRuntimeService {
   return { getGameBoard: () => ({ postEvent }) } as unknown as OrcaRuntimeService
@@ -65,6 +76,27 @@ describe('recordGameMerges', () => {
     await recordGameMerges(runtimeWith(postEvent), leadState, caller)
 
     expect(postEvent).toHaveBeenCalledWith({ ...caller, ...MERGE })
+  })
+
+  // Why (ORCA-1170): auto-release frees the member next, so the merge pays its character here.
+  it("credits the merge to the member's character from the project's roster", async () => {
+    const postEvent = vi.fn().mockResolvedValue({ posted: true })
+    const caller = { worktreeId: 'wt-lead', terminalHandle: 'term-lead' }
+
+    rosters.length = 0
+    await recordGameMerges(
+      runtimeWith(postEvent),
+      { ...leadState, agents: [{}] } as unknown as OrchestratorGameState,
+      caller
+    )
+
+    expect(rosters[0]).toContainEqual({ en: 'Arthur', es: 'Arturo' })
+    expect(postEvent).toHaveBeenCalledWith({
+      ...caller,
+      ...MERGE,
+      key: 'merged ORCA-924 #924',
+      credit: { character: ARTHUR, number: 923 }
+    })
   })
 
   it('records nothing for a member', async () => {

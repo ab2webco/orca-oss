@@ -274,6 +274,24 @@ describe('GameHistoryStore events', () => {
     expect((await history.events('repo-a')).map((one) => one.ticket)).toEqual(['CIN-1', 'CIN-2'])
     expect((await history.list('repo-a')).map((one) => one.ticket)).toEqual(['CIN-3'])
   })
+
+  // Why (ORCA-1170): an auto-released member leaves no record, so its merge was never paid.
+  it("pays a merged event's character once, in the write that keeps the event", async () => {
+    const { store: history, dir } = store()
+    const merged = event('CIN-1', 'merged', 'merged CIN-1 #41')
+    const credit = { character: { key: 'arthur', name: 'Arthur' }, number: 41 }
+    await Promise.all([
+      history.appendEvent('repo-a', merged, credit),
+      history.appendEvent('repo-a', merged, credit)
+    ])
+    await history.appendEvent('repo-a', event('CIN-2', 'claimed'), credit)
+
+    const again = new GameHistoryStore(() => dir)
+    await again.appendEvent('repo-a', merged, credit)
+    expect((await again.characters('repo-a')).map((one) => [one.key, one.xp])).toEqual([
+      ['arthur', 100]
+    ])
+  })
 })
 
 describe('GameHistoryStore inbox cursors', () => {
