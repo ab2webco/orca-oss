@@ -108,6 +108,38 @@ test('names the rate-limit wait while the Tasks page loads Plane', async ({
     expect(heading!.height).toBeLessThan(20)
     expect(Math.abs(refresh!.y - firstPreset!.y)).toBeLessThan(refresh!.height)
   }
+  // Why: at 768 with the sidebar open, viewport breakpoints laid the full grid into a narrower pane.
+  for (const width of [768, 1024, 1440]) {
+    await electronApp.evaluate(({ BrowserWindow }, w) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(w, 900)
+    }, width)
+    await orcaPage.waitForTimeout(400)
+    const boxes: { name: string; box: { x: number; width: number } }[] = []
+    for (const name of ['ID', 'Work item', 'Status', 'Priority', 'Assignee', 'Updated']) {
+      const header = orcaPage.getByRole('button', { name: new RegExp(`^${name}(,|$)`) })
+      if (await header.isVisible()) {
+        boxes.push({ name, box: (await header.boundingBox())! })
+        // Why: a collapsed column keeps its button box but its label spills over the next one.
+        const fits = await header.evaluate(
+          (el) => el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().height < 24
+        )
+        expect(fits, `${name} label overflows its column at ${width}`).toBe(true)
+      }
+    }
+    // Why either: a pane too narrow for the full grid shows the compact sort bar instead.
+    const compact = await orcaPage.getByTestId('plane-mobile-sort-controls').isVisible()
+    const title = boxes.find((one) => one.name === 'Work item')
+    expect(
+      compact || (title?.box.width ?? 0) >= 120,
+      `the Work item column collapsed at ${width}`
+    ).toBe(true)
+    for (const [one, next] of boxes.slice(0, -1).map((b, i) => [b, boxes[i + 1]] as const)) {
+      expect(
+        one.box.x + one.box.width,
+        `${one.name} runs into ${next.name} at ${width}`
+      ).toBeLessThanOrEqual(next.box.x)
+    }
+  }
   const capture = process.env.ORCA_E2E_CAPTURE === '1'
   const shoot = async (name: string): Promise<void> => {
     if (!capture) {
