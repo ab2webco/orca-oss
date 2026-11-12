@@ -2,6 +2,7 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestration'
+import { gamePausedRefusalOf } from './orchestrator-game-paused-refusal'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { gameHostRefusalOf } from '../../shared/orchestrator-game-host-load'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
@@ -282,11 +283,9 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     const remote = remotePlacementOf(flags, repo)
     const response = await readCallerGameState(client)
     refuseWhileStopped(response.result, ticket)
-    if (response.result.pausedMembers?.some((one) => one.ticket === ticket)) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `${ticket} is paused since Orca restarted: \`orca game resume-members ${ticket}\` resumes it, \`orca game resume-members ${ticket} --discard\` frees it.`
-      )
+    const paused = response.result.pausedMembers?.find((one) => one.ticket === ticket)
+    if (paused) {
+      throw new RuntimeClientError('invalid_argument', gamePausedRefusalOf(paused))
     }
     const queued = response.result.queuedMembers?.find((one) => one.ticket === ticket)
     if (queued) {

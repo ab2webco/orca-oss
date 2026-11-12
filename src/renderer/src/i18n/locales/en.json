@@ -17542,5 +17542,19 @@
   "agentQuestionNotification": {
     "title": "{{context}} - {{agent}} asks you",
     "body": "Open the Inbox to answer."
+  },
+  "newTabMenu": {
+    "account": {
+      "inUseBy": "In use by {{value}}",
+      "limited": "Limit reached",
+      "signedOut": "Signed out",
+      "otherModel": "Other model",
+      "noReading": "No reading",
+      "used": "{{value}}% used",
+      "ownLogin": "Own login",
+      "hostLogin": "Host login",
+      "choose": "Choose the {{value}} account",
+      "systemLogin": "System login"
+    }
   }
 }

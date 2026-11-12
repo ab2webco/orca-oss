@@ -211,6 +211,11 @@ export function useTeamPanelKind(): TeamPanelModel['kind'] | null {
   )
 }
 
+/** The members the last model read, for the + menu's in-use tags; never polls (ORCA-717). */
+export function useTeamPanelMembers(): readonly TeamMemberCard[] {
+  return useTeamPanelModelStore((s) => membersOf(s.source))
+}
+
 /** The member whose pane is in this terminal tab, from the last model the panel read; never polls. */
 export function useTeamMemberOfTab(tabId: string): TeamMemberCard | null {
   const members = useTeamPanelModelStore((s) => membersOf(s.source))

@@ -62,4 +62,28 @@ describe('isGameMemberWorktreeGone (ORCA-832)', () => {
     expect(await isGameMemberWorktreeGone('repo1::/w/f', folder)).toBe(false)
     expect(await isGameMemberWorktreeGone('no-separator', folder)).toBe(false)
   })
+  it('is gone when a local folder workspace no longer has its folder', async () => {
+    const folder = repo('repo1', { kind: 'folder', connectionId: null } as Partial<Repo>)
+    const result = await isGameMemberWorktreeGone('repo1::/w/f', {
+      ...deps([folder], { ok: true, worktrees: [] }),
+      pathExists: async (path) => path !== '/w/f'
+    })
+    expect(result).toBe(true)
+  })
+
+  it('keeps a folder workspace whose folder is there, and one on an SSH host it cannot check', async () => {
+    const pathExists = async (): Promise<boolean> => false
+    const local = repo('repo1', { kind: 'folder' } as Partial<Repo>)
+    const remote = repo('repo2', { kind: 'folder', connectionId: 'ssh-1' } as Partial<Repo>)
+    const scan: RuntimeWorktreeScanResult = { ok: true, worktrees: [] }
+    expect(
+      await isGameMemberWorktreeGone('repo1::/w/f', {
+        ...deps([local], scan),
+        pathExists: async () => true
+      })
+    ).toBe(false)
+    expect(
+      await isGameMemberWorktreeGone('repo2::/w/f', { ...deps([remote], scan), pathExists })
+    ).toBe(false)
+  })
 })

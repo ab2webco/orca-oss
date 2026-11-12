@@ -301,6 +301,27 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalled()
   })
 
+  // Why (ORCA-717): a Codex account names one on THIS host, so only a local spawn may carry it.
+  it.each([
+    ['local', 'acct-codex'],
+    ['runtime:owner-runtime', undefined]
+  ] as const)('forwards a hand-picked Codex account only to a %s spawn', async (host, expected) => {
+    const { connectPanePty } = await import('./pty-connection')
+    transportFactoryQueue.push(createMockTransport('pty-codex-1'))
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] },
+      repos: [{ id: 'repo1', connectionId: null, displayName: 'orca', executionHostId: host }]
+    } as StoreState
+    const deps = createDeps({
+      startup: { command: 'codex', launchAgent: 'codex', codexAccountId: 'acct-codex' }
+    })
+
+    connectPanePty(createPane(2) as never, createManager(2) as never, deps as never)
+
+    expect(createdTransportOptions[0]?.codexAccountId).toBe(expected)
+  })
+
   it('prints a terminal notice when the startup cwd fell back to the workspace root', async () => {
     const { connectPanePty, STARTUP_CWD_FALLBACK_NOTICE } = await import('./pty-connection')
     const transport = createMockTransport('pty-fallback')

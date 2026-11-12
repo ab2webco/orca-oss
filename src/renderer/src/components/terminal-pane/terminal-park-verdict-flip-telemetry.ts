@@ -3,11 +3,11 @@
  * Field breadcrumbs prove render-cadence flips, but not which eligibility input
  * oscillates; burst damping keeps the pane mounted before React reaches #185.
  *
- * Scope: flips are counted on the rendered verdict, but the pin can only
- * subtract from the cold-park candidate set. Churn driven by the other parked
- * inputs (forced parking, portal ownership, deferred activation mounts) is
- * observed and breadcrumbed, not damped — read a repeating `burst` crumb for
- * one tab as "damping did not reach the oscillating input".
+ * Scope: flips are counted on the rendered verdict. The pin subtracts from the
+ * cold-park candidate set and from the worktree-level park (a pane remount there
+ * cost a new xterm and a scrollback replay per flip, ORCA-1148). Churn driven by
+ * portal ownership or deferred activation mounts is observed, not damped — read
+ * a repeating `burst` crumb for one tab as "damping did not reach the input".
  */
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
 
@@ -57,6 +57,16 @@ function resetFlipWindows(record: ParkVerdictFlipRecord, nowMs: number): void {
 // expired pin must stop damping and stop gating breadcrumbs on its own.
 function isParkVerdictPinLive(record: ParkVerdictFlipRecord, nowMs: number): boolean {
   return record.pinnedUntilMs != null && nowMs < record.pinnedUntilMs
+}
+
+/** Read-only: when a live flip-burst pin stops holding this tab mounted; null when none holds it. */
+export function liveParkVerdictPinUntilMs(
+  records: ReadonlyMap<string, ParkVerdictFlipRecord>,
+  tabId: string,
+  nowMs: number
+): number | null {
+  const record = records.get(tabId)
+  return record && isParkVerdictPinLive(record, nowMs) ? (record.pinnedUntilMs ?? null) : null
 }
 
 /** Returns the safe-side pin deadline and re-arms an expired window. */
