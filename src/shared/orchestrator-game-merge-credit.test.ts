@@ -28,7 +28,7 @@ const xpOf = (stored: Record<string, unknown> | null): number | undefined =>
 
 // Why (ORCA-1170): auto-release and a stop free a merged member without a merged outcome, so its XP stayed 0.
 describe('creditGameMerge', () => {
-  it("credits a merge to a character no free has written yet, and keeps its counts at zero", () => {
+  it('credits a merge to a character no free has written yet, and keeps its counts at zero', () => {
     const [character] = listGameCharacters(creditGameMerge({}, arthur, merge) ?? {})
 
     expect(character).toMatchObject({ key: 'arthur', name: 'Arthur', xp: 100, tickets: 0 })
