@@ -420,6 +420,29 @@ test("the default button covers no terminal row nor a Team card's meta at any wi
       )
     }
   }
+
+  // Why: the clip must not hide a real overlap; a button over a painted row inside the list still counts.
+  const probe = meta.first()
+  const [placed] = await sweepTarget(probe, ['center'])
+  await orcaPage.evaluate((box) => {
+    const stand = document.createElement('div')
+    stand.id = 'covering-probe'
+    stand.dataset.floatingTerminalToggle = ''
+    Object.assign(stand.style, {
+      position: 'fixed',
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: '20px',
+      height: `${box.bottom - box.top}px`
+    })
+    document.body.append(stand)
+  }, placed.target)
+  const [over] = await sweepTarget(probe, ['center'])
+  expect(
+    over.buttons.some((button) => intersects(button, over.target)),
+    'a button over a painted row reads as covering it'
+  ).toBe(true)
+  await orcaPage.evaluate(() => document.getElementById('covering-probe')?.remove())
 })
 
 test('the menu still moves the button both ways, a drag still places it, and the choice sticks', async ({
