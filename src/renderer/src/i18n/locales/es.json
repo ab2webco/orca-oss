@@ -16418,7 +16418,7 @@
       "thisProject": "este proyecto",
       "projectUnread": "No se pudieron leer las preguntas de este proyecto.",
       "forYouEmpty": "No hay preguntas esperando tu respuesta.",
-      "otherProjects": "Otros proyectos · {{count}}",
+      "otherProjects": "Otros proyectos",
       "yourAnswer": "Tu respuesta",
       "openTerminal": "Abrir terminal",
       "youAnswered": "Respondiste",

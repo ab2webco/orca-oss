@@ -36,11 +36,10 @@ export function TeamInboxOtherProjects({
       <CollapsibleTrigger className="flex w-full items-center gap-1 rounded-sm pt-2 pb-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         <ChevronRight
           aria-hidden
-          className="size-3.5 shrink-0 transition-transform group-data-[state=open]/others:rotate-90"
+          className="size-3.5 shrink-0 transition-transform motion-reduce:transition-none group-data-[state=open]/others:rotate-90"
         />
-        <span className="truncate">
-          {translate('teamPanel.inbox.otherProjects', 'Other projects · {{count}}', { count })}
-        </span>
+        <span className="truncate">{translate('teamPanel.inbox.otherProjects', 'Other projects')}</span>
+        <span className="tabular-nums">{count}</span>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2">
         {groups.map((group) => (

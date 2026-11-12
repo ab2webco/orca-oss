@@ -256,11 +256,11 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
 
     // Full: this project's question counts on the tab; the other project's waits folded below it.
     const inbox = panel.getByTestId('team-panel-inbox')
-    const others = inbox.getByRole('button', { name: /Other projects · \d/ })
+    const others = inbox.getByRole('button', { name: /Other projects/ })
     await expect(inbox.getByText('Merge #923 now or wait for #915 first?')).toBeVisible({
       timeout: 60_000
     })
-    await expect(others).toHaveText('Other projects · 1', { timeout: 60_000 })
+    await expect(others).toHaveText('Other projects1', { timeout: 60_000 })
     await expect(others).toHaveAttribute('aria-expanded', 'false')
     await expect(inboxTab).toContainText('1')
     await expect(inboxTab).not.toContainText('2')
@@ -376,7 +376,7 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     })
     await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
     await inbox.getByRole('tab', { name: /For you/ }).click()
-    await expect(others).toHaveText('Other projects · 1', { timeout: 60_000 })
+    await expect(others).toHaveText('Other projects1', { timeout: 60_000 })
     await expect(others).toHaveAttribute('aria-expanded', 'false')
     await expect(inbox.getByText('No questions are waiting for you.')).toBeVisible()
     await expect(inboxTab).not.toHaveText(/\d/)

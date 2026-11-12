@@ -129,7 +129,8 @@ describe('Inbox tab', () => {
     expect(view.getByRole('tab', { name: /For you/ }).textContent).toBe('For you1')
     expect(view.getByText('orca-oss · this project')).toBeTruthy()
     expect(view.getByText('Merge #923 now or wait for #915?')).toBeTruthy()
-    const others = view.getByRole('button', { name: 'Other projects · 1' })
+    const others = view.getByRole('button', { name: /Other projects/ })
+    expect(others.textContent).toBe('Other projects1')
     expect(others.getAttribute('aria-expanded')).toBe('false')
     expect(view.queryByText('Ship the price change today?')).toBeNull()
     const sections = [...view.container.querySelectorAll('[data-team-inbox-project]')]
@@ -150,7 +151,8 @@ describe('Inbox tab', () => {
     }
     const view = renderInbox({ otherGroups: [local, otherGroup()] })
 
-    const others = view.getByRole('button', { name: 'Other projects · 2' })
+    const others = view.getByRole('button', { name: /Other projects/ })
+    expect(others.textContent).toBe('Other projects2')
     openOthers(view)
 
     expect(others.getAttribute('aria-expanded')).toBe('true')
@@ -166,7 +168,7 @@ describe('Inbox tab', () => {
 
     expect(view.getByRole('tab', { name: /For you/ }).textContent).toBe('For you0')
     const empty = view.getByText('No questions are waiting for you.')
-    const others = view.getByRole('button', { name: 'Other projects · 1' })
+    const others = view.getByRole('button', { name: /Other projects/ })
     expect(empty.compareDocumentPosition(others) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(view.queryByText('Ship the price change today?')).toBeNull()
   })
