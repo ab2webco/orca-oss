@@ -197,7 +197,7 @@ describe('list urls', () => {
       })
     ).toBe('https://linear.app/acme/my-issues/assigned')
     expect(todoListUrlOf({ provider: 'github', repo: { owner: 'o', repo: 'r' } })).toBe(
-      'https://github.com/o/r/issues?q=is%3Aissue%20is%3Aopen%20assignee%3A%40me'
+      'https://github.com/o/r/issues?q=is%3Aissue%20is%3Aopen'
     )
     expect(
       todoListUrlOf({ provider: 'gitlab', sampleUrl: 'https://gitlab.com/g/p/-/issues/7' })

@@ -280,7 +280,7 @@ export function reviewsListUrlOf(source: ListUrlSource): string | null {
 export function todoListUrlOf(source: ListUrlSource): string | null {
   if (source.provider === 'github') {
     return source.repo
-      ? `${githubBase(source.repo)}/issues?q=${encodeURIComponent('is:issue is:open assignee:@me')}`
+      ? `${githubBase(source.repo)}/issues?q=${encodeURIComponent('is:issue is:open')}`
       : null
   }
   if (source.provider === 'gitlab') {

@@ -30,7 +30,12 @@ import {
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
 
-type TodoSource = Exclude<OrchestratorGameTodoSource, 'off'>
+import {
+  mergeTodoLists,
+  todoSourcesOf,
+  type GameTodoConnections,
+  type TodoSource
+} from './orchestrator-game-todo-sources'
 
 /** The provider calls the band's project lists need; each one may throw. */
 export type GameProjectWorkPort = GameProjectReviewsPort & {
@@ -100,29 +105,6 @@ export const planeWorkspaceIdOf = (
   value === undefined
     ? undefined
     : (workspaces.find((one) => one.id === value || one.workspaceSlug === value)?.id ?? value)
-
-const keyPrefixOf = (identifier: string): string | undefined =>
-  /^([A-Za-z][A-Za-z0-9_]*)-\d+$/.exec(identifier)?.[1]
-
-/** The To Do when the project names none: its linked Plane project, the worktree's tracker, then its host. */
-export function autoTodoSourceOf(args: {
-  planeProject: string | null
-  workItem: Pick<GameWorkItem, 'provider' | 'identifier'> | null
-  host: 'github' | 'gitlab' | null
-}): TodoSource | null {
-  if (args.planeProject) {
-    return { provider: 'plane', project: args.planeProject }
-  }
-  const item = args.workItem
-  if (item?.provider === 'jira' || item?.provider === 'linear') {
-    const project = keyPrefixOf(item.identifier)
-    return project ? { provider: item.provider, project } : { provider: item.provider }
-  }
-  if (item?.provider === 'plane') {
-    return { provider: 'plane' }
-  }
-  return args.host ? { provider: args.host } : null
-}
 
 const DONE_PLANE_GROUPS = new Set(['completed', 'cancelled'])
 
@@ -221,7 +203,7 @@ async function readTodo(
       const issues = await port.githubIssues()
       return listOf(
         'github',
-        issues.map((one) => ({ id: `#${one.number}`, title: one.title, url: one.url })),
+        issues.map((one) => ticketOf(`#${one.number}`, one, 'Open', 'todo')),
         todoListUrlOf({ provider: 'github', repo })
       )
     }
@@ -229,7 +211,7 @@ async function readTodo(
       const issues = await port.gitlabIssues()
       return listOf(
         'gitlab',
-        issues.map((one) => ({ id: `#${one.number}`, title: one.title, url: one.url }))
+        issues.map((one) => ticketOf(`#${one.number}`, one, 'Open', 'todo'))
       )
     }
   }
@@ -241,6 +223,7 @@ export async function readGameProjectWork(
     todo: OrchestratorGameTodoSource | null
     workItem: Pick<GameWorkItem, 'provider' | 'identifier'> | null
     planeProject?: string | null
+    connected?: GameTodoConnections
   }
 ): Promise<GameProjectWork> {
   const repo = await settle(port.githubRepo)
@@ -248,16 +231,22 @@ export async function readGameProjectWork(
     repo ? readGitHubReviews(port, repo) : readGitLabReviews(port)
   )
   const host = repo ? 'github' : reviews?.provider === 'gitlab' ? 'gitlab' : null
-  const source =
+  const sources =
     args.todo === 'off'
-      ? null
-      : (args.todo ??
-        autoTodoSourceOf({
+      ? []
+      : todoSourcesOf({
+          configured: args.todo,
           planeProject: args.planeProject ?? null,
           workItem: args.workItem,
-          host
-        }))
-  const todo = source ? await settle(() => readTodo(port, source, repo)) : null
+          host,
+          connected: args.connected ?? { jira: false, linear: false }
+        })
+  const todo =
+    sources.length > 0
+      ? mergeTodoLists(
+          await Promise.all(sources.map((source) => settle(() => readTodo(port, source, repo))))
+        )
+      : null
   const queue = repo ? await readGitHubQueue(port) : null
   return { reviews, todo, ...(queue ? { queue } : {}) }
 }

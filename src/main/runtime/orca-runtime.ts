@@ -32497,9 +32497,19 @@ export class OrcaRuntimeService {
         const trackerKey = workItem
           ? `${workItem.provider}:${workItem.identifier.split('-')[0]}`
           : ''
-        const key = JSON.stringify([repoId, todo, planeProject, trackerKey])
+        // Why local reads: both answer from stored tokens, so asking costs no tracker call (ORCA-1168).
+        const connected = {
+          jira: this.jiraReadStatus().connected,
+          linear: this.linearStatus().connected
+        }
+        const key = JSON.stringify([repoId, todo, planeProject, trackerKey, connected])
         return await this.gameProjectWork.read(key, () =>
-          readGameProjectWork(this.gameProjectWorkPortFor(repoId), { todo, workItem, planeProject })
+          readGameProjectWork(this.gameProjectWorkPortFor(repoId), {
+            todo,
+            workItem,
+            planeProject,
+            connected
+          })
         )
       },
       readReview: async () =>
@@ -32833,10 +32843,18 @@ export class OrcaRuntimeService {
         )
       },
       githubBudgetLow: async () => (await readGameGitHubBudget())?.low === true,
-      githubIssues: async () =>
-        (await this.listRepoWorkItems(selector, 20, 'assignee:@me is:issue is:open')).items.filter(
-          (item) => item.type === 'issue'
-        ),
+      githubIssues: async () => {
+        const repo = await this.resolveRepoSelector(selector)
+        // Why origin by default: a fork's upstream issues are not this project's To Do (ORCA-1168).
+        const result = await listGitHubIssues(
+          repo.path,
+          20,
+          repo.issueSourcePreference ?? 'origin',
+          repo.connectionId ?? null,
+          ...this.getLocalGitExecutionOptionArgs(repo)
+        )
+        return result.items
+      },
       gitlabMergeRequests: async () => {
         if (isFolder) {
           return null
@@ -32845,7 +32863,7 @@ export class OrcaRuntimeService {
         return result.error ? null : result.items
       },
       gitlabIssues: async () =>
-        (await this.listGitLabRepoIssues(selector, 'opened', '@me', 20)).items,
+        (await this.listGitLabRepoIssues(selector, 'opened', undefined, 20)).items,
       planeOpen: async ({ project, workspace }) => {
         const workspaceId = planeWorkspaceIdOf(getPlaneWorkspaceFile().workspaces, workspace)
         // Why one fetch: Plane's 60/min limiter is the bottleneck (ORCA-1166); the viewer is cached.
