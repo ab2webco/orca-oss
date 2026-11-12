@@ -256,6 +256,7 @@ type StoreState = {
   getAgentLaunchConfigForStatusEntry: ReturnType<typeof vi.fn>
   getAgentLaunchConfigForStatusMetadata: ReturnType<typeof vi.fn>
   clearSleepingAgentSession: ReturnType<typeof vi.fn>
+  consumeSleepingAgentSession: ReturnType<typeof vi.fn>
   registerAgentLaunchConfig: ReturnType<typeof vi.fn>
   clearAgentLaunchConfig: ReturnType<typeof vi.fn>
   markWorktreeUnread: ReturnType<typeof vi.fn>
@@ -976,6 +977,9 @@ describe('connectPanePty', () => {
         }
       ),
       clearSleepingAgentSession: vi.fn((paneKey: string) => {
+        delete mockStoreState.sleepingAgentSessionsByPaneKey[paneKey]
+      }),
+      consumeSleepingAgentSession: vi.fn((paneKey: string) => {
         delete mockStoreState.sleepingAgentSessionsByPaneKey[paneKey]
       }),
       registerAgentLaunchConfig: vi.fn(),
@@ -3700,7 +3704,7 @@ describe('connectPanePty', () => {
 
     deferredSpawn.resolve('pty-resumed')
     await flushAsyncTicks()
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('re-arms the exact hibernation target after a replacement spawn fails', async () => {
@@ -8733,7 +8737,7 @@ describe('connectPanePty', () => {
       expect(deps.clearTabPtyId).toHaveBeenCalledWith('tab-1', 'restored-session')
       expect(deps.syncPanePtyLayoutBinding).not.toHaveBeenCalledWith(2, 'restored-session')
       expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(2, 'fresh-resume-pty')
-      expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+      expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
       expect(window.api.pty.clearPendingPaneSerializer).toHaveBeenCalledWith(paneKey, 1)
     } finally {
       globalThis.setTimeout = originalSetTimeout
@@ -8903,6 +8907,7 @@ describe('connectPanePty', () => {
     expect(transport.disconnect).not.toHaveBeenCalled()
     expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(2, 'restored-session')
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('keeps a contentless reattach when a live status supersedes passive sleep evidence', async () => {
@@ -8962,6 +8967,7 @@ describe('connectPanePty', () => {
     expect(transport.disconnect).not.toHaveBeenCalled()
     expect(deps.syncPanePtyLayoutBinding).toHaveBeenCalledWith(2, 'restored-session')
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('clears the pending serializer when disposed before non-deferred SSH reattach expiry resolves', async () => {
@@ -10848,7 +10854,7 @@ describe('connectPanePty', () => {
       })
     )
     // Why: consuming the record prevents a later worktree activation from launching a duplicate resume tab.
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('marks the pane as freshly started when main declined an unverifiable resume', async () => {
@@ -10979,7 +10985,7 @@ describe('connectPanePty', () => {
         command: "codex '--dangerously-bypass-approvals-and-sandbox' 'resume' 'codex-session-1'"
       })
     )
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(legacyPaneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(legacyPaneKey)
     expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(duplicateLegacyPaneKey)
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[legacyPaneKey]).toBeUndefined()
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[duplicateLegacyPaneKey]).toBeUndefined()
@@ -11053,6 +11059,7 @@ describe('connectPanePty', () => {
       expect.objectContaining({ command: expect.stringContaining('resume') })
     )
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('uses sleeping-record launch config for pane cold restore after settings change', async () => {
@@ -11306,6 +11313,7 @@ describe('connectPanePty', () => {
       leafId: LEAF_1
     })
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not resume a live provider session while legacy worker recovery owns the pane', async () => {
@@ -11376,6 +11384,7 @@ describe('connectPanePty', () => {
     expect(attachOptions).not.toHaveProperty('rows')
     expect(mockStoreState.registerAgentLaunchConfig).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not replace a missing retained legacy worker over direct SSH', async () => {
@@ -11654,7 +11663,7 @@ describe('connectPanePty', () => {
     )
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledTimes(1)
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledWith(2, 'restored')
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('resumes a local sleeping pane in place when the restored PTY hint is missing', async () => {
@@ -11743,6 +11752,7 @@ describe('connectPanePty', () => {
     )
     expect(deps.onShowSessionRestoredBanner).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
 
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
@@ -11757,7 +11767,7 @@ describe('connectPanePty', () => {
 
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledTimes(1)
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledWith(2, 'restored')
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('says the fresh-spawn resume started fresh when main declined it', async () => {
@@ -11954,6 +11964,7 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalledTimes(2)
     expect(deps.onShowSessionRestoredBanner).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[paneKey]).toBeDefined()
   })
 
@@ -12034,6 +12045,7 @@ describe('connectPanePty', () => {
 
     expect(transport.sendInput).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not resume the provider session when daemon reattach returns a live snapshot', async () => {
@@ -19294,7 +19306,7 @@ describe('connectPanePty', () => {
     expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-1', freshPtyId)
     expect(window.api.pty.reportRendererSerializerReady).toHaveBeenCalledWith(freshPtyId)
     expect(transport.sendInput).not.toHaveBeenCalled()
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('does not let a restored encoded PTY override the current worktree owner', async () => {

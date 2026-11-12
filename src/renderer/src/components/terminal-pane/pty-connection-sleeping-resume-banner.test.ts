@@ -230,6 +230,7 @@ describe('connectPanePty', () => {
     )
     expect(deps.onShowSessionRestoredBanner).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
 
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
@@ -244,7 +245,7 @@ describe('connectPanePty', () => {
 
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledTimes(1)
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledWith(2, 'restored')
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('says the fresh-spawn resume started fresh when main declined it', async () => {
@@ -441,6 +442,7 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalledTimes(2)
     expect(deps.onShowSessionRestoredBanner).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[paneKey]).toBeDefined()
   })
 

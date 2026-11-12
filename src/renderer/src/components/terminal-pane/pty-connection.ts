@@ -1301,7 +1301,8 @@ export function connectPanePty(
     state: ReturnType<typeof useAppStore.getState>,
     consumed: { paneKey: string; record: SleepingAgentSessionRecord }
   ): void => {
-    state.clearSleepingAgentSession(consumed.paneKey)
+    // Why consume, not clear: clearing also drops the launch this restore just registered (ORCA-1171).
+    state.consumeSleepingAgentSession(consumed.paneKey)
     for (const [paneKey, record] of Object.entries(state.sleepingAgentSessionsByPaneKey)) {
       if (
         paneKey !== consumed.paneKey &&

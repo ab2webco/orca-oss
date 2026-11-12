@@ -64,6 +64,9 @@ export function createInitialStoreState(getState: () => StoreState): StoreState 
     clearSleepingAgentSession: vi.fn((paneKey: string) => {
       delete getState().sleepingAgentSessionsByPaneKey[paneKey]
     }),
+    consumeSleepingAgentSession: vi.fn((paneKey: string) => {
+      delete getState().sleepingAgentSessionsByPaneKey[paneKey]
+    }),
     registerAgentLaunchConfig: vi.fn(),
     clearAgentLaunchConfig: vi.fn(),
     markWorktreeUnread: vi.fn(),
