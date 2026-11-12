@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   ORCHESTRATOR_GAME_LAYER_ORDER,
@@ -35,6 +36,7 @@ import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { translate } from '@/i18n/i18n'
 import { gameStyleFallbackNote } from './orchestrator-game-style-fallback-note'
+import { GamePanelStylePreview } from './GamePanelStylePreview'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -184,6 +186,9 @@ export function GamePanelSetting({
             }
           />
         ))}
+      {panel.look === 'game' ? (
+        <GamePanelStylePreview style={panel.style} sceneId={sceneId} />
+      ) : null}
       {GAME_PANEL_TABS.map((tab) => (
         <SettingsSwitchRow
           key={tab}
@@ -277,7 +282,7 @@ export function ProjectGamePanelRows({
         const own = ownOf(local, field)
         const isToggle = field !== 'look' && field !== 'style'
         const value = own === undefined ? 'inherit' : String(own)
-        return (
+        const row = (
           <SettingsRow
             key={field}
             label={text[field][0]}
@@ -300,6 +305,14 @@ export function ProjectGamePanelRows({
               />
             }
           />
+        )
+        return field === 'style' ? (
+          <Fragment key={field}>
+            {row}
+            <GamePanelStylePreview style={panel.style} sceneId={sceneId} />
+          </Fragment>
+        ) : (
+          row
         )
       })}
     </>

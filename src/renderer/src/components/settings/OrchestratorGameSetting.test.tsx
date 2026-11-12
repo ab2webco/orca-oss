@@ -8,6 +8,11 @@ import type { PluginHostListEntry } from '../../../../preload/api/plugin-host-ap
 import { usePluginPanelsStore } from '../../store/plugin-panels'
 import { OrchestratorGameSetting, ProjectOrchestratorGameSetting } from './OrchestratorGameSetting'
 
+// Why never settles: the panel preview's art loads from assets happy-dom cannot decode.
+vi.mock('../team-scene/team-scene-art-load', () => ({
+  loadTeamSceneArt: vi.fn(() => new Promise(() => {}))
+}))
+
 vi.mock('../ui/select', () => ({
   Select: ({
     value,
@@ -440,5 +445,36 @@ describe('the preview follows the render', () => {
     )
     expect(preview(project.container)?.dataset.render).toBe('classic')
     project.unmount()
+  })
+})
+
+describe('the terminal band group', () => {
+  it('holds what Agent Teams panes draw under its own heading, apart from the panel, globally and per project', () => {
+    const pages = [
+      <OrchestratorGameSetting key="global" settings={{}} updateSettings={() => undefined} />,
+      <ProjectOrchestratorGameSetting
+        key="project"
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={undefined}
+        updateSettings={() => undefined}
+      />
+    ]
+    for (const page of pages) {
+      const view = render(page)
+      const band = view.container.querySelector<HTMLElement>(
+        '[role="group"][aria-label="Terminal band"]'
+      )
+
+      expect(band?.querySelector('h3')?.textContent).toBe('Terminal band')
+      expect(band?.contains(sceneSelect(view.container))).toBe(true)
+      expect(band?.querySelector('[data-slot="game-scene-preview"]')).toBeTruthy()
+      for (const label of ['Render', 'Time zone', 'Teammate HUD']) {
+        expect(band?.querySelector(`[aria-label="${label}"]`), label).toBeTruthy()
+      }
+      expect(band?.querySelector('[aria-label="Scene style"]')).toBeNull()
+      expect(band?.querySelector('[data-slot="game-panel-style-preview"]')).toBeNull()
+      view.unmount()
+    }
   })
 })

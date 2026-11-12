@@ -49,6 +49,9 @@ vi.mock('@/hooks/useDetectedAgents', () => ({
   }
 }))
 
+// Why: the panel style preview paints a canvas from the live document, which a static render has not.
+vi.mock('./GamePanelStylePreview', () => ({ GamePanelStylePreview: () => null }))
+
 vi.mock('./AgentRuntimeSetting', async (importOriginal) => {
   const actual = await importOriginal<typeof AgentRuntimeSettingModule>()
   return {

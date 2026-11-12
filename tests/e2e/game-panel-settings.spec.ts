@@ -203,3 +203,70 @@ test('a saved soft shows as Pixel in both rows, stays on disk, and is not offere
   }, repoId)
   expect(onDisk).toBe('soft')
 })
+
+test('the panel preview draws the chosen style, and the terminal band stays its own group', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  const projectSection = `repo-${repoId}-game`
+  const preview = (section: string) =>
+    orcaPage.locator(`[id="${section}"] [data-slot="game-panel-style-preview"]`)
+
+  for (const style of ['office', 'figures', 'pixel'] as const) {
+    const label = { office: 'Office', figures: 'Figures', pixel: 'Pixel' }[style]
+    const globalSection = await openTarget(orcaPage, null)
+    await expectSectionInView(orcaPage, globalSection)
+    await orcaPage
+      .locator(`[id="${globalSection}"] [aria-label="Scene style"] button`)
+      .filter({ hasText: new RegExp(`^${label}$`) })
+      .click()
+    await expect(preview(globalSection)).toHaveAttribute('data-style', style)
+    // Why the canvas: the stage paints only once the style's art has loaded.
+    await expect(preview(globalSection).locator('canvas')).toBeVisible({ timeout: 15_000 })
+    const band = orcaPage.locator('[role="group"][aria-label="Terminal band"]')
+    await expect(band.getByRole('heading', { name: 'Terminal band' })).toBeVisible()
+    await expect(band.locator('[aria-label="Scene style"]')).toHaveCount(0)
+    for (const theme of THEMES) {
+      await applySettings(orcaPage, { theme })
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        for (const [name, target] of [
+          ['panel', orcaPage.locator(`[id="${globalSection}"]`)],
+          ['band', band]
+        ] as const) {
+          await target.scrollIntoViewIfNeeded()
+          await target.screenshot({
+            path: testInfo.outputPath(`${style}-${name}-${theme}-${width}.png`),
+            animations: 'disabled'
+          })
+        }
+      }
+    }
+    await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+
+    await openTarget(orcaPage, repoId)
+    await expectSectionInView(orcaPage, projectSection)
+    await expect(preview(projectSection)).toHaveAttribute('data-style', style)
+    await expect(
+      orcaPage.locator(`[id="${projectSection}"] [role="group"][aria-label="Terminal band"]`)
+    ).toBeVisible()
+    for (const theme of THEMES) {
+      await applySettings(orcaPage, { theme })
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        const section = orcaPage.locator(`[id="${projectSection}"]`)
+        await section.scrollIntoViewIfNeeded()
+        await section.screenshot({
+          path: testInfo.outputPath(`${style}-project-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+    await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+  }
+})

@@ -10946,7 +10946,8 @@
           "sceneFileSsh": "Este proyecto está en un host SSH, así que escribe la ruta; el selector de archivos solo explora este equipo.",
           "sceneFileSshOffline": "Conecta este proyecto SSH para leer su archivo de escena.",
           "previewFileFallback": "Hasta que el archivo de escena sea válido, el juego dibuja Quest.",
-          "sceneFileNotText": "no es un archivo de texto"
+          "sceneFileNotText": "no es un archivo de texto",
+          "terminalBand": "Banda del terminal"
         },
         "OrchestratorGameMemberNamesRow": {
           "label": "Nombres de los miembros",
@@ -11078,6 +11079,9 @@
           "limits": "El token solo hace solicitudes al modelo: Remote Control y los conectores de claude.ai no funcionan con él. Se queda en este host.",
           "remove": "Quitar token",
           "save": "Guardar token"
+        },
+        "GamePanelStylePreview": {
+          "lead": "Líder"
         }
       },
       "right": {
