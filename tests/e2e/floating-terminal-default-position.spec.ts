@@ -66,7 +66,14 @@ async function toggleBoxes(page: Page): Promise<Box[]> {
 }
 
 const intersects = (a: Box, b: Box): boolean =>
-  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+  a.left < a.right &&
+  a.top < a.bottom &&
+  b.left < b.right &&
+  b.top < b.bottom &&
+  a.left < b.right &&
+  a.right > b.left &&
+  a.top < b.bottom &&
+  a.bottom > b.top
 
 async function boxOf(target: Locator): Promise<Box> {
   return target.evaluate((node) => {
@@ -94,6 +101,22 @@ async function sweepTarget(
       const { left, top, right, bottom } = element.getBoundingClientRect()
       return { left, top, right, bottom }
     }
+    // Why: a row scrolled past its list's edge is clipped, not painted, so no button can cover it.
+    const paintedBoxOf = (element: Element) => {
+      const box = boxOfNode(element)
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const style = getComputedStyle(parent)
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') {
+          continue
+        }
+        const clip = parent.getBoundingClientRect()
+        box.left = Math.max(box.left, clip.left)
+        box.top = Math.max(box.top, clip.top)
+        box.right = Math.min(box.right, clip.right)
+        box.bottom = Math.min(box.bottom, clip.bottom)
+      }
+      return box
+    }
     const buttons = () =>
       [...document.querySelectorAll('[data-floating-terminal-toggle]')]
         .map(boxOfNode)
@@ -116,7 +139,7 @@ async function sweepTarget(
       } else {
         node.scrollIntoView({ block, behavior: 'instant' })
       }
-      return { block, target: boxOfNode(node), buttons: buttons() }
+      return { block, target: paintedBoxOf(node), buttons: buttons() }
     })
   }, blocks)
 }
