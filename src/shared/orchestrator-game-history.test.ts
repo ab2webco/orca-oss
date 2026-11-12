@@ -62,6 +62,17 @@ describe('game history', () => {
     expect(gameHistoryOutcomeOf({}, 'stop', 'ready')).toBe('stopped')
   })
 
+  // Why (ORCA-1170): a lead stops a member whose PR already merged, and its character earned nothing.
+  it('records a stopped member whose review reads merged as merged, and as qa while its ticket is in review', () => {
+    const merged = { review: { state: 'merged' as const } }
+    expect(gameHistoryOutcomeOf(merged, 'stop', 'ready')).toBe('merged')
+    expect(gameHistoryOutcomeOf({ ...merged, limit: { resetsAt: null } }, 'stop')).toBe('merged')
+    expect(
+      gameHistoryOutcomeOf({ ...merged, workItem: { statusGroup: 'review' as const } }, 'stop')
+    ).toBe('qa')
+    expect(gameHistoryOutcomeOf({ review: { state: 'open' as const } }, 'stop')).toBe('stopped')
+  })
+
   it('accepts a well-formed record over the wire and refuses the rest', () => {
     const good = record('CIN-1', '2026-10-16T10:00:00.000Z')
     expect(parseGameHistoryRecord(good)).toEqual(good)
