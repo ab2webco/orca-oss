@@ -48,6 +48,14 @@ async function shootAll(
   }
 }
 
+/** Why: the band is off by default (ORCA-1148), and these cases check what it draws. */
+async function showBand(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const settings = await window.api.settings.set({ orchestratorGame: { band: true } })
+    window.__store?.setState({ settings })
+  })
+}
+
 // Why: the seeded repo is shared by the worker; a test's orca.yaml or scene files must not reach the next test.
 test.afterEach(({ testRepoPath }) => {
   rmSync(join(testRepoPath, 'orca.yaml'), { force: true })
@@ -82,18 +90,18 @@ test('global and per-project Agent Teams game settings persist and render at eve
   await orcaPage.getByRole('switch', { name: 'Rewards' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
-    .toEqual({ mode: 'zen', rewards: false })
+    .toEqual({ mode: 'zen', rewards: false, band: true })
   const show = orcaPage.getByRole('switch', { name: 'Show the game' }).first()
   await show.click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
-    .toEqual({ mode: 'zen', rewards: false, show: false })
+    .toEqual({ mode: 'zen', rewards: false, band: true, show: false })
   await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeDisabled()
   await expect(globalSection).toHaveText('Zen · medium')
   await show.click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
-    .toEqual({ mode: 'zen', rewards: false, show: true })
+    .toEqual({ mode: 'zen', rewards: false, band: true, show: true })
 
   await shootAll(electronApp, orcaPage, testInfo, 'global', globalSection)
 
@@ -112,6 +120,7 @@ test('global and per-project Agent Teams game settings persist and render at eve
   await expect(orcaPage.getByText('On · global setting').first()).toBeVisible()
 
   await projectView.click()
+  // Why no band here: picking Zen above already turned it on globally, so this layer needs none.
   await orcaPage.getByRole('option', { name: '2D hd · heavy' }).click()
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
@@ -231,6 +240,7 @@ test('the game section says it is for Claude Agent Teams only and previews the p
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await showBand(orcaPage)
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')
@@ -293,6 +303,7 @@ test("a project's scene file previews when valid, says why when not, and renders
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await showBand(orcaPage)
   const repo = await orcaPage.evaluate(() => {
     const first = window.__store!.getState().repos[0]
     return first ? { id: first.id, path: first.path } : null
@@ -378,6 +389,7 @@ test("the project's scene files are listed in the Scene picker and picking one s
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await showBand(orcaPage)
   const repo = await orcaPage.evaluate(() => {
     const first = window.__store!.getState().repos[0]
     return first ? { id: first.id, path: first.path } : null
@@ -657,6 +669,7 @@ test('the render and time zone rows persist globally and per project and render 
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await showBand(orcaPage)
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')
@@ -674,7 +687,7 @@ test('the render and time zone rows persist globally and per project and render 
   await zone.press('Enter')
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
-    .toEqual({ render: 'hd', timezone: 'America/Bogota' })
+    .toEqual({ band: true, render: 'hd', timezone: 'America/Bogota' })
   await shootAll(electronApp, orcaPage, testInfo, 'render-global', zone)
 
   await setWindowWidth(electronApp, orcaPage, 1440)
@@ -713,6 +726,7 @@ test('the hd preview is lit by the hour in the chosen time zone and renders at e
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  await showBand(orcaPage)
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')
