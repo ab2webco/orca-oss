@@ -386,6 +386,28 @@ describe('GamePausedMembers.note joins a saved member to its live agent by launc
     expect(view.paused.map((one) => one.ticket)).toEqual(['CHECK-MAIN'])
   })
 
+  it('reads a queued launch started again after a restart as the one live member', async () => {
+    const restarted = { ...context('CHECK-MAIN'), taskId: 'task_check', dispatchId: 'ctx_again' }
+    const { store, paused } = setup({ 'term-after-restart': restarted })
+    await store.upsert('repo:a', queuedLaunch)
+    // The restart dropped the in-memory setup queue: the launch reads paused until it starts again.
+    expect((await paused.note('repo:a', [])).paused.map((one) => one.ticket)).toEqual([
+      'CHECK-MAIN'
+    ])
+
+    const view = await paused.note(
+      'repo:a',
+      [arturo({ terminalHandle: 'term-after-restart' })],
+      new Set(['wt-check'])
+    )
+
+    expect(view.paused).toEqual([])
+    const read = await store.read('repo:a')
+    expect(read.ok && read.members).toMatchObject([
+      { ticket: 'CHECK-MAIN', worktreeId: 'wt-check', dispatchId: 'ctx_again' }
+    ])
+  })
+
   it('reads a member on a paired host as live by its dispatch', async () => {
     const { store, paused } = setup()
     await store.upsert('repo:a', { ...queuedLaunch, dispatchId: 'ctx_remote', lastState: 'ready' })
