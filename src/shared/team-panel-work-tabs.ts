@@ -25,10 +25,12 @@ const LONG_QUEUE_WAIT_MS = HOUR_MS
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
-  risk: 1,
-  working: 2,
-  done: 3,
-  idle: 4
+  failed: 1,
+  risk: 2,
+  working: 3,
+  done: 4,
+  idle: 5,
+  closed: 6
 }
 
 // Why failed first: red outranks amber, and a conflict can wait for the fix a red check needs.

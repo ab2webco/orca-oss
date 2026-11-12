@@ -22,7 +22,7 @@ function releaseTarball(dir, version) {
   return { tarball, sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex') }
 }
 
-function run({ installed, release = '4.9.3', sha256, isDownloadDown = false }) {
+function run({ installed, release = '4.9.3', sha256, isDownloadDown = false, viaCurl = false }) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-release-'))
   const { tarball, sha256: real } = releaseTarball(dir, release)
   const installDir = mkdtempSync(path.join(dir, 'bin-'))
@@ -39,6 +39,20 @@ function run({ installed, release = '4.9.3', sha256, isDownloadDown = false }) {
       : `#!/usr/bin/env bash\ncp ${JSON.stringify(tarball)} "$1"\n`,
     { mode: 0o755 }
   )
+  // Why a fake curl: the real download path is what bounds each attempt (ORCA-1179).
+  const curlArgs = path.join(dir, 'curl-args')
+  writeFileSync(
+    path.join(fake, 'curl'),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$*" >${JSON.stringify(curlArgs)}
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then cp ${JSON.stringify(tarball)} "$2"; exit 0; fi
+  shift
+done
+exit 1
+`,
+    { mode: 0o755 }
+  )
   const versionCommand = installed === null ? 'false' : `echo fish, version ${installed}`
   let status = 0
   let output = ''
@@ -52,7 +66,7 @@ function run({ installed, release = '4.9.3', sha256, isDownloadDown = false }) {
         ORCA_FISH4_VERSION_COMMAND: versionCommand,
         ORCA_FISH4_SOURCE_STATUS_FILE: statusFile,
         ORCA_FISH4_INSTALL_DIR: installDir,
-        ORCA_FISH4_DOWNLOAD_COMMAND: download,
+        ...(viaCurl ? {} : { ORCA_FISH4_DOWNLOAD_COMMAND: download }),
         ORCA_FISH4_RELEASE_SHA256: sha256 ?? real
       }
     })
@@ -67,10 +81,29 @@ function run({ installed, release = '4.9.3', sha256, isDownloadDown = false }) {
   } catch {
     shippedVersion = null
   }
-  return { status, output, recorded: readFileSync(statusFile, 'utf8').trim(), shippedVersion }
+  let curlCall = null
+  try {
+    curlCall = readFileSync(curlArgs, 'utf8').trim()
+  } catch {
+    curlCall = null
+  }
+  return {
+    status,
+    output,
+    recorded: readFileSync(statusFile, 'utf8').trim(),
+    shippedVersion,
+    curlCall
+  }
 }
 
 describe('install-fish4-release fallback', () => {
+  it('bounds each download attempt, so a stalled release host cannot hold the job', () => {
+    const result = run({ installed: '3.7.0', viaCurl: true })
+    expect(result.status).toBe(0)
+    expect(result.curlCall).toMatch(/--connect-timeout \d+/)
+    expect(result.curlCall).toMatch(/--max-time \d+/)
+  })
+
   it('installs the pinned fish 4 release when apt left fish 3.7', () => {
     const result = run({ installed: '3.7.0' })
     expect(result.status).toBe(0)
@@ -146,6 +179,15 @@ describe('pr.yml "Install zsh and fish" step', () => {
   const body = workflow.jobs.shell_contracts.steps.find(
     (step) => step.name === 'Install zsh and fish'
   ).run
+
+  // ORCA-1179: every apt call is bounded for this step, and the job leaves room for its worst case.
+  it('bounds each apt call and gives the job room for the step at its worst', () => {
+    const calls = body.match(/bash config\/scripts\/ci-apt\.sh/g) ?? []
+    const bounded = body.match(/CI_APT_TIMEOUT=\d+s bash config\/scripts\/ci-apt\.sh/g) ?? []
+    expect(calls.length).toBeGreaterThan(0)
+    expect(bounded.length).toBe(calls.length)
+    expect(workflow.jobs.shell_contracts['timeout-minutes']).toBeGreaterThanOrEqual(30)
+  })
 
   function runStep({ isFishDebDown, isZshDown = false }) {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-step-'))

@@ -1524,18 +1524,20 @@ orchestratorGame:
   8 MB and 16 megapixels a style; paths are relative to the scene file. `orca game scene validate`
   reads every file and reports problems as `native.<style>…: <message>`; the game drops a broken
   block with a warning. The panel draws a style with the scene's own art when its block covers
-  that style and the images load (`orchestratorGameSceneArtOf`); otherwise it draws the chosen
-  style with Quest's art, which ships with Orca in
-  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json), and keeps the
-  scene's names and roster. Pixel draws only when it is picked, or when even Quest's art fails to
-  decode. The stage marks the default art with `data-team-scene-default-art`, and Settings says so
-  under the style. A scene file whose stem is `quest` is Quest, so its bundled art is its own. The
+  that style and the images load (`orchestratorGameSceneArtOf`). Quest draws with its art, which
+  ships with Orca in
+  [`quest-art/native.json`](../../src/renderer/src/assets/quest-art/native.json). Office keeps that
+  office for any scene without Office art of its own, since an office reads as one in any theme.
+  Any other scene without Figures art draws in Pixel, with its own characters, advisor, pet and
+  colours, so a themed scene never shows Quest's knights. Settings says which under the style. A
+  style falls to Pixel otherwise only when even Orca's art fails to decode. A scene file whose stem is `quest` is Quest, so its
+  bundled art is its own. The
   panel reads a scene file's images on demand with `game.sceneArt`, on the host that owns the
   worktree: locally, over SSH through the worktree's remote filesystem, and from a paired host
   through the runtime RPC, with the lead's caller. The host serves only the images of the scene its
   worktree draws, contained to the scene file's folder, at most 2 MB each. A host older than the
-  method, a scene carried to a remote member, a plugin scene, and any image that fails all draw the
-  default art. Game state carries the block as an optional field. The
+  method, a scene carried to a remote member, a plugin scene, and any image that fails all draw in
+  Pixel with the scene's own characters. Game state carries the block as an optional field. The
   [scenes guide](../../skill-guides/orca-game-scenes.md#native-optional) has the format.
 
 **Settings.** The project's **Scene** picker ends with **Custom file…**, which shows the path (typed,
@@ -1666,16 +1668,19 @@ gesture without a bubble. A `REFUSED` deny names no judge, so its bubble is the 
 - **Each pane's Jev, on the lead's Panel.** Pane state does not cross panes, so a lead or member
   pane's mod reports its own Jev on the `orca game state` poll it already runs every 30 s (and at once when
   Jev switches the main model or effort): `ORCA_GAME_ADVISOR` in the CLI's env, JSON
-  `{ version: 1, model, effort, line, pinned: { model, effort } }`, with `pinned` read from
+  `{ version: 1, model, effort, line, pinned: { model, effort }, decisions? }`, with `pinned` read from
   `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, or `null` once Jev stops after a report. A pane
   where Jev never published sends nothing. The CLI passes it to `game.state` as an optional
   `advisor` param, the host keeps it per pane in memory (a restart refills it within one poll, a
   report not renewed for 3 minutes expires) and puts it on that pane's row of its lead's state as
-  an optional `advisor` (`{ model, effort, line?, pinned, previous? }`, `previous` being what Jev had it on
-  before its latest switch)
+  an optional `advisor` (`{ model, effort, line?, pinned, previous?, decisions? }`, `previous` being what
+  Jev had it on before its latest switch)
   ([`orchestrator-game-member-advisors.ts`](../../src/main/runtime/orchestrator-game-member-advisors.ts)).
-  The lead's own report fills the Advisor row of the native Team panel and its scene's advisor, whose
-  bubble says `line`; Jev's decisions stay in the pane, so that row lists no calls.
+  `decisions` is Jev's latest five in that pane, newest last, as `{ id, verdict, gesture }` only: their
+  titles and tool text stay in the pane. It is absent while Jev has decided nothing, and an older
+  Orca drops it, reading the rest as before. The Team model carries it on the lead's and each
+  member's card for the scene. The lead's own report fills the Advisor row of the native Team panel and
+  its scene's advisor, whose bubble says `line`; that row still lists no calls.
   The member card draws `◆ Jev Sonnet 5.5·high · model pinned` (Jev's name, then the pin, dropped
   on a narrow card; what still does not fit wraps, so the model is never cut) and, after a switch,
   `↳ Opus 5.5 → Sonnet 5.5`, naming only what changed; the Fleet heading sums it up (`◆ 2 on Sonnet 5.5, 1 on Opus 5.5`). An env var, not

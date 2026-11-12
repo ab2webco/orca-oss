@@ -3,11 +3,12 @@ import { STATUS_COLOR_DEFAULTS } from '@/lib/status-color-overrides'
 import type { StatusTone } from '@/components/status-tone'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 
-// The scene's three meanings, each on the ORCA-1070 tone that carries it.
+// The scene's four meanings, each on the ORCA-1070 tone that carries it.
 const TONE_OF: Record<keyof TeamSceneStatusColors, StatusTone> = {
   attention: 'attention',
   done: 'success',
-  working: 'info'
+  working: 'info',
+  risk: 'warning'
 }
 
 /** A canvas cannot use the tone classes, so it reads the resolved tokens, user overrides included. */
@@ -19,11 +20,16 @@ export function readTeamSceneStatusColors(doc: Document = document): TeamSceneSt
     const tone = TONE_OF[meaning]
     return computed?.getPropertyValue(`--status-${tone}`).trim() || defaults[tone]
   }
-  return { attention: read('attention'), done: read('done'), working: read('working') }
+  return {
+    attention: read('attention'),
+    done: read('done'),
+    working: read('working'),
+    risk: read('risk')
+  }
 }
 
 const sameColors = (a: TeamSceneStatusColors, b: TeamSceneStatusColors): boolean =>
-  a.attention === b.attention && a.done === b.done && a.working === b.working
+  a.attention === b.attention && a.done === b.done && a.working === b.working && a.risk === b.risk
 
 /** The tones for the current theme; a new object only when a colour changes, so painters rebuild rarely. */
 export function useTeamSceneStatusColors(): TeamSceneStatusColors {

@@ -13,12 +13,15 @@ export type TeamSceneMover = {
   v: number
   facing: 1 | -1
   gait: number
+  /** Its top walking speed in px/s; members and the lead walk at the default. */
+  speed?: number
 }
 
 /** Eases toward the target; the gait advances by distance over stride so feet stay planted. */
 export function moveTeamSceneBody(body: TeamSceneMover, dt: number, width: number): void {
   const dx = (body.target.x - body.x) * width
-  const want = Math.max(-MAX_SPEED_PX, Math.min(MAX_SPEED_PX, dx * 4.5))
+  const top = body.speed ?? MAX_SPEED_PX
+  const want = Math.max(-top, Math.min(top, dx * 4.5))
   body.v += (want - body.v) * Math.min(1, dt * 9)
   body.x += (body.v * dt) / width
   body.depth += (body.target.depth - body.depth) * Math.min(1, dt * 2)

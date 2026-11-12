@@ -43,6 +43,17 @@ const isReleased = (receipt: WorkerReleaseReceipt): boolean =>
 export async function releaseFederatedWorker(
   args: FederatedReleaseArgs
 ): Promise<FederatedWorkerReleaseReceipt> {
+  const receipt = await releaseFederatedWorkerNow(args)
+  // Why: the lead asked; the next state read finishes it on the host once its terminal is gone.
+  if (receipt.state === 'retained') {
+    args.runtime.getOrchestrationDb().markFederatedReleaseRequested(args.federated.dispatch_id)
+  }
+  return receipt
+}
+
+async function releaseFederatedWorkerNow(
+  args: FederatedReleaseArgs
+): Promise<FederatedWorkerReleaseReceipt> {
   const db = args.runtime.getOrchestrationDb()
   const dispatchId = args.federated.dispatch_id
   const siblings = db.listUnreleasedWorktreeSiblings(dispatchId)

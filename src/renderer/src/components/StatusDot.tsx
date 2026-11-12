@@ -1,11 +1,11 @@
 import React from 'react'
-import { CircleCheck } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleSlash } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentQuestionIcon } from '@/components/AgentQuestionIcon'
 import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
 import { statusToneBgClass, statusToneTextClass, type StatusTone } from './status-tone'
 
-export type StatusDotGlyph = 'dot' | 'spinner' | 'question' | 'check'
+export type StatusDotGlyph = 'dot' | 'spinner' | 'question' | 'check' | 'alert' | 'closed'
 
 type StatusDotProps = React.ComponentProps<'span'> & {
   tone: StatusTone
@@ -52,6 +52,10 @@ export const StatusDot = React.memo(function StatusDot({
         <AgentQuestionIcon className={icon} />
       ) : glyph === 'check' ? (
         <CircleCheck className={cn(statusToneTextClass(tone), icon)} aria-hidden="true" />
+      ) : glyph === 'alert' ? (
+        <CircleAlert className={cn(statusToneTextClass(tone), icon)} aria-hidden="true" />
+      ) : glyph === 'closed' ? (
+        <CircleSlash className={cn(statusToneTextClass(tone), icon)} aria-hidden="true" />
       ) : (
         <span
           className={cn(

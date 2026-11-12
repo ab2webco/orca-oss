@@ -90,7 +90,12 @@ const reportKeyOf = (report: GameMemberAdvisor | GameMemberAdvisorReport | null)
     return 'null'
   }
   const { previous: _previous, ...rest } = report as GameMemberAdvisor
-  return JSON.stringify(rest, Object.keys(rest).sort())
+  // Why sort per object, not a key list: a list filters nested keys too, so decisions read as {}.
+  return JSON.stringify(rest, (_key, value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value
+  )
 }
 
 const isSameReport = (

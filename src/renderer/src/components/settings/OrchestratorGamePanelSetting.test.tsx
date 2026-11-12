@@ -67,8 +67,8 @@ describe('GamePanelSetting', () => {
     view.unmount()
   })
 
-  // ORCA-1139, ORCA-1150: vigilante has no Office art, so the panel draws the default art.
-  it('says when the scene has no art for the chosen style, so the panel draws the default art', () => {
+  // ORCA-1139, ORCA-1150: vigilante has no Office art, so the panel draws Orca's own office.
+  it("says when the scene has no Office art, so the panel draws Orca's own office", () => {
     const view = render(
       <GamePanelSetting
         settings={{ orchestratorGame: { scene: 'vigilante', panel: { style: 'office' } } }}
@@ -77,7 +77,7 @@ describe('GamePanelSetting', () => {
     )
 
     expect(view.container.textContent).toContain(
-      'This scene has no Office art, so the Team panel draws it with the default art.'
+      "This scene has no Office art, so the Team panel draws Orca's own office."
     )
     view.unmount()
   })
@@ -192,7 +192,7 @@ describe('ProjectGamePanelRows', () => {
     const local = { orchestratorGameProjects: { r1: { panel: { style: 'figures' as const } } } }
     const vigilante = projectRows(local, { scene: 'vigilante' })
     expect(vigilante.container.textContent).toContain(
-      'This scene has no Figures art, so the Team panel draws it with the default art.'
+      "This scene has no Figures art, so the Team panel draws the scene's own characters in Pixel."
     )
     vigilante.unmount()
     const quest = projectRows(local, { scene: 'quest' })

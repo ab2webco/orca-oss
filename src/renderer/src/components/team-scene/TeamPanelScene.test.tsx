@@ -89,13 +89,8 @@ let host: HTMLDivElement
 const canvasHeight = (): string | undefined => host.querySelector('canvas')?.style.height
 const shownStyle = (): string | null | undefined =>
   host.querySelector('[data-team-scene]')?.getAttribute('data-team-scene')
-const artOf = (): (string | null)[] => {
-  const stage = host.querySelector('[data-team-scene]')
-  return [
-    stage?.getAttribute('data-team-scene-art') ?? null,
-    stage?.getAttribute('data-team-scene-default-art') ?? null
-  ]
-}
+const artOf = (): string | null =>
+  host.querySelector('[data-team-scene]')?.getAttribute('data-team-scene-art') ?? null
 const stageHeight = (): string | undefined =>
   host.querySelector<HTMLElement>('[data-team-scene] > *')?.style.height
 
@@ -159,8 +154,9 @@ describe('TeamPanelScene', () => {
     })
     await act(async () => root.render(<TeamPanelScene model={asking} style="pixel" />))
 
-    const bubble = host.querySelector('[data-scene-bubble="lead"]')?.textContent
-    expect(bubble).toBe('Waiting for you · Merge #923 now?')
+    const bubble = host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')
+    expect(bubble?.textContent).toBe('Waiting for you\nMerge #923 now?')
+    expect(bubble?.innerHTML).toContain('whitespace-pre-line')
 
     act(() => useAppStore.setState({ agentStatusByPaneKey: {} }))
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toBe('Waiting for you')
@@ -269,31 +265,41 @@ describe('TeamPanelScene', () => {
       )
     )
     expect(shownStyle()).toBe('figures')
-    expect(artOf()).toEqual(['scene', null])
+    expect(artOf()).toBe('scene')
     expect(loadTeamSceneArt).toHaveBeenLastCalledWith(
       teamSceneQuestArtOf('figures'),
       expect.any(Function)
     )
   })
 
-  it('draws a scene with no art for the style with the default art, and marks it', async () => {
+  it("draws a scene with no art of its own for Office in Orca's office", async () => {
     await act(async () =>
       root.render(
         <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="office" />
       )
     )
     expect(shownStyle()).toBe('office')
-    expect(artOf()).toEqual(['bundled', 'true'])
+    expect(artOf()).toBe('bundled')
   })
 
-  it('draws Quest exported as a scene file with its bundled art, not marked as default', async () => {
+  it("draws a scene with no Figures art as its own characters in Pixel, never Quest's", async () => {
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="figures" />
+      )
+    )
+    expect(shownStyle()).toBe('pixel')
+    expect(artOf()).toBe('pixel')
+  })
+
+  it('draws Quest exported as a scene file with its bundled art', async () => {
     const id = 'file:.orca/scenes/quest.json'
     const file = { ...plain, id, pluginId: 'file' } as OrchestratorGameSceneExtension
     await act(async () =>
       root.render(<TeamPanelScene model={model({ id, extensions: [file] })} style="figures" />)
     )
     expect(shownStyle()).toBe('figures')
-    expect(artOf()).toEqual(['bundled', null])
+    expect(artOf()).toBe('bundled')
   })
 
   it('draws Pixel when asked, and the lead line from the model', () => {
@@ -302,5 +308,42 @@ describe('TeamPanelScene', () => {
     )
     expect(canvasHeight()).toBe('126px')
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toContain('Merge #923?')
+  })
+
+  it('draws the building only in Office and only when the team spans more than one machine', async () => {
+    const member = (paneKey: string, host: TeamLeadCard['host']) =>
+      ({
+        ...lead,
+        paneKey,
+        host,
+        name: paneKey,
+        ticket: null,
+        flowPhase: 'code',
+        summary: null,
+        pr: null,
+        needsYou: false,
+        limitResetsAt: null,
+        found: false
+      }) as unknown as TeamPanelGameModel['members'][number]
+    const spread = (hosts: TeamLeadCard['host'][]) => ({
+      ...model({ id: 'quest', extensions: [] }),
+      members: hosts.map((h, i) => member(`m${i}`, h))
+    })
+    const imac = { kind: 'remote' as const, name: 'imac', environmentId: 'e1', reachable: true }
+    const building = () => host.querySelector('[data-team-building]')
+    await act(async () =>
+      root.render(<TeamPanelScene model={spread([{ kind: 'local' }, imac])} style="office" />)
+    )
+    expect(building()).not.toBeNull()
+    await act(async () =>
+      root.render(<TeamPanelScene model={spread([{ kind: 'local' }, imac])} style="figures" />)
+    )
+    expect(building()).toBeNull()
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={spread([{ kind: 'local' }, { kind: 'local' }])} style="office" />
+      )
+    )
+    expect(building()).toBeNull()
   })
 })

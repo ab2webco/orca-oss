@@ -6,6 +6,7 @@ import type { TeamSceneActivity, TeamSceneSpot } from './team-scene-types'
 // walking work to each busy member; here the lead does it, and only to members really working.
 export const LEAD_SPOT: TeamSceneSpot = { x: 0.84, depth: 0.45 }
 const REST_SECONDS = 2
+const LEAD_STAYS_BELOW_PX = 360
 const GIVE_SECONDS = 0.9
 const BESIDE_X = 0.075
 
@@ -76,8 +77,19 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     return
   }
   const rounds = world.rounds
-  const asking = membersWith(world, 'needsYou')[0]
-  if ((rounds.stage === 'toMember' || rounds.stage === 'atMember') && !stillWanted(world, asking)) {
+  // Why: on a narrow building floor the row has no gap a lead can stand in without covering one.
+  if (world.leadStays && width < LEAD_STAYS_BELOW_PX) {
+    Object.assign(rounds, { stage: 'rest', member: null })
+    lead.target = LEAD_SPOT
+    return
+  }
+  // Why: the scene never contradicts the lead's card: only a working lead hands out work, and a lead
+  // that cannot work walks nowhere; any other still goes to a member who needs you (owner, #1167).
+  const leading = lead.activity === 'working'
+  const asking = lead.activity === 'blocked' ? undefined : membersWith(world, 'needsYou')[0]
+  const out = rounds.stage === 'toMember' || rounds.stage === 'atMember'
+  const allowed = rounds.purpose === 'attend' ? asking !== undefined : leading
+  if (out && (!allowed || !stillWanted(world, asking))) {
     Object.assign(rounds, { stage: 'home', member: null })
   }
   if (rounds.stage === 'home' && asking && world.queue.length === 0) {
@@ -88,7 +100,7 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     if (world.queue.length > 0) {
       return
     }
-    const giveTo = world.t - rounds.at >= REST_SECONDS ? nextWorking(world) : null
+    const giveTo = leading && world.t - rounds.at >= REST_SECONDS ? nextWorking(world) : null
     if (asking) {
       setOut(world, 'attend', asking.key)
     } else if (giveTo) {
@@ -106,7 +118,10 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
   const member = world.bodies.get(rounds.member!)!
   const side = member.home.x < LEAD_SPOT.x ? 1 : -1
   if (rounds.stage === 'toMember') {
-    lead.target = { x: member.home.x + side * BESIDE_X, depth: member.home.depth + 0.04 }
+    // Why halfway at most: past it the lead stands on the next seat, two to one desk.
+    const next = world.stations.map((s) => (s.x - member.home.x) * side).filter((d) => d > 0.001)
+    const beside = Math.min(BESIDE_X, ...next.map((d) => d / 2))
+    lead.target = { x: member.home.x + side * beside, depth: member.home.depth + 0.04 }
     if (!near(lead, width)) {
       return
     }

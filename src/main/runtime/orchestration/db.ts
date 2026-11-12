@@ -544,6 +544,7 @@ export class OrchestrationDb {
         remote_terminal_handle  TEXT,
         to_home_imported_sequence INTEGER NOT NULL DEFAULT 0,
         to_home_acknowledged_sequence INTEGER NOT NULL DEFAULT 0,
+        release_requested_at    TEXT,
         created_at              TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at              TEXT NOT NULL DEFAULT (datetime('now'))
       );
@@ -1183,6 +1184,9 @@ export class OrchestrationDb {
         this.db.exec(
           'ALTER TABLE remote_dispatch_attachments ADD COLUMN settled_capability_hash TEXT'
         )
+      }
+      if (current < 39 && !this.hasColumn('federated_dispatches', 'release_requested_at')) {
+        this.db.exec('ALTER TABLE federated_dispatches ADD COLUMN release_requested_at TEXT')
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -5089,6 +5093,24 @@ export class OrchestrationDb {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  /** A release its host retained; kept so it is finished once the terminal is gone (ORCA-1076). */
+  markFederatedReleaseRequested(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE federated_dispatches
+            SET release_requested_at = COALESCE(release_requested_at, datetime('now'))
+          WHERE dispatch_id = ?`
+      )
+      .run(dispatchId)
+  }
+
+  isFederatedReleaseRequested(dispatchId: string): boolean {
+    const row = this.db
+      .prepare('SELECT release_requested_at AS at FROM federated_dispatches WHERE dispatch_id = ?')
+      .get(dispatchId) as { at: string | null } | undefined
+    return Boolean(row?.at)
   }
 
   getFederatedDispatch(dispatchId: string): FederatedDispatchRow | undefined {

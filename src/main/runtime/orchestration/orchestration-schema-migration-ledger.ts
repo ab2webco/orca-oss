@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 38
+export const ORCHESTRATION_SCHEMA_VERSION = 39
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -156,5 +156,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     lineage: 'lab',
     summary: "a settled remote member's capability proof, so it can reopen (ORCA-856)",
     effects: ['column:remote_dispatch_attachments.settled_capability_hash']
+  },
+  {
+    version: 39,
+    lineage: 'lab',
+    summary: 'a release its host retained, so it finishes once the terminal is gone (ORCA-1076)',
+    effects: ['column:federated_dispatches.release_requested_at']
   }
 ]

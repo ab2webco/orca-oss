@@ -1,5 +1,5 @@
 ---
-sourceHash: 0932257d9b7014b5
+sourceHash: 973c1c8a06540312
 ---
 
 # El juego orquestador de Agent Teams
@@ -1630,18 +1630,20 @@ orchestratorGame:
   `orca game scene validate` lee cada archivo e informa los problemas como
   `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. El panel dibuja
   un estilo con el arte propio de la escena cuando su bloque cubre ese estilo y las imágenes cargan
-  (`orchestratorGameSceneArtOf`); si no, dibuja el estilo elegido con el arte de Quest, que viene con
-  Orca en [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json), y conserva
-  los nombres y el elenco de la escena. Pixel se dibuja solo cuando se elige, o cuando incluso el arte de
-  Quest no se puede decodificar. El escenario marca el arte predeterminado con
-  `data-team-scene-default-art`, y Settings lo dice bajo el estilo. Un archivo de escena cuyo nombre es
+  (`orchestratorGameSceneArtOf`). Quest se dibuja con su arte, que viene con Orca en
+  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Office conserva esa
+  oficina para cualquier escena sin arte propio de Office, porque una oficina se lee como tal en
+  cualquier tema. Cualquier otra escena sin arte de Figures se dibuja en Pixel, con sus propios
+  personajes, asesor, mascota y colores, así que una escena con tema nunca muestra los caballeros de
+  Quest. Settings dice cuál bajo el estilo. Por lo demás, un estilo pasa a Pixel solo cuando ni
+  siquiera el arte de Orca se puede decodificar. Un archivo de escena cuyo nombre es
   `quest` es Quest, así que el arte incluido es el suyo. El panel lee las imágenes de un archivo de
   escena bajo demanda con `game.sceneArt`, en el host dueño del worktree: en local, por SSH a través del
   sistema de archivos remoto del worktree, y desde un host emparejado por el RPC del runtime, con el
   caller del lead. El host sirve solo las imágenes de la escena que dibuja su worktree, contenidas en la
   carpeta del archivo de escena, con un máximo de 2 MB cada una. Un host anterior al método, una escena
-  llevada a un miembro remoto, una escena de plugin y cualquier imagen que falle dibujan el arte
-  predeterminado. El estado del juego lleva el bloque como campo opcional. La
+  llevada a un miembro remoto, una escena de plugin y cualquier imagen que falle se dibujan en Pixel
+  con los personajes de la propia escena. El estado del juego lleva el bloque como campo opcional. La
   [guía de escenas](../../../skill-guides/orca-game-scenes.md#native-optional) tiene el formato.
 
 **Settings.** El selector **Scene** del proyecto termina con **Custom file…**, que muestra la ruta
@@ -1783,16 +1785,21 @@ burbuja es solo el comando.
 - **El Jev de cada pane, en el Panel del líder.** El estado de un pane no cruza a otros panes, así que
   el mod del pane del líder o de un miembro informa de su propio Jev en el sondeo de `orca game state` que ya ejecuta
   cada 30 s (y de inmediato cuando Jev cambia el modelo o el esfuerzo principal): `ORCA_GAME_ADVISOR` en
-  el entorno de la CLI, JSON `{ version: 1, model, effort, line, pinned: { model, effort } }`, con `pinned`
+  el entorno de la CLI, JSON `{ version: 1, model, effort, line, pinned: { model, effort }, decisions? }`, con `pinned`
   leído de `ORCA_AGENT_MODEL_PINNED`/`ORCA_AGENT_EFFORT_PINNED`, o `null` una vez que Jev se detiene
   después de un informe. Un pane donde Jev nunca publicó no envía nada. La CLI lo pasa a `game.state`
   como un parámetro opcional `advisor`, el host lo guarda por pane en memoria (un reinicio lo vuelve a
   llenar en un sondeo, un informe no renovado durante 3 minutos expira) y lo pone en la fila de ese
   pane dentro del estado de su líder como un `advisor` opcional
-  (`{ model, effort, line?, pinned, previous? }`, siendo `previous` lo que Jev tenía antes de su último cambio)
+  (`{ model, effort, line?, pinned, previous?, decisions? }`, siendo `previous` lo que Jev tenía antes de su
+  último cambio)
   ([`orchestrator-game-member-advisors.ts`](../../../src/main/runtime/orchestrator-game-member-advisors.ts)).
-  El informe del propio líder llena la fila Advisor del panel Team nativo y el asesor de su escena, cuya
-  burbuja dice `line`; las decisiones de Jev se quedan en el pane, así que esa fila no lista llamadas.
+  `decisions` son las cinco últimas de Jev en ese pane, la más nueva al final, solo como
+  `{ id, verdict, gesture }`: sus títulos y el texto de las herramientas se quedan en el pane. No aparece
+  mientras Jev no haya decidido nada, y un Orca anterior lo descarta y lee el resto como antes. El modelo
+  Team lo lleva en la tarjeta del líder y de cada miembro para la escena. El informe del propio líder llena
+  la fila Advisor del panel Team nativo y el asesor de su escena, cuya burbuja dice `line`; esa fila sigue
+  sin listar llamadas.
   La tarjeta del miembro dibuja `◆ Jev Sonnet 5.5·high · model pinned` (el nombre de Jev, luego el pin,
   que se omite en una tarjeta estrecha; lo que aun así no cabe pasa a la línea siguiente, así que el
   modelo nunca se corta) y, después de un cambio, `↳ Opus 5.5 → Sonnet 5.5`, nombrando solo lo que

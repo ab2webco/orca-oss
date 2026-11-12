@@ -91,9 +91,25 @@ function commandOf(line: string): string {
 }
 
 /** A tool step as the scene's bubble words it: the command for a shell, else tool and file. */
+// An MCP tool's server prefix, as in `mcp__plane__list_states`.
+const MCP_PREFIX = /^mcp__[^_]+(?:_[^_]+)*?__/
+
+/** A tool's identifier as words: `PushNotification` reads 'Push notification', `exec_command` 'Exec command'. */
+function toolWords(tool: string): string {
+  const words = tool
+    .replace(MCP_PREFIX, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => word.toLowerCase())
+  const line = words.join(' ')
+  return line ? line[0]!.toUpperCase() + line.slice(1) : tool
+}
+
 export function teamSceneStepLabel(tool: string, detail: string | null): string {
   if (!detail) {
-    return tool
+    // Why words: a bare identifier read as a cut word in the bubble ('PushNotific').
+    return toolWords(tool)
   }
   if (SHELL_TOOLS.has(tool)) {
     return commandOf(detail) || tool

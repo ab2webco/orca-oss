@@ -11682,7 +11682,8 @@
           "title": "Panel"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "This scene has no {{style}} art, so the Team panel draws it with the default art."
+          "text": "This scene has no {{style}} art, so the Team panel draws the scene's own characters in Pixel.",
+          "office": "This scene has no {{style}} art, so the Team panel draws Orca's own office."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Long-lived token",
@@ -16503,7 +16504,7 @@
       "team-scene": {
         "team-scene-copy": {
           "label": "Live team scene",
-          "leadAsks": "Waiting for you · {{question}}",
+          "leadAsks": "Waiting for you\n{{question}}",
           "leadDone": "Done, nothing pending",
           "leadWaits": "Waiting for you"
         }
@@ -17230,6 +17231,7 @@
       "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
     },
     "machines": {
+      "all": "All",
       "offline": "Offline",
       "lowMemory": "Low memory",
       "free": "Free",
@@ -17410,6 +17412,7 @@
       "thisProject": "this project",
       "projectUnread": "Could not read this project's questions.",
       "forYouEmpty": "No questions are waiting for you.",
+      "otherProjects": "Other projects",
       "yourAnswer": "Your answer",
       "openTerminal": "Open terminal",
       "youAnswered": "You answered",

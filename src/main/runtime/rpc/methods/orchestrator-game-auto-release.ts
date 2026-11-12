@@ -13,6 +13,10 @@ import { WORKER_RELEASABLE_STATES } from '../../orchestration/worker-terminal-ow
 import type { WorkerReleaseReceipt } from './orchestration-worker-release-completion'
 import { releaseWorker } from './orchestration-worker-release'
 import { isFederatedMemberGoneOnHost } from './orchestration-federated-worker-gone'
+import {
+  finishRequestedRelease,
+  retainedReleaseIntervalMs
+} from './orchestrator-game-retained-release'
 
 type LeadCaller = { worktreeId?: string; terminalHandle?: string }
 type Attempt = 'releasing' | 'released' | 'kept'
@@ -118,9 +122,18 @@ function settleGoneRemoteMembers(
       !remote?.gone ||
       !environmentId ||
       landed.some((one) => one.dispatchId === dispatchId) ||
-      now - (checks.get(dispatchId) ?? -Infinity) < GONE_CHECK_INTERVAL_MS ||
-      !report(agent)
+      now - (checks.get(dispatchId) ?? -Infinity) <
+        retainedReleaseIntervalMs(runtime, dispatchId, GONE_CHECK_INTERVAL_MS)
     ) {
+      continue
+    }
+    // Why first: the lead asked for this release and its host kept it only for its terminal (ORCA-1076).
+    if (db.isFederatedReleaseRequested(dispatchId)) {
+      checks.set(dispatchId, now)
+      void finishRequestedRelease(runtime, dispatchId, agent, caller)
+      continue
+    }
+    if (!report(agent)) {
       continue
     }
     checks.set(dispatchId, now)

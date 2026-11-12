@@ -18,10 +18,15 @@ export type GameMemberAdvisorDetailKey = (typeof GAME_MEMBER_ADVISOR_DETAIL_KEYS
 
 export type GameMemberAdvisorDetail = Partial<Record<GameMemberAdvisorDetailKey, string | null>>
 
+/** One of Jev's latest decisions in a pane: its id, verdict and the gesture the game plays for it. */
+export type GameMemberAdvisorDecision = { id: string; verdict: string; gesture: string | null }
+
 /** What a member pane says its Jev has it on, and which dimension Orca pinned at launch. */
 export type GameMemberAdvisorReport = GameMemberAdvisorPick &
   GameMemberAdvisorDetail & {
     pinned: { model: boolean; effort: boolean }
+    /** Newest last; absent from a mod that sends none, which an older Orca also drops. */
+    decisions?: GameMemberAdvisorDecision[]
   }
 
 /** The report the lead's Panel reads, with what the member was on before Jev's latest switch. */
@@ -44,6 +49,30 @@ const wordsOf = (value: unknown, isNumberOk = false): string | null | undefined 
   }
   const words = stripTerminalControl(String(value)).replace(/\s+/g, ' ').trim()
   return words === '' ? null : words.slice(0, WORDS_MAX)
+}
+
+export const GAME_MEMBER_ADVISOR_DECISIONS_MAX = 5
+
+/** A pane's decisions as a field to spread; nothing where its Jev sent none, so a card stays as it was. */
+export const gameAdvisorDecisionsOf = (
+  advisor: GameMemberAdvisorReport | undefined
+): { decisions?: GameMemberAdvisorDecision[] } =>
+  advisor?.decisions ? { decisions: advisor.decisions } : {}
+
+// Why ids only: a decision's title and tool text are the pane's own, never sent across.
+function decisionsOf(value: unknown): GameMemberAdvisorDecision[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+  return value.slice(-GAME_MEMBER_ADVISOR_DECISIONS_MAX).flatMap((one) => {
+    if (!isRecord(one)) {
+      return []
+    }
+    const id = wordsOf(one.id)
+    const verdict = wordsOf(one.verdict)
+    const gesture = wordsOf(one.gesture)
+    return id && verdict ? [{ id, verdict, gesture: gesture ?? null }] : []
+  })
 }
 
 /** Null when Jev stopped publishing; undefined for a value this build cannot read, which is ignored. */
@@ -69,11 +98,13 @@ export function parseGameMemberAdvisorReport(
       detail[key] = text
     }
   }
+  const decisions = decisionsOf(value.decisions)
   return {
     model,
     effort,
     pinned: { model: pinned.model === true, effort: pinned.effort === true },
-    ...detail
+    ...detail,
+    ...(decisions ? { decisions } : {})
   }
 }
 

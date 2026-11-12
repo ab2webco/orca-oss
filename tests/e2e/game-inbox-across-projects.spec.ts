@@ -116,7 +116,8 @@ test('another project’s question is announced, counted, answered and opens the
     await expect.poll(async () => (await recorded()).badge.at(-1)).toBe(2)
 
     const { inboxTab, inbox } = await openTeamInbox(orcaPage)
-    await expect(inboxTab).toContainText('2')
+    // Why 1: the tab counts this project's questions; another project's waits under its own heading (ORCA-1169).
+    await expect(inboxTab).toContainText('1')
 
     // The host names the worktree the click opens; the window must know it to switch to it.
     const target = (await recorded()).dispatched.find(
@@ -148,7 +149,10 @@ test('another project’s question is announced, counted, answered and opens the
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store?.getState().activeWorktreeId))
       .toBe(target?.worktreeId)
-    // The project left behind is now the other one, listed under its name.
+    // The project left behind is now the other one, folded under Other projects and listed by name.
+    const others = inbox.locator('[data-team-inbox-project="others"] button[aria-expanded]')
+    await expect(others).toHaveAttribute('aria-expanded', 'false')
+    await others.click()
     await expect(inbox.getByRole('heading', { name: firstName ?? '' })).toBeVisible()
     await expect(inbox.locator('[data-game-owner-question]')).toHaveCount(2)
     // V28's card starts closed (ORCA-1095); opened here so the boxes are measured, not skipped.
@@ -185,7 +189,8 @@ test('another project’s question is announced, counted, answered and opens the
     expect(
       answered.result.questions.find((one) => one.id === other.result.question.id)?.answer?.text
     ).toBe('Wait for Monday')
-    await expect(inboxTab).toContainText('1')
+    // This project has nothing left; the OS badge still counts the first project's question.
+    await expect(inboxTab).not.toHaveText(/\d/)
     await expect.poll(async () => (await recorded()).badge.at(-1)).toBe(1)
   } finally {
     rmSync(otherRepo, { recursive: true, force: true })
