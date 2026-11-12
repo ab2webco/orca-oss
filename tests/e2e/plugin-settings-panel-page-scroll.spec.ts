@@ -14,8 +14,8 @@ import { expect, test } from './helpers/orca-app'
 const PANEL_TITLE = 'Registry'
 
 /** Taller than any settings viewport, with a textarea last — the element the
- *  earlier fixed-height attempt cut in half — and a block that arrives after
- *  load, like the panel's own list refresh. */
+ *  earlier fixed-height attempt cut in half. The test adds the late block after
+ *  load through `addRows`, like the panel's own list refresh (ORCA-1186). */
 const TALL_PANEL_HTML = `<!doctype html>
 <html>
   <head>
@@ -42,10 +42,6 @@ const TALL_PANEL_HTML = `<!doctype html>
         }
       }
       addRows(24, 'initial')
-      // The conversation list repopulating long after first paint.
-      setTimeout(function () {
-        addRows(12, 'late')
-      }, 1200)
     </script>
   </body>
 </html>
@@ -123,11 +119,19 @@ test('grows a settings-surface plugin panel to its content height', async ({
             node.getBoundingClientRect().bottom <= view.innerHeight + 1
           )
         })
-    // The late rows land 1.2s in; poll past them so the settled height is the grown one.
-    await expect.poll(fits, { timeout: 15_000 }).toBe(true)
+    // The conversation list repopulating after first paint.
+    await orcaPage
+      .frameLocator(`iframe[title="${PANEL_TITLE}"]`)
+      .locator('#rows')
+      .evaluate(() =>
+        (window as unknown as { addRows: (n: number, p: string) => void }).addRows(12, 'late')
+      )
     await expect(
       orcaPage.frameLocator(`iframe[title="${PANEL_TITLE}"]`).locator('#rows section')
     ).toHaveCount(36)
+    // Why after the count: fits is also true for the first 24 rows, and a scroll between the late rows
+    // and the frame's regrowth leaves the note below the viewport (ORCA-1186).
+    await expect.poll(fits, { timeout: 15_000 }).toBe(true)
 
     // The one scroller that must exist: the settings page itself. Scoped to the
     // section's own ancestors — the settings sidebar is a scroller too, and it
