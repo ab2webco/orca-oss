@@ -26,7 +26,8 @@ import {
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const MCP_TOOL = 'mcp__plugin_engram_engram__mem_current_project'
-const TOOL_LABEL = 'engram: mem current project'
+// Why capitalized: a card reads a tool shown with no detail as words (teamToolText).
+const TOOL_LABEL = 'Engram: mem current project'
 
 type Leads = { leads: { handle: string; paneKey?: string }[] }
 type LeadAgent = { isLeader: boolean; state: string; toolName: string | null }
