@@ -51,6 +51,17 @@ export const GAME_CHARACTER_XP: Readonly<Record<GameHistoryOutcome, number>> = {
 export const GAME_CHARACTER_RECENT_MAX = 20
 // Why bounded: tasks already folded in, so a retried free never counts one twice.
 const APPLIED_MAX = 50
+// Why bounded: PRs whose merge a character was paid for, so a merge seen again never pays twice.
+const SETTLED_MAX = 100
+
+/** `#41 merged` → 41. */
+export const prNumberOf = (pr: string | null): number | null => {
+  const found = pr ? /^#(\d+)\b/.exec(pr) : null
+  return found ? Number(found[1]) : null
+}
+
+const prKeyOf = (ticket: string | null, number: number | null): string | null =>
+  ticket && number !== null ? `${ticket.toUpperCase()}#${number}` : null
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -83,7 +94,12 @@ function parseTask(raw: unknown): GameCharacterTask | null {
   }
 }
 
-function parseCharacter(raw: unknown): (GameCharacter & { applied: string[] }) | null {
+const textsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((one): one is string => typeof one === 'string') : []
+
+type StoredCharacter = GameCharacter & { applied: string[]; settled: string[] }
+
+function parseCharacter(raw: unknown): StoredCharacter | null {
   if (!isRecord(raw) || typeof raw.key !== 'string' || typeof raw.name !== 'string') {
     return null
   }
@@ -102,9 +118,8 @@ function parseCharacter(raw: unknown): (GameCharacter & { applied: string[] }) |
     lastAt: typeof raw.lastAt === 'string' ? raw.lastAt : '',
     ...seatOf(raw),
     recent: Array.isArray(raw.recent) ? raw.recent.flatMap((one) => parseTask(one) ?? []) : [],
-    applied: Array.isArray(raw.applied)
-      ? raw.applied.filter((one): one is string => typeof one === 'string')
-      : []
+    applied: textsOf(raw.applied),
+    settled: textsOf(raw.settled)
   }
 }
 
@@ -112,7 +127,7 @@ function parseCharacter(raw: unknown): (GameCharacter & { applied: string[] }) |
 export function listGameCharacters(stored: Record<string, unknown>): GameCharacter[] {
   return Object.values(stored)
     .flatMap((raw) => parseCharacter(raw) ?? [])
-    .map(({ applied: _applied, ...character }) => character)
+    .map(({ applied: _applied, settled: _settled, ...character }) => character)
     .toSorted((a, b) => b.xp - a.xp || a.key.localeCompare(b.key))
 }
 
@@ -155,7 +170,11 @@ export function foldFreedMember(
     ...seat
   }
   const outcomes = before?.outcomes ?? { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 }
-  const next: GameCharacter & { applied: string[] } = {
+  const prKey = prKeyOf(record.ticket, prNumberOf(record.pr))
+  // Why: a merge the host already paid for (creditGameMerge) is not paid again by its free.
+  const paid = prKey !== null && (before?.settled.includes(prKey) ?? false)
+  const settled = before?.settled ?? []
+  const next: StoredCharacter = {
     key: character.key,
     name: character.name,
     tickets: (before?.tickets ?? 0) + (record.ticket === null ? 0 : 1),
@@ -163,11 +182,57 @@ export function foldFreedMember(
     prsMerged: (before?.prsMerged ?? 0) + (record.pr?.endsWith(' merged') ? 1 : 0),
     outcomes: { ...outcomes, [record.outcome]: outcomes[record.outcome] + 1 },
     workedMs: (before?.workedMs ?? 0) + (workedMs ?? 0),
-    xp: (before?.xp ?? 0) + GAME_CHARACTER_XP[record.outcome],
+    xp: (before?.xp ?? 0) + (paid ? 0 : GAME_CHARACTER_XP[record.outcome]),
     lastAt: record.endedAt,
     ...seat,
     recent: [...(before?.recent ?? []), task].slice(-GAME_CHARACTER_RECENT_MAX),
-    applied: [...(before?.applied ?? []), taskKey].slice(-APPLIED_MAX)
+    applied: [...(before?.applied ?? []), taskKey].slice(-APPLIED_MAX),
+    settled:
+      record.outcome === 'merged' && prKey && !paid
+        ? [...settled, prKey].slice(-SETTLED_MAX)
+        : settled
+  }
+  return { ...stored, [character.key]: next }
+}
+
+/**
+ * The stored characters with a merged PR paid to `character`, topping up what a QA free of that
+ * PR already paid; null when that PR was already paid. Creates a character no free has written.
+ */
+export function creditGameMerge(
+  stored: Record<string, unknown>,
+  character: { key: string; name: string },
+  merge: { ticket: string; number: number; at: string }
+): Record<string, unknown> | null {
+  const before = parseCharacter(stored[character.key])
+  const prKey = prKeyOf(merge.ticket, merge.number)
+  if (!prKey || before?.settled.includes(prKey)) {
+    return null
+  }
+  // Why the recent tasks: an older build's merged free of this PR left no settled key.
+  const earned = (before?.recent ?? [])
+    .filter((task) => prKeyOf(task.ticket, prNumberOf(task.pr)) === prKey)
+    .reduce((sum, task) => sum + GAME_CHARACTER_XP[task.outcome], 0)
+  const base: StoredCharacter = before ?? {
+    key: character.key,
+    name: character.name,
+    tickets: 0,
+    prsOpened: 0,
+    prsMerged: 0,
+    outcomes: { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 },
+    workedMs: 0,
+    xp: 0,
+    lastAt: '',
+    recent: [],
+    applied: [],
+    settled: []
+  }
+  const next: StoredCharacter = {
+    ...base,
+    name: character.name,
+    xp: base.xp + Math.max(0, GAME_CHARACTER_XP.merged - earned),
+    lastAt: base.lastAt > merge.at ? base.lastAt : merge.at,
+    settled: [...base.settled, prKey].slice(-SETTLED_MAX)
   }
   return { ...stored, [character.key]: next }
 }
@@ -203,7 +268,8 @@ export function mergeGameCharacters(
       recent: [...theirs.recent, ...mine.recent]
         .toSorted((a, b) => a.endedAt.localeCompare(b.endedAt))
         .slice(-GAME_CHARACTER_RECENT_MAX),
-      applied: [...theirs.applied, ...mine.applied].slice(-APPLIED_MAX)
+      applied: [...theirs.applied, ...mine.applied].slice(-APPLIED_MAX),
+      settled: [...new Set([...theirs.settled, ...mine.settled])].slice(-SETTLED_MAX)
     }
   }
   return merged
