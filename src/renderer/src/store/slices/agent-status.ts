@@ -296,6 +296,8 @@ export type AgentStatusSlice = {
   /** Capture resumable agent sessions across every worktree for crash recovery or quit; mode sets live/quit precedence. */
   captureAllSleepingAgentSessions: (mode: AllAgentSessionCaptureMode) => void
   clearSleepingAgentSession: (paneKey: string) => void
+  /** Drops the record a restore just resumed; its pane keeps the launch the restore registered. */
+  consumeSleepingAgentSession: (paneKey: string) => void
   clearSleepingAgentSessionsByPaneKey: (paneKeys: readonly string[]) => void
   setSleepingAgentAutomaticResumeBlocked: (paneKey: string, blocked: boolean) => void
   clearSleepingAgentSessionsByWorktree: (worktreeId: string) => void
@@ -3140,6 +3142,16 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
     },
 
     clearSleepingAgentSession: (paneKey) => clearSleepingAgentSessionsByPaneKey([paneKey]),
+    consumeSleepingAgentSession: (paneKey) => {
+      set((s) => {
+        if (!(paneKey in s.sleepingAgentSessionsByPaneKey)) {
+          return s
+        }
+        const next = { ...s.sleepingAgentSessionsByPaneKey }
+        delete next[paneKey]
+        return { sleepingAgentSessionsByPaneKey: next }
+      })
+    },
     clearSleepingAgentSessionsByPaneKey,
     setSleepingAgentAutomaticResumeBlocked: (paneKey, blocked) => {
       set((s) => {
