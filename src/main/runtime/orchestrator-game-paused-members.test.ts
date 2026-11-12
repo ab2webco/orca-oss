@@ -335,3 +335,67 @@ describe('GamePausedMembers.note for an adopted member', () => {
     expect(view.unlisted).toEqual([])
   })
 })
+
+// ORCA-1172: a queued launch saved no worktree, and a ticket like CHECK-MAIN carries no number to read back from the name.
+describe('GamePausedMembers.note joins a saved member to its live agent by launch, not by name', () => {
+  const queuedLaunch = {
+    ticket: 'CHECK-MAIN',
+    name: 'Arturo · CHECK-MAIN',
+    runId: 'run_1',
+    taskId: 'task_check',
+    agent: 'codex',
+    lastState: 'queued'
+  }
+  const arturo = (extra: Partial<GameAgent> = {}): GameAgent =>
+    member('CHECK-MAIN', {
+      displayName: 'Arturo · CHECK-MAIN',
+      agentType: 'codex',
+      terminalHandle: 'term-arturo',
+      worktree: { id: 'wt-check', branch: 'check-main', displayName: 'check-main' },
+      ...extra
+    })
+
+  it('reads a queued launch that started as the one live member, and saves its worktree', async () => {
+    const started = { ...context('CHECK-MAIN'), taskId: 'task_check', dispatchId: 'ctx_check' }
+    const { store, paused } = setup({ 'term-arturo': started })
+    await store.upsert('repo:a', queuedLaunch)
+
+    const view = await paused.note('repo:a', [arturo()], new Set(['wt-check']))
+
+    expect(view.paused).toEqual([])
+    expect(view.unlisted).toEqual([])
+    const read = await store.read('repo:a')
+    expect(read.ok && read.members).toMatchObject([
+      {
+        ticket: 'CHECK-MAIN',
+        worktreeId: 'wt-check',
+        dispatchId: 'ctx_check',
+        lastState: 'working'
+      }
+    ])
+  })
+
+  it('still lists it as paused once that agent is gone', async () => {
+    const started = { ...context('CHECK-MAIN'), taskId: 'task_check', dispatchId: 'ctx_check' }
+    const { store, paused } = setup({ 'term-arturo': started })
+    await store.upsert('repo:a', queuedLaunch)
+    await paused.note('repo:a', [arturo()], new Set(['wt-check']))
+
+    const view = await paused.note('repo:a', [])
+
+    expect(view.paused.map((one) => one.ticket)).toEqual(['CHECK-MAIN'])
+  })
+
+  it('reads a member on a paired host as live by its dispatch', async () => {
+    const { store, paused } = setup()
+    await store.upsert('repo:a', { ...queuedLaunch, dispatchId: 'ctx_remote', lastState: 'ready' })
+    const remote = arturo({
+      paneKey: 'remote:ctx_remote',
+      terminalHandle: 'remote-term',
+      worktree: { id: 'remote-wt', branch: 'check-main', displayName: 'Arturo · CHECK-MAIN' },
+      remote: { host: 'builder', environmentId: 'env-1', stateKnown: true }
+    })
+
+    expect((await paused.note('repo:a', [remote])).paused).toEqual([])
+  })
+})
