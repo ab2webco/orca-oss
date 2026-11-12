@@ -12,6 +12,7 @@ import {
 } from '../../../../shared/orchestrator-game-history'
 import { withGameAutoRelease } from './orchestrator-game-auto-release'
 import { recordGameMerges } from './orchestrator-game-merge-record'
+import { recordLateGameMerges } from './orchestrator-game-late-merges'
 
 const GameStateParams = z
   .object({
@@ -307,6 +308,7 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
       const caller = { worktreeId: params?.worktreeId, terminalHandle: params?.terminalHandle }
       // Why first: auto-release drops a merged member's row from this very state.
       await recordGameMerges(runtime, state, caller)
+      recordLateGameMerges(runtime, state, caller)
       return withGameAutoRelease(runtime, state, caller)
     }
   })

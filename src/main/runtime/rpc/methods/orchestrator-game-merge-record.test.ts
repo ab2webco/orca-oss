@@ -28,8 +28,11 @@ const leadState = {
   config: { scene: 'quest' }
 } as unknown as OrchestratorGameState
 
-function runtimeWith(postEvent: (args: unknown) => Promise<unknown>): OrcaRuntimeService {
-  return { getGameBoard: () => ({ postEvent }) } as unknown as OrcaRuntimeService
+function runtimeWith(
+  postEvent: (args: unknown) => Promise<unknown>,
+  payGameMerge: (...args: unknown[]) => Promise<unknown> = async () => true
+): OrcaRuntimeService {
+  return { getGameBoard: () => ({ postEvent }), payGameMerge } as unknown as OrcaRuntimeService
 }
 
 describe('recordGameMerges', () => {
@@ -81,22 +84,19 @@ describe('recordGameMerges', () => {
   // Why (ORCA-1170): auto-release frees the member next, so the merge pays its character here.
   it("credits the merge to the member's character from the project's roster", async () => {
     const postEvent = vi.fn().mockResolvedValue({ posted: true })
+    const pay = vi.fn().mockResolvedValue(true)
     const caller = { worktreeId: 'wt-lead', terminalHandle: 'term-lead' }
 
     rosters.length = 0
     await recordGameMerges(
-      runtimeWith(postEvent),
+      runtimeWith(postEvent, pay),
       { ...leadState, agents: [{}] } as unknown as OrchestratorGameState,
       caller
     )
 
     expect(rosters[0]).toContainEqual({ en: 'Arthur', es: 'Arturo' })
-    expect(postEvent).toHaveBeenCalledWith({
-      ...caller,
-      ...MERGE,
-      key: 'merged ORCA-924 #924',
-      credit: { character: ARTHUR, number: 923 }
-    })
+    expect(postEvent).toHaveBeenCalledWith({ ...caller, ...MERGE, key: 'merged ORCA-924 #924' })
+    expect(pay).toHaveBeenCalledWith(caller, { character: ARTHUR, number: 923 }, 'ORCA-923')
   })
 
   it('records nothing for a member', async () => {

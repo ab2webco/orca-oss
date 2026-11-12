@@ -797,6 +797,14 @@ import {
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { GAME_HISTORY_MIGRATIONS, GameHistoryStore } from './orchestrator-game-history-store'
 import {
+  lateGameReviewChecks,
+  payGameMerge,
+  settleClosedGameReview,
+  type GameMergeCredit
+} from './orchestrator-game-character-ledger'
+import type { LateMergePort } from './rpc/methods/orchestrator-game-late-merges'
+import type { GameLateReviewCheck } from '../../shared/orchestrator-game-late-merges'
+import {
   GameLessonStore,
   GameLessons,
   type GameLessonProject
@@ -822,7 +830,7 @@ import {
   GameMemberNameReservations,
   liveProjectMemberNamesOf
 } from './orchestrator-game-member-name-reservations'
-import type { GameMemberName } from '../../shared/orchestrator-game-member-names'
+import { characterKeyOf, type GameMemberName } from '../../shared/orchestrator-game-member-names'
 import { wakeSleepingTerminal } from './terminal-wake'
 import { sleepingTerminalOwnerOf } from './sleeping-terminal-owner'
 import { GameMemberResume } from './orchestrator-game-member-resume'
@@ -31616,6 +31624,61 @@ export class OrcaRuntimeService {
         ? { handle: leadTerminal, paneKey: this.getPaneKeyForTerminalHandle(leadTerminal) ?? null }
         : null
     }
+  }
+
+  /** Pays a member's merged PR to its character in the lead's project; false when already paid (ORCA-1170). */
+  async payGameMerge(
+    caller: { worktreeId?: string; terminalHandle?: string },
+    credit: GameMergeCredit,
+    ticket: string
+  ): Promise<boolean> {
+    const { key } = await this.gameBoardProjectOf(caller)
+    return payGameMerge(this.gameHistory, key, credit, { ticket, at: new Date().toISOString() })
+  }
+
+  /** What a lead's look at its freed members' open PRs reads and writes (ORCA-1170). */
+  gameLateMergePort(
+    caller: { worktreeId?: string; terminalHandle?: string },
+    roster: readonly GameMemberName[]
+  ): LateMergePort {
+    const projectKey = async (): Promise<string> => (await this.gameBoardProjectOf(caller)).key
+    return {
+      checks: async () =>
+        lateGameReviewChecks(this.gameHistory, await projectKey(), (name) =>
+          characterKeyOf(roster, name)
+        ),
+      reviewStateOf: async (check) => (await this.readGameLateReview(check))?.state ?? null,
+      pay: async (check, at) => {
+        await this.getGameBoard().postEvent({
+          ...caller,
+          kind: 'merged',
+          ticket: check.ticket,
+          text: `PR #${check.number} merged`,
+          key: `merged ${check.ticket} #${check.number}`
+        })
+        await payGameMerge(this.gameHistory, await projectKey(), check, {
+          ticket: check.ticket,
+          at
+        })
+      },
+      settleClosed: async (check) =>
+        settleClosedGameReview(this.gameHistory, await projectKey(), check)
+    }
+  }
+
+  // Why the record's own repo only: a remote member's repo may not be on this host to read its PR from.
+  private async readGameLateReview(check: GameLateReviewCheck): Promise<{ state: string } | null> {
+    const repo = check.repo
+      ? this.store?.getRepos().find((one) => one.displayName === check.repo)
+      : undefined
+    if (!repo) {
+      return null
+    }
+    return this.getGameReviewForBranch({
+      repoSelector: `id:${repo.id}`,
+      branch: check.branch.replace(/^refs\/heads\//, ''),
+      linkedGitHubPR: check.number
+    })
   }
 
   async recordGameHistory(args: {

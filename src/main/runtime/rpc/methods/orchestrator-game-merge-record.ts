@@ -30,9 +30,11 @@ export async function recordGameMerges(
     // Why claim before the await: the panel and the mod poll at once, and both would post it.
     recorded.add(id)
     try {
+      await runtime.getGameBoard().postEvent({ ...caller, ...one })
       // Why here: auto-release frees the member next and leaves no record its character could earn from.
-      const credit = character ? { credit: { character, number: one.merge.number } } : {}
-      await runtime.getGameBoard().postEvent({ ...caller, ...one, ...credit })
+      if (character) {
+        await runtime.payGameMerge(caller, { character, number: one.merge.number }, one.ticket)
+      }
     } catch {
       // Why: a board that cannot be written must cost the merge its rewards, never the lead its state.
       recorded.delete(id)
