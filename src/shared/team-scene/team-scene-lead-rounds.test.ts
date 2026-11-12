@@ -177,14 +177,33 @@ describe('team scene lead rounds', () => {
     expect(nearB()).toBe(true)
   })
 
-  it('a lead that is not working stays at its spot and hands nothing, as its card says', () => {
-    for (const activity of ['resting', 'done'] as const) {
+  // Why (owner, #1167): the lead travels to whoever needs you even when it is not working itself.
+  it('a lead that is not working hands nothing, yet still goes to a member who needs you', () => {
+    for (const activity of ['resting', 'done', 'needsYou'] as const) {
       const world = createTeamSceneWorld()
       applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')], activity))
-      const home = actor(world, 'lead').x
-      expect(handsTo(run(world, 20))).toEqual([])
-      expect(actor(world, 'lead').x).toBe(home)
+      const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
+      expect(handsTo(run(world, 20, () => nearB() && !leadWalking(world))), activity).toEqual([])
+      expect(nearB(), activity).toBe(true)
       expect(actor(world, 'lead').pose).not.toBe('give')
+    }
+  })
+
+  it('a lead that cannot work stays at its spot, as its card says', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')], 'blocked'))
+    const home = actor(world, 'lead').x
+    expect(handsTo(run(world, 20))).toEqual([])
+    expect(actor(world, 'lead').x).toBe(home)
+  })
+
+  it('a lead that is not working stays at its spot when nobody needs you', () => {
+    for (const activity of ['resting', 'done'] as const) {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input([member('a'), member('b')], activity))
+      const home = actor(world, 'lead').x
+      expect(handsTo(run(world, 20)), activity).toEqual([])
+      expect(actor(world, 'lead').x, activity).toBe(home)
     }
   })
 
