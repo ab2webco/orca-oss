@@ -15,6 +15,7 @@ import {
 } from './team-card-text'
 import { TeamActivityDetail } from './TeamActivityDetail'
 import { openTeamSession } from './team-session-open'
+import { teamActivityRowsOf, useTeamActivityFilter } from './team-activity-filter'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 
 const AGE_TICK_MS = 30_000
@@ -81,11 +82,13 @@ export function TeamPanelActivityTab({
     const timer = window.setInterval(() => setNow(Date.now()), AGE_TICK_MS)
     return () => window.clearInterval(timer)
   }, [])
-  const selected = value.rows.find((row) => row.paneKey === value.selectedPaneKey) ?? value.rows[0]
+  const { filter } = useTeamActivityFilter()
+  const rows = teamActivityRowsOf(value.rows, filter)
+  const selected = rows.find((row) => row.paneKey === value.selectedPaneKey) ?? rows[0]
   if (!selected) {
     return null
   }
-  const others = value.rows.filter((row) => row !== selected)
+  const others = rows.filter((row) => row !== selected)
   return (
     <div data-team-activity-tab="">
       <TeamActivityDetail
