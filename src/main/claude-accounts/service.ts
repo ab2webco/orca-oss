@@ -99,6 +99,11 @@ import {
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
 import { configureManagedClaudeRefreshAccounts } from './claude-managed-refresh-chain'
+import {
+  CLAUDE_LOGIN_HELP_ARGS,
+  claudeLoginFlagCache,
+  runWithClaudeLoginFallback
+} from '../../shared/claude-login-args'
 import { assertRefreshChainNotHeldByOtherAccount } from './claude-refresh-chain-ownership'
 import {
   applyLongLivedTokenToVaultSettings,
@@ -1401,10 +1406,19 @@ export class ClaudeAccountService {
       if (loginAbortController.signal.aborted) {
         throw new Error('Claude sign-in was cancelled.')
       }
-      await this.runClaudeCommand(['auth', 'login', '--claudeai'], tempConfig, LOGIN_TIMEOUT_MS, {
-        signal: loginAbortController.signal,
-        keepStdinOpen: true
-      })
+      await runWithClaudeLoginFallback(
+        (args) =>
+          this.runClaudeCommand([...args], tempConfig, LOGIN_TIMEOUT_MS, {
+            signal: loginAbortController.signal,
+            keepStdinOpen: true
+          }),
+        await this.claudeLoginCacheKey(tempConfig),
+        claudeLoginFlagCache,
+        () =>
+          this.runClaudeCommand([...CLAUDE_LOGIN_HELP_ARGS], tempConfig, STATUS_TIMEOUT_MS, {
+            allowFailure: true
+          })
+      )
       this.cancelPendingClaudeLogin = null
       const status = await this.runClaudeCommand(
         ['auth', 'status', '--json'],
@@ -2093,6 +2107,17 @@ export class ClaudeAccountService {
     } catch (error) {
       console.warn('[claude-accounts] Failed to clear global config from vault:', error)
     }
+  }
+
+  /** Which Claude binary a login runs, so a flag it lacks is learned once per binary. */
+  private async claudeLoginCacheKey(configDir: {
+    linuxPath: string | null
+    wslDistro: string | null
+  }): Promise<string> {
+    if (configDir.linuxPath && configDir.wslDistro) {
+      return `wsl:${configDir.wslDistro}`
+    }
+    return `host:${(await this.resolveHostClaudeCommand()) ?? 'claude'}`
   }
 
   private async runClaudeCommand(
