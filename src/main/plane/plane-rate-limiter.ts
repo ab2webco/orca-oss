@@ -20,6 +20,7 @@ type KeyState = {
   timestamps: number[]
   waiters: Waiter[]
   timer: ReturnType<typeof setTimeout> | null
+  timerDueMs: number
   /** Largest budget the server has shown; the fallback is only a floor. */
   learnedMax: number | null
   /** The server's last remaining count, less what was sent since. */
@@ -73,10 +74,28 @@ export class PlaneRateLimiter {
     state.remaining = null
   }
 
+  /** When the soonest queued call can go; null while nothing waits. */
+  waitingUntilMs(): number | null {
+    let soonest: number | null = null
+    for (const state of this.states.values()) {
+      if (state.timer && state.waiters.length > 0) {
+        soonest = Math.min(soonest ?? state.timerDueMs, state.timerDueMs)
+      }
+    }
+    return soonest
+  }
+
   private stateOf(key: string): KeyState {
     let state = this.states.get(key)
     if (!state) {
-      state = { timestamps: [], waiters: [], timer: null, learnedMax: null, remaining: null }
+      state = {
+        timestamps: [],
+        waiters: [],
+        timer: null,
+        timerDueMs: 0,
+        learnedMax: null,
+        remaining: null
+      }
       this.states.set(key, state)
     }
     return state
@@ -110,6 +129,7 @@ export class PlaneRateLimiter {
       const wait = this.waitMs(state, now)
       if (wait > 0) {
         if (!state.timer) {
+          state.timerDueMs = now + wait
           state.timer = setTimeout(() => {
             state.timer = null
             this.pump(key, state)

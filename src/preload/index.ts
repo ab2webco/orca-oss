@@ -2091,6 +2091,8 @@ const api = {
 
     status: (): Promise<unknown> => ipcRenderer.invoke('plane:status'),
 
+    rateLimitWait: (): Promise<unknown> => ipcRenderer.invoke('plane:rateLimitWait'),
+
     testConnection: (args?: {
       workspaceId?: string
     }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>

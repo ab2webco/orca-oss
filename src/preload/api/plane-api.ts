@@ -15,6 +15,7 @@ import type {
   PlaneWorkItemUpdate,
   PlaneWorkspaceSelection
 } from '../../shared/plane-types'
+import type { PlaneRateLimitWait } from '../../shared/plane-rate-limit-wait'
 
 export type PlaneApi = {
   connect: (args: {
@@ -23,8 +24,11 @@ export type PlaneApi = {
     apiKey: string
   }) => Promise<{ ok: true; viewer: PlaneViewer } | { ok: false; error: string }>
   disconnect: (args?: { workspaceId?: string }) => Promise<void>
-  selectWorkspace: (args: { workspaceId: PlaneWorkspaceSelection }) => Promise<PlaneConnectionStatus>
+  selectWorkspace: (args: {
+    workspaceId: PlaneWorkspaceSelection
+  }) => Promise<PlaneConnectionStatus>
   status: () => Promise<PlaneConnectionStatus>
+  rateLimitWait: () => Promise<PlaneRateLimitWait | null>
   testConnection: (args?: {
     workspaceId?: string
   }) => Promise<{ ok: true; viewer: PlaneViewer } | { ok: false; error: string }>
@@ -97,7 +101,5 @@ export type PlaneApi = {
   }) => Promise<PlaneMutationResult>
   /** Fires when any route (renderer, CLI, paired client) mutates Plane, so open
    *  views can refetch instead of showing stale cards. Returns an unsubscribe. */
-  onChanged: (
-    callback: (event: { method: string; projectId: string | null }) => void
-  ) => () => void
+  onChanged: (callback: (event: { method: string; projectId: string | null }) => void) => () => void
 }

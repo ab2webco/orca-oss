@@ -2304,7 +2304,9 @@
         "linearOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
         "linearWorktreesColumn": "Workspaces",
         "planeSnapshotUpdating": "Updating…",
-        "planeSnapshotUpdatedAt": "Updated {{value0}}"
+        "planeSnapshotUpdatedAt": "Updated {{value0}}",
+        "planeRateLimitWaiting": "Plane rate limit: waiting {{value0}} s",
+        "planeRateLimitRetrying": "Plane asked to slow down: retrying in {{value0}} s"
       },
       "Terminal": {
         "73768427cf": "Close",

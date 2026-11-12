@@ -2168,7 +2168,9 @@
         "linearModeHasWorktreeTooltip": "Tickets de Linear vinculados a un espacio de trabajo de Orca Lab",
         "linearEmptyHasWorktree": "Aún no hay tickets de Linear vinculados a un espacio de trabajo de Orca Lab. Inicia el trabajo desde un issue de Linear para verlo aquí.",
         "linearOpenAttachedWorkspace": "Abrir el espacio de trabajo vinculado a {{value0}}",
-        "linearWorktreesColumn": "Espacios de trabajo"
+        "linearWorktreesColumn": "Espacios de trabajo",
+        "planeRateLimitWaiting": "Límite de peticiones de Plane: esperando {{value0}} s",
+        "planeRateLimitRetrying": "Plane pidió ir más despacio: reintentando en {{value0}} s"
       },
       "Terminal": {
         "73768427cf": "Cerrar",

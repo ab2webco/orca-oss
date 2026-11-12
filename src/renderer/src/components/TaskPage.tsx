@@ -213,6 +213,7 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import PlaneWorkItemWorkspace from '@/components/PlaneWorkItemWorkspace'
 import { TaskPagePlaneWorkItemList } from '@/components/task-page-plane-work-item-list'
 import { TaskPagePlaneBoard } from '@/components/task-page-plane-board'
+import { TaskPagePlaneRateLimitNotice } from '@/components/task-page-plane-rate-limit-notice'
 import {
   TaskPagePlaneBoardSkeleton,
   resolvePlaneLoadingSkeleton
@@ -10598,8 +10599,9 @@ export default function TaskPage(): React.JSX.Element {
                   </div>
                 ) : taskSource === 'plane' && planeConnected ? (
                   <div className="rounded-md rounded-b-none border border-border/50 bg-muted/50 px-3 pt-2 pb-0 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap gap-2">
+                    {/* Why no wrap here: at narrow widths refresh sat alone on its own row; only the presets wrap. */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 flex-wrap gap-2">
                         {planePresets.map((preset) => {
                           const active = activePlanePreset === preset.id
                           return (
@@ -10681,7 +10683,7 @@ export default function TaskPage(): React.JSX.Element {
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-3">
-                      <div className="relative min-w-[320px] flex-1">
+                      <div className="relative min-w-0 flex-1">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <Input
                           value={planeSearchInput}
@@ -11958,7 +11960,7 @@ export default function TaskPage(): React.JSX.Element {
             ) : (
               <div className="flex min-h-0 max-h-full flex-col overflow-hidden rounded-md rounded-t-none border border-t-0 border-border/50 bg-background shadow-sm">
                 <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border/50 bg-muted/35 px-3">
-                  <div className="min-w-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  <div className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     {translate(
                       'auto.components.TaskPage.planeWorkItemsHeading',
                       'Plane work items'
@@ -12028,6 +12030,10 @@ export default function TaskPage(): React.JSX.Element {
                         onOpenChange={setPlaneErrorDetailsOpen}
                       />
                     </div>
+                  ) : null}
+
+                  {planeLoading ? (
+                    <TaskPagePlaneRateLimitNotice settings={planeBoardProviderSettings} />
                   ) : null}
 
                   {/* Why view-gated: the board branch swaps in its own board-shaped skeleton; row shimmer over columns read as a broken table. */}
