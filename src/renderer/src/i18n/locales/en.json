@@ -17398,6 +17398,7 @@
       "thisProject": "this project",
       "projectUnread": "Could not read this project's questions.",
       "forYouEmpty": "No questions are waiting for you.",
+      "otherProjects": "Other projects · {{count}}",
       "yourAnswer": "Your answer",
       "openTerminal": "Open terminal",
       "youAnswered": "You answered",

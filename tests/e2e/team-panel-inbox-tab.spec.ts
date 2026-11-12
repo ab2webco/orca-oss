@@ -254,14 +254,17 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     })
     await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
 
-    // Full: this project's question and the other project's, counted once on the tab.
+    // Full: this project's question counts on the tab; the other project's waits folded below it.
     const inbox = panel.getByTestId('team-panel-inbox')
-    await expect(inboxTab).toContainText('2', { timeout: 60_000 })
+    const others = inbox.getByRole('button', { name: /Other projects · \d/ })
     await expect(inbox.getByText('Merge #923 now or wait for #915 first?')).toBeVisible({
       timeout: 60_000
     })
-    await expect(inbox.getByText('Ship the price change today or tomorrow?')).toBeVisible()
-    await expect(inbox.getByText(`${otherName}`, { exact: false }).first()).toBeVisible()
+    await expect(others).toHaveText('Other projects · 1', { timeout: 60_000 })
+    await expect(others).toHaveAttribute('aria-expanded', 'false')
+    await expect(inboxTab).toContainText('1')
+    await expect(inboxTab).not.toContainText('2')
+    await expect(inbox.getByText('Ship the price change today or tomorrow?')).toHaveCount(0)
     // ORCA-780: the member's ask is the lead's to answer; it reaches you only through the lead.
     const needsYou = inbox.locator('[data-needs-you="true"]')
     await expect(needsYou).toHaveCount(1)
@@ -273,8 +276,15 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     const forYouList = inbox.locator('[role="tabpanel"][data-state="active"]')
     await expect(forYouList.getByRole('textbox')).toHaveCount(0)
     await expect(forYouList.getByRole('button', { name: 'Send' })).toHaveCount(0)
-    await expect(forYouList.getByRole('button', { name: 'Answer' })).toHaveCount(2)
+    await expect(forYouList.getByRole('button', { name: 'Answer' })).toHaveCount(1)
     await capture('for-you', inbox)
+    // Opened, the other project is titled with its own name and stays answerable from here.
+    await others.click()
+    await expect(others).toHaveAttribute('aria-expanded', 'true')
+    await expect(inbox.getByText('Ship the price change today or tomorrow?')).toBeVisible()
+    await expect(inbox.getByRole('heading', { name: otherName })).toBeVisible()
+    await expect(forYouList.getByRole('button', { name: 'Answer' })).toHaveCount(2)
+    await capture('for-you-others', inbox)
 
     for (const [key, name] of [
       ['waiting', 'waiting'],
@@ -300,13 +310,17 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
       await capture(name, inbox)
     }
 
-    // Answering another project's question from here removes it and lowers the one count.
+    // Answering another project's question from here removes it and its heading; the tab never counted it.
     await inbox.getByRole('tab', { name: /For you/ }).click()
+    if ((await others.getAttribute('aria-expanded')) !== 'true') {
+      await others.click()
+    }
     await inbox.getByRole('button', { name: 'Today' }).click()
     await expect(inbox.getByText('Ship the price change today or tomorrow?')).toHaveCount(0, {
       timeout: 60_000
     })
-    await expect(inboxTab).toContainText('1', { timeout: 60_000 })
+    await expect(others).toHaveCount(0)
+    await expect(inboxTab).toContainText('1')
 
     // Answering this project's question moves it to Answered, under what you answered.
     await inbox.getByRole('button', { name: 'Merge now' }).click()
@@ -352,6 +366,21 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
     await expect(inbox.getByText('You answered: Merge now')).toBeVisible({ timeout: 60_000 })
     await expect(inbox.getByText('The lead answered: Use 8080')).toBeVisible()
     await capture('answered-yours', inbox)
+
+    // Nothing here but a question elsewhere: the empty line, then the folded heading; no tab count.
+    await client.call('game.ownerAsk', {
+      worktreeId: `${added.result.repo.id}::${otherRepo}`,
+      ticket: 'WEB-213',
+      question: 'Publish the pricing page now?',
+      options: ['Now', 'Later']
+    })
+    await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await inbox.getByRole('tab', { name: /For you/ }).click()
+    await expect(others).toHaveText('Other projects · 1', { timeout: 60_000 })
+    await expect(others).toHaveAttribute('aria-expanded', 'false')
+    await expect(inbox.getByText('No questions are waiting for you.')).toBeVisible()
+    await expect(inboxTab).not.toHaveText(/\d/)
+    await capture('for-you-elsewhere', inbox)
   } finally {
     agent.dispose()
     rmSync(otherRepo, { recursive: true, force: true })
