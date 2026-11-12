@@ -1,7 +1,6 @@
 import {
   ALL_EXECUTION_HOSTS_SCOPE,
   LOCAL_EXECUTION_HOST_ID,
-  getLocalExecutionHostLabel,
   getRepoExecutionHostId,
   getWorktreeExecutionHostId,
   type ExecutionHostId,
@@ -16,6 +15,7 @@ import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Row } from './worktree-list/grouping/row-types'
 import { getProjectGroupExecutionHostIdForRows } from './worktree-list/listing/host-filtering'
+import { localHostDisplayLabel, localHostPlatformDetail } from '../../lib/local-host-display-label'
 
 export type HostHeaderRow = {
   type: 'host-header'
@@ -95,8 +95,8 @@ function getFallbackHost(hostId: ExecutionHostId): HostSectionOption {
   return {
     id: hostId,
     kind: isLocal ? 'local' : hostId.startsWith('ssh:') ? 'ssh' : 'runtime',
-    label: isLocal ? getLocalExecutionHostLabel() : hostId,
-    detail: isLocal ? 'This computer' : 'Host',
+    label: isLocal ? localHostDisplayLabel() : hostId,
+    detail: isLocal ? localHostPlatformDetail() : 'Host',
     health: isLocal ? 'local' : 'available'
   }
 }

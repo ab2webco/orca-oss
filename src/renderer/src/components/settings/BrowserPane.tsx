@@ -29,6 +29,7 @@ import {
 import { isMacUserAgent } from '@/components/terminal-pane/pane-helpers'
 import { translate } from '@/i18n/i18n'
 import { resolveAvailableBrowserSessionHostId } from './browser-session-host-selection'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 export { getBrowserPaneCombinedSearchEntries }
 
 type BrowserPaneProps = {
@@ -134,7 +135,7 @@ export function BrowserPane({
           label: host.label,
           detail:
             host.kind === 'local'
-              ? translate('auto.components.settings.BrowserPane.86b7c83fee', 'This computer')
+              ? localHostDisplayLabel()
               : translate(
                   'auto.components.settings.BrowserPane.c0f85056d9',
                   'Browser profiles on this Orca Lab server.'

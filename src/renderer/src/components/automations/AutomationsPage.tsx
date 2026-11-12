@@ -24,11 +24,7 @@ import {
   DEFAULT_AUTOMATION_COMMAND_TIMEOUT_SECONDS,
   normalizeAutomationCommandTimeoutSeconds
 } from '../../../../shared/automation-command-run'
-import {
-  getLocalExecutionHostLabel,
-  getRepoExecutionHostId,
-  parseExecutionHostId
-} from '../../../../shared/execution-host'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import type { PreflightStatus } from '../../../../preload/api-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -125,6 +121,7 @@ import { AutomationsDetailPane } from './AutomationsDetailPane'
 import { AutomationsPageSkeleton } from './AutomationsPageSkeleton'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { translate } from '@/i18n/i18n'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 
 const AGENTS = getAgentCatalog().map((agent) => agent.id)
 const AUTOMATIONS_CHANGED_EVENT = 'orca:automations-changed'
@@ -738,13 +735,13 @@ export default function AutomationsPage(): React.JSX.Element {
             ?.name ?? parsed.environmentId
         )
       }
-      return getLocalExecutionHostLabel()
+      return localHostDisplayLabel()
     },
     [runtimeEnvironments, sshTargetLabels]
   )
   const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   const hostLabelById = useMemo(() => {
-    const labels = new Map<string, string>([['local', getLocalExecutionHostLabel()]])
+    const labels = new Map<string, string>([['local', localHostDisplayLabel()]])
     for (const [targetId, label] of sshTargetLabels) {
       labels.set(`ssh:${encodeURIComponent(targetId)}`, label)
     }

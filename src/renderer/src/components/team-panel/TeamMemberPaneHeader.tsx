@@ -2,13 +2,8 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { StatusDot } from '@/components/StatusDot'
 import { translate } from '@/i18n/i18n'
-import {
-  teamCiText,
-  teamHostText,
-  teamModelText,
-  teamStatusTone,
-  teamTicketBesideName
-} from './team-card-text'
+import { teamCiText, teamModelText, teamStatusTone, teamTicketBesideName } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { useTeamMemberOfTab } from './use-team-panel-model'
 import { useTeamPanelLook } from './use-team-panel-look'
 
@@ -47,7 +42,9 @@ function OpenTeamMemberPaneHeader({ tabId }: { tabId: string }): React.JSX.Eleme
           ) : null}
           {ticket ? <code className="font-mono text-[11.5px]">{ticket}</code> : null}
         </span>
-        <span className="font-mono text-[11px]">{teamHostText(card.host)}</span>
+        <span className="font-mono text-[11px]">
+          <TeamHostName host={card.host} />
+        </span>
         {model ? <span className="truncate">{model}</span> : null}
         {card.pr ? (
           <a

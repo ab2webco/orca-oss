@@ -44,7 +44,6 @@ import type {
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { translate } from '@/i18n/i18n'
 import {
-  getExecutionHostLabel,
   getSettingsFocusedExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
@@ -65,6 +64,7 @@ import {
   assertManagedBrowserMaterializationAllowed,
   getClientCreationActionPolicy
 } from '@/lib/client-creation-action-policy'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 type CreateBrowserTabOptions = {
   activate?: boolean
@@ -288,7 +288,7 @@ function getBrowserSettingsHostLabel(state: AppState, hostId: ExecutionHostId): 
       return name
     }
   }
-  return getExecutionHostLabel(hostId)
+  return hostDisplayLabel(hostId)
 }
 
 function getBrowserSettingsRuntimeEnvironmentId(

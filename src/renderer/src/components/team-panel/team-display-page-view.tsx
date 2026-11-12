@@ -1,7 +1,7 @@
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamDisplayPage } from './team-display-pages'
-import { teamHostText } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import {
   Bars,
   Blocks,
@@ -226,7 +226,9 @@ function MachinesPage({ page }: { page: PageOf<'machines'> }) {
       <DisplayLabel>{translate('teamPanel.display.agents', 'Agents')}</DisplayLabel>
       {page.rows.map((row) => (
         <div key={row.key} className="contents">
-          <span className="truncate text-[11.5px] text-foreground">{teamHostText(row.host)}</span>
+          <span className="truncate text-[11.5px] text-foreground">
+            <TeamHostName host={row.host} />
+          </span>
           {row.cpuPercent === null ? (
             <DisplayLabel wrap className="col-span-2 text-status-attention">
               {translate('teamPanel.display.offline', 'Offline')}

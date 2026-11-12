@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '../types'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import {
   createBrowserMockApi,
   createTestStore,
   resetBrowserRuntimeMocks,
   settingsWithRuntime
 } from './browser-slice-test-harness'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 const createWebRuntimeSessionBrowserTabMock = vi.hoisted(() => vi.fn())
 const runtimeEnvironmentCall = vi.fn()
@@ -207,7 +207,7 @@ describe('createBrowserSlice runtime guard', () => {
     expect(result).toMatchObject({
       ok: true,
       executionHostId: 'local',
-      executionHostLabel: getExecutionHostLabel('local')
+      executionHostLabel: hostDisplayLabel('local')
     })
   })
 

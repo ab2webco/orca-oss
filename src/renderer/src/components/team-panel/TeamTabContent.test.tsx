@@ -171,7 +171,7 @@ describe('TeamTabContent', () => {
     expect(card.textContent).toContain('Castle')
     expect(card.textContent).toContain('Lead')
     expect(card.querySelector('svg[data-crown]')).not.toBeNull()
-    expect(card.textContent).toContain('local')
+    expect(card.textContent).toContain('This computer')
     // ORCA-1129: a command reads as every tool label does.
     expect(card.textContent).toContain('Bash · gh pr checks 923')
     expect(card.textContent).toContain('Opus 5.5 · high')

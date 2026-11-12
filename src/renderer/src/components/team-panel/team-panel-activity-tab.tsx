@@ -7,12 +7,12 @@ import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import type { TeamActivityRow, TeamPanelSoloModel } from '../../../../shared/team-panel-model-types'
 import {
   teamConditionText,
-  teamHostText,
   teamLiveText,
   teamModelText,
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamActivityDetail } from './TeamActivityDetail'
 import { openTeamSession } from './team-session-open'
 import { teamActivityRowsOf, useTeamActivityFilter } from './team-activity-filter'
@@ -48,7 +48,7 @@ function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): Reac
           <span className="truncate text-xs text-muted-foreground">{row.repoName}</span>
         ) : null}
         <code className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {teamHostText(row.host)}
+          <TeamHostName host={row.host} />
         </code>
       </span>
       <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

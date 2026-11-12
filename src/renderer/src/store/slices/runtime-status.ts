@@ -41,7 +41,7 @@ export type RuntimeStatusSlice = {
    * `runtimeEnvironmentCatalogHydrated`, so a failed read degrades rather than
    * leaving them pending for the whole session. */
   runtimeEnvironmentCatalogSettled: boolean
-  /** Keyed by runtime environment id. Fed into buildExecutionHostRegistry so
+  /** Keyed by runtime environment id. Fed into buildHostDisplayRegistry so
    * compat verdicts/blocked health show live in the sidebar host pickers. */
   runtimeStatusByEnvironmentId: Map<string, RuntimeEnvironmentStatus>
   /** Tombstones of runtime environment ids that were removed from the saved list

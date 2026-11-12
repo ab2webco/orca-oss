@@ -12,6 +12,7 @@ import type {
   TeamStatus,
   TeamTicket
 } from '../../../../shared/team-panel-model-types'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 
 const TONE: Record<TeamStatus, StatusTone> = {
   attention: 'attention',
@@ -153,8 +154,9 @@ export function teamModelText(model: TeamModel | null): string | null {
   return model.effort ? `${model.label} · ${model.effort}` : model.label
 }
 
-export function teamHostText(host: TeamHost): string {
-  return host.kind === 'local' ? translate('teamPanel.host.local', 'local') : host.name
+/** `localName` is the user's rename of this machine, which wins over the default label. */
+export function teamHostText(host: TeamHost, localName?: string | null): string {
+  return host.kind === 'local' ? localName?.trim() || localHostDisplayLabel() : host.name
 }
 
 /** The PR chip's second half; null when there is nothing to say about its checks. */

@@ -1,12 +1,12 @@
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import {
-  getExecutionHostLabel,
   getRepoExecutionHostId,
   getWorktreeExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { ProjectGroupingIndex, WorktreeGroupEntry } from './project-grouping'
+import { hostDisplayLabel } from '../../../../lib/local-host-display-label'
 
 function getRepoHostLabel(
   repoId: string,
@@ -16,14 +16,14 @@ function getRepoHostLabel(
 ): string | null {
   const setup = projectIndex?.setupByRepoId.get(repoId)
   if (setup) {
-    return hostLabelById?.get(setup.hostId) ?? getExecutionHostLabel(setup.hostId)
+    return hostLabelById?.get(setup.hostId) ?? hostDisplayLabel(setup.hostId)
   }
   const repo = repoMap.get(repoId)
   if (!repo) {
     return null
   }
   const hostId = getRepoExecutionHostId(repo)
-  return hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId)
+  return hostLabelById?.get(hostId) ?? hostDisplayLabel(hostId)
 }
 
 export function getMixedHostContextLabels(
@@ -56,7 +56,7 @@ export function getMixedWorktreeHostContextLabels(
   for (const worktree of worktrees) {
     const hostId = getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId)
     uniqueHostIds.add(hostId)
-    labelsByWorktreeId.set(worktree.id, hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId))
+    labelsByWorktreeId.set(worktree.id, hostLabelById?.get(hostId) ?? hostDisplayLabel(hostId))
   }
   return uniqueHostIds.size > 1 ? labelsByWorktreeId : undefined
 }

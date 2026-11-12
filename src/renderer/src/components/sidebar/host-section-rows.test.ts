@@ -250,27 +250,29 @@ describe('addHostSectionRows', () => {
   it('keeps host headers for a custom multi-host visibility filter', () => {
     const local = repo('local')
     const ssh = repo('ssh', 'ssh-1')
-    const rows = [repoHeader(local), item('local-wt', local), repoHeader(ssh), item('ssh-wt', ssh)]
+    const localRows = [repoHeader(local), item('local-wt', local)]
+    const sectionsOf = (rows: Row[]): HostSectionRow[] =>
+      addHostSectionRows({
+        rows,
+        hostOptions: [
+          {
+            id: 'local',
+            kind: 'local',
+            label: 'Local Mac',
+            detail: 'This computer',
+            health: 'local'
+          },
+          { id: 'ssh:ssh-1', kind: 'ssh', label: 'Builder', detail: 'SSH', health: 'available' }
+        ],
+        workspaceHostScope: 'all',
+        visibleWorkspaceHostIds: ['local', 'ssh:ssh-1'],
+        defaultHostId: 'local',
+        preferProjectGrouping: true
+      })
 
-    const sectioned = addHostSectionRows({
-      rows,
-      hostOptions: [
-        {
-          id: 'local',
-          kind: 'local',
-          label: 'Local Mac',
-          detail: 'This computer',
-          health: 'local'
-        },
-        { id: 'ssh:ssh-1', kind: 'ssh', label: 'Builder', detail: 'SSH', health: 'available' }
-      ],
-      workspaceHostScope: 'all',
-      visibleWorkspaceHostIds: ['local', 'ssh:ssh-1'],
-      defaultHostId: 'local',
-      preferProjectGrouping: true
-    })
-
-    expect(sectioned.map(rowKey)).toEqual([
+    // Why: a filtered host that owns no rows draws no header, so the other host gets none either.
+    expect(sectionsOf(localRows)).toEqual(localRows)
+    expect(sectionsOf([...localRows, repoHeader(ssh), item('ssh-wt', ssh)]).map(rowKey)).toEqual([
       'host:local',
       'repo:local',
       'local-wt',

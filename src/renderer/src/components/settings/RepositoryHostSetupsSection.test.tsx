@@ -3,7 +3,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getExecutionHostLabel, toSshExecutionHostId } from '../../../../shared/execution-host'
+import { toSshExecutionHostId } from '../../../../shared/execution-host'
 import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   RUNTIME_PROTOCOL_VERSION,
@@ -13,11 +13,12 @@ import type { Project, ProjectHostSetup } from '../../../../shared/project-types
 import type { Repo } from '../../../../shared/repo-types'
 import { useAppStore } from '../../store'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 let container: HTMLDivElement
 let root: Root
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 function makeRepo(overrides: Partial<Repo> & Pick<Repo, 'id' | 'displayName' | 'path'>): Repo {
   return {
