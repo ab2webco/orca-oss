@@ -6,7 +6,7 @@ import { actOutGate, registerAdvisor } from './advisor-sync'
 import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
-import { leadAutostart } from './lead-autostart'
+import { startOrRearmLead } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
 import { registerTextLayer } from './text-layer'
@@ -41,7 +41,7 @@ export const register: Register = (on) => {
     })
     void watchFleet($, () => void refreshSoon($).catch(() => undefined)).catch(() => undefined)
     // Why not awaited: the skill runs once the session is idle, and session.start must not wait on it.
-    void leadAutostart($).catch(() => undefined)
+    void startOrRearmLead($).catch(() => undefined)
     return started
   })
 
