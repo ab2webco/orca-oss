@@ -52,11 +52,16 @@ export function filterGameHistory(
 }
 
 export function gameHistoryOutcomeOf(
-  agent: { workItem?: { statusGroup: GameStatusGroup }; limit?: GameAgent['limit'] },
+  agent: {
+    workItem?: { statusGroup: GameStatusGroup }
+    limit?: GameAgent['limit']
+    review?: { state: string } | null
+  },
   freedBy: 'sweep' | 'stop',
   workerState?: string
 ): GameHistoryOutcome {
-  if (freedBy === 'sweep') {
+  // Why the review on a stop: a lead often stops a member once its PR merged (ORCA-1170).
+  if (freedBy === 'sweep' || agent.review?.state === 'merged') {
     return agent.workItem?.statusGroup === 'review' ? 'qa' : 'merged'
   }
   if (agent.limit) {
