@@ -18,6 +18,9 @@ const sourceScriptPath = fileURLToPath(new URL('./rebuild-native-deps.mjs', impo
 const sourceInstallScriptPath = fileURLToPath(
   new URL('./install-electron-package-binary.mjs', import.meta.url)
 )
+const sourceExtractorCommandPath = fileURLToPath(
+  new URL('./electron-archive-extractor-command.mjs', import.meta.url)
+)
 const PID_RECORDER_FILE = 'pid-recorder.cjs'
 const SPAWNED_PIDS_FILE = 'spawned-pids.log'
 
@@ -328,6 +331,10 @@ function mkTempProject() {
   copyFileSync(
     sourceInstallScriptPath,
     join(projectDir, 'config', 'scripts', 'install-electron-package-binary.mjs')
+  )
+  copyFileSync(
+    sourceExtractorCommandPath,
+    join(projectDir, 'config', 'scripts', 'electron-archive-extractor-command.mjs')
   )
   writeFileSync(
     join(projectDir, PID_RECORDER_FILE),

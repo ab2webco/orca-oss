@@ -17,6 +17,9 @@ import { describe, expect, it } from 'vitest'
 const sourceScriptPath = fileURLToPath(
   new URL('./install-electron-package-binary.mjs', import.meta.url)
 )
+const sourceExtractorCommandPath = fileURLToPath(
+  new URL('./electron-archive-extractor-command.mjs', import.meta.url)
+)
 
 describe('install-electron-package-binary', () => {
   it('installs Electron from an isolated cache and repairs path.txt', () => {
@@ -288,6 +291,10 @@ function mkTempProject() {
   copyFileSync(
     sourceScriptPath,
     join(projectDir, 'config', 'scripts', 'install-electron-package-binary.mjs')
+  )
+  copyFileSync(
+    sourceExtractorCommandPath,
+    join(projectDir, 'config', 'scripts', 'electron-archive-extractor-command.mjs')
   )
   return projectDir
 }

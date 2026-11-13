@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { platform as osPlatform, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { getElectronArchiveExtractorCommand } from './electron-archive-extractor-command.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const electronPackageDir = resolve(projectDir, 'node_modules/electron')
@@ -251,7 +252,7 @@ function extractElectronArchive(zipPath, extractDir) {
   mkdirSync(extractDir, { recursive: true })
   // Why: extract-zip/Electron install.js can leave Node 24 with an unsettled
   // promise and no active handles on CI. Host unzip tools fail synchronously.
-  const command = getExtractorCommand(zipPath, extractDir)
+  const command = getElectronArchiveExtractorCommand(zipPath, extractDir)
   const result = spawnSync(command.file, command.args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
@@ -281,44 +282,6 @@ function moveExtractedElectronDist(extractDir, electronDistDir) {
       verbatimSymlinks: true
     })
   }
-}
-
-function getExtractorCommand(zipPath, extractDir) {
-  if (process.env.ORCA_ELECTRON_PACKAGE_EXTRACTOR) {
-    return {
-      file: process.execPath,
-      args: [process.env.ORCA_ELECTRON_PACKAGE_EXTRACTOR, zipPath, extractDir],
-      label: `node ${process.env.ORCA_ELECTRON_PACKAGE_EXTRACTOR}`
-    }
-  }
-
-  if (osPlatform() === 'win32') {
-    return {
-      file: process.env.ORCA_POWERSHELL_BIN || 'powershell',
-      args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        [
-          "$ErrorActionPreference = 'Stop'",
-          `Expand-Archive -LiteralPath ${quotePowerShellLiteral(zipPath)} -DestinationPath ${quotePowerShellLiteral(extractDir)} -Force`
-        ].join('; ')
-      ],
-      label: 'powershell Expand-Archive'
-    }
-  }
-
-  return {
-    file: process.env.ORCA_UNZIP_BIN || 'unzip',
-    args: ['-q', zipPath, '-d', extractDir],
-    label: 'unzip'
-  }
-}
-
-function quotePowerShellLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`
 }
 
 function formatExtractorFailure(command, result) {
