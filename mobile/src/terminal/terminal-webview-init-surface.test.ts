@@ -18,6 +18,7 @@ type TerminalStub = ReturnType<typeof makeTerminal>
 type TerminalOptions = {
   cursorInactiveStyle?: string
   cursorStyle?: string
+  minimumContrastRatio?: number
   showCursorImmediately?: boolean
 }
 type RegisteredWindowListener = {
@@ -151,6 +152,13 @@ describe('terminal WebView init surface replacement', () => {
         showCursorImmediately: true
       })
     }
+  })
+
+  it('builds the default dark terminal with the WCAG AA floor, so dim hints and brightBlack stay readable', () => {
+    // Why: dim hints (#565f89) sit at 2.76:1 and brightBlack (#414868) at 1.91:1 on #1a1b26.
+    dispatchInit(51, 'hint')
+
+    expect(terminalOptions[0]?.minimumContrastRatio).toBe(4.5)
   })
 
   it('commits only the newest surface when phone-fit init calls overlap', () => {

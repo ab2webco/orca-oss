@@ -1,13 +1,13 @@
 import { colors } from '../theme/mobile-theme'
 
 // Theme normalization and page-surface painting injected into the WebView IIFE.
-// Mirrors the desktop minimumContrastRatio gate (src/renderer/src/lib/terminal-contrast-correction.ts,
-// #7934/#10104): a dark composed background gets a mild floor of 3 to rescue near-background body text
-// (e.g. Antigravity's #262b30 on #1e242a) without over-brightening vibrant ANSI colors; a light
-// background keeps the WCAG-AA 4.5 floor. Gate on the composed background luminance, not app mode,
+// Same minimumContrastRatio gate as the desktop (src/renderer/src/lib/terminal-contrast-correction.ts,
+// #7934/#10104), but the phone lifts a dark composed background to the WCAG-AA 4.5 floor too, not the
+// desktop's 3: on #1a1b26, dim hints (#565f89, 2.76:1) and brightBlack (#414868, 1.91:1) lifted only to
+// 3:1 stay hard to read at phone font sizes. Gate on the composed background luminance, not app mode,
 // because either theme slot can hold either kind of theme.
 export const TERMINAL_WEBVIEW_THEME_JS = `
-  var DARK_BG_MIN_CONTRAST = 3;
+  var DARK_BG_MIN_CONTRAST = 4.5;
   var LIGHT_BG_MIN_CONTRAST = 4.5;
   // Dark app surface a transparent terminal background composites over (matches desktop APP_SURFACE_COLORS.dark).
   var CONTRAST_APP_SURFACE = { r: 10, g: 10, b: 10 };

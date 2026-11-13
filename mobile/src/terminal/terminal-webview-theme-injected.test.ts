@@ -3,7 +3,7 @@ import { parse } from 'acorn'
 import { describe, expect, it } from 'vitest'
 import { TERMINAL_WEBVIEW_THEME_JS } from './terminal-webview-theme-injected'
 
-const DARK_FLOOR = 3
+const DARK_FLOOR = 4.5
 const LIGHT_FLOOR = 4.5
 
 // Eval the injected theme JS in a bare context so the declared helpers become
