@@ -22,6 +22,7 @@ import {
   syncAdvisorBody
 } from './team-scene-advisor-walk'
 import { seatPlanOf } from './team-scene-seats'
+import type { TeamSceneAttendReach as Reach } from './team-scene-lead-attend'
 import {
   grownSite,
   keepTrophy,
@@ -111,7 +112,7 @@ export type TeamSceneWorld = {
 }
 
 /** How a style seats its team: a row's length, and whether work keeps members at their desks. */
-export type TeamSceneLayout = { rowSize: number; workSeated: boolean; firstX?: number }
+export type TeamSceneLayout = { rowSize: number; workSeated: boolean; firstX?: number } & Reach
 const GROUND_LAYOUT: TeamSceneLayout = { rowSize: 4, workSeated: false }
 
 export function createTeamSceneWorld(): TeamSceneWorld {

@@ -14,7 +14,14 @@ export const OFFICE_BACK_SEAT: OfficeBackSeat = { chairEnd: 144 }
 
 /** Desks in one row of five, members typing at them; a walk to a tray read as a bug at a desk. */
 // Why first at 0.16: the advisor gestures left of the first desk, past that sitter's own mark.
-export const OFFICE_BACK_LAYOUT = { rowSize: 5, workSeated: true, firstX: 0.16 } as const
+export const OFFICE_BACK_LAYOUT = {
+  rowSize: 5,
+  workSeated: true,
+  firstX: 0.16,
+  // Why: an Office lead holds nothing and its asker shows the back of its head; its mark hangs left.
+  attendReachPx: 14,
+  attendMarkDxPx: -20
+} as const
 
 export type OfficeBackLook = { hair: string; skin: string; shirt: string }
 

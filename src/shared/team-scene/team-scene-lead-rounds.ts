@@ -1,4 +1,5 @@
 import { teamSceneArrived as near } from './team-scene-motion'
+import { teamSceneAttendSpotOf } from './team-scene-lead-attend'
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import type { TeamSceneActivity, TeamSceneSpot } from './team-scene-types'
 
@@ -121,7 +122,10 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     // Why halfway at most: past it the lead stands on the next seat, two to one desk.
     const next = world.stations.map((s) => (s.x - member.home.x) * side).filter((d) => d > 0.001)
     const beside = Math.min(BESIDE_X, ...next.map((d) => d / 2))
-    lead.target = { x: member.home.x + side * beside, depth: member.home.depth + 0.04 }
+    lead.target =
+      rounds.purpose === 'attend'
+        ? teamSceneAttendSpotOf(world, member, width, side)
+        : { x: member.home.x + side * beside, depth: member.home.depth + 0.04 }
     if (!near(lead, width)) {
       return
     }
@@ -131,8 +135,12 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
       world.effects.push({ kind: 'handoff', from: 'lead', to: member.key })
       member.emote = { kind: 'check', until: world.t + 1.1 }
     }
+  } else if (rounds.purpose === 'attend') {
+    // Why: a narrowed stage moves the asker's clear spot, so the lead follows it.
+    lead.target = teamSceneAttendSpotOf(world, member, width, side)
   }
-  lead.facing = side === 1 ? -1 : 1
+  // Why from where it stands: an attending lead may stand on the asker's far side.
+  lead.facing = lead.target.x > member.home.x ? -1 : 1
   if (rounds.purpose === 'give' && world.t - rounds.at >= GIVE_SECONDS) {
     Object.assign(rounds, { stage: 'home', member: null })
   }
