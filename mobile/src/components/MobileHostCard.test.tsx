@@ -9,6 +9,7 @@ import {
   type HostWorktreeInfo
 } from '../worktree/home-worktree-info'
 import type { HostTeamLine } from '../hosts/host-team-line'
+import type { HostAccountLine } from '../hosts/host-account-line'
 import { MobileHostCard } from './MobileHostCard'
 
 vi.mock('react-native', () => ({
@@ -57,6 +58,8 @@ describe('MobileHostCard', () => {
       path?: MobileConnectionPath
       credentialStatus?: HostCredentialStatus
       teamLine?: HostTeamLine | null
+      account?: HostAccountLine | null
+      lastSeen?: string | null
     }
   ): Promise<string[]> {
     await act(async () => {
@@ -69,6 +72,8 @@ describe('MobileHostCard', () => {
           credentialStatus: overrides?.credentialStatus,
           worktreeInfo,
           teamLine: overrides?.teamLine,
+          account: overrides?.account,
+          lastSeen: overrides?.lastSeen,
           onPress: () => {},
           onLongPress: () => {},
           onOpenActions: () => {}
@@ -185,15 +190,42 @@ describe('MobileHostCard', () => {
     expect(lines).toEqual(['Studio', 'Connected', ' · Direct · LAN', '12 worktrees · 2 active'])
   })
 
-  it('claims no team for a host the phone cannot reach', async () => {
+  it('shows a host the phone cannot reach as the last team it proved, never as live', async () => {
     const lines = await renderCard(loaded, {
       state: 'disconnected',
       verdict: { kind: 'unreachable', label: "Can't reach desktop" },
-      teamLine: { members: 4, working: 2, needsYou: 1 }
+      teamLine: { members: 4, working: 2, needsYou: 1 },
+      lastSeen: 'last seen 14:02'
     })
 
-    expect(lines).not.toContain('4 members')
+    expect(lines).toContain('Last known: 4 members · 2 working')
+    expect(lines).toContain('last seen 14:02')
     expect(lines).not.toContain('1 needs you')
+  })
+
+  it('shows the active account and its 5 h percentage on a connected desktop', async () => {
+    const lines = await renderCard(loaded, {
+      account: { email: 'dev@example.com', fiveHourPercent: 38 }
+    })
+
+    expect(lines).toContain('dev@example.com')
+    expect(lines).toContain('38%')
+  })
+
+  it('shows no account line for a host whose account is not known', async () => {
+    const lines = await renderCard(loaded, { account: null })
+
+    expect(lines).toEqual(['Studio', 'Connected', ' · Direct · LAN', '12 worktrees · 2 active'])
+  })
+
+  it('shows no account line for a disconnected host, which may have changed account since', async () => {
+    const lines = await renderCard(loaded, {
+      state: 'disconnected',
+      verdict: { kind: 'unreachable', label: "Can't reach desktop" },
+      account: { email: 'dev@example.com', fiveHourPercent: 38 }
+    })
+
+    expect(lines).not.toContain('dev@example.com')
   })
 
   it('offers re-pairing when the credential is missing', async () => {

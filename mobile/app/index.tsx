@@ -23,6 +23,8 @@ import { removeHostAndCloseClient } from '../src/transport/host-removal-lifecycl
 import { fetchHomeHostWorktreeInfo } from '../src/worktree/home-host-worktree-fetch'
 import { fetchHomeHostTeamLine } from '../src/hosts/home-host-team-fetch'
 import type { HostTeamLine } from '../src/hosts/host-team-line'
+import { hostAccountLineOf } from '../src/hosts/host-account-line'
+import { hostLastSeenLabel } from '../src/hosts/host-last-seen'
 import { totalHomeStats, type HomeStatsSummary } from '../src/stats/home-stats-total'
 import { HomeStatsRow } from '../src/components/HomeStatsRow'
 import type { HomeWorktreeSummary, HostWorktreeInfo } from '../src/worktree/home-worktree-info'
@@ -848,6 +850,10 @@ export default function HomeScreen() {
                 path={hostPaths[item.id] ?? 'lan'}
                 worktreeInfo={worktreeInfo[item.id]}
                 teamLine={teamLines[item.id] ?? null}
+                account={
+                  accountsByHost[item.id] ? hostAccountLineOf(accountsByHost[item.id]!) : null
+                }
+                lastSeen={hostLastSeenLabel(item.lastConnected)}
                 onPress={() => {
                   if (item.credentialStatus === 'missing') {
                     router.push('/pair-scan')
