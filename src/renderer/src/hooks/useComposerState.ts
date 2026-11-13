@@ -153,13 +153,13 @@ import { useFolderWorkspaceComposerPathStatus } from '@/components/sidebar/folde
 import { resolveFolderWorkspaceLaunchDraft } from '@/components/sidebar/folder-workspace-linked-startup-plan'
 import { submitFolderWorkspaceCreate } from '@/components/sidebar/folder-workspace-composer-submit'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
-import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import {
   getRepoExecutionHostId,
   normalizeExecutionHostId,
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../shared/execution-host'
+
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
@@ -214,6 +214,7 @@ import { isWorkspaceLinkedItemSourceContextMatch } from '../../../shared/workspa
 import { resolveJiraSourceHostId } from '@/lib/jira-source-host'
 import { buildTrustedComposerIssueCommand } from '@/lib/composer-issue-command'
 import { settleComposerSubmit } from '@/lib/composer-submit-cancellation'
+import { buildHostDisplayRegistry } from '../lib/local-host-display-label'
 
 const NEVER_CANCEL_COMPOSER_SUBMIT = (): boolean => false
 
@@ -687,7 +688,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   const eligibleRepos = useMemo(() => getComposerEligibleRepos(repos), [repos])
   const hostOptions = useMemo(
     () =>
-      buildExecutionHostRegistry({
+      buildHostDisplayRegistry({
         repos,
         settings,
         hostSource: 'configured-only',

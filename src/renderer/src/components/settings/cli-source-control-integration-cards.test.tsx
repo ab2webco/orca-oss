@@ -3,13 +3,13 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import {
   GitHubIntegrationCard,
   GitLabIntegrationCard
 } from './cli-source-control-integration-cards'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 type StoreState = {
   settings: { activeRuntimeEnvironmentId: string | null }

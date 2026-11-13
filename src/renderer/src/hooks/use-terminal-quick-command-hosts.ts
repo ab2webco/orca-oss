@@ -8,7 +8,6 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
-import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import { useAppStore } from '@/store'
 import type {
@@ -16,6 +15,7 @@ import type {
   TerminalQuickCommandHostsSlice
 } from '@/store/slices/terminal-quick-command-hosts'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { buildHostDisplayRegistry, localHostDisplayLabel } from '../lib/local-host-display-label'
 
 export type TerminalQuickCommandHost = {
   commands: readonly TerminalQuickCommand[]
@@ -89,7 +89,7 @@ export function getTerminalQuickCommandHostOptions(
   settings: GlobalSettings | null | undefined,
   runtimeEnvironments: readonly Pick<PublicKnownRuntimeEnvironment, 'id' | 'name'>[]
 ): { id: ExecutionHostId; label: string }[] {
-  return buildExecutionHostRegistry({
+  return buildHostDisplayRegistry({
     repos: [],
     settings,
     hostSource: 'configured-only',
@@ -179,7 +179,8 @@ export function useTerminalQuickCommandHosts(
         commands: settings?.terminalQuickCommands ?? [],
         hostId: LOCAL_EXECUTION_HOST_ID,
         label:
-          hostOptions.find((host) => host.id === LOCAL_EXECUTION_HOST_ID)?.label ?? 'This computer'
+          hostOptions.find((host) => host.id === LOCAL_EXECUTION_HOST_ID)?.label ??
+          localHostDisplayLabel()
       }
     ]
     if (

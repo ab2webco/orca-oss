@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import {
   buildSidebarHostOptions,
   buildSidebarHostScopeOptions,
@@ -7,8 +6,9 @@ import {
   getSidebarHostHealthLabel,
   shouldShowHostScopeControls
 } from './sidebar-host-options'
+import { hostDisplayLabel, localHostPlatformDetail } from '../../lib/local-host-display-label'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 describe('sidebar host options', () => {
   it('hides host controls for local-only workspaces', () => {
@@ -22,7 +22,7 @@ describe('sidebar host options', () => {
       {
         id: 'local',
         label: LOCAL_HOST_LABEL,
-        detail: 'This computer',
+        detail: localHostPlatformDetail(),
         kind: 'local',
         health: 'local',
         presence: 'local'

@@ -95,7 +95,11 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     })
 
     // Row 6: the member's tab names its character, ticket and host, not `worker-task_…`.
-    await expect(orcaPage.getByText('Merlín · ORCA-12 · local').first()).toBeVisible({
+    // ORCA-1149: the stored title keeps `local`; only the label names this machine.
+    const memberTab = orcaPage.locator(
+      '[data-testid="sortable-tab"][data-tab-title="Merlín · ORCA-12 · local"]'
+    )
+    await expect(memberTab.first()).toContainText('Merlín · ORCA-12 · This computer', {
       timeout: 60_000
     })
     await expect(orcaPage.getByText(/worker-task_/)).toHaveCount(0)

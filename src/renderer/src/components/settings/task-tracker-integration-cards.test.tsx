@@ -3,12 +3,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { TooltipProvider } from '../ui/tooltip'
 import { LinearIntegrationCard } from './task-tracker-integration-cards'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 type StoreState = {
   linearStatus: {

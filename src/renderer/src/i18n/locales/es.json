@@ -6004,7 +6004,6 @@
           "4399c77caa": "Predeterminado",
           "4af9a17947": "kagi",
           "c0f85056d9": "Perfiles del navegador en este servidor de Orca Lab.",
-          "86b7c83fee": "Este equipo",
           "6480776a03": "Perfiles del navegador para el host seleccionado.",
           "5e19a692f7": "Host"
         },
@@ -15652,6 +15651,9 @@
     }
   },
   "components": {
+    "executionHost": {
+      "thisComputer": "Este equipo"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Este agente no admite pegar imágenes.",
@@ -16349,9 +16351,6 @@
       "tests": "Probando",
       "pr": "En PR",
       "merge": "En merge"
-    },
-    "host": {
-      "local": "local"
     },
     "card": {
       "merged": "Mergeado",

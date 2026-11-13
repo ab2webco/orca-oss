@@ -2,7 +2,8 @@ import { statusToneTextClass } from '@/components/status-tone'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamMachine } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamStatusTone } from './team-card-text'
+import { teamStatusTone } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import { TeamStatusMark } from './TeamStatusMark'
@@ -72,16 +73,20 @@ function MemoryBar({
   )
 }
 
+// Why not the shown name: it is translated, and E2E and React need an id that stays put.
+const machineId = (host: TeamMachine['host']): string =>
+  host.kind === 'local' ? 'local' : host.name
+
 function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
   const tone = teamStatusTone(machine.status)
   return (
     <div
-      data-team-machine={teamHostText(machine.host)}
+      data-team-machine={machineId(machine.host)}
       className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5 last:border-b-0"
     >
       <div className="flex min-w-0 items-center gap-2">
         <b className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-medium">
-          {teamHostText(machine.host)}
+          <TeamHostName host={machine.host} />
         </b>
         <span
           className={cn('inline-flex flex-none items-center gap-1.5 text-[11.5px]', {
@@ -116,7 +121,7 @@ export function TeamPanelMachinesTab({
   return (
     <div className={cn('flex flex-col pt-1.5', { 'pb-3': !alone })}>
       {value.map((machine) => (
-        <MachineRow key={teamHostText(machine.host)} machine={machine} />
+        <MachineRow key={machineId(machine.host)} machine={machine} />
       ))}
       {alone ? <TeamPanelMessageState {...teamMachinesAloneCopy()} /> : null}
     </div>

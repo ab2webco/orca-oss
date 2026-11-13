@@ -188,13 +188,16 @@ export function buildExecutionHostRegistry(args: {
   // Why: user-chosen per-host display labels override the derived label so a
   // rename in the host menu/settings shows everywhere the registry feeds.
   hostLabelOverrides?: ReadonlyMap<ExecutionHostId, string>
+  // Why: the desktop names its own machine in its UI language; mobile keeps the shared label.
+  localLabel?: string
+  localDetail?: string
 }): ExecutionHostRegistryEntry[] {
   const hosts = new Map<ExecutionHostId, ExecutionHostRegistryEntry>()
   hosts.set(LOCAL_EXECUTION_HOST_ID, {
     id: LOCAL_EXECUTION_HOST_ID,
     kind: 'local',
-    label: getLocalExecutionHostLabel(),
-    detail: 'This computer',
+    label: args.localLabel ?? getLocalExecutionHostLabel(),
+    detail: args.localDetail ?? 'This computer',
     health: 'local'
   })
 

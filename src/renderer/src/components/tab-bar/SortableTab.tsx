@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { X, Minimize2, Pin } from 'lucide-react'
-import { stripLeadingAgentTitleDecoration } from '../../../../shared/agent-title-decoration'
 import { useTabAgent } from '@/lib/use-tab-agent'
+import { useTabDisplayTitle } from '@/lib/use-tab-display-title'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -115,9 +115,7 @@ export default function SortableTab({
   // Why: use hook status + title evidence so the icon reflects the harness running now, not just the launch command.
   const tabAgent = useTabAgent(tab)
 
-  // Why: with a provider icon shown, strip the agent's own leading glyph so the tab doesn't show two icons for one agent.
-  const displayTitle =
-    tab.customTitle ?? (tabAgent ? stripLeadingAgentTitleDecoration(tab.title) : tab.title)
+  const displayTitle = useTabDisplayTitle(tab, tabAgent)
 
   const { attributes, listeners, setNodeRef } = useSortable({
     id: tab.id,

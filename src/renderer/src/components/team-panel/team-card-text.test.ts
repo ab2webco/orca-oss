@@ -146,7 +146,10 @@ describe('card words', () => {
   })
 
   it('names the host', () => {
-    expect(teamHostText({ kind: 'local' })).toBe('local')
+    // Why (ORCA-1149): the owner reads the local machine as 'This computer', not 'local'.
+    expect(teamHostText({ kind: 'local' })).toBe('This computer')
+    expect(teamHostText({ kind: 'local' }, 'Studio')).toBe('Studio')
+    expect(teamHostText({ kind: 'local' }, '  ')).toBe('This computer')
     expect(
       teamHostText({ kind: 'remote', name: 'imac', environmentId: 'env', reachable: true })
     ).toBe('imac')

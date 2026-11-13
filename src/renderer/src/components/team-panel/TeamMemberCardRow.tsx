@@ -7,12 +7,12 @@ import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
   teamAgeText,
   teamHelpersCountText,
-  teamHostText,
   teamLiveText,
   teamModelText,
   teamPhaseText,
   teamTicketBesideName
 } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { TeamMemberCardDetail } from './TeamMemberCardDetail'
@@ -153,7 +153,7 @@ export function TeamMemberCardRow({
               data-team-host=""
               className="ml-auto shrink-0 text-right font-mono text-[11px] text-muted-foreground"
             >
-              {teamHostText(card.host)}
+              <TeamHostName host={card.host} />
             </span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

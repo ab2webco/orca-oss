@@ -1,6 +1,5 @@
 import React from 'react'
 import { translate } from '@/i18n/i18n'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import {
   WORKSPACE_CLEANUP_BLOCKER_MODE_VALUES,
   WORKSPACE_CLEANUP_BLOCKER_VALUES,
@@ -31,6 +30,7 @@ import {
   getWorkspaceCleanupTriStateLabel
 } from './workspace-cleanup-facet-labels'
 import type { WorkspaceCleanupFacetGroupProps } from './workspace-cleanup-facet-panel-model'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 /** Git, review/PR, tickets, location/host, and safety blockers. */
 export function WorkspaceCleanupGitReviewFacets({
@@ -142,7 +142,7 @@ export function WorkspaceCleanupGitReviewFacets({
           label={translate('components.workspace.cleanup.browse.host', 'Host')}
           values={options.hostIds}
           selected={filters.location.hostIds}
-          getLabel={getExecutionHostLabel}
+          getLabel={hostDisplayLabel}
           onChange={(hostIds) => onPatch('location', { hostIds })}
         />
         {options.repos.length > 1 ? (
