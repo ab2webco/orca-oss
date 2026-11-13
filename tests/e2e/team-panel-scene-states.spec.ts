@@ -458,11 +458,26 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
             await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
               timeout: 30_000
             })
+            // Why (ORCA-1190): capture the lead standing by the member who needs you, not on its way.
+            const stage = scene.locator('[data-scene-lead-x]').first()
+            await expect(stage).toHaveAttribute('data-scene-lead-attends', 'true', {
+              timeout: 30_000
+            })
+            await expect
+              .poll(
+                async () => {
+                  const at = await stage.getAttribute('data-scene-lead-x')
+                  await orcaPage.waitForTimeout(700)
+                  return at === (await stage.getAttribute('data-scene-lead-x'))
+                },
+                { timeout: 30_000, message: 'the attending lead never stood still' }
+              )
+              .toBe(true)
             await orcaPage.waitForTimeout(1500)
             const shot = `props-${(name ?? 'default.json').replace('.json', '')}-${style}-${width}`
             await scene.screenshot({ path: testInfo.outputPath(`${shot}.png`) })
-            // Why the default scene in light too: Orca has two themes, and the props sit on both.
-            if (name === null && width === 1440) {
+            // Why the default scene in light too: Orca has two themes, and the scene sits on both.
+            if (name === null) {
               await writeSettings(orcaPage, { theme: 'light' })
               await orcaPage.waitForTimeout(1500)
               await scene.screenshot({ path: testInfo.outputPath(`${shot}-light.png`) })

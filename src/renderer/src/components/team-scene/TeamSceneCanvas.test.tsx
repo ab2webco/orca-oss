@@ -159,6 +159,10 @@ describe('TeamSceneCanvas', () => {
       act(() => next?.(now))
     }
     expect(leadX()).toBeLessThan(0.5)
+    // Why (ORCA-1190): a spec captures the lead attending, so it must know when it does.
+    expect(host.querySelector<HTMLElement>('[data-scene-lead-x]')?.dataset.sceneLeadAttends).toBe(
+      'true'
+    )
   })
 
   it("seats the team as the painter's style lays it out", () => {
