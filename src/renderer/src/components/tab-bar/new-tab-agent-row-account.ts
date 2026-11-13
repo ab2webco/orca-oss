@@ -1,4 +1,3 @@
-import type { TuiAgent } from '../../../../shared/tui-agent'
 import type {
   NewTabAccountChoice,
   NewTabAccountRow
@@ -23,7 +22,8 @@ export type AgentRowAccount =
       checkedId: string | null
     }
 
-const MANAGED_PROVIDER: Partial<Record<TuiAgent, 'claude' | 'codex'>> = {
+// Why string keys: a project's member agent comes from orca.yaml, which may name any CLI.
+const MANAGED_PROVIDER: Partial<Record<string, 'claude' | 'codex'>> = {
   claude: 'claude',
   'claude-agent-teams': 'claude',
   codex: 'codex'
@@ -31,9 +31,11 @@ const MANAGED_PROVIDER: Partial<Record<TuiAgent, 'claude' | 'codex'>> = {
 
 // Why checkedId is the resolved account: a plain row launches as today unless a person picks (ORCA-717).
 export function agentRowAccountOf(args: {
-  agent: TuiAgent
+  agent: string
   local: boolean
   providers: NewTabAgentProviders
+  /** `member-default`: the team's rows check the member pick (pickGameMemberAccount) instead. */
+  checked?: 'resolved' | 'member-default'
 }): AgentRowAccount {
   const provider = MANAGED_PROVIDER[args.agent]
   if (!provider) {
@@ -50,5 +52,7 @@ export function agentRowAccountOf(args: {
   if (accounts.choice.kind === 'own-login') {
     return { kind: 'own-login' }
   }
-  return { kind: 'picker', provider, rows: accounts.choice.rows, checkedId: accounts.resolvedId }
+  const { choice } = accounts
+  const checkedId = args.checked === 'member-default' ? choice.defaultId : accounts.resolvedId
+  return { kind: 'picker', provider, rows: choice.rows, checkedId }
 }

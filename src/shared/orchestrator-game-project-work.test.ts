@@ -11,6 +11,29 @@ import {
   todoToneOf
 } from './orchestrator-game-project-work'
 
+describe('parseGameTodoSource project lists (ORCA-1168)', () => {
+  it('reads several Jira keys as a list, each one validated', () => {
+    expect(parseGameTodoSource({ provider: 'jira', project: ['CIN', 'MPP'] })).toEqual({
+      value: { provider: 'jira', project: ['CIN', 'MPP'] },
+      warnings: []
+    })
+    expect(parseGameTodoSource({ provider: 'jira', project: ['CIN', 'mpp bad'] }).value).toBe(
+      undefined
+    )
+  })
+
+  it('reads several Linear team keys as a list', () => {
+    expect(parseGameTodoSource({ provider: 'linear', project: ['ENG', 'OPS'] }).value).toEqual({
+      provider: 'linear',
+      project: ['ENG', 'OPS']
+    })
+  })
+
+  it('keeps Plane to one project id, a list being refused', () => {
+    expect(parseGameTodoSource({ provider: 'plane', project: ['p1', 'p2'] }).value).toBe(undefined)
+  })
+})
+
 describe('parseGameTodoSource', () => {
   it('takes off, a provider alone, or a provider with its project and workspace', () => {
     expect(parseGameTodoSource('off')).toEqual({ value: 'off', warnings: [] })
@@ -197,7 +220,7 @@ describe('list urls', () => {
       })
     ).toBe('https://linear.app/acme/my-issues/assigned')
     expect(todoListUrlOf({ provider: 'github', repo: { owner: 'o', repo: 'r' } })).toBe(
-      'https://github.com/o/r/issues?q=is%3Aissue%20is%3Aopen%20assignee%3A%40me'
+      'https://github.com/o/r/issues?q=is%3Aissue%20is%3Aopen'
     )
     expect(
       todoListUrlOf({ provider: 'gitlab', sampleUrl: 'https://gitlab.com/g/p/-/issues/7' })

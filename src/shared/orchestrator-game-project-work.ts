@@ -17,12 +17,12 @@ const GAME_TODO_TEXT_MAX = 64
 export const GAME_TODO_PROVIDERS = ['plane', 'jira', 'linear', 'github', 'gitlab'] as const
 export type GameTodoProvider = (typeof GAME_TODO_PROVIDERS)[number]
 
-/** Where the To Do comes from; `project` is a Plane project id, Jira key or Linear team key. */
+/** Where the To Do comes from; `project` is a Plane project id, or Jira keys and Linear team keys (one or a list). */
 export type OrchestratorGameTodoSource =
   | 'off'
   | {
       provider: GameTodoProvider
-      project?: string
+      project?: string | readonly string[]
       workspace?: string
       /** What "work on" sends the lead: `{id}`, `{title}`, `{url}`, `{status}`. */
       workPrompt?: string
@@ -128,7 +128,28 @@ export function parseGameTodoSource(raw: unknown): {
     return refuse(`orchestratorGame.todo.provider must be one of ${GAME_TODO_PROVIDERS.join(', ')}`)
   }
   const source: Exclude<OrchestratorGameTodoSource, 'off'> = { provider: raw.provider }
+  // Why: a Jira or Linear source may name several projects; every key is checked on its own.
+  const keys =
+    Array.isArray(raw.project) && (raw.provider === 'jira' || raw.provider === 'linear')
+      ? raw.project
+      : null
+  if (keys) {
+    const list = keys.map((one) => (typeof one === 'string' ? one.trim() : ''))
+    if (
+      list.length === 0 ||
+      list.some((one) => one.length === 0 || one.length > GAME_TODO_TEXT_MAX)
+    ) {
+      return refuse('orchestratorGame.todo.project must name 1 to 1 key of up to 64 characters')
+    }
+    if (raw.provider === 'jira' && list.some((one) => !JIRA_PROJECT_KEY.test(one))) {
+      return refuse('orchestratorGame.todo.project must be Jira project keys like CIN')
+    }
+    source.project = list
+  }
   for (const key of ['project', 'workspace'] as const) {
+    if (key === 'project' && keys) {
+      continue
+    }
     if (raw[key] === undefined) {
       continue
     }
@@ -139,7 +160,11 @@ export function parseGameTodoSource(raw: unknown): {
     source[key] = text
   }
   // Why: the key is spliced into JQL, so anything but a project key could widen the query.
-  if (source.provider === 'jira' && source.project && !JIRA_PROJECT_KEY.test(source.project)) {
+  if (
+    source.provider === 'jira' &&
+    source.project !== undefined &&
+    !keysOfProject(source.project).every((key) => JIRA_PROJECT_KEY.test(key))
+  ) {
     return refuse('orchestratorGame.todo.project must be a Jira project key like CIN')
   }
   if (raw.workPrompt !== undefined) {
@@ -277,10 +302,23 @@ export function reviewsListUrlOf(source: ListUrlSource): string | null {
   return null
 }
 
+/** A project as a list of keys; Plane's single project id is a list of one. */
+export const keysOfProject = (project: string | readonly string[]): readonly string[] =>
+  typeof project === 'string' ? [project] : project
+
+/** The JQL clause that names one or several Jira projects, empty when none is named (ORCA-1168). */
+export function jiraScopeOf(project: string | readonly string[] | undefined): string {
+  const keys = project === undefined ? [] : typeof project === 'string' ? [project] : project
+  if (keys.length === 0) {
+    return ''
+  }
+  return keys.length === 1 ? `project = ${keys[0]} AND ` : `project in (${keys.join(', ')}) AND `
+}
+
 export function todoListUrlOf(source: ListUrlSource): string | null {
   if (source.provider === 'github') {
     return source.repo
-      ? `${githubBase(source.repo)}/issues?q=${encodeURIComponent('is:issue is:open assignee:@me')}`
+      ? `${githubBase(source.repo)}/issues?q=${encodeURIComponent('is:issue is:open')}`
       : null
   }
   if (source.provider === 'gitlab') {
@@ -299,7 +337,7 @@ export function todoListUrlOf(source: ListUrlSource): string | null {
     return first ? `${url.origin}/${first}/my-issues/assigned` : null
   }
   if (source.provider === 'jira') {
-    const scope = source.project ? `project = ${source.project} AND ` : ''
+    const scope = jiraScopeOf(source.project)
     const jql = `${scope}assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC`
     return `${url.origin}/issues/?jql=${encodeURIComponent(jql)}`
   }

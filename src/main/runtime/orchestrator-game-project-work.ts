@@ -14,6 +14,8 @@ import {
 import {
   GAME_TODO_ITEMS_MAX,
   gameProjectListOf,
+  jiraScopeOf,
+  keysOfProject,
   todoListUrlOf,
   todoToneOf,
   type GameProjectItem,
@@ -30,7 +32,7 @@ import {
   type GameWorkItem
 } from '../../shared/orchestrator-game-state'
 
-type TodoSource = Exclude<OrchestratorGameTodoSource, 'off'>
+import { mergeTodoLists, todoSourcesOf, type TodoSource } from './orchestrator-game-todo-sources'
 
 /** The provider calls the band's project lists need; each one may throw. */
 export type GameProjectWorkPort = GameProjectReviewsPort & {
@@ -38,10 +40,11 @@ export type GameProjectWorkPort = GameProjectReviewsPort & {
   githubRepo: () => Promise<GitHubRepositoryIdentity | null>
   githubIssues: () => Promise<readonly Pick<GitHubWorkItem, 'number' | 'title' | 'url'>[]>
   gitlabIssues: () => Promise<readonly Pick<GitLabWorkItem, 'number' | 'title' | 'url'>[]>
-  planeAssigned: (args: {
-    project?: string
-    workspace?: string
-  }) => Promise<readonly Pick<PlaneWorkItem, 'identifier' | 'title' | 'url' | 'state'>[]>
+  /** The open items in one fetch, with the viewer they are read for (null when unknown). */
+  planeOpen: (args: { project?: string; workspace?: string }) => Promise<{
+    viewerId: string | null
+    items: readonly PlaneTodoItem[]
+  }>
   jiraSearch: (
     jql: string,
     site?: string
@@ -49,6 +52,10 @@ export type GameProjectWorkPort = GameProjectReviewsPort & {
   linearAssigned: (
     workspace?: string
   ) => Promise<readonly Pick<LinearIssue, 'identifier' | 'title' | 'url' | 'state' | 'team'>[]>
+}
+
+type PlaneTodoItem = Pick<PlaneWorkItem, 'identifier' | 'title' | 'url' | 'state'> & {
+  assignees?: readonly { id: string }[]
 }
 
 // Why: a tracker that is offline, unauthenticated or rate limited costs its own list, never the other.
@@ -96,30 +103,22 @@ export const planeWorkspaceIdOf = (
     ? undefined
     : (workspaces.find((one) => one.id === value || one.workspaceSlug === value)?.id ?? value)
 
-const keyPrefixOf = (identifier: string): string | undefined =>
-  /^([A-Za-z][A-Za-z0-9_]*)-\d+$/.exec(identifier)?.[1]
-
-/** The To Do when the project names none: its linked Plane project, the worktree's tracker, then its host. */
-export function autoTodoSourceOf(args: {
-  planeProject: string | null
-  workItem: Pick<GameWorkItem, 'provider' | 'identifier'> | null
-  host: 'github' | 'gitlab' | null
-}): TodoSource | null {
-  if (args.planeProject) {
-    return { provider: 'plane', project: args.planeProject }
-  }
-  const item = args.workItem
-  if (item?.provider === 'jira' || item?.provider === 'linear') {
-    const project = keyPrefixOf(item.identifier)
-    return project ? { provider: item.provider, project } : { provider: item.provider }
-  }
-  if (item?.provider === 'plane') {
-    return { provider: 'plane' }
-  }
-  return args.host ? { provider: args.host } : null
-}
-
 const DONE_PLANE_GROUPS = new Set(['completed', 'cancelled'])
+
+/** My open items and, in a known project, its unstarted ones whoever holds them (ORCA-1168). */
+const planeTodoOf = (
+  items: readonly PlaneTodoItem[],
+  viewerId: string | null,
+  projectKnown: boolean
+): PlaneTodoItem[] =>
+  items.filter((one) => {
+    if (DONE_PLANE_GROUPS.has(one.state.group)) {
+      return false
+    }
+    // Why null reads as mine: like Plane's own assigned filter, no viewer degrades to every open item.
+    const mine = viewerId === null || one.assignees?.some((who) => who.id === viewerId) === true
+    return mine || (projectKnown && one.state.group === 'unstarted')
+  })
 
 const ticketOf = (
   id: string,
@@ -148,7 +147,7 @@ async function readTodo(
         todoListUrlOf({
           provider,
           sampleUrl: items[0]?.url ?? null,
-          project: source.project,
+          project: typeof source.project === 'string' ? source.project : undefined,
           repo
         }),
       items.length,
@@ -156,9 +155,9 @@ async function readTodo(
     )
   switch (source.provider) {
     case 'plane': {
-      const open = (
-        await port.planeAssigned({ project: source.project, workspace: source.workspace })
-      ).filter((one) => !DONE_PLANE_GROUPS.has(one.state.group))
+      const project = typeof source.project === 'string' ? source.project : undefined
+      const read = await port.planeOpen({ project, workspace: source.workspace })
+      const open = planeTodoOf(read.items, read.viewerId, project !== undefined)
       return listOf(
         'plane',
         open.map((one) =>
@@ -172,7 +171,7 @@ async function readTodo(
       )
     }
     case 'jira': {
-      const scope = source.project ? `project = ${source.project} AND ` : ''
+      const scope = jiraScopeOf(source.project)
       const jql = `${scope}assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC`
       const issues = await port.jiraSearch(jql, source.workspace)
       return listOf(
@@ -189,7 +188,7 @@ async function readTodo(
     }
     case 'linear': {
       const issues = (await port.linearAssigned(source.workspace)).filter(
-        (one) => !source.project || one.team.key === source.project
+        (one) => !source.project || keysOfProject(source.project).includes(one.team.key)
       )
       return listOf(
         'linear',
@@ -202,7 +201,7 @@ async function readTodo(
       const issues = await port.githubIssues()
       return listOf(
         'github',
-        issues.map((one) => ({ id: `#${one.number}`, title: one.title, url: one.url })),
+        issues.map((one) => ticketOf(`#${one.number}`, one, 'Open', 'todo')),
         todoListUrlOf({ provider: 'github', repo })
       )
     }
@@ -210,7 +209,7 @@ async function readTodo(
       const issues = await port.gitlabIssues()
       return listOf(
         'gitlab',
-        issues.map((one) => ({ id: `#${one.number}`, title: one.title, url: one.url }))
+        issues.map((one) => ticketOf(`#${one.number}`, one, 'Open', 'todo'))
       )
     }
   }
@@ -229,16 +228,21 @@ export async function readGameProjectWork(
     repo ? readGitHubReviews(port, repo) : readGitLabReviews(port)
   )
   const host = repo ? 'github' : reviews?.provider === 'gitlab' ? 'gitlab' : null
-  const source =
+  const sources =
     args.todo === 'off'
-      ? null
-      : (args.todo ??
-        autoTodoSourceOf({
+      ? []
+      : todoSourcesOf({
+          configured: args.todo,
           planeProject: args.planeProject ?? null,
           workItem: args.workItem,
           host
-        }))
-  const todo = source ? await settle(() => readTodo(port, source, repo)) : null
+        })
+  const todo =
+    sources.length > 0
+      ? mergeTodoLists(
+          await Promise.all(sources.map((source) => settle(() => readTodo(port, source, repo))))
+        )
+      : null
   const queue = repo ? await readGitHubQueue(port) : null
   return { reviews, todo, ...(queue ? { queue } : {}) }
 }

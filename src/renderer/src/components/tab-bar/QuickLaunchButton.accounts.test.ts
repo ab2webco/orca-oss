@@ -4,12 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuickLaunchAgentMenuItems, type QuickLaunchAgentAccounts } from './QuickLaunchButton'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 
-const {
-  shortcutLabelMock,
-  storeState,
-  useDetectedAgentsMock,
-  selectables
-} = vi.hoisted(() => ({
+const { shortcutLabelMock, storeState, useDetectedAgentsMock, selectables } = vi.hoisted(() => ({
   shortcutLabelMock: vi.fn<() => string | null>(),
   storeState: {
     settings: {
@@ -83,6 +78,8 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
     },
     DropdownMenuShortcut: ({ children }: { children: React.ReactNode }) =>
       ReactActual.createElement('span', { 'data-dropdown-shortcut': 'true' }, children),
+    DropdownMenuLabel: passThrough,
+    DropdownMenuSeparator: () => null,
     DropdownMenuSub: passThrough,
     DropdownMenuSubContent: passThrough,
     DropdownMenuSubTrigger: ({
@@ -138,14 +135,15 @@ function accounts(local = true): QuickLaunchAgentAccounts {
   }
 }
 
-function render(agentAccounts?: QuickLaunchAgentAccounts): string {
+function render(agentAccounts?: QuickLaunchAgentAccounts, hiddenAgents?: 'codex'[]): string {
   selectables.length = 0
   return renderToStaticMarkup(
     React.createElement(QuickLaunchAgentMenuItems, {
       worktreeId: 'worktree-1',
       groupId: 'group-1',
       onFocusTerminal: vi.fn(),
-      ...(agentAccounts ? { agentAccounts } : {})
+      ...(agentAccounts ? { agentAccounts } : {}),
+      ...(hiddenAgents ? { hiddenAgents } : {})
     })
   )
 }
@@ -202,6 +200,12 @@ describe('QuickLaunchAgentMenuItems accounts', () => {
 
     expect(html).toContain('Host login')
     expect(html).not.toContain('data-sub-trigger')
+  })
+
+  // Why: a project with a lead offers its Team rows, not Claude Agent Teams' second team.
+  it('leaves out the agents the menu hides, and keeps every row otherwise', () => {
+    expect(render(accounts(), ['codex'])).not.toContain('Launch Codex in a new terminal')
+    expect(render(accounts())).toContain('Launch Codex in a new terminal')
   })
 
   it('keeps plain rows in a menu that passes no account context', () => {

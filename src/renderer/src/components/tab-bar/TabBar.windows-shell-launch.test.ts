@@ -8,14 +8,15 @@ import {
   stubFocusTerminalTabSurface,
   stubHeadlessReact,
   stubQuickLaunchButton,
-  stubNewTabAgentMenuItems,
+  stubNewTabMenuSections,
   stubShallowSelector,
   stubShellIcons,
   stubSortableContext,
   stubSortableTab,
   stubStatusDisplay,
   stubTabInsertion,
-  stubTabStripDragScroll
+  stubTabStripDragScroll,
+  stubUseTranslation
 } from './tab-bar-windows-shell-launch-render-stubs'
 import {
   appStoreSnapshot,
@@ -24,6 +25,7 @@ import {
 } from './tab-bar-windows-shell-launch-test-harness'
 
 vi.mock('react', async () => await stubHeadlessReact())
+vi.mock('react-i18next', async () => await stubUseTranslation())
 vi.mock('zustand/react/shallow', () => stubShallowSelector())
 vi.mock('lucide-react', async () => (await import('./lucide-icon-stub-fixture')).stubEveryIcon())
 vi.mock('@dnd-kit/sortable', () => stubSortableContext())
@@ -36,7 +38,7 @@ vi.mock('./SortableTab', () => stubSortableTab())
 vi.mock('./EditorFileTab', () => stubEditorFileTab())
 vi.mock('./BrowserTab', () => stubBrowserTab())
 vi.mock('./QuickLaunchButton', () => stubQuickLaunchButton())
-vi.mock('./NewTabAgentMenuItems', () => stubNewTabAgentMenuItems())
+vi.mock('./NewTabMenuSections', () => stubNewTabMenuSections())
 vi.mock('./shell-icons', () => stubShellIcons())
 vi.mock('@/lib/focus-terminal-tab-surface', () => stubFocusTerminalTabSurface())
 vi.mock('@/components/ui/dropdown-menu', () => stubDropdownMenu())

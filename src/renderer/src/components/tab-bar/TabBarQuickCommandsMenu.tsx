@@ -210,7 +210,7 @@ export function TabBarQuickCommandsMenu({
             }
           >
             <Play className="size-3 shrink-0" fill="currentColor" strokeWidth={0} />
-            <span className="max-w-[160px] truncate text-[12px] font-medium @max-[240px]/tab-strip:sr-only">
+            <span className="max-w-[160px] truncate text-[12px] font-medium @max-[400px]/tab-strip:sr-only">
               {mostRecent?.command.label ??
                 translate('auto.components.tab.bar.TabBarQuickCommandsButton.7b1c9d6ae1', 'Run')}
             </span>

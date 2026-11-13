@@ -3191,7 +3191,7 @@
             "8e9d603a09": "Desanclar pestaña"
           },
           "QuickLaunchButton": {
-            "348a04c1ad": "Ajustes de Agents…",
+            "348a04c1ad": "Ajustes de agentes…",
             "ec2adf093e": "Iniciar {{value0}} en un nuevo terminal",
             "465e432ef1": "No se pudo generar el comando de inicio para {{value0}}.",
             "e518f544b1": "No se detectaron agentes",
@@ -3204,8 +3204,7 @@
           "SortableTab": {
             "ab19f603eb": "Cambiar nombre de pestaña {{value0}}",
             "6df69d9388": "Cerrar pestaña {{value0}}",
-            "fdb2691425": "Contraer panel",
-            "95db5f2f7d": "Cerrar pestaña"
+            "fdb2691425": "Contraer panel"
           },
           "SortableTabContextMenu": {
             "35e8892fd0": "Color de pestaña",
@@ -16571,6 +16570,11 @@
     "title": "{{context}} - {{agent}} te pregunta",
     "body": "Abre la Bandeja para responder."
   },
+  "tabStrip": {
+    "hiddenTabs": "{{count}} pestañas más",
+    "hiddenTabs_one": "{{count}} pestaña más",
+    "hiddenTabs_other": "{{count}} pestañas más"
+  },
   "newTabMenu": {
     "account": {
       "inUseBy": "En uso por {{value}}",
@@ -16582,7 +16586,32 @@
       "ownLogin": "Login propio",
       "hostLogin": "Login del host",
       "choose": "Elegir la cuenta de {{value}}",
-      "systemLogin": "Login del sistema"
+      "systemLogin": "Login del sistema",
+      "claudeAccounts": "Cuentas de Claude",
+      "codexAccounts": "Cuentas de Codex",
+      "manage": "Administrar cuentas…"
+    },
+    "group": {
+      "terminal": "Terminal",
+      "agents": "Agentes"
+    },
+    "team": {
+      "group": "Equipo",
+      "goToLeadUnnamed": "Ir al lead",
+      "addMember": "Agregar miembro…",
+      "chooseMember": "Elegir la cuenta del miembro",
+      "memberAccount": "Cuenta del miembro",
+      "todoEmpty": "To Do está vacío",
+      "reopen": "Reabrir el equipo",
+      "startFresh": "Empezar un lead nuevo…",
+      "chooseLead": "Elegir la cuenta del lead",
+      "startFreshConfirm": "¿Empezar un lead nuevo?",
+      "start": "Empezar",
+      "cancel": "Cancelar",
+      "leadFallback": "el lead",
+      "reopenFailed": "No se pudo reabrir el equipo: {{value}}",
+      "reopenNothingKept": "No hay un lead guardado para reabrir",
+      "reopenUnsupported": "Este host no puede reabrir el equipo"
     }
   }
 }

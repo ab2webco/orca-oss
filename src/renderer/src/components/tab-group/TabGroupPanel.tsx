@@ -245,7 +245,12 @@ export default function TabGroupPanel({
               }
             />
           ) : null}
-          <div className="min-w-0 flex-1 h-full">{tabBar}</div>
+          {/* Why min-w-11 beside the floating header: the strip keeps room for its + at 320 (ORCA-717). */}
+          <div
+            className={`${reserveCollapsedSidebarHeaderSpace && !sidebarOpen ? 'min-w-11' : 'min-w-0'} flex-1 h-full`}
+          >
+            {tabBar}
+          </div>
           {/* Why hidden: beside a 280 px sidebar at 320 the strip is 40 px, all of it the toggle's. */}
           <div
             className="ml-1.5 flex shrink-0 items-center gap-0.5 @max-[96px]/tab-strip:hidden"

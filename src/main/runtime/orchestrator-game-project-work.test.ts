@@ -3,7 +3,6 @@ import type { PRCheckDetail } from '../../shared/github/check-types'
 import type { GitHubRepositoryIdentity } from '../../shared/github/pull-request-types'
 import { GAME_TODO_ITEMS_MAX } from '../../shared/orchestrator-game-project-work'
 import {
-  autoTodoSourceOf,
   GameProjectWorkCache,
   myOpenPullRequestsOf,
   planeWorkspaceIdOf,
@@ -32,7 +31,7 @@ const port = (overrides: Partial<GameProjectWorkPort>): GameProjectWorkPort => (
   githubBudgetLow: async () => false,
   gitlabMergeRequests: async () => null,
   gitlabIssues: unused,
-  planeAssigned: unused,
+  planeOpen: unused,
   jiraSearch: unused,
   linearAssigned: unused,
   ...overrides
@@ -285,8 +284,18 @@ describe('readGameProjectWork', () => {
     expect(work.todo).toEqual({
       provider: 'github',
       total: 1,
-      url: 'https://github.com/ab2webco/orca-oss/issues?q=is%3Aissue%20is%3Aopen%20assignee%3A%40me',
-      items: [{ id: '#7', title: 'Bug', url: 'https://github.com/ab2webco/orca-oss/issues/7' }]
+      url: 'https://github.com/ab2webco/orca-oss/issues?q=is%3Aissue%20is%3Aopen',
+      items: [
+        {
+          id: '#7',
+          title: 'Bug',
+          url: 'https://github.com/ab2webco/orca-oss/issues/7',
+          status: 'Open',
+          tone: 'neutral',
+          group: 'todo'
+        }
+      ],
+      groups: { todo: 1 }
     })
   })
 
@@ -376,14 +385,17 @@ describe('readGameProjectWork', () => {
     })
     const work = await readGameProjectWork(
       port({
-        planeAssigned: async (args) => {
+        planeOpen: async (args) => {
           asked.push(args)
-          return [
-            item('ORCA-1', 'started', 'In Progress'),
-            item('ORCA-2', 'completed', 'Done'),
-            item('ORCA-3', 'unstarted', 'Todo'),
-            item('ORCA-4', 'cancelled', 'Cancelled')
-          ]
+          return {
+            viewerId: null,
+            items: [
+              item('ORCA-1', 'started', 'In Progress'),
+              item('ORCA-2', 'completed', 'Done'),
+              item('ORCA-3', 'unstarted', 'Todo'),
+              item('ORCA-4', 'cancelled', 'Cancelled')
+            ]
+          }
         }
       }),
       { todo: { provider: 'plane', project: 'p1', workspace: 'w1' }, workItem: null }
@@ -582,33 +594,6 @@ describe('planeWorkspaceIdOf', () => {
     expect(planeWorkspaceIdOf(workspaces, 'JC8r')).toBe('JC8r')
     expect(planeWorkspaceIdOf(workspaces, undefined)).toBeUndefined()
     expect(planeWorkspaceIdOf(workspaces, 'unknown')).toBe('unknown')
-  })
-})
-
-describe('autoTodoSourceOf', () => {
-  it('prefers the Plane project linked to the repo, then the linked item tracker, then the host', () => {
-    expect(autoTodoSourceOf({ planeProject: 'p1', workItem: null, host: 'github' })).toEqual({
-      provider: 'plane',
-      project: 'p1'
-    })
-    expect(
-      autoTodoSourceOf({
-        planeProject: null,
-        workItem: { provider: 'jira', identifier: 'CIN-12' },
-        host: 'github'
-      })
-    ).toEqual({ provider: 'jira', project: 'CIN' })
-    expect(
-      autoTodoSourceOf({
-        planeProject: null,
-        workItem: { provider: 'linear', identifier: 'ENG-3' },
-        host: null
-      })
-    ).toEqual({ provider: 'linear', project: 'ENG' })
-    expect(autoTodoSourceOf({ planeProject: null, workItem: null, host: 'gitlab' })).toEqual({
-      provider: 'gitlab'
-    })
-    expect(autoTodoSourceOf({ planeProject: null, workItem: null, host: null })).toBeNull()
   })
 })
 
