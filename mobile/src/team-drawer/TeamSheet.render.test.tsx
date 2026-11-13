@@ -285,6 +285,17 @@ describe('TeamSheet', () => {
     expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
   })
 
+  it("lands a switched tab at its top, not at the last tab's scroll", () => {
+    show(teamWith())
+    act(() => button('Team').click())
+    const scroller = (): Element | null | undefined =>
+      document.body.querySelector('[role="tablist"]')?.parentElement?.parentElement
+    const teamScroller = scroller()
+    act(() => button('Answer in Inbox').click())
+    expect(teamScroller?.isConnected).toBe(false)
+    expect(scroller()).not.toBeNull()
+  })
+
   it("words the sheet and its cards in the host's language", () => {
     const team = teamWith()
     show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
