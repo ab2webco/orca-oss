@@ -88,6 +88,11 @@ const RUN_936 = {
 // Why 2 minutes: what every shard spends on checkout, install and the artifact before its first test.
 const SHARD_SETUP_SECONDS = 120
 const filesOf = (shard) => JSON.parse(shard.files)
+// #1191's 131 changed specs: 6 shards by size put 30 measured minutes on one, and two hit the cap (ORCA-1155).
+const PR_1191 = JSON.parse(
+  readFileSync('config/scripts/fixtures/split-changed-e2e-specs/pr-1191-changed-specs.json', 'utf8')
+).files
+const MEASURED = JSON.parse(readFileSync('config/e2e-spec-durations.json', 'utf8')).seconds
 
 describe('splitChangedSpecs', () => {
   it('keeps a short list on one runner', () => {
@@ -119,9 +124,9 @@ describe('splitChangedSpecs', () => {
     )
   })
 
-  it("keeps every shard of #936's list under 20 minutes, split by size", () => {
+  it("keeps every shard of #936's list under 20 minutes, split by its seconds", () => {
     const files = Object.keys(RUN_936)
-    const shards = splitChangedSpecs(files, (file) => RUN_936[file][1])
+    const shards = splitChangedSpecs(files, (file) => RUN_936[file][0])
     const minutes = shards.map(
       (shard) =>
         (filesOf(shard).reduce((sum, file) => sum + RUN_936[file][0], 0) + SHARD_SETUP_SECONDS) / 60
@@ -130,7 +135,18 @@ describe('splitChangedSpecs', () => {
     expect(Math.max(...minutes)).toBeLessThanOrEqual(20)
   })
 
-  it('reads the specs off disk by size when no weight is given', () => {
+  // Why half the cap: #1191's shard 6 ran past 28 minutes on 24.7 measured, so the record runs low.
+  it("keeps every shard of #1191's 131 specs within half the 30-minute cap, by measured seconds", () => {
+    const shards = splitChangedSpecs(PR_1191)
+    const minutes = shards.map(
+      (shard) => filesOf(shard).reduce((sum, file) => sum + (MEASURED[file] ?? 0), 0) / 60
+    )
+    expect(shards.flatMap(filesOf).sort()).toEqual([...PR_1191].sort())
+    expect(shards.length).toBeLessThanOrEqual(MAX_SHARDS)
+    expect(Math.max(...minutes)).toBeLessThanOrEqual(15)
+  })
+
+  it('weighs the specs by their measured seconds when no weight is given', () => {
     const shards = splitChangedSpecs(panelFiles)
     const withScene = shards.find((shard) =>
       filesOf(shard).includes('tests/e2e/team-panel-scene.spec.ts')
