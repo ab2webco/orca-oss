@@ -47,8 +47,13 @@ const review = (number: number, ci: string, state = 'open') => ({
   ci
 })
 
+// Why: the same ids as the mock accounts snapshot, so the Accounts screen names who runs on each.
+const CLAUDE_TEAM = { provider: 'claude', id: 'claude-team', email: 'dev@example.com' }
+const CLAUDE_PERSONAL = { provider: 'claude', id: 'claude-personal', email: 'personal@example.com' }
+
 const DEFAULT_MEMBERS = [
   member('tab-9:a', 'Cipher Wren', 'idle', {
+    account: CLAUDE_TEAM,
     workItem: workItem('ORCA-950', 'Metrics undercount merged per day', 'In Review'),
     review: review(845, 'success', 'merged')
   }),
@@ -56,7 +61,7 @@ const DEFAULT_MEMBERS = [
     workItem: workItem('ORCA-949', 'Panel visual redesign for the Fleet pane', 'In Progress'),
     review: review(844, 'pending'),
     remote: { host: 'iMac', stateKnown: true },
-    account: { email: 'lab-account-b' }
+    account: CLAUDE_TEAM
   }),
   member('tab-9:c', 'Nova', 'waiting', {
     workItem: workItem('ORCA-948', "Fleet lists other projects' found agents", 'In Progress')
@@ -69,7 +74,7 @@ const DEFAULT_MEMBERS = [
   }),
   member('tab-9:f', 'Kiro', 'idle', {
     workItem: workItem('ORCA-947', 'Release notes for lab.116', 'In Progress'),
-    account: { email: 'lab-account-a' },
+    account: CLAUDE_PERSONAL,
     limit: { resetsAt: Date.now() + 2 * 3_600_000 }
   }),
   member('tab-9:e', 'Rho', 'done', {
@@ -129,6 +134,7 @@ function leadState(worktreeId: unknown): unknown {
     lead: { autostart: false, cap: 5, agent: 'claude', label: 'Lead' },
     agents: isShowcaseScenario ? SHOWCASE_MEMBERS : DEFAULT_MEMBERS,
     worktree: { id: worktreeId },
+    ...(isShowcaseScenario ? {} : { leadAccount: CLAUDE_TEAM }),
     // Why: MOCK_GAME_LOCALE=es checks the cards follow the host's language.
     locale: process.env.MOCK_GAME_LOCALE,
     inboxes: [
@@ -142,8 +148,8 @@ function leadState(worktreeId: unknown): unknown {
     openOwnerQuestions: openQuestionCount(),
     metrics: {
       claudeAccounts: [
-        { email: 'lab-account-a', sessionPercent: 100, weeklyPercent: 71 },
-        { email: 'lab-account-b', sessionPercent: 42, weeklyPercent: 18 }
+        { email: CLAUDE_PERSONAL.email, sessionPercent: 100, weeklyPercent: 71 },
+        { email: CLAUDE_TEAM.email, sessionPercent: 42, weeklyPercent: 18 }
       ],
       computedAt: new Date().toISOString(),
       timezone: 'America/Bogota',
