@@ -219,14 +219,18 @@ function MachinesPage({ page }: { page: PageOf<'machines'> }) {
     )
   }
   return (
-    <div className="grid grid-cols-[54px_minmax(0,1fr)_minmax(0,1fr)_46px] items-center gap-x-2.5 gap-y-[7px] @max-[260px]:gap-x-1.5">
+    <div className="grid grid-cols-[60px_minmax(0,1fr)_minmax(0,1fr)_46px] items-center gap-x-2.5 gap-y-[7px] @max-[260px]:gap-x-1.5">
       <span />
       <DisplayLabel>{translate('teamPanel.display.cpu', 'CPU')}</DisplayLabel>
       <DisplayLabel>{translate('teamPanel.display.ram', 'RAM')}</DisplayLabel>
       <DisplayLabel>{translate('teamPanel.display.agents', 'Agents')}</DisplayLabel>
       {page.rows.map((row) => (
         <div key={row.key} className="contents">
-          <span className="truncate text-[11.5px] text-foreground">
+          {/* Why 60 px and two lines: 'This computer' in mono needs both; a longer name ends in an ellipsis (ORCA-1188). */}
+          <span
+            data-team-display-machine=""
+            className="line-clamp-2 break-words text-[11.5px] leading-tight text-foreground"
+          >
             <TeamHostName host={row.host} />
           </span>
           {row.cpuPercent === null ? (
