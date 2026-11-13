@@ -41,13 +41,40 @@ describe('buildOrchestratorGameState member accounts', () => {
 
     expect(asked).toEqual([
       { paneKey: 'tab-4:here', agentType: 'claude', worktreeId: null },
-      { paneKey: 'tab-6:away', agentType: 'codex', worktreeId: 'wt-cin-8' }
+      { paneKey: 'tab-6:away', agentType: 'codex', worktreeId: 'wt-cin-8' },
+      { paneKey: 'tab-1:lead', agentType: 'claude', worktreeId: null }
     ])
     expect(state.agents.map((agent) => [agent.paneKey, agent.account])).toEqual([
       ['tab-1:lead', undefined],
       ['tab-4:here', undefined],
       ['tab-6:away', { provider: 'codex', id: 'acct_bo', email: 'bo@example.com' }]
     ])
+  })
+
+  it("names the lead's own account apart from its agent row, so older clients see the same agents", async () => {
+    const lead = { provider: 'claude' as const, id: 'acct_maya', email: 'maya@example.com' }
+    const input = {
+      settings: undefined,
+      worktree: null,
+      agents: [
+        { ...row, paneKey: 'tab-1:lead' },
+        { ...row, paneKey: 'tab-4:here', parentPaneKey: 'tab-1:lead' }
+      ],
+      leaderPaneKey: 'tab-1:lead',
+      readReview: none,
+      readPlane: none,
+      readLinear: none
+    }
+
+    const named = await buildOrchestratorGameState({
+      ...input,
+      accountOf: (member) => (member.paneKey === 'tab-1:lead' ? lead : null)
+    })
+    const unknown = await buildOrchestratorGameState({ ...input, accountOf: () => null })
+
+    expect(named.leadAccount).toEqual(lead)
+    expect(named.agents.find((agent) => agent.paneKey === 'tab-1:lead')?.account).toBeUndefined()
+    expect('leadAccount' in unknown).toBe(false)
   })
 
   it('flags a member on the global login, never the lead or a member with a managed account', async () => {
