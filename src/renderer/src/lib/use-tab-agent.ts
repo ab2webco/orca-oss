@@ -273,10 +273,13 @@ export function useTabAgent(tab: TerminalTab): TuiAgent | null {
   useEffect(() => {
     // Why: reset+re-seed in one effect so a respawn drops the stale-generation signal yet re-observes a still-live hook, not left stuck false.
     const generation = `${ptyId ?? ''}|${String(isRemoteLike)}`
+    // Why: an unchanged set here still queues a render, and a burst of sync title commits turns that into React #185.
     if (signalGenerationRef.current !== generation) {
       signalGenerationRef.current = generation
-      hasObservedAgentSignalRef.current = false
-      setHasObservedAgentSignal(false)
+      if (hasObservedAgentSignalRef.current) {
+        hasObservedAgentSignalRef.current = false
+        setHasObservedAgentSignal(false)
+      }
     }
     const explicitTitleAgent = resolveExplicitTerminalTitleAgentType(tab.title)
     // Why: only a title naming the launched agent arms its exit clearing — sibling/other-agent evidence must not.
@@ -284,7 +287,10 @@ export function useTabAgent(tab: TerminalTab): TuiAgent | null {
       ? explicitTitleAgent === tab.launchAgent
       : Boolean(explicitTitleAgent || siblingHookAgent)
     // Why: a recognized foreground process arms exit clearing even for agents with no hook or title integration.
-    if (focusedHookAgent || completedHookEvidence || processAgent || fallbackAgentSignal) {
+    if (
+      !hasObservedAgentSignalRef.current &&
+      (focusedHookAgent || completedHookEvidence || processAgent || fallbackAgentSignal)
+    ) {
       hasObservedAgentSignalRef.current = true
       setHasObservedAgentSignal(true)
     }
