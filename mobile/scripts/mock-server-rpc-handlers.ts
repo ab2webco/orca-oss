@@ -1,7 +1,8 @@
 import type { WebSocket } from 'ws'
 import {
   DESKTOP_PROTOCOL_VERSION,
-  MIN_COMPATIBLE_MOBILE_VERSION
+  MIN_COMPATIBLE_MOBILE_VERSION,
+  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY
 } from '../../src/shared/protocol-version'
 import {
   applyTerminalQuickCommandMutation,
@@ -153,7 +154,7 @@ export function handleRequest(
           runtimeId: 'mock-runtime',
           protocolVersion: DESKTOP_PROTOCOL_VERSION,
           minCompatibleMobileVersion: MIN_COMPATIBLE_MOBILE_VERSION,
-          capabilities: ['accounts.codex-reset-credit.v1'],
+          capabilities: ['accounts.codex-reset-credit.v1', MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY],
           graphStatus: 'ready',
           windowCount: 1,
           tabCount: 2,
