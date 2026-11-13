@@ -32,6 +32,8 @@ export type RemoteGameMemberSource = {
   earlierLead: boolean
   /** The model and effort the lead chose at `worker-start --on`; null when it chose neither (ORCA-933). */
   launch: GameMemberLaunch | null
+  /** The `--repo` selector it was started in; null in the lead's own repo (ORCA-1170). */
+  repo?: string | null
 }
 
 /** What the host's own federationShow reports about the member's terminal. */
@@ -48,7 +50,21 @@ export type RemoteGameMemberShow = {
 type RemoteMemberReads = {
   /** Null when the host answers without the member's terminal; rejects when it does not answer. */
   showOf: (source: RemoteGameMemberSource) => Promise<RemoteGameMemberShow | null>
-  reviewOf: (branch: string) => Promise<Parameters<typeof gameReviewOf>[0] | null>
+  /** `repo` is the member's `--repo` selector; absent reads the lead's repo. */
+  reviewOf: (
+    branch: string,
+    repo?: string | null
+  ) => Promise<Parameters<typeof gameReviewOf>[0] | null>
+}
+
+function repoOf(startOptions: string | null): string | null {
+  try {
+    const parsed: unknown = startOptions ? JSON.parse(startOptions) : null
+    const repo = typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'repo') : null
+    return typeof repo === 'string' && repo.length > 0 ? repo : null
+  } catch {
+    return null
+  }
 }
 
 const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
@@ -99,7 +115,8 @@ const sourceOf = (
     startFailed: row.startFailed === 1,
     ticketDone: row.ticketDone === 1,
     earlierLead,
-    launch: chosen ? gameMemberLaunchOf({ ...chosen, source: 'launch' }) : null
+    launch: chosen ? gameMemberLaunchOf({ ...chosen, source: 'launch' }) : null,
+    repo: repoOf(startOptions)
   }
 }
 
@@ -260,7 +277,9 @@ export async function remoteGameMembersOf(
         return null
       }
       const titleState = show?.title ? detectAgentStatusFromTitle(show.title) : null
-      const hosted = show?.branch ? await reads.reviewOf(show.branch).catch(() => null) : null
+      const hosted = show?.branch
+        ? await reads.reviewOf(show.branch, source.repo).catch(() => null)
+        : null
       const review = hosted ? gameReviewOf(hosted) : null
       // Why: the hooks see a member keep working after its dispatch settles (ORCA-837).
       const agent = gone ? null : (show?.agent ?? null)

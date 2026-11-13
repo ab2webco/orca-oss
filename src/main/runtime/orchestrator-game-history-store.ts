@@ -19,7 +19,6 @@ import {
 } from '../../shared/orchestrator-game-characters'
 import {
   migrateGameStore,
-  type GameStoreData,
   type GameStoreMigration
 } from '../../shared/orchestrator-game-store-migration'
 import { mergeAdoptedGameLog } from '../../shared/orchestrator-game-log-adoption'
@@ -29,26 +28,11 @@ import {
   type GameArcadeCredits
 } from '../../shared/orchestrator-game-arcade-credits'
 import { adoptedArcadeFields, migratedArcadeFields } from './orchestrator-game-history-arcade'
+import { cursorsOf, isRecord, logOf, type ProjectLog } from './orchestrator-game-history-log'
 import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Ordered steps for this store's file; empty while version 1 is the only shape. */
 export const GAME_HISTORY_MIGRATIONS: readonly GameStoreMigration[] = []
-
-// Why raw: entries and keys this build cannot read were written by a newer one, and a rewrite
-// that dropped them would cost that history after a one-release downgrade.
-type ProjectLog = {
-  data: GameStoreData
-  records: unknown[]
-  events: unknown[]
-  /** Per inbox (`lead` or a ticket), the newest orchestration message sequence the board marked read. */
-  cursors: Record<string, unknown>
-  /** Per character key, its saved progress; absent until a member with a character is freed. */
-  characters: Record<string, unknown> | null
-  /** What the lead asked the person; absent until the first question. */
-  ownerQuestions: unknown[] | null
-  /** Saved arcade plays; absent until the first perfect merge recorded after this build. */
-  arcade: Record<string, unknown> | null
-}
 
 type LoadedLog = {
   log: ProjectLog
@@ -63,35 +47,6 @@ type LoadedLog = {
 
 // Why bounded: one cursor per ticket ever launched would grow without end.
 const CURSORS_MAX = 200
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const listOf = (data: GameStoreData, key: string): unknown[] => {
-  const list = data[key]
-  return Array.isArray(list) ? list : []
-}
-
-function cursorsOf(raw: Record<string, unknown>): Record<string, number> {
-  return Object.fromEntries(
-    Object.entries(raw).filter(
-      (entry): entry is [string, number] =>
-        entry[0].length <= 40 && typeof entry[1] === 'number' && Number.isFinite(entry[1])
-    )
-  )
-}
-
-function logOf(data: GameStoreData): ProjectLog {
-  return {
-    data,
-    records: listOf(data, 'records'),
-    events: listOf(data, 'events'),
-    cursors: isRecord(data.cursors) ? data.cursors : {},
-    characters: isRecord(data.characters) ? data.characters : null,
-    ownerQuestions: Array.isArray(data.ownerQuestions) ? data.ownerQuestions : null,
-    arcade: isRecord(data.arcade) ? data.arcade : null
-  }
-}
 
 const fileStamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 
@@ -166,6 +121,23 @@ export class GameHistoryStore {
       return { ...current, events: next.events, ...(arcade && { arcade }) }
     })
     return { added }
+  }
+
+  /** `change` sees the characters and records as kept, and returns null characters to leave them. */
+  async changeCharacters<R>(
+    projectKey: string,
+    change: (
+      characters: Record<string, unknown>,
+      records: unknown[]
+    ) => { next: Record<string, unknown> | null; result: R }
+  ): Promise<R> {
+    let result: R | undefined
+    await this.update(projectKey, (current) => {
+      const changed = change(current.characters ?? {}, current.records)
+      result = changed.result
+      return changed.next ? { ...current, characters: changed.next } : null
+    })
+    return result as R
   }
 
   async arcade(projectKey: string): Promise<GameArcadeCredits> {

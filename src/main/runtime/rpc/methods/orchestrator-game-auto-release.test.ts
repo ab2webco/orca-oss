@@ -150,7 +150,8 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
   async function leadReads(member: GameAgent): Promise<OrchestratorGameState> {
     vi.spyOn(runtime, 'getOrchestratorGameState').mockResolvedValue({
       role: 'lead',
-      agents: [lead, member]
+      agents: [lead, member],
+      config: { scene: 'quest' }
     } as OrchestratorGameState)
     return (await call(ORCHESTRATOR_GAME_METHODS, 'game.state', {
       worktreeId: 'wt-lead',
@@ -201,6 +202,29 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
     })
     await leadReads(member)
     expect(postEvent.mock.calls.filter(([one]) => one.kind === 'merged')).toHaveLength(1)
+  })
+
+  // Why (ORCA-1170): auto-release frees the member with no history record, so its merge paid nobody.
+  it("pays the merge to the member's character before releasing it, once", async () => {
+    const pay = vi.spyOn(runtime, 'payGameMerge').mockResolvedValue(true)
+    await startMember(true)
+    const member = memberOf({
+      displayName: 'Arturo · ORCA-41 Cartelera',
+      worktree: { id: 'wt-41', branch: 'feat/orca-41', displayName: 'orca-41' },
+      review: merged
+    })
+
+    const state = await leadReads(member)
+    await leadReads(member)
+
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual([COORD_PANE])
+    expect(pay.mock.calls).toEqual([
+      [
+        { worktreeId: 'wt-lead' },
+        { character: { key: 'arthur', name: 'Arturo' }, number: 41 },
+        'ORCA-41'
+      ]
+    ])
   })
 
   it('never touches a member its live state reports working (ORCA-862)', async () => {
@@ -332,7 +356,8 @@ describe('a lead game state settles a remote member its host has nothing left of
   async function leadReads(member: GameAgent): Promise<OrchestratorGameState> {
     vi.spyOn(runtime, 'getOrchestratorGameState').mockResolvedValue({
       role: 'lead',
-      agents: [lead, member]
+      agents: [lead, member],
+      config: { scene: 'quest' }
     } as OrchestratorGameState)
     const method = ORCHESTRATOR_GAME_METHODS.find((one) => one.name === 'game.state')!
     return (await method.handler(

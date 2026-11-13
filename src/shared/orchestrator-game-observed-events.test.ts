@@ -100,6 +100,19 @@ describe('observedMergesOf', () => {
     ).toEqual([])
   })
 
+  // Why (ORCA-1170): auto-release frees a merged member with no record, so the merge must name who earned it.
+  it("names the merged member's character under its roster key", () => {
+    const roster = [{ en: 'Arthur', es: 'Arturo' }]
+    const [named] = observedMergesOf(
+      [member({ displayName: 'Arturo · CIN-1 Cartelera', worktree, review: review('merged') })],
+      roster
+    )
+    const [unnamed] = observedMergesOf([member({ worktree, review: review('merged') })], roster)
+
+    expect(named?.character).toEqual({ key: 'arthur', name: 'Arturo' })
+    expect(unnamed).not.toHaveProperty('character')
+  })
+
   it('records nothing for a found session, which earns its lead nothing (ORCA-914)', () => {
     expect(
       observedMergesOf([

@@ -1,4 +1,5 @@
 import { ticketOfMember } from './orchestrator-game-fleet-verbs'
+import { characterKeyOf, memberNameOf, type GameMemberName } from './orchestrator-game-member-names'
 import type { GameEventKind, GameEventMerge } from './orchestrator-game-events'
 import type { GameAgent } from './orchestrator-game-state'
 
@@ -48,8 +49,9 @@ export function observedGameEventsOf(agents: readonly GameAgent[]): ObservedGame
  * rewards need: the member may be freed before the lead's next poll sees it (ORCA-887).
  */
 export function observedMergesOf(
-  agents: readonly GameAgent[]
-): (ObservedGameEvent & { merge: GameEventMerge })[] {
+  agents: readonly GameAgent[],
+  roster: readonly GameMemberName[] = []
+): (ObservedGameEvent & { merge: GameEventMerge; character?: { key: string; name: string } })[] {
   return agents.flatMap((agent) => {
     const ticket = agent.isMember && !agent.isLeader && !agent.found ? ticketOfMember(agent) : null
     const review = agent.review
@@ -62,6 +64,9 @@ export function observedMergesOf(
       worktreeId: agent.worktree.id,
       perfect: review.perfectMerge === true
     }
-    return [{ ...mergedEventOf(ticket, agent), merge }]
+    const name = memberNameOf(agent.displayName)
+    const character =
+      name === null ? {} : { character: { key: characterKeyOf(roster, name), name } }
+    return [{ ...mergedEventOf(ticket, agent), merge, ...character }]
   })
 }

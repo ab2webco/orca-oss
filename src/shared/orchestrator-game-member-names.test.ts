@@ -99,6 +99,11 @@ describe('memberRosterOf', () => {
     expect(memberRosterOf({ config: {} })).toBe(ORCHESTRATOR_GAME_BUILT_IN_ROSTERS.quest)
   })
 
+  // Why (ORCA-1170): game.state reads the roster of a state that may carry no config, as an older host's can.
+  it('falls back to Quest for a state with no config', () => {
+    expect(memberRosterOf({})).toBe(ORCHESTRATOR_GAME_BUILT_IN_ROSTERS.quest)
+  })
+
   it("lets the project's memberNames replace any scene's roster", () => {
     const lead = { autostart: false, cap: 4, agent: 'claude', memberNames: ['Mario', 'Luigi'] }
     expect(memberRosterOf({ config: { scene: 'jrpg' }, lead })).toEqual(['Mario', 'Luigi'])

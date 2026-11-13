@@ -16,12 +16,13 @@ function startRemote(
   d: OrchestrationDb,
   runId: string,
   title: string,
-  leadWorktreeId?: string
+  leadWorktreeId?: string,
+  repo?: string
 ): string {
   const task = d.createTask({ spec: title, taskTitle: title, runId })
   const started = d.createStartingWorkerDispatch({
     taskId: task.id,
-    startOptions: { on: 'env_imac', serverName: 'imac', leadWorktreeId },
+    startOptions: { on: 'env_imac', serverName: 'imac', leadWorktreeId, ...(repo && { repo }) },
     federation: {
       environmentId: 'env_imac',
       environmentName: 'imac',
@@ -153,6 +154,31 @@ describe('remote members of a lead (ORCA-824)', () => {
       review: { number: 701, state: 'open', ci: 'success' },
       lastActivityAt: '2026-10-27T14:00:00.000Z'
     })
+  })
+
+  // Why (ORCA-1170): a member started with --repo works in another repo, so the lead's repo never saw its PR.
+  it('keeps the repo a member was started in and reads its PR there', async () => {
+    db = new OrchestrationDb(':memory:')
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead',
+      coordinatorPaneKey: LEAD_PANE
+    })
+    startRemote(db, run.id, 'CIN-1850', undefined, 'name:cineco-frontend')
+    startRemote(db, run.id, 'CIN-1851')
+    const [own, lead] = listRemoteGameMemberSources(db, run.id)
+    const asked: [string, string | null | undefined][] = []
+
+    await remoteGameMembersOf([{ ...source, repo: 'name:cineco-frontend' }], {
+      showOf: async () => ({ branch: 'fix/cin-1850', title: null, liveness: 'running' }),
+      reviewOf: async (branch, repo) => {
+        asked.push([branch, repo])
+        return null
+      }
+    })
+
+    expect([own?.repo, lead?.repo]).toEqual(['name:cineco-frontend', null])
+    expect(asked).toEqual([['fix/cin-1850', 'name:cineco-frontend']])
   })
 
   it("shows the agent's hook state the host relays, not its settled dispatch (ORCA-837)", async () => {
