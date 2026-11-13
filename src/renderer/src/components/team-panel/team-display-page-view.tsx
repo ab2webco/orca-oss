@@ -226,7 +226,7 @@ function MachinesPage({ page }: { page: PageOf<'machines'> }) {
       <DisplayLabel>{translate('teamPanel.display.agents', 'Agents')}</DisplayLabel>
       {page.rows.map((row) => (
         <div key={row.key} className="contents">
-          {/* Why 60 px and two lines: 'This computer' in mono needs both; a longer name ends in an ellipsis (ORCA-1188). */}
+          {/* Why 60 px and two lines: the local machine's name in mono needs both; a longer one ends in an ellipsis (ORCA-1188). */}
           <span
             data-team-display-machine=""
             className="line-clamp-2 break-words text-[11.5px] leading-tight text-foreground"
