@@ -21,6 +21,8 @@ import { selectConnectableHostProfiles } from '../src/transport/host-catalog-sel
 import { useOpenMobileHostEdit } from '../src/transport/use-open-mobile-host-edit'
 import { removeHostAndCloseClient } from '../src/transport/host-removal-lifecycle'
 import { fetchHomeHostWorktreeInfo } from '../src/worktree/home-host-worktree-fetch'
+import { fetchHomeHostTeamLine } from '../src/hosts/home-host-team-fetch'
+import type { HostTeamLine } from '../src/hosts/host-team-line'
 import { totalHomeStats, type HomeStatsSummary } from '../src/stats/home-stats-total'
 import { HomeStatsRow } from '../src/components/HomeStatsRow'
 import type { HomeWorktreeSummary, HostWorktreeInfo } from '../src/worktree/home-worktree-info'
@@ -285,6 +287,7 @@ export default function HomeScreen() {
   const [hostLastConnected, setHostLastConnected] = useState<Record<string, number | null>>({})
   const [statsByHost, setStatsByHost] = useState<Record<string, HomeStatsSummary>>({})
   const [worktreeInfo, setWorktreeInfo] = useState<Record<string, HostWorktreeInfo>>({})
+  const [teamLines, setTeamLines] = useState<Record<string, HostTeamLine | null>>({})
   const [accountsByHost, setAccountsByHost] = useState<Record<string, AccountsSnapshot>>({})
   const [accountsErrorByHost, setAccountsErrorByHost] = useState<Record<string, string>>({})
   const [taskProvidersByHost, setTaskProvidersByHost] = useState<Record<string, TaskProvider[]>>({})
@@ -397,6 +400,7 @@ export default function HomeScreen() {
         if (entry.client.getState() === 'connected') {
           fetchStats(entry.client, entry.hostId, setStatsByHost, () => stale)
           void fetchHomeHostWorktreeInfo(entry.client, entry.hostId, setWorktreeInfo, () => stale)
+          void fetchHomeHostTeamLine(entry.client, entry.hostId, setTeamLines, () => stale)
           fetchAccountsSnapshot(
             entry.client,
             entry.hostId,
@@ -538,6 +542,7 @@ export default function HomeScreen() {
         if (reconnected) {
           fetchStats(entry.client, entry.hostId, setStatsByHost, () => false)
           void fetchHomeHostWorktreeInfo(entry.client, entry.hostId, setWorktreeInfo, () => false)
+          void fetchHomeHostTeamLine(entry.client, entry.hostId, setTeamLines, () => false)
           fetchTaskProviders(entry.client, entry.hostId, setTaskProvidersByHost, () => false)
           // Why accounts belong here too: this path already re-reads every other host
           // card on reconnect, and leaving accounts out is why the usage section stayed
@@ -842,6 +847,7 @@ export default function HomeScreen() {
                 verdict={verdict}
                 path={hostPaths[item.id] ?? 'lan'}
                 worktreeInfo={worktreeInfo[item.id]}
+                teamLine={teamLines[item.id] ?? null}
                 onPress={() => {
                   if (item.credentialStatus === 'missing') {
                     router.push('/pair-scan')

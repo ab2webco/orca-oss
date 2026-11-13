@@ -209,6 +209,14 @@ export function handleMockGameTeamRequest(
   success: (id: string, result: unknown) => RpcResponse,
   activeWorktreeId: () => string | undefined
 ): boolean {
+  if (request.method === 'game.leads') {
+    // Why: the Home card reads each lead's team through its worktree, handle and pane.
+    const worktreeId = activeWorktreeId() ?? 'mock'
+    respond(
+      success(request.id, { leads: [{ handle: 'term-1', paneKey: 'tab-9:lead', worktreeId }] })
+    )
+    return true
+  }
   if (request.method === 'game.state') {
     respond(success(request.id, leadState(request.params?.worktreeId)))
     return true

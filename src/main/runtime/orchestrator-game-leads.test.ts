@@ -36,6 +36,27 @@ describe('GameLeads', () => {
     })
   })
 
+  // Why (ORCA-1183): the phone's host card reads each lead's game.state by its worktree.
+  it('lists the lead worktree the caller registered, and no worktree for an older caller', async () => {
+    const game = leads(LEAD)
+    await game.register({
+      worktreeId: 'wt-lead',
+      terminalHandle: 'term_a',
+      project: 'cineco',
+      label: 'Ana'
+    })
+
+    expect((await game.list()).leads).toEqual([
+      {
+        project: 'cineco',
+        label: 'Ana',
+        handle: 'term_a',
+        since: '2026-10-17T10:00:00.000Z',
+        worktreeId: 'wt-lead'
+      }
+    ])
+  })
+
   it('never registers a member or a caller without a terminal', async () => {
     const member = leads({ ...LEAD, isMember: true, memberTicket: 'CIN-1' })
     const nobody = leads({ ...LEAD, lead: null })

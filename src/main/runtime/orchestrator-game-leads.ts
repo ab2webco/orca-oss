@@ -54,7 +54,8 @@ export class GameLeads {
       project: args.project,
       handle,
       label: args.label,
-      at: (this.deps.now?.() ?? new Date()).toISOString()
+      at: (this.deps.now?.() ?? new Date()).toISOString(),
+      ...(args.worktreeId ? { worktreeId: args.worktreeId } : {})
     })
     if (!args.claim || project.key === UNPLACED_PROJECT) {
       const entry = entryOf(caller)
@@ -224,7 +225,8 @@ export class GameLeads {
           label: one.label,
           handle: one.handle,
           since: one.at,
-          ...(paneKey ? { paneKey } : {})
+          ...(paneKey ? { paneKey } : {}),
+          ...(one.worktreeId ? { worktreeId: one.worktreeId } : {})
         }
       })
     const restoring = [...this.pending.values()]

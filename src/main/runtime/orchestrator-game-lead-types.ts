@@ -36,6 +36,8 @@ export type GameLeadListing = {
   handle: string
   since: string
   paneKey?: string
+  /** The lead's worktree; absent from an older CLI's registration, so the phone shows no team line. */
+  worktreeId?: string
 }
 
 /** A lead kept from before a restart whose pane is not back yet; `paneKey` is the pane it led from. */

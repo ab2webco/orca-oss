@@ -1,4 +1,4 @@
-import { Monitor, MoreVertical } from 'lucide-react-native'
+import { Monitor, MoreVertical, Users } from 'lucide-react-native'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { Text } from '../theme/dynamic-type-text'
 import type { ConnectionVerdict } from '../transport/connection-health'
@@ -8,6 +8,7 @@ import type { MobileConnectionPath } from '../transport/stable-logical-rpc-clien
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 import { homeHostWorktreeSummary, type HostWorktreeInfo } from '../worktree/home-worktree-info'
+import { hostTeamLineParts, type HostTeamLine } from '../hosts/host-team-line'
 import { StatusDot } from './StatusDot'
 
 export function MobileHostCard(props: {
@@ -19,6 +20,8 @@ export function MobileHostCard(props: {
   // Why: the card owns the fresh/stale/unavailable wording so no caller can re-gate the counts
   // away (STA-3123 shipped that bug once already).
   worktreeInfo?: HostWorktreeInfo
+  /** The host's team across its live leads; null or absent when the host cannot say (an older desktop). */
+  teamLine?: HostTeamLine | null
   onPress: () => void
   onLongPress: () => void
   onOpenActions: () => void
@@ -44,6 +47,10 @@ export function MobileHostCard(props: {
       ? { kind: 'warning', label: statusLabel }
       : props.verdict
   const worktreeSummary = homeHostWorktreeSummary(props.worktreeInfo)
+  // Why only while connected: a team count from a host the phone cannot reach would be a guess.
+  const teamLine = connected ? (props.teamLine ?? null) : null
+  const teamParts = teamLine ? hostTeamLineParts(teamLine) : null
+  const needsYouText = teamLine && teamLine.needsYou > 0 ? `${teamLine.needsYou} needs you` : null
   const connectionPathLabel =
     !credentialMissing && !credentialUnavailable && (connected || dialingPath)
       ? mobileConnectionPathLabel(props.path)
@@ -62,6 +69,8 @@ export function MobileHostCard(props: {
     statusLabel,
     connectionPathLabel?.replace(' · ', ' via '),
     connected ? worktreeSummary?.replace(' · ', ', ') : null,
+    needsYouText,
+    teamParts?.join(', '),
     discoveryHint,
     credentialHint
   ]
@@ -105,6 +114,20 @@ export function MobileHostCard(props: {
             <Text style={styles.worktreeMetaText} numberOfLines={1}>
               {worktreeSummary}
             </Text>
+          ) : null}
+          {teamParts ? (
+            <View style={styles.teamRow}>
+              <Users size={12} color={colors.textMuted} style={styles.teamIcon} />
+              {/* Why wrap: on a 320 phone the pieces move to a new line whole instead of being cut. */}
+              <View style={styles.teamStack}>
+                {needsYouText ? <Text style={styles.teamNeedsText}>{needsYouText}</Text> : null}
+                {teamParts.map((part) => (
+                  <Text key={part} style={styles.teamText}>
+                    {part}
+                  </Text>
+                ))}
+              </View>
+            </View>
           ) : null}
           {discoveryHint ? (
             <Text style={styles.discoveryHint} numberOfLines={2}>
@@ -169,6 +192,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted
   },
+  teamRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 2,
+    marginLeft: spacing.xl,
+    minWidth: 0
+  },
+  teamIcon: { marginTop: 2 },
+  teamStack: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, minWidth: 0 },
+  teamNeedsText: { fontSize: 12, color: colors.statusRed },
+  teamText: { fontSize: 12, color: colors.textMuted },
   discoveryHint: {
     marginTop: spacing.xs,
     fontSize: 11,

@@ -5,6 +5,8 @@ export type GameLeadEntry = {
   handle: string
   label: string
   at: string
+  /** The lead's own worktree, when its CLI sent one; an older CLI does not. */
+  worktreeId?: string
 }
 
 /**
