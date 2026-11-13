@@ -8,7 +8,7 @@ import type { MobileConnectionPath } from '../transport/stable-logical-rpc-clien
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 import { homeHostWorktreeSummary, type HostWorktreeInfo } from '../worktree/home-worktree-info'
-import { hostTeamLineText, type HostTeamLine } from '../hosts/host-team-line'
+import { hostTeamLineParts, type HostTeamLine } from '../hosts/host-team-line'
 import { StatusDot } from './StatusDot'
 
 export function MobileHostCard(props: {
@@ -49,7 +49,7 @@ export function MobileHostCard(props: {
   const worktreeSummary = homeHostWorktreeSummary(props.worktreeInfo)
   // Why only while connected: a team count from a host the phone cannot reach would be a guess.
   const teamLine = connected ? (props.teamLine ?? null) : null
-  const teamSummary = teamLine ? hostTeamLineText(teamLine) : null
+  const teamParts = teamLine ? hostTeamLineParts(teamLine) : null
   const needsYouText = teamLine && teamLine.needsYou > 0 ? `${teamLine.needsYou} needs you` : null
   const connectionPathLabel =
     !credentialMissing && !credentialUnavailable && (connected || dialingPath)
@@ -70,7 +70,7 @@ export function MobileHostCard(props: {
     connectionPathLabel?.replace(' · ', ' via '),
     connected ? worktreeSummary?.replace(' · ', ', ') : null,
     needsYouText,
-    teamSummary?.replace(' · ', ', '),
+    teamParts?.join(', '),
     discoveryHint,
     credentialHint
   ]
@@ -115,17 +115,18 @@ export function MobileHostCard(props: {
               {worktreeSummary}
             </Text>
           ) : null}
-          {teamSummary ? (
+          {teamParts ? (
             <View style={styles.teamRow}>
-              <Users size={12} color={colors.textMuted} />
-              {needsYouText ? (
-                <Text style={styles.teamNeedsText} numberOfLines={1}>
-                  {needsYouText}
-                </Text>
-              ) : null}
-              <Text style={styles.teamText} numberOfLines={1}>
-                {teamSummary}
-              </Text>
+              <Users size={12} color={colors.textMuted} style={styles.teamIcon} />
+              {/* Why wrap: on a 320 phone the pieces move to a new line whole instead of being cut. */}
+              <View style={styles.teamStack}>
+                {needsYouText ? <Text style={styles.teamNeedsText}>{needsYouText}</Text> : null}
+                {teamParts.map((part) => (
+                  <Text key={part} style={styles.teamText}>
+                    {part}
+                  </Text>
+                ))}
+              </View>
             </View>
           ) : null}
           {discoveryHint ? (
@@ -193,14 +194,16 @@ const styles = StyleSheet.create({
   },
   teamRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 6,
     marginTop: 2,
     marginLeft: spacing.xl,
     minWidth: 0
   },
+  teamIcon: { marginTop: 2 },
+  teamStack: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, minWidth: 0 },
   teamNeedsText: { fontSize: 12, color: colors.statusRed },
-  teamText: { flexShrink: 1, fontSize: 12, color: colors.textMuted },
+  teamText: { fontSize: 12, color: colors.textMuted },
   discoveryHint: {
     marginTop: spacing.xs,
     fontSize: 11,

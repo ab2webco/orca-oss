@@ -50,8 +50,8 @@ export function hostTeamLineOf(states: readonly unknown[]): HostTeamLine | null 
   return hasTeam ? { members, working, needsYou } : null
 }
 
-/** "4 members · 2 working"; the working part is left out while nobody works. */
-export function hostTeamLineText(line: HostTeamLine): string {
+/** ["4 members", "2 working"]; the working piece is left out while nobody works. */
+export function hostTeamLineParts(line: HostTeamLine): string[] {
   const members = line.members === 1 ? '1 member' : `${line.members} members`
-  return line.working > 0 ? `${members} · ${line.working} working` : members
+  return line.working > 0 ? [members, `${line.working} working`] : [members]
 }

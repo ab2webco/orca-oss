@@ -152,7 +152,31 @@ describe('MobileHostCard', () => {
     })
 
     expect(lines).toContain('1 needs you')
-    expect(lines).toContain('4 members · 2 working')
+    expect(lines).toContain('4 members')
+    expect(lines).toContain('2 working')
+  })
+
+  it('lets the team pieces wrap onto a new line instead of cutting them on a narrow phone', async () => {
+    await renderCard(loaded, { teamLine: { members: 4, working: 2, needsYou: 1 } })
+
+    const pieces = renderer!.root
+      .findAllByType('Text')
+      .filter((node) =>
+        ['1 needs you', '4 members', '2 working'].includes(String(node.children[0]))
+      )
+    expect(pieces).toHaveLength(3)
+    for (const piece of pieces) {
+      expect(piece.props.numberOfLines).toBeUndefined()
+    }
+    const stack = renderer!.root.findAll(
+      (node) => node.type === 'View' && node.props.style?.flexWrap === 'wrap'
+    )
+    expect(stack).toHaveLength(1)
+    expect(stack[0]!.findAllByType('Text').map((node) => node.children[0])).toEqual([
+      '1 needs you',
+      '4 members',
+      '2 working'
+    ])
   })
 
   it('keeps the card as it is for a host that cannot say its team', async () => {
@@ -168,7 +192,7 @@ describe('MobileHostCard', () => {
       teamLine: { members: 4, working: 2, needsYou: 1 }
     })
 
-    expect(lines).not.toContain('4 members · 2 working')
+    expect(lines).not.toContain('4 members')
     expect(lines).not.toContain('1 needs you')
   })
 

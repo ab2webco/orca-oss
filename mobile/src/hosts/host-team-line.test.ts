@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hostLeadCallersOf, hostTeamLineOf, hostTeamLineText } from './host-team-line'
+import { hostLeadCallersOf, hostTeamLineOf, hostTeamLineParts } from './host-team-line'
 
 const lead = (agents: unknown[]) => ({ role: 'lead', lead: { handle: 'term_lead' }, agents })
 const agent = (name: string, state: string, extra: Record<string, unknown> = {}) => ({
@@ -43,9 +43,12 @@ describe('hostTeamLineOf', () => {
   })
 })
 
-describe('hostTeamLineText', () => {
-  it('names the members and who works, and leaves needs-you to its own mark', () => {
-    expect(hostTeamLineText({ members: 4, working: 2, needsYou: 1 })).toBe('4 members · 2 working')
-    expect(hostTeamLineText({ members: 1, working: 0, needsYou: 0 })).toBe('1 member')
+describe('hostTeamLineParts', () => {
+  it('names the members and who works as separate pieces, and leaves needs-you to its own mark', () => {
+    expect(hostTeamLineParts({ members: 4, working: 2, needsYou: 1 })).toEqual([
+      '4 members',
+      '2 working'
+    ])
+    expect(hostTeamLineParts({ members: 1, working: 0, needsYou: 0 })).toEqual(['1 member'])
   })
 })
