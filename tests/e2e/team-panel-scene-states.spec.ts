@@ -1,4 +1,6 @@
+import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -11,6 +13,8 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const STYLES = ['figures', 'office', 'pixel'] as const
+// Why opt-in: every scene file in every style at two widths outruns the CI budget.
+const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
 type Style = (typeof STYLES)[number]
 const WINDOW_MS = 1500
 // Why: Pixel's swing rests for most of its 1.15 s; sparser frames could miss it (see scene-motion).
@@ -154,9 +158,10 @@ const disjoint = (a: Set<string>, b: Set<string>): boolean => [...a].every((one)
 // A real lead and member driven through idle, working, waiting and done by their own hooks.
 test('every Team scene style draws idle, working, waiting and done apart, as V28 does', async ({
   electronApp,
-  orcaPage
+  orcaPage,
+  testRepoPath
 }, testInfo) => {
-  test.setTimeout(600_000)
+  test.setTimeout(CAPTURE_EVIDENCE ? 1_500_000 : 600_000)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -399,6 +404,72 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       }
       for (const key of ['lead:done', 'member:done'] as const) {
         expect.soft(at(style, key).size, `${style}: ${key} is not a held pose`).toBe(1)
+      }
+    }
+
+    // ORCA-1150 C4: every scene file, and the default scene, in each style, for the V30 props review.
+    if (CAPTURE_EVIDENCE) {
+      // Why a variable: the scene files are a checkout's own .orca/scenes, not part of the repo.
+      const source = process.env.ORCA_SCENES_DIR ?? join(process.cwd(), '.orca', 'scenes')
+      const files = readdirSync(source).filter((name) => name.endsWith('.json'))
+      mkdirSync(join(testRepoPath, '.orca', 'scenes'), { recursive: true })
+      for (const name of files) {
+        copyFileSync(join(source, name), join(testRepoPath, '.orca', 'scenes', name))
+      }
+      const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]!.id)
+      await writeSettings(orcaPage, { theme: 'dark' })
+      for (const name of [null, ...files]) {
+        const sceneFile = name === null ? undefined : `.orca/scenes/${name}`
+        await orcaPage.evaluate(
+          ([id, file]) =>
+            window.__store!.getState().updateSettings({
+              orchestratorGameProjects: { [id as string]: file ? { sceneFile: file } : {} }
+            }),
+          [repoId, sceneFile] as const
+        )
+        // Why both: the host must publish the file, then the panel reads it on its next 20 s refresh.
+        await expect
+          .poll(
+            async () => {
+              const scene = (await stateOf()).config?.scene ?? ''
+              return name === null ? !scene.endsWith('.json') : scene.endsWith(name)
+            },
+            {
+              timeout: 30_000,
+              message: `game.state never published ${name ?? 'the default scene'}`
+            }
+          )
+          .toBe(true)
+        await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
+        for (const style of STYLES) {
+          await orcaPage.evaluate(
+            (next) =>
+              window
+                .__store!.getState()
+                .updateSettings({ orchestratorGame: { panel: { style: next } } }),
+            style
+          )
+          // Why Pixel for a themed file's Figures: it has no figures art, and that also proves it applied.
+          const quest = name === null || name === 'quest.json'
+          const drawn = style === 'figures' && !quest ? 'pixel' : style
+          const scene = panel.locator(`[data-team-scene="${drawn}"]`)
+          for (const width of [1440, 390]) {
+            await orcaPage.setViewportSize({ width, height: 900 })
+            await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
+              timeout: 30_000
+            })
+            await orcaPage.waitForTimeout(1500)
+            const shot = `props-${(name ?? 'default.json').replace('.json', '')}-${style}-${width}`
+            await scene.screenshot({ path: testInfo.outputPath(`${shot}.png`) })
+            // Why the default scene in light too: Orca has two themes, and the props sit on both.
+            if (name === null && width === 1440) {
+              await writeSettings(orcaPage, { theme: 'light' })
+              await orcaPage.waitForTimeout(1500)
+              await scene.screenshot({ path: testInfo.outputPath(`${shot}-light.png`) })
+              await writeSettings(orcaPage, { theme: 'dark' })
+            }
+          }
+        }
       }
     }
   } finally {
