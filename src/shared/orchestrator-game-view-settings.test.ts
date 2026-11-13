@@ -7,7 +7,7 @@ describe('writing a view to a settings layer', () => {
     const settings = { orchestratorGame: { scene: 'jrpg', render: 'hd-compact' as const } }
 
     expect(orchestratorGameViewSettingsOf(settings, { view: '2d-hd', scope: 'global' })).toEqual({
-      orchestratorGame: { scene: 'jrpg', render: 'hd-compact', mode: 'on' }
+      orchestratorGame: { scene: 'jrpg', render: 'hd-compact', mode: 'on', band: true }
     })
     expect(orchestratorGameViewSettingsOf(settings, { view: 'flat', scope: 'global' })).toEqual({
       orchestratorGame: { scene: 'jrpg', render: 'hd-compact', mode: 'flat' }
@@ -29,7 +29,7 @@ describe('writing a view to a settings layer', () => {
     ).toEqual({
       orchestratorGameProjects: {
         other: { mode: 'zen' },
-        r1: { mode: 'on', render: 'classic' }
+        r1: { mode: 'on', render: 'classic', band: true }
       }
     })
   })
@@ -39,14 +39,16 @@ describe('writing a view to a settings layer', () => {
 
     expect(
       orchestratorGameViewSettingsOf(settings, { view: '2d-hd', scope: 'project', repoId: 'r1' })
-    ).toEqual({ orchestratorGameProjects: { r1: { mode: 'on', render: 'hd-compact' } } })
+    ).toEqual({
+      orchestratorGameProjects: { r1: { mode: 'on', render: 'hd-compact', band: true } }
+    })
   })
 
   it('shows a hidden game again when a view other than off is picked for that scope', () => {
     const settings = { orchestratorGame: { show: false, mode: 'zen' as const } }
 
     expect(orchestratorGameViewSettingsOf(settings, { view: 'zen', scope: 'global' })).toEqual({
-      orchestratorGame: { show: true, mode: 'zen' }
+      orchestratorGame: { show: true, mode: 'zen', band: true }
     })
     expect(orchestratorGameViewSettingsOf(settings, { view: 'off', scope: 'global' })).toEqual({
       orchestratorGame: { show: false, mode: 'off' }
@@ -71,7 +73,29 @@ describe('writing a view to a settings layer', () => {
         {},
         { view: '2d-hd', scope: 'project', repoId: 'r1', project: { render: 'hd-compact' } }
       )
-    ).toEqual({ orchestratorGameProjects: { r1: { mode: 'on', render: 'hd-compact' } } })
+    ).toEqual({
+      orchestratorGameProjects: { r1: { mode: 'on', render: 'hd-compact', band: true } }
+    })
+  })
+
+  it('turns the band on in that layer when a view that draws pixels is picked, and leaves it for flat and off', () => {
+    const drawn = orchestratorGameViewSettingsOf({}, { view: 'zen', scope: 'global' })
+    expect(drawn.orchestratorGame?.band).toBe(true)
+    const project = orchestratorGameViewSettingsOf(
+      {},
+      { view: '2d-classic', scope: 'project', repoId: 'r1' }
+    )
+    expect(project.orchestratorGameProjects?.r1?.band).toBe(true)
+    for (const view of ['flat', 'off'] as const) {
+      expect(
+        orchestratorGameViewSettingsOf({}, { view, scope: 'global' }).orchestratorGame
+      ).not.toHaveProperty('band')
+    }
+    const alreadyOn = { orchestratorGame: { band: true } }
+    expect(
+      orchestratorGameViewSettingsOf(alreadyOn, { view: '2d-hd', scope: 'global' }).orchestratorGame
+        ?.band
+    ).toBe(true)
   })
 
   it('refuses this project without a repo to key it on', () => {

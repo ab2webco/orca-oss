@@ -11,7 +11,6 @@ import {
   type OrchestratorGameOrcaActions
 } from './orchestrator-game-orca-actions'
 import {
-  parseGameLead,
   resolveGameLead,
   type GameHostProfile,
   type OrchestratorGameLead,
@@ -30,7 +29,6 @@ import {
   type OrchestratorGameTodoSource
 } from './orchestrator-game-project-work'
 import {
-  parseGameRewardWeights,
   resolveGameRewardWeights,
   type GameRewardWeights
 } from './orchestrator-game-reward-weights'
@@ -40,7 +38,8 @@ import {
   ORCHESTRATOR_GAME_LOCAL_TIMEZONE,
   type OrchestratorGameRender
 } from './orchestrator-game-render'
-import { parseGamePanel, type OrchestratorGamePanelLayer } from './orchestrator-game-panel'
+import type { OrchestratorGamePanelLayer } from './orchestrator-game-panel'
+import { ORCHESTRATOR_GAME_SECTION_PARSERS } from './orchestrator-game-layer-sections'
 import {
   orchestratorGameSceneFileErrorText,
   orchestratorGameSceneFileId,
@@ -62,6 +61,8 @@ export type OrchestratorGameConfig = {
   /** Show the game: false hides it and keeps `mode` as the default view for when it returns. */
   show: boolean
   scene: string
+  /** The pixel band in Agent Teams panes; off draws no pixels there and keeps the game itself. */
+  band: boolean
   hud: boolean
   rewards: boolean
   tracker: boolean
@@ -121,6 +122,7 @@ export const DEFAULT_ORCHESTRATOR_GAME_CONFIG: OrchestratorGameConfig = {
   mode: 'on',
   show: true,
   scene: 'quest',
+  band: false,
   hud: true,
   rewards: true,
   tracker: true,
@@ -264,19 +266,6 @@ export function resolveOrchestratorGameRewardWeights(
 const isMode = (value: unknown): value is OrchestratorGameMode =>
   typeof value === 'string' && (ORCHESTRATOR_GAME_MODES as readonly string[]).includes(value)
 
-/** The layer's nested sections, each parsed on its own and dropped when it yields nothing. */
-const SECTION_PARSERS = {
-  links: parseGameLinkTemplates,
-  activity: parseGameActivityRules,
-  actions: parseGameActions,
-  orcaActions: parseGameOrcaActions,
-  orchestrator: parseGameLead,
-  rewardWeights: parseGameRewardWeights,
-  panel: parseGamePanel,
-  reviews: parseGameReviewsSource,
-  todo: parseGameTodoSource
-} satisfies Record<string, (raw: unknown) => { value: unknown; warnings: string[] }>
-
 export function parseOrchestratorGameLayer(raw: unknown): {
   layer: OrchestratorGameLayer
   warnings: string[]
@@ -324,14 +313,23 @@ export function parseOrchestratorGameLayer(raw: unknown): {
       } else {
         warnings.push(checked.warning)
       }
-    } else if (key === 'show' || key === 'hud' || key === 'rewards' || key === 'tracker') {
+    } else if (
+      key === 'show' ||
+      key === 'band' ||
+      key === 'hud' ||
+      key === 'rewards' ||
+      key === 'tracker'
+    ) {
       if (typeof value === 'boolean') {
         layer[key] = value
       } else {
         warnings.push(`orchestratorGame.${key} must be true or false`)
       }
-    } else if (Object.hasOwn(SECTION_PARSERS, key)) {
-      const parsed = SECTION_PARSERS[key as keyof typeof SECTION_PARSERS](value)
+    } else if (Object.hasOwn(ORCHESTRATOR_GAME_SECTION_PARSERS, key)) {
+      const parsed =
+        ORCHESTRATOR_GAME_SECTION_PARSERS[key as keyof typeof ORCHESTRATOR_GAME_SECTION_PARSERS](
+          value
+        )
       warnings.push(...parsed.warnings)
       if (parsed.value !== undefined) {
         Object.assign(layer, { [key]: parsed.value })

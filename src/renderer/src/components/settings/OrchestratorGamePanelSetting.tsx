@@ -1,5 +1,7 @@
+import { Fragment, useMemo } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
+  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   ORCHESTRATOR_GAME_LAYER_ORDER,
   resolveOrchestratorGameConfig,
   type OrchestratorGameLayer,
@@ -35,6 +37,10 @@ import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { translate } from '@/i18n/i18n'
 import { gameStyleFallbackNote } from './orchestrator-game-style-fallback-note'
+import { GamePanelStylePreview } from './GamePanelStylePreview'
+import { OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
+import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
+import { withOrchestratorGameField } from '../../../../shared/orchestrator-game-settings-updates'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -110,6 +116,9 @@ const copy = () => ({
   ]
 })
 
+const sceneTitle = (): string =>
+  translate('auto.components.settings.OrchestratorGameSetting.scene', 'Scene')
+
 const showLabel = (label: string): string =>
   translate('auto.components.settings.OrchestratorGamePanelSetting.show', 'Show {{label}}', {
     label
@@ -148,6 +157,7 @@ export function GamePanelSetting({
   const layer = settings.orchestratorGame
   const panel = resolveOrchestratorGamePanel({ global: layer })
   const sceneId = resolveOrchestratorGameConfig({ global: layer }).config.scene
+  const scene = useMemo(() => ({ id: sceneId, extensions: [] }), [sceneId])
   const text = copy()
   const [{ title, description, keywords }] = getGamePanelSearchEntries()
   const set = (field: GamePanelField, value: boolean | string): void =>
@@ -161,6 +171,28 @@ export function GamePanelSetting({
       className="space-y-1"
     >
       <SettingsSubsectionHeader title={title} description={description} />
+      <SettingsRow
+        label={sceneTitle()}
+        description={translate(
+          'auto.components.settings.OrchestratorGameSetting.sceneDescription',
+          'The art the game draws. Installed plugins can add scenes.'
+        )}
+        control={
+          <OrchestratorGameSceneSelect
+            value={sceneId}
+            ariaLabel={sceneTitle()}
+            onChange={(next) =>
+              updateSettings({
+                orchestratorGame: withOrchestratorGameField(
+                  layer,
+                  'scene',
+                  next ?? DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene
+                )
+              })
+            }
+          />
+        }
+      />
       {(['look', 'style'] as const)
         .filter((field) => field === 'look' || panel.look === 'game')
         .map((field) => (
@@ -184,6 +216,7 @@ export function GamePanelSetting({
             }
           />
         ))}
+      {panel.look === 'game' ? <GamePanelStylePreview style={panel.style} scene={scene} /> : null}
       {GAME_PANEL_TABS.map((tab) => (
         <SettingsSwitchRow
           key={tab}
@@ -218,18 +251,23 @@ export function ProjectGamePanelRows({
   settings,
   projectLayer,
   advisorPlugin,
+  scene,
   updateSettings
 }: {
   repoId: string
   settings: GameSettings
   projectLayer: OrchestratorGameLayer | undefined
   advisorPlugin: AdvisorPluginPresence
+  /** The project's scene with a custom file's definition; without it the preview resolves the id. */
+  scene?: { id: string; extensions: OrchestratorGameSceneExtension[] }
   updateSettings: Update
 }): React.JSX.Element {
   const local = settings.orchestratorGameProjects?.[repoId]
   const layers = { global: settings.orchestratorGame, project: projectLayer, local }
   const panel = resolveOrchestratorGamePanel(layers)
   const sceneId = resolveOrchestratorGameConfig(layers).config.scene
+  const ownScene = useMemo(() => ({ id: sceneId, extensions: [] }), [sceneId])
+  const shownScene = scene ?? ownScene
   const text = copy()
   const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
@@ -277,7 +315,7 @@ export function ProjectGamePanelRows({
         const own = ownOf(local, field)
         const isToggle = field !== 'look' && field !== 'style'
         const value = own === undefined ? 'inherit' : String(own)
-        return (
+        const row = (
           <SettingsRow
             key={field}
             label={text[field][0]}
@@ -300,6 +338,14 @@ export function ProjectGamePanelRows({
               />
             }
           />
+        )
+        return field === 'style' ? (
+          <Fragment key={field}>
+            {row}
+            <GamePanelStylePreview style={panel.style} scene={shownScene} />
+          </Fragment>
+        ) : (
+          row
         )
       })}
     </>

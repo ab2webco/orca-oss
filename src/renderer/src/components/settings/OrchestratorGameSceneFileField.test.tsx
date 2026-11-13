@@ -95,7 +95,11 @@ function project(
   return (
     <ProjectOrchestratorGameSetting
       repo={REPO}
-      settings={{ orchestratorGameProjects: local ? { repo1: local } : {} }}
+      // Why the band on: the scene preview shows only while the band draws.
+      settings={{
+        orchestratorGame: { band: true },
+        orchestratorGameProjects: local ? { repo1: local } : {}
+      }}
       projectLayer={projectLayer}
       updateSettings={(update) => updates.push(update)}
     />

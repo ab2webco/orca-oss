@@ -1,12 +1,17 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
+import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
 import { GamePanelSetting, ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
+
+// Why never settles: the preview's art loads from assets happy-dom cannot decode.
+vi.mock('../team-scene/team-scene-art-load', () => ({
+  loadTeamSceneArt: vi.fn(() => new Promise(() => {}))
+}))
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 
@@ -227,5 +232,60 @@ describe('ProjectGamePanelRows', () => {
     expect(shown('installed')).toBe(true)
     expect(shown('unknown')).toBe(true)
     expect(shown('missing')).toBe(false)
+  })
+})
+
+describe('the panel style preview', () => {
+  const drawn = (container: HTMLElement): string | undefined =>
+    container.querySelector<HTMLElement>('[data-slot="game-panel-style-preview"]')?.dataset.style
+
+  function Global(): React.JSX.Element {
+    const [settings, setSettings] = useState<GameSettings>({
+      orchestratorGame: { scene: 'quest', panel: { style: 'pixel' } }
+    })
+    return (
+      <GamePanelSetting
+        settings={settings}
+        updateSettings={(next) => setSettings((now) => ({ ...now, ...next }))}
+      />
+    )
+  }
+
+  function Project(): React.JSX.Element {
+    const [settings, setSettings] = useState<GameSettings>({ orchestratorGame: { scene: 'quest' } })
+    return (
+      <ProjectGamePanelRows
+        repoId="r1"
+        settings={settings}
+        projectLayer={{ panel: { style: 'pixel' } }}
+        advisorPlugin="installed"
+        updateSettings={(next) => setSettings((now) => ({ ...now, ...next }))}
+      />
+    )
+  }
+
+  it('draws the chosen style and redraws when another is picked, globally and per project', () => {
+    for (const element of [<Global key="global" />, <Project key="project" />]) {
+      const view = render(element)
+
+      expect(drawn(view.container)).toBe('pixel')
+      press(view.container, 'Scene style', 'Office')
+      expect(drawn(view.container)).toBe('office')
+      press(view.container, 'Scene style', 'Figures')
+      expect(drawn(view.container)).toBe('figures')
+      view.unmount()
+    }
+  })
+
+  it('draws no preview outside the Game look', () => {
+    const view = render(
+      <GamePanelSetting
+        settings={{ orchestratorGame: { panel: { look: 'plain' } } }}
+        updateSettings={() => {}}
+      />
+    )
+
+    expect(drawn(view.container)).toBeUndefined()
+    view.unmount()
   })
 })

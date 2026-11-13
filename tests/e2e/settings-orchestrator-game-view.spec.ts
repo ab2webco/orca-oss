@@ -8,6 +8,11 @@ test('the preview follows the default view: no scene for flat or off, the scene 
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
+  // Why: the band is off by default (ORCA-1148), and the preview this checks is the band's.
+  await orcaPage.evaluate(async () => {
+    const settings = await window.api.settings.set({ orchestratorGame: { band: true } })
+    window.__store?.setState({ settings })
+  })
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')

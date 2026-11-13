@@ -73,3 +73,20 @@ export const shownOrchestratorGameModeOf = (config: {
   mode: OrchestratorGameMode
   show: boolean
 }): OrchestratorGameMode => (config.show ? config.mode : 'off')
+
+/** What a pane draws: with the band off it stays flat with no HUD, so no pixels reach the terminal. */
+export const shownOrchestratorGameTerminalOf = (config: {
+  mode: OrchestratorGameMode
+  show: boolean
+  band: boolean
+  hud: boolean
+}): { mode: OrchestratorGameMode; hud: boolean } => {
+  const mode = shownOrchestratorGameModeOf(config)
+  return config.band
+    ? { mode, hud: config.hud }
+    : { mode: mode === 'off' ? 'off' : 'flat', hud: false }
+}
+
+/** Views that draw the scene; storing one turns the band on, or it would change nothing on screen. */
+export const isOrchestratorGamePixelView = (id: OrchestratorGameViewId): boolean =>
+  id === 'zen' || id === '2d-classic' || id === '2d-hd'

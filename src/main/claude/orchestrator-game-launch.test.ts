@@ -15,7 +15,9 @@ const PLUGIN_DIR = '/app/resources/claude-plugins/orca-game'
 describe('buildOrchestratorGameLaunch', () => {
   it('loads the plugin with the effective config on a Claude Code that supports mods', () => {
     const launch = buildOrchestratorGameLaunch({
-      resolved: resolveOrchestratorGameConfig({ project: { mode: 'zen', rewards: false } }),
+      resolved: resolveOrchestratorGameConfig({
+        project: { mode: 'zen', rewards: false, band: true }
+      }),
       claudeVersion: '2.1.301',
       pluginDir: PLUGIN_DIR,
       orcaCli: '/app/bin/orca',
@@ -35,6 +37,18 @@ describe('buildOrchestratorGameLaunch', () => {
       ORCA_GAME_LOCALE: 'es',
       CLAUDE_CODE_NO_FLICKER: '1'
     })
+  })
+
+  it('draws no pixels while the band is off, the default: flat and no HUD, the game still loads', () => {
+    const launch = buildOrchestratorGameLaunch({
+      resolved: resolveOrchestratorGameConfig({ project: { mode: 'zen' } }),
+      claudeVersion: '2.1.301',
+      pluginDir: PLUGIN_DIR
+    })
+
+    expect(launch.args).toEqual(['--plugin-dir', PLUGIN_DIR])
+    expect(launch.env.ORCA_GAME_MODE).toBe('flat')
+    expect(launch.env.ORCA_GAME_HUD).toBe('0')
   })
 
   it('tells a member pane its role, and leaves the lead launch without one', () => {

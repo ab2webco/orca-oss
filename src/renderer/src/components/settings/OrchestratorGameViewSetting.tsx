@@ -12,6 +12,7 @@ import {
 import {
   ORCHESTRATOR_GAME_VIEWS,
   orchestratorGameViewOf,
+  isOrchestratorGamePixelView,
   orchestratorGameViewPatchOf,
   type OrchestratorGameViewCost,
   type OrchestratorGameViewId
@@ -91,9 +92,12 @@ function withView(
   }
   const patch = orchestratorGameViewPatchOf(view, now)
   const moded = withOrchestratorGameField(layer, 'mode', patch.mode)
-  return patch.render === undefined
-    ? moded
-    : withOrchestratorGameField(moded, 'render', patch.render)
+  const rendered =
+    patch.render === undefined ? moded : withOrchestratorGameField(moded, 'render', patch.render)
+  // Why: a view that draws changes nothing on screen while the band is off.
+  return isOrchestratorGamePixelView(view) && !now.band
+    ? withOrchestratorGameField(rendered, 'band', true)
+    : rendered
 }
 
 function ViewSelect({

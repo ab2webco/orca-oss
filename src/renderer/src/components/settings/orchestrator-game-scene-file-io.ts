@@ -1,7 +1,8 @@
 import type { SshMutationExpectation } from '../../../../shared/ssh-types'
 import {
   ORCHESTRATOR_GAME_SCENE_PHASES,
-  parseOrchestratorGameScene
+  parseOrchestratorGameScene,
+  type OrchestratorGameSceneDefinition
 } from '../../../../shared/orchestrator-game-scene'
 import {
   ORCHESTRATOR_GAME_SCENE_FILE_DIR,
@@ -35,7 +36,8 @@ export type SceneFileFs = {
 }
 
 export type SceneFileRead =
-  | { status: 'ok'; definition: SceneDefinition }
+  // Why the shared type: the parser returns it, and the Team panel takes it as a scene extension.
+  | { status: 'ok'; definition: OrchestratorGameSceneDefinition }
   | { status: 'invalid' | 'unreadable'; message: string }
 
 const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`

@@ -56,7 +56,7 @@ describe('prepareOrchestratorGameLaunch', () => {
     const launch = await prepareOrchestratorGameLaunch({
       ...base,
       settings: {
-        orchestratorGame: { hud: false },
+        orchestratorGame: { hud: false, band: true },
         orchestratorGameProjects: { repo1: { rewards: false } }
       },
       repoId: 'repo1',
@@ -153,7 +153,7 @@ describe('prepareOrchestratorGameLaunch', () => {
       worktreePath: worktreeWith(null)
     })
 
-    expect(launch.env.ORCA_GAME_MODE).toBe('on')
+    expect(launch.env.ORCA_GAME_MODE).toBe('flat')
   })
 
   it('launches plain Claude when the version probe fails', async () => {

@@ -10,6 +10,7 @@ import {
   orchestratorGameViewOf,
   orchestratorGameViewPatchOf,
   shownOrchestratorGameModeOf,
+  shownOrchestratorGameTerminalOf,
   suggestedOrchestratorGameView
 } from './orchestrator-game-view'
 
@@ -113,5 +114,33 @@ describe('Show the game', () => {
 
   it('is on by default', () => {
     expect(resolveOrchestratorGameConfig({}).config.show).toBe(true)
+  })
+})
+
+describe('what a pane draws in its terminal', () => {
+  const config = { mode: 'on' as const, show: true, band: false, hud: true }
+
+  it('draws no pixels while the band is off: the scene goes flat and the HUD goes away', () => {
+    expect(shownOrchestratorGameTerminalOf(config)).toEqual({ mode: 'flat', hud: false })
+    expect(shownOrchestratorGameTerminalOf({ ...config, mode: 'zen' })).toEqual({
+      mode: 'flat',
+      hud: false
+    })
+  })
+
+  it('keeps the view and HUD as set while the band is on', () => {
+    expect(shownOrchestratorGameTerminalOf({ ...config, band: true })).toEqual({
+      mode: 'on',
+      hud: true
+    })
+    expect(shownOrchestratorGameTerminalOf({ ...config, band: true, hud: false })).toEqual({
+      mode: 'on',
+      hud: false
+    })
+  })
+
+  it('leaves off and a hidden game off', () => {
+    expect(shownOrchestratorGameTerminalOf({ ...config, mode: 'off' }).mode).toBe('off')
+    expect(shownOrchestratorGameTerminalOf({ ...config, band: true, show: false }).mode).toBe('off')
   })
 })

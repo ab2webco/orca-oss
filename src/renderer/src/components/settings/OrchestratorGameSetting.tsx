@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import {
-  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   resolveOrchestratorGameConfig,
   type OrchestratorGameBuiltInScene,
@@ -67,40 +66,14 @@ import { ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
 import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { useAdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { getRepositoryGameSectionId } from './repository-settings-targets'
+import {
+  switchPlaceOf,
+  orchestratorGameSwitches,
+  type ToggleKey
+} from './orchestrator-game-switches'
+import { TerminalBandGroup } from './OrchestratorGameTerminalBand'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
-type ToggleKey = 'hud' | 'rewards' | 'tracker'
-
-const toggles = (): { key: ToggleKey; label: string; description: string }[] => [
-  {
-    key: 'hud',
-    label: translate('auto.components.settings.OrchestratorGameSetting.hud', 'Teammate HUD'),
-    description: translate(
-      'auto.components.settings.OrchestratorGameSetting.hudDescription',
-      "Show the fleet band above Claude's prompt."
-    )
-  },
-  {
-    key: 'rewards',
-    label: translate('auto.components.settings.OrchestratorGameSetting.rewards', 'Rewards'),
-    description: translate(
-      'auto.components.settings.OrchestratorGameSetting.rewardsDescription',
-      'XP, level-ups and celebrations when reviews merge or CI turns green.'
-    )
-  },
-  {
-    key: 'tracker',
-    label: translate(
-      'auto.components.settings.OrchestratorGameSetting.tracker',
-      'Work item tracking'
-    ),
-    description: translate(
-      'auto.components.settings.OrchestratorGameSetting.trackerDescription',
-      'Follow the linked Plane, Jira, Linear, GitHub or GitLab item in the flow.'
-    )
-  }
-]
-
 const title = (): string =>
   translate('auto.components.settings.OrchestratorGameSetting.title', 'Agent Teams game')
 
@@ -138,6 +111,22 @@ export function OrchestratorGameSetting({
     'auto.components.settings.OrchestratorGameSetting.description',
     'Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.'
   )
+  const switchRow = (
+    toggle: ReturnType<typeof orchestratorGameSwitches>[number]
+  ): React.JSX.Element => (
+    <SettingsSwitchRow
+      key={toggle.key}
+      label={toggle.label}
+      description={toggle.description}
+      checked={config[toggle.key]}
+      disabled={config.mode === 'off'}
+      onChange={() => set(toggle.key, !config[toggle.key])}
+    />
+  )
+  const switchesAt = (place: ReturnType<typeof switchPlaceOf>): React.JSX.Element[] =>
+    orchestratorGameSwitches()
+      .filter((toggle) => switchPlaceOf(toggle.key) === place)
+      .map(switchRow)
 
   return (
     <section>
@@ -149,44 +138,28 @@ export function OrchestratorGameSetting({
       >
         {sectionHeader()}
         <OrchestratorGameViewRows settings={settings} updateSettings={updateSettings} />
-        <SettingsRow
-          label={sceneTitle()}
-          description={translate(
-            'auto.components.settings.OrchestratorGameSetting.sceneDescription',
-            'The art the game draws. Installed plugins can add scenes.'
-          )}
-          control={
-            <OrchestratorGameSceneSelect
-              value={config.scene}
-              ariaLabel={sceneTitle()}
-              disabled={config.mode === 'off'}
-              onChange={(scene) => set('scene', scene ?? DEFAULT_ORCHESTRATOR_GAME_CONFIG.scene)}
-            />
-          }
-        />
-        <OrchestratorGameScenePreview config={config} />
-        {toggles().map((toggle) => (
-          <SettingsSwitchRow
-            key={toggle.key}
-            label={toggle.label}
-            description={toggle.description}
-            checked={config[toggle.key]}
-            disabled={config.mode === 'off'}
-            onChange={() => set(toggle.key, !config[toggle.key])}
-          />
-        ))}
+        {switchesAt('game')}
         <OrchestratorGameOpenLinksRow
           value={config.openLinks}
           disabled={config.mode === 'off'}
           onChange={(next) => set('openLinks', next)}
         />
-        <OrchestratorGameLookRows
-          layer={layer}
-          disabled={config.mode === 'off'}
-          onChange={(key, value) =>
-            updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
-          }
-        />
+        <TerminalBandGroup>
+          {switchesAt('band')}
+          {config.band ? (
+            <>
+              <OrchestratorGameScenePreview config={config} />
+              <OrchestratorGameLookRows
+                layer={layer}
+                disabled={config.mode === 'off'}
+                onChange={(key, value) =>
+                  updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
+                }
+              />
+              {switchesAt('drawn')}
+            </>
+          ) : null}
+        </TerminalBandGroup>
       </SearchableSetting>
       <OrchestratorGameScenesSkillCard />
     </section>
@@ -232,6 +205,14 @@ export function ProjectOrchestratorGameSetting({
     isReachable: !connectionId || sshStatus === 'connected',
     path: sceneFile
   })
+  // Why the file's definition: the panel draws a custom scene's own cast, as the band does.
+  const panelScene = {
+    id: config.scene,
+    extensions:
+      sceneFile !== null && file.state?.status === 'ok'
+        ? [{ id: config.scene, pluginId: 'file', definition: file.state.definition }]
+        : []
+  }
   const projectFiles = useOrchestratorGameProjectSceneFiles({
     rootPath: target.path,
     connectionId,
@@ -281,7 +262,7 @@ export function ProjectOrchestratorGameSetting({
     text: string
     value: FieldValue | 'inherit'
     options: { value: FieldValue | 'inherit'; label: string }[]
-  }[] = toggles().map((toggle) => ({
+  }[] = orchestratorGameSwitches().map((toggle) => ({
     key: toggle.key,
     label: toggle.label,
     text: onOff(config[toggle.key]),
@@ -295,6 +276,28 @@ export function ProjectOrchestratorGameSetting({
       { value: 'false' as const, label: labels.off }
     ]
   }))
+  const toggleRow = (row: (typeof rows)[number]): React.JSX.Element => (
+    <SettingsRow
+      key={row.key}
+      label={row.label}
+      description={effective(row.key, row.text)}
+      control={
+        <SettingsSegmentedControl
+          value={row.value}
+          ariaLabel={row.label}
+          size="sm"
+          options={row.options}
+          onChange={(next) => {
+            if (next === 'inherit') {
+              set(row.key, undefined)
+            } else {
+              set(row.key, next === 'true')
+            }
+          }}
+        />
+      }
+    />
+  )
 
   return (
     <SearchableSetting
@@ -306,54 +309,6 @@ export function ProjectOrchestratorGameSetting({
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
-        <ProjectGamePanelRows
-          repoId={repoId}
-          settings={settings}
-          projectLayer={projectLayer}
-          advisorPlugin={advisorPlugin}
-          updateSettings={updateSettings}
-        />
-        <ProjectOrchestratorGameViewRows
-          repoId={repoId}
-          settings={settings}
-          projectLayer={projectLayer}
-          updateSettings={updateSettings}
-        />
-        {rows.map((row) => (
-          <SettingsRow
-            key={row.key}
-            label={row.label}
-            description={effective(row.key, row.text)}
-            control={
-              <SettingsSegmentedControl
-                value={row.value}
-                ariaLabel={row.label}
-                size="sm"
-                options={row.options}
-                onChange={(next) => {
-                  if (next === 'inherit') {
-                    set(row.key, undefined)
-                  } else {
-                    set(row.key, next === 'true')
-                  }
-                }}
-              />
-            }
-          />
-        ))}
-        <OrchestratorGameOpenLinksRow
-          value={local?.openLinks ?? 'inherit'}
-          effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
-          onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
-        />
-        <OrchestratorGameLookRows
-          layer={local}
-          effective={{
-            render: effective('render', orchestratorGameRenderLabels()[config.render]),
-            timezone: effective('timezone', config.timezone)
-          }}
-          onChange={set}
-        />
         <SettingsRow
           label={sceneTitle()}
           description={effective('scene', sceneFile ?? config.scene)}
@@ -386,10 +341,46 @@ export function ProjectOrchestratorGameSetting({
         ) : (
           <OrchestratorGameSceneFileStatus read={file.state} />
         )}
-        <OrchestratorGameScenePreview
-          config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
-          fileScene={file.state}
+        <ProjectGamePanelRows
+          repoId={repoId}
+          scene={panelScene}
+          settings={settings}
+          projectLayer={projectLayer}
+          advisorPlugin={advisorPlugin}
+          updateSettings={updateSettings}
         />
+        <ProjectOrchestratorGameViewRows
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          updateSettings={updateSettings}
+        />
+        {rows.filter((row) => switchPlaceOf(row.key) === 'game').map(toggleRow)}
+        <OrchestratorGameOpenLinksRow
+          value={local?.openLinks ?? 'inherit'}
+          effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
+          onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
+        />
+        <TerminalBandGroup>
+          {rows.filter((row) => switchPlaceOf(row.key) === 'band').map(toggleRow)}
+          {config.band ? (
+            <>
+              <OrchestratorGameScenePreview
+                config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
+                fileScene={file.state}
+              />
+              <OrchestratorGameLookRows
+                layer={local}
+                effective={{
+                  render: effective('render', orchestratorGameRenderLabels()[config.render]),
+                  timezone: effective('timezone', config.timezone)
+                }}
+                onChange={set}
+              />
+              {rows.filter((row) => switchPlaceOf(row.key) === 'drawn').map(toggleRow)}
+            </>
+          ) : null}
+        </TerminalBandGroup>
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}
           settings={settings}

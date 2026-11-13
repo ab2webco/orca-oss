@@ -111,7 +111,7 @@ describe('Show the game and the default view, globally', () => {
     click(view.container, '[role="switch"]', 'Show the game')
     expect(updates).toEqual([
       { orchestratorGame: { render: 'hd-compact', show: false, mode: 'flat' } },
-      { orchestratorGame: { render: 'hd-compact', show: false, mode: 'on' } },
+      { orchestratorGame: { render: 'hd-compact', show: false, mode: 'on', band: true } },
       { orchestratorGame: { render: 'hd-compact', show: true } }
     ])
     view.unmount()
@@ -141,7 +141,7 @@ describe('Show the game and the default view, per project', () => {
     choose(view.container, 'zen')
     click(view.container, '[aria-label="Show the game"] button', 'On')
     expect(updates).toEqual([
-      { orchestratorGameProjects: { repo1: { render: 'hd', mode: 'zen' } } },
+      { orchestratorGameProjects: { repo1: { render: 'hd', mode: 'zen', band: true } } },
       { orchestratorGameProjects: { repo1: { render: 'hd', show: true } } }
     ])
     view.unmount()

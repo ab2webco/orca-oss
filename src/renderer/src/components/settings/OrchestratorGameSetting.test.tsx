@@ -7,6 +7,12 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PluginHostListEntry } from '../../../../preload/api/plugin-host-api'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
 import { OrchestratorGameSetting, ProjectOrchestratorGameSetting } from './OrchestratorGameSetting'
+import { GamePanelSetting } from './OrchestratorGamePanelSetting'
+
+// Why never settles: the panel preview's art loads from assets happy-dom cannot decode.
+vi.mock('../team-scene/team-scene-art-load', () => ({
+  loadTeamSceneArt: vi.fn(() => new Promise(() => {}))
+}))
 
 vi.mock('../ui/select', () => ({
   Select: ({
@@ -124,7 +130,7 @@ describe('OrchestratorGameSetting', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <OrchestratorGameSetting
-        settings={{ orchestratorGame: { rewards: false } }}
+        settings={{ orchestratorGame: { rewards: false, band: true } }}
         updateSettings={(update) => updates.push(update)}
       />
     )
@@ -132,8 +138,8 @@ describe('OrchestratorGameSetting', () => {
     choose(viewSelect(view.container), 'zen')
     click(view.container, '[role="switch"]', 'Teammate HUD')
     expect(updates).toEqual([
-      { orchestratorGame: { rewards: false, mode: 'zen' } },
-      { orchestratorGame: { rewards: false, hud: false } }
+      { orchestratorGame: { rewards: false, band: true, mode: 'zen' } },
+      { orchestratorGame: { rewards: false, band: true, hud: false } }
     ])
     view.unmount()
   })
@@ -152,7 +158,7 @@ describe('game settings section', () => {
   it('previews the effective scene and mode', () => {
     const view = render(
       <OrchestratorGameSetting
-        settings={{ orchestratorGame: { scene: 'tamer', mode: 'zen' } }}
+        settings={{ orchestratorGame: { scene: 'tamer', mode: 'zen', band: true } }}
         updateSettings={() => undefined}
       />
     )
@@ -166,7 +172,7 @@ describe('game settings section', () => {
     const view = render(
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
-        settings={{ orchestratorGame: { scene: 'tamer' } }}
+        settings={{ orchestratorGame: { scene: 'tamer', band: true } }}
         projectLayer={{ scene: 'jrpg', mode: 'off' }}
         updateSettings={() => undefined}
       />
@@ -186,7 +192,10 @@ describe('ProjectOrchestratorGameSetting', () => {
     const view = render(
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
-        settings={{ orchestratorGameProjects: { repo1: { hud: false } } }}
+        settings={{
+          orchestratorGame: { band: true },
+          orchestratorGameProjects: { repo1: { hud: false } }
+        }}
         projectLayer={{ mode: 'off' }}
         updateSettings={(update) => updates.push(update)}
       />
@@ -236,7 +245,7 @@ describe('game scene picker', () => {
   it('offers the built-in scenes and those of running plugins, and writes the pick globally', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
-      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+      <GamePanelSetting settings={{}} updateSettings={(update) => updates.push(update)} />
     )
 
     const select = sceneSelect(view.container)
@@ -255,7 +264,7 @@ describe('game scene picker', () => {
 
   it('keeps a scene nothing installed serves selected and says so', () => {
     const view = render(
-      <OrchestratorGameSetting
+      <GamePanelSetting
         settings={{ orchestratorGame: { scene: 'acme.gone/orbit' } }}
         updateSettings={() => undefined}
       />
@@ -357,7 +366,10 @@ describe('render and time zone', () => {
   it('writes the render and a valid time zone globally, refusing a zone that does not exist', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
-      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { band: true } }}
+        updateSettings={(update) => updates.push(update)}
+      />
     )
     click(view.container, '[aria-label="Render"] button', 'HD')
     typeAndLeave(timezoneField(view.container), 'Mars/Olympus')
@@ -366,8 +378,8 @@ describe('render and time zone', () => {
     )
     typeAndLeave(timezoneField(view.container), ' America/Bogota ')
     expect(updates).toEqual([
-      { orchestratorGame: { render: 'hd' } },
-      { orchestratorGame: { timezone: 'America/Bogota' } }
+      { orchestratorGame: { band: true, render: 'hd' } },
+      { orchestratorGame: { band: true, timezone: 'America/Bogota' } }
     ])
     view.unmount()
   })
@@ -375,10 +387,13 @@ describe('render and time zone', () => {
   it('offers hd-compact next to classic and hd', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
-      <OrchestratorGameSetting settings={{}} updateSettings={(update) => updates.push(update)} />
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { band: true } }}
+        updateSettings={(update) => updates.push(update)}
+      />
     )
     click(view.container, '[aria-label="Render"] button', 'HD compact')
-    expect(updates).toEqual([{ orchestratorGame: { render: 'hd-compact' } }])
+    expect(updates).toEqual([{ orchestratorGame: { band: true, render: 'hd-compact' } }])
     view.unmount()
   })
 
@@ -386,13 +401,13 @@ describe('render and time zone', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <OrchestratorGameSetting
-        settings={{ orchestratorGame: { timezone: 'Asia/Tokyo' } }}
+        settings={{ orchestratorGame: { timezone: 'Asia/Tokyo', band: true } }}
         updateSettings={(update) => updates.push(update)}
       />
     )
     expect(timezoneField(view.container).value).toBe('Asia/Tokyo')
     typeAndLeave(timezoneField(view.container), '')
-    expect(updates).toEqual([{ orchestratorGame: {} }])
+    expect(updates).toEqual([{ orchestratorGame: { band: true } }])
     view.unmount()
   })
 
@@ -401,7 +416,7 @@ describe('render and time zone', () => {
     const view = render(
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
-        settings={{ orchestratorGame: { timezone: 'America/Bogota' } }}
+        settings={{ orchestratorGame: { timezone: 'America/Bogota', band: true } }}
         projectLayer={{ render: 'hd' }}
         updateSettings={(update) => updates.push(update)}
       />
@@ -422,7 +437,7 @@ describe('the preview follows the render', () => {
   it('previews hd globally and per project when the render resolves to hd', () => {
     const global = render(
       <OrchestratorGameSetting
-        settings={{ orchestratorGame: { render: 'hd' } }}
+        settings={{ orchestratorGame: { render: 'hd', band: true } }}
         updateSettings={() => undefined}
       />
     )
@@ -433,12 +448,134 @@ describe('the preview follows the render', () => {
     const project = render(
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
-        settings={{ orchestratorGame: { render: 'hd' } }}
+        settings={{ orchestratorGame: { render: 'hd', band: true } }}
         projectLayer={{ render: 'classic' }}
         updateSettings={() => undefined}
       />
     )
     expect(preview(project.container)?.dataset.render).toBe('classic')
     project.unmount()
+  })
+})
+
+describe('the terminal band group', () => {
+  const pages = (band: boolean | undefined) => [
+    <OrchestratorGameSetting
+      key="global"
+      settings={band === undefined ? {} : { orchestratorGame: { band } }}
+      updateSettings={() => undefined}
+    />,
+    <ProjectOrchestratorGameSetting
+      key="project"
+      repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+      settings={{}}
+      projectLayer={band === undefined ? undefined : { band }}
+      updateSettings={() => undefined}
+    />
+  ]
+  const hasSceneSelect = (root: HTMLElement | null): boolean =>
+    Array.from(root?.querySelectorAll('select') ?? []).some((one) =>
+      Array.from(one.options).some((option) => option.value === 'quest')
+    )
+  const bandOf = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[role="group"][aria-label="Terminal band"]')
+  const drawnRows = (band: HTMLElement | null) => [
+    band?.querySelector('[data-slot="game-scene-preview"]') ?? null,
+    ...['Render', 'Time zone', 'Teammate HUD'].map(
+      (label) => band?.querySelector(`[aria-label="${label}"]`) ?? null
+    )
+  ]
+
+  it('holds what Agent Teams panes draw under its own heading, apart from the panel, globally and per project', () => {
+    for (const page of pages(true)) {
+      const view = render(page)
+      const band = bandOf(view.container)
+
+      expect(band?.querySelector('h3')?.textContent).toBe('Terminal band')
+      expect(hasSceneSelect(band)).toBe(false)
+      expect(drawnRows(band).every(Boolean)).toBe(true)
+      expect(band?.querySelector('[aria-label="Scene style"]')).toBeNull()
+      expect(band?.querySelector('[data-slot="game-panel-style-preview"]')).toBeNull()
+      view.unmount()
+    }
+  })
+
+  it('is off by default: only its switch shows, what the band draws hides', () => {
+    for (const page of pages(undefined)) {
+      const view = render(page)
+      const band = bandOf(view.container)
+
+      expect(band?.querySelector('[aria-label="Show the band"]')).toBeTruthy()
+      expect(hasSceneSelect(band)).toBe(false)
+      expect(drawnRows(band).some(Boolean)).toBe(false)
+      view.unmount()
+    }
+  })
+
+  it('writes the band switch globally and per project', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const global = render(
+      <OrchestratorGameSetting settings={{}} updateSettings={(next) => updates.push(next)} />
+    )
+    click(global.container, '[role="switch"]', 'Show the band')
+    global.unmount()
+    const project = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={undefined}
+        updateSettings={(next) => updates.push(next)}
+      />
+    )
+    click(project.container, '[aria-label="Show the band"] button', 'On')
+    project.unmount()
+
+    expect(updates).toEqual([
+      { orchestratorGame: { band: true } },
+      { orchestratorGameProjects: { repo1: { band: true } } }
+    ])
+  })
+})
+
+describe('the scene leads the Panel group', () => {
+  const before = (first: Element | null, second: Element | null): boolean =>
+    Boolean(
+      first && second && first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  const preview = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-slot="game-panel-style-preview"]')
+
+  it('sits above the look and style globally and draws the panel preview of the chosen scene', () => {
+    const view = render(
+      <GamePanelSetting
+        settings={{ orchestratorGame: { scene: 'tamer' } }}
+        updateSettings={() => undefined}
+      />
+    )
+
+    const scene = sceneSelect(view.container)
+    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
+    expect(before(scene, view.container.querySelector('[aria-label="Scene style"]'))).toBe(true)
+    expect(preview(view.container)?.dataset.scene).toBe('tamer')
+    view.unmount()
+  })
+
+  it('sits above the look and style per project, outside the terminal band', () => {
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={{ scene: 'jrpg' }}
+        updateSettings={() => undefined}
+      />
+    )
+
+    const scene = sceneSelect(view.container)
+    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
+    expect(
+      view.container.querySelector('[role="group"][aria-label="Terminal band"]')?.contains(scene)
+    ).toBe(false)
+    expect(preview(view.container)?.dataset.scene).toBe('jrpg')
+    view.unmount()
   })
 })

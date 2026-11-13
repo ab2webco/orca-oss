@@ -352,3 +352,20 @@ describe('orchestratorGame.rewardWeights', () => {
     expect(resolveOrchestratorGameRewardWeights({})).toEqual(DEFAULT_GAME_REWARD_WEIGHTS)
   })
 })
+
+describe('band', () => {
+  it('is off by default and a layer that sets it wins, whatever its value', () => {
+    expect(resolveOrchestratorGameConfig({}).config.band).toBe(false)
+    expect(resolveOrchestratorGameConfig({ project: { band: true } }).config.band).toBe(true)
+    const local = resolveOrchestratorGameConfig({ global: { band: true }, local: { band: false } })
+    expect(local.config.band).toBe(false)
+    expect(local.sources.band).toBe('local')
+  })
+
+  it('reads it from orca.yaml, dropping a value that is not true or false', () => {
+    expect(parseOrchestratorGameLayer({ band: true }).layer).toEqual({ band: true })
+    const bad = parseOrchestratorGameLayer({ band: 'yes' })
+    expect(bad.layer).toEqual({})
+    expect(bad.warnings).toEqual(['orchestratorGame.band must be true or false'])
+  })
+})
