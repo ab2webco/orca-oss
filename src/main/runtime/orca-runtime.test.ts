@@ -1908,6 +1908,44 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it("merges a paired phone's Agent Teams scene, style and colours into Settings", async () => {
+    let settings = {
+      ...store.getSettings(),
+      orchestratorGame: { band: true, panel: { tabs: { queue: false } } },
+      statusColors: { light: { info: '#111111' } }
+    }
+    const updateSettings = vi.fn((updates: Partial<typeof settings>) => {
+      settings = { ...settings, ...updates }
+      return settings
+    })
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => settings,
+      updateSettings
+    } as never)
+
+    const result = await runtime.updateClientSettings({
+      agentTeamsPanel: { scene: 'jrpg', style: 'figures' },
+      statusColors: { dark: { success: '#3ddc97' } }
+    })
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      {
+        orchestratorGame: {
+          band: true,
+          scene: 'jrpg',
+          panel: { tabs: { queue: false }, style: 'figures' }
+        },
+        statusColors: { light: { info: '#111111' }, dark: { success: '#3ddc97' } }
+      },
+      { notifyListeners: true }
+    )
+    expect(result).toMatchObject({
+      agentTeamsPanel: { scene: 'jrpg', look: 'game', style: 'figures' },
+      statusColors: { light: { info: '#111111' }, dark: { success: '#3ddc97' } }
+    })
+  })
+
   it('broadcasts visibility default changes to paired clients', async () => {
     let settings = { ...store.getSettings(), worktreeVisibilityDefaults: { external: 'hide' } }
     const runtime = new OrcaRuntimeService({

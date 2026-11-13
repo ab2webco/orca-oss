@@ -203,6 +203,13 @@ export const MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY = 'mobile.plugin-panels.v1'
 // Why: older hosts refuse updater.requestMobileInstall at dispatch, so the phone shows status only unless this is advertised.
 export const MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY =
   'mobile.remote-update-install.v1' as const
+// Why: older hosts refuse game.leads, leadStored, leadReopen and paneAdvisors from a phone at dispatch (ORCA-1183).
+export const MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY = 'mobile.team-control.v1' as const
+// Why: older hosts refuse game.sceneArt from a phone, so it draws the readable band instead (ORCA-1183).
+export const MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY = 'mobile.team-scene.v1' as const
+// Why: settings.update is strict, so an older host rejects agentTeamsPanel and statusColors (ORCA-1183).
+export const MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY =
+  'mobile.agent-teams-settings.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
@@ -269,7 +276,10 @@ export const RUNTIME_CAPABILITIES = [
   GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
   AUTOMATION_ACCOUNT_PIN_RUNTIME_CAPABILITY,
   MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
-  MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY
+  MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
+  MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
