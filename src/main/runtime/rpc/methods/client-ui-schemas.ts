@@ -18,6 +18,7 @@ import {
   WORKTREE_CARD_PROPERTIES
 } from '../../../../shared/worktree/card-properties'
 import { isPluginPanelTabKey } from '../../../../shared/plugins/plugin-manifest'
+import { AgentTeamsSettingsUpdateFields } from './client-ui-agent-teams-schemas'
 import type { TaskProvider } from '../../../../shared/types'
 import { GitHubProjectSettings } from './client-github-project-schemas'
 import { ClientUiWorkspaceFilterFields } from './client-ui-workspace-filter-fields'
@@ -144,7 +145,8 @@ export const SettingsUpdate = z
     prBotAuthorOverrides: z
       .unknown()
       .transform((value) => normalizePRBotAuthorOverrides(value))
-      .optional()
+      .optional(),
+    ...AgentTeamsSettingsUpdateFields
   })
   .strict()
   .default({})

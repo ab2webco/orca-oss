@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
+  MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_DATE_CLEARS_RUNTIME_CAPABILITY,
@@ -11,6 +12,8 @@ import {
   MOBILE_PLANE_BOARD_WRITES_RUNTIME_CAPABILITY,
   MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
   MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../../shared/protocol-version'
 
@@ -177,7 +180,7 @@ describe('mobile RPC allowlist', () => {
     ])
   })
 
-  it("allows exactly the Inbox's owner-question methods and the Team drawer's reads on the phone", () => {
+  it("allows exactly the Inbox, the Team panel's reads and the lead's reopen on the phone", () => {
     // Why exact: member actions, the STOP switch and the lead's own board stay desktop decisions.
     const gameMethods = [...mobileRpcAllowlist()]
       .filter((method) => method.startsWith('game.'))
@@ -185,10 +188,37 @@ describe('mobile RPC allowlist', () => {
 
     expect(gameMethods).toEqual([
       'game.inboxThreads',
+      'game.leadReopen',
+      'game.leadStored',
+      'game.leads',
       'game.ownerAnswer',
       'game.ownerQuestionsAll',
+      'game.paneAdvisors',
+      'game.sceneArt',
       'game.state'
     ])
+  })
+
+  it('opens the lead reads and reopen to the phone as one advertised capability', () => {
+    // Why: an older host refuses these at dispatch, so the phone's + menu Team group keys on this.
+    const allowed = mobileRpcAllowlist()
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY)
+    expect(
+      ['game.leads', 'game.leadStored', 'game.leadReopen', 'game.paneAdvisors'].filter(
+        (method) => !allowed.has(method)
+      )
+    ).toEqual([])
+  })
+
+  it('opens the scene art to the phone as its own advertised capability', () => {
+    // Why: without it the phone draws the readable band instead of asking an older host for art.
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY)
+    expect(mobileRpcAllowlist().has('game.sceneArt')).toBe(true)
+  })
+
+  it('advertises the Agent Teams settings fields as their own capability', () => {
+    // Why: settings.update is strict, so an older host rejects the new keys; the phone sends them only under this.
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY)
   })
 
   it('opens one Plane work item to the phone as its own advertised capability', () => {

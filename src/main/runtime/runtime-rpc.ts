@@ -373,6 +373,14 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'game.state',
   // The Team drawer's Inbox tab reads the lead's threads; it never marks them read (ORCA-961).
   'game.inboxThreads',
+  // The Team group of the + menu and the advisor line of the panel, gated on the phone by
+  // MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY; the STOP switch stays on the desktop (ORCA-1183).
+  'game.leads',
+  'game.leadStored',
+  'game.leadReopen',
+  'game.paneAdvisors',
+  // The scene band of the panel, gated on the phone by MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY (ORCA-1183).
+  'game.sceneArt',
   // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
   // Consent, enablement and invokeCommand stay off: those are desktop decisions.
   'plugins.list',

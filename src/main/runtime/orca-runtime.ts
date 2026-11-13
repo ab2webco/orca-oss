@@ -735,6 +735,12 @@ import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { readGameSceneArt } from './orchestrator-game-scene-art'
+import {
+  agentTeamsClientSettingsOf,
+  agentTeamsSettingsPatchOf,
+  type AgentTeamsClientSettings,
+  type AgentTeamsSettingsUpdate
+} from '../../shared/agent-teams-client-settings'
 import type { GameSceneArtImage } from '../worktree-game-scene-file'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import type { GamePanelTab } from '../../shared/orchestrator-game-panel'
@@ -4437,12 +4443,14 @@ export class OrcaRuntimeService {
     // still omits the key so no RPC caller can grant it to itself.
     | 'artifactSharingEnabled'
     | 'worktreeVisibilityDefaults'
-  > {
+  > &
+    AgentTeamsClientSettings {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
     return {
+      ...agentTeamsClientSettingsOf(settings),
       worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
       defaultTuiAgent: settings.defaultTuiAgent ?? null,
       disabledTuiAgents: settings.disabledTuiAgents ?? [],
@@ -4514,7 +4522,8 @@ export class OrcaRuntimeService {
       | 'minimaxGroupId'
       | 'minimaxUsageModels'
       | 'prBotAuthorOverrides'
-    >
+    > &
+      AgentTeamsSettingsUpdate
   ): Promise<
     Pick<
       GlobalSettings,
@@ -4544,7 +4553,14 @@ export class OrcaRuntimeService {
     }
     const beforeSettings = this.store.getSettings()
     const before = beforeSettings.agentStatusHooksEnabled !== false
-    this.store.updateSettings(updates, { notifyListeners: true })
+    const { agentTeamsPanel, statusColors, ...rest } = updates
+    this.store.updateSettings(
+      {
+        ...rest,
+        ...agentTeamsSettingsPatchOf(beforeSettings, { agentTeamsPanel, statusColors })
+      },
+      { notifyListeners: true }
+    )
     const settings = this.store.getSettings()
     if (updates.worktreeVisibilityDefaults !== undefined) {
       this.notifyReposChanged()
