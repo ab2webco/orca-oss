@@ -177,6 +177,16 @@ export async function buildOrchestratorGameState(
       ? fleet
       : withIdleLeader(fleet, input.leaderPaneKey, input.terminalHandleOf)
   const leaderActivity = input.leaderPaneKey ? activityOf(input.leaderPaneKey) : null
+  // Why its own field: an account on the lead's agent row would change the cards older clients draw.
+  const leaderRow = input.agents.find((one) => one.paneKey === input.leaderPaneKey)
+  const leadAccount =
+    !isMember && input.leaderPaneKey && input.accountOf
+      ? input.accountOf({
+          paneKey: input.leaderPaneKey,
+          agentType: leaderRow?.agentType ?? null,
+          worktreeId: input.worktree?.id ?? null
+        })
+      : null
   const sceneList = sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes
   const locale = orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
   // Why the Team card's order: a heading names the lead as its card does (ORCA-1140).
@@ -221,6 +231,7 @@ export async function buildOrchestratorGameState(
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
     ...(suggested ? { suggestedView: suggested } : {}),
     ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
+    ...(leadAccount ? { leadAccount } : {}),
     review: gameReview,
     workItem,
     extensions: { scenes: sceneList },

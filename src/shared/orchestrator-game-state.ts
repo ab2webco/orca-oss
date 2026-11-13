@@ -229,6 +229,8 @@ export type OrchestratorGameState = {
   role?: 'lead' | 'member'
   /** The project's live lead when it is another pane; absent when this pane is it, or none is live. */
   leadElsewhere?: { handle: string }
+  /** The managed account the lead's own agent runs on; absent when Orca cannot tell or from an older host. */
+  leadAccount?: GameMemberAccount
   /** The project's persistent STOP, null when clear; absent from a host older than it. */
   stopped?: GameStop | null
   /** The lead's inbox first, then each ticket's, with unread counts; only for the lead, absent from an older host. */
