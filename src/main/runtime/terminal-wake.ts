@@ -8,6 +8,8 @@ export type TerminalWakeDeps = {
   /** False without a host window: only its renderer holds the records and wake paths. */
   canWake: () => boolean
   requestWake: (paneKey: string) => void
+  /** The worktree's tabs as the host's session last saved them. */
+  tabIdsOf: (worktreeId: string) => readonly string[]
   isAsleep: (record: SleepingAgentSessionRecord) => boolean
   liveHandleOf: (record: SleepingAgentSessionRecord) => Promise<string | null>
   sleep: (ms: number) => Promise<void>
@@ -34,16 +36,32 @@ export async function wakeSleepingTerminal(
   }
   const now = deps.now ?? Date.now
   const deadline = now() + (options.timeoutMs ?? WAKE_TIMEOUT_MS)
+  const tabsBefore = new Set(deps.tabIdsOf(record.worktreeId))
   deps.requestWake(record.paneKey)
-  // Why the record: the renderer drops it only once the resumed agent's PTY spawned.
+  const waking: RuntimeTerminalWake = {
+    handle: null,
+    status: 'waking',
+    paneKey: record.paneKey
+  }
+  // Why the record: in place it drops once the agent's PTY spawned; a fresh tab drops it at launch.
   while (deps.isAsleep(record)) {
     if (now() >= deadline) {
-      return { handle: null, status: 'waking', paneKey: record.paneKey }
+      return waking
     }
     await deps.sleep(WAKE_POLL_MS)
   }
-  const woken = await deps.liveHandleOf(record)
-  return woken
-    ? { handle: woken, status: 'woken', paneKey: record.paneKey }
-    : { handle: null, status: 'waking', paneKey: record.paneKey }
+  // Why poll: a fresh tab is found by the session its agent reports, after the spawn (ORCA-1167).
+  // A refused resume closes that tab, so its absence ends the wait at once.
+  const hasFreshTab = (): boolean =>
+    deps.tabIdsOf(record.worktreeId).some((tabId) => !tabsBefore.has(tabId))
+  for (;;) {
+    const woken = await deps.liveHandleOf(record)
+    if (woken) {
+      return { handle: woken, status: 'woken', paneKey: record.paneKey }
+    }
+    if (!hasFreshTab() || now() >= deadline) {
+      return waking
+    }
+    await deps.sleep(WAKE_POLL_MS)
+  }
 }

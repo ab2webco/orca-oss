@@ -19,11 +19,18 @@ function deps(overrides: Partial<TerminalWakeDeps> = {}): TerminalWakeDeps {
     },
     canWake: () => true,
     requestWake: vi.fn(),
+    tabIdsOf: () => [],
     isAsleep: () => false,
     liveHandleOf: async () => 'term_woken',
     sleep: async () => {},
     ...overrides
   }
+}
+
+/** The tab list a fresh-tab wake leaves: the session's tab, then the one it opened. */
+function freshTabAfterWake(): () => string[] {
+  let reads = 0
+  return () => (reads++ < 1 ? ['tab-1'] : ['tab-1', 'tab-fresh'])
 }
 
 describe('wakeSleepingTerminal', () => {
@@ -35,7 +42,11 @@ describe('wakeSleepingTerminal', () => {
       'term_asleep'
     )
     expect(requestWake).toHaveBeenCalledExactlyOnceWith(RECORD.paneKey)
-    expect(result).toEqual({ handle: 'term_woken', status: 'woken', paneKey: RECORD.paneKey })
+    expect(result).toEqual({
+      handle: 'term_woken',
+      status: 'woken',
+      paneKey: RECORD.paneKey
+    })
   })
 
   it('answers a running terminal as already awake without waking anything', async () => {
@@ -72,14 +83,67 @@ describe('wakeSleepingTerminal', () => {
       'term_asleep',
       { timeoutMs: 1_000 }
     )
-    expect(result).toEqual({ handle: null, status: 'waking', paneKey: RECORD.paneKey })
+    expect(result).toEqual({
+      handle: null,
+      status: 'waking',
+      paneKey: RECORD.paneKey
+    })
   })
 
-  it('reports waking while the woken pane has no running terminal yet', async () => {
+  it('reports waking while the woken pane has no running terminal by the deadline', async () => {
+    let now = 0
     const result = await wakeSleepingTerminal(
-      deps({ liveHandleOf: async () => null }),
+      deps({
+        tabIdsOf: freshTabAfterWake(),
+        liveHandleOf: async () => null,
+        now: () => now,
+        sleep: async (ms) => {
+          now += ms
+        }
+      }),
+      'term_asleep',
+      { timeoutMs: 1_000 }
+    )
+    expect(result).toEqual({
+      handle: null,
+      status: 'waking',
+      paneKey: RECORD.paneKey
+    })
+  })
+
+  // Why (ORCA-1167): a fresh tab is known only once its agent reports the session, after the spawn.
+  it('waits for the fresh tab to be known after the record drops', async () => {
+    let reads = 0
+    const result = await wakeSleepingTerminal(
+      deps({
+        tabIdsOf: freshTabAfterWake(),
+        liveHandleOf: async () => (++reads < 3 ? null : 'term_fresh')
+      }),
+      'term_asleep'
+    )
+    expect(result).toEqual({
+      handle: 'term_fresh',
+      status: 'woken',
+      paneKey: RECORD.paneKey
+    })
+  })
+
+  // Why (ORCA-1167): the refusal closes the fresh tab, so the wake knows at once it will not come up.
+  it('a refused resume answers without waiting for the deadline', async () => {
+    let now = 0
+    let reads = 0
+    const result = await wakeSleepingTerminal(
+      deps({
+        tabIdsOf: () => (reads++ < 1 ? ['tab-1'] : reads < 3 ? ['tab-1', 'tab-fresh'] : ['tab-1']),
+        liveHandleOf: async () => null,
+        now: () => now,
+        sleep: async (ms) => {
+          now += ms
+        }
+      }),
       'term_asleep'
     )
     expect(result).toEqual({ handle: null, status: 'waking', paneKey: RECORD.paneKey })
+    expect(now).toBeLessThan(1_000)
   })
 })

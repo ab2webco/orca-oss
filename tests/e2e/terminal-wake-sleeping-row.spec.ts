@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/orca-app'
+import { createResumedClaudeAgent, type ResumedClaudeAgent } from './helpers/resumed-claude-agent'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { SleepingAgentSessionRecord } from '../../src/shared/agent-session-resume'
@@ -51,6 +54,9 @@ const isSleepingRowOf = (paneKey: string) => (terminal: RuntimeTerminalSummary) 
   `${terminal.tabId}:${terminal.leafId}` === paneKey && terminal.liveness === 'sleeping'
 
 test.describe('waking a sleeping row through the runtime', () => {
+  let agent: ResumedClaudeAgent | null = null
+  test.afterEach(() => agent?.dispose())
+
   test('resumes the slept session without changing what the window shows', async ({
     orcaPage,
     electronApp
@@ -74,6 +80,17 @@ test.describe('waking a sleeping row through the runtime', () => {
 
     const paneKey = `${randomUUID()}:${randomUUID()}`
     const sessionId = randomUUID()
+    // Why resumable (ORCA-1167): Orca refuses a made-up session and closes its tab as the spec reads it;
+    // the stand-in reports the session as Claude's hook does, the only way wake knows its fresh tab.
+    const transcripts = path.join(userDataDir, 'claude-transcripts', 'projects', 'e2e')
+    mkdirSync(transcripts, { recursive: true })
+    writeFileSync(path.join(transcripts, `${sessionId}.jsonl`), '')
+    agent = createResumedClaudeAgent(sessionId)
+    await orcaPage.evaluate(
+      (command) =>
+        window.__store!.getState().updateSettings({ agentCmdOverrides: { claude: command } }),
+      agent.command
+    )
     await seedWorktreeSleptRecord(orcaPage, worktreeId, paneKey, sessionId)
     let asleep: RuntimeTerminalSummary | undefined
     await expect
@@ -94,18 +111,31 @@ test.describe('waking a sleeping row through the runtime', () => {
       terminal: asleep!.handle
     })
 
-    expect(wake.result.wake.status).not.toBe('awake')
-    expect(wake.result.wake.paneKey).toBe(paneKey)
-    const after = await orcaPage.evaluate(
-      (id) => ({
-        activeTabId: window.__store?.getState().activeTabId ?? null,
-        tabIds: (window.__store?.getState().tabsByWorktree[id] ?? []).map((tab) => tab.id)
-      }),
-      worktreeId
-    )
+    // Why 'woken' with a handle: 'waking' also covers a resume Orca refused and tore down (ORCA-1167).
+    expect(wake.result.wake).toMatchObject({ status: 'woken', paneKey })
+    const wokenHandle = wake.result.wake.handle
+    expect(wokenHandle).toBeTruthy()
+    const readTabs = (): Promise<{
+      activeTabId: string | null
+      tabIds: string[]
+    }> =>
+      orcaPage.evaluate(
+        (id) => ({
+          activeTabId: window.__store?.getState().activeTabId ?? null,
+          tabIds: (window.__store?.getState().tabsByWorktree[id] ?? []).map((tab) => tab.id)
+        }),
+        worktreeId
+      )
+    const newTabs = async (): Promise<string[]> =>
+      (await readTabs()).tabIds.filter((id) => !before.tabIds.includes(id))
     // The session reopened in a fresh background tab; the window kept its tab.
-    expect(after.tabIds.filter((id) => !before.tabIds.includes(id))).toHaveLength(1)
-    expect(after.activeTabId).toBe(before.activeTabId)
+    await expect.poll(newTabs).toHaveLength(1)
+    expect((await readTabs()).activeTabId).toBe(before.activeTabId)
+    // Why again: a torn-down resume shows its tab for a moment, then closes it.
+    expect(
+      (await listTerminals(client)).find((terminal) => terminal.handle === wokenHandle)?.liveness
+    ).toMatch(/^(running|starting)$/)
+    expect(await newTabs()).toHaveLength(1)
     expect(
       await orcaPage.evaluate(
         (key) => Boolean(window.__store?.getState().sleepingAgentSessionsByPaneKey[key]),
