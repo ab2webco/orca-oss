@@ -8,8 +8,10 @@ import type {
   TeamLeadCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
-import { teamHostText, teamLeadLiveText, teamModelText } from './team-card-text'
+import { teamLeadLiveText, teamModelText } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
+import { TeamAdvisorLine } from './TeamAdvisorLine'
 import { TeamCardFace } from './TeamCardFace'
 import { MetaLine, TeamMemberCardRow } from './TeamMemberCardRow'
 import { openTeamSession } from './team-session-open'
@@ -64,7 +66,7 @@ function LeadCardRow({
               data-team-host=""
               className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
             >
-              {teamHostText(lead.host)}
+              <TeamHostName host={lead.host} />
             </span>
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -84,7 +86,7 @@ function LeadCardRow({
           {sceneLine ? (
             <span
               data-team-lead-line=""
-              className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
+              className="whitespace-pre-line text-xs text-muted-foreground [overflow-wrap:anywhere]"
             >
               {sceneLine}
             </span>
@@ -123,15 +125,8 @@ function AdvisorCardRow({
             {teamAdvisorSourceText()}
           </span>
         </span>
-        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows all of it (ORCA-1139). */}
-        {advisor.line ? (
-          <span
-            data-team-advisor-line
-            className="text-xs text-muted-foreground [overflow-wrap:anywhere]"
-          >
-            {advisor.line}
-          </span>
-        ) : null}
+        {/* Why it wraps: on a narrow stage the line has no bubble, so the card shows it (ORCA-1139). */}
+        {advisor.line ? <TeamAdvisorLine line={advisor.line} /> : null}
       </span>
     </article>
   )

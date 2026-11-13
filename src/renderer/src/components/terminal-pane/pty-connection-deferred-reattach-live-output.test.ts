@@ -186,6 +186,7 @@ describe('connectPanePty', () => {
 
     expect(transport.sendInput).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not resume the provider session when daemon reattach returns a live snapshot', async () => {

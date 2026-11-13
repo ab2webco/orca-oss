@@ -45,6 +45,27 @@ afterEach(() => {
 describe('TeamSceneBubbles', () => {
   // ORCA-1139: a cloud laid half a pixel short wrapped `cat TeamSceneBubbles.tsx` onto a second
   // line the one-line cloud did not hold.
+  // hallmark sloplint: colour through tokens, a solid surface, a decorative canvas hidden.
+  it('draws both bubbles from tokens on a solid surface, its cloud canvas hidden from readers', () => {
+    const cloud = render('Merge #923?')
+    expect(cloud.querySelector('canvas')?.getAttribute('aria-hidden')).toBe('true')
+    const cloudClass = cloud.className
+    act(() =>
+      root.render(
+        <TeamSceneBubbles
+          speeches={[{ key: 'lead', text: 'Merge #923?', anchor: { x: 180, top: 120 } }]}
+          width={360}
+          height={176}
+        />
+      )
+    )
+    const glass = host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!
+    for (const bubble of [cloudClass, glass.className]) {
+      expect(bubble).not.toMatch(/#[0-9a-f]{3,8}/i)
+      expect(bubble).not.toContain('backdrop-blur')
+    }
+  })
+
   it('lays a bubble at least as wide as the line it measured', () => {
     const bubble = render('cat TeamSceneBubbles.tsx')
     expect(Number.parseFloat(bubble.style.width)).toBeGreaterThanOrEqual(120.5)
@@ -126,10 +147,14 @@ describe('TeamSceneBubbles', () => {
       )
       return host.querySelector<HTMLElement>('[data-scene-bubble="lead"]')!
     }
-    expect(show(false).style.visibility).toBe('hidden')
+    const left = show(false)
+    expect(left.style.visibility).toBe('hidden')
+    expect(left.dataset.sceneClamped).toBeUndefined()
     const bubble = show(true)
     expect(bubble.style.visibility).toBe('visible')
     expect(bubble.querySelector('.line-clamp-1')?.textContent).toBe(speech.text)
+    // Marked, so a check can tell a clamped line from one shown whole.
+    expect(bubble.dataset.sceneClamped).toBe('')
     // Clamped, the line is not whole in its bubble, so its card shows it all as for an unplaced one.
     expect(unplaced).toHaveBeenLastCalledWith(['lead'])
   })

@@ -2,6 +2,8 @@ import type { AgentStatusEntry } from './agent-status-types'
 import { agentToolLabelOf } from './agent-tool-label'
 import { redactDispatchCapability } from './dispatch-capability-redaction'
 import { parseAskFromStatus } from './native-chat-ask'
+import { parseDispatchBriefLine } from './orca-dispatch-brief-line'
+import { isOrcaDispatchStatusPrompt, orcaDispatchTaskBodyOf } from './orca-dispatch-status-prompt'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 import type {
@@ -40,10 +42,12 @@ export type TeamSoloSession = {
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
-  risk: 1,
-  working: 2,
-  done: 3,
-  idle: 4
+  failed: 1,
+  risk: 2,
+  working: 3,
+  done: 4,
+  idle: 5,
+  closed: 6
 }
 
 // Why: an interrupted turn or a session boundary is not work that finished; a row restored from disk proves no live turn.
@@ -65,6 +69,20 @@ const STATUS_OF: Partial<Record<TeamCondition, TeamStatus>> = {
 
 const shownTextOf = (text: string | null | undefined): string | null =>
   text ? redactDispatchCapability(text) : null
+
+// Why: a dispatched member's prompt is its brief; the person asked for the task, not the boilerplate.
+const requestTextOf = (entry: AgentStatusEntry): string | null => {
+  const prompt = entry.prompt
+  if (!isOrcaDispatchStatusPrompt(prompt) && !parseDispatchBriefLine(prompt)) {
+    return shownTextOf(prompt)
+  }
+  return (
+    entry.orchestration?.taskTitle?.trim() ||
+    shownTextOf(orcaDispatchTaskBodyOf(prompt)) ||
+    entry.orchestration?.displayName?.trim() ||
+    null
+  )
+}
 
 const liveActionOf = (entry: AgentStatusEntry, condition: TeamCondition): TeamLiveAction | null => {
   if (entry.restoredUnconfirmed) {
@@ -128,7 +146,7 @@ function activityRowOf(session: TeamSoloSession): TeamActivityRow {
     worktreeName: session.worktreeName,
     isPrimary: session.isPrimary,
     inTeam: session.inTeam,
-    prompt: shownTextOf(entry.prompt),
+    prompt: requestTextOf(entry),
     ticket: session.ticket,
     pr: session.pr,
     lastMessage: shownTextOf(finalMessageOf(entry)),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { teamSceneSiteOf } from './team-scene-sites'
+import { grownSite, teamSceneSiteOf } from './team-scene-sites'
 import type { TeamPullRequest } from '../team-panel-model-types'
 
 const pr = (state: TeamPullRequest['state'], ci: TeamPullRequest['ci']): TeamPullRequest => ({
@@ -25,16 +25,28 @@ describe('team scene site', () => {
     expect(teamSceneSiteOf({ flowPhase: 'tests', pr: null }).stage).toBe(2)
   })
 
-  it('is nearly done once a PR is open, and done once it merges', () => {
+  it('puts up the scaffold while an open PR runs CI, nearly done once CI is green', () => {
     expect(teamSceneSiteOf({ flowPhase: 'code', pr: pr('open', 'pending') })).toEqual({
-      stage: 3,
+      stage: 2,
       broken: false
     })
-    expect(teamSceneSiteOf({ flowPhase: 'pr', pr: null }).stage).toBe(3)
+    expect(teamSceneSiteOf({ flowPhase: 'pr', pr: pr('draft', 'none') }).stage).toBe(2)
+    expect(teamSceneSiteOf({ flowPhase: 'pr', pr: pr('open', 'success') }).stage).toBe(3)
+    expect(teamSceneSiteOf({ flowPhase: 'pr', pr: null }).stage).toBe(2)
+  })
+
+  it('is done once it merges', () => {
     expect(teamSceneSiteOf({ flowPhase: 'merge', pr: pr('merged', 'success') })).toEqual({
       stage: 4,
       broken: false
     })
+  })
+
+  it('grows only, but starts over when merged work is followed by new work', () => {
+    const walls = { stage: 1, broken: false } as const
+    expect(grownSite({ stage: 2, broken: true }, walls)).toEqual({ stage: 2, broken: false })
+    expect(grownSite(null, walls)).toEqual(walls)
+    expect(grownSite({ stage: 4, broken: false }, walls)).toEqual(walls)
   })
 
   it('breaks while the open PR has red CI, and only then', () => {

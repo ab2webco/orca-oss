@@ -133,6 +133,7 @@ import {
   HOST_ACCOUNT_REAUTH_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import { HostAccountLoginDialog } from './HostAccountLoginDialog'
+import { systemDefaultLoginText } from './system-default-login-text'
 import {
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
@@ -277,11 +278,7 @@ function getCodexSystemDefaultSubtitle(
       'Custom provider — no usage tracked.'
     )
   }
-  return translate(
-    'auto.components.settings.AccountsPane.fcc4093fc1',
-    'Use your current {{value0}} Codex login.',
-    { value0: runtimeSentenceLabel }
-  )
+  return systemDefaultLoginText('codex', runtimeSentenceLabel)
 }
 
 function getCodexAccountRuntimeLabel(
@@ -1702,12 +1699,8 @@ export function AccountsPane({
                     </Badge>
                   ) : null}
                 </div>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.AccountsPane.e05d0ff737',
-                    'Use your current {{value0}} Claude login.',
-                    { value0: accountRuntimeSentenceLabel }
-                  )}
+                <span className="break-words text-[11px] text-muted-foreground">
+                  {systemDefaultLoginText('claude', accountRuntimeSentenceLabel)}
                 </span>
               </div>
             </button>

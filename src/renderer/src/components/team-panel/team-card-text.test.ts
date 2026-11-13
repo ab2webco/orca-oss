@@ -116,7 +116,10 @@ describe('card words', () => {
   })
 
   it('names the host', () => {
-    expect(teamHostText({ kind: 'local' })).toBe('local')
+    // Why (ORCA-1149): the owner reads the local machine as 'This computer', not 'local'.
+    expect(teamHostText({ kind: 'local' })).toBe('This computer')
+    expect(teamHostText({ kind: 'local' }, 'Studio')).toBe('Studio')
+    expect(teamHostText({ kind: 'local' }, '  ')).toBe('This computer')
     expect(
       teamHostText({ kind: 'remote', name: 'imac', environmentId: 'env', reachable: true })
     ).toBe('imac')
@@ -128,10 +131,15 @@ describe('card words', () => {
     expect(teamStatusTone('working')).toBe('info')
     expect(teamStatusTone('done')).toBe('success')
     expect(teamStatusTone('idle')).toBe('idle')
+    // Why: a closed session is no call to act, and a failed start is, but is no question for you.
+    expect(teamStatusTone('closed')).toBe('idle')
+    expect(teamStatusTone('failed')).toBe('attention')
   })
 
-  it('marks needs-you or failed with a question and working with a spinner', () => {
+  it('marks only needs-you with a question, a failure and a closed session each its own way', () => {
     expect(teamStatusGlyph('attention')).toBe('question')
+    expect(teamStatusGlyph('failed')).toBe('alert')
+    expect(teamStatusGlyph('closed')).toBe('closed')
     expect(teamStatusGlyph('working')).toBe('spinner')
     expect(teamStatusGlyph('risk')).toBe('dot')
     expect(teamStatusGlyph('done')).toBe('dot')

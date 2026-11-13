@@ -1597,9 +1597,10 @@ function Settings(): React.JSX.Element {
                       updateSettings={updateSettings}
                       scrollbackMode={scrollbackMode}
                       setScrollbackMode={setScrollbackMode}
-                      wslAvailable={windowsTerminalCapabilities.wslAvailable}
-                      wslDistros={windowsTerminalCapabilities.wslDistros}
-                      wslCapabilitiesLoading={windowsTerminalCapabilities.isLoading}
+                      wslSupportedPlatform={localWslSupportedPlatform}
+                      wslAvailable={localWindowsRuntimeCapabilities.wslAvailable}
+                      wslDistros={localWindowsRuntimeCapabilities.wslDistros}
+                      wslCapabilitiesLoading={localWindowsRuntimeCapabilities.isLoading}
                       pwshAvailable={windowsTerminalCapabilities.pwshAvailable}
                       gitBashAvailable={windowsTerminalCapabilities.gitBashAvailable}
                       isWindowsTerminalHost={isWindowsTerminalHost}

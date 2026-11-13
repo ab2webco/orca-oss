@@ -7,14 +7,15 @@ import { formatUiRelativeTime } from '@/i18n/relative-time-format'
 import type { TeamActivityRow, TeamPanelSoloModel } from '../../../../shared/team-panel-model-types'
 import {
   teamConditionText,
-  teamHostText,
   teamLiveText,
   teamModelText,
   teamSessionStateText,
   teamStatusTone
 } from './team-card-text'
+import { TeamHostName } from './TeamHostName'
 import { TeamActivityDetail } from './TeamActivityDetail'
 import { openTeamSession } from './team-session-open'
+import { teamActivityRowsOf, useTeamActivityFilter } from './team-activity-filter'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 
 const AGE_TICK_MS = 30_000
@@ -47,7 +48,7 @@ function OtherSession({ row, now }: { row: TeamActivityRow; now: number }): Reac
           <span className="truncate text-xs text-muted-foreground">{row.repoName}</span>
         ) : null}
         <code className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground">
-          {teamHostText(row.host)}
+          <TeamHostName host={row.host} />
         </code>
       </span>
       <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -81,11 +82,13 @@ export function TeamPanelActivityTab({
     const timer = window.setInterval(() => setNow(Date.now()), AGE_TICK_MS)
     return () => window.clearInterval(timer)
   }, [])
-  const selected = value.rows.find((row) => row.paneKey === value.selectedPaneKey) ?? value.rows[0]
+  const { filter } = useTeamActivityFilter()
+  const rows = teamActivityRowsOf(value.rows, filter)
+  const selected = rows.find((row) => row.paneKey === value.selectedPaneKey) ?? rows[0]
   if (!selected) {
     return null
   }
-  const others = value.rows.filter((row) => row !== selected)
+  const others = rows.filter((row) => row !== selected)
   return (
     <div data-team-activity-tab="">
       <TeamActivityDetail

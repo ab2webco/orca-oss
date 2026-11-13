@@ -47,6 +47,56 @@ describe('teamSceneEventsBetween', () => {
     expect(teamSceneEventsBetween(next, next)).toEqual([])
   })
 
+  it('marks a member finishing once, when its card turns done', () => {
+    const prev = input([member('a')])
+    const next = input([member('a', { activity: 'done' })])
+    expect(teamSceneEventsBetween(prev, next)).toEqual([{ kind: 'finish', key: 'a' }])
+    expect(teamSceneEventsBetween(next, next)).toEqual([])
+    expect(teamSceneEventsBetween(input([]), next)).toEqual([{ kind: 'join', key: 'a' }])
+  })
+
+  it('plays a Jev decision once, in the pane it was made in, by its gesture or its verdict', () => {
+    const decision = (id: string, verdict: string, gesture: string | null = null) => ({
+      id,
+      verdict,
+      gesture
+    })
+    const prev = input([member('a', { decisions: [decision('d1', 'allow')] })])
+    const next = input([
+      member('a', {
+        decisions: [
+          decision('d1', 'allow'),
+          decision('d2', 'deny'),
+          decision('d3', 'ask', 'ciFailed')
+        ]
+      })
+    ])
+    // Only the newest of a burst: the advisor walks once per poll, not three times.
+    expect(teamSceneEventsBetween(prev, next)).toEqual([
+      { kind: 'judged', key: 'a', gesture: 'ciFailed' }
+    ])
+    expect(teamSceneEventsBetween(next, next)).toEqual([])
+    const denied = input([
+      member('a', { decisions: [decision('d1', 'allow'), decision('d4', 'deny')] })
+    ])
+    expect(teamSceneEventsBetween(prev, denied)).toEqual([
+      { kind: 'judged', key: 'a', gesture: 'escalated' }
+    ])
+    const leadJudged = {
+      ...input([]),
+      lead: { ...input([]).lead, decisions: [decision('l1', 'ask')] }
+    }
+    expect(teamSceneEventsBetween(input([]), leadJudged)).toEqual([
+      { kind: 'judged', key: 'lead', gesture: 'unsure' }
+    ])
+    expect(
+      teamSceneEventsBetween(
+        input([member('b')]),
+        input([member('b', { decisions: [decision('x', 'allow')] })])
+      )
+    ).toEqual([{ kind: 'judged', key: 'b', gesture: 'approved' }])
+  })
+
   it('lets the advisor speak only when its line changes', () => {
     expect(teamSceneEventsBetween(input([], 'a'), input([], 'b'))).toEqual([
       { kind: 'advisorSpoke', line: 'b' }
@@ -55,5 +105,22 @@ describe('teamSceneEventsBetween', () => {
     expect(teamSceneEventsBetween(input([]), input([], 'a'))).toEqual([
       { kind: 'advisorSpoke', line: 'a' }
     ])
+  })
+})
+
+describe('teamSceneEventsBetween and CI turning green', () => {
+  const at = (ci?: TeamSceneMemberInput['ci']) => input([member('m', ci ? { ci } : {})])
+  const greens = (from: TeamSceneInput | null, to: TeamSceneInput) =>
+    teamSceneEventsBetween(from, to).filter((e) => e.kind === 'ciGreen')
+
+  it('marks CI going green from running or red, once', () => {
+    expect(greens(at('pending'), at('success'))).toEqual([{ kind: 'ciGreen', key: 'm' }])
+    expect(greens(at('failure'), at('success'))).toEqual([{ kind: 'ciGreen', key: 'm' }])
+    expect(greens(at('success'), at('success'))).toEqual([])
+  })
+
+  it('never on opening, nor for a PR that was green or unread before', () => {
+    expect(greens(null, at('success'))).toEqual([])
+    expect(greens(at(), at('success'))).toEqual([])
   })
 })

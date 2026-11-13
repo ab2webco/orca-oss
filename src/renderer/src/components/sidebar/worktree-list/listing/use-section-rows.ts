@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
@@ -20,6 +21,7 @@ import { getEmptyProjectPlaceholderRepoIds } from '../../empty-project-placehold
 import { addHostSectionRows } from '../../host-section-rows'
 import { orderHostSectionOptions } from '../../host-section-order'
 import { buildSidebarHostOptions } from '../../sidebar-host-options'
+import { localHostDisplayLabel } from '../../../../lib/local-host-display-label'
 
 type SectionRowsArgs = {
   groupBy: WorktreeGroupBy
@@ -70,6 +72,9 @@ function collectRenderedSidebarRowKeys(sectionRows: ReturnType<typeof addHostSec
 // tier wrapped around them.
 export function useSidebarSectionRows(args: SectionRowsArgs) {
   const { repos, worktrees, repoMap, effectiveCollapsedGroups, defaultHostId } = args
+  // Why: the local host's label is translated, and the memo below must rebuild on a live switch.
+  useTranslation()
+  const localLabel = localHostDisplayLabel()
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
@@ -126,7 +131,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         settings: args.settings,
         runtimeEnvironments,
         runtimeStatusByEnvironmentId,
-        hostLabelOverrides
+        hostLabelOverrides,
+        localLabel
       }),
     [
       repos,
@@ -135,7 +141,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       args.settings,
       runtimeEnvironments,
       runtimeStatusByEnvironmentId,
-      hostLabelOverrides
+      hostLabelOverrides,
+      localLabel
     ]
   )
   const hostLabelById = useMemo(

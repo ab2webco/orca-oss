@@ -1,4 +1,4 @@
-import { getExecutionHostLabel, type ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { ExecutionHostRegistryEntry } from '../../../../shared/execution-host-registry'
 import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/protocol-version'
 import type { ProjectHostSetup, ProjectHostSetupState } from '../../../../shared/project-types'
 import { translate } from '@/i18n/i18n'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
 export type SetupHostOption = {
   id: ExecutionHostId
@@ -56,7 +57,7 @@ export function buildSetupHostOptions({
       const canUsePathActions = host.health === 'local' || host.health === 'available'
       return {
         id: host.id,
-        label: host.label || getExecutionHostLabel(host.id),
+        label: host.label || hostDisplayLabel(host.id),
         detail:
           availability.isAvailable && !canUsePathActions
             ? translate(

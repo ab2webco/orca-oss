@@ -161,6 +161,19 @@ describe('TeamSceneCanvas', () => {
     expect(leadX()).toBeLessThan(0.5)
   })
 
+  it("seats the team as the painter's style lays it out", () => {
+    reduced = true
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    const ground = painter()
+    render(<TeamSceneCanvas input={input(keys)} painter={ground.value} leadLine={null} />)
+    expect(new Set(ground.frames.at(-1)!.stations.map((s) => s.depth)).size).toBe(2)
+    const desks = painter()
+    const seated = { ...desks.value, layout: { rowSize: 5, workSeated: true } }
+    render(<TeamSceneCanvas input={input(keys)} painter={seated} leadLine={null} />)
+    expect(new Set(desks.frames.at(-1)!.stations.map((s) => s.depth)).size).toBe(1)
+  })
+
   it('paints the settled end state once per change under reduced motion', () => {
     reduced = true
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
@@ -173,6 +186,97 @@ describe('TeamSceneCanvas', () => {
     // Seated on stage, not queued off it at x < 0.
     expect(newcomer.pose).toBe('work')
     expect(newcomer.x).toBeGreaterThan(0)
+  })
+
+  it('paints the end of a ride under reduced motion: the away lead gone, the guest by its member', () => {
+    reduced = true
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(420)
+    const home = painter()
+    render(
+      <TeamSceneCanvas
+        input={{ ...input(['a']), leadStays: true, ride: 'away' }}
+        painter={home.value}
+        leadLine={null}
+      />
+    )
+    expect(home.frames.at(-1)!.actors.some((a) => a.key === 'lead')).toBe(false)
+    act(() => root.unmount())
+    root = createRoot(host)
+    const there = painter()
+    const floor = { ...input(['b']), leadless: true as const }
+    floor.members[0] = { ...floor.members[0]!, activity: 'needsYou' }
+    render(
+      <TeamSceneCanvas
+        input={{ ...floor, ride: { guest: 'b' } }}
+        painter={there.value}
+        leadLine={null}
+      />
+    )
+    const frame = there.frames.at(-1)!
+    const guest = frame.actors.find((a) => a.key === 'lead')
+    const b = frame.actors.find((a) => a.key === 'b')!
+    expect(Math.abs(guest!.x - b.x)).toBeLessThan(0.12)
+  })
+
+  // Why: a building floor below keeps its bubbles clear of this stage's asker tags and marks.
+  it("reports each asker's tag-and-mark box, and lays its bubbles around boxes it is handed", () => {
+    reduced = true
+    const asking = input(['n'])
+    asking.members[0] = { ...asking.members[0]!, activity: 'needsYou' }
+    const onAskers = vi.fn()
+    const extra = [{ left: 0, top: 0, width: 50, height: 20 }]
+    render(
+      <TeamSceneCanvas
+        input={asking}
+        painter={painter().value}
+        leadLine={null}
+        onAskers={onAskers}
+        extraObstacles={extra}
+      />
+    )
+    const boxes = onAskers.mock.lastCall![0] as { top: number; height: number; width: number }[]
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0]!.height).toBeGreaterThan(0)
+    expect(boxes[0]!.width).toBeGreaterThan(0)
+    expect(host.querySelector<HTMLElement>('[data-scene-obstacles]')?.dataset.sceneObstacles).toBe(
+      '1'
+    )
+  })
+
+  it("caps the stage at its painter's widest and centres it, so wide panels never stretch the art", () => {
+    reduced = true
+    const p = painter()
+    render(
+      <TeamSceneCanvas
+        input={input(['a'])}
+        painter={{ ...p.value, maxWidth: 300 }}
+        leadLine={null}
+      />
+    )
+    const stage = host.querySelector<HTMLElement>('canvas')!.parentElement!
+    expect(stage.style.maxWidth).toBe('300px')
+    expect(stage.className).toContain('mx-auto')
+  })
+
+  // Why: capped, the stage shows its art whole, and the art's own edge cut the plant (lead, 1120 px).
+  it('fades its edges into the floor only while it is capped at its art width', () => {
+    reduced = true
+    const p = painter()
+    const capped = { ...p.value, maxWidth: 300 }
+    render(<TeamSceneCanvas input={input(['a'])} painter={capped} leadLine={null} />)
+    const canvas = () => host.querySelector<HTMLCanvasElement>('canvas')!
+    // The stage is 360 px wide in this suite, past the 300 px art.
+    expect(canvas().style.getPropertyValue('mask-image')).toContain('linear-gradient')
+    act(() => root.unmount())
+    root = createRoot(host)
+    render(
+      <TeamSceneCanvas
+        input={input(['a'])}
+        painter={{ ...capped, maxWidth: 800 }}
+        leadLine={null}
+      />
+    )
+    expect(canvas().style.getPropertyValue('mask-image')).toBe('')
   })
 
   it('ties the lead line to the lead', () => {
@@ -198,6 +302,21 @@ describe('TeamSceneCanvas', () => {
     ])
     // Above the head and its alert mark, never over the speaker's face.
     expect(Number.parseFloat((tags[0] as HTMLElement).style.top)).toBeLessThan(100 - 16)
+  })
+
+  it('hangs the name tag over the alert wherever the style draws it', () => {
+    reduced = true
+    const asking: TeamSceneInput = {
+      ...input([]),
+      members: [{ ...member('h'), name: 'Herrero', activity: 'needsYou' }]
+    }
+    const beside = { ...painter().value, emoteAt: () => ({ x: 150, y: 120 }) }
+    render(<TeamSceneCanvas input={asking} painter={beside} leadLine={null} />)
+    act(() => {})
+    const tag = host.querySelector('[data-scene-speaker="h"]') as HTMLElement
+    expect(Number.parseFloat(tag.style.left)).toBe(150)
+    expect(Number.parseFloat(tag.style.top)).toBeLessThan(120 - 7 - 16)
+    expect(Number.parseFloat(tag.style.top)).toBeGreaterThan(120 - 40)
   })
 
   it("draws Pixel's thought cloud instead of the glass bubble", () => {

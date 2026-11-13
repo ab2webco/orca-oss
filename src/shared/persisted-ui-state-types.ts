@@ -165,6 +165,8 @@ export type PersistedUIState = {
   _planeIssueCardPropertyDefaulted?: boolean
   /** One-shot backfill flag for 'jira-issue', which joined the defaults after the expansion migration had already stamped upgraded profiles. */
   _jiraIssueWorktreeCardPropertyDefaulted?: boolean
+  /** One-shot flag for the ORCA-1163 agent-focus defaults: only a profile still on the previous defaults moves. */
+  _agentFocusWorktreeCardPropertiesDefaulted?: boolean
   /** totalAgentsSpawned snapshot at first sighting of the current app version, so the nag counts agents since last update (not from zero). */
   starNagBaselineAgents?: number | null
   /** App version that set the current baseline; a version change re-captures the baseline on next spawn, restarting the nag countdown. */

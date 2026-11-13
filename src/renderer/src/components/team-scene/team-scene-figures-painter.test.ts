@@ -8,7 +8,7 @@ import { recordingContext } from './team-scene-recording-context'
 import { CASTLE_BANNER } from './team-scene-castle-sites'
 import { SCENE_DUST } from './team-scene-painter-marks'
 
-const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3' }
+const COLORS = { attention: '#ff0001', done: '#00ff02', working: '#0000f3', risk: '#ffaa04' }
 
 const actor = (key: string, extra: Partial<TeamSceneActor> = {}): TeamSceneActor => ({
   key,
@@ -95,6 +95,13 @@ describe('createFiguresPainter', () => {
     const landed = recordingContext()
     painter.paint(landed.g, frame())
     expect(landed.calls.some((c) => c.name === 'rotate' && c.fillStyle === '#f4e6c0')).toBe(false)
+  })
+
+  it('marks a member that cannot work with the warning colour, as its card does', () => {
+    const painter = createFiguresPainter(COLORS)
+    const r = recordingContext()
+    painter.paint(r.g, frame({ actors: [actor('a', { pose: 'idle', emote: 'blocked' })] }))
+    expect(r.fills()).toContain(COLORS.risk)
   })
 
   it('draws each seat build at its stage, with its pile, instead of the bench', () => {

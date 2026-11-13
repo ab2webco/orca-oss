@@ -254,7 +254,7 @@ test('routes Add Project folder browsing through the paired host', async ({
       .click()
     const addDialog = client.getByRole('dialog', { name: /Add a project/i })
     await expect(addDialog).toBeVisible()
-    await expect(addDialog).not.toContainText('Local Mac')
+    await expect(addDialog).not.toContainText(/Local Mac|This computer/)
 
     await addDialog.getByRole('button', { name: /Browse folder/i }).click()
     const browser = client.getByRole('dialog', { name: /Browse host filesystem/i })

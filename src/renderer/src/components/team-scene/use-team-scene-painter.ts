@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   daylightAt,
   hourOf
@@ -18,6 +18,7 @@ import {
   type TeamSceneArtHost
 } from './team-scene-art-host'
 import { createImagePainter, type TeamSceneImageArt } from './team-scene-image-painter'
+import { OFFICE_BACK_SEAT } from './team-scene-office-back'
 import type { TeamScenePainter } from './team-scene-painter'
 import { createPixelPainter } from './team-scene-pixel-painter'
 import { teamScenePixelSceneOf } from './team-scene-pixel-scene'
@@ -62,9 +63,9 @@ export function teamSceneArtOf(args: {
 export type TeamSceneStage = {
   drawn: GamePanelStyle
   art: OrchestratorGameSceneArtSource
-  /** Orca's default art stands in for art the scene does not have; the panel says so. */
-  defaultArt: boolean
   painter: TeamScenePainter | null
+  /** A fresh painter of the same art, for a building floor that draws apart from the stage's. */
+  makePainter: () => TeamScenePainter | null
 }
 
 type ArtRequest = { key: string; own: boolean; load: () => Promise<TeamSceneImageArt> }
@@ -166,11 +167,16 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
   }, [sceneKey, timezone])
 
   const image = request !== null && loaded?.key === request.key ? loaded.art : null
-  const painter = useMemo(() => {
+  // Why a maker: each floor of the building draws with its own painter, which keeps its own effects.
+  const makePainter = useCallback((): TeamScenePainter | null => {
     if (artStyle === null) {
       return createPixelPainter({ ...pixelScene, colors })
     }
-    return image ? createImagePainter({ art: image, colors }) : null
-  }, [artStyle, image, pixelScene, colors])
-  return { drawn: art.drawn, art: art.art, defaultArt: art.defaultArt, painter }
+    const builds = artStyle === 'figures' ? 'castle' : 'office'
+    // Why only Orca's own desk: the back view knows where its art's side chair ends.
+    const back = artStyle === 'office' && request?.own === false ? OFFICE_BACK_SEAT : null
+    return image ? createImagePainter({ art: image, colors, builds, back }) : null
+  }, [artStyle, image, pixelScene, colors, request])
+  const painter = useMemo(makePainter, [makePainter])
+  return { drawn: art.drawn, art: art.art, painter, makePainter }
 }

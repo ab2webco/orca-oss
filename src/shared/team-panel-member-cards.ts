@@ -4,9 +4,11 @@ import {
   characterKeyOf,
   leadCharacterOf,
   memberNameOf,
-  memberRosterOf
+  memberRosterOf,
+  type GameMemberName
 } from './orchestrator-game-member-names'
-import type { GameMemberName } from './orchestrator-game-member-names'
+import { gameAdvisorDecisionsOf } from './orchestrator-game-member-advisor'
+import { teamAgentModelOf } from './team-panel-agent-model'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { teamFlowPhaseOf } from './team-flow-phase'
@@ -18,7 +20,6 @@ import type {
   TeamLeadCard,
   TeamLiveAction,
   TeamMemberCard,
-  TeamModel,
   TeamPullRequest,
   TeamStatus,
   TeamTicket
@@ -30,10 +31,12 @@ type Work = { review: GameReview | null; workItem: GameAgent['workItem'] | null 
 
 const STATUS_RANK: Record<TeamStatus, number> = {
   attention: 0,
-  risk: 1,
-  working: 2,
-  done: 3,
-  idle: 4
+  failed: 1,
+  risk: 2,
+  working: 3,
+  done: 4,
+  idle: 5,
+  closed: 6
 }
 
 const conditionOf = (agent: GameAgent): TeamCondition => {
@@ -66,10 +69,12 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
     return 'attention'
   }
   switch (condition) {
+    // Why not attention: the owner read a closed session as 'needs me' and expected the lead to come.
     case 'gone':
+      return 'closed'
     case 'startFailed':
     case 'loggedOut':
-      return 'attention'
+      return 'failed'
     case 'unreachable':
     case 'asleep':
     case 'limited':
@@ -95,25 +100,6 @@ const hostOf = (agent: GameAgent): TeamHost =>
         reachable: agent.remote.stateKnown
       }
     : { kind: 'local' }
-
-const modelOf = (
-  agent: GameAgent,
-  fallback?: { model?: string; effort?: string }
-): TeamModel | null => {
-  if (agent.advisor?.model) {
-    return { label: agent.advisor.model, effort: agent.advisor.effort, source: 'advisor' }
-  }
-  if (agent.launch?.model) {
-    return {
-      label: agent.launch.model,
-      effort: agent.launch.effort,
-      source: agent.launch.source ?? 'launch'
-    }
-  }
-  return fallback?.model
-    ? { label: fallback.model, effort: fallback.effort ?? null, source: 'launch' }
-    : null
-}
 
 // Why: a worker's Bash line carries its dispatch capability, a bearer secret no card may show.
 const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
@@ -214,8 +200,9 @@ function memberCardOf(
     condition,
     since: agent.stateSince ?? null,
     liveAction: liveActionOf(agent),
-    model: modelOf(agent),
+    model: teamAgentModelOf(agent),
     account: accountOf(agent, state),
+    ...gameAdvisorDecisionsOf(agent.advisor),
     characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
     flowPhase: teamFlowPhaseOf(agent),
@@ -292,8 +279,9 @@ export function teamCardsOf(
     condition,
     since: leader.stateSince ?? null,
     liveAction: liveActionOf(leader),
-    model: modelOf(leader, state.lead),
+    model: teamAgentModelOf(leader, state.lead),
     account: accountOf(leader, state),
+    ...gameAdvisorDecisionsOf(leader.advisor),
     characterKey: null,
     branch: state.worktree?.branch ?? null,
     ownerAsk

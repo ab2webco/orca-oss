@@ -1,7 +1,7 @@
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import {
   isWslShellName,
-  resolveLocalWindowsTerminalRuntimeOptions
+  resolveLocalWindowsTerminalRuntimeOptions,
+  type LocalWindowsTerminalRuntimeSettings
 } from '../../shared/local-windows-terminal-runtime'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import type { AgentStartupShell } from '../../shared/tui-agent-startup-shell'
@@ -35,9 +35,7 @@ export function orchestratorGamePaneShell(args: {
 /** The same answer for a pane the runtime creates, from what its pty spawn will resolve the shell from. */
 export function localOrchestratorGamePaneShell(args: {
   platform: NodeJS.Platform
-  settings:
-    | Partial<Pick<GlobalSettings, 'terminalWindowsShell' | 'terminalWindowsWslDistro'>>
-    | undefined
+  settings: LocalWindowsTerminalRuntimeSettings
   projectRuntime: ProjectExecutionRuntimeResolution | undefined
   cwd: string
   fallbackHostShell: string

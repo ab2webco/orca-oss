@@ -14,7 +14,7 @@ const PHASE_STAGE: Record<TeamFlowPhase, TeamSceneSiteStage> = {
   docs: 0,
   code: 1,
   tests: 2,
-  pr: 3,
+  pr: 2,
   merge: 3
 }
 
@@ -28,7 +28,30 @@ export function teamSceneSiteOf(m: {
   }
   const open = m.pr?.state === 'open' || m.pr?.state === 'draft'
   const phase = m.flowPhase ? PHASE_STAGE[m.flowPhase] : 0
-  return { stage: open ? 3 : phase, broken: open && m.pr?.ci === 'failure' }
+  if (!open) {
+    return { stage: phase, broken: false }
+  }
+  return { stage: m.pr?.ci === 'success' ? 3 : 2, broken: m.pr?.ci === 'failure' }
+}
+
+/** A build only grows: `code` lasts only while an edit tool runs, so the phase flickers. */
+export const grownSite = (before: TeamSceneSite | null, now: TeamSceneSite): TeamSceneSite => {
+  // Why the reset: after a merge, a lower stage is the member's next build, not a flicker.
+  const keep = before && before.stage < 4 && before.stage > now.stage
+  return { stage: keep ? before.stage : now.stage, broken: now.broken }
+}
+
+const MAX_TROPHIES = 6
+
+/** Adds merged work once, dropping the oldest past what the stage has room for. */
+export function keepTrophy(
+  trophies: { key: string; name: string }[],
+  next: { key: string; name: string }
+): void {
+  if (!trophies.some((t) => t.key === next.key)) {
+    trophies.push(next)
+    trophies.splice(0, Math.max(0, trophies.length - MAX_TROPHIES))
+  }
 }
 
 // Why these offsets: a column is 0.16 wide, so the pile and the site stay inside the seat's own.

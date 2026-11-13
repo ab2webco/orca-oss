@@ -1,7 +1,9 @@
 import { StatusDot } from '@/components/StatusDot'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import type { TeamActivityRow, TeamStatus } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
+import { useTeamActivityFilter } from './team-activity-filter'
 
 function needsYouText(count: number): string {
   return count === 1
@@ -18,12 +20,35 @@ function doneText(count: number): string {
 const workingText = (count: number): string =>
   translate('teamPanel.activity.countWorking', '{{count}} working', { count })
 
-function Count({ status, text }: { status: TeamStatus; text: string }): React.JSX.Element {
+/** A count that filters the session list to its own; a second press shows every session again. */
+function Count({
+  status,
+  text,
+  count
+}: {
+  status: TeamStatus
+  text: string
+  count: number
+}): React.JSX.Element {
+  const { filter, setFilter } = useTeamActivityFilter()
+  const active = filter === status
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <button
+      type="button"
+      data-team-activity-filter={status}
+      aria-pressed={active}
+      disabled={count === 0 && !active}
+      onClick={() => setFilter(active ? null : status)}
+      className={cn(
+        '-mx-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
+        active
+          ? 'bg-sidebar-accent font-medium text-foreground'
+          : 'hover:bg-sidebar-accent/60 hover:text-foreground disabled:hover:bg-transparent disabled:hover:text-muted-foreground'
+      )}
+    >
       <StatusDot tone={teamStatusTone(status)} />
       {text}
-    </span>
+    </button>
   )
 }
 
@@ -33,6 +58,7 @@ export function TeamSessionCount({
 }: {
   rows: readonly TeamActivityRow[]
 }): React.JSX.Element | null {
+  const { filter, setFilter } = useTeamActivityFilter()
   if (rows.length < 2) {
     return null
   }
@@ -41,11 +67,19 @@ export function TeamSessionCount({
   return (
     <div
       data-team-activity-count=""
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && filter) {
+          event.stopPropagation()
+          setFilter(null)
+        }
+      }}
       className="flex flex-wrap gap-x-3.5 gap-y-1 px-3 pb-2.5 text-xs text-muted-foreground"
     >
-      {needsYou > 0 ? <Count status="attention" text={needsYouText(needsYou)} /> : null}
-      <Count status="working" text={workingText(count('working'))} />
-      <Count status="done" text={doneText(count('done'))} />
+      {needsYou > 0 ? (
+        <Count status="attention" text={needsYouText(needsYou)} count={needsYou} />
+      ) : null}
+      <Count status="working" text={workingText(count('working'))} count={count('working')} />
+      <Count status="done" text={doneText(count('done'))} count={count('done')} />
     </div>
   )
 }

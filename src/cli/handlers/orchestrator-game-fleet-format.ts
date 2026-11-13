@@ -150,7 +150,7 @@ function formatPaused(fleet: GameFleet): string[] {
   ])
   return [
     ...open,
-    `Paused since Orca or the machine restarted: ${restarted.length} · \`orca game resume-members\` resumes them, \`--discard\` frees them`,
+    `Paused, terminal gone (it ended or Orca restarted): ${restarted.length} · \`orca game resume-members\` resumes them, \`--discard\` frees them`,
     tableOf([['TICKET', 'STATE', 'BRANCH', 'AGENT', 'ACCOUNT', 'RESUMES', 'NAME'], ...rows])
   ]
 }

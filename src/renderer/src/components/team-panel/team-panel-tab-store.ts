@@ -6,6 +6,8 @@ type TeamPanelTabState = {
   selected: TeamTabId | null
   /** The tab the open panel really draws, which a hidden stored tab differs from. */
   shown: TeamTabId | null
+  /** Counts tab picks, so what belongs to one visit of a tab ends with it. */
+  visit: number
   select: (tab: TeamTabId) => void
   publishShown: (tab: TeamTabId | null) => void
 }
@@ -14,6 +16,7 @@ type TeamPanelTabState = {
 export const useTeamPanelTabStore = create<TeamPanelTabState>((set) => ({
   selected: null,
   shown: null,
-  select: (tab) => set({ selected: tab }),
+  visit: 0,
+  select: (tab) => set((state) => ({ selected: tab, visit: state.visit + 1 })),
   publishShown: (tab) => set({ shown: tab })
 }))

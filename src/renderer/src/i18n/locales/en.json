@@ -4901,6 +4901,12 @@
           "newCardDisplay": {
             "title": "Card display"
           },
+          "cardDisplayGroup": {
+            "work": "Work",
+            "agent": "Agent",
+            "source": "Source"
+          },
+          "prAndChecks": "Pull request and checks",
           "09faabd875": "Project order",
           "7bada3b1ab": "Sort by",
           "dc0bb670bc": "Group by",
@@ -5925,7 +5931,7 @@
           "ef91cfa06b": "Codex",
           "3fe7862418": "No managed Claude accounts for {{value0}}. Orca Lab will use that environment's system default Claude login until you add one here.",
           "3455cf43fa": "Claude login.",
-          "fcc4093fc1": "Use your current {{value0}} Codex login.",
+          "codexSystemDefaultLogin": "Use the Codex login on {{value0}}.",
           "79e484c3b2": "Optional account switcher for the shared Claude auth files.",
           "8bbfd74556": "Claude Accounts",
           "72b36ea174": "Optional. Orca Lab can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.",
@@ -5951,7 +5957,7 @@
           "75ca9b718e": "Codex reported that the active account needs a fresh sign-in. Re-authenticate it before starting new Codex sessions.",
           "b11078a9c2": "wsl",
           "350b2a1aa7": "Use your current",
-          "e05d0ff737": "Use your current {{value0}} Claude login.",
+          "claudeSystemDefaultLogin": "Use the Claude login on {{value0}}.",
           "2f24f244a4": "MiniMax cookie is required.",
           "8e6f0cb1d8": "MiniMax cookie was not saved.",
           "8d61637a77": "MiniMax cookie saved.",
@@ -6309,7 +6315,6 @@
           "8f22b7580d": "Profile \"{{value0}}\" created.",
           "8481ee0331": "New Browser Profile",
           "c0f85056d9": "Browser profiles on this Orca Lab server.",
-          "86b7c83fee": "This computer",
           "6480776a03": "Browser profiles for the selected host.",
           "5e19a692f7": "Host",
           "6f2584b39e": "Add Profile",
@@ -11672,7 +11677,8 @@
           "title": "Panel"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "This scene has no {{style}} art, so the Team panel draws it with the default art."
+          "text": "This scene has no {{style}} art, so the Team panel draws the scene's own characters in Pixel.",
+          "office": "This scene has no {{style}} art, so the Team panel draws Orca's own office."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Long-lived token",
@@ -16490,7 +16496,7 @@
       "team-scene": {
         "team-scene-copy": {
           "label": "Live team scene",
-          "leadAsks": "Waiting for you · {{question}}",
+          "leadAsks": "Waiting for you\n{{question}}",
           "leadDone": "Done, nothing pending",
           "leadWaits": "Waiting for you"
         }
@@ -16571,6 +16577,9 @@
     }
   },
   "components": {
+    "executionHost": {
+      "thisComputer": "This computer"
+    },
     "native-chat": {
       "composer": {
         "imageUnsupported": "Image paste is not supported for this agent.",
@@ -17217,6 +17226,7 @@
       "githubLimit": "GitHub API limit reached. It retries on its own in {{minutes}} min."
     },
     "machines": {
+      "all": "All",
       "offline": "Offline",
       "lowMemory": "Low memory",
       "free": "Free",
@@ -17321,9 +17331,6 @@
       "pr": "In PR",
       "merge": "Merging"
     },
-    "host": {
-      "local": "local"
-    },
     "card": {
       "merged": "Merged",
       "ciFailed": "CI failing",
@@ -17397,6 +17404,7 @@
       "thisProject": "this project",
       "projectUnread": "Could not read this project's questions.",
       "forYouEmpty": "No questions are waiting for you.",
+      "otherProjects": "Other projects",
       "yourAnswer": "Your answer",
       "openTerminal": "Open terminal",
       "youAnswered": "You answered",

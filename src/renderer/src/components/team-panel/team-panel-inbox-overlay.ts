@@ -1,23 +1,29 @@
 import type { TeamInboxCounts, TeamSection } from '../../../../shared/team-panel-model-types'
 
 /**
- * This project's Inbox counts plus every other project's and host's open questions, so the one
- * count on the tab bar covers them all.
+ * This project's Inbox counts plus its questions the model cannot see. Other projects' questions
+ * never count; they only keep the tab readable when this project's own read failed.
  */
-export function withOtherProjectQuestions(
+export function withAddedInboxQuestions(
   own: TeamSection<TeamInboxCounts>,
+  added: number,
   otherOpen: number
 ): TeamSection<TeamInboxCounts> {
-  if (otherOpen === 0 || own.kind === 'loading') {
+  if (own.kind === 'loading') {
     return own
   }
   if (own.kind === 'ready') {
-    return { kind: 'ready', value: { ...own.value, forYou: own.value.forYou + otherOpen } }
+    return added === 0
+      ? own
+      : { kind: 'ready', value: { ...own.value, forYou: own.value.forYou + added } }
+  }
+  if (added + otherOpen === 0) {
+    return own
   }
   return {
     kind: 'ready',
     value: {
-      forYou: otherOpen,
+      forYou: added,
       waiting: 0,
       threads: 0,
       answered: 0,

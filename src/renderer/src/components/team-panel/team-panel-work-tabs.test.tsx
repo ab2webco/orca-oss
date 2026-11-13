@@ -212,7 +212,7 @@ describe('TeamPanelMachinesTab', () => {
   })
 
   it('names the local machine in the UI language', () => {
-    expect(machines([machine({ host: { kind: 'local' } })]).textContent).toContain('local')
+    expect(machines([machine({ host: { kind: 'local' } })]).textContent).toContain('This computer')
   })
 
   it('counts agents against the cap, and alone when the host has none', () => {

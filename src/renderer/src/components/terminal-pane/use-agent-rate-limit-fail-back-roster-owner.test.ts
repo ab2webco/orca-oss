@@ -64,7 +64,10 @@ describe('fail-back roster owner', () => {
     )
 
     renderHook(() =>
-      useAgentRateLimitFailBack({ worktreeId: 'wt-owner-field', getLiveClaudePaneContext: () => null })
+      useAgentRateLimitFailBack({
+        worktreeId: 'wt-owner-field',
+        getLiveClaudePaneContext: () => null
+      })
     )
     await flush()
 

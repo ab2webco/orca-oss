@@ -50,6 +50,7 @@ const store = {
   queueTabStartupCommand: mockQueueTabStartupCommand,
   claimAutomaticAgentResume: vi.fn(),
   clearSleepingAgentSession: vi.fn(),
+  consumeSleepingAgentSession: vi.fn(),
   setActiveTabType: vi.fn(),
   setTabBarOrder: vi.fn()
 }

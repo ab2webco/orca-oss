@@ -65,6 +65,10 @@ vi.mock('react', async () => {
   }
 })
 
+vi.mock('@/lib/use-local-host-name', () => ({
+  useLocalHostName: () => 'This computer'
+}))
+
 vi.mock('@dnd-kit/sortable', () => ({
   useSortable: () => ({
     attributes: {},

@@ -147,4 +147,24 @@ describe('copied real-home Codex resume command', () => {
       "unset CODEX_HOME; unset ORCA_CODEX_HOME; cd '/home/alice/repo' && codex 'resume' 'session one'"
     )
   })
+  it('parses a folder session in WSL when the Windows default runtime is WSL', () => {
+    const state = {
+      ...makeState(),
+      activeRepoId: null,
+      activeWorktreeId: null,
+      folderWorkspaces: [{ id: 'folder-1', folderPath: 'C:\\Users\\dev\\notes' }],
+      settings: {
+        terminalWindowsShell: 'powershell.exe',
+        localWindowsRuntimeDefault: { kind: 'wsl', distro: 'Ubuntu-24.04' }
+      }
+    } as unknown as AppState
+    expect(
+      resolveAiVaultResumeStartupShell({
+        state,
+        worktreeId: 'folder:folder-1',
+        platform: 'win32',
+        isLocalSession: true
+      })
+    ).toBe('posix')
+  })
 })

@@ -72,7 +72,7 @@ export type GameFleet = {
   free: number
   /** Running members and free slots per host, local first; absent when the state has no per-host caps. */
   hosts?: GameHostLoad[]
-  /** Members not live since Orca or the machine restarted: `game resume-members`. */
+  /** Members not live now (terminal ended, Orca restarted or not reporting): `game resume-members`. */
   paused: GamePausedMember[]
   /** Members whose start waits for the setup in flight (ORCA-746). */
   queued: GameQueuedMember[]

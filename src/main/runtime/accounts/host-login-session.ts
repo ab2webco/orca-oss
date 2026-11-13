@@ -4,6 +4,12 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveCliCommand } from '../../../shared/node-cli-command-resolution'
+import {
+  CLAUDE_LOGIN_ARGS,
+  CLAUDE_LOGIN_HELP_ARGS,
+  claudeLoginFlagCache,
+  runWithClaudeLoginFallback
+} from '../../../shared/claude-login-args'
 
 export type HostLoginAgent = 'claude' | 'codex' | 'github'
 
@@ -31,6 +37,7 @@ type Session = {
 
 /** How long to wait for the agent to print its sign-in URL before giving up. */
 const URL_WAIT_MS = 45_000
+const HELP_WAIT_MS = 15_000
 /** How long to wait for the agent to finish after the code goes in. */
 const COMPLETION_WAIT_MS = 120_000
 const MAX_TRANSCRIPT = 64_000
@@ -75,7 +82,7 @@ function agentInvocation(
     // loopback callback the caller's browser would have to reach.
     return {
       command: 'claude',
-      args: ['auth', 'login', '--claudeai'],
+      args: [...CLAUDE_LOGIN_ARGS],
       env: { CLAUDE_CONFIG_DIR: home }
     }
   }
@@ -135,9 +142,70 @@ export async function beginHostLogin(
 ): Promise<HostLoginSessionStarted> {
   const home = mkdtempSync(join(tmpdir(), `orca-host-login-${agent}-`))
   const { command, args, env } = agentInvocation(agent, home)
-  const child = spawn(resolveCliCommand(command), args, {
+  const start = (startArgs: readonly string[]): Promise<Session> =>
+    startLoginAttempt({ agent, command, args: startArgs, env, home, accountId })
+  try {
+    const session =
+      agent === 'claude'
+        ? await runWithClaudeLoginFallback(
+            start,
+            `host:${resolveCliCommand(command)}`,
+            claudeLoginFlagCache,
+            () => readCommandOutput(command, CLAUDE_LOGIN_HELP_ARGS, env)
+          )
+        : await start(args)
+    return { sessionId: session.id, ...parseTranscript(session.transcript) }
+  } catch (error) {
+    rmSync(home, { recursive: true, force: true })
+    throw error
+  }
+}
+
+/** A short command's whole output; '' when it cannot run, so a missing CLI reads as no `auth login`. */
+function readCommandOutput(
+  command: string,
+  args: readonly string[],
+  env: Record<string, string>
+): Promise<string> {
+  return new Promise((resolve) => {
+    let output = ''
+    const child = spawn(resolveCliCommand(command), [...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env }
+    })
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve(output)
+    }, HELP_WAIT_MS)
+    const collect = (buf: Buffer): void => {
+      output += buf.toString()
+    }
+    child.stdout?.on('data', collect)
+    child.stderr?.on('data', collect)
+    child.once('error', () => {
+      clearTimeout(timer)
+      resolve('')
+    })
+    child.once('close', () => {
+      clearTimeout(timer)
+      resolve(output)
+    })
+  })
+}
+
+/** One spawn of the agent, waiting for its URL; it never removes `home`, so a retry can reuse it. */
+async function startLoginAttempt(attempt: {
+  agent: HostLoginAgent
+  command: string
+  args: readonly string[]
+  env: Record<string, string>
+  home: string
+  accountId: string | null
+}): Promise<Session> {
+  const { agent, command, home, accountId } = attempt
+  const child = spawn(resolveCliCommand(command), [...attempt.args], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ...env }
+    env: { ...process.env, ...attempt.env }
   })
   const session: Session = {
     id: randomUUID(),
@@ -172,19 +240,26 @@ export async function beginHostLogin(
         clearTimeout(timer)
         reject(error)
       })
-      void session.exited.then(() => {
+      void session.exited.then((code) => {
         clearTimeout(timer)
+        const clean = stripAnsi(session.transcript)
+        // Why reject only with no URL: a failed start (an unknown flag) is the error the caller retries on.
+        if (code !== 0 && !URL_PATTERN.test(clean)) {
+          reject(new Error(clean.trim() || `${command} exited with code ${code ?? 'signal'}`))
+          return
+        }
         // Why resolve and not reject: an agent that exits having printed the URL
         // already finished; the caller reads the transcript to find out.
         resolve()
       })
     })
   } catch (error) {
-    endHostLogin(session.id)
+    sessions.delete(session.id)
+    session.child.kill()
     throw error
   }
 
-  return { sessionId: session.id, ...parseTranscript(session.transcript) }
+  return session
 }
 
 export type HostLoginCompletion = {

@@ -12,22 +12,32 @@ import type {
   TeamStatus,
   TeamTicket
 } from '../../../../shared/team-panel-model-types'
+import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 
 const TONE: Record<TeamStatus, StatusTone> = {
   attention: 'attention',
   risk: 'warning',
   working: 'info',
   done: 'success',
-  idle: 'idle'
+  idle: 'idle',
+  failed: 'attention',
+  closed: 'idle'
 }
 
 export function teamStatusTone(status: TeamStatus): StatusTone {
   return TONE[status]
 }
 
-/** V28's marks: a question for needs-you or failed, a spinner while working, else a dot. */
+const GLYPH: Partial<Record<TeamStatus, StatusDotGlyph>> = {
+  attention: 'question',
+  failed: 'alert',
+  working: 'spinner',
+  closed: 'closed'
+}
+
+/** V28's marks: a question only for needs-you, a spinner while working, else a dot. */
 export function teamStatusGlyph(status: TeamStatus): StatusDotGlyph {
-  return status === 'attention' ? 'question' : status === 'working' ? 'spinner' : 'dot'
+  return GLYPH[status] ?? 'dot'
 }
 
 const MINUTE = 60_000
@@ -144,8 +154,9 @@ export function teamModelText(model: TeamModel | null): string | null {
   return model.effort ? `${model.label} · ${model.effort}` : model.label
 }
 
-export function teamHostText(host: TeamHost): string {
-  return host.kind === 'local' ? translate('teamPanel.host.local', 'local') : host.name
+/** `localName` is the user's rename of this machine, which wins over the default label. */
+export function teamHostText(host: TeamHost, localName?: string | null): string {
+  return host.kind === 'local' ? localName?.trim() || localHostDisplayLabel() : host.name
 }
 
 /** The PR chip's second half; null when there is nothing to say about its checks. */

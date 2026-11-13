@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import {
   getProviderAccountScope,
   getProviderRateLimitScope,
   getRemoteAccountsPaneScope
 } from './provider-account-scope'
+import { hostDisplayLabel } from '../../lib/local-host-display-label'
 
-const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
+const LOCAL_HOST_LABEL = hostDisplayLabel('local')
 
 describe('getProviderAccountScope', () => {
   it('describes provider accounts as client-owned without an active runtime', () => {
