@@ -14,20 +14,11 @@ export function getElectronArchiveExtractorCommand(
   }
 
   if (platform === 'win32') {
+    // Why: Windows PowerShell's Expand-Archive broke on the windows-2022 20261112.366 image (ORCA-1191); bsdtar ships with Windows 10 1803+.
     return {
-      file: env.ORCA_POWERSHELL_BIN || 'powershell',
-      args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        [
-          "$ErrorActionPreference = 'Stop'",
-          `Expand-Archive -LiteralPath ${quotePowerShellLiteral(zipPath)} -DestinationPath ${quotePowerShellLiteral(extractDir)} -Force`
-        ].join('; ')
-      ],
-      label: 'powershell Expand-Archive'
+      file: 'tar.exe',
+      args: ['-xf', zipPath, '-C', extractDir],
+      label: 'tar.exe -xf'
     }
   }
 
@@ -36,8 +27,4 @@ export function getElectronArchiveExtractorCommand(
     args: ['-q', zipPath, '-d', extractDir],
     label: 'unzip'
   }
-}
-
-function quotePowerShellLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`
 }
