@@ -1,4 +1,6 @@
+import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
+import { toolDisplayWords } from '../../../../shared/tool-display-words'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -103,9 +105,9 @@ export function teamLeadLiveText(action: TeamLiveAction | null, condition: TeamC
     : text
 }
 
-/** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`. */
+/** What a tool works on, named as every tool label is: `Bash · gh pr checks 924`; alone, as words. */
 export const teamToolText = (tool: string, detail: string | null): string =>
-  detail ? `${tool} · ${detail}` : tool
+  detail ? `${tool} · ${detail}` : toolDisplayWords(tool)
 
 /** What the agent does now; agent words (tool detail, questions) are shown as written. */
 export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
@@ -201,5 +203,38 @@ export function teamTicketBesideName(
   showName: boolean
 ): string | null {
   const identifier = card.ticket?.identifier ?? null
-  return identifier && !(showName && card.name === identifier) ? identifier : null
+  // Why the name's own ticket: 'Merlin · E2E-801' already says it, as the sidebar row does (#1125).
+  return identifier && !(showName && ticketInText(card.name) === identifier.toUpperCase())
+    ? identifier
+    : null
+}
+
+/** A usage meter's fill by percent used, in the status tokens, with its track a lighter step of it. */
+export function teamUsageBarClass(usedPercent: number): { fill: string; track: string } {
+  if (usedPercent < 60) {
+    return { fill: 'bg-status-idle', track: 'bg-status-idle/20' }
+  }
+  return usedPercent < 90
+    ? { fill: 'bg-status-warning', track: 'bg-status-warning/20' }
+    : { fill: 'bg-status-attention/70', track: 'bg-status-attention/15' }
+}
+
+/** A branch split for a middle cut: `tail` holds the ticket part (or last segment) and stays whole longest. */
+export function teamBranchParts(branch: string): { head: string; tail: string } {
+  const ticket = ticketInText(branch)
+  const at = ticket ? branch.toUpperCase().lastIndexOf(ticket) : -1
+  const cut = at >= 0 ? at : branch.lastIndexOf('/') + 1
+  return { head: branch.slice(0, cut), tail: branch.slice(cut) }
+}
+
+export function teamHelpersCountText(count: number): string {
+  return count === 1
+    ? translate('teamPanel.card.helpers_one', '{{count}} helper', { count })
+    : translate('teamPanel.card.helpers_other', '{{count}} helpers', { count })
+}
+
+export function teamHelperStateText(state: 'working' | 'done'): string {
+  return state === 'working'
+    ? translate('teamPanel.card.helper.working', 'Working')
+    : translate('teamPanel.card.helper.done', 'Done')
 }

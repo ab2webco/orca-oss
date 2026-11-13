@@ -302,9 +302,18 @@ test('the Team tab shows the live lead and its members from the lead game state'
         await expect(cards).toHaveCount(2)
       }
     )
-    await failPanelReads(electronApp, false)
+    const readsBeforeSecondRetry = await panelReads(electronApp)
     await panel.getByRole('button', { name: COPY.en.retry }).click()
-    await expect(panel).not.toContainText(COPY.en.readError)
+    await expect.poll(() => panelReads(electronApp)).toBeGreaterThan(readsBeforeSecondRetry)
+    await failPanelReads(electronApp, false)
+    // Why retry until clear: the next poll can beat the click, and clears the error just the same.
+    await expect(async () => {
+      const retry = panel.getByRole('button', { name: COPY.en.retry })
+      if (await retry.isVisible()) {
+        await retry.click({ timeout: 1_000 })
+      }
+      await expect(panel).not.toContainText(COPY.en.readError, { timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
     await expect(cards).toHaveCount(2)
 
     // Display and Plain come from the real panel look setting: no scene slot, agents by role.
@@ -381,14 +390,74 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
 
-    // Entering a member opens its own terminal in the center under a native header; Team stays open.
+    // One click on a member opens its own terminal in the center and opens its card; Team stays open.
     await panel.getByRole('tab', { name: COPY.en.team }).click()
     const asker = cards.filter({ hasText: 'ORCA-14' })
     await asker.locator('button[aria-expanded]').click()
-    await asker.getByRole('button', { name: COPY.en.open }).click()
+    await expect(asker.locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'true')
     await expect
       .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
       .toBe(members[1].paneKey.split(':')[0])
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'member-card-open',
+      async (language) => {
+        const detail = asker.locator('[data-team-card-detail]')
+        await expect(detail).toBeVisible()
+        // Why gone: the card itself opens the terminal, so the button would only repeat it.
+        await expect(asker.getByRole('button', { name: COPY[language].open })).toHaveCount(0)
+        await expect(detail.getByRole('button', { name: COPY[language].answer })).toBeVisible()
+        // Each fact once: the header shows model, phase, time and host, so the grid does not.
+        await expect(detail.locator('[data-team-detail]')).toHaveCount(
+          (await detail.locator('[data-team-detail="tool"]').count()) + 1
+        )
+        await expect(detail.locator('[data-team-detail="branch"] code')).not.toContainText(
+          'refs/heads/'
+        )
+        await expect(detail.locator('[data-team-detail="branch"] code')).not.toBeEmpty()
+        // A card wider than the panel is cut; the open card's surface must fit it too.
+        const spill = await asker.evaluate((node) => {
+          const panelBox = node.closest('[data-testid="team-panel"]')!.getBoundingClientRect()
+          return node.getBoundingClientRect().right - panelBox.right
+        })
+        expect(spill).toBeLessThanOrEqual(0)
+      }
+    )
+
+    // Subagents are helpers inside the member's session: a live count on its row, a line each when open.
+    await orcaPage.evaluate((paneKey) => {
+      window.__store!.setState((state) => ({
+        agentStatusByPaneKey: {
+          ...state.agentStatusByPaneKey,
+          [paneKey]: {
+            ...state.agentStatusByPaneKey[paneKey],
+            subagents: [
+              { id: 'a1', description: 'Map sidebar rows', state: 'working', startedAt: 1 },
+              {
+                id: 'a2',
+                description: 'Inventory sidebar features',
+                state: 'working',
+                startedAt: 2
+              },
+              { id: 'a3', agentType: 'Explore', state: 'idle', startedAt: 3 }
+            ]
+          }
+        }
+      }))
+    }, members[1].paneKey)
+    await captureEvery(
+      orcaPage,
+      testInfo.outputPath.bind(testInfo),
+      'member-helpers',
+      async (language) => {
+        await expect(asker.locator('[data-team-helpers]')).toHaveText(
+          language === 'en' ? '2 helpers' : '2 ayudantes'
+        )
+        await expect(asker.locator('[data-team-helper]')).toHaveCount(3)
+      }
+    )
+    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
     const askerTab = members[1].paneKey.split(':')[0]
     // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
     const header = orcaPage.locator(

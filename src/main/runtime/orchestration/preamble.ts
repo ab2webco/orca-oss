@@ -1,4 +1,6 @@
 import type { OrchestrationCliCommand } from './cli-command'
+import { personLanguageNameOf } from '../../../shared/person-language-rule'
+import type { SupportedUiLocale } from '../../../shared/ui-locale'
 import { MAX_ENVELOPE_CORRECTION_ATTEMPTS } from './worker-done-envelope'
 import { DISPATCH_FIRST_SIGNAL_DEADLINE_MIN } from './dispatch-lifecycle-deadline'
 
@@ -33,6 +35,8 @@ export type PreambleParams = {
   // Why: prompt-returning agents should idle after worker_done, while bare
   // shells have no agent prompt for Orca to reuse.
   workerKind?: 'prompt-returning-agent' | 'bare-shell'
+  // Why: a game member's question can surface in the person's Inbox, so it follows their language.
+  personLocale?: SupportedUiLocale
 }
 
 // Why: the dispatch preamble teaches agents about Orca's CLI commands for
@@ -51,6 +55,10 @@ export function buildDispatchPreamble(params: PreambleParams): string {
   })
   const capabilityFlag = params.dispatchCapability
     ? ` --dispatch-capability ${params.dispatchCapability}`
+    : ''
+  const language = personLanguageNameOf(params.personLocale)
+  const askLanguageNote = language
+    ? `  #\n  # A question can reach the person's Inbox: write the question and its options in ${language}.\n`
     : ''
 
   const header = `You are working inside Orca Lab, a multi-agent IDE. You are a dispatched worker.
@@ -135,7 +143,7 @@ Slack, GitHub comments, or any other channel to reach a human during the run.
   # blocks until the coordinator replies, then prints the reply body. If the
   # call times out or disconnects, resume with the returned message ID instead
   # of creating a duplicate question.
-  ${cli} orchestration ask --from ${params.workerHandle}${capabilityFlag} \\
+${askLanguageNote}  ${cli} orchestration ask --from ${params.workerHandle}${capabilityFlag} \\
     --question "<your question>" \\
     --options "<optional,comma,separated>" \\
     --timeout-ms 600000

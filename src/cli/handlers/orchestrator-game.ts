@@ -169,7 +169,7 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       brief:
         role === 'member' || elsewhere || gap === 'missing'
           ? null
-          : gameLeadBriefOf(lead, project, gameLeadCliOf(process.env)),
+          : gameLeadBriefOf(lead, project, gameLeadCliOf(process.env), state.locale),
       ...(gap === 'missing' ? { outcome: 'plain' } : {}),
       ...(elsewhere
         ? { outcome: registration.live ? 'live' : 'resumed', handle: elsewhere.handle }

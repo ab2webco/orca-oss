@@ -1,12 +1,12 @@
+import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StatusDot } from '@/components/StatusDot'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
-  statusToneOfCi,
   teamAgeText,
-  teamCiText,
+  teamHelpersCountText,
   teamLiveText,
   teamModelText,
   teamPhaseText,
@@ -15,8 +15,32 @@ import {
 import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
+import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
+import { teamHelpersOf } from './team-member-helpers'
+
+/** The live count of helpers (subagents) inside a member's session; nothing once they stop. */
+function HelpersMark({ paneKey }: { paneKey: string }): React.JSX.Element | null {
+  const subagents = useAppStore((state) => state.agentStatusByPaneKey[paneKey]?.subagents)
+  const { running } = teamHelpersOf(subagents)
+  if (running === 0) {
+    return null
+  }
+  return (
+    <span
+      data-team-helpers=""
+      className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground"
+    >
+      <LoaderCircle
+        data-team-helpers-spinner=""
+        className="size-3 shrink-0 motion-safe:animate-spin"
+        aria-hidden="true"
+      />
+      {teamHelpersCountText(running)}
+    </span>
+  )
+}
 
 /** A row's meta as `model · a · b`; the model is mono, as V28 sets it. */
 export function MetaLine({
@@ -69,15 +93,28 @@ export function TeamMemberCardRow({
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
-  const ci = card.pr ? teamCiText(card.pr) : null
-  const ciTone = card.pr ? statusToneOfCi(card.pr) : null
   const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
+  // Why only on opening: a second click folds the card and leaves the center as it is.
+  const toggle = (): void => {
+    if (!expanded && (card.terminalHandle || card.worktreeId)) {
+      void openTeamSession(card, shownName)
+    }
+    onToggle()
+  }
   return (
-    <article data-team-card="member" data-pane-key={card.paneKey}>
+    <article
+      data-team-card="member"
+      data-pane-key={card.paneKey}
+      // Why one surface: V30's .card.sel and .more read as one card, not loose text under a row.
+      className={cn(
+        expanded &&
+          'mx-2 my-1 overflow-hidden rounded-lg border border-sidebar-border bg-sidebar-accent'
+      )}
+    >
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={onToggle}
+        onClick={toggle}
         className={cn(
           'flex w-full min-w-0 items-start gap-2.5 py-2 pr-3 text-left hover:bg-sidebar-accent',
           // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
@@ -114,7 +151,7 @@ export function TeamMemberCardRow({
             ) : null}
             <span
               data-team-host=""
-              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
+              className="ml-auto shrink-0 text-right font-mono text-[11px] text-muted-foreground"
             >
               <TeamHostName host={card.host} />
             </span>
@@ -122,7 +159,11 @@ export function TeamMemberCardRow({
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {showName ? <TeamStatusMark status={card.status} /> : null}
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
-            <span className={cn('truncate', card.needsYou && 'text-status-attention')}>
+            <span
+              className={cn(
+                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
+              )}
+            >
               {card.needsYou
                 ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
                 : teamLiveText(card.liveAction, card.condition)}
@@ -138,44 +179,11 @@ export function TeamMemberCardRow({
                 : null
             ]}
           />
+          <HelpersMark paneKey={card.paneKey} />
         </span>
       </button>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}
-      {expanded ? (
-        <div className="flex flex-col items-start gap-2 bg-sidebar-accent/50 px-3 pb-3 pt-1 text-xs">
-          {answer}
-          {card.ticket?.title ? (
-            <p className="break-words text-[13px] text-foreground">{card.ticket.title}</p>
-          ) : null}
-          {card.summary ? (
-            <p className="break-words text-muted-foreground">{card.summary}</p>
-          ) : null}
-          <div className="flex flex-wrap gap-1.5">
-            {card.pr ? (
-              <a
-                data-team-pr-chip=""
-                href={card.pr.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground"
-              >
-                {ciTone ? <StatusDot tone={ciTone} /> : null}
-                {`#${card.pr.number}${ci ? ` · ${ci}` : ''}`}
-              </a>
-            ) : null}
-            {card.account ? (
-              <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
-                {card.account.usedPercent !== null
-                  ? `${card.account.email} · ${card.account.usedPercent}%`
-                  : card.account.email}
-              </span>
-            ) : null}
-          </div>
-          <Button size="xs" variant="outline" onClick={() => void openTeamSession(card, shownName)}>
-            {translate('teamPanel.card.openTerminal', 'Open terminal')}
-          </Button>
-        </div>
-      ) : null}
+      {expanded ? <TeamMemberCardDetail card={card} now={now} answer={answer} /> : null}
     </article>
   )
 }

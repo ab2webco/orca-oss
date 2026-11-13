@@ -718,7 +718,9 @@ import {
 } from '../claude/orchestrator-game-launch-context'
 import type { DispatchBriefTarget } from './orchestration/dispatch-brief-delivery'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
+import type { SupportedUiLocale } from '../../shared/ui-locale'
 import {
+  orchestratorGameLocaleOf,
   orchestratorGameMemberCliOf,
   withOrchestratorGameArgs,
   type OrchestratorGameLaunch
@@ -1642,6 +1644,7 @@ type RuntimeStore = {
     claudeAgentTeamsMode?: GlobalSettings['claudeAgentTeamsMode']
     orchestratorGame?: GlobalSettings['orchestratorGame']
     orchestratorGameProjects?: GlobalSettings['orchestratorGameProjects']
+    uiLanguage?: GlobalSettings['uiLanguage']
     // Why: Phase-5 query responder kill switches — read per chunk in
     // onPtyData to capture reply ownership at ingestion.
     terminalMainSideEffectAuthority?: GlobalSettings['terminalMainSideEffectAuthority']
@@ -32921,6 +32924,14 @@ export class OrcaRuntimeService {
     } catch {
       return { args: [], env: {} }
     }
+  }
+
+  /** The language the person reads Orca in, for what game agents write to them. */
+  gamePersonLocale(): SupportedUiLocale {
+    return orchestratorGameLocaleOf(
+      this.store?.getSettings?.()?.uiLanguage,
+      getPreferredSystemLocale()
+    )
   }
 
   /** Where a game member's dispatch brief goes; null keeps the full preamble (ORCA-757). */

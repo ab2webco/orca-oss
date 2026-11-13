@@ -15,6 +15,22 @@ describe('gameLeadBriefOf', () => {
     expect(brief).not.toContain('Project rules')
   })
 
+  it('tells the lead to write what the person reads in Spanish when the game speaks Spanish', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', 'orca', 'es')
+
+    expect(brief).toContain('Write everything the person reads in Spanish')
+    expect(brief).toContain('ask-owner questions and options')
+  })
+
+  it('keeps the English brief as it was', () => {
+    expect(gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco', 'orca', 'en')).toBe(
+      gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+    )
+    expect(gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')).not.toContain(
+      'Write everything the person reads'
+    )
+  })
+
   it('forbids Claude Code subagents and points the lead to a member launch', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 

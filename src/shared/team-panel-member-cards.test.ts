@@ -110,6 +110,76 @@ describe('teamCardsOf', () => {
     })
   })
 
+  it('gives the account its id and both windows, and the branch it works on', () => {
+    const [card] =
+      cardsOf(
+        [
+          agent({
+            worktree: { id: 'repo::/w/121', branch: 'netsa-121-auth', displayName: 'netsa-121' },
+            account: { provider: 'claude', id: 'a1', email: 'dev@example.com' }
+          })
+        ],
+        {
+          metrics: {
+            computedAt: '',
+            timezone: 'UTC',
+            mergedPerDay: [],
+            leadTime: { medianMs: null, measured: 0 },
+            claudeAccounts: [
+              { email: 'dev@example.com', active: true, sessionPercent: 20, weeklyPercent: 12 }
+            ]
+          }
+        }
+      )?.members ?? []
+    expect(card?.account).toEqual({
+      provider: 'claude',
+      email: 'dev@example.com',
+      id: 'a1',
+      usedPercent: 20,
+      weeklyPercent: 12
+    })
+    expect(card?.branch).toBe('netsa-121-auth')
+  })
+
+  it('names the branch without its refs/heads/ prefix', () => {
+    const [card] =
+      cardsOf([
+        agent({
+          worktree: {
+            id: 'repo::/w/121',
+            branch: 'refs/heads/fabolivark/netsa-121-sso',
+            displayName: 'netsa-121'
+          }
+        })
+      ])?.members ?? []
+    expect(card?.branch).toBe('fabolivark/netsa-121-sso')
+  })
+
+  it('works on the lead branch when it has no worktree of its own', () => {
+    const [card] = cardsOf([agent()])?.members ?? []
+    expect(card?.branch).toBe('main')
+  })
+
+  it('titles a ticket read from its name with the To Do item of the same id', () => {
+    const [card] =
+      cardsOf([agent({ displayName: 'Arthur NETSA-121' })], {
+        project: {
+          reviews: null,
+          todo: {
+            provider: 'plane',
+            total: 1,
+            url: null,
+            items: [{ id: 'NETSA-121', title: 'Sign in with SSO', url: 'https://p/NETSA-121' }]
+          }
+        }
+      })?.members ?? []
+    expect(card?.ticket).toMatchObject({
+      identifier: 'NETSA-121',
+      title: 'Sign in with SSO',
+      url: 'https://p/NETSA-121'
+    })
+  })
+
   it('prefers what Jev has the member on over the launch choice', () => {
     const [card] =
       cardsOf([

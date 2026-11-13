@@ -8,8 +8,26 @@ import {
   teamPhaseText,
   teamAgeText,
   teamStatusGlyph,
-  teamStatusTone
+  teamStatusTone,
+  teamUsageBarClass,
+  teamBranchParts,
+  teamTicketBesideName
 } from './team-card-text'
+
+describe('teamTicketBesideName', () => {
+  const ticket = { identifier: 'E2E-801' } as Parameters<typeof teamTicketBesideName>[0]['ticket']
+
+  // Why: 'Merlin · E2E-801' carried its ticket again beneath, once the row wrapped at 390.
+  it('shows the ticket once when the shown name already carries it', () => {
+    expect(teamTicketBesideName({ name: 'Merlin · E2E-801', ticket }, true)).toBeNull()
+    expect(teamTicketBesideName({ name: 'E2E-801', ticket }, true)).toBeNull()
+  })
+
+  it('shows the ticket beside a name without it, or when the name is hidden', () => {
+    expect(teamTicketBesideName({ name: 'Merlin', ticket }, true)).toBe('E2E-801')
+    expect(teamTicketBesideName({ name: 'Merlin · E2E-801', ticket }, false)).toBe('E2E-801')
+  })
+})
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -30,6 +48,18 @@ describe('teamLeadLiveText', () => {
 })
 
 describe('teamLiveText tool labels', () => {
+  it('reads a bare tool name as words, and keeps the tool beside its detail', () => {
+    expect(teamLiveText({ kind: 'tool', tool: 'PushNotification', detail: null }, 'working')).toBe(
+      'Push notification'
+    )
+    expect(
+      teamLiveText({ kind: 'tool', tool: 'mcp__plane__list_states', detail: null }, 'working')
+    ).toBe('List states')
+    expect(
+      teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 924' }, 'working')
+    ).toBe('Bash · gh pr checks 924')
+  })
+
   it('names the tool on every row, as V28 soloNow does', () => {
     expect(
       teamLiveText({ kind: 'tool', tool: 'Bash', detail: 'gh pr checks 912' }, 'working')
@@ -152,5 +182,43 @@ describe('card words', () => {
     expect(teamAgeText(now - 10 * 60_000, now)).toBe('10 min')
     expect(teamAgeText(now - 13 * 3_600_000, now)).toBe('13 h')
     expect(teamAgeText(now - 3 * 86_400_000, now)).toBe('3 d')
+  })
+})
+
+describe('teamUsageBarClass', () => {
+  it('stays quiet until the window runs low, warns, and turns to a softened attention near the end', () => {
+    expect([0, 59, 60, 89, 90, 100].map((used) => teamUsageBarClass(used).fill)).toEqual([
+      'bg-status-idle',
+      'bg-status-idle',
+      'bg-status-warning',
+      'bg-status-warning',
+      'bg-status-attention/70',
+      'bg-status-attention/70'
+    ])
+  })
+
+  it('draws the track as a lighter step of the fill, so the state reads across the whole bar', () => {
+    expect([0, 60, 90].map((used) => teamUsageBarClass(used).track)).toEqual([
+      'bg-status-idle/20',
+      'bg-status-warning/20',
+      'bg-status-attention/15'
+    ])
+  })
+})
+
+describe('teamBranchParts', () => {
+  it('keeps the part from the ticket on, so a cut drops the owner prefix first', () => {
+    expect(teamBranchParts('fabolivark/netsa-121-sso-sign-in')).toEqual({
+      head: 'fabolivark/',
+      tail: 'netsa-121-sso-sign-in'
+    })
+  })
+
+  it('keeps the last path segment when the branch names no ticket', () => {
+    expect(teamBranchParts('fabolivark/fix-panel')).toEqual({
+      head: 'fabolivark/',
+      tail: 'fix-panel'
+    })
+    expect(teamBranchParts('main')).toEqual({ head: '', tail: 'main' })
   })
 })

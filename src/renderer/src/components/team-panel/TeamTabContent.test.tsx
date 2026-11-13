@@ -14,6 +14,7 @@ import { TeamScenePainterContext } from '../team-scene/team-scene-painter-contex
 import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 import type { TeamScenePainter } from '../team-scene/team-scene-painter'
 import { recordingContext } from '../team-scene/team-scene-recording-context'
+import { useAppStore } from '@/store'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -209,11 +210,11 @@ describe('TeamTabContent', () => {
     for (const card of [leadCard(container), ...memberCards(container)]) {
       const name = card.querySelector('[data-team-name]')!
       const host = card.querySelector('[data-team-host]')!
-      // Why basis-0: the host claims only what is left, so it gives way before the name does.
-      expect(host.className).toContain('basis-0')
-      expect(host.className).toContain('flex-1')
-      expect(host.className).toContain('truncate')
-      expect(host.className).toContain('min-w-0')
+      // ORCA-1148: at 320 a cut host read 'loc…'; short of room it drops to its own line whole.
+      expect(host.className).toContain('shrink-0')
+      expect(host.className).toContain('ml-auto')
+      expect(host.className).not.toContain('truncate')
+      expect(host.className).not.toContain('basis-0')
       // ORCA-1092 row 23: a name too long for the row truncates instead of pushing the row wider.
       expect(name.className).not.toContain('shrink-0')
       expect(name.className).toContain('min-w-0')
@@ -362,6 +363,53 @@ describe('TeamTabContent', () => {
     expect(card.textContent).not.toContain('Edit · terminal-role.ts')
   })
 
+  // ORCA-1148: subagents are helpers inside a member's session, not members; the row counts the live ones.
+  it('marks a member running helpers with their live count, and clears it when they stop', async () => {
+    const working = (id: string) => ({ id, state: 'working' as const, startedAt: 1 })
+    useAppStore.setState({
+      agentStatusByPaneKey: {
+        'pane-m': { subagents: [working('a1'), working('a2'), working('a3')] }
+      } as never
+    })
+    const { container } = await render(model())
+    const mark = memberCards(container)[0].querySelector('[data-team-helpers]')
+    expect(mark?.textContent).toBe('3 helpers')
+    expect(mark?.querySelector('[data-team-helpers-spinner]')).not.toBeNull()
+
+    await act(async () => {
+      useAppStore.setState({
+        agentStatusByPaneKey: {
+          'pane-m': { subagents: [{ id: 'a1', state: 'idle', startedAt: 1 }] }
+        } as never
+      })
+    })
+    expect(memberCards(container)[0].querySelector('[data-team-helpers]')).toBeNull()
+    useAppStore.setState({ agentStatusByPaneKey: {} })
+  })
+
+  // ORCA-1148: at 320 the waiting line read 'Waiting for your a…'; it wraps to two lines instead.
+  it('wraps the waiting line on a member and on the lead instead of cutting it', async () => {
+    const { container } = await render(
+      model({
+        lead: { ...lead, status: 'attention', ownerAsk: { ticket: 'ORCA-14' } },
+        members: [member({ needsYou: true, status: 'attention' })]
+      })
+    )
+    const waiting = [
+      [...memberCards(container)[0].querySelectorAll('span')].findLast(
+        (node) => node.textContent === 'Waiting for your answer'
+      ),
+      [...leadCard(container).querySelectorAll('span')].findLast(
+        (node) => node.textContent === 'Waiting for you · Question on ORCA-14'
+      )
+    ]
+
+    for (const line of waiting) {
+      expect(line?.className).not.toContain('truncate')
+      expect(line?.className).toContain('line-clamp-2')
+    }
+  })
+
   // Why: a question appears in full only in Inbox (ORCA-1048).
   it('never prints the question on the card', async () => {
     const question = { kind: 'question' as const, text: 'Merge #14 now?', options: ['Yes'] }
@@ -379,15 +427,16 @@ describe('TeamTabContent', () => {
     expect(memberCards(container)[0].textContent?.match(/ORCA-1044/g)).toHaveLength(1)
   })
 
-  it('expands a member to show its summary, pull request and account', async () => {
+  it('expands a member to show its title, pull request and account', async () => {
     const { container } = await render(model())
     const toggle = memberCards(container)[0].querySelector<HTMLButtonElement>('[aria-expanded]')!
 
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(container.textContent).not.toContain('Fixing the Windows check')
+    expect(container.querySelector('[data-team-card-detail]')).toBeNull()
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(container.textContent).toContain('Fixing the Windows check')
+    // Why not the summary: it is the last message's subject, which stays in Inbox (owner, ORCA-1148).
+    expect(container.textContent).not.toContain('Fixing the Windows check')
     expect(container.textContent).toContain('#924')
     expect(container.textContent).toContain('Remote member keeps its role')
     expect(container.textContent).toContain('CI failing')
@@ -395,7 +444,10 @@ describe('TeamTabContent', () => {
     expect(chip.querySelector('[data-status-tone]')?.getAttribute('data-status-tone')).toBe(
       'attention'
     )
-    expect(container.textContent).toContain('dev@example.test · 12%')
+    expect(container.querySelector('[data-team-account]')?.textContent).toContain(
+      'dev@example.test'
+    )
+    expect(container.querySelector('[data-team-usage="session"]')?.textContent).toContain('12%')
   })
 
   it('shows the Advisor row under the lead only when the plugin reports one', async () => {

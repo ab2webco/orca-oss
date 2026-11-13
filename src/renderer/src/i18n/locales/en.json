@@ -17340,7 +17340,23 @@
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
       "openTerminal": "Open terminal",
-      "inFolder": "In the folder, no worktree"
+      "inFolder": "In the folder, no worktree",
+      "helpers_one": "{{count}} helper",
+      "helpers_other": "{{count}} helpers",
+      "helper": {
+        "working": "Working",
+        "done": "Done"
+      },
+      "detail": {
+        "branch": "Branch",
+        "tool": "Last tool"
+      },
+      "usage": {
+        "session": "5 h",
+        "weekly": "Week",
+        "claude": "Claude",
+        "codex": "Codex"
+      }
     },
     "activity": {
       "prompt": "Prompt",

@@ -38,7 +38,9 @@ export function TeamInboxOtherProjects({
           aria-hidden
           className="size-3.5 shrink-0 transition-transform motion-reduce:transition-none group-data-[state=open]/others:rotate-90"
         />
-        <span className="truncate">{translate('teamPanel.inbox.otherProjects', 'Other projects')}</span>
+        <span className="truncate">
+          {translate('teamPanel.inbox.otherProjects', 'Other projects')}
+        </span>
         <span className="tabular-nums">{count}</span>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2">

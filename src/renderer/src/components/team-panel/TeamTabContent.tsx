@@ -64,7 +64,7 @@ function LeadCardRow({
             </span>
             <span
               data-team-host=""
-              className="min-w-0 flex-1 basis-0 truncate text-right font-mono text-[11px] text-muted-foreground"
+              className="ml-auto shrink-0 text-right font-mono text-[11px] text-muted-foreground"
             >
               <TeamHostName host={lead.host} />
             </span>
@@ -72,7 +72,7 @@ function LeadCardRow({
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <TeamStatusMark status={lead.status} />
             {lead.ownerAsk ? (
-              <span className="truncate text-status-attention">
+              <span className="line-clamp-2 break-words text-status-attention">
                 {lead.ownerAsk.ticket
                   ? translate('teamPanel.lead.asksOn', 'Waiting for you · Question on {{ticket}}', {
                       ticket: lead.ownerAsk.ticket

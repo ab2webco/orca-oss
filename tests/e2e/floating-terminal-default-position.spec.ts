@@ -66,7 +66,14 @@ async function toggleBoxes(page: Page): Promise<Box[]> {
 }
 
 const intersects = (a: Box, b: Box): boolean =>
-  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+  a.left < a.right &&
+  a.top < a.bottom &&
+  b.left < b.right &&
+  b.top < b.bottom &&
+  a.left < b.right &&
+  a.right > b.left &&
+  a.top < b.bottom &&
+  a.bottom > b.top
 
 async function boxOf(target: Locator): Promise<Box> {
   return target.evaluate((node) => {
@@ -94,6 +101,22 @@ async function sweepTarget(
       const { left, top, right, bottom } = element.getBoundingClientRect()
       return { left, top, right, bottom }
     }
+    // Why: a row scrolled past its list's edge is clipped, not painted, so no button can cover it.
+    const paintedBoxOf = (element: Element) => {
+      const box = boxOfNode(element)
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const style = getComputedStyle(parent)
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') {
+          continue
+        }
+        const clip = parent.getBoundingClientRect()
+        box.left = Math.max(box.left, clip.left)
+        box.top = Math.max(box.top, clip.top)
+        box.right = Math.min(box.right, clip.right)
+        box.bottom = Math.min(box.bottom, clip.bottom)
+      }
+      return box
+    }
     const buttons = () =>
       [...document.querySelectorAll('[data-floating-terminal-toggle]')]
         .map(boxOfNode)
@@ -116,7 +139,7 @@ async function sweepTarget(
       } else {
         node.scrollIntoView({ block, behavior: 'instant' })
       }
-      return { block, target: boxOfNode(node), buttons: buttons() }
+      return { block, target: paintedBoxOf(node), buttons: buttons() }
     })
   }, blocks)
 }
@@ -397,6 +420,29 @@ test("the default button covers no terminal row nor a Team card's meta at any wi
       )
     }
   }
+
+  // Why: the clip must not hide a real overlap; a button over a painted row inside the list still counts.
+  const probe = meta.first()
+  const [placed] = await sweepTarget(probe, ['center'])
+  await orcaPage.evaluate((box) => {
+    const stand = document.createElement('div')
+    stand.id = 'covering-probe'
+    stand.dataset.floatingTerminalToggle = ''
+    Object.assign(stand.style, {
+      position: 'fixed',
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: '20px',
+      height: `${box.bottom - box.top}px`
+    })
+    document.body.append(stand)
+  }, placed.target)
+  const [over] = await sweepTarget(probe, ['center'])
+  expect(
+    over.buttons.some((button) => intersects(button, over.target)),
+    'a button over a painted row reads as covering it'
+  ).toBe(true)
+  await orcaPage.evaluate(() => document.getElementById('covering-probe')?.remove())
 })
 
 test('the menu still moves the button both ways, a drag still places it, and the choice sticks', async ({

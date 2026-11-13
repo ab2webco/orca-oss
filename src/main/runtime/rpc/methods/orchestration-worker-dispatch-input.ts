@@ -23,7 +23,8 @@ export async function workerDispatchInputOf(args: {
     workerHandle: args.terminalHandle,
     dispatchCapability: args.capability,
     devMode: params.devMode,
-    cliCommand: runtime.getTerminalOrchestrationCliCommand(args.terminalHandle)
+    cliCommand: runtime.getTerminalOrchestrationCliCommand(args.terminalHandle),
+    ...(params.game ? { personLocale: runtime.gamePersonLocale() } : {})
   })
   // Why only a game member in a terminal Orca started: the line names a path relative to that cwd.
   if (!params.game || params.terminal) {
