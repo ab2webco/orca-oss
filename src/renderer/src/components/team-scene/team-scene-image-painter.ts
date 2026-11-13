@@ -16,7 +16,7 @@ import {
   drawSceneOverflow,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
-import { drawCastleBuilds } from './team-scene-castle-sites'
+import { drawFiguresScenery } from './team-scene-figures-props-draw'
 import { drawOfficeBuilds, officeSceneEffects } from './team-scene-office-builds'
 import { officeVirusShakeAt } from './team-scene-office-virus'
 import {
@@ -309,7 +309,7 @@ export function createImagePainter(args: {
         args.builds === 'office' ? boots.take(officeSceneEffects(f.effects), f.t) : f.effects
       effects.start(shown, f.actors, h)
       if (args.builds === 'castle') {
-        drawCastleBuilds(g, f, feetY)
+        drawFiguresScenery(g, f, feetY)
       } else if (args.builds === 'office') {
         drawOfficeBuilds(g, f, feetY, colors.attention, monitorFromSeat, !back, colors.risk)
       }
