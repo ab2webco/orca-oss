@@ -124,7 +124,12 @@ async function expectNothingCut(page: Page, label: string): Promise<void> {
   const cut = await page.getByTestId('team-panel').evaluate((node) => {
     const carousel = node.querySelector('[aria-roledescription="carousel"]')!
     const texts = [...carousel.querySelectorAll<HTMLElement>('[data-team-display-stage] span')]
-      .filter((one) => one.children.length === 0 && one.scrollWidth > one.clientWidth + 1)
+      // Why height too: a line-clamp cuts below, as 'This / comput…' did in the Machines column (ORCA-1188).
+      .filter(
+        (one) =>
+          one.children.length === 0 &&
+          (one.scrollWidth > one.clientWidth + 1 || one.scrollHeight > one.clientHeight + 1)
+      )
       .map((one) => one.textContent)
     const squeezed = [...carousel.querySelectorAll<HTMLElement>('[data-team-display-blocks]')]
       .filter((one) => one.getClientRects().length > 0 && one.getBoundingClientRect().width < 24)

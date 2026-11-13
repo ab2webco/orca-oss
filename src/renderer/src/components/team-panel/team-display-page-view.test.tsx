@@ -96,6 +96,28 @@ describe('TeamDisplayPageView', () => {
     expect(container.textContent).toContain('0/2')
   })
 
+  // Why (ORCA-1188): 'This computer' overflowed the 54 px name column cut to one line.
+  it('wraps a machine name over two lines instead of cutting it', async () => {
+    const container = await render({
+      id: 'machines',
+      rows: [
+        {
+          key: 'local',
+          host: { kind: 'local' },
+          cpuPercent: 35,
+          memoryPercent: 42,
+          running: 1,
+          cap: 4
+        }
+      ]
+    })
+
+    const name = container.querySelector<HTMLElement>('[data-team-display-machine]')!
+    expect(name.textContent).toBe('This computer')
+    expect(name.className).toContain('line-clamp-2')
+    expect(name.className).not.toContain('truncate')
+  })
+
   it('says what Orca has no data for on every page and draws no invented figure', async () => {
     const empty: TeamDisplayPage[] = [
       {
