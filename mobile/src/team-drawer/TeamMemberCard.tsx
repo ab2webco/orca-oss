@@ -92,7 +92,7 @@ export function TeamMemberCard({
   const ciTone = CI_TONE[pr?.ci as CheckStatus] ?? colors.textMuted
   const terminal = member.terminal
   return (
-    <View style={[styles.card, member.needsYou && styles.needsYou]}>
+    <View style={styles.card}>
       <Pressable
         style={styles.head}
         onPress={onToggle}
@@ -203,10 +203,6 @@ const styles = StyleSheet.create({
   },
   head: {
     gap: spacing.xs
-  },
-  needsYou: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.statusRed
   },
   top: {
     flexDirection: 'row',

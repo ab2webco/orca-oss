@@ -325,6 +325,17 @@ describe('TeamSheet', () => {
     expect(getComputedStyle(button('Open PR 850, CI green')).minHeight).not.toBe('44px')
   })
 
+  // Why: the owner read the red left edge as decoration; the red waiting line already says it.
+  it('marks a waiting card by its line, with no coloured left edge', () => {
+    show(teamWith())
+    act(() => button('Team').click())
+    expect(texts()).toContain('Waiting for your answer')
+    const edged = [...document.body.querySelectorAll<HTMLElement>('div')].filter(
+      (one) => getComputedStyle(one).borderLeftWidth === '3px'
+    )
+    expect(edged).toEqual([])
+  })
+
   it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
     show(teamWith())
     expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
