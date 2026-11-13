@@ -694,7 +694,13 @@ describe('createImagePainter office back view', () => {
         builds: 'office',
         back
       }).layout
-    expect(at({ chairEnd: 144 })).toEqual({ rowSize: 5, workSeated: true, firstX: 0.16 })
+    expect(at({ chairEnd: 144 })).toEqual({
+      rowSize: 5,
+      workSeated: true,
+      firstX: 0.16,
+      attendReachPx: 14,
+      attendMarkDxPx: -20
+    })
     expect(at(null)).toBeUndefined()
   })
 

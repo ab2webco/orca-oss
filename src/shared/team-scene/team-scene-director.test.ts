@@ -307,7 +307,13 @@ describe('team scene director', () => {
 
   describe('the advisor walk at a row of desks', () => {
     // The Office layout: a row of five, members at their desks, room at the row's left end.
-    const layout = { rowSize: 5, workSeated: true, firstX: 0.16 }
+    const layout = {
+      rowSize: 5,
+      workSeated: true,
+      firstX: 0.16,
+      attendReachPx: 14,
+      attendMarkDxPx: -20
+    }
     const names = ['q', 'b', 'c', 'd']
     // The owner's case: the lead attends the needs-you member Jev then judges.
     const team = (decisions?: { id: string; verdict: string; gesture: null }[]) =>
