@@ -121,3 +121,23 @@ describe('a lead attending a member who needs you', () => {
     }
   }
 })
+
+// Why: the panel narrows while the lead attends (1440 to 390); its spot must follow the new width.
+describe('a lead already attending when the stage narrows', () => {
+  it('moves to clear the asker at the new width', () => {
+    const lead = { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' } as const
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, { lead, advisor: null, members: [member('m0', 'needsYou')] })
+    for (let t = 0; t < 40 && world.rounds.stage !== 'atMember'; t += 1 / 30) {
+      stepTeamScene(world, 1 / 30, { width: 349 })
+    }
+    expect(world.rounds.stage).toBe('atMember')
+    for (let t = 0; t < 10; t += 1 / 30) {
+      stepTeamScene(world, 1 / 30, { width: 219 })
+    }
+    const actors = teamSceneActors(world)
+    const leader = actors.find((a) => a.role === 'lead')!
+    const asking = actors.find((a) => a.key === 'm0')!
+    expect(Math.abs(leader.x - asking.x) * 219).toBeGreaterThanOrEqual(26 - 0.5)
+  })
+})

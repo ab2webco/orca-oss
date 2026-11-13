@@ -135,6 +135,9 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
       world.effects.push({ kind: 'handoff', from: 'lead', to: member.key })
       member.emote = { kind: 'check', until: world.t + 1.1 }
     }
+  } else if (rounds.purpose === 'attend') {
+    // Why: a narrowed stage moves the asker's clear spot, so the lead follows it.
+    lead.target = teamSceneAttendSpotOf(world, member, width, side)
   }
   // Why from where it stands: an attending lead may stand on the asker's far side.
   lead.facing = lead.target.x > member.home.x ? -1 : 1
