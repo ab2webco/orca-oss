@@ -11,7 +11,19 @@ export const TASK_WORKTREE_CARD_PROPERTIES: WorktreeCardProperty[] = [
   'plane-issue'
 ]
 
+// Why: ORCA-1163 shows by default only what an agent operator acts on; notes, origin and ports are opt-in.
 export const DEFAULT_WORKTREE_CARD_PROPERTIES: WorktreeCardProperty[] = [
+  ...FIXED_WORKTREE_CARD_PROPERTIES,
+  ...TASK_WORKTREE_CARD_PROPERTIES,
+  'pr',
+  // Why: agent activity is the primary reason users opt into the feature, so
+  // the Default mode keeps it inline on each card while Compact removes the
+  // extra row.
+  'inline-agents'
+]
+
+/** The defaults before ORCA-1163; a profile still equal to them was never customised. */
+export const PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES: WorktreeCardProperty[] = [
   ...FIXED_WORKTREE_CARD_PROPERTIES,
   ...TASK_WORKTREE_CARD_PROPERTIES,
   'pr',
@@ -19,11 +31,18 @@ export const DEFAULT_WORKTREE_CARD_PROPERTIES: WorktreeCardProperty[] = [
   'cli',
   'comment',
   'ports',
-  // Why: agent activity is the primary reason users opt into the feature, so
-  // the Default mode keeps it inline on each card while Compact removes the
-  // extra row.
   'inline-agents'
 ]
+
+export function isPreAgentFocusDefaultWorktreeCardProperties(
+  properties: readonly WorktreeCardProperty[]
+): boolean {
+  const shown = new Set(properties)
+  return (
+    shown.size === PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES.length &&
+    PRE_AGENT_FOCUS_DEFAULT_WORKTREE_CARD_PROPERTIES.every((property) => shown.has(property))
+  )
+}
 
 // Why: compact cards default to the quiet preset; metadata icons remain opt-in
 // through Show properties instead of appearing automatically.

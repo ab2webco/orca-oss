@@ -4,12 +4,37 @@ import type {
   TeamSceneEmote
 } from '../../../../shared/team-scene/team-scene-types'
 import { SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
+import { drawSceneGesture } from './team-scene-gesture-marks'
 import type { TeamSceneFrame } from './team-scene-painter'
 
 /** Status colours resolved from the theme; the scene uses them only for what they mean. */
-export type TeamSceneStatusColors = { attention: string; done: string; working: string }
+export type TeamSceneStatusColors = {
+  attention: string
+  done: string
+  working: string
+  /** The card's warning tone: a member that cannot work (limit, login, pause). */
+  risk: string
+}
 
 const TAU = 2 * Math.PI
+// Why stacked: an advisor cheering a merge can also hold up a gesture.
+const GESTURE_OVER_EMOTE = 18
+
+/** An actor's emote and, for the advisor, its gesture, centred at `x, y` above the head. */
+export function drawActorMarks(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  a: Pick<TeamSceneActor, 'emote' | 'gesture'>,
+  colors: TeamSceneStatusColors
+): void {
+  if (a.emote) {
+    drawSceneEmote(g, x, y, a.emote, colors)
+  }
+  if (a.gesture) {
+    drawSceneGesture(g, x, a.emote ? y - GESTURE_OVER_EMOTE : y, a.gesture, colors)
+  }
+}
 const SCROLL = '#f4e6c0'
 const SHOT_SECONDS = 0.55
 export const SCENE_DUST = '#cfc6b4'
@@ -28,7 +53,8 @@ export function drawSceneEmote(
     alert: colors.attention,
     check: colors.done,
     star: '#ffd24a',
-    heart: '#ff8fa8'
+    heart: '#ff8fa8',
+    blocked: colors.risk
   }
   g.save()
   g.translate(x, y)
@@ -49,6 +75,11 @@ export function drawSceneEmote(
     g.lineTo(0, 0.6)
     g.stroke()
     g.fillRect(-1, 2.6, 2, 2)
+  } else if (kind === 'blocked') {
+    // A no-entry bar: stopped, not asking.
+    g.moveTo(-3.6, 0)
+    g.lineTo(3.6, 0)
+    g.stroke()
   } else if (kind === 'check') {
     g.moveTo(-3, 0.2)
     g.lineTo(-0.8, 2.6)
@@ -117,6 +148,10 @@ export function createSceneEffects(feetY: (depth: number, h: number) => number):
   let sparks: Spark[] = []
   const startOne = (effect: TeamSceneEffect, actors: TeamSceneActor[], h: number): void => {
     const find = (key: string) => actors.find((a) => a.key === key)
+    // Why skip: only a style with monitors draws CI turning green, on that member's screen.
+    if (effect.kind === 'ciGreen') {
+      return
+    }
     if (effect.kind === 'handoff') {
       const from = find(effect.from)
       const to = find(effect.to)
@@ -125,8 +160,23 @@ export function createSceneEffects(feetY: (depth: number, h: number) => number):
       }
       return
     }
-    const at = find(effect.key)
+    const at = effect.at ?? find(effect.key)
     if (!at) {
+      return
+    }
+    if (effect.reason === 'puff') {
+      // Why dust at the waist: the advisor blinks out and in, a small cloud and no fanfare.
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * TAU
+        sparks.push({
+          x: at.x,
+          y: feetY(at.depth, h) - 18,
+          vx: Math.cos(angle) * 34,
+          vy: Math.sin(angle) * 34 - 20,
+          life: 0.6,
+          color: i % 2 ? '#ffffff' : SCENE_DUST
+        })
+      }
       return
     }
     if (effect.reason === 'build' || effect.reason === 'repair') {

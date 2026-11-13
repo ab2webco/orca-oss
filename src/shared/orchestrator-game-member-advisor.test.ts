@@ -47,6 +47,14 @@ describe('parseGameMemberAdvisorReport', () => {
     expect(parsed?.model).toHaveLength(64)
     expect(parsed?.effort).toBeNull()
   })
+
+  // Why (ORCA-1173): the card showed 'piso de código (Jev: c', Jev's sentence cut at the model's 64.
+  it("keeps Jev's whole sentence, bounding it apart from the short fields", () => {
+    const line = 'jev · mediría: Opus 5.5 · esfuerzo alto · piso de código (Jev: código)'
+    expect(parseGameMemberAdvisorReport(report({ line }))?.line).toBe(line)
+    const long = parseGameMemberAdvisorReport(report({ line: 'y'.repeat(1000) }))?.line
+    expect(long).toHaveLength(240)
+  })
 })
 
 describe('parseGameMemberAdvisorReport detail fields', () => {
@@ -88,6 +96,51 @@ describe('parseGameMemberAdvisorReport detail fields', () => {
 
     expect(parsed).toMatchObject({ model: 'Sonnet 5.5', tool: 'Bash' })
     expect(parsed).not.toHaveProperty('line')
+  })
+
+  it("keeps Jev's latest decisions as ids, verdicts and gestures only, at most five", () => {
+    const decisions = Array.from({ length: 7 }, (_, i) => ({
+      id: `d${i}`,
+      verdict: i === 6 ? 'deny' : 'allow',
+      gesture: i === 6 ? 'escalated' : null,
+      title: 'rm -rf build',
+      tool: 'Bash'
+    }))
+    const parsed = parseGameMemberAdvisorReport(report({ decisions }))
+    expect(parsed?.decisions).toEqual([
+      { id: 'd2', verdict: 'allow', gesture: null },
+      { id: 'd3', verdict: 'allow', gesture: null },
+      { id: 'd4', verdict: 'allow', gesture: null },
+      { id: 'd5', verdict: 'allow', gesture: null },
+      { id: 'd6', verdict: 'deny', gesture: 'escalated' }
+    ])
+  })
+
+  it('reads every other field of a report with decisions as it reads one without', () => {
+    const decisions = [{ id: 'd1', verdict: 'deny', gesture: 'escalated' }]
+    const { decisions: _dropped, ...rest } = parseGameMemberAdvisorReport(
+      report({ line: 'jev', decisions })
+    )!
+    expect(rest).toEqual(parseGameMemberAdvisorReport(report({ line: 'jev' })))
+  })
+
+  it('drops decisions it cannot read, and the whole list when it is not one', () => {
+    const parsed = parseGameMemberAdvisorReport(
+      report({
+        decisions: [{ id: 7, verdict: 'allow' }, { verdict: 'allow' }, { id: 'ok', verdict: 'ask' }]
+      })
+    )
+    expect(parsed?.decisions).toEqual([{ id: 'ok', verdict: 'ask', gesture: null }])
+    expect(parseGameMemberAdvisorReport(report({ decisions: 'x' }))).not.toHaveProperty('decisions')
+    expect(parseGameMemberAdvisorReport(report())).not.toHaveProperty('decisions')
+  })
+
+  it('keeps the decisions on an advisor a host hands back', () => {
+    const decisions = [{ id: 'a', verdict: 'deny', gesture: 'escalated' }]
+    expect(
+      parseGameMemberAdvisor({ model: 'Opus 5.5', effort: 'high', pinned: {}, decisions })
+        ?.decisions
+    ).toEqual(decisions)
   })
 
   it('keeps an explicit null detail field as null', () => {

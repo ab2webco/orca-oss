@@ -91,9 +91,7 @@ jobs:
       # broken bundled gyp_main.py on Linux.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        uses: ./.github/actions/use-external-node-gyp
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -175,9 +173,7 @@ jobs:
       # currently pins runs-on: ubuntu-latest.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        uses: ./.github/actions/use-external-node-gyp
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -286,9 +282,7 @@ jobs:
           run_install: false
 
       - name: Use external node-gyp to avoid pnpm's bundled copy
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        uses: ./.github/actions/use-external-node-gyp
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -403,9 +397,7 @@ jobs:
       # stays consistent across workflows even while this job is ubuntu-latest.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        uses: ./.github/actions/use-external-node-gyp
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

@@ -156,6 +156,29 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
   )
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
 
+  // ORCA-1039: the System default row read 'Use your current this device Claude login.'
+  await expect(orcaPage.getByText('Use the Claude login on this device.')).toBeVisible()
+  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'es' }))
+  const systemDefaultEs = orcaPage.getByText(
+    'Usa el inicio de sesión de Claude en este dispositivo.'
+  )
+  await expect(systemDefaultEs).toBeVisible()
+  for (const width of [1440, 320]) {
+    await orcaPage.setViewportSize({ width, height: 900 })
+    await systemDefaultEs.scrollIntoViewIfNeeded()
+    // The sentence names where the login lives; cut at 320 it lost exactly that.
+    const cut = await systemDefaultEs.evaluate((node) => node.scrollWidth - node.clientWidth)
+    expect(cut, `${width}px: the System default line is cut`).toBeLessThanOrEqual(0)
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`system-default-es-${width}-${theme}.png`)
+      })
+    }
+  }
+  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await orcaPage.setViewportSize({ width: 1440, height: 900 })
+
   await tokenButton(withoutToken).click()
   const dialog = orcaPage.getByRole('dialog', { name: 'Long-lived token' })
   await expect(dialog).toBeVisible()

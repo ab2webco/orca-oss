@@ -13,7 +13,8 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 
 // Why: one capture per tab, plugin state, width and theme outruns the CI budget; ORCA_CAPTURE_EVIDENCE=1 runs it.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
-const JEV_LINE = 'Keeps the lead on Opus for ORCA-1134'
+// Why past 64 characters: Jev's sentence was cut at the short fields' cap, mid-word (ORCA-1173).
+const JEV_LINE = 'jev · would pick: Opus 5.5 · high effort · code floor for ORCA-1134 (Jev: code)'
 
 // Why a fake gh: the merge queue is read through Orca's own GraphQL call, so only GitHub is stood in for.
 const fakeGhDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-queue-gh-'))
@@ -205,6 +206,21 @@ test('PRs opens with the GitHub merge queue, Machines lists this machine alone, 
     await plugins(true)
     await panel.getByRole('tab', { name: 'Team' }).click()
     await expect(advisor).toContainText(JEV_LINE, { timeout: 30_000 })
+    // Two lines then an ellipsis on the card; the whole sentence is its hover title (ORCA-1173).
+    await expect(advisor.locator('[data-team-advisor-line]')).toHaveAttribute('title', JEV_LINE)
+    if (CAPTURE_EVIDENCE) {
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of THEMES) {
+          await setTheme(orcaPage, theme)
+          await advisor.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`advisor-card-${width}-${theme}.png`)
+          })
+        }
+      }
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    }
     await capture('on')
 
     await plugins(false)

@@ -397,6 +397,7 @@ describe('connectPanePty', () => {
       leafId: LEAF_1
     })
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not resume a live provider session while legacy worker recovery owns the pane', async () => {
@@ -467,6 +468,7 @@ describe('connectPanePty', () => {
     expect(attachOptions).not.toHaveProperty('rows')
     expect(mockStoreState.registerAgentLaunchConfig).not.toHaveBeenCalled()
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not replace a missing retained legacy worker over direct SSH', async () => {
@@ -745,6 +747,6 @@ describe('connectPanePty', () => {
     )
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledTimes(1)
     expect(deps.onShowSessionRestoredBanner).toHaveBeenCalledWith(2, 'restored')
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 })

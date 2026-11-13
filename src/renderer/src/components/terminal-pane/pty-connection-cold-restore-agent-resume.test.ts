@@ -390,7 +390,7 @@ describe('connectPanePty', () => {
       })
     )
     // Why: consuming the record prevents a later worktree activation from launching a duplicate resume tab.
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(paneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(paneKey)
   })
 
   it('marks the pane as freshly started when main declined an unverifiable resume', async () => {
@@ -521,7 +521,7 @@ describe('connectPanePty', () => {
         command: "codex '--dangerously-bypass-approvals-and-sandbox' 'resume' 'codex-session-1'"
       })
     )
-    expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(legacyPaneKey)
+    expect(mockStoreState.consumeSleepingAgentSession).toHaveBeenCalledWith(legacyPaneKey)
     expect(mockStoreState.clearSleepingAgentSession).toHaveBeenCalledWith(duplicateLegacyPaneKey)
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[legacyPaneKey]).toBeUndefined()
     expect(mockStoreState.sleepingAgentSessionsByPaneKey[duplicateLegacyPaneKey]).toBeUndefined()
@@ -595,5 +595,6 @@ describe('connectPanePty', () => {
       expect.objectContaining({ command: expect.stringContaining('resume') })
     )
     expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
+    expect(mockStoreState.consumeSleepingAgentSession).not.toHaveBeenCalled()
   })
 })

@@ -42,10 +42,14 @@ import {
   splitWorktreeIdForFilesystem
 } from '../../../../shared/worktree/id'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
-import type { ProjectExecutionRuntimeResolution } from '../../../../shared/project-execution-runtime'
+import type {
+  GlobalWindowsRuntimeDefault,
+  ProjectExecutionRuntimeResolution
+} from '../../../../shared/project-execution-runtime'
 import type { StartupCommandDelivery } from '../../../../shared/codex-startup-delivery'
 import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
 import { resolveLocalWindowsTerminalShellOverrideForTab } from '../../../../shared/local-windows-terminal-runtime'
+import { getWorktreeLessWindowsRuntimeDefault } from '@/lib/worktree-less-windows-runtime-default'
 import { WINDOWS_GIT_BASH_SHELL } from '../../../../shared/windows-terminal-shell'
 import type { AgentStartedTelemetry } from '../../lib/worktree-startup-payload'
 import type { AiVaultSessionTitle } from '../../../../shared/ai-vault-session-title'
@@ -362,7 +366,8 @@ function resolveCreatedTabShellOverride(
   isRemoteWorktree: boolean,
   remotePlatform: NodeJS.Platform | null,
   isWslWorktree: boolean,
-  projectRuntime: ProjectExecutionRuntimeResolution | undefined
+  projectRuntime: ProjectExecutionRuntimeResolution | undefined,
+  globalWindowsRuntimeDefault: GlobalWindowsRuntimeDefault | undefined
 ): string | undefined {
   if (isRemoteWorktree) {
     if (remotePlatform === 'win32' && isAllowedRemoteWindowsTerminalShell(explicitShellOverride)) {
@@ -374,6 +379,7 @@ function resolveCreatedTabShellOverride(
     return resolveLocalWindowsTerminalShellOverrideForTab({
       explicitShellOverride,
       defaultWindowsShell,
+      globalWindowsRuntimeDefault,
       isWslWorktree,
       projectRuntime
     })
@@ -1393,7 +1399,10 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         isWslWorktree,
         isRemoteWorktree || options?.forceHostRuntime
           ? undefined
-          : getLocalProjectExecutionRuntimeContext(s, worktreeId)
+          : getLocalProjectExecutionRuntimeContext(s, worktreeId),
+        isRemoteWorktree || options?.forceHostRuntime
+          ? undefined
+          : getWorktreeLessWindowsRuntimeDefault(s, worktreeId)
       )
       tab = {
         id,

@@ -195,6 +195,17 @@ describe('teamCardsOf', () => {
     expect(card?.model).toEqual({ label: 'Sonnet 5.5', effort: 'low', source: 'advisor' })
   })
 
+  it("carries Jev's latest decisions in the member's pane, and none where it sent none", () => {
+    const decisions = [{ id: 'd1', verdict: 'deny', gesture: 'escalated' }]
+    const pinned = { model: false, effort: false }
+    const [card] =
+      cardsOf([agent({ advisor: { model: null, effort: null, pinned, decisions } })])?.members ?? []
+    expect(card?.decisions).toEqual(decisions)
+    const [plain] =
+      cardsOf([agent({ advisor: { model: null, effort: null, pinned } })])?.members ?? []
+    expect(plain).not.toHaveProperty('decisions')
+  })
+
   it('reads the ticket from the name when the tracker has none', () => {
     const [card] = cardsOf([agent({ displayName: 'Arthur orca-1047' })])?.members ?? []
     expect(card?.ticket).toEqual({
@@ -218,10 +229,10 @@ describe('teamCardsOf', () => {
     const byKey = Object.fromEntries((rows ?? []).map((one) => [one.paneKey, one]))
     expect(byKey.a).toMatchObject({ condition: 'unreachable', status: 'risk' })
     expect(byKey.b).toMatchObject({ condition: 'asleep', status: 'risk' })
-    expect(byKey.c).toMatchObject({ condition: 'gone', status: 'attention' })
-    expect(byKey.d).toMatchObject({ condition: 'startFailed', status: 'attention' })
+    expect(byKey.c).toMatchObject({ condition: 'gone', status: 'closed' })
+    expect(byKey.d).toMatchObject({ condition: 'startFailed', status: 'failed' })
     expect(byKey.e).toMatchObject({ condition: 'limited', status: 'risk', limitResetsAt: 9 })
-    expect(byKey.f).toMatchObject({ condition: 'loggedOut', status: 'attention' })
+    expect(byKey.f).toMatchObject({ condition: 'loggedOut', status: 'failed' })
   })
 
   it('turns red for a waiting member or an open question, green only once merged', () => {

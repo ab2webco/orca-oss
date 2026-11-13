@@ -3,9 +3,8 @@ import type { EngineInterface, On } from 'claude-code'
 import type { GameLocale } from '../types'
 
 import { readFleetText, refresh, viewOf } from './fleet-sync'
-import { LEAD_SKILL } from './game-lead'
 import { gameLocale } from './game-strings'
-import { unmarkLeadStarted } from './lead-autostart'
+import { rearmLeadOnce, unmarkLeadStarted } from './lead-autostart'
 import { isLeadStarted } from './lead-started'
 
 /** The session starts after which a lead no longer sees its members; a fresh start runs `game lead`. */
@@ -83,7 +82,7 @@ export const registerLeadBrief = (on: On): void => {
     }
     if (source === 'resume') {
       // Why: a restart killed the lead's report watcher, and its rules say whether to resume members.
-      void $.command.run({ command: LEAD_SKILL, args: '' }).catch(() => undefined)
+      void rearmLeadOnce($).catch(() => undefined)
     }
     const brief = await leadBriefContextOf($, source).catch(() => undefined)
     return brief === undefined

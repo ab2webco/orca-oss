@@ -1,6 +1,7 @@
 import type { AgentStatusEntry } from '../../../shared/agent-status-types'
 import {
   findOrcaDispatchTaskMarkerIndex,
+  isOrcaDispatchStatusPrompt,
   ORCA_DISPATCH_STATUS_PREAMBLE_PREFIX,
   ORCA_DISPATCH_STATUS_TASK_MARKER
 } from '../../../shared/orca-dispatch-status-prompt'
@@ -20,10 +21,7 @@ const ORCA_DISPATCH_TASK_MARKER_SCAN_LIMIT = 32_768
 
 /** True when the live prompt is still an Orca dispatch turn (not sticky metadata alone). */
 export function isOrcaDispatchPrompt(prompt: string): boolean {
-  return (
-    prompt.trimStart().startsWith(ORCA_DISPATCH_PREAMBLE_PREFIX) ||
-    parseDispatchBriefLine(prompt) !== null
-  )
+  return isOrcaDispatchStatusPrompt(prompt) || parseDispatchBriefLine(prompt) !== null
 }
 
 /**

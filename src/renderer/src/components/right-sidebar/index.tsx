@@ -12,7 +12,8 @@ import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import {
   RIGHT_SIDEBAR_MIN_WIDTH,
   clampRightSidebarPanelWidth,
-  computeMaxRightSidebarPanelWidth
+  computeMaxRightSidebarPanelWidth,
+  rightSidebarOverlaysContent
 } from './right-sidebar-width'
 import { translate } from '@/i18n/i18n'
 import { RightSidebarPanelContent } from './right-sidebar-panel-content'
@@ -67,6 +68,16 @@ function RightSidebarInner(): React.JSX.Element {
     windowWidth,
     activityBarSideWidth
   )
+  const leftSidebarOpen = useAppStore((s) => s.sidebarOpen)
+  const leftSidebarWidth = useAppStore((s) => s.sidebarWidth)
+  // Why: when the columns cannot fit, the panel floats over the content instead of overflowing the app row.
+  const overlaysContent =
+    rightSidebarOpen &&
+    rightSidebarOverlaysContent({
+      windowWidth,
+      leftSidebarWidth: leftSidebarOpen ? leftSidebarWidth : 0,
+      rightPanelWidth: renderedRightSidebarWidth + activityBarSideWidth
+    })
   const { containerRef, onResizeStart } = useSidebarResize<HTMLDivElement>({
     isOpen: rightSidebarOpen,
     width: renderedRightSidebarWidth,
@@ -140,7 +151,9 @@ function RightSidebarInner(): React.JSX.Element {
     <div
       ref={containerRef}
       className={cn(
-        'relative flex-shrink-0 flex flex-row',
+        overlaysContent
+          ? 'absolute inset-y-0 right-0 z-30 flex flex-row shadow-lg'
+          : 'relative flex-shrink-0 flex flex-row',
         // Why: overflow-visible is needed when open so the resize handle
         // on the left edge remains interactive.  When closed (width 0),
         // switch to overflow-hidden so the activity bar icons and panel
@@ -148,6 +161,7 @@ function RightSidebarInner(): React.JSX.Element {
         // stays mounted for performance — see App.tsx).
         rightSidebarOpen ? 'overflow-visible' : 'overflow-hidden'
       )}
+      data-right-sidebar-overlay={overlaysContent ? '' : undefined}
     >
       {/* Panel content area */}
       <div
@@ -190,6 +204,7 @@ function RightSidebarInner(): React.JSX.Element {
 
         {/* Resize handle on LEFT side */}
         <div
+          data-right-sidebar-resize=""
           className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-ring/20 active:bg-ring/30 transition-colors z-10"
           onMouseDown={onResizeStart}
         />

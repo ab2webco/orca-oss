@@ -155,6 +155,9 @@ let wslDistroListRetryAfterMs = 0
 let wslDistroListEmptyStreak = 0
 let wslDistroProbeSequence = 0
 let wslDistroCacheSequence = 0
+let wslDistroCachedAtMs = 0
+// Why: only the async (Settings) path re-probes, so a distro installed mid-session appears without a restart.
+const WSL_DISTRO_ASYNC_REFRESH_MS = 60_000
 function armWslDistroListRetry(): void {
   const now = Date.now()
   // Concurrent completions belong to the retry window already armed by the first result.
@@ -189,6 +192,7 @@ function cacheWslDistroList(rawDistros: string[], probeSequence: number): string
   }
   wslDistroCacheSequence = probeSequence
   wslDistroCache = userDistros
+  wslDistroCachedAtMs = Date.now()
   if (wslDistroCache.length === 0) {
     armWslDistroListRetry()
   }
@@ -230,8 +234,16 @@ export function listWslDistros(): string[] {
   }
 }
 
+function isKnownWslDistroListFresh(): boolean {
+  return (
+    wslDistroCache === null ||
+    wslDistroCache.length === 0 ||
+    Date.now() - wslDistroCachedAtMs < WSL_DISTRO_ASYNC_REFRESH_MS
+  )
+}
+
 export async function listWslDistrosAsync(): Promise<string[]> {
-  if (shouldReuseCachedWslDistros()) {
+  if (shouldReuseCachedWslDistros() && isKnownWslDistroListFresh()) {
     return wslDistroCache ?? []
   }
 
@@ -244,6 +256,10 @@ export async function listWslDistrosAsync(): Promise<string[]> {
     return wslDistroCache ?? []
   }
 
+  if (wslDistroCache !== null && wslDistroCache.length > 0) {
+    // Why: stamp at probe start so concurrent and empty-answer re-probes wait the full window.
+    wslDistroCachedAtMs = Date.now()
+  }
   try {
     const probeSequence = ++wslDistroProbeSequence
     const output = await execFileUtf8('wsl.exe', ['--list', '--quiet'])
@@ -338,6 +354,7 @@ export function _resetWslCachesForTests(): void {
   wslDistroListEmptyStreak = 0
   wslDistroProbeSequence = 0
   wslDistroCacheSequence = 0
+  wslDistroCachedAtMs = 0
   _resetWslAvailabilityCacheForTests()
 }
 

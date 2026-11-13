@@ -52,12 +52,18 @@ export const leadResumeArgsOf = (
   return resumeArgs.trim() || null
 }
 
+// Why: native Claude runs as `~/.local/share/claude/versions/<version>`, which the kernel names the pane's foreground.
+const NATIVE_CLAUDE_BINARY = /^\d+\.\d+\.\d+$/
+
 /** What a reopened lead's pane runs. Why `starting`: a new pane shows `login`, then its shell, then Claude. */
 export const resumedPaneStateOf = (foreground: string | null): 'running' | 'shell' | 'starting' => {
   if (foreground === null) {
     return 'starting'
   }
-  if (recognizeAgentProcess(foreground)?.agent === 'claude') {
+  if (
+    recognizeAgentProcess(foreground)?.agent === 'claude' ||
+    NATIVE_CLAUDE_BINARY.test(foreground)
+  ) {
     return 'running'
   }
   return isShellProcess(foreground) ? 'shell' : 'starting'

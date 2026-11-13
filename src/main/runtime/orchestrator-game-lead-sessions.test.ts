@@ -221,8 +221,15 @@ describe('resumedPaneStateOf', () => {
 
   it('reads what a pane shows while it starts as neither', () => {
     expect(resumedPaneStateOf('login')).toBe('starting')
-    expect(resumedPaneStateOf('2.1.302')).toBe('starting')
+    expect(resumedPaneStateOf('2.1')).toBe('starting')
     expect(resumedPaneStateOf(null)).toBe('starting')
+  })
+
+  // Why (ORCA-1171): native Claude runs as its versioned binary, so the kernel names it `2.1.322`
+  // until a process scan says claude; under load that scan can miss a whole reopen.
+  it('counts a native Claude named by its version as running', () => {
+    expect(resumedPaneStateOf('2.1.322')).toBe('running')
+    expect(leadPaneStateOf('2.1.322')).toBe('running')
   })
 })
 

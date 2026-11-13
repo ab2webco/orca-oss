@@ -7,7 +7,7 @@ import { resolveClaudeCommand } from '../codex-cli/command'
 import { getPreferredSystemLocale } from '../i18n/main-i18n'
 import { resolveClaudeAgentTeamsShimBin } from '../runtime/claude-agent-teams-shim-env'
 import { readWorktreeOrcaYaml } from '../worktree-orca-yaml'
-import { parseClaudeCodeVersion } from './hook-event-versions'
+import { createClaudeCodeVersionDetector } from './claude-code-version-detector'
 import {
   buildOrchestratorGameLaunch,
   orchestratorGameCliPathOf,
@@ -24,28 +24,16 @@ import type { GlobalSettings } from '../../shared/types'
 import { shownOrchestratorGameModeOf } from '../../shared/orchestrator-game-view'
 
 const execFileAsync = promisify(execFile)
-const VERSION_CACHE_MS = 10 * 60_000
-
-let cachedVersion: { value: string | null; at: number } | null = null
-
-// Why: async and cached so an Agent Teams launch never blocks main on `claude --version`.
-export async function detectClaudeCodeVersionCached(): Promise<string | null> {
-  if (cachedVersion && Date.now() - cachedVersion.at < VERSION_CACHE_MS) {
-    return cachedVersion.value
-  }
-  let value: string | null = null
-  try {
-    const { stdout } = await execFileAsync(resolveClaudeCommand(), ['--version'], {
-      encoding: 'utf-8',
-      timeout: 5000
-    })
-    value = parseClaudeCodeVersion(stdout)
-  } catch {
-    value = null
-  }
-  cachedVersion = { value, at: Date.now() }
-  return value
-}
+// Why async: an Agent Teams launch never blocks main on `claude --version`.
+export const detectClaudeCodeVersionCached = createClaudeCodeVersionDetector({
+  run: async () =>
+    (
+      await execFileAsync(resolveClaudeCommand(), ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5000
+      })
+    ).stdout
+})
 
 let installedPlugin: {
   sourceDir: string

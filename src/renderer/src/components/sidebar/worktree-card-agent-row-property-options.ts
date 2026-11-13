@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import type { WorktreeCardPropertyOption } from './sidebar-workspace-option-items'
+import type { WorktreeCardPropertyOption } from './worktree-card-property-options'
 
 // Why off by default: the agent row shows the live action; the hover card holds these (ORCA-1074).
 export const AGENT_ROW_PROPERTY_OPTIONS: WorktreeCardPropertyOption[] = [

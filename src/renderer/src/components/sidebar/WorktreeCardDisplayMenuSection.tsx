@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   DropdownMenuCheckboxItem,
@@ -16,11 +16,36 @@ import type {
 } from '../../../../shared/ui-chrome-types'
 import {
   AGENT_ACTIVITY_DISPLAY_OPTIONS,
-  CARD_LAYOUT_OPTIONS,
-  getWorktreeCardPropertyOptions
+  CARD_LAYOUT_OPTIONS
 } from './sidebar-workspace-option-items'
+import {
+  getWorktreeCardPropertyOptions,
+  type WorktreeCardPropertyGroup
+} from './worktree-card-property-options'
 import { PROPERTY_OPTIONS } from './worktree-card-display-property-options'
+import { submenuFitSideOffset } from './submenu-fit-offset'
 import { translate } from '@/i18n/i18n'
+
+function cardDisplayGroupLabel(group: WorktreeCardPropertyGroup): string {
+  if (group === 'work') {
+    return translate(
+      'auto.components.sidebar.SidebarWorkspaceOptionsMenu.cardDisplayGroup.work',
+      'Work'
+    )
+  }
+  return group === 'agent'
+    ? translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.cardDisplayGroup.agent',
+        'Agent'
+      )
+    : translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.cardDisplayGroup.source',
+        'Source'
+      )
+}
+
+// Why: matches the submenu's w-56, the width the fit offset reserves on screen.
+const CARD_DISPLAY_SUBMENU_WIDTH_PX = 224
 
 type WorktreeCardDisplayMenuSectionProps = {
   preserveWorkspaceBoardOpen: boolean
@@ -57,11 +82,26 @@ export function WorktreeCardDisplayMenuSection({
     },
     [setWorktreeCardProperties, worktreeCardProperties]
   )
+  const cardDisplayTriggerRef = useRef<HTMLDivElement>(null)
+  const [cardDisplaySideOffset, setCardDisplaySideOffset] = useState(0)
 
   if (newCardStyle) {
     return (
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
+      <DropdownMenuSub
+        onOpenChange={(open) => {
+          const trigger = cardDisplayTriggerRef.current
+          if (open && trigger) {
+            setCardDisplaySideOffset(
+              submenuFitSideOffset({
+                triggerRight: trigger.getBoundingClientRect().right,
+                submenuWidth: CARD_DISPLAY_SUBMENU_WIDTH_PX,
+                viewportWidth: window.innerWidth
+              })
+            )
+          }
+        }}
+      >
+        <DropdownMenuSubTrigger ref={cardDisplayTriggerRef}>
           <span className="flex flex-1 items-center justify-between gap-3">
             {translate(
               'auto.components.sidebar.SidebarWorkspaceOptionsMenu.newCardDisplay.title',
@@ -71,22 +111,37 @@ export function WorktreeCardDisplayMenuSection({
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent
           className="w-56"
+          sideOffset={cardDisplaySideOffset}
           data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
         >
-          {worktreeCardPropertyOptions.map((opt) => (
-            <DropdownMenuCheckboxItem
-              key={opt.id}
-              checked={opt.properties.every((property) =>
-                worktreeCardProperties.includes(property)
-              )}
-              onCheckedChange={(checked) =>
-                handleWorktreeCardPropertyChange(opt.properties, checked === true)
-              }
-              onSelect={(e) => e.preventDefault()}
-            >
-              {opt.label}
-            </DropdownMenuCheckboxItem>
-          ))}
+          {worktreeCardPropertyOptions.map((opt, index) => {
+            const previous = worktreeCardPropertyOptions[index - 1]
+            const startsGroup = opt.group !== undefined && opt.group !== previous?.group
+            return (
+              <React.Fragment key={opt.id}>
+                {startsGroup && index > 0 ? <DropdownMenuSeparator /> : null}
+                {startsGroup && opt.group ? (
+                  <DropdownMenuLabel
+                    data-card-display-group={opt.group}
+                    className="text-xs font-normal text-muted-foreground"
+                  >
+                    {cardDisplayGroupLabel(opt.group)}
+                  </DropdownMenuLabel>
+                ) : null}
+                <DropdownMenuCheckboxItem
+                  checked={opt.properties.every((property) =>
+                    worktreeCardProperties.includes(property)
+                  )}
+                  onCheckedChange={(checked) =>
+                    handleWorktreeCardPropertyChange(opt.properties, checked === true)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {opt.label}
+                </DropdownMenuCheckboxItem>
+              </React.Fragment>
+            )
+          })}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
     )

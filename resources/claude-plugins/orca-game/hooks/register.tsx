@@ -3,21 +3,19 @@ import type { Register } from 'claude-code'
 import { registerActionCommands } from './action-commands'
 import { dropAdvisorCall } from './advisor-state'
 import { actOutGate, registerAdvisor } from './advisor-sync'
-import { POLL_EVERY_MS, refreshSoon } from './fleet-sync'
+import { POLL_EVERY_MS, refreshSoon, viewOf } from './fleet-sync'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
-import { leadAutostart } from './lead-autostart'
+import { markLeadStarted, startOrRearmLead, unmarkLeadStarted } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
 import { registerTextLayer } from './text-layer'
 import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
 import { isHumanOrigin } from './quest-policy'
-import { markLeadStarted, unmarkLeadStarted } from './lead-autostart'
 import { isSubagentTool, isTeammateSpawnOf, leadSubagentDenyOf } from './lead-subagent-guard'
 import { isGameLeadCommand, isLeadStarted, isMadeLeadOutput } from './lead-started'
 import { noteSubagentCall, noteSubagentDone, runningLeadSubagents } from './lead-subagents'
-import { viewOf } from './fleet-sync'
 import { questLeadActive, questToolCall, questTurnComplete } from './quest-turns'
 import { bumpLive, liveAsk, liveTurnEnd, liveTurnStart } from './live-turn'
 
@@ -41,7 +39,7 @@ export const register: Register = (on) => {
     })
     void watchFleet($, () => void refreshSoon($).catch(() => undefined)).catch(() => undefined)
     // Why not awaited: the skill runs once the session is idle, and session.start must not wait on it.
-    void leadAutostart($).catch(() => undefined)
+    void startOrRearmLead($).catch(() => undefined)
     return started
   })
 

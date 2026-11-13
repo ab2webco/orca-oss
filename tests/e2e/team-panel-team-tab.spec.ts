@@ -62,9 +62,9 @@ async function wrapPanelReads(app: ElectronApplication): Promise<void> {
     ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
       if (args.method === 'game.state') {
         rig.__teamReads = (rig.__teamReads ?? 0) + 1
-        if (rig.__teamReadFails) {
-          throw new Error('host did not answer')
-        }
+      }
+      if (args.method === 'game.state' && rig.__teamReadFails) {
+        throw new Error('host did not answer')
       }
       return real(event, args)
     })
@@ -75,6 +75,10 @@ const failPanelReads = (app: ElectronApplication, fails: boolean): Promise<void>
   app.evaluate((_, next) => {
     ;(globalThis as ReadRig).__teamReadFails = next
   }, fails)
+
+/** How many game.state reads the panel has made, failed or not. */
+const panelReads = (app: ElectronApplication): Promise<number> =>
+  app.evaluate(() => (globalThis as ReadRig).__teamReads ?? 0)
 
 /** Every language, width and theme, after checking the screen means what the name says. */
 async function captureEvery(
@@ -249,13 +253,17 @@ test('the Team tab shows the live lead and its members from the lead game state'
       await expect(panel).not.toContainText(COPY[language].noTeam)
     }
     await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
-    // Why click while reads still fail: once they answer, the panel's own poll can recover and
-    // take the button away before the click lands (CI run 42985493201).
-    const readsSoFar = (): Promise<number> =>
-      electronApp.evaluate(() => (globalThis as ReadRig).__teamReads ?? 0)
-    const readsBeforeRetry = await readsSoFar()
+    // Why Retry while reads still fail: the panel also re-reads on its 20 s poll and on main's change
+    // events, so once reads succeed it recovers on its own; the read within a second is Retry's (ORCA-1184).
+    const readsBefore = await panelReads(electronApp)
     await panel.getByRole('button', { name: COPY.en.retry }).click()
-    await expect.poll(readsSoFar).toBeGreaterThan(readsBeforeRetry)
+    await expect
+      .poll(() => panelReads(electronApp), {
+        timeout: 1_000,
+        message: 'Retry made no game.state read'
+      })
+      .toBe(readsBefore + 1)
+    await expect(panel).toContainText(COPY.en.readError)
     await failPanelReads(electronApp, false)
 
     await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
@@ -294,9 +302,9 @@ test('the Team tab shows the live lead and its members from the lead game state'
         await expect(cards).toHaveCount(2)
       }
     )
-    const readsBeforeSecondRetry = await readsSoFar()
+    const readsBeforeSecondRetry = await panelReads(electronApp)
     await panel.getByRole('button', { name: COPY.en.retry }).click()
-    await expect.poll(readsSoFar).toBeGreaterThan(readsBeforeSecondRetry)
+    await expect.poll(() => panelReads(electronApp)).toBeGreaterThan(readsBeforeSecondRetry)
     await failPanelReads(electronApp, false)
     // Why retry until clear: the next poll can beat the click, and clears the error just the same.
     await expect(async () => {

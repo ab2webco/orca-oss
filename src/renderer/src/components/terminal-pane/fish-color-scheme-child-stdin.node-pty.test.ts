@@ -395,6 +395,7 @@ describe('fish never receives a color-scheme report it did not query (#9993)', (
       getAgentLaunchConfigForStatusEntry: vi.fn(),
       getAgentLaunchConfigForStatusMetadata: vi.fn(),
       clearSleepingAgentSession: vi.fn(),
+      consumeSleepingAgentSession: vi.fn(),
       registerAgentLaunchConfig: vi.fn(),
       clearAgentLaunchConfig: vi.fn(),
       markWorktreeUnread: vi.fn(),

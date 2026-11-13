@@ -8602,10 +8602,6 @@ describe('Store', () => {
       'jira-issue',
       'plane-issue',
       'pr',
-      'automation',
-      'cli',
-      'comment',
-      'ports',
       'inline-agents'
     ])
     expect(store.getUI().worktreeCardProperties).not.toContain('branch')

@@ -549,6 +549,9 @@ describe('remote hidden-output restore abandonment (issue2-hidden-output-skip)',
       clearSleepingAgentSession: vi.fn((paneKey: string) => {
         delete (mockStoreState.sleepingAgentSessionsByPaneKey as Record<string, unknown>)[paneKey]
       }),
+      consumeSleepingAgentSession: vi.fn((paneKey: string) => {
+        delete (mockStoreState.sleepingAgentSessionsByPaneKey as Record<string, unknown>)[paneKey]
+      }),
       registerAgentLaunchConfig: vi.fn(),
       clearAgentLaunchConfig: vi.fn(),
       markWorktreeUnread: vi.fn(),

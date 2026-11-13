@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -7,8 +7,10 @@ import { translate } from '@/i18n/i18n'
 import type {
   TeamPanelGameModel,
   TeamPanelModel,
+  TeamStatus,
   TeamTabId
 } from '../../../../shared/team-panel-model-types'
+import { TeamActivityFilterContext, teamActivityRowsOf } from './team-activity-filter'
 import { TeamReadError, TeamReadNotice, TeamReadRetryContext } from './team-panel-read-error'
 import { TeamSessionCount } from './team-panel-session-count'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
@@ -176,6 +178,23 @@ export function TeamPanelView({
   const { section, retry } = source
   const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
+  // Why a scope, not an effect: the filter belongs to the list in view, so another tab visit or
+  // a team view reads as unfiltered at once, with no frame of the stale filter.
+  const tabVisit = useTeamPanelTabStore((s) => s.visit)
+  const scope = `${tabVisit}:${model?.kind ?? ''}`
+  const [picked, setPicked] = useState<{ status: TeamStatus; scope: string } | null>(null)
+  const soloRows = model?.kind === 'solo' ? model.rows : null
+  const candidate = picked?.scope === scope ? picked.status : null
+  // Why: a live update can leave a filter with no session; the list then shows every one again.
+  const activityFilter =
+    candidate && soloRows && teamActivityRowsOf(soloRows, candidate).length > 0 ? candidate : null
+  const filterState = useMemo(
+    () => ({
+      filter: activityFilter,
+      setFilter: (status: TeamStatus | null) => setPicked(status ? { status, scope } : null)
+    }),
+    [activityFilter, scope]
+  )
   const body = (
     <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
@@ -197,24 +216,26 @@ export function TeamPanelView({
     </>
   )
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col"
-      data-testid="team-panel"
-      data-team-panel-state={model?.kind ?? section.kind}
-    >
-      {model?.kind === 'team' && look === 'game' ? (
-        <TeamPanelScene model={model} style={sceneStyle}>
-          {body}
-        </TeamPanelScene>
-      ) : (
-        <>
-          {model?.kind === 'team' && look === 'display' ? (
-            <TeamDisplayCarousel model={model} />
-          ) : null}
-          {body}
-        </>
-      )}
-      {model?.kind === 'team' && dock ? dock(model) : null}
-    </div>
+    <TeamActivityFilterContext.Provider value={filterState}>
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        data-testid="team-panel"
+        data-team-panel-state={model?.kind ?? section.kind}
+      >
+        {model?.kind === 'team' && look === 'game' ? (
+          <TeamPanelScene model={model} style={sceneStyle}>
+            {body}
+          </TeamPanelScene>
+        ) : (
+          <>
+            {model?.kind === 'team' && look === 'display' ? (
+              <TeamDisplayCarousel model={model} />
+            ) : null}
+            {body}
+          </>
+        )}
+        {model?.kind === 'team' && dock ? dock(model) : null}
+      </div>
+    </TeamActivityFilterContext.Provider>
   )
 }

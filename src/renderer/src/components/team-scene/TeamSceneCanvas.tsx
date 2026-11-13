@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
 import {
   advisorLineShown,
@@ -9,6 +9,10 @@ import {
   stepTeamScene,
   type TeamSceneWorld
 } from '../../../../shared/team-scene/team-scene-director'
+import {
+  drainTeamSceneBoarded,
+  teamSceneGuestAttends
+} from '../../../../shared/team-scene/team-scene-elevator'
 import { teamSceneLeadAttends } from '../../../../shared/team-scene/team-scene-lead-rounds'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
@@ -25,16 +29,35 @@ type Props = {
   leadLine: string | null
   /** Which speeches the last layout left without a bubble. */
   onUnplaced?: (keys: string[]) => void
+  /** The lead or advisor stepped into the building's elevator. */
+  onBoarded?: (rider: string) => void
+  /** Rows of the stage a building floor hides above and below; only the canvas is cut, never a bubble. */
+  crop?: { top: number; bottom: number }
+  /** Where the stage's bubbles may start: a top floor keeps them under its own cropped top. */
+  visibleTop?: number
+  /** Told each asker's tag-and-mark box, so a floor below keeps its bubbles off them. */
+  onAskers?: (boxes: TeamSceneRect[]) => void
+  /** Boxes from outside the stage its bubbles must not cover, as the floor above's askers. */
+  extraObstacles?: readonly TeamSceneRect[]
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
 const ADVISOR_BUBBLE_MS = 6000
+const NO_RECTS: readonly TeamSceneRect[] = []
+const CAPPED_EDGE_FADE =
+  'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
 
-type TeamSceneAsker = { key: string; name: string; x: number; top: number }
+/** `bottom`: where its alert mark ends, below the tag at `top`. */
+type TeamSceneAsker = { key: string; name: string; x: number; top: number; bottom: number }
 
 // Why: V28 names the asker in a tag above its alert mark, which sits about 20px over the head.
 const ASKER_LIFT = 38
+// From a moved mark's centre: its 7px radius, a 2px gap, then the 16px tag.
+const MARK_LIFT = 25
 const ASKER_EDGE = 32
+// Half a tag of its usual width, for a box measured before the tag has laid out; the mark's radius.
+const TAG_HALF = 28
+const MARK_R = 9
 // How far a speaker moves before its bubble follows.
 const ANCHOR_STEP_PX = 4
 
@@ -42,7 +65,12 @@ export function TeamSceneCanvas({
   input,
   painter,
   leadLine,
-  onUnplaced
+  onUnplaced,
+  onBoarded,
+  crop,
+  visibleTop,
+  onAskers,
+  extraObstacles = NO_RECTS
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
@@ -58,6 +86,15 @@ export function TeamSceneCanvas({
   const speakersKeyRef = useRef('')
   const tagRefs = useRef(new Map<string, HTMLSpanElement>())
   const [tags, setTags] = useState<TeamSceneRect[]>([])
+  const askersKeyRef = useRef('')
+  const onAskersRef = useRef(onAskers)
+  const onBoardedRef = useRef(onBoarded)
+  // Why in a layout effect: render stays pure, and the latest callbacks are in place before paint.
+  useLayoutEffect(() => {
+    onAskersRef.current = onAskers
+    onBoardedRef.current = onBoarded
+  })
+  const obstacles = useMemo(() => [...tags, ...extraObstacles], [tags, extraObstacles])
 
   const paint = useCallback(
     (dt: number, elapsed = dt) => {
@@ -74,6 +111,12 @@ export function TeamSceneCanvas({
         canvas.height = Math.round(height * ratio)
       }
       stepTeamScene(world, dt, { width, elapsed })
+      // Why a fade only when capped: the stage then shows its art whole, and the art's own edge
+      // would cut a prop in half; under the cap the art is a central crop and needs none.
+      const room = canvas.parentElement?.parentElement?.clientWidth ?? width
+      const capped = painter.maxWidth !== undefined && room > painter.maxWidth
+      canvas.style.setProperty('mask-image', capped ? CAPPED_EDGE_FADE : '')
+      drainTeamSceneBoarded(world).forEach((rider) => onBoardedRef.current?.(rider))
       const g = canvas.getContext('2d')
       if (!g) {
         return
@@ -88,13 +131,19 @@ export function TeamSceneCanvas({
       )
       const askers = actors
         .filter((a) => a.role === 'member' && a.emote === 'alert')
-        .map((a) => ({
-          key: a.key,
-          name: a.name,
-          x: Math.round(a.x * width),
-          top: Math.round(painter.headTop(a.depth, height) - ASKER_LIFT)
-        }))
-      const leadAttends = teamSceneLeadAttends(world)
+        .map((a) => {
+          const mark = painter.emoteAt?.(a, { width, height, stations: world.stations })
+          return {
+            key: a.key,
+            name: a.name,
+            x: Math.round(mark ? mark.x : a.x * width),
+            top: Math.round(
+              mark ? mark.y - MARK_LIFT : painter.headTop(a.depth, height) - ASKER_LIFT
+            ),
+            bottom: Math.round(mark ? mark.y + MARK_R : painter.headTop(a.depth, height))
+          }
+        })
+      const leadAttends = teamSceneLeadAttends(world) || teamSceneGuestAttends(world)
       // Why keyed, and by a few px: the overlay re-renders only when a line, size or speaker moves,
       // so a walking lead's bubble follows it without a render every frame.
       const key = `${width}|${advisor}|${leadAttends}|${[...anchors]
@@ -116,7 +165,8 @@ export function TeamSceneCanvas({
         overflow: world.overflow,
         stations: world.stations,
         sites: world.sites,
-        trophies: world.trophies
+        trophies: world.trophies,
+        stopped: world.stopped
       })
     },
     [painter]
@@ -124,7 +174,7 @@ export function TeamSceneCanvas({
 
   useEffect(() => {
     worldRef.current ??= createTeamSceneWorld()
-    applyTeamSceneInput(worldRef.current, input)
+    applyTeamSceneInput(worldRef.current, input, painter.layout)
     if (!reducedMotion) {
       return
     }
@@ -140,7 +190,7 @@ export function TeamSceneCanvas({
       paint(0)
     }, ADVISOR_BUBBLE_MS)
     return () => window.clearTimeout(timer)
-  }, [input, reducedMotion, paint])
+  }, [input, reducedMotion, paint, painter.layout])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -200,6 +250,17 @@ export function TeamSceneCanvas({
         : []
     })
     setTags((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next))
+    const boxes = speakers.askers.map((asker) => {
+      const tag = next.find((one) => one.left <= asker.x && asker.x <= one.left + one.width)
+      const left = tag ? tag.left : asker.x - TAG_HALF
+      const width = tag ? tag.width : 2 * TAG_HALF
+      return { left, top: asker.top, width, height: Math.max(0, asker.bottom - asker.top) }
+    })
+    const key = JSON.stringify(boxes)
+    if (key !== askersKeyRef.current) {
+      askersKeyRef.current = key
+      onAskersRef.current?.(boxes)
+    }
   }, [speakers])
 
   const speeches: TeamSceneSpeech[] = []
@@ -226,7 +287,8 @@ export function TeamSceneCanvas({
 
   return (
     <div
-      className="relative"
+      className="relative mx-auto"
+      style={painter.maxWidth ? { maxWidth: painter.maxWidth } : undefined}
       // Why exposed: specs crop the lead's pixels, and on its rounds it leaves its spot.
       data-scene-lead-x={
         leadAnchor && speakers.width > 0 ? (leadAnchor.x / speakers.width).toFixed(2) : undefined
@@ -237,7 +299,10 @@ export function TeamSceneCanvas({
         role="img"
         aria-label={teamSceneLabel()}
         className="block w-full"
-        style={{ height: painter.height }}
+        style={{
+          height: painter.height,
+          ...(crop ? { clipPath: `inset(${crop.top}px 0px ${crop.bottom}px)` } : {})
+        }}
       />
       {speakers.askers.map((asker) => (
         <span
@@ -265,8 +330,9 @@ export function TeamSceneCanvas({
         width={speakers.width}
         height={painter.height}
         cloudPixel={painter.cloudPixel}
-        obstacles={tags}
+        obstacles={obstacles}
         onUnplaced={onUnplaced}
+        visibleTop={visibleTop}
       />
     </div>
   )

@@ -28,8 +28,11 @@ const member = (key: string, activity: TeamSceneActivity = 'working'): TeamScene
   mergedPr: null,
   site: { stage: 0, broken: false }
 })
-const input = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
-  lead: { key: 'lead', name: 'Lead', characterKey: null, activity: 'working' },
+const input = (
+  members: TeamSceneMemberInput[],
+  leadActivity: TeamSceneActivity = 'working'
+): TeamSceneInput => ({
+  lead: { key: 'lead', name: 'Lead', characterKey: null, activity: leadActivity },
   advisor: null,
   members
 })
@@ -65,6 +68,29 @@ function scene(members: TeamSceneMemberInput[]): TeamSceneWorld {
 }
 
 describe('team scene lead rounds', () => {
+  it('stands in the gap beside a member, never on the next seat of a long row', () => {
+    const world = createTeamSceneWorld()
+    const keys = ['a', 'b', 'c', 'd', 'e']
+    applyTeamSceneInput(world, input(keys.map((k) => member(k))), {
+      rowSize: 5,
+      workSeated: true
+    })
+    const seats = world.stations.map((s) => s.x)
+    const gap = Math.min(...seats.slice(1).map((x, i) => x - seats[i]!))
+    let visits = 0
+    let closest = Infinity
+    for (let t = 0; t < 40; t += DT) {
+      stepTeamScene(world, DT, { width: WIDTH })
+      if (world.rounds.stage === 'atMember') {
+        visits += 1
+        const x = world.bodies.get('lead')!.x
+        closest = Math.min(closest, ...seats.map((s) => Math.abs(s - x)))
+      }
+    }
+    expect(visits).toBeGreaterThan(0)
+    expect(closest).toBeGreaterThanOrEqual(gap / 2 - 0.001)
+  })
+
   it('walks to a working member, hands it work, and walks back', () => {
     const world = scene([member('a')])
     const home = actor(world, 'lead').x
@@ -149,6 +175,45 @@ describe('team scene lead rounds', () => {
     const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
     expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
     expect(nearB()).toBe(true)
+  })
+
+  // Why (owner, #1167): the lead travels to whoever needs you even when it is not working itself.
+  it('a lead that is not working hands nothing, yet still goes to a member who needs you', () => {
+    for (const activity of ['resting', 'done', 'needsYou'] as const) {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')], activity))
+      const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
+      expect(handsTo(run(world, 20, () => nearB() && !leadWalking(world))), activity).toEqual([])
+      expect(nearB(), activity).toBe(true)
+      expect(actor(world, 'lead').pose).not.toBe('give')
+    }
+  })
+
+  it('a lead that cannot work stays at its spot, as its card says', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')], 'blocked'))
+    const home = actor(world, 'lead').x
+    expect(handsTo(run(world, 20))).toEqual([])
+    expect(actor(world, 'lead').x).toBe(home)
+  })
+
+  it('a lead that is not working stays at its spot when nobody needs you', () => {
+    for (const activity of ['resting', 'done'] as const) {
+      const world = createTeamSceneWorld()
+      applyTeamSceneInput(world, input([member('a'), member('b')], activity))
+      const home = actor(world, 'lead').x
+      expect(handsTo(run(world, 20)), activity).toEqual([])
+      expect(actor(world, 'lead').x, activity).toBe(home)
+    }
+  })
+
+  it('walks back home when the lead stops working mid-round', () => {
+    const world = scene([member('a')])
+    const home = actor(world, 'lead').x
+    run(world, 6, () => leadWalking(world))
+    applyTeamSceneInput(world, input([member('a')], 'resting'))
+    expect(handsTo(run(world, 15))).toEqual([])
+    expect(actor(world, 'lead').x).toBe(home)
   })
 
   it('reduced motion settles the lead at home', () => {
