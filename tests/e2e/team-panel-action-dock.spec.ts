@@ -209,14 +209,12 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
       terminal: lead,
@@ -317,10 +315,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       ['en', 'dark'],
       ['es', 'light']
     ] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       await setTheme(orcaPage, theme)
       await expect(chips.first()).toHaveText(language === 'en' ? 'Push2' : 'Reactivar2')
       await expect(chips.first()).toHaveAccessibleName(
@@ -447,7 +442,7 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await expect(chips).toHaveCount(3)
 
     // The lead's own Stop hook carries the reply the dock shows: lastAssistantMessage reaches it.
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     await setTheme(orcaPage, 'dark')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     const release = chips.filter({ hasText: 'Release' })

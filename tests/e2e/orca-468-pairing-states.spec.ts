@@ -1,6 +1,7 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 // Screenshot rig for ORCA-468. Delete once the images are read.
 const WIDTHS = [1440, 768, 390, 320] as const
@@ -64,11 +65,11 @@ async function resizeWindow(electronApp: ElectronApplication, width: number): Pr
 }
 
 async function openPairingStep(page: Page, state: PairingState): Promise<void> {
-  await page.evaluate(async (asWebClient: boolean) => {
-    await window.__store!.getState().updateSettings({
-      mobilePairingConnectionMode: 'local-only',
-      mobilePairingCustomAddress: null
-    })
+  await writeSettings(page, {
+    mobilePairingConnectionMode: 'local-only',
+    mobilePairingCustomAddress: null
+  })
+  await page.evaluate((asWebClient: boolean) => {
     // The web client's runtime IS the machine being paired, so that is the surface where an
     // older host turns the wizard into a dead end.
     ;(window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = asWebClient
@@ -89,9 +90,7 @@ async function capture(
   state: PairingState
 ): Promise<void> {
   for (const theme of THEMES) {
-    await page.evaluate(async (next) => {
-      await window.__store!.getState().updateSettings({ theme: next })
-    }, theme)
+    await writeSettings(page, { theme })
     for (const width of WIDTHS) {
       await resizeWindow(electronApp, width)
       await page.waitForTimeout(400)

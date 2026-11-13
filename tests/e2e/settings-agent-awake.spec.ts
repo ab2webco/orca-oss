@@ -4,6 +4,7 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import type { GlobalSettings } from '../../src/shared/global-settings-types'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { writeSettings } from './helpers/settings-write'
 
 type AwakeProbeSnapshot = {
   starts: { type: string; id: number }[]
@@ -16,12 +17,7 @@ async function getSettings(page: Page): Promise<GlobalSettings> {
 }
 
 async function setKeepAwake(page: Page, enabled: boolean): Promise<void> {
-  await page.evaluate(async (enabled) => {
-    const nextSettings = await window.api.settings.set({
-      keepComputerAwakeWhileAgentsRun: enabled
-    })
-    window.__store?.setState({ settings: nextSettings as GlobalSettings })
-  }, enabled)
+  await writeSettings(page, { keepComputerAwakeWhileAgentsRun: enabled })
 }
 
 async function openSettings(page: Page): Promise<void> {

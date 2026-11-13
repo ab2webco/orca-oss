@@ -17,6 +17,7 @@ import {
   waitForActivePanePtyId
 } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: one capture per width and theme outruns the CI budget; ORCA_CAPTURE_EVIDENCE=1 saves them.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
@@ -235,9 +236,8 @@ test('the default button covers no Settings switch or account action at every wi
   await waitForSessionReady(orcaPage)
   await orcaPage.evaluate(async () => {
     await window.api.ui.set({ starNagCompleted: true })
-    const settings = await window.api.settings.set({ uiLanguage: 'en' })
-    window.__store?.setState({ settings })
   })
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await stubAccounts(electronApp)
   // A fresh profile carries the button in the status bar, the 24 px row at the window's foot.
   const inStatusBar = await orcaPage.evaluate(() => {
@@ -320,9 +320,8 @@ test("the default button covers no terminal row nor a Team card's meta at any wi
   const ptyId = await waitForActivePanePtyId(orcaPage)
   await orcaPage.evaluate(async () => {
     await window.api.ui.set({ starNagCompleted: true })
-    const settings = await window.api.settings.set({ uiLanguage: 'en' })
-    window.__store?.setState({ settings })
   })
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
 
   // Why a drawn line: Claude Code's status line sits in the pane's last rows, where the button was.
   // Why the sidebar shut: open, it is what sits under the button, not the pane.

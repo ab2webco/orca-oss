@@ -13,10 +13,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 async function setLanguage(page: Page, uiLanguage: 'en' | 'es'): Promise<void> {
-  await page.evaluate(
-    (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-    uiLanguage
-  )
+  await writeSettings(page, { uiLanguage })
 }
 
 const COPY = {

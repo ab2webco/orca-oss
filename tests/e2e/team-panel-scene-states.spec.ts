@@ -176,14 +176,12 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await client.call('terminal.send', {
       terminal: lead,
       text: 'node -e "setInterval(() => {}, 1e9)"',
@@ -285,13 +283,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     // its spot; with a member waiting it walks to that member on its rounds (ORCA-1150).
     const capture = async (round: Partial<Record<'lead' | 'member', string>>): Promise<void> => {
       for (const style of STYLES) {
-        await orcaPage.evaluate(
-          (next) =>
-            window
-              .__store!.getState()
-              .updateSettings({ orchestratorGame: { panel: { style: next } } }),
-          style
-        )
+        await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
         const scene = panel.locator(`[data-team-scene="${style}"]`)
         await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
           timeout: 30_000

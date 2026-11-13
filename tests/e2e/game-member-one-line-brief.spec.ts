@@ -8,6 +8,7 @@ import { memberDispatchOf, memberWorkspaceOf } from './helpers/game-member-works
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 // A launched member is typed one line naming its brief, and acts on the file alone (ORCA-757).
 
@@ -20,12 +21,10 @@ test('a launched member reads its one-line brief and sends the start heartbeat f
   try {
     await waitForSessionReady(orcaPage)
     // Why an override: the login shell's PATH puts a real codex ahead of any fixture dir.
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await ensureTerminalVisible(orcaPage)
     await waitForActivePanePtyId(orcaPage)
     const leadPane = await waitForActivePaneHookDescriptor(orcaPage)

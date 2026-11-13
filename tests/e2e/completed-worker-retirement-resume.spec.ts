@@ -21,6 +21,7 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalSummary } from '../../src/shared/runtime-types'
 import { splitWorktreeIdForFilesystem } from '../../src/shared/worktree/id'
 import { SUCCESS_ENVELOPE } from '../../src/main/runtime/orchestration/worker-done-envelope-fixture'
+import { writeSettings } from './helpers/settings-write'
 
 const PROVIDER_SESSION_ID = '019feb51-2269-71c2-89c6-faa8dc65c8dc'
 
@@ -46,11 +47,9 @@ for (const closeMode of ['terminal-close-cli', 'worker-release'] as const) {
     await ensureTerminalVisible(orcaPage)
     await waitForActiveTerminalManager(orcaPage)
     await waitForActivePanePtyId(orcaPage)
-    await orcaPage.evaluate(async () => {
-      await window.__store?.getState().updateSettings({
-        disabledTuiAgents: [],
-        terminalHiddenViewParking: false
-      })
+    await writeSettings(orcaPage, {
+      disabledTuiAgents: [],
+      terminalHiddenViewParking: false
     })
 
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))

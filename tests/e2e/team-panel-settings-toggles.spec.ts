@@ -103,10 +103,7 @@ async function overlayGameState(electronApp: ElectronApplication): Promise<void>
 }
 
 async function setPanel(page: Page, panel: Record<string, unknown>): Promise<void> {
-  await page.evaluate(
-    (next) => window.__store!.getState().updateSettings({ orchestratorGame: { panel: next } }),
-    panel
-  )
+  await writeSettings(page, { orchestratorGame: { panel } })
 }
 
 // Why queue: V30 draws the merge queue at the top of PRs; its toggle drops that part, not a tab.
@@ -292,10 +289,7 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
     })
     await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
     for (const language of ['es', 'en'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       const tabs = strip.getByRole('tab')
       await expect(tabs).toHaveCount(4)
       for (const width of [220, 280, 2000]) {

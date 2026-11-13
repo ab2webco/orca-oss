@@ -1,8 +1,9 @@
 import type { Page } from '@stablyai/playwright-test'
 import { writeFileSync } from 'node:fs'
+import { writeSettings } from './settings-write'
 
 async function setCustomGenerator(page: Page, scriptPath: string): Promise<void> {
-  await page.evaluate(async (scriptPath) => {
+  const commitMessageAi = await page.evaluate(() => {
     const store =
       window.__store ??
       (() => {
@@ -12,19 +13,20 @@ async function setCustomGenerator(page: Page, scriptPath: string): Promise<void>
     if (!currentSettings) {
       throw new Error('Settings were not loaded')
     }
-    await store.getState().updateSettings({
-      activeRuntimeEnvironmentId: null,
-      commitMessageAi: {
-        ...currentSettings.commitMessageAi,
-        enabled: true,
-        agentId: 'custom' as const,
-        selectedModelByAgent: {},
-        selectedThinkingByModel: {},
-        customPrompt: '',
-        customAgentCommand: `node ${JSON.stringify(scriptPath)}`
-      }
-    })
-  }, scriptPath)
+    return currentSettings.commitMessageAi
+  })
+  await writeSettings(page, {
+    activeRuntimeEnvironmentId: null,
+    commitMessageAi: {
+      ...commitMessageAi,
+      enabled: true,
+      agentId: 'custom' as const,
+      selectedModelByAgent: {},
+      selectedThinkingByModel: {},
+      customPrompt: '',
+      customAgentCommand: `node ${JSON.stringify(scriptPath)}`
+    }
+  })
 }
 
 /**

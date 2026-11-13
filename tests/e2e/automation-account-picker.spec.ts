@@ -9,6 +9,7 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 const INHERIT_LABEL = 'Inherit (worktree or global)'
@@ -39,10 +40,7 @@ const CODEX_STATE = {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -88,9 +86,8 @@ test('saves, re-hydrates and clears the Claude account pinned on an automation',
     },
     { claude: CLAUDE_STATE, codex: CODEX_STATE }
   )
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({ defaultTuiAgent: 'claude' })
-    window.__store?.setState({ settings })
+  await writeSettings(orcaPage, { defaultTuiAgent: 'claude' })
+  await orcaPage.evaluate(() => {
     window.__store?.getState().openAutomationsPage()
   })
 

@@ -23,6 +23,7 @@ import type {
 } from '../../src/shared/runtime-types'
 import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
 import { makePaneKey } from '../../src/shared/stable-pane-id'
+import { writeSettings } from './helpers/settings-write'
 
 type SpawnEvent = { args: string[]; pid: number }
 type TerminalIdentity = Pick<
@@ -545,15 +546,15 @@ test('adopts runtime-owned agent and Setup PTYs on first mount', async ({
         await window.__store?.getState().updateRepo(repoId, {
           hookSettings: { ...repo.hookSettings, setupAgentStartupPolicy: 'start-immediately' }
         })
-        await window.__store?.getState().updateSettings({
-          disabledTuiAgents: [],
-          setupScriptLaunchMode: 'new-tab',
-          terminalHiddenViewParking: false
-        })
         return true
       }, repoId)
     )
     .toBe(true)
+  await writeSettings(orcaPage, {
+    disabledTuiAgents: [],
+    setupScriptLaunchMode: 'new-tab',
+    terminalHiddenViewParking: false
+  })
 
   const created = await client.call<RuntimeWorktreeCreateResult>('worktree.create', {
     repo: `id:${repoId}`,

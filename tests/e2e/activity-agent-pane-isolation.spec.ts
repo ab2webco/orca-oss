@@ -14,6 +14,7 @@ import {
 } from './helpers/terminal'
 import { clickFileInExplorer } from './helpers/file-explorer'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 type SeededActivityThread = {
   paneKey: string
@@ -177,12 +178,9 @@ async function enableInlineAgentCards(page: Page): Promise<void> {
 }
 
 async function enableActivityAgentsView(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const settings = await window.api.settings.set({ experimentalActivity: true })
-    // Why: these specs exercise the experimental Agents page. E2E profiles use
-    // production defaults, where the sidebar entry is hidden unless enabled.
-    window.__store?.setState({ settings })
-  })
+  // Why: these specs exercise the experimental Agents page. E2E profiles use
+  // production defaults, where the sidebar entry is hidden unless enabled.
+  await writeSettings(page, { experimentalActivity: true })
 }
 
 async function clickWorkspaceCardAgentRow(page: Page, prompt: string): Promise<void> {

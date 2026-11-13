@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
@@ -33,10 +34,7 @@ function seedMismatchedHooksRepo(): string {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

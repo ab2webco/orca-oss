@@ -5,6 +5,7 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { openTeamInbox } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 // The types a lead's report watcher passes.
@@ -13,10 +14,7 @@ const LEAD_WATCH_TYPES = 'worker_done,escalation,question,decision_gate'
 type Mail = { messages: { from_handle: string; type: string; subject: string; run_id: string }[] }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

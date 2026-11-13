@@ -1,6 +1,7 @@
 import { test, expect } from './helpers/orca-app'
 import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: a flat pane draws no scene, so neither may its preview; nor may Off picked as the default view.
 test('the preview follows the default view: no scene for flat or off, the scene again for zen', async ({
@@ -9,10 +10,7 @@ test('the preview follows the default view: no scene for flat or off, the scene 
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
   // Why: the band is off by default (ORCA-1148), and the preview this checks is the band's.
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({ orchestratorGame: { band: true } })
-    window.__store?.setState({ settings })
-  })
+  await writeSettings(orcaPage, { orchestratorGame: { band: true } })
   await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')

@@ -14,6 +14,7 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 const TICKET = 'E2E-702'
 
@@ -90,13 +91,11 @@ test('a game member paused by a real restart is resumed on its own task and can 
     const worktreeId = await attachRepoAndOpenTerminal(first.page, repoPath)
     await waitForSessionReady(first.page)
     // Why an override: the login shell's PATH puts a real codex ahead of any fixture dir.
-    await first.page.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(first.page, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await ensureTerminalVisible(first.page)
     await waitForActivePanePtyId(first.page)
     const leadPane = await waitForActivePaneHookDescriptor(first.page)

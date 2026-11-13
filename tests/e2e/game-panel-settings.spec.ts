@@ -14,6 +14,7 @@ import {
   sceneFile,
   sceneLook
 } from '../../src/shared/__fixtures__/orchestrator-game-scene'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
@@ -22,10 +23,7 @@ const LANGUAGES = ['en', 'es'] as const
 type SavedPanels = { global: string | undefined; project: string | undefined }
 
 async function applySettings(page: Page, patch: Record<string, string>): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set(next)
-    window.__store?.setState({ settings })
-  }, patch)
+  await writeSettings(page, patch)
 }
 
 /** The main window floors at 600px, so phone widths need the floor lifted first. */
@@ -161,16 +159,10 @@ test('a saved soft shows as Pixel in both rows, stays on disk, and is not offere
   const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
   expect(repoId, 'the fixture seeds a repo').not.toBe('')
   const save = (global: string, project: string): Promise<void> =>
-    orcaPage.evaluate(
-      async ([id, globalStyle, projectStyle]) => {
-        const settings = await window.api.settings.set({
-          orchestratorGame: { panel: { style: globalStyle } },
-          orchestratorGameProjects: { [id]: { panel: { style: projectStyle } } }
-        } as Parameters<typeof window.api.settings.set>[0])
-        window.__store?.setState({ settings })
-      },
-      [repoId, global, project]
-    )
+    writeSettings(orcaPage, {
+      orchestratorGame: { panel: { style: global } },
+      orchestratorGameProjects: { [repoId]: { panel: { style: project } } }
+    } as Parameters<typeof window.api.settings.set>[0])
   const styles = (section: string) =>
     orcaPage.locator(`[id="${section}"] [aria-label="Scene style"] [role="radio"]`)
   const checked = (section: string) =>

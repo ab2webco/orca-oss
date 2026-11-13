@@ -1,6 +1,7 @@
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const HINT = {
   en: 'Workspace board moved to the bottom bar',
@@ -21,10 +22,7 @@ async function reopenHint(page: Page): Promise<void> {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
 }
 
 // ORCA-1098: at 320 in Spanish the first-run board hint ran past the right edge and was cut.
@@ -34,10 +32,7 @@ test('the workspace board hint wraps inside a phone-wide window, in English and 
   await waitForSessionReady(orcaPage)
   await expect(orcaPage.getByText(HINT.en)).toBeVisible({ timeout: 30_000 })
   for (const language of ['es', 'en'] as const) {
-    await orcaPage.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(orcaPage, { uiLanguage: language })
     const hint = orcaPage
       .locator('[data-slot="tooltip-content"]')
       .filter({ hasText: HINT[language] })

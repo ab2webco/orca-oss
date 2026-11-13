@@ -2,6 +2,7 @@ import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/pla
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { ORCA_CHANGELOG_URL, ORCA_DOCS_INDEX_URL } from '../../src/shared/orca-docs-urls'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
@@ -9,10 +10,7 @@ const THEMES = ['light', 'dark'] as const
 type OpenedUrlsGlobal = { __orcaOpenedUrls?: string[] }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

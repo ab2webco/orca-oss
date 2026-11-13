@@ -168,7 +168,7 @@ test('the + reaches a pointer click at every width', async ({ orcaPage }, testIn
   await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
   await waitForActivePanePtyId(orcaPage)
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await captureEach(
     orcaPage,
     'reach',
@@ -211,7 +211,7 @@ test("the + menu offers the project's lead instead of a second team", async ({
   await ensureTerminalVisible(orcaPage)
   await waitForActivePanePtyId(orcaPage)
   const pane = await waitForActivePaneHookDescriptor(orcaPage)
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await electronApp.evaluate(({ ipcMain }, fixture) => {
     ipcMain.removeHandler('claudeAccounts:list')
     ipcMain.handle('claudeAccounts:list', async () => fixture)
@@ -343,7 +343,7 @@ test('the +N count lists the hidden tabs and opens the one picked', async ({
   const worktreeId = await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
   await waitForActivePanePtyId(orcaPage)
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await orcaPage.evaluate((id) => {
     const state = window.__store!.getState()
     state.createTab(id)

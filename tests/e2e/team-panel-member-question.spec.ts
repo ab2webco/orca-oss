@@ -35,7 +35,7 @@ async function capturePanel(page: Page, panel: Locator, name: string, testInfo: 
   if (!CAPTURE) {
     return
   }
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'es' }))
+  await writeSettings(page, { uiLanguage: 'es' })
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 })
     for (const theme of ['dark', 'light'] as const) {
@@ -48,7 +48,7 @@ async function capturePanel(page: Page, panel: Locator, name: string, testInfo: 
       })
     }
   }
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(page, { uiLanguage: 'en' })
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
@@ -80,11 +80,7 @@ setInterval(() => {}, 60_000)
 }
 
 async function setPlugins(page: Page, enabled: boolean): Promise<void> {
-  await page.evaluate(
-    (next) =>
-      window.__store!.getState().updateSettings({ pluginSystemEnabled: next, uiLanguage: 'en' }),
-    enabled
-  )
+  await writeSettings(page, { pluginSystemEnabled: enabled, uiLanguage: 'en' })
 }
 
 for (const plugins of [false, true]) {
@@ -110,13 +106,11 @@ for (const plugins of [false, true]) {
           paneKey: pane.paneKey
         })
       ).result.terminal.handle
-      await orcaPage.evaluate(async (command) => {
-        await window.__store?.getState().updateSettings({
-          defaultTuiAgent: 'codex',
-          agentCmdOverrides: { codex: command },
-          agentDefaultArgs: { codex: '' }
-        })
-      }, agent.command)
+      await writeSettings(orcaPage, {
+        defaultTuiAgent: 'codex',
+        agentCmdOverrides: { codex: agent.command },
+        agentDefaultArgs: { codex: '' }
+      })
       // Why a foreground process: a lead pane back at its shell is not a live lead.
       await client.call('terminal.send', {
         terminal: lead,

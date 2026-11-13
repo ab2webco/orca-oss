@@ -6,6 +6,7 @@ import { setTheme, THEMES, WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 const GB = 1024 ** 3
 const HOUR_MS = 3_600_000
@@ -345,10 +346,7 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
     }
 
     for (const language of LANGUAGES) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       for (const name of ['full', 'empty', 'error', 'unavailable'] as const) {
         await setScene(electronApp, all[name])
         await rereadPanel(orcaPage)

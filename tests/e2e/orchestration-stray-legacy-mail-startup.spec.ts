@@ -4,6 +4,7 @@ import { test, expect } from './helpers/orca-app'
 import { createRestartSession } from './helpers/orca-restart'
 import Database from '../../src/main/sqlite/sync-database'
 import { LEGACY_RUN_ID, OrchestrationDb } from '../../src/main/runtime/orchestration/db'
+import { writeSettings } from './helpers/settings-write'
 
 const LEAD_HANDLE = 'term_orca_726_lead'
 const WIDTHS = [1440, 768, 390, 320] as const
@@ -77,10 +78,7 @@ function readMessageRuns(userDataDir: string, ids: string[]): string[] {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

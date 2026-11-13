@@ -15,6 +15,7 @@ import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { writeShowcaseClaude } from './helpers/showcase-claude'
 import { startMessagesApi } from './helpers/showcase-messages-api'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
@@ -106,9 +107,8 @@ async function seedAgentStatus(
 
 async function openAgentGrid(page: Page): Promise<void> {
   // The in-window drawer host sits behind an experimental setting.
-  await page.evaluate(async () => {
-    const settings = await window.api.settings.set({ experimentalAgentDashboardPopout: true })
-    window.__store?.setState({ settings })
+  await writeSettings(page, { experimentalAgentDashboardPopout: true })
+  await page.evaluate(() => {
     window.__store?.getState().setSidebarOpen?.(true)
   })
   await page.evaluate(() => {

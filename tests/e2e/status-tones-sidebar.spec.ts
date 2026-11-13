@@ -11,6 +11,7 @@ import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-t
 import { expect, test } from './helpers/orca-app'
 import { ensureTerminalVisible, switchToWorktree, waitForSessionReady } from './helpers/store'
 import { waitForPaneIdentitySnapshot } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 type AgentRow = { name: string; state: 'working' | 'blocked' | 'done'; tone: string }
 
@@ -29,10 +30,7 @@ const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
 const WIDTHS = [1440, 768, 390, 320] as const
 
 async function applySettings(page: Page, updates: Record<string, unknown>): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set(next)
-    window.__store?.setState({ settings })
-  }, updates)
+  await writeSettings(page, updates)
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {

@@ -9,12 +9,10 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 async function applySettings(page: Page, updates: Record<string, unknown>): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set(next)
-    window.__store?.setState({ settings })
-  }, updates)
+  await writeSettings(page, updates)
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -89,11 +87,8 @@ test('a picked status colour repaints its theme only and Reset restores it', asy
     return
   }
   // Why: a too-close pair in the shot shows the warning copy fits too.
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      statusColors: { dark: { warning: '#ff6a6a' } }
-    })
-    window.__store?.setState({ settings })
+  await writeSettings(orcaPage, {
+    statusColors: { dark: { warning: '#ff6a6a' } }
   })
   await captureEveryScreen(electronApp, orcaPage, testInfo)
 })
@@ -104,10 +99,7 @@ async function captureEveryScreen(
   testInfo: TestInfo
 ): Promise<void> {
   for (const language of ['en', 'es'] as const) {
-    await page.evaluate(async (uiLanguage) => {
-      const settings = await window.api.settings.set({ uiLanguage })
-      window.__store?.setState({ settings })
-    }, language)
+    await writeSettings(page, { uiLanguage: language })
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(page, theme)
       for (const width of [1440, 768, 390, 320]) {

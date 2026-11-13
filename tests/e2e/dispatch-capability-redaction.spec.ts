@@ -21,6 +21,7 @@ import {
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { setTheme } from './helpers/settings-window'
 import type { AgentHookEndpoint } from '../../src/shared/agent-hook-endpoint-file'
+import { writeSettings } from './helpers/settings-write'
 
 const CAPABILITY = `dcap_${'Q'.repeat(20)}e2e${'Z'.repeat(20)}`
 // The three ways a capability reaches text: a spaced flag, an `=` flag and a bare token.
@@ -173,13 +174,12 @@ test('a seeded dispatch capability is visible on no agent surface', async ({
   const pane = await waitForActivePaneHookDescriptor(orcaPage)
   const endpoint = await readHookEndpoint(electronApp)
 
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      experimentalActivity: true,
-      experimentalAgentDashboardPopout: true,
-      experimentalAgentDashboardShowIdle: true
-    })
-    window.__store!.setState({ settings })
+  await writeSettings(orcaPage, {
+    experimentalActivity: true,
+    experimentalAgentDashboardPopout: true,
+    experimentalAgentDashboardShowIdle: true
+  })
+  await orcaPage.evaluate(() => {
     // Why: the right sidebar overlays the dashboard sheet and would hide its cards in the captures.
     window.__store!.getState().setRightSidebarOpen(false)
   })
@@ -313,13 +313,12 @@ test('a capability wrapped across rows leaves no fragment in the narrow grid', a
   await waitForPaneCount(orcaPage, 1, 30_000)
   const pane = await waitForActivePaneHookDescriptor(orcaPage)
   const endpoint = await readHookEndpoint(electronApp)
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      experimentalActivity: true,
-      experimentalAgentDashboardPopout: true,
-      experimentalAgentDashboardShowIdle: true
-    })
-    window.__store!.setState({ settings })
+  await writeSettings(orcaPage, {
+    experimentalActivity: true,
+    experimentalAgentDashboardPopout: true,
+    experimentalAgentDashboardShowIdle: true
+  })
+  await orcaPage.evaluate(() => {
     window.__store!.getState().setRightSidebarOpen(false)
   })
 
@@ -374,13 +373,12 @@ test('a long token wrapped over three rows leaves no tail row in the grid', asyn
   await waitForPaneCount(orcaPage, 1, 30_000)
   const pane = await waitForActivePaneHookDescriptor(orcaPage)
   const endpoint = await readHookEndpoint(electronApp)
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      experimentalActivity: true,
-      experimentalAgentDashboardPopout: true,
-      experimentalAgentDashboardShowIdle: true
-    })
-    window.__store!.setState({ settings })
+  await writeSettings(orcaPage, {
+    experimentalActivity: true,
+    experimentalAgentDashboardPopout: true,
+    experimentalAgentDashboardShowIdle: true
+  })
+  await orcaPage.evaluate(() => {
     window.__store!.getState().setRightSidebarOpen(false)
   })
 

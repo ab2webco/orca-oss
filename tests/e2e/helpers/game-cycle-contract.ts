@@ -10,6 +10,7 @@ import { ensureTerminalVisible, waitForSessionReady } from './store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './terminal'
 import { RuntimeClient } from '../../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../../src/shared/runtime-types'
+import { writeSettings } from './settings-write'
 
 const cliEntry = path.join(process.cwd(), 'out', 'cli', 'index.js')
 
@@ -46,14 +47,12 @@ export async function startLead(
 ): Promise<GameLead> {
   await waitForSessionReady(page)
   // Why an override: the login shell's PATH puts a real codex ahead of any fixture dir.
-  await page.evaluate(async (command) => {
-    await window.__store?.getState().updateSettings({
-      uiLanguage: 'en',
-      defaultTuiAgent: 'codex',
-      agentCmdOverrides: { codex: command },
-      agentDefaultArgs: { codex: '' }
-    })
-  }, agent.command)
+  await writeSettings(page, {
+    uiLanguage: 'en',
+    defaultTuiAgent: 'codex',
+    agentCmdOverrides: { codex: agent.command },
+    agentDefaultArgs: { codex: '' }
+  })
   await ensureTerminalVisible(page)
   await waitForActivePanePtyId(page)
   const pane = await waitForActivePaneHookDescriptor(page)
@@ -258,9 +257,8 @@ export async function copyInstalledPlugin(
 
 /** Turns the plugin system on, rediscovers, and approves every plugin waiting on consent. */
 export async function enablePluginSystem(page: Page): Promise<string[]> {
+  await writeSettings(page, { pluginSystemEnabled: true })
   return page.evaluate(async () => {
-    const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-    window.__store?.setState({ settings })
     await window.api.plugins.refresh()
     for (const entry of await window.api.plugins.list()) {
       if (entry.consentFingerprint && entry.status !== 'idle' && entry.status !== 'running') {

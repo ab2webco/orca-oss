@@ -23,10 +23,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 async function setLanguage(page: Page, uiLanguage: 'en' | 'es'): Promise<void> {
-  await page.evaluate(
-    (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-    uiLanguage
-  )
+  await writeSettings(page, { uiLanguage })
 }
 
 const COPY = {
@@ -144,10 +141,7 @@ async function defaultCardHover(page: Page): Promise<Locator> {
 }
 
 const setPluginSystem = (page: Page, enabled: boolean): Promise<void> =>
-  page.evaluate(
-    (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
-    enabled
-  )
+  writeSettings(page, { pluginSystemEnabled: enabled })
 
 /** What the mod's poll sends: `orca game state` with the pane's report. */
 async function reportJev(app: ElectronApplication, panes: string[], model: string): Promise<void> {
@@ -412,9 +406,7 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
   await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(true))
 
   // The hover card holds what left the row; it stays off while Activity shows the same facts.
-  await orcaPage.evaluate(() =>
-    window.__store!.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
-  )
+  await writeSettings(orcaPage, { experimentalNewWorktreeCardStyle: true })
   const card = orcaPage.locator('[data-worktree-card-hover-trigger]').first()
   const agentFacts = orcaPage.locator('[data-worktree-agent-hover]')
   await card.hover()

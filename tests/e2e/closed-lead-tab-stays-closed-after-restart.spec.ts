@@ -13,6 +13,7 @@ import {
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 // ORCA-718 (audit row 26): a lead opened through the runtime and closed with `orca terminal close`
 // came back after a restart as a sleeping Lead tab. The close keeps its resume record (ORCA-487),
@@ -75,9 +76,7 @@ test('a lead closed with terminal.close does not come back after a restart', asy
     await waitForActivePanePtyId(page)
     const [control] = await getWorktreeTabs(page, worktreeId)
     // Why `echo claude`: the lead's launch shape without a real Claude CLI.
-    await page.evaluate(() =>
-      window.__store!.getState().updateSettings({ agentCmdOverrides: { claude: 'echo claude' } })
-    )
+    await writeSettings(page, { agentCmdOverrides: { claude: 'echo claude' } })
 
     const sessionId = randomUUID()
     // Why: a resume whose conversation the shared store lacks is refused (ORCA-718).

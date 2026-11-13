@@ -8,6 +8,7 @@ import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
 import { runOrcaCli } from './helpers/orca-cli-process'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
+import { writeSettings } from './helpers/settings-write'
 
 type Agents = {
   result?: { agents?: { found?: boolean; terminalHandle?: string; displayName?: string }[] }
@@ -33,13 +34,11 @@ test('two adopted agents that share a worktree name get their own names and thre
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agents[0].command)
+    await writeSettings(orcaPage, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agents[0].command },
+      agentDefaultArgs: { codex: '' }
+    })
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
       terminal: lead,

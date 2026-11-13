@@ -10,6 +10,7 @@ import {
   sceneFile,
   sceneLook
 } from '../../src/shared/__fixtures__/orchestrator-game-scene'
+import { writeSettings } from './helpers/settings-write'
 
 // Zones spread across the day, so their hours differ in light whatever time the run starts.
 const HD_HOUR_ZONES = [
@@ -50,10 +51,7 @@ async function shootAll(
 
 /** Why: the band is off by default (ORCA-1148), and these cases check what it draws. */
 async function showBand(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const settings = await window.api.settings.set({ orchestratorGame: { band: true } })
-    window.__store?.setState({ settings })
-  })
+  await writeSettings(page, { orchestratorGame: { band: true } })
 }
 
 // Why: the seeded repo is shared by the worker; a test's orca.yaml or scene files must not reach the next test.
@@ -210,11 +208,8 @@ test('the scene picker lists plugin scenes, keeps an uninstalled id and renders 
   }
 
   await setWindowWidth(electronApp, orcaPage, 1440)
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      orchestratorGame: { scene: 'acme.gone/orbit' }
-    })
-    window.__store?.setState({ settings })
+  await writeSettings(orcaPage, {
+    orchestratorGame: { scene: 'acme.gone/orbit' }
   })
   await expect(scene).toHaveText('acme.gone/orbit (not installed)')
   await shootAll(electronApp, orcaPage, testInfo, 'scene-missing', scene)

@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const PANEL_TITLE = 'Hello Orca'
 
@@ -43,10 +44,7 @@ async function materializePlugin(patchPanelCss: string | null): Promise<string> 
 /** Drives the real setting so the whole window repaints, not just the root
  *  class — a screenshot of a half-applied theme is not evidence of one. */
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -55,9 +53,8 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 async function installAndOpenPanel(page: Page, sourcePath: string): Promise<void> {
+  await writeSettings(page, { pluginSystemEnabled: true })
   await page.evaluate(async (pluginPath) => {
-    const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-    window.__store?.setState({ settings })
     await window.api.plugins.refresh()
     const installed = await window.api.plugins.install({ kind: 'local-path', path: pluginPath })
     if (!installed.ok) {

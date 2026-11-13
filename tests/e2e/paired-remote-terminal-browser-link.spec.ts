@@ -19,6 +19,7 @@ import {
   waitForActiveTerminalManager,
   waitForTerminalOutput
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const PAGE_MARKER = 'remote terminal browser owner'
 const TERMINAL_MARKER = 'remote-terminal-still-live-after-browser-close'
@@ -163,16 +164,16 @@ test('opens a paired-runtime terminal link on its owning host', async ({
       throw new Error('paired client worktree disappeared after discovery')
     }
     await page.evaluate(
-      async ({ environmentId, worktreeId }) => {
+      ({ environmentId, worktreeId }) => {
         const state = window.__store?.getState()
         state?.setActiveWorktree(worktreeId, `runtime:${environmentId}`)
-        await state?.updateSettings({
-          openLinksInApp: true,
-          terminalLinkActionPopoverEnabled: true
-        })
       },
       { environmentId: client.environmentId, worktreeId }
     )
+    await writeSettings(page, {
+      openLinksInApp: true,
+      terminalLinkActionPopoverEnabled: true
+    })
     await ensureTerminalVisible(page, 30_000)
     await waitForActiveTerminalManager(page, 30_000)
     await waitForTerminalOutput(page, fixture.url, 30_000)

@@ -16,6 +16,7 @@ import {
   waitForPaneCount,
   waitForPaneIdentitySnapshot
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
 const WIDTHS = [1440, 768, 390, 320] as const
@@ -51,10 +52,7 @@ async function settle(page: Page): Promise<void> {
 }
 
 async function applySettings(page: Page, updates: Record<string, unknown>): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set(next)
-    window.__store?.setState({ settings })
-  }, updates)
+  await writeSettings(page, updates)
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -227,11 +225,10 @@ test('the Agents sheet covers the sidebar at phone widths and outlives a sidebar
   const snapshot = await waitForPaneIdentitySnapshot(orcaPage, SEEDED.length)
   const paneKeys = snapshot.panes.map((pane) => `${snapshot.tabId}:${pane.leafId}`)
 
+  await writeSettings(orcaPage, { experimentalAgentDashboardPopout: true })
   await orcaPage.evaluate(
-    async ({ paneKeys, seeded }) => {
+    ({ paneKeys, seeded }) => {
       const store = window.__store!
-      const settings = await window.api.settings.set({ experimentalAgentDashboardPopout: true })
-      store.setState({ settings })
       const now = Date.now()
       seeded.forEach(({ state, title }, index) => {
         store

@@ -1,6 +1,7 @@
 import type { Page } from '@stablyai/playwright-test'
 import { expect } from './orca-app'
 import type { CommitMessageAiSettings } from '../../../src/shared/commit-message-ai-types'
+import { writeSettings } from './settings-write'
 
 // Why: these specs create worktrees via raw `git worktree add`, which bypasses
 // Orca's own add/remove path — the one thing that invalidates the main-process
@@ -79,8 +80,11 @@ export async function openSourceControlForWorktree(
 ): Promise<void> {
   const worktreeId = await resolveE2eWorktreeId(page, repoPath, targetWorktreePath)
 
+  if (options.commitMessageAi) {
+    await writeSettings(page, { commitMessageAi: options.commitMessageAi })
+  }
   await page.evaluate(
-    async ({ worktreeId, commitMessageAi }) => {
+    async ({ worktreeId }) => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
@@ -92,15 +96,12 @@ export async function openSourceControlForWorktree(
         throw new Error(`E2E worktree disappeared from the store: ${worktreeId}`)
       }
       store.getState().setActiveWorktree(worktree.id)
-      if (commitMessageAi) {
-        await store.getState().updateSettings({ commitMessageAi })
-      }
       const status = await window.api.git.status({ worktreePath: worktree.path })
       store.getState().setGitStatus(worktree.id, status)
       store.getState().setRightSidebarTab('source-control')
       store.getState().setRightSidebarOpen(true)
     },
-    { worktreeId, commitMessageAi: options.commitMessageAi ?? null }
+    { worktreeId }
   )
 
   await expect

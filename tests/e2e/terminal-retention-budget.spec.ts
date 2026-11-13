@@ -15,6 +15,7 @@ import {
 } from './helpers/docker-ssh-relay-target'
 import { connectDockerSshRelayTarget } from './helpers/docker-ssh-relay-connection'
 import { createAndActivateDockerSshRelayWorktree } from './helpers/docker-ssh-relay-worktree-activation'
+import { writeSettings } from './helpers/settings-write'
 
 const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
 const PARKING_DELAY_MS = Number(process.env.ORCA_E2E_TERMINAL_PARKING_DELAY_MS) || 500
@@ -77,9 +78,7 @@ test.describe('terminal hidden-worktree retention budget', () => {
       // hidden remote worktrees join the un-parkable class the budget governs.
       // Written after the first terminal is live so it cannot race target setup;
       // parking eligibility reads it at verdict time, not spawn time.
-      await orcaPage.evaluate(async () => {
-        await window.__store?.getState().updateSettings({ terminalSshViewParking: false })
-      })
+      await writeSettings(orcaPage, { terminalSshViewParking: false })
 
       // Why worktrees of ONE remote repo: the retention budget ranks worktrees,
       // and a repo added mid-session misroutes its pty spawn to the local daemon

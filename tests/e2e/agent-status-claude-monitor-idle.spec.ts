@@ -15,6 +15,7 @@ import {
 } from './helpers/terminal'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
 import type { AgentHookEndpoint } from '../../src/shared/agent-hook-endpoint-file'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 // Payload shapes captured from Claude Code 2.1.306.
@@ -59,10 +60,7 @@ async function paneState(page: Page, paneKey: string): Promise<string | undefine
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

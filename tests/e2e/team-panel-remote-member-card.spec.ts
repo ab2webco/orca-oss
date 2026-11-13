@@ -63,14 +63,12 @@ test('a member on a paired host gets its card, character, face and host name', a
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store!.getState().updateSettings({
-        uiLanguage: 'es',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'es',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
 
     // Why seeded: a headless host has no settings IPC, and the wire refuses command overrides.
     host = await launchHeadlessPairedRuntimeHost({

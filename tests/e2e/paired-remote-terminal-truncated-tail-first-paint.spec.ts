@@ -11,6 +11,7 @@ import {
   launchPairedWebClient
 } from './helpers/paired-electron-client'
 import { getTerminalContent, waitForActivePanePtyId } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const RETENTION_PARK_DELAY_MS = 100
 const scratch = mkdtempSync(path.join(os.tmpdir(), 'orca-paired-truncated-tail-'))
@@ -279,11 +280,7 @@ test('legacy paired hosts retain the lossy hidden-manager budget fallback @headf
         { timeout: 30_000 }
       )
       .toBe(true)
-    await client.page.evaluate(async () => {
-      await window.__store
-        ?.getState()
-        .updateSettings({ terminalHiddenWorktreeRetentionBudget: false })
-    })
+    await writeSettings(client.page, { terminalHiddenWorktreeRetentionBudget: false })
 
     const remoteTabs: { tabId: string; terminal: string; worktreeId: string; marker: string }[] = []
     for (const [index, worktreeId] of worktreeIds.entries()) {
@@ -366,11 +363,7 @@ test('legacy paired hosts retain the lossy hidden-manager budget fallback @headf
       )
       .toEqual({ heldLongEnough: true, mounted: 2 })
 
-    await client.page.evaluate(async () => {
-      await window.__store
-        ?.getState()
-        .updateSettings({ terminalHiddenWorktreeRetentionBudget: true })
-    })
+    await writeSettings(client.page, { terminalHiddenWorktreeRetentionBudget: true })
     await expect
       .poll(
         () =>

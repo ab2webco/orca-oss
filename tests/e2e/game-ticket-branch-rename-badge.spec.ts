@@ -4,6 +4,7 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { worktreeRow } from './worktree-row-locators'
+import { writeSettings } from './helpers/settings-write'
 
 // Game members' branches are named after their ticket; `orca-<n>` once read as the creature `orca`
 // at collision tier <n>, so the first prompt raised a "rename failed" badge (ORCA-696).
@@ -18,10 +19,7 @@ const UNNAMEABLE_PROMPT = '?!'
 const RENAME_FAILED_BADGE = '[aria-label="Auto-rename failed: view error"]'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -63,13 +61,10 @@ test('a game member branch named after its ticket never shows the rename-failed 
   test.setTimeout(180_000)
   await waitForSessionReady(orcaPage)
   // No Source Control AI agent configured yet: #655 makes that a quiet setup state, not a failure.
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({
-      autoRenameBranchFromWork: true,
-      defaultTuiAgent: 'blank',
-      disabledTuiAgents: ['claude']
-    })
-    window.__store?.setState({ settings })
+  await writeSettings(orcaPage, {
+    autoRenameBranchFromWork: true,
+    defaultTuiAgent: 'blank',
+    disabledTuiAgents: ['claude']
   })
 
   const gameIds: string[] = []
@@ -114,26 +109,25 @@ test('a game member branch named after its ticket never shows the rename-failed 
   await expect(worktreeRow(orcaPage, noAgentId).locator(RENAME_FAILED_BADGE)).toHaveCount(0)
 
   // Configured agent whose generation fails: an eligible branch still raises the badge.
-  await orcaPage.evaluate(async (binary) => {
-    const current = (await window.api.settings.get()).sourceControlAi
-    if (!current) {
-      throw new Error('Source Control AI settings are unavailable')
-    }
-    // Why: the branchName action recipe wins over the global agent, so pin it there too.
-    const settings = await window.api.settings.set({
-      sourceControlAi: {
-        ...current,
-        enabled: true,
-        agentId: 'custom',
-        customAgentCommand: binary,
-        actions: {
-          ...current.actions,
-          branchName: { ...current.actions?.branchName, agentId: 'custom' }
-        }
+  const current = await orcaPage.evaluate(
+    () => window.__store!.getState().settings?.sourceControlAi
+  )
+  if (!current) {
+    throw new Error('Source Control AI settings are unavailable')
+  }
+  // Why: the branchName action recipe wins over the global agent, so pin it there too.
+  await writeSettings(orcaPage, {
+    sourceControlAi: {
+      ...current,
+      enabled: true,
+      agentId: 'custom',
+      customAgentCommand: MISSING_AGENT_BINARY,
+      actions: {
+        ...current.actions,
+        branchName: { ...current.actions?.branchName, agentId: 'custom' }
       }
-    })
-    window.__store?.setState({ settings })
-  }, MISSING_AGENT_BINARY)
+    }
+  })
 
   for (const [index, id] of gameIds.entries()) {
     const branch = GAME_BRANCHES[index]

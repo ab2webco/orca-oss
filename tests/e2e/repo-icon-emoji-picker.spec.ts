@@ -8,12 +8,13 @@ import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { getStoreState, waitForSessionReady } from './helpers/store'
 import type { Repo } from '../../src/shared/repo-types'
+import { writeSettings } from './helpers/settings-write'
 
 /** Opens the repo settings panel and pins the UI language to English. */
 async function openRepoSettings(page: Page, repoId: string): Promise<void> {
   // Why: the host OS locale (e.g. ko-KR) drives Orca's default UI language.
   // Pin English so this spec's locators are stable across dev machines and CI.
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(page, { uiLanguage: 'en' })
   await page.evaluate((repoId) => {
     const state = window.__store!.getState()
     state.openSettingsTarget({ pane: 'repo', repoId })

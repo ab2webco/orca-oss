@@ -9,6 +9,7 @@
 
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 /** Names long enough that a shrink-to-fit wrapper outgrows a 512px dialog. */
 const INVENTORY = {
@@ -60,10 +61,7 @@ const INVENTORY = {
 
 /** Drives the real setting so the whole window repaints, not just the root class. */
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -192,11 +190,8 @@ test('fits every sync row inside the dialog and keeps its scroll across a pane r
   expect(offset, 'could not scroll the list').toBeGreaterThan(0)
 
   for (const blur of [false, true, false]) {
-    await orcaPage.evaluate(async (next) => {
-      // An unrelated setting write: the same store churn the quota poll causes.
-      const settings = await window.api.settings.set({ windowBackgroundBlur: next })
-      window.__store?.setState({ settings })
-    }, blur)
+    // An unrelated setting write: the same store churn the quota poll causes.
+    await writeSettings(orcaPage, { windowBackgroundBlur: blur })
   }
   await expect(listScrollTop(orcaPage), 'the pane re-render reset the list').resolves.toBe(offset)
   await expect(orcaPage.getByText('mcp__graft__graft_check_freshness')).toBeVisible()

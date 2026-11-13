@@ -10,6 +10,7 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const PANEL_TITLE = 'Registry'
 
@@ -70,9 +71,8 @@ test('grows a settings-surface plugin panel to its content height', async ({
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2))
 
   try {
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
     const installed = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
       const result = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!result.ok) {
         throw new Error(result.error)

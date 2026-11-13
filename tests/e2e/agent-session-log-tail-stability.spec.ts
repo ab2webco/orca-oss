@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const ANCHOR_TOKEN = 'E2E_LIVE_LOG_STABLE_ANCHOR'
 const INITIAL_PAYLOAD_BYTES = 9 * 1024 * 1024
@@ -52,12 +53,12 @@ test.describe('Agent Session History live log', () => {
       .poll(() => readProbeOrNull(orcaPage), { timeout: 120_000 })
       .toMatchObject({ filePath: fixture.filePath, valueLength: fixture.initialLength })
     await orcaPage.setViewportSize({ width: 900, height: 720 })
-    await orcaPage.evaluate(async () => {
+    await orcaPage.evaluate(() => {
       const state = window.__store?.getState()
       state?.setRightSidebarOpen(false)
       state?.setEditorFontZoomLevel(0)
-      await state?.updateSettings({ terminalFontSize: 13 })
     })
+    await writeSettings(orcaPage, { terminalFontSize: 13 })
 
     let baseline = await restoreAnchorState(orcaPage, true)
     console.log(`[live-log-stability] geometry ${JSON.stringify(baseline)}`)

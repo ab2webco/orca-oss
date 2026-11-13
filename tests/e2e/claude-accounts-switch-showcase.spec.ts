@@ -5,6 +5,7 @@ import { waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
@@ -66,10 +67,9 @@ test('switches the active Claude account from the accounts pane', async ({
   await mkdir(join(home, '.codex'), { recursive: true })
   await writeFile(join(home, '.codex', 'config.toml'), 'model = "gpt-5.5"\n')
   await writeFile(join(home, '.codex', 'auth.json'), JSON.stringify({ OPENAI_API_KEY: 'sk-demo' }))
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({ theme: 'dark' })
+  await writeSettings(orcaPage, { theme: 'dark' })
+  await orcaPage.evaluate(() => {
     const state = window.__store!.getState()
-    window.__store!.setState({ settings })
     state.setSettingsSearchQuery('')
     state.openSettingsTarget({ pane: 'accounts', repoId: null, sectionId: 'accounts-claude' })
     state.openSettingsPage()

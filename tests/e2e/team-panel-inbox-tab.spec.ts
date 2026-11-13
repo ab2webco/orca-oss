@@ -66,14 +66,12 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
 
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
@@ -111,10 +109,7 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
 
     const capture = async (name: string, scroller: Locator | null): Promise<void> => {
       for (const language of ['en', 'es'] as const) {
-        await orcaPage.evaluate(
-          (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-          language
-        )
+        await writeSettings(orcaPage, { uiLanguage: language })
         await expect(inboxTab).toContainText(INBOX[language])
         for (const width of WIDTHS) {
           await orcaPage.setViewportSize({ width, height: 900 })
@@ -153,7 +148,7 @@ test('the Inbox tab holds every question for you, the lead mail and its answers'
           }
         }
       }
-      await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+      await writeSettings(orcaPage, { uiLanguage: 'en' })
       await orcaPage.setViewportSize({ width: 1440, height: 900 })
     }
 

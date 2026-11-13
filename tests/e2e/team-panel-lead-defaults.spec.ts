@@ -34,14 +34,12 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     await ensureTerminalVisible(orcaPage)
     await waitForActivePanePtyId(orcaPage)
     const pane = await waitForActivePaneHookDescriptor(orcaPage)
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     const client = new RuntimeClient(userDataDir, 30_000, null, null)
     const lead = (
@@ -148,10 +146,7 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     expect(state.lead?.label).toBeUndefined()
 
     for (const language of ['en', 'es'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       await expect(xp).toContainText(language === 'es' ? 'Nv 2' : 'Lv 2')
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })

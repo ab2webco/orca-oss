@@ -14,6 +14,7 @@ import type {
   RuntimeTerminalSummary,
   RuntimeTerminalWake
 } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: after a host restart a member's pane came back asleep, and a lead on
 // another machine could only wake it by clicking it in that host's UI (ORCA-915).
@@ -86,11 +87,7 @@ test.describe('waking a sleeping row through the runtime', () => {
     mkdirSync(transcripts, { recursive: true })
     writeFileSync(path.join(transcripts, `${sessionId}.jsonl`), '')
     agent = createResumedClaudeAgent(sessionId)
-    await orcaPage.evaluate(
-      (command) =>
-        window.__store!.getState().updateSettings({ agentCmdOverrides: { claude: command } }),
-      agent.command
-    )
+    await writeSettings(orcaPage, { agentCmdOverrides: { claude: agent.command } })
     await seedWorktreeSleptRecord(orcaPage, worktreeId, paneKey, sessionId)
     let asleep: RuntimeTerminalSummary | undefined
     await expect

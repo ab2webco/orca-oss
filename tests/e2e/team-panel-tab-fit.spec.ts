@@ -12,6 +12,7 @@ import { setTheme, THEMES, WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 const CAPTURE = process.env.ORCA_E2E_CAPTURE === '1'
 const soft = expect.configure({ soft: true })
@@ -107,10 +108,7 @@ async function sweepStrips(page: Page, testInfo: TestInfo, look: 'team' | 'solo'
   await expect(subTabs.getByRole('tab', { name: /For you/ })).toContainText('12')
   let cases = 0
   for (const language of LANGUAGES) {
-    await page.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(page, { uiLanguage: language })
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       for (const sidebar of SIDEBARS) {

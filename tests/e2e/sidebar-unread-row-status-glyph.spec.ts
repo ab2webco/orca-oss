@@ -1,6 +1,7 @@
 import { test, expect } from './helpers/orca-app'
 import { getAllWorktreeIds, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { worktreeRow } from './worktree-row-locators'
+import { writeSettings } from './helpers/settings-write'
 
 // ORCA-1131: an unread row swapped its status glyph for a bell, so every member that had finished a
 // turn read as needing you. As in V28 the glyph stays; unread shows in the title weight.
@@ -21,9 +22,9 @@ test.describe('Unread sidebar row', () => {
     const unreadId = (await getAllWorktreeIds(orcaPage)).find((id) => id !== activeId)
     expect(unreadId, 'the seeded repo needs a second workspace').toBeTruthy()
 
-    await orcaPage.evaluate(async (id) => {
+    await writeSettings(orcaPage, { uiLanguage: 'es' })
+    await orcaPage.evaluate((id) => {
       const state = window.__store!.getState()
-      await state.updateSettings({ uiLanguage: 'es' })
       state.setSidebarOpen(true)
       state.setGroupBy('repo')
       state.updateWorktreeMeta(id, { isUnread: true })
@@ -40,10 +41,7 @@ test.describe('Unread sidebar row', () => {
     await expect(orcaPage.locator('[data-sidebar-section-title]')).toHaveText('Proyectos')
 
     for (const theme of ['dark', 'light'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ theme: next }),
-        theme
-      )
+      await writeSettings(orcaPage, { theme })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         await expect(row).toBeVisible()

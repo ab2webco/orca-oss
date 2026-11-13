@@ -12,6 +12,7 @@ import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
@@ -111,21 +112,17 @@ test('shows a Plane project as a board with its states as columns', async ({
       fixture: { status: STATUS, project: PROJECT, states: STATES, items: ITEMS, members: MEMBERS }
     }
   )
-  await orcaPage.evaluate(
-    async ({ workspaceSlug, projectId }) => {
-      const store = window.__store!
-      const settings = await window.api.settings.set({
-        theme: 'dark',
-        defaultPlaneSelection: { workspaceSlug, projectId },
-        planeViewMode: 'board'
-      })
-      store.setState({ settings })
-      store.getState().setSidebarOpen(false)
-      await store.getState().checkPlaneConnection(true)
-      store.getState().openTaskPage({ taskSource: 'plane' })
-    },
-    { workspaceSlug: WORKSPACE.workspaceSlug, projectId: PROJECT.id }
-  )
+  await writeSettings(orcaPage, {
+    theme: 'dark',
+    defaultPlaneSelection: { workspaceSlug: WORKSPACE.workspaceSlug, projectId: PROJECT.id },
+    planeViewMode: 'board'
+  })
+  await orcaPage.evaluate(async () => {
+    const store = window.__store!
+    store.getState().setSidebarOpen(false)
+    await store.getState().checkPlaneConnection(true)
+    store.getState().openTaskPage({ taskSource: 'plane' })
+  })
 
   for (const state of STATES) {
     await expect(

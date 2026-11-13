@@ -9,6 +9,7 @@ import {
 } from './helpers/paired-electron-client'
 import { toWebTerminalSurfaceTabId } from '../../src/shared/terminal-surface-id'
 import type { RuntimeTerminalSummary } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 type ClientMirror = {
   activeTabId: string | null
@@ -250,12 +251,9 @@ test('headed paired host keeps structured agent focus viewer-local @headful', as
 }) => {
   test.setTimeout(180_000)
   const override = fixtureCommand(fixtureScript)
-  await orcaPage.evaluate(async (agentCommand) => {
-    const settings = await window.api.settings.set({
-      agentCmdOverrides: { codex: agentCommand }
-    })
-    window.__store?.setState({ settings })
-  }, override)
+  await writeSettings(orcaPage, {
+    agentCmdOverrides: { codex: override }
+  })
 
   const offer = await createRuntimeDesktopPairingOffer(orcaPage)
   const client = await launchPairedWebClient(electronApp, offer)

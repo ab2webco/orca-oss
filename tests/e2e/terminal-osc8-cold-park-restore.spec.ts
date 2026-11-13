@@ -17,6 +17,7 @@ import {
 } from './helpers/terminal'
 import { nodeTerminalCommand } from './terminal-node-command'
 import { waitForPtyShellEcho } from './terminal-pty-readiness'
+import { writeSettings } from './helpers/settings-write'
 
 const PARKING_DELAY_MS = Number(process.env.ORCA_E2E_TERMINAL_PARKING_DELAY_MS) || 500
 
@@ -121,11 +122,9 @@ async function activateTerminalTab(page: Page, tabId: string): Promise<void> {
 test('restores and opens an OSC 8 link after its terminal is cold-parked', async ({ orcaPage }) => {
   await waitForSessionReady(orcaPage)
   const worktreeId = await waitForActiveWorktree(orcaPage)
-  await orcaPage.evaluate(async () => {
-    await window.__store?.getState().updateSettings({
-      openLinksInApp: true,
-      openLinksInAppPreferencePrompted: true
-    })
+  await writeSettings(orcaPage, {
+    openLinksInApp: true,
+    openLinksInAppPreferencePrompted: true
   })
   await ensureTerminalVisible(orcaPage)
   await waitForActiveTerminalManager(orcaPage, 30_000)

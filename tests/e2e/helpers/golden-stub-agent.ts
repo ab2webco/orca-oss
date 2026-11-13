@@ -7,6 +7,7 @@ import {
   composerLineFor,
   type GoldenStubExitVerdict
 } from '../golden-stub-exit-verdict'
+import { writeSettings } from './settings-write'
 
 export const GOLDEN_STUB_READY_MARKER = 'GOLDEN_STUB_AGENT_READY'
 export const GOLDEN_STUB_EXIT_MARKER = 'GOLDEN_STUB_AGENT_EXITED'
@@ -21,16 +22,10 @@ export function getGoldenStubAgentLaunchEnv(): NodeJS.ProcessEnv {
 }
 
 export async function configureGoldenStubAgent(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('Orca store is unavailable')
-    }
-    await store.getState().updateSettings({
-      defaultTuiAgent: 'codex',
-      agentCmdOverrides: { codex: 'golden-stub-agent' },
-      agentDefaultArgs: { codex: '' }
-    })
+  await writeSettings(page, {
+    defaultTuiAgent: 'codex',
+    agentCmdOverrides: { codex: 'golden-stub-agent' },
+    agentDefaultArgs: { codex: '' }
   })
 }
 

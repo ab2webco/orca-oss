@@ -3,6 +3,7 @@ import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { createRestartSession } from './helpers/orca-restart'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in src/shared/constants.ts.
 // E2E specs avoid importing renderer/shared modules into the Playwright runner.
@@ -27,6 +28,7 @@ async function seedFloatingMarkdownFile(page: Page): Promise<{
   const originalPath = path.join(directory, originalName)
   const intermediatePath = path.join(directory, intermediateName)
   const renamedPath = path.join(directory, renamedName)
+  await writeSettings(page, { floatingTerminalEnabled: true })
   const tabId = await page.evaluate(
     async ({ filePath, originalName, worktreeId }) => {
       const store = window.__store
@@ -34,7 +36,6 @@ async function seedFloatingMarkdownFile(page: Page): Promise<{
         throw new Error('Store unavailable')
       }
 
-      await store.getState().updateSettings({ floatingTerminalEnabled: true })
       await window.api.fs.createFile({ filePath })
       await window.api.fs.writeFile({ filePath, content: '# Floating rename\n' })
       store.getState().openFile(

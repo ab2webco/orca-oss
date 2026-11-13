@@ -13,6 +13,7 @@ import {
   type DockerSshRelayTarget
 } from './helpers/docker-ssh-relay-target'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false })
 
@@ -120,6 +121,7 @@ test('adopts a recipe-provisioned SSH root without creating a linked worktree', 
 })
 
 async function addRecipeRepo(page: Parameters<typeof waitForSessionReady>[0], repoPath: string) {
+  await writeSettings(page, { experimentalEphemeralVms: true })
   return page.evaluate(async (pathValue) => {
     const result = await window.api.repos.add({ path: pathValue })
     if ('error' in result) {
@@ -127,7 +129,6 @@ async function addRecipeRepo(page: Parameters<typeof waitForSessionReady>[0], re
     }
     const store = window.__store!
     await store.getState().fetchRepos()
-    await store.getState().updateSettings({ experimentalEphemeralVms: true })
     store.getState().setActiveRepo(result.repo.id)
     return result.repo.id
   }, repoPath)

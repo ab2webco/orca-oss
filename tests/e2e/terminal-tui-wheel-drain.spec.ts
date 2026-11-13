@@ -9,6 +9,7 @@ import {
   waitForActivePanePtyId,
   waitForActiveTerminalManager
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const VISIBLE_TUI_FIXTURE_PATH = path.join(
   process.cwd(),
@@ -40,9 +41,7 @@ async function startHeavyTuiFixture(page: Page, logPath: string): Promise<void> 
   await waitForActiveWorktree(page)
   await ensureTerminalVisible(page)
   await waitForActiveTerminalManager(page, 30_000)
-  await page.evaluate(() =>
-    window.__store?.getState().updateSettings({ terminalTuiScrollSensitivity: 1 })
-  )
+  await writeSettings(page, { terminalTuiScrollSensitivity: 1 })
 
   const ptyId = await waitForActivePanePtyId(page)
   await execInTerminal(

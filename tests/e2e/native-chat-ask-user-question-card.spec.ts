@@ -6,15 +6,12 @@ import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
-import type { GlobalSettings } from '../../src/shared/global-settings-types'
+import { writeSettings } from './helpers/settings-write'
 
 const QUESTION = 'Tabs or spaces?'
 
 async function enableNativeChatSetting(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const nextSettings = await window.api.settings.set({ experimentalNativeChat: true })
-    window.__store?.setState({ settings: nextSettings as GlobalSettings })
-  })
+  await writeSettings(page, { experimentalNativeChat: true })
 }
 
 // Why (#11761): reproduces the paired-headless topology from the client's side —

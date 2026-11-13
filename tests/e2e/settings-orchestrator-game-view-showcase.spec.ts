@@ -3,6 +3,7 @@ import { waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
@@ -18,10 +19,7 @@ test('the default view picker lists the views and the preview follows the pick',
 }, testInfo) => {
   await waitForSessionReady(orcaPage)
   // Why: the band is off by default (ORCA-1148), and the preview this checks is the band's.
-  await orcaPage.evaluate(async () => {
-    const settings = await window.api.settings.set({ orchestratorGame: { band: true } })
-    window.__store?.setState({ settings })
-  })
+  await writeSettings(orcaPage, { orchestratorGame: { band: true } })
   await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
   await electronApp.evaluate(
     ({ BrowserWindow }, size) => {

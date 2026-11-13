@@ -1,18 +1,19 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 test.describe('Settings sidebar search on the Shortcuts pane', () => {
   test('pane-title-only query keeps rows visible and local search usable', async ({ orcaPage }) => {
     await waitForSessionReady(orcaPage)
 
-    await orcaPage.evaluate(async () => {
+    // Why: the spec asserts on English strings; the host machine may run a
+    // non-English system locale, which 'system' would follow.
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
+    await orcaPage.evaluate(() => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
       }
-      // Why: the spec asserts on English strings; the host machine may run a
-      // non-English system locale, which 'system' would follow.
-      await store.getState().updateSettings({ uiLanguage: 'en' })
       store.getState().openSettingsPage()
     })
 

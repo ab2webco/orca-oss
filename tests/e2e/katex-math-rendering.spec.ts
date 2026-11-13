@@ -8,6 +8,7 @@ import {
   openMarkdownFixture,
   waitForRichMarkdownEditor
 } from './helpers/markdown-ordered-list-exit'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: KaTeX lays out math only through its CSS; markup from another katex than the stylesheet's
 // loses the classes 0.18 renamed, so struts stop sizing lines and \Large stops scaling (ORCA-994).
@@ -64,10 +65,7 @@ async function expectLaidOutMath(page: Page, rootSelector: string, label: string
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
 }
 
 async function setWindowWidth(app: ElectronApplication, page: Page, width: number): Promise<void> {

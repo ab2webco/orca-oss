@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 // ORCA-1131: the "Add a setup script" card floated over the sidebar list, so its last rows could
 // not be reached even when scrolled to the bottom.
@@ -105,10 +106,7 @@ test.describe('Setup script prompt in the sidebar', () => {
     await expect(promptCard.getByText('Add a setup script')).toBeVisible({ timeout: 20_000 })
 
     for (const theme of ['dark', 'light'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ theme: next }),
-        theme
-      )
+      await writeSettings(orcaPage, { theme })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         await scrollSidebarListToBottom(orcaPage)

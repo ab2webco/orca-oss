@@ -5,6 +5,7 @@ import path from 'node:path'
 import { test as base, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { getTerminalContent } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const ISSUE_NUMBER = 6613
 const ISSUE_TITLE = 'Start a newly created issue without losing its context'
@@ -157,7 +158,12 @@ test.fixme('starting a just-created GitHub issue launches Claude with its URL pr
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
 
-  await orcaPage.evaluate(async () => {
+  await writeSettings(orcaPage, {
+    defaultTuiAgent: 'claude',
+    disabledTuiAgents: [],
+    ...(process.platform === 'win32' ? { terminalWindowsShell: 'git-bash' as const } : {})
+  })
+  await orcaPage.evaluate(() => {
     const store = window.__store
     if (!store) {
       throw new Error('window.__store is not available')
@@ -172,11 +178,6 @@ test.fixme('starting a just-created GitHub issue launches Claude with its URL pr
     // Why: this regression owns renderer-to-PTY command propagation, while the shared fixture already covers Git worktree creation.
     store.setState({
       createWorktree: async () => ({ worktree: preparedWorkspace })
-    })
-    await state.updateSettings({
-      defaultTuiAgent: 'claude',
-      disabledTuiAgents: [],
-      ...(navigator.userAgent.includes('Windows') ? { terminalWindowsShell: 'git-bash' } : {})
     })
     store.getState().openTaskPage({ taskSource: 'github' })
   })

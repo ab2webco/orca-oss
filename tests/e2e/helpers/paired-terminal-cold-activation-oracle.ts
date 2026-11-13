@@ -9,6 +9,7 @@ import {
 } from './paired-terminal-cold-activation-observation'
 import { createPairedTerminalParkingFixture } from './paired-terminal-parking-fixture'
 import { getTerminalContent, waitForActivePanePtyId } from './terminal'
+import { writeSettings } from './settings-write'
 
 const TARGET_TAB_COUNT = 8
 
@@ -182,9 +183,7 @@ export async function runPairedTerminalColdActivationOracle(
     expect(await waitForActivePanePtyId(page, 30_000)).toBe(tabs[0].originalPtyId)
 
     const deferred = tabs[4]
-    await page.evaluate(async () => {
-      await window.__store?.getState().updateSettings({ terminalHiddenViewParking: false })
-    })
+    await writeSettings(page, { terminalHiddenViewParking: false })
     await expectStableColdActivationMountState(page, tabIds, {
       mounted: TARGET_TAB_COUNT,
       parked: 0
@@ -200,9 +199,7 @@ export async function runPairedTerminalColdActivationOracle(
       .toContain(`READY:${deferred.marker}`)
     await firstTab.click()
     await expect(firstTab).toHaveAttribute('data-active', 'true')
-    await page.evaluate(async () => {
-      await window.__store?.getState().updateSettings({ terminalHiddenViewParking: true })
-    })
+    await writeSettings(page, { terminalHiddenViewParking: true })
     await expectStableColdActivationMountState(page, tabIds, {
       mounted: 2,
       parked: TARGET_TAB_COUNT - 2

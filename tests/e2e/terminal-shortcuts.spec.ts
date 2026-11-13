@@ -35,6 +35,7 @@ import {
   readTerminalPtyWrites as getPtyWrites
 } from './helpers/terminal-pty-write-spy'
 import { buildPendingLineDiscardInputSequence } from './terminal-probe-input-sequence'
+import { writeSettings } from './helpers/settings-write'
 
 async function setActivePaneForegroundAgent(
   page: Page,
@@ -688,11 +689,8 @@ test.describe('Terminal Shortcuts', () => {
 
   test('floating terminal owns tab switch shortcuts while focused', async ({ orcaPage }) => {
     const scenario = await seedFloatingTerminalTabSwitchScenario(orcaPage)
-    await orcaPage.evaluate(async () => {
-      const state = window.__store?.getState()
-      if (state?.settings?.floatingTerminalEnabled !== true) {
-        await state?.updateSettings({ floatingTerminalEnabled: true })
-      }
+    await writeSettings(orcaPage, { floatingTerminalEnabled: true })
+    await orcaPage.evaluate(() => {
       if (!document.querySelector('[data-floating-terminal-panel][aria-hidden="false"]')) {
         window.dispatchEvent(new CustomEvent('orca-toggle-floating-terminal'))
       }

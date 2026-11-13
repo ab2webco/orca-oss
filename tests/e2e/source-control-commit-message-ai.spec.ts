@@ -6,6 +6,7 @@ import { test, expect } from './helpers/orca-app'
 import { writeLinkedIssueEchoGenerator } from './helpers/source-control-ai-generators'
 import { waitForSessionReady } from './helpers/store'
 import { openSourceControlForWorktree } from './helpers/worktree-registration'
+import { writeSettings } from './helpers/settings-write'
 
 function createWorktreeWithStagedChange(repoPath: string): {
   branchName: string
@@ -63,7 +64,7 @@ test.describe('Source Control AI commit messages', () => {
         await openSourceControlForWorktree(orcaPage, testRepoPath, worktreePath)
 
         await orcaPage.evaluate(
-          async ({ generatorPath, linkedIssue }) => {
+          async ({ linkedIssue }) => {
             const store = window.__store
             if (!store) {
               throw new Error('window.__store is not available')
@@ -73,27 +74,26 @@ test.describe('Source Control AI commit messages', () => {
               throw new Error('No worktree was active after opening Source Control')
             }
             await window.api.worktrees.updateMeta({ worktreeId, updates: { linkedIssue } })
-            const customAgentCommand = `node ${JSON.stringify(generatorPath)}`
-            await store.getState().updateSettings({
-              activeRuntimeEnvironmentId: null,
-              sourceControlAi: {
-                enabled: true,
-                agentId: 'custom' as const,
-                selectedModelByAgent: {},
-                selectedThinkingByModel: {},
-                customAgentCommand,
-                instructionsByOperation: {},
-                actions: {
-                  commitMessage: {
-                    agentId: 'custom' as const,
-                    commandInputTemplate: 'ORCA_E2E_ISSUE={linkedIssue}\n\n{basePrompt}'
-                  }
-                }
-              }
-            })
           },
-          { generatorPath, linkedIssue }
+          { linkedIssue }
         )
+        await writeSettings(orcaPage, {
+          activeRuntimeEnvironmentId: null,
+          sourceControlAi: {
+            enabled: true,
+            agentId: 'custom' as const,
+            selectedModelByAgent: {},
+            selectedThinkingByModel: {},
+            customAgentCommand: `node ${JSON.stringify(generatorPath)}`,
+            instructionsByOperation: {},
+            actions: {
+              commitMessage: {
+                agentId: 'custom' as const,
+                commandInputTemplate: 'ORCA_E2E_ISSUE={linkedIssue}\n\n{basePrompt}'
+              }
+            }
+          }
+        })
 
         const textarea = orcaPage.getByRole('textbox', { name: 'Commit message' })
         await expect(textarea).toBeVisible({ timeout: 10_000 })
