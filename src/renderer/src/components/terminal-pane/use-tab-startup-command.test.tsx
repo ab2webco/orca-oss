@@ -1,19 +1,21 @@
 // @vitest-environment happy-dom
 
 import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { useAppStore } from '@/store'
 import { useTabStartupCommand } from './use-tab-startup-command'
 
 const TAB = 'tab-1'
 const COMMAND = { command: 'claude' }
 
+type Consume = ReturnType<typeof useAppStore.getState>['consumeTabStartupCommand']
+
 describe('useTabStartupCommand (ORCA-1189)', () => {
-  let consume: ReturnType<typeof vi.fn>
+  let consume: Mock<Consume>
 
   beforeEach(() => {
     const real = useAppStore.getState().consumeTabStartupCommand
-    consume = vi.fn((tabId: string) => real(tabId))
+    consume = vi.fn<Consume>((tabId) => real(tabId))
     useAppStore.setState({ consumeTabStartupCommand: consume })
     useAppStore.getState().queueTabStartupCommand(TAB, COMMAND)
   })
