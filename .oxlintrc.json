@@ -21,6 +21,10 @@
     {
       "name": "sync-spawn-input-timeout",
       "specifier": "./config/oxlint-plugins/sync-spawn-input-timeout.mjs"
+    },
+    {
+      "name": "e2e-settings-write",
+      "specifier": "./config/oxlint-plugins/e2e-settings-write.mjs"
     }
   ],
   "categories": {
@@ -138,6 +142,18 @@
       "rules": {
         "quadratic-buffer-concat/no-loop-carried-concat": "off",
         "renderer-scrollbar-style/require-styled-vertical-scrollbar": "off"
+      }
+    },
+    {
+      "files": ["tests/e2e/**/*.ts"],
+      "rules": {
+        "e2e-settings-write/no-held-write-in-evaluate": "error"
+      }
+    },
+    {
+      "files": ["tests/e2e/settings-set-cdp-promise-lifetime.spec.ts"],
+      "rules": {
+        "e2e-settings-write/no-held-write-in-evaluate": "off"
       }
     },
     {
