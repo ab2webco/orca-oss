@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, createElement } from 'react'
-import { flushSync } from 'react-dom'
+import { act, createElement, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAppStore } from '@/store'
@@ -13,6 +12,8 @@ import { useTabAgent } from './use-tab-agent'
 const initialAppState = useAppStore.getInitialState()
 const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 const TAB_ID = 'tab-1'
+const WORKTREE_ID = 'wt-1'
+const RETITLE_COUNT = 60
 let root: Root | null = null
 
 function HookProbe({ tab }: { tab: TerminalTab }): null {
@@ -20,11 +21,17 @@ function HookProbe({ tab }: { tab: TerminalTab }): null {
   return null
 }
 
+// Why: the tab reaches the hook from the store, as the tab bar passes it to SortableTab.
+function StoreTabProbe(): ReactElement | null {
+  const tab = useAppStore((s) => s.tabsByWorktree[WORKTREE_ID]?.[0])
+  return tab ? createElement(HookProbe, { tab }) : null
+}
+
 function tabWithTitle(title: string): TerminalTab {
   return {
     id: TAB_ID,
     ptyId: 'pty-1',
-    worktreeId: 'wt-1',
+    worktreeId: WORKTREE_ID,
     title,
     customTitle: null,
     color: null,
@@ -45,10 +52,11 @@ function workingHook(paneKey: string): AgentStatusEntry {
   }
 }
 
-describe('useTabAgent under a burst of synchronous commits', () => {
+describe('useTabAgent under a burst of tab-title store writes', () => {
   beforeEach(() => {
     useAppStore.setState(initialAppState, true)
     useAppStore.setState({
+      tabsByWorktree: { [WORKTREE_ID]: [tabWithTitle('✳ Claude Code')] },
       terminalLayoutsByTabId: {
         [TAB_ID]: {
           root: null,
@@ -74,18 +82,21 @@ describe('useTabAgent under a burst of synchronous commits', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     await act(async () => {
-      root?.render(createElement(HookProbe, { tab: tabWithTitle('✳ Claude Code') }))
+      root?.render(createElement(StoreTabProbe))
     })
 
-    // Why: after a worktree switch each title write is its own sync commit whose passive effects
-    // React flushes inline; a no-op setState there left work pending on every one (crash #298).
-    const retitleBurst = (): void => {
-      for (let i = 0; i < 60; i++) {
-        flushSync(() => {
-          root?.render(createElement(HookProbe, { tab: tabWithTitle(`✳ Claude Code ${i}`) }))
-        })
+    // Why: one microtask per write gives each its own sync commit in one task, so the render a
+    // no-op setState queues never runs between them and React counts every commit as nested.
+    const retitleBurst = async (): Promise<number> => {
+      let landed = 0
+      for (let index = 0; index < RETITLE_COUNT; index += 1) {
+        useAppStore.getState().updateTabTitle(TAB_ID, `✳ Claude Code ${index}`)
+        await Promise.resolve()
+        await Promise.resolve()
+        landed += 1
       }
+      return landed
     }
-    expect(retitleBurst).not.toThrow()
+    await expect(retitleBurst()).resolves.toBe(RETITLE_COUNT)
   })
 })
