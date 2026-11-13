@@ -8,6 +8,7 @@ import {
   markHomeWorktreeCatalogUnavailable,
   type HostWorktreeInfo
 } from '../worktree/home-worktree-info'
+import type { HostTeamLine } from '../hosts/host-team-line'
 import { MobileHostCard } from './MobileHostCard'
 
 vi.mock('react-native', () => ({
@@ -16,7 +17,11 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   View: 'View'
 }))
-vi.mock('lucide-react-native', () => ({ Monitor: 'Monitor', MoreVertical: 'MoreVertical' }))
+vi.mock('lucide-react-native', () => ({
+  Monitor: 'Monitor',
+  MoreVertical: 'MoreVertical',
+  Users: 'Users'
+}))
 vi.mock('./StatusDot', () => ({ StatusDot: 'StatusDot' }))
 
 const host: HostProfile = {
@@ -51,6 +56,7 @@ describe('MobileHostCard', () => {
       verdict?: ConnectionVerdict
       path?: MobileConnectionPath
       credentialStatus?: HostCredentialStatus
+      teamLine?: HostTeamLine | null
     }
   ): Promise<string[]> {
     await act(async () => {
@@ -62,6 +68,7 @@ describe('MobileHostCard', () => {
           path: overrides?.path ?? 'lan',
           credentialStatus: overrides?.credentialStatus,
           worktreeInfo,
+          teamLine: overrides?.teamLine,
           onPress: () => {},
           onLongPress: () => {},
           onOpenActions: () => {}
@@ -137,6 +144,32 @@ describe('MobileHostCard', () => {
 
     expect(lines).not.toContain('0 worktrees')
     expect(lines).not.toContain('Worktree list unavailable')
+  })
+
+  it("draws the host's team: who needs you first, then members and who works", async () => {
+    const lines = await renderCard(loaded, {
+      teamLine: { members: 4, working: 2, needsYou: 1 }
+    })
+
+    expect(lines).toContain('1 needs you')
+    expect(lines).toContain('4 members · 2 working')
+  })
+
+  it('keeps the card as it is for a host that cannot say its team', async () => {
+    const lines = await renderCard(loaded, { teamLine: null })
+
+    expect(lines).toEqual(['Studio', 'Connected', ' · Direct · LAN', '12 worktrees · 2 active'])
+  })
+
+  it('claims no team for a host the phone cannot reach', async () => {
+    const lines = await renderCard(loaded, {
+      state: 'disconnected',
+      verdict: { kind: 'unreachable', label: "Can't reach desktop" },
+      teamLine: { members: 4, working: 2, needsYou: 1 }
+    })
+
+    expect(lines).not.toContain('4 members · 2 working')
+    expect(lines).not.toContain('1 needs you')
   })
 
   it('offers re-pairing when the credential is missing', async () => {
