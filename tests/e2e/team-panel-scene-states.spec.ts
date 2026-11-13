@@ -412,13 +412,9 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       await writeSettings(orcaPage, { theme: 'dark' })
       for (const name of [null, ...files]) {
         const sceneFile = name === null ? undefined : `.orca/scenes/${name}`
-        await orcaPage.evaluate(
-          ([id, file]) =>
-            window.__store!.getState().updateSettings({
-              orchestratorGameProjects: { [id as string]: file ? { sceneFile: file } : {} }
-            }),
-          [repoId, sceneFile] as const
-        )
+        await writeSettings(orcaPage, {
+          orchestratorGameProjects: { [repoId]: sceneFile ? { sceneFile } : {} }
+        })
         // Why both: the host must publish the file, then the panel reads it on its next 20 s refresh.
         await expect
           .poll(
@@ -434,13 +430,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
           .toBe(true)
         await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
         for (const style of STYLES) {
-          await orcaPage.evaluate(
-            (next) =>
-              window
-                .__store!.getState()
-                .updateSettings({ orchestratorGame: { panel: { style: next } } }),
-            style
-          )
+          await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
           // Why Pixel for a themed file's Figures: it has no figures art, and that also proves it applied.
           const quest = name === null || name === 'quest.json'
           const drawn = style === 'figures' && !quest ? 'pixel' : style
