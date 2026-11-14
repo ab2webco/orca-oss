@@ -137,10 +137,11 @@ test('a brief failed team read stays quiet; only a sustained one shows the error
     await expect(errorTitle).toHaveCount(0)
     await expect(retry).toHaveCount(0)
     await expect(leadCard).toBeVisible()
-    for (const width of WIDTHS) {
-      await orcaPage.setViewportSize({ width, height: 900 })
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
+    // Why themes outside: two theme writes keep all eight shots inside the sustained window.
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
         await expect(updating).toBeVisible()
         await expect(errorTitle).toHaveCount(0)
         await orcaPage.screenshot({
@@ -155,10 +156,10 @@ test('a brief failed team read stays quiet; only a sustained one shows the error
     await expect(retry).toBeVisible()
     await expect(updating).toHaveCount(0)
     await expect(leadCard).toBeVisible()
-    for (const width of WIDTHS) {
-      await orcaPage.setViewportSize({ width, height: 900 })
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(orcaPage, theme)
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(orcaPage, theme)
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
         await expect(errorTitle).toBeVisible()
         await orcaPage.screenshot({
           animations: 'disabled',
