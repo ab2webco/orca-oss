@@ -284,6 +284,11 @@ export class ClaudeAccountService {
     )
   }
 
+  /** Refuses up front what setLongLivedToken would refuse, before a sign-in is started. */
+  resolveLongLivedTokenAccountId(accountSelector: string): string {
+    return this.resolveOAuthAccountSelector(accountSelector).id
+  }
+
   private resolveOAuthAccountSelector(selector: string): ClaudeManagedAccount {
     const wanted = selector.trim()
     const accounts = this.store.getSettings().claudeManagedAccounts
