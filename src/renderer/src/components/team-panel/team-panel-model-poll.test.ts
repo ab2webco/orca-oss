@@ -235,6 +235,32 @@ describe('createTeamPanelModelPoller', () => {
     expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
   })
 
+  // Why: a streak nobody polled through is not a sustained failure; one miss on return is still brief.
+  it('starts a new streak when the project comes back after a pause in reads', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValue(new Error('timeout'))
+    const { all, sources } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+    release()
+
+    const other = poller.subscribe({ ...SCOPE, key: 'local|repo-2', repoId: 'repo-2' })
+    await vi.advanceTimersByTimeAsync(100_000)
+    other()
+
+    poller.subscribe(SCOPE)
+    await flush()
+    await flush()
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+  })
+
   it('records the failure class when a streak starts, turns sustained, and recovers', async () => {
     const record = vi.fn()
     const readState = vi

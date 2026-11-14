@@ -78,7 +78,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
   // Why outside the run: leaving the panel ends the run, and a sick host must not cost the team.
   const lastTeams = new Map<string, TeamPanelGameModel>()
   // Why per scope and outside the run: reopening the panel mid-streak must not restart the clock.
-  const failingSince = new Map<string, { at: number; sustained: boolean }>()
+  const failingSince = new Map<string, { at: number; last: number; sustained: boolean }>()
+  // Why two polls: a longer gap means nobody read in between, so the streak proves nothing.
+  const streakGapMs = intervalMs * 2
 
   const endStreak = (scope: TeamPanelScope, recovered: boolean): void => {
     const streak = failingSince.get(scope.key)
@@ -92,8 +94,8 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
   const noteFailure = (scope: TeamPanelScope, stage: ReadStage, error: unknown): boolean => {
     const now = Date.now()
     const streak = failingSince.get(scope.key)
-    if (!streak) {
-      failingSince.set(scope.key, { at: now, sustained: false })
+    if (!streak || now - streak.last > streakGapMs) {
+      failingSince.set(scope.key, { at: now, last: now, sustained: false })
       deps.record?.('team_panel_read_failed', {
         stage,
         failure: failureOf(error),
@@ -101,6 +103,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       })
       return false
     }
+    streak.last = now
     if (!streak.sustained && now - streak.at >= TEAM_READ_SUSTAINED_FAILURE_MS) {
       streak.sustained = true
       deps.record?.('team_panel_read_failed', { stage, failure: failureOf(error), sustained: true })
