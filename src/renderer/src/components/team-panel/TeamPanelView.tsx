@@ -11,7 +11,12 @@ import type {
   TeamTabId
 } from '../../../../shared/team-panel-model-types'
 import { TeamActivityFilterContext, teamActivityRowsOf } from './team-activity-filter'
-import { TeamReadError, TeamReadNotice, TeamReadRetryContext } from './team-panel-read-error'
+import {
+  TeamReadError,
+  TeamReadNotice,
+  TeamReadStatusContext,
+  teamReadStatusOf
+} from './team-panel-read-error'
 import { TeamSessionCount } from './team-panel-session-count'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
@@ -176,6 +181,7 @@ export function TeamPanelView({
   dock?: (model: TeamPanelGameModel) => React.ReactNode
 }): React.JSX.Element {
   const { section, retry } = source
+  const readStatus = useMemo(() => teamReadStatusOf(source), [source])
   const sceneStyle = useTeamSceneStyle()
   const model = section.kind === 'ready' ? section.value : null
   // Why a scope, not an effect: the filter belongs to the list in view, so another tab visit or
@@ -201,9 +207,9 @@ export function TeamPanelView({
       {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
-        <TeamReadRetryContext.Provider value={retry}>
+        <TeamReadStatusContext.Provider value={readStatus}>
           <TeamPanelTabs model={section.value} />
-        </TeamReadRetryContext.Provider>
+        </TeamReadStatusContext.Provider>
       ) : section.kind === 'loading' ? (
         <TeamPanelLoadingState rows={5} />
       ) : section.kind === 'error' ? (

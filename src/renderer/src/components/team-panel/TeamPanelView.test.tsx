@@ -278,6 +278,36 @@ describe('TeamPanelView', () => {
     expect(panelText(container)).toContain('Could not read the team')
   })
 
+  // Why: one slow read while a paired host hangs is not news; the rows stay and a quiet line says so (ORCA-1199).
+  it('keeps the team with a quiet updating line, no error and no retry, after a brief failed read', async () => {
+    const { container } = await render({
+      section: { kind: 'ready', value: game },
+      retry: null,
+      updating: true
+    })
+    const text = panelText(container)
+
+    expect(container.querySelector('[role="tablist"]')).not.toBeNull()
+    expect(text).not.toContain('Could not read the team')
+    expect([...container.querySelectorAll('button')].map((node) => node.textContent)).not.toContain(
+      'Try again'
+    )
+    expect(text.indexOf('Lead')).toBeLessThan(text.indexOf('Updating the team…'))
+    expect(text.indexOf('Updating the team…')).toBeLessThan(text.indexOf('No agents yet'))
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Updating the team…')
+  })
+
+  it('keeps the quiet updating line on the other tabs', async () => {
+    useTeamPanelTabStore.setState({ selected: 'inbox' })
+    const { container } = await render({
+      section: { kind: 'ready', value: game },
+      retry: null,
+      updating: true
+    })
+
+    expect(panelText(container)).toContain('Updating the team…')
+  })
+
   it('shows no read error while the team reads fine', async () => {
     const { container } = await render({ section: { kind: 'ready', value: game }, retry: null })
 

@@ -1,4 +1,5 @@
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { CrashReportBreadcrumbData } from '../../../../shared/crash-reporting'
 import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-result'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
@@ -37,13 +38,28 @@ export type TeamPanelPollDeps = {
   }) => TeamPanelGameModel | null
   /** `scope` is the one the source was read for. */
   publish: (source: TeamPanelModelSource, scope: TeamPanelScope) => void
+  /** Notes a failure streak's start, its turn to sustained, and its end. */
+  record?: (name: string, data: CrashReportBreadcrumbData) => void
 }
+
+/**
+ * How long reads must keep failing before the panel shows the error over the last team.
+ * Why 60 s: three missed 20 s polls; one slow read while a paired host hangs is not news (ORCA-1199).
+ */
+export const TEAM_READ_SUSTAINED_FAILURE_MS = 60_000
 
 // Why 1 s: a restarted host restores the lead's pane within seconds, and 20 s of loading reads as stuck.
 const RESTORING_RETRY_MS = 1_000
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
+
+const failureOf = (error: unknown): 'timeout' | 'error' =>
+  hasRuntimeRpcErrorCode(error, 'runtime_timeout') || /timed out/i.test(messageOf(error))
+    ? 'timeout'
+    : 'error'
+
+type ReadStage = 'game.leads' | 'game.state'
 
 // Why one poller: the activity bar and the panel both read the model, and two polls would
 // double game.state's load on a host that also serves the lead's mod.
@@ -61,9 +77,40 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
   let generation = 0
   // Why outside the run: leaving the panel ends the run, and a sick host must not cost the team.
   const lastTeams = new Map<string, TeamPanelGameModel>()
+  // Why per scope and outside the run: reopening the panel mid-streak must not restart the clock.
+  const failingSince = new Map<string, { at: number; sustained: boolean }>()
+
+  const endStreak = (scope: TeamPanelScope, recovered: boolean): void => {
+    const streak = failingSince.get(scope.key)
+    failingSince.delete(scope.key)
+    if (streak && recovered) {
+      deps.record?.('team_panel_read_recovered', { failedForMs: Date.now() - streak.at })
+    }
+  }
+
+  /** Whether reads for `scope` have now failed for the sustained window. */
+  const noteFailure = (scope: TeamPanelScope, stage: ReadStage, error: unknown): boolean => {
+    const now = Date.now()
+    const streak = failingSince.get(scope.key)
+    if (!streak) {
+      failingSince.set(scope.key, { at: now, sustained: false })
+      deps.record?.('team_panel_read_failed', {
+        stage,
+        failure: failureOf(error),
+        sustained: false
+      })
+      return false
+    }
+    if (!streak.sustained && now - streak.at >= TEAM_READ_SUSTAINED_FAILURE_MS) {
+      streak.sustained = true
+      deps.record?.('team_panel_read_failed', { stage, failure: failureOf(error), sustained: true })
+    }
+    return streak.sustained
+  }
 
   const publishNoTeam = (scope: TeamPanelScope): void => {
     lastTeams.delete(scope.key)
+    endStreak(scope, false)
     deps.publish({ section: { kind: 'unavailable' }, retry: null }, scope)
   }
 
@@ -75,10 +122,12 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     const mine = ++generation
     const { scope } = run
     const retry = (): void => void refresh()
+    let stage: ReadStage = 'game.leads'
     try {
       const found = deps.findCaller(await deps.readLeads(scope.target), scope)
       if (found === 'restoring') {
         if (mine === generation && active === run) {
+          endStreak(scope, false)
           const team = lastTeams.get(scope.key)
           deps.publish(
             { section: team ? { kind: 'ready', value: team } : { kind: 'loading' }, retry: null },
@@ -92,6 +141,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       const caller = found
+      stage = 'game.state'
       const state = caller ? await deps.readState(scope.target, caller) : null
       const [questions, xp] =
         caller && state
@@ -117,6 +167,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       lastTeams.set(scope.key, model)
+      endStreak(scope, true)
       deps.publish({ section: { kind: 'ready', value: model }, retry: null }, scope)
     } catch (error) {
       if (mine !== generation || active !== run) {
@@ -127,8 +178,16 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         publishNoTeam(scope)
         return
       }
+      const sustained = noteFailure(scope, stage, error)
       // Why keep the last team: one failed read says nothing about the team, only about the host.
       const team = lastTeams.get(scope.key)
+      if (team && !sustained) {
+        deps.publish(
+          { section: { kind: 'ready', value: team }, retry: null, updating: true },
+          scope
+        )
+        return
+      }
       deps.publish(
         {
           section: team
