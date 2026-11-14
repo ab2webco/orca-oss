@@ -12,6 +12,7 @@ import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
 import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
 import type { TerminalOpenTarget } from '../session/host-terminal-open'
+import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { teamMemberContextOf, type TeamMemberContext } from './team-drawer-member-context'
 import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
 import type { TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
@@ -254,7 +255,8 @@ export type TeamPeek = { tone: 'question' | 'working' | 'idle'; text: string }
 export function teamPeekOf(
   view: TeamLeadView,
   openQuestions: number,
-  questionTickets: readonly string[] = []
+  questionTickets: readonly string[] = [],
+  words: Pick<TeamCardWords, 'needYou' | 'workingOf' | 'noMembers'> = teamCardWordsOf('en')
 ): TeamPeek {
   const asked = new Set(questionTickets)
   // Why: a waiting member whose ticket already has an open question is that one ask.
@@ -263,16 +265,16 @@ export function teamPeekOf(
   ).length
   const need = openQuestions + waiting
   if (need > 0) {
-    return { tone: 'question', text: `${need} ${need === 1 ? 'needs' : 'need'} you` }
+    return { tone: 'question', text: words.needYou(need) }
   }
   const total = view.members.length
   if (total === 0) {
-    return { tone: 'idle', text: 'No members running' }
+    return { tone: 'idle', text: words.noMembers }
   }
   const working = view.members.filter((one) => one.state === 'working').length
   return {
     tone: working > 0 ? 'working' : 'idle',
-    text: `${working} working · ${total} member${total === 1 ? '' : 's'}`
+    text: words.workingOf(working, total)
   }
 }
 

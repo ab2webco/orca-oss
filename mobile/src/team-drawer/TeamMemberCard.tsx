@@ -3,47 +3,82 @@ import type { CheckStatus } from '../../../src/shared/github/pull-request-types'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamAgeText, type TeamMemberRow } from './team-drawer-model'
+import type { TeamCardWords } from './team-card-words'
 
-const STATE: Record<TeamMemberRow['state'], { text: string; tone: string }> = {
-  waiting: { text: 'Waiting for you', tone: colors.statusRed },
-  working: { text: 'Working', tone: colors.statusGreen },
-  idle: { text: 'Idle', tone: colors.textMuted },
-  done: { text: 'Done', tone: colors.statusPurple }
+const TONE: Record<TeamMemberRow['state'], string> = {
+  waiting: colors.statusRed,
+  working: colors.statusGreen,
+  idle: colors.textMuted,
+  done: colors.statusPurple
 }
 
-const CI: Partial<Record<CheckStatus, { text: string; tone: string }>> = {
-  success: { text: 'CI green', tone: colors.statusGreen },
-  failure: { text: 'CI failing', tone: colors.statusRed },
-  pending: { text: 'CI running', tone: colors.statusAmber }
+const CI_TONE: Partial<Record<CheckStatus, string>> = {
+  success: colors.statusGreen,
+  failure: colors.statusRed,
+  pending: colors.statusAmber
 }
+
+const ciText = (ci: CheckStatus | 'none', words: TeamCardWords): string | null =>
+  ({ success: words.ciGreen, failure: words.ciFailing, pending: words.ciRunning })[
+    ci as 'success'
+  ] ?? null
 
 /** What the member does now; a limit or a logout outranks its tool. */
-function statusOf(member: TeamMemberRow, now: number): { text: string; tone: string } {
+function statusOf(
+  member: TeamMemberRow,
+  now: number,
+  words: TeamCardWords
+): { text: string; tone: string } {
   if (member.needsYou) {
-    return { text: 'Waiting for your answer', tone: colors.statusRed }
+    return { text: words.waitingForAnswer, tone: colors.statusRed }
   }
   if (member.limit) {
     if (member.limit.loggedOut) {
-      return { text: 'Logged out', tone: colors.statusRed }
+      return { text: words.loggedOut, tone: colors.statusRed }
     }
     const resets = member.limit.resetsAt
     return {
       text:
-        resets && resets > now
-          ? `Usage limit · resets in ${teamAgeText(now, resets)}`
-          : 'Usage limit reached',
+        resets && resets > now ? words.limitResetsIn(teamAgeText(now, resets)) : words.limitReached,
       tone: colors.statusAmber
     }
   }
-  return { ...STATE[member.state], text: member.live ?? STATE[member.state].text }
+  return { text: member.live ?? words.state[member.state], tone: TONE[member.state] }
 }
 
-type Props = { member: TeamMemberRow; now: number; onOpenLink: (url: string) => void }
+function usageText(account: NonNullable<TeamMemberRow['account']>): string {
+  const parts = [
+    account.usedPercent === null ? null : `5 h ${account.usedPercent}%`,
+    account.weeklyPercent === null ? null : `7 d ${account.weeklyPercent}%`
+  ]
+  return [account.email, ...parts].filter(Boolean).join(' · ')
+}
 
-export function TeamMemberCard({ member, now, onOpenLink }: Props) {
-  const status = statusOf(member, now)
+type Props = {
+  member: TeamMemberRow
+  now: number
+  words: TeamCardWords
+  expanded: boolean
+  onToggle: () => void
+  onAnswer: () => void
+  onOpenLink: (url: string) => void
+  onOpenTerminal: (terminal: NonNullable<TeamMemberRow['terminal']>) => void
+}
+
+export function TeamMemberCard({
+  member,
+  now,
+  words,
+  expanded,
+  onToggle,
+  onAnswer,
+  onOpenLink,
+  onOpenTerminal
+}: Props) {
+  const status = statusOf(member, now, words)
   const meta = [
     member.model,
+    member.phase ? words.phase[member.phase] : null,
     member.since === null ? null : teamAgeText(member.since, now),
     member.ticketStatus
   ]
@@ -51,43 +86,61 @@ export function TeamMemberCard({ member, now, onOpenLink }: Props) {
     .join(' · ')
   const pr = member.pr
   const account = member.account
-  const ci = pr
-    ? pr.state === 'merged'
-      ? 'Merged'
-      : (CI[pr.ci as CheckStatus]?.text ?? null)
-    : null
-  const ciTone = CI[pr?.ci as CheckStatus]?.tone ?? colors.textMuted
+  const ci = pr ? (pr.state === 'merged' ? words.merged : ciText(pr.ci, words)) : null
+  const ciTone = CI_TONE[pr?.ci as CheckStatus] ?? colors.textMuted
+  const terminal = member.terminal
   return (
     <View style={[styles.card, member.needsYou && styles.needsYou]}>
-      <View style={styles.top}>
-        <Text style={styles.name} numberOfLines={1}>
-          {member.name}
-        </Text>
-        {member.ticket && member.ticket !== member.name ? (
-          <Text style={styles.mono}>{member.ticket}</Text>
+      <Pressable
+        style={styles.head}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={`${member.name}, ${status.text}`}
+        aria-expanded={expanded}
+      >
+        <View style={styles.top}>
+          <Text style={styles.name} numberOfLines={1}>
+            {member.name}
+          </Text>
+          {member.ticket && member.ticket !== member.name ? (
+            <Text style={styles.mono}>{member.ticket}</Text>
+          ) : null}
+          <Text style={[styles.mono, styles.host]} numberOfLines={1}>
+            {member.host ?? words.local}
+          </Text>
+        </View>
+        <View style={styles.statusLine}>
+          <View style={[styles.dot, { backgroundColor: status.tone }]} />
+          <Text
+            style={[styles.status, member.needsYou && { color: status.tone }]}
+            numberOfLines={expanded ? undefined : 1}
+          >
+            {status.text}
+          </Text>
+        </View>
+        {meta ? (
+          <Text style={styles.meta} numberOfLines={2}>
+            {meta}
+          </Text>
         ) : null}
-        <Text style={[styles.mono, styles.host]} numberOfLines={1}>
-          {member.host ?? 'local'}
-        </Text>
-      </View>
-      <View style={styles.statusLine}>
-        <View style={[styles.dot, { backgroundColor: status.tone }]} />
-        <Text style={[styles.status, member.needsYou && { color: status.tone }]} numberOfLines={1}>
-          {status.text}
-        </Text>
-      </View>
-      {meta ? (
-        <Text style={styles.meta} numberOfLines={2}>
-          {meta}
-        </Text>
+        {account ? (
+          <Text style={styles.meta} numberOfLines={1}>
+            {usageText(account)}
+          </Text>
+        ) : null}
+      </Pressable>
+      {member.needsYou ? (
+        <Pressable
+          style={[styles.action, styles.answer]}
+          onPress={onAnswer}
+          accessibilityRole="button"
+          accessibilityLabel={words.answerInInbox}
+        >
+          <Text style={styles.answerText}>{words.answerInInbox}</Text>
+        </Pressable>
       ) : null}
-      {account ? (
-        <Text style={styles.meta} numberOfLines={1}>
-          {account.usedPercent === null
-            ? account.email
-            : `${account.email} · ${account.usedPercent}%`}
-        </Text>
-      ) : null}
+      {expanded && member.title ? <Text style={styles.title}>{member.title}</Text> : null}
+      {expanded && member.summary ? <Text style={styles.meta}>{member.summary}</Text> : null}
       {pr ? (
         <Pressable
           style={styles.prButton}
@@ -101,22 +154,35 @@ export function TeamMemberCard({ member, now, onOpenLink }: Props) {
             <View
               style={styles.heads}
               accessible
-              accessibilityLabel={`CI per push: ${pr.ciHistory.map((head) => head.ci).join(', ')}`}
+              accessibilityLabel={`CI per push: ${pr.ciHistory.map((one) => one.ci).join(', ')}`}
             >
-              {pr.ciHistory.slice(-6).map((head) => (
+              {pr.ciHistory.slice(-6).map((one) => (
                 <View
-                  key={head.headSha}
-                  style={[styles.head, { backgroundColor: CI[head.ci]?.tone ?? colors.textMuted }]}
+                  key={one.headSha}
+                  style={[
+                    styles.dotSmall,
+                    { backgroundColor: CI_TONE[one.ci] ?? colors.textMuted }
+                  ]}
                 />
               ))}
             </View>
           ) : null}
-          {pr.comments ? (
-            <Text style={styles.meta}>
-              {`${pr.comments} comment${pr.comments === 1 ? '' : 's'}`}
-            </Text>
-          ) : null}
+          {pr.comments ? <Text style={styles.meta}>{words.comments(pr.comments)}</Text> : null}
         </Pressable>
+      ) : null}
+      {expanded ? (
+        terminal ? (
+          <Pressable
+            style={[styles.action, styles.outline]}
+            onPress={() => onOpenTerminal(terminal)}
+            accessibilityRole="button"
+            accessibilityLabel={words.openTerminal}
+          >
+            <Text style={styles.outlineText}>{words.openTerminal}</Text>
+          </Pressable>
+        ) : member.host ? (
+          <Text style={styles.meta}>{words.terminalOnHost(member.host)}</Text>
+        ) : null
       ) : null}
     </View>
   )
@@ -130,6 +196,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBase,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle
+  },
+  head: {
+    gap: spacing.xs
   },
   needsYou: {
     borderLeftWidth: 3,
@@ -195,9 +264,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 3
   },
-  head: {
+  dotSmall: {
     width: 6,
     height: 6,
     borderRadius: 3
+  },
+  title: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize
+  },
+  action: {
+    minHeight: MIN_TOUCH_TARGET,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.button
+  },
+  answer: {
+    backgroundColor: colors.textPrimary
+  },
+  answerText: {
+    color: colors.bgBase,
+    fontSize: typography.metaSize + 1,
+    fontWeight: '600'
+  },
+  outline: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle
+  },
+  outlineText: {
+    color: colors.textPrimary,
+    fontSize: typography.metaSize + 1,
+    fontWeight: '600'
   }
 })

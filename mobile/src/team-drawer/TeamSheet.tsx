@@ -7,10 +7,12 @@ import {
   formatLeadTime,
   teamPeekOf,
   type TeamDrawerData,
+  type TeamMemberRow,
   type TeamMetrics,
   type TeamPeek
 } from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
+import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
 
 type TeamTab = 'team' | 'inbox'
@@ -21,12 +23,23 @@ type Props = {
   team: TeamDrawerData
   now: number
   onOpenLink: (url: string) => void
+  onOpenTerminal: (terminal: NonNullable<TeamMemberRow['terminal']>) => void
 }
 
 /** V30's collapsed sheet height. */
 export const TEAM_PEEK_HEIGHT = 60
 
-function PeekBar({ peek, open, onPress }: { peek: TeamPeek; open: boolean; onPress: () => void }) {
+function PeekBar({
+  peek,
+  open,
+  words,
+  onPress
+}: {
+  peek: TeamPeek
+  open: boolean
+  words: TeamCardWords
+  onPress: () => void
+}) {
   const tone = { question: colors.statusRed, working: colors.statusGreen, idle: colors.textMuted }[
     peek.tone
   ]
@@ -35,7 +48,7 @@ function PeekBar({ peek, open, onPress }: { peek: TeamPeek; open: boolean; onPre
       style={styles.peek}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${open ? 'Close' : 'Open'} Team, ${peek.text}`}
+      accessibilityLabel={open ? words.closeTeam(peek.text) : words.openTeam(peek.text)}
       aria-expanded={open}
     >
       <View style={styles.grab} />
@@ -52,16 +65,15 @@ function PeekBar({ peek, open, onPress }: { peek: TeamPeek; open: boolean; onPre
   )
 }
 
-function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
+function MetricsSummary({ metrics, words }: { metrics: TeamMetrics; words: TeamCardWords }) {
   const tiles = [
     metrics.latestDay
-      ? { label: `Merged on ${metrics.latestDay.day}`, value: metrics.latestDay.merged }
+      ? { label: words.mergedOn(metrics.latestDay.day), value: metrics.latestDay.merged }
       : null,
-    // Why the no-break space: a narrow tile wrapped the "d" alone onto its own line.
-    { label: `Merged in ${metrics.windowDays} d`, value: metrics.mergedInWindow },
+    { label: words.mergedIn(metrics.windowDays), value: metrics.mergedInWindow },
     metrics.leadTimeMedianMs === null
       ? null
-      : { label: 'Median lead time', value: formatLeadTime(metrics.leadTimeMedianMs) }
+      : { label: words.medianLeadTime, value: formatLeadTime(metrics.leadTimeMedianMs) }
   ].filter((one) => one !== null)
   return (
     <View style={styles.metrics}>
@@ -80,15 +92,17 @@ function MetricsSummary({ metrics }: { metrics: TeamMetrics }) {
 function TabBar({
   active,
   inboxCount,
+  words,
   onSelect
 }: {
   active: TeamTab
   inboxCount: number
+  words: TeamCardWords
   onSelect: (tab: TeamTab) => void
 }) {
   const tabs: { tab: TeamTab; label: string }[] = [
-    { tab: 'team', label: 'Team' },
-    { tab: 'inbox', label: 'Inbox' }
+    { tab: 'team', label: words.team },
+    { tab: 'inbox', label: words.inbox }
   ]
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
@@ -123,20 +137,23 @@ function TabBar({
 }
 
 /** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that opens to 84%. */
-export function TeamSheet({ open, onOpenChange, team, now, onOpenLink }: Props) {
+export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTerminal }: Props) {
   const { view, questions } = team
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   // Why null until picked: each open lands on the Inbox while a question waits, else on the Team.
   const [picked, setPicked] = useState<TeamTab | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
   if (!view) {
     return null
   }
   const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
+  const words = teamCardWordsOf(view.locale)
   const peek = teamPeekOf(
     view,
     questions.length,
-    questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : []))
+    questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : [])),
+    words
   )
   const close = (): void => {
     setPicked(null)
@@ -144,39 +161,47 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink }: Props) 
   }
   return (
     <View style={[styles.dock, { paddingBottom: insets.bottom }]}>
-      <PeekBar peek={peek} open={false} onPress={() => onOpenChange(true)} />
+      <PeekBar peek={peek} open={false} words={words} onPress={() => onOpenChange(true)} />
       <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
         {/* Why no scrim: the lead's terminal stays readable above the sheet, as in V30. */}
         <Pressable style={styles.above} onPress={close} accessible={false} />
         <View style={[styles.dock, styles.sheet, { height: Math.round(height * 0.84) }]}>
-          <PeekBar peek={peek} open onPress={close} />
+          <PeekBar peek={peek} open words={words} onPress={close} />
           <ScrollView
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}
           >
-            <TabBar active={tab} inboxCount={questions.length} onSelect={setPicked} />
+            <TabBar active={tab} inboxCount={questions.length} words={words} onSelect={setPicked} />
             {tab === 'inbox' ? (
               <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
             ) : (
               <>
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>{`Members (${view.members.length})`}</Text>
+                  <Text style={styles.sectionTitle}>{words.members(view.members.length)}</Text>
                   {view.members.length > 0 ? (
                     view.members.map((member) => (
                       <TeamMemberCard
                         key={member.key}
                         member={member}
                         now={now}
+                        words={words}
+                        expanded={expanded === member.key}
+                        onToggle={() => setExpanded(expanded === member.key ? null : member.key)}
+                        onAnswer={() => setPicked('inbox')}
                         onOpenLink={onOpenLink}
+                        onOpenTerminal={(terminal) => {
+                          close()
+                          onOpenTerminal(terminal)
+                        }}
                       />
                     ))
                   ) : (
-                    <Text style={styles.empty}>No members running.</Text>
+                    <Text style={styles.empty}>{words.noMembersRunning}</Text>
                   )}
                 </View>
                 {view.metrics ? (
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Metrics</Text>
-                    <MetricsSummary metrics={view.metrics} />
+                    <Text style={styles.sectionTitle}>{words.metrics}</Text>
+                    <MetricsSummary metrics={view.metrics} words={words} />
                   </View>
                 ) : null}
               </>

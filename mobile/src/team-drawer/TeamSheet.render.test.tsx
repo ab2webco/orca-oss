@@ -98,6 +98,15 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
     {
       role: 'lead',
       lead: { autostart: false, cap: 4, agent: 'claude' },
+      worktree: { id: 'repo::/lead' },
+      inboxes: [
+        {
+          key: 'ORCA-9',
+          unread: 0,
+          last: { at: 'x', from: 'ORCA-9', subject: 'Tests green, opening the PR' },
+          waiting: []
+        }
+      ],
       agents: [
         member('a', 'ORCA-1 idle one', 'idle'),
         member('b', 'ORCA-7 asker', 'working'),
@@ -105,7 +114,7 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
           workItem: {
             provider: 'plane',
             identifier: 'ORCA-9',
-            title: 't',
+            title: 'Terminal role pill',
             url: 'u',
             status: 'In Progress',
             statusGroup: 'started'
@@ -129,10 +138,13 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
             commentCount: 3
           }
         }),
-        member('d', 'Rho', 'idle', { limit: { resetsAt: null, loggedOut: true } })
+        member('d', 'Rho', 'idle', {
+          limit: { resetsAt: null, loggedOut: true },
+          remote: { host: 'iMac', stateKnown: true }
+        })
       ],
       metrics: {
-        claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37 }],
+        claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37, weeklyPercent: 61 }],
         mergedPerDay: [{ day: '2026-11-02', merged: 4 }],
         leadTime: { medianMs: 2 * 3_600_000, measured: 4 }
       }
@@ -185,6 +197,7 @@ describe('TeamSheet', () => {
     container.remove()
   })
 
+  const onOpenTerminal = vi.fn()
   const render = (team: TeamDrawerData, open: boolean, onOpenChange = vi.fn()) => {
     act(() =>
       root.render(
@@ -195,6 +208,7 @@ describe('TeamSheet', () => {
             team={team}
             now={NOW}
             onOpenLink={() => {}}
+            onOpenTerminal={onOpenTerminal}
           />
         </SafeAreaProvider>
       )
@@ -230,12 +244,64 @@ describe('TeamSheet', () => {
     show(teamWith({ questions: [] }))
     const shown = texts()
     expect(shown).toContain('Edit · terminal-role.ts')
-    expect(shown).toContain('opus · high · 12 min · In Progress')
-    expect(shown).toContain('dev@example.com · 37%')
+    expect(shown).toContain('opus · high · Coding · 12 min · In Progress')
+    expect(shown).toContain('dev@example.com · 5 h 37% · 7 d 61%')
     expect(shown).toContain('CI green')
     expect(shown).toContain('3 comments')
     expect(button('CI per push: failure, success')).toBeDefined()
     expect(shown).toContain('Logged out')
+  })
+
+  it("opens a card on a tap to its ticket title, summary and the member's terminal", () => {
+    const onOpenChange = show(teamWith({ questions: [] }))
+    expect(texts()).not.toContain('Terminal role pill')
+    expect(texts()).not.toContain('Tests green, opening the PR')
+    const card = button('Juno, Edit · terminal-role.ts')
+    expect(card.getAttribute('aria-expanded')).toBe('false')
+    act(() => card.click())
+    expect(card.getAttribute('aria-expanded')).toBe('true')
+    expect(texts()).toContain('Terminal role pill')
+    expect(texts()).toContain('Tests green, opening the PR')
+    act(() => button('Open terminal').click())
+    expect(onOpenTerminal).toHaveBeenCalledWith({
+      worktreeId: 'repo::/lead',
+      tabId: 'c',
+      terminal: null
+    })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it("names the host instead of a terminal button for a paired host's member", () => {
+    show(teamWith({ questions: [] }))
+    act(() => button('Rho, Logged out').click())
+    expect(texts()).toContain('Its terminal is on iMac')
+    expect(document.body.querySelector('[aria-label="Open terminal"]')).toBeNull()
+  })
+
+  it('takes a waiting card to the Inbox in one tap', () => {
+    show(teamWith())
+    act(() => button('Team').click())
+    act(() => button('Answer in Inbox').click())
+    expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it("words the sheet and its cards in the host's language", () => {
+    const team = teamWith()
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    expect(texts()).toContain('1 te necesita')
+    expect(button('Bandeja').getAttribute('aria-selected')).toBe('true')
+    act(() => button('Equipo').click())
+    act(() => button('Juno, Edit · terminal-role.ts').click())
+    const shown = texts()
+    expect(shown).toContain('Miembros (4)')
+    expect(shown).toContain('Esperando tu respuesta')
+    expect(shown).toContain('Responder en Bandeja')
+    expect(shown).toContain('opus · high · Programando · 12 min · In Progress')
+    expect(shown).toContain('Abrir terminal')
+    expect(shown).toContain('Sesión cerrada en la cuenta')
+    expect(shown).toContain('Métricas')
+    expect(shown).toContain('Mergeados en 1 d')
+    expect(button('Cerrar Equipo, 1 te necesita')).toBeDefined()
   })
 
   it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
