@@ -41,6 +41,12 @@ export const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 1
   },
+  hostPickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start'
+  },
   scroll: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm

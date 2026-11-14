@@ -56,11 +56,17 @@ vi.mock('expo-crypto', () => ({ randomUUID: dependencies.randomUUID }))
 
 vi.mock('lucide-react-native', () => ({
   Check: 'Check',
+  ChevronDown: 'ChevronDown',
   ChevronLeft: 'ChevronLeft',
+  Monitor: 'Monitor',
   RefreshCw: 'RefreshCw',
   RotateCcw: 'RotateCcw',
-  User: 'User'
+  User: 'User',
+  Users: 'Users'
 }))
+// Why: the host sheet pulls in gesture-handler and reanimated, which this route test does not load.
+vi.mock('./components/BottomDrawer', () => ({ BottomDrawer: () => null }))
+vi.mock('./transport/use-all-host-clients', () => ({ useAllHostClients: () => [] }))
 
 vi.mock('./transport/host-store', () => ({ loadHosts: dependencies.loadHosts }))
 
