@@ -1493,6 +1493,11 @@ import {
   type HostLoginAgent,
   type HostLoginSessionStarted
 } from './accounts/host-login-session'
+import { ClaudeSetupTokenSessions } from './accounts/claude-setup-token-session'
+import type {
+  ClaudeSetupTokenStarted,
+  ClaudeSetupTokenStatus
+} from '../../shared/claude-setup-token-types'
 import {
   importGithubCliCredentials,
   type GithubCliImportResult
@@ -15104,6 +15109,30 @@ export class OrcaRuntimeService {
 
   cancelHostAccountLogin(sessionId: string): void {
     endHostLogin(sessionId)
+  }
+
+  private readonly setupTokenSessions = new ClaudeSetupTokenSessions({
+    storeToken: (accountId, token) => this.setClaudeLongLivedToken(accountId, token)
+  })
+
+  // Why a caller may be remote here while setClaudeLongLivedToken stays host-only: the
+  // token is minted and stored on this host; only the sign-in link and code cross the wire.
+  beginClaudeSetupToken(accountSelector: string): Promise<ClaudeSetupTokenStarted> {
+    const accountId =
+      this.requireAccountServices().claudeAccounts.resolveLongLivedTokenAccountId(accountSelector)
+    return this.setupTokenSessions.begin(accountId)
+  }
+
+  submitClaudeSetupTokenCode(sessionId: string, code: string): ClaudeSetupTokenStatus {
+    return this.setupTokenSessions.submitCode(sessionId, code)
+  }
+
+  getClaudeSetupTokenStatus(sessionId: string): ClaudeSetupTokenStatus {
+    return this.setupTokenSessions.status(sessionId)
+  }
+
+  cancelClaudeSetupToken(sessionId: string): void {
+    this.setupTokenSessions.cancel(sessionId)
   }
 
   removeCodexAccount(accountId: string): Promise<CodexRateLimitAccountsState> {
