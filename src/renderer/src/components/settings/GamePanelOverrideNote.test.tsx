@@ -88,6 +88,26 @@ describe('the global Panel look row when a project overrides it', () => {
     view.unmount()
   })
 
+  it('names the host when two projects share a name', () => {
+    useAppStore.setState({
+      repos: [
+        { id: 'oss', displayName: 'orca-oss', path: '/r/oss' } as Repo,
+        {
+          id: 'oss-m1',
+          displayName: 'orca-oss',
+          path: '/r/oss',
+          connectionId: 'm1',
+          executionHostId: 'ssh:m1'
+        } as Repo
+      ]
+    })
+    const layer = owner.orchestratorGameProjects!.oss
+    const view = render({ ...owner, orchestratorGameProjects: { oss: layer, 'oss-m1': layer } }, [])
+
+    expect(note(view.container)?.textContent).toContain('orca-oss · m1 uses Game on this machine')
+    view.unmount()
+  })
+
   it('says nothing when every project shows the global look', () => {
     const view = render({ ...owner, orchestratorGame: { panel: { look: 'game' } } }, [])
 

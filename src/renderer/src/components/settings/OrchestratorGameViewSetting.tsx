@@ -165,7 +165,7 @@ export function OrchestratorGameViewRows({
         label={viewTitle()}
         description={translate(
           'auto.components.settings.OrchestratorGameViewSetting.viewDescription',
-          'How Agent Teams terminal panes draw the game, with what it costs. The Team panel has its own Panel look. Each project can change it, and one pane with /orca-game:view.'
+          'How Agent Teams terminal panes draw the game, with what it costs. The Team panel follows it until you pick a Panel look. Each project can change it, and one pane with /orca-game:view.'
         )}
         control={
           <ViewSelect

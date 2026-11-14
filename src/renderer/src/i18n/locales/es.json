@@ -11048,7 +11048,7 @@
           "show": "Mostrar el juego",
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
-          "viewDescription": "Cómo dibujan el juego los paneles de terminal de Agent Teams y lo que cuesta. El panel Team tiene su propia Apariencia del panel. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+          "viewDescription": "Cómo dibujan el juego los paneles de terminal de Agent Teams y lo que cuesta. El panel Team la sigue hasta que eliges una Apariencia del panel. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
         },
         "OrchestratorGamePanelSetting": {
           "advisor": "Advisor",

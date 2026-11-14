@@ -11659,7 +11659,7 @@
           "show": "Show the game",
           "view": "Default view",
           "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
-          "viewDescription": "How Agent Teams terminal panes draw the game, with what it costs. The Team panel has its own Panel look. Each project can change it, and one pane with /orca-game:view."
+          "viewDescription": "How Agent Teams terminal panes draw the game, with what it costs. The Team panel follows it until you pick a Panel look. Each project can change it, and one pane with /orca-game:view."
         },
         "OrchestratorGamePanelSetting": {
           "advisor": "Advisor",
