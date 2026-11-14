@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { View, Pressable, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { Text } from '../../../src/theme/dynamic-type-text'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { ChevronLeft, Check, RefreshCw, User } from 'lucide-react-native'
+import { useFocusEffect, useLocalSearchParams } from 'expo-router'
+import { Check, User } from 'lucide-react-native'
 import { loadHosts } from '../../../src/transport/host-store'
 import { useHostClient } from '../../../src/transport/client-context'
 import { colors, spacing } from '../../../src/theme/mobile-theme'
 import { styles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { AccountsHeader } from '../../../src/accounts/AccountsHeader'
 import { AccountMembersLine } from '../../../src/accounts/AccountMembersLine'
 import { accountMemberNamesOf } from '../../../src/accounts/account-member-names'
 import { useAccountMemberStates } from '../../../src/accounts/account-member-states'
@@ -38,7 +39,6 @@ function errorText(error: unknown): string {
 }
 
 export default function AccountsScreen() {
-  const router = useRouter()
   const insets = useSafeAreaInsets()
   const { hostId } = useLocalSearchParams<{ hostId: string }>()
 
@@ -354,30 +354,13 @@ export default function AccountsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.topRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ChevronLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <View style={styles.titleWrap}>
-          <Text style={styles.heading}>Accounts</Text>
-          {hostName ? (
-            <Text style={styles.subheading} numberOfLines={1}>
-              {hostName}
-            </Text>
-          ) : null}
-        </View>
-        <Pressable
-          style={styles.iconButton}
-          onPress={refresh}
-          disabled={!client || refreshing || connState !== 'connected'}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={colors.textSecondary} />
-          ) : (
-            <RefreshCw size={18} color={colors.textSecondary} />
-          )}
-        </Pressable>
-      </View>
+      <AccountsHeader
+        hostId={hostId}
+        hostName={hostName}
+        refreshing={refreshing}
+        canRefresh={Boolean(client) && !refreshing && connState === 'connected'}
+        onRefresh={refresh}
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
