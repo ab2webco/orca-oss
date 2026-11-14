@@ -287,8 +287,17 @@ export function ProjectGamePanelRows({
   const text = copy()
   const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
-  const named = (field: GamePanelField, value: PanelValue): string =>
-    `${valueNameOf(value)} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
+  const named = (field: GamePanelField, value: PanelValue): string => {
+    const line = `${valueNameOf(value)} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
+    // Why named: the band preview below also draws pixels, and only this row sets the Team panel.
+    return field === 'look'
+      ? translate(
+          'auto.components.settings.OrchestratorGamePanelSetting.teamPanelLook',
+          'Team panel: {{look}}',
+          { look: line }
+        )
+      : line
+  }
   const set = (field: GamePanelField, value: boolean | string | undefined): void => {
     const nextLayer = withGamePanelField(local, field, value as PanelValue | undefined)
     const projects = { ...settings.orchestratorGameProjects, [repoId]: nextLayer }

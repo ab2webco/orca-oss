@@ -11565,7 +11565,8 @@
           "previewFlat": "Flat draws the game as text, with no scene or characters.",
           "terminalBand": "Terminal band",
           "band": "Show the band",
-          "bandDescription": "The pixel scene and HUD in Agent Teams panes."
+          "bandDescription": "The pixel scene and HUD in Agent Teams panes.",
+          "terminalBandDescription": "Drawn at the top of each Agent Teams terminal pane. The Team panel uses Panel look."
         },
         "OrchestratorGameLeadSetting": {
           "cap": "Member cap",
@@ -11684,7 +11685,8 @@
           "styleFigures": "Figures",
           "styleOffice": "Office",
           "stylePixel": "Pixel",
-          "title": "Panel"
+          "title": "Panel",
+          "teamPanelLook": "Team panel: {{look}}"
         },
         "orchestrator-game-style-fallback-note": {
           "text": "This scene has no {{style}} art, so the Team panel draws the scene's own characters in Pixel.",

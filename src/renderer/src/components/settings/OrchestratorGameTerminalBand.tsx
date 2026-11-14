@@ -8,7 +8,13 @@ const bandTitle = (): string =>
 export function TerminalBandGroup({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <div role="group" aria-label={bandTitle()} className="space-y-1 pt-4">
-      <SettingsSubsectionHeader title={bandTitle()} />
+      <SettingsSubsectionHeader
+        title={bandTitle()}
+        description={translate(
+          'auto.components.settings.OrchestratorGameSetting.terminalBandDescription',
+          'Drawn at the top of each Agent Teams terminal pane. The Team panel uses Panel look.'
+        )}
+      />
       {children}
     </div>
   )

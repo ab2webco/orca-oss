@@ -210,6 +210,7 @@ describe('ProjectGamePanelRows', () => {
       { panel: { look: 'game', style: 'office' } }
     )
 
+    expect(view.container.textContent).toContain('Team panel: Game · from orca.yaml')
     expect(view.container.textContent).toContain('Office · from orca.yaml')
     expect(view.container.textContent).toContain('Off · global setting')
     expect(view.container.textContent).toContain('Row under the lead.')

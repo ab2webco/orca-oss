@@ -531,3 +531,51 @@ test('each look picked globally draws in the Team panel', async ({
     await setWindowWidth(electronApp, orcaPage, 1440)
   }
 })
+
+// ORCA-1203: the "pixel banner" the owner saw with Display was the project's terminal band preview.
+test("with Display, the project's band preview reads as the terminal's, apart from the Team panel", async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const layers = OWNER_LAYERS(repoId) as {
+    orchestratorGame: { panel: Record<string, string> }
+    orchestratorGameProjects: Record<string, { panel: Record<string, string> }>
+  }
+  layers.orchestratorGame.panel.look = 'display'
+  layers.orchestratorGameProjects[repoId].panel.look = 'display'
+  await writeSettings(orcaPage, layers as Parameters<typeof window.api.settings.set>[0])
+  const projectSection = await openTarget(orcaPage, repoId)
+  await expectSectionInView(orcaPage, projectSection)
+  const section = orcaPage.locator(`[id="${projectSection}"]`)
+  const band = section.locator('[role="group"][aria-label="Terminal band"]')
+  const preview = band.locator('[data-slot="game-scene-preview"]')
+  await expect(preview).toBeVisible({ timeout: 15_000 })
+  for (const theme of THEMES) {
+    await applySettings(orcaPage, { theme })
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      for (const [name, target] of [
+        ['look-row', section.locator('[aria-label="Panel look"]')],
+        ['band', preview]
+      ] as const) {
+        await target.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`project-display-${name}-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+  }
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await expect(section).toContainText('Team panel: Display · this machine')
+  await expect(band).toContainText(
+    'Drawn at the top of each Agent Teams terminal pane. The Team panel uses Panel look.'
+  )
+  await expect(band.getByRole('radiogroup', { name: 'Show the band' })).toBeVisible()
+  await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+})

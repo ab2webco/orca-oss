@@ -10954,7 +10954,8 @@
           "sceneFileNotText": "no es un archivo de texto",
           "terminalBand": "Banda del terminal",
           "band": "Mostrar la banda",
-          "bandDescription": "La escena pixel y el HUD en los paneles de Agent Teams."
+          "bandDescription": "La escena pixel y el HUD en los paneles de Agent Teams.",
+          "terminalBandDescription": "Se dibuja arriba de cada panel de terminal de Agent Teams. El panel Team usa la Apariencia del panel."
         },
         "OrchestratorGameMemberNamesRow": {
           "label": "Nombres de los miembros",
@@ -11073,7 +11074,8 @@
           "styleFigures": "Figuras",
           "styleOffice": "Oficina",
           "stylePixel": "Pixel",
-          "title": "Panel"
+          "title": "Panel",
+          "teamPanelLook": "Panel Team: {{look}}"
         },
         "orchestrator-game-style-fallback-note": {
           "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo dibuja los personajes de la propia escena en Pixel.",
