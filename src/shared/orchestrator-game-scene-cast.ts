@@ -15,7 +15,7 @@ const CAST_MAX_FRAMES = 4
 const castRow = z.string().regex(/^[!-~]{1,10}$/, 'must be one to ten printable ASCII glyphs')
 const isEven = (rows: readonly string[]): boolean =>
   rows.every((row) => row.length === rows[0]?.length)
-const castFrame = z
+export const castFrame = z
   .array(castRow)
   .min(1)
   .max(CAST_MAX_ROWS)
