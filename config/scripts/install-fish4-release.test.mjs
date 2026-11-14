@@ -19,7 +19,10 @@ function releaseTarball(dir, version) {
   })
   const tarball = path.join(dir, 'fish.tar.xz')
   execFileSync('tar', ['-cJf', tarball, '-C', stage, 'fish'])
-  return { tarball, sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex') }
+  return {
+    tarball,
+    sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex')
+  }
 }
 
 function run({ installed, release = '4.9.3', sha256, isDownloadDown = false, viaCurl = false }) {
@@ -30,7 +33,9 @@ function run({ installed, release = '4.9.3', sha256, isDownloadDown = false, via
   writeFileSync(statusFile, 'ppa\n', 'utf8')
   const fake = mkdtempSync(path.join(dir, 'fake-'))
   // Why a fake sudo that just runs its command: the runner's sudo is passwordless, a test machine's is not.
-  writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 })
+  writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', {
+    mode: 0o755
+  })
   const download = path.join(fake, 'download')
   writeFileSync(
     download,
@@ -77,7 +82,9 @@ exit 1
   const shipped = path.join(installDir, 'fish')
   let shippedVersion = null
   try {
-    shippedVersion = execFileSync(shipped, ['--version'], { encoding: 'utf8' }).trim()
+    shippedVersion = execFileSync(shipped, ['--version'], {
+      encoding: 'utf8'
+    }).trim()
   } catch {
     shippedVersion = null
   }
@@ -189,6 +196,50 @@ describe('pr.yml "Install zsh and fish" step', () => {
     expect(workflow.jobs.shell_contracts['timeout-minutes']).toBeGreaterThanOrEqual(30)
   })
 
+  // Why recomputed here: the first ORCA-1179 sum left out the 3 bounded PPA drops and put the
+  // step at ~29.6 of the job's 30 minutes, with nothing left for the tests it exists to run.
+  it('fits the step worst case in the job with room for checkout, dependencies and the tests', () => {
+    const script = (name) => readFileSync(path.resolve(import.meta.dirname, name), 'utf8')
+    const defaultOf = (source, name) => Number(source.match(new RegExp(`${name}:-(\\d+)`))[1])
+
+    const apt = script('ci-apt.sh')
+    const aptKill = Number(apt.match(/--kill-after=(\d+)s/)[1])
+    const aptPause = Number(apt.match(/^\s*sleep (\d+)$/m)[1])
+    // Two attempts and the pause between them; an install also refreshes lists on the fallback.
+    const aptSeconds = [
+      ...body.matchAll(/CI_APT_TIMEOUT=(\d+)s bash config\/scripts\/ci-apt\.sh (\w+)/g)
+    ]
+      .map(([, deadline, verb]) => {
+        const attempt = Number(deadline) + aptKill
+        return 2 * attempt + aptPause + (verb === 'install' ? attempt : 0)
+      })
+      .reduce((sum, seconds) => sum + seconds, 0)
+
+    const ppa = script('enable-fish4-apt-source.sh')
+    const ppaKill = Number(ppa.match(/--kill-after=(\d+)s/)[1])
+    const backoff = ppa
+      .match(/ORCA_FISH4_BACKOFF_SECONDS:-([\d ]+)/)[1]
+      .trim()
+      .split(/\s+/)
+      .map(Number)
+    const add = defaultOf(ppa, 'ORCA_FISH4_ADD_TIMEOUT') + ppaKill
+    const drop = defaultOf(ppa, 'ORCA_FISH4_DROP_TIMEOUT') + ppaKill
+    const ppaSeconds =
+      (backoff.length + 1) * add + backoff.length * drop + backoff.reduce((a, b) => a + b, 0)
+
+    const curl = script('install-fish4-release.sh').match(/curl [^\n]*\\\n[^\n]*/)[0]
+    const flag = (name) => Number(curl.match(new RegExp(`--${name} (\\d+)`))[1])
+    const releaseSeconds =
+      (flag('retry') + 1) * flag('max-time') + flag('retry') * flag('retry-delay')
+
+    // Healthy runs finish the whole job in under 3 minutes; 5 leaves room for a slow pnpm install.
+    const restOfJobSeconds = 5 * 60
+    const stepSeconds = aptSeconds + ppaSeconds + releaseSeconds
+    expect(stepSeconds + restOfJobSeconds).toBeLessThanOrEqual(
+      workflow.jobs.shell_contracts['timeout-minutes'] * 60
+    )
+  })
+
   function runStep({ isFishDebDown, isZshDown = false }) {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-fish4-step-'))
     const calls = path.join(dir, 'calls.log')
@@ -202,11 +253,17 @@ describe('pr.yml "Install zsh and fish" step', () => {
       readFileSync(path.resolve(import.meta.dirname, 'ci-apt.sh'))
     )
     const fake = mkdtempSync(path.join(dir, 'fake-'))
-    writeFileSync(path.join(fake, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
+    writeFileSync(path.join(fake, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', {
+      mode: 0o755
+    })
     writeFileSync(path.join(fake, 'timeout'), '#!/usr/bin/env bash\nshift 3\nexec "$@"\n', {
       mode: 0o755
     })
-    writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 })
+    writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', {
+      mode: 0o755
+    })
+    // Why: ci-apt.sh skips an install the host's dpkg reports, so a dev machine with zsh passed the fatal case without running it.
+    writeFileSync(path.join(fake, 'dpkg-query'), '#!/usr/bin/env bash\nexit 1\n', { mode: 0o755 })
     writeFileSync(
       path.join(fake, 'apt-get'),
       `#!/usr/bin/env bash
@@ -224,7 +281,11 @@ exit 0
       execFileSync('bash', ['-e', '-c', body], {
         cwd: dir,
         stdio: 'ignore',
-        env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, RUNNER_TEMP: dir }
+        env: {
+          ...process.env,
+          PATH: `${fake}:${process.env.PATH}`,
+          RUNNER_TEMP: dir
+        }
       })
     } catch (error) {
       status = error.status
