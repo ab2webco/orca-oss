@@ -8,3 +8,6 @@ orchestratorGame:
     provider: plane
     project: e665c0d5-22e7-495e-9ecf-3effee3ae370
     workspace: ab2web
+  orchestrator:
+    memberRepos:
+      - github.com/ab2webco/orca-oss
