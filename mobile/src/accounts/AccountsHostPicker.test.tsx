@@ -28,47 +28,49 @@ function textsOf(renderer: ReactTestRenderer): string[] {
 }
 
 describe('AccountsHostPicker', () => {
-  let renderer: ReactTestRenderer | null = null
+  const mounted: { renderer?: ReactTestRenderer } = {}
   afterEach(() => {
-    act(() => renderer?.unmount())
-    renderer = null
+    act(() => mounted.renderer?.unmount())
+    mounted.renderer = undefined
   })
 
   it('lists each host with its state, marks the open one, and opens the one picked', () => {
     const onPick = vi.fn()
     act(() => {
-      renderer = create(
+      mounted.renderer = create(
         createElement(AccountsHostPicker, { visible: true, rows, onPick, onClose: () => {} })
       )
     })
 
-    expect(textsOf(renderer!)).toEqual([
+    expect(textsOf(mounted.renderer!)).toEqual([
       'Accounts on',
       'm1',
       'Connected · 2 Claude accounts',
       'contabo',
       "Can't reach desktop"
     ])
-    expect(renderer!.root.findAllByType('Check')).toHaveLength(1)
-    act(() => renderer!.root.findAllByType('Pressable')[1]!.props.onPress())
+    expect(mounted.renderer!.root.findAllByType('Check')).toHaveLength(1)
+    act(() => mounted.renderer!.root.findAllByType('Pressable')[1]!.props.onPress())
     expect(onPick).toHaveBeenCalledWith('contabo')
   })
 })
 
 describe('AccountMembersLine', () => {
-  let renderer: ReactTestRenderer | null = null
+  const mounted: { renderer?: ReactTestRenderer } = {}
   afterEach(() => {
-    act(() => renderer?.unmount())
-    renderer = null
+    act(() => mounted.renderer?.unmount())
+    mounted.renderer = undefined
   })
 
   it('names who runs on the account, and draws nothing when nobody does', () => {
     act(() => {
-      renderer = create(createElement(AccountMembersLine, { names: ['Lead', 'Merlín', 'Arquera'] }))
+      mounted.renderer = create(
+        createElement(AccountMembersLine, { names: ['Lead', 'Merlín', 'Arquera'] })
+      )
     })
-    expect(textsOf(renderer!)).toEqual(['Lead, Merlín, Arquera'])
+    expect(textsOf(mounted.renderer!)).toEqual(['Lead, Merlín, Arquera'])
 
-    act(() => renderer!.update(createElement(AccountMembersLine, { names: [] })))
-    expect(renderer!.toJSON()).toBeNull()
+    act(() => mounted.renderer!.update(createElement(AccountMembersLine, { names: [] })))
+    expect(mounted.renderer!.toJSON()).toBeNull()
   })
 })
