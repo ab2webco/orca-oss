@@ -19,10 +19,7 @@ function releaseTarball(dir, version) {
   })
   const tarball = path.join(dir, 'fish.tar.xz')
   execFileSync('tar', ['-cJf', tarball, '-C', stage, 'fish'])
-  return {
-    tarball,
-    sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex')
-  }
+  return { tarball, sha256: createHash('sha256').update(readFileSync(tarball)).digest('hex') }
 }
 
 function run({ installed, release = '4.9.3', sha256, isDownloadDown = false, viaCurl = false }) {
@@ -33,9 +30,7 @@ function run({ installed, release = '4.9.3', sha256, isDownloadDown = false, via
   writeFileSync(statusFile, 'ppa\n', 'utf8')
   const fake = mkdtempSync(path.join(dir, 'fake-'))
   // Why a fake sudo that just runs its command: the runner's sudo is passwordless, a test machine's is not.
-  writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', {
-    mode: 0o755
-  })
+  writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 })
   const download = path.join(fake, 'download')
   writeFileSync(
     download,
@@ -82,9 +77,7 @@ exit 1
   const shipped = path.join(installDir, 'fish')
   let shippedVersion = null
   try {
-    shippedVersion = execFileSync(shipped, ['--version'], {
-      encoding: 'utf8'
-    }).trim()
+    shippedVersion = execFileSync(shipped, ['--version'], { encoding: 'utf8' }).trim()
   } catch {
     shippedVersion = null
   }
@@ -253,16 +246,12 @@ describe('pr.yml "Install zsh and fish" step', () => {
       readFileSync(path.resolve(import.meta.dirname, 'ci-apt.sh'))
     )
     const fake = mkdtempSync(path.join(dir, 'fake-'))
-    writeFileSync(path.join(fake, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', {
-      mode: 0o755
-    })
+    writeFileSync(path.join(fake, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
     writeFileSync(path.join(fake, 'timeout'), '#!/usr/bin/env bash\nshift 3\nexec "$@"\n', {
       mode: 0o755
     })
-    writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', {
-      mode: 0o755
-    })
-    // Why: ci-apt.sh skips an install the host's dpkg reports, so a dev machine with zsh passed the fatal case without running it.
+    writeFileSync(path.join(fake, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 })
+    // Why: ci-apt.sh skips what the host's dpkg reports, so a host with zsh passed the fatal case unrun.
     writeFileSync(path.join(fake, 'dpkg-query'), '#!/usr/bin/env bash\nexit 1\n', { mode: 0o755 })
     writeFileSync(
       path.join(fake, 'apt-get'),
@@ -281,11 +270,7 @@ exit 0
       execFileSync('bash', ['-e', '-c', body], {
         cwd: dir,
         stdio: 'ignore',
-        env: {
-          ...process.env,
-          PATH: `${fake}:${process.env.PATH}`,
-          RUNNER_TEMP: dir
-        }
+        env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, RUNNER_TEMP: dir }
       })
     } catch (error) {
       status = error.status
