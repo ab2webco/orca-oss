@@ -40,8 +40,6 @@ const SCENES = [
   { name: 'mario-bros.json', prop: 'none' },
   { name: 'mario-hammer.json', prop: 'hammer' }
 ] as const
-// Why: the panel reads game.state every 20 s (TEAM_REFRESH_MS).
-const REFRESH_WAIT_MS = 21_000
 
 test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
@@ -216,23 +214,35 @@ test("Pixel draws Quest's sword for Quest only, and a scene file's own prop or n
           { timeout: 30_000, message: `game.state never published ${name ?? 'Quest'}` }
         )
         .toBe(true)
-      await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
       await emitCodexHookStatus(endpoint, { ...member, state: 'working', prompt: 'Work' })
       await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
         timeout: 30_000
       })
-      const sword = await colourPixels(orcaPage, SWORD)
-      const hammer = await colourPixels(orcaPage, HAMMER_HEAD)
+      // Why polled on what is drawn: the panel picks the new scene up on its own 20 s refresh, and
+      // Mario follows Quest, so its sword going away is what proves the switch.
+      const drawn = async (): Promise<{ sword: number; hammer: number }> => ({
+        sword: await colourPixels(orcaPage, SWORD),
+        hammer: await colourPixels(orcaPage, HAMMER_HEAD)
+      })
+      const expected = {
+        sword: { sword: true, hammer: false },
+        none: { sword: false, hammer: false },
+        hammer: { sword: false, hammer: true }
+      }[prop]
+      let last = { sword: 0, hammer: 0 }
+      await expect
+        .poll(
+          async () => {
+            last = await drawn()
+            return { sword: last.sword > 0, hammer: last.hammer > 0 }
+          },
+          { timeout: 60_000, message: `${name ?? 'Quest'} never drew its own prop` }
+        )
+        .toEqual(expected)
       testInfo.annotations.push({
         type: 'prop',
-        description: `${name ?? 'quest'}: sword ${sword} px, hammer head ${hammer} px`
+        description: `${name ?? 'quest'}: sword ${last.sword} px, hammer head ${last.hammer} px`
       })
-      if (prop === 'sword') {
-        expect(sword, 'Quest drew no sword').toBeGreaterThan(0)
-      } else {
-        expect(sword, `${name} drew Quest's sword`).toBe(0)
-      }
-      expect(hammer > 0, `${name ?? 'quest'}: hammer drawn`).toBe(prop === 'hammer')
       const label = (name ?? 'quest.json').replace('.json', '')
       for (const render of ['classic', 'hd'] as const) {
         // Why both keys: the panel style must survive the render switch.
