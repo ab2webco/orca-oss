@@ -1,5 +1,6 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { BackHandler } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -398,6 +399,41 @@ describe('TeamSheet', () => {
   it('keeps the window unit on the line of its number', () => {
     show(teamWith({ questions: [] }))
     expect(texts().filter((one) => one.startsWith('Merged in'))).toEqual(['Merged in 1 d'])
+  })
+
+  // Why: a Modal only appears once open, so the peek could not be dragged up into it.
+  it("slides the open sheet in the session's own tree, not a separate window", () => {
+    show(teamWith())
+    expect(container.querySelector('[role="tablist"]')).not.toBeNull()
+    expect(container.contains(button('Close Team, 1 needs you'))).toBe(true)
+  })
+
+  it('closes on a tap above the open sheet', () => {
+    const onOpenChange = show(teamWith())
+    const above = container.querySelector<HTMLElement>('[data-testid="team-sheet-above"]')
+    act(() => above?.click())
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('closes on the Android back button while open, and leaves it alone while closed', () => {
+    const handlers: (() => boolean)[] = []
+    const listen = vi
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        handlers.push(handler as () => boolean)
+        return { remove: () => handlers.splice(handlers.indexOf(handler as () => boolean), 1) }
+      })
+    const onOpenChange = render(teamWith(), false)
+    expect(handlers).toHaveLength(0)
+    show(teamWith(), onOpenChange)
+    expect(handlers).toHaveLength(1)
+    let handled = false
+    act(() => {
+      handled = handlers[0]!()
+    })
+    expect(handled).toBe(true)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    listen.mockRestore()
   })
 
   it('closes from the peek at the top of the open sheet', () => {
