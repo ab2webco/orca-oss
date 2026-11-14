@@ -175,6 +175,13 @@ describe('splitChangedSpecs', () => {
     )
     expect(filesOf(withScene)).not.toContain('tests/e2e/team-panel-work-tabs.spec.ts')
   })
+
+  // Why: a spec with no measured seconds used to weigh its size in bytes, so a 7 KB spec read as 8 shards.
+  it('keeps one new, unmeasured spec on one runner', () => {
+    const shards = splitChangedSpecs(['tests/e2e/team-panel-read-failure.spec.ts'])
+    expect(shards).toHaveLength(1)
+    expect(filesOf(shards[0])).toEqual(['tests/e2e/team-panel-read-failure.spec.ts'])
+  })
 })
 
 describe('main', () => {
