@@ -64,10 +64,7 @@ function run(dir, statusFile, extraEnv = {}) {
     })
     return { status: 0, output: stderr }
   } catch (error) {
-    return {
-      status: error.status,
-      output: `${error.stdout ?? ''}${error.stderr ?? ''}`
-    }
+    return { status: error.status, output: `${error.stdout ?? ''}${error.stderr ?? ''}` }
   }
 }
 
@@ -244,19 +241,13 @@ describe('require-fish4 gate', () => {
       })
       return { status: 0, output: out }
     } catch (error) {
-      return {
-        status: error.status,
-        output: `${error.stdout ?? ''}${error.stderr ?? ''}`
-      }
+      return { status: error.status, output: `${error.stdout ?? ''}${error.stderr ?? ''}` }
     }
   }
 
   // The ticket's actual scenario: fish 3.7 IS installed and the apt source failed.
   it('names the infrastructure when fish 3.7 is present and the source never came up', () => {
-    const { status, output } = runGate({
-      fishVersion: '3.7.0',
-      sourceStatus: 'unavailable'
-    })
+    const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'unavailable' })
     expect(status).toBe(1)
     expect(output).toContain('fish, version 3.7.0')
     expect(output).toContain('INFRASTRUCTURE, not this PR')
@@ -264,10 +255,7 @@ describe('require-fish4 gate', () => {
   })
 
   it('names the infrastructure when fish is absent and the source never came up', () => {
-    const { status, output } = runGate({
-      fishVersion: null,
-      sourceStatus: 'unavailable'
-    })
+    const { status, output } = runGate({ fishVersion: null, sourceStatus: 'unavailable' })
     expect(status).toBe(1)
     expect(output).toContain('INFRASTRUCTURE, not this PR')
     expect(output).not.toContain('DECSET 2031')
@@ -275,10 +263,7 @@ describe('require-fish4 gate', () => {
 
   // ORCA-732: the PPA was added, its key and InRelease answered, but its Packages index 503'd.
   it('names the PPA index, not the package, when the PPA was added and apt still kept 3.7', () => {
-    const { status, output } = runGate({
-      fishVersion: '3.7.0',
-      sourceStatus: 'ppa'
-    })
+    const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'ppa' })
     expect(status).toBe(1)
     expect(output).toContain('INFRASTRUCTURE, not this PR')
     expect(output).toContain('Packages index')
@@ -297,10 +282,7 @@ describe('require-fish4 gate', () => {
   })
 
   it('names the install, not an outage, when the fish 4 release went in but fish is still old', () => {
-    const { status, output } = runGate({
-      fishVersion: '3.7.0',
-      sourceStatus: 'release'
-    })
+    const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: 'release' })
     expect(status).toBe(1)
     expect(output).toContain('DECSET 2031')
     expect(output).toContain('PATH')
@@ -308,20 +290,14 @@ describe('require-fish4 gate', () => {
   })
 
   it('still fails closed when the status file is missing entirely', () => {
-    const { status, output } = runGate({
-      fishVersion: '3.7.0',
-      sourceStatus: null
-    })
+    const { status, output } = runGate({ fishVersion: '3.7.0', sourceStatus: null })
     expect(status).toBe(1)
     expect(output).toContain('status=unknown')
     expect(output).toContain('INFRASTRUCTURE, not this PR')
   })
 
   it('passes on fish 4 without printing either diagnosis', () => {
-    const { status, output } = runGate({
-      fishVersion: '4.0.2',
-      sourceStatus: 'ppa'
-    })
+    const { status, output } = runGate({ fishVersion: '4.0.2', sourceStatus: 'ppa' })
     expect(status).toBe(0)
     expect(output).not.toContain('::error::')
   })
