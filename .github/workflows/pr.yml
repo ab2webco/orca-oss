@@ -232,8 +232,9 @@ jobs:
     runs-on: ubuntu-latest
     # Why: these specs drive real shells and PTYs, so a wedged child hangs the
     # job; healthy runs stay under 3 minutes. Why 30 (ORCA-1179): every network call in
-    # "Install zsh and fish" is bounded, and that step at its worst is about 27 minutes:
-    # 2 updates x ~145s + PPA 4 x 55s + 65s backoff + 2 installs x ~395s + release ~245s.
+    # "Install zsh and fish" is bounded, and that step at its worst is under 25 minutes:
+    # 2 updates x 145s + PPA 345s + fish install 395s + zsh retry 215s + release 245s = 1490s,
+    # which leaves 5 for checkout, dependencies and the tests. The test recomputes this sum.
     timeout-minutes: 30
     env:
       # Why: the suites below gate their live fish tests on the binary, which is
@@ -272,8 +273,9 @@ jobs:
           # Why both shells on one line: pr-workflow-parallelism.test.mjs parses only the
           # first install command in this step to prove the lane really installs them.
           # Why the zsh-only retry: the PPA's fish .deb can 503 while its index answers
-          # (ORCA-737); fish falls through to the release below, zsh stays fatal.
-          CI_APT_TIMEOUT=120s bash config/scripts/ci-apt.sh install -y zsh fish || CI_APT_TIMEOUT=120s bash config/scripts/ci-apt.sh install -y zsh
+          # (ORCA-737); fish falls through to the release below, zsh stays fatal. Why 60s: zsh is
+          # one small .deb, and the job has no room for a second 120s install (ORCA-1179).
+          CI_APT_TIMEOUT=120s bash config/scripts/ci-apt.sh install -y zsh fish || CI_APT_TIMEOUT=60s bash config/scripts/ci-apt.sh install -y zsh
           # Why a second source: the PPA can be added and still 503 its Packages index,
           # which leaves Noble's fish 3.7 (ORCA-732); this fetches the pinned fish 4 release.
           bash config/scripts/install-fish4-release.sh || true

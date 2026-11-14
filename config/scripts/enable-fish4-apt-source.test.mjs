@@ -165,6 +165,32 @@ exit 0
       expect(Date.now() - started).toBeLessThan(15_000)
     }, 25_000)
 
+    // A hung drop must not cost an add's bound: the drop is best effort and has its own, shorter one.
+    it('bounds a hung PPA drop by the drop timeout, not the add timeout', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'orca-fish4-drop-hang-'))
+      await fs.writeFile(
+        path.join(dir, 'sudo'),
+        `#!/usr/bin/env bash
+if [ "$3" = '-r' ]; then
+  exec sleep 30
+fi
+exit 1
+`,
+        { mode: 0o755 }
+      )
+      const statusFile = path.join(dir, 'status')
+      const started = Date.now()
+      const { status } = run(dir, statusFile, {
+        ORCA_FISH4_ADD_TIMEOUT: '20',
+        ORCA_FISH4_DROP_TIMEOUT: '1',
+        ORCA_FISH4_BACKOFF_SECONDS: '0'
+      })
+
+      expect(status).toBe(75)
+      expect((await fs.readFile(statusFile, 'utf8')).trim()).toBe('unavailable')
+      expect(Date.now() - started).toBeLessThan(15_000)
+    }, 25_000)
+
     it('drops the half-added PPA between attempts', async () => {
       const { dir, callLog } = await fakeSudo(1)
       const { status } = run(dir, path.join(dir, 'status'))
