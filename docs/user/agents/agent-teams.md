@@ -34,13 +34,14 @@ terminal and in the history.
 Open **Team** in the right sidebar's activity bar. Without a team the same item is called **Your
 work** and lists your own agent sessions.
 
-| Tab                | With a team | Without a team | Shows                                                            |
-| ------------------ | ----------- | -------------- | ---------------------------------------------------------------- |
-| **Team**           | Yes         | No             | The lead, the advisor when installed, and a card per member      |
-| **Activity**       | No          | Yes            | Each session's prompt, current step, question, model and account |
-| **Inbox**          | Yes         | Yes            | Questions for you, with a red count                              |
-| **PRs**            | Yes         | Yes            | Open PRs with their state, and the merge queue on top            |
-| **Machines**       | Yes         | Yes            | Each host with its free memory and how many agents it runs       |
+- **Team**, with a team only: the lead, the advisor when installed, and a card per member.
+- **Activity**, without a team only: each session's prompt, current step, question, model and
+  account.
+- **Inbox**: questions for you, with a red count.
+- **PRs**: open PRs with their state, and the merge queue on top.
+- **Machines**: each host with its free memory and how many agents it runs.
+
+On the **Team** tab:
 
 - Click a member's card to open its terminal and expand the card: ticket title, branch, last tool,
   PR with CI, helpers, and the account's 5-hour and weekly use. Click again to fold it.

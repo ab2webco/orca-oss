@@ -40,28 +40,26 @@ command takes `--json` for machine-readable output.
 Run these from the lead's terminal, or from any Orca terminal in the project for the read-only
 ones. [Agent Teams](../agents/agent-teams.md) explains the lead and its members.
 
-| Command                                     | What it does                                                                                    |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `orca game lead [--fresh]`                  | Make this session the project's lead. `--fresh` retires the old lead's conversation instead of reopening it. |
-| `orca game leads`                           | List the leads that are live on this Orca host.                                                 |
-| `orca game launch <ticket>`                 | Start one member for a ticket in its own worktree. `--on <host> --repo <selector>` runs it on a paired host; `--account`, `--agent`, `--model` and `--effort` override the project's choice. |
-| `orca game wave [<ticket>,...]`             | Launch members for the named tickets, or fill the free slots from the To Do. `--dry-run` only prints the plan. |
-| `orca game fleet`                           | List the members with their ticket, PR, CI, phase and next step, including paused and found agents. |
-| `orca game state`                           | The game state of the current terminal, including `review.ci` and `review.mergeState`.         |
-| `orca game member <ticket\|character>`      | What one member is doing now and what it did since its launch.                                   |
-| `orca game accounts [--refresh]`            | Every managed account with its 5 h and 7 d use and the members running on it.                   |
-| `orca game move <ticket>`                   | Move a member that hit its account limit onto another account.                                   |
-| `orca game adopt <name\|ticket>`            | Make an agent the fleet found running (here or on a paired host) a member, so mail flows both ways. |
-| `orca game drop <name\|ticket>`             | Take an agent out of the fleet without stopping it or touching its worktree.                     |
-| `orca game sweep [--close]`                 | List finished members and what each leaves pending. `--close` records them in the history and frees their tabs. |
-| `orca game history`                         | The project's freed members: ticket, outcome, PR, character, agent, account and host. Filter with `--ticket`, `--character` or `--since`. |
-| `orca game resume-members`                  | Bring back the members a restart left paused, or free them with `--discard`.                     |
-| `orca game owner-questions`                 | What the lead asked you that still waits for an answer. Answer with `orca game answer-owner`.     |
-| `orca game metrics`                         | Tickets done, lead time and freed members by outcome.                                            |
-| `orca game stop <ticket>\|--all [--hold]`   | Stop members and record them in the history. `--all --hold` also sets a STOP that refuses new launches until `orca game resume`. |
-| `orca game adopt-history --from-repo-id <id>` | Fold the history, lessons and STOP a removed repo id left behind into this project.            |
-| `orca game scene list`                      | List the built-in scenes and the project's scene files. `scene new` and `scene validate` author one. |
-| `orca game view <view> --scope project\|global` | Store the terminal band's view for this project or every project.                            |
+- `orca game lead [--fresh]`: make this session the project's lead. `--fresh` retires the old lead's conversation instead of reopening it.
+- `orca game leads`: list the leads that are live on this Orca host.
+- `orca game launch <ticket>`: start one member for a ticket in its own worktree. `--on <host> --repo <selector>` runs it on a paired host; `--account`, `--agent`, `--model` and `--effort` override the project's choice.
+- `orca game wave [<ticket>,...]`: launch members for the named tickets, or fill the free slots from the To Do. `--dry-run` only prints the plan.
+- `orca game fleet`: list the members with their ticket, PR, CI, phase and next step, including paused and found agents.
+- `orca game state`: the game state of the current terminal, including `review.ci` and `review.mergeState`.
+- `orca game member <ticket|character>`: what one member is doing now and what it did since its launch.
+- `orca game accounts [--refresh]`: every managed account with its 5 h and 7 d use and the members running on it.
+- `orca game move <ticket>`: move a member that hit its account limit onto another account.
+- `orca game adopt <name|ticket>`: make an agent the fleet found running (here or on a paired host) a member, so mail flows both ways.
+- `orca game drop <name|ticket>`: take an agent out of the fleet without stopping it or touching its worktree.
+- `orca game sweep [--close]`: list finished members and what each leaves pending. `--close` records them in the history and frees their tabs.
+- `orca game history`: the project's freed members: ticket, outcome, PR, character, agent, account and host. Filter with `--ticket`, `--character` or `--since`.
+- `orca game resume-members`: bring back the members a restart left paused, or free them with `--discard`.
+- `orca game owner-questions`: what the lead asked you that still waits for an answer. Answer with `orca game answer-owner`.
+- `orca game metrics`: tickets done, lead time and freed members by outcome.
+- `orca game stop <ticket>|--all [--hold]`: stop members and record them in the history. `--all --hold` also sets a STOP that refuses new launches until `orca game resume`.
+- `orca game adopt-history --from-repo-id <id>`: fold the history, lessons and STOP a removed repo id left behind into this project.
+- `orca game scene list`: list the built-in scenes and the project's scene files. `scene new` and `scene validate` author one.
+- `orca game view <view> --scope project|global`: store the terminal band's view for this project or every project.
 
 ```bash
 orca game launch ORCA-101

@@ -1,5 +1,5 @@
 ---
-sourceHash: cddbb86cf2176281
+sourceHash: f8f32e77254de328
 ---
 # Agent Teams
 
@@ -38,13 +38,14 @@ terminal y en el historial.
 Abre **Team** en la barra de actividad de la barra lateral derecha. Sin equipo, el mismo elemento se
 llama **Your work** y lista tus propias sesiones de agente.
 
-| Pestaña            | Con equipo  | Sin equipo     | Muestra                                                          |
-| ------------------ | ----------- | -------------- | ---------------------------------------------------------------- |
-| **Team**           | Sí          | No             | El líder, el advisor si está instalado y una tarjeta por miembro |
-| **Activity**       | No          | Sí             | El prompt, el paso actual, la pregunta, el modelo y la cuenta de cada sesión |
-| **Inbox**          | Sí          | Sí             | Las preguntas para ti, con un contador rojo                      |
-| **PRs**            | Sí          | Sí             | Los PR abiertos con su estado, y la cola de merge arriba         |
-| **Machines**       | Sí          | Sí             | Cada host con su memoria libre y cuántos agentes ejecuta         |
+- **Team**, solo con equipo: el líder, el advisor si está instalado y una tarjeta por miembro.
+- **Activity**, solo sin equipo: el prompt, el paso actual, la pregunta, el modelo y la cuenta de
+  cada sesión.
+- **Inbox**: las preguntas para ti, con un contador rojo.
+- **PRs**: los PR abiertos con su estado, y la cola de merge arriba.
+- **Machines**: cada host con su memoria libre y cuántos agentes ejecuta.
+
+En la pestaña **Team**:
 
 - Haz clic en la tarjeta de un miembro para abrir su terminal y expandir la tarjeta: título del ticket,
   rama, última herramienta, PR con CI, ayudantes y el uso de 5 horas y semanal de la cuenta. Haz clic

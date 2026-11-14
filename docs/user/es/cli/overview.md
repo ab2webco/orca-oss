@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e3adb26df44e16a
+sourceHash: b7bff96884cf1c9b
 ---
 # CLI
 
@@ -44,28 +44,26 @@ comandos aceptan `--json` para una salida legible por máquina.
 Ejecútalos desde la terminal del líder, o desde cualquier terminal de Orca del proyecto en el caso de los de solo
 lectura. [Agent Teams](../agents/agent-teams.md) explica el líder y sus miembros.
 
-| Comando                                     | Qué hace                                                                                        |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `orca game lead [--fresh]`                  | Convierte esta sesión en el líder del proyecto. `--fresh` retira la conversación del líder anterior en lugar de reabrirla. |
-| `orca game leads`                           | Lista los líderes activos en este host de Orca.                                                 |
-| `orca game launch <ticket>`                 | Inicia un miembro para un ticket en su propio worktree. `--on <host> --repo <selector>` lo ejecuta en un host emparejado; `--account`, `--agent`, `--model` y `--effort` sustituyen la elección del proyecto. |
-| `orca game wave [<ticket>,...]`             | Lanza miembros para los tickets indicados, o llena los huecos libres desde el To Do. `--dry-run` solo imprime el plan. |
-| `orca game fleet`                           | Lista los miembros con su ticket, PR, CI, fase y siguiente paso, incluidos los agentes pausados y los encontrados. |
-| `orca game state`                           | El estado del juego de la terminal actual, incluidos `review.ci` y `review.mergeState`.         |
-| `orca game member <ticket\|character>`      | Qué hace ahora un miembro y qué hizo desde su lanzamiento.                                       |
-| `orca game accounts [--refresh]`            | Cada cuenta administrada con su uso de 5 h y 7 d y los miembros que corren en ella.             |
-| `orca game move <ticket>`                   | Mueve a otra cuenta un miembro que llegó al límite de su cuenta.                                 |
-| `orca game adopt <name\|ticket>`            | Convierte en miembro un agente que la flota encontró en ejecución (aquí o en un host emparejado), para que el correo fluya en ambos sentidos. |
-| `orca game drop <name\|ticket>`             | Saca un agente de la flota sin detenerlo ni tocar su worktree.                                   |
-| `orca game sweep [--close]`                 | Lista los miembros terminados y lo que cada uno deja pendiente. `--close` los registra en el historial y libera sus pestañas. |
-| `orca game history`                         | Los miembros liberados del proyecto: ticket, resultado, PR, personaje, agente, cuenta y host. Filtra con `--ticket`, `--character` o `--since`. |
-| `orca game resume-members`                  | Recupera los miembros que un reinicio dejó en pausa, o los libera con `--discard`.               |
-| `orca game owner-questions`                 | Lo que el líder te preguntó y sigue esperando respuesta. Responde con `orca game answer-owner`.  |
-| `orca game metrics`                         | Tickets terminados, lead time y miembros liberados por resultado.                                |
-| `orca game stop <ticket>\|--all [--hold]`   | Detiene miembros y los registra en el historial. `--all --hold` además pone un STOP que rechaza nuevos lanzamientos hasta `orca game resume`. |
-| `orca game adopt-history --from-repo-id <id>` | Incorpora a este proyecto el historial, las lecciones y el STOP que dejó un id de repo eliminado. |
-| `orca game scene list`                      | Lista las escenas incluidas y los archivos de escena del proyecto. `scene new` y `scene validate` crean uno. |
-| `orca game view <view> --scope project\|global` | Guarda la vista de la banda de la terminal para este proyecto o para todos.                  |
+- `orca game lead [--fresh]`: convierte esta sesión en el líder del proyecto. `--fresh` retira la conversación del líder anterior en lugar de reabrirla.
+- `orca game leads`: lista los líderes activos en este host de Orca.
+- `orca game launch <ticket>`: inicia un miembro para un ticket en su propio worktree. `--on <host> --repo <selector>` lo ejecuta en un host emparejado; `--account`, `--agent`, `--model` y `--effort` sustituyen la elección del proyecto.
+- `orca game wave [<ticket>,...]`: lanza miembros para los tickets indicados, o llena los huecos libres desde el To Do. `--dry-run` solo imprime el plan.
+- `orca game fleet`: lista los miembros con su ticket, PR, CI, fase y siguiente paso, incluidos los agentes pausados y los encontrados.
+- `orca game state`: el estado del juego de la terminal actual, incluidos `review.ci` y `review.mergeState`.
+- `orca game member <ticket|character>`: qué hace ahora un miembro y qué hizo desde su lanzamiento.
+- `orca game accounts [--refresh]`: cada cuenta administrada con su uso de 5 h y 7 d y los miembros que corren en ella.
+- `orca game move <ticket>`: mueve a otra cuenta un miembro que llegó al límite de su cuenta.
+- `orca game adopt <name|ticket>`: convierte en miembro un agente que la flota encontró en ejecución (aquí o en un host emparejado), para que el correo fluya en ambos sentidos.
+- `orca game drop <name|ticket>`: saca un agente de la flota sin detenerlo ni tocar su worktree.
+- `orca game sweep [--close]`: lista los miembros terminados y lo que cada uno deja pendiente. `--close` los registra en el historial y libera sus pestañas.
+- `orca game history`: los miembros liberados del proyecto: ticket, resultado, PR, personaje, agente, cuenta y host. Filtra con `--ticket`, `--character` o `--since`.
+- `orca game resume-members`: recupera los miembros que un reinicio dejó en pausa, o los libera con `--discard`.
+- `orca game owner-questions`: lo que el líder te preguntó y sigue esperando respuesta. Responde con `orca game answer-owner`.
+- `orca game metrics`: tickets terminados, lead time y miembros liberados por resultado.
+- `orca game stop <ticket>|--all [--hold]`: detiene miembros y los registra en el historial. `--all --hold` además pone un STOP que rechaza nuevos lanzamientos hasta `orca game resume`.
+- `orca game adopt-history --from-repo-id <id>`: incorpora a este proyecto el historial, las lecciones y el STOP que dejó un id de repo eliminado.
+- `orca game scene list`: lista las escenas incluidas y los archivos de escena del proyecto. `scene new` y `scene validate` crean uno.
+- `orca game view <view> --scope project|global`: guarda la vista de la banda de la terminal para este proyecto o para todos.
 
 ```bash
 orca game launch ORCA-101
