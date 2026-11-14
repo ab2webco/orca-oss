@@ -64,17 +64,17 @@ test('the Team panel never scrolls sideways, with a long member name or no team'
     await ensureTerminalVisible(orcaPage)
     await waitForActivePanePtyId(orcaPage)
     const pane = await waitForActivePaneHookDescriptor(orcaPage)
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
+    await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')
-    }, agent.command)
+    })
     const panel = orcaPage.getByTestId('team-panel')
     await expect(panel).toBeVisible({ timeout: 60_000 })
 

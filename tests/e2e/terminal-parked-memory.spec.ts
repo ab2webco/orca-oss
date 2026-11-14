@@ -17,6 +17,7 @@ import {
   waitForActiveTerminalManager,
   waitForPaneIdentitySnapshot
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: production cold-park hysteresis is 30s. The fast-park env override is
 // scoped to this spec's app launches via orcaAppExtraEnv (same pattern as
@@ -325,13 +326,7 @@ test.describe('Terminal parked memory', () => {
     // and updates the store slice the cold-park hook subscribes to — the same
     // mutation path dead-terminal-repro.spec.ts uses, so no extra launch-env
     // wiring is needed.
-    await orcaPage.evaluate(async () => {
-      const store = window.__store
-      if (!store) {
-        throw new Error('parked memory spec: window.__store is unavailable')
-      }
-      await store.getState().updateSettings({ terminalHiddenViewParking: false })
-    })
+    await writeSettings(orcaPage, { terminalHiddenViewParking: false })
     await expect
       .poll(
         () =>
@@ -572,13 +567,7 @@ async function updateTerminalSettings(
   page: Page,
   patch: { terminalHiddenWorktreeRetentionBudget?: boolean; terminalScrollbackRows?: number }
 ): Promise<void> {
-  await page.evaluate(async (patch) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('updateTerminalSettings: window.__store is unavailable')
-    }
-    await store.getState().updateSettings(patch)
-  }, patch)
+  await writeSettings(page, patch)
 }
 
 async function waitForRetentionBudgetSetting(page: Page, enabled: boolean): Promise<void> {

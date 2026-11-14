@@ -9,6 +9,7 @@
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 const NO_TRANSMIT_TITLE = 'This Orca Lab build sends no telemetry'
@@ -16,10 +17,7 @@ const NO_TRANSMIT_BODY = 'do not send usage counts or any other telemetry'
 const TRANSMIT_BODY = 'Anonymous counts of which features you use'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

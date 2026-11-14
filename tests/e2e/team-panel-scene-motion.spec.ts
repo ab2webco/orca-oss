@@ -114,14 +114,12 @@ test('every Team scene style moves while its team works, with no one entering or
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
       terminal: lead,
@@ -226,13 +224,9 @@ test('every Team scene style moves while its team works, with no one entering or
     expect(reduced, 'the scene only animates without reduced motion').toBe(false)
 
     for (const style of STYLES) {
-      await orcaPage.evaluate(
-        (next) =>
-          window.__store!.getState().updateSettings({
-            orchestratorGame: { panel: { style: next } }
-          }),
-        style
-      )
+      await writeSettings(orcaPage, {
+        orchestratorGame: { panel: { style } }
+      })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -272,9 +266,7 @@ test('every Team scene style moves while its team works, with no one entering or
     }
 
     // Two moments of Pixel per width and theme, a swing apart, to judge the motion against V28.
-    await orcaPage.evaluate(() =>
-      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { style: 'pixel' } } })
-    )
+    await writeSettings(orcaPage, { orchestratorGame: { panel: { style: 'pixel' } } })
     const pixel = panel.locator('[data-team-scene="pixel"]')
     await expect(sceneCanvasIn(pixel)).toBeVisible({ timeout: 30_000 })
     // A sequence across one swing, so the motion can be read frame by frame.

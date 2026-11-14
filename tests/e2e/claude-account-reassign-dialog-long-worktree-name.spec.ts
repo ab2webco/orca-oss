@@ -10,6 +10,7 @@
 
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const ACCOUNT_ID = 'orca-533-account'
 /** One unbroken path long enough to outgrow a `sm:max-w-lg` dialog with nothing to wrap on. */
@@ -45,10 +46,7 @@ const WORKTREE_USAGE_REPORT = {
 
 /** Drives the real setting so the whole window repaints, not just the root class. */
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

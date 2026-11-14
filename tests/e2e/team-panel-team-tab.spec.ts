@@ -89,10 +89,7 @@ async function captureEvery(
 ): Promise<void> {
   const panel = page.getByTestId('team-panel')
   for (const language of ['en', 'es'] as const) {
-    await page.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(page, { uiLanguage: language })
     await check(language)
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
@@ -110,7 +107,7 @@ async function captureEvery(
       }
     }
   }
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(page, { uiLanguage: 'en' })
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
@@ -135,14 +132,12 @@ test('the Team tab shows the live lead and its members from the lead game state'
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        uiLanguage: 'en',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'en',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
 
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
@@ -317,14 +312,14 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await expect(cards).toHaveCount(2)
 
     // Display and Plain come from the real panel look setting: no scene slot, agents by role.
-    const setLook = (look: 'game' | 'display' | 'plain') =>
-      orcaPage.evaluate(async (next) => {
-        const state = window.__store!.getState()
-        const game = state.settings?.orchestratorGame
-        await state.updateSettings({
-          orchestratorGame: { ...game, panel: { ...game?.panel, look: next } }
-        })
-      }, look)
+    const setLook = async (look: 'game' | 'display' | 'plain'): Promise<void> => {
+      const game = await orcaPage.evaluate(
+        () => window.__store!.getState().settings?.orchestratorGame
+      )
+      await writeSettings(orcaPage, {
+        orchestratorGame: { ...game, panel: { ...game?.panel, look } }
+      })
+    }
     const leadCard = panel.locator('[data-team-card="lead"]')
     // ORCA-1094 row 1: with no Lead name the lead is the quest roster's last character, never the worktree.
     const leadName = 'Elaine'
@@ -360,10 +355,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
         expect(row.glyphRight, `status column in ${look}`).toBeLessThanOrEqual(row.textLeft)
       }
       for (const language of ['en', 'es'] as const) {
-        await orcaPage.evaluate(
-          (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-          language
-        )
+        await writeSettings(orcaPage, { uiLanguage: language })
         await expect(leadCard).toContainText(COPY[language].lead)
         for (const width of WIDTHS) {
           await orcaPage.setViewportSize({ width, height: 900 })
@@ -385,7 +377,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await setLook('game')
     await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
 
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
@@ -457,7 +449,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
         await expect(asker.locator('[data-team-helper]')).toHaveCount(3)
       }
     )
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     const askerTab = members[1].paneKey.split(':')[0]
     // Why by tab, not :visible: where both sidebars leave the center 0px wide, the header clips to 0.
     const header = orcaPage.locator(
@@ -469,10 +461,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
     expect((await header.innerText()).match(/ORCA-14/g)).toHaveLength(1)
     await expect(panel).toBeVisible()
     for (const language of ['en', 'es'] as const) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       await expect(header).toContainText(COPY[language].awaited)
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
@@ -505,7 +494,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
     }
 
     // The gear leaves the panel for Settings, so it runs last, back in English at full width.
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     await panel.getByRole('button', { name: 'Project settings' }).click()
     const gameSection = orcaPage.locator('[id^="repo-"][id$="-game"]')

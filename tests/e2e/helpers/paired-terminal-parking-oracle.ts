@@ -17,6 +17,7 @@ import {
   expectHostTerminalsUnmounted,
   type RemoteTab
 } from './paired-terminal-parking-runtime-probes'
+import { writeSettings } from './settings-write'
 
 const TARGET_WORKTREE_COUNT = 6
 const MIN_STAGED_BUFFER_CELLS = 1_000_000
@@ -54,11 +55,9 @@ export async function runPairedTerminalParkingOracle(
         { timeout: 30_000 }
       )
       .toBe(true)
-    await page.evaluate(async () => {
-      await window.__store?.getState().updateSettings({
-        terminalHiddenViewParking: false,
-        terminalHiddenWorktreeRetentionBudget: false
-      })
+    await writeSettings(page, {
+      terminalHiddenViewParking: false,
+      terminalHiddenWorktreeRetentionBudget: false
     })
     const createdTerminals: Omit<RemoteTab, 'originalPtyId'>[] = []
     while (createdTerminals.length < TARGET_WORKTREE_COUNT) {
@@ -138,9 +137,7 @@ export async function runPairedTerminalParkingOracle(
     let maxLagMs = Number.POSITIVE_INFINITY
     let lagProbeStopped = false
     try {
-      await page.evaluate(async () => {
-        await window.__store?.getState().updateSettings({ terminalHiddenViewParking: true })
-      })
+      await writeSettings(page, { terminalHiddenViewParking: true })
       await expect
         .poll(
           () =>

@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 /** Declares a hardcoded brand colour and a fixed pixel size on purpose: both
  *  must be gone by the time the sidebar paints it. */
@@ -29,10 +30,7 @@ const BRAND_SVG = `<?xml version="1.0" encoding="UTF-8"?>
 /** Drives the real setting so the whole window repaints, not just the root
  *  class — a screenshot of a half-applied theme is not evidence of one. */
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -113,9 +111,8 @@ test('badges a nav entry from plugin storage and paints the plugin own icon', as
       BrowserWindow.getAllWindows()[0]?.setSize(1440, 900)
     })
 
-    await orcaPage.evaluate(async () => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
+    await orcaPage.evaluate(() => {
       const state = window.__store?.getState()
       if (!state) {
         throw new Error('store unavailable')

@@ -11,6 +11,7 @@ import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { focusActiveTerminalInput, waitForTerminalOutput } from './helpers/terminal'
 import { getGoldenStubAgentLaunchEnv, GOLDEN_STUB_READY_MARKER } from './helpers/golden-stub-agent'
+import { writeSettings } from './helpers/settings-write'
 
 /** Puts a `claude` shim for the golden stub first on PATH; the New tab menu lists only found agents. */
 function claudeStubEnv(): Record<string, string> {
@@ -36,12 +37,10 @@ test('a Claude tab opened while the repo host is unknown runs the agent once the
   await waitForSessionReady(orcaPage)
   const worktreeId = await waitForActiveWorktree(orcaPage)
   await ensureTerminalVisible(orcaPage)
-  await orcaPage.evaluate(async () => {
-    await window.__store!.getState().updateSettings({
-      defaultTuiAgent: 'claude',
-      agentCmdOverrides: { claude: 'golden-stub-agent' },
-      agentDefaultArgs: { claude: '' }
-    })
+  await writeSettings(orcaPage, {
+    defaultTuiAgent: 'claude',
+    agentCmdOverrides: { claude: 'golden-stub-agent' },
+    agentDefaultArgs: { claude: '' }
   })
   // Why the store and not the menu: agent detection is host-scoped, so the menu drops Claude while
   // the host is unknown; these are the calls its Claude item makes (launch-agent-in-new-tab.ts).

@@ -7,6 +7,7 @@ import {
   waitForActivePanePtyId,
   waitForActiveTerminalManager
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 type WheelReportSample = {
   reportCount: number
@@ -292,9 +293,7 @@ test.describe('terminal TUI wheel reports', () => {
     await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
     await waitForActiveTerminalManager(orcaPage, 30_000)
-    await orcaPage.evaluate(() =>
-      window.__store?.getState().updateSettings({ terminalTuiScrollSensitivity: 1 })
-    )
+    await writeSettings(orcaPage, { terminalTuiScrollSensitivity: 1 })
 
     const samples = await probeSmallMouseWheelReports(orcaPage, 4)
 
@@ -334,9 +333,7 @@ test.describe('terminal TUI wheel reports', () => {
     await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
     await waitForActiveTerminalManager(orcaPage, 30_000)
-    await orcaPage.evaluate(() =>
-      window.__store?.getState().updateSettings({ terminalTuiScrollSensitivity: 1 })
-    )
+    await writeSettings(orcaPage, { terminalTuiScrollSensitivity: 1 })
 
     const ptyId = await waitForActivePanePtyId(orcaPage)
     await execInTerminal(orcaPage, ptyId, `node ${JSON.stringify(VISIBLE_TUI_FIXTURE_PATH)}`)
@@ -395,9 +392,7 @@ test.describe('terminal TUI wheel reports', () => {
     await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
     await waitForActiveTerminalManager(orcaPage, 30_000)
-    await orcaPage.evaluate(() =>
-      window.__store?.getState().updateSettings({ terminalTuiScrollSensitivity: 5 })
-    )
+    await writeSettings(orcaPage, { terminalTuiScrollSensitivity: 5 })
 
     const slow = await probeTimedSmallMouseWheelReports(orcaPage, {
       drainWaitMs: 120,

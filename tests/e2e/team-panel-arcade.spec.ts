@@ -38,10 +38,7 @@ async function everyScreen(
   ready: (language: Language) => Promise<void>
 ): Promise<void> {
   for (const language of ['en', 'es'] as const) {
-    await page.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(page, { uiLanguage: language })
     await ready(language)
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
@@ -97,7 +94,7 @@ test('the Team tab shows the saved plays and the offer, and Play and Keep settle
       paneKey: pane.paneKey
     })
   ).result.terminal.handle
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
 
   // Why a foreground process: a lead pane back at its shell is not a live lead.
   await client.call('terminal.send', {
@@ -147,7 +144,7 @@ test('the Team tab shows the saved plays and the offer, and Play and Keep settle
   })
 
   // Play spends one credit on the host and opens the run in the center, beside the panel.
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   await saved.getByRole('button', { name: COPY.en.play }).click()
   await expect(orcaPage.locator('[data-arcade-tab]').first()).toBeVisible({ timeout: 15_000 })
@@ -171,20 +168,19 @@ test('the Team tab shows the saved plays and the offer, and Play and Keep settle
     await expect(offer).toContainText(COPY[language].offer)
   })
   // Keep saves the play: the card goes and the count shows the two plays now saved.
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   await offer.getByRole('button', { name: 'Keep' }).click()
   await expect(offer).toHaveCount(0, { timeout: 15_000 })
   await expect(saved).toContainText(COPY.en.two, { timeout: 15_000 })
 
   // The panel's arcade setting hides the saved plays; the host keeps them.
-  await orcaPage.evaluate(async () => {
-    const store = window.__store!.getState()
-    const game = store.settings?.orchestratorGame ?? {}
-    await store.updateSettings({
-      orchestratorGame: { ...game, panel: { ...game.panel, arcade: false } }
-    } as never)
-  })
+  const game = await orcaPage.evaluate(
+    () => window.__store!.getState().settings?.orchestratorGame ?? {}
+  )
+  await writeSettings(orcaPage, {
+    orchestratorGame: { ...game, panel: { ...game.panel, arcade: false } }
+  } as never)
   await expect(saved).toHaveCount(0)
   await orcaPage.screenshot({
     animations: 'disabled',

@@ -94,19 +94,19 @@ test('Team cards carry names, live detail and V28 status marks', async ({
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
+    const repoId = await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
-      const repoId = state.getKnownWorktreeById(state.activeWorktreeId!)!.repoId
-      await state.updateSettings({
-        uiLanguage: 'es',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' },
-        orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Alfred' } } },
-        // Why: the panel draws no Jev row with the plugin system off.
-        pluginSystemEnabled: true
-      })
-    }, agent.command)
+      return state.getKnownWorktreeById(state.activeWorktreeId!)!.repoId
+    })
+    await writeSettings(orcaPage, {
+      uiLanguage: 'es',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' },
+      orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Alfred' } } },
+      // Why: the panel draws no Jev row with the plugin system off.
+      pluginSystemEnabled: true
+    })
 
     await client.call('terminal.send', {
       terminal: lead,
@@ -238,14 +238,14 @@ test('Team cards carry names, live detail and V28 status marks', async ({
       'question'
     )
 
-    const setStyle = (next: (typeof STYLES)[number]) =>
-      orcaPage.evaluate((style) => {
-        const state = window.__store!.getState()
-        const game = state.settings?.orchestratorGame
-        return state.updateSettings({
-          orchestratorGame: { ...game, panel: { ...game?.panel, style } }
-        })
-      }, next)
+    const setStyle = async (style: (typeof STYLES)[number]): Promise<void> => {
+      const game = await orcaPage.evaluate(
+        () => window.__store!.getState().settings?.orchestratorGame
+      )
+      await writeSettings(orcaPage, {
+        orchestratorGame: { ...game, panel: { ...game?.panel, style } }
+      })
+    }
     // V28 draws each card's face as the scene draws that character, in every style.
     const faces = panel.locator('canvas[data-team-face]')
     for (const style of STYLES) {

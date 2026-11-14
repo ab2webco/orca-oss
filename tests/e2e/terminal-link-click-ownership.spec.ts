@@ -11,6 +11,7 @@ import {
   waitForTerminalOutput
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const FIXTURE_PATH = path.join(
   process.cwd(),
@@ -135,9 +136,7 @@ test.describe('terminal link click ownership', () => {
     orcaPage
   }, testInfo) => {
     const { mouseLogPath, ptyId, target } = await startMouseAwareLinkFixture(orcaPage, testInfo)
-    await orcaPage.evaluate(async () => {
-      await window.__store?.getState().updateSettings({ terminalLinkActionPopoverEnabled: false })
-    })
+    await writeSettings(orcaPage, { terminalLinkActionPopoverEnabled: false })
 
     await orcaPage.mouse.click(target.x, target.y)
 

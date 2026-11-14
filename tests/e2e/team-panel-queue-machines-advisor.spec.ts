@@ -10,6 +10,7 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: one capture per tab, plugin state, width and theme outruns the CI budget; ORCA_CAPTURE_EVIDENCE=1 runs it.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
@@ -199,10 +200,7 @@ test('PRs opens with the GitHub merge queue, Machines lists this machine alone, 
     await capture('off')
 
     const plugins = (on: boolean): Promise<unknown> =>
-      orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ pluginSystemEnabled: next }),
-        on
-      )
+      writeSettings(orcaPage, { pluginSystemEnabled: on })
     await plugins(true)
     await panel.getByRole('tab', { name: 'Team' }).click()
     await expect(advisor).toContainText(JEV_LINE, { timeout: 30_000 })

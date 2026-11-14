@@ -16,6 +16,7 @@ import {
   installTerminalPtyWriteSpy,
   readTerminalPtyWrites
 } from './helpers/terminal-pty-write-spy'
+import { writeSettings } from './helpers/settings-write'
 
 function keyboardPasteChords(): string[] {
   return process.platform === 'darwin'
@@ -373,9 +374,7 @@ test.describe('terminal paste ownership', () => {
     await waitForSessionReady(orcaPage)
     await waitForActiveWorktree(orcaPage)
     await ensureTerminalVisible(orcaPage)
-    await orcaPage.evaluate(async () => {
-      await window.__store?.getState().updateSettings({ terminalRightClickToPaste: true })
-    })
+    await writeSettings(orcaPage, { terminalRightClickToPaste: true })
     await waitForActiveTerminalManager(orcaPage, 30_000)
     await installTerminalPtyWriteSpy(electronApp)
 

@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 async function openPluginSettings(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -77,9 +78,8 @@ test('runs hello-orca panel, command, and event behind visible consent', async (
   })
 
   try {
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
     const installed = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
       const result = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!result.ok) {
         throw new Error(result.error)
@@ -139,11 +139,10 @@ test('runs hello-orca panel, command, and event behind visible consent', async (
     expect(commandResults.first).toEqual({ pong: true, count: 1, args: { source: 'e2e' } })
     expect(commandResults.second).toEqual({ pong: true, count: 2, args: { source: 'e2e' } })
 
-    await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ devPluginPaths: [sourcePath] })
-      window.__store?.setState({ settings })
+    await writeSettings(orcaPage, { devPluginPaths: [pluginRoot] })
+    await orcaPage.evaluate(async () => {
       await window.api.plugins.refresh()
-    }, pluginRoot)
+    })
 
     await openDemoPanel(orcaPage)
 

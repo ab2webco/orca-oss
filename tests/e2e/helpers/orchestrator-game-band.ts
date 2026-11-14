@@ -6,6 +6,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { ensureTerminalVisible } from './store'
 import { attachRepoAndOpenTerminal } from './orca-restart'
 import { execInTerminal, waitForActivePanePtyId } from './terminal'
+import { writeSettings } from './settings-write'
 
 // The band and Panel are drawn by the orca-game mod inside a real Claude Code, so
 // specs using this need `claude` on PATH and skip without it. Game state comes from
@@ -234,13 +235,12 @@ export async function startGameBand(
 
   await attachRepoAndOpenTerminal(page, testRepoPath)
   await ensureTerminalVisible(page)
-  await page.evaluate(async (theme) => {
-    const settings = await window.api.settings.set({ theme })
+  await writeSettings(page, { theme: options.theme })
+  await page.evaluate(() => {
     const store = window.__store!
-    store.setState({ settings })
     store.getState().setSidebarOpen(false)
     store.getState().setRightSidebarOpen(false)
-  }, options.theme)
+  })
   const ptyId = await waitForActivePanePtyId(page)
   // Neutral prompt, then the demo folder; Claude's fullscreen view hides the shell after.
   await execInTerminal(page, ptyId, `PS1='$ '; cd '${projectDir}'; clear; ./play; exit`)

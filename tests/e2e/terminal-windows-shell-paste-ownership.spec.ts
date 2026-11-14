@@ -18,6 +18,7 @@ import {
   installTerminalPtyWriteSpy,
   readTerminalPtyWrites
 } from './helpers/terminal-pty-write-spy'
+import { writeSettings } from './helpers/settings-write'
 
 type WindowsPasteShell = 'cmd.exe' | 'powershell.exe' | 'wsl.exe' | typeof WINDOWS_GIT_BASH_SHELL
 
@@ -88,7 +89,8 @@ async function createWindowsDefaultShellTerminalTab(
   page: Page,
   shell: WindowsPasteShell
 ): Promise<string> {
-  const tabId = await page.evaluate(async (selectedShell) => {
+  await writeSettings(page, { terminalWindowsShell: shell })
+  const tabId = await page.evaluate(() => {
     const store = window.__store
     if (!store) {
       throw new Error('Store unavailable')
@@ -99,12 +101,11 @@ async function createWindowsDefaultShellTerminalTab(
       throw new Error('No active worktree')
     }
 
-    await state.updateSettings({ terminalWindowsShell: selectedShell })
     const terminal = store.getState().createTab(worktreeId)
     store.getState().setActiveTab(terminal.id)
     store.getState().setActiveTabType('terminal')
     return terminal.id
-  }, shell)
+  })
 
   const tab = page.locator(`[data-testid="sortable-tab"][data-tab-id="${tabId}"]`)
   await expect(tab).toBeVisible()
@@ -179,13 +180,7 @@ async function updateWindowsDefaultShellSetting(
   page: Page,
   shell: WindowsPasteShell
 ): Promise<void> {
-  await page.evaluate(async (selectedShell) => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('Store unavailable')
-    }
-    await store.getState().updateSettings({ terminalWindowsShell: selectedShell })
-  }, shell)
+  await writeSettings(page, { terminalWindowsShell: shell })
 }
 
 test.describe('Windows terminal shell paste ownership', () => {

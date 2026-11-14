@@ -8,6 +8,7 @@ import {
   waitForActiveTerminalManager,
   waitForTerminalOutput
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 // Budget for xterm's 500ms hide timer plus the 800ms fade transition, with room for a late
 // PTY write to re-reveal the bar and restart the timer once or twice.
@@ -237,12 +238,10 @@ test.describe('terminal scrollbar thumb', () => {
     await waitForScrollableBuffer(page)
 
     for (const mode of ['dark', 'light'] as const) {
-      await page.evaluate(async (themeMode) => {
-        await window.__store?.getState().updateSettings({
-          theme: themeMode,
-          terminalUseSeparateLightTheme: themeMode === 'light'
-        })
-      }, mode)
+      await writeSettings(page, {
+        theme: mode,
+        terminalUseSeparateLightTheme: mode === 'light'
+      })
       await page.waitForTimeout(1000)
       await waitForScrollableBuffer(page)
 

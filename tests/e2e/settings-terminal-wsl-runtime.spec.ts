@@ -2,6 +2,7 @@ import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { THEMES, WIDTHS, setTheme, setWindowWidth } from './helpers/settings-window'
+import { writeSettings } from './helpers/settings-write'
 
 const DISTRO = 'Ubuntu-24.04'
 
@@ -34,9 +35,9 @@ test.describe('Settings → Terminal: WSL default runtime on Windows', () => {
   }, testInfo) => {
     await waitForSessionReady(orcaPage)
     await stubWindowsHostWithWsl(electronApp, orcaPage)
-    await orcaPage.evaluate(async () => {
+    await writeSettings(orcaPage, { localWindowsRuntimeDefault: { kind: 'windows-host' } })
+    await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
-      await state.updateSettings({ localWindowsRuntimeDefault: { kind: 'windows-host' } })
       state.setSettingsSearchQuery('')
       state.openSettingsTarget({ pane: 'terminal', repoId: null })
       state.openSettingsPage()

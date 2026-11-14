@@ -8,6 +8,7 @@
 
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const FIXTURE_TOKEN = 'fixture-long-lived-token'
 const NOW = Date.now()
@@ -71,10 +72,7 @@ async function tokenCalls(
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -158,7 +156,7 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
 
   // ORCA-1039: the System default row read 'Use your current this device Claude login.'
   await expect(orcaPage.getByText('Use the Claude login on this device.')).toBeVisible()
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'es' }))
+  await writeSettings(orcaPage, { uiLanguage: 'es' })
   const systemDefaultEs = orcaPage.getByText(
     'Usa el inicio de sesión de Claude en este dispositivo.'
   )
@@ -176,7 +174,7 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
       })
     }
   }
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
 
   await tokenButton(withoutToken).click()

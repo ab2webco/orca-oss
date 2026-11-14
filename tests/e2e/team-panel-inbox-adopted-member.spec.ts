@@ -43,13 +43,11 @@ test('the Inbox names an adopted member, gives it a thread, and credits the pers
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {
       terminal: lead,

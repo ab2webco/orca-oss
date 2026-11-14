@@ -118,11 +118,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 async function setPlugins(page: Page, enabled: boolean): Promise<void> {
-  await page.evaluate(
-    (next) =>
-      window.__store!.getState().updateSettings({ pluginSystemEnabled: next, uiLanguage: 'en' }),
-    enabled
-  )
+  await writeSettings(page, { pluginSystemEnabled: enabled, uiLanguage: 'en' })
 }
 
 async function startAgent(page: Page, client: RuntimeClient, script: string): Promise<string> {
@@ -158,10 +154,7 @@ async function captureCard(
 ) {
   const inboxTab = panel.getByRole('tab', { name: /Inbox|Bandeja/ })
   for (const language of ['en', 'es'] as const) {
-    await page.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(page, { uiLanguage: language })
     await expect(inboxTab).toContainText(INBOX[language])
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
@@ -184,7 +177,7 @@ async function captureCard(
       }
     }
   }
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(page, { uiLanguage: 'en' })
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
@@ -207,10 +200,7 @@ async function captureScene(
   testInfo: { outputPath: (n: string) => string }
 ): Promise<void> {
   for (const language of ['en', 'es'] as const) {
-    await page.evaluate(
-      (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-      language
-    )
+    await writeSettings(page, { uiLanguage: language })
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       for (const theme of THEMES) {
@@ -226,7 +216,7 @@ async function captureScene(
       }
     }
   }
-  await page.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(page, { uiLanguage: 'en' })
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 

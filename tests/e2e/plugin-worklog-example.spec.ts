@@ -18,6 +18,7 @@ import {
   reportContextLifecycle,
   startContextLifecycleRecording
 } from './helpers/execution-context-lifecycle'
+import { writeSettings } from './helpers/settings-write'
 
 const PANEL_TITLE = 'Worklog'
 const AUTOMATION_COMMAND = "require('fs').appendFileSync('worklog-digest.log'"
@@ -33,10 +34,7 @@ async function setTheme(
 ): Promise<void> {
   // ORCA-753: names the main-frame context each call ran against if one is lost.
   lifecycle.mark(`setTheme ${theme} ${where}`)
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -80,9 +78,8 @@ test('installs, consents, mounts and round-trips the worklog example plugin', as
   await cp(join(process.cwd(), 'examples', 'plugins', 'worklog'), pluginRoot, { recursive: true })
 
   try {
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
     const installed = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
       const result = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!result.ok) {
         throw new Error(result.error)

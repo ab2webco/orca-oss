@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const AUTOMATION_TITLE = 'Inbox sync'
 const PLUGIN_NAME = 'Inbox'
@@ -46,10 +47,7 @@ const SCREENSHOT_WIDTHS = [1440, 768, 390, 320]
 /** Drives the real setting so the whole window repaints, not just the root
  *  class — a screenshot of a half-applied theme is not evidence of one. */
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -78,9 +76,8 @@ test('shows the plugin workspace on the row it just contributed', async ({
   await writeFile(join(pluginRoot, 'orca-plugin.json'), JSON.stringify(MANIFEST, null, 2))
 
   try {
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
     const approved = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
       const installed = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!installed.ok) {
         throw new Error(installed.error)

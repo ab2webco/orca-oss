@@ -25,6 +25,7 @@ import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-
 import { cleanupE2EDaemons } from './helpers/electron-process-shutdown'
 import { getGoldenStubAgentLaunchEnv, GOLDEN_STUB_READY_MARKER } from './helpers/golden-stub-agent'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { writeSettings } from './helpers/settings-write'
 
 // ORCA-1128: a tab closed with the X must never come back after a warm or cold restart, and a
 // tab left open must. The close only sticks once main retires the surface and persists it.
@@ -250,12 +251,10 @@ for (const workspaceKind of ['git worktree', 'folder workspace'] as const) {
         }, folderPath)
       }
       await activate(page, workspaceId)
-      await page.evaluate(async () => {
-        await window.__store!.getState().updateSettings({
-          defaultTuiAgent: 'claude',
-          agentCmdOverrides: { claude: 'golden-stub-agent' },
-          agentDefaultArgs: { claude: '' }
-        })
+      await writeSettings(page, {
+        defaultTuiAgent: 'claude',
+        agentCmdOverrides: { claude: 'golden-stub-agent' },
+        agentDefaultArgs: { claude: '' }
       })
 
       const keptFirst = await openShellTab(page, workspaceId)

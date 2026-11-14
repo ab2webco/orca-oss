@@ -19,6 +19,7 @@ import {
   stopPanelNavigationObserver,
   type PanelNavigationObservation
 } from './helpers/plugin-panel-navigation-observer'
+import { writeSettings } from './helpers/settings-write'
 
 type InstalledPanel = {
   pluginKey: string
@@ -96,9 +97,8 @@ async function materializeHostilePlugin(origin: string): Promise<string> {
 }
 
 async function installApprovedPanel(page: Page, sourcePath: string): Promise<InstalledPanel> {
+  await writeSettings(page, { pluginSystemEnabled: true })
   return page.evaluate(async (pluginPath) => {
-    const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-    window.__store?.setState({ settings })
     await window.api.plugins.refresh()
     const installed = await window.api.plugins.install({ kind: 'local-path', path: pluginPath })
     if (!installed.ok) {

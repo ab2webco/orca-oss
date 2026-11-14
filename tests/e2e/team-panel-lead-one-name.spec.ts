@@ -20,7 +20,7 @@ test('the lead keeps the name it first had when the scene and the language chang
   await ensureTerminalVisible(orcaPage)
   await waitForActivePanePtyId(orcaPage)
   const pane = await waitForActivePaneHookDescriptor(orcaPage)
-  await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+  await writeSettings(orcaPage, { uiLanguage: 'en' })
   const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
   const client = new RuntimeClient(userDataDir, 30_000, null, null)
   const lead = (
@@ -79,11 +79,10 @@ test('the lead keeps the name it first had when the scene and the language chang
     { label: 'vigilante-es', scene: 'vigilante', uiLanguage: 'es' }
   ] as const
   for (const step of steps) {
-    await orcaPage.evaluate(
-      ({ scene, uiLanguage }) =>
-        window.__store!.getState().updateSettings({ uiLanguage, orchestratorGame: { scene } }),
-      step
-    )
+    await writeSettings(orcaPage, {
+      uiLanguage: step.uiLanguage,
+      orchestratorGame: { scene: step.scene }
+    })
     await expect.poll(async () => (await stateOf()).config?.scene).toBe(step.scene)
     expect((await stateOf()).leadName, `${step.label}: game.state renamed the lead`).toBe('Elaine')
     await orcaPage.waitForTimeout(REFRESH_WAIT_MS)

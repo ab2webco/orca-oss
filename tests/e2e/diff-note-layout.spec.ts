@@ -1,6 +1,7 @@
 import type { Page, TestInfo } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const NOTE_LINE = 6
 const INITIAL_ZONE_HEIGHT = 88
@@ -75,9 +76,9 @@ test.describe('Diff note layout', () => {
         filePath: `${worktree.path}${separator}${relative}`,
         content: `${lines.join('\n')}\n`
       })
-      await state.updateSettings({ diffDefaultView: 'side-by-side' })
       return relative
     }, worktreeId)
+    await writeSettings(orcaPage, { diffDefaultView: 'side-by-side' })
 
     const added = await orcaPage.evaluate(
       ({ wId, filePath, lineNumber, body }) =>
@@ -118,9 +119,7 @@ test.describe('Diff note layout', () => {
     await assertCardClearsFollowingLine(orcaPage)
     await attachDiffScreenshot(orcaPage, testInfo, 'side-by-side-diff-note-layout')
 
-    await orcaPage.evaluate(() =>
-      window.__store?.getState().updateSettings({ diffDefaultView: 'inline' })
-    )
+    await writeSettings(orcaPage, { diffDefaultView: 'inline' })
     await expect(orcaPage.locator('button:has(svg.lucide-columns-2)')).toBeVisible()
     await assertCardClearsFollowingLine(orcaPage)
     await attachDiffScreenshot(orcaPage, testInfo, 'inline-diff-note-layout')

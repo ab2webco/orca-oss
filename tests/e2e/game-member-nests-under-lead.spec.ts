@@ -9,6 +9,7 @@ import { ensureTerminalVisible, waitForSessionReady, waitForActiveWorktree } fro
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import { worktreeRow } from './worktree-row-locators'
+import { writeSettings } from './helpers/settings-write'
 
 type Lead = { handle: string; worktreeId: string }
 type Started = { state: string; effects: { kind: string; action?: string; warning?: string }[] }
@@ -139,13 +140,11 @@ test('game members nest under their lead before and after a real restart', async
     await attachRepoAndOpenTerminal(first.page, repoPath)
     await waitForSessionReady(first.page)
     // Why an override: the login shell's PATH puts a real codex ahead of any fixture dir.
-    await first.page.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(first.page, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await ensureTerminalVisible(first.page)
     await waitForActivePanePtyId(first.page)
     const leadPane = await waitForActivePaneHookDescriptor(first.page)

@@ -11,6 +11,7 @@ import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { AgentHookEndpoint } from '../../src/shared/agent-hook-endpoint-file'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 
@@ -61,13 +62,11 @@ for (const [plugins, group] of [false, true].flatMap((one) =>
       writeFileSync(testInfo.outputPath('plugins.json'), JSON.stringify(listed))
       const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
       const client = new RuntimeClient(userDataDir, 30_000, null, null)
-      await orcaPage.evaluate(async (command) => {
-        await window.__store!.getState().updateSettings({
-          defaultTuiAgent: 'codex',
-          agentCmdOverrides: { codex: command },
-          agentDefaultArgs: { codex: '' }
-        })
-      }, agent.command)
+      await writeSettings(orcaPage, {
+        defaultTuiAgent: 'codex',
+        agentCmdOverrides: { codex: agent.command },
+        agentDefaultArgs: { codex: '' }
+      })
       const made = await client.call<{ group: { id: string } }>('projectGroup.create', {
         name: 'Folder team',
         ...(group.parentPath ? { parentPath: folder } : {}),
@@ -204,10 +203,7 @@ for (const [plugins, group] of [false, true].flatMap((one) =>
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
-          await orcaPage.evaluate(async (next) => {
-            const settings = await window.api.settings.set({ theme: next })
-            window.__store?.setState({ settings })
-          }, theme)
+          await writeSettings(orcaPage, { theme })
           await orcaPage.waitForTimeout(300)
           const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
           expect(overflow, `panel overflows at ${width}px ${theme}`).toBeLessThanOrEqual(0)

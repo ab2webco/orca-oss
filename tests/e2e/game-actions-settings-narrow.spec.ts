@@ -9,6 +9,7 @@ import path from 'node:path'
 import type { ElectronApplication, Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [390, 320] as const
 // Why: the theme captures outrun the CI budget; ORCA_CAPTURE_EVIDENCE=1 saves them locally.
@@ -30,10 +31,7 @@ const ORCA_YAML = [
 ].join('\n')
 
 async function applySettings(page: Page, patch: Record<string, string>): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set(next)
-    window.__store?.setState({ settings })
-  }, patch)
+  await writeSettings(page, patch)
 }
 
 /** The main window floors at 600px, so phone widths need the floor lifted first. */

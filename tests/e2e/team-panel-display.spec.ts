@@ -6,6 +6,7 @@ import { setTheme, THEMES, WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 const GB = 1024 ** 3
 // Why: every page, width, theme and language outruns the CI budget; ORCA_CAPTURE_EVIDENCE=1 runs it.
@@ -113,11 +114,7 @@ async function rereadPanel(page: Page): Promise<void> {
 }
 
 const setLook = (page: Page, look: 'game' | 'display' | 'plain'): Promise<void> =>
-  page.evaluate(
-    (next) =>
-      window.__store!.getState().updateSettings({ orchestratorGame: { panel: { look: next } } }),
-    look
-  )
+  writeSettings(page, { orchestratorGame: { panel: { look } } })
 
 // A soft check: names every label the narrow panel cuts and every block row squeezed to nothing.
 async function expectNothingCut(page: Page, label: string): Promise<void> {
@@ -247,10 +244,7 @@ test('the Display look draws a metrics carousel from real game.state metrics', a
     ).toHaveAttribute('aria-label', '5')
 
     for (const language of LANGUAGES) {
-      await orcaPage.evaluate(
-        (next) => window.__store!.getState().updateSettings({ uiLanguage: next }),
-        language
-      )
+      await writeSettings(orcaPage, { uiLanguage: language })
       await carousel.getByRole('button', { name: PAUSE[language] }).click()
       await carousel.getByRole('button', { name: PAGES[language][0] }).click()
       for (const name of PAGES[language]) {
@@ -284,7 +278,7 @@ test('the Display look draws a metrics carousel from real game.state metrics', a
     }
 
     // A host that publishes no metrics: every page says what it lacks.
-    await orcaPage.evaluate(() => window.__store!.getState().updateSettings({ uiLanguage: 'en' }))
+    await writeSettings(orcaPage, { uiLanguage: 'en' })
     await setOverlay(electronApp, {})
     await rereadPanel(orcaPage)
     await carousel.getByRole('button', { name: PAUSE.en }).click()

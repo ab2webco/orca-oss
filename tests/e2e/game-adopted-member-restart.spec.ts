@@ -12,6 +12,7 @@ import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpe
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 const ADOPTED = 'Adoptee'
 
@@ -44,13 +45,11 @@ test('an adopted member keeps its tab, membership, name and thread across a cold
     let page = launch.page
     const worktreeId = await attachRepoAndOpenTerminal(page, repoPath)
     await waitForSessionReady(page)
-    await page.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(page, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await ensureTerminalVisible(page)
     await waitForActivePanePtyId(page)
     const pane = await waitForActivePaneHookDescriptor(page)

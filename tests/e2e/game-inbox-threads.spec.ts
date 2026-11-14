@@ -8,14 +8,12 @@ import { openTeamInbox, postLeadAgentRow } from './helpers/team-panel-inbox'
 import { waitForRuntimeWorktree } from './helpers/game-cycle-contract'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameInboxThreads } from '../../src/shared/orchestrator-game-inbox-threads'
+import { writeSettings } from './helpers/settings-write'
 
 const WIDTHS = [1440, 768, 390, 320]
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -43,13 +41,11 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      await window.__store?.getState().updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
 
     // Why a foreground process: a lead pane back at its shell is not a live lead.
     await client.call('terminal.send', {

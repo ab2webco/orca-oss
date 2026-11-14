@@ -15,6 +15,7 @@ import {
   waitForActiveTerminalManager,
   waitForPaneCount
 } from './helpers/terminal'
+import { writeSettings } from './helpers/settings-write'
 
 const FRAME_FIXTURE = path.join(process.cwd(), 'tests/e2e/fixtures/claude-dock-frame.cjs')
 const CAPTURES = path.join(
@@ -141,10 +142,7 @@ async function clipboardAfter(
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
 }
 
 async function setWindowWidth(app: ElectronApplication, page: Page, width: number): Promise<void> {
@@ -196,10 +194,7 @@ test.describe('copying beside a docked Claude Code pane', () => {
     orcaPage
   }) => {
     const layout = await paintFrame(orcaPage, true)
-    await orcaPage.evaluate(async () => {
-      const settings = await window.api.settings.set({ terminalClipboardOnSelect: true })
-      window.__store?.setState({ settings })
-    })
+    await writeSettings(orcaPage, { terminalClipboardOnSelect: true })
 
     const onSelect = await clipboardAfter(electronApp, () => dragOverCommands(orcaPage, layout))
     expect(await rawSelection(orcaPage), 'the drag did not cross the Panel border').toContain('│')

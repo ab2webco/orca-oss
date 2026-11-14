@@ -1,6 +1,7 @@
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { clickWithoutFrameDependency, disableCssAnimations } from './helpers/frame-independent-ui'
+import { writeSettings } from './helpers/settings-write'
 
 type FakeMicrophoneDevice = {
   deviceId: string
@@ -63,27 +64,19 @@ async function prepareVoiceSettings(
   microphoneDeviceId: string | null,
   microphoneDeviceLabel: string | null
 ): Promise<void> {
-  await page.evaluate(
-    async ({ microphoneDeviceId, microphoneDeviceLabel }) => {
-      const store = window.__store
-      const settings = await window.api.settings.get()
-      if (!store || !settings.voice) {
-        throw new Error('Voice settings are not available')
-      }
-      await store.getState().updateSettings({
-        uiLanguage: 'en',
-        voice: {
-          ...settings.voice,
-          enabled: true,
-          microphoneDeviceId,
-          microphoneDeviceLabel
-        }
-      })
-      store.getState().openSettingsTarget({ pane: 'voice', repoId: null })
-      store.getState().openSettingsPage()
-    },
-    { microphoneDeviceId, microphoneDeviceLabel }
-  )
+  const voice = await page.evaluate(() => window.__store?.getState().settings?.voice)
+  if (!voice) {
+    throw new Error('Voice settings are not available')
+  }
+  await writeSettings(page, {
+    uiLanguage: 'en',
+    voice: { ...voice, enabled: true, microphoneDeviceId, microphoneDeviceLabel }
+  })
+  await page.evaluate(() => {
+    const store = window.__store!
+    store.getState().openSettingsTarget({ pane: 'voice', repoId: null })
+    store.getState().openSettingsPage()
+  })
   await expect(page.getByPlaceholder('Search settings')).toBeVisible()
   const featureTipDialog = page.getByRole('dialog', { name: 'Voice Dictation is here' })
   if (await featureTipDialog.isVisible().catch(() => false)) {

@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const OBSERVE_COPY =
   'Receive a copy of the notifications Orca Lab raises, even ones this computer does not show, ' +
@@ -33,10 +34,7 @@ const MANIFEST = {
 const SCREENSHOT_WIDTHS = [1440, 768, 390, 320]
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -65,9 +63,8 @@ test('tells the user what a notifications:observe plugin receives before consent
   await writeFile(join(pluginRoot, 'worker.mjs'), 'export {}\n')
 
   try {
+    await writeSettings(orcaPage, { pluginSystemEnabled: true })
     const installed = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true })
-      window.__store?.setState({ settings })
       const result = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!result.ok) {
         throw new Error(result.error)

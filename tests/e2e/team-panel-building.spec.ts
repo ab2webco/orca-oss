@@ -8,6 +8,7 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+import { writeSettings } from './helpers/settings-write'
 
 const GB = 1024 ** 3
 const machine = (cores: number, total: number, free: number) => ({
@@ -105,14 +106,11 @@ test('the Team panel draws a team on five machines as a building in Office', asy
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
-      const state = window.__store!.getState()
-      await state.updateSettings({
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
     await client.call('terminal.send', {
       terminal: lead,
       text: 'node -e "setInterval(() => {}, 1e9)"',

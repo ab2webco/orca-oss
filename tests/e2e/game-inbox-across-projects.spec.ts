@@ -9,12 +9,10 @@ import { expectPlaceholdersFit } from './helpers/placeholder-fit'
 import { openTeamInbox } from './helpers/team-panel-inbox'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { GameOwnerQuestion } from '../../src/shared/orchestrator-game-owner-questions'
+import { writeSettings } from './helpers/settings-write'
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))

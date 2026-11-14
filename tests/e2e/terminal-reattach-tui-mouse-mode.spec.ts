@@ -19,6 +19,7 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
+import { writeSettings } from './helpers/settings-write'
 
 const VISIBLE_TUI_FIXTURE_PATH = path.join(
   process.cwd(),
@@ -198,9 +199,7 @@ test.describe('terminal reattach mouse mode', () => {
       await ensureTerminalVisible(secondLaunch.page)
       await waitForActiveTerminalManager(secondLaunch.page, 30_000)
       await waitForPaneCount(secondLaunch.page, 1, 30_000)
-      await secondLaunch.page.evaluate(() =>
-        window.__store?.getState().updateSettings({ terminalTuiScrollSensitivity: 1 })
-      )
+      await writeSettings(secondLaunch.page, { terminalTuiScrollSensitivity: 1 })
 
       // Beacon: drive one report straight down the PTY so the TUI repaints
       // `offset=1`. That row can only reach the pane through the reattach

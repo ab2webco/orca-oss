@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
+import { writeSettings } from './helpers/settings-write'
 
 const SCREENSHOT_WIDTHS = [1440, 768, 390, 320]
 
@@ -46,10 +47,7 @@ async function openPluginSettings(page: Page): Promise<void> {
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate(async (next) => {
-    const settings = await window.api.settings.set({ theme: next })
-    window.__store?.setState({ settings })
-  }, theme)
+  await writeSettings(page, { theme })
   await expect
     .poll(async () =>
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
@@ -104,14 +102,13 @@ test('restarts a running dev plugin worker after a refresh replaces it', async (
   })
 
   try {
-    await orcaPage.evaluate(async (root) => {
-      const settings = await window.api.settings.set({
-        pluginSystemEnabled: true,
-        devPluginPaths: [root]
-      })
-      window.__store?.setState({ settings })
+    await writeSettings(orcaPage, {
+      pluginSystemEnabled: true,
+      devPluginPaths: [pluginRoot]
+    })
+    await orcaPage.evaluate(async () => {
       await window.api.plugins.refresh()
-    }, pluginRoot)
+    })
     await approve(orcaPage, pluginKey)
     expect(await pluginStatus(orcaPage, pluginKey)).toBe('idle')
     await orcaPage.evaluate(
@@ -148,17 +145,13 @@ test('keeps a trusted dev folder approved across edits and re-reviews an untrust
   }
 
   try {
-    await orcaPage.evaluate(
-      async (roots) => {
-        const settings = await window.api.settings.set({
-          pluginSystemEnabled: true,
-          devPluginPaths: roots
-        })
-        window.__store?.setState({ settings })
-        await window.api.plugins.refresh()
-      },
-      [trustedRoot, untrustedRoot]
-    )
+    await writeSettings(orcaPage, {
+      pluginSystemEnabled: true,
+      devPluginPaths: [trustedRoot, untrustedRoot]
+    })
+    await orcaPage.evaluate(async () => {
+      await window.api.plugins.refresh()
+    })
 
     await openPluginSettings(orcaPage)
     await orcaPage.getByRole('tab', { name: /^Installed/ }).click()

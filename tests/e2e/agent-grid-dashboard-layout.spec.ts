@@ -16,6 +16,7 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { writeSettings } from './helpers/settings-write'
 
 // The grid shipped with zero E2E coverage and all three of its real defects were
 // integration, not cell logic (ORCA-281). Everything here is measured off the DOM
@@ -113,9 +114,8 @@ async function seedAgentStatus(
 async function openAgentGrid(page: Page): Promise<void> {
   // The in-window drawer host is behind an experimental setting; E2E profiles
   // ship production defaults, so it renders nothing until this is on.
-  await page.evaluate(async () => {
-    const settings = await window.api.settings.set({ experimentalAgentDashboardPopout: true })
-    window.__store?.setState({ settings })
+  await writeSettings(page, { experimentalAgentDashboardPopout: true })
+  await page.evaluate(() => {
     window.__store?.getState().setSidebarOpen?.(true)
   })
   await page.evaluate(() => {

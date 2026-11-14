@@ -26,14 +26,12 @@ test('a team in a folder workspace gets its cards, names and faces', async ({
     await waitForSessionReady(orcaPage)
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     const client = new RuntimeClient(userDataDir, 30_000, null, null)
-    await orcaPage.evaluate(async (command) => {
-      await window.__store!.getState().updateSettings({
-        uiLanguage: 'es',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' }
-      })
-    }, agent.command)
+    await writeSettings(orcaPage, {
+      uiLanguage: 'es',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' }
+    })
 
     const added = await client.call<{ repo: { id: string } }>('repo.add', {
       path: folder,

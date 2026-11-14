@@ -173,18 +173,18 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
-    await orcaPage.evaluate(async (command) => {
+    const repoId = await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
-      const repoId = state.getKnownWorktreeById(state.activeWorktreeId!)!.repoId
-      await state.updateSettings({
-        uiLanguage: 'es',
-        defaultTuiAgent: 'codex',
-        agentCmdOverrides: { codex: command },
-        agentDefaultArgs: { codex: '' },
-        orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Castillo' } } }
-      })
-      state.setRightSidebarOpen(false)
-    }, agent.command)
+      return state.getKnownWorktreeById(state.activeWorktreeId!)!.repoId
+    })
+    await writeSettings(orcaPage, {
+      uiLanguage: 'es',
+      defaultTuiAgent: 'codex',
+      agentCmdOverrides: { codex: agent.command },
+      agentDefaultArgs: { codex: '' },
+      orchestratorGameProjects: { [repoId]: { orchestrator: { label: 'Castillo' } } }
+    })
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
 
     await client.call('terminal.send', {
       terminal: lead,
@@ -418,12 +418,11 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
     // Plain mode names a member by its ticket only and the lead by its role.
     await orcaPage.setViewportSize({ width: 1440, height: 720 })
     await setTheme(orcaPage, 'dark')
-    await orcaPage.evaluate(() => {
-      const state = window.__store!.getState()
-      const game = state.settings?.orchestratorGame
-      return state.updateSettings({
-        orchestratorGame: { ...game, panel: { ...game?.panel, look: 'plain' } }
-      })
+    const game = await orcaPage.evaluate(
+      () => window.__store!.getState().settings?.orchestratorGame
+    )
+    await writeSettings(orcaPage, {
+      orchestratorGame: { ...game, panel: { ...game?.panel, look: 'plain' } }
     })
     await expect(knightRow.locator('[data-team-row-part="name"] b')).toHaveText('ORCA-1142', {
       timeout: 60_000

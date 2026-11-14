@@ -9,6 +9,7 @@ import {
 } from './helpers/source-control-ai-generation'
 import { writeLinkedIssueEchoGenerator } from './helpers/source-control-ai-generators'
 import { waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
 
 // Why: the PR path reads the echoed issue from the generated title.
 function writeLinkedIssuePrEchoGenerator(scriptPath: string, base: string): void {
@@ -48,33 +49,32 @@ test.describe('Source Control AI pull request linkedIssue', () => {
 
       try {
         await orcaPage.evaluate(
-          async ({ generatorPath, linkedIssue, worktreeId }) => {
+          async ({ linkedIssue, worktreeId }) => {
             const store = window.__store
             if (!store) {
               throw new Error('window.__store is not available')
             }
             await window.api.worktrees.updateMeta({ worktreeId, updates: { linkedIssue } })
-            const customAgentCommand = `node ${JSON.stringify(generatorPath)}`
-            await store.getState().updateSettings({
-              activeRuntimeEnvironmentId: null,
-              sourceControlAi: {
-                enabled: true,
-                agentId: 'custom' as const,
-                selectedModelByAgent: {},
-                selectedThinkingByModel: {},
-                customAgentCommand,
-                instructionsByOperation: {},
-                actions: {
-                  pullRequest: {
-                    agentId: 'custom' as const,
-                    commandInputTemplate: 'ORCA_E2E_ISSUE={linkedIssue}\n\n{basePrompt}'
-                  }
-                }
-              }
-            })
           },
-          { generatorPath, linkedIssue, worktreeId: prWorktreeId }
+          { linkedIssue, worktreeId: prWorktreeId }
         )
+        await writeSettings(orcaPage, {
+          activeRuntimeEnvironmentId: null,
+          sourceControlAi: {
+            enabled: true,
+            agentId: 'custom' as const,
+            selectedModelByAgent: {},
+            selectedThinkingByModel: {},
+            customAgentCommand: `node ${JSON.stringify(generatorPath)}`,
+            instructionsByOperation: {},
+            actions: {
+              pullRequest: {
+                agentId: 'custom' as const,
+                commandInputTemplate: 'ORCA_E2E_ISSUE={linkedIssue}\n\n{basePrompt}'
+              }
+            }
+          }
+        })
 
         await openSourceControl(orcaPage, prWorktreeId)
 

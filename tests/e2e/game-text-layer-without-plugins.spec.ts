@@ -15,6 +15,7 @@ import { claudeVersionOk, screenRows, startGameBand } from './helpers/orchestrat
 import { startMessagesApi } from './helpers/showcase-messages-api'
 import { waitForActivePaneHookDescriptor } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
+import { writeSettings } from './helpers/settings-write'
 
 // ORCA-1005: orca-game is a Claude Code mod Orca passes with --plugin-dir, not an Orca plugin, so
 // the plugin system being off must neither drop it nor break the text layer it draws.
@@ -66,13 +67,14 @@ test.describe('plugin system off, real Claude Code', () => {
       const lead = await startLead(electronApp, orcaPage, agent)
       await expectPluginSystemOff(orcaPage)
       const claude = await writeArgvLoggingAgent(dir, agent)
-      await orcaPage.evaluate(async (command) => {
-        const state = window.__store!.getState()
-        await state.updateSettings({
-          agentCmdOverrides: { ...state.settings?.agentCmdOverrides, claude: command },
-          agentDefaultArgs: { ...state.settings?.agentDefaultArgs, claude: '' }
-        })
-      }, claude.command)
+      const current = await orcaPage.evaluate(() => {
+        const settings = window.__store!.getState().settings
+        return { commands: settings?.agentCmdOverrides, args: settings?.agentDefaultArgs }
+      })
+      await writeSettings(orcaPage, {
+        agentCmdOverrides: { ...current.commands, claude: claude.command },
+        agentDefaultArgs: { ...current.args, claude: '' }
+      })
       await launchMember(lead, agent, 'E2E-51', 'claude')
       const launches = (await claude.launches()).trim().split('\n').filter(Boolean)
       await writeFile(testInfo.outputPath('launches.jsonl'), launches.join('\n'))

@@ -6,6 +6,7 @@ import { waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { writeSettings } from './helpers/settings-write'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
@@ -44,9 +45,8 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
 
   try {
     // Pinned before the panel mounts: a theme switch rebuilds its document (ORCA-753).
+    await writeSettings(orcaPage, { pluginSystemEnabled: true, theme: 'dark' })
     const pluginKey = await orcaPage.evaluate(async (sourcePath) => {
-      const settings = await window.api.settings.set({ pluginSystemEnabled: true, theme: 'dark' })
-      window.__store?.setState({ settings })
       const result = await window.api.plugins.install({ kind: 'local-path', path: sourcePath })
       if (!result.ok) {
         throw new Error(result.error)

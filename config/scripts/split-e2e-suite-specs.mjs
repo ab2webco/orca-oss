@@ -19,18 +19,16 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { balanceByWeight } from './split-changed-e2e-specs.mjs'
+import {
+  DURATIONS_FILE,
+  balanceByWeight,
+  measuredSecondsOf,
+  readDurations
+} from './split-changed-e2e-specs.mjs'
 
+export { DURATIONS_FILE, readDurations }
 export const SUITE_SHARDS = 12
-export const DURATIONS_FILE = 'config/e2e-spec-durations.json'
 const SPEC_DIR = 'tests/e2e'
-// Why a floor: at 0 every skipped spec lands on the same lightest shard, and a skip can end.
-const FLOOR_SECONDS = 5
-
-/** @returns {Record<string, number>} seconds each spec file took on CI, by repo path. */
-export function readDurations(mapFile = DURATIONS_FILE) {
-  return JSON.parse(readFileSync(mapFile, 'utf8')).seconds
-}
 
 export function listSpecs(dir = SPEC_DIR) {
   return readdirSync(dir, { recursive: true })
@@ -41,18 +39,12 @@ export function listSpecs(dir = SPEC_DIR) {
 }
 
 /**
- * Measured seconds (at least the floor) where the map has them; otherwise size at the map's own
- * seconds per byte, so a new spec lands somewhere sensible until the next refresh measures it.
+ * Balances the suite by measured seconds; see measuredSecondsOf for specs the record lacks.
  * @param {string[]} files
  * @param {{ durations: Record<string, number>, sizeOf: (file: string) => number, total?: number }} options
  */
 export function planSuiteShards(files, { durations, sizeOf, total = SUITE_SHARDS }) {
-  const measured = files.filter((file) => durations[file] > 0)
-  const measuredBytes = measured.reduce((sum, file) => sum + sizeOf(file), 0)
-  const perByte =
-    measuredBytes > 0 ? measured.reduce((sum, file) => sum + durations[file], 0) / measuredBytes : 1
-  const weightOf = (file) =>
-    file in durations ? Math.max(durations[file], FLOOR_SECONDS) : sizeOf(file) * perByte
+  const weightOf = measuredSecondsOf(files, { durations, sizeOf })
   return balanceByWeight(files, total, weightOf).map((shard, index) => ({
     shard_name: `${index + 1}-of-${total}`,
     files: JSON.stringify(shard.files),
