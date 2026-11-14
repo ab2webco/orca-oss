@@ -63,6 +63,18 @@ describe('creditGameMerge', () => {
     expect(xpOf(foldFreedMember(mergedFirst ?? {}, arthur, freed({ outcome: 'qa' })))).toBe(100)
   })
 
+  // Why (ORCA-1210): a retaken ticket's PR is one merge, whichever character a look names.
+  it('credits a PR once even when another character asks for it', () => {
+    const credited = creditGameMerge({}, arthur, merge) ?? {}
+
+    expect(creditGameMerge(credited, { key: 'merlin', name: 'Merlin' }, merge)).toBeNull()
+    const merlin = foldFreedMember(credited, { key: 'merlin', name: 'Merlin' }, freed())
+    expect(listGameCharacters(merlin ?? {}).map((one) => [one.key, one.xp])).toEqual([
+      ['arthur', 100],
+      ['merlin', 0]
+    ])
+  })
+
   it('credits another PR of the same ticket on its own', () => {
     const one = creditGameMerge({}, arthur, merge)
 

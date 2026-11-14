@@ -767,7 +767,8 @@ import {
   GAME_DELIVERY_REFRESH_MS,
   gameDeliverySinceOf,
   withGameDelivery,
-  type GameDelivery
+  type GameDelivery,
+  type GameMergedReview
 } from '../../shared/orchestrator-game-delivery'
 import { listMergedPullRequestsSince } from '../github/merged-pull-requests'
 import { listMergedMergeRequestsSince } from '../gitlab/merged-merge-requests'
@@ -805,6 +806,7 @@ import {
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { GAME_HISTORY_MIGRATIONS, GameHistoryStore } from './orchestrator-game-history-store'
 import {
+  backfillGameMergesInStore,
   lateGameReviewChecks,
   payGameMerge,
   settleClosedGameReview,
@@ -3900,6 +3902,8 @@ export class OrcaRuntimeService {
     const repo = this.store?.getRepo(repoId)
     return repo ? { connectionId: repo.connectionId ?? null, path: repo.path } : null
   })
+  // Projects whose merged history this run already read back to its oldest free (ORCA-1210).
+  private readonly gameMergeBackfilled = new Set<string>()
   private readonly gameHistory = new GameHistoryStore(
     () => join(app.getPath('userData'), 'orchestrator-game-history'),
     GAME_HISTORY_MIGRATIONS,
@@ -31688,8 +31692,41 @@ export class OrcaRuntimeService {
         })
       },
       settleClosed: async (check) =>
-        settleClosedGameReview(this.gameHistory, await projectKey(), check)
+        settleClosedGameReview(this.gameHistory, await projectKey(), check),
+      mergedReviews: async () => this.readGameMergedReviewsOf(await projectKey()),
+      backfill: async (merged) => {
+        const key = await projectKey()
+        const paid = await backfillGameMergesInStore(this.gameHistory, key, merged, (name) =>
+          characterKeyOf(roster, name)
+        )
+        if (paid.length > 0) {
+          const lines = paid.map(
+            (one) => `${one.character} +${one.xp} ${one.ticket} #${one.number}`
+          )
+          console.info(`[game] merge backfill ${key}: ${lines.join(', ')}`)
+        }
+      }
     }
+  }
+
+  // Why wide once per run: frees older than the delivery window were never paid (ORCA-1210).
+  private async readGameMergedReviewsOf(
+    projectKey: string
+  ): Promise<readonly GameMergedReview[] | null> {
+    if (this.gameMergeBackfilled.has(projectKey)) {
+      return (await this.readGameDeliveryOf(projectKey))?.reviews ?? null
+    }
+    const records = await this.gameHistory.list(projectKey)
+    const oldest = records
+      .map((one) => Date.parse(one.launchedAt ?? one.endedAt))
+      .filter(Number.isFinite)
+      .reduce((min, at) => Math.min(min, at), Date.now())
+    const repoId = this.gameDeliveryRepoIdOf(projectKey)
+    const read = repoId ? await this.fetchGameMergedSince(repoId, oldest) : null
+    if (read) {
+      this.gameMergeBackfilled.add(projectKey)
+    }
+    return read?.reviews ?? null
   }
 
   // Why the record's own repo only: a remote member's repo may not be on this host to read its PR from.
@@ -32082,26 +32119,34 @@ export class OrcaRuntimeService {
     return { delivery: await this.readGameDeliveryOf(key) }
   }
 
-  // Why per repo, not zone: one read covers the widget's window in any zone.
-  private async readGameDeliveryOf(projectKey: string): Promise<GameDelivery | null> {
+  private gameDeliveryRepoIdOf(projectKey: string): string | null {
     const repoId = projectKey.startsWith('repo:') ? projectKey.slice('repo:'.length) : ''
     // Why: a folder workspace has no remote, so its numbers stay the game's own.
-    if (!repoId || (this.store?.getRepo(repoId)?.kind ?? 'folder') === 'folder') {
+    return repoId && (this.store?.getRepo(repoId)?.kind ?? 'folder') !== 'folder' ? repoId : null
+  }
+
+  // Why per repo, not zone: one read covers the widget's window in any zone.
+  private async readGameDeliveryOf(projectKey: string): Promise<GameDelivery | null> {
+    const repoId = this.gameDeliveryRepoIdOf(projectKey)
+    if (!repoId) {
       return null
     }
-    return this.gameDelivery.read(repoId, async () => {
-      const repo = await this.resolveRepoSelector(`id:${repoId}`)
-      const now = Date.now()
-      const read = {
-        repoPath: repo.path,
-        since: gameDeliverySinceOf(now),
-        now,
-        preference: repo.issueSourcePreference,
-        connectionId: repo.connectionId ?? null,
-        localGitOptions: this.getLocalGitExecutionOptionArgs(repo)[0] ?? {}
-      }
-      return (await listMergedPullRequestsSince(read)) ?? (await listMergedMergeRequestsSince(read))
-    })
+    return this.gameDelivery.read(repoId, async () =>
+      this.fetchGameMergedSince(repoId, Date.parse(gameDeliverySinceOf(Date.now())))
+    )
+  }
+
+  private async fetchGameMergedSince(repoId: string, since: number): Promise<GameDelivery | null> {
+    const repo = await this.resolveRepoSelector(`id:${repoId}`)
+    const read = {
+      repoPath: repo.path,
+      since: new Date(since).toISOString(),
+      now: Date.now(),
+      preference: repo.issueSourcePreference,
+      connectionId: repo.connectionId ?? null,
+      localGitOptions: this.getLocalGitExecutionOptionArgs(repo)[0] ?? {}
+    }
+    return (await listMergedPullRequestsSince(read)) ?? (await listMergedMergeRequestsSince(read))
   }
 
   async listGameHistory(args: {

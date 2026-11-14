@@ -4,6 +4,11 @@ import {
   lateReviewChecksOf,
   type GameLateReviewCheck
 } from '../../shared/orchestrator-game-late-merges'
+import type { GameMergedReview } from '../../shared/orchestrator-game-delivery'
+import {
+  backfillGameMerges,
+  type GameMergeBackfill
+} from '../../shared/orchestrator-game-merge-backfill'
 import type { GameHistoryStore } from './orchestrator-game-history-store'
 
 // What a project's characters earn from merges, kept in the history store's file (ORCA-1170).
@@ -50,4 +55,22 @@ export function lateGameReviewChecks(
       keyOf
     )
   }))
+}
+
+/** Pays the merged PRs that this project's freed members worked and no free or look paid (ORCA-1210). */
+export function backfillGameMergesInStore(
+  store: GameHistoryStore,
+  projectKey: string,
+  merged: readonly GameMergedReview[],
+  keyOf: (name: string) => string
+): Promise<GameMergeBackfill[]> {
+  return store.changeCharacters(projectKey, (characters, records) => {
+    const { next, paid } = backfillGameMerges(
+      characters,
+      records.flatMap((one) => parseGameHistoryRecord(one) ?? []),
+      merged,
+      keyOf
+    )
+    return { next, result: paid }
+  })
 }
