@@ -7,7 +7,8 @@ export type HostTeamLineSetter = (
   updater: (prev: Record<string, HostTeamLine | null>) => Record<string, HostTeamLine | null>
 ) => void
 
-function capabilitiesOf(result: unknown): string[] {
+/** The capabilities a status.get answer advertises; none from an answer it does not recognise. */
+export function hostCapabilitiesOf(result: unknown): string[] {
   const raw =
     result && typeof result === 'object'
       ? (result as { capabilities?: unknown }).capabilities
@@ -27,7 +28,7 @@ export function fetchHomeHostTeamLine(
       if (disposed() || !status.ok) {
         return
       }
-      const line = await readHostTeamLine(client, capabilitiesOf(status.result))
+      const line = await readHostTeamLine(client, hostCapabilitiesOf(status.result))
       if (!disposed()) {
         setLines((prev) => ({ ...prev, [hostId]: line }))
       }

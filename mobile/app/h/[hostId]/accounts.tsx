@@ -8,6 +8,9 @@ import { loadHosts } from '../../../src/transport/host-store'
 import { useHostClient } from '../../../src/transport/client-context'
 import { colors, spacing } from '../../../src/theme/mobile-theme'
 import { styles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { AccountMembersLine } from '../../../src/accounts/AccountMembersLine'
+import { accountMemberNamesOf } from '../../../src/accounts/account-member-names'
+import { useAccountMemberStates } from '../../../src/accounts/account-member-states'
 import { describeClaudeSwitchRefusal } from '../../../src/accounts/claude-switch-refusal-detail'
 import { useNow } from '../../../src/hooks/use-now'
 import { ClaudeIcon, OpenAIIcon } from '../../../src/components/AgentIcons'
@@ -41,6 +44,7 @@ export default function AccountsScreen() {
 
   // Why: shared client per host. See docs/mobile-shared-client-per-host.md.
   const { client, state: connState } = useHostClient(hostId)
+  const memberStates = useAccountMemberStates(client, hostId, connState === 'connected')
   const [hostName, setHostName] = useState<string>('')
   const [snapshot, setSnapshot] = useState<AccountsSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -319,6 +323,9 @@ export default function AccountsScreen() {
                         {usage.error}
                       </Text>
                     ) : null}
+                    <AccountMembersLine
+                      names={accountMemberNamesOf(memberStates, provider, account)}
+                    />
                   </View>
                   <View style={styles.rowTrailing}>
                     {isActive ? (
