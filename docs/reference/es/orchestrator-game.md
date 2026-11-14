@@ -672,6 +672,12 @@ visto bueno del dueño, clónalo allí y ejecuta `orca repo add --path <ruta en 
 El host solo responde sus viejos `repo.list` y `repo.show`, así que se puede comprobar cualquier Orca
 emparejado.
 
+En un fork la comparación usa el remoto propio de cada repo, no su identidad (ORCA-1198): la identidad
+de un fork nombra su `upstream`, que comparten todos los demás forks. El remoto propio del líder se
+lee con `git remote -v` (primero origin, `upstream` solo si es el único remoto); un repo del host
+emparejado cuya identidad es su `upstream` no se toma como el proyecto, porque podría ser cualquier
+fork de él. Para aceptarlo a propósito, lista ese upstream en `memberRepos`.
+
 Cada miembro que inicia `game launch`/`game wave` recibe el primer nombre del roster que no tenga
 ningún miembro vivo: `memberNames`, o si no el `roster` de la escena activa (cada escena incluida trae
 uno), en el `ORCA_GAME_LOCALE` del pane del líder. El nombre va antes del ticket

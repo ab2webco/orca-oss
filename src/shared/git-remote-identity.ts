@@ -121,8 +121,8 @@ function primaryRemoteSortKey(entry: GitRemoteEntry): number {
   return 2
 }
 
-export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | null {
-  const entries = parseGitRemoteVerboseOutput(stdout)
+function rankedRemotes(stdout: string): (GitRemoteEntry & { canonicalKey: string })[] {
+  return parseGitRemoteVerboseOutput(stdout)
     .map((entry) => ({
       ...entry,
       canonicalKey: normalizeGitRemoteUrl(entry.url)
@@ -132,7 +132,10 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
       const priority = primaryRemoteSortKey(left) - primaryRemoteSortKey(right)
       return priority === 0 ? left.name.localeCompare(right.name) : priority
     })
-  const selected = entries[0]
+}
+
+export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | null {
+  const selected = rankedRemotes(stdout)[0]
   return selected
     ? {
         canonicalKey: selected.canonicalKey,
@@ -140,4 +143,10 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
         remoteUrl: selected.url
       }
     : null
+}
+
+/** The repo's own remote key: origin before others, `upstream` only when it is the sole remote (ORCA-1198). */
+export function deriveGitOwnRemoteKey(stdout: string): string | null {
+  const entries = rankedRemotes(stdout)
+  return (entries.find((entry) => entry.name !== 'upstream') ?? entries[0])?.canonicalKey ?? null
 }
