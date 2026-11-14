@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
-import { readHostTeamLine } from './host-team-read'
+import { readHostLeadStates, readHostTeamLine } from './host-team-read'
 
 const LEAD_STATE = {
   role: 'lead',
@@ -45,5 +45,19 @@ describe('readHostTeamLine', () => {
     await expect(
       readHostTeamLine(client, [MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY])
     ).resolves.toBeNull()
+  })
+})
+
+describe('readHostLeadStates', () => {
+  it("returns each live lead's game.state, and nothing from a host without the team capability", async () => {
+    const { client } = clientWith({
+      'game.leads': { ok: true, result: LEADS },
+      'game.state': { ok: true, result: LEAD_STATE }
+    })
+
+    await expect(
+      readHostLeadStates(client, [MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY])
+    ).resolves.toEqual([LEAD_STATE])
+    await expect(readHostLeadStates(client, [])).resolves.toBeNull()
   })
 })
