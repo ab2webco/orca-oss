@@ -1,5 +1,5 @@
 ---
-sourceHash: 973c1c8a06540312
+sourceHash: d000b87ad0ca3b9f
 ---
 
 # El juego orquestador de Agent Teams
@@ -12,6 +12,13 @@ modo quest del plugin `o` en koombea/cineco-orchestrator (Jucer Orozco) y vive e
 [`resources/claude-plugins/orca-game`](../../../resources/claude-plugins/orca-game).
 
 Claude a secas, Codex y cualquier otro agente no se tocan.
+
+La vista principal de un equipo es ahora el panel nativo **Team** de la barra lateral derecha, con sus
+tres apariencias (Game, Display, Plain) y sus estilos de escena (Pixel, Figures, Office). La banda
+pixel dentro del pane está apagada por defecto (`band: false`, consulta
+[Capas de configuración](#capas-de-configuración)). La guía de usuario
+[Agent Teams](../../user/es/agents/agent-teams.md) cubre el panel; esta referencia cubre el plugin,
+la CLI y la configuración.
 
 ## Cuándo se carga
 
@@ -448,7 +455,7 @@ popover de enlaces.
 
 ## Disposición del Panel
 
-Las secciones del panel Fleet son Team (las tarjetas y la tarjeta del advisor), Review (las filas de la
+Esta sección es el pane Fleet de la terminal, no el panel nativo Team. Las secciones del panel Fleet son Team (las tarjetas y la tarjeta del advisor), Review (las filas de la
 revisión y del work item), My PRs, To Do, Actions y Metrics, en ese orden. Un Panel nuevo muestra solo
 Team y My PRs; las otras cuatro son widgets del catálogo que una persona añade desde el chip de menú
 **Widgets** o con `/orca-game:layout add <section>`, y quita de la misma forma. En el catálogo, `●`

@@ -2,6 +2,8 @@
 
 React Native companion app for Orca Lab. Monitor worktrees, view terminal output, and send commands from your phone.
 
+To install the app rather than build it, see [Mobile](../docs/user/mobile.md): iPhone builds ship through TestFlight and Android APKs are attached to the `mobile-android-v*` GitHub releases. There is no App Store or Google Play listing yet.
+
 Local development uses two processes:
 
 - Orca Lab desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
@@ -142,7 +144,7 @@ pnpm typecheck:node
 
 ## Protocol Version Compatibility
 
-Mobile and desktop talk over a versioned protocol. Because mobile updates lag desktop by 24-48h via the App Store, both sides exchange version numbers on `status.get` so a genuinely incompatible combo can hard-block instead of silently misbehaving.
+Mobile and desktop talk over a versioned protocol. Because mobile builds (TestFlight and the Android APK) ship separately from, and often after, the desktop, both sides exchange version numbers on `status.get` so a genuinely incompatible combo can hard-block instead of silently misbehaving.
 
 Constants live in two files (Metro can't resolve outside `mobile/`):
 
@@ -167,7 +169,7 @@ Do **not** bump for additive changes:
 
 Set `MIN_COMPATIBLE_MOBILE_VERSION` (kill-switch) when desktop ships a change that requires a minimum mobile version to function safely. Same for `MIN_COMPATIBLE_DESKTOP_VERSION` from the mobile side.
 
-When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at either the App Store (mobile too old) or GitHub Releases (desktop too old).
+When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen with **Open TestFlight** (mobile too old) or **Open GitHub Releases** (desktop too old).
 
 To exercise the block screen locally: set `MIN_COMPATIBLE_DESKTOP_VERSION = 999` in `mobile/src/transport/protocol-version.ts`, rebuild, pair to any desktop. Revert before merging.
 
@@ -209,9 +211,15 @@ Read on every request, so behaviour can be flipped mid-session without a restart
 mobile/
 ├── app/                   # Expo Router screens (file-based routing)
 │   ├── _layout.tsx        # Root layout with navigation stack
-│   ├── index.tsx          # Home screen — paired hosts list
-│   └── pair-scan.tsx      # QR code scanning screen
+│   ├── index.tsx          # Home screen — paired desktops, team and account lines
+│   ├── pair-scan.tsx      # QR code scanning screen
+│   ├── settings.tsx       # App settings
+│   └── h/[hostId]/        # One desktop: worktrees, session, accounts, inbox, tasks, plugins
 ├── src/
+│   ├── accounts/          # Accounts screen, desktop picker, members per account
+│   ├── game-inbox/        # Per-desktop Inbox of the leads' questions
+│   ├── hosts/             # Home card team and account lines
+│   ├── team-drawer/       # Team drawer over a lead's terminal
 │   ├── terminal/          # Terminal WebView and xterm bridge
 │   └── transport/         # WebSocket RPC client
 ├── scripts/

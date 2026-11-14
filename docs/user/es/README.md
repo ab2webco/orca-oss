@@ -1,5 +1,5 @@
 ---
-sourceHash: ba865b42939e1d39
+sourceHash: e175e69948265825
 ---
 # Documentación de usuario de Orca Lab
 
@@ -12,9 +12,11 @@ de issues.
 - [Instalación](install.md): builds de escritorio para macOS, Windows y Linux, la CLI y hosts sin interfaz gráfica.
 - [Worktrees](model/worktrees.md): un worktree de git aislado por tarea, y cómo cambiar entre ellos.
 - [Apertura rápida](model/quick-open.md): busca archivos y salta a worktrees, chats y acciones.
-- [Terminal](terminal.md): pestañas, divisiones y qué sobrevive a un reinicio.
+- [Barra lateral y pestañas nuevas](model/sidebar.md): hosts, agrupación y filtros, y el menú **+**.
+- [Terminal](terminal.md): pestañas, divisiones, ventanas estrechas, Windows y WSL, y qué sobrevive a un reinicio.
 - [Agentes compatibles](agents/supported.md): qué agentes de programación puede lanzar y seguir Orca Lab.
-- [Seguimiento de uso y cuentas](agents/usage-tracking.md): uso de los límites de tasa y cambio de cuentas.
+- [Seguimiento de uso y cuentas](agents/usage-tracking.md): uso de los límites de tasa, cambio de cuentas y tokens de Claude de larga duración.
+- [Agent Teams](agents/agent-teams.md): un líder y sus miembros, el panel Team, las escenas y el Inbox.
 - [SSH](ssh.md): worktrees y terminales remotos por SSH.
 - [Tareas de Linear y Plane](review/linear.md): vincula issues a worktrees.
 - [Anotar diffs de IA](review/annotate-ai-diff.md): deja notas en un diff y envíalas a un agente.
@@ -22,7 +24,7 @@ de issues.
 - [Visores de archivos](editing/viewers.md): imágenes, PDF, Markdown y otros tipos de archivo.
 - [Navegador y Design Mode](browser/design-mode.md): previsualiza páginas y envía comentarios sobre elementos a un agente.
 - [CLI](cli/overview.md): automatiza Orca Lab desde una terminal con el comando `orca`.
-- [Móvil](mobile.md): empareja la app del teléfono, responde al líder y sigue las terminales.
+- [Móvil](mobile.md): instala y empareja la app del teléfono, mira el equipo y las cuentas de cada escritorio y responde al líder.
 - [Telemetría y privacidad](telemetry.md): qué datos envía Orca Lab y cómo desactivarlo.
 
 Las notas de versión se publican en la [página de releases de GitHub](https://github.com/ab2webco/orca-oss/releases).

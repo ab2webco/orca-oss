@@ -54,4 +54,5 @@ When the agent has committed its work, open **Source Control** in the right side
 
 One agent in one worktree is the basic unit. [Orca Game](../reference/orchestrator-game.md) puts
 a lead agent on top: it takes your tickets, starts one member per ticket in its own worktree, and
-asks you only what you have to decide.
+asks you only what you have to decide. [Agent Teams](agents/agent-teams.md) walks through starting a
+lead, adding members and reading the Team panel.
