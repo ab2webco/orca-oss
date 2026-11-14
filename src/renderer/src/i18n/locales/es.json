@@ -11083,12 +11083,26 @@
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Token de larga duración",
-          "description": "Ejecuta claude setup-token en este host con la sesión de {{value0}} iniciada y pega el token. Los agentes de esta cuenta lo usan en lugar del inicio de sesión guardado, así que dejan de rotarlo.",
           "inputLabel": "Token",
           "replacePlaceholder": "Ya hay un token guardado. Pega uno nuevo para reemplazarlo.",
-          "limits": "El token solo hace solicitudes al modelo: Remote Control y los conectores de claude.ai no funcionan con él. Se queda en este host.",
           "remove": "Quitar token",
-          "save": "Guardar token"
+          "save": "Guardar token",
+          "generateDescription": "Orca Lab ejecuta claude setup-token en el host de {{value0}} y guarda allí el token de un año. Los agentes de esta cuenta lo usan en lugar del inicio de sesión guardado, así que dejan de rotarlo.",
+          "limitsHost": "El token solo hace solicitudes al modelo: Remote Control y los conectores de claude.ai no funcionan con él. Nunca sale del host de la cuenta.",
+          "pasteInstead": "Pegar un token",
+          "pasteHint": "Lo da claude setup-token ejecutado en este host con la sesión de esta cuenta."
+        },
+        "ClaudeSetupTokenGenerate": {
+          "openStep": "1. Abre la página de inicio de sesión y entra como {{value0}}.",
+          "open": "Abrir inicio de sesión",
+          "copyUrl": "Copiar enlace",
+          "codeLabel": "2. Pega el código que muestra la página.",
+          "finish": "Terminar",
+          "starting": "Iniciando claude setup-token…",
+          "verifying": "Guardando el token…",
+          "retry": "Reintentar",
+          "generate": "Generar token",
+          "unchanged": "No cambió nada: la cuenta conserva su inicio de sesión y su token."
         },
         "GamePanelStylePreview": {
           "lead": "Líder"

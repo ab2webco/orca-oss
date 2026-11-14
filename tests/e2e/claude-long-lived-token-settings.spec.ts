@@ -181,6 +181,8 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
   const dialog = orcaPage.getByRole('dialog', { name: 'Long-lived token' })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Remove token' })).toHaveCount(0)
+  // ORCA-1211: Generate is the primary path; pasting stays one click away.
+  await dialog.getByRole('button', { name: 'Paste a token instead' }).click()
   await dialog.getByLabel('Token').fill(FIXTURE_TOKEN)
   await screenshotAllWidths(orcaPage, testInfo, 'dialog', dialog)
   await dialog.getByRole('button', { name: 'Save token' }).click()
@@ -198,6 +200,7 @@ test('stores, marks and removes a Claude long-lived token from Settings', async 
   await expect(tokenBadge(withoutToken)).toBeVisible()
 
   await tokenButton(withToken).click()
+  await dialog.getByRole('button', { name: 'Paste a token instead' }).click()
   await expect(dialog.getByLabel('Token')).toHaveValue('')
   await screenshotAllWidths(orcaPage, testInfo, 'dialog-stored', dialog)
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
