@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeGitHubRemoteHost } from './git-remote-host-alias'
 import {
+  deriveGitOwnRemoteKey,
   deriveGitRemoteIdentity,
   matchGitRemoteKeyParts,
   normalizeGitRemoteUrl,
@@ -80,6 +81,32 @@ describe('deriveGitRemoteIdentity', () => {
       canonicalKey: 'git.company.test/team/sample-app',
       remoteName: 'mirror'
     })
+  })
+})
+
+describe('deriveGitOwnRemoteKey (ORCA-1198)', () => {
+  const fork = [
+    'upstream\thttps://github.com/stablyai/orca.git (fetch)',
+    'origin\tgit@github.com:ab2webco/orca-oss.git (fetch)'
+  ].join('\n')
+
+  it("names a fork's own remote, never the upstream every fork shares", () => {
+    expect(deriveGitOwnRemoteKey(fork)).toBe('github.com/ab2webco/orca-oss')
+    expect(
+      deriveGitOwnRemoteKey(
+        [
+          'upstream\thttps://github.com/stablyai/orca.git (fetch)',
+          'mine\tgit@github.com:me/orca.git (fetch)'
+        ].join('\n')
+      )
+    ).toBe('github.com/me/orca')
+  })
+
+  it('reads a repo whose only remote is upstream as that remote, and none without remotes', () => {
+    expect(deriveGitOwnRemoteKey('upstream\thttps://github.com/stablyai/orca.git (fetch)')).toBe(
+      'github.com/stablyai/orca'
+    )
+    expect(deriveGitOwnRemoteKey('')).toBeNull()
   })
 })
 

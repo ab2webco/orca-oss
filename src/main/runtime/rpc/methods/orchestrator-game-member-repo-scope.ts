@@ -4,6 +4,7 @@ import type {
   GameRepoSummary
 } from '../../../../shared/orchestrator-game-member-repo-scope'
 import type { Repo } from '../../../../shared/repo-types'
+import { detectGitOwnRemoteKey } from '../../../repo-git-remote-identity'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalString, requiredString } from '../schemas'
@@ -14,19 +15,39 @@ const GameMemberRepoScopeParams = z.object({
   on: OptionalString
 })
 
-type RepoRecord = Pick<Repo, 'id' | 'displayName' | 'path' | 'gitRemoteIdentity'>
+type RepoRecord = Pick<Repo, 'id' | 'displayName' | 'path' | 'gitRemoteIdentity' | 'connectionId'>
 
 const REMOTE_TIMEOUT_MS = 30_000
 
-const summaryOf = (repo: RepoRecord): GameRepoSummary => ({
-  id: repo.id,
-  displayName: repo.displayName,
-  path: repo.path,
-  remoteKey: repo.gitRemoteIdentity?.canonicalKey ?? null
-})
+const namesUpstream = (repo: RepoRecord): boolean =>
+  repo.gitRemoteIdentity?.remoteName === 'upstream'
+
+// Why null for upstream: a paired host's repo named by its upstream could be any fork of it (ORCA-1198).
+const summaryOf = (repo: RepoRecord): GameRepoSummary => {
+  const remoteKey = repo.gitRemoteIdentity?.canonicalKey ?? null
+  return {
+    id: repo.id,
+    displayName: repo.displayName,
+    path: repo.path,
+    remoteKey,
+    ownRemoteKey: namesUpstream(repo) ? null : remoteKey
+  }
+}
+
+/** A repo in this Orca's store, whose remotes it can read to find a fork's own. */
+const localSummaryOf = async (repo: RepoRecord): Promise<GameRepoSummary> =>
+  namesUpstream(repo)
+    ? {
+        ...summaryOf(repo),
+        ownRemoteKey: await detectGitOwnRemoteKey(repo.path, repo.connectionId)
+      }
+    : summaryOf(repo)
 
 const shownOn = async (show: () => Promise<RepoRecord>): Promise<GameRepoSummary | null> =>
   await show().then(summaryOf, () => null)
+
+const shownHere = async (show: () => Promise<RepoRecord>): Promise<GameRepoSummary | null> =>
+  await show().then(localSummaryOf, () => null)
 
 async function hostRead(
   runtime: OrcaRuntimeService,
@@ -55,11 +76,11 @@ export const ORCHESTRATOR_GAME_MEMBER_REPO_SCOPE_METHODS: RpcMethod[] = [
     name: 'game.memberRepoScope',
     params: GameMemberRepoScopeParams,
     handler: async (params, { runtime }): Promise<GameMemberRepoScopeRead> => {
-      const lead = await shownOn(async () => await runtime.showRepo(`id:${params.leadRepo}`))
+      const lead = await shownHere(async () => await runtime.showRepo(`id:${params.leadRepo}`))
       if (params.on) {
         return { lead, ...(await hostRead(runtime, params.on, params.repo)) }
       }
-      const repo = await shownOn(async () => await runtime.showRepo(params.repo))
+      const repo = await shownHere(async () => await runtime.showRepo(params.repo))
       return { host: null, lead, repo, repos: [] }
     }
   })

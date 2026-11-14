@@ -5,11 +5,17 @@ import {
   type GameRepoSummary
 } from './orchestrator-game-member-repo-scope'
 
-const repo = (id: string, displayName: string, remoteKey: string | null): GameRepoSummary => ({
+const repo = (
+  id: string,
+  displayName: string,
+  remoteKey: string | null,
+  ownRemoteKey?: string | null
+): GameRepoSummary => ({
   id,
   displayName,
   path: `/work/${displayName}`,
-  remoteKey
+  remoteKey,
+  ...(ownRemoteKey === undefined ? {} : { ownRemoteKey })
 })
 
 const netsat = repo('r_netsat', 'helpdesk_netsat', 'github.com/ab2webco/helpdesk_netsat')
@@ -68,20 +74,38 @@ describe('gameMemberRepoRefusalOf on a paired host', () => {
   const hostOrca = repo('h_orca', 'orca-oss', 'github.com/ab2webco/orca-oss')
 
   it("lets a lead launch into the host's copy of its own repo", () => {
-    const read = { host: 'm1', lead: netsat, repo: hostNetsat, repos: [hostNetsat, hostOrca] }
+    const read = {
+      host: 'm1',
+      lead: netsat,
+      repo: hostNetsat,
+      repos: [hostNetsat, hostOrca]
+    }
     expect(gameMemberRepoRefusalOf({ read, selector: 'id:h_netsat' })).toBeNull()
   })
 
   it('names the host and the register step when the project is not on it (ORCA-1156)', () => {
-    const read = { host: 'm1', lead: netsat, repo: hostOrca, repos: [hostOrca] }
-    const refusal = gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })
+    const read = {
+      host: 'm1',
+      lead: netsat,
+      repo: hostOrca,
+      repos: [hostOrca]
+    }
+    const refusal = gameMemberRepoRefusalOf({
+      read,
+      selector: 'name:orca-oss'
+    })
     expect(refusal).toMatch(/helpdesk_netsat is not registered on m1/)
     expect(refusal).toMatch(/orca repo add --path <path on m1> --environment m1/)
     expect(refusal).toMatch(/No worktree was created/)
   })
 
   it("refuses another project's repo on the host and points at the project's own", () => {
-    const read = { host: 'm1', lead: netsat, repo: hostOrca, repos: [hostNetsat, hostOrca] }
+    const read = {
+      host: 'm1',
+      lead: netsat,
+      repo: hostOrca,
+      repos: [hostNetsat, hostOrca]
+    }
     expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toMatch(
       /--repo name:orca-oss on m1 is orca-oss, outside this lead's project \(helpdesk_netsat\); use --repo id:h_netsat/
     )
@@ -89,9 +113,100 @@ describe('gameMemberRepoRefusalOf on a paired host', () => {
 
   it("never matches a host repo by the lead's local id", () => {
     const stranger = repo('r_netsat', 'other', 'github.com/someone/other')
-    const read = { host: 'm1', lead: netsat, repo: stranger, repos: [stranger] }
+    const read = {
+      host: 'm1',
+      lead: netsat,
+      repo: stranger,
+      repos: [stranger]
+    }
     expect(gameMemberRepoRefusalOf({ read, selector: 'id:r_netsat' })).toMatch(
       /helpdesk_netsat is not registered on m1/
     )
+  })
+})
+
+describe('gameMemberRepoRefusalOf for a fork (ORCA-1198)', () => {
+  const upstream = 'github.com/stablyai/orca'
+  // The lead's identity names its upstream remote; its own remote is the fork's origin.
+  const leadFork = repo('r_orca', 'orca-oss', upstream, 'github.com/ab2webco/orca-oss')
+
+  it("lets a lead launch into the host's clone of its fork, whose identity is origin", () => {
+    const hostFork = repo(
+      'h_orca',
+      'orca-oss',
+      'github.com/ab2webco/orca-oss',
+      'github.com/ab2webco/orca-oss'
+    )
+    const read = {
+      host: 'm1',
+      lead: leadFork,
+      repo: hostFork,
+      repos: [hostFork]
+    }
+    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toBeNull()
+  })
+
+  it('refuses a host repo whose only match is the shared upstream (another fork)', () => {
+    const otherFork = repo('h_other', 'orca', upstream, null)
+    const read = {
+      host: 'm1',
+      lead: leadFork,
+      repo: otherFork,
+      repos: [otherFork]
+    }
+    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca' })).toMatch(
+      /the upstream every fork of it shares.*No worktree was created/
+    )
+  })
+
+  it('refuses a local clone of another fork that shares the upstream', () => {
+    const otherFork = repo('r_other', 'orca', upstream, 'github.com/someone/orca')
+    const read = { host: null, lead: leadFork, repo: otherFork, repos: [] }
+    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca' })).toMatch(
+      /outside this lead's project \(orca-oss\)/
+    )
+  })
+
+  it('keeps matching by remoteKey when an older runtime sends no ownRemoteKey', () => {
+    const lead = repo('r_orca', 'orca-oss', 'github.com/ab2webco/orca-oss')
+    const hostFork = repo('h_orca', 'orca-oss', 'github.com/ab2webco/orca-oss')
+    const read = { host: 'm1', lead, repo: hostFork, repos: [hostFork] }
+    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toBeNull()
+  })
+
+  it("keeps today's refusal for a host whose repo.list carries no remote identity", () => {
+    const bare = repo('h_orca', 'orca-oss', null, null)
+    const read = { host: 'm1', lead: leadFork, repo: bare, repos: [bare] }
+    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toMatch(
+      /orca-oss is not registered on m1, so no member can start there for it/
+    )
+  })
+
+  it('says why a host clone named by the shared upstream is refused, not that the project is missing', () => {
+    const clone = repo('h_orca', 'orca-oss', upstream, null)
+    const read = { host: 'm1', lead: leadFork, repo: clone, repos: [clone] }
+    const refusal = gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })
+    expect(refusal).toMatch(
+      /orca-oss on m1 names github\.com\/stablyai\/orca, the upstream every fork of it shares/
+    )
+    expect(refusal).toMatch(/memberRepos/)
+    expect(refusal).not.toMatch(/is not registered on m1/)
+  })
+
+  it('still accepts an upstream the orca.yaml lists in memberRepos', () => {
+    const otherFork = repo('h_other', 'orca', upstream, null)
+    const read = {
+      host: 'm1',
+      lead: leadFork,
+      repo: otherFork,
+      repos: [otherFork]
+    }
+    expect(
+      gameMemberRepoRefusalOf({
+        read,
+        selector: 'name:orca',
+        memberRepos: [upstream]
+      })
+    ).toBeNull()
   })
 })
