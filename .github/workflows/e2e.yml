@@ -313,6 +313,11 @@ jobs:
           TEST_FILES_JSON: ${{ matrix.files }}
           PROJECT: ${{ inputs.project }}
         run: |
+          # Why: with no file argument Playwright runs the whole suite, which ran 841 tests into the 30-min cap (ORCA-1199).
+          if [ "$(jq 'length' <<<"$TEST_FILES_JSON")" -eq 0 ]; then
+            echo "::error::This changed-spec shard has no specs; refusing to run the full suite."
+            exit 1
+          fi
           mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
           E2E_ENV=(SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1)
           if printf '%s\n' "${TEST_FILES[@]}" | grep -qx 'tests/e2e/ephemeral-vm-provisioned-root.spec.ts'; then
