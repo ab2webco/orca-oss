@@ -72,14 +72,17 @@ La cuadrícula de agentes reúne en una pantalla a todos los agentes activos de 
   <img src="../assets/readme/agent-grid.gif" alt="La cuadrícula de agentes de Orca Lab: cuatro sesiones vivas de Claude Code en lumen-app transmiten sus respuestas, agrupadas en Needs You, Working y Done, y luego filtradas por grupo" width="960" />
 </p>
 
+- **Una barra lateral para cada host.** Cada host lista sus proyectos y workspaces, con el líder y los miembros de un equipo como filas de agente. Agrupa por estado, PR o proyecto, y filtra lo que no necesitas. [Barra lateral →](../user/model/sidebar.md)
+- **Un menú + para las pestañas nuevas.** Terminales, el navegador y cada agente detectado; en un proyecto con líder, **Go to lead**, **Add member…** desde el To Do, o reabrir el equipo. En un pane del ancho de un teléfono las pestañas se reducen a iconos con una lista **+N**. [Pestañas nuevas →](../user/model/sidebar.md#the--menu)
 - **Un worktree por agente.** Cada tarea tiene su propio worktree de git, así que los agentes nunca editan la misma copia; las carpetas también sirven como espacios de trabajo. [Worktrees →](../user/model/worktrees.md)
 - **Terminales que sobreviven a la ventana.** Las pestañas y los paneles divididos corren en un proceso en segundo plano, así que tras reiniciar se reconectan con su salida reciente. [Terminal →](../user/terminal.md)
 - **Worktrees por SSH y hosts sin pantalla.** Ejecuta worktrees en una máquina remota por SSH, o todo el runtime sin ventana con `orca serve`. [SSH →](../user/ssh.md) · [Linux sin pantalla →](../reference/headless-linux-server.md)
+- **Windows y WSL.** Settings → Terminal → Windows Shell elige el shell por defecto y si los proyectos corren en Windows o en una distro de WSL; las terminales sin proyecto también lo siguen. [Windows y WSL →](../user/terminal.md#windows-and-wsl)
 - **Apertura rápida, explorador de archivos y visores** para código, imágenes y documentos. [Apertura rápida →](../user/model/quick-open.md) · [Archivos →](../user/editing/file-explorer.md) · [Visores →](../user/editing/viewers.md)
 
 ### Cambia de cuenta de Claude y Codex sin perder la sesión
 
-Agrega varias cuentas de Claude y Codex y elige la activa en Settings → AI Provider Accounts, o cambia la de una terminal en marcha con `orca account switch`: Claude se relanza en la misma terminal y retoma la conversación. Un worktree puede quedar fijado a su propia cuenta, y el uso y el reinicio de cuota aparecen junto a cada agente. [Seguimiento de uso →](../user/agents/usage-tracking.md)
+Agrega varias cuentas de Claude y Codex y elige la activa en Settings → AI Provider Accounts, o cambia la de una terminal en marcha con `orca account switch`: Claude se relanza en la misma terminal y retoma la conversación. Un worktree puede quedar fijado a su propia cuenta, y el uso y el reinicio de cuota aparecen junto a cada agente. Para que los inicios de sesión no roten entre hosts, dale a una cuenta un token de larga duración de `claude setup-token` en cada host (**Token** en su fila, u `orca account token set`). [Seguimiento de uso →](../user/agents/usage-tracking.md)
 
 <p align="center">
   <img src="../assets/readme/claude-accounts-switch.gif" alt="Settings → AI Provider Accounts: tres cuentas de Claude, la etiqueta Active pasando de una a otra con un aviso de confirmación" width="960" />
@@ -119,16 +122,18 @@ Un plugin es una carpeta con un `orca-plugin.json`. Nada se ejecuta hasta que re
 - **Informes de fallos** con el proceso que murió, la memoria por tipo de proceso y el estado de GPU/WebGL, desde un diálogo que puedes revisar antes de enviar.
 - **Aviso de memoria baja** que lista primero las terminales de agentes y dice qué lo abrió.
 - **Automatizaciones** que ejecutan un prompt o un comando programado, con la cuenta de Claude o Codex que elija la automatización.
-- **La CLI `orca`** controla todo esto, así que los agentes también pueden: worktrees, terminales, cuentas, Plane, el juego y más. [CLI →](../user/cli/overview.md)
+- **La CLI `orca`** controla todo esto, así que los agentes también pueden: worktrees, terminales, cuentas, Plane, el equipo y más. Ahí están todos los comandos de `orca game`. [CLI →](../user/cli/overview.md)
 
 ## Móvil
 
-La app Orca Lab se vincula con tu escritorio y te pone a los agentes en el bolsillo. Vincúlala una vez desde Desktop → Settings → Mobile escaneando un código QR; después el teléfono llega al escritorio directo o por un relay cifrado de extremo a extremo. [App móvil →](../../mobile/README.md)
+La app Orca Lab (0.0.62) se vincula con tu escritorio y te pone a los agentes en el bolsillo. Vincúlala una vez desde Desktop → Settings → Mobile escaneando un código QR; después el teléfono llega al escritorio directo o por un relay cifrado de extremo a extremo. [Móvil →](../user/mobile.md)
 
+- **Cada escritorio de un vistazo.** La tarjeta de cada escritorio muestra su equipo (miembros, cuántos trabajan, quién te necesita) y el uso de 5 horas de la cuenta de Claude activa, y conserva el último equipo conocido cuando el escritorio se desconecta.
+- **Cuentas por escritorio.** Elige un escritorio vinculado, mira el uso de 5 horas y 7 días de cada cuenta de Claude y Codex y quién corre en ella, y cambia de cuenta.
 - **Terminales en vivo.** Mira la terminal de cualquier agente en tiempo real y escribe en ella.
 - **Bandeja de preguntas para ti.** Cuando un líder necesita una decisión que solo tú puedes tomar, la pregunta llega a la bandeja del teléfono con una notificación. Respóndela ahí y la respuesta vuelve al líder.
 - **Toques que llevan al lugar correcto.** Un toque abre el host y la pantalla que corresponden; una pregunta del líder abre su terminal con el cajón del equipo.
-- **Cajón del equipo sobre la terminal del líder.** Preguntas abiertas, una tarjeta por miembro con su ticket, estado, PR y CI, y las métricas del equipo: merges por día y lead time mediano.
+- **Cajón del equipo sobre la terminal del líder.** Una pestaña **Team** con una tarjeta por miembro (ticket, host, estado, uso de la cuenta, PR y CI) y las métricas del equipo, y una pestaña **Inbox** con las preguntas del líder.
 - **Tablero de Plane y paneles de plugins** desde el teléfono, y un botón que pide al escritorio instalar su actualización pendiente.
 
 ```mermaid
@@ -152,7 +157,7 @@ Builds: iOS se distribuye por TestFlight; los APK de Android van adjuntos a las 
 
 Orca Game convierte una sesión de Claude Code en el **líder** de un equipo. El líder no escribe el código: lanza un **miembro** por ticket, cada uno en su propio worktree y su propia rama, espera sus reportes, responde sus preguntas y te pregunta solo lo que únicamente tú puedes decidir.
 
-Parece un juego, con un grupo en pixel art bajo el prompt del líder, XP y subidas de nivel, porque seguir a diez agentes en diez terminales es difícil. Las reglas de fondo son las que ya sigue un buen equipo de ingeniería.
+Parece un juego, un panel **Team** en la barra lateral derecha con una escena, niveles y XP, porque seguir a diez agentes en diez terminales es difícil. Las reglas de fondo son las que ya sigue un buen equipo de ingeniería. [Guía de Agent Teams →](../user/agents/agent-teams.md)
 
 La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco](https://github.com/Jucerweb).
 
@@ -178,7 +183,8 @@ La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco
 - **Reportes tipados.** Un miembro termina con un sobre `worker_done` que declara cada verificación y cómo la hizo: en vivo, solo con tests unitarios o sin verificar. El runtime rechaza un reporte mal formado, y un éxito no puede apoyarse en una afirmación sin verificar.
 - **Terminar antes de empezar.** El líder lleva cada miembro hasta el merge antes de lanzar otro ticket, y luego borra el worktree y la rama ya mergeados, para que no se acumule trabajo a medias.
 - **Las preguntas van a un lugar real.** Los miembros preguntan al líder, o se detienen en un decision gate; el líder responde lo que puede y registra la respuesta en el ticket. Lo que solo tú puedes decidir (releases, gastos, acciones difíciles de revertir, dirección del producto) se vuelve una pregunta para ti con opciones, guardada en una bandeja en el escritorio y en el teléfono, nunca perdida en el chat.
-- **El Panel muestra la verdad.** Una tarjeta por miembro con su ticket, rama, PR, CI y estado, más tus PR abiertos, el To Do y las métricas: merges por día, lead time y qué cuentas están trabajando.
+- **El panel Team muestra la verdad.** Una tarjeta por miembro con su ticket, rama, PR, CI, fase y uso de la cuenta; haz clic para abrir la terminal del miembro. **Inbox** guarda las preguntas para ti, **PRs** tus PR abiertos y la cola de merge, **Machines** la memoria libre y los agentes de cada host. Un miembro lee el CI de su PR y el estado de merge de GitHub con `orca game state` (`review.ci`, `review.mergeState`), y solo un PR `clean` puede hacer merge.
+- **Miembros a los que puedes seguir.** Cada miembro es un personaje durante toda su ejecución, en su tarjeta, su terminal y el historial. `orca game history` lista los miembros liberados con su resultado, PR y personaje; sus resultados se vuelven lecciones breves del proyecto que los miembros nuevos reciben en su brief, y `orca game adopt-history` trae ambos cuando un repo se vuelve a agregar.
 - **La recuperación viene incluida.** `game resume-members` trae de vuelta a los miembros que un reinicio pausó; `game adopt` suma al equipo un agente que la flota encontró en marcha y `game drop` lo deja ir sin detenerlo; `game lead --fresh` rota a un líder nuevo cuando la conversación anterior es demasiado larga.
 
 Una ola llena los cupos libres desde el To Do, un miembro por ticket; el CI en verde y el merge dan XP:
@@ -199,7 +205,7 @@ El Panel también muestra tus PR abiertos y los números del equipo:
   <img src="../assets/readme/panel-metrics.gif" alt="El dueño abre el Panel del líder en My PRs con CI en verde, CI en curso y cambios pedidos, y luego el widget Metrics con los merges por día de 14 días, el lead time mediano y el uso de sesión y semanal de cada cuenta de Claude" width="960" />
 </p>
 
-Settings → Agents elige cómo se ve y cuánto le cuesta a tu máquina: **Off**, **Flat** (texto plano), **Zen**, **2D classic** o **2D hd**. Las escenas se pueden personalizar. [Referencia de Orca Game →](../reference/orchestrator-game.md)
+Settings → Agents → Panel elige cómo se ve el panel: **Game** (una escena con niveles y XP), **Display** (un carrusel de métricas del equipo) o **Plain**. La escena viene en tres estilos que representan el estado real del trabajo: **Pixel** (un huerto), **Figures** (una torre de castillo por miembro, trofeos por los merges) y **Office** (pizarras, y un edificio con una planta por máquina). Un proyecto puede cambiar cualquiera de estos ajustes en su propia configuración o en `orca.yaml`, un archivo de escena puede traer su propio arte y Settings muestra una vista previa del estilo elegido. Settings → Appearance → Status colors define un color por estado para claro y oscuro. La banda pixel antigua dentro del pane del líder está apagada por defecto; **Show the band** en Settings → Agents → Agent Teams game la activa con su **Default view** (Off, Flat, Zen, 2D classic, 2D hd). [Guía de Agent Teams →](../user/agents/agent-teams.md) · [Referencia de Orca Game →](../reference/orchestrator-game.md)
 
 <p align="center">
   <img src="../assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: las cinco vistas, y luego Flat y Off apagando la vista previa de la escena" width="960" />
