@@ -5,12 +5,21 @@ import type { GameInboxThread } from '../../../src/shared/orchestrator-game-inbo
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { timeAgoOf } from './team-inbox-meta'
+import type { TeamInboxWords } from './team-inbox-words'
 
 // Why a cap: a long thread would push every other ticket off the phone; the desktop keeps it whole.
 const THREAD_MESSAGES_SHOWN = 20
 
 /** One ticket's mail with the lead, collapsed to its last message until tapped. */
-export function TeamInboxThreadRow({ thread, now }: { thread: GameInboxThread; now: number }) {
+export function TeamInboxThreadRow({
+  thread,
+  now,
+  words
+}: {
+  thread: GameInboxThread
+  now: number
+  words: TeamInboxWords
+}) {
   const [open, setOpen] = useState(false)
   const last = thread.messages.at(-1)
   const count = thread.messages.length
@@ -23,16 +32,16 @@ export function TeamInboxThreadRow({ thread, now }: { thread: GameInboxThread; n
         onPress={() => setOpen((value) => !value)}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${open ? 'Close' : 'Open'} the ${thread.ticket} thread, ${count} message${count === 1 ? '' : 's'}`}
+        accessibilityLabel={words.thread(open, thread.ticket, count)}
       >
         <Chevron size={16} color={colors.textSecondary} />
         <View style={styles.headText}>
           <View style={styles.meta}>
             <Text style={styles.ticket}>{thread.ticket}</Text>
             {thread.waiting > 0 ? (
-              <Text style={styles.waiting}>{`${thread.waiting} waiting`}</Text>
+              <Text style={styles.waiting}>{words.waiting(thread.waiting)}</Text>
             ) : null}
-            <Text style={styles.age}>{timeAgoOf(thread.last, now) ?? ''}</Text>
+            <Text style={styles.age}>{timeAgoOf(thread.last, now, words.justNow) ?? ''}</Text>
           </View>
           {last ? (
             <Text style={styles.subject} numberOfLines={1}>
@@ -44,20 +53,18 @@ export function TeamInboxThreadRow({ thread, now }: { thread: GameInboxThread; n
       {open ? (
         <View style={styles.messages}>
           {count > shown.length ? (
-            <Text style={styles.age}>
-              {`Last ${shown.length} of ${count}; the rest are on the computer.`}
-            </Text>
+            <Text style={styles.age}>{words.lastOf(shown.length, count)}</Text>
           ) : null}
           {shown.map((message) => (
             <View key={message.id} style={styles.message}>
               <View style={styles.meta}>
                 <Text style={styles.route}>{`${message.from} → ${message.to}`}</Text>
                 <Text style={styles.age}>{message.kind}</Text>
-                <Text style={styles.age}>{timeAgoOf(message.at, now) ?? ''}</Text>
+                <Text style={styles.age}>{timeAgoOf(message.at, now, words.justNow) ?? ''}</Text>
               </View>
               {message.failure ? (
                 <Text style={styles.failure}>
-                  {message.failure.kind === 'rejected' ? 'Rejected' : 'Failed'}
+                  {message.failure.kind === 'rejected' ? words.rejected : words.failed}
                   {message.failure.reason ? `: ${message.failure.reason}` : ''}
                 </Text>
               ) : null}

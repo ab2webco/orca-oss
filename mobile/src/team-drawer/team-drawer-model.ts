@@ -279,10 +279,10 @@ export function teamPeekOf(
 }
 
 /** Time in state, as the desktop card words it: `now`, `10 min`, `13 h`, `3 d`. */
-export function teamAgeText(since: number, now: number): string {
+export function teamAgeText(since: number, now: number, nowWord = 'now'): string {
   const minutes = Math.floor((now - since) / 60_000)
   if (minutes < 1) {
-    return 'now'
+    return nowWord
   }
   if (minutes < 60) {
     return `${minutes} min`

@@ -2,9 +2,9 @@ import { StyleSheet } from 'react-native'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import { formatTimeAgo } from '../worktree/agent-row-display'
 
-export const timeAgoOf = (iso: string, now: number): string | null => {
+export const timeAgoOf = (iso: string, now: number, justNow?: string): string | null => {
   const at = Date.parse(iso)
-  return Number.isNaN(at) ? null : formatTimeAgo(at, now)
+  return Number.isNaN(at) ? null : formatTimeAgo(at, now, justNow)
 }
 
 /** The ticket, kind and age line every Inbox card on the phone starts with, and its body text. */

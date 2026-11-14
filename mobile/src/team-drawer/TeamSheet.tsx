@@ -14,6 +14,7 @@ import {
 import { TeamMemberCard } from './TeamMemberCard'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
+import { teamInboxWordsOf } from './team-inbox-words'
 
 type TeamTab = 'team' | 'inbox'
 
@@ -167,12 +168,19 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
         <Pressable style={styles.above} onPress={close} accessible={false} />
         <View style={[styles.dock, styles.sheet, { height: Math.round(height * 0.84) }]}>
           <PeekBar peek={peek} open words={words} onPress={close} />
+          {/* Why keyed: a tab switch (Answer in Inbox) must not keep the other tab's scroll and hide the tabs. */}
           <ScrollView
+            key={tab}
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}
           >
             <TabBar active={tab} inboxCount={questions.length} words={words} onSelect={setPicked} />
             {tab === 'inbox' ? (
-              <TeamInboxTab team={team} now={now} onOpenLink={onOpenLink} />
+              <TeamInboxTab
+                team={team}
+                now={now}
+                words={teamInboxWordsOf(view.locale)}
+                onOpenLink={onOpenLink}
+              />
             ) : (
               <>
                 <View style={styles.section}>

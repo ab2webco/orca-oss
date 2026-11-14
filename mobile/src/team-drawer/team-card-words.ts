@@ -18,6 +18,7 @@ type Words = {
   openTerminal: string
   terminalOnHost: (host: string) => string
   local: string
+  now: string
   needYou: (count: number) => string
   workingOf: (working: number, total: number) => string
   noMembers: string
@@ -59,6 +60,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     openTerminal: 'Open terminal',
     terminalOnHost: (host) => `Its terminal is on ${host}`,
     local: 'local',
+    now: 'now',
     needYou: (count) => `${count} ${count === 1 ? 'needs' : 'need'} you`,
     workingOf: (working, total) => `${working} working · ${total} member${total === 1 ? '' : 's'}`,
     noMembers: 'No members running',
@@ -96,6 +98,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     openTerminal: 'Abrir terminal',
     terminalOnHost: (host) => `Su terminal está en ${host}`,
     local: 'local',
+    now: 'ahora',
     needYou: (count) => `${count} te ${count === 1 ? 'necesita' : 'necesitan'}`,
     workingOf: (working, total) =>
       `${working} trabajando · ${total} miembro${total === 1 ? '' : 's'}`,

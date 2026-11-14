@@ -285,6 +285,17 @@ describe('TeamSheet', () => {
     expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
   })
 
+  it("lands a switched tab at its top, not at the last tab's scroll", () => {
+    show(teamWith())
+    act(() => button('Team').click())
+    const scroller = (): Element | null | undefined =>
+      document.body.querySelector('[role="tablist"]')?.parentElement?.parentElement
+    const teamScroller = scroller()
+    act(() => button('Answer in Inbox').click())
+    expect(teamScroller?.isConnected).toBe(false)
+    expect(scroller()).not.toBeNull()
+  })
+
   it("words the sheet and its cards in the host's language", () => {
     const team = teamWith()
     show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
@@ -302,6 +313,38 @@ describe('TeamSheet', () => {
     expect(shown).toContain('Métricas')
     expect(shown).toContain('Mergeados en 1 d')
     expect(button('Cerrar Equipo, 1 te necesita')).toBeDefined()
+  })
+
+  it("words the Inbox tab in the host's language", () => {
+    const team = teamWith()
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    const shown = texts()
+    expect(shown).toContain('Para ti (1)')
+    expect(shown).toContain('Esperando al lead (1)')
+    expect(shown).toContain('Decisión')
+    expect(shown).toContain('Hilos (1)')
+    expect(shown).toContain('Respondidas (1)')
+    expect(shown).toContain('Enviar')
+    expect(button('Enviar respuesta')).toBeDefined()
+    act(() => button('Abrir el hilo de ORCA-1, 2 mensajes').click())
+    expect(button('Cerrar el hilo de ORCA-1, 2 mensajes')).toBeDefined()
+  })
+
+  // Why: a 44 pt minimum height left a dead band under every PR line; the touch area is hitSlop now.
+  it('keeps the PR line its own height, so the card ends as it starts', () => {
+    show(teamWith({ questions: [] }))
+    expect(getComputedStyle(button('Open PR 850, CI green')).minHeight).not.toBe('44px')
+  })
+
+  // Why: the owner read the red left edge as decoration; the red waiting line already says it.
+  it('marks a waiting card by its line, with no coloured left edge', () => {
+    show(teamWith())
+    act(() => button('Team').click())
+    expect(texts()).toContain('Waiting for your answer')
+    const edged = [...document.body.querySelectorAll<HTMLElement>('div')].filter(
+      (one) => getComputedStyle(one).borderLeftWidth === '3px'
+    )
+    expect(edged).toEqual([])
   })
 
   it("opens on the lead's Inbox while a question waits, then shows the Team tab on a tap", () => {
