@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
+import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
@@ -8,13 +10,16 @@ import {
   teamPeekOf,
   type TeamDrawerData,
   type TeamMemberRow,
-  type TeamMetrics,
-  type TeamPeek
+  type TeamMetrics
 } from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
 import { teamInboxWordsOf } from './team-inbox-words'
+import { useTeamSheetDrag } from './use-team-sheet-drag'
+import { PeekBar, TEAM_PEEK_HEIGHT } from './TeamPeekBar'
+
+export { TEAM_PEEK_HEIGHT }
 
 type TeamTab = 'team' | 'inbox'
 
@@ -25,45 +30,6 @@ type Props = {
   now: number
   onOpenLink: (url: string) => void
   onOpenTerminal: (terminal: NonNullable<TeamMemberRow['terminal']>) => void
-}
-
-/** V30's collapsed sheet height. */
-export const TEAM_PEEK_HEIGHT = 60
-
-function PeekBar({
-  peek,
-  open,
-  words,
-  onPress
-}: {
-  peek: TeamPeek
-  open: boolean
-  words: TeamCardWords
-  onPress: () => void
-}) {
-  const tone = { question: colors.statusRed, working: colors.statusGreen, idle: colors.textMuted }[
-    peek.tone
-  ]
-  return (
-    <Pressable
-      style={styles.peek}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={open ? words.closeTeam(peek.text) : words.openTeam(peek.text)}
-      aria-expanded={open}
-    >
-      <View style={styles.grab} />
-      <View style={styles.peekLine}>
-        <View style={[styles.dot, { backgroundColor: tone }]} />
-        <Text
-          style={[styles.peekText, peek.tone === 'question' && { color: tone }]}
-          numberOfLines={1}
-        >
-          {peek.text}
-        </Text>
-      </View>
-    </Pressable>
-  )
 }
 
 function MetricsSummary({ metrics, words }: { metrics: TeamMetrics; words: TeamCardWords }) {
@@ -137,7 +103,7 @@ function TabBar({
   )
 }
 
-/** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that opens to 84%. */
+/** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that drags or taps open to 84%. */
 export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTerminal }: Props) {
   const { view, questions } = team
   const insets = useSafeAreaInsets()
@@ -145,10 +111,40 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
   // Why null until picked: each open lands on the Inbox while a question waits, else on the Team.
   const [picked, setPicked] = useState<TeamTab | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const sheetHeight = Math.round(height * 0.84)
+  // Why measured: the column can be shorter than 84% of the window (keyboard, header), which caps it.
+  const [laidOut, setLaidOut] = useState(sheetHeight)
+  const setOpen = (next: boolean): void => {
+    if (!next) {
+      setPicked(null)
+    }
+    onOpenChange(next)
+  }
+  const drag = useTeamSheetDrag(
+    open,
+    Math.max(0, Math.min(laidOut, sheetHeight) - TEAM_PEEK_HEIGHT - insets.bottom),
+    setOpen
+  )
+  const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
+  const { scrollY } = drag
+  // Why: a keyed tab remounts its ScrollView at the top without a scroll event to say so.
+  useEffect(() => {
+    scrollY.value = 0
+  }, [tab, scrollY])
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setPicked(null)
+      onOpenChange(false)
+      return true
+    })
+    return () => sub.remove()
+  }, [open, onOpenChange])
   if (!view) {
     return null
   }
-  const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
   const words = teamCardWordsOf(view.locale)
   const peek = teamPeekOf(
     view,
@@ -156,68 +152,105 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
     questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : [])),
     words
   )
-  const close = (): void => {
-    setPicked(null)
-    onOpenChange(false)
-  }
+  const close = (): void => setOpen(false)
   return (
-    <View style={[styles.dock, { paddingBottom: insets.bottom }]}>
-      <PeekBar peek={peek} open={false} words={words} onPress={() => onOpenChange(true)} />
-      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
-        {/* Why no scrim: the lead's terminal stays readable above the sheet, as in V30. */}
-        <Pressable style={styles.above} onPress={close} accessible={false} />
-        <View style={[styles.dock, styles.sheet, { height: Math.round(height * 0.84) }]}>
-          <PeekBar peek={peek} open words={words} onPress={close} />
-          {/* Why keyed: a tab switch (Answer in Inbox) must not keep the other tab's scroll and hide the tabs. */}
-          <ScrollView
-            key={tab}
-            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.lg }]}
-          >
-            <TabBar active={tab} inboxCount={questions.length} words={words} onSelect={setPicked} />
-            {tab === 'inbox' ? (
-              <TeamInboxTab
-                team={team}
-                now={now}
-                words={teamInboxWordsOf(view.locale)}
-                onOpenLink={onOpenLink}
-              />
-            ) : (
-              <>
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>{words.members(view.members.length)}</Text>
-                  {view.members.length > 0 ? (
-                    view.members.map((member) => (
-                      <TeamMemberCard
-                        key={member.key}
-                        member={member}
+    <>
+      {/* Why: holds the peek's place in the column so the command dock stays above it. */}
+      <View style={{ height: TEAM_PEEK_HEIGHT + insets.bottom }} />
+      {open ? (
+        // Why no scrim: the lead's terminal stays readable above the sheet, as in V30.
+        <Pressable
+          testID="team-sheet-above"
+          style={[StyleSheet.absoluteFill, styles.layer]}
+          onPress={close}
+          accessible={false}
+        />
+      ) : null}
+      <Animated.View
+        style={[styles.dock, styles.sheet, { height: sheetHeight }, drag.sheetStyle]}
+        onLayout={(event) => setLaidOut(Math.round(event.nativeEvent.layout.height))}
+        accessibilityViewIsModal={open}
+      >
+        {/* Why inside the sheet: a root over the column would swallow the terminal's touches on Android. */}
+        <GestureHandlerRootView style={styles.body}>
+          <GestureDetector gesture={drag.handlePan}>
+            <View collapsable={false}>
+              <PeekBar peek={peek} open={open} words={words} onPress={() => setOpen(!open)} />
+            </View>
+          </GestureDetector>
+          {drag.resting ? null : (
+            <GestureDetector gesture={drag.contentPan}>
+              <View style={styles.body} collapsable={false}>
+                <GestureDetector gesture={drag.scrollGesture}>
+                  {/* Why keyed: a tab switch (Answer in Inbox) must not keep the other tab's scroll and hide the tabs. */}
+                  <Animated.ScrollView
+                    key={tab}
+                    bounces={false}
+                    onScroll={drag.scrollHandler}
+                    scrollEventThrottle={16}
+                    contentContainerStyle={[
+                      styles.content,
+                      { paddingBottom: insets.bottom + spacing.lg }
+                    ]}
+                  >
+                    <TabBar
+                      active={tab}
+                      inboxCount={questions.length}
+                      words={words}
+                      onSelect={setPicked}
+                    />
+                    {tab === 'inbox' ? (
+                      <TeamInboxTab
+                        team={team}
                         now={now}
-                        words={words}
-                        expanded={expanded === member.key}
-                        onToggle={() => setExpanded(expanded === member.key ? null : member.key)}
-                        onAnswer={() => setPicked('inbox')}
+                        words={teamInboxWordsOf(view.locale)}
                         onOpenLink={onOpenLink}
-                        onOpenTerminal={(terminal) => {
-                          close()
-                          onOpenTerminal(terminal)
-                        }}
                       />
-                    ))
-                  ) : (
-                    <Text style={styles.empty}>{words.noMembersRunning}</Text>
-                  )}
-                </View>
-                {view.metrics ? (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{words.metrics}</Text>
-                    <MetricsSummary metrics={view.metrics} words={words} />
-                  </View>
-                ) : null}
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-    </View>
+                    ) : (
+                      <>
+                        <View style={styles.section}>
+                          <Text style={styles.sectionTitle}>
+                            {words.members(view.members.length)}
+                          </Text>
+                          {view.members.length > 0 ? (
+                            view.members.map((member) => (
+                              <TeamMemberCard
+                                key={member.key}
+                                member={member}
+                                now={now}
+                                words={words}
+                                expanded={expanded === member.key}
+                                onToggle={() =>
+                                  setExpanded(expanded === member.key ? null : member.key)
+                                }
+                                onAnswer={() => setPicked('inbox')}
+                                onOpenLink={onOpenLink}
+                                onOpenTerminal={(terminal) => {
+                                  close()
+                                  onOpenTerminal(terminal)
+                                }}
+                              />
+                            ))
+                          ) : (
+                            <Text style={styles.empty}>{words.noMembersRunning}</Text>
+                          )}
+                        </View>
+                        {view.metrics ? (
+                          <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>{words.metrics}</Text>
+                            <MetricsSummary metrics={view.metrics} words={words} />
+                          </View>
+                        ) : null}
+                      </>
+                    )}
+                  </Animated.ScrollView>
+                </GestureDetector>
+              </View>
+            </GestureDetector>
+          )}
+        </GestureHandlerRootView>
+      </Animated.View>
+    </>
   )
 }
 
@@ -229,38 +262,21 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radii.card,
     borderTopRightRadius: radii.card
   },
-  peek: {
-    height: TEAM_PEEK_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7
-  },
-  grab: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.textMuted
-  },
-  peekLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: spacing.lg
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4
-  },
-  peekText: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize + 1
-  },
-  above: {
-    flex: 1
+  // Why zIndex: the command dock sits at 20 and must not draw over the open sheet.
+  layer: {
+    zIndex: 30
   },
   sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
+    maxHeight: '100%',
     overflow: 'hidden'
+  },
+  body: {
+    flex: 1
   },
   content: {
     paddingHorizontal: spacing.lg
