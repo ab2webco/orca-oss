@@ -22,7 +22,12 @@ const DOCS = [
   'orchestrator/orca-game',
   'cli/overview',
   'extend/plugins',
-  'ssh'
+  'ssh',
+  'agents/agent-teams',
+  'agents/usage-tracking',
+  'model/sidebar',
+  'terminal',
+  'mobile'
 ]
 const PAGES = [
   { name: 'landing', path: '/' },
