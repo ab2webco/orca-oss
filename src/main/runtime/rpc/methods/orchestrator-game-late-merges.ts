@@ -1,3 +1,4 @@
+import type { GameMergedReview } from '../../../../shared/orchestrator-game-delivery'
 import type { GameLateReviewCheck } from '../../../../shared/orchestrator-game-late-merges'
 import { memberRosterOf } from '../../../../shared/orchestrator-game-member-names'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
@@ -12,6 +13,10 @@ export type LateMergePort = {
   reviewStateOf: (check: GameLateReviewCheck) => Promise<string | null>
   pay: (check: GameLateReviewCheck, at: string) => Promise<void>
   settleClosed: (check: GameLateReviewCheck) => Promise<void>
+  /** The project's merged PRs with the tickets their titles name; null when they cannot be read. */
+  mergedReviews: () => Promise<readonly GameMergedReview[] | null>
+  /** Pays each merged PR a freed member worked that nothing paid yet (ORCA-1210). */
+  backfill: (merged: readonly GameMergedReview[]) => Promise<void>
 }
 
 // Why throttled: each look reads up to 20 reviews, and a lead's state is read every few seconds.
@@ -36,6 +41,11 @@ export async function checkLateGameMerges(port: LateMergePort, at: string): Prom
     } else if (state === 'closed') {
       await port.settleClosed(check)
     }
+  }
+  // Why after the look: a free with no open PR to watch is paid from the merged list instead.
+  const merged = await port.mergedReviews().catch(() => null)
+  if (merged && merged.length > 0) {
+    await port.backfill(merged)
   }
 }
 

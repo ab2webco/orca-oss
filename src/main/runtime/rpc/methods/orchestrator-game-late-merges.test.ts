@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { GameMergedReview } from '../../../../shared/orchestrator-game-delivery'
 import type { GameLateReviewCheck } from '../../../../shared/orchestrator-game-late-merges'
 import {
   checkLateGameMerges,
@@ -15,7 +16,10 @@ const check = (ticket: string, number: number): GameLateReviewCheck => ({
   character: { key: 'merlin', name: 'Merlín' }
 })
 
-function portWith(states: Record<number, string | null | Error>) {
+function portWith(
+  states: Record<number, string | null | Error>,
+  merged: GameMergedReview[] | null = []
+) {
   const port = {
     checks: vi.fn(async () => [
       check('WAINBOX-79', 98),
@@ -31,7 +35,9 @@ function portWith(states: Record<number, string | null | Error>) {
       return state ?? null
     }),
     pay: vi.fn(async () => undefined),
-    settleClosed: vi.fn(async () => undefined)
+    settleClosed: vi.fn(async () => undefined),
+    mergedReviews: vi.fn(async (): Promise<GameMergedReview[] | null> => merged),
+    backfill: vi.fn(async () => undefined)
   } satisfies LateMergePort
   return port
 }
@@ -53,6 +59,21 @@ describe('checkLateGameMerges', () => {
     expect(port.settleClosed).toHaveBeenCalledTimes(1)
     expect(port.settleClosed).toHaveBeenCalledWith(check('WAINBOX-80', 99))
     expect(port.reviewStateOf).toHaveBeenCalledTimes(4)
+  })
+
+  // Why (ORCA-1210): a member stopped before its PR showed on the board left no PR to watch.
+  it('then backfills from the merged list, and skips it when the list cannot be read', async () => {
+    const list = [
+      { number: 1190, openedAt: 'a', mergedAt: 'b', tickets: ['ORCA-1199'] }
+    ] satisfies GameMergedReview[]
+    const readable = portWith({}, list)
+    const unreadable = portWith({}, null)
+
+    await checkLateGameMerges(readable, 'now')
+    await checkLateGameMerges(unreadable, 'now')
+
+    expect(readable.backfill).toHaveBeenCalledWith(list)
+    expect(unreadable.backfill).not.toHaveBeenCalled()
   })
 })
 

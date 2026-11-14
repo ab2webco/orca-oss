@@ -52,7 +52,8 @@ export const GAME_CHARACTER_RECENT_MAX = 20
 // Why bounded: tasks already folded in, so a retried free never counts one twice.
 const APPLIED_MAX = 50
 // Why bounded: PRs whose merge a character was paid for, so a merge seen again never pays twice.
-const SETTLED_MAX = 100
+// Twice the history's 200 records, so a PR whose free is still in history keeps its key (ORCA-1210).
+const SETTLED_MAX = 400
 
 /** `#41 merged` → 41. */
 export const prNumberOf = (pr: string | null): number | null => {
@@ -172,7 +173,7 @@ export function foldFreedMember(
   const outcomes = before?.outcomes ?? { merged: 0, qa: 0, stopped: 0, failed: 0, limited: 0 }
   const prKey = prKeyOf(record.ticket, prNumberOf(record.pr))
   // Why: a merge the host already paid for (creditGameMerge) is not paid again by its free.
-  const paid = prKey !== null && (before?.settled.includes(prKey) ?? false)
+  const paid = prKey !== null && paidGameMergeNumbers(stored).has(prNumberOf(record.pr) ?? -1)
   const settled = before?.settled ?? []
   const next: StoredCharacter = {
     key: character.key,
@@ -195,24 +196,42 @@ export function foldFreedMember(
   return { ...stored, [character.key]: next }
 }
 
+/** Every PR number a merge was paid for, to any character: one PR pays once (ORCA-1210). */
+export function paidGameMergeNumbers(stored: Record<string, unknown>): Set<number> {
+  const numbers = new Set<number>()
+  for (const raw of Object.values(stored)) {
+    for (const key of parseCharacter(raw)?.settled ?? []) {
+      const found = key.startsWith('closed:') ? null : /#(\d+)$/.exec(key)
+      if (found) {
+        numbers.add(Number(found[1]))
+      }
+    }
+  }
+  return numbers
+}
+
 /**
  * The stored characters with a merged PR paid to `character`, topping up what a QA free of that
- * PR already paid; null when that PR was already paid. Creates a character no free has written.
+ * PR already paid (`earned` when the caller counted it); null when that PR was already paid to
+ * anyone. Creates a character no free has written.
  */
 export function creditGameMerge(
   stored: Record<string, unknown>,
   character: { key: string; name: string },
-  merge: { ticket: string; number: number; at: string }
+  merge: { ticket: string; number: number; at: string },
+  earnedBefore?: number
 ): Record<string, unknown> | null {
   const before = parseCharacter(stored[character.key])
   const prKey = prKeyOf(merge.ticket, merge.number)
-  if (!prKey || before?.settled.includes(prKey)) {
+  if (!prKey || paidGameMergeNumbers(stored).has(merge.number)) {
     return null
   }
   // Why the recent tasks: an older build's merged free of this PR left no settled key.
-  const earned = (before?.recent ?? [])
-    .filter((task) => prKeyOf(task.ticket, prNumberOf(task.pr)) === prKey)
-    .reduce((sum, task) => sum + GAME_CHARACTER_XP[task.outcome], 0)
+  const earned =
+    earnedBefore ??
+    (before?.recent ?? [])
+      .filter((task) => prKeyOf(task.ticket, prNumberOf(task.pr)) === prKey)
+      .reduce((sum, task) => sum + GAME_CHARACTER_XP[task.outcome], 0)
   const base: StoredCharacter = before ?? {
     key: character.key,
     name: character.name,

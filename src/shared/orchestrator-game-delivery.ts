@@ -6,7 +6,18 @@ import {
 } from './orchestrator-game-metrics-summary'
 
 /** The project's merged PRs as its review provider lists them (ORCA-950). */
-export type GameMergedReview = { number: number; openedAt: string; mergedAt: string }
+export type GameMergedReview = {
+  number: number
+  openedAt: string
+  mergedAt: string
+  /** The tickets its title names, like `ORCA-1210`; absent from an older host (ORCA-1210). */
+  tickets?: string[]
+}
+
+const TICKET_IN_TITLE = /\b[A-Z][A-Z0-9]*-\d+\b/g
+
+export const ticketsOfTitle = (title: unknown): string[] =>
+  typeof title === 'string' ? [...new Set(title.match(TICKET_IN_TITLE) ?? [])] : []
 
 export type GameDelivery = {
   provider: 'github' | 'gitlab'
@@ -66,8 +77,9 @@ export function gameMergedReviewsOf(
     const mergedAt = isoOf(
       provider === 'github' ? fieldsOf(one.pull_request).merged_at : one.merged_at
     )
+    const tickets = ticketsOfTitle(one.title)
     return typeof number === 'number' && openedAt && mergedAt
-      ? [{ number, openedAt, mergedAt }]
+      ? [{ number, openedAt, mergedAt, ...(tickets.length > 0 ? { tickets } : {}) }]
       : []
   })
 }

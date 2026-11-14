@@ -1,4 +1,4 @@
-import { isReviewSettled } from './orchestrator-game-characters'
+import { isReviewSettled, paidGameMergeNumbers } from './orchestrator-game-characters'
 import type { GameHistoryRecord } from './orchestrator-game-history'
 
 /** A freed member's PR that was still open, and the character its merge would pay. */
@@ -28,6 +28,7 @@ export function lateReviewChecksOf(
 ): GameLateReviewCheck[] {
   const checks: GameLateReviewCheck[] = []
   const seen = new Set<string>()
+  const paid = paidGameMergeNumbers(stored)
   for (const record of records.toReversed()) {
     const number = Number(OPEN_PR.exec(record.pr ?? '')?.[1] ?? Number.NaN)
     const name = record.character?.trim()
@@ -37,7 +38,11 @@ export function lateReviewChecksOf(
     }
     const key = keyOf(name)
     const review = { ticket, number }
-    if (seen.has(`${ticket}#${number}`) || isReviewSettled(stored, key, review)) {
+    if (
+      seen.has(`${ticket}#${number}`) ||
+      paid.has(number) ||
+      isReviewSettled(stored, key, review)
+    ) {
       continue
     }
     seen.add(`${ticket}#${number}`)
