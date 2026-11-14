@@ -30,7 +30,7 @@ the desktop directly on your network, or through an end-to-end encrypted relay w
 Tap an **Account usage** card on Home, or the person icon on a desktop's worktree list.
 
 - The desktop's name under **Accounts** opens **Accounts on**, a list of your paired desktops with
-  their state. Picking one does not connect to it until you ask.
+  their state. Opening the list does not connect to any desktop on its own.
 - **Claude** and **Codex** list **System default** and each account with its 5-hour and 7-day bars.
   Tap an account to switch to it.
 - Under each account, a line names who runs on it, such as the lead and its members.

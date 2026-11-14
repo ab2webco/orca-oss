@@ -1,5 +1,5 @@
 ---
-sourceHash: 93c297dd56ecc78d
+sourceHash: a108d5d529100f86
 ---
 # Móvil
 
@@ -36,7 +36,7 @@ Toca una tarjeta **Account usage** en Inicio, o el icono de persona en la lista 
 escritorio.
 
 - El nombre del escritorio bajo **Accounts** abre **Accounts on**, una lista de tus escritorios
-  emparejados con su estado. Elegir uno no se conecta hasta que lo pides.
+  emparejados con su estado. Abrir la lista no conecta con ningún escritorio por sí solo.
 - **Claude** y **Codex** listan **System default** y cada cuenta con sus barras de 5 horas y 7 días.
   Toca una cuenta para cambiar a ella.
 - Bajo cada cuenta, una línea nombra quién corre en ella, como el líder y sus miembros.
