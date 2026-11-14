@@ -72,14 +72,17 @@ The agent grid puts every live agent of every project on one screen, grouped by 
   <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four live Claude Code sessions in lumen-app stream their answers, grouped as Needs You, Working and Done, then filtered by bucket" width="960" />
 </p>
 
+- **A sidebar for every host.** Each host lists its projects and workspaces, with a team's lead and members as agent rows. Group by status, PR or project, and filter out what you do not need. [Sidebar →](docs/user/model/sidebar.md)
+- **One + menu for new tabs.** Terminals, the browser and every detected agent; in a project with a lead, **Go to lead**, **Add member…** from the To Do, or reopen the team. On a phone-width pane the tabs shrink to icons with a **+N** list. [New tabs →](docs/user/model/sidebar.md#the--menu)
 - **One worktree per agent.** Every task gets its own git worktree, so agents never edit the same checkout; folders work as workspaces too. [Worktrees →](docs/user/model/worktrees.md)
 - **Terminals that outlive the window.** Tabs and split panes run in a background daemon, so a restart reconnects them with their recent output. [Terminal →](docs/user/terminal.md)
 - **SSH worktrees and headless hosts.** Run worktrees on a remote machine over SSH, or run the whole runtime without a window with `orca serve`. [SSH →](docs/user/ssh.md) · [Headless Linux →](docs/reference/headless-linux-server.md)
+- **Windows and WSL.** Settings → Terminal → Windows Shell picks the default shell and whether projects run on Windows or in a WSL distro; terminals with no project follow it too. [Windows and WSL →](docs/user/terminal.md#windows-and-wsl)
 - **Quick open, file explorer and viewers** for code, images and documents. [Quick open →](docs/user/model/quick-open.md) · [Files →](docs/user/editing/file-explorer.md) · [Viewers →](docs/user/editing/viewers.md)
 
 ### Switch Claude and Codex accounts without losing the session
 
-Add several Claude and Codex accounts and pick the active one in Settings → AI Provider Accounts, or switch a running terminal with `orca account switch`: Claude relaunches in the same terminal and resumes the conversation. A worktree can be pinned to its own account, and usage and quota resets show next to each agent. [Usage tracking →](docs/user/agents/usage-tracking.md)
+Add several Claude and Codex accounts and pick the active one in Settings → AI Provider Accounts, or switch a running terminal with `orca account switch`: Claude relaunches in the same terminal and resumes the conversation. A worktree can be pinned to its own account, and usage and quota resets show next to each agent. To stop logins rotating across hosts, give an account a long-lived `claude setup-token` token per host (**Token** on its row, or `orca account token set`). [Usage tracking →](docs/user/agents/usage-tracking.md)
 
 <p align="center">
   <img src="docs/assets/readme/claude-accounts-switch.gif" alt="Settings → AI Provider Accounts: three Claude accounts, the Active badge moving from one to the next with a confirmation toast" width="960" />
@@ -119,16 +122,18 @@ A plugin is a folder with an `orca-plugin.json`. Nothing runs until you review w
 - **Crash reports** with the process that died, memory by process type and GPU/WebGL state, from a dialog you can review before sending.
 - **Low-memory warning** that lists agent terminals first and says what opened it.
 - **Automations** that run a scheduled prompt or command, on the Claude or Codex account the automation picks.
-- **The `orca` CLI** drives all of it, so agents can too: worktrees, terminals, accounts, Plane, the game and more. [CLI →](docs/user/cli/overview.md)
+- **The `orca` CLI** drives all of it, so agents can too: worktrees, terminals, accounts, Plane, the team and more. Every `orca game` command is listed there. [CLI →](docs/user/cli/overview.md)
 
 ## Mobile
 
-The Orca Lab app pairs with your desktop and puts your agents in your pocket. Pair once from Desktop → Settings → Mobile by scanning a QR code; the phone then reaches the desktop directly or through an end-to-end encrypted relay. [Mobile app →](mobile/README.md)
+The Orca Lab app (0.0.62) pairs with your desktop and puts your agents in your pocket. Pair once from Desktop → Settings → Mobile by scanning a QR code; the phone then reaches the desktop directly or through an end-to-end encrypted relay. [Mobile →](docs/user/mobile.md)
 
+- **Every desktop at a glance.** Each desktop's card shows its team (members, how many are working, who needs you) and the active Claude account's 5-hour use, and keeps the last known team when the desktop drops.
+- **Accounts per desktop.** Pick a paired desktop, see each Claude and Codex account's 5-hour and 7-day use and who runs on it, and switch accounts.
 - **Live terminals.** Watch any agent's terminal stream and type into it.
 - **Owner-question Inbox.** When a lead needs a decision only you can make, the question lands in the phone's Inbox with a notification. Answer it there, and the answer goes back to the lead.
 - **Notification tap routing.** A tap opens the right host and screen; a lead's question opens the lead's terminal with the Team drawer.
-- **Team drawer over the lead's terminal.** Open questions, a card per member with its ticket, state, PR and CI, and the team's metrics: merges per day and median lead time.
+- **Team drawer over the lead's terminal.** A **Team** tab with a card per member (ticket, host, state, account use, PR and CI) and the team's metrics, and an **Inbox** tab for the lead's questions.
 - **Plane board and plugin panels** from the phone, and a button that asks the desktop to install its pending update.
 
 ```mermaid
@@ -152,7 +157,7 @@ Builds: iOS ships through TestFlight; Android APKs are attached to the [`mobile-
 
 Orca Game turns a Claude Code session into the **lead** of a team. The lead does not write the code itself: it launches one **member** per ticket, each in its own worktree and branch, waits for their reports, answers their questions, and asks you only what only you can decide.
 
-It looks like a game, a pixel-art party under the lead's prompt with XP and level-ups, because watching ten agents in ten terminals is hard. The rules underneath are the ones a good engineering team already keeps.
+It looks like a game, a **Team** panel in the right sidebar with a scene, levels and XP, because watching ten agents in ten terminals is hard. The rules underneath are the ones a good engineering team already keeps. [Agent Teams guide →](docs/user/agents/agent-teams.md)
 
 The idea of running a Claude Code team as a game came from [Jucer Orozco](https://github.com/Jucerweb).
 
@@ -178,7 +183,8 @@ The idea of running a Claude Code team as a game came from [Jucer Orozco](https:
 - **Typed reports.** A member finishes with a `worker_done` envelope that states each claim it verified and how: live, unit tests only, or not at all. The runtime rejects a malformed report, and a success cannot rest on an unverified claim.
 - **Finish before starting.** The lead drives each member to a merge before it launches another ticket, then removes the merged worktree and branch, so half-done work does not pile up.
 - **Questions go somewhere real.** Members ask the lead, or stop on a decision gate; the lead answers what it can and records the answer on the ticket. What only you can decide (releases, spending, hard-to-reverse actions, product direction) becomes an owner question with options, kept in an Inbox on desktop and phone, never buried in chat.
-- **The Panel shows the truth.** One card per member with its ticket, branch, PR, CI and state, plus your open PRs, the To Do, and metrics: merges per day, lead time, and which accounts are working.
+- **The Team panel shows the truth.** One card per member with its ticket, branch, PR, CI, phase and account use; click it to open the member's terminal. **Inbox** holds the questions for you, **PRs** your open PRs and the merge queue, **Machines** each host's free memory and agents. A member reads its PR's CI and GitHub's merge state from `orca game state` (`review.ci`, `review.mergeState`), and only a `clean` PR can merge.
+- **Members you can follow.** Each member is one character for its whole run, on its card, its terminal and the history. `orca game history` lists the freed members with outcome, PR and character; their outcomes become short project lessons that new members get in their brief, and `orca game adopt-history` carries both over when a repo is added again.
 - **Recovery is built in.** `game resume-members` brings back members a restart paused; `game adopt` takes an agent the fleet found running into the team, `game drop` lets one go without stopping it; `game lead --fresh` rotates to a new lead when the old conversation is too long.
 
 A wave fills the free slots from the To Do, one member per ticket; green CI and a merge pay XP:
@@ -199,7 +205,7 @@ The Panel also keeps your open PRs and the team's numbers:
   <img src="docs/assets/readme/panel-metrics.gif" alt="The owner opens the lead's Panel on My PRs with CI green, CI running and changes requested, then the Metrics widget with merges per day over 14 days, median lead time and each Claude account's session and weekly use" width="960" />
 </p>
 
-Settings → Agents picks how it looks, and what it costs your machine: **Off**, **Flat** (plain text), **Zen**, **2D classic** or **2D hd**. Scenes are themeable. [Orca Game reference →](docs/reference/orchestrator-game.md)
+Settings → Agents → Panel picks how the panel looks: **Game** (a scene with levels and XP), **Display** (a carousel of team metrics) or **Plain**. The scene comes in three styles that act out the real state of the work: **Pixel** (a garden), **Figures** (a castle tower per member, trophies for merges) and **Office** (whiteboards, and a building with one floor per machine). A project can change any of it in its own settings or in `orca.yaml`, a scene file can bring its own art, and Settings previews the chosen style. Settings → Appearance → Status colors sets one color per state for light and dark. The older pixel band inside the lead's pane is off by default; **Show the band** in Settings → Agents → Agent Teams game turns it on with its **Default view** (Off, Flat, Zen, 2D classic, 2D hd). [Agent Teams guide →](docs/user/agents/agent-teams.md) · [Orca Game reference →](docs/reference/orchestrator-game.md)
 
 <p align="center">
   <img src="docs/assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: the five views, then Flat and Off turning the scene preview off" width="960" />

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7261a1b778458d72
+sourceHash: 2b5cf57193d559ed
 ---
 # Terminal
 
@@ -15,6 +15,25 @@ shell o agente.
 - `Mod+Shift+Enter` expande o contrae el pane activo.
 - `Mod+W` cierra el pane activo.
 - `Mod+F` busca en el pane activo. `Mod+K` lo limpia.
+
+## Pestañas en una ventana estrecha
+
+Las pestañas se encogen a medida que la ventana se estrecha. Por debajo de unos 120 píxeles de barra
+de pestañas, como en un pane del ancho de un teléfono, cada pestaña muestra solo su icono, al pasar el
+puntero sobre una pestaña el icono se cambia por su botón de cerrar, y un botón **+N** cuenta las demás
+pestañas. Haz clic en él para listarlas por nombre y elegir una.
+
+## Windows y WSL
+
+**Settings > Terminal > Windows Shell** define el **Default Shell** de los panes nuevos (PowerShell,
+Command Prompt, Git Bash cuando está instalado) y el **Default project runtime**: **Windows** o
+**WSL** con una distro. Los proyectos heredan ese runtime salvo que un proyecto lo cambie.
+
+- Las terminales que no pertenecen a ningún proyecto, como un workspace de carpeta o la terminal
+  flotante, siguen el mismo valor: con **WSL** elegido se abren en esa distro. Un shell que eliges
+  para una pestaña sigue mandando.
+- Una distro que instalas con Orca Lab abierto aparece en la lista de distros sin reiniciar:
+  Settings vuelve a comprobar cuando su lista tiene un minuto.
 
 ## Entre reinicios
 

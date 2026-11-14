@@ -11,10 +11,14 @@ export const docsSidebar = [
   group('Workspaces', 'Espacios de trabajo', [
     page('docs/model/worktrees'),
     page('docs/model/quick-open'),
+    page('docs/model/sidebar'),
     page('docs/terminal')
   ]),
   group('Agents', 'Agentes', [page('docs/agents/supported'), page('docs/agents/usage-tracking')]),
-  group('Orchestrator', 'Orquestador', [page('docs/orchestrator/orca-game')]),
+  group('Orchestrator', 'Orquestador', [
+    page('docs/agents/agent-teams'),
+    page('docs/orchestrator/orca-game')
+  ]),
   group('Review', 'Revisión', [page('docs/review/annotate-ai-diff'), page('docs/review/linear')]),
   group('Editing', 'Edición', [page('docs/editing/file-explorer'), page('docs/editing/viewers')]),
   group('Browser', 'Navegador', [page('docs/browser/design-mode')]),

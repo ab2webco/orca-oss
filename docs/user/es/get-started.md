@@ -1,5 +1,5 @@
 ---
-sourceHash: 2222ff9e38dfb222
+sourceHash: 8340619f4cfafbda
 ---
 # Primeros pasos
 
@@ -57,4 +57,5 @@ derecha (`Mod+Shift+G`). En **New pull request**, revisa el título y la **Base 
 
 Un agente en un worktree es la unidad básica. [Orca Game](../../reference/orchestrator-game.md)
 pone un agente líder por encima: toma tus tickets, inicia un miembro por ticket en su propio
-worktree y solo te pregunta lo que tienes que decidir tú.
+worktree y solo te pregunta lo que tienes que decidir tú. [Agent Teams](agents/agent-teams.md) explica
+cómo iniciar un líder, agregar miembros y leer el panel Team.

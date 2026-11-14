@@ -9,6 +9,12 @@ own and its members'). It started as the quest mode of the
 
 Plain Claude, Codex and every other agent are untouched.
 
+A team's main view is now the native **Team** panel in the right sidebar, with its three looks
+(Game, Display, Plain) and scene styles (Pixel, Figures, Office). The pixel band inside the pane is
+off by default (`band: false`, see [Configuration layers](#configuration-layers)). The user guide
+[Agent Teams](../user/agents/agent-teams.md) covers the panel; this reference covers the plugin,
+the CLI and the configuration.
+
 ## When it loads
 
 Both ways into a team load it with `--plugin-dir <bundled plugin>` and the `ORCA_GAME_*` env
@@ -433,7 +439,7 @@ popover.
 
 ## Panel layout
 
-The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
+This section is the terminal Fleet pane, not the native Team panel. The Fleet pane's sections are Team (the cards and the advisor card), Review (the review and work
 item rows), My PRs, To Do, Actions and Metrics, in that order. A new Panel shows only Team and My
 PRs; the other four are widgets in the catalog that a person adds from the **Widgets** menu chip or with
 `/orca-game:layout add <section>`, and removes the same way. In the catalog `●` marks a shown

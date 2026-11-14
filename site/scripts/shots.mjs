@@ -22,11 +22,18 @@ const DOCS = [
   'orchestrator/orca-game',
   'cli/overview',
   'extend/plugins',
-  'ssh'
+  'ssh',
+  'agents/agent-teams',
+  'agents/usage-tracking',
+  'model/sidebar',
+  'terminal',
+  'mobile'
 ]
 const PAGES = [
   { name: 'landing', path: '/' },
   { name: 'landing-es', path: '/es/' },
+  { name: 'docs-index', path: '/docs/' },
+  { name: 'docs-es-index', path: '/es/docs/' },
   ...DOCS.flatMap((doc) => [
     { name: `docs-${doc.replace(/\//g, '-')}`, path: `/docs/${doc}/` },
     { name: `docs-es-${doc.replace(/\//g, '-')}`, path: `/es/docs/${doc}/` }
