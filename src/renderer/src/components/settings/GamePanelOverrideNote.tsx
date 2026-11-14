@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import { getExecutionHostLabel, getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { hostDisplayLabel } from '@/lib/local-host-display-label'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { GamePanelField, GamePanelValue } from '../../../../shared/orchestrator-game-panel'
 import { useTeamPanelSettingLayers } from '../team-panel/team-panel-setting-layers'
@@ -37,7 +38,7 @@ export function useGamePanelOverrideProjects(settings: GameSettings): GamePanelO
           (one) => one.id !== repo.id && one.displayName === repo.displayName
         )
         const name = shared
-          ? `${repo.displayName} · ${getExecutionHostLabel(getRepoExecutionHostId(repo))}`
+          ? `${repo.displayName} · ${hostDisplayLabel(getRepoExecutionHostId(repo))}`
           : repo.displayName
         return local || project ? [{ repoId: repo.id, name, project, local }] : []
       }),

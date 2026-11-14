@@ -97,7 +97,9 @@ describe('the global Panel look row when a project overrides it', () => {
           displayName: 'orca-oss',
           path: '/r/oss',
           connectionId: 'm1',
-          executionHostId: 'ssh:m1'
+          executionHostId: 'ssh:m1',
+          badgeColor: '#000000',
+          addedAt: 0
         } as Repo
       ]
     })
