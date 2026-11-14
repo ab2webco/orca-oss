@@ -492,6 +492,10 @@ describe('the terminal band group', () => {
       const band = bandOf(view.container)
 
       expect(band?.querySelector('h3')?.textContent).toBe('Terminal band')
+      // ORCA-1203: the band's preview is not the Team panel, which follows Panel look.
+      expect(band?.textContent).toContain(
+        'Drawn at the top of each Agent Teams terminal pane. The Team panel uses Panel look.'
+      )
       expect(hasSceneSelect(band)).toBe(false)
       expect(drawnRows(band).every(Boolean)).toBe(true)
       expect(band?.querySelector('[aria-label="Scene style"]')).toBeNull()

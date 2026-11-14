@@ -5515,6 +5515,13 @@
         }
       },
       "settings": {
+        "GamePanelOverrideNote": {
+          "local": "{{project}} usa {{value}} en este equipo.",
+          "open": "Abrir proyecto",
+          "project": "El orca.yaml de {{project}} pone {{value}}.",
+          "useGlobal": "Usar el global",
+          "view": "{{project}} muestra {{value}} por su Vista por defecto."
+        },
         "keep": {
           "local": {
             "main": {
@@ -10947,7 +10954,8 @@
           "sceneFileNotText": "no es un archivo de texto",
           "terminalBand": "Banda del terminal",
           "band": "Mostrar la banda",
-          "bandDescription": "La escena pixel y el HUD en los paneles de Agent Teams."
+          "bandDescription": "La escena pixel y el HUD en los paneles de Agent Teams.",
+          "terminalBandDescription": "Se dibuja arriba de cada panel de terminal de Agent Teams. El panel Team usa la Apariencia del panel."
         },
         "OrchestratorGameMemberNamesRow": {
           "label": "Nombres de los miembros",
@@ -11041,7 +11049,7 @@
           "show": "Mostrar el juego",
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
-          "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+          "viewDescription": "Cómo dibujan el juego los paneles de terminal de Agent Teams y lo que cuesta. El panel Team la sigue hasta que eliges una Apariencia del panel. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
         },
         "OrchestratorGamePanelSetting": {
           "advisor": "Advisor",
@@ -11050,7 +11058,7 @@
           "arcadeDescription": "Un merge perfecto guarda una partida.",
           "description": "El panel de la barra derecha para tus agentes. Cada proyecto puede cambiarlo en sus propios ajustes.",
           "look": "Apariencia del panel",
-          "lookDescription": "Los mismos datos y acciones en las tres.",
+          "lookDescription": "El panel Team de la barra derecha; la Vista por defecto define los paneles de terminal. Los mismos datos y acciones en las tres.",
           "lookDisplay": "Display",
           "lookGame": "Juego",
           "lookPlain": "Sobrio",
@@ -11066,7 +11074,8 @@
           "styleFigures": "Figuras",
           "styleOffice": "Oficina",
           "stylePixel": "Pixel",
-          "title": "Panel"
+          "title": "Panel",
+          "teamPanelLook": "Panel Team: {{look}}"
         },
         "orchestrator-game-style-fallback-note": {
           "text": "Esta escena no tiene arte para {{style}}, así que el panel de Equipo dibuja los personajes de la propia escena en Pixel.",

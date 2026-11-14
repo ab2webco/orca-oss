@@ -15,6 +15,7 @@ import {
   sceneLook
 } from '../../src/shared/__fixtures__/orchestrator-game-scene'
 import { writeSettings } from './helpers/settings-write'
+import { openTeamPanelWithLead } from './helpers/team-panel-lead'
 
 const WIDTHS = [1440, 768, 390, 320] as const
 const THEMES = ['light', 'dark'] as const
@@ -403,4 +404,178 @@ test('the scene heads the Panel group, and the preview draws a built-in or custo
   } finally {
     rmSync(join(testRepoPath, '.orca'), { recursive: true, force: true })
   }
+})
+
+// ORCA-1203: the owner's saved layers, a global panel with no look and a project one on Game.
+const OWNER_LAYERS = (repoId: string) =>
+  ({
+    orchestratorGame: { panel: { style: 'office' } },
+    orchestratorGameProjects: {
+      [repoId]: { panel: { style: 'office', look: 'game' }, mode: 'on', band: true }
+    }
+  }) as Parameters<typeof window.api.settings.set>[0]
+
+const pressIn = (page: Page, section: string, group: string, label: string): Promise<void> =>
+  page
+    .locator(`[id="${section}"] [aria-label="${group}"] button`)
+    .filter({ hasText: new RegExp(`^${label}$`) })
+    .click()
+
+test('a look this machine sets for the project wins over Display, and the global row says so', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  const { repoId } = await openTeamPanelWithLead(electronApp, orcaPage)
+  expect(repoId, 'the active worktree has a repo').not.toBe('')
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  await writeSettings(orcaPage, OWNER_LAYERS(repoId))
+  const panel = orcaPage.getByTestId('team-panel')
+  const scene = panel.locator('[data-team-scene]')
+  const display = panel.getByTestId('team-panel-display')
+  const hint = orcaPage.locator(
+    '[id="agents-game-panel"] [data-slot="game-panel-override"][data-field="look"]'
+  )
+  const close = (): Promise<void> =>
+    orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+  await expect(scene).toHaveCount(1, { timeout: 30_000 })
+
+  const globalSection = await openTarget(orcaPage, null)
+  await expectSectionInView(orcaPage, globalSection)
+  await expect(hint).toHaveCount(0)
+  await pressIn(orcaPage, globalSection, 'Panel look', 'Display')
+  await expect(hint).toContainText('uses Game on this machine')
+  for (const theme of THEMES) {
+    await applySettings(orcaPage, { theme })
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      await hint.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+      await orcaPage.screenshot({
+        path: testInfo.outputPath(`override-hint-${theme}-${width}.png`),
+        animations: 'disabled'
+      })
+    }
+  }
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await close()
+  // Why still the scene: the project's own look wins, as the hint said.
+  await expect(scene).toHaveCount(1)
+  await expect(display).toHaveCount(0)
+
+  await openTarget(orcaPage, null)
+  await hint.getByRole('button', { name: 'Open project' }).click()
+  await expectSectionInView(orcaPage, `repo-${repoId}-game`)
+  await openTarget(orcaPage, null)
+  await hint.getByRole('button', { name: 'Use global' }).click()
+  await expect(hint).toHaveCount(0)
+  const saved = await orcaPage.evaluate(
+    async (id) =>
+      (
+        (await window.api.settings.get()) as {
+          orchestratorGameProjects?: Record<string, { panel?: Record<string, string> }>
+        }
+      ).orchestratorGameProjects?.[id]?.panel,
+    repoId
+  )
+  expect(saved, 'only the look leaves the project layer').toEqual({ style: 'office' })
+  await close()
+  await expect(display).toHaveCount(1, { timeout: 15_000 })
+  await expect(scene).toHaveCount(0)
+})
+
+test('each look picked globally draws in the Team panel', async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  const { repoId } = await openTeamPanelWithLead(electronApp, orcaPage)
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const layers = OWNER_LAYERS(repoId) as {
+    orchestratorGameProjects: Record<string, { panel: Record<string, string> }>
+  }
+  delete layers.orchestratorGameProjects[repoId].panel.look
+  await writeSettings(orcaPage, layers as Parameters<typeof window.api.settings.set>[0])
+  const panel = orcaPage.getByTestId('team-panel')
+  const scene = panel.locator('[data-team-scene]')
+  const display = panel.getByTestId('team-panel-display')
+  for (const look of ['Display', 'Plain', 'Game'] as const) {
+    const globalSection = await openTarget(orcaPage, null)
+    await expectSectionInView(orcaPage, globalSection)
+    await pressIn(orcaPage, globalSection, 'Panel look', look)
+    const lookRow = orcaPage.locator(`[id="${globalSection}"] [aria-label="Panel look"]`)
+    for (const theme of THEMES) {
+      await applySettings(orcaPage, { theme })
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        await lookRow.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`settings-${look.toLowerCase()}-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+    await setWindowWidth(electronApp, orcaPage, 1440)
+    await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
+    await expect(scene).toHaveCount(look === 'Game' ? 1 : 0, { timeout: 15_000 })
+    await expect(display).toHaveCount(look === 'Display' ? 1 : 0)
+    for (const theme of THEMES) {
+      await applySettings(orcaPage, { theme })
+      for (const width of WIDTHS) {
+        await setWindowWidth(electronApp, orcaPage, width)
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`panel-${look.toLowerCase()}-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+    await setWindowWidth(electronApp, orcaPage, 1440)
+  }
+})
+
+// ORCA-1203: the "pixel banner" the owner saw with Display was the project's terminal band preview.
+test("with Display, the project's band preview reads as the terminal's, apart from the Team panel", async ({
+  electronApp,
+  orcaPage
+}, testInfo: TestInfo) => {
+  test.setTimeout(600_000)
+  await waitForSessionReady(orcaPage)
+  const repoId = await orcaPage.evaluate(() => window.__store!.getState().repos[0]?.id ?? '')
+  expect(repoId, 'the fixture seeds a repo').not.toBe('')
+  await applySettings(orcaPage, { uiLanguage: 'en' })
+  const layers = OWNER_LAYERS(repoId) as {
+    orchestratorGame: { panel: Record<string, string> }
+    orchestratorGameProjects: Record<string, { panel: Record<string, string> }>
+  }
+  layers.orchestratorGame.panel.look = 'display'
+  layers.orchestratorGameProjects[repoId].panel.look = 'display'
+  await writeSettings(orcaPage, layers as Parameters<typeof window.api.settings.set>[0])
+  const projectSection = await openTarget(orcaPage, repoId)
+  await expectSectionInView(orcaPage, projectSection)
+  const section = orcaPage.locator(`[id="${projectSection}"]`)
+  const band = section.locator('[role="group"][aria-label="Terminal band"]')
+  const preview = band.locator('[data-slot="game-scene-preview"]')
+  await expect(preview).toBeVisible({ timeout: 15_000 })
+  for (const theme of THEMES) {
+    await applySettings(orcaPage, { theme })
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      for (const [name, target] of [
+        ['look-row', section.locator('[aria-label="Panel look"]')],
+        ['band', preview]
+      ] as const) {
+        await target.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+        await orcaPage.screenshot({
+          path: testInfo.outputPath(`project-display-${name}-${theme}-${width}.png`),
+          animations: 'disabled'
+        })
+      }
+    }
+  }
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  await expect(section).toContainText('Team panel: Display · this machine')
+  await expect(band).toContainText(
+    'Drawn at the top of each Agent Teams terminal pane. The Team panel uses Panel look.'
+  )
+  await expect(band.getByRole('radiogroup', { name: 'Show the band' })).toBeVisible()
+  await orcaPage.evaluate(() => window.__store!.getState().closeSettingsPage())
 })
