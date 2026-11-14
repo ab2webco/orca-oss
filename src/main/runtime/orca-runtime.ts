@@ -3959,7 +3959,8 @@ export class OrcaRuntimeService {
             undefined,
             GAME_HOST_CAPACITY_TIMEOUT_MS
           ),
-        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS
+        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
+        { marksSilence: false }
       )
   })
   // Why worktree.ps: every paired host already answers it, so no wire change (ORCA-943).
@@ -3975,7 +3976,8 @@ export class OrcaRuntimeService {
             { limit: GAME_REMOTE_SESSIONS_LIMIT },
             GAME_HOST_CAPACITY_TIMEOUT_MS
           ),
-        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS
+        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
+        { marksSilence: false }
       )) as { worktrees?: RuntimeWorktreePsSummary[] }
   })
   private readonly gamePairedHosts = new GamePairedHostReader({

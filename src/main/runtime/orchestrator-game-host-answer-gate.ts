@@ -20,7 +20,13 @@ export class GameHostAnswerGate {
 
   constructor(private readonly options: { downForMs: number; now?: () => number }) {}
 
-  async call<T>(environmentId: string, read: () => Promise<T>, deadlineMs: number): Promise<T> {
+  /** `marksSilence: false` for a slow sweep: it obeys the skip, but its own miss proves no silence. */
+  async call<T>(
+    environmentId: string,
+    read: () => Promise<T>,
+    deadlineMs: number,
+    options: { marksSilence?: boolean } = {}
+  ): Promise<T> {
     const until = this.downUntil.get(environmentId)
     if (until !== undefined) {
       if (this.now() < until) {
@@ -35,7 +41,10 @@ export class GameHostAnswerGate {
     try {
       return await Promise.race([read(), deadline])
     } catch (error) {
-      if (error instanceof GameHostUnansweredError || isTimeout(error)) {
+      if (
+        options.marksSilence !== false &&
+        (error instanceof GameHostUnansweredError || isTimeout(error))
+      ) {
         this.downUntil.set(environmentId, this.now() + this.options.downForMs)
       }
       throw error

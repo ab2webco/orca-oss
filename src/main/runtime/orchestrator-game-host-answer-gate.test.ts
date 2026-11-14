@@ -44,6 +44,31 @@ describe('GameHostAnswerGate', () => {
     expect(again).toHaveBeenCalledTimes(1)
   })
 
+  // Why: a full `ps` sweep can run long on a loaded host that still answers its light reads.
+  it('lets a slow sweep give up at its deadline without marking a live host silent', async () => {
+    const gate = new GameHostAnswerGate({ downForMs: 30_000 })
+    const sweep = gate.call('env_m1', never, 7_000, { marksSilence: false }).catch((e) => e)
+    await vi.advanceTimersByTimeAsync(7_000)
+    expect(await sweep).toBeInstanceOf(GameHostUnansweredError)
+
+    const show = vi.fn(async () => 'shown')
+    await expect(gate.call('env_m1', show, 4_000)).resolves.toBe('shown')
+    expect(show).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a silent host for a sweep too', async () => {
+    const gate = new GameHostAnswerGate({ downForMs: 30_000 })
+    const first = gate.call('env_imac', never, 4_000).catch(() => null)
+    await vi.advanceTimersByTimeAsync(4_000)
+    await first
+
+    const sweep = vi.fn(async () => 'swept')
+    await expect(
+      gate.call('env_imac', sweep, 7_000, { marksSilence: false })
+    ).rejects.toBeInstanceOf(GameHostUnansweredError)
+    expect(sweep).not.toHaveBeenCalled()
+  })
+
   it('does not skip a host that answered with an error', async () => {
     const gate = new GameHostAnswerGate({ downForMs: 30_000 })
     await expect(
