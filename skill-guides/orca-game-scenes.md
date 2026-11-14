@@ -31,7 +31,8 @@ Run every step; skipping validation is the usual way scenes ship broken.
    required block filled in, its team-band palette (`hud`) and its advisor (a wizard), plus an
    example of each optional block in place of Quest's own: a `foe` (a goblin), a `finale`, a
    `cast.pet` (a fox), a palette theme, and a `roster` of ten of Quest's characters. Replace them
-   all; none of them is meant to stay:
+   all; none of them is meant to stay. It leaves out Quest's sword, so a new scene holds no
+   [`prop`](#prop-optional) until you give it one:
 
    ```text
    orca game scene new .orca/scenes/<name>.json
