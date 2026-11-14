@@ -676,7 +676,8 @@ En un fork la comparación usa el remoto propio de cada repo, no su identidad (O
 de un fork nombra su `upstream`, que comparten todos los demás forks. El remoto propio del líder se
 lee con `git remote -v` (primero origin, `upstream` solo si es el único remoto); un repo del host
 emparejado cuya identidad es su `upstream` no se toma como el proyecto, porque podría ser cualquier
-fork de él. Para aceptarlo a propósito, lista ese upstream en `memberRepos`.
+fork de él: el rechazo nombra ese repo y el upstream. Para aceptarlo a propósito, lista ese upstream
+en `memberRepos`.
 
 Cada miembro que inicia `game launch`/`game wave` recibe el primer nombre del roster que no tenga
 ningún miembro vivo: `memberNames`, o si no el `roster` de la escena activa (cada escena incluida trae

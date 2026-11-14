@@ -652,8 +652,8 @@ answers its old `repo.list` and `repo.show`, so any paired Orca can be checked.
 For a fork the match uses each repo's own remote, not its identity (ORCA-1198): a fork's identity
 names its `upstream`, which every other fork shares. The lead's own remote is read with
 `git remote -v` (origin first, `upstream` only when it is the sole remote); a paired host's repo whose
-identity is its `upstream` is not taken as the project, since it could be any fork of it. List that
-upstream in `memberRepos` to accept it on purpose.
+identity is its `upstream` is not taken as the project, since it could be any fork of it: the refusal
+names that repo and the upstream. List that upstream in `memberRepos` to accept it on purpose.
 
 Each member `game launch`/`game wave` starts is named after the first roster name no live member
 holds: `memberNames`, else the active scene's `roster` (every built-in scene ships one), in the lead

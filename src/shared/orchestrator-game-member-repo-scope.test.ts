@@ -155,7 +155,7 @@ describe('gameMemberRepoRefusalOf for a fork (ORCA-1198)', () => {
       repos: [otherFork]
     }
     expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca' })).toMatch(
-      /orca-oss is not registered on m1/
+      /the upstream every fork of it shares.*No worktree was created/
     )
   })
 
@@ -180,6 +180,17 @@ describe('gameMemberRepoRefusalOf for a fork (ORCA-1198)', () => {
     expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toMatch(
       /orca-oss is not registered on m1, so no member can start there for it/
     )
+  })
+
+  it('says why a host clone named by the shared upstream is refused, not that the project is missing', () => {
+    const clone = repo('h_orca', 'orca-oss', upstream, null)
+    const read = { host: 'm1', lead: leadFork, repo: clone, repos: [clone] }
+    const refusal = gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })
+    expect(refusal).toMatch(
+      /orca-oss on m1 names github\.com\/stablyai\/orca, the upstream every fork of it shares/
+    )
+    expect(refusal).toMatch(/memberRepos/)
+    expect(refusal).not.toMatch(/is not registered on m1/)
   })
 
   it('still accepts an upstream the orca.yaml lists in memberRepos', () => {

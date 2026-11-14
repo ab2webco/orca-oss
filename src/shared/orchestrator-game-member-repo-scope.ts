@@ -87,6 +87,15 @@ export function gameMemberRepoRefusalOf(args: {
     return null
   }
   const own = read.repos.find(inProject)
+  const upstream = lead.remoteKey?.toLowerCase() ?? null
+  // A host clone named by its upstream may be this fork or any other one (ORCA-1198).
+  const namedByUpstream =
+    upstream === null
+      ? undefined
+      : read.repos.find((repo) => ownKeyOf(repo) === null && sameKey(repo.remoteKey, upstream))
+  if (!own && namedByUpstream) {
+    return `${namedByUpstream.displayName} on ${read.host} names ${upstream}, the upstream every fork of it shares, so Orca cannot tell it is ${lead.displayName}'s clone. If it is, list ${upstream} in orchestratorGame.orchestrator.memberRepos. No worktree was created.`
+  }
   if (!own) {
     return `${lead.displayName} is not registered on ${read.host}, so no member can start there for it. With the owner's OK, clone it on ${read.host} and register it: orca repo add --path <path on ${read.host}> --environment ${read.host}. No worktree was created.`
   }
