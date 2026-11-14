@@ -5866,6 +5866,13 @@
         }
       },
       "settings": {
+        "GamePanelOverrideNote": {
+          "local": "{{project}} uses {{value}} on this machine.",
+          "open": "Open project",
+          "project": "{{project}}'s orca.yaml sets {{value}}.",
+          "useGlobal": "Use global",
+          "view": "{{project}} shows {{value}}, from its Default view."
+        },
         "keep": {
           "local": {
             "main": {
@@ -11652,7 +11659,7 @@
           "show": "Show the game",
           "view": "Default view",
           "showDescription": "Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.",
-          "viewDescription": "How panes draw the game, with what it costs. Each project can change it, and one pane with /orca-game:view."
+          "viewDescription": "How Agent Teams terminal panes draw the game, with what it costs. The Team panel has its own Panel look. Each project can change it, and one pane with /orca-game:view."
         },
         "OrchestratorGamePanelSetting": {
           "advisor": "Advisor",
@@ -11661,7 +11668,7 @@
           "arcadeDescription": "A perfect merge saves a game.",
           "description": "The right sidebar panel for your agents. Each project can change it in its own settings.",
           "look": "Panel look",
-          "lookDescription": "Same data and actions in all three.",
+          "lookDescription": "The Team panel in the right sidebar; Default view sets the terminal panes. Same data and actions in all three.",
           "lookDisplay": "Display",
           "lookGame": "Game",
           "lookPlain": "Plain",

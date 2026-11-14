@@ -73,6 +73,7 @@ export function TeamDisplayCarousel({ model }: { model: TeamPanelGameModel }): R
   const message = ticker[line % ticker.length]
   return (
     <section
+      data-testid="team-panel-display"
       aria-roledescription="carousel"
       aria-label={translate('teamPanel.display.label', 'Team metrics')}
       className="@container flex shrink-0 flex-col gap-3 border-b border-border bg-background p-3 font-mono"

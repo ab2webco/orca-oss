@@ -102,6 +102,10 @@ describe('GamePanelSetting', () => {
 
     expect(view.container.querySelector('#agents-game-panel')).toBeTruthy()
     expect(view.container.textContent).toContain('Same data and actions in all three.')
+    // ORCA-1203: the look is the Team panel's, apart from the terminal's Default view.
+    expect(view.container.textContent).toContain(
+      'The Team panel in the right sidebar; Default view sets the terminal panes.'
+    )
     expect(view.container.textContent).not.toContain('Advisor')
     expect(view.container.textContent).not.toContain('Arcade')
     press(view.container, 'Scene style', 'Figures')

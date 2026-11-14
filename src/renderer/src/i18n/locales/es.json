@@ -5515,6 +5515,13 @@
         }
       },
       "settings": {
+        "GamePanelOverrideNote": {
+          "local": "{{project}} usa {{value}} en este equipo.",
+          "open": "Abrir proyecto",
+          "project": "El orca.yaml de {{project}} pone {{value}}.",
+          "useGlobal": "Usar el global",
+          "view": "{{project}} muestra {{value}} por su Vista por defecto."
+        },
         "keep": {
           "local": {
             "main": {
@@ -11041,7 +11048,7 @@
           "show": "Mostrar el juego",
           "view": "Vista por defecto",
           "showDescription": "Apagado abre los paneles de Agent Teams como Claude normal y guarda la vista por defecto para cuando vuelva a encenderse.",
-          "viewDescription": "Cómo dibujan el juego los paneles y lo que cuesta. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
+          "viewDescription": "Cómo dibujan el juego los paneles de terminal de Agent Teams y lo que cuesta. El panel Team tiene su propia Apariencia del panel. Cada proyecto puede cambiarla, y un panel con /orca-game:view."
         },
         "OrchestratorGamePanelSetting": {
           "advisor": "Advisor",
@@ -11050,7 +11057,7 @@
           "arcadeDescription": "Un merge perfecto guarda una partida.",
           "description": "El panel de la barra derecha para tus agentes. Cada proyecto puede cambiarlo en sus propios ajustes.",
           "look": "Apariencia del panel",
-          "lookDescription": "Los mismos datos y acciones en las tres.",
+          "lookDescription": "El panel Team de la barra derecha; la Vista por defecto define los paneles de terminal. Los mismos datos y acciones en las tres.",
           "lookDisplay": "Display",
           "lookGame": "Juego",
           "lookPlain": "Sobrio",

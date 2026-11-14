@@ -12,13 +12,11 @@ import {
   GAME_PANEL_LOOKS,
   GAME_PANEL_STYLES,
   GAME_PANEL_TABS,
-  parseGamePanel,
   withGamePanelField,
   type GamePanelField,
   type GamePanelLook,
   type GamePanelStyle,
-  type GamePanelValue as PanelValue,
-  type OrchestratorGamePanel
+  type GamePanelValue as PanelValue
 } from '../../../../shared/orchestrator-game-panel'
 import { SearchableSetting } from './SearchableSetting'
 import {
@@ -41,6 +39,8 @@ import { GamePanelStylePreview } from './GamePanelStylePreview'
 import { OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
 import { withOrchestratorGameField } from '../../../../shared/orchestrator-game-settings-updates'
+import { gamePanelValueOf, ownGamePanelValueOf } from './game-panel-overrides'
+import { GamePanelOverrideNote, useGamePanelOverrideProjects } from './GamePanelOverrideNote'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -69,7 +69,7 @@ const copy = () => ({
     translate('auto.components.settings.OrchestratorGamePanelSetting.look', 'Panel look'),
     translate(
       'auto.components.settings.OrchestratorGamePanelSetting.lookDescription',
-      'Same data and actions in all three.'
+      'The Team panel in the right sidebar; Default view sets the terminal panes. Same data and actions in all three.'
     )
   ],
   style: [
@@ -124,16 +124,16 @@ const showLabel = (label: string): string =>
     label
   })
 
-const isTab = (field: GamePanelField): field is (typeof GAME_PANEL_TABS)[number] =>
-  (GAME_PANEL_TABS as readonly string[]).includes(field)
+const ownOf = ownGamePanelValueOf
+const valueOf = gamePanelValueOf
 
-const ownOf = (layer: OrchestratorGameLayer | undefined, field: GamePanelField) => {
-  const panel = parseGamePanel(layer?.panel ?? {}).value ?? {}
-  return isTab(field) ? panel.tabs?.[field] : panel[field]
+const valueNameOf = (value: PanelValue): string => {
+  if (typeof value === 'boolean') {
+    const onOff = orchestratorGameModeLabels()
+    return value ? onOff.on : onOff.off
+  }
+  return ({ ...lookLabels(), ...styleLabels() } as Record<string, string>)[value]
 }
-
-const valueOf = (panel: OrchestratorGamePanel, field: GamePanelField) =>
-  isTab(field) ? panel.tabs[field] : panel[field]
 
 // Why parsed: only a key the layer sets validly counts, so a bad hand edit names the layer below.
 function sourceOf(
@@ -162,6 +162,16 @@ export function GamePanelSetting({
   const [{ title, description, keywords }] = getGamePanelSearchEntries()
   const set = (field: GamePanelField, value: boolean | string): void =>
     updateSettings({ orchestratorGame: withGamePanelField(layer, field, value as PanelValue) })
+  const projects = useGamePanelOverrideProjects(settings)
+  const overrideNote = (field: GamePanelField): React.JSX.Element => (
+    <GamePanelOverrideNote
+      field={field}
+      settings={settings}
+      projects={projects}
+      nameOf={valueNameOf}
+      updateSettings={updateSettings}
+    />
+  )
   return (
     <SearchableSetting
       id={GAME_PANEL_GLOBAL_SECTION_ID}
@@ -203,6 +213,7 @@ export function GamePanelSetting({
               <>
                 {text[field][1]}
                 <StyleNote field={field} style={panel.style} sceneId={sceneId} />
+                {overrideNote(field)}
               </>
             }
             control={
@@ -221,7 +232,12 @@ export function GamePanelSetting({
         <SettingsSwitchRow
           key={tab}
           label={text[tab][0]}
-          description={text[tab][1]}
+          description={
+            <>
+              {text[tab][1]}
+              {overrideNote(tab)}
+            </>
+          }
           ariaLabel={showLabel(text[tab][0])}
           checked={panel.tabs[tab]}
           onChange={() => set(tab, !panel.tabs[tab])}
@@ -271,15 +287,8 @@ export function ProjectGamePanelRows({
   const text = copy()
   const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
-  const named = (field: GamePanelField, value: boolean | string): string => {
-    const word =
-      typeof value === 'boolean'
-        ? value
-          ? onOff.on
-          : onOff.off
-        : ({ ...lookLabels(), ...styleLabels() } as Record<string, string>)[value]
-    return `${word} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
-  }
+  const named = (field: GamePanelField, value: PanelValue): string =>
+    `${valueNameOf(value)} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
   const set = (field: GamePanelField, value: boolean | string | undefined): void => {
     const nextLayer = withGamePanelField(local, field, value as PanelValue | undefined)
     const projects = { ...settings.orchestratorGameProjects, [repoId]: nextLayer }

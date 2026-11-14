@@ -251,3 +251,21 @@ describe('orchestratorGame.panel across versions and writers', () => {
     expect(withPanel).toEqual(plain)
   })
 })
+
+// ORCA-1203: pins for the owner's report; each row writes only its own key.
+describe("a project's panel row and the global look", () => {
+  const ownerLocal: OrchestratorGameLayer = { panel: { style: 'office' }, mode: 'on', band: true }
+
+  it('saving the style for a project writes no look', () => {
+    expect(withGamePanelField(ownerLocal, 'style', 'pixel').panel).toEqual({ style: 'pixel' })
+  })
+
+  it('a global Display with no project look resolves to Display', () => {
+    expect(
+      resolveOrchestratorGamePanel({
+        global: { panel: { style: 'office', look: 'display' } },
+        local: ownerLocal
+      }).look
+    ).toBe('display')
+  })
+})
