@@ -55,3 +55,8 @@ export function hostTeamLineParts(line: HostTeamLine): string[] {
   const members = line.members === 1 ? '1 member' : `${line.members} members`
   return line.working > 0 ? [members, `${line.working} working`] : [members]
 }
+
+/** ["Last known:", "4 members", "2 working"]; joined, the first piece outgrew a 320 card row and broke mid-phrase. */
+export function hostLastKnownTeamParts(line: HostTeamLine): string[] {
+  return ['Last known:', ...hostTeamLineParts(line)]
+}

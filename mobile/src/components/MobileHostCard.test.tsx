@@ -198,9 +198,18 @@ describe('MobileHostCard', () => {
       lastSeen: 'last seen 14:02'
     })
 
-    expect(lines).toContain('Last known: 4 members · 2 working')
-    expect(lines).toContain('last seen 14:02')
     expect(lines).not.toContain('1 needs you')
+    // Why pieces: a Text wider than the 320 row wraps inside its phrase ("6 / members"); short ones move whole.
+    const stack = renderer!.root.findAll(
+      (node) => node.type === 'View' && node.props.style?.flexWrap === 'wrap'
+    )
+    expect(stack).toHaveLength(1)
+    expect(stack[0]!.findAllByType('Text').map((node) => node.children[0])).toEqual([
+      'Last known:',
+      '4 members',
+      '2 working',
+      'last seen 14:02'
+    ])
   })
 
   it('shows the active account and its 5 h percentage on a connected desktop', async () => {

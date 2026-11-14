@@ -8,7 +8,11 @@ import type { MobileConnectionPath } from '../transport/stable-logical-rpc-clien
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 import { homeHostWorktreeSummary, type HostWorktreeInfo } from '../worktree/home-worktree-info'
-import { hostTeamLineParts, type HostTeamLine } from '../hosts/host-team-line'
+import {
+  hostLastKnownTeamParts,
+  hostTeamLineParts,
+  type HostTeamLine
+} from '../hosts/host-team-line'
 import type { HostAccountLine } from '../hosts/host-account-line'
 import { usageColorOf } from './usage-color'
 import { StatusDot } from './StatusDot'
@@ -56,9 +60,8 @@ export function MobileHostCard(props: {
   // Why only while connected: a team count from a host the phone cannot reach would be a guess.
   // Why: a dropped host keeps the last team it proved, labelled as such, and never claims a live "needs you".
   const teamLine = props.teamLine ?? null
-  const teamParts = teamLine && connected ? hostTeamLineParts(teamLine) : null
-  const lastKnownTeam =
-    teamLine && !connected ? `Last known: ${hostTeamLineParts(teamLine).join(' · ')}` : null
+  const teamPartsOf = connected ? hostTeamLineParts : hostLastKnownTeamParts
+  const teamParts = teamLine ? teamPartsOf(teamLine) : null
   const needsYouText =
     connected && teamLine && teamLine.needsYou > 0 ? `${teamLine.needsYou} needs you` : null
   const accountLine = connected ? (props.account ?? null) : null
@@ -126,18 +129,17 @@ export function MobileHostCard(props: {
               {worktreeSummary}
             </Text>
           ) : null}
-          {teamParts || lastKnownTeam ? (
+          {teamParts ? (
             <View style={styles.teamRow}>
               <Users size={12} color={colors.textMuted} style={styles.teamIcon} />
               {/* Why wrap: on a 320 phone the pieces move to a new line whole instead of being cut. */}
               <View style={styles.teamStack}>
                 {needsYouText ? <Text style={styles.teamNeedsText}>{needsYouText}</Text> : null}
-                {teamParts?.map((part) => (
+                {teamParts.map((part) => (
                   <Text key={part} style={styles.teamText}>
                     {part}
                   </Text>
                 ))}
-                {lastKnownTeam ? <Text style={styles.teamText}>{lastKnownTeam}</Text> : null}
                 {!connected && props.lastSeen ? (
                   <Text style={styles.teamText}>{props.lastSeen}</Text>
                 ) : null}
