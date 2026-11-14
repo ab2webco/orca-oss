@@ -8,7 +8,13 @@ import type { MobileConnectionPath } from '../transport/stable-logical-rpc-clien
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
 import { colors, radii, spacing } from '../theme/mobile-theme'
 import { homeHostWorktreeSummary, type HostWorktreeInfo } from '../worktree/home-worktree-info'
-import { hostTeamLineParts, type HostTeamLine } from '../hosts/host-team-line'
+import {
+  hostLastKnownTeamParts,
+  hostTeamLineParts,
+  type HostTeamLine
+} from '../hosts/host-team-line'
+import type { HostAccountLine } from '../hosts/host-account-line'
+import { usageColorOf } from './usage-color'
 import { StatusDot } from './StatusDot'
 
 export function MobileHostCard(props: {
@@ -22,6 +28,10 @@ export function MobileHostCard(props: {
   worktreeInfo?: HostWorktreeInfo
   /** The host's team across its live leads; null or absent when the host cannot say (an older desktop). */
   teamLine?: HostTeamLine | null
+  /** The active Claude account; shown only while connected, since a dropped host may have switched. */
+  account?: HostAccountLine | null
+  /** 'last seen HH:MM' for a host that cannot be reached right now. */
+  lastSeen?: string | null
   onPress: () => void
   onLongPress: () => void
   onOpenActions: () => void
@@ -48,9 +58,13 @@ export function MobileHostCard(props: {
       : props.verdict
   const worktreeSummary = homeHostWorktreeSummary(props.worktreeInfo)
   // Why only while connected: a team count from a host the phone cannot reach would be a guess.
-  const teamLine = connected ? (props.teamLine ?? null) : null
-  const teamParts = teamLine ? hostTeamLineParts(teamLine) : null
-  const needsYouText = teamLine && teamLine.needsYou > 0 ? `${teamLine.needsYou} needs you` : null
+  // Why: a dropped host keeps the last team it proved, labelled as such, and never claims a live "needs you".
+  const teamLine = props.teamLine ?? null
+  const teamPartsOf = connected ? hostTeamLineParts : hostLastKnownTeamParts
+  const teamParts = teamLine ? teamPartsOf(teamLine) : null
+  const needsYouText =
+    connected && teamLine && teamLine.needsYou > 0 ? `${teamLine.needsYou} needs you` : null
+  const accountLine = connected ? (props.account ?? null) : null
   const connectionPathLabel =
     !credentialMissing && !credentialUnavailable && (connected || dialingPath)
       ? mobileConnectionPathLabel(props.path)
@@ -126,7 +140,27 @@ export function MobileHostCard(props: {
                     {part}
                   </Text>
                 ))}
+                {!connected && props.lastSeen ? (
+                  <Text style={styles.teamText}>{props.lastSeen}</Text>
+                ) : null}
               </View>
+            </View>
+          ) : null}
+          {accountLine ? (
+            <View style={styles.accountRow}>
+              <Text style={styles.accountEmail} numberOfLines={1}>
+                {accountLine.email}
+              </Text>
+              {accountLine.fiveHourPercent != null ? (
+                <Text
+                  style={[
+                    styles.accountPercent,
+                    { color: usageColorOf(accountLine.fiveHourPercent) }
+                  ]}
+                >
+                  {`${accountLine.fiveHourPercent}%`}
+                </Text>
+              ) : null}
             </View>
           ) : null}
           {discoveryHint ? (
@@ -201,6 +235,16 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   teamIcon: { marginTop: 2 },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    marginLeft: spacing.xl,
+    minWidth: 0
+  },
+  accountEmail: { flexShrink: 1, fontSize: 12, color: colors.textSecondary },
+  accountPercent: { fontSize: 12, fontWeight: '600' },
   teamStack: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, minWidth: 0 },
   teamNeedsText: { fontSize: 12, color: colors.statusRed },
   teamText: { fontSize: 12, color: colors.textMuted },
