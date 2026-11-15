@@ -129,10 +129,19 @@ test('a member on a paired host gets its card, character, face and host name', a
         name: 'orca-21',
         displayName: title,
         agent: 'codex',
+        // ORCA-851: the lead's ticket-kind default crosses to the host and starts there unpinned.
+        model: 'claude-opus-5-5',
+        effort: 'high',
+        modelChosenBy: { by: 'lead', kind: 'implement', source: 'flag' },
         timeoutMs: 60_000
       },
       { timeoutMs: 90_000 }
     )
+    await expect
+      .poll(() =>
+        agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes('claude-opus-5-5')))
+      )
+      .toMatchObject({ modelPinned: null, effortPinned: null })
 
     await expect
       .poll(
@@ -162,6 +171,11 @@ test('a member on a paired host gets its card, character, face and host name', a
     await expect(card).not.toContainText('Remote look')
     await expect(card).toContainText('imac')
     await expect(card.locator('canvas[data-team-face]')).toHaveCount(1)
+    await expect(card.locator('[data-team-model]')).toHaveText('Opus 5.5 · high', {
+      timeout: 60_000
+    })
+    await card.locator('button[aria-expanded]').first().click()
+    await expect(card).toContainText('Elegido por el lead: implementación')
 
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })

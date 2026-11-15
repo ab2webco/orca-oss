@@ -155,6 +155,8 @@ export async function startFederatedWorker(args: {
       remote.state === 'ready'
     )
     if (remote.state === 'ready' && remote.worktreeId && remote.terminalHandle) {
+      // Why kept: the home names a remote member's model from it when the host relays no hook status.
+      db.recordWorkerLaunchReceipt(started.dispatch.id, launch)
       db.updateFederatedDispatchResources({
         dispatchId: started.dispatch.id,
         remoteRuntimeEpoch: remote.runtimeEpoch,
