@@ -34,6 +34,12 @@ function statusOf(
   if (member.needsYou) {
     return { text: words.waitingForAnswer, tone: colors.statusRed }
   }
+  // Why these tones: the desktop's, paused at risk and a queued launch idle (team-panel-member-cards.ts).
+  if (member.hold) {
+    return member.hold.kind === 'paused'
+      ? { text: words.condition.paused, tone: colors.statusAmber }
+      : { text: words.condition.queued, tone: colors.textMuted }
+  }
   if (member.limit) {
     if (member.limit.loggedOut) {
       return { text: words.loggedOut, tone: colors.statusRed }
@@ -85,7 +91,8 @@ export function TeamMemberCard({
     member.model,
     member.phase ? words.phase[member.phase] : null,
     member.since === null ? null : teamAgeText(member.since, now, words.now),
-    member.ticketStatus
+    member.ticketStatus,
+    member.hold?.kind === 'queued' ? member.hold.waitingOn : null
   ]
     .filter(Boolean)
     .join(' · ')

@@ -8,6 +8,7 @@ import {
   FlaskConical,
   GitPullRequest,
   List,
+  MoreHorizontal,
   Play,
   Search,
   Square,
@@ -20,6 +21,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamActionHintOf, teamActionLabelOf, type TeamControlWords } from './team-control-words'
 import type { TeamSheetControl } from './team-sheet-control'
+import { TeamActionMenu } from './TeamActionMenu'
 
 // Why these glyphs: the desktop dock's (team-action-icons.tsx), so both surfaces read the same.
 const ICONS: Record<GameActionIcon, typeof Square> = {
@@ -76,6 +78,7 @@ export function TeamActionDock({
 }) {
   const { width } = useWindowDimensions()
   const [confirming, setConfirming] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
     if (!note) {
@@ -86,7 +89,7 @@ export function TeamActionDock({
   }, [note])
   const chips = teamDockActionsOf(control.actions, null)
   const stop = control.actions.find((one) => one.orca === 'stop') ?? null
-  if (chips.length === 0 && !stop) {
+  if (control.actions.length === 0) {
     return null
   }
   const run = (action: TeamAction): void => {
@@ -118,6 +121,25 @@ export function TeamActionDock({
         >
           <Text style={styles.chipText}>{words.cancel}</Text>
         </Pressable>
+      </View>
+    )
+  }
+  if (menuOpen) {
+    return (
+      <View style={styles.column}>
+        <TeamActionMenu
+          actions={control.actions}
+          words={words}
+          onPick={(action) => {
+            setMenuOpen(false)
+            if (action.orca === 'stop') {
+              setConfirming(true)
+            } else {
+              run(action)
+            }
+          }}
+          onClose={() => setMenuOpen(false)}
+        />
       </View>
     )
   }
@@ -162,6 +184,14 @@ export function TeamActionDock({
             <Square size={16} color={stop.off ? colors.textMuted : colors.textSecondary} />
           </Pressable>
         ) : null}
+        <Pressable
+          style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
+          onPress={() => setMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={words.menu.label}
+        >
+          <MoreHorizontal size={16} color={colors.textSecondary} />
+        </Pressable>
       </View>
     </View>
   )
