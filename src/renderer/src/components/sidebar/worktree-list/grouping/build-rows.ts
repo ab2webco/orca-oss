@@ -179,6 +179,10 @@ export function buildRows(
     activeProjectKeys:
       groupBy === 'repo' && idleProjectFold
         ? getActiveProjectKeys(worktrees, repoMap, projectIndex, idleProjectFold)
+        : undefined,
+    urgency:
+      groupBy === 'repo' && idleProjectFold?.urgency
+        ? { ...idleProjectFold.urgency, orderByTier: projectOrderBy === 'needs-you' }
         : undefined
   }
 

@@ -22,6 +22,7 @@ import {
   getVisibleSidebarHostIdSet
 } from './worktree-list/listing/host-filtering'
 import { selectIdleProjectFoldInputs } from './worktree-list/listing/idle-project-fold-inputs'
+import { selectProjectUrgencyInputs } from './worktree-list/listing/workspace-urgency-signals'
 
 const EMPTY_REPO_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>())
 const EMPTY_IMPORTED_BY_REPO = Object.freeze(new Map()) as never
@@ -55,10 +56,12 @@ export function computeRenderedSidebarWorktreeOrder(
     state.worktreeCardProperties
   )
 
+  const now = Date.now()
+  const repoMap = getRepoMapFromState(state)
   const rows = buildRows(
     state.groupBy,
     [...visibleWorktrees],
-    getRepoMapFromState(state),
+    repoMap,
     prCache,
     state.collapsedGroups,
     getLogicalRepoOrderRankById(state.repos.map((repo) => repo.id)),
@@ -86,7 +89,10 @@ export function computeRenderedSidebarWorktreeOrder(
     defaultHostId,
     pinnedDisplayPolicy,
     // Why: folded workspaces are not rendered rows, so they take no number here either.
-    selectIdleProjectFoldInputs(state, Date.now())
+    {
+      ...selectIdleProjectFoldInputs(state, now),
+      urgency: selectProjectUrgencyInputs(state, visibleWorktrees, repoMap, now)
+    }
   )
 
   // Why lazy: with no host filter, addHostSectionRows is a pass-through, so skip building the whole host registry on a keystroke.

@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import { create } from 'zustand'
 import { useAppStore } from '@/store'
+import { e2eConfig } from '@/lib/e2e-config'
 import type { GamePanelLook } from '../../../../shared/orchestrator-game-panel'
 import type {
   TeamLeadCard,
@@ -23,6 +24,12 @@ export const useSidebarTeamRosterStore = create<SidebarTeamRoster>(() => ({
   model: null,
   look: 'game'
 }))
+
+// Why: E2E seeds a member's account limit here, the only renderer source for one (ORCA-1216 §4).
+if (e2eConfig.exposeStore && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__sidebarTeamRosterStore =
+    useSidebarTeamRosterStore
+}
 
 export function teamRowOfWorktree(
   model: SidebarTeamRoster['model'],

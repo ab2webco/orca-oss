@@ -170,14 +170,15 @@ export function getManualOrderAnchorRepo(
  * Order project header entries by the user's project-order preference. Manual
  * follows the canonical repoOrder; Recent follows each project's most recent
  * visible workspace activity (descending), with empty/imported-only projects
- * sorting after active ones, then by manual rank, then label.
+ * sorting after active ones, then by manual rank, then label. Needs you first
+ * starts from Recent; its tiers reorder the active group when the rows are built.
  */
 export function sortProjectEntries(
   entries: OrderedGroupEntry[],
   projectOrderBy: ProjectOrderBy,
   repoOrder: Map<string, number> | undefined
 ): OrderedGroupEntry[] {
-  if (projectOrderBy === 'recent') {
+  if (projectOrderBy !== 'manual') {
     return [...entries].sort((a, b) => {
       const byRecent = compareRecentRank(recentRankForEntry(a), recentRankForEntry(b))
       if (byRecent !== 0) {

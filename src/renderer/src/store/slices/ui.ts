@@ -2107,7 +2107,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setSortBy: (s) => set({ sortBy: s }),
 
   // Why: bare set — persists only via the debounced window.api.ui.set writer in App.tsx, not on its own.
-  projectOrderBy: 'manual',
+  projectOrderBy: 'needs-you',
   setProjectOrderBy: (p) => set({ projectOrderBy: p }),
 
   showActiveOnly: false,
@@ -2557,7 +2557,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           ? ui.groupBy
           : 'repo',
         sortBy,
-        // Why: main-process getUI() already normalized this (defaulting to 'manual'); read it through without migrating.
+        // Why: main-process getUI() already normalized and migrated this (defaulting to 'needs-you'); read it through without migrating.
         projectOrderBy: ui.projectOrderBy,
         // Why: Active-only was retired; force the old flag off so an old profile can't invisibly narrow the workspace list.
         showActiveOnly: false,

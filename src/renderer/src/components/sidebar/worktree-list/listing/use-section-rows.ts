@@ -23,6 +23,7 @@ import { addHostSectionRows } from '../../host-section-rows'
 import { orderHostSectionOptions } from '../../host-section-order'
 import { buildSidebarHostOptions } from '../../sidebar-host-options'
 import { localHostDisplayLabel } from '../../../../lib/local-host-display-label'
+import { useCommitProjectTierMemory } from './project-tier-memory-store'
 
 type SectionRowsArgs = {
   groupBy: WorktreeGroupBy
@@ -204,6 +205,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       args.idleProjectFold
     ]
   )
+  useCommitProjectTierMemory(rows)
   const orderedHostOptions = useMemo(
     () => orderHostSectionOptions(hostOptions, workspaceHostOrder),
     [hostOptions, workspaceHostOrder]

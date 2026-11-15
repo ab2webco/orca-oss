@@ -40,6 +40,7 @@ import type { WorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import { getWorktreeOptionId } from './option-dom'
 import { isFolderRepo } from '../../../../../../shared/repo-kind'
 import { ShortActivityAgeLabel } from '../../ShortActivityAgeLabel'
+import { ProjectHeaderReason } from './project-header-reason'
 import {
   activateIdleProjectWorkspace,
   getIdleProjectFoldKeyAction,
@@ -346,10 +347,14 @@ export function renderWorktreeSectionHeaderRow(args: {
           </div>
         </div>
 
-        {/* Why a slot: a project's reason (ORCA-1216 §2.3) takes this place; without one it shows the age. */}
+        {/* Why a slot: a project's reason (ORCA-1216 §4) takes this place; without one it shows the age. */}
         {isRepoHeader ? (
           <span data-project-header-trailing="" className="flex shrink-0 items-center pr-1.5">
-            <ShortActivityAgeLabel since={row.lastActivityAt} />
+            {row.urgency?.reason ? (
+              <ProjectHeaderReason reason={row.urgency.reason} />
+            ) : (
+              <ShortActivityAgeLabel since={row.lastActivityAt} />
+            )}
           </span>
         ) : null}
 

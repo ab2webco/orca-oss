@@ -29,6 +29,8 @@ import type {
 import { orderMainWorktreeFirst } from './section-order'
 import { resolveIdleProjectFold } from './idle-project-fold'
 import { getLatestActivityAt } from './project-activity'
+import { resolveSectionUrgency } from './section-urgency'
+import type { SectionUrgencyContext } from './section-urgency'
 
 /** Everything section emission reads that stays fixed for one buildRows call. */
 export type SectionAppendContext = {
@@ -49,6 +51,8 @@ export type SectionAppendContext = {
   cyclicLineageIds: ReadonlySet<string>
   /** Set only when the caller opts into the idle-project fold (groupBy 'repo'). */
   activeProjectKeys?: ReadonlySet<string>
+  /** Set only when the caller passes the Needs you first inputs (groupBy 'repo'). */
+  urgency?: SectionUrgencyContext
 }
 
 function getSectionRepoIds(key: string, repoIds: ReadonlySet<string>, repo?: Repo): string[] {
@@ -114,6 +118,7 @@ export function appendOrderedGroups(
     const repoIds = groupBy === 'repo' ? getSectionRepoIds(key, group.repoIds, repo) : []
     const fold = resolveSectionFold(ctx, key, group)
     const lastActivityAt = groupBy === 'repo' ? getLatestActivityAt(group.items) : null
+    const urgency = fold ? undefined : resolveSectionUrgency(ctx, key, group)
     // Why: while idle, only the fold's open key governs; a stale collapse key must not hide an opened project.
     const isCollapsed = fold ? fold.state === 'folded' : collapsedGroups.has(key)
     const header =
@@ -128,7 +133,8 @@ export function appendOrderedGroups(
             repo,
             projectGroupDepth,
             ...(fold ? { fold } : {}),
-            ...(lastActivityAt !== null ? { lastActivityAt } : {})
+            ...(lastActivityAt !== null ? { lastActivityAt } : {}),
+            ...(urgency ? { urgency } : {})
           }
         : (() => {
             const meta =

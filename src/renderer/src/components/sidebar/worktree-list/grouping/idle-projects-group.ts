@@ -6,6 +6,7 @@ import type { SectionAppendContext } from './group-sections'
 import { getHostWorktreeIds } from './host-labels'
 import type { OrderedGroupEntry } from './project-grouping'
 import type { GroupHeaderRow } from './row-types'
+import { orderActiveSectionsByTier } from './section-urgency'
 
 type IdleEntry = { entry: OrderedGroupEntry; latest: number }
 
@@ -58,7 +59,11 @@ export function appendRepoSectionsSplitByActivity(
       active.push(entry)
     }
   }
-  appendOrderedGroups(ctx, active, projectGroupDepth)
+  appendOrderedGroups(
+    ctx,
+    ctx.urgency?.orderByTier ? orderActiveSectionsByTier(ctx, active) : active,
+    projectGroupDepth
+  )
   if (idle.length === 0) {
     return
   }

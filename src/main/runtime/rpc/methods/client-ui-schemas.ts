@@ -179,7 +179,8 @@ const UiUpdateFields = z
     groupBy: z.enum(['none', 'agent-status', 'repo', 'pr-status', 'workspace-status']).optional(),
     showWorkspaceLineage: z.boolean().optional(),
     sortBy: z.enum(['name', 'smart', 'recent', 'repo', 'manual']).optional(),
-    projectOrderBy: z.enum(['manual', 'recent']).optional(),
+    // Why no reject on unknown: tolerateUnknownValues drops a newer client's order and keeps the batch.
+    projectOrderBy: z.enum(['needs-you', 'manual', 'recent']).optional(),
     showActiveOnly: z.boolean().optional(),
     hideSleepingWorkspaces: z.boolean().optional(),
     showSleepingWorkspaces: z.boolean().optional(),

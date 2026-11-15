@@ -366,6 +366,7 @@ import {
   type SettingsMutationOperations
 } from '../applying-settings/settings-update'
 import { getPersistedUI } from '../applying-settings/ui-state-read'
+import { migrateProjectOrderByOnLoad } from '../applying-settings/project-order-migration'
 import { updatePersistedUI, type UIUpdateOperations } from '../applying-settings/ui-state-update'
 import { ProjectGroupPersistenceOperations } from '../tracking-repos/project-group-operations'
 import { FolderWorkspacePersistenceOperations } from '../restoring-sessions/folder-workspace-operations'
@@ -1318,6 +1319,10 @@ export class Store {
             const rawSort = parsed.ui?.sortBy
             const sort = normalizeSortBy(rawSort)
             const migrate = !parsed.ui?._sortBySmartMigrated && rawSort === 'recent'
+            const projectOrder = migrateProjectOrderByOnLoad(parsed.ui)
+            if (projectOrder.needsSave) {
+              this.loadNeedsSave = true
+            }
             const rightSidebarOpen =
               typeof parsed.ui?.rightSidebarOpen === 'boolean'
                 ? parsed.ui.rightSidebarOpen
@@ -1499,6 +1504,8 @@ export class Store {
               _workspaceStatusesDefaultWorkflowMigrated: true,
               _workspaceStatusesDefaultVisualsMigrated: true,
               _sortBySmartMigrated: true,
+              projectOrderBy: projectOrder.projectOrderBy,
+              _projectOrderNeedsYouMigrated: true,
               ...(migratedCardProps !== undefined
                 ? { worktreeCardProperties: migratedCardProps }
                 : {}),

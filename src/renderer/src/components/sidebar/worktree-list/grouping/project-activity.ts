@@ -1,4 +1,6 @@
 import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { ProjectTierMemory } from './project-tier-order'
+import type { WorkspaceUrgencySignal } from './project-urgency-tier'
 
 /** Owner decision (ORCA-1216): a project is active with activity in the last 24 h, by default. */
 export const PROJECT_ACTIVITY_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -10,6 +12,15 @@ export type ProjectActivityInputs = {
   liveAgentWorktreeIds: ReadonlySet<string>
   /** The sidebarActivityWindowHours setting, in ms. */
   windowMs: number
+  /** Opts into the Needs you first tiers (ORCA-1216 §4); absent leaves headers on their age. */
+  urgency?: ProjectUrgencyInputs
+}
+
+export type ProjectUrgencyInputs = {
+  signalByWorktreeId: ReadonlyMap<string, WorkspaceUrgencySignal>
+  /** Workspaces whose open PR fails CI, from the live prCache (no new GitHub reads). */
+  ciFailingWorktreeIds: ReadonlySet<string>
+  tierMemory: ProjectTierMemory
 }
 
 type ActivityWorktree = Pick<Worktree, 'id' | 'lastActivityAt'>
@@ -21,6 +32,9 @@ export function isWorkspaceActive(
   return (
     worktree.id === inputs.currentWorktreeId ||
     inputs.liveAgentWorktreeIds.has(worktree.id) ||
+    // Why: Rest is the only tier the window decides; a signal or red CI never folds (§4, §6).
+    inputs.urgency?.signalByWorktreeId.has(worktree.id) === true ||
+    inputs.urgency?.ciFailingWorktreeIds.has(worktree.id) === true ||
     inputs.now - worktree.lastActivityAt < inputs.windowMs
   )
 }

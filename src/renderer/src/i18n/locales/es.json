@@ -4696,7 +4696,9 @@
           "cli": "Orca Lab CLI",
           "showSection": "Mostrar",
           "account": "Cuenta",
-          "model": "Modelo y esfuerzo"
+          "model": "Modelo y esfuerzo",
+          "needsYouFirst": "Te necesita primero",
+          "needsYouFirstDescription": "Preguntas y límites, luego CI que falla, luego agentes trabajando"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",
@@ -5486,6 +5488,16 @@
           "count": "{{count}} proyectos",
           "count_one": "{{count}} proyecto",
           "count_other": "{{count}} proyectos"
+        },
+        "ProjectHeaderReason": {
+          "questions": "{{count}} preguntas",
+          "questions_one": "{{count}} pregunta",
+          "questions_other": "{{count}} preguntas",
+          "accountLimited": "Cuenta limitada",
+          "ciFailing": "CI falla",
+          "working": "{{count}} trabajando",
+          "working_one": "{{count}} trabajando",
+          "working_other": "{{count}} trabajando"
         }
       },
       "shared": {

@@ -611,7 +611,8 @@ describe('client UI RPC methods', () => {
     ['browserImportHintHidden', { browserImportHintHidden: true }],
     ['mobileEmulatorTabIntroDismissed', { mobileEmulatorTabIntroDismissed: true }],
     ['mobileEmulatorAgentSetupDismissed', { mobileEmulatorAgentSetupDismissed: true }],
-    ['alwaysShowDefaultBranchWorkspace', { alwaysShowDefaultBranchWorkspace: false }]
+    ['alwaysShowDefaultBranchWorkspace', { alwaysShowDefaultBranchWorkspace: false }],
+    ['projectOrderBy needs-you', { projectOrderBy: 'needs-you' }]
   ])('accepts %s, which the renderer persists through ui.set', async (_label, payload) => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
@@ -701,7 +702,9 @@ describe('client UI RPC methods', () => {
     ['worktree card property', { worktreeCardProperties: ['status', 'pr-status'] }],
     ['feature interaction id', { featureInteractions: { unknown: { firstInteractedAt: 100 } } }],
     ['feature tip id', { featureTipsSeenIds: ['voice-dictation', 'unknown-tip'] }],
-    ['right sidebar tab', { rightSidebarTab: 'not-a-tab' }]
+    ['right sidebar tab', { rightSidebarTab: 'not-a-tab' }],
+    // A newer client's project order must not reset this host's or reject the batch.
+    ['project order', { projectOrderBy: 'name' }]
   ])('drops an unknown %s instead of rejecting the batch around it', async (_label, drifted) => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

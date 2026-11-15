@@ -7,6 +7,7 @@ import { appendOrderedGroups } from './group-sections'
 import type { SectionAppendContext } from './group-sections'
 import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
 import type { OrderedGroupEntry } from './project-grouping'
+import { orderGroupSectionsByTier } from './section-urgency'
 import {
   compareRecentRank,
   recentRankForEntry,
@@ -36,10 +37,11 @@ export function appendProjectGroupSections(
   }
 
   const sortRepoEntriesWithinGroup = (entries: OrderedGroupEntry[]): OrderedGroupEntry[] => {
-    if (projectOrderBy === 'recent') {
-      return [...entries].sort((left, right) =>
+    if (projectOrderBy !== 'manual') {
+      const byRecent = [...entries].sort((left, right) =>
         compareRecentRank(recentRankForEntry(left), recentRankForEntry(right))
       )
+      return ctx.urgency?.orderByTier ? orderGroupSectionsByTier(ctx, byRecent) : byRecent
     }
     // Manual: within a Project Group, projects order by their per-group rank
     // (projectGroupOrder), falling back to global repoOrder when unset so drag

@@ -117,6 +117,21 @@ export const SORT_OPTIONS = [
 
 export const PROJECT_ORDER_OPTIONS = [
   {
+    id: 'needs-you',
+    get label() {
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.needsYouFirst',
+        'Needs you first'
+      )
+    },
+    get description() {
+      return translate(
+        'auto.components.sidebar.SidebarWorkspaceOptionsMenu.needsYouFirstDescription',
+        'Questions and limits, then failing CI, then running agents'
+      )
+    }
+  },
+  {
     id: 'manual',
     get label() {
       return translate('auto.components.sidebar.SidebarWorkspaceOptionsMenu.7b316bdd51', 'Manual')

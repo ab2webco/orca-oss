@@ -4,6 +4,7 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { DetectedWorktree, Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ProjectUrgency } from './project-urgency-tier'
 
 export type WorktreeGroupBy = 'none' | 'agent-status' | 'repo' | 'pr-status'
 export type PinnedWorktreeDisplayPolicy = 'single-location' | 'duplicate-in-groups'
@@ -44,6 +45,8 @@ export type GroupHeaderRow = {
   lastActivityAt?: number
   /** The collapsible group that holds idle projects (ORCA-1216 §2.3); `count` is its project count. */
   idleProjectsGroup?: { collapsed: boolean }
+  /** Active repo headers (ORCA-1216 §4): tier, the reason the header shows, and its frozen entry. */
+  urgency?: ProjectUrgency & { enteredAt: number }
 }
 
 export type WorktreeRow = {

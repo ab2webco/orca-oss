@@ -4954,7 +4954,9 @@
           "planeWorkItem": "Plane work item",
           "showSection": "Show",
           "account": "Account",
-          "model": "Model and effort"
+          "model": "Model and effort",
+          "needsYouFirst": "Needs you first",
+          "needsYouFirstDescription": "Questions and limits, then failing CI, then running agents"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",
@@ -5837,6 +5839,16 @@
           "count": "{{count}} projects",
           "count_one": "{{count}} project",
           "count_other": "{{count}} projects"
+        },
+        "ProjectHeaderReason": {
+          "questions": "{{count}} questions",
+          "questions_one": "{{count}} question",
+          "questions_other": "{{count}} questions",
+          "accountLimited": "Account limited",
+          "ciFailing": "CI failing",
+          "working": "{{count}} working",
+          "working_one": "{{count}} working",
+          "working_other": "{{count}} working"
         }
       },
       "shared": {

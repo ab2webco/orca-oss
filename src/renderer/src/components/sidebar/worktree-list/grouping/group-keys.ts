@@ -100,6 +100,8 @@ export function getPRGroupKey(
     : 'with-pr'
 }
 
+type CachedPRData = { state?: string; checksStatus?: string }
+
 /** The cached PR state for a worktree's branch, or null when it has none. */
 export function getWorktreePRState(
   worktree: Worktree,
@@ -107,6 +109,28 @@ export function getWorktreePRState(
   prCache: Record<string, unknown> | null,
   settings?: AppState['settings']
 ): string | null {
+  const data = getWorktreeCachedPR(worktree, repoMap, prCache, settings)
+  return data ? (data.state ?? 'open') : null
+}
+
+/** At risk (ORCA-1216 §4): an open or draft PR whose CI fails, read from the live cache only. */
+export function isWorktreeCIFailing(
+  worktree: Worktree,
+  repoMap: Map<string, Repo>,
+  prCache: Record<string, unknown> | null,
+  settings?: AppState['settings']
+): boolean {
+  const data = getWorktreeCachedPR(worktree, repoMap, prCache, settings)
+  const state = data?.state ?? 'open'
+  return data?.checksStatus === 'failure' && (state === 'open' || state === 'draft')
+}
+
+function getWorktreeCachedPR(
+  worktree: Worktree,
+  repoMap: Map<string, Repo>,
+  prCache: Record<string, unknown> | null,
+  settings?: AppState['settings']
+): CachedPRData | null {
   const repo = repoMap.get(worktree.repoId)
   const branch = branchName(worktree.branch)
   const repoScopedCacheKey =
@@ -130,16 +154,16 @@ export function getWorktreePRState(
   // still exist from persisted cache, but must not override fresher repo data.
   const prEntry = prCache
     ? ((repoScopedCacheKey
-        ? (prCache[repoScopedCacheKey] as { data?: { state?: string } } | undefined)
+        ? (prCache[repoScopedCacheKey] as { data?: CachedPRData } | undefined)
         : undefined) ??
       (legacyRepoScopedCacheKey
-        ? (prCache[legacyRepoScopedCacheKey] as { data?: { state?: string } } | undefined)
+        ? (prCache[legacyRepoScopedCacheKey] as { data?: CachedPRData } | undefined)
         : undefined) ??
       (legacyPathScopedCacheKey
-        ? (prCache[legacyPathScopedCacheKey] as { data?: { state?: string } } | undefined)
+        ? (prCache[legacyPathScopedCacheKey] as { data?: CachedPRData } | undefined)
         : undefined))
     : undefined
-  return prEntry?.data ? (prEntry.data.state ?? 'open') : null
+  return prEntry?.data ?? null
 }
 
 /**

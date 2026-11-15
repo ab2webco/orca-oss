@@ -155,6 +155,8 @@ export type PersistedUIState = {
   dashboardPopoutBounds?: { x: number; y: number; width: number; height: number } | null
   /** One-shot flag: 'recent' once meant the smart sort (v1→v2 rename), migrated to 'smart' once so the new last-activity 'recent' isn't re-clobbered. */
   _sortBySmartMigrated?: boolean
+  /** One-shot flag (ORCA-1216): a stored 'recent' project order moved to 'needs-you' once, so later choices stand. */
+  _projectOrderNeedsYouMigrated?: boolean
   /** LEGACY inline-agents flag, stamped unconditionally every load so it can't gate migration; kept only for rollback forward-compat (real gate: _inlineAgentsDefaultedForAllUsers). */
   _inlineAgentsDefaultedForExperiment?: boolean
   /** One-shot flag for the inline-agents default-on rollout; distinct from _inlineAgentsDefaultedForExperiment, which was stamped every load and is permanently dirty. */
