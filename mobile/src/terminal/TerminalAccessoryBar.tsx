@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import {
   ChevronDown,
   ChevronsRight,
@@ -40,7 +40,15 @@ export type TerminalAccessoryBarProps = {
 export function TerminalAccessoryBar(props: TerminalAccessoryBarProps) {
   const { canSend, canCompose, liveInputEnabled, phoneDisplayMode } = props
   const overflow = useHorizontalOverflow()
-  const keyTextStyle = [styles.keyText, !canSend && styles.keyTextDisabled]
+  // Why: Fabric caches text measurements without the density, so after a live display-size
+  // change labels keep their old widths and clip (ORCA-1225); the window width moves with the
+  // density, so binding it changes the measure key and forces a fresh measurement.
+  const { width: windowWidth } = useWindowDimensions()
+  const keyTextStyle = [
+    styles.keyText,
+    { maxWidth: windowWidth },
+    !canSend && styles.keyTextDisabled
+  ]
   const iconColor = canSend ? colors.textSecondary : colors.textMuted
 
   return (
