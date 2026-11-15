@@ -197,7 +197,23 @@ export function teamModelText(model: TeamModel | null): string | null {
   if (!model) {
     return null
   }
-  return model.effort ? `${model.label} · ${model.effort}` : model.label
+  const label = model.credit?.from ? `${model.credit.from} → ${model.label}` : model.label
+  return model.effort ? `${label} · ${model.effort}` : label
+}
+
+/** Who picked the model and why; null where no router or chooser is known. */
+export function teamModelCreditText(model: TeamModel | null): string | null {
+  const credit = model?.credit
+  if (!credit) {
+    return null
+  }
+  if (!credit.reason) {
+    return translate('teamPanel.model.chosenByJev', 'Chosen by Jev')
+  }
+  // Why: Jev's own reason often already names it (`code floor (Jev: code)`).
+  return /\bjev\b/i.test(credit.reason)
+    ? credit.reason
+    : translate('teamPanel.model.jevReason', '{{reason}} (Jev)', { reason: credit.reason })
 }
 
 /** `localName` is the user's rename of this machine, which wins over the default label. */

@@ -18,6 +18,7 @@ import {
   teamCiText,
   teamHelperStateText,
   teamLiveText,
+  teamModelCreditText,
   teamPrNumberText,
   teamUsageBarClass
 } from './team-card-text'
@@ -70,6 +71,7 @@ function factsOf(card: TeamMemberCard): Fact[] {
     card.liveAction && card.liveAction.kind !== 'question'
       ? teamLiveText(card.liveAction, card.condition)
       : null
+  const credit = teamModelCreditText(card.model)
   const facts: (Fact | null)[] = [
     card.branch
       ? {
@@ -80,6 +82,13 @@ function factsOf(card: TeamMemberCard): Fact[] {
       : null,
     tool
       ? { key: 'tool', label: translate('teamPanel.card.detail.tool', 'Last tool'), value: tool }
+      : null,
+    credit
+      ? {
+          key: 'modelChoice',
+          label: translate('teamPanel.card.detail.modelChoice', 'Model choice'),
+          value: credit
+        }
       : null
   ]
   return facts.filter((fact): fact is Fact => fact !== null)

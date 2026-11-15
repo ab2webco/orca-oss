@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   claudeSessionModelOfHook,
-  claudeSessionModelOfTranscriptLine
+  claudeSessionModelOfTranscriptLine,
+  type ClaudeSessionModel
 } from './claude-session-model'
 
 const assistantLine = (model: string, effort?: string): string =>
@@ -90,7 +91,9 @@ describe('claudeSessionModelOfHook', () => {
 
   // Why: a member works its ticket in one long turn, and a router switches the model per step.
   it('reads the step a router switched mid-turn, as soon as the transcript grows', () => {
-    const files = { '/t.jsonl': { bytes: 10, turn: { model: 'claude-sonnet-5-5' } } }
+    const files: Record<string, { bytes: number; turn?: ClaudeSessionModel }> = {
+      '/t.jsonl': { bytes: 10, turn: { model: 'claude-sonnet-5-5' } }
+    }
     const { transcript } = transcriptOf(files)
     const started = claudeSessionModelOfHook(
       'SessionStart',
