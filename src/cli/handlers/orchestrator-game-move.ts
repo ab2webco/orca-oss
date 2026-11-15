@@ -13,6 +13,8 @@ import {
   type GameMemberAccountChoice
 } from './orchestrator-game-launch-account'
 import { gameLaunchChoiceOf, remotePlacementOf } from './orchestrator-game-launch-options'
+import { gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
+import { runtimeCapabilitiesOf } from './orchestrator-game-setup-queue'
 import { moveMemberToHost } from './orchestrator-game-move-host'
 import { dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
@@ -155,6 +157,13 @@ async function relaunch(args: {
     { agent: member.agentType ?? undefined },
     args.state.lead ?? DEFAULT_GAME_LEAD
   )
+  // Why the kind again: a move must not drop a member back to the account's default model (ORCA-851).
+  const model = gameMemberModelParamsOf(
+    choice,
+    { kind: member.launch?.chosenBy?.kind },
+    member.workItem?.title ?? member.displayName ?? '',
+    await runtimeCapabilitiesOf(client)
+  )
   const started = await client.call<{ dispatchId: string; state: string }>(
     'orchestration.workerStart',
     {
@@ -162,7 +171,7 @@ async function relaunch(args: {
       retryOf: dispatch.dispatchId,
       worktree: `id:${where}`,
       agent: choice.agent,
-      ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
+      ...model,
       ...args.target.pin,
       run: dispatch.runId,
       from: await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client),

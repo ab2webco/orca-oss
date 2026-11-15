@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ORCHESTRATOR_GAME_MOVE_HANDLERS } from './orchestrator-game-move'
 import type { RuntimeClient } from '../runtime-client'
+import {
+  ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY,
+  ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
+} from '../../shared/protocol-version'
 import { openHostRuntimeClient } from './orchestrator-game-host-client'
 
 vi.mock('./orchestrator-game-host-client', () => ({ openHostRuntimeClient: vi.fn() }))
@@ -219,6 +223,40 @@ describe('orca game move', () => {
         from: 'bo@example.com',
         to: 'di@example.com',
         dispatchId: 'd8'
+      })
+    )
+  })
+
+  // ORCA-851: a relaunch must not drop a Claude member back to the account's default model.
+  it("relaunches a Claude member with no terminal on its ticket kind's model, unpinned", async () => {
+    const fake = fakeClient(
+      stateWith({ ...CLAUDE_MEMBER, terminalHandle: null }),
+      snapshotWith(limits(10))
+    )
+    const call = fake.client.call.bind(fake.client)
+    const client = {
+      call: async (method: string, params: unknown) =>
+        method === 'status.get'
+          ? {
+              ok: true,
+              result: {
+                capabilities: [
+                  ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+                  ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY
+                ]
+              }
+            }
+          : call(method, params)
+    } as unknown as RuntimeClient
+
+    await move(client)
+
+    expect(fake.paramsOf('orchestration.workerStart')).toEqual(
+      expect.objectContaining({
+        agent: 'claude',
+        model: 'claude-opus-5-5',
+        effort: 'high',
+        modelChosenBy: { by: 'lead', kind: 'implement', source: 'default' }
       })
     )
   })
