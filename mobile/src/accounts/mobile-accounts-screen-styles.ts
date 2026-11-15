@@ -100,6 +100,14 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textPrimary
   },
+  rowTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  rowTitleText: {
+    flexShrink: 1
+  },
   rowSubtitle: {
     fontSize: typography.metaSize,
     color: colors.textSecondary

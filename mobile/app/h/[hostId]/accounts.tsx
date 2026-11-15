@@ -13,6 +13,11 @@ import { AccountMembersLine } from '../../../src/accounts/AccountMembersLine'
 import { accountMemberNamesOf } from '../../../src/accounts/account-member-names'
 import { useAccountMemberStates } from '../../../src/accounts/account-member-states'
 import { describeClaudeSwitchRefusal } from '../../../src/accounts/claude-switch-refusal-detail'
+import { claudeTokenAccountStatusOf } from '../../../src/accounts/claude-token-account'
+import {
+  ClaudeAccountRowNotice,
+  ClaudeTokenBadge
+} from '../../../src/accounts/ClaudeTokenAccountLine'
 import { useNow } from '../../../src/hooks/use-now'
 import { ClaudeIcon, OpenAIIcon } from '../../../src/components/AgentIcons'
 import {
@@ -285,6 +290,10 @@ export default function AccountsScreen() {
               (!isActive && inactiveEntry?.isFetching === true)
             const sessionBar = getUsageBarState(usage, 'session', isFetching)
             const weeklyBar = getUsageBarState(usage, 'weekly', isFetching)
+            const token =
+              provider === 'claude'
+                ? claudeTokenAccountStatusOf(account, snapshot.rateLimits, now)
+                : null
             return (
               <View key={account.id}>
                 <View style={styles.separator} />
@@ -299,9 +308,12 @@ export default function AccountsScreen() {
                   }
                 >
                   <View style={styles.rowMain}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>
-                      {account.email}
-                    </Text>
+                    <View style={styles.rowTitleLine}>
+                      <Text style={[styles.rowTitle, styles.rowTitleText]} numberOfLines={1}>
+                        {account.email}
+                      </Text>
+                      {token ? <ClaudeTokenBadge /> : null}
+                    </View>
                     <View style={styles.usageRow}>
                       <UsageBar
                         label="5h"
@@ -318,11 +330,7 @@ export default function AccountsScreen() {
                         resetText={getWindowResetLabel(usage, 'weekly', now)}
                       />
                     </View>
-                    {usage?.error ? (
-                      <Text style={styles.errorText} numberOfLines={1}>
-                        {usage.error}
-                      </Text>
-                    ) : null}
+                    <ClaudeAccountRowNotice token={token} usageError={usage?.error} />
                     <AccountMembersLine
                       names={accountMemberNamesOf(memberStates, provider, account)}
                     />
