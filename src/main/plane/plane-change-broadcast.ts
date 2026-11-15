@@ -81,6 +81,25 @@ export async function withPlaneChangeBroadcast<T extends { ok?: boolean }>(
   return result
 }
 
+/**
+ * Tell open Plane views an RPC mutation changed a work item.
+ *
+ * Why the RPC dispatcher calls this: the mutations that matter most come from
+ * orchestrated agents through the CLI, which never touch the renderer's own
+ * call path. Every route — renderer IPC, CLI, paired client — funnels through
+ * that dispatcher, so one hook covers them all.
+ */
+export function broadcastPlaneMutation(method: string, rawParams: unknown): void {
+  if (!isPlaneMutationMethod(method)) {
+    return
+  }
+  try {
+    broadcastPlaneChange({ method, projectId: resolveChangedProjectId(rawParams) })
+  } catch {
+    // Best-effort: the mutation already succeeded, so a failed notice must not turn into an RPC error.
+  }
+}
+
 export function broadcastPlaneChange(event: PlaneChangeEvent): void {
   const window = broadcastWindow
   if (!window || window.isDestroyed()) {

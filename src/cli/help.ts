@@ -154,6 +154,9 @@ Speech:
   speech models list        List speech models with download state and language coverage
   speech models download    Download a speech model for local transcription
 
+Mobile:
+  mobile pair               Mint a phone pairing link for this Orca Lab or a paired host
+
 Mobile Emulator (iOS Simulator):
   emulator list             List available/running emulators (Orca Lab-managed + raw serve-sim)
   emulator attach <device>  Attach/start helper and make active for the worktree

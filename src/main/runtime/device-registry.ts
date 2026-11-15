@@ -140,6 +140,19 @@ export class DeviceRegistry {
     return this.createAndPersistDevice(retainedDevices, name, scope, pairingReach)
   }
 
+  /** Drops the never-scanned entries of `scope` other than `keepDeviceId`; returns how many went. */
+  removePendingDevicesExcept(scope: DeviceScope, keepDeviceId: string): number {
+    const nextDevices = this.devices.filter(
+      (d) => d.lastSeenAt !== 0 || d.scope !== scope || d.deviceId === keepDeviceId
+    )
+    const removed = this.devices.length - nextDevices.length
+    if (removed > 0) {
+      this.save(nextDevices)
+      this.devices = nextDevices
+    }
+    return removed
+  }
+
   removeDevice(deviceId: string): boolean {
     const nextDevices = this.devices.filter((d) => d.deviceId !== deviceId)
     if (nextDevices.length === this.devices.length) {

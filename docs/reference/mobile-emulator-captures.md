@@ -51,6 +51,42 @@ $adb shell am start -a android.intent.action.VIEW -d '<Pairing URL>'
 
 `MOCK_SERVER_KEY_FILE` keeps the pairing when you restart the mock to change a scenario below.
 
+## Pairing the emulator with a real host
+
+Some captures have to show what a real Orca sends, not the mock. Mint the link from the CLI on any
+machine paired with that host. Nobody has to open Settings > Mobile on it:
+
+```sh
+orca mobile pair --environment m1 --connection lan --address 10.0.2.2 --json
+```
+
+The flags match Settings > Mobile on that host:
+
+- `--environment` names the paired host that mints the link, as in `orca environment list`. Leave
+  it out to pair with the Orca on the machine you run the command on.
+- `--connection` is the UI's Connection method. `relay` is the default, and it needs Orca sign-in on
+  that host. When Relay can't make an invite, the host refuses with `relay_mint_failed`, and the
+  error names the Relay failure code. `lan` pairs over `--address` alone, and that is all an emulator
+  needs.
+- `--address` is the UI's address of this computer, the one the phone dials. `lan` requires it.
+  Without one, the command lists the host's addresses instead of minting a link. `10.0.2.2` is how an
+  Android emulator reaches the machine it runs on, so the link points the emulator at the Orca on
+  that same machine.
+- A host keeps one unused link at a time, and repeated calls reuse it until a phone scans it.
+  `--rotate`, or a different `--connection` than the pending link's, mints a new one. The old one
+  stops pairing only once the new one exists, and the command says so. A mint that fails, such as a
+  Relay refusal, leaves the earlier link working.
+
+Then open the `pairingUrl` from the output on the emulator, on the host's machine:
+
+```sh
+$adb shell am start -a android.intent.action.VIEW -d '<pairingUrl>'
+```
+
+The link is a credential for that host: don't paste it into a PR, a ticket or a chat. A host older
+than this command answers with an error that names it and its version. Update it, or pair from its
+Settings > Mobile.
+
 ## Widths and theme
 
 The AVD screen is 1080 px wide. Set the width with the screen density:

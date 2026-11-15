@@ -7,11 +7,7 @@ import {
   type RpcRequest,
   type RpcResponse
 } from './core'
-import {
-  broadcastPlaneChange,
-  isPlaneMutationMethod,
-  resolveChangedProjectId
-} from '../../plane/plane-change-broadcast'
+import { broadcastPlaneMutation } from '../../plane/plane-change-broadcast'
 import type { FeatureInteractionId } from '../../../shared/feature-interactions'
 import { resolveAuthenticatedCallerFingerprint } from './local-caller-fingerprint-scope'
 import { errorResponse, successResponse } from './errors'
@@ -48,7 +44,10 @@ export class RpcDispatcher {
 
   async dispatch(
     request: RpcRequest,
-    options?: { signal?: AbortSignal; authenticatedCallerFingerprint?: string }
+    options?: Pick<
+      RpcDispatchStreamingOptions,
+      'signal' | 'authenticatedCallerFingerprint' | 'mobilePairingQr'
+    >
   ): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)
@@ -114,6 +113,7 @@ export class RpcDispatcher {
             mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint,
           recordMutationReceipt: mutation?.recordReceipt,
           orchestrationMutation: mutation?.identity,
+          mobilePairingQr: options?.mobilePairingQr,
           legacyCoordinatorRunId,
           legacyCoordinatorAuthority: legacyCoordinator?.authority,
           revalidateLegacyCoordinator: legacyCoordinator?.revalidate,
@@ -137,7 +137,7 @@ export class RpcDispatcher {
         undefined,
         request.params
       )
-      this.broadcastPlaneMutation(request.method, request.params)
+      broadcastPlaneMutation(request.method, request.params)
       return successResponse(request.id, meta, result)
     } catch (error) {
       if (request.method.startsWith('emulator.')) {
@@ -245,7 +245,7 @@ export class RpcDispatcher {
           undefined,
           request.params
         )
-        this.broadcastPlaneMutation(request.method, request.params)
+        broadcastPlaneMutation(request.method, request.params)
         reply(JSON.stringify(successResponse(request.id, meta, result)))
       } catch (error) {
         reply(JSON.stringify(mapDispatcherError(request, meta, error)))
@@ -294,7 +294,7 @@ export class RpcDispatcher {
         recordedStreamingFeatureInteractions,
         request.params
       )
-      this.broadcastPlaneMutation(request.method, request.params)
+      broadcastPlaneMutation(request.method, request.params)
     } catch (error) {
       reply(JSON.stringify(mapDispatcherError(request, meta, error)))
     }
@@ -302,28 +302,5 @@ export class RpcDispatcher {
 
   private meta(): RpcEnvelopeMeta {
     return { runtimeId: this.runtime.getRuntimeId() }
-  }
-
-  /**
-   * Tell open Plane views a work item changed.
-   *
-   * Why here and not in each handler: the mutations that matter most come from
-   * orchestrated agents through the CLI, which never touch the renderer's own
-   * call path. Every route — renderer IPC, CLI, paired client — funnels through
-   * this dispatcher, so one hook covers them all.
-   */
-  private broadcastPlaneMutation(method: string, rawParams: unknown): void {
-    if (!isPlaneMutationMethod(method)) {
-      return
-    }
-    try {
-      broadcastPlaneChange({
-        method,
-        projectId: resolveChangedProjectId(rawParams)
-      })
-    } catch {
-      // Best-effort: the mutation already succeeded, so a failed notice must not
-      // turn into an RPC error.
-    }
   }
 }

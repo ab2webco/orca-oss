@@ -12,6 +12,7 @@ import { ENVIRONMENT_COMMAND_SPECS } from './environment'
 import { AGENT_HOOK_COMMAND_SPECS } from './agent-hooks'
 import { DIAGNOSTICS_COMMAND_SPECS } from './diagnostics'
 import { EMULATOR_COMMAND_SPECS } from './emulator'
+import { MOBILE_COMMAND_SPECS } from './mobile'
 import { INTROSPECTION_COMMAND_SPECS } from './introspection'
 import { LINEAR_COMMAND_SPECS } from './linear'
 import { PLANE_COMMAND_SPECS } from './plane'
@@ -35,6 +36,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...WORKTREE_PROCESSES_COMMAND_SPECS,
   ...ARTIFACT_COMMAND_SPECS,
   ...DASHBOARD_POPOUT_COMMAND_SPECS,
+  ...MOBILE_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_VIEW_COMMAND_SPECS,
   ...ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS,

@@ -18,7 +18,7 @@ import {
   type RuntimeSocketLivenessWatch
 } from './runtime-socket-liveness-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
-import type { RpcRequest, RpcResponse } from './rpc/core'
+import type { MobilePairingQrRpcContext, RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse, successResponse } from './rpc/errors'
 import { createLocalStreamFrameWriter } from './rpc/local-stream-frame-writer'
 import { fingerprintAuthenticatedPairingCredential } from './rpc/orchestration-mutation-executor'
@@ -120,6 +120,8 @@ type MobilePairingOfferAvailable = {
   webClientUrl: string | null
   /** Mode the offer actually encodes. */
   connectionMode: MobilePairingConnectionMode
+  /** True when this mint retired an earlier never-scanned link, which no longer pairs. */
+  replacedPendingLink: boolean
 }
 
 type MobilePairingOffer = PairingOfferUnavailable | MobilePairingOfferAvailable
@@ -757,6 +759,8 @@ export class OrcaRuntimeRpcServer {
     // Why: STA-2370 — recorded on the grant so a "This computer only" client reconnecting cannot make the
     // next launch bind every interface. Defaults to network reach, which is what every other caller means.
     reach?: RuntimePairingReach
+    /** Mint a fresh credential beside the pending one; the caller retires the old one on success. */
+    mintAlongsidePending?: boolean
   }):
     | PairingOfferUnavailable
     | {
@@ -794,9 +798,11 @@ export class OrcaRuntimeRpcServer {
     let device: DeviceEntry
     try {
       const reach = args.reach ?? 'network'
-      device = args.rotate
-        ? this.deviceRegistry.rotatePendingDevice(deviceName, scope, reach)
-        : this.deviceRegistry.getOrCreatePendingDevice(deviceName, scope, reach)
+      device = args.mintAlongsidePending
+        ? this.deviceRegistry.addDevice(deviceName, scope, reach)
+        : args.rotate
+          ? this.deviceRegistry.rotatePendingDevice(deviceName, scope, reach)
+          : this.deviceRegistry.getOrCreatePendingDevice(deviceName, scope, reach)
     } catch (error) {
       console.error('[runtime] Failed to persist pairing credential:', error)
       return pairingUnavailable('device_registry_unavailable', DEVICE_REGISTRY_UNAVAILABLE_GUIDANCE)
@@ -818,6 +824,16 @@ export class OrcaRuntimeRpcServer {
         this.webClientRoot && scope === 'runtime' ? createWebClientUrl(endpoint, pairingUrl) : null
     }
   }
+
+  // Why one closure for both transports: the WebSocket wizard and the local CLI must mint identical offers.
+  private readonly mintMobilePairingQr: MobilePairingQrRpcContext = (qrArgs) =>
+    createMobilePairingQrResponse(
+      {
+        resolveDefaultAddress: () => getDefaultPairingAddress(),
+        createOffer: (offerArgs) => this.createMobilePairingOffer(offerArgs)
+      },
+      qrArgs
+    )
 
   async createMobilePairingOffer(args: {
     address?: string | null
@@ -894,26 +910,32 @@ export class OrcaRuntimeRpcServer {
     const switchingPendingMode =
       pending != null &&
       this.deviceRegistry?.getMobilePairingConnectionMode(pending.deviceId) !== connectionMode
-    if (args.rotate || switchingPendingMode) {
-      if (pending?.relayBinding) {
-        // Why: record the durable cloud revoke before rotating the local token so an old relay invite can't outlive the QR.
-        if (!this.queueRelayDeviceRevoke(pending.relayBinding)) {
-          return pairingUnavailable(
-            'device_registry_unavailable',
-            'Could not persist Relay cleanup before rotating the pairing code.'
-          )
-        }
-      }
-    }
+    // Why: a failed mint must leave the earlier link pairing, so the replacement is minted beside it
+    // and the old one is retired only once the new link exists (ORCA-1238).
+    const replacesPending = pending != null && (args.rotate === true || switchingPendingMode)
     const direct = this.createPairingOffer({
       ...args,
       rotate: args.rotate || switchingPendingMode,
+      mintAlongsidePending: replacesPending,
       scope: 'mobile'
     })
     if (!direct.available) {
       return direct
     }
     const createdNewPendingDevice = pending?.deviceId !== direct.deviceId
+    const commitMint = (offer: MobilePairingOfferAvailable): MobilePairingOffer => {
+      if (!replacesPending) {
+        return offer
+      }
+      if (!this.retireReplacedMobilePairingDevices(direct.deviceId)) {
+        this.discardPendingMobilePairingDevice(direct.deviceId)
+        return pairingUnavailable(
+          'device_registry_unavailable',
+          'Could not persist Relay cleanup before rotating the pairing code.'
+        )
+      }
+      return { ...offer, replacedPendingLink: true }
+    }
     let connectionModeStored = false
     try {
       connectionModeStored =
@@ -931,7 +953,7 @@ export class OrcaRuntimeRpcServer {
     }
     // Why: explicit LAN path never needs Relay; mint the direct-only offer as selected.
     if (connectionMode === 'local-only') {
-      return { ...direct, connectionMode: 'local-only' }
+      return commitMint({ ...direct, connectionMode: 'local-only', replacedPendingLink: false })
     }
     // Why: Anywhere must not silently ship a LAN-only QR under the Relay label.
     // Fail closed, drop the unused pending credential, and let the UI offer Use LAN.
@@ -1011,9 +1033,10 @@ export class OrcaRuntimeRpcServer {
         message: 'Could not store Relay binding for the pairing device'
       })
     }
-    return {
+    return commitMint({
       ...direct,
       connectionMode: 'automatic',
+      replacedPendingLink: false,
       pairingUrl: encodePairingOffer({
         v: PAIRING_OFFER_VERSION,
         endpoint: direct.endpoint,
@@ -1023,6 +1046,33 @@ export class OrcaRuntimeRpcServer {
         scope: 'mobile',
         relay: relayPairing.relay
       })
+    })
+  }
+
+  /** Retire the never-scanned mobile links a successful mint replaced; false when cleanup could not be recorded. */
+  private retireReplacedMobilePairingDevices(keepDeviceId: string): boolean {
+    const registry = this.deviceRegistry
+    if (!registry) {
+      return false
+    }
+    const replaced = registry
+      .listDevices()
+      .filter(
+        (device) =>
+          device.scope === 'mobile' && device.lastSeenAt === 0 && device.deviceId !== keepDeviceId
+      )
+    for (const device of replaced) {
+      // Why: record the durable cloud revoke before dropping the local token so an old relay invite can't outlive it.
+      if (device.relayBinding && !this.queueRelayDeviceRevoke(device.relayBinding)) {
+        return false
+      }
+    }
+    try {
+      registry.removePendingDevicesExcept('mobile', keepDeviceId)
+      return true
+    } catch (error) {
+      console.error('[runtime] Failed to retire a replaced mobile pairing credential:', error)
+      return false
     }
   }
 
@@ -1698,7 +1748,9 @@ export class OrcaRuntimeRpcServer {
 
     try {
       return await this.dispatcher.dispatch(request, {
-        signal: longPoll ? context?.signal : undefined
+        signal: longPoll ? context?.signal : undefined,
+        // Why: the socket token is the 0o600 metadata secret, so its caller is this machine's owner (ORCA-1238).
+        mobilePairingQr: this.mintMobilePairingQr
       })
     } finally {
       this.releaseLongPoll(longPoll)
@@ -1919,14 +1971,7 @@ export class OrcaRuntimeRpcServer {
         // Why unconditional while `pairing` is not: minting a QR needs only this server, so a
         // runtime-scoped client asking for one is the pairing wizard for this very machine.
         // Phones never reach it — the method is absent from MOBILE_RPC_METHOD_ALLOWLIST.
-        mobilePairingQr: (qrArgs) =>
-          createMobilePairingQrResponse(
-            {
-              resolveDefaultAddress: () => getDefaultPairingAddress(),
-              createOffer: (offerArgs) => this.createMobilePairingOffer(offerArgs)
-            },
-            qrArgs
-          ),
+        mobilePairingQr: this.mintMobilePairingQr,
         signal: abortRegistration?.signal,
         sendBinary,
         registerBinaryStreamHandler: (streamId, handler) =>

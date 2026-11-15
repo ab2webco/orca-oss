@@ -59,6 +59,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/dashboard-popout.js')).DASHBOARD_POPOUT_HANDLERS
   },
   {
+    name: 'mobile-pair',
+    keys: ['mobile pair'],
+    load: async () => (await import('./handlers/mobile-pair.js')).MOBILE_PAIR_HANDLERS
+  },
+  {
     name: 'automations',
     keys: [
       'automations list',
