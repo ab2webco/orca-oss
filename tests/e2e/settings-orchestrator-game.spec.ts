@@ -1,3 +1,4 @@
+// Throwaway: runs this spec on Linux CI for ORCA-1199; never merged.
 import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
