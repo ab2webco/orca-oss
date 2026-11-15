@@ -1,14 +1,19 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { decodeAccountsSnapshot } from '../components/accounts-snapshot'
 import { triggerError, triggerSuccess } from '../platform/haptics'
 import type { RpcClient } from '../transport/rpc-client'
-import type { AddMemberRoster } from './add-member-options'
+import {
+  addMemberAccountsOf,
+  type AddMemberAccounts,
+  type AddMemberRoster
+} from './add-member-options'
 import { createAddMemberSender, type AddMemberChoice } from './add-member-send'
 
 const sendAddMember = createAddMemberSender(Date.now)
 
 type Target = { roster: AddMemberRoster; terminal: string }
 
-/** The Add member sheet's state: opened from the Team group, it sends the lead one ticket. */
+/** The Add member sheet's state: opened from the Team group, it reads accounts and sends the lead one ticket. */
 export function useAddMember(args: {
   client: RpcClient | null
   showToast: (message: string, durationMs?: number) => void
@@ -16,6 +21,31 @@ export function useAddMember(args: {
   const { client, showToast } = args
   const [target, setTarget] = useState<Target | null>(null)
   const [open, setOpen] = useState(false)
+  const [accounts, setAccounts] = useState<AddMemberAccounts | null>(null)
+  const provider = target?.roster.provider ?? null
+
+  useEffect(() => {
+    setAccounts(null)
+    if (!open || !client || !provider) {
+      return
+    }
+    let stale = false
+    void client
+      .sendRequest('accounts.list')
+      .then((response) => {
+        if (!stale && response.ok) {
+          setAccounts(
+            addMemberAccountsOf(decodeAccountsSnapshot(response.result), provider, Date.now())
+          )
+        }
+      })
+      // Why ignored: without accounts the sheet leaves the pick to the lead's host.
+      .catch(() => undefined)
+    return () => {
+      stale = true
+    }
+  }, [client, open, provider])
+
   const start = useCallback((roster: AddMemberRoster, terminal: string) => {
     setTarget({ roster, terminal })
     setOpen(true)
@@ -44,7 +74,7 @@ export function useAddMember(args: {
   return {
     start,
     sheet: target
-      ? { visible: open, roster: target.roster, onSend, onClose: () => setOpen(false) }
+      ? { visible: open, roster: target.roster, accounts, onSend, onClose: () => setOpen(false) }
       : null
   }
 }

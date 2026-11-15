@@ -69,7 +69,8 @@ describe('readNewTabTeam', () => {
 
     expect(team.kind === 'lead-live' && team.roster).toEqual({
       todo: [{ identifier: 'ORCA-2', title: 'T', prompt: 'P' }],
-      hosts: [{ on: null, running: 0, cap: 4 }]
+      hosts: [{ on: null, running: 0, cap: 4 }],
+      provider: 'claude'
     })
     expect(sendRequest).toHaveBeenCalledWith('game.state', {
       worktreeId: 'repo-a::/w/main',

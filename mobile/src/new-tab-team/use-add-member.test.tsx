@@ -11,8 +11,15 @@ const ok = (result: unknown): RpcResponse =>
   ({ id: 'x', ok: true, result, _meta: { runtimeId: 'rt' } }) as RpcResponse
 const roster = {
   todo: [{ identifier: 'ORCA-7', title: 'T', prompt: 'P' }],
-  hosts: [{ on: null, running: 0, cap: 4 }]
+  hosts: [{ on: null, running: 0, cap: 4 }],
+  provider: 'claude' as const
 }
+const snapshot = {
+  claude: { accounts: [{ id: 'a-1', email: 'maya@acme.dev' }], activeAccountId: 'a-1' },
+  codex: { accounts: [], activeAccountId: null },
+  rateLimits: { claude: null, codex: null, inactiveClaudeAccounts: [], inactiveCodexAccounts: [] }
+}
+
 type Hook = ReturnType<typeof useAddMember>
 
 describe('useAddMember', () => {
@@ -23,7 +30,9 @@ describe('useAddMember', () => {
   })
 
   async function setup(accepted: boolean) {
-    const sendRequest = vi.fn(async () => ok({ send: { accepted } }))
+    const sendRequest = vi.fn(async (method: string) =>
+      method === 'accounts.list' ? ok(snapshot) : ok({ send: { accepted } })
+    )
     const client = { sendRequest } as unknown as RpcClient
     const showToast = vi.fn()
     const seen: Hook[] = []
@@ -38,10 +47,14 @@ describe('useAddMember', () => {
     return { sendRequest, showToast, hook: () => seen.at(-1)! }
   }
 
-  it("opens on the lead's roster", async () => {
+  it("opens on the lead's roster and reads the member agent's accounts", async () => {
     const { hook } = await setup(true)
 
     expect(hook().sheet).toMatchObject({ visible: true, roster })
+    expect(hook().sheet?.accounts).toEqual({
+      accounts: [{ id: 'a-1', email: 'maya@acme.dev', usedPercent: null }],
+      defaultId: 'a-1'
+    })
   })
 
   it('sends the lead the ticket, then confirms and closes', async () => {

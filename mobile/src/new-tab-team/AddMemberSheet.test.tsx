@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AddMemberSheet } from './AddMemberSheet'
-import type { AddMemberRoster } from './add-member-options'
+import type { AddMemberAccounts, AddMemberRoster } from './add-member-options'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -28,8 +28,17 @@ const roster: AddMemberRoster = {
   hosts: [
     { on: null, running: 2, cap: 5 },
     { on: 'imac', running: 0, cap: null }
-  ]
+  ],
+  provider: 'claude'
 }
+const accounts: AddMemberAccounts = {
+  accounts: [
+    { id: 'a-1', email: 'maya@acme.dev', usedPercent: 42 },
+    { id: 'a-2', email: 'leo@acme.dev', usedPercent: null }
+  ],
+  defaultId: 'a-1'
+}
+
 function textsOf(node: ReactTestInstance): string[] {
   return node
     .findAllByType('Text')
@@ -60,6 +69,7 @@ describe('AddMemberSheet', () => {
           visible: true,
           hostName: 'm1',
           roster,
+          accounts,
           onSend,
           onClose: () => {}
         })
@@ -68,11 +78,14 @@ describe('AddMemberSheet', () => {
     return { renderer: mounted.renderer!, onSend }
   }
 
-  it("shows the lead's desktop with its agents, and the To Do", () => {
+  it("shows the picked account, the lead's desktop with its agents, and the To Do", () => {
     const { renderer } = render()
 
     expect(textsOf(renderer.root)).toEqual([
       'Add member',
+      'Member account',
+      'maya@acme.dev',
+      '42%',
       'Run on',
       'm1',
       '2 of 5 agents',
@@ -98,7 +111,7 @@ describe('AddMemberSheet', () => {
     })
     act(() => button().props.onPress())
 
-    expect(onSend).toHaveBeenCalledWith({ ticket: roster.todo[1], accountId: null, on: null })
+    expect(onSend).toHaveBeenCalledWith({ ticket: roster.todo[1], accountId: 'a-1', on: null })
   })
 
   // Why: a background step alone (#242424 on #1a1a1a) read as unpicked in the m1 captures.
@@ -140,22 +153,45 @@ describe('AddMemberSheet', () => {
       ['imac', 1]
     ])
   })
+  it('marks the current account in the open Member account list', () => {
+    const { renderer } = render()
+    const optionChecks = () =>
+      renderer.root
+        .findAllByType('Pressable')
+        .filter((node) => (textsOf(node)[0] ?? '').endsWith('@acme.dev'))
+        .slice(1)
+        .map((node) => [textsOf(node)[0], node.findAllByType('Check').length])
 
-  it('runs the member on another host when picked', () => {
+    act(() => pressableWith(renderer, 'maya@acme.dev').props.onPress())
+    expect(optionChecks()).toEqual([
+      ['maya@acme.dev', 1],
+      ['leo@acme.dev', 0]
+    ])
+    act(() => pressableWith(renderer, 'leo@acme.dev').props.onPress())
+    act(() => pressableWith(renderer, 'leo@acme.dev').props.onPress())
+    expect(optionChecks()).toEqual([
+      ['maya@acme.dev', 0],
+      ['leo@acme.dev', 1]
+    ])
+  })
+
+  it('runs the member on another account and host when picked', () => {
     const { renderer, onSend } = render()
 
+    act(() => pressableWith(renderer, 'maya@acme.dev').props.onPress())
+    act(() => pressableWith(renderer, 'leo@acme.dev').props.onPress())
     act(() => pressableWith(renderer, 'm1').props.onPress())
     act(() => pressableWith(renderer, 'imac').props.onPress())
     act(() => pressableWith(renderer, 'ACME-221').props.onPress())
     act(() => renderer.root.findAllByType('Pressable').at(-1)!.props.onPress())
 
-    expect(onSend).toHaveBeenCalledWith({ ticket: roster.todo[0], accountId: null, on: 'imac' })
+    expect(onSend).toHaveBeenCalledWith({ ticket: roster.todo[0], accountId: 'a-2', on: 'imac' })
     expect(textsOf(renderer.root)).toContain('0 agents')
   })
 
   it('opens again with no ticket picked', () => {
     const { renderer } = render()
-    const props = { hostName: 'm1', roster, onSend: vi.fn(), onClose: () => {} }
+    const props = { hostName: 'm1', roster, accounts, onSend: vi.fn(), onClose: () => {} }
     act(() => pressableWith(renderer, 'ACME-221').props.onPress())
 
     act(() => renderer.update(createElement(AddMemberSheet, { ...props, visible: false })))
