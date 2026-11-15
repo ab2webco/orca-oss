@@ -207,6 +207,7 @@ import {
 } from './browser-page-guest-recovery'
 import { subscribeBrowserSystemResume } from './browser-system-resume'
 import {
+  canOpenRemoteBrowserContextMenu,
   canReconnectRemoteBrowserStream,
   isRemoteBrowserStreamBusy,
   REMOTE_BROWSER_STREAM_IDLE,
@@ -1739,7 +1740,7 @@ function RemoteBrowserPagePane({
   }
 
   const handleRemoteContextMenu = (event: React.MouseEvent<HTMLImageElement>): void => {
-    if (busy) {
+    if (!canOpenRemoteBrowserContextMenu(streamStatus, paneBusy)) {
       return
     }
     const target = runtimeTarget()
