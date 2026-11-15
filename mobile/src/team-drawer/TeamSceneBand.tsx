@@ -1,141 +1,148 @@
-import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
+import { WebView } from 'react-native-webview'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import type { TeamMemberRow } from './team-drawer-model'
-import type { TeamSceneBand as Band, TeamSceneBandActor } from './team-scene-band'
-import { teamSceneQuestArtOf } from './team-scene-quest-art'
-import { teamSceneRoleOf, type TeamSceneArtLoad } from './use-team-scene-art'
-import { MEMBER_STATE_ROLE, useTeamTones } from './team-status-tone'
+import type { TeamSceneArtPick, TeamSceneBand as Band } from './team-scene-band'
+import type { TeamSceneEngineMessage, TeamSceneEngineStage } from './team-scene-engine-messages'
+import {
+  TEAM_SCENE_ENGINE_JS,
+  TEAM_SCENE_QUEST_IMAGES
+} from './team-scene-webview-engine.generated'
+import type { TeamSceneArtLoad } from './use-team-scene-art'
+import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-tone'
 
-/** Fixed, so the sheet does not jump when the art decodes or falls back. */
-export const TEAM_SCENE_BAND_HEIGHT = 128
+/** The desktop stage's height (TEAM_SCENE_ART_HEIGHT), held until the page says its own. */
+export const TEAM_SCENE_BAND_HEIGHT = 176
 
-// Why these numbers: the desktop stage is 176 px with feet 14 px over its bottom, and a role's `size`
-// is its drawn height there (team-scene-image-painter.ts); the band draws that stage scaled down.
-const SCALE = TEAM_SCENE_BAND_HEIGHT / 176
-const FEET_Y = TEAM_SCENE_BAND_HEIGHT - 14 * SCALE
+const HTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none'" />
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: ${colors.bgBase}; }
+  #wrap { position: relative; }
+  #stage { display: block; width: 100%; }
+  #overlay { position: absolute; inset: 0; pointer-events: none; }
+  .bubble { position: absolute; box-sizing: border-box; padding: 3px 8px; border-radius: 8px;
+    background: #f4f4f5; color: #18181b; font: 500 11px/14px -apple-system, system-ui, sans-serif;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    white-space: pre-line; overflow-wrap: anywhere; }
+</style>
+</head>
+<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div></div>
+<script>${TEAM_SCENE_ENGINE_JS}</script>
+</body>
+</html>`
 
-type Sheet = { source: ImageSourcePropType; width: number; height: number }
-type Figure = {
-  sheet: Sheet
-  frame: { width: number; height: number }
-  feet: { x: number; y: number }
-  size: number
-  row: number
-}
-/** What a stage draws: back layers, one figure per actor, then front layers. */
-type Stage = {
-  back: ImageSourcePropType[]
-  front: ImageSourcePropType[]
-  figureOf: (actor: TeamSceneBandActor) => Figure
-}
+type PageEvent =
+  | { kind: 'loaded' }
+  | { kind: 'ready'; height: number }
+  | { kind: 'artFailed' }
+  | { kind: 'error'; message: string }
 
-// Why one frame: the build script keeps the idle frame of each Quest sheet, 128 px with feet at 64,122.
-function questStage(style: 'figures' | 'office'): Stage {
-  const art = teamSceneQuestArtOf(style)
-  const frame = { width: 128, height: 128 }
-  return {
-    back: [art.backdrop],
-    front: art.front ? [art.front] : [],
-    figureOf: (actor) => ({
-      sheet: {
-        source:
-          actor.role === 'lead'
-            ? art.lead
-            : actor.role === 'advisor'
-              ? art.advisor
-              : (art.members[actor.seed % art.members.length] ?? art.lead),
-        ...frame
-      },
-      frame,
-      feet: { x: 64, y: 122 },
-      size: 60,
-      row: 0
-    })
+const pageEventOf = (data: string): PageEvent | null => {
+  try {
+    const event = JSON.parse(data) as PageEvent
+    return typeof event?.kind === 'string' ? event : null
+  } catch {
+    return null
   }
 }
 
-function sceneStage(
-  band: Extract<Band, { kind: 'scene' }>,
-  images: ReadonlyMap<string, { uri: string; width: number; height: number }>
-): Stage {
-  const sheetOf = (src: string): Sheet => {
-    const image = images.get(src)!
-    return { source: { uri: image.uri }, width: image.width, height: image.height }
+// Why escaped: U+2028/2029 end a line inside a script, and a name may carry either.
+const scriptOf = (message: TeamSceneEngineMessage): string =>
+  `window.__teamScene(${JSON.stringify(message).replace(/[\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`)});true;`
+
+// The scene's four meanings on the sheet's tones, as team-scene-status-colors.ts maps the desktop's.
+const sceneColorsOf = (tones: TeamTones): TeamSceneEngineStage['colors'] => ({
+  attention: tones.attention,
+  done: tones.success,
+  working: tones.info,
+  risk: tones.warning
+})
+
+function imagesOf(art: TeamSceneArtPick, ownArt: TeamSceneArtLoad | null): Record<string, string> {
+  if (art.kind === 'bundled') {
+    return TEAM_SCENE_QUEST_IMAGES[art.style]
   }
-  const layers = band.native.layers
-  return {
-    back: layers.filter((one) => !one.front).map((one) => sheetOf(one.src).source),
-    front: layers.filter((one) => one.front).map((one) => sheetOf(one.src).source),
-    figureOf: (actor) => {
-      const { role, sheet } = teamSceneRoleOf(band.native, actor)
-      return {
-        sheet: sheetOf(sheet),
-        frame: role.frame,
-        feet: role.feet ?? { x: role.frame.width / 2, y: role.frame.height },
-        size: role.size,
-        row: role.animations.idle.row
-      }
+  if (art.kind === 'scene' && ownArt?.kind === 'ready') {
+    return Object.fromEntries([...ownArt.images].map(([src, image]) => [src, image.uri]))
+  }
+  return {}
+}
+
+/** The desktop's live stage, drawn by its own painters in a WebView and fed each Team reading. */
+function StageBand({
+  band,
+  ownArt,
+  leadLine
+}: {
+  band: Extract<Band, { kind: 'stage' }>
+  ownArt: TeamSceneArtLoad | null
+  leadLine: string | null
+}) {
+  const ref = useRef<WebView>(null)
+  const tones = useTeamTones()
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [height, setHeight] = useState(TEAM_SCENE_BAND_HEIGHT)
+  const ownFailed = band.art.kind === 'scene' && ownArt?.kind === 'failed'
+  const art = failed || ownFailed ? band.fallback : band.art
+  const waitsForArt = art.kind === 'scene' && ownArt?.kind !== 'ready'
+  const stageKey = JSON.stringify([art, band.scenes, band.timezone, tones, ownArt?.kind])
+  const stage = useMemo<TeamSceneEngineStage>(
+    () => ({
+      art,
+      images: imagesOf(art, ownArt),
+      scenes: band.scenes,
+      timezone: band.timezone,
+      nowMs: Date.now(),
+      colors: sceneColorsOf(tones)
+    }),
+    // Why by text: every 20 s poll hands a new band, and a new stage re-decodes megabytes of art.
+    [stageKey]
+  )
+  const inputKey = JSON.stringify([band.input, leadLine])
+  useEffect(() => {
+    if (loaded && !waitsForArt) {
+      ref.current?.injectJavaScript(scriptOf({ kind: 'stage', stage }))
     }
-  }
-}
-
-function StageBand({ stage, actors }: { stage: Stage; actors: TeamSceneBandActor[] }) {
+  }, [loaded, waitsForArt, stage])
+  useEffect(() => {
+    if (loaded && !waitsForArt) {
+      ref.current?.injectJavaScript(scriptOf({ kind: 'input', input: band.input, leadLine }))
+    }
+  }, [loaded, waitsForArt, stage, inputKey])
   return (
     <View
       testID="team-scene-band"
-      style={styles.band}
+      style={[styles.band, { height }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      {stage.back.map((source, at) => (
-        <Image
-          key={`back-${at}`}
-          source={source}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        />
-      ))}
-      {actors.map((actor, at) => {
-        const { sheet, frame, feet, size, row } = stage.figureOf(actor)
-        const px = (size / frame.height) * SCALE
-        return (
-          <View
-            key={actor.key}
-            testID="team-scene-actor"
-            style={[
-              styles.actor,
-              {
-                width: frame.width * px,
-                height: frame.height * px,
-                left: `${((at + 1) / (actors.length + 1)) * 100}%`,
-                marginLeft: -feet.x * px,
-                top: FEET_Y - feet.y * px
-              }
-            ]}
-          >
-            <Image
-              source={sheet.source}
-              style={[
-                styles.sheet,
-                {
-                  top: -row * frame.height * px,
-                  width: sheet.width * px,
-                  height: sheet.height * px
-                }
-              ]}
-            />
-          </View>
-        )
-      })}
-      {stage.front.map((source, at) => (
-        <Image
-          key={`front-${at}`}
-          source={source}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        />
-      ))}
+      <WebView
+        ref={ref}
+        style={styles.webview}
+        originWhitelist={['*']}
+        source={{ html: HTML }}
+        javaScriptEnabled
+        scrollEnabled={false}
+        // Why: the stage is self-contained; nothing it draws may navigate the sheet.
+        onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
+        onMessage={(event) => {
+          const page = pageEventOf(event.nativeEvent.data)
+          if (page?.kind === 'loaded') {
+            setLoaded(true)
+          } else if (page?.kind === 'ready') {
+            setHeight(page.height)
+          } else if (page?.kind === 'artFailed') {
+            setFailed(true)
+          }
+        }}
+      />
     </View>
   )
 }
@@ -170,34 +177,27 @@ function ReadableBand({
   )
 }
 
-/** The Game look's stage at phone size: the scene's art or Orca's when it can draw, else the names. */
+/** The Game look's stage at phone size: the desktop's own scene, or the names on an older host. */
 export function TeamSceneBand({
   band,
   ownArt,
+  leadLine,
   leadName,
   members
 }: {
   band: Band
-  /** The scene file's images, for a `scene` band. */
+  /** The scene file's images, for a stage drawn in a scene's own art. */
   ownArt: TeamSceneArtLoad | null
+  /** The lead's bubble; null shows none. */
+  leadLine: string | null
   leadName: string | null
   members: TeamMemberRow[]
 }) {
-  if (band.kind === 'scene') {
-    if (ownArt?.kind === 'ready') {
-      return <StageBand stage={sceneStage(band, ownArt.images)} actors={band.actors} />
-    }
-    if (ownArt?.kind === 'failed') {
-      return (
-        <TeamSceneBand band={band.fallback} ownArt={null} leadName={leadName} members={members} />
-      )
-    }
-    return <View testID="team-scene-band" style={styles.band} />
-  }
-  if (band.kind === 'readable') {
-    return <ReadableBand leadName={leadName} members={members} />
-  }
-  return <StageBand stage={questStage(band.style)} actors={band.actors} />
+  return band.kind === 'stage' ? (
+    <StageBand band={band} ownArt={ownArt} leadLine={leadLine} />
+  ) : (
+    <ReadableBand leadName={leadName} members={members} />
+  )
 }
 
 const styles = StyleSheet.create({
@@ -207,15 +207,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.bgBase
   },
-  actor: {
-    position: 'absolute',
-    overflow: 'hidden'
-  },
-  sheet: {
-    position: 'absolute',
-    left: 0
+  webview: {
+    flex: 1,
+    backgroundColor: colors.bgBase
   },
   readable: {
+    height: 128,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignContent: 'center',

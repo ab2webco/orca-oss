@@ -66,3 +66,8 @@ export function teamLeadLiveText(lead: TeamLeadCard, words: TeamCardWords): stri
         : toolDisplayWords(action.tool)
   return lead.condition === 'working' ? words.orchestrating(step) : step
 }
+
+/** The lead's bubble on the stage: its card line while it acts or asks, none while it rests. */
+export function teamSceneLeadLineOf(lead: TeamLeadCard, words: TeamCardWords): string | null {
+  return lead.liveAction || lead.ownerAsk ? teamLeadLiveText(lead, words) : null
+}

@@ -16,30 +16,17 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
-// Why: Metro resolves the band's PNGs by require; the render runner only needs a source per image.
-vi.mock('./team-scene-quest-art', () => ({
-  teamSceneQuestArtOf: (style: string) => ({
-    backdrop: { uri: `${style}/backdrop.png` },
-    front: style === 'figures' ? { uri: 'figures/front.png' } : null,
-    lead: { uri: `${style}/lead.png` },
-    advisor: { uri: `${style}/advisor.png` },
-    members: Array.from({ length: 8 }, (_, at) => ({ uri: `${style}/member-${at + 1}.png` }))
-  })
-}))
+// Why a stand-in: react-native-webview ships native source; the stage's page is tested on its own.
+vi.mock('react-native-webview', async () => {
+  const { forwardRef, createElement: h } = await import('react')
+  return { WebView: forwardRef(() => h('div', { 'data-testid': 'team-scene-webview' })) }
+})
 
 import { TeamSheet } from './TeamSheet'
 import type { TeamDrawerData } from './team-drawer-model'
 import { teamTonesOf } from './team-status-tone'
 import { colors } from '../theme/mobile-theme'
-import {
-  button,
-  gamePanel,
-  leader,
-  NOW,
-  safeArea,
-  teamWith,
-  work
-} from './team-sheet-render-fixtures'
+import { button, leader, NOW, safeArea, teamWith, work } from './team-sheet-render-fixtures'
 
 describe("TeamSheet in the person's status colours from Settings > Agent Teams", () => {
   let container: HTMLDivElement
@@ -139,8 +126,8 @@ describe("TeamSheet in the person's status colours from Settings > Agent Teams",
     expect(imac).not.toContain(paint(colors.statusRed))
   })
 
-  it("marks each name in the scene band by its member's state", () => {
-    show(teamWith({ tones }, leader, gamePanel('pixel')))
+  it("marks each name in an older host's readable band by its member's state", () => {
+    show(teamWith({ tones }, leader))
     const band = container.querySelector('[data-testid="team-scene-band"]')!
     expect(paints(lineOf('Juno', band))).toContain(paint(tones.info))
     expect(paints(lineOf('Merlin', band))).toContain(paint(tones.attention))

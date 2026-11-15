@@ -171,13 +171,18 @@ export function teamLeadViewOf(
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
     .concat(teamHeldMemberRowsOf(raw))
+  const control = teamSheetControlOf(raw)
   return {
     members,
     lead,
     advisor,
     work: teamSheetWorkOf(raw, cards, locale, now),
-    scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }, options),
-    control: teamSheetControlOf(raw),
+    scene: teamSceneBandOf(
+      raw,
+      { lead, members: cards, advisor, stopped: control.stopped !== null },
+      options
+    ),
+    control,
     metrics: metricsOf(raw.metrics),
     locale
   }

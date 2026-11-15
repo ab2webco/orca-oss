@@ -1,34 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import type { OrchestratorGameSceneNativeStyle } from '../../../src/shared/orchestrator-game-scene-native'
+import { orchestratorGameSceneArtFiles } from '../../../src/shared/orchestrator-game-scene-native'
 import type { RpcClient } from '../transport/rpc-client'
 import { readTeamSceneArtImage, type TeamSceneArtImage } from './team-scene-art-rpc'
-import type { TeamSceneBand, TeamSceneBandActor } from './team-scene-band'
+import type { TeamSceneArtPick, TeamSceneBand } from './team-scene-band'
 
 export type TeamSceneArtLoad =
   | { kind: 'loading' }
   | { kind: 'failed' }
   | { kind: 'ready'; images: ReadonlyMap<string, TeamSceneArtImage> }
 
-type Role = OrchestratorGameSceneNativeStyle['roles']['lead']
-
-/** The art and sheet an actor wears; Jev wears the member art when the scene has none for it. */
-export function teamSceneRoleOf(
-  native: OrchestratorGameSceneNativeStyle,
-  actor: TeamSceneBandActor
-): { role: Role; sheet: string } {
-  const role =
-    actor.role === 'lead'
-      ? native.roles.lead
-      : actor.role === 'advisor'
-        ? (native.roles.advisor ?? native.roles.member)
-        : native.roles.member
-  return { role, sheet: role.sheets[actor.seed % role.sheets.length]! }
-}
-
-// Why only these: a scene may hold eight 2 MB sheets per role, and the band draws one per actor.
-function srcsOf(band: Extract<TeamSceneBand, { kind: 'scene' }>): string[] {
-  const sheets = band.actors.map((actor) => teamSceneRoleOf(band.native, actor).sheet)
-  return [...new Set([...band.native.layers.map((layer) => layer.src), ...sheets])]
+// Why every file: the stage animates each sheet and draws the desks, as the desktop loads them all.
+function srcsOf(art: Extract<TeamSceneArtPick, { kind: 'scene' }>): string[] {
+  return orchestratorGameSceneArtFiles({ [art.style]: art.native })
 }
 
 /** The scene file's images the band draws, read once per scene and style from the lead's host. */
@@ -37,14 +20,15 @@ export function useTeamSceneArt(
   caller: { worktreeId: string; terminalHandle: string } | null,
   band: TeamSceneBand | null
 ): TeamSceneArtLoad | null {
-  const srcs = band?.kind === 'scene' ? srcsOf(band) : null
+  const art = band?.kind === 'stage' && band.art.kind === 'scene' ? band.art : null
+  const srcs = art ? srcsOf(art) : null
   const request =
-    band?.kind === 'scene' && srcs && client && caller
+    art && srcs && client && caller
       ? {
-          key: JSON.stringify([caller, band.sceneId, srcs]),
+          key: JSON.stringify([caller, art.sceneId, srcs]),
           client,
           caller,
-          sceneId: band.sceneId,
+          sceneId: art.sceneId,
           srcs
         }
       : null
