@@ -127,6 +127,7 @@ import {
 import { clearGlobalConfigForProviderAccount } from '@/runtime/runtime-provider-global-config'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import {
+  CLAUDE_SETUP_TOKEN_RUNTIME_CAPABILITY,
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
   GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
@@ -488,11 +489,13 @@ export function AccountsPane({
   // set of methods — enabling them blind trades a dead button for a dead click.
   const [remoteEndpointEditSupported, setRemoteEndpointEditSupported] = useState(false)
   const [remoteGlobalConfigSupported, setRemoteGlobalConfigSupported] = useState(false)
+  const [remoteSetupTokenSupported, setRemoteSetupTokenSupported] = useState(false)
 
   useEffect(() => {
     if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
       setRemoteEndpointEditSupported(false)
       setRemoteGlobalConfigSupported(false)
+      setRemoteSetupTokenSupported(false)
       return
     }
     let cancelled = false
@@ -504,18 +507,24 @@ export function AccountsPane({
       runtimeEnvironmentSupportsCapability(
         activeRuntimeEnvironmentId,
         GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY
+      ),
+      runtimeEnvironmentSupportsCapability(
+        activeRuntimeEnvironmentId,
+        CLAUDE_SETUP_TOKEN_RUNTIME_CAPABILITY
       )
     ])
-      .then(([endpointEdit, globalConfig]) => {
+      .then(([endpointEdit, globalConfig, setupToken]) => {
         if (!cancelled) {
           setRemoteEndpointEditSupported(endpointEdit)
           setRemoteGlobalConfigSupported(globalConfig)
+          setRemoteSetupTokenSupported(setupToken)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setRemoteEndpointEditSupported(false)
           setRemoteGlobalConfigSupported(false)
+          setRemoteSetupTokenSupported(false)
         }
       })
     return () => {
@@ -1731,19 +1740,20 @@ export function AccountsPane({
                   )
                 const isReauthing = claudeAction === `reauth:${account.id}`
                 const hasLongLivedToken = !isCustomEndpoint && Boolean(account.longLivedTokenSetAt)
-                // Why: the token lives in a vault on the host that runs the agents; the
-                // RPC refuses remote callers so the secret never crosses the pairing wire.
-                const tokenBlockedReason = isRemoteAccountScope
-                  ? translate(
-                      'auto.components.settings.AccountsPane.longLivedTokenRemoteHint',
-                      'Set it on that host with orca account token set.'
-                    )
-                  : account.managedAuthRuntime === 'wsl'
+                // Why: the token lives in a vault on the host that runs the agents; only a
+                // host that can mint it there itself is offered, so it never crosses the wire.
+                const tokenBlockedReason =
+                  isRemoteAccountScope && !remoteSetupTokenSupported
                     ? translate(
-                        'auto.components.settings.AccountsPane.longLivedTokenWslHint',
-                        'Long-lived tokens are not supported for WSL accounts yet.'
+                        'auto.components.settings.AccountsPane.longLivedTokenRemoteHint',
+                        'Set it on that host with orca account token set.'
                       )
-                    : null
+                    : account.managedAuthRuntime === 'wsl'
+                      ? translate(
+                          'auto.components.settings.AccountsPane.longLivedTokenWslHint',
+                          'Long-lived tokens are not supported for WSL accounts yet.'
+                        )
+                      : null
                 const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
                 const authStatus = resolveClaudeAccountAuthRowStatus(
                   findClaudeAccountAuthVerdict(rateLimitsState, account.id),
@@ -2925,8 +2935,18 @@ export function AccountsPane({
             setTokenDialogAccountId(null)
           }
         }}
+        accountId={tokenDialogAccount?.id ?? null}
         accountLabel={tokenDialogAccount?.email ?? ''}
         hasToken={Boolean(tokenDialogAccount?.longLivedTokenSetAt)}
+        settings={settings}
+        canGenerate={!isRemoteAccountScope || remoteSetupTokenSupported}
+        canPaste={!isRemoteAccountScope}
+        onGenerated={(accounts) => {
+          if (tokenDialogAccount) {
+            void runClaudeAccountAction(`token:${tokenDialogAccount.id}`, async () => accounts)
+          }
+          setTokenDialogAccountId(null)
+        }}
         submitting={claudeAction.startsWith('token:')}
         onSave={(token) => {
           if (tokenDialogAccount) {

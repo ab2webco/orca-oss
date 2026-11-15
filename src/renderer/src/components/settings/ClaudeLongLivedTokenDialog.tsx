@@ -12,25 +12,40 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
+import { ClaudeSetupTokenGenerate } from './ClaudeSetupTokenGenerate'
 
 type ClaudeLongLivedTokenDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  accountId: string | null
   accountLabel: string
   hasToken: boolean
   submitting: boolean
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
+  /** The host can run `claude setup-token` for this account. */
+  canGenerate: boolean
+  /** Pasting and removing go through the host-only RPC, so a paired client cannot. */
+  canPaste: boolean
   onSave: (token: string) => void
   onClear: () => void
+  onGenerated: (accounts: ClaudeRateLimitAccountsState) => void
 }
 
 export function ClaudeLongLivedTokenDialog({
   open,
   onOpenChange,
+  accountId,
   accountLabel,
   hasToken,
   submitting,
+  settings,
+  canGenerate,
+  canPaste,
   onSave,
-  onClear
+  onClear,
+  onGenerated
 }: ClaudeLongLivedTokenDialogProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,42 +59,87 @@ export function ClaudeLongLivedTokenDialog({
           </DialogTitle>
           <DialogDescription>
             {translate(
-              'auto.components.settings.ClaudeLongLivedTokenDialog.description',
-              'Run claude setup-token on this host while signed in as {{value0}}, then paste the token. Agents on this account use it instead of the stored login, so they stop rotating it.',
+              'auto.components.settings.ClaudeLongLivedTokenDialog.generateDescription',
+              'Orca Lab runs claude setup-token on the host that owns {{value0}} and stores the one-year token there. Agents on this account use it instead of the stored login, so they stop rotating it.',
               { value0: accountLabel }
             )}
           </DialogDescription>
         </DialogHeader>
+        {canGenerate && accountId ? (
+          <ClaudeSetupTokenGenerate
+            settings={settings}
+            accountId={accountId}
+            accountLabel={accountLabel}
+            onStored={onGenerated}
+          />
+        ) : null}
         {/* Why: DialogContent unmounts on close, so a typed secret never survives into the next open. */}
-        <TokenFields
-          hasToken={hasToken}
-          submitting={submitting}
-          onSave={onSave}
-          onClear={onClear}
-        />
+        {canPaste ? (
+          <PasteFallback
+            collapsed={canGenerate}
+            hasToken={hasToken}
+            submitting={submitting}
+            onSave={onSave}
+          />
+        ) : null}
+        <p className="text-[11px] text-muted-foreground">
+          {translate(
+            'auto.components.settings.ClaudeLongLivedTokenDialog.limitsHost',
+            'The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It never leaves the host that owns the account.'
+          )}
+        </p>
+        {canPaste && hasToken ? (
+          <DialogFooter>
+            <Button variant="outline" onClick={onClear} disabled={submitting}>
+              {translate(
+                'auto.components.settings.ClaudeLongLivedTokenDialog.remove',
+                'Remove token'
+              )}
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   )
 }
 
-function TokenFields({
+function PasteFallback({
+  collapsed,
   hasToken,
   submitting,
-  onSave,
-  onClear
-}: Pick<
-  ClaudeLongLivedTokenDialogProps,
-  'hasToken' | 'submitting' | 'onSave' | 'onClear'
->): React.JSX.Element {
+  onSave
+}: {
+  collapsed: boolean
+  hasToken: boolean
+  submitting: boolean
+  onSave: (token: string) => void
+}): React.JSX.Element {
+  const [expanded, setExpanded] = useState(!collapsed)
   const [draft, setDraft] = useState('')
   const canSave = draft.trim().length > 0 && !submitting
 
+  if (!expanded) {
+    return (
+      <Button
+        variant="link"
+        size="xs"
+        className="h-auto self-start px-0 text-muted-foreground"
+        onClick={() => setExpanded(true)}
+      >
+        {translate(
+          'auto.components.settings.ClaudeLongLivedTokenDialog.pasteInstead',
+          'Paste a token instead'
+        )}
+      </Button>
+    )
+  }
+
   return (
-    <>
-      <div className="space-y-1.5">
-        <Label htmlFor="claude-long-lived-token">
-          {translate('auto.components.settings.ClaudeLongLivedTokenDialog.inputLabel', 'Token')}
-        </Label>
+    <div className="space-y-1.5">
+      <Label htmlFor="claude-long-lived-token">
+        {translate('auto.components.settings.ClaudeLongLivedTokenDialog.inputLabel', 'Token')}
+      </Label>
+      <div className="flex gap-2">
         <Input
           id="claude-long-lived-token"
           type="password"
@@ -95,31 +155,24 @@ function TokenFields({
                 )
               : undefined
           }
-          className="text-xs"
+          className="min-w-0 text-xs"
         />
-        <p className="text-[11px] text-muted-foreground">
-          {translate(
-            'auto.components.settings.ClaudeLongLivedTokenDialog.limits',
-            'The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It stays on this host.'
-          )}
-        </p>
-      </div>
-      <DialogFooter className="gap-2 sm:justify-between">
-        {hasToken ? (
-          <Button variant="outline" onClick={onClear} disabled={submitting}>
-            {translate(
-              'auto.components.settings.ClaudeLongLivedTokenDialog.remove',
-              'Remove token'
-            )}
-          </Button>
-        ) : (
-          <span />
-        )}
-        <Button onClick={() => onSave(draft)} disabled={!canSave} className="gap-1.5">
+        <Button
+          variant="outline"
+          onClick={() => onSave(draft)}
+          disabled={!canSave}
+          className="gap-1.5"
+        >
           {submitting ? <Loader2 className="size-3 animate-spin" /> : null}
           {translate('auto.components.settings.ClaudeLongLivedTokenDialog.save', 'Save token')}
         </Button>
-      </DialogFooter>
-    </>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {translate(
+          'auto.components.settings.ClaudeLongLivedTokenDialog.pasteHint',
+          'From claude setup-token run on this host while signed in as this account.'
+        )}
+      </p>
+    </div>
   )
 }
