@@ -153,7 +153,8 @@ export function teamAskText(ask: TeamMemberAsk | null | undefined): string {
         : translate('teamPanel.card.permissionPromptAny', 'Permission prompt in its terminal')
     case 'question':
       return translate('teamPanel.card.questionInTerminal', 'Question in its terminal')
-    default:
+    case 'inbox':
+    case undefined:
       return translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
   }
 }
