@@ -51,6 +51,34 @@ $adb shell am start -a android.intent.action.VIEW -d '<Pairing URL>'
 
 `MOCK_SERVER_KEY_FILE` keeps the pairing when you restart the mock to change a scenario below.
 
+## Pairing the emulator with a real host
+
+Some captures have to show what a real Orca sends, not the mock. Mint the link from the CLI on any
+machine paired with that host. Nobody has to open Settings > Mobile on it:
+
+```sh
+orca mobile pair --environment m1 --address 10.0.2.2 --local-only --json
+```
+
+- `--environment` names the paired host that mints the link, as in `orca environment list`. Leave
+  it out to pair with the Orca on the machine you run the command on.
+- `10.0.2.2` is how an Android emulator reaches the machine it runs on, so the link points the
+  emulator at the Orca on that same machine.
+- `--local-only` pairs over that address alone. Without it the host also asks Orca Relay for an
+  invite, and if Relay can't make one the host refuses with `relay_mint_failed`. m1 refuses this way.
+- Repeated calls reuse the same pending link until a phone scans it. `--rotate` revokes it and mints
+  a new one.
+
+Then open the `pairingUrl` from the output on the emulator, on the host's machine:
+
+```sh
+$adb shell am start -a android.intent.action.VIEW -d '<pairingUrl>'
+```
+
+The link is a credential for that host: don't paste it into a PR, a ticket or a chat. A host older
+than this command answers with an error that names it and its version. Update it, or pair from its
+Settings > Mobile.
+
 ## Widths and theme
 
 The AVD screen is 1080 px wide. Set the width with the screen density:
