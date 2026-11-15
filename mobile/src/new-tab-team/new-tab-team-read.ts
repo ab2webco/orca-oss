@@ -4,13 +4,21 @@ import type { TerminalOpenTarget } from '../session/host-terminal-open'
 import { getRepoIdFromMobileWorktreeId } from '../session/mobile-session-route-helpers'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse } from '../transport/types'
+import type { OrchestratorGameState } from '../../../src/shared/orchestrator-game-state'
+import { readLeadGameState } from '../team-drawer/team-drawer-rpc'
+import { addMemberRosterOf, type AddMemberRoster } from './add-member-options'
 
 /** The worktree project's lead as the + menu's Team group sees it (desktop: newTabTeamMenuStateOf). */
 export type NewTabTeam =
   | { kind: 'unsupported' }
   | { kind: 'pending' }
   | { kind: 'none' }
-  | { kind: 'lead-live'; lead: TerminalOpenTarget & { terminal: string } }
+  | {
+      kind: 'lead-live'
+      lead: TerminalOpenTarget & { terminal: string }
+      /** null when the lead's game.state could not be read, so Add member waits. */
+      roster: AddMemberRoster | null
+    }
   | { kind: 'lead-closed'; accountEmail: string | null }
 
 type Rec = Record<string, unknown>
@@ -30,6 +38,15 @@ async function accountEmailOf(client: RpcClient, accountId: string): Promise<str
   return typeof email === 'string' ? email : null
 }
 
+function rosterOf(state: unknown): AddMemberRoster | null {
+  try {
+    return addMemberRosterOf(state as OrchestratorGameState)
+  } catch {
+    // Why: a host answering an unexpected shape holds Add member instead of losing Go to lead.
+    return null
+  }
+}
+
 /** Reads the host's leads once per sheet open; a failed read keeps today's entries only. */
 export async function readNewTabTeam(
   client: RpcClient,
@@ -45,9 +62,11 @@ export async function readNewTabTeam(
   )
   const tabId = lead ? parsePaneKey(lead.paneKey)?.tabId : undefined
   if (lead && tabId) {
+    const state = await readLeadGameState(client, lead).catch(() => null)
     return {
       kind: 'lead-live',
-      lead: { worktreeId: lead.worktreeId, terminal: lead.terminalHandle, tabId }
+      lead: { worktreeId: lead.worktreeId, terminal: lead.terminalHandle, tabId },
+      roster: state?.status === 'ok' ? rosterOf(state.state) : null
     }
   }
   // Why any restoring pane: a phone cannot map a pane to its project, and a second team is worse than a wait.
