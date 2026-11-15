@@ -116,7 +116,10 @@ function drawNames(
   g.font = NAME_FONT
   g.textAlign = 'center'
   g.textBaseline = 'top'
-  for (const a of actors) {
+  const drawn: { left: number; right: number; y: number }[] = []
+  // Why still figures first: a walker passing a desk must not cover the name of who sits there.
+  const order = [...actors].sort((a, b) => Number(a.pose === 'walk') - Number(b.pose === 'walk'))
+  for (const a of order) {
     if (a.away) {
       continue
     }
@@ -124,7 +127,16 @@ function drawNames(
     const w = g.measureText(name).width + 6
     const x = Math.min(Math.max(a.x * width, w / 2 + 1), width - w / 2 - 1)
     const feet = painter.feetAt?.(a.depth, height) ?? height - 14
-    const y = Math.min(feet + NAME_GAP, height - 13)
+    const top = Math.min(feet + NAME_GAP, height - 26)
+    const [left, right] = [x - w / 2, x + w / 2]
+    const free = (y: number) =>
+      !drawn.some((o) => o.left < right && left < o.right && Math.abs(o.y - y) < 13)
+    // Why a second row: at 320 pt neighbouring desks sit closer than a name is wide.
+    const y = [top, top + 13].find(free)
+    if (y === undefined) {
+      continue
+    }
+    drawn.push({ left, right, y })
     g.fillStyle = 'rgb(10 12 16 / 0.72)'
     g.fillRect(x - w / 2, y - 1, w, 13)
     g.fillStyle = '#eef0f4'

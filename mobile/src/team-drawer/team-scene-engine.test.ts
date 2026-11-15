@@ -90,7 +90,7 @@ const inputOf = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
   members
 })
 
-function mount(): { engine: TeamSceneEngine; events: TeamSceneEngineEvent[] } {
+function mount(width = 390): { engine: TeamSceneEngine; events: TeamSceneEngineEvent[] } {
   const stage = document.createElement('div')
   const canvas = document.createElement('canvas')
   stage.appendChild(canvas)
@@ -99,7 +99,7 @@ function mount(): { engine: TeamSceneEngine; events: TeamSceneEngineEvent[] } {
   const engine = createTeamSceneEngine({
     canvas,
     overlay: stage,
-    width: () => 390,
+    width: () => width,
     ratio: () => 1,
     reducedMotion: false,
     scheduler: {
@@ -213,6 +213,55 @@ describe('the phone scene engine', () => {
     expect(drawn).toContain('office/desk.png')
     const names = calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])
     expect(names).toEqual(expect.arrayContaining(['Alfred', 'Toadette']))
+  })
+
+  it("never lets a walker's name cover the name of a member at its desk", async () => {
+    const { engine } = mount()
+    await officeStage(engine)
+    const seated = ['Toadette', 'Wario', 'Peach'].map((name, at) =>
+      member(`m${at}`, name, 'working')
+    )
+    engine.receive({ kind: 'input', input: inputOf(seated), leadLine: null })
+    run(engine, 2)
+    engine.receive({
+      kind: 'input',
+      input: inputOf([...seated, member('m9', 'Mario', 'working')]),
+      leadLine: null
+    })
+    for (let frame = 0; frame < 90; frame++) {
+      calls = []
+      engine.paint(1 / 30)
+      // Why 6 px a letter: the recording context measures text that way; +6 is the label's padding.
+      const boxes = calls
+        .filter((one) => one.name === 'fillText')
+        .map((one) => {
+          const [text, x, y] = one.args as [string, number, number]
+          const half = (text.length * 6 + 6) / 2
+          return { left: x - half, right: x + half, y }
+        })
+      const clash = boxes.some((a, i) =>
+        boxes.some(
+          (b, j) => i < j && a.left < b.right && b.left < a.right && Math.abs(a.y - b.y) < 13
+        )
+      )
+      expect(clash, `frame ${frame}`).toBe(false)
+    }
+  })
+
+  it('names every member at its desk on a 320 pt phone, where the desks sit closer than a name', async () => {
+    const { engine } = mount(320)
+    await officeStage(engine)
+    const names = ['Toadette', 'Wario', 'Peach', 'Rosalina']
+    engine.receive({
+      kind: 'input',
+      input: inputOf(names.map((name, at) => member(`m${at}`, name, 'working'))),
+      leadLine: null
+    })
+    run(engine, 2)
+    calls = []
+    engine.paint(1 / 30)
+    const drawn = calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])
+    expect(drawn).toEqual(expect.arrayContaining(names))
   })
 
   it("puts the lead's line in a bubble over the stage", async () => {
