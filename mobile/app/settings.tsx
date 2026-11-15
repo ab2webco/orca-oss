@@ -15,15 +15,17 @@ import {
   Globe,
   MessageSquare,
   Terminal as TerminalIcon,
-  KeyRound
+  KeyRound,
+  Users
 } from 'lucide-react-native'
 import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
 import {
   loadPendingHostCredentialCleanup,
   subscribePendingHostCredentialCleanup
 } from '../src/transport/host-credential-cleanup'
-import { retryPendingHostCredentialCleanup } from '../src/transport/host-store'
+import { loadHosts, retryPendingHostCredentialCleanup } from '../src/transport/host-store'
 import { ORCA_REPOSITORY_URL } from '../../src/shared/orca-repository-url'
+import { agentTeamsSettingsRouteOf } from '../src/agent-teams-settings/agent-teams-settings-host'
 
 export default function SettingsScreen() {
   const router = useRouter()
@@ -142,6 +144,22 @@ export default function SettingsScreen() {
           >
             <Bell size={16} color={colors.textSecondary} />
             <Text style={styles.rowLabel}>Notifications</Text>
+            <ChevronRight size={16} color={colors.textMuted} />
+          </Pressable>
+          <View style={styles.separator} />
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            onPress={() =>
+              void loadHosts().then((hosts) => {
+                const route = agentTeamsSettingsRouteOf(hosts)
+                if (route) {
+                  router.push(route)
+                }
+              })
+            }
+          >
+            <Users size={16} color={colors.textSecondary} />
+            <Text style={styles.rowLabel}>Agent Teams</Text>
             <ChevronRight size={16} color={colors.textMuted} />
           </Pressable>
           <View style={styles.separator} />

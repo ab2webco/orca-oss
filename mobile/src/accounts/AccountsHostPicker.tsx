@@ -18,10 +18,11 @@ export function AccountsHostPicker(props: {
   rows: readonly AccountsHostPickerRow[]
   onPick: (hostId: string) => void
   onClose: () => void
+  title?: string
 }) {
   return (
     <BottomDrawer visible={props.visible} onClose={props.onClose}>
-      <Text style={styles.title}>Accounts on</Text>
+      <Text style={styles.title}>{props.title ?? 'Accounts on'}</Text>
       <View style={styles.group}>
         {props.rows.map((row, index) => (
           <Pressable

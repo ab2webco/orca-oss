@@ -15,14 +15,16 @@ import { styles } from './mobile-accounts-screen-styles'
 // Why none: the sheet only reports the connections Home already holds; it never dials a host.
 const NO_AUTO_CONNECT: readonly string[] = []
 
-/** The Accounts title row; the host name opens the "Accounts on" sheet to switch desktops. */
+/** A per-desktop screen's title row; the host name opens the "{title} on" sheet to switch desktops. */
 export function AccountsHeader(props: {
   hostId: string
   hostName: string | null
-  refreshing: boolean
-  canRefresh: boolean
-  onRefresh: () => void
+  /** The host-stack screen the picker reopens on another desktop. */
+  screen?: 'accounts' | 'agent-teams'
+  title?: string
+  refresh?: { refreshing: boolean; canRefresh: boolean; onRefresh: () => void }
 }) {
+  const title = props.title ?? 'Accounts'
   const router = useRouter()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [hosts, setHosts] = useState<{ id: string; name: string }[]>([])
@@ -65,7 +67,7 @@ export function AccountsHeader(props: {
         <ChevronLeft size={22} color={colors.textPrimary} />
       </Pressable>
       <View style={styles.titleWrap}>
-        <Text style={styles.heading}>Accounts</Text>
+        <Text style={styles.heading}>{title}</Text>
         {props.hostName ? (
           <Pressable style={styles.hostPickerButton} onPress={() => setPickerOpen(true)}>
             <Text style={styles.subheading} numberOfLines={1}>
@@ -75,21 +77,28 @@ export function AccountsHeader(props: {
           </Pressable>
         ) : null}
       </View>
-      <Pressable style={styles.iconButton} onPress={props.onRefresh} disabled={!props.canRefresh}>
-        {props.refreshing ? (
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-        ) : (
-          <RefreshCw size={18} color={colors.textSecondary} />
-        )}
-      </Pressable>
+      {props.refresh ? (
+        <Pressable
+          style={styles.iconButton}
+          onPress={props.refresh.onRefresh}
+          disabled={!props.refresh.canRefresh}
+        >
+          {props.refresh.refreshing ? (
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+          ) : (
+            <RefreshCw size={18} color={colors.textSecondary} />
+          )}
+        </Pressable>
+      ) : null}
       <AccountsHostPicker
+        title={`${title} on`}
         visible={pickerOpen}
         rows={rows}
         onClose={() => setPickerOpen(false)}
         onPick={(hostId) => {
           setPickerOpen(false)
           if (hostId !== props.hostId) {
-            router.replace(`/h/${hostId}/accounts`)
+            router.replace(`/h/${hostId}/${props.screen ?? 'accounts'}`)
           }
         }}
       />
