@@ -6085,7 +6085,11 @@
           "longLivedTokenBadge": "Token",
           "longLivedTokenAction": "Token",
           "longLivedTokenUpdated": "Long-lived token updated.",
-          "longLivedTokenRestart": "Restart live Claude terminals on this account so they use it."
+          "longLivedTokenRestart": "Restart live Claude terminals on this account so they use it.",
+          "tokenAccountRemoteHint": "Update {{value0}} to add an account from a token there.",
+          "addWithToken": "Add with token",
+          "tokenOnlyBadgeHint": "Added from a long-lived token, with no stored login. It runs agents and members assigned to it, never the shared login.",
+          "tokenOnlyBadge": "Token only"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Restart",
@@ -11701,7 +11705,8 @@
           "generateDescription": "Orca Lab runs claude setup-token on the host that owns {{value0}} and stores the one-year token there. Agents on this account use it instead of the stored login, so they stop rotating it.",
           "limitsHost": "The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It never leaves the host that owns the account.",
           "pasteInstead": "Paste a token instead",
-          "pasteHint": "From claude setup-token run on this host while signed in as this account."
+          "pasteHint": "From claude setup-token run on this host while signed in as this account.",
+          "tokenOnlyNote": "This token is the account’s only sign-in, so it can be replaced but not removed. Remove the account to drop it."
         },
         "ClaudeSetupTokenGenerate": {
           "openStep": "1. Open the sign-in page and sign in as {{value0}}.",
@@ -11717,6 +11722,15 @@
         },
         "GamePanelStylePreview": {
           "lead": "Lead"
+        },
+        "ClaudeTokenAccountDialog": {
+          "nothingAdded": "Nothing was added.",
+          "title": "Add account with a token",
+          "description": "Uses a one-year token from claude setup-token, with no browser sign-in first. The token cannot read the account’s email, so name the account yourself.",
+          "nameLabel": "Name or email",
+          "limits": "Agents and members assigned to it launch on the token. It cannot be the shared login, and its usage cannot be shown. Sign in again on its row later to give it its real email.",
+          "add": "Add account",
+          "pasteHint": "From claude setup-token, run while signed in as the account you are adding."
         }
       },
       "right": {

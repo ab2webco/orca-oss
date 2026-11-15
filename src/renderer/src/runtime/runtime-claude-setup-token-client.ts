@@ -23,6 +23,16 @@ export function beginClaudeSetupToken(settings: Settings, accountId: string) {
   )
 }
 
+// Why a label and no token: the host mints the token and adds the account itself (ORCA-1215).
+export function beginClaudeSetupTokenForNewAccount(settings: Settings, label: string) {
+  return call<ClaudeSetupTokenStarted>(
+    settings,
+    'accounts.beginClaudeSetupTokenForNewAccount',
+    { label },
+    60_000
+  )
+}
+
 export function submitClaudeSetupTokenCode(settings: Settings, sessionId: string, code: string) {
   return call<ClaudeSetupTokenStatus>(settings, 'accounts.submitClaudeSetupTokenCode', {
     sessionId,

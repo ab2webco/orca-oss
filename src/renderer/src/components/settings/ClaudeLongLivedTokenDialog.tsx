@@ -14,6 +14,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
+import { beginClaudeSetupToken } from '@/runtime/runtime-claude-setup-token-client'
 import { ClaudeSetupTokenGenerate } from './ClaudeSetupTokenGenerate'
 
 type ClaudeLongLivedTokenDialogProps = {
@@ -31,6 +32,8 @@ type ClaudeLongLivedTokenDialogProps = {
   onSave: (token: string) => void
   onClear: () => void
   onGenerated: (accounts: ClaudeRateLimitAccountsState) => void
+  /** Added from a token alone: the token is its only sign-in, so it can be replaced, not removed. */
+  tokenOnly?: boolean
 }
 
 export function ClaudeLongLivedTokenDialog({
@@ -45,7 +48,8 @@ export function ClaudeLongLivedTokenDialog({
   canPaste,
   onSave,
   onClear,
-  onGenerated
+  onGenerated,
+  tokenOnly = false
 }: ClaudeLongLivedTokenDialogProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +72,7 @@ export function ClaudeLongLivedTokenDialog({
         {canGenerate && accountId ? (
           <ClaudeSetupTokenGenerate
             settings={settings}
-            accountId={accountId}
+            begin={() => beginClaudeSetupToken(settings, accountId)}
             accountLabel={accountLabel}
             onStored={onGenerated}
           />
@@ -88,7 +92,15 @@ export function ClaudeLongLivedTokenDialog({
             'The token only makes model requests: Remote Control and claude.ai connectors do not work with it. It never leaves the host that owns the account.'
           )}
         </p>
-        {canPaste && hasToken ? (
+        {tokenOnly ? (
+          <p className="text-[11px] text-muted-foreground">
+            {translate(
+              'auto.components.settings.ClaudeLongLivedTokenDialog.tokenOnlyNote',
+              'This token is the account’s only sign-in, so it can be replaced but not removed. Remove the account to drop it.'
+            )}
+          </p>
+        ) : null}
+        {canPaste && hasToken && !tokenOnly ? (
           <DialogFooter>
             <Button variant="outline" onClick={onClear} disabled={submitting}>
               {translate(
@@ -145,7 +157,7 @@ function PasteFallback({
           type="password"
           autoComplete="off"
           spellCheck={false}
-          value={draft}
+          // Why uncontrolled: React mirrors a controlled value into the `value` attribute, i.e. the DOM.
           onChange={(event) => setDraft(event.target.value)}
           placeholder={
             hasToken
