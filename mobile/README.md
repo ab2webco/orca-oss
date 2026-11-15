@@ -190,6 +190,7 @@ Connect from the app using endpoint `ws://localhost:6768` and token `mock-device
 - `MOCK_SCENARIO=showcase` — invented demo data for the README recordings: three `acme`/`field` projects, a lead with five members (tickets, PRs, CI, metrics), owner questions across projects, and agent terminals that echo what you type. `curl -X POST localhost:<PORT>/mock/owner-question` adds a question and sends the owner-question notification. Every name, ticket and URL in it is made up; keep it that way.
 - `MOCK_PAIRING_ENDPOINT` — the endpoint written into the printed `Pairing URL` (default `ws://127.0.0.1:<PORT>`; the Android emulator needs `ws://10.0.2.2:<PORT>`). Open that URL on the device (`xcrun simctl openurl` / `adb shell am start -d`) to pair without a QR code.
 - `MOCK_CHUNK_INTERVAL_MS` — pace of the scripted terminal output (default 500).
+- Agent Teams scenarios (`MOCK_LEADS`, `MOCK_LEAD_STORED`, `MOCK_REOPEN`, `MOCK_DOCK`, `MOCK_STOPPED`, `MOCK_PANEL_STYLE`, `MOCK_CUSTOM_SCENE`, `MOCK_TOKEN` and more), and how to capture PR screens on the Android emulator against them: [`docs/reference/mobile-emulator-captures.md`](../docs/reference/mobile-emulator-captures.md).
 
 ### Scenario control files
 

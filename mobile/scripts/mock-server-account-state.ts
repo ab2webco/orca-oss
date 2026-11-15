@@ -1,3 +1,4 @@
+import type { ClaudeAccountAuthVerdict } from '../../src/shared/claude-account-auth-verdict'
 import {
   buildCodexResetCreditExpectedScope,
   type CodexResetCreditExpectedScope
@@ -192,13 +193,51 @@ export function consumeMockCodexResetCredit(
   return { outcome, scope: currentScope }
 }
 
+// MOCK_TOKEN=a|b: the personal account signs in with a long-lived token the host verified (a)
+// or rejected (b, with a long email to test wrapping).
+function personalTokenAccount(): { email: string; longLivedTokenSetAt?: number } {
+  const token = process.env.MOCK_TOKEN
+  if (token === 'a') {
+    return {
+      email: 'personal@example.com',
+      longLivedTokenSetAt: Date.parse('2026-03-02T00:00:00Z')
+    }
+  }
+  if (token === 'b') {
+    return {
+      email: 'release.automation.personal@example-company.com',
+      longLivedTokenSetAt: Date.parse('2025-11-25T00:00:00Z')
+    }
+  }
+  return { email: 'personal@example.com' }
+}
+
+function personalTokenAuth(): { claudeAccountAuth?: ClaudeAccountAuthVerdict[] } {
+  const token = process.env.MOCK_TOKEN
+  if (token !== 'a' && token !== 'b') {
+    return {}
+  }
+  const checkedAt = Date.now() - 6 * 60_000
+  const verdict: ClaudeAccountAuthVerdict = {
+    accountId: 'claude-personal',
+    state: 'authenticated',
+    checkedAt,
+    failure: null,
+    undecided: null,
+    undecidedAt: null,
+    checking: false,
+    token: { state: token === 'b' ? 'rejected' : 'verified', checkedAt }
+  }
+  return { claudeAccountAuth: [verdict] }
+}
+
 export function createMockAccountsSnapshot() {
   const codexLimits = codexLimitsFor(activeCodexAccountId)
   return {
     claude: {
       accounts: [
         { id: 'claude-team', email: 'dev@example.com', organizationName: 'Example Team' },
-        { id: 'claude-personal', email: 'personal@example.com', organizationName: null }
+        { id: 'claude-personal', organizationName: null, ...personalTokenAccount() }
       ],
       activeAccountId: activeClaudeAccountId
     },
@@ -230,6 +269,7 @@ export function createMockAccountsSnapshot() {
       claudeTarget: { runtime: 'host' as const, wslDistro: null },
       codexTarget: { runtime: 'host' as const, wslDistro: null },
       inactiveClaudeAccounts: [],
+      ...personalTokenAuth(),
       inactiveCodexAccounts: CODEX_ACCOUNTS.filter(
         (account) => account.id !== activeCodexAccountId
       ).map((account) => ({

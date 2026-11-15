@@ -1,4 +1,5 @@
 import type { WebSocket } from 'ws'
+import type { RuntimeTerminalSend } from '../../src/shared/runtime-types'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
 import {
   createMockTerminals,
@@ -172,7 +173,14 @@ export function handleMockTerminalRequest(
           request.params?.enter === true
         )
       }
-      respond(success(request.id, { send: { handle: 'term-1', ok: true } }))
+      const text = String(request.params?.text ?? '')
+      // Why accepted: the phone treats a send the host did not accept as refused (#1240).
+      const send: RuntimeTerminalSend = {
+        handle: String(request.params?.terminal ?? 'term-1'),
+        accepted: true,
+        bytesWritten: Buffer.byteLength(text)
+      }
+      respond(success(request.id, { send }))
       return true
     }
 

@@ -3,6 +3,11 @@ import type {
   RuntimeWorktreePsSummary
 } from '../../src/shared/runtime-types'
 import type { GameOwnerQuestionProject } from '../../src/shared/orchestrator-game-owner-questions'
+import {
+  statusGroupOfName,
+  type GameAgent,
+  type GameReview
+} from '../../src/shared/orchestrator-game-state'
 import type { MockRepo } from './mobile-lag-scenario'
 
 // MOCK_SCENARIO=showcase: invented demo data for the README recordings (ORCA-955).
@@ -142,10 +147,10 @@ export function createShowcaseWorktrees(now = Date.now()): RuntimeWorktreePsSumm
 const member = (
   paneKey: string,
   name: string,
-  state: string,
+  state: GameAgent['state'],
   ticket: [string, string, string],
-  extra: Record<string, unknown> = {}
-) => ({
+  extra: Partial<GameAgent> = {}
+): GameAgent => ({
   paneKey,
   displayName: name,
   agentType: 'claude',
@@ -160,12 +165,16 @@ const member = (
     title: ticket[1],
     url: `${PLANE}/${ticket[0]}`,
     status: ticket[2],
-    statusGroup: ticket[2] === 'Done' ? 'completed' : 'started'
+    statusGroup: statusGroupOfName(ticket[2])
   },
   ...extra
 })
 
-const review = (number: number, ci: string, state = 'open') => ({
+const review = (
+  number: number,
+  ci: GameReview['ci'],
+  state: GameReview['state'] = 'open'
+): GameReview => ({
   provider: 'github',
   number,
   title: `PR ${number}`,

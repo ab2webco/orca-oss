@@ -1,8 +1,19 @@
+import { normalizeSupportedUiLocale } from '../../src/shared/ui-locale'
 import { getRepoIdFromWorktreeId } from '../../src/shared/worktree/id'
 import type {
   GameOwnerQuestion,
   GameOwnerQuestionProject
 } from '../../src/shared/orchestrator-game-owner-questions'
+import {
+  statusGroupOfName,
+  type GameAgent,
+  type OrchestratorGameState,
+  type GameMemberAccount,
+  type GameReview,
+  type GameWorkItem
+} from '../../src/shared/orchestrator-game-state'
+import { leadProjectState } from './mock-server-lead-project'
+import { LEAD_PANE_KEY } from './mock-server-lead-sessions'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
 import {
   createShowcaseQuestionProjects,
@@ -14,10 +25,16 @@ import {
 } from './mock-server-showcase-scenario'
 import { createShowcaseInboxThreads } from './mock-server-showcase-inbox'
 import { showcaseAnswerChunks } from './mock-server-showcase-terminal'
+import { teamSceneState } from './mock-server-team-scene'
 import { queueTerminalOutput } from './mock-server-terminal-stream'
 
 // Every terminal is the lead of a project with five members, so the Team drawer (ORCA-952) has data.
-const member = (paneKey: string, name: string, state: string, extra: Record<string, unknown>) => ({
+const member = (
+  paneKey: string,
+  name: string,
+  state: GameAgent['state'],
+  extra: Partial<GameAgent>
+): GameAgent => ({
   paneKey,
   displayName: name,
   agentType: 'claude',
@@ -29,16 +46,21 @@ const member = (paneKey: string, name: string, state: string, extra: Record<stri
   ...extra
 })
 
-const workItem = (id: string, title: string, status: string) => ({
+// Why statusGroupOfName: the host groups a status by name, so the mock cannot invent a group.
+const workItem = (id: string, title: string, status: string): GameWorkItem => ({
   provider: 'plane',
   identifier: id,
   title,
   url: `https://plane.example/${id}`,
   status,
-  statusGroup: 'started'
+  statusGroup: statusGroupOfName(status)
 })
 
-const review = (number: number, ci: string, state = 'open') => ({
+const review = (
+  number: number,
+  ci: GameReview['ci'],
+  state: GameReview['state'] = 'open'
+): GameReview => ({
   provider: 'github',
   number,
   title: `PR ${number}`,
@@ -48,8 +70,16 @@ const review = (number: number, ci: string, state = 'open') => ({
 })
 
 // Why: the same ids as the mock accounts snapshot, so the Accounts screen names who runs on each.
-const CLAUDE_TEAM = { provider: 'claude', id: 'claude-team', email: 'dev@example.com' }
-const CLAUDE_PERSONAL = { provider: 'claude', id: 'claude-personal', email: 'personal@example.com' }
+const CLAUDE_TEAM: GameMemberAccount = {
+  provider: 'claude',
+  id: 'claude-team',
+  email: 'dev@example.com'
+}
+const CLAUDE_PERSONAL: GameMemberAccount = {
+  provider: 'claude',
+  id: 'claude-personal',
+  email: 'personal@example.com'
+}
 
 const DEFAULT_MEMBERS = [
   member('tab-9:a', 'Cipher Wren', 'idle', {
@@ -124,19 +154,63 @@ function openQuestionCount(): number {
     : defaultQuestions.length
 }
 
-function leadState(worktreeId: unknown): unknown {
+// The lead's own row: the host sends no account, launch or isMember on it (leadAccount has the account).
+const LEAD_AGENT: GameAgent = {
+  paneKey: LEAD_PANE_KEY,
+  displayName: 'Lead',
+  agentType: 'claude',
+  state: 'working',
+  toolName: 'Bash',
+  toolInput: 'gh pr checks 412',
+  isLeader: true,
+  advisor: {
+    model: 'opus',
+    effort: 'high',
+    pinned: { model: false, effort: false },
+    line: 'Opus high: the lead is coordinating five members and reading CI on #412, so it stays on the strongest model until the merge queue drains.',
+    skill: 'orchestration',
+    confidence: 'high',
+    previous: { model: 'sonnet', effort: 'medium' },
+    decisions: [{ id: 'd1', verdict: 'upgrade', gesture: 'point' }]
+  }
+}
+
+// MOCK_DOCK=1 gives each member a terminal (the lead dock) and raises the cap to 9;
+// MOCK_EXTRA_MEMBERS=1 adds three more members.
+function leadAgents(): GameAgent[] {
+  const members = DEFAULT_MEMBERS.map((one, i) =>
+    process.env.MOCK_DOCK ? { ...one, terminalHandle: `term-m${i}` } : one
+  )
+  const extra = process.env.MOCK_EXTRA_MEMBERS
+    ? ['Quinn', 'Rafa', 'Valentina'].map((name, i) =>
+        member(`tab-${20 + i}:a`, name, i === 0 ? 'working' : 'idle', {
+          workItem: workItem(`ACME-24${i}`, `Extra member ${name}`, 'In Progress')
+        })
+      )
+    : []
+  return [LEAD_AGENT, ...members, ...extra]
+}
+
+function leadState(worktreeId: unknown): Partial<OrchestratorGameState> {
   if (isShowcaseScenario && worktreeId !== LEAD_WORKTREE_ID) {
     // A root pane with no lead config: the phone shows no Team button over it.
     return { role: 'lead', agents: [] }
   }
   return {
     role: 'lead',
-    lead: { autostart: false, cap: 5, agent: 'claude', label: 'Lead' },
-    agents: isShowcaseScenario ? SHOWCASE_MEMBERS : DEFAULT_MEMBERS,
-    worktree: { id: worktreeId },
+    lead: { autostart: false, cap: process.env.MOCK_DOCK ? 9 : 5, agent: 'claude', label: 'Lead' },
+    agents: isShowcaseScenario ? SHOWCASE_MEMBERS : leadAgents(),
+    worktree: {
+      id: String(worktreeId),
+      path: '/Users/dev/code/orca-oss',
+      branch: 'main',
+      displayName: 'orca-oss'
+    },
     ...(isShowcaseScenario ? {} : { leadAccount: CLAUDE_TEAM }),
     // Why: MOCK_GAME_LOCALE=es checks the cards follow the host's language.
-    locale: process.env.MOCK_GAME_LOCALE,
+    locale: process.env.MOCK_GAME_LOCALE
+      ? normalizeSupportedUiLocale(process.env.MOCK_GAME_LOCALE)
+      : undefined,
     inboxes: [
       {
         key: 'ORCA-949',
@@ -146,10 +220,13 @@ function leadState(worktreeId: unknown): unknown {
       }
     ],
     openOwnerQuestions: openQuestionCount(),
+    // Why not the showcase: its recorded clips keep their own Team sheet.
+    ...(isShowcaseScenario ? {} : leadProjectState()),
+    ...teamSceneState(),
     metrics: {
       claudeAccounts: [
-        { email: CLAUDE_PERSONAL.email, sessionPercent: 100, weeklyPercent: 71 },
-        { email: CLAUDE_TEAM.email, sessionPercent: 42, weeklyPercent: 18 }
+        { email: CLAUDE_PERSONAL.email, active: false, sessionPercent: 100, weeklyPercent: 71 },
+        { email: CLAUDE_TEAM.email, active: true, sessionPercent: 42, weeklyPercent: 18 }
       ],
       computedAt: new Date().toISOString(),
       timezone: 'America/Bogota',
@@ -181,7 +258,7 @@ function answerShowcaseQuestion(id: string, params: Record<string, unknown>): vo
         : String(params.text ?? '')
     if (project.worktreeId === LEAD_WORKTREE_ID && answer) {
       // Why by ticket: the lead relays the answer to whoever owns it, not a fixed member.
-      const owner = SHOWCASE_MEMBERS.find((one) => one.workItem.identifier === found.ticket)
+      const owner = SHOWCASE_MEMBERS.find((one) => one.workItem?.identifier === found.ticket)
       queueTerminalOutput(
         'term-lead',
         showcaseAnswerChunks(found.ticket, answer, owner?.displayName ?? null)
@@ -215,14 +292,6 @@ export function handleMockGameTeamRequest(
   success: (id: string, result: unknown) => RpcResponse,
   activeWorktreeId: () => string | undefined
 ): boolean {
-  if (request.method === 'game.leads') {
-    // Why: the Home card reads each lead's team through its worktree, handle and pane.
-    const worktreeId = activeWorktreeId() ?? 'mock'
-    respond(
-      success(request.id, { leads: [{ handle: 'term-1', paneKey: 'tab-9:lead', worktreeId }] })
-    )
-    return true
-  }
   if (request.method === 'game.state') {
     respond(success(request.id, leadState(request.params?.worktreeId)))
     return true
