@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canOpenRemoteBrowserContextMenu,
   canReconnectRemoteBrowserStream,
   isRemoteBrowserStreamBusy,
   REMOTE_BROWSER_STREAM_IDLE,
@@ -77,5 +78,19 @@ describe('remote browser stream status', () => {
         expect(isRemoteBrowserStreamBusy(status)).toBe(false)
       }
     }
+  })
+
+  // ORCA-1232: a reopen keeps the last frame on screen, so a right-click on it must still open the
+  // menu; the hit-test reads the page over RPC and never needed the screencast.
+  it('opens the context menu over a frame the stream is reopening', () => {
+    for (const status of ALL) {
+      expect(canOpenRemoteBrowserContextMenu(status, false)).toBe(true)
+    }
+  })
+
+  // A navigation in flight is about to replace the frame, so a hit-test would read the next page.
+  it('holds the context menu while the pane itself is navigating', () => {
+    expect(canOpenRemoteBrowserContextMenu(REMOTE_BROWSER_STREAM_LIVE, true)).toBe(false)
+    expect(canOpenRemoteBrowserContextMenu(REMOTE_BROWSER_STREAM_OPENING, true)).toBe(false)
   })
 })

@@ -41,6 +41,15 @@ export function isRemoteBrowserStreamBusy(status: RemoteBrowserStreamStatus): bo
   return status.kind === 'opening' || status.kind === 'retrying'
 }
 
+// Why not gated on the stream: a reopen (every tab switch) keeps the last frame on screen, and the
+// menu's hit-test reads the page over RPC, so a right-click there must not be silently dropped.
+export function canOpenRemoteBrowserContextMenu(
+  status: RemoteBrowserStreamStatus,
+  paneBusy: boolean
+): boolean {
+  return status.kind === 'stopped' || !paneBusy
+}
+
 /** The stream's own message. Incidental notices (input failures, URL validation) are separate. */
 export function remoteBrowserStreamNotice(status: RemoteBrowserStreamStatus): string | null {
   if (status.kind === 'stopped') {

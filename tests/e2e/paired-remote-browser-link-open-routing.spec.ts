@@ -245,9 +245,12 @@ test('opens a remote pane link on the pane runtime and refuses to fall back to t
     await expect(page.getByTestId('remote-browser-pane')).toHaveCount(paneCountBeforeOpen + 1, {
       timeout: 60_000
     })
-    expect(await readRemotePaneUrls(page, worktreeId)).toContainEqual(
-      expect.stringContaining(fixture.linkUrl)
-    )
+    // Polled: the mirrored page is created as about:blank and takes the host's URL a moment later.
+    await expect
+      .poll(() => readRemotePaneUrls(page, worktreeId), {
+        message: 'the client never mirrored the link page as a remote pane'
+      })
+      .toContainEqual(expect.stringContaining(fixture.linkUrl))
     expect(await readLocalBrowserViewUrls(page)).toHaveLength(0)
 
     // Drop every tab except the pane's, so the second act drives the pane it started with.
