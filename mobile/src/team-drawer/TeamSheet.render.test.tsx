@@ -203,6 +203,7 @@ function teamWith(
     },
     answer: vi.fn(async () => {}),
     level: null,
+    sceneArt: null,
     ...over
   }
 }

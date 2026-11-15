@@ -12,6 +12,7 @@ import {
 } from './team-drawer-model'
 import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
 import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
+import { useTeamSceneArt } from './use-team-scene-art'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -24,8 +25,11 @@ export function useTeamDrawer(args: {
   paneKey: string | null
   /** The host advertises MOBILE_TEAM_LEVEL_CAPABILITY. */
   levelSupported: boolean
+  /** The host advertises MOBILE_TEAM_SCENE_CAPABILITY. */
+  sceneArtSupported: boolean
 }): TeamDrawerData {
   const { client, connected, worktreeId, terminalHandle, paneKey, levelSupported } = args
+  const { sceneArtSupported } = args
   const [focused, setFocused] = useState(false)
   useFocusEffect(
     useCallback(() => {
@@ -122,8 +126,21 @@ export function useTeamDrawer(args: {
     )
     // Why oldest: the desktop's lead card names its oldest open question (the board lists open ones only).
     const oldest = [...own.questions].sort((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
-    return teamLeadViewOf(rawState, tickets, oldest ? { ticket: oldest.ticket } : null)
-  }, [own.questions, rawState])
+    return teamLeadViewOf(
+      rawState,
+      tickets,
+      oldest ? { ticket: oldest.ticket } : null,
+      Date.now(),
+      {
+        sceneArt: sceneArtSupported
+      }
+    )
+  }, [own.questions, rawState, sceneArtSupported])
+  const sceneArt = useTeamSceneArt(
+    client,
+    terminalHandle ? { worktreeId, terminalHandle } : null,
+    view?.scene ?? null
+  )
 
   const inboxAnswer = inbox.answer
   const answer = useCallback(
@@ -142,6 +159,7 @@ export function useTeamDrawer(args: {
     answerWorktreeId: own.worktreeId,
     inbox: leadInbox,
     answer,
-    level: view && xp !== null ? gameCharacterLevelOf(xp) : null
+    level: view && xp !== null ? gameCharacterLevelOf(xp) : null,
+    sceneArt
   }
 }
