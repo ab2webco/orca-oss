@@ -15,7 +15,12 @@ import type { TerminalOpenTarget } from '../session/host-terminal-open'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { teamMemberContextOf, type TeamMemberContext } from './team-drawer-member-context'
 import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
-import type { TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
+import type {
+  TeamAdvisorRow,
+  TeamFlowPhase,
+  TeamLeadCard
+} from '../../../src/shared/team-panel-model-types'
+import { teamLeadCardsOf } from './team-sheet-lead'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -63,6 +68,10 @@ export type TeamMetrics = {
 
 export type TeamLeadView = {
   members: TeamMemberRow[]
+  /** null when the host sends no lead agent. */
+  lead: TeamLeadCard | null
+  /** Jev's card; null without the advisor plugin or from an older host. */
+  advisor: TeamAdvisorRow | null
   metrics: TeamMetrics | null
   locale: SupportedUiLocale
 }
@@ -216,7 +225,8 @@ const rank = (row: TeamMemberRow): number =>
 /** The lead's Team, or null when this pane is not the live lead of a game project. */
 export function teamLeadViewOf(
   raw: unknown,
-  questionTickets: ReadonlySet<string> = new Set()
+  questionTickets: ReadonlySet<string> = new Set(),
+  ownerAsk: { ticket: string | null } | null = null
 ): TeamLeadView | null {
   // Why `lead`: role is `lead` for any root pane; only a project with a lead has a Team.
   if (!isRecord(raw) || raw.role !== 'lead' || !isRecord(raw.lead) || raw.leadElsewhere) {
@@ -230,10 +240,12 @@ export function teamLeadViewOf(
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
+  const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
   return {
     members,
+    ...teamLeadCardsOf(raw, questionTickets, ownerAsk, locale),
     metrics: metricsOf(raw.metrics),
-    locale: normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+    locale
   }
 }
 
