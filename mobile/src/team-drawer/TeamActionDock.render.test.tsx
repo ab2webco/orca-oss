@@ -147,6 +147,46 @@ describe('TeamActionDock', () => {
     expect(texts()).toContain('Wave launched 3 members')
   })
 
+  it('clears what a Wave launched after a while, and a new press replaces it at once', async () => {
+    vi.useFakeTimers()
+    try {
+      await act(async () => show(vi.fn(async () => SENT)))
+      await act(async () => button('Wave, 4 to do, slots free').click())
+      await act(async () =>
+        show(
+          vi.fn(async () => SENT),
+          'en',
+          5
+        )
+      )
+      expect(texts()).toContain('Wave launched 1 member')
+      await act(async () => vi.advanceTimersByTime(8_000))
+      expect(texts()).not.toContain('Wave launched 1 member')
+      await act(async () =>
+        show(
+          vi.fn(async () => SENT),
+          'en',
+          6
+        )
+      )
+      expect(texts()).not.toContain('Wave launched 2 members')
+      await act(async () => button('Wave, 4 to do, slots free').click())
+      await act(async () =>
+        show(
+          vi.fn(async () => SENT),
+          'en',
+          7
+        )
+      )
+      expect(texts()).toContain('Wave launched 1 member')
+      act(() => button('Sweep, 1 finished to close').click())
+      expect(texts()).toContain('Sending Sweep to the lead…')
+      expect(texts()).not.toContain('Wave launched 1 member')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('words the dock in the host language', () => {
     show(vi.fn(), 'es')
     expect(texts()).toEqual(expect.arrayContaining(['Ola', 'Barrer']))

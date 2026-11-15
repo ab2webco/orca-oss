@@ -92,12 +92,16 @@ export function TeamActionDock({
     const timer = setTimeout(() => setNote(null), NOTE_MS)
     return () => clearTimeout(timer)
   }, [note])
+  // Why derived: the count must show on the render the members join, not one render later.
+  const launched = waveFrom !== null && memberCount > waveFrom ? memberCount - waveFrom : 0
   useEffect(() => {
-    if (waveFrom !== null && memberCount > waveFrom) {
-      setNote({ text: words.launched(memberCount - waveFrom), tone: 'info' })
-      setWaveFrom(null)
+    if (launched === 0) {
+      return
     }
-  }, [memberCount, waveFrom, words])
+    const timer = setTimeout(() => setWaveFrom(null), NOTE_MS)
+    return () => clearTimeout(timer)
+  }, [launched])
+  const shown = launched > 0 ? { text: words.launched(launched), tone: 'info' as const } : note
   const chips = teamDockActionsOf(control.actions, null)
   const stop = control.actions.find((one) => one.orca === 'stop') ?? null
   if (control.actions.length === 0) {
@@ -105,6 +109,7 @@ export function TeamActionDock({
   }
   const run = (action: TeamAction): void => {
     setConfirming(false)
+    setWaveFrom(null)
     const label = teamActionLabelOf(action, words)
     setNote({ text: words.sending(label), tone: 'info' })
     void onSend(action).then(({ outcome, reason }) => {
@@ -162,11 +167,11 @@ export function TeamActionDock({
   const labelled = width >= LABELS_FROM_WIDTH
   return (
     <View style={styles.column} accessibilityLabel={words.actions}>
-      {note ? (
+      {shown ? (
         <View style={styles.noteLine}>
-          <View style={[styles.dot, { backgroundColor: tones[note.tone] }]} />
+          <View style={[styles.dot, { backgroundColor: tones[shown.tone] }]} />
           <Text style={styles.note} accessibilityLiveRegion="polite" numberOfLines={2}>
-            {note.text}
+            {shown.text}
           </Text>
         </View>
       ) : null}
