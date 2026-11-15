@@ -3,6 +3,7 @@ import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 type Words = {
   prs: string
+  hosts: string
   mergeQueue: string
   openPrs: string
   viewAll: (count: number) => string
@@ -12,16 +13,27 @@ type Words = {
   noPrs: string
   prsError: string
   queueError: string
+  machinesError: string
   unavailable: string
   loading: string
   providerFailed: string
   githubLimit: (minutes: number) => string
+  offline: string
+  lowMemory: string
+  free: string
+  running: (count: number) => string
+  runningOfCap: (count: number, cap: number) => string
+  memoryUsed: (percent: number) => string
+  memoryFree: (free: string, total: string) => string
+  aloneTitle: string
+  aloneText: string
 }
 
 // Why these words: they match desktop's teamPanel catalog, so both surfaces say the same.
 const WORDS: Record<SupportedUiLocale, Words> = {
   en: {
     prs: 'PRs',
+    hosts: 'Hosts',
     mergeQueue: 'Merge queue',
     openPrs: 'Open PRs',
     viewAll: (count) => `View all ${count}`,
@@ -40,13 +52,24 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     noPrs: 'No open pull requests',
     prsError: 'Could not read pull requests',
     queueError: 'Could not read the queue',
+    machinesError: 'Could not read the machines',
     unavailable: 'This Orca host does not publish it yet.',
     loading: 'Loading',
     providerFailed: 'The provider did not answer. It retries on its own.',
-    githubLimit: (minutes) => `GitHub API limit reached. It retries on its own in ${minutes} min.`
+    githubLimit: (minutes) => `GitHub API limit reached. It retries on its own in ${minutes} min.`,
+    offline: 'Offline',
+    lowMemory: 'Low memory',
+    free: 'Free',
+    running: (count) => (count === 1 ? '1 agent' : `${count} agents`),
+    runningOfCap: (count, cap) => `${count} of ${cap} agents`,
+    memoryUsed: (percent) => `Memory used ${percent}%`,
+    memoryFree: (free, total) => `${free} of ${total} GB free`,
+    aloneTitle: 'Only this machine',
+    aloneText: 'Pair another machine to spread agents across hosts.'
   },
   es: {
     prs: 'PRs',
+    hosts: 'Hosts',
     mergeQueue: 'Cola de merge',
     openPrs: 'PRs abiertos',
     viewAll: (count) => `Ver los ${count}`,
@@ -65,11 +88,21 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     noPrs: 'No hay pull requests abiertos',
     prsError: 'No se pudieron leer los pull requests',
     queueError: 'No se pudo leer la cola',
+    machinesError: 'No se pudieron leer las máquinas',
     unavailable: 'Este host de Orca todavía no lo publica.',
     loading: 'Cargando',
     providerFailed: 'El proveedor no respondió. Se reintenta solo.',
     githubLimit: (minutes) =>
-      `Límite de la API de GitHub alcanzado. Se reintenta solo en ${minutes} min.`
+      `Límite de la API de GitHub alcanzado. Se reintenta solo en ${minutes} min.`,
+    offline: 'Sin conexión',
+    lowMemory: 'Poca memoria',
+    free: 'Libre',
+    running: (count) => (count === 1 ? '1 agente' : `${count} agentes`),
+    runningOfCap: (count, cap) => `${count} de ${cap} agentes`,
+    memoryUsed: (percent) => `Memoria usada ${percent}%`,
+    memoryFree: (free, total) => `${free} de ${total} GB libres`,
+    aloneTitle: 'Solo esta máquina',
+    aloneText: 'Empareja otra máquina para repartir agentes entre hosts.'
   }
 }
 

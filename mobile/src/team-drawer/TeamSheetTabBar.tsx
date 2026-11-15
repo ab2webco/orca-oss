@@ -5,9 +5,9 @@ import type { TeamCardWords } from './team-card-words'
 import type { TeamSheetWork } from './team-sheet-work'
 import type { TeamWorkWords } from './team-work-words'
 
-export type TeamTab = 'team' | 'inbox' | 'prs'
+export type TeamTab = 'team' | 'inbox' | 'prs' | 'hosts'
 
-/** Team and Inbox always; PRs only when the project has a remote to review on. */
+/** Team and Inbox always; PRs and Hosts only when the host publishes them. */
 export function TeamSheetTabBar({
   active,
   inboxCount,
@@ -26,7 +26,8 @@ export function TeamSheetTabBar({
   const tabs: { tab: TeamTab; label: string }[] = [
     { tab: 'team', label: words.team },
     { tab: 'inbox', label: words.inbox },
-    ...(work.prs || work.queue ? [{ tab: 'prs' as const, label: workWords.prs }] : [])
+    ...(work.prs || work.queue ? [{ tab: 'prs' as const, label: workWords.prs }] : []),
+    ...(work.machines ? [{ tab: 'hosts' as const, label: workWords.hosts }] : [])
   ]
   return (
     <View style={styles.tabs} accessibilityRole="tablist">

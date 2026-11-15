@@ -20,6 +20,7 @@ import { teamInboxWordsOf } from './team-inbox-words'
 import { useTeamSheetDrag } from './use-team-sheet-drag'
 import { PeekBar, TEAM_PEEK_HEIGHT } from './TeamPeekBar'
 import { TeamSheetTabBar, type TeamTab } from './TeamSheetTabBar'
+import { TeamHostsTab } from './TeamHostsTab'
 import { TeamPrsTab } from './TeamPrsTab'
 import { teamWorkWordsOf } from './team-work-words'
 import { TeamLevelRow } from './TeamLevelRow'
@@ -171,6 +172,13 @@ export function TeamSheet({
                     />
                     {tab === 'prs' ? (
                       <TeamPrsTab work={view.work} words={workWords} onOpenLink={onOpenLink} />
+                    ) : tab === 'hosts' ? (
+                      <TeamHostsTab
+                        machines={view.work.machines}
+                        hostName={hostName}
+                        locale={view.locale}
+                        words={workWords}
+                      />
                     ) : tab === 'inbox' ? (
                       <TeamInboxTab
                         team={team}
