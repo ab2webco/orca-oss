@@ -80,7 +80,9 @@ function LeadCardRow({
                   : translate('teamPanel.lead.asks', 'Waiting for you')}
               </span>
             ) : (
-              <span className="truncate">{teamLeadLiveText(lead.liveAction, lead.condition)}</span>
+              <span className="truncate">
+                {teamLeadLiveText(lead.liveAction, lead.condition, lead.waitingOn)}
+              </span>
             )}
           </span>
           {sceneLine ? (

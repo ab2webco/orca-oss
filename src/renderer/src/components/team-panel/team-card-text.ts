@@ -10,12 +10,14 @@ import type {
   TeamHost,
   TeamLiveAction,
   TeamMemberAsk,
+  TeamMemberCard,
   TeamModel,
   TeamPullRequest,
   TeamStatus,
   TeamTicket
 } from '../../../../shared/team-panel-model-types'
 import { localHostDisplayLabel } from '../../lib/local-host-display-label'
+import { teamIdleCiOf } from '../../../../shared/team-member-shown-state'
 
 const TONE: Record<TeamStatus, StatusTone> = {
   attention: 'attention',
@@ -99,7 +101,19 @@ export function teamSessionStateText(condition: TeamCondition): string {
 }
 
 /** The lead's line: what it does now, led by V30's verb while it works on something. */
-export function teamLeadLiveText(action: TeamLiveAction | null, condition: TeamCondition): string {
+export function teamLeadLiveText(
+  action: TeamLiveAction | null,
+  condition: TeamCondition,
+  waitingOn = 0
+): string {
+  // Why (ORCA-1205): a lead whose turn ended still coordinates while members work.
+  if (!action && waitingOn > 0 && (condition === 'idle' || condition === 'done')) {
+    return waitingOn === 1
+      ? translate('teamPanel.lead.waitingOnOne', 'Waiting on 1 agent')
+      : translate('teamPanel.lead.waitingOnMany', 'Waiting on {{count}} agents', {
+          count: waitingOn
+        })
+  }
   const text = teamLiveText(action, condition)
   return condition === 'working' && action !== null && action.kind !== 'question'
     ? translate('teamPanel.lead.orchestrating', 'Orchestrating · {{action}}', { action: text })
@@ -141,6 +155,20 @@ export function teamAskText(ask: TeamMemberAsk | null | undefined): string {
       return translate('teamPanel.card.questionInTerminal', 'Question in its terminal')
     default:
       return translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
+  }
+}
+
+/** A member's line: what it does now, or the CI a stopped member's open PR waits on (ORCA-1205). */
+export function teamMemberLiveText(
+  card: Pick<TeamMemberCard, 'condition' | 'liveAction' | 'pr'>
+): string {
+  switch (teamIdleCiOf(card)) {
+    case 'failure':
+      return translate('teamPanel.card.ciFailed', 'CI failing')
+    case 'pending':
+      return translate('teamPanel.card.ciRunning', 'CI running')
+    case null:
+      return teamLiveText(card.liveAction, card.condition)
   }
 }
 

@@ -4,11 +4,12 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
+import { teamIdleCiOf } from '../../../../shared/team-member-shown-state'
 import {
   teamAgeText,
   teamAskText,
   teamHelpersCountText,
-  teamLiveText,
+  teamMemberLiveText,
   teamModelText,
   teamPhaseText,
   teamTicketBesideName
@@ -175,12 +176,13 @@ export function TeamMemberCardRow({
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
             <span
               className={cn(
-                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
+                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate',
+                !card.needsYou && teamIdleCiOf(card) === 'failure' && 'text-status-attention'
               )}
             >
               {card.needsYou && card.ask !== null
                 ? teamAskText(card.ask)
-                : teamLiveText(card.liveAction, card.condition)}
+                : teamMemberLiveText(card)}
             </span>
           </span>
           <MetaLine

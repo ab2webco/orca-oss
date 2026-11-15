@@ -17433,6 +17433,8 @@
       "badge": "Lead",
       "coordinatesOne": "Coordinates 1 agent",
       "coordinatesMany": "Coordinates {{count}} agents",
+      "waitingOnOne": "Waiting on 1 agent",
+      "waitingOnMany": "Waiting on {{count}} agents",
       "asksOn": "Waiting for you · Question on {{ticket}}",
       "asks": "Waiting for you",
       "orchestrating": "Orchestrating · {{action}}"

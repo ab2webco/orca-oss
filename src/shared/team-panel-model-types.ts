@@ -142,6 +142,8 @@ export type TeamLeadCard = TeamAgentFacts & {
   branch: string | null
   /** The oldest question the lead asked the user that is still open; the text stays in Inbox. */
   ownerAsk: { ticket: string | null } | null
+  /** Members not finished yet, which a lead whose turn ended still waits on; absent from an older client. */
+  waitingOn?: number
 }
 
 /** One sub-agent decision Jev made: which agent, on what, and what it did. */
