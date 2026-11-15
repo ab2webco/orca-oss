@@ -317,6 +317,40 @@ describe('createTeamPanelModelPoller', () => {
   })
 
   // Why: leaving the panel ends the run, and a sick host must not cost the team on the way back.
+  // Why: reopening the panel showed the loader until a fresh read landed, up to 16 s (ORCA-1199).
+  it('shows the last team as updating, not loading, when the panel reopens or joins', async () => {
+    let finish: (state: OrchestratorGameState) => void = () => {}
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    const { all, sources } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    release()
+
+    const before = sources.length
+    poller.subscribe(SCOPE)
+    expect(sources[before]).toEqual({
+      section: { kind: 'ready', value: MODEL },
+      retry: null,
+      updating: true
+    })
+
+    const joined = sources.length
+    poller.subscribe(SCOPE, { background: true })
+    const releasePanel = poller.subscribe(SCOPE)
+    releasePanel()
+    poller.subscribe(SCOPE)
+    expect(sources.slice(joined).map((source) => source.section.kind)).not.toContain('loading')
+
+    await flush()
+    finish({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    expect(sources.at(-1)).toEqual({ section: { kind: 'ready', value: MODEL }, retry: null })
+  })
+
   it('keeps the team when the first read after reopening the panel fails', async () => {
     const readState = vi
       .fn()
