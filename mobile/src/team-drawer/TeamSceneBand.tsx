@@ -86,7 +86,8 @@ function StageBand({
 }) {
   const ref = useRef<WebView>(null)
   const tones = useTeamTones()
-  const [loaded, setLoaded] = useState(false)
+  // Why a count: a reloaded page (its renderer killed) says loaded again and needs everything again.
+  const [loaded, setLoaded] = useState(0)
   const [failed, setFailed] = useState(false)
   const [height, setHeight] = useState(TEAM_SCENE_BAND_HEIGHT)
   const ownFailed = band.art.kind === 'scene' && ownArt?.kind === 'failed'
@@ -107,12 +108,12 @@ function StageBand({
   )
   const inputKey = JSON.stringify([band.input, leadLine])
   useEffect(() => {
-    if (loaded && !waitsForArt) {
+    if (loaded > 0 && !waitsForArt) {
       ref.current?.injectJavaScript(scriptOf({ kind: 'stage', stage }))
     }
   }, [loaded, waitsForArt, stage])
   useEffect(() => {
-    if (loaded && !waitsForArt) {
+    if (loaded > 0 && !waitsForArt) {
       ref.current?.injectJavaScript(scriptOf({ kind: 'input', input: band.input, leadLine }))
     }
   }, [loaded, waitsForArt, stage, inputKey])
@@ -131,11 +132,13 @@ function StageBand({
         javaScriptEnabled
         scrollEnabled={false}
         // Why: the stage is self-contained; nothing it draws may navigate the sheet.
-        onShouldStartLoadWithRequest={(request) => request.url === 'about:blank'}
+        onShouldStartLoadWithRequest={(request) =>
+          request.url === 'about:blank' || request.url.startsWith('data:')
+        }
         onMessage={(event) => {
           const page = pageEventOf(event.nativeEvent.data)
           if (page?.kind === 'loaded') {
-            setLoaded(true)
+            setLoaded((count) => count + 1)
           } else if (page?.kind === 'ready') {
             setHeight(page.height)
           } else if (page?.kind === 'artFailed') {

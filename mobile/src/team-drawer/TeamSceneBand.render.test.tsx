@@ -121,6 +121,42 @@ describe('the Team sheet scene band', () => {
     expect(messages()[2]).toMatchObject({ input: { members: [{ activity: 'needsYou' }] } })
   })
 
+  it('hands the stage and team again when the page reloads, as after its renderer was killed', () => {
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+      />
+    )
+    send({ kind: 'loaded' })
+    send({ kind: 'loaded' })
+    expect(messages().map((one) => one.kind)).toEqual(['stage', 'input', 'stage', 'input'])
+  })
+
+  it('lets the inline page load from a data URL, as Android serves it, and nothing else', () => {
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+      />
+    )
+    const allow = (url: string) =>
+      (
+        webview.props as unknown as {
+          onShouldStartLoadWithRequest: (request: { url: string }) => boolean
+        }
+      ).onShouldStartLoadWithRequest({ url })
+    expect(allow('about:blank')).toBe(true)
+    expect(allow('data:text/html;base64,PGh0bWw+')).toBe(true)
+    expect(allow('https://example.com')).toBe(false)
+  })
+
   it('draws the fallback stage when the art does not load', () => {
     const scene: Band = {
       ...officeBand,
