@@ -16583,6 +16583,9 @@
         "queue": "Cola {{count}}, próximo {{pr}}",
         "working": "{{count}} trabajando"
       }
+    },
+    "building": {
+      "resize": "Cambiar el alto del edificio"
     }
   },
   "claudeDeadHooks": {

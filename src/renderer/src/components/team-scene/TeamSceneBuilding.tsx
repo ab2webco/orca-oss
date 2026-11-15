@@ -21,6 +21,10 @@ import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { teamSceneLabel } from './team-scene-copy'
 import { useTeamBuildingScroll, useTeamFloorViews } from './use-team-building-scroll'
 import { useTeamSceneRideLegs } from './use-team-scene-ride-legs'
+import { teamSceneWhoOf } from './team-scene-who'
+import type { TeamSceneWho } from './team-scene-hit'
+import { TeamBuildingResizeHandle } from './TeamBuildingResizeHandle'
+import { teamBuildingHeightOf, useTeamBuildingHeight } from './use-team-building-height'
 import type { TeamScenePainter } from './team-scene-painter'
 
 export type TeamSceneBuildingModel = Pick<
@@ -119,7 +123,8 @@ function FloorStage({
   aboveView,
   onAskers,
   fromAbove,
-  floorRef
+  floorRef,
+  who
 }: Props & {
   floor: TeamSceneFloor
   zoomed: boolean
@@ -132,6 +137,7 @@ function FloorStage({
   /** The floor above's asker boxes, in this floor's stage: its rising bubbles keep off them. */
   fromAbove: readonly TeamSceneRect[]
   floorRef: (el: HTMLElement | null) => void
+  who: ReadonlyMap<string, TeamSceneWho>
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
   const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
@@ -196,6 +202,7 @@ function FloorStage({
           visibleTop={zoomed ? 0 : Math.max(0, cropTop + aboveView)}
           onAskers={(boxes) => onAskers(floor.key, boxes)}
           extraObstacles={obstacles}
+          members={who}
         />
       </div>
       {/* Why a deeper night each storey up: the same skyline seen from higher reads as another floor. */}
@@ -231,6 +238,12 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   // Why the lead's at the bottom: floor 1 is where the lead stands, the others above it.
   // Why every floor: an owner with five machines saw three and a fold; the building scrolls instead.
   const shown = zoomed ? [zoomed] : floors.toReversed()
+  const who = useMemo(() => teamSceneWhoOf(props.model.members), [props.model.members])
+  // Why a handle: past three floors the building scrolled, and the owner could not see it all.
+  const row = STRIP.height + STRIP.slab
+  const bounds = { min: Math.min(VIEW_FLOORS, shown.length) * row, max: shown.length * row }
+  const [wanted, setWanted] = useTeamBuildingHeight()
+  const viewHeight = teamBuildingHeightOf(wanted, bounds)
   const [askers, setAskers] = useState<Record<string, TeamSceneRect[]>>({})
   const [scrollTop, setScrollTop] = useState(0)
   const onAskers = useCallback(
@@ -326,7 +339,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
         data-team-floors-scroll=""
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         className="scrollbar-sleek flex min-w-0 overflow-y-auto"
-        style={zoomed ? undefined : { maxHeight: VIEW_FLOORS * (STRIP.height + STRIP.slab) }}
+        style={zoomed ? undefined : { maxHeight: viewHeight }}
       >
         <div className="min-w-0 flex-1">
           {shown.map((floor, index) => (
@@ -342,6 +355,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               onAskers={onAskers}
               fromAbove={fromAboveOf(index)}
               floorRef={views.register(floor.key)}
+              who={who}
             />
           ))}
         </div>
@@ -354,6 +368,15 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
           leadFloor={leadFloor}
         />
       </div>
+      {!zoomed && bounds.max > bounds.min ? (
+        <TeamBuildingResizeHandle
+          height={viewHeight}
+          min={bounds.min}
+          max={bounds.max}
+          step={row}
+          onResize={setWanted}
+        />
+      ) : null}
     </div>
   )
 }

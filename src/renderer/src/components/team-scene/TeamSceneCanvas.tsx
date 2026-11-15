@@ -14,11 +14,19 @@ import {
   teamSceneGuestAttends
 } from '../../../../shared/team-scene/team-scene-elevator'
 import { teamSceneLeadAttends } from '../../../../shared/team-scene/team-scene-lead-rounds'
-import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
+import type { TeamSceneActor, TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { teamSceneLabel } from './team-scene-copy'
 import { createTeamSceneFrameLoop } from './team-scene-frame-loop'
 import { TeamSceneBubbles, type TeamSceneSpeech } from './TeamSceneBubbles'
+import {
+  drawTeamSceneHighlight,
+  teamSceneActorBox,
+  useTeamSceneHover,
+  type TeamSceneWho
+} from './team-scene-hit'
+import { useTeamSceneStatusColors } from './team-scene-status-colors'
+import { useTeamScenePointer } from './use-team-scene-pointer'
 import type { TeamSceneRect } from './team-scene-bubble-layout'
 import type { TeamScenePainter } from './team-scene-painter'
 
@@ -39,6 +47,8 @@ type Props = {
   onAskers?: (boxes: TeamSceneRect[]) => void
   /** Boxes from outside the stage its bubbles must not cover, as the floor above's askers. */
   extraObstacles?: readonly TeamSceneRect[]
+  /** Members the pointer can light and open, by pane key; absent, the stage is a plain image. */
+  members?: ReadonlyMap<string, TeamSceneWho>
 }
 
 // Why: the advisor's line fades on a timer; without frames the timer is the wall clock.
@@ -60,6 +70,9 @@ const TAG_HALF = 28
 const MARK_R = 9
 // How far a speaker moves before its bubble follows.
 const ANCHOR_STEP_PX = 4
+// A lit member's label: its widest, inside the stage, and its two lines' height.
+const WHO_MAX = 220
+const WHO_HEIGHT = 40
 
 export function TeamSceneCanvas({
   input,
@@ -70,7 +83,8 @@ export function TeamSceneCanvas({
   crop,
   visibleTop,
   onAskers,
-  extraObstacles = NO_RECTS
+  extraObstacles = NO_RECTS,
+  members
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<TeamSceneWorld | null>(null)
@@ -82,7 +96,12 @@ export function TeamSceneCanvas({
     askers: TeamSceneAsker[]
     /** The lead stands by a member who asks, under that member's tag. */
     leadAttends: boolean
-  }>({ width: 0, advisor: null, anchors: new Map(), askers: [], leadAttends: false })
+    /** The member lit from the stage or the Team list, where its label hangs. */
+    lit: { key: string; x: number; top: number } | null
+  }>({ width: 0, advisor: null, anchors: new Map(), askers: [], leadAttends: false, lit: null })
+  const actorsRef = useRef<TeamSceneActor[]>([])
+  const colors = useTeamSceneStatusColors()
+  const pointer = useTeamScenePointer({ canvasRef, actorsRef, painter, members })
   const speakersKeyRef = useRef('')
   const tagRefs = useRef(new Map<string, HTMLSpanElement>())
   const [tags, setTags] = useState<TeamSceneRect[]>([])
@@ -123,6 +142,15 @@ export function TeamSceneCanvas({
       }
       g.setTransform(ratio, 0, 0, ratio, 0, 0)
       const actors = teamSceneActors(world)
+      actorsRef.current = actors
+      const litKey = members ? useTeamSceneHover.getState().key : null
+      const litActor = actors.find((a) => a.role === 'member' && a.key === litKey)
+      const litBox = litActor ? teamSceneActorBox(litActor, painter, width, height) : null
+      const lit = litBox && {
+        key: litKey!,
+        x: Math.round(litBox.left + litBox.width / 2),
+        top: Math.round(litBox.top)
+      }
       const advisor = advisorLineShown(world)
       const anchors = new Map(
         actors
@@ -156,10 +184,10 @@ export function TeamSceneCanvas({
       // so a walking lead's bubble follows it without a render every frame.
       const key = `${width}|${advisor}|${leadAttends}|${[...anchors]
         .map(([k, a]) => `${k}:${Math.round(a.x / ANCHOR_STEP_PX)}`)
-        .join()}|${askers.map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`).join()}`
+        .join()}|${askers.map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`).join()}|${lit ? `${lit.key}:${Math.round(lit.x / ANCHOR_STEP_PX)}:${lit.top}` : ''}`
       if (key !== speakersKeyRef.current) {
         speakersKeyRef.current = key
-        setSpeakers({ width, advisor, anchors, askers, leadAttends })
+        setSpeakers({ width, advisor, anchors, askers, leadAttends, lit })
       }
       painter.paint(g, {
         width,
@@ -176,8 +204,17 @@ export function TeamSceneCanvas({
         trophies: world.trophies,
         stopped: world.stopped
       })
+      if (litBox) {
+        drawTeamSceneHighlight(g, litBox, colors.working)
+      }
     },
-    [painter]
+    [painter, members, colors]
+  )
+
+  // Why: under reduced motion no frame runs, so a member lit from the Team list repaints here.
+  useEffect(
+    () => (reducedMotion && members ? useTeamSceneHover.subscribe(() => paint(0)) : undefined),
+    [reducedMotion, members, paint]
   )
 
   useEffect(() => {
@@ -271,6 +308,9 @@ export function TeamSceneCanvas({
     }
   }, [speakers])
 
+  const { lit } = speakers
+  const litWho = lit ? members?.get(lit.key) : undefined
+  const whoMax = Math.min(WHO_MAX, speakers.width - 8)
   const speeches: TeamSceneSpeech[] = []
   // Why the advisor first: it keeps its spot, and the lead's bubble climbs above it on a clash.
   const advisorAnchor = speakers.anchors.get('advisor')
@@ -339,6 +379,35 @@ export function TeamSceneCanvas({
           {asker.name}
         </span>
       ))}
+      {pointer ? (
+        <div
+          data-team-scene-hit=""
+          aria-hidden="true"
+          // Why its own layer: a building floor's view takes no pointer, and only its strip shows.
+          className="pointer-events-auto absolute inset-x-0"
+          style={{
+            top: crop?.top ?? 0,
+            height: painter.height - (crop?.top ?? 0) - (crop?.bottom ?? 0),
+            cursor: pointer.over ? 'pointer' : undefined
+          }}
+          {...pointer.handlers}
+        />
+      ) : null}
+      {lit && litWho ? (
+        <span
+          data-scene-who={lit.key}
+          aria-hidden="true"
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md bg-foreground px-2 py-1 text-[11px] leading-4 text-background shadow-sm"
+          style={{
+            maxWidth: whoMax,
+            left: Math.min(Math.max(lit.x, whoMax / 2 + 4), speakers.width - whoMax / 2 - 4),
+            top: Math.max(lit.top - 4, (crop?.top ?? 0) + WHO_HEIGHT)
+          }}
+        >
+          <span className="block truncate font-medium">{litWho.title}</span>
+          <span className="block truncate opacity-80">{litWho.detail}</span>
+        </span>
+      ) : null}
       <TeamSceneBubbles
         speeches={speeches}
         width={speakers.width}
