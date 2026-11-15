@@ -287,6 +287,9 @@ export type SceneAdvisor = {
 
 export type SceneCast = { pet?: ScenePet; advisor?: SceneAdvisor }
 
+/** A hand prop drawn facing right, like a cast frame; Quest's is the game's own `'sword'`. */
+export type SceneProp = 'sword' | { rows: CastFrame; colors: Readonly<Record<string, number>> }
+
 export type SceneDefinition = {
   id: string
   looks: Readonly<Record<ScenePhase, Look>>
@@ -301,6 +304,8 @@ export type SceneDefinition = {
   hud?: HudPalette
   /** The pet and Jev's advisor; either left out keeps Clawd or the referee. */
   cast?: SceneCast
+  /** What the hero holds in the panel's Pixel style; left out, nothing. */
+  prop?: SceneProp
   /** Names Orca gives a lead's members, in order. */
   roster?: readonly LocalizedName[]
   /** The roster entries drawn in their own look; every other member wears the phase costume. */
@@ -309,16 +314,7 @@ export type SceneDefinition = {
   themes?: readonly SceneTheme[]
 }
 
-export type LookColor =
-  | 'skyTop'
-  | 'skyBottom'
-  | 'sun'
-  | 'far'
-  | 'snow'
-  | 'near'
-  | 'ground'
-  | 'plant'
-  | 'cloud'
+export type LookColor = Exclude<keyof Look, 'isNight' | 'plantKind' | 'scenery' | 'isSignal'>
 
 /** Colors mixed into every phase's look, `weight` of the way from the look's own. */
 export type SceneTheme = {

@@ -3,13 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { STATUS_TONES } from '@/components/status-tone'
-import {
-  STATUS_COLOR_BACKGROUND,
-  STATUS_COLOR_DEFAULTS,
-  applyStatusColorOverrides,
-  buildStatusColorCss,
-  statusColorWarning
-} from './status-color-overrides'
+import { STATUS_COLOR_BACKGROUND, STATUS_COLOR_DEFAULTS } from '../../../shared/status-colors'
+import { applyStatusColorOverrides, buildStatusColorCss } from './status-color-overrides'
 
 const css = readFileSync(join(__dirname, '../assets/main.css'), 'utf8')
 const BLOCKS = {
@@ -63,30 +58,5 @@ describe('applyStatusColorOverrides', () => {
 
     applyStatusColorOverrides({})
     expect(document.head.querySelector('style#orca-status-colors')).toBeNull()
-  })
-})
-
-describe('statusColorWarning', () => {
-  const dark = STATUS_COLOR_DEFAULTS.dark
-
-  it('stays quiet for the defaults', () => {
-    for (const tone of STATUS_TONES) {
-      expect(statusColorWarning(tone, dark, STATUS_COLOR_BACKGROUND.dark), tone).toBeNull()
-    }
-  })
-
-  it('names the tone a colour is too close to', () => {
-    const palette = { ...dark, warning: '#ff6a6a' }
-    expect(statusColorWarning('warning', palette, STATUS_COLOR_BACKGROUND.dark)).toEqual({
-      kind: 'close',
-      other: 'attention'
-    })
-  })
-
-  it('flags a colour that cannot be read on the background', () => {
-    const palette = { ...dark, info: '#1a1a2a' }
-    expect(statusColorWarning('info', palette, STATUS_COLOR_BACKGROUND.dark)).toEqual({
-      kind: 'contrast'
-    })
   })
 })

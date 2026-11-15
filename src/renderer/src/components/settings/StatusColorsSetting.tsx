@@ -1,18 +1,18 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { StatusColorTheme } from '../../../../shared/status-colors'
+import {
+  STATUS_COLOR_BACKGROUND,
+  STATUS_COLOR_DEFAULTS,
+  statusColorWarning,
+  type StatusColorTheme
+} from '../../../../shared/status-colors'
 import { STATUS_TONES, type StatusTone } from '@/components/status-tone'
 import { Button } from '../ui/button'
 import { SettingsSegmentedControl } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { resolveDocumentTheme } from '@/lib/document-theme'
-import {
-  STATUS_COLOR_BACKGROUND,
-  STATUS_COLOR_DEFAULTS,
-  applyStatusColorOverrides,
-  statusColorWarning
-} from '@/lib/status-color-overrides'
+import { applyStatusColorOverrides } from '@/lib/status-color-overrides'
 
 type Props = {
   settings: GlobalSettings
