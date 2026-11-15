@@ -67,7 +67,10 @@ export type TeamSceneEvent =
   | { kind: 'ciGreen'; key: string }
   | { kind: 'advisorSpoke'; line: string }
   /** Jev decided in `key`'s pane ('lead' for the lead); the advisor walks over and gestures. */
-  | { kind: 'judged'; key: string; gesture: TeamSceneGesture }
+  | { kind: 'judged'; key: string; gesture: TeamSceneGesture; tone: TeamSceneVerdictTone }
+
+/** A Jev decision's colour: allow, ask and deny as the card draws them; note for advice alone. */
+export type TeamSceneVerdictTone = 'allow' | 'ask' | 'deny' | 'note'
 
 /** What the advisor shows for a Jev decision, as the game's gestures name them. */
 export type TeamSceneGesture =
@@ -138,6 +141,8 @@ export type TeamSceneActor = {
 /** One-shot moments a style may draw particles or a thrown item for. */
 export type TeamSceneEffect =
   | { kind: 'handoff'; from: string; to: string }
+  /** Jev's decision on `to`, sent from the advisor to that member's desk (ORCA-1218). */
+  | { kind: 'verdict'; to: string; tone: TeamSceneVerdictTone }
   /** A member's CI just turned green; a style with monitors flashes that one. */
   | { kind: 'ciGreen'; key: string }
   | {

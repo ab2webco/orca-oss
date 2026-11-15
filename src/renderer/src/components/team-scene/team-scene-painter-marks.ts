@@ -148,8 +148,9 @@ export function createSceneEffects(feetY: (depth: number, h: number) => number):
   let sparks: Spark[] = []
   const startOne = (effect: TeamSceneEffect, actors: TeamSceneActor[], h: number): void => {
     const find = (key: string) => actors.find((a) => a.key === key)
-    // Why skip: only a style with monitors draws CI turning green, on that member's screen.
-    if (effect.kind === 'ciGreen') {
+    // Why skip: only a style with monitors draws CI turning green, on that member's screen; Jev's
+    // tokens fly in their own layer (team-scene-verdict-flights).
+    if (effect.kind === 'ciGreen' || effect.kind === 'verdict') {
       return
     }
     if (effect.kind === 'handoff') {

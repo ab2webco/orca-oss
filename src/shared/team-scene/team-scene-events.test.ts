@@ -73,28 +73,41 @@ describe('teamSceneEventsBetween', () => {
     ])
     // Only the newest of a burst: the advisor walks once per poll, not three times.
     expect(teamSceneEventsBetween(prev, next)).toEqual([
-      { kind: 'judged', key: 'a', gesture: 'ciFailed' }
+      { kind: 'judged', key: 'a', gesture: 'ciFailed', tone: 'ask' }
     ])
     expect(teamSceneEventsBetween(next, next)).toEqual([])
     const denied = input([
       member('a', { decisions: [decision('d1', 'allow'), decision('d4', 'deny')] })
     ])
     expect(teamSceneEventsBetween(prev, denied)).toEqual([
-      { kind: 'judged', key: 'a', gesture: 'escalated' }
+      { kind: 'judged', key: 'a', gesture: 'escalated', tone: 'deny' }
     ])
     const leadJudged = {
       ...input([]),
       lead: { ...input([]).lead, decisions: [decision('l1', 'ask')] }
     }
     expect(teamSceneEventsBetween(input([]), leadJudged)).toEqual([
-      { kind: 'judged', key: 'lead', gesture: 'unsure' }
+      { kind: 'judged', key: 'lead', gesture: 'unsure', tone: 'ask' }
     ])
     expect(
       teamSceneEventsBetween(
         input([member('b')]),
         input([member('b', { decisions: [decision('x', 'allow')] })])
       )
-    ).toEqual([{ kind: 'judged', key: 'b', gesture: 'approved' }])
+    ).toEqual([{ kind: 'judged', key: 'b', gesture: 'approved', tone: 'allow' }])
+  })
+
+  // ORCA-1218: the token carries the card's colour, by verdict, else by the gesture's meaning.
+  it('colours a decision by its verdict, else by its gesture, else as advice', () => {
+    const judgedTone = (verdict: string, gesture: string | null) =>
+      teamSceneEventsBetween(
+        input([member('a')]),
+        input([member('a', { decisions: [{ id: 'x', verdict, gesture }] })])
+      )[0]
+    expect(judgedTone('deny', 'approved')).toMatchObject({ gesture: 'approved', tone: 'deny' })
+    expect(judgedTone('other', 'stopped')).toMatchObject({ tone: 'deny' })
+    expect(judgedTone('other', 'ciPassed')).toMatchObject({ tone: 'allow' })
+    expect(judgedTone('other', 'consulting')).toMatchObject({ tone: 'note' })
   })
 
   it('lets the advisor speak only when its line changes', () => {

@@ -15,8 +15,10 @@ import {
   type TeamSceneRounds
 } from './team-scene-lead-rounds'
 import {
+  ADVISOR_SPOT,
   createAdvisorWalk,
   queueJudgment,
+  throwVerdict,
   stepAdvisorWalk,
   type TeamSceneAdvisorWalk,
   syncAdvisorBody
@@ -52,8 +54,6 @@ import {
   callNextVisitor
 } from './team-scene-visits'
 
-// Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
-const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
 const CHEER_SECONDS = 2.2
 const CHECK_SECONDS = 1.2
 const ADVISOR_RAISE_SECONDS = 1.4
@@ -244,6 +244,7 @@ export function applyTeamSceneInput(
       world.advisorRaiseUntil = world.t + ADVISOR_RAISE_SECONDS
     } else if (event.kind === 'judged') {
       queueJudgment(world, event.key, event.gesture)
+      throwVerdict(world, event.key, event.tone)
     }
   }
   world.overflow = plan.overflow

@@ -2,7 +2,8 @@ import type {
   TeamSceneAgentInput,
   TeamSceneEvent,
   TeamSceneGesture,
-  TeamSceneInput
+  TeamSceneInput,
+  TeamSceneVerdictTone
 } from './team-scene-types'
 
 type Decision = NonNullable<TeamSceneAgentInput['decisions']>[number]
@@ -31,6 +32,20 @@ const gestureOf = (decision: Decision): TeamSceneGesture =>
   decision.gesture && GESTURES.has(decision.gesture)
     ? (decision.gesture as TeamSceneGesture)
     : (VERDICT_GESTURE[decision.verdict] ?? 'advised')
+
+const GESTURE_TONE: Partial<Record<TeamSceneGesture, TeamSceneVerdictTone>> = {
+  approved: 'allow',
+  ciPassed: 'allow',
+  unsure: 'ask',
+  escalated: 'deny',
+  stopped: 'deny',
+  ciFailed: 'deny'
+}
+
+const toneOf = (decision: Decision): TeamSceneVerdictTone =>
+  decision.verdict === 'allow' || decision.verdict === 'ask' || decision.verdict === 'deny'
+    ? decision.verdict
+    : (GESTURE_TONE[gestureOf(decision)] ?? 'note')
 
 // Why only the newest: the decisions ride a 30 s poll, so several arrive at once.
 function newestDecisionOf(
@@ -91,7 +106,7 @@ export function teamSceneEventsBetween(
   for (const [key, now, then] of panes) {
     const judged = newestDecisionOf(now, then)
     if (judged) {
-      events.push({ kind: 'judged', key, gesture: gestureOf(judged) })
+      events.push({ kind: 'judged', key, gesture: gestureOf(judged), tone: toneOf(judged) })
     }
   }
   const line = next.advisor?.line ?? null

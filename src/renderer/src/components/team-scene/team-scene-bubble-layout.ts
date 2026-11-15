@@ -212,11 +212,14 @@ function besideOf(
       }
     }
   }
-  const secondLeft = Math.min(second.x - second.box.width / 2, width - EDGE - second.box.width)
+  const maxSecondLeft = width - EDGE - second.box.width
+  const centred = Math.min(second.x - second.box.width / 2, maxSecondLeft)
   const firstLeft = Math.max(
     EDGE,
-    Math.min(first.x - first.box.width / 2, secondLeft - GAP - first.box.width)
+    Math.min(first.x - first.box.width / 2, centred - GAP - first.box.width)
   )
+  // Why slid right: with its speaker just right of the first one's, a centred cloud left no room (ORCA-1218).
+  const secondLeft = Math.min(maxSecondLeft, Math.max(centred, firstLeft + first.box.width + GAP))
   if (firstLeft + first.box.width + GAP > secondLeft || secondLeft < EDGE) {
     return null
   }

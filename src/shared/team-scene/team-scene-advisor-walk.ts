@@ -1,7 +1,22 @@
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneArrived as near } from './team-scene-motion'
 import { ELEVATOR_X, stepAdvisorLeaving } from './team-scene-elevator'
-import type { TeamSceneGesture, TeamSceneInput, TeamSceneSpot } from './team-scene-types'
+import { LEAD_SPOT } from './team-scene-lead-rounds'
+import type {
+  TeamSceneGesture,
+  TeamSceneInput,
+  TeamSceneSpot,
+  TeamSceneVerdictTone
+} from './team-scene-types'
+
+// Why left of the lead: its bubble hangs leftward, leaving the column above the lead free.
+export const ADVISOR_SPOT: TeamSceneSpot = { x: 0.74, depth: 0.15 }
+// Why px: at a narrow panel a tenth of the stage is less than a body, and Jev stood on the lead.
+const LEAD_CLEAR_PX = 34
+// Its idle: look over the desks, step toward them, back, glance at the board (ORCA-1218).
+const IDLE_SECONDS = 2.6
+const PACE_PX = 10
+const THROW_RAISE_SECONDS = 0.8
 
 // How long the advisor holds a gesture beside the pane Jev judged.
 const GESTURE_SECONDS = 2.4
@@ -39,6 +54,39 @@ export const createAdvisorWalk = (): TeamSceneAdvisorWalk => ({
   gesture: null,
   at: 0
 })
+
+/** Jev's home at this width: its spot, or further left, a body clear of the lead's. */
+export const advisorHomeAt = (width: number): TeamSceneSpot => ({
+  x: Math.min(ADVISOR_SPOT.x, LEAD_SPOT.x - LEAD_CLEAR_PX / Math.max(1, width)),
+  depth: ADVISOR_SPOT.depth
+})
+
+/**
+ * Sends Jev's decision to the judged member's desk at once, as the advisor raises its hand toward
+ * it: its walk over takes seconds, and the owner saw a Jev that never moved (ORCA-1218).
+ */
+export function throwVerdict(world: TeamSceneWorld, key: string, tone: TeamSceneVerdictTone): void {
+  const advisor = world.bodies.get('advisor')
+  const target = world.bodies.get(key)
+  if (!advisor || advisor.hidden || !target || target.role !== 'member') {
+    return
+  }
+  world.effects.push({ kind: 'verdict', to: key, tone })
+  world.advisorRaiseUntil = Math.max(world.advisorRaiseUntil, world.t + THROW_RAISE_SECONDS)
+  if (world.advisorWalk.stage === 'home') {
+    advisor.facing = target.x < advisor.x ? -1 : 1
+  }
+}
+
+// Where an idle advisor stands this beat, and which way it looks once there.
+function idleBeatOf(world: TeamSceneWorld, advisor: TeamSceneBody, width: number) {
+  const beat = Math.floor(world.t / IDLE_SECONDS) % 4
+  const x = beat === 1 ? advisor.home.x - PACE_PX / Math.max(1, width) : advisor.home.x
+  return {
+    spot: { x, depth: advisor.home.depth },
+    facing: beat === 3 ? (1 as const) : (-1 as const)
+  }
+}
 
 export function queueJudgment(world: TeamSceneWorld, key: string, gesture: TeamSceneGesture): void {
   if (!world.bodies.has('advisor')) {
@@ -110,7 +158,18 @@ export function stepAdvisorWalk(world: TeamSceneWorld, width: number): void {
   }
   const target = walk.key ? world.bodies.get(walk.key) : undefined
   if (walk.stage === 'home') {
-    advisor.target = advisor.home
+    const home = advisorHomeAt(width)
+    // Why carried, not walked: a new width moves the stage under it, and a walk crossed the lead;
+    // one just out of the elevator walks home as before.
+    if (Math.abs(advisor.x - advisor.home.x) * width <= PACE_PX + 2) {
+      advisor.x += home.x - advisor.home.x
+    }
+    advisor.home = home
+    const idle = idleBeatOf(world, advisor, width)
+    advisor.target = idle.spot
+    if (near(advisor, width) && world.t >= world.advisorRaiseUntil) {
+      advisor.facing = idle.facing
+    }
     const ready = near(advisor, width) && !isLeadPassing(world, advisor)
     const next = ready ? walk.queue.shift() : undefined
     if (next && world.bodies.has(next.key)) {
