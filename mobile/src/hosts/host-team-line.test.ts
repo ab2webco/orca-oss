@@ -42,6 +42,15 @@ describe('hostTeamLineOf', () => {
     ).toEqual({ members: 4, working: 2, needsYou: 1 })
   })
 
+  // Why: the host lists the lead's own pane among its agents, even an idle lead it never heard from.
+  it("leaves the lead's own row out of the members", () => {
+    expect(
+      hostTeamLineOf([
+        lead([agent('Lead', 'working', { isLeader: true }), agent('Arquera', 'waiting')])
+      ])
+    ).toEqual({ members: 1, working: 0, needsYou: 1 })
+  })
+
   it('has no line when no state is a live lead with a team', () => {
     expect(hostTeamLineOf([])).toBeNull()
     expect(hostTeamLineOf([{ role: 'member' }])).toBeNull()

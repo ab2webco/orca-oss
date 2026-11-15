@@ -2,7 +2,10 @@ import type { WebSocket } from 'ws'
 import {
   DESKTOP_PROTOCOL_VERSION,
   MIN_COMPATIBLE_MOBILE_VERSION,
-  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY
+  MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY
 } from '../../src/shared/protocol-version'
 import {
   applyTerminalQuickCommandMutation,
@@ -13,6 +16,9 @@ import { handleMockFilePreviewRequest } from './mock-server-file-preview-data'
 import { handleMockGameTeamRequest } from './mock-server-game-team'
 import { handleMockGitRequest } from './mock-server-git-state'
 import { handleMockAccountRequest } from './mock-server-account-rpc'
+import { handleMockSettingsRequest } from './mock-server-agent-teams-settings'
+import { handleMockLeadSessionRequest } from './mock-server-lead-sessions'
+import { handleMockTeamSceneRequest } from './mock-server-team-scene'
 import { handleMockNativeChatRequest } from './mock-server-native-chat-scenario'
 import { handleMockNotificationRequest } from './mock-server-notifications'
 import { handleMockSessionTabsRequest } from './mock-server-session-tabs-fixture'
@@ -27,6 +33,17 @@ import { createMockRepos, createMockWorktrees, readScenarioNumber } from './mobi
 const MOCK_REPO_COUNT = readScenarioNumber('MOCK_REPO_COUNT', 2)
 const MOCK_WORKTREE_COUNT = readScenarioNumber('MOCK_WORKTREE_COUNT', 2)
 const MOCK_RPC_DELAY_MS = readScenarioNumber('MOCK_RPC_DELAY_MS', 0)
+
+// MOCK_NO_TEAM_CONTROL=1 plays a host older than the phone's Agent Teams controls.
+const mobileTeamCapabilities = () =>
+  process.env.MOCK_NO_TEAM_CONTROL
+    ? []
+    : [
+        MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+        MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
+        MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
+        MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY
+      ]
 
 const FAKE_REPOS = isShowcaseScenario ? SHOWCASE_REPOS : createMockRepos(MOCK_REPO_COUNT)
 let fakeWorktrees = isShowcaseScenario
@@ -141,6 +158,11 @@ export function handleRequest(
     handleMockNativeChatRequest(request, respond, success, error, ws) ||
     handleMockSessionTabsRequest(request, respond, success, terminalListWorktreeId) ||
     handleMockNotificationRequest(request, respond, success, ws) ||
+    handleMockSettingsRequest(request, respond, success) ||
+    handleMockLeadSessionRequest(request, respond, success, () =>
+      terminalListWorktreeId(undefined)
+    ) ||
+    handleMockTeamSceneRequest(request, respond, success, error) ||
     handleMockGameTeamRequest(request, respond, success, () => terminalListWorktreeId(undefined)) ||
     handleMockTerminalRequest(request, respond, success, ws, terminalListWorktreeId)
   ) {
@@ -154,7 +176,7 @@ export function handleRequest(
           runtimeId: 'mock-runtime',
           protocolVersion: DESKTOP_PROTOCOL_VERSION,
           minCompatibleMobileVersion: MIN_COMPATIBLE_MOBILE_VERSION,
-          capabilities: ['accounts.codex-reset-credit.v1', MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY],
+          capabilities: ['accounts.codex-reset-credit.v1', ...mobileTeamCapabilities()],
           graphStatus: 'ready',
           windowCount: 1,
           tabCount: 2,
@@ -175,18 +197,6 @@ export function handleRequest(
 
     case 'repo.list':
       respond(success(request.id, { repos: FAKE_REPOS }))
-      break
-
-    case 'settings.get':
-      respond(
-        success(request.id, {
-          settings: {
-            defaultTuiAgent: 'codex',
-            disabledTuiAgents: [],
-            agentCmdOverrides: {}
-          }
-        })
-      )
       break
 
     case 'settings.getTerminalQuickCommands':
