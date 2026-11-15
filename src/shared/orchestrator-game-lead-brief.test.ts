@@ -200,9 +200,13 @@ describe('gameLeadBriefOf', () => {
     )
 
     expect(brief).toContain('You are the lead of cineco ("orquestador")')
-    expect(brief.trimEnd().endsWith('## Project rules\n\nMembers report TERMINADO CIN-NNN.')).toBe(
-      true
-    )
+    expect(
+      brief
+        .trimEnd()
+        .endsWith(
+          '## Project rules\n\nWhere these differ from the rules above, these win.\n\nMembers report TERMINADO CIN-NNN.'
+        )
+    ).toBe(true)
   })
 
   it('names the account tools, lets the person pick an agent or account per ticket, and handles a limited member', () => {
@@ -318,5 +322,68 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('An idle member with no PR in flight is a lead failure')
     expect(brief).toContain('Finish before starting')
     expect(brief).toContain('new launches only fill slots freed by merged work')
+  })
+
+  // Why: the 2026-11-14 lead audits (ORCA-1214); each line is a lesson the owner had to point out.
+  describe('the 2026-11-14 audit lessons', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    it('arms and re-arms its watches on every start, resume or compaction', () => {
+      expect(brief).toContain(
+        'On every start, resume or compaction, without being asked, arm the report wait'
+      )
+      expect(brief).toContain('re-arm it each time')
+      expect(brief).toContain(
+        'also read `orca game fleet` and `orca game sweep` and act on what changed'
+      )
+    })
+
+    it('settles each gone-from-host row and never mails a gone session', () => {
+      expect(brief).toContain('Read the NEXT column of every row before you give any status')
+      expect(brief).toContain('A `gone from <host>` row is a lost session: settle it at once')
+      expect(brief).toContain('`orca worktree list --environment <host>`')
+      expect(brief).toContain('Never mail work to a member whose session is gone')
+    })
+
+    it('drives a verified PR to merge and cleans up in the same turn', () => {
+      expect(brief).toContain('A verified PR is not done until it merges')
+      expect(brief).toContain('drop from the merge queue, red queue run or entry stuck')
+      expect(brief).toContain('After each merge, in the same turn')
+      expect(brief).toContain('Act on every sweep line')
+      expect(brief).toContain('are yours to close, not to report')
+    })
+
+    it('plans lanes by file overlap and asks for a split plan before a big first commit', () => {
+      expect(brief).toContain('list the files each will touch, docs and locale files included')
+      expect(brief).toContain('ask its member for a split plan')
+      expect(brief).toContain('a ticket moves to In Progress only when a member starts it')
+    })
+
+    it('places on a free paired host and reports refused --on once', () => {
+      expect(brief).toContain('when this one is full or busy and a paired')
+      expect(brief).toContain(
+        'If every `--on` is refused, tell the person once, quoting the refusal'
+      )
+    })
+
+    it('gives an idle member on red CI its next step and checks config sources first', () => {
+      expect(brief).toContain('A member idle on red CI gets its next step from you at once')
+      expect(brief).toContain('may be a local copy git does not track (skip-worktree)')
+    })
+
+    it('names no project, host or account', () => {
+      expect(brief).not.toMatch(/orca-oss|ORCA-\d|~\/orca|lead-watch/)
+    })
+  })
+
+  it('prints project rules last and unchanged, winning where they contradict a default', () => {
+    const rules = 'Launch every ticket on this host only, even when a paired host has room.'
+    const brief = gameLeadBriefOf({ ...DEFAULT_GAME_LEAD, rules }, 'cineco')
+
+    expect(brief).toContain('when this one is full or busy and a paired')
+    expect(brief).toContain(
+      '## Project rules\n\nWhere these differ from the rules above, these win.'
+    )
+    expect(brief.endsWith(`${rules}\n`)).toBe(true)
   })
 })

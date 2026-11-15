@@ -923,6 +923,26 @@ state the bar:
 - **Finish before starting.** The lead drives each member to merge before it launches another ticket;
   new launches only fill slots freed by merged work. The lead removes a merged member's worktree and
   branch right away, so no unfinished or merged workspaces pile up.
+- **Watches.** On every start, resume or compaction the lead arms its report wait without being
+  asked, re-arms it when it returns or expires, and reads `game fleet` and `game sweep` each time.
+  After a compaction the lead's context says to re-arm it.
+- **Lost sessions.** A `gone from <host>` row in `game fleet` is settled at once: the lead compares the
+  host worktree's head with the pushed branch, then closes, merges, or stops and relaunches. It never
+  mails work to a gone session.
+- **Done means merged.** The lead acts on each merge-queue drop, red queue run or stuck entry, and
+  after each merge moves the ticket to done, removes its worktree and branch, and frees the member.
+  It closes every sweep line itself (leftover worktrees, board drift, unverified PRs).
+- **Lanes and placement.** Before parallel lanes the lead lists the files each touches, docs and
+  locales included, and serializes overlaps; it asks a member for a split plan when a ticket looks
+  over 400 lines. It launches on a free paired host when this one is busy, and tells the person once
+  when every `--on` is refused. It checks where config is read (a local, untracked `orca.yaml`, the
+  host registry) before it says a fix is needed.
+- **Members** get the same lessons with their ticket (`GAME_MEMBER_REPORT_RULES` in
+  [`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts)): a split plan before a
+  first commit over about 400 lines, worker_done sent once, and a red CI outside their change named
+  (job, run id, cause, who fixes it) instead of going idle.
+- **Project rules win.** `orchestrator.rules` print after these under `## Project rules`, unchanged,
+  with a line saying they win where they differ.
 
 ### One setup at a time
 

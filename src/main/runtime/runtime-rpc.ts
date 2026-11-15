@@ -381,6 +381,8 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'game.paneAdvisors',
   // The scene band of the panel, gated on the phone by MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY (ORCA-1183).
   'game.sceneArt',
+  // The level bar of the panel, read-only XP, gated on the phone by MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY (ORCA-1197).
+  'game.characters',
   // Plugin panel host, gated on the phone by MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY.
   // Consent, enablement and invokeCommand stay off: those are desktop decisions.
   'plugins.list',

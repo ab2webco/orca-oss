@@ -257,6 +257,86 @@ describe('releasing a remote member that took follow-up work in its worktree', (
     expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
   })
 
+  // Why: the host lost both dispatches, yet the home kept the ready one live and refused forever (ORCA-1196).
+  function hostForgets(...dispatchIds: string[]): void {
+    const sqlite = (
+      workerDb as unknown as { db: { prepare: (sql: string) => { run: (id: string) => void } } }
+    ).db
+    for (const id of dispatchIds) {
+      sqlite.prepare('DELETE FROM remote_dispatch_attachments WHERE dispatch_id = ?').run(id)
+    }
+  }
+
+  async function readyMemberWithFinishedFollowUp() {
+    const run = homeDb.createRun({
+      objective: 'Remote members',
+      coordinatorHandle: 'term_coord',
+      coordinatorPaneKey: 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    })
+    const first = await start(run.id, false)
+    const followUp = await start(run.id, true)
+    await finish(followUp)
+    expect(homeDb.getWorkerDispatch(first)?.state).toBe('ready')
+    return { run, first, followUp }
+  }
+
+  it('frees a member whose ready sibling its host no longer knows', async () => {
+    const { run, first, followUp } = await readyMemberWithFinishedFollowUp()
+    hostForgets(first, followUp)
+
+    const response = await release(followUp)
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        dispatchId: followUp,
+        state: 'released',
+        worktreeDispatches: [{ dispatchId: first, state: 'released' }]
+      }
+    })
+    expect(homeDb.getWorkerDispatch(first)).toMatchObject({ state: 'stopped', stage: 'released' })
+    expect(homeDb.getDispatchContextById(first)?.capability_revoked_at).not.toBeNull()
+    expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+  })
+
+  it('keeps a member whose ready sibling its host still runs', async () => {
+    const { run, first, followUp } = await readyMemberWithFinishedFollowUp()
+    hostForgets(followUp)
+
+    const response = await release(followUp)
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: { state: 'retained', reason: 'not_settled' }
+    })
+    expect(JSON.stringify(response)).toContain(first)
+    expect(homeDb.getWorkerDispatch(first)?.state).toBe('ready')
+    expect(remoteMethods).not.toContain('orchestration.federationRelease')
+    expect(listRemoteGameMemberSources(homeDb, run.id)).toHaveLength(2)
+  })
+
+  it('keeps a member whose sibling start the host never acknowledged, without asking it', async () => {
+    const { first, followUp } = await readyMemberWithFinishedFollowUp()
+    hostForgets(first, followUp)
+    const sqlite = (homeDb as unknown as { db: { prepare: (sql: string) => { run: () => void } } })
+      .db
+    sqlite
+      .prepare(
+        `UPDATE worker_dispatches SET state = 'start_unknown' WHERE dispatch_id = '${first}'`
+      )
+      .run()
+    remoteMethods = []
+
+    const response = await release(followUp)
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: { state: 'retained', reason: 'not_settled' }
+    })
+    expect(homeDb.getWorkerDispatch(first)?.state).toBe('start_unknown')
+    expect(remoteMethods).toEqual([])
+  })
+
   it('touches nothing on the host while a follow-up in that worktree still runs', async () => {
     const { run, first, followUp } = await memberWithFollowUp()
 

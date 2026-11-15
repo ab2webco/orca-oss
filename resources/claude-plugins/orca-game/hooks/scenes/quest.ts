@@ -205,6 +205,7 @@ export const QUEST_SCENE: SceneDefinition = {
   // Orca's built-in roster for the scene; its first name wears a look derived from the name.
   roster: [{ en: 'Arthur', es: 'Arturo' }, ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
+  prop: 'sword',
   cast: {
     // The squire's hound, trotting behind the hero.
     pet: {

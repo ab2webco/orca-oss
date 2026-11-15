@@ -26,6 +26,7 @@ export type {
   SceneDefinition,
   ScenePet,
   ScenePhase,
+  SceneProp,
   SceneTheme,
   Scenery
 } from '../../types'

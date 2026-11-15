@@ -13,6 +13,13 @@ request and report back; the lead relays only what needs you. The **Team** panel
 3. To set up `orca.yaml` (the tracker for the To Do, the lead's rules, the scene), run
    `/orca-game:setup` in a Claude pane of the project.
 
+`orca game lead` prints Orca's built-in rules first. Among them, the lead re-arms its report wait on
+every start, resume or compaction. It settles each member `gone from` its host at once and treats a
+PR as done only once it merges. It plans parallel lanes by the files they touch and asks members for
+a split plan before a large first commit. Members are told to report once and to name a red CI
+instead of going idle. Your project's `orchestratorGame.orchestrator.rules` in `orca.yaml` print
+after them, unchanged, and win wherever they differ: add a rule there, or contradict a built-in one.
+
 A project has one lead. Once it has one, **+** shows a **Team** group instead of a second
 **Claude Agent Teams** entry: **Go to lead** and **Add member…** while the lead runs, **Reopen
 team** and **Start fresh lead…** after you close it. `/orca-game:lead fresh` (`orca game lead
