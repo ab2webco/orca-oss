@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { NOON } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
+import { ADVISOR_SPOT, advisorHomeAt } from '../../../../shared/team-scene/team-scene-advisor-walk'
+import { LEAD_SPOT } from '../../../../shared/team-scene/team-scene-lead-rounds'
 import {
   applyTeamSceneInput,
   createTeamSceneWorld,
@@ -370,6 +372,39 @@ describe('layoutTeamSceneBubbles', () => {
     // A narrowed cloud wraps one more line, and it still clears its speaker's head.
     expect(lead!.height).toBeGreaterThan(41)
     expect(lead!.top + lead!.height).toBeLessThanOrEqual(84)
+  })
+
+  // ORCA-1218: Jev stands a body left of the lead on the 219 px stage, so the lead walks home just
+  // right of it; a cloud centred on that lead left the advisor's no room, and it yielded for seconds.
+  it("keeps the advisor's cloud while the lead walks home just right of Jev on Pixel's 219 px stage", () => {
+    const pixel = STAGES.find((stage) => stage.style === 'pixel')!
+    const top = (depth: number) => pixel.painter.headTop(depth, pixel.painter.height)
+    const home = advisorHomeAt(219).x * 219
+    for (const jev of [home, home - 10]) {
+      for (let lead = jev + 1; lead <= LEAD_SPOT.x * 219; lead += 1) {
+        const boxes = layoutTeamSceneBubbles(
+          [
+            {
+              key: 'advisor',
+              anchor: { x: jev, top: top(ADVISOR_SPOT.depth) },
+              width: 130,
+              height: 41,
+              align: 'end',
+              yields: true
+            },
+            { key: 'lead', anchor: { x: lead, top: top(LEAD_SPOT.depth) }, width: 75, height: 41 }
+          ],
+          { width: 219, height: pixel.painter.height },
+          { beside: true }
+        )
+        const where = `Jev at ${jev.toFixed(0)}, lead at ${lead.toFixed(0)}`
+        expect(boxes.map((box) => box.key).sort(), where).toEqual(['advisor', 'lead'])
+        expect(overlaps(boxes[0]!, boxes[1]!), where).toBe(false)
+        const leadBox = boxes.find((box) => box.key === 'lead')!
+        expect(leadBox.left + leadBox.width, where).toBeLessThanOrEqual(213)
+        expect(leadBox.tailX, where).toBeGreaterThanOrEqual(10)
+      }
+    }
   })
 })
 
