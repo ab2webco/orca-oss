@@ -1,4 +1,5 @@
 import { characterCostumeOf } from '../../../../../resources/claude-plugins/orca-game/hooks/character-look'
+import { createVerdictFlights } from './team-scene-verdict-flights'
 import { hdBackdropPixel } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-backdrop'
 import type { Daylight } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import { hdLandBakeOf } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-land-bake'
@@ -90,6 +91,7 @@ export function createPixelPainter(args: {
   let backdrop: { columns: number; step: number; canvas: HTMLCanvasElement } | null = null
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
+  const verdicts = createVerdictFlights((depth) => feetRow(depth) * PIXEL, colors)
 
   const backdropFor = (columns: number, t: number): HTMLCanvasElement => {
     const step = Math.floor((t * 1000) / TICK_MS / SKY_TICKS)
@@ -216,17 +218,20 @@ export function createPixelPainter(args: {
         drawPixelPlot(g, seat + BED_FROM_SEAT, row, PIXEL, site, f.t, garden)
       }
       effects.start(f.effects, f.actors, f.height)
+      verdicts.start(f.effects, f.actors)
       for (const a of f.actors) {
         // Why offset by x: members side by side swing out of step, as in Figures and Office.
         drawActor(g, a, columns, f.t + a.x * 7)
       }
       effects.draw(g, f)
+      verdicts.draw(g, f)
       drawSceneOverflow(g, f.overflow)
     },
     dispose: () => {
       backdrop = null
       sprites = new WeakMap()
       effects.clear()
+      verdicts.clear()
     }
   }
 }

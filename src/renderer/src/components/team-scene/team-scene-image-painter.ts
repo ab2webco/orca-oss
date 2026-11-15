@@ -19,6 +19,7 @@ import {
 import { drawFiguresScenery } from './team-scene-figures-props-draw'
 import { drawOfficeBuilds, officeSceneEffects } from './team-scene-office-builds'
 import { officeVirusShakeAt } from './team-scene-office-virus'
+import { createDeskMonitors } from './team-scene-desk-monitors'
 import {
   drawOfficeBack,
   drawOfficeTakenChair,
@@ -30,8 +31,6 @@ import {
   type OfficeBackSeat
 } from './team-scene-office-back'
 import {
-  createStationBoots,
-  drawStationScreen,
   stationFailingAt,
   stationScreenRectAt,
   stationScreenStateOf
@@ -171,7 +170,7 @@ export function createImagePainter(args: {
     image
   )
   const effects = createSceneEffects(feetY)
-  const boots = createStationBoots()
+  const monitors = createDeskMonitors(feetY, colors)
   const roleOf = (a: Pick<TeamSceneActor, 'role'>): RoleArt =>
     a.role === 'lead'
       ? style.roles.lead
@@ -224,13 +223,7 @@ export function createImagePainter(args: {
       }
       if (screen) {
         const rect = stationScreenRectAt(screen, left, top, px)
-        const boot = boots.progressOf(worker?.key, f.t)
-        const show = {
-          desk: worker?.desk,
-          hold: worker?.hold,
-          green: boots.passOf(worker?.key, f.t)
-        }
-        drawStationScreen(g, rect, state, f.t, { ...colors, virus, boot, ...show })
+        monitors.drawScreen(g, rect, state, worker, f.t, virus)
       }
       g.globalAlpha = 1
     }
@@ -308,8 +301,9 @@ export function createImagePainter(args: {
       narrow = back ? base * officeRowScaleOf(f.stations) : 1
       backdrop.draw(g, f)
       const shown =
-        args.builds === 'office' ? boots.take(officeSceneEffects(f.effects), f.t) : f.effects
+        args.builds === 'office' ? monitors.take(officeSceneEffects(f.effects), f.t) : f.effects
       effects.start(shown, f.actors, h)
+      monitors.start(f.effects, f.actors)
       if (args.builds === 'castle') {
         drawFiguresScenery(g, f, feetY)
       } else if (args.builds === 'office') {
@@ -324,6 +318,7 @@ export function createImagePainter(args: {
       f.actors.filter((a) => !behind(a)).forEach((a) => drawActor(g, a, f))
       foreground.draw(g, f)
       effects.draw(g, f)
+      monitors.drawFlights(g, f)
       drawSceneOverflow(g, f.overflow)
     },
     // Why only caches: the images go with the painter, and StrictMode disposes one it keeps.
@@ -331,6 +326,7 @@ export function createImagePainter(args: {
       backdrop.clear()
       foreground.clear()
       effects.clear()
+      monitors.clear()
     }
   }
 }

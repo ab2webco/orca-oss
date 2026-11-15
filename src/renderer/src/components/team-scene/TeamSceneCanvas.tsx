@@ -302,6 +302,11 @@ export function TeamSceneCanvas({
         leadAnchor && speakers.width > 0 ? (leadAnchor.x / speakers.width).toFixed(2) : undefined
       }
       data-scene-lead-attends={speakers.leadAttends ? 'true' : undefined}
+      data-scene-advisor-x={
+        advisorAnchor && speakers.width > 0
+          ? (advisorAnchor.x / speakers.width).toFixed(3)
+          : undefined
+      }
     >
       <canvas
         ref={canvasRef}

@@ -1,3 +1,9 @@
+import {
+  applyTeamSceneInput,
+  createTeamSceneWorld,
+  drainTeamSceneEffects
+} from './team-scene-director'
+import { ELEVATOR_X } from './team-scene-elevator'
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMachine, TeamMemberCard, TeamSection } from '../team-panel-model-types'
 import {
@@ -262,6 +268,16 @@ describe('teamSceneFloorInputOf, riders on their trips', () => {
       inputs({ lead: HOME, advisor })[1]!.members[0]!.decisions
     expect(decisionsOn(leg('travel'))).toBeUndefined()
     expect(decisionsOn(leg('there'))).toHaveLength(1)
+  })
+
+  // ORCA-1218: on a remote floor the token leaves with the advisor, from where it walks in.
+  it('sends the decision to the remote desk as the advisor arrives there, never before', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, inputs({ lead: HOME, advisor: leg('travel') })[1]!)
+    expect(drainTeamSceneEffects(world).filter((e) => e.kind === 'verdict')).toEqual([])
+    applyTeamSceneInput(world, inputs({ lead: HOME, advisor: leg('there') })[1]!)
+    expect(drainTeamSceneEffects(world)).toContainEqual({ kind: 'verdict', to: 'c', tone: 'allow' })
+    expect(world.bodies.get('advisor')!.x).toBe(ELEVATOR_X)
   })
 })
 
