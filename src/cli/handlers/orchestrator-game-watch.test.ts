@@ -72,4 +72,82 @@ describe('orca game watch', () => {
 
     expect(calls[1]?.[2]).toEqual({ timeoutMs: 35_000 })
   })
+
+  // Why: ORCA-1214: the lead's fleet and merge-queue watch lived in a script outside Orca.
+  describe('--lead', () => {
+    const idleNoPr = {
+      paneKey: 'p',
+      displayName: 'CIN-1 Cartelera',
+      agentType: 'claude',
+      state: 'idle',
+      toolName: null,
+      isLeader: false,
+      isMember: true,
+      terminalHandle: 'term_1'
+    }
+
+    function leadClient(waits: { version: number; changed: boolean; afterMs?: number }[]) {
+      const calls: string[] = []
+      const client = {
+        call: async (method: string) => {
+          calls.push(method)
+          if (method === 'game.state') {
+            return { ok: true, result: { agents: [idleNoPr], lead: { cap: 4 } } }
+          }
+          const reply = waits.shift()
+          if (!reply) {
+            throw GONE
+          }
+          if (reply.afterMs) {
+            vi.setSystemTime(Date.now() + reply.afterMs)
+          }
+          return { ok: true, result: { version: reply.version, changed: reply.changed } }
+        }
+      } as unknown as RuntimeClient
+      return { client, calls }
+    }
+
+    const runLead = (client: RuntimeClient) =>
+      ORCHESTRATOR_GAME_WATCH_HANDLERS['game watch']({
+        flags: new Map([['lead', true]]),
+        client,
+        cwd: '/repo',
+        json: false
+      })
+
+    it('prints each alert once and no fleet ticks, which would wake the lead for nothing', async () => {
+      const { client } = leadClient([
+        { version: 1, changed: false },
+        { version: 2, changed: true },
+        { version: 3, changed: true }
+      ])
+
+      await expect(runLead(client)).rejects.toBe(GONE)
+
+      expect(output).toEqual(['ready 1', 'alert CIN-1 idle with no PR: push'])
+    })
+
+    it('reads the state on each fleet change, and on a quiet fleet once a minute at most', async () => {
+      vi.useFakeTimers({ now: Date.parse('2026-11-14T20:00:00Z'), toFake: ['Date'] })
+      const { client, calls } = leadClient([
+        { version: 1, changed: false },
+        { version: 1, changed: false, afterMs: 30_000 },
+        { version: 1, changed: false, afterMs: 31_000 },
+        { version: 2, changed: true }
+      ])
+      await expect(runLead(client)).rejects.toBe(GONE)
+      vi.useRealTimers()
+
+      expect(calls).toEqual([
+        'game.fleetWait',
+        'game.state',
+        'game.fleetWait',
+        'game.fleetWait',
+        'game.state',
+        'game.fleetWait',
+        'game.state',
+        'game.fleetWait'
+      ])
+    })
+  })
 })
