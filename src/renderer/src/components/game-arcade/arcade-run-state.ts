@@ -3,6 +3,7 @@ import type {
   OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
 import { RUNNER_DRIVER } from './arcade-driver-runner'
+import { SNAKE_DRIVER } from './arcade-driver-snake'
 
 // One saved play in Orca's center tab: a built-in game's driver, its screens, and the pause while
 // someone needs the user. The frame clock lives in the view; each game's rules live in src/shared.
@@ -80,6 +81,8 @@ function arcadePlayFor(game: OrchestratorGameArcade, seed: number): ArcadePlay {
   switch (game.engine) {
     case 'runner':
       return arcadePlayOf(RUNNER_DRIVER, game, RUNNER_DRIVER.startOf(game, seed))
+    case 'snake':
+      return arcadePlayOf(SNAKE_DRIVER, game, SNAKE_DRIVER.startOf(game, seed))
   }
 }
 

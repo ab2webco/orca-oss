@@ -1,0 +1,10 @@
+{
+  "engine": "snake",
+  "name": { "en": "Berry vine", "es": "Enredadera" },
+  "fps": 12,
+  "grid": { "columns": 24, "rows": 15 },
+  "speed": { "start": 6, "max": 13, "rampPerFood": 0.35 },
+  "start": { "length": 4 },
+  "food": { "points": 10, "growth": 2 },
+  "colors": { "head": "#2f6b3a", "body": "#7da84a", "food": "#d4483b" }
+}

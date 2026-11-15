@@ -3,6 +3,7 @@ import { useAppStore } from '@/store'
 import {
   parseOrchestratorGameArcade,
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
+  ORCHESTRATOR_GAME_ARCADE_SNAKE,
   type OrchestratorGameArcade,
   type OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
@@ -28,7 +29,8 @@ const builtInOf = (text: string): OrchestratorGameArcade => {
 }
 
 const GAMES: Record<OrchestratorGameArcadeEngine, OrchestratorGameArcade> = {
-  runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+  runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER),
+  snake: builtInOf(ORCHESTRATOR_GAME_ARCADE_SNAKE)
 }
 
 type Props = {

@@ -1,10 +1,11 @@
 import { z } from 'zod'
 import { color, localizedSceneName, uncoloredGlyphOf } from './orchestrator-game-scene-values'
 import runnerData from './orchestrator-game-arcade-runner.json'
+import snakeData from './orchestrator-game-arcade-snake.json'
 
 /** A game the arcade offers after a perfect merge: inert data one of the game's built-in engines plays. */
 
-export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner'] as const
+export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner', 'snake'] as const
 export type OrchestratorGameArcadeEngine = (typeof ORCHESTRATOR_GAME_ARCADE_ENGINES)[number]
 
 /** One of the built-in games for `roll` in [0, 1). */
@@ -83,17 +84,22 @@ const atLeast = (low: string, high: string) => ({
   message: `must be at least ${low}`
 })
 
+const engineError = `must be one of: ${ORCHESTRATOR_GAME_ARCADE_ENGINES.join(', ')}`
+const fps = z
+  .number({ error: fpsError })
+  .int(fpsError)
+  .min(ORCHESTRATOR_GAME_ARCADE_FPS_MIN, fpsError)
+  .max(ORCHESTRATOR_GAME_ARCADE_FPS_MAX, fpsError)
+const whole = (min: number, max: number) => {
+  const error = `must be a whole number from ${min} to ${max}`
+  return z.number({ error }).int(error).min(min, error).max(max, error)
+}
+
 // Why not strict: a game written for a newer Orca keeps working on an older one.
-const arcadeFileSchema = z.object({
-  engine: z.enum(ORCHESTRATOR_GAME_ARCADE_ENGINES, {
-    error: `must be one of: ${ORCHESTRATOR_GAME_ARCADE_ENGINES.join(', ')}`
-  }),
+const runnerFileSchema = z.object({
+  engine: z.literal('runner', { error: engineError }),
   name: localizedSceneName,
-  fps: z
-    .number({ error: fpsError })
-    .int(fpsError)
-    .min(ORCHESTRATOR_GAME_ARCADE_FPS_MIN, fpsError)
-    .max(ORCHESTRATOR_GAME_ARCADE_FPS_MAX, fpsError),
+  fps,
   /** Columns per second; the run speeds up by `rampPerMinute` until `max`. */
   speed: z
     .object({ start: bounded(2, 40), max: bounded(2, 40), rampPerMinute: bounded(0, 20) })
@@ -115,11 +121,36 @@ const arcadeFileSchema = z.object({
   theme: themeSchema.optional()
 })
 
-export type OrchestratorGameArcade = z.infer<typeof arcadeFileSchema>
-export type OrchestratorGameArcadeRunner = OrchestratorGameArcade
+/** Eat, grow, and keep off the walls and your own tail, on a board of `grid` cells. */
+const snakeFileSchema = z.object({
+  engine: z.literal('snake', { error: engineError }),
+  name: localizedSceneName,
+  fps,
+  grid: z.object({ columns: whole(12, 40), rows: whole(8, 30) }),
+  /** Cells per second; each food eaten adds `rampPerFood` until `max`. */
+  speed: z
+    .object({ start: bounded(2, 20), max: bounded(2, 20), rampPerFood: bounded(0, 2) })
+    .refine((speed) => speed.max >= speed.start, atLeast('speed.start', 'max')),
+  start: z.object({ length: whole(2, 8) }),
+  food: z.object({ points: whole(1, 50), growth: whole(1, 5) }),
+  colors: z.object({ head: color, body: color, food: color })
+})
+
+export type OrchestratorGameArcadeRunner = z.infer<typeof runnerFileSchema>
+export type OrchestratorGameArcadeSnake = z.infer<typeof snakeFileSchema>
+export type OrchestratorGameArcade = OrchestratorGameArcadeRunner | OrchestratorGameArcadeSnake
+
+// Why not a discriminated union: a bad engine still lists every other problem, as a runner's.
+const schemaOf = (raw: unknown) =>
+  typeof raw === 'object' && raw !== null && (raw as { engine?: unknown }).engine === 'snake'
+    ? snakeFileSchema
+    : runnerFileSchema
 
 /** The runner every scene can play: the scene's own decoration plus a rock for scenes without one. */
 export const ORCHESTRATOR_GAME_ARCADE_RUNNER = `${JSON.stringify(runnerData, null, 2)}\n`
+
+/** The snake every scene can play on the runner's backdrop. */
+export const ORCHESTRATOR_GAME_ARCADE_SNAKE = `${JSON.stringify(snakeData, null, 2)}\n`
 
 type ArcadeRead = { ok: true; raw: unknown } | { ok: false; issue: string }
 
@@ -141,7 +172,7 @@ export function orchestratorGameArcadeIssues(text: string): string[] {
   if (!read.ok) {
     return [read.issue]
   }
-  const parsed = arcadeFileSchema.safeParse(read.raw)
+  const parsed = schemaOf(read.raw).safeParse(read.raw)
   return parsed.success
     ? []
     : parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
@@ -154,7 +185,7 @@ export function parseOrchestratorGameArcade(
   if (!read.ok) {
     return { ok: false, error: read.issue }
   }
-  const parsed = arcadeFileSchema.safeParse(read.raw)
+  const parsed = schemaOf(read.raw).safeParse(read.raw)
   if (parsed.success) {
     return { ok: true, game: parsed.data }
   }

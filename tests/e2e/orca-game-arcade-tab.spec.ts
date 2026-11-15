@@ -29,6 +29,15 @@ const GAMES: Record<
       ['ArrowUp', (b) => b.press('ArrowUp')],
       ['a tap', (b) => b.click()]
     ]
+  },
+  snake: {
+    start: 'ArrowUp',
+    keepsOpen: 'ArrowDown',
+    inputs: [
+      ['W', (b) => b.press('w')],
+      ['ArrowDown', (b) => b.press('ArrowDown')],
+      ['a tap', (b) => b.click({ position: { x: 20, y: 20 } })]
+    ]
   }
 }
 
@@ -200,7 +209,7 @@ for (const engine of Object.keys(GAMES) as OrchestratorGameArcadeEngine[]) {
       expect(await canvasPixels(orcaPage), 'Esc keeps the run where it was').toBe(held)
       await seedStatuses(orcaPage, null)
 
-      // Played out: with no jump, the runner meets the first obstacle.
+      // Played out: the runner meets the first obstacle, the snake the top wall.
       await expect
         .poll(
           async () => {
