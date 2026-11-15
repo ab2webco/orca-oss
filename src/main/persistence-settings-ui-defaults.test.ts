@@ -777,4 +777,17 @@ describe('Store', () => {
     store.updateUI({ projectOrderBy: 'manual' })
     expect(store.getUI().projectOrderBy).toBe('manual')
   })
+
+  it('keeps a stored name projectOrderBy and round-trips it through updateUI', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      ui: { projectOrderBy: 'name', _projectOrderNeedsYouMigrated: true }
+    })
+    const store = await createStore()
+    expect(store.getUI().projectOrderBy).toBe('name')
+
+    store.updateUI({ projectOrderBy: 'recent' })
+    store.updateUI({ projectOrderBy: 'name' })
+    expect(store.getUI().projectOrderBy).toBe('name')
+  })
 })

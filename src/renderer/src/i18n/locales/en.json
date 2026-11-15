@@ -4800,6 +4800,15 @@
           "keepDefaultBranch": "Except default branch",
           "keepDefaultBranchAria": "Keep the default branch visible while hiding sleeping workspaces"
         },
+        "SidebarProjectOrderMenu": {
+          "title": "Order projects",
+          "needsYouFirst": "Needs you first",
+          "recent": "Recent activity",
+          "name": "Name",
+          "manual": "Manual (drag)",
+          "defaultTag": "default",
+          "footer": "Saved for your user. Idle stays by age."
+        },
         "SidebarHeader": {
           "25a95899c9": "Add Project",
           "92154beb7e": "New workspace",
@@ -4907,15 +4916,12 @@
             "source": "Source"
           },
           "prAndChecks": "Pull request and checks",
-          "09faabd875": "Project order",
           "7bada3b1ab": "Sort by",
           "dc0bb670bc": "Group by",
           "631b97eea9": "Host scope",
           "9919ae1082": "Workspace options",
           "bc96dbd041": "Workspace options ({{value0}})",
-          "af9249c505": "Most recent workspace activity",
           "b451c8b162": "Recent",
-          "6664282a7b": "Drag projects to arrange them",
           "7b316bdd51": "Manual",
           "7153d07485": "Drag workspaces to arrange them within each group.",
           "2170d553cf": "Project",
@@ -4954,9 +4960,7 @@
           "planeWorkItem": "Plane work item",
           "showSection": "Show",
           "account": "Account",
-          "model": "Model and effort",
-          "needsYouFirst": "Needs you first",
-          "needsYouFirstDescription": "Questions and limits, then failing CI, then running agents"
+          "model": "Model and effort"
         },
         "SshTargetRow": {
           "4677394048": "Connecting…",

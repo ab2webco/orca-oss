@@ -14,6 +14,7 @@ vi.mock('@/store', () => ({
 }))
 vi.mock('@/hooks/useShortcutLabel', () => ({ useShortcutLabel: () => '' }))
 vi.mock('./SidebarWorkspaceOptionsMenu', () => ({ default: () => null }))
+vi.mock('./SidebarProjectOrderMenu', () => ({ default: () => <i data-sort-menu-stub /> }))
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   TooltipContent: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -64,5 +65,20 @@ describe('SidebarHeader section title', () => {
     expect(sectionTitle()).toBe('Projects')
     mocks.groupBy = 'none'
     expect(sectionTitle()).toBe('Workspaces')
+  })
+})
+
+describe('SidebarHeader sort button (ORCA-1216 §5)', () => {
+  afterEach(() => {
+    mocks.groupBy = 'repo'
+  })
+
+  const markup = (): string =>
+    renderToStaticMarkup(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
+
+  it('offers the project order only while the list is grouped by project', () => {
+    expect(markup()).toContain('data-sort-menu-stub')
+    mocks.groupBy = 'none'
+    expect(markup()).not.toContain('data-sort-menu-stub')
   })
 })

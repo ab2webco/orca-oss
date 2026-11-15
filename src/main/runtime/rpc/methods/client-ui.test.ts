@@ -612,7 +612,8 @@ describe('client UI RPC methods', () => {
     ['mobileEmulatorTabIntroDismissed', { mobileEmulatorTabIntroDismissed: true }],
     ['mobileEmulatorAgentSetupDismissed', { mobileEmulatorAgentSetupDismissed: true }],
     ['alwaysShowDefaultBranchWorkspace', { alwaysShowDefaultBranchWorkspace: false }],
-    ['projectOrderBy needs-you', { projectOrderBy: 'needs-you' }]
+    ['projectOrderBy needs-you', { projectOrderBy: 'needs-you' }],
+    ['projectOrderBy name', { projectOrderBy: 'name' }]
   ])('accepts %s, which the renderer persists through ui.set', async (_label, payload) => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
@@ -704,7 +705,7 @@ describe('client UI RPC methods', () => {
     ['feature tip id', { featureTipsSeenIds: ['voice-dictation', 'unknown-tip'] }],
     ['right sidebar tab', { rightSidebarTab: 'not-a-tab' }],
     // A newer client's project order must not reset this host's or reject the batch.
-    ['project order', { projectOrderBy: 'name' }]
+    ['project order', { projectOrderBy: 'alphabetical-desc' }]
   ])('drops an unknown %s instead of rejecting the batch around it', async (_label, drifted) => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

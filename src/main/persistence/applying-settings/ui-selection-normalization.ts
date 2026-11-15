@@ -56,7 +56,8 @@ export function normalizeProjectOrderBy(
   if (
     projectOrderBy === 'needs-you' ||
     projectOrderBy === 'manual' ||
-    projectOrderBy === 'recent'
+    projectOrderBy === 'recent' ||
+    projectOrderBy === 'name'
   ) {
     return projectOrderBy
   }

@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useCallback, useRef } from 'react'
 import { FolderPlus, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import SidebarWorkspaceOptionsMenu from './SidebarWorkspaceOptionsMenu'
+import SidebarProjectOrderMenu from './SidebarProjectOrderMenu'
 import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 import { openWorkspaceCreationComposerWithTourHandoff } from '../contextual-tours/workspace-creation-tour-handoff'
 import { translate } from '@/i18n/i18n'
@@ -26,6 +27,23 @@ const SidebarHeader = React.memo(function SidebarHeader({
     groupBy === 'repo'
       ? translate('auto.components.sidebar.SidebarHeader.projects', 'Projects')
       : translate('auto.components.sidebar.SidebarHeader.workspaces', 'Workspaces')
+  // Why both: when one menu opens as the other closes, the board must hear "a menu is open".
+  const openMenus = useRef({ options: false, order: false })
+  const reportMenuOpen = useCallback(
+    (menu: 'options' | 'order', open: boolean) => {
+      openMenus.current[menu] = open
+      onWorkspaceBoardMenuOpenChange(openMenus.current.options || openMenus.current.order)
+    },
+    [onWorkspaceBoardMenuOpenChange]
+  )
+  const onOptionsMenuOpenChange = useCallback(
+    (open: boolean) => reportMenuOpen('options', open),
+    [reportMenuOpen]
+  )
+  const onOrderMenuOpenChange = useCallback(
+    (open: boolean) => reportMenuOpen('order', open),
+    [reportMenuOpen]
+  )
 
   return (
     <div className="mt-2 flex h-8 items-center justify-between px-2 gap-2">
@@ -38,9 +56,11 @@ const SidebarHeader = React.memo(function SidebarHeader({
         </span>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* Why gated: project order only has a visible effect when grouping by project. */}
+        {groupBy === 'repo' && <SidebarProjectOrderMenu onMenuOpenChange={onOrderMenuOpenChange} />}
         <SidebarWorkspaceOptionsMenu
           preserveWorkspaceBoardOpen
-          onMenuOpenChange={onWorkspaceBoardMenuOpenChange}
+          onMenuOpenChange={onOptionsMenuOpenChange}
         />
 
         <Tooltip>

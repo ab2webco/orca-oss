@@ -13,6 +13,10 @@ describe('migrateProjectOrderByOnLoad', () => {
     expect(migrateProjectOrderByOnLoad({ projectOrderBy: 'manual' }).projectOrderBy).toBe('manual')
   })
 
+  it('keeps a stored name order', () => {
+    expect(migrateProjectOrderByOnLoad({ projectOrderBy: 'name' }).projectOrderBy).toBe('name')
+  })
+
   it('never runs again once the flag is recorded, so a later recent choice stays', () => {
     const first = migrateProjectOrderByOnLoad({ projectOrderBy: 'recent' })
     expect(first.projectOrderBy).toBe('needs-you')

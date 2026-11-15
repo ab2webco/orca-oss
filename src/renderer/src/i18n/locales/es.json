@@ -4556,6 +4556,15 @@
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
         },
+        "SidebarProjectOrderMenu": {
+          "title": "Ordenar proyectos",
+          "needsYouFirst": "Te necesita primero",
+          "recent": "Actividad reciente",
+          "name": "Nombre",
+          "manual": "Manual (arrastrar)",
+          "defaultTag": "predeterminado",
+          "footer": "Se guarda para tu usuario. En reposo sigue por antigüedad."
+        },
         "SidebarHeader": {
           "92154beb7e": "Nuevo espacio de trabajo",
           "49f62c5665": "Tablero de espacios de trabajo",
@@ -4645,14 +4654,11 @@
             "source": "Origen"
           },
           "prAndChecks": "Pull request y checks",
-          "09faabd875": "Orden del proyecto",
           "7bada3b1ab": "Ordenar por",
           "dc0bb670bc": "Agrupar por",
           "9919ae1082": "Opciones de espacio de trabajo",
           "bc96dbd041": "Opciones de espacio de trabajo ({{value0}})",
-          "af9249c505": "Actividad más reciente en el espacio de trabajo",
           "b451c8b162": "Reciente",
-          "6664282a7b": "Arrastra proyectos para organizarlos",
           "7b316bdd51": "Manual",
           "7153d07485": "Arrastra los espacios de trabajo para organizarlos dentro de cada grupo.",
           "2170d553cf": "Proyecto",
@@ -4696,9 +4702,7 @@
           "cli": "Orca Lab CLI",
           "showSection": "Mostrar",
           "account": "Cuenta",
-          "model": "Modelo y esfuerzo",
-          "needsYouFirst": "Te necesita primero",
-          "needsYouFirstDescription": "Preguntas y límites, luego CI que falla, luego agentes trabajando"
+          "model": "Modelo y esfuerzo"
         },
         "SshTargetRow": {
           "4677394048": "Conectando…",

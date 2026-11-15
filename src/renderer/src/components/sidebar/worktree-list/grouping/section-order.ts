@@ -166,9 +166,24 @@ export function getManualOrderAnchorRepo(
   return anchor
 }
 
+const projectNameCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+/** Name order: display name A–Z ignoring case, ties by manual rank, then key, so it never flickers. */
+export function sortProjectEntriesByName(
+  entries: readonly OrderedGroupEntry[],
+  repoOrder: Map<string, number> | undefined
+): OrderedGroupEntry[] {
+  return withRepoSectionDisplayLabels(entries).sort(
+    (a, b) =>
+      projectNameCollator.compare(a[1].label, b[1].label) ||
+      manualRankForEntry(a, repoOrder) - manualRankForEntry(b, repoOrder) ||
+      a[0].localeCompare(b[0])
+  )
+}
+
 /**
  * Order project header entries by the user's project-order preference. Manual
- * follows the canonical repoOrder; Recent follows each project's most recent
+ * follows the canonical repoOrder; Name is A–Z; Recent follows each project's most recent
  * visible workspace activity (descending), with empty/imported-only projects
  * sorting after active ones, then by manual rank, then label. Needs you first
  * starts from Recent; its tiers reorder the active group when the rows are built.
@@ -178,6 +193,9 @@ export function sortProjectEntries(
   projectOrderBy: ProjectOrderBy,
   repoOrder: Map<string, number> | undefined
 ): OrderedGroupEntry[] {
+  if (projectOrderBy === 'name') {
+    return sortProjectEntriesByName(entries, repoOrder)
+  }
   if (projectOrderBy !== 'manual') {
     return [...entries].sort((a, b) => {
       const byRecent = compareRecentRank(recentRankForEntry(a), recentRankForEntry(b))

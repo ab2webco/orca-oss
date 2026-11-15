@@ -11,6 +11,7 @@ import { orderGroupSectionsByTier } from './section-urgency'
 import {
   compareRecentRank,
   recentRankForEntry,
+  sortProjectEntriesByName,
   withRepoSectionDisplayLabels
 } from './section-order'
 
@@ -37,6 +38,9 @@ export function appendProjectGroupSections(
   }
 
   const sortRepoEntriesWithinGroup = (entries: OrderedGroupEntry[]): OrderedGroupEntry[] => {
+    if (projectOrderBy === 'name') {
+      return sortProjectEntriesByName(entries, repoOrder)
+    }
     if (projectOrderBy !== 'manual') {
       const byRecent = [...entries].sort((left, right) =>
         compareRecentRank(recentRankForEntry(left), recentRankForEntry(right))
