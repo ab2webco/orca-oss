@@ -6,6 +6,7 @@ import type {
   GameMemberWork,
   ReadLinkedStatus
 } from './orchestrator-game-fleet'
+import type { GameScreenStateOf } from './orchestrator-game-screen-state'
 import type { CarriedGameScene } from './orchestrator-game-carried-scene'
 import type { GameActivityMemory } from './orchestrator-game-activity-memory'
 import type { GameLeadNames } from './orchestrator-game-lead-names'
@@ -89,6 +90,7 @@ export type OrchestratorGameStateInput = {
   accountOf?: GameMemberAccountOf
   globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
+  screenStateOf?: GameScreenStateOf
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */

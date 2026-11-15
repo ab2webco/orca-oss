@@ -1,0 +1,35 @@
+[
+  {
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  },
+  {
+    "hook_event_name": "UserPromptSubmit",
+    "permission_mode": "auto",
+    "prompt": "Run exactly this Bash command verbatim and nothing else: rm -f $D/*.png"
+  },
+  {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "rm -f $D/*.png",
+      "description": "Remove PNG files from directory $D"
+    },
+    "tool_use_id": "toolu_01RLHCSaC5msXVA27fdA9ffP",
+    "permission_mode": "auto"
+  },
+  {
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "rm -f $D/*.png",
+      "description": "Remove PNG files from directory $D"
+    },
+    "permission_mode": "auto"
+  },
+  {
+    "hook_event_name": "Notification",
+    "notification_type": "permission_prompt",
+    "message": "Claude needs your permission"
+  }
+]
