@@ -64,7 +64,8 @@ export function MetaLine({
       className="flex min-w-0 flex-wrap items-center gap-x-1 text-[11.5px] text-muted-foreground/80"
     >
       {model ? (
-        <code data-team-model="" className="shrink-0 font-mono">
+        // Why wrap: a routed model (`Sonnet 5.5 → Opus 5.5 · high`) is wider than a 320 card.
+        <code data-team-model="" className="min-w-0 break-words font-mono">
           {model}
         </code>
       ) : null}
