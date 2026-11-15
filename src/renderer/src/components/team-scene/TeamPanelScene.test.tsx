@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
 import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestrator-game-scene'
 import { orchestratorGameSceneArtFiles } from '../../../../shared/orchestrator-game-scene-native'
-import type { TeamLeadCard, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
+import type {
+  TeamLeadCard,
+  TeamMemberCard,
+  TeamPanelGameModel
+} from '../../../../shared/team-panel-model-types'
 import { TeamPanelScene } from './TeamPanelScene'
 import { TeamScenePainterContext } from './team-scene-painter-context'
 import { TeamSceneLeadLineContext } from './team-scene-lead-line-context'
@@ -345,5 +349,45 @@ describe('TeamPanelScene', () => {
       )
     )
     expect(building()).toBeNull()
+  })
+
+  // ORCA-1199: reopened on its last team, the fresh read walked members in from the edge, untagged.
+  it('seats a member a reopened panel learns of, tagged over its alert, instead of walking it in', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query) =>
+        ({
+          matches: false,
+          media: query,
+          addEventListener() {},
+          removeEventListener() {}
+        }) as unknown as MediaQueryList
+    )
+    let pending: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => pending.push(cb))
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const last = model({ id: 'quest', extensions: [] })
+    const asker: TeamMemberCard = {
+      ...lead,
+      paneKey: 'pane-14',
+      name: 'Merlin',
+      liveAction: null,
+      characterKey: null,
+      ticket: null,
+      flowPhase: null,
+      summary: null,
+      pr: null,
+      needsYou: true,
+      limitResetsAt: null,
+      found: false
+    }
+    await act(async () => root.render(<TeamPanelScene model={last} style="pixel" unconfirmed />))
+    await act(async () =>
+      root.render(<TeamPanelScene model={{ ...last, members: [asker] }} style="pixel" />)
+    )
+    const due = pending
+    pending = []
+    act(() => due.forEach((cb) => cb(16)))
+
+    expect(host.querySelector('[data-scene-speaker]')?.textContent).toBe('Merlin')
   })
 })

@@ -30,6 +30,8 @@ export type TeamSceneBuildingModel = Pick<
 
 type Props = {
   model: TeamSceneBuildingModel
+  /** The panel's last team, shown while a read confirms it. */
+  unconfirmed?: boolean
   /** A fresh painter per floor: each keeps its own effects and caches. */
   makePainter: () => TeamScenePainter | null
   leadLine: string | null
@@ -108,6 +110,7 @@ export const teamSceneHasFloors = (model: TeamSceneBuildingModel): boolean =>
 
 function FloorStage({
   model,
+  unconfirmed,
   floor,
   makePainter,
   leadLine,
@@ -134,7 +137,13 @@ function FloorStage({
   floorRef: (el: HTMLElement | null) => void
 }): React.JSX.Element | null {
   const painter = useMemo(makePainter, [makePainter])
-  const input = useMemo(() => teamSceneFloorInputOf(model, floor, legs), [model, floor, legs])
+  const input = useMemo(
+    () => ({
+      ...teamSceneFloorInputOf(model, floor, legs),
+      ...(unconfirmed ? { unconfirmed: true as const } : {})
+    }),
+    [model, floor, legs, unconfirmed]
+  )
   const cropTop = zoomed ? 0 : cropOf(level)
   const plateRef = useRef<HTMLSpanElement>(null)
   const [plate, setPlate] = useState<TeamSceneRect | null>(null)

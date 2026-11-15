@@ -63,6 +63,24 @@ describe('team scene director', () => {
     )
   })
 
+  // Why: a reopened panel shows its last team while the fresh read lands (ORCA-1199).
+  it('measures nothing from an unconfirmed opening snapshot, so a reopened panel replays nothing', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, { ...input([]), unconfirmed: true })
+    applyTeamSceneInput(world, input([member('a', { activity: 'needsYou' })]))
+    expect(actor(world, 'a')?.emote).toBe('alert')
+    expect(actor(world, 'a')?.x).toBe(world.stations[0]?.x)
+  })
+
+  it('still measures from its last confirmed snapshot through an unconfirmed one', () => {
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, input([]))
+    applyTeamSceneInput(world, { ...input([]), unconfirmed: true })
+    applyTeamSceneInput(world, input([member('a', { activity: 'needsYou' })]))
+    expect(actor(world, 'a')?.emote).toBeNull()
+    expect(actor(world, 'a')?.x).not.toBe(world.stations[0]?.x)
+  })
+
   it('keeps one station per seat for styles to draw', () => {
     const world = seated(['a', 'b', 'c'])
     expect(world.stations).toHaveLength(3)
