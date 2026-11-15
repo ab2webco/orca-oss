@@ -161,6 +161,37 @@ describe('orca game drop (ORCA-943)', () => {
     expect(process.exitCode).toBe(1)
   })
 
+  // Why: a host that no longer knows the member shows no branch, so its row has no worktree (ORCA-1196).
+  const forgottenMember = { ...remoteMember, worktree: undefined }
+
+  it('finds a remote member its host no longer knows, and points a live one at stop', async () => {
+    const { client, calls } = clientWith({ agents: [LEAD, forgottenMember] }, [
+      { dispatchId: 'ctx_915', workerState: 'ready', agentTerminalHandle: null }
+    ])
+
+    await drop(client, 'ORCA-915')
+
+    expect(drops(calls)).toEqual([])
+    expect(output()).toMatchObject({ dropped: false, dispatchId: 'ctx_915' })
+    expect(output().refusal).toContain('orca game stop')
+  })
+
+  it('refuses a settled one honestly, since a drop has no worktree to key on', async () => {
+    const { client, calls } = clientWith({ agents: [LEAD, forgottenMember] }, [
+      { dispatchId: 'ctx_915', workerState: 'succeeded', agentTerminalHandle: null }
+    ])
+
+    await drop(client, 'orca-915')
+
+    expect(drops(calls)).toEqual([])
+    expect(output()).toMatchObject({
+      dropped: false,
+      host: 'm1',
+      refusal: expect.stringContaining('orca game stop ORCA-915')
+    })
+    expect(process.exitCode).toBe(1)
+  })
+
   it('answers an agent already dropped without writing again', async () => {
     const { client, calls } = clientWith({
       agents: [LEAD],

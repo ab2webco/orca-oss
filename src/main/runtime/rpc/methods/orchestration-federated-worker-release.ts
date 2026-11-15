@@ -30,7 +30,7 @@ type FederatedReleaseArgs = {
   requestId: string | undefined
 }
 
-const LIVE_STATES: readonly string[] = ['starting', 'ready', 'start_unknown']
+const UNACKNOWLEDGED_STATES: readonly string[] = ['starting', 'start_unknown']
 const STOP_UNPROVEN_STATES: readonly string[] = ['stopping', 'stop_unknown']
 
 const isReleased = (receipt: WorkerReleaseReceipt): boolean =>
@@ -92,20 +92,25 @@ async function releaseFederatedWorkerNow(
   return memberReceiptOf(own, others)
 }
 
-/** A sibling that may still run in the shared terminal and worktree: live, or stopped unproven on a host that still holds it. */
+/**
+ * A sibling that may still run in the shared terminal and worktree: starting, or ready or stopped
+ * unproven on a host that still holds it. A ready one the host proves gone is stopped at home, so it
+ * releases with the member.
+ */
 async function runningSiblingOf(
   args: FederatedReleaseArgs,
   siblings: { dispatchId: string; state: string | null }[]
 ): Promise<{ dispatchId: string } | undefined> {
-  const live = siblings.find((sibling) => LIVE_STATES.includes(sibling.state ?? ''))
-  if (live) {
-    return live
+  // Why no host check: an unacknowledged start may not have reached it yet, so its absence proves nothing.
+  const starting = siblings.find((sibling) => UNACKNOWLEDGED_STATES.includes(sibling.state ?? ''))
+  if (starting) {
+    return starting
   }
   const db = args.runtime.getOrchestrationDb()
-  for (const sibling of siblings) {
-    if (!STOP_UNPROVEN_STATES.includes(sibling.state ?? '')) {
-      continue
-    }
+  const open = siblings.filter((sibling) =>
+    ['ready', ...STOP_UNPROVEN_STATES].includes(sibling.state ?? '')
+  )
+  for (const sibling of open) {
     const federated = db.getFederatedDispatch(sibling.dispatchId)
     const gone = federated
       ? await isFederatedMemberGoneOnHost(
@@ -116,6 +121,11 @@ async function runningSiblingOf(
       : true
     if (!gone) {
       return sibling
+    }
+    // Why: a home row the host no longer knows stays live forever and keeps the member (ORCA-1196).
+    if (federated && sibling.state === 'ready') {
+      db.settleGoneFederatedWorker(sibling.dispatchId)
+      args.runtime.notifyMessageArrived(`dispatch:${sibling.dispatchId}`, 'status')
     }
   }
   return undefined

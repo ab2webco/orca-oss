@@ -31,7 +31,8 @@ Run every step; skipping validation is the usual way scenes ship broken.
    required block filled in, its team-band palette (`hud`) and its advisor (a wizard), plus an
    example of each optional block in place of Quest's own: a `foe` (a goblin), a `finale`, a
    `cast.pet` (a fox), a palette theme, and a `roster` of ten of Quest's characters. Replace them
-   all; none of them is meant to stay:
+   all; none of them is meant to stay. It leaves out Quest's sword, so a new scene holds no
+   [`prop`](#prop-optional) until you give it one:
 
    ```text
    orca game scene new .orca/scenes/<name>.json
@@ -179,6 +180,7 @@ Top level, all required unless marked optional:
 | `finale`   | Optional. Caption painted while a merge runs                       |
 | `hud`      | Optional. The team band's frame, sky and text colors               |
 | `cast`     | Optional. The scene's pet (what Pet hearts) and who stands for Jev |
+| `prop`     | Optional. What the characters hold in the panel's Pixel style      |
 | `roster`   | Optional. Names a lead's members take, each in a look of its own   |
 | `themes`   | Optional. Palette variants the band shows one a day                |
 | `native`   | Optional. Image art for the native panel's Figures and Office      |
@@ -264,8 +266,8 @@ The file must be at most 64 KB; `native` art lives in image files next to it, ou
   the 6 body rows must read on their own. hd draws the same 10×7 with a 1-pixel outline (12×9).
 - Draw the head in the top rows; the game adds the walk, the blink and the reactions.
 - **Facing.** Nothing is mirrored when a figure walks back: every costume is drawn exactly as
-  written, everywhere. The hero faces **right** (its prop is drawn on its right, the pet and
-  the party walk on its left), so draw every costume facing right.
+  written, everywhere. The hero faces **right** (its [`prop`](#prop-optional) is drawn on its right, the pet
+  and the party walk on its left), so draw every costume facing right.
 - `foe` uses the same shape and also faces right as written. It shows on a teammate whose CI is
   red: on the band it replaces that teammate's costume in turns, **as written**; on the
   teammate's Panel tile it stands at the right, **mirrored** (it faces left, toward the
@@ -367,6 +369,26 @@ CJK characters and emoji are refused. A plain string or per-language object.
   lead (it stands at the right edge and holds its props out on its left).
 - An invalid `pet` or `advisor` is left out with a warning and the rest of the scene still
   draws, but `validate` reports it: fix it before you report.
+
+### `prop` (optional)
+
+```json
+{ "rows": ["HHH", "HHH", ".W.", ".W."], "colors": { "H": "#7a7a86", "W": "#8a5a2c" } }
+```
+
+What every character holds in its hand in the native panel's Pixel style: raised to ask the
+user, swung while it works. **Left out, they hold nothing**: the game never lends a scene
+Quest's sword. `"prop": "sword"` draws Quest's own sword (Quest and the JRPG scene use it).
+
+- One frame in the cast's format: 1 to 7 rows, every row the same width, 1 to 10 printable
+  ASCII glyphs; `.` is transparent and every other glyph needs a color.
+- Draw it **facing right**, held from its bottom-left corner, the way the hero faces. It is
+  mirrored when a character faces left, and swings by moving up and down, never turned, so a
+  hammer or a wand reads better than a long blade.
+- Keep it small (3 to 4 wide, 3 to 5 tall): it stands beside a ten-pixel character.
+- A paper a character hands over is the game's and draws in every scene.
+- An invalid `prop` is left out with a warning and the rest of the scene still draws, but
+  `validate` reports it.
 
 ### `roster` (optional)
 
@@ -513,6 +535,7 @@ Never use third-party characters in anything committed or published: see
 | `finale…: must be width-1 characters…`                            | Remove emoji and CJK characters from the finale                       |
 | `cast.<member>…: every row of a frame must be the same width`     | Pad the short rows with `.`                                           |
 | `cast.<member>.frames: every frame must be the size of the first` | Same width and height for every frame, `happy` and gesture            |
+| `prop: must be "sword" or { rows, colors }`                       | A string other than `"sword"`: draw the prop, or leave the key out    |
 | `roster.N.variant.colors: glyph "X" is in no costume`             | Recolor only glyphs a `costumes.<phase>.colors` lists                 |
 | `roster.N: set a variant or costumes, not both`                   | Keep one look per entry                                               |
 | `roster.N.variant: must set colors or an accessory`               | Give the variant a palette, an accessory or both                      |
@@ -533,7 +556,8 @@ overriding `orca.yaml`, and read the band's note or `orca game state --json` `wa
 - Give the roster at least 10 names, each a character of its own, so a team in one phase never
   looks like clones.
 - Include `hud`, `foe` and `finale`: a scene without them only half changes the game. Add a
-  `cast` pet whenever the lead is not Clawd, or Pet hearts the lead.
+  `cast` pet whenever the lead is not Clawd, or Pet hearts the lead. Give the characters a
+  `prop` that belongs to the scene (a hammer, a wand, a ball) or leave it out.
 - Give every costume, pet and advisor one dark color (eyes, hair, boots): hd inks its outline
   from it, and without one the figure blurs into a light sky.
 - In hd a narrow pane closes the party up behind the hero, and only the teammates that fit whole

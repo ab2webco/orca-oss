@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { STATUS_COLOR_DEFAULTS } from '@/lib/status-color-overrides'
+import { STATUS_COLOR_DEFAULTS } from '../../../../shared/status-colors'
 import type { StatusTone } from '@/components/status-tone'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 

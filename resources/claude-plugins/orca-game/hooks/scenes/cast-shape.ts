@@ -7,7 +7,8 @@ import {
   type CastFrame,
   type SceneAdvisor,
   type SceneCast,
-  type ScenePet
+  type ScenePet,
+  type SceneProp
 } from './scene-definition'
 import { glyphColorsOf, isShape, nameOf } from './scene-values'
 
@@ -46,6 +47,16 @@ const isDrawable = (
     frames.every((frame) => sizeOf(frame) === size) &&
     [...glyphs].every((one) => Object.hasOwn(colors, one))
   )
+}
+
+// Mirrors Orca's prop schema; a bad prop is left out, as Orca leaves it out, never the scene.
+export const propOf = (value: unknown): SceneProp | undefined => {
+  if (value === 'sword') {
+    return value
+  }
+  const rows = isShape(value) ? frameOf(value.rows) : undefined
+  const colors = isShape(value) ? glyphColorsOf(value.colors) : undefined
+  return rows && colors && isDrawable([rows], colors) ? { rows, colors } : undefined
 }
 
 // Absent stays absent; present but invalid is undefined, so the caller leaves it out.

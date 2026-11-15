@@ -94,6 +94,25 @@ describe('sceneDefinitionOf', () => {
     expect(sceneDefinitionOf({ ...quest, cast: 7 }, 'file:mc.json')?.cast).toBeUndefined()
   })
 
+  it('reads a prop as Orca does, and leaves out only a prop it cannot draw', () => {
+    const hammer = { rows: ['HHH', '.W.'], colors: { H: '#9c9ca8', W: '#8a5a2c' } }
+    const cases = [
+      [hammer, { rows: hammer.rows, colors: { H: 0x9c9ca8, W: 0x8a5a2c } }],
+      ['sword', 'sword'],
+      ['axe', undefined],
+      [{ ...hammer, rows: ['HHH', 'W'] }, undefined],
+      [{ ...hammer, colors: { H: '#9c9ca8' } }, undefined],
+      [{ ...hammer, rows: Array(8).fill('H') }, undefined]
+    ] as const
+    for (const [prop, drawn] of cases) {
+      const text = JSON.stringify(sceneFile({ prop }))
+      const orca = parseOrchestratorGameScene(text, 'file:mc.json')
+      const scene = sceneDefinitionOf(JSON.parse(text), 'file:mc.json')
+      expect(scene?.prop).toEqual(drawn)
+      expect(scene).toEqual(orca.ok ? orca.definition : undefined)
+    }
+  })
+
   it('takes a name per language like Orca does, keeping only the languages it ships', () => {
     const text = JSON.stringify(
       sceneFile({

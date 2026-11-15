@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { STATUS_COLOR_DEFAULTS } from '@/lib/status-color-overrides'
+import { STATUS_COLOR_DEFAULTS } from '../../../../shared/status-colors'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { readTeamSceneStatusColors, useTeamSceneStatusColors } from './team-scene-status-colors'
 
