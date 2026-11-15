@@ -55,6 +55,7 @@ export const APPIMAGE_CLI_COMMAND_ROOTS: readonly string[] = [
   'is',
   'keypress',
   'linear',
+  'mobile',
   'mouse',
   'network',
   'open',
