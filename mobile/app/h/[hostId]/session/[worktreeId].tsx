@@ -286,7 +286,15 @@ import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
 import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
 import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
-import { newTabTeamSectionOf } from '../../../../src/new-tab-team/new-tab-team-section'
+import { useAddMember } from '../../../../src/new-tab-team/use-add-member'
+import { AddMemberSheet } from '../../../../src/new-tab-team/AddMemberSheet'
+import { useFreshLead } from '../../../../src/new-tab-team/use-fresh-lead'
+import { FreshLeadSheets } from '../../../../src/new-tab-team/FreshLeadSheets'
+import { reopenTeamLeadFromPhone } from '../../../../src/new-tab-team/new-tab-team-reopen'
+import {
+  newTabTeamSectionOf,
+  reopenFailureOf
+} from '../../../../src/new-tab-team/new-tab-team-section'
 import { openMobilePrUrl } from '../../../../src/components/mobile-pr-url'
 import { useNow } from '../../../../src/hooks/use-now'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
@@ -2893,9 +2901,37 @@ export default function SessionScreen() {
     supported: teamControlSupported,
     worktreeId
   })
+  const addMember = useAddMember({ client, showToast })
+  const freshLead = useFreshLead({
+    client,
+    hostName: hostName || 'this computer',
+    worktreeId,
+    showToast,
+    sessionTabs,
+    selectTab: switchSessionTab
+  })
   const newTabTeamSection = newTabTeamSectionOf(newTabTeam, {
     hostName: hostName || 'this computer',
-    onGoToLead: openTeamTerminal
+    onGoToLead: openTeamTerminal,
+    onAddMember: (roster) => {
+      if (newTabTeam.kind === 'lead-live') {
+        addMember.start(roster, newTabTeam.lead.terminal)
+      }
+    },
+    onStartFresh: freshLead.start,
+    onReopen: () => {
+      if (!client) {
+        return
+      }
+      // Why no project name: the host keys the lead by worktree; the desktop sends '' when it has none too.
+      void reopenTeamLeadFromPhone(client, { worktreeId, project: '' }).then((answer) => {
+        const failure = reopenFailureOf(answer)
+        if (failure) {
+          triggerError()
+          showToast(failure, 2400)
+        }
+      })
+    }
   })
   const activeLeadPaneKey = leadPaneKeyOf(
     sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null
@@ -4976,6 +5012,10 @@ export default function SessionScreen() {
         sections={newTabTeamSection ? [newTabTeamSection] : undefined}
         onClose={() => setShowCreateTabDrawer(false)}
       />
+      {addMember.sheet ? (
+        <AddMemberSheet {...addMember.sheet} hostName={hostName || 'this computer'} />
+      ) : null}
+      <FreshLeadSheets account={freshLead.account} confirm={freshLead.confirm} />
 
       <ActionSheetModal
         visible={pendingDiffNotesDelivery !== null}
