@@ -24,6 +24,7 @@ import type {
 import { teamLeadCardsOf } from './team-sheet-lead'
 import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
 import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
+import type { TeamSceneArtLoad } from './use-team-scene-art'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -98,6 +99,8 @@ export type TeamDrawerData = {
   answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
   /** The team's level from its characters' XP; null on a host that does not advertise it. */
   level: GameCharacterLevel | null
+  /** The scene file's images for the band; null unless the band draws a scene's own art. */
+  sceneArt: TeamSceneArtLoad | null
 }
 
 type Rec = Record<string, unknown>
@@ -235,7 +238,8 @@ export function teamLeadViewOf(
   raw: unknown,
   questionTickets: ReadonlySet<string> = new Set(),
   ownerAsk: { ticket: string | null } | null = null,
-  now: number = Date.now()
+  now: number = Date.now(),
+  options: { sceneArt?: boolean } = {}
 ): TeamLeadView | null {
   // Why `lead`: role is `lead` for any root pane; only a project with a lead has a Team.
   if (!isRecord(raw) || raw.role !== 'lead' || !isRecord(raw.lead) || raw.leadElsewhere) {
@@ -256,7 +260,7 @@ export function teamLeadViewOf(
     lead,
     advisor,
     work: teamSheetWorkOf(raw, cards, locale, now),
-    scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }),
+    scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }, options),
     metrics: metricsOf(raw.metrics),
     locale
   }

@@ -1,21 +1,36 @@
 import { GAME_PANEL_STYLES, type GamePanelStyle } from '../../../src/shared/orchestrator-game-panel'
-import { orchestratorGameSceneArtOf } from '../../../src/shared/orchestrator-game-scene-native'
+import {
+  orchestratorGameSceneArtOf,
+  orchestratorGameSceneNativeOf,
+  type OrchestratorGameSceneNativeStyle
+} from '../../../src/shared/orchestrator-game-scene-native'
 import type { TeamLeadCard, TeamMemberCard } from '../../../src/shared/team-panel-model-types'
 
 export type TeamSceneBandActor = {
   key: string
   role: 'lead' | 'member' | 'advisor'
-  /** Which of the role's sheets it wears. */
-  sheet: number
+  /** Picks which of the role's sheets it wears, modulo how many the art has. */
+  seed: number
 }
 
-/** `readable` is the band with no art: names in place of figures. */
-export type TeamSceneBand =
+type BandFallback =
   | { kind: 'art'; style: 'figures' | 'office'; actors: TeamSceneBandActor[] }
   | { kind: 'readable'; actors: TeamSceneBandActor[] }
 
+/** `art` is Orca's own Quest art, `scene` the scene file's art read from the host, `readable` names only. */
+export type TeamSceneBand =
+  | BandFallback
+  | {
+      kind: 'scene'
+      style: 'figures' | 'office'
+      sceneId: string
+      native: OrchestratorGameSceneNativeStyle
+      actors: TeamSceneBandActor[]
+      /** Drawn when the scene's images do not load. */
+      fallback: BandFallback
+    }
+
 const QUEST = 'quest'
-const MEMBER_SHEETS = 8
 // Why: past eight the figures overlap at 320 pt; the Team tab still lists every member.
 const MEMBERS_DRAWN = 8
 
@@ -36,36 +51,60 @@ const styleOf = (panel: Rec): GamePanelStyle =>
   GAME_PANEL_STYLES.find((one) => one === panel.style) ?? 'pixel'
 
 /**
- * The band above the tabs, drawn as the desktop's Game look draws its stage; null when the
- * desktop panel shows no scene. Pixel and a scene's own art come later; both read as `readable`.
+ * The band above the tabs, chosen as the desktop's Game look chooses its stage; null when the
+ * desktop panel shows no scene. Pixel draws as `readable` until the phone has a Pixel painter.
  */
 export function teamSceneBandOf(
   state: Rec,
-  cards: { lead: TeamLeadCard | null; members: readonly TeamMemberCard[]; advisor: boolean }
+  cards: { lead: TeamLeadCard | null; members: readonly TeamMemberCard[]; advisor: boolean },
+  /** `sceneArt`: the host advertises mobile.team-scene.v1, so a scene file's own art can be read. */
+  options: { sceneArt?: boolean } = {}
 ): TeamSceneBand | null {
   const panel = isRecord(state.panel) ? state.panel : null
   if (panel && panel.look !== 'game') {
     return null
   }
   const actors: TeamSceneBandActor[] = [
-    ...(cards.lead ? [{ key: 'lead', role: 'lead' as const, sheet: 0 }] : []),
+    ...(cards.lead ? [{ key: 'lead', role: 'lead' as const, seed: 0 }] : []),
     ...cards.members.slice(0, MEMBERS_DRAWN).map((card) => ({
       key: card.paneKey,
       role: 'member' as const,
-      sheet: figureSeedOf(card.characterKey ?? card.paneKey) % MEMBER_SHEETS
+      seed: figureSeedOf(card.characterKey ?? card.paneKey)
     })),
-    ...(cards.advisor ? [{ key: 'advisor', role: 'advisor' as const, sheet: 0 }] : [])
+    ...(cards.advisor ? [{ key: 'advisor', role: 'advisor' as const, seed: 0 }] : [])
   ]
   if (!panel) {
     return { kind: 'readable', actors }
   }
   const config = isRecord(state.config) ? state.config : {}
-  const art = orchestratorGameSceneArtOf({
-    style: styleOf(panel),
-    sceneId: typeof config.scene === 'string' ? config.scene : QUEST,
-    // Why failed: the phone does not read a scene file's own images yet, so Orca's art or Pixel draws.
-    sceneArtFailed: true
-  })
+  const sceneId = typeof config.scene === 'string' ? config.scene : QUEST
+  const style = styleOf(panel)
+  const fallback = fallbackOf(style, sceneId, actors)
+  const native = options.sceneArt ? sceneNativeOf(state, sceneId) : undefined
+  const own = orchestratorGameSceneArtOf({ style, sceneId, scene: native ? { native } : undefined })
+  const drawn = own.drawn === 'figures' || own.drawn === 'office' ? own.drawn : null
+  const art = drawn && native?.[drawn]
+  return own.art === 'scene' && drawn && art
+    ? { kind: 'scene', style: drawn, sceneId, native: art, actors, fallback }
+    : fallback
+}
+
+// Why parsed again: a paired host may run another build, and a bad block only costs the art.
+function sceneNativeOf(state: Rec, sceneId: string) {
+  const scenes =
+    isRecord(state.extensions) && Array.isArray(state.extensions.scenes)
+      ? state.extensions.scenes
+      : []
+  const scene = scenes.find((one) => isRecord(one) && one.id === sceneId)
+  return isRecord(scene) ? orchestratorGameSceneNativeOf(scene.definition).native : undefined
+}
+
+function fallbackOf(
+  style: GamePanelStyle,
+  sceneId: string,
+  actors: TeamSceneBandActor[]
+): BandFallback {
+  const art = orchestratorGameSceneArtOf({ style, sceneId, sceneArtFailed: true })
   return art.art === 'bundled' && (art.drawn === 'figures' || art.drawn === 'office')
     ? { kind: 'art', style: art.drawn, actors }
     : { kind: 'readable', actors }

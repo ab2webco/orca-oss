@@ -21,7 +21,7 @@ const sourceOf = (art: TeamSceneQuestArt, actor: TeamSceneBandActor) =>
     ? art.lead
     : actor.role === 'advisor'
       ? art.advisor
-      : (art.members[actor.sheet % art.members.length] ?? art.lead)
+      : (art.members[actor.seed % art.members.length] ?? art.lead)
 
 const TONE: Record<TeamMemberRow['state'], string> = {
   waiting: colors.statusRed,
@@ -69,6 +69,10 @@ export function TeamSceneBand({
   leadName: string | null
   members: TeamMemberRow[]
 }) {
+  if (band.kind === 'scene') {
+    // Why the fallback: drawing a scene file's own sheets comes next; it is read but not drawn yet.
+    return <TeamSceneBand band={band.fallback} leadName={leadName} members={members} />
+  }
   if (band.kind === 'readable') {
     return <ReadableBand leadName={leadName} members={members} />
   }
