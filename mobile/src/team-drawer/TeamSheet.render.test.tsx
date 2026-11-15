@@ -541,6 +541,70 @@ describe('TeamSheet', () => {
     expect(names).toEqual(expect.arrayContaining(['Castillo', 'Juno', 'Rho']))
   })
 
+  const role = (sheets: string[]) => ({
+    sheets,
+    frame: { width: 64, height: 64 },
+    size: 50,
+    animations: { idle: { row: 1, frames: 2 } }
+  })
+  const mario = {
+    ...gamePanel('figures'),
+    config: { scene: 'mario' },
+    extensions: {
+      scenes: [
+        {
+          id: 'mario',
+          pluginId: 'project',
+          definition: {
+            native: {
+              figures: {
+                layers: [{ src: 'sky.png' }],
+                roles: { lead: role(['mario.png']), member: role(['toad.png']) }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+  const sceneTeam = (sceneArt: TeamDrawerData['sceneArt']) => {
+    const team = teamWith({ questions: [] }, leader, mario)
+    const view =
+      team.view &&
+      teamLeadViewOf(
+        { role: 'lead', lead: {}, leadName: 'Castillo', agents: [leader], ...mario },
+        new Set(),
+        null,
+        NOW,
+        { sceneArt: true }
+      )
+    return { ...team, view: team.view && view && { ...team.view, scene: view.scene }, sceneArt }
+  }
+  const image = (uri: string) => ({ uri, width: 128, height: 256 })
+
+  it("draws the scene file's own art, one frame of each sheet, once its images load", () => {
+    const images = new Map(['sky.png', 'mario.png', 'toad.png'].map((src) => [src, image(src)]))
+    show(sceneTeam({ kind: 'ready', images }))
+    const actors = container.querySelectorAll<HTMLElement>('[data-testid="team-scene-actor"]')
+    expect(actors).toHaveLength(2)
+    const px = (50 / 64) * (128 / 176)
+    expect(Number.parseFloat(getComputedStyle(actors[0]!).width)).toBeCloseTo(64 * px, 3)
+    expect(getComputedStyle(actors[0]!).overflowX).toBe('hidden')
+    // Why: the idle row is row 1 here, so the sheet sits one frame up inside its clip.
+    const sheet = actors[0]!.firstElementChild as HTMLElement
+    expect(Number.parseFloat(getComputedStyle(sheet).top)).toBeCloseTo(-64 * px, 3)
+    expect(Number.parseFloat(getComputedStyle(sheet).height)).toBeCloseTo(256 * px, 3)
+  })
+
+  it('holds the band empty while the art loads, and draws the names when it fails', () => {
+    show(sceneTeam({ kind: 'loading' }))
+    const band = () => container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
+    expect(getComputedStyle(band()!).height).toBe('128px')
+    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(0)
+    show(sceneTeam({ kind: 'failed' }))
+    expect(band()!.textContent).toContain('Castillo')
+  })
+
   it('draws no band when the desktop panel is not in the Game look', () => {
     show(teamWith({ questions: [] }, leader, gamePanel('figures', 'plain')))
     expect(container.querySelector('[data-testid="team-scene-band"]')).toBeNull()

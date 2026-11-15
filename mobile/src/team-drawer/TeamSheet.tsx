@@ -165,6 +165,7 @@ export function TeamSheet({
                     {view.scene ? (
                       <TeamSceneBand
                         band={view.scene}
+                        ownArt={team.sceneArt}
                         leadName={view.lead?.name ?? null}
                         members={view.members}
                       />
