@@ -57,15 +57,21 @@ Some captures have to show what a real Orca sends, not the mock. Mint the link f
 machine paired with that host. Nobody has to open Settings > Mobile on it:
 
 ```sh
-orca mobile pair --environment m1 --address 10.0.2.2 --local-only --json
+orca mobile pair --environment m1 --connection lan --address 10.0.2.2 --json
 ```
+
+The flags match Settings > Mobile on that host:
 
 - `--environment` names the paired host that mints the link, as in `orca environment list`. Leave
   it out to pair with the Orca on the machine you run the command on.
-- `10.0.2.2` is how an Android emulator reaches the machine it runs on, so the link points the
-  emulator at the Orca on that same machine.
-- `--local-only` pairs over that address alone. Without it the host also asks Orca Relay for an
-  invite, and if Relay can't make one the host refuses with `relay_mint_failed`. m1 refuses this way.
+- `--connection` is the UI's Connection method. `relay` is the default, and it needs Orca sign-in on
+  that host. When Relay can't make an invite, the host refuses with `relay_mint_failed`, and the
+  error names the Relay failure code. `lan` pairs over `--address` alone, and that is all an emulator
+  needs.
+- `--address` is the UI's address of this computer, the one the phone dials. `lan` requires it.
+  Without one, the command lists the host's addresses instead of minting a link. `10.0.2.2` is how an
+  Android emulator reaches the machine it runs on, so the link points the emulator at the Orca on
+  that same machine.
 - Repeated calls reuse the same pending link until a phone scans it. `--rotate` revokes it and mints
   a new one.
 

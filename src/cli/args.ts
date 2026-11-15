@@ -33,7 +33,6 @@ export const BOOLEAN_FLAGS = new Set([
   'interrupt',
   'json',
   'local',
-  'local-only',
   'messages',
   'me',
   'mobile',
