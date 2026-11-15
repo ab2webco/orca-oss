@@ -61,6 +61,8 @@ export function getIdleProjectOpenKey(groupKey: string): string {
   return `${IDLE_PROJECT_OPEN_KEY_PREFIX}${groupKey}`
 }
 
+export const IDLE_PROJECTS_GROUP_KEY = 'idle-projects'
+
 export const PINNED_GROUP_KEY = 'pinned'
 
 export const PINNED_GROUP_META = {

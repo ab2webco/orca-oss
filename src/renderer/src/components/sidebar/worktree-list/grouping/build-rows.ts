@@ -33,6 +33,7 @@ import type {
 import { getRenderedNaturalAnchorRepoIds, withRepoSectionDisplayLabels } from './section-order'
 import { buildOrderedGroups } from './worktree-grouping'
 import { getActiveProjectKeys } from './idle-project-fold'
+import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
 import type { ProjectActivityInputs } from './project-activity'
 
 export function buildRows(
@@ -181,11 +182,12 @@ export function buildRows(
         : undefined
   }
 
-  if (groupBy !== 'repo' || projectGroups.length === 0) {
-    appendOrderedGroups(
-      sectionContext,
-      groupBy === 'repo' ? withRepoSectionDisplayLabels(orderedGroups) : orderedGroups
-    )
+  if (groupBy !== 'repo') {
+    appendOrderedGroups(sectionContext, orderedGroups)
+    return result
+  }
+  if (projectGroups.length === 0) {
+    appendRepoSectionsSplitByActivity(sectionContext, withRepoSectionDisplayLabels(orderedGroups))
     return result
   }
 

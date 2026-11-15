@@ -49,6 +49,10 @@ function isFoldedHeader(row: RenderRow | undefined): boolean {
   return row?.type === 'header' && row.fold?.state === 'folded'
 }
 
+function isIdleProjectsGroupHeader(row: RenderRow | undefined): boolean {
+  return row?.type === 'header' && row.idleProjectsGroup !== undefined
+}
+
 export function shouldUseHeaderTopSpacing(args: {
   rows: readonly RenderRow[]
   index: number
@@ -59,7 +63,8 @@ export function shouldUseHeaderTopSpacing(args: {
     previousRenderRow?.type === 'header' && previousRenderRow.key === PINNED_GROUP_KEY
   // Why: consecutive one-row idle projects read as one list, as in the ORCA-1216 mock-up.
   const followsFoldedProject =
-    isFoldedHeader(args.rows[args.index]) && isFoldedHeader(previousRenderRow)
+    isFoldedHeader(args.rows[args.index]) &&
+    (isFoldedHeader(previousRenderRow) || isIdleProjectsGroupHeader(previousRenderRow))
   return (
     args.index !== args.firstHeaderIndex && !followsCollapsedPinnedHeader && !followsFoldedProject
   )
@@ -258,8 +263,12 @@ export function getActiveStickyIndexesForScroll(args: {
     hostIndex === null
   )
 
-  // Why: a folded idle project has no rows to label; it only ends the previous project's pin.
-  return { hostIndex, groupIndex: isFoldedHeader(args.rows[groupIndex ?? -1]) ? null : groupIndex }
+  // Why: a folded idle project and the idle group label no rows; they only end the previous project's pin.
+  const groupRow = args.rows[groupIndex ?? -1]
+  return {
+    hostIndex,
+    groupIndex: isFoldedHeader(groupRow) || isIdleProjectsGroupHeader(groupRow) ? null : groupIndex
+  }
 }
 
 export function getActiveStickyHeaderIndex(

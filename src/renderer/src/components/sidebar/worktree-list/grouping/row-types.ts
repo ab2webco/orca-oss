@@ -40,6 +40,10 @@ export type GroupHeaderRow = {
   hostWorktreeIds?: ReadonlyMap<ExecutionHostId, readonly string[]>
   worktreeIds?: readonly string[]
   fold?: IdleProjectFold
+  /** Repo headers: the newest workspace activity, absent when none has a timestamp. */
+  lastActivityAt?: number
+  /** The collapsible group that holds idle projects (ORCA-1216 §2.3); `count` is its project count. */
+  idleProjectsGroup?: { collapsed: boolean }
 }
 
 export type WorktreeRow = {

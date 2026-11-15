@@ -8,7 +8,12 @@ import {
 } from './project-activity'
 
 const NOW = 1_800_000_000_000
-const inputs = { now: NOW, currentWorktreeId: null, liveAgentWorktreeIds: new Set<string>() }
+const inputs = {
+  now: NOW,
+  currentWorktreeId: null,
+  liveAgentWorktreeIds: new Set<string>(),
+  windowMs: PROJECT_ACTIVITY_WINDOW_MS
+}
 
 describe('isWorkspaceActive', () => {
   it('is active with activity inside the 24 h window and idle once it is older', () => {
@@ -25,6 +30,12 @@ describe('isWorkspaceActive', () => {
       true
     )
     expect(isWorkspaceActive(old, { ...inputs, currentWorktreeId: old.id })).toBe(true)
+  })
+
+  it('reads the configured window instead of a fixed 24 h', () => {
+    const fiveHoursAgo = { ...worktree, lastActivityAt: NOW - 5 * 60 * 60 * 1000 }
+    expect(isWorkspaceActive(fiveHoursAgo, { ...inputs, windowMs: 4 * 60 * 60 * 1000 })).toBe(false)
+    expect(isWorkspaceActive(fiveHoursAgo, { ...inputs, windowMs: 6 * 60 * 60 * 1000 })).toBe(true)
   })
 })
 

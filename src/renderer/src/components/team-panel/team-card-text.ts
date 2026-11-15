@@ -23,6 +23,7 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import { localHostDisplayLabel } from '../../lib/local-host-display-label'
 import { teamIdleCiOf } from '../../../../shared/team-member-shown-state'
+import { formatShortActivityAge } from '../sidebar/short-activity-age'
 
 const TONE: Record<TeamStatus, StatusTone> = {
   attention: 'attention',
@@ -50,21 +51,9 @@ export function teamStatusGlyph(status: TeamStatus): StatusDotGlyph {
   return GLYPH[status] ?? 'dot'
 }
 
-const MINUTE = 60_000
-
-/** V28's short age: `now`, `10 min`, `13 h`, `3 d`. */
+/** V28's short age: `now`, `10 min`, `13 h`, `3 d`; the sidebar's one formatter. */
 export function teamAgeText(since: number, now: number): string {
-  const minutes = Math.floor((now - since) / MINUTE)
-  if (minutes < 1) {
-    return translate('teamPanel.age.now', 'now')
-  }
-  if (minutes < 60) {
-    return translate('teamPanel.age.minutes', '{{count}} min', { count: minutes })
-  }
-  const hours = Math.floor(minutes / 60)
-  return hours < 24
-    ? translate('teamPanel.age.hours', '{{count}} h', { count: hours })
-    : translate('teamPanel.age.days', '{{count}} d', { count: Math.floor(hours / 24) })
+  return formatShortActivityAge(since, now) ?? ''
 }
 
 export function teamConditionText(condition: TeamCondition): string {

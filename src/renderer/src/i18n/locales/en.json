@@ -5824,6 +5824,19 @@
           "fold": "Fold {{project}}",
           "unfold": "Show workspaces in {{project}}",
           "count": "{{count}} workspaces"
+        },
+        "ShortActivityAge": {
+          "now": "now",
+          "minutes": "{{count}} min",
+          "hours": "{{count}} h",
+          "days": "{{count}} d",
+          "weeks": "{{count}} wk"
+        },
+        "IdleProjectsGroup": {
+          "label": "Idle",
+          "count": "{{count}} projects",
+          "count_one": "{{count}} project",
+          "count_other": "{{count}} projects"
         }
       },
       "shared": {
@@ -8720,7 +8733,12 @@
             "d6c0a9e2f4": "grok",
             "c5b9f8d1e3": "xai",
             "usagePercentageDisplayTitle": "Usage percentages",
-            "usagePercentageDisplayDescription": "Choose whether provider limits show the percentage used or remaining."
+            "usagePercentageDisplayDescription": "Choose whether provider limits show the percentage used or remaining.",
+            "sidebarActivityWindow": {
+              "idle": "idle",
+              "activity": "activity",
+              "window": "window"
+            }
           }
         },
         "auto": {
@@ -11736,6 +11754,14 @@
           "limits": "Agents and members assigned to it launch on the token. It cannot be the shared login, and its usage cannot be shown. Sign in again on its row later to give it its real email.",
           "add": "Add account",
           "pasteHint": "From claude setup-token, run while signed in as the account you are adding."
+        },
+        "SidebarActivityWindowSetting": {
+          "title": "Idle project window",
+          "description": "Projects with no activity in this window fold into Idle at the bottom of the sidebar.",
+          "hours12": "12 h",
+          "hours24": "24 h",
+          "days3": "3 d",
+          "days7": "7 d"
         }
       },
       "right": {
@@ -17523,12 +17549,6 @@
         "new": "New action",
         "edit": "Edit"
       }
-    },
-    "age": {
-      "now": "now",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h",
-      "days": "{{count}} d"
     },
     "display": {
       "label": "Team metrics",

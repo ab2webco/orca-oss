@@ -29,6 +29,7 @@ import {
   type WorktreeItemRowContext
 } from './item-row'
 import { renderWorktreeSectionHeaderRow, type SectionHeaderRowContext } from './SectionHeader'
+import { renderIdleProjectsGroupHeaderRow } from './idle-projects-group-header'
 import type { WorktreeRowDragState } from '../drag/row-state'
 
 export type WorktreeVirtualRowContext = {
@@ -154,6 +155,20 @@ export function renderWorktreeVirtualRow(
 ): React.JSX.Element | null {
   if (row.type === 'host-header') {
     return renderHostHeaderVirtualRow(ctx, row, vItem)
+  }
+
+  if (row.type === 'header' && row.idleProjectsGroup) {
+    return renderIdleProjectsGroupHeaderRow({
+      ctx: ctx.header,
+      row,
+      vItem,
+      hasHeaderTopSpacing: shouldUseHeaderTopSpacing({
+        rows: ctx.renderRows,
+        index: vItem.index,
+        firstHeaderIndex: ctx.firstHeaderIndex
+      }),
+      measureVirtualRowElement: ctx.measureVirtualRowElement
+    })
   }
 
   if (row.type === 'header') {

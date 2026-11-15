@@ -1,3 +1,4 @@
+import type { SidebarListSettings } from './sidebar-list-settings-types'
 import type { ExecutionHostId } from './execution-host'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
@@ -50,7 +51,8 @@ import type { WorktreeVisibilityDefaults } from './repo-types'
 
 export type { WorktreeVisibilityDefaults }
 
-export type GlobalSettings = {
+// Why the intersection: sidebar list options live in their own module to keep this file under max-lines.
+export type GlobalSettings = SidebarListSettings & {
   workspaceDir: string
   /** Host-owned defaults used when a repository has no explicit visibility override. */
   worktreeVisibilityDefaults?: WorktreeVisibilityDefaults
@@ -238,8 +240,6 @@ export type GlobalSettings = {
   showArtifactsButton?: boolean
   /** Only toggles the sidebar shortcut; Orca Mobile stays reachable from Settings. */
   showMobileButton?: boolean
-  /** Pinned workspaces show in one sidebar location by default; opt in to also show them in their natural groups. */
-  showPinnedWorktreesInGroups?: boolean
   /** How Ctrl+Tab picks the next visible tab; optional (older profiles), readers default to MRU. */
   ctrlTabOrderMode?: CtrlTabOrderMode
   /** Orca-first keeps app shortcuts from TUIs; terminal-first is opt-in to let shell/TUI bindings win. */

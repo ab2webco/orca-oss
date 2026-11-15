@@ -5,7 +5,12 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import { PINNED_GROUP_KEY, getIdleProjectOpenKey, getLineageGroupKey } from '../grouping/group-keys'
+import {
+  IDLE_PROJECTS_GROUP_KEY,
+  PINNED_GROUP_KEY,
+  getIdleProjectOpenKey,
+  getLineageGroupKey
+} from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
@@ -64,6 +69,8 @@ export function useEffectiveCollapsedGroups(args: {
         // Why: an idle project's fold also hides the target; an extra open key on an active project is inert.
         next.add(getIdleProjectOpenKey(groupKey))
       }
+      // Why unconditional: an idle target may sit in the collapsed idle group; opening it while picking is harmless.
+      next.delete(IDLE_PROJECTS_GROUP_KEY)
     }
 
     for (const parent of getWorktreeLineageAncestors(

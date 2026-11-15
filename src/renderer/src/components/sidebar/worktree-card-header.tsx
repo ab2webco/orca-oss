@@ -14,6 +14,7 @@ import { formatSparseDirectoryPreview, shouldBeginWorktreeRename } from './workt
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import { WorktreeCardSshHostControl } from './WorktreeCardSshHostControl'
 import { WorktreeTitleInlineRename } from './WorktreeTitleInlineRename'
+import { ShortActivityAgeLabel } from './ShortActivityAgeLabel'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 // Why: pinned repo icon and compact inline badge share this chip shell so both repo cues read as the same affordance.
@@ -249,6 +250,11 @@ export function WorktreeCardHeader({
 
         {showTitleRowIndicators && titleRowIndicators}
       </div>
+
+      <ShortActivityAgeLabel
+        since={worktree.lastActivityAt}
+        className={showHeaderActions ? undefined : 'pr-1.5'}
+      />
 
       {showHeaderActions && (
         <div className="ml-auto flex shrink-0 items-center justify-center gap-1 pr-1.5">

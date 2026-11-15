@@ -5473,6 +5473,19 @@
           "fold": "Plegar {{project}}",
           "unfold": "Mostrar los espacios de trabajo de {{project}}",
           "count": "{{count}} espacios de trabajo"
+        },
+        "ShortActivityAge": {
+          "now": "ahora",
+          "minutes": "{{count}} min",
+          "hours": "{{count}} h",
+          "days": "{{count}} d",
+          "weeks": "{{count}} sem"
+        },
+        "IdleProjectsGroup": {
+          "label": "En reposo",
+          "count": "{{count}} proyectos",
+          "count_one": "{{count}} proyecto",
+          "count_other": "{{count}} proyectos"
         }
       },
       "shared": {
@@ -8324,7 +8337,12 @@
             "d6c0a9e2f4": "grok",
             "c5b9f8d1e3": "xai",
             "usagePercentageDisplayTitle": "Porcentajes de uso",
-            "usagePercentageDisplayDescription": "Elige si los límites del proveedor muestran el porcentaje usado o restante."
+            "usagePercentageDisplayDescription": "Elige si los límites del proveedor muestran el porcentaje usado o restante.",
+            "sidebarActivityWindow": {
+              "idle": "en reposo",
+              "activity": "actividad",
+              "window": "ventana"
+            }
           }
         },
         "auto": {
@@ -11125,6 +11143,14 @@
           "limits": "Los agentes y miembros asignados a ella se inician con el token. No puede ser el inicio de sesión compartido y su uso no se puede mostrar. Más tarde puedes volver a iniciar sesión en su fila para darle su correo real.",
           "add": "Agregar cuenta",
           "pasteHint": "De claude setup-token, ejecutado con la sesión iniciada en la cuenta que estás agregando."
+        },
+        "SidebarActivityWindowSetting": {
+          "title": "Ventana de proyectos en reposo",
+          "description": "Los proyectos sin actividad en esta ventana se pliegan en En reposo, al final de la barra lateral.",
+          "hours12": "12 h",
+          "hours24": "24 h",
+          "days3": "3 d",
+          "days7": "7 d"
         }
       },
       "right": {
@@ -16543,12 +16569,6 @@
         "new": "Nueva acción",
         "edit": "Editar"
       }
-    },
-    "age": {
-      "now": "ahora",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h",
-      "days": "{{count}} d"
     },
     "display": {
       "label": "Métricas del equipo",

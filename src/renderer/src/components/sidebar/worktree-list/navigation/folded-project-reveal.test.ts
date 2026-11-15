@@ -43,6 +43,23 @@ describe('getFoldedProjectRevealKeys', () => {
   })
 })
 
+describe('getFoldedProjectRevealKeys with a collapsed idle group', () => {
+  const collapsedIdleGroup: RenderRow = {
+    type: 'header',
+    key: 'idle-projects',
+    label: 'Idle',
+    count: 1,
+    tone: 'text-foreground',
+    idleProjectsGroup: { collapsed: true },
+    worktreeIds: ['hub-main', 'hub-spike']
+  }
+
+  it('opens the collapsed idle group that hides the workspace first', () => {
+    expect(getFoldedProjectRevealKeys([collapsedIdleGroup], 'hub-spike')).toEqual(['idle-projects'])
+    expect(getFoldedProjectRevealKeys([collapsedIdleGroup], 'elsewhere')).toEqual([])
+  })
+})
+
 describe('expandGroupsForWorktreeReveal', () => {
   it('unfolds the folded project holding the reveal target', () => {
     const toggleGroup = vi.fn()

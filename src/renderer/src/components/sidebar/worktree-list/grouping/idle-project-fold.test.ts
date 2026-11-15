@@ -54,7 +54,8 @@ const all = [activeMain, hubMain, hubSpike, lonelyMain, folderMain]
 const inputs: ProjectActivityInputs = {
   now: NOW,
   currentWorktreeId: null,
-  liveAgentWorktreeIds: new Set()
+  liveAgentWorktreeIds: new Set(),
+  windowMs: 24 * 60 * 60 * 1000
 }
 
 function build(
@@ -113,6 +114,7 @@ describe('buildRows idle project fold', () => {
     expect(shape(rows)).toEqual([
       'cineco-frontend',
       '  active-main',
+      'Idle',
       'project-hub [folded 2]',
       'fe-ai-prototype [folded 1]',
       'ab2web-landing [folded 1]'
@@ -136,6 +138,7 @@ describe('buildRows idle project fold', () => {
     expect(shape(rows)).toEqual([
       'cineco-frontend',
       '  active-main',
+      'Idle',
       'project-hub [open 2]',
       '  hub-main',
       '  hub-spike',
@@ -143,7 +146,7 @@ describe('buildRows idle project fold', () => {
       'ab2web-landing [folded 1]'
     ])
     // Why: the legacy collapse key alone never unfolds an idle project.
-    expect(shape(build(all, new Set(['repo:idle'])))[2]).toBe('project-hub [folded 2]')
+    expect(shape(build(all, new Set(['repo:idle'])))[3]).toBe('project-hub [folded 2]')
   })
 
   it('treats the current workspace and a live agent as activity, whatever the age', () => {

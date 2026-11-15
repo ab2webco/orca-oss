@@ -5,6 +5,7 @@ import { getEffectiveProjectGroupManualRank } from '../../../../../../shared/pro
 import { PROJECT_GROUP_META, getProjectGroupHeaderKey } from './group-keys'
 import { appendOrderedGroups } from './group-sections'
 import type { SectionAppendContext } from './group-sections'
+import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
 import type { OrderedGroupEntry } from './project-grouping'
 import {
   compareRecentRank,
@@ -138,7 +139,8 @@ export function appendProjectGroupSections(
     // not fetched yet; missing metadata must not make those repos disappear.
     remainingRepoEntries.push(...entries)
   }
-  appendOrderedGroups(
+  // Why only ungrouped projects: inside a Project Group, idle projects fold in place under their group.
+  appendRepoSectionsSplitByActivity(
     ctx,
     withRepoSectionDisplayLabels(sortRepoEntriesWithinGroup(remainingRepoEntries)),
     0

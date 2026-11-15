@@ -11,6 +11,7 @@ function sameInputs(left: ProjectActivityInputs, right: ProjectActivityInputs): 
   return (
     left.now === right.now &&
     left.currentWorktreeId === right.currentWorktreeId &&
+    left.windowMs === right.windowMs &&
     left.liveAgentWorktreeIds.size === right.liveAgentWorktreeIds.size &&
     [...left.liveAgentWorktreeIds].every((id) => right.liveAgentWorktreeIds.has(id))
   )
@@ -21,13 +22,20 @@ export function useIdleProjectFoldInputs(): ProjectActivityInputs {
   const activeWorkspaceKey = useAppStore((s) => s.activeWorkspaceKey)
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const agentStatusEpoch = useAppStore((s) => s.agentStatusEpoch)
+  const windowHours = useAppStore((s) => s.settings?.sidebarActivityWindowHours)
   const previous = useRef<ProjectActivityInputs | null>(null)
   return useMemo(() => {
     void agentStatusEpoch
     // Why snapshot on agentStatusEpoch: membership changes bump it; hook pings do not repaint the list.
     const { agentStatusByPaneKey, tabsByWorktree } = useAppStore.getState()
     const next = selectIdleProjectFoldInputs(
-      { activeWorkspaceKey, activeWorktreeId, agentStatusByPaneKey, tabsByWorktree },
+      {
+        activeWorkspaceKey,
+        activeWorktreeId,
+        agentStatusByPaneKey,
+        tabsByWorktree,
+        settings: { sidebarActivityWindowHours: windowHours }
+      },
       now
     )
     // Why reuse: these inputs feed the buildRows memo; a fresh identity per epoch rebuilds every row.
@@ -36,5 +44,5 @@ export function useIdleProjectFoldInputs(): ProjectActivityInputs {
     }
     previous.current = next
     return next
-  }, [activeWorkspaceKey, activeWorktreeId, agentStatusEpoch, now])
+  }, [activeWorkspaceKey, activeWorktreeId, agentStatusEpoch, now, windowHours])
 }

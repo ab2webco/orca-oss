@@ -16,6 +16,7 @@ import {
 } from './claude-statusline-items'
 import { EMPTY_CODEX_RESET_CREDIT_ATTEMPT_LEDGER } from './codex-reset-credit-attempt-ledger'
 import { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
+import { DEFAULT_SIDEBAR_ACTIVITY_WINDOW_HOURS } from './sidebar-activity-window'
 import { DEFAULT_TERMINAL_FONT_WEIGHT, DEFAULT_TERMINAL_FONT_WEIGHT_BOLD } from './terminal-fonts'
 import { getDefaultTerminalQuickCommands } from './terminal-quick-commands'
 import { DEFAULT_TERMINAL_PANE_ACTIONS_POSITION } from './terminal-pane-actions-position'
@@ -292,6 +293,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     showArtifactsButton: false,
     showMobileButton: true,
     showPinnedWorktreesInGroups: false,
+    sidebarActivityWindowHours: DEFAULT_SIDEBAR_ACTIVITY_WINDOW_HOURS,
     ctrlTabOrderMode: 'mru',
     // Why: Orca-first keeps core shortcuts working from a focused terminal; TUI-ownership users opt in.
     terminalShortcutPolicy: 'orca-first',

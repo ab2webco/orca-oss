@@ -1,6 +1,6 @@
 import type { Worktree } from '../../../../../../shared/worktree/types'
 
-/** Owner decision (ORCA-1216): a project is active with activity in the last 24 h. */
+/** Owner decision (ORCA-1216): a project is active with activity in the last 24 h, by default. */
 export const PROJECT_ACTIVITY_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export type ProjectActivityInputs = {
@@ -8,6 +8,8 @@ export type ProjectActivityInputs = {
   /** The workspace the sidebar marks as current; its project is always active. */
   currentWorktreeId: string | null
   liveAgentWorktreeIds: ReadonlySet<string>
+  /** The sidebarActivityWindowHours setting, in ms. */
+  windowMs: number
 }
 
 type ActivityWorktree = Pick<Worktree, 'id' | 'lastActivityAt'>
@@ -19,7 +21,7 @@ export function isWorkspaceActive(
   return (
     worktree.id === inputs.currentWorktreeId ||
     inputs.liveAgentWorktreeIds.has(worktree.id) ||
-    inputs.now - worktree.lastActivityAt < PROJECT_ACTIVITY_WINDOW_MS
+    inputs.now - worktree.lastActivityAt < inputs.windowMs
   )
 }
 
@@ -47,4 +49,15 @@ export function pickProjectOpenWorktree<
     }
   }
   return best
+}
+
+/** Newest activity among the workspaces; null when none has a timestamp, so no age is invented. */
+export function getLatestActivityAt(
+  worktrees: readonly Pick<Worktree, 'lastActivityAt'>[]
+): number | null {
+  let latest = 0
+  for (const worktree of worktrees) {
+    latest = Math.max(latest, worktree.lastActivityAt)
+  }
+  return latest > 0 ? latest : null
 }
