@@ -357,9 +357,11 @@ export default function AccountsScreen() {
       <AccountsHeader
         hostId={hostId}
         hostName={hostName}
-        refreshing={refreshing}
-        canRefresh={Boolean(client) && !refreshing && connState === 'connected'}
-        onRefresh={refresh}
+        refresh={{
+          refreshing,
+          canRefresh: Boolean(client) && !refreshing && connState === 'connected',
+          onRefresh: refresh
+        }}
       />
 
       <ScrollView
