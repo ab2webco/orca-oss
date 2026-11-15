@@ -286,7 +286,11 @@ import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
 import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
 import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
-import { newTabTeamSectionOf } from '../../../../src/new-tab-team/new-tab-team-section'
+import { reopenTeamLeadFromPhone } from '../../../../src/new-tab-team/new-tab-team-reopen'
+import {
+  newTabTeamSectionOf,
+  reopenFailureOf
+} from '../../../../src/new-tab-team/new-tab-team-section'
 import { openMobilePrUrl } from '../../../../src/components/mobile-pr-url'
 import { useNow } from '../../../../src/hooks/use-now'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
@@ -2895,7 +2899,20 @@ export default function SessionScreen() {
   })
   const newTabTeamSection = newTabTeamSectionOf(newTabTeam, {
     hostName: hostName || 'this computer',
-    onGoToLead: openTeamTerminal
+    onGoToLead: openTeamTerminal,
+    onReopen: () => {
+      if (!client) {
+        return
+      }
+      // Why no project name: the host keys the lead by worktree; the desktop sends '' when it has none too.
+      void reopenTeamLeadFromPhone(client, { worktreeId, project: '' }).then((answer) => {
+        const failure = reopenFailureOf(answer)
+        if (failure) {
+          triggerError()
+          showToast(failure, 2400)
+        }
+      })
+    }
   })
   const activeLeadPaneKey = leadPaneKeyOf(
     sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null

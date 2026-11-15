@@ -11,6 +11,7 @@ export type NewTabTeam =
   | { kind: 'pending' }
   | { kind: 'none' }
   | { kind: 'lead-live'; lead: TerminalOpenTarget & { terminal: string } }
+  | { kind: 'lead-closed'; accountEmail: string | null }
 
 type Rec = Record<string, unknown>
 
@@ -20,6 +21,13 @@ const recordOf = (value: unknown): Rec | null =>
 async function resultOf(request: Promise<RpcResponse>): Promise<unknown> {
   const response = await request.catch(() => null)
   return response?.ok ? response.result : undefined
+}
+
+async function accountEmailOf(client: RpcClient, accountId: string): Promise<string | null> {
+  const claude = recordOf(recordOf(await resultOf(client.sendRequest('accounts.list')))?.claude)
+  const accounts = Array.isArray(claude?.accounts) ? claude.accounts : []
+  const email = accounts.map(recordOf).find((account) => account?.id === accountId)?.email
+  return typeof email === 'string' ? email : null
 }
 
 /** Reads the host's leads once per sheet open; a failed read keeps today's entries only. */
@@ -46,6 +54,17 @@ export async function readNewTabTeam(
   const restoring = recordOf(leads)?.restoring
   if (Array.isArray(restoring) && restoring.length > 0) {
     return { kind: 'pending' }
+  }
+  const stored = recordOf(
+    await resultOf(client.sendRequest('game.leadStored', { worktreeId: args.worktreeId }))
+  )
+  const kept = stored ? recordOf(stored.stored) : null
+  const accountId = kept?.accountId
+  if (accountId === null) {
+    return { kind: 'lead-closed', accountEmail: null }
+  }
+  if (typeof accountId === 'string') {
+    return { kind: 'lead-closed', accountEmail: await accountEmailOf(client, accountId) }
   }
   return { kind: 'none' }
 }
