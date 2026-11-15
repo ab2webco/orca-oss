@@ -129,7 +129,7 @@ export function listGameCharacters(stored: Record<string, unknown>): GameCharact
   return Object.values(stored)
     .flatMap((raw) => parseCharacter(raw) ?? [])
     .map(({ applied: _applied, settled: _settled, ...character }) => character)
-    .toSorted((a, b) => b.xp - a.xp || a.key.localeCompare(b.key))
+    .sort((a, b) => b.xp - a.xp || a.key.localeCompare(b.key))
 }
 
 function workedMsOf(record: GameHistoryRecord): number | null {
@@ -314,7 +314,7 @@ export function mergeGameCharacters(
       xp: sum('xp'),
       lastAt: mine.lastAt > theirs.lastAt ? mine.lastAt : theirs.lastAt,
       recent: [...theirs.recent, ...mine.recent]
-        .toSorted((a, b) => a.endedAt.localeCompare(b.endedAt))
+        .sort((a, b) => a.endedAt.localeCompare(b.endedAt))
         .slice(-GAME_CHARACTER_RECENT_MAX),
       applied: [...theirs.applied, ...mine.applied].slice(-APPLIED_MAX),
       settled: [...new Set([...theirs.settled, ...mine.settled])].slice(-SETTLED_MAX)
