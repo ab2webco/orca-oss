@@ -8,6 +8,8 @@ import type {
   TeamMemberCard,
   TeamPanelGameModel
 } from '../../../../shared/team-panel-model-types'
+import type { DeliveredMember } from './sidebar-delivered-members'
+import { useSidebarDeliveredStore } from './sidebar-delivered-store'
 
 /** A worktree card that is the game lead's or a member's: it draws V30's agent row instead. */
 export type SidebarTeamRow =
@@ -66,14 +68,21 @@ export function useSidebarTeamLook(): GamePanelLook {
 /** True inside the lead's children: a member there draws as V30's child row. */
 export const SidebarTeamChildContext = createContext(false)
 
-/** The card's team row, and whether it sits under the lead as a child row. */
+/** The card's team row, whether it sits under the lead, and its delivery once its member was freed. */
 export function useSidebarTeamCard(worktreeId: string): {
   row: SidebarTeamRow | null
   child: boolean
+  delivered: DeliveredMember | null
 } {
   const row = useSidebarTeamRow(worktreeId)
   const underLead = useContext(SidebarTeamChildContext)
-  return { row, child: underLead && row?.role === 'member' }
+  const delivered = useSidebarDeliveredStore((s) => s.delivered[worktreeId] ?? null)
+  // Why only under the lead: away from it the worktree is no team row, so it keeps its own card.
+  return {
+    row,
+    child: underLead && row?.role === 'member',
+    delivered: underLead && !row ? delivered : null
+  }
 }
 
 export function useSidebarTeamRowSince(row: SidebarTeamRow): number | null {

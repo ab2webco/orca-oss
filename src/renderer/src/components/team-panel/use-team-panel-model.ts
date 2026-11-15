@@ -34,6 +34,7 @@ import { teamPanelProjectOf } from './team-panel-project'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
 import { publishTeamSceneArtHost } from '../team-scene/team-scene-art-host'
 import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
+import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
@@ -46,8 +47,13 @@ export type TeamPanelModelSource = {
 // Why 20 s: the same cadence as the mobile Team drawer, which polls the same game.state cache.
 const TEAM_REFRESH_MS = 20_000
 
-const useTeamPanelModelStore = create<{ source: TeamPanelModelSource }>(() => ({
-  source: { section: { kind: 'loading' }, retry: null }
+const useTeamPanelModelStore = create<{
+  source: TeamPanelModelSource
+  /** The host the source was read from, for reads that must go to the same one. */
+  target: RuntimeClientTarget | null
+}>(() => ({
+  source: { section: { kind: 'loading' }, retry: null },
+  target: null
 }))
 
 const NO_MEMBERS: readonly TeamMemberCard[] = []
@@ -85,10 +91,11 @@ const poller = createTeamPanelModelPoller(
   {
     readLeads: readTeamLeadRoster,
     findCaller: (roster, scope) => teamLeadCallerOf(roster, scope.worktreeIds),
-    // Why: the scene reads its art from the same host and lead caller as game.state (ORCA-1150).
+    // Why: the scene's art and the sidebar's history come from the host game.state is read on (ORCA-1150).
     readState: (target, caller) => {
       const { worktreeId, terminalHandle } = caller
       publishTeamSceneArtHost({ target, caller: { worktreeId, terminalHandle } })
+      useTeamPanelModelStore.setState({ target })
       return readTeamLeadState(target, caller)
     },
     readQuestions: readTeamOwnerQuestions,
@@ -199,6 +206,11 @@ export function useTeamPanelModel(options: { background?: boolean } = {}): TeamP
     const value = { ...model, inbox: withAddedInboxQuestions(model.inbox, added, otherOpen) }
     return { ...shown, section: { kind: 'ready', value } }
   }, [noTeam, solo, source, otherOpen, everyOpen, teamAsks])
+}
+
+/** The host the last model was read from; the sidebar reads the lead's history there (ORCA-1216 §6). */
+export function useTeamPanelTarget(): RuntimeClientTarget | null {
+  return useTeamPanelModelStore((s) => s.target)
 }
 
 /** The lead's pane as the last model read it, for what the panel sends it. */

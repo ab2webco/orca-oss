@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { findTeamLeadCaller, readTeamLeadState, readTeamXp } from './team-panel-lead-read'
+import {
+  findTeamLeadCaller,
+  readTeamHistory,
+  readTeamLeadState,
+  readTeamXp
+} from './team-panel-lead-read'
 
 const callRuntimeRpc = vi.fn()
 vi.mock('@/runtime/runtime-rpc-client', () => ({
@@ -101,5 +106,44 @@ describe('readTeamLeadState', () => {
     await expect(
       readTeamLeadState({ kind: 'local' }, { worktreeId: 'w', terminalHandle: 't', paneKey: PANE })
     ).resolves.toBeNull()
+  })
+})
+
+describe('readTeamHistory', () => {
+  it("reads the lead's freed members, dropping records this build cannot read", async () => {
+    callRuntimeRpc.mockResolvedValueOnce({
+      records: [
+        {
+          ticket: 'ORCA-1',
+          endedAt: '2026-11-15T10:00:00.000Z',
+          outcome: 'merged',
+          pr: '#2 merged'
+        },
+        { ticket: 'ORCA-3', endedAt: 'not a date', outcome: 'merged' }
+      ]
+    })
+
+    const records = await readTeamHistory(
+      { kind: 'local' },
+      { worktreeId: 'wt', terminalHandle: 'term' }
+    )
+
+    expect(records.map((one) => one.ticket)).toEqual(['ORCA-1'])
+    expect(callRuntimeRpc).toHaveBeenLastCalledWith(
+      { kind: 'local' },
+      'game.history',
+      { worktreeId: 'wt', terminalHandle: 'term' },
+      expect.anything()
+    )
+  })
+
+  it('reads none from a host with no history', async () => {
+    callRuntimeRpc.mockRejectedValueOnce(
+      Object.assign(new Error('unknown method'), { code: 'method_not_found' })
+    )
+
+    await expect(
+      readTeamHistory({ kind: 'local' }, { worktreeId: 'wt', terminalHandle: 'term' })
+    ).resolves.toEqual([])
   })
 })

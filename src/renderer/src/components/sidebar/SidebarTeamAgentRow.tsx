@@ -32,6 +32,10 @@ function namePartsOf(row: SidebarTeamRow, game: boolean): NameParts {
   return { name: row.card.name, mono: teamTicketBesideName(row.card, true) }
 }
 
+/** V30's tree connector from the lead to a child row; -top-0.5 bridges the 2 px of card borders above. */
+export const TEAM_CHILD_CONNECTOR_CLASS =
+  "before:absolute before:-top-0.5 before:bottom-1/2 before:-left-[13px] before:w-[7px] before:rounded-bl-[5px] before:border-b before:border-l before:border-muted-foreground/40 before:content-['']"
+
 /** V30's sidebar row: state dot, PR or branch icon, bold name, age. */
 export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
   row,
@@ -61,9 +65,7 @@ export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
       className={cn(
         // Why isolate: the selection fill (main.css `::after`) sits under the row's content.
         'relative isolate flex h-6.5 w-full min-w-0 items-center gap-[7px] text-[12.5px]',
-        // Why -top-0.5: it bridges the 2 px of card borders up to the row above, as V30's rows touch.
-        child &&
-          "before:absolute before:-top-0.5 before:bottom-1/2 before:-left-[13px] before:w-[7px] before:rounded-bl-[5px] before:border-b before:border-l before:border-muted-foreground/40 before:content-['']"
+        child && TEAM_CHILD_CONNECTOR_CLASS
       )}
     >
       <span data-team-row-part="state" className="grid w-3.5 shrink-0 place-items-center">

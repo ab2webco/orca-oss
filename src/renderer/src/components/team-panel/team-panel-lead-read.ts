@@ -2,6 +2,11 @@ import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import {
+  parseGameHistoryRecord,
+  type GameHistoryRecord
+} from '../../../../shared/orchestrator-game-history'
+import { hasRuntimeRpcErrorCode } from '@/runtime/runtime-rpc-result'
+import {
   parseGameOwnerQuestion,
   type GameOwnerQuestion
 } from '../../../../shared/orchestrator-game-owner-questions'
@@ -138,4 +143,27 @@ export async function readTeamOwnerQuestions(
   )
   const questions = Array.isArray(result.questions) ? result.questions : []
   return questions.flatMap((raw) => parseGameOwnerQuestion(raw) ?? [])
+}
+
+/** The lead's freed members (`orca game history`), oldest first; none from a host with no history. */
+export async function readTeamHistory(
+  target: RuntimeClientTarget,
+  caller: Pick<TeamLeadCaller, 'worktreeId' | 'terminalHandle'>
+): Promise<GameHistoryRecord[]> {
+  try {
+    const result = await callRuntimeRpc<{ records?: unknown }>(
+      target,
+      'game.history',
+      { worktreeId: caller.worktreeId, terminalHandle: caller.terminalHandle },
+      { timeoutMs: TEAM_RPC_TIMEOUT_MS }
+    )
+    const records = Array.isArray(result.records) ? result.records : []
+    // Why reversed back: game.history lists newest first; the sidebar reads them as stored.
+    return records.flatMap((raw) => parseGameHistoryRecord(raw) ?? []).toReversed()
+  } catch (error) {
+    if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
+      return []
+    }
+    throw error
+  }
 }

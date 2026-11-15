@@ -5865,6 +5865,31 @@
           "days": "{{count}} d",
           "weeks": "{{count}} wk"
         },
+        "SidebarDelivered": {
+          "group": "Delivered",
+          "foldedCount": "{{count}} delivered · over 24 h",
+          "foldedCount_one": "{{count}} delivered · over 24 h",
+          "foldedCount_other": "{{count}} delivered · over 24 h",
+          "merged": "merged",
+          "open": "open",
+          "queued": "queued",
+          "ciFailing": "CI failing",
+          "closed": "closed",
+          "noPr": "No PR",
+          "doneBy": "Done by {{name}}",
+          "label": {
+            "pr": "PR",
+            "title": "Title",
+            "branch": "Branch",
+            "lead": "Lead",
+            "freed": "Freed"
+          },
+          "today": "today {{time}}",
+          "freedValue": "{{time}} · worktree waiting",
+          "freed": "freed",
+          "inProgress": "in progress",
+          "also": "{{name}} also: {{tickets}}"
+        },
         "SidebarResumeStrip": {
           "resume": "Resume",
           "dismiss": "Dismiss"

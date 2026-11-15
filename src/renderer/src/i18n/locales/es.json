@@ -5514,6 +5514,31 @@
           "days": "{{count}} d",
           "weeks": "{{count}} sem"
         },
+        "SidebarDelivered": {
+          "group": "Entregados",
+          "foldedCount": "{{count}} entregados · más de 24 h",
+          "foldedCount_one": "{{count}} entregado · más de 24 h",
+          "foldedCount_other": "{{count}} entregados · más de 24 h",
+          "merged": "mergeado",
+          "open": "abierto",
+          "queued": "en cola",
+          "ciFailing": "CI falla",
+          "closed": "cerrado",
+          "noPr": "Sin PR",
+          "doneBy": "Hecho por {{name}}",
+          "label": {
+            "pr": "PR",
+            "title": "Título",
+            "branch": "Rama",
+            "lead": "Lead",
+            "freed": "Liberado"
+          },
+          "today": "hoy {{time}}",
+          "freedValue": "{{time}} · worktree en espera",
+          "freed": "liberado",
+          "inProgress": "en curso",
+          "also": "{{name}} también: {{tickets}}"
+        },
         "SidebarResumeStrip": {
           "resume": "Retomar",
           "dismiss": "Descartar"
