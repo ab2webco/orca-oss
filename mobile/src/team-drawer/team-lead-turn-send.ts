@@ -2,6 +2,7 @@ import {
   createLeadPromptSender,
   type LeadPromptOutcome
 } from '../../../src/shared/team-lead-prompt-sender'
+import { readMobileReviewTerminalSendAccepted } from '../session/mobile-diff-review-rpc'
 import type { RpcClient } from '../transport/rpc-client'
 
 export type TeamLeadTurnSender = (
@@ -11,22 +12,18 @@ export type TeamLeadTurnSender = (
   prompt: string
 ) => Promise<LeadPromptOutcome>
 
-/** Sends the lead a turn through its terminal, as the desktop dock does, with its 3 s repeat guard. */
+/** Sends the lead a turn through its terminal with the desktop dock's 3 s repeat guard. */
 export function createTeamLeadTurnSender(now: () => number): TeamLeadTurnSender {
   const press = createLeadPromptSender(now)
   return (client, terminal, key, prompt) =>
     press(key, async () => {
-      // Why agentPrompt: a raw `text\r` races the agent's composer and can leave the turn unsent (ORCA-437).
+      // Why no agentPrompt: the host refuses it while the phone drives the lead's terminal.
       const response = await client.sendRequest('terminal.send', {
         terminal,
         text: prompt,
-        enter: true,
-        agentPrompt: true
+        enter: true
       })
-      const send = response.ok
-        ? (response.result as { send?: { accepted?: unknown } } | null)?.send
-        : null
-      return send?.accepted === true
+      return response.ok && readMobileReviewTerminalSendAccepted(response.result)
     })
 }
 

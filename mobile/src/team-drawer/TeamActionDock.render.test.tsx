@@ -193,7 +193,7 @@ describe('TeamActionDock', () => {
         />
       )
     )
-    expect(texts().filter(Boolean)).toEqual(['Stopped by lead', 'Launches and pushes paused'])
+    expect(container.textContent).toBe('Stopped by lead Launches and pushes paused')
     act(() =>
       root.render(
         <TeamStoppedBanner
@@ -202,6 +202,26 @@ describe('TeamActionDock', () => {
         />
       )
     )
-    expect(texts().filter(Boolean)).toEqual(['Detenido'])
+    expect(container.textContent).toBe('Detenido')
+  })
+
+  it('lets the STOP sentence wrap instead of cutting it at 320', () => {
+    act(() =>
+      root.render(
+        <TeamStoppedBanner
+          stopped={{ by: 'lead', membersRunning: 2 }}
+          words={teamControlWordsOf('en')}
+        />
+      )
+    )
+    const clipped = [...container.querySelectorAll<HTMLElement>('*')].filter((one) => {
+      const style = getComputedStyle(one)
+      return (
+        style.whiteSpace === 'nowrap' ||
+        style.textOverflow === 'ellipsis' ||
+        style.getPropertyValue('-webkit-line-clamp') !== ''
+      )
+    })
+    expect(clipped.map((one) => one.textContent)).toEqual([])
   })
 })
