@@ -38,6 +38,14 @@ const GAMES: Record<
       ['ArrowDown', (b) => b.press('ArrowDown')],
       ['a tap', (b) => b.click({ position: { x: 20, y: 20 } })]
     ]
+  },
+  bricks: {
+    start: 'ArrowLeft',
+    keepsOpen: 'ArrowRight',
+    inputs: [
+      ['D', (b) => b.press('d')],
+      ['a tap', (b) => b.click()]
+    ]
   }
 }
 
@@ -222,7 +230,7 @@ for (const engine of Object.keys(GAMES) as OrchestratorGameArcadeEngine[]) {
       expect(await canvasPixels(orcaPage), 'Esc keeps the run where it was').toBe(held)
       await seedStatuses(orcaPage, null)
 
-      // Played out: the runner meets the first obstacle, the snake the top wall.
+      // Played out: the runner meets an obstacle, the snake a wall, the bricks lose the ball.
       await expect
         .poll(
           async () => {

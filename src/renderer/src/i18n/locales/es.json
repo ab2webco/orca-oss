@@ -15628,6 +15628,7 @@
           "scoreOne": "1 pto",
           "hint": "Espacio o toque para saltar",
           "snakeHint": "Flechas, WASD o toque para girar",
+          "bricksHint": "Flechas, A/D o el mouse para mover la paleta",
           "heldBy": "En pausa · {{name}} te necesita",
           "held": "En pausa · alguien te necesita",
           "over": "Fin de la partida · {{score}} pts",

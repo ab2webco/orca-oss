@@ -1,0 +1,15 @@
+{
+  "engine": "bricks",
+  "name": { "en": "Dusk wall", "es": "Muro del ocaso" },
+  "fps": 12,
+  "field": { "columns": 30, "rows": 22 },
+  "wall": { "columns": 10, "rows": 5, "points": 5 },
+  "paddle": { "width": 5, "speed": 26 },
+  "ball": { "start": 11, "max": 20, "rampPerWall": 2 },
+  "powerUps": { "chance": 0.15, "wideMs": 10000 },
+  "colors": {
+    "bricks": ["#d4483b", "#f0a57a", "#f2c14e", "#7da84a", "#5f6f93"],
+    "paddle": "#2f5fb3",
+    "ball": "#fff4d6"
+  }
+}
