@@ -237,6 +237,21 @@ test('Team cards show the served model and who chose it', async ({
     await expect(soloCard).not.toContainText('Jev')
     await routedCard.locator('button[aria-expanded]').first().click()
     await expect(routedCard).toContainText('code floor (Jev: code)')
+    // Opening the card opens the member's terminal, whose header says the same.
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    const header = orcaPage.locator(
+      `[data-terminal-overlay-tab-id="${routed.paneKey.split(':')[0]}"] [data-team-member-header]`
+    )
+    await expect(header).toContainText('Sonnet 5.5 → Opus 5.5 · high · code floor (Jev: code)', {
+      timeout: 30_000
+    })
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.screenshot({ path: testInfo.outputPath(`header-${width}-${theme}.png`) })
+      }
+    }
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
