@@ -18,4 +18,13 @@ describe('arcadeWordsOf', () => {
     expect(arcadeWordsOf(1).over).toBe('Fin de la partida · 1 pto')
     expect(arcadeWordsOf(3).score).toBe('3 pts')
   })
+
+  it('names who the run waits on, in English and Spanish', async () => {
+    await i18n.changeLanguage('en')
+    expect(arcadeWordsOf(0, 'Luigi').held).toBe('Paused · Luigi needs you')
+    expect(arcadeWordsOf(0).held).toBe('Paused · someone needs you')
+
+    await i18n.changeLanguage('es')
+    expect(arcadeWordsOf(0, 'Luigi').held).toBe('En pausa · Luigi te necesita')
+  })
 })

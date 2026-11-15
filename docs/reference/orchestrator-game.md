@@ -570,15 +570,15 @@ orchestratorGame:
   (name, a command that follows the name until typed, icon, a lead prompt or an MCP tool), the
   project's rows move up and pin to the dock's row (3 at most), and Orca's own rows take **Edit**
   and an on switch (none on Stop).
-- **Where an action is saved.** A project action's form says **Where it is saved**. *Project,
-  orca.yaml*, the default for a new one, writes only `orchestratorGame.actions` in the active
+- **Where an action is saved.** A project action's form says **Where it is saved**. _Project,
+  orca.yaml_, the default for a new one, writes only `orchestratorGame.actions` in the active
   worktree's `orca.yaml` (else the primary's), locally or over SSH, keeping its comments and the
-  entries it did not change, and refuses when the file changed since it was shown. *Only this
-  machine* saves it in `machineActions` of `orchestratorGameProjects[repoId]`
+  entries it did not change, and refuses when the file changed since it was shown. _Only this
+  machine_ saves it in `machineActions` of `orchestratorGameProjects[repoId]`
   ([`orchestrator-game-machine-actions.ts`](../../src/shared/orchestrator-game-machine-actions.ts)),
   which merge over `orca.yaml`'s by command: `orca.yaml`'s come first, an entry with the same command
   replaces one, `{ command, enabled: false }` hides one, and this machine's own follow. **Remove** on
-  *Only this machine* hides an `orca.yaml` action here; its row stays, dimmed, and **Show** brings it
+  _Only this machine_ hides an `orca.yaml` action here; its row stays, dimmed, and **Show** brings it
   back. An old `actions` list saved on this machine, which replaced `orca.yaml`'s whole, still
   resolves as before and becomes `machineActions` on the next save. **Use orca.yaml's list again**
   clears this machine's changes. Orca's own rows are this machine's only. `/orca-game:setup`
@@ -1858,6 +1858,12 @@ merge seen twice pays once. At most 9 plays are kept. The lead's `game state` ca
 `arcade: { credits, offer }`, and `game.arcade` (`orca game arcade`) reads them, or with
 `action: play | keep` spends one or dismisses the offer. Only the lead's project reads or spends
 them. The Team panel plays the run in a center tab.
+
+- Esc goes back to the conversation and keeps the run. A press after the run ended closes the tab.
+- The run stands still while a live agent in any project is blocked on a permission or waiting on
+  the person, and the pause names it (`Paused · Luigi needs you`). A sleeping or disconnected pane,
+  or a row the tab bar's freshness gate calls stale (unconfirmed after a restore, or silent for
+  30 minutes), holds nothing.
 
 Offers the old 15-second countdown made are paid once each. The terminal kept their ids under
 `arcade-offers` in `$.store` without noting which were played, so every one counts. The lead pane

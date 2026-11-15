@@ -13,7 +13,8 @@ import {
   type ArcadeRun
 } from './arcade-run-state'
 import { arcadeCanvasLabel, arcadeWordsOf } from './arcade-words'
-import { isSomeoneWaitingOnUser } from './arcade-hold'
+import { whoIsWaitingOnUser } from './arcade-hold'
+import { keepArcadeRun, keptArcadeRunOf } from './arcade-kept-runs'
 
 const GAME = (() => {
   const parsed = parseOrchestratorGameArcade(ORCHESTRATOR_GAME_ARCADE_RUNNER)
@@ -27,6 +28,8 @@ const JUMP_KEYS = new Set(['Space', 'ArrowUp'])
 
 type Props = {
   isActive: boolean
+  /** The tab and play the run is kept under while the tab is hidden. */
+  keepAs?: { tabId: string; play: number }
   /** Esc: back to the conversation, keeping the run. */
   onBack: () => void
   /** A press after the run ended: the tab closes and the conversation comes back. */
@@ -34,13 +37,18 @@ type Props = {
 }
 
 /** One saved play of the runner, beside Claude in the center. */
-export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Element {
-  const isHeld = useAppStore((s) => isSomeoneWaitingOnUser(s.agentStatusByPaneKey))
+export function ArcadeTab({ isActive, keepAs, onBack, onDone }: Props): React.JSX.Element {
+  // Why a string: null runs, any string holds, and a primitive keeps the selector stable.
+  const heldBy = useAppStore((s) => whoIsWaitingOnUser(s)?.name ?? null)
+  const isHeld = heldBy !== null
   const boxRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [firstRun] = useState(() => arcadeRunOf(GAME, Date.now()))
+  const [firstRun] = useState(
+    () => (keepAs && keptArcadeRunOf(keepAs.tabId, keepAs.play)) ?? arcadeRunOf(GAME, Date.now())
+  )
   const runRef = useRef<ArcadeRun>(firstRun)
   const heldRef = useRef(isHeld)
+  const heldByRef = useRef(heldBy ?? '')
   const paintRef = useRef<{ size: ArcadePaintSize; backdrop: HTMLCanvasElement } | null>(null)
   const frameRef = useRef<number | null>(null)
 
@@ -53,7 +61,7 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
         g,
         painted.backdrop,
         runRef.current,
-        arcadeWordsOf(Math.floor(runRef.current.state.score)),
+        arcadeWordsOf(Math.floor(runRef.current.state.score), heldByRef.current),
         painted.size
       )
     }
@@ -95,6 +103,17 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
     }
     frameRef.current = requestAnimationFrame(tick)
   }, [paint])
+
+  const keepTabId = keepAs?.tabId
+  const keepPlay = keepAs?.play
+  useEffect(
+    () => () => {
+      if (keepTabId !== undefined && keepPlay !== undefined) {
+        keepArcadeRun(keepTabId, keepPlay, runRef.current)
+      }
+    },
+    [keepTabId, keepPlay]
+  )
 
   const press = useCallback(() => {
     const pressed = pressArcadeRun(runRef.current)
@@ -149,10 +168,14 @@ export function ArcadeTab({ isActive, onBack, onDone }: Props): React.JSX.Elemen
 
   useEffect(() => {
     heldRef.current = isHeld
+    heldByRef.current = heldBy ?? ''
+    if (runRef.current.screen === 'held') {
+      paint()
+    }
     if (isActive && runRef.current.screen === 'held' && !isHeld) {
       startLoop()
     }
-  }, [isActive, isHeld, startLoop])
+  }, [isActive, isHeld, heldBy, paint, startLoop])
 
   return (
     <div

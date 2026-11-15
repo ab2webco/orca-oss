@@ -16551,6 +16551,7 @@
           "score": "{{score}} pts",
           "scoreOne": "1 pt",
           "hint": "Space or tap to jump",
+          "heldBy": "Paused · {{name}} needs you",
           "held": "Paused · someone needs you",
           "over": "Game over · {{score}} pts",
           "overOne": "Game over · 1 pt",
