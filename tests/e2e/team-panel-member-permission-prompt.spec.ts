@@ -10,6 +10,7 @@ import path from 'node:path'
 import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { test as base, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { seededReview, seedRendererGameState } from './helpers/game-state-renderer-seed'
 import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
 import { writeSettings } from './helpers/settings-write'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
@@ -82,34 +83,10 @@ test.afterAll(() => {
 const readKeys = (): string =>
   existsSync(keysPath) ? readFileSync(keysPath, 'utf8').slice(-400) : ''
 
-type RuntimeCall = (event: unknown, args: { method: string }) => Promise<unknown>
-
-const review = (number: number, state: string, ci: string) => ({
-  provider: 'github',
-  number,
-  title: `PR ${number}`,
-  url: `https://github.com/example/repo/pull/${number}`,
-  state,
-  ci
-})
-
 /** ORCA-1205's members, added to the real ones in game.state as a launch would report them. */
-async function withStoppedMembers(app: ElectronApplication): Promise<void> {
-  await app.evaluate(
-    ({ ipcMain }, extra) => {
-      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, RuntimeCall> })
-        ._invokeHandlers
-      const real = handlers.get('runtime:call')!
-      ipcMain.removeHandler('runtime:call')
-      ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
-        const response = (await real(event, args)) as { result?: { agents?: unknown[] } }
-        if (args.method === 'game.state' && response?.result?.agents) {
-          response.result.agents = [...response.result.agents, ...extra]
-        }
-        return response
-      })
-    },
-    [
+const withStoppedMembers = (app: ElectronApplication): Promise<void> =>
+  seedRendererGameState(app, {
+    agents: [
       {
         paneKey: 'seed:1198',
         displayName: 'Rosalina · ORCA-1198',
@@ -118,7 +95,7 @@ async function withStoppedMembers(app: ElectronApplication): Promise<void> {
         toolName: null,
         isLeader: false,
         isMember: true,
-        review: review(1205, 'open', 'failure')
+        review: seededReview(1205, 'open', 'failure')
       },
       {
         paneKey: 'seed:1195',
@@ -128,11 +105,10 @@ async function withStoppedMembers(app: ElectronApplication): Promise<void> {
         toolName: null,
         isLeader: false,
         isMember: true,
-        review: review(1195, 'merged', 'success')
+        review: seededReview(1195, 'merged', 'success')
       }
     ]
-  )
-}
+  })
 
 async function capture(
   app: ElectronApplication,
