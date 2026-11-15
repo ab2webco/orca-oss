@@ -8,19 +8,17 @@ import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
 import type { GameCharacterLevel } from '../../../src/shared/orchestrator-game-characters'
 import type { GameInboxThreads } from '../../../src/shared/orchestrator-game-inbox-threads'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
-import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
-import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
-import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
 import type { TerminalOpenTarget } from '../session/host-terminal-open'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
-import { teamMemberContextOf, type TeamMemberContext } from './team-drawer-member-context'
-import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
+import { teamMemberContextOf } from './team-drawer-member-context'
 import type {
   TeamAdvisorRow,
   TeamFlowPhase,
-  TeamLeadCard
+  TeamLeadCard,
+  TeamMemberAsk
 } from '../../../src/shared/team-panel-model-types'
+import { AGENT_STATES, memberRowOf } from './team-member-row'
 import { teamLeadCardsOf } from './team-sheet-lead'
 import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
 import type { TeamTones } from './team-status-tone'
@@ -68,6 +66,10 @@ export type TeamMemberRow = {
   limit: { resetsAt: number | null; loggedOut: boolean } | null
   /** A STOP paused it, or its launch waits in the queue; null for a live session. */
   hold: { kind: 'paused' } | { kind: 'queued'; waitingOn: string } | null
+  /** What it waits on the person for, as the desktop card says it (ORCA-1231). */
+  ask?: TeamMemberAsk | null
+  /** The open PR's CI a stopped member waits on (ORCA-1205). */
+  idleCi?: 'failure' | 'pending' | null
 }
 
 export type TeamMetrics = {
@@ -121,108 +123,7 @@ const isRecord = (value: unknown): value is Rec =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value !== '' ? value : null
-const AGENT_STATES: readonly GameAgent['state'][] = ['waiting', 'working', 'idle', 'done']
 const STATE_ORDER = new Map(AGENT_STATES.map((state, index) => [state, index]))
-
-const num = (value: unknown): number | null => (typeof value === 'number' ? value : null)
-
-function prOf(raw: unknown): TeamMemberRow['pr'] {
-  if (!isRecord(raw) || typeof raw.number !== 'number' || !text(raw.url)) {
-    return null
-  }
-  const heads = Array.isArray(raw.ciHistory) ? raw.ciHistory : []
-  return {
-    number: raw.number,
-    url: raw.url as string,
-    state: (text(raw.state) ?? 'open') as HostedReviewState,
-    ci: (text(raw.ci) ?? 'none') as CheckStatus | 'none',
-    ciHistory: heads.flatMap((head) =>
-      isRecord(head) && text(head.ci) && text(head.headSha)
-        ? [{ headSha: head.headSha as string, ci: head.ci as CheckStatus }]
-        : []
-    ),
-    comments: num(raw.commentCount)
-  }
-}
-
-// Why: a worker's Bash line carries its dispatch capability, a bearer secret no card may show.
-const DISPATCH_CAPABILITY = /dcap_[A-Za-z0-9_-]+/g
-
-// Why only working or waiting: an agent keeps its last tool after it stops.
-function liveOf(raw: Rec, state: GameAgent['state']): string | null {
-  if (state !== 'working' && state !== 'waiting') {
-    return null
-  }
-  const activity = isRecord(raw.activity) ? raw.activity : null
-  if (activity?.running === true && text(activity.name) && text(activity.id)) {
-    return `${activity.name as string} · ${activity.id as string}`
-  }
-  const tool = text(raw.toolName)
-  if (!tool || isAskUserQuestionTool(tool)) {
-    return null
-  }
-  const input = text(raw.toolInput)?.replace(DISPATCH_CAPABILITY, '[redacted]')
-  return input ? `${agentToolLabelOf(tool)} · ${input}` : agentToolLabelOf(tool)
-}
-
-function modelOf(launch: unknown): string | null {
-  const model = isRecord(launch) ? text(launch.model) : null
-  const effort = model && isRecord(launch) ? text(launch.effort) : null
-  return effort ? `${model} · ${effort}` : model
-}
-
-function memberRowOf(raw: Rec, context: TeamMemberContext): TeamMemberRow | null {
-  const { questionTickets, usage } = context
-  const key = text(raw.paneKey)
-  if (!key || raw.isMember !== true) {
-    return null
-  }
-  const state = AGENT_STATES.find((one) => one === raw.state) ?? 'idle'
-  const item = isRecord(raw.workItem) && text(raw.workItem.identifier) ? raw.workItem : null
-  const worktree = isRecord(raw.worktree) ? raw.worktree : {}
-  const name = text(raw.displayName) ?? text(worktree.displayName) ?? key
-  const ticket = item
-    ? (item.identifier as string).toUpperCase()
-    : (ticketInText(name) ?? ticketInText(text(worktree.branch)))
-  const remote = isRecord(raw.remote) ? raw.remote : null
-  const email = isRecord(raw.account) ? text(raw.account.email) : null
-  const used = email ? usage.get(email) : undefined
-  const review = isRecord(raw.review) ? raw.review : null
-  return {
-    key,
-    name,
-    ticket,
-    title: item ? text(item.title) : null,
-    state,
-    needsYou: state === 'waiting' || (ticket !== null && questionTickets.has(ticket)),
-    host: remote ? text(remote.host) : null,
-    agent: text(raw.agentType),
-    model: modelOf(raw.launch),
-    pr: prOf(raw.review),
-    ticketStatus: item
-      ? (text(item.status) ?? text(item.statusGroup))
-      : remote?.ticketDone === true
-        ? 'done'
-        : null,
-    live: liveOf(raw, state),
-    since: num(raw.stateSince),
-    phase: teamFlowPhaseOf({
-      state,
-      toolName: text(raw.toolName),
-      review: review && text(review.state) ? { state: review.state as string } : null,
-      workItem: item ? { statusGroup: text(item.statusGroup) } : null
-    }),
-    summary: ticket ? (context.summaries.get(ticket) ?? null) : null,
-    terminal: context.terminalOf(raw, key),
-    account: email
-      ? { email, usedPercent: used?.session ?? null, weeklyPercent: used?.weekly ?? null }
-      : null,
-    limit: isRecord(raw.limit)
-      ? { resetsAt: num(raw.limit.resetsAt), loggedOut: raw.limit.loggedOut === true }
-      : null,
-    hold: null
-  }
-}
 
 function metricsOf(raw: unknown): TeamMetrics | null {
   if (!isRecord(raw) || !Array.isArray(raw.mergedPerDay)) {
@@ -260,15 +161,16 @@ export function teamLeadViewOf(
   }
   const agents = Array.isArray(raw.agents) ? raw.agents : []
   const context = teamMemberContextOf(raw, questionTickets)
+  const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+  const { lead, advisor, cards } = teamLeadCardsOf(raw, questionTickets, ownerAsk, locale)
+  const cardsByKey = new Map(cards.map((card) => [card.paneKey, card]))
   const members = agents
-    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, context)] : []))
+    .flatMap((one) => (isRecord(one) ? [memberRowOf(one, context, cardsByKey)] : []))
     .filter((one): one is TeamMemberRow => one !== null)
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
     .concat(teamHeldMemberRowsOf(raw))
-  const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
-  const { lead, advisor, cards } = teamLeadCardsOf(raw, questionTickets, ownerAsk, locale)
   return {
     members,
     lead,

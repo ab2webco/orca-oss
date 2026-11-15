@@ -26,8 +26,16 @@ function statusOf(
   words: TeamCardWords,
   tones: TeamTones
 ): { text: string; tone: string } {
-  if (member.needsYou) {
-    return { text: words.waitingForAnswer, tone: tones.attention }
+  // Why the ask: a prompt in its pane is answered there, never in the Inbox (ORCA-1231).
+  if (member.needsYou && member.ask !== null) {
+    const ask = member.ask
+    const text =
+      ask?.kind === 'permission'
+        ? words.permissionPrompt(ask.tool)
+        : ask?.kind === 'question'
+          ? words.questionInTerminal
+          : words.waitingForAnswer
+    return { text, tone: tones.attention }
   }
   // Why these tones: the desktop's, paused at risk and a queued launch idle (team-panel-member-cards.ts).
   if (member.hold) {
@@ -45,6 +53,13 @@ function statusOf(
         resets && resets > now ? words.limitResetsIn(teamAgeText(now, resets)) : words.limitReached,
       tone: tones.warning
     }
+  }
+  // Why (ORCA-1205): a stopped member's open PR says more than its idle state.
+  if (member.idleCi === 'failure') {
+    return { text: words.ciFailing, tone: tones.attention }
+  }
+  if (member.idleCi === 'pending') {
+    return { text: words.ciRunning, tone: tones.idle }
   }
   return {
     text: member.live ?? words.state[member.state],
@@ -99,6 +114,8 @@ export function TeamMemberCard({
   const ci = pr ? (pr.state === 'merged' ? words.merged : ciText(pr.ci, words)) : null
   const ciTone = CI_TONE[pr?.ci as CheckStatus] ?? colors.textMuted
   const terminal = member.terminal
+  const inPane =
+    member.needsYou && (member.ask?.kind === 'permission' || member.ask?.kind === 'question')
   return (
     <View style={styles.card}>
       <Pressable
@@ -141,7 +158,16 @@ export function TeamMemberCard({
           </Text>
         ) : null}
       </Pressable>
-      {member.needsYou ? (
+      {inPane && terminal ? (
+        <Pressable
+          style={[styles.action, styles.answer]}
+          onPress={() => onOpenTerminal(terminal)}
+          accessibilityRole="button"
+          accessibilityLabel={words.answerInTerminal}
+        >
+          <Text style={styles.answerText}>{words.answerInTerminal}</Text>
+        </Pressable>
+      ) : member.needsYou && !inPane && member.ask !== null ? (
         <Pressable
           style={[styles.action, styles.answer]}
           onPress={onAnswer}

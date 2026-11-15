@@ -54,8 +54,13 @@ describe('the lead card on the Team sheet', () => {
   })
 
   it('words an idle or unreachable lead by its condition', () => {
-    const idle = teamLeadViewOf(stateWith({ state: 'idle' }))?.lead
+    const idle = teamLeadViewOf(
+      stateWith({ state: 'idle' }, { agents: [leader({ state: 'idle' })] })
+    )?.lead
     expect(idle && teamLeadLiveText(idle, en)).toBe('Idle')
+    // Why (ORCA-1205): an idle lead with a working member waits on it.
+    const coordinating = teamLeadViewOf(stateWith({ state: 'idle' }))?.lead
+    expect(coordinating && teamLeadLiveText(coordinating, en)).toBe('Waiting on 1 agent')
     const away = teamLeadViewOf(
       stateWith({ state: 'idle', remote: { host: 'm1', stateKnown: false } })
     )?.lead
