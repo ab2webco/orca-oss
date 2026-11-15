@@ -638,6 +638,20 @@ describe('GameProjectWorkCache', () => {
     await cache.read('repo', load)
     expect(loads).toBe(1)
   })
+
+  // Why: the lead's game.state waited on this reload for seconds every 90 s (ORCA-1199).
+  it('answers an expired entry with its last lists while it reloads behind', async () => {
+    let now = 0
+    const cache = new GameProjectWorkCache(90_000, () => now)
+    const first = { reviews: null, todo: null }
+    await cache.read('repo', async () => first)
+    now = 90_000
+    const answer = await Promise.race([
+      cache.read('repo', () => new Promise(() => {})),
+      new Promise((resolve) => setTimeout(() => resolve('waited'), 50))
+    ])
+    expect(answer).toBe(first)
+  })
 })
 
 describe('myOpenPullRequestsOf', () => {
