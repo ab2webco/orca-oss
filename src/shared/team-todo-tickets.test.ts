@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
-import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
-import { teamTodoTicketsOf } from './team-panel-todo'
+import type { OrchestratorGameState } from './orchestrator-game-state'
+import type { TeamMemberCard } from './team-panel-model-types'
+import { teamTodoTicketsOf } from './team-todo-tickets'
 
 const item = (id: string, group?: string, prompt?: string) => ({
   id,

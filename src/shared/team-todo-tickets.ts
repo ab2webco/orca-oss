@@ -1,6 +1,6 @@
-import { renderGameWorkPrompt } from '../../../../shared/orchestrator-game-actions'
-import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
-import type { TeamMemberCard, TeamTodoTicket } from '../../../../shared/team-panel-model-types'
+import { renderGameWorkPrompt } from './orchestrator-game-actions'
+import type { OrchestratorGameState } from './orchestrator-game-state'
+import type { TeamMemberCard, TeamTodoTicket } from './team-panel-model-types'
 
 /** The project's To Do tickets that no member holds, for the + menu's Add a member (ORCA-717). */
 export function teamTodoTicketsOf(
