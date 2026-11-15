@@ -6,7 +6,7 @@ const reply = (accepted: boolean): RpcResponse =>
   ({ id: 'x', ok: true, result: { send: { accepted } }, _meta: { runtimeId: 'rt' } }) as RpcResponse
 
 describe('the Team sheet lead turn', () => {
-  it("sends the action to the lead's terminal as an agent prompt, as the desktop dock does", async () => {
+  it("sends the action to the lead's terminal as a submitted turn", async () => {
     const sendRequest = vi.fn(async () => reply(true))
     const send = createTeamLeadTurnSender(() => 0)
     const client = { sendRequest } as unknown as RpcClient
@@ -14,8 +14,7 @@ describe('the Team sheet lead turn', () => {
     expect(sendRequest).toHaveBeenCalledWith('terminal.send', {
       terminal: 'term_lead',
       text: '/orca-game:wave',
-      enter: true,
-      agentPrompt: true
+      enter: true
     })
   })
 

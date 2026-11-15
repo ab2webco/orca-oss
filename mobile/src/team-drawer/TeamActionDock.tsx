@@ -50,14 +50,13 @@ export function TeamStoppedBanner({
   return (
     <View style={styles.banner}>
       <View style={[styles.dot, { backgroundColor: colors.statusRed }]} />
-      <Text style={styles.bannerTitle}>
-        {stopped.by ? words.stoppedBy(stopped.by) : words.stopped}
-      </Text>
-      {stopped.membersRunning > 0 ? (
-        <Text style={styles.bannerText} numberOfLines={1}>
-          {words.paused}
+      {/* Why one paragraph: at 320 the paused part must wrap under the title, not be cut. */}
+      <Text style={styles.bannerText}>
+        <Text style={styles.bannerTitle}>
+          {stopped.by ? words.stoppedBy(stopped.by) : words.stopped}
         </Text>
-      ) : null}
+        {stopped.membersRunning > 0 ? ` ${words.paused}` : null}
+      </Text>
     </View>
   )
 }
@@ -254,7 +253,6 @@ const styles = StyleSheet.create({
   },
   bannerTitle: {
     color: colors.textPrimary,
-    fontSize: typography.metaSize + 1,
     fontWeight: '600'
   },
   bannerText: {
