@@ -173,7 +173,15 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       }
       lastTeams.set(scope.key, model)
       endStreak(scope, true)
-      deps.publish({ section: { kind: 'ready', value: model }, retry: null }, scope)
+      // Why: a panel opening draws the sidebar's read before re-reading, so it is the last team, not news.
+      deps.publish(
+        {
+          section: { kind: 'ready', value: model },
+          retry: null,
+          ...(run.shown === 0 ? { updating: true } : {})
+        },
+        scope
+      )
     } catch (error) {
       if (mine !== generation || active !== run) {
         return
