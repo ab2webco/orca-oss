@@ -3895,8 +3895,11 @@ export class OrcaRuntimeService {
   private readonly gameProjectWork = new GameProjectWorkCache(
     () => 90_000 * gameGitHubPollStretch()
   )
+  // Why in the background: an expired member PR read made the lead's game.state wait 2-16 s (ORCA-1199).
   private readonly gameMemberWork = new GameReadCache<GameMemberWork>(
-    () => 60_000 * gameGitHubPollStretch()
+    () => 60_000 * gameGitHubPollStretch(),
+    Date.now,
+    { refreshInBackground: true }
   )
   // Why TTL 0 otherwise: each pane's own review stays fresh until the GitHub budget runs low (ORCA-877).
   private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
