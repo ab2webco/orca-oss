@@ -19,6 +19,7 @@ import { TeamInboxTab } from './TeamInboxTab'
 import { teamInboxWordsOf } from './team-inbox-words'
 import { useTeamSheetDrag } from './use-team-sheet-drag'
 import { PeekBar, TEAM_PEEK_HEIGHT } from './TeamPeekBar'
+import { TeamLevelRow } from './TeamLevelRow'
 
 export { TEAM_PEEK_HEIGHT }
 
@@ -204,6 +205,7 @@ export function TeamSheet({
                       { paddingBottom: insets.bottom + spacing.lg }
                     ]}
                   >
+                    {team.level ? <TeamLevelRow level={team.level} words={words} /> : null}
                     <TabBar
                       active={tab}
                       inboxCount={questions.length}

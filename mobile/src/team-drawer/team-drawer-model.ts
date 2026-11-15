@@ -5,6 +5,7 @@ import type {
   GameOwnerQuestionProject
 } from '../../../src/shared/orchestrator-game-owner-questions'
 import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
+import type { GameCharacterLevel } from '../../../src/shared/orchestrator-game-characters'
 import type { GameInboxThreads } from '../../../src/shared/orchestrator-game-inbox-threads'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
@@ -90,6 +91,8 @@ export type TeamDrawerData = {
   answerWorktreeId: string | null
   inbox: TeamInbox
   answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
+  /** The team's level from its characters' XP; null on a host that does not advertise it. */
+  level: GameCharacterLevel | null
 }
 
 type Rec = Record<string, unknown>

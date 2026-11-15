@@ -10,7 +10,8 @@ import {
   type TeamDrawerData,
   type TeamInbox
 } from './team-drawer-model'
-import { readLeadGameState, readLeadInboxThreads } from './team-drawer-rpc'
+import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
+import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -21,8 +22,10 @@ export function useTeamDrawer(args: {
   worktreeId: string
   terminalHandle: string | null
   paneKey: string | null
+  /** The host advertises MOBILE_TEAM_LEVEL_CAPABILITY. */
+  levelSupported: boolean
 }): TeamDrawerData {
-  const { client, connected, worktreeId, terminalHandle, paneKey } = args
+  const { client, connected, worktreeId, terminalHandle, paneKey, levelSupported } = args
   const [focused, setFocused] = useState(false)
   useFocusEffect(
     useCallback(() => {
@@ -40,6 +43,8 @@ export function useTeamDrawer(args: {
   const [inboxRead, setInboxRead] = useState<{ key: string; inbox: TeamInbox } | null>(null)
   const leadInbox: TeamInbox =
     inboxRead?.key === terminalKey ? inboxRead.inbox : { kind: 'loading' }
+  const [xpRead, setXpRead] = useState<{ key: string; xp: number | null } | null>(null)
+  const xp = xpRead?.key === terminalKey ? xpRead.xp : null
   const generationRef = useRef(0)
 
   useEffect(() => {
@@ -62,6 +67,16 @@ export function useTeamDrawer(args: {
           if (!teamLeadViewOf(state)) {
             return
           }
+          if (levelSupported) {
+            void readLeadXp(client, { worktreeId, terminalHandle })
+              .then((read) => {
+                if (generationRef.current === generation) {
+                  setXpRead({ key: terminalKey, xp: read })
+                }
+              })
+              // Why keep the last level: a failed read says nothing about the XP.
+              .catch(() => {})
+          }
           const threads = await readLeadInboxThreads(client, { worktreeId, terminalHandle })
           if (generationRef.current === generation) {
             const inbox: TeamInbox =
@@ -83,7 +98,16 @@ export function useTeamDrawer(args: {
       generationRef.current++
       clearInterval(interval)
     }
-  }, [candidate, client, paneKey, reloadQuestions, terminalHandle, terminalKey, worktreeId])
+  }, [
+    candidate,
+    client,
+    levelSupported,
+    paneKey,
+    reloadQuestions,
+    terminalHandle,
+    terminalKey,
+    worktreeId
+  ])
 
   const own = useMemo(
     () =>
@@ -117,6 +141,7 @@ export function useTeamDrawer(args: {
     questions: view ? own.questions : [],
     answerWorktreeId: own.worktreeId,
     inbox: leadInbox,
-    answer
+    answer,
+    level: view && xp !== null ? gameCharacterLevelOf(xp) : null
   }
 }
