@@ -46,6 +46,8 @@ export default function AgentTeamsSettingsScreen() {
           hostName={hostName}
           onScene={settings.setScene}
           onStyle={settings.setStyle}
+          onToneColor={settings.setToneColor}
+          onResetColors={settings.resetColors}
         />
       </ScrollView>
     </SafeAreaView>

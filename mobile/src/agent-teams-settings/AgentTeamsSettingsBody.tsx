@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native'
 import { Check, ChevronRight, Image, Palette } from 'lucide-react-native'
 import type { GamePanelStyle } from '../../../src/shared/orchestrator-game-panel'
+import type { StatusColorTone } from '../../../src/shared/status-colors'
 import { ActionSheetModal, type ActionSheetAction } from '../components/ActionSheetModal'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
@@ -9,13 +10,17 @@ import {
   BUILT_IN_SCENES,
   PANEL_STYLES,
   sceneLabelOf,
+  statusColorRowsOf,
   type AgentTeamsSettings
 } from './agent-teams-settings-model'
+import { StatusColorSheet } from './StatusColorSheet'
 import type { AgentTeamsSettingsState } from './use-agent-teams-settings'
 
 type Handlers = {
   onScene: (scene: string) => void
   onStyle: (style: GamePanelStyle) => void
+  onToneColor: (tone: StatusColorTone, color: string | null) => void
+  onResetColors: () => void
 }
 
 function sceneActionsOf(scene: string, onScene: Handlers['onScene']): ActionSheetAction[] {
@@ -65,7 +70,9 @@ function NavRow(props: { icon: typeof Image; label: string; value: string; onPre
 }
 
 function ReadyBody({ settings, ...handlers }: Handlers & { settings: AgentTeamsSettings }) {
-  const [open, setOpen] = useState<'scene' | 'style' | null>(null)
+  const [open, setOpen] = useState<'scene' | 'style' | StatusColorTone | null>(null)
+  const rows = statusColorRowsOf(settings.dark)
+  const edited = rows.some((row) => row.edited)
   const close = () => setOpen(null)
   return (
     <>
@@ -86,6 +93,32 @@ function ReadyBody({ settings, ...handlers }: Handlers & { settings: AgentTeamsS
         />
       </View>
 
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeading}>Status colors</Text>
+        <Pressable disabled={!edited} onPress={handlers.onResetColors} hitSlop={8}>
+          <Text style={[styles.reset, !edited && styles.resetDisabled]}>Reset</Text>
+        </Pressable>
+      </View>
+      <View style={styles.card}>
+        {rows.map((row, index) => (
+          <View key={row.tone}>
+            {index > 0 ? <View style={styles.separator} /> : null}
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${row.name} colour`}
+                style={[styles.swatch, { backgroundColor: row.color }]}
+                onPress={() => setOpen(row.tone)}
+              />
+              <View style={styles.toneText}>
+                <Text style={styles.rowLabel}>{row.name}</Text>
+                {row.warning ? <Text style={styles.warning}>{row.warning}</Text> : null}
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+
       <ActionSheetModal
         visible={open === 'scene'}
         title="Scene"
@@ -98,11 +131,21 @@ function ReadyBody({ settings, ...handlers }: Handlers & { settings: AgentTeamsS
         actions={styleActionsOf(settings.style, handlers.onStyle)}
         onClose={close}
       />
+      <StatusColorSheet
+        row={rows.find((row) => row.tone === open) ?? null}
+        onPick={(color) => {
+          const tone = rows.find((row) => row.tone === open)?.tone
+          if (tone) {
+            handlers.onToneColor(tone, color)
+          }
+        }}
+        onClose={close}
+      />
     </>
   )
 }
 
-/** Settings → Agent Teams (p08): the panel's scene and style. */
+/** Settings → Agent Teams (p08): the panel's scene and style, then the five status colours. */
 export function AgentTeamsSettingsBody(
   props: Handlers & { state: AgentTeamsSettingsState; hostName: string }
 ) {
@@ -149,6 +192,12 @@ const styles = StyleSheet.create({
     fontSize: typography.metaSize,
     color: colors.statusRed
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xl
+  },
   sectionHeading: {
     paddingBottom: spacing.sm,
     fontSize: typography.metaSize,
@@ -156,6 +205,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5
+  },
+  reset: {
+    paddingBottom: spacing.sm,
+    fontSize: typography.metaSize,
+    fontWeight: '600',
+    color: colors.accentBlue
+  },
+  resetDisabled: {
+    color: colors.textMuted
   },
   card: {
     backgroundColor: colors.bgPanel,
@@ -186,5 +244,18 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.borderSubtle,
     marginLeft: spacing.md + 2
+  },
+  swatch: {
+    width: 24,
+    height: 24,
+    borderRadius: 12
+  },
+  toneText: {
+    flex: 1,
+    gap: 2
+  },
+  warning: {
+    fontSize: typography.metaSize,
+    color: colors.statusAmber
   }
 })
