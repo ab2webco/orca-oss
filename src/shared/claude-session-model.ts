@@ -15,7 +15,13 @@ export function claudeSessionModelOfTranscriptLine(line: string): ClaudeSessionM
   } catch {
     return undefined
   }
-  if (!isRecord(parsed) || parsed.type !== 'assistant' || !isRecord(parsed.message)) {
+  // Why skip a sidechain: a sub-agent's line names the sub-agent's model, not the session's.
+  if (
+    !isRecord(parsed) ||
+    parsed.type !== 'assistant' ||
+    parsed.isSidechain === true ||
+    !isRecord(parsed.message)
+  ) {
     return undefined
   }
   const model = textOf(parsed.message.model)
@@ -27,33 +33,57 @@ export function claudeSessionModelOfTranscriptLine(line: string): ClaudeSessionM
   return effort === undefined ? { model } : { model, effort }
 }
 
-const withoutUndefined = (pick: ClaudeSessionModel): ClaudeSessionModel => ({
-  ...(pick.model !== undefined ? { model: pick.model } : {}),
-  ...(pick.effort !== undefined ? { effort: pick.effort } : {})
-})
+/** The pane's pick plus what it last read, so an unchanged transcript is never re-read. */
+export type ClaudeSessionModelState = ClaudeSessionModel & {
+  /** The transcript's size at the last read, or at SessionStart. */
+  transcriptBytes?: number
+  /** The latest turn the API served in this session. */
+  served?: ClaudeSessionModel
+}
+
+export type ClaudeTranscriptReader = {
+  bytesOf: (transcriptPath: string) => number | undefined
+  read: (transcriptPath: string) => ClaudeSessionModel | undefined
+}
+
+const withoutUndefined = (pick: ClaudeSessionModelState): ClaudeSessionModelState =>
+  Object.fromEntries(
+    Object.entries(pick).filter(([, value]) => value !== undefined)
+  ) as ClaudeSessionModelState
 
 /**
- * The pane's session model after a lead hook event. Interactive SessionStart names the model;
- * Stop's transcript turn is what the API actually ran, so it wins over a later `/model` guess.
+ * The pane's session model after a lead hook event. SessionStart names the model; every later
+ * event re-reads the transcript once it grew, because a member works its ticket in one long turn
+ * and a router (Jev) switches the model per step: the served turn wins over the hook's guess.
  */
 export function claudeSessionModelOfHook(
   eventName: unknown,
   hookPayload: Record<string, unknown>,
-  previous: ClaudeSessionModel | undefined,
-  readTranscript: (transcriptPath: string) => ClaudeSessionModel | undefined
-): ClaudeSessionModel {
+  previous: ClaudeSessionModelState | undefined,
+  transcript: ClaudeTranscriptReader
+): ClaudeSessionModelState {
   const transcriptPath = textOf(hookPayload.transcript_path ?? hookPayload.transcriptPath)
-  const isNewSession = eventName === 'SessionStart'
-  // Why read on a first sight: after a restart the cache is empty until the next Stop.
-  const shouldRead =
-    transcriptPath !== undefined && !isNewSession && (eventName === 'Stop' || !previous)
-  const turn = shouldRead ? readTranscript(transcriptPath) : undefined
-  const base = isNewSession ? {} : (previous ?? {})
+  const bytes = transcriptPath === undefined ? undefined : transcript.bytesOf(transcriptPath)
   const hookEffort = isRecord(hookPayload.effort)
     ? textOf(hookPayload.effort.level)
     : textOf(hookPayload.effort)
+  if (eventName === 'SessionStart') {
+    return withoutUndefined({
+      model: textOf(hookPayload.model),
+      effort: hookEffort,
+      transcriptBytes: bytes
+    })
+  }
+  const grew =
+    transcriptPath !== undefined &&
+    bytes !== undefined &&
+    (previous === undefined || bytes !== previous.transcriptBytes)
+  const turn = grew ? transcript.read(transcriptPath) : undefined
+  const served = turn ?? previous?.served
   return withoutUndefined({
-    model: turn?.model ?? textOf(hookPayload.model) ?? base.model,
-    effort: turn?.effort ?? hookEffort ?? base.effort
+    model: served?.model ?? textOf(hookPayload.model) ?? previous?.model,
+    effort: served?.effort ?? hookEffort ?? previous?.effort,
+    transcriptBytes: grew ? bytes : previous?.transcriptBytes,
+    served
   })
 }
