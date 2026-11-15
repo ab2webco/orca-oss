@@ -16,19 +16,24 @@ import { teamLeadQuestionOf } from '../team-panel/team-panel-inbox-agents'
 type Props = {
   model: TeamPanelGameModel
   style: GamePanelStyle
+  /** The panel's last team, shown while a read confirms it. */
+  unconfirmed?: boolean
   /** The panel below the scene; its card faces draw with the scene's painter. */
   children?: React.ReactNode
 }
 
 /** The live scene for a team in the Game look, drawn from the Team model only. */
-export function TeamPanelScene({ model, style, children }: Props): React.JSX.Element {
+export function TeamPanelScene({ model, style, unconfirmed, children }: Props): React.JSX.Element {
   const timezone = model.metrics.kind === 'ready' ? model.metrics.value.timezone : 'local'
   const { drawn, art, painter, makePainter } = useTeamScenePainter({
     style,
     scene: model.scene,
     timezone
   })
-  const input = useMemo(() => teamSceneInputOf(model), [model])
+  const input = useMemo(
+    () => ({ ...teamSceneInputOf(model), ...(unconfirmed ? { unconfirmed: true as const } : {}) }),
+    [model, unconfirmed]
+  )
   const members = useMemo(() => teamSceneWhoOf(model.members), [model.members])
   // Why agent status: game.state names the lead's question tool, never its question.
   const question = useAppStore((s) => teamLeadQuestionOf(model, s)?.text ?? null)
@@ -51,6 +56,7 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
           {painter && drawn === 'office' && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}
+              unconfirmed={unconfirmed}
               makePainter={makePainter}
               leadLine={leadLine}
               onUnplaced={onUnplaced}
