@@ -17576,7 +17576,16 @@
     },
     "model": {
       "chosenByAdvisor": "Chosen by {{advisor}}",
-      "advisorReason": "{{reason}} ({{advisor}})"
+      "advisorReason": "{{reason}} ({{advisor}})",
+      "chosenByLead": "Chosen by the lead: {{kind}}",
+      "kind": {
+        "audit": "read-only audit",
+        "implement": "implementation",
+        "review": "review or design",
+        "captures": "captures"
+      },
+      "inferredFromTicket": "Inferred from the ticket: {{kind}}",
+      "leadDefault": "Lead default: {{kind}}"
     }
   },
   "claudeDeadHooks": {

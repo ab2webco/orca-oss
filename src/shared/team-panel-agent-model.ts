@@ -1,6 +1,7 @@
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 import type { GameAgent } from './orchestrator-game-state'
+import type { GameLaunchChosenBy, GameTicketKind } from './orchestrator-game-ticket-kind'
 import { advisorReasonNamesIt, TEAM_ADVISOR_NAME } from './team-model-advisor-words'
 import type { TeamModel, TeamModelCredit } from './team-panel-model-types'
 
@@ -53,10 +54,14 @@ export const teamAgentModelOf = (
     }
   }
   if (agent.launch?.model) {
+    const { chosenBy } = agent.launch
     return {
       label: agent.launch.model,
       effort: agent.launch.effort,
-      source: agent.launch.source ?? 'launch'
+      source: agent.launch.source ?? 'launch',
+      ...(chosenBy
+        ? { credit: { by: 'lead', from: null, reason: chosenBy.kind, source: chosenBy.source } }
+        : {})
     }
   }
   return fallback?.model
@@ -73,11 +78,28 @@ export function teamModelLabelText(model: TeamModel): string {
 export type TeamModelCreditWords = {
   chosenByAdvisor: string
   advisorReason: (reason: string) => string
+  /** `source`: the lead named the kind, Orca read it from the ticket title, or it is the default. */
+  chosenByLead: (kind: GameTicketKind, source: GameLaunchChosenBy['source']) => string
+}
+
+const ENGLISH_KIND_WORDS: Record<GameTicketKind, string> = {
+  audit: 'read-only audit',
+  implement: 'implementation',
+  review: 'review or design',
+  captures: 'captures'
+}
+
+const ENGLISH_KIND_SOURCE_WORDS: Record<GameLaunchChosenBy['source'], string> = {
+  flag: 'Chosen by the lead',
+  ticket: 'Inferred from the ticket',
+  default: 'Lead default'
 }
 
 const ENGLISH_CREDIT_WORDS: TeamModelCreditWords = {
   chosenByAdvisor: `Chosen by ${TEAM_ADVISOR_NAME}`,
-  advisorReason: (reason) => `${reason} (${TEAM_ADVISOR_NAME})`
+  advisorReason: (reason) => `${reason} (${TEAM_ADVISOR_NAME})`,
+  chosenByLead: (kind, source) =>
+    `${ENGLISH_KIND_SOURCE_WORDS[source]}: ${ENGLISH_KIND_WORDS[kind]}`
 }
 
 /** Who picked the model and why; null where no router or chooser is known. */
@@ -87,6 +109,9 @@ export function teamModelCreditTextOf(
 ): string | null {
   if (!credit) {
     return null
+  }
+  if (credit.by === 'lead') {
+    return words.chosenByLead(credit.reason, credit.source)
   }
   if (!credit.reason) {
     return words.chosenByAdvisor

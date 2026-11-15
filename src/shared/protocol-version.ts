@@ -86,6 +86,9 @@ export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY =
 // Why: an older host's attach schema strips `allowedAccounts`, so its `auto` picks from all of its accounts (ORCA-891).
 export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY =
   'orchestration.federation-member-account-allowed.v1' as const
+// Why: an older runtime strips `modelChosenBy` and pins the lead's default, locking a router (Jev) out (ORCA-851).
+export const ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY =
+  'orchestration.worker-launch-chosen-by.v1' as const
 // Why: an older host's attach schema strips `accountReadings`, so its `auto` sees only its own, often empty, cache (ORCA-1028).
 export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_READINGS_RUNTIME_CAPABILITY =
   'orchestration.federation-member-account-readings.v1' as const
@@ -227,6 +230,7 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_FEDERATION_MEMBER_REOPEN_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_FOLLOW_UP_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
+  ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,

@@ -122,4 +122,33 @@ describe("a member's model from its own hooks", () => {
       source: 'session'
     })
   })
+
+  // ORCA-851: the card credits the lead only while the member still runs what the lead chose.
+  it("credits the lead's ticket-kind choice until the session serves another model", async () => {
+    const chosenBy = { by: 'lead', kind: 'implement', source: 'flag' }
+    const member = runtimeWithMember({
+      requested: { agent: 'claude', model: 'claude-opus-5-5', effort: 'high' },
+      effective: { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', chosenBy }
+    })
+    dbs.push(member.db)
+    member.hookStatuses.push({
+      paneKey: 'tab-4:member',
+      state: 'working',
+      model: 'claude-opus-5-5',
+      effort: 'high'
+    })
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Opus 5.5',
+      effort: 'high',
+      source: 'session',
+      chosenBy
+    })
+
+    member.hookStatuses[0] = { ...member.hookStatuses[0]!, model: 'claude-sonnet-5-5' }
+    expect(await member.memberLaunch()).toEqual({
+      model: 'Sonnet 5.5',
+      effort: 'high',
+      source: 'session'
+    })
+  })
 })

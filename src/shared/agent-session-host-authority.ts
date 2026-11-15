@@ -91,6 +91,8 @@ export type AgentLaunchPreferences = {
   model?: string
   effort?: string
   mode?: string
+  /** A default Orca picked, not a person: no pin env, so a router (Jev) may still move it (ORCA-851). */
+  unpinned?: true
 }
 
 export type AgentPromptDelivery = 'auto-submit' | 'draft'

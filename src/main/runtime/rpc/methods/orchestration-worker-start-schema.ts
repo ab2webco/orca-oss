@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  GAME_LAUNCH_KIND_SOURCES,
+  GAME_TICKET_KINDS
+} from '../../../../shared/orchestrator-game-ticket-kind'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 
 export const OptionalWorkerLaunchPreference = z
@@ -6,6 +10,15 @@ export const OptionalWorkerLaunchPreference = z
   .min(1)
   .max(512)
   .refine((value) => value === value.trim(), 'Surrounding whitespace is invalid')
+  .optional()
+
+// Why optional: only `game launch` sends it, for a model it picked by ticket kind (ORCA-851).
+export const OptionalWorkerModelChosenBy = z
+  .object({
+    by: z.literal('lead'),
+    kind: z.enum(GAME_TICKET_KINDS),
+    source: z.enum(GAME_LAUNCH_KIND_SOURCES)
+  })
   .optional()
 
 export const WorkerStartParams = z.object({
@@ -32,6 +45,7 @@ export const WorkerStartParams = z.object({
   remoteAllowedAccounts: z.array(z.string().min(1).max(320)).min(1).max(100).optional(),
   model: OptionalWorkerLaunchPreference,
   effort: OptionalWorkerLaunchPreference,
+  modelChosenBy: OptionalWorkerModelChosenBy,
   retryOf: OptionalString,
   timeoutMs: OptionalFiniteNumber,
   devMode: z.boolean().optional(),

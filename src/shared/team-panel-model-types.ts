@@ -2,6 +2,7 @@ import type { CheckStatus } from './github/pull-request-types'
 import type { HostedReviewProvider, HostedReviewState } from './hosted-review'
 import type { OrchestratorGameSceneExtension } from './orchestrator-game-scene'
 import type { GameReviewVerdict, GameStatusGroup } from './orchestrator-game-state'
+import type { GameLaunchChosenBy, GameTicketKind } from './orchestrator-game-ticket-kind'
 import type { TeamLeadAction } from './team-panel-list-action'
 import type { TeamAction } from './team-panel-actions'
 
@@ -44,13 +45,15 @@ export type TeamLiveAction =
   /** The agent asks the user, as written; `options` are its choices when it offers some. */
   | { kind: 'question'; text: string; options: string[] }
 
-/** Who picked the model a card names: the advisor's (Jev's) router, from what, and its reason. */
-export type TeamModelCredit = {
-  by: 'advisor'
-  /** The session's own model when the router moved it; null when it kept it. */
-  from: string | null
-  reason: string | null
-}
+/** Who picked the model a card names: the advisor's (Jev's) router, or the lead by ticket kind. */
+export type TeamModelCredit =
+  | {
+      by: 'advisor'
+      /** The session's own model when the router moved it; null when it kept it. */
+      from: string | null
+      reason: string | null
+    }
+  | { by: 'lead'; from: null; reason: GameTicketKind; source: GameLaunchChosenBy['source'] }
 
 /** `source`: Jev in the pane, the session's own hooks, or Orca's launch choice. */
 export type TeamModel = {

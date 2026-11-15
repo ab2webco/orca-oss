@@ -27,6 +27,45 @@ describe('orchestration worker launch preferences', () => {
     })
   })
 
+  // Why unpinned: the lead's default must leave a router (Jev) free to move the model (ORCA-851).
+  it("launches the lead's ticket-kind default unpinned and records why", () => {
+    expect(
+      resolveWorkerLaunchPreferences({
+        agent: 'claude',
+        model: 'claude-opus-5-5',
+        effort: 'high',
+        chosenBy: { by: 'lead', kind: 'implement', source: 'flag' }
+      })
+    ).toEqual({
+      preferences: { model: 'claude-opus-5-5', effort: 'high', unpinned: true },
+      receipt: {
+        requested: { agent: 'claude', model: 'claude-opus-5-5', effort: 'high' },
+        effective: {
+          agent: 'claude',
+          model: 'claude-opus-5-5',
+          effort: 'high',
+          chosenBy: { by: 'lead', kind: 'implement', source: 'flag' }
+        }
+      }
+    })
+  })
+
+  it('reads the lead choice from worker-start params, and refuses an unknown kind', () => {
+    const base = { task: 't', from: 'f', agent: 'claude', model: 'claude-opus-5-5' }
+    expect(
+      WorkerStartParams.parse({
+        ...base,
+        modelChosenBy: { by: 'lead', kind: 'review', source: 'flag' }
+      }).modelChosenBy
+    ).toEqual({ by: 'lead', kind: 'review', source: 'flag' })
+    expect(
+      WorkerStartParams.safeParse({
+        ...base,
+        modelChosenBy: { by: 'lead', kind: 'qa', source: 'flag' }
+      }).success
+    ).toBe(false)
+  })
+
   it('does not invent an effort when only a model is requested', () => {
     expect(
       resolveWorkerLaunchPreferences({ agent: 'codex', model: 'gpt-5.6-sol' }).preferences

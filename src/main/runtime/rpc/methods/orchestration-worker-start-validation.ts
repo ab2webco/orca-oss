@@ -9,6 +9,7 @@ import {
   resolveWorkerLaunchPreferences
 } from './orchestration-worker-launch-preferences'
 import type { WorkerStartInput } from './orchestration-worker-start-schema'
+import type { GameLaunchChosenBy } from '../../../../shared/orchestrator-game-ticket-kind'
 
 type WorkerStartLaunch = ReturnType<typeof resolveWorkerLaunchPreferences>
 
@@ -102,6 +103,7 @@ export function prepareLocalWorkerStart(args: {
     agent: params.agent,
     model: params.model,
     effort: params.effort,
+    chosenBy: params.modelChosenBy,
     missingAgentMessage: 'A configured --agent is required when worker-start creates a terminal.'
   })
 }
@@ -146,6 +148,7 @@ export function prepareFederationAttachmentWorkerStart(args: {
     agent: params.agent,
     model: params.model,
     effort: params.effort,
+    chosenBy: params.modelChosenBy,
     missingAgentMessage:
       'A configured --agent is required when federated worker-start creates a terminal.'
   })
@@ -157,6 +160,7 @@ function resolveWorkerStartAgent(args: {
   agent?: string
   model?: string
   effort?: string
+  chosenBy?: GameLaunchChosenBy
   missingAgentMessage: string
 }): { agent: TuiAgent | undefined; launch: WorkerStartLaunch } {
   if (!args.terminal && (!args.agent || !isTuiAgent(args.agent))) {
@@ -170,7 +174,8 @@ function resolveWorkerStartAgent(args: {
       launch: resolveWorkerLaunchPreferences({
         agent,
         model: args.model,
-        effort: args.effort
+        effort: args.effort,
+        chosenBy: args.chosenBy
       })
     }
   }

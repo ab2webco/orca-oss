@@ -38,6 +38,13 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('`orca game launch <ticket> --prompt <task>`')
   })
 
+  // ORCA-851: without Jev, the ticket's kind is what picks a member's model.
+  it('tells the lead to name each ticket kind at launch', () => {
+    expect(gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')).toContain(
+      'Pass `--kind audit|implement|review|captures` to every game launch'
+    )
+  })
+
   it('names the fleet verbs: status, a wave from the To Do, a verified sweep and a push', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
