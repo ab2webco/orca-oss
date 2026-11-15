@@ -44,15 +44,15 @@ export type TeamLiveAction =
   /** The agent asks the user, as written; `options` are its choices when it offers some. */
   | { kind: 'question'; text: string; options: string[] }
 
-/** `source`: Jev in the pane, the session's own hooks, or Orca's launch choice. */
-/** Who picked the model a card names: Jev's router, and from what, with its reason. */
+/** Who picked the model a card names: the advisor's (Jev's) router, from what, and its reason. */
 export type TeamModelCredit = {
-  by: 'jev'
+  by: 'advisor'
   /** The session's own model when the router moved it; null when it kept it. */
   from: string | null
   reason: string | null
 }
 
+/** `source`: Jev in the pane, the session's own hooks, or Orca's launch choice. */
 export type TeamModel = {
   label: string
   effort: string | null

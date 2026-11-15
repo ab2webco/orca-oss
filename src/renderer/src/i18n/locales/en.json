@@ -17574,8 +17574,8 @@
       "resize": "Resize building"
     },
     "model": {
-      "chosenByJev": "Chosen by Jev",
-      "jevReason": "{{reason}} (Jev)"
+      "chosenByAdvisor": "Chosen by {{advisor}}",
+      "advisorReason": "{{reason}} ({{advisor}})"
     }
   },
   "claudeDeadHooks": {

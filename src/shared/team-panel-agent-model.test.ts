@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameAgent } from './orchestrator-game-state'
-import { jevReasonOf, teamAgentModelOf } from './team-panel-agent-model'
+import { advisorReasonOf, teamAgentModelOf } from './team-panel-agent-model'
 
 const unpinned = { model: false, effort: false }
 const agentWith = (fields: Pick<GameAgent, 'advisor' | 'launch'>) => fields
@@ -32,7 +32,7 @@ describe('teamAgentModelOf', () => {
           }
         })
       )?.credit
-    ).toEqual({ by: 'jev', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' })
+    ).toEqual({ by: 'advisor', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' })
   })
 
   it('shows the model alone for a member without Jev', () => {
@@ -60,22 +60,22 @@ describe('teamAgentModelOf', () => {
       label: 'Opus 5.5',
       effort: 'high',
       source: 'advisor',
-      credit: { by: 'jev', from: null, reason: null }
+      credit: { by: 'advisor', from: null, reason: null }
     })
   })
 })
 
-describe('jevReasonOf', () => {
+describe('advisorReasonOf', () => {
   it("reads the router's reason from Jev's line, in either language", () => {
-    expect(jevReasonOf('jev · modelo: Opus 5.5 · esfuerzo alto · Jev: código', 'Opus 5.5')).toBe(
-      'Jev: código'
-    )
-    expect(jevReasonOf('jev · model: Haiku 5.5 · lowered', 'Haiku 5.5')).toBe('lowered')
+    expect(
+      advisorReasonOf('jev · modelo: Opus 5.5 · esfuerzo alto · Jev: código', 'Opus 5.5')
+    ).toBe('Jev: código')
+    expect(advisorReasonOf('jev · model: Haiku 5.5 · lowered', 'Haiku 5.5')).toBe('lowered')
   })
 
   it('reads no reason from a line that is not about the model', () => {
-    expect(jevReasonOf('jev · blocked `rm -rf /`: destructive', 'Opus 5.5')).toBeNull()
-    expect(jevReasonOf(null, 'Opus 5.5')).toBeNull()
-    expect(jevReasonOf('jev · model: Opus 5.5', 'Opus 5.5')).toBeNull()
+    expect(advisorReasonOf('jev · blocked `rm -rf /`: destructive', 'Opus 5.5')).toBeNull()
+    expect(advisorReasonOf(null, 'Opus 5.5')).toBeNull()
+    expect(advisorReasonOf('jev · model: Opus 5.5', 'Opus 5.5')).toBeNull()
   })
 })

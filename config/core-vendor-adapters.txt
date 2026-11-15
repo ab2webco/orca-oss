@@ -16,6 +16,7 @@ jev resources/claude-plugins/orca-game/hooks/text-layer.tsx -- reads Jev's alert
 jev src/cli/bundled-skill-guides.ts -- generated skill guide text that mentions Jev
 jev src/renderer/src/components/settings/use-advisor-plugin-presence.ts -- asks whether Jev's plugin is installed; missing is an answer
 jev src/renderer/src/components/team-panel/TeamTabContent.tsx -- the Advisor row's source label, drawn only with a Jev report
+jev src/shared/team-model-advisor-words.ts -- names the advisor in a model credit, which is built only from a Jev report
 sonar src/cli/bundled-skill-guides.ts -- generated skill guide text that mentions orca sonar
 sonar src/cli/handler-group-manifest.ts -- registers `orca sonar`, which refuses plainly without the plugin
 sonar src/cli/handlers/sonar.ts -- `orca sonar` handler; refuses when the plugin is not installed

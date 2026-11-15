@@ -196,7 +196,7 @@ describe('teamCardsOf', () => {
       label: 'Sonnet 5.5',
       effort: 'low',
       source: 'advisor',
-      credit: { by: 'jev', from: null, reason: null }
+      credit: { by: 'advisor', from: null, reason: null }
     })
   })
 

@@ -1,16 +1,17 @@
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 import type { GameAgent } from './orchestrator-game-state'
+import { advisorReasonNamesIt, TEAM_ADVISOR_NAME } from './team-model-advisor-words'
 import type { TeamModel, TeamModelCredit } from './team-panel-model-types'
 
-const JEV_LINE_SEPARATOR = ' · '
+const ADVISOR_LINE_SEPARATOR = ' · '
 
 /**
- * The router's reason on Jev's line (`jev · model: X · [effort ·] reason`); null for any other
- * line Jev draws, such as a gate verdict, so a card never shows one as a model choice.
+ * The router's reason on the advisor's line (`jev · model: X · [effort ·] reason`); null for any
+ * other line it draws, such as a gate verdict, so a card never shows one as a model choice.
  */
-export function jevReasonOf(line: string | null | undefined, model: string): string | null {
-  const segments = line?.split(JEV_LINE_SEPARATOR) ?? []
+export function advisorReasonOf(line: string | null | undefined, model: string): string | null {
+  const segments = line?.split(ADVISOR_LINE_SEPARATOR) ?? []
   if (segments.length < 3 || !segments[1]?.includes(model)) {
     return null
   }
@@ -20,20 +21,21 @@ export function jevReasonOf(line: string | null | undefined, model: string): str
 const labelOf = (model: string | null | undefined): string | null =>
   model ? (gameMemberLaunchOf({ model, effort: null })?.model ?? null) : null
 
-const jevCreditOf = (advisor: GameMemberAdvisor, served: string): TeamModelCredit => {
+const advisorCreditOf = (advisor: GameMemberAdvisor, served: string): TeamModelCredit => {
   const routed = labelOf(advisor.routedModel)
   const session = labelOf(advisor.sessionModel)
   return {
-    by: 'jev',
+    by: 'advisor',
     from: routed && session && session !== served ? session : null,
-    // Why Jev's label: its line names the model it routed, which the transcript may not show yet.
-    reason: jevReasonOf(advisor.line, advisor.model ?? served)
+    // Why the advisor's label: its line names the model it routed, which the transcript may not show yet.
+    reason: advisorReasonOf(advisor.line, advisor.model ?? served)
   }
 }
 
 /**
- * The model a card names: what the session served (its transcript), else what Jev reports, else
- * the launch choice, else `fallback`. Jev is credited only where its report exists (ORCA-851).
+ * The model a card names: what the session served (its transcript), else what the advisor (Jev)
+ * reports, else the launch choice, else `fallback`. The advisor is credited only where its report
+ * exists (ORCA-851).
  */
 export const teamAgentModelOf = (
   agent: Pick<GameAgent, 'advisor' | 'launch'>,
@@ -47,7 +49,7 @@ export const teamAgentModelOf = (
       label,
       effort: served ? served.effort : advisor.effort,
       source: served ? 'session' : 'advisor',
-      credit: jevCreditOf(advisor, label)
+      credit: advisorCreditOf(advisor, label)
     }
   }
   if (agent.launch?.model) {
@@ -69,13 +71,13 @@ export function teamModelLabelText(model: TeamModel): string {
 }
 
 export type TeamModelCreditWords = {
-  chosenByJev: string
-  jevReason: (reason: string) => string
+  chosenByAdvisor: string
+  advisorReason: (reason: string) => string
 }
 
 const ENGLISH_CREDIT_WORDS: TeamModelCreditWords = {
-  chosenByJev: 'Chosen by Jev',
-  jevReason: (reason) => `${reason} (Jev)`
+  chosenByAdvisor: `Chosen by ${TEAM_ADVISOR_NAME}`,
+  advisorReason: (reason) => `${reason} (${TEAM_ADVISOR_NAME})`
 }
 
 /** Who picked the model and why; null where no router or chooser is known. */
@@ -87,10 +89,9 @@ export function teamModelCreditTextOf(
     return null
   }
   if (!credit.reason) {
-    return words.chosenByJev
+    return words.chosenByAdvisor
   }
-  // Why: Jev's own reason often already names it (`code floor (Jev: code)`).
-  return /\bjev\b/i.test(credit.reason) ? credit.reason : words.jevReason(credit.reason)
+  return advisorReasonNamesIt(credit.reason) ? credit.reason : words.advisorReason(credit.reason)
 }
 
 /** A member's model and who chose it as the CLI prints them; null where its host sent none. */

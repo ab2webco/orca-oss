@@ -5,6 +5,7 @@ import {
   teamModelCreditTextOf,
   teamModelLabelText
 } from '../../../../shared/team-panel-agent-model'
+import { TEAM_ADVISOR_NAME } from '../../../../shared/team-model-advisor-words'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -203,9 +204,13 @@ export function teamModelText(model: TeamModel | null): string | null {
 
 /** Who picked the model and why; null where no router or chooser is known. */
 export function teamModelCreditText(model: TeamModel | null): string | null {
+  const advisor = TEAM_ADVISOR_NAME
   return teamModelCreditTextOf(model?.credit, {
-    chosenByJev: translate('teamPanel.model.chosenByJev', 'Chosen by Jev'),
-    jevReason: (reason) => translate('teamPanel.model.jevReason', '{{reason}} (Jev)', { reason })
+    chosenByAdvisor: translate('teamPanel.model.chosenByAdvisor', 'Chosen by {{advisor}}', {
+      advisor
+    }),
+    advisorReason: (reason) =>
+      translate('teamPanel.model.advisorReason', '{{reason}} ({{advisor}})', { reason, advisor })
   })
 }
 

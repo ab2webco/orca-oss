@@ -152,7 +152,7 @@ describe('card words', () => {
         label: 'Opus 5.5',
         effort: 'high',
         source: 'session',
-        credit: { by: 'jev', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
+        credit: { by: 'advisor', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
       })
     ).toBe('Sonnet 5.5 → Opus 5.5 · high')
   })
@@ -162,15 +162,15 @@ describe('card words', () => {
     expect(
       teamModelCreditText({
         ...model,
-        credit: { by: 'jev', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
+        credit: { by: 'advisor', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
       })
     ).toBe('code floor (Jev: code)')
     expect(
-      teamModelCreditText({ ...model, credit: { by: 'jev', from: null, reason: 'lowered' } })
+      teamModelCreditText({ ...model, credit: { by: 'advisor', from: null, reason: 'lowered' } })
     ).toBe('lowered (Jev)')
-    expect(teamModelCreditText({ ...model, credit: { by: 'jev', from: null, reason: null } })).toBe(
-      'Chosen by Jev'
-    )
+    expect(
+      teamModelCreditText({ ...model, credit: { by: 'advisor', from: null, reason: null } })
+    ).toBe('Chosen by Jev')
     expect(teamModelCreditText(model)).toBeNull()
     expect(teamModelCreditText(null)).toBeNull()
   })
