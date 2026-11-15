@@ -133,7 +133,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
           endStreak(scope, false)
           const team = lastTeams.get(scope.key)
           deps.publish(
-            { section: team ? { kind: 'ready', value: team } : { kind: 'loading' }, retry: null },
+            team
+              ? { section: { kind: 'ready', value: team }, retry: null, updating: true }
+              : { section: { kind: 'loading' }, retry: null },
             scope
           )
           run.soon ??= setTimeout(() => {
