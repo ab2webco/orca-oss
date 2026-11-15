@@ -72,8 +72,10 @@ The flags match Settings > Mobile on that host:
   Without one, the command lists the host's addresses instead of minting a link. `10.0.2.2` is how an
   Android emulator reaches the machine it runs on, so the link points the emulator at the Orca on
   that same machine.
-- Repeated calls reuse the same pending link until a phone scans it. `--rotate` revokes it and mints
-  a new one.
+- A host keeps one unused link at a time, and repeated calls reuse it until a phone scans it.
+  `--rotate`, or a different `--connection` than the pending link's, mints a new one. The old one
+  stops pairing only once the new one exists, and the command says so. A mint that fails, such as a
+  Relay refusal, leaves the earlier link working.
 
 Then open the `pairingUrl` from the output on the emulator, on the host's machine:
 

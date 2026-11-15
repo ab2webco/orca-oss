@@ -32,6 +32,7 @@ type MobilePairingQrResponse =
       endpoint: string | null
       deviceId: string
       connectionMode: MobilePairingConnectionMode
+      replacedPendingLink?: boolean
     }
 
 type PairingNetworkInterface = { name: string; address: string; hasDefaultRoute?: boolean }
@@ -44,6 +45,8 @@ export type MobilePairResult = {
   /** The paired host that minted it, or null for this machine's own runtime. */
   host: string | null
   qrText: string | null
+  /** True when this link retired an earlier unused one; null when the host is too old to say. */
+  replacedPendingLink: boolean | null
 }
 
 export const MOBILE_PAIR_HANDLERS: Record<string, CommandHandler> = {
@@ -70,7 +73,8 @@ export const MOBILE_PAIR_HANDLERS: Record<string, CommandHandler> = {
       deviceId: qr.deviceId,
       connection: qr.connectionMode === 'local-only' ? 'lan' : 'relay',
       host,
-      qrText: await renderTerminalQr(qr.pairingUrl)
+      qrText: await renderTerminalQr(qr.pairingUrl),
+      replacedPendingLink: qr.replacedPendingLink ?? null
     }
     printResult({ ...response, result }, ctx.json, formatMobilePair)
   }
@@ -208,7 +212,11 @@ function formatMobilePair(result: MobilePairResult): string {
     `Pairing URL: ${result.pairingUrl}`,
     `Endpoint: ${result.endpoint ?? 'none (pairs over Relay)'}`,
     `Connection: ${result.connection}`,
-    `Host: ${result.host ?? 'this machine'}`
+    `Host: ${result.host ?? 'this machine'}`,
+    // Why: whoever holds the earlier link must learn it is dead before a phone fails to pair with it.
+    result.replacedPendingLink
+      ? `Replaced the earlier unused pairing link on ${result.host ? `host "${result.host}"` : 'this Orca Lab'}; that link no longer pairs.`
+      : ''
   ]
     .filter((line) => line.length > 0)
     .join('\n')

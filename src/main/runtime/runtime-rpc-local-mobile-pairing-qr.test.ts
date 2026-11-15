@@ -56,6 +56,20 @@ describe('pairing.createMobileQr over the local socket', () => {
     expect(server.getDeviceRegistry()?.getDevice(result.deviceId)?.scope).toBe('mobile')
   })
 
+  it('tells the caller when the new link replaced an earlier unused one', async () => {
+    const { endpoint, authToken } = await startServer(true)
+    const mint = (rotate: boolean) =>
+      sendRequest(endpoint, {
+        id: 'req_pair',
+        authToken,
+        method: 'pairing.createMobileQr',
+        params: { address: '10.0.2.2', connectionMode: 'local-only', rotate }
+      })
+
+    expect(await mint(false)).toMatchObject({ result: { replacedPendingLink: false } })
+    expect(await mint(true)).toMatchObject({ result: { replacedPendingLink: true } })
+  })
+
   it('says why when the runtime has no WebSocket listener to pair with', async () => {
     const { endpoint, authToken } = await startServer(false)
 

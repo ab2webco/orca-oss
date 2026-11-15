@@ -18,8 +18,8 @@ export const MOBILE_COMMAND_SPECS: CommandSpec[] = [
       '--environment mints on a paired host; without it the link pairs with this machine.',
       '--connection is the Connection method. relay (the default) is Orca Relay and needs Orca sign-in on that host; when Relay cannot mint, the error names its failure code. lan pairs over --address alone.',
       '--address is the address the phone dials, the UI’s address of this computer. lan requires it; without one the command lists the host’s addresses. An Android emulator reaches the machine it runs on at 10.0.2.2.',
-      '--rotate revokes a pending, never-scanned link and mints a fresh one; otherwise repeated calls reuse it.',
-      '--json returns pairingUrl, endpoint, deviceId, connection, host and qrText. The link is a credential: do not paste it into PRs, tickets or chats.'
+      'Repeated calls reuse the pending, never-scanned link. --rotate or a different --connection replaces it once the new link exists, and the command says so; a failed mint leaves it working.',
+      '--json returns pairingUrl, endpoint, deviceId, connection, host, qrText and replacedPendingLink (null from older hosts). The link is a credential: do not paste it into PRs, tickets or chats.'
     ]
   }
 ]

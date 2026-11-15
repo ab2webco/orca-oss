@@ -102,6 +102,59 @@ describe('orca mobile pair', () => {
     )
   })
 
+  it('says the earlier unused link stopped pairing when the host replaced it', async () => {
+    const call = vi.fn().mockResolvedValue(ok({ ...mintedLan, replacedPendingLink: true }))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
+    await runPair(
+      [
+        ['connection', 'lan'],
+        ['address', '10.0.2.2'],
+        ['environment', 'm1']
+      ],
+      call,
+      { isRemote: true }
+    )
+
+    const printed = log.mock.calls.map((args) => String(args[0])).join('\n')
+    expect(printed).toMatch(/replaced the earlier unused pairing link on host "m1"/i)
+    expect(printed).toMatch(/no longer pairs/i)
+  })
+
+  it('prints no replacement notice when the host reused or freshly minted the link', async () => {
+    const call = vi.fn().mockResolvedValue(ok({ ...mintedLan, replacedPendingLink: false }))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
+    await runPair(
+      [
+        ['connection', 'lan'],
+        ['address', '10.0.2.2']
+      ],
+      call
+    )
+
+    const printed = log.mock.calls.map((args) => String(args[0])).join('\n')
+    expect(printed).not.toMatch(/replaced/i)
+  })
+
+  it('reports the replacement in --json, and null when the host does not say', async () => {
+    const replaced = vi.fn().mockResolvedValue(ok({ ...mintedLan, replacedPendingLink: true }))
+    const olderHost = vi.fn().mockResolvedValue(ok(mintedLan))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const lan: [string, string][] = [
+      ['connection', 'lan'],
+      ['address', '10.0.2.2']
+    ]
+
+    await runPair(lan, replaced, { json: true })
+    await runPair(lan, olderHost, { json: true })
+
+    const results = log.mock.calls.map(
+      (args) => (JSON.parse(String(args[0])) as { result: { replacedPendingLink: unknown } }).result
+    )
+    expect(results.map((result) => result.replacedPendingLink)).toEqual([true, null])
+  })
+
   it('refuses a connection that is neither relay nor lan before calling the host', async () => {
     const call = vi.fn()
 

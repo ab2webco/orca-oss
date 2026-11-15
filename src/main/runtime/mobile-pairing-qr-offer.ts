@@ -25,6 +25,8 @@ export type MobilePairingQrResponse =
       deviceId: string
       /** Mode the QR actually encodes. */
       connectionMode: MobilePairingConnectionMode
+      /** True when this mint retired an earlier unused link. Absent from hosts older than ORCA-1238. */
+      replacedPendingLink?: boolean
     }
 
 type PairingOfferForQr =
@@ -35,6 +37,7 @@ type PairingOfferForQr =
       endpoint: string
       deviceId: string
       connectionMode: MobilePairingConnectionMode
+      replacedPendingLink?: boolean
     }
 
 export type MobilePairingQrEnvironment = {
@@ -106,6 +109,9 @@ export async function createMobilePairingQrResponse(
     // instead of printing an address the phone can't reach.
     endpoint: ip ? offer.endpoint : null,
     deviceId: offer.deviceId,
-    connectionMode: offer.connectionMode
+    connectionMode: offer.connectionMode,
+    ...(offer.replacedPendingLink !== undefined
+      ? { replacedPendingLink: offer.replacedPendingLink }
+      : {})
   }
 }
