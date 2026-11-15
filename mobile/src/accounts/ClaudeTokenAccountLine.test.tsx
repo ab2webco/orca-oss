@@ -42,8 +42,25 @@ describe('ClaudeAccountRowNotice', () => {
 
     expect(shown).toEqual([
       'Token rejected — run claude setup-token again',
-      'Expires about Nov 15, 2027 · Saved Nov 15, 2026'
+      'Expires about Nov 15, 2027 ·',
+      'Saved Nov 15, 2026'
     ])
+  })
+
+  it('wraps the saved date onto a second line at narrow widths instead of cutting it', () => {
+    texts(createElement(ClaudeAccountRowNotice, { token: TOKEN, usageError: null }))
+    const term = mounted
+      .renderer!.root.findAllByType('Text' as never)
+      .filter((node) => /^(Expires|Saved)/.test([node.props.children].flat().join('')))
+
+    expect(term).toHaveLength(2)
+    for (const node of term) {
+      expect(node.props.numberOfLines).toBeUndefined()
+      expect(Object.assign({}, ...[node.parent?.props.style].flat())).toMatchObject({
+        flexDirection: 'row',
+        flexWrap: 'wrap'
+      })
+    }
   })
 
   it("keeps today's usage error for an account without a token", () => {

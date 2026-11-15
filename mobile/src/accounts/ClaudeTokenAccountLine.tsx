@@ -1,7 +1,7 @@
 import { KeyRound } from 'lucide-react-native'
 import { StyleSheet, View } from 'react-native'
 import { Text } from '../theme/dynamic-type-text'
-import { colors, radii, typography } from '../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { ClaudeTokenAccountStatus, ClaudeTokenTone } from './claude-token-account'
 
 const TONE: Record<ClaudeTokenTone, string> = {
@@ -43,9 +43,13 @@ export function ClaudeAccountRowNotice({
           {token.check}
         </Text>
       </View>
-      <Text style={[styles.meta, token.term.soon && styles.soon]} numberOfLines={1}>
-        {`${token.term.expiry} · ${token.term.saved}`}
-      </Text>
+      {/* Why two texts in a wrapping row: at 320 the saved date moves whole to a second line. */}
+      <View style={styles.termRow}>
+        <Text
+          style={[styles.meta, token.term.soon && styles.soon]}
+        >{`${token.term.expiry} ·`}</Text>
+        <Text style={[styles.meta, token.term.soon && styles.soon]}>{token.term.saved}</Text>
+      </View>
     </View>
   )
 }
@@ -69,6 +73,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6
+  },
+  termRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.xs
   },
   meta: {
     flexShrink: 1,
