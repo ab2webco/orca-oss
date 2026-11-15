@@ -5865,6 +5865,10 @@
           "days": "{{count}} d",
           "weeks": "{{count}} wk"
         },
+        "SidebarResumeStrip": {
+          "resume": "Resume",
+          "dismiss": "Dismiss"
+        },
         "IdleProjectsGroup": {
           "label": "Idle",
           "count": "{{count}} projects",

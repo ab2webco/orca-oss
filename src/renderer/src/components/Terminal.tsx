@@ -104,7 +104,7 @@ import {
   anyMountedWorktreeHasLayout as computeAnyMountedWorktreeHasLayout
 } from './terminal/split-group-mount'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/duplicate-browser-tab-options'
-import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { openNewTerminalFromTabBar } from './tab-bar/tab-bar-new-terminal'
 import { setForegroundTerminalTabIds } from '@/lib/foreground-terminal-tabs'
 import { getTerminalWorktreeColdParkRecheckDelayMs } from './terminal-pane/terminal-cold-park-recheck-deadlines'
 import {
@@ -150,7 +150,6 @@ import {
   activateWebRuntimeSessionTab,
   closeWebRuntimeSessionTab,
   createWebRuntimeSessionBrowserTab,
-  createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
 import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
@@ -375,9 +374,6 @@ function Terminal(): React.JSX.Element | null {
     (s) => s.openNewBrowserTabInActiveWorkspace
   )
   const openNewMarkdownInActiveWorkspace = useAppStore((s) => s.openNewMarkdownInActiveWorkspace)
-  const openNewTerminalTabInActiveWorkspace = useAppStore(
-    (s) => s.openNewTerminalTabInActiveWorkspace
-  )
   const closeBrowserTab = useAppStore((s) => s.closeBrowserTab)
   const setActiveBrowserTab = useAppStore((s) => s.setActiveBrowserTab)
   const groupsByWorktree = useAppStore((s) => s.groupsByWorktree)
@@ -387,7 +383,6 @@ function Terminal(): React.JSX.Element | null {
   const reconcileWorktreeTabModel = useAppStore((s) => s.reconcileWorktreeTabModel)
 
   const markFileDirty = useAppStore((s) => s.markFileDirty)
-  const setTabBarOrder = useAppStore((s) => s.setTabBarOrder)
   const tabBarOrderByWorktree = useAppStore((s) => s.tabBarOrderByWorktree)
   const tabBarOrder = renderedActiveWorktreeId
     ? tabBarOrderByWorktree[renderedActiveWorktreeId]
@@ -1530,58 +1525,9 @@ function Terminal(): React.JSX.Element | null {
       if (!activeWorktreeId) {
         return
       }
-      const targetGroupId =
-        useAppStore.getState().activeGroupIdByWorktree[activeWorktreeId] ??
-        useAppStore.getState().groupsByWorktree[activeWorktreeId]?.[0]?.id
-      const runtimeEnvironmentId = getActiveWorktreeRuntimeEnvironmentId(activeWorktreeId)
-      if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
-        void createWebRuntimeSessionTerminal({
-          worktreeId: activeWorktreeId,
-          environmentId: runtimeEnvironmentId,
-          targetGroupId,
-          command: shellOverride,
-          activate: true
-        })
-        return
-      }
-      if (!shellOverride && targetGroupId) {
-        void openNewTerminalTabInActiveWorkspace(targetGroupId)
-        return
-      }
-      const newTab = createTab(activeWorktreeId, undefined, shellOverride)
-      setActiveTabType('terminal')
-      // Why: persist tab-bar order with the new terminal appended; else reconcileOrder falls back to terminals-first and jumps it to index 0 before editor tabs.
-      const state = useAppStore.getState()
-      const currentTerminals = state.tabsByWorktree[activeWorktreeId] ?? []
-      const currentEditors = state.openFiles.filter((f) => f.worktreeId === activeWorktreeId)
-      const currentBrowsers = state.browserTabsByWorktree[activeWorktreeId] ?? []
-      const stored = state.tabBarOrderByWorktree[activeWorktreeId]
-      const termIds = currentTerminals.map((t) => t.id)
-      const editorIds = currentEditors.map((f) => f.id)
-      const browserIds = currentBrowsers.map((tab) => tab.id)
-      const validIds = new Set([...termIds, ...editorIds, ...browserIds])
-      const base = (stored ?? []).filter((id) => validIds.has(id))
-      const inBase = new Set(base)
-      for (const id of [...termIds, ...editorIds, ...browserIds]) {
-        if (!inBase.has(id)) {
-          base.push(id)
-          inBase.add(id)
-        }
-      }
-      // The new tab is already in base via termIds; move it to the end
-      const order = base.filter((id) => id !== newTab.id)
-      order.push(newTab.id)
-      setTabBarOrder(activeWorktreeId, order)
-      // Why: shell-specific creation still uses the legacy path; keep focus here until the lifted action accepts shell overrides.
-      focusTerminalTabSurface(newTab.id)
+      void openNewTerminalFromTabBar(activeWorktreeId, shellOverride)
     },
-    [
-      activeWorktreeId,
-      createTab,
-      openNewTerminalTabInActiveWorkspace,
-      setActiveTabType,
-      setTabBarOrder
-    ]
+    [activeWorktreeId]
   )
 
   const handleNewAgentTab = useCallback(

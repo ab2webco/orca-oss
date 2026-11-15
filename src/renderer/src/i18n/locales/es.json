@@ -5514,6 +5514,10 @@
           "days": "{{count}} d",
           "weeks": "{{count}} sem"
         },
+        "SidebarResumeStrip": {
+          "resume": "Retomar",
+          "dismiss": "Descartar"
+        },
         "IdleProjectsGroup": {
           "label": "En reposo",
           "count": "{{count}} proyectos",

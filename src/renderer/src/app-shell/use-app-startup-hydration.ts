@@ -232,6 +232,8 @@ export function useAppStartupHydration(onOnboardingLoaded: (state: OnboardingSta
             actions.pruneLastVisitedTimestamps()
             actions.seedActiveWorktreeLastVisitedIfMissing()
           })
+          // Why (ORCA-1216 §8): bring the restored workspace into view and name it, without taking focus.
+          useAppStore.getState().revealRestoredWorkspace()
           await timeRendererStartupStep('fetch-browser-session-profiles', () =>
             actions.fetchBrowserSessionProfiles()
           )

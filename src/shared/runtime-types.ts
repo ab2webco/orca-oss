@@ -713,8 +713,8 @@ type RuntimeTerminalCreateBaseRequestPayload = {
   presentation?: RuntimeTerminalPresentation
   /**
    * Why: adopting a terminal is separate from pointing the user at it. `false`
-   * keeps the tab silent — no sidebar reveal, no tab focus — for terminals the
-   * user never asked to see (e.g. a workspace created in the background).
+   * keeps the tab silent — no activation, no tab focus — for terminals the user
+   * never asked to see; the renderer only scrolls a new tab's row into view (ORCA-1192).
    * Absent means "surface it", so this is a suppression switch, never `true`.
    */
   surfaceOwner?: false

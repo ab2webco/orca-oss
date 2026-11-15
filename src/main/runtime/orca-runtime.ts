@@ -1916,8 +1916,8 @@ type TerminalCreateOptions = {
   activate?: boolean
   presentation?: RuntimeTerminalPresentation
   // Why: `false` adopts the terminal without pointing the user at it — no
-  // sidebar reveal, no tab focus. Distinct from 'background' presentation,
-  // which skips renderer adoption entirely.
+  // activation, no tab focus, only a passive sidebar scroll. Distinct from
+  // 'background' presentation, which skips renderer adoption entirely.
   surfaceOwner?: false
   tabId?: string
   leafId?: string
@@ -24512,8 +24512,8 @@ export class OrcaRuntimeService {
     // the setup command. Pass that wrapped command through so the Setup tab runs
     // the same script the agent is waiting on instead of a bare runner.
     wrappedSetupCommand?: string
-    // Why: a workspace provisioned in the background must not pull the sidebar
-    // to itself; the user never asked to look at these tabs.
+    // Why: a workspace provisioned in the background must not activate or take
+    // focus; the user never asked to look at these tabs.
     surfaceOwner?: false
   }): Promise<{ setupSpawned: boolean; setupTerminalHandle: string | null }> {
     if (!this.ptyController?.spawn) {

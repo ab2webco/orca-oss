@@ -65,6 +65,20 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
     }
 
     let cancelled = false
+    const retryPendingWorktreeReveal = (): boolean => {
+      const previousRetry = pendingRevealRetryRef.current
+      const nextRetryCount =
+        previousRetry?.worktreeId === pendingRevealWorktree.worktreeId ? previousRetry.count + 1 : 1
+      pendingRevealRetryRef.current = {
+        worktreeId: pendingRevealWorktree.worktreeId,
+        count: nextRetryCount
+      }
+      if (nextRetryCount <= MAX_REVEAL_RETRIES) {
+        scheduleRetryTick(() => cancelled)
+        return true
+      }
+      return false
+    }
     schedulePendingRevealFrame(() => {
       if (cancelled) {
         return
@@ -86,6 +100,11 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
         return
       }
       if (outcome !== 'scroll-and-clear') {
+        // Why: give a passive reveal a few frames to unfold its row, then drop it rather than land when filters change.
+        if (pendingRevealWorktree.passive && !retryPendingWorktreeReveal()) {
+          pendingRevealRetryRef.current = null
+          clearPendingRevealWorktreeId()
+        }
         return
       }
       const targetRow = renderRows[targetIndex]
@@ -120,15 +139,7 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
 
       // Why: virtual indexing can leave the card edge clipped; stage it into the window, then retry the exact DOM reveal.
       virtualizer.scrollToIndex(targetIndex, { align: 'auto', behavior: 'auto' })
-      const previousRetry = pendingRevealRetryRef.current
-      const nextRetryCount =
-        previousRetry?.worktreeId === pendingRevealWorktree.worktreeId ? previousRetry.count + 1 : 1
-      pendingRevealRetryRef.current = {
-        worktreeId: pendingRevealWorktree.worktreeId,
-        count: nextRetryCount
-      }
-      if (nextRetryCount <= MAX_REVEAL_RETRIES) {
-        scheduleRetryTick(() => cancelled)
+      if (retryPendingWorktreeReveal()) {
         return
       }
       pendingRevealRetryRef.current = null

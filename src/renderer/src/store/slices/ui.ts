@@ -80,6 +80,7 @@ import {
   DEFAULT_SHOW_SLEEPING_WORKSPACES,
   DEFAULT_STATUS_BAR_ITEMS,
   DEFAULT_WORKTREE_CARD_PROPERTIES,
+  FLOATING_TERMINAL_WORKTREE_ID,
   getWorktreeCardModeUpdates,
   normalizeAgentActivityDisplayMode,
   normalizeWorktreeCardProperties
@@ -134,12 +135,15 @@ import { buildAgentNotificationId } from '../../../../shared/agent-notification-
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { translate } from '@/i18n/i18n'
 import { getRepoHostIdentity } from './repo-host-identity'
+import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
 
 export type PendingSidebarWorktreeReveal = {
   worktreeId: string
   behavior: 'auto' | 'smooth'
   highlight?: boolean
   beginRename?: boolean
+  // Why: a reveal nobody asked for (a background terminal) must not land later when filters change.
+  passive?: boolean
 }
 
 export type PendingSidebarRowReveal = {
@@ -1002,8 +1006,13 @@ export type UISlice = {
       behavior?: PendingSidebarWorktreeReveal['behavior']
       highlight?: boolean
       beginRename?: boolean
+      passive?: boolean
     }
   ) => void
+  /** Session-only: the restored workspace the Retomar strip names until it is clicked or dismissed. */
+  resumeStripWorkspaceId: string | null
+  revealRestoredWorkspace: () => void
+  dismissResumeStrip: () => void
   revealSidebarRow: (
     rowKey: string,
     options?: {
@@ -2440,9 +2449,23 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         worktreeId,
         behavior: options?.behavior ?? 'smooth',
         ...(options?.highlight ? { highlight: true } : {}),
-        ...(options?.beginRename ? { beginRename: true } : {})
+        ...(options?.beginRename ? { beginRename: true } : {}),
+        ...(options?.passive ? { passive: true } : {})
       }
     }),
+  resumeStripWorkspaceId: null,
+  revealRestoredWorkspace: () => {
+    const workspaceId = getActiveSidebarWorkspaceId(
+      get().activeWorkspaceKey,
+      get().activeWorktreeId
+    )
+    if (!workspaceId || workspaceId === FLOATING_TERMINAL_WORKTREE_ID) {
+      return
+    }
+    set({ resumeStripWorkspaceId: workspaceId })
+    get().revealWorktreeInSidebar(workspaceId, { behavior: 'auto' })
+  },
+  dismissResumeStrip: () => set({ resumeStripWorkspaceId: null }),
   revealSidebarRow: (rowKey, options) =>
     set({
       pendingRevealSidebarRow: {

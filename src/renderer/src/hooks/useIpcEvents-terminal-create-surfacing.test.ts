@@ -90,6 +90,8 @@ describe('useIpcEvents updater integration', () => {
       activeRuntimeEnvironmentId: 'windows-2'
     }
 
+    focusRuntimeTerminalSurface.mockClear()
+    focusTerminalTabSurface.mockClear()
     createTerminalListenerRef.current({
       worktreeId: 'wt-2',
       title: 'Runner',
@@ -107,8 +109,9 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
     expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2')
-    expect(focusRuntimeTerminalSurface).toHaveBeenCalledWith('tab-new', undefined)
-    expect(focusTerminalTabSurface).toHaveBeenCalledWith('tab-new', undefined)
+    // ORCA-1192: a fresh tab nobody activated must not pull focus from what the person is typing in.
+    expect(focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+    expect(focusTerminalTabSurface).not.toHaveBeenCalled()
     expect(setTabCustomTitle).toHaveBeenCalledWith('tab-new', 'Runner', {
       recordInteraction: false
     })
@@ -179,8 +182,9 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
     expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-3')
-    expect(focusRuntimeTerminalSurface).toHaveBeenCalledWith('tab-new', undefined)
-    expect(focusTerminalTabSurface).toHaveBeenCalledWith('tab-new', undefined)
+    // ORCA-1192: a fresh tab nobody activated must not pull focus from what the person is typing in.
+    expect(focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+    expect(focusTerminalTabSurface).not.toHaveBeenCalled()
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'orca-background-mount-terminal-worktree',
@@ -242,8 +246,9 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
     expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2')
-    expect(focusRuntimeTerminalSurface).toHaveBeenCalledWith('tab-new', undefined)
-    expect(focusTerminalTabSurface).toHaveBeenCalledWith('tab-new', undefined)
+    // ORCA-1192: a fresh tab nobody activated must not pull focus from what the person is typing in.
+    expect(focusRuntimeTerminalSurface).not.toHaveBeenCalled()
+    expect(focusTerminalTabSurface).not.toHaveBeenCalled()
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'orca-background-mount-terminal-worktree',
@@ -452,7 +457,7 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveWorktree).not.toHaveBeenCalled()
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
-    expect(revealWorktreeInSidebar).not.toHaveBeenCalled()
+    expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2', { passive: true })
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'orca-background-mount-terminal-worktree',
@@ -579,7 +584,7 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveWorktree).not.toHaveBeenCalled()
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
-    expect(revealWorktreeInSidebar).not.toHaveBeenCalled()
+    expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2', { passive: true })
     expect(dispatchEvent).toHaveBeenCalledOnce()
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -614,7 +619,7 @@ describe('useIpcEvents updater integration', () => {
     expect(setActiveWorktree).not.toHaveBeenCalled()
     expect(setActiveTabType).not.toHaveBeenCalled()
     expect(setActiveTab).not.toHaveBeenCalled()
-    expect(revealWorktreeInSidebar).not.toHaveBeenCalled()
+    expect(revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2', { passive: true })
     expect(focusRuntimeTerminalSurface).not.toHaveBeenCalled()
     expect(focusTerminalTabSurface).not.toHaveBeenCalled()
     expect(dispatchEvent).toHaveBeenCalledOnce()

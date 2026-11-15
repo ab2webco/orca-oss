@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import type { StateCreator } from 'zustand'
+import { revealNewTerminalOwnerRow } from '@/lib/new-terminal-owner-reveal'
 import type { AppState } from '../types'
 import type { WorkspaceKey } from '../../../../shared/folder-workspace-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -1585,12 +1586,14 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         targetGroupId: groupId,
         activate: true
       })
+      revealNewTerminalOwnerRow(get(), worktreeId)
       return
     }
     if (isWebClientLocation() && worktreeId !== FLOATING_TERMINAL_WORKTREE_ID) {
       return
     }
     const terminal = get().createTab(worktreeId, groupId)
+    revealNewTerminalOwnerRow(get(), worktreeId)
     get().setActiveTab(terminal.id)
     get().setActiveTabType('terminal')
     const latest = get()

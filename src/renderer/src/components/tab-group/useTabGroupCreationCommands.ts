@@ -2,13 +2,9 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import { useAppStore } from '../../store'
-import { focusTerminalTabSurface } from '../../lib/focus-terminal-tab-surface'
-import {
-  createWebRuntimeSessionBrowserTab,
-  createWebRuntimeSessionTerminal,
-  isWebRuntimeSessionActive
-} from '../../runtime/web-runtime-session'
+import { createWebRuntimeSessionBrowserTab } from '../../runtime/web-runtime-session'
 import { openTabBarEntry, type TabCreateEntryArgs } from '../tab-bar/tab-create-entry-action'
+import { openShellTerminalInGroup } from '../tab-bar/tab-bar-new-terminal'
 import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
 import { ensureSimulatorTab, getSimulatorTabForWorktree } from '@/lib/ensure-simulator-tab'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/duplicate-browser-tab-options'
@@ -147,23 +143,7 @@ export function useTabGroupCreationCommands({
       void openNewTerminalTabInActiveWorkspace(groupId)
     },
     newTerminalWithShell: (shellOverride: string) => {
-      void (async () => {
-        const environmentId = getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), worktreeId)
-        const outcome = await createWebRuntimeSessionTerminal({
-          worktreeId,
-          environmentId,
-          targetGroupId: groupId,
-          command: shellOverride,
-          activate: true
-        })
-        if (outcome.status === 'created' || isWebRuntimeSessionActive(environmentId)) {
-          return
-        }
-        const terminal = createTab(worktreeId, groupId, shellOverride)
-        setActiveTab(terminal.id)
-        setActiveTabType('terminal')
-        focusTerminalTabSurface(terminal.id)
-      })()
+      void openShellTerminalInGroup(worktreeId, groupId, shellOverride)
     }
   }
 }
