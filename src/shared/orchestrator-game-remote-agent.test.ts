@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentStatusIpcPayload } from './agent-status-types'
 import { parseRemoteMemberAgent, remoteMemberAgentOf } from './orchestrator-game-remote-agent'
+import { gameMemberModelTextOf } from './team-panel-agent-model'
 
 const entry = (overrides: Partial<AgentStatusIpcPayload> = {}): AgentStatusIpcPayload => ({
   paneKey: 'tab:817',
@@ -145,5 +146,39 @@ describe("a remote member's relayed activity and model (ORCA-933)", () => {
       effort: null
     })
     expect(relayed({ launch: { model: null, effort: null } })).not.toHaveProperty('launch')
+  })
+})
+
+describe("a remote member's served model and Jev's credit (ORCA-851)", () => {
+  it('crosses the relay whole, so the home card credits Jev with the switch', () => {
+    const relayed = parseRemoteMemberAgent({
+      state: 'working',
+      updatedAt: 5,
+      launch: { model: 'Opus 5.5', effort: 'high', source: 'session' },
+      advisor: {
+        model: 'Opus 5.5',
+        effort: 'high',
+        pinned: { model: false, effort: false },
+        routedModel: 'claude-opus-5-5',
+        sessionModel: 'claude-sonnet-5-5',
+        line: 'jev · model: Opus 5.5 · high effort · code floor (Jev: code)'
+      }
+    })
+    expect(relayed && gameMemberModelTextOf(relayed)).toEqual({
+      model: 'Sonnet 5.5 → Opus 5.5 · high',
+      modelBy: 'code floor (Jev: code)'
+    })
+  })
+
+  it('names the model alone from an older host that relays no Jev detail', () => {
+    const relayed = parseRemoteMemberAgent({
+      state: 'working',
+      updatedAt: 5,
+      launch: { model: 'Sonnet 5.5', effort: 'medium' }
+    })
+    expect(relayed && gameMemberModelTextOf(relayed)).toEqual({
+      model: 'Sonnet 5.5 · medium',
+      modelBy: null
+    })
   })
 })
