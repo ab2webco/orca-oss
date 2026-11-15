@@ -13,10 +13,20 @@ describe('the scene template `orca game scene new` writes', () => {
     const definition = parsed.ok ? parsed.definition : undefined
     // Why: the template shows its own example foe, finale, pet and theme in place of Quest's,
     // the stop gesture of Quest's advisor, and ten of Quest's roster as characters of their own.
-    const { foe, finale, cast, roster, characters, themes, ...quest } = definition ?? QUEST_SCENE
+    const { foe, finale, cast, roster, characters, themes, prop, ...quest } =
+      definition ?? QUEST_SCENE
     expect([foe, finale, cast?.pet, themes].every((extra) => extra !== undefined)).toBe(true)
+    // Why: a scene started from the template must not inherit Quest's sword (ORCA-1202).
+    expect(prop).toBeUndefined()
     const { roster: questRoster, characters: questCharacters, ...questOwn } = QUEST_SCENE
-    const { foe: _foe, finale: _finale, themes: _themes, cast: questCast, ...questScene } = questOwn
+    const {
+      foe: _foe,
+      finale: _finale,
+      themes: _themes,
+      prop: _prop,
+      cast: questCast,
+      ...questScene
+    } = questOwn
     expect(roster).toEqual(questRoster?.slice(0, 10))
     expect(characters).toEqual(questCharacters?.slice(0, 9))
     const { gestures, ...advisor } = cast?.advisor ?? { frames: [], colors: {} }

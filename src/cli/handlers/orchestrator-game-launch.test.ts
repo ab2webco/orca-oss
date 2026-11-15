@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TODO_ITEM, fakeClient, launch, stateWith } from './orchestrator-game-launch-test-fixtures'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
-import { GAME_MEMBER_CI_NOTE, withGameMemberCiNote } from '../../shared/orchestrator-game-lead'
+import {
+  GAME_MEMBER_CI_NOTE,
+  GAME_MEMBER_REPORT_RULES,
+  withGameMemberNotes
+} from '../../shared/orchestrator-game-lead'
 
 describe('orca game launch', () => {
   const saved = { ...process.env }
@@ -67,7 +71,7 @@ describe('orca game launch', () => {
       'game.eventPost'
     ])
     expect(calls[8]?.[1]).toEqual({
-      spec: withGameMemberCiNote('Implement CIN-12: Cartelera page'),
+      spec: withGameMemberNotes('Implement CIN-12: Cartelera page'),
       taskTitle: 'Arthur · CIN-12 Cartelera page',
       callerTerminalHandle: 'h1'
     })
@@ -105,9 +109,26 @@ describe('orca game launch', () => {
     const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1] as
       | { spec: string }
       | undefined
-    expect(create?.spec).toBe(`Implement CIN-12: Cartelera page\n\n${GAME_MEMBER_CI_NOTE}`)
+    expect(create?.spec).toBe(
+      `Implement CIN-12: Cartelera page\n\n${GAME_MEMBER_CI_NOTE}\n\n${GAME_MEMBER_REPORT_RULES}`
+    )
     expect(GAME_MEMBER_CI_NOTE).toContain('`orca game state --json`')
     expect(GAME_MEMBER_CI_NOTE).toContain('gh pr checks')
+  })
+
+  // Why: the 2026-11-14 lead audits (ORCA-1214): late splits, resent worker_done, idle on a red PR.
+  it('tells the member to plan a split, report once and never go idle on red CI', () => {
+    expect(GAME_MEMBER_REPORT_RULES).toContain(
+      'when it will pass about 400 lines outside tests, send your lead a split plan'
+    )
+    expect(GAME_MEMBER_REPORT_RULES).toContain(
+      'Send worker_done once, with `--dispatch-capability`'
+    )
+    expect(GAME_MEMBER_REPORT_RULES).toContain('never resend worker_done')
+    expect(GAME_MEMBER_REPORT_RULES).toContain(
+      'name the failing job, its run id and the cause, propose who fixes it'
+    )
+    expect(GAME_MEMBER_REPORT_RULES).toContain('Never go idle on a red PR')
   })
 
   it("ends the member's brief with the project's lessons as untrusted data", async () => {
@@ -161,7 +182,7 @@ describe('orca game launch', () => {
 
       const create = calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]
       expect(create).toMatchObject({
-        spec: withGameMemberCiNote('Implement CIN-12: Cartelera page')
+        spec: withGameMemberNotes('Implement CIN-12: Cartelera page')
       })
     }
   })
@@ -482,7 +503,7 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
       expect.objectContaining({
-        spec: withGameMemberCiNote('Implement CIN-99:'),
+        spec: withGameMemberNotes('Implement CIN-99:'),
         taskTitle: 'Arthur · CIN-99'
       })
     )
@@ -497,7 +518,7 @@ describe('orca game launch', () => {
 
     expect(calls.find(([method]) => method === 'orchestration.taskCreate')?.[1]).toEqual(
       expect.objectContaining({
-        spec: withGameMemberCiNote(
+        spec: withGameMemberNotes(
           'Run the Tambora test run of CIN-12 (Cartelera page) and report pass/fail'
         )
       })

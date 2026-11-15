@@ -209,6 +209,8 @@ export const MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY =
 export const MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY = 'mobile.team-control.v1' as const
 // Why: older hosts refuse game.sceneArt from a phone, so it draws the readable band instead (ORCA-1183).
 export const MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY = 'mobile.team-scene.v1' as const
+// Why: older hosts refuse game.characters from a phone, so its Team sheet shows no level bar (ORCA-1197).
+export const MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY = 'mobile.team-level.v1' as const
 // Why: settings.update is strict, so an older host rejects agentTeamsPanel and statusColors (ORCA-1183).
 export const MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY =
   'mobile.agent-teams-settings.v1' as const
@@ -282,7 +284,8 @@ export const RUNTIME_CAPABILITIES = [
   MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
-  MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY
+  MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})

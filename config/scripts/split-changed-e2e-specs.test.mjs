@@ -1,8 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MAX_SHARDS, main, splitChangedSpecs } from './split-changed-e2e-specs.mjs'
+import {
+  MAX_SHARDS,
+  SHARD_BUDGET_SECONDS,
+  main,
+  measuredSecondsOf,
+  splitChangedSpecs
+} from './split-changed-e2e-specs.mjs'
 
 // The changed specs of the panel branch's run 42350108207, with the seconds each took on CI
 // (skipped ones at the 0 they take once they skip before launch). That run timed out at 30 min.
@@ -144,6 +150,22 @@ describe('splitChangedSpecs', () => {
     expect(shards.flatMap(filesOf).sort()).toEqual([...PR_1191].sort())
     expect(shards.length).toBeLessThanOrEqual(MAX_SHARDS)
     expect(Math.max(...minutes)).toBeLessThanOrEqual(15)
+  })
+
+  // Why: a shard with no files runs the whole suite; #1207's one spec ran 841 tests on 11 of 12 shards.
+  it('never makes more shards than specs, however slow they are', () => {
+    const files = panelFiles.slice(0, 2)
+    const shards = splitChangedSpecs(files, () => 100_000)
+    expect(shards).toHaveLength(2)
+    expect(shards.every((shard) => filesOf(shard).length === 1)).toBe(true)
+  })
+
+  it("prices a lone unmeasured spec from the map's seconds per byte", () => {
+    const spec = 'tests/e2e/not-yet-measured.spec.ts'
+    const sizeOf = (file) => (file === spec ? 10_509 : existsSync(file) ? statSync(file).size : 0)
+    const secondsOf = measuredSecondsOf([spec], { durations: MEASURED, sizeOf })
+    expect(secondsOf(spec)).toBeLessThan(SHARD_BUDGET_SECONDS)
+    expect(splitChangedSpecs([spec, panelFiles[0]], secondsOf)).toHaveLength(1)
   })
 
   it('weighs the specs by their measured seconds when no weight is given', () => {
