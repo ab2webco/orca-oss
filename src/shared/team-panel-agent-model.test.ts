@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameAgent } from './orchestrator-game-state'
-<<<<<<< HEAD
-import { advisorReasonOf, teamAgentModelOf } from './team-panel-agent-model'
-||||||| parent of 6ffa6f17a87 (feat(game): start a Claude member without Jev on its ticket kind's model, unpinned, and say who chose it (ORCA-851))
-import { jevReasonOf, teamAgentModelOf } from './team-panel-agent-model'
-=======
-import { gameMemberModelTextOf, jevReasonOf, teamAgentModelOf } from './team-panel-agent-model'
->>>>>>> 6ffa6f17a87 (feat(game): start a Claude member without Jev on its ticket kind's model, unpinned, and say who chose it (ORCA-851))
+import { advisorReasonOf, gameMemberModelTextOf, teamAgentModelOf } from './team-panel-agent-model'
 
 const unpinned = { model: false, effort: false }
 const agentWith = (fields: Pick<GameAgent, 'advisor' | 'launch'>) => fields
@@ -71,11 +65,6 @@ describe('teamAgentModelOf', () => {
   })
 })
 
-<<<<<<< HEAD
-describe('advisorReasonOf', () => {
-||||||| parent of 6ffa6f17a87 (feat(game): start a Claude member without Jev on its ticket kind's model, unpinned, and say who chose it (ORCA-851))
-describe('jevReasonOf', () => {
-=======
 describe("the lead's ticket-kind choice (ORCA-851)", () => {
   const launch = {
     model: 'Opus 5.5',
@@ -116,12 +105,11 @@ describe("the lead's ticket-kind choice (ORCA-851)", () => {
         launch,
         advisor: { model: 'Opus 5.5', effort: 'high', pinned: unpinned }
       })?.credit?.by
-    ).toBe('jev')
+    ).toBe('advisor')
   })
 })
 
-describe('jevReasonOf', () => {
->>>>>>> 6ffa6f17a87 (feat(game): start a Claude member without Jev on its ticket kind's model, unpinned, and say who chose it (ORCA-851))
+describe('advisorReasonOf', () => {
   it("reads the router's reason from Jev's line, in either language", () => {
     expect(
       advisorReasonOf('jev · modelo: Opus 5.5 · esfuerzo alto · Jev: código', 'Opus 5.5')
