@@ -5,13 +5,15 @@ import { MIN_TOUCH_TARGET } from '../theme/mobile-theme'
 import { TERMINAL_ACCESSORY_KEYS } from './terminal-accessory-keys'
 import { TerminalAccessoryBar, type TerminalAccessoryBarProps } from './TerminalAccessoryBar'
 
+const windowSize = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 3 }))
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   StyleSheet: { create: <T,>(styles: T) => styles },
   Text: 'Text',
   View: 'View',
-  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 })
+  useWindowDimensions: () => ({ ...windowSize })
 }))
 vi.mock('react-native-svg', () => ({
   default: 'Svg',
@@ -98,14 +100,41 @@ function render(overrides: Partial<TerminalAccessoryBarProps> = {}): ReactTestIn
   act(() => {
     const renderer = create(createElement(TerminalAccessoryBar, props))
     unmounts.push(() => renderer.unmount())
+    rerenders.push(() => renderer.update(createElement(TerminalAccessoryBar, props)))
     readRoot = () => renderer.root
   })
   return readRoot()
 }
 
+const rerenders: (() => void)[] = []
+
 afterEach(() => {
   act(() => unmounts.splice(0).forEach((unmount) => unmount()))
+  rerenders.splice(0)
+  Object.assign(windowSize, { width: 390, height: 844, scale: 3 })
 })
+
+type ElementLike = { props?: { style?: unknown; children?: unknown } }
+
+// Why: the mocked Pressable never calls its render-function children, so walk what they return.
+function textStyles(element: unknown): unknown[] {
+  if (Array.isArray(element)) {
+    return element.flatMap(textStyles)
+  }
+  if (!element || typeof element !== 'object') {
+    return []
+  }
+  const props = (element as ElementLike).props
+  const own = typeof props?.children === 'string' ? [props.style] : []
+  return [...own, ...textStyles(props?.children)]
+}
+
+function labelMaxWidths(root: ReactTestInstance): unknown[] {
+  return root
+    .findAll((node) => node.type === 'Pressable')
+    .flatMap((node) => textStyles(node.props.children({ pressed: false })))
+    .map((style) => flattenStyle(style).maxWidth)
+}
 
 function pressableByLabel(root: ReactTestInstance, label: string): ReactTestInstance {
   return root.find((node) => node.type === 'Pressable' && node.props.accessibilityLabel === label)
@@ -129,6 +158,19 @@ describe('TerminalAccessoryBar', () => {
       expect(target.width, node.props.accessibilityLabel).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET)
       expect(target.height, node.props.accessibilityLabel).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET)
     }
+  })
+
+  it('re-binds every key label to the window width when the display size changes', () => {
+    const root = render()
+    const before = labelMaxWidths(root)
+    expect(before.length).toBeGreaterThan(TERMINAL_ACCESSORY_KEYS.length)
+    expect(new Set(before)).toEqual(new Set([390]))
+
+    // Why: a live display-size change keeps the pixel width and raises the density.
+    Object.assign(windowSize, { width: 320, height: 692, scale: 4.2 })
+    act(() => rerenders.forEach((rerender) => rerender()))
+
+    expect(new Set(labelMaxWidths(root))).toEqual(new Set([320]))
   })
 
   it('pins the mode toggles outside the scrolling key strip', () => {
