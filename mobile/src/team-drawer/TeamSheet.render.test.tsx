@@ -30,6 +30,7 @@ vi.mock('./team-scene-quest-art', () => ({
 
 import { TeamSheet } from './TeamSheet'
 import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
+import { colors, radii } from '../theme/mobile-theme'
 import {
   ADVISOR_LINE,
   button,
@@ -95,9 +96,10 @@ describe('TeamSheet', () => {
 
   it("opens to 84% of the screen with rounded top corners, over the lead's terminal", () => {
     show(teamWith())
+    // Why the parent: the rounded surface fills the 84% sheet, which also holds the corner cover.
     const rounded = [...document.body.querySelectorAll<HTMLElement>('div')]
       .filter((one) => getComputedStyle(one).borderTopLeftRadius === '14px')
-      .map((one) => getComputedStyle(one).height)
+      .map((one) => getComputedStyle(one.parentElement!).height)
     expect(rounded).toContain(`${Math.round(844 * 0.84)}px`)
   })
 
@@ -346,6 +348,17 @@ describe('TeamSheet', () => {
     expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(0)
     show(sceneTeam({ kind: 'failed' }))
     expect(band()!.textContent).toContain('Castillo')
+  })
+
+  it('covers the terminal behind its rounded top corners, so no glyph shows in the drag area', () => {
+    show(teamWith({ questions: [] }, leader))
+    const cover = container.querySelector<HTMLElement>('[data-testid="team-sheet-corners"]')
+    expect(cover).not.toBeNull()
+    const style = getComputedStyle(cover!)
+    const n = Number.parseInt(colors.terminalBg.slice(1), 16)
+    expect(style.backgroundColor).toBe(`rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, 1.00)`)
+    expect(style.height).toBe(`${radii.card}px`)
+    expect(style.top).toBe('0px')
   })
 
   it('draws no band when the desktop panel is not in the Game look', () => {
