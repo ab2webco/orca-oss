@@ -41,7 +41,10 @@ const HELD: ReadonlySet<TeamCondition> = new Set(['gone', 'startFailed', 'paused
 export const isPendingMember = (card: Pick<TeamMemberCard, 'status' | 'condition'>): boolean =>
   card.status !== 'done' && card.status !== 'closed' && !HELD.has(card.condition)
 
-/** What a member waits on the person for. Why the Inbox first: an answer there is what it waits on. */
+/**
+ * What a member waits on the person for. Why the Inbox first: an answer there is what it waits on;
+ * and a question in its pane is the Inbox's too, as For you lists and answers it from agent status.
+ */
 export function memberAskOf(agent: GameAgent, inboxQuestion: boolean): TeamMemberAsk | null {
   if (inboxQuestion) {
     return { kind: 'inbox' }
@@ -50,6 +53,6 @@ export function memberAskOf(agent: GameAgent, inboxQuestion: boolean): TeamMembe
     return null
   }
   return isAskUserQuestionTool(agent.toolName ?? undefined)
-    ? { kind: 'question' }
+    ? { kind: 'inbox' }
     : { kind: 'permission', tool: agent.toolName ? agentToolLabelOf(agent.toolName) : null }
 }

@@ -30,10 +30,11 @@ describe('what a member card says it waits on', () => {
     })
   })
 
-  it('names an AskUserQuestion open in its pane as a question there', () => {
+  // Why the Inbox: its For you lists a question asked in the pane and answers it there.
+  it('sends an AskUserQuestion open in its pane to the Inbox, which answers it', () => {
     expect(memberOf(agent({ state: 'waiting', toolName: 'AskUserQuestion' }))).toMatchObject({
       needsYou: true,
-      ask: { kind: 'question' }
+      ask: { kind: 'inbox' }
     })
   })
 

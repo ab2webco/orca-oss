@@ -372,9 +372,8 @@ describe('teamSceneInputOf and where a member waits on you', () => {
     return teamSceneActors(world).find((a) => a.key === 'm')?.emote
   }
 
-  it('marks a prompt in its pane apart from an Inbox question', () => {
+  it('marks a permission prompt in its pane apart from an Inbox question', () => {
     expect(markOf({ kind: 'permission', tool: 'Bash' })).toBe('prompt')
-    expect(markOf({ kind: 'question' })).toBe('prompt')
     expect(markOf({ kind: 'inbox' })).toBe('alert')
   })
 })

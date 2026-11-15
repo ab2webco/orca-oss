@@ -16404,7 +16404,6 @@
       "waitingForAnswer": "Esperando tu respuesta",
       "permissionPrompt": "Permiso pendiente: {{tool}}",
       "permissionPromptAny": "Permiso pendiente en su terminal",
-      "questionInTerminal": "Pregunta en su terminal",
       "answerInTerminal": "Responder en su terminal",
       "openTerminal": "Abrir terminal",
       "inFolder": "En la carpeta, sin worktree",

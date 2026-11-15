@@ -130,11 +130,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   inFolder?: true
 }
 
-/** An open Inbox question, or a prompt in the member's own pane that only its terminal can answer. */
-export type TeamMemberAsk =
-  | { kind: 'inbox' }
-  | { kind: 'permission'; tool: string | null }
-  | { kind: 'question' }
+/** A question the Inbox holds (its ticket's, or one asked in its pane), or a permission prompt only its terminal can answer. */
+export type TeamMemberAsk = { kind: 'inbox' } | { kind: 'permission'; tool: string | null }
 
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */
 export type TeamLeadCard = TeamAgentFacts & {

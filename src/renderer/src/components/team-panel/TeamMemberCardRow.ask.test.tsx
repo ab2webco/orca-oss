@@ -102,14 +102,6 @@ describe('a member card that waits on the person', () => {
     expect(selectTab).not.toHaveBeenCalled()
   })
 
-  it('names a question asked in its pane, answered there too', async () => {
-    const { card, button } = await render(toadette({ kind: 'question' }))
-
-    expect(card.textContent).toContain('Question in its terminal')
-    expect(button('Answer in its terminal')).toBeTruthy()
-    expect(button('Answer in Inbox')).toBeUndefined()
-  })
-
   it('keeps the Inbox for a question the Inbox holds', async () => {
     const { card, selectTab, button } = await render(toadette({ kind: 'inbox' }))
 

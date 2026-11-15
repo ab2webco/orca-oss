@@ -7,7 +7,6 @@ type Words = {
   phase: Record<TeamFlowPhase, string>
   waitingForAnswer: string
   permissionPrompt: (tool: string | null) => string
-  questionInTerminal: string
   answerInTerminal: string
   waitingOn: (count: number) => string
   loggedOut: string
@@ -64,7 +63,6 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     waitingForAnswer: 'Waiting for your answer',
     permissionPrompt: (tool) =>
       tool ? `Permission prompt: ${tool}` : 'Permission prompt in its terminal',
-    questionInTerminal: 'Question in its terminal',
     answerInTerminal: 'Answer in its terminal',
     waitingOn: (count) => `Waiting on ${count} agent${count === 1 ? '' : 's'}`,
     loggedOut: 'Logged out',
@@ -131,7 +129,6 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     waitingForAnswer: 'Esperando tu respuesta',
     permissionPrompt: (tool) =>
       tool ? `Permiso pendiente: ${tool}` : 'Permiso pendiente en su terminal',
-    questionInTerminal: 'Pregunta en su terminal',
     answerInTerminal: 'Responder en su terminal',
     waitingOn: (count) => `Esperando a ${count} agente${count === 1 ? '' : 's'}`,
     loggedOut: 'Sesión cerrada en la cuenta',

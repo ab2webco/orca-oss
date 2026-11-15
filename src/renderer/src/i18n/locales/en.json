@@ -17384,7 +17384,6 @@
       "waitingForAnswer": "Waiting for your answer",
       "permissionPrompt": "Permission prompt: {{tool}}",
       "permissionPromptAny": "Permission prompt in its terminal",
-      "questionInTerminal": "Question in its terminal",
       "answerInTerminal": "Answer in its terminal",
       "openTerminal": "Open terminal",
       "inFolder": "In the folder, no worktree",

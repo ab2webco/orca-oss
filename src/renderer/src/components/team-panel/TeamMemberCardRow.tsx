@@ -96,7 +96,7 @@ export function TeamMemberCardRow({
   const setHover = useTeamSceneHover((s) => s.set)
   const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   // Why the pane: only its terminal can answer a prompt there, and the Inbox does not hold it (ORCA-1231).
-  const inPane = card.ask?.kind === 'permission' || card.ask?.kind === 'question'
+  const inPane = card.ask?.kind === 'permission'
   const answer = !card.needsYou ? null : inPane ? (
     <Button size="xs" onClick={() => void openTeamSession(card, shownName)}>
       {translate('teamPanel.card.answerInTerminal', 'Answer in its terminal')}

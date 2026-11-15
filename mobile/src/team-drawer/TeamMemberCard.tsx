@@ -30,11 +30,7 @@ function statusOf(
   if (member.needsYou && member.ask !== null) {
     const ask = member.ask
     const text =
-      ask?.kind === 'permission'
-        ? words.permissionPrompt(ask.tool)
-        : ask?.kind === 'question'
-          ? words.questionInTerminal
-          : words.waitingForAnswer
+      ask?.kind === 'permission' ? words.permissionPrompt(ask.tool) : words.waitingForAnswer
     return { text, tone: tones.attention }
   }
   // Why these tones: the desktop's, paused at risk and a queued launch idle (team-panel-member-cards.ts).
@@ -114,8 +110,7 @@ export function TeamMemberCard({
   const ci = pr ? (pr.state === 'merged' ? words.merged : ciText(pr.ci, words)) : null
   const ciTone = CI_TONE[pr?.ci as CheckStatus] ?? colors.textMuted
   const terminal = member.terminal
-  const inPane =
-    member.needsYou && (member.ask?.kind === 'permission' || member.ask?.kind === 'question')
+  const inPane = member.needsYou && member.ask?.kind === 'permission'
   return (
     <View style={styles.card}>
       <Pressable
