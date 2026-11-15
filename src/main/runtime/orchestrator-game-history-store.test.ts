@@ -34,6 +34,24 @@ const record = (ticket: string): GameHistoryRecord => ({
 })
 
 describe('GameHistoryStore', () => {
+  // ORCA-1216 §6: a parent removed by hand must not come back on the next restart.
+  it('forgets the lead of one worktree only, and keeps the rest of its record', async () => {
+    const { store: history } = store()
+    const nested = { worktreeId: 'repo::/member', leadWorktreeId: 'repo::/lead' }
+    await history.append('repo-a', { ...record('CIN-1'), ...nested })
+    await history.append('repo-a', {
+      ...record('CIN-2'),
+      worktreeId: 'repo::/other',
+      leadWorktreeId: 'repo::/lead'
+    })
+
+    await history.forgetLead('repo-a', 'repo::/member')
+
+    const [first, second] = await history.list('repo-a')
+    expect(first).toEqual({ ...record('CIN-1'), worktreeId: 'repo::/member' })
+    expect(second?.leadWorktreeId).toBe('repo::/lead')
+  })
+
   it('keeps each project apart and survives a new store on the same folder', async () => {
     const { store: first, dir } = store()
     await first.append('repo-a', record('CIN-1'))

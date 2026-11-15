@@ -842,6 +842,7 @@ import { collectHostMemory } from '../memory/host-memory'
 import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
 import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
 import { isGameMemberWorktreeGone } from './game-member-worktree-presence'
+import { freedMembersToNest } from './game-freed-member-lineage'
 import { gamePausedCauseOf } from './orchestrator-game-paused-cause'
 import {
   GameMemberNameReservations,
@@ -3919,6 +3920,8 @@ export class OrcaRuntimeService {
   })
   // Projects whose merged history this run already read back to its oldest free (ORCA-1210).
   private readonly gameMergeBackfilled = new Set<string>()
+  // Projects whose freed members this run already nested from their history (ORCA-1216).
+  private readonly healedFreedMemberProjects = new Set<string>()
   private readonly gameHistory = new GameHistoryStore(
     () => join(app.getPath('userData'), 'orchestrator-game-history'),
     GAME_HISTORY_MIGRATIONS,
@@ -26861,7 +26864,8 @@ export class OrcaRuntimeService {
   async nestGameMemberWorktree(
     memberWorktreeId: string,
     leadWorktreeId: string,
-    context: { taskId: string; runId: string; coordinatorHandle: string }
+    // Why optional: a freed member nested from its history has no live task or run left.
+    context: { taskId?: string; runId?: string; coordinatorHandle?: string } = {}
   ): Promise<string | null> {
     const store = this.store
     if (memberWorktreeId === leadWorktreeId) {
@@ -26992,6 +26996,8 @@ export class OrcaRuntimeService {
     this.assertCurrentManagedCodexAccountPins([persistedMetaUpdates])
     if (nextLineage === null) {
       this.store.removeWorktreeLineage?.(worktree.id)
+      // Why: a freed member's history would otherwise nest it under its lead again (ORCA-1216).
+      await this.gameHistory.forgetLead(`repo:${worktree.repoId}`, worktree.id).catch(() => {})
     } else if (nextLineage) {
       this.store.setWorktreeLineage?.(worktree.id, nextLineage)
     }
@@ -31820,16 +31826,21 @@ export class OrcaRuntimeService {
     character?: string
     characterKey?: string
   }): Promise<{ recorded: true; count: number }> {
-    const { key, worktreesById } = await this.gameHistoryProjectOf(args)
+    const { key, worktreesById, worktree: leadWorktree } = await this.gameHistoryProjectOf(args)
     const memberRepoId = args.memberWorktreeId
       ? worktreesById.get(args.memberWorktreeId)?.repoId
       : undefined
     const repo =
       args.record.repo ??
       (memberRepoId ? (this.store?.getRepo(memberRepoId)?.displayName ?? null) : null)
+    // Why both ids: the history outlives a restart, so it can nest the freed worktree again (ORCA-1216).
+    const nesting =
+      args.memberWorktreeId && leadWorktree && leadWorktree.id !== args.memberWorktreeId
+        ? { worktreeId: args.memberWorktreeId, leadWorktreeId: leadWorktree.id }
+        : {}
     const records = await this.gameHistory.append(
       key,
-      { ...args.record, repo },
+      { ...args.record, repo, ...nesting },
       freedCharacterOf({ projectKey: key, ...args }) ?? undefined
     )
     const project = this.gameLessonProjectOf(key)
@@ -34846,6 +34857,31 @@ export class OrcaRuntimeService {
         taskId,
         createdAt: Date.now()
       })
+    }
+    await this.healFreedMemberLineage(worktrees)
+  }
+
+  /**
+   * Nests each recently freed member under the lead its history names when its edge is gone or
+   * stale (ORCA-1216 §6). Once per project per session: the history is the source that outlives a
+   * restart, and nestGameMemberWorktree keeps a valid edge or a parent set by hand.
+   */
+  async healFreedMemberLineage(
+    worktrees: readonly { id: string; repoId: string }[]
+  ): Promise<void> {
+    const ids = new Set(worktrees.map((worktree) => worktree.id))
+    const projectKeys = new Set(worktrees.map((worktree) => `repo:${worktree.repoId}`))
+    for (const projectKey of projectKeys) {
+      if (this.healedFreedMemberProjects.has(projectKey)) {
+        continue
+      }
+      this.healedFreedMemberProjects.add(projectKey)
+      const records = await this.gameHistory.list(projectKey).catch(() => [])
+      for (const nest of freedMembersToNest(records, Date.now(), (id) => ids.has(id))) {
+        await this.nestGameMemberWorktree(nest.memberWorktreeId, nest.leadWorktreeId).catch(
+          () => null
+        )
+      }
     }
   }
 

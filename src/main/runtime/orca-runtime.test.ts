@@ -42411,6 +42411,12 @@ describe('OrcaRuntimeService', () => {
       }
     ])
     const runtime = new OrcaRuntimeService(runtimeStore as never)
+    const history = (
+      runtime as unknown as {
+        gameHistory: { forgetLead: (key: string, worktreeId: string) => Promise<void> }
+      }
+    ).gameHistory
+    const forgetLead = vi.spyOn(history, 'forgetLead').mockResolvedValue()
 
     await runtime.updateManagedWorktreeMeta(`id:${childId}`, {
       lineage: { noParent: true }
@@ -42418,6 +42424,8 @@ describe('OrcaRuntimeService', () => {
 
     expect(removeWorktreeLineage).toHaveBeenCalledWith(childId)
     expect(removeWorkspaceLineage).toHaveBeenCalledWith(`worktree:${childId}`)
+    // ORCA-1216: a freed member's history must not nest it again on the next restart.
+    expect(forgetLead).toHaveBeenCalledWith(`repo:${TEST_REPO_ID}`, childId)
   })
 
   it('strips Orca Lab provenance fields from runtime metadata updates', async () => {

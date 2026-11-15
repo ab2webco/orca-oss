@@ -106,6 +106,22 @@ export class GameHistoryStore {
     return log.records.flatMap((one) => parseGameHistoryRecord(one) ?? [])
   }
 
+  /** Drops the lead from a worktree's records, so a parent removed by hand stays removed (ORCA-1216). */
+  async forgetLead(projectKey: string, worktreeId: string): Promise<void> {
+    await this.update(projectKey, (current) => {
+      let changed = false
+      const records = current.records.map((one) => {
+        if (!isRecord(one) || one.worktreeId !== worktreeId || !('leadWorktreeId' in one)) {
+          return one
+        }
+        changed = true
+        const { leadWorktreeId: _lead, ...rest } = one
+        return rest
+      })
+      return changed ? { ...current, records } : null
+    })
+  }
+
   /** `added` is false when an event with the same key is already kept; a new perfect merge saves a credit. */
   async appendEvent(projectKey: string, event: GameEvent): Promise<{ added: boolean }> {
     let added = false
