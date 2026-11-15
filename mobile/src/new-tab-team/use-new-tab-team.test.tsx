@@ -66,7 +66,7 @@ describe('useNewTabTeam', () => {
   })
 
   it("keeps today's sheet while the desktop is not connected", async () => {
-    expect((await render({ connected: false })).at(-1)).toEqual({ kind: 'none' })
+    expect((await render({ connected: false })).at(-1)).toEqual({ kind: 'unread' })
     expect(sendRequest).not.toHaveBeenCalled()
   })
 })

@@ -33,8 +33,8 @@ const roster: AddMemberRoster = {
 }
 const accounts: AddMemberAccounts = {
   accounts: [
-    { id: 'a-1', email: 'maya@acme.dev', usedPercent: 42 },
-    { id: 'a-2', email: 'leo@acme.dev', usedPercent: null }
+    { id: 'a-1', email: 'maya@acme.dev', usedPercent: 42, weeklyPercent: 64 },
+    { id: 'a-2', email: 'leo@acme.dev', usedPercent: null, weeklyPercent: null }
   ],
   defaultId: 'a-1'
 }

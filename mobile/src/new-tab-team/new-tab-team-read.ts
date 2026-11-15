@@ -12,7 +12,10 @@ import { addMemberRosterOf, type AddMemberRoster } from './add-member-options'
 export type NewTabTeam =
   | { kind: 'unsupported' }
   | { kind: 'pending' }
+  /** Both reads answered: nothing live or kept, so Start fresh lead is safe. */
   | { kind: 'none' }
+  /** A lead read failed or the phone is offline: today's sheet, no team rows. */
+  | { kind: 'unread' }
   | {
       kind: 'lead-live'
       lead: TerminalOpenTarget & { terminal: string }
@@ -57,6 +60,9 @@ export async function readNewTabTeam(
   }
   const repoId = getRepoIdFromMobileWorktreeId(args.worktreeId)
   const leads = await resultOf(client.sendRequest('game.leads'))
+  if (leads === undefined) {
+    return { kind: 'unread' }
+  }
   const lead = hostLeadCallersOf(leads).find(
     (caller) => getRepoIdFromMobileWorktreeId(caller.worktreeId) === repoId
   )
@@ -77,7 +83,10 @@ export async function readNewTabTeam(
   const stored = recordOf(
     await resultOf(client.sendRequest('game.leadStored', { worktreeId: args.worktreeId }))
   )
-  const kept = stored ? recordOf(stored.stored) : null
+  if (!stored) {
+    return { kind: 'unread' }
+  }
+  const kept = recordOf(stored.stored)
   const accountId = kept?.accountId
   if (accountId === null) {
     return { kind: 'lead-closed', accountEmail: null }
