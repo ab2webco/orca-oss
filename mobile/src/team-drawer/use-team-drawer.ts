@@ -13,6 +13,9 @@ import {
 import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
 import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
 import { useTeamSceneArt } from './use-team-scene-art'
+import { sendTeamLeadTurn } from './team-lead-turn-send'
+import type { TeamAction } from '../../../src/shared/team-panel-actions'
+import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -142,6 +145,16 @@ export function useTeamDrawer(args: {
     view?.scene ?? null
   )
 
+  const sendAction = useMemo(
+    () =>
+      view && client && terminalHandle
+        ? (action: TeamAction): Promise<LeadPromptOutcome> =>
+            action.send
+              ? sendTeamLeadTurn(client, terminalHandle, action.id, action.send)
+              : Promise.resolve('failed')
+        : null,
+    [client, terminalHandle, view]
+  )
   const inboxAnswer = inbox.answer
   const answer = useCallback(
     async (id: string, reply: OwnerQuestionReply): Promise<void> => {
@@ -160,6 +173,7 @@ export function useTeamDrawer(args: {
     inbox: leadInbox,
     answer,
     level: view && xp !== null ? gameCharacterLevelOf(xp) : null,
-    sceneArt
+    sceneArt,
+    sendAction
   }
 }
