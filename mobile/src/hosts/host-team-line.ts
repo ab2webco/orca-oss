@@ -36,7 +36,8 @@ export function hostTeamLineOf(states: readonly unknown[]): HostTeamLine | null 
     }
     hasTeam = true
     for (const agent of state.agents) {
-      if (!isRecord(agent)) {
+      // Why: the host lists the lead's own pane among its agents.
+      if (!isRecord(agent) || agent.isLeader === true) {
         continue
       }
       members += 1
