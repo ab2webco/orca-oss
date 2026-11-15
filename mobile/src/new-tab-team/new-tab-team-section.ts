@@ -1,4 +1,4 @@
-import { Crown, Info, RotateCcw, UserPlus } from 'lucide-react-native'
+import { Crown, Info, Plus, RotateCcw, UserPlus } from 'lucide-react-native'
 import type { ActionSheetAction, ActionSheetSection } from '../components/ActionSheetModal'
 import type { AddMemberRoster } from './add-member-options'
 import type { NewTabTeam } from './new-tab-team-read'
@@ -13,6 +13,7 @@ type TeamActionArgs = {
   onGoToLead: (lead: LiveLead) => void
   onReopen: () => void
   onAddMember: (roster: AddMemberRoster) => void
+  onStartFresh: () => void
 }
 
 function addMemberActionOf(
@@ -30,10 +31,19 @@ function addMemberActionOf(
   }
 }
 
+const startFreshActionOf = (onStartFresh: () => void): ActionSheetAction => ({
+  label: 'Start fresh lead…',
+  icon: Plus,
+  closeBeforePress: true,
+  onPress: onStartFresh
+})
+
 function teamActionsOf(team: NewTabTeam, args: TeamActionArgs): ActionSheetAction[] {
   switch (team.kind) {
-    case 'none':
+    case 'unread':
       return []
+    case 'none':
+      return [startFreshActionOf(args.onStartFresh)]
     case 'unsupported':
       return [
         {
@@ -64,7 +74,8 @@ function teamActionsOf(team: NewTabTeam, args: TeamActionArgs): ActionSheetActio
           icon: RotateCcw,
           closeBeforePress: true,
           onPress: args.onReopen
-        }
+        },
+        startFreshActionOf(args.onStartFresh)
       ]
   }
 }

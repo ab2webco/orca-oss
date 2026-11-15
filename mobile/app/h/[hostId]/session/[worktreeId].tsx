@@ -288,6 +288,8 @@ import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamShe
 import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
 import { useAddMember } from '../../../../src/new-tab-team/use-add-member'
 import { AddMemberSheet } from '../../../../src/new-tab-team/AddMemberSheet'
+import { useFreshLead } from '../../../../src/new-tab-team/use-fresh-lead'
+import { FreshLeadSheets } from '../../../../src/new-tab-team/FreshLeadSheets'
 import { reopenTeamLeadFromPhone } from '../../../../src/new-tab-team/new-tab-team-reopen'
 import {
   newTabTeamSectionOf,
@@ -2900,6 +2902,14 @@ export default function SessionScreen() {
     worktreeId
   })
   const addMember = useAddMember({ client, showToast })
+  const freshLead = useFreshLead({
+    client,
+    hostName: hostName || 'this computer',
+    worktreeId,
+    showToast,
+    sessionTabs,
+    selectTab: switchSessionTab
+  })
   const newTabTeamSection = newTabTeamSectionOf(newTabTeam, {
     hostName: hostName || 'this computer',
     onGoToLead: openTeamTerminal,
@@ -2908,6 +2918,7 @@ export default function SessionScreen() {
         addMember.start(roster, newTabTeam.lead.terminal)
       }
     },
+    onStartFresh: freshLead.start,
     onReopen: () => {
       if (!client) {
         return
@@ -5004,6 +5015,7 @@ export default function SessionScreen() {
       {addMember.sheet ? (
         <AddMemberSheet {...addMember.sheet} hostName={hostName || 'this computer'} />
       ) : null}
+      <FreshLeadSheets account={freshLead.account} confirm={freshLead.confirm} />
 
       <ActionSheetModal
         visible={pendingDiffNotesDelivery !== null}

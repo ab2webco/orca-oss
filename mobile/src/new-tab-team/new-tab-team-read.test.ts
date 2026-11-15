@@ -127,17 +127,32 @@ describe('readNewTabTeam', () => {
     await expect(read(client)).resolves.toEqual({ kind: 'pending' })
   })
 
-  it('has no team when nothing is kept, and when both reads fail', async () => {
+  it('has no team only when both reads answer that nothing is live or kept', async () => {
     const nothingKept = clientAnswering({
       'game.leads': ok({ leads: [], restoring: [] }),
       'game.leadStored': ok({ stored: null })
     })
     await expect(read(nothingKept.client)).resolves.toEqual({ kind: 'none' })
+  })
 
+  // Why: Start fresh lead sits on 'none'; offering it on a failed read could open a second lead.
+  it('reads nothing it can offer when either lead read fails', async () => {
     const bothDown = clientAnswering({
       'game.leads': new Error('closed'),
       'game.leadStored': failure('forbidden')
     })
-    await expect(read(bothDown.client)).resolves.toEqual({ kind: 'none' })
+    await expect(read(bothDown.client)).resolves.toEqual({ kind: 'unread' })
+
+    const leadsDown = clientAnswering({
+      'game.leads': failure('internal'),
+      'game.leadStored': ok({ stored: null })
+    })
+    await expect(read(leadsDown.client)).resolves.toEqual({ kind: 'unread' })
+
+    const storedDown = clientAnswering({
+      'game.leads': ok({ leads: [], restoring: [] }),
+      'game.leadStored': new Error('timeout')
+    })
+    await expect(read(storedDown.client)).resolves.toEqual({ kind: 'unread' })
   })
 })

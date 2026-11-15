@@ -3,7 +3,7 @@ import type { RpcClient } from '../transport/rpc-client'
 import { readNewTabTeam, type NewTabTeam } from './new-tab-team-read'
 
 const PENDING: NewTabTeam = { kind: 'pending' }
-const NONE: NewTabTeam = { kind: 'none' }
+const UNREAD: NewTabTeam = { kind: 'unread' }
 
 /** Reads the Team group each time the + sheet opens; `supported` is null until the capability probe answers. */
 export function useNewTabTeam(args: {
@@ -18,7 +18,7 @@ export function useNewTabTeam(args: {
 
   useEffect(() => {
     if (!client || !connected) {
-      setTeam(NONE)
+      setTeam(UNREAD)
       return
     }
     if (!open || supported === null) {

@@ -52,7 +52,7 @@ describe('useAddMember', () => {
 
     expect(hook().sheet).toMatchObject({ visible: true, roster })
     expect(hook().sheet?.accounts).toEqual({
-      accounts: [{ id: 'a-1', email: 'maya@acme.dev', usedPercent: null }],
+      accounts: [{ id: 'a-1', email: 'maya@acme.dev', usedPercent: null, weeklyPercent: null }],
       defaultId: 'a-1'
     })
   })

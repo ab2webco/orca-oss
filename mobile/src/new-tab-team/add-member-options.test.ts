@@ -115,11 +115,11 @@ const snapshot = {
 } as unknown as AccountsSnapshot
 
 describe('addMemberAccountsOf', () => {
-  it("lists the provider's accounts with their 5 h use and defaults to the one the lead would pick", () => {
+  it("lists the provider's accounts with their 5 h and 7 d use and defaults to the one the lead would pick", () => {
     expect(addMemberAccountsOf(snapshot, 'claude', 0)).toEqual({
       accounts: [
-        { id: 'a-busy', email: 'busy@acme.dev', usedPercent: 92 },
-        { id: 'a-free', email: 'free@acme.dev', usedPercent: 42 }
+        { id: 'a-busy', email: 'busy@acme.dev', usedPercent: 92, weeklyPercent: 10 },
+        { id: 'a-free', email: 'free@acme.dev', usedPercent: 42, weeklyPercent: 10 }
       ],
       defaultId: 'a-free'
     })

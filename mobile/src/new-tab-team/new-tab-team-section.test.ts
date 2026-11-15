@@ -4,6 +4,7 @@ import { newTabTeamSectionOf, reopenFailureOf } from './new-tab-team-section'
 vi.mock('lucide-react-native', () => ({
   Crown: 'Crown',
   Info: 'Info',
+  Plus: 'Plus',
   RotateCcw: 'RotateCcw',
   UserPlus: 'UserPlus'
 }))
@@ -20,11 +21,19 @@ function section(team: Parameters<typeof newTabTeamSectionOf>[0]) {
   const onGoToLead = vi.fn()
   const onReopen = vi.fn()
   const onAddMember = vi.fn()
+  const onStartFresh = vi.fn()
   return {
-    built: newTabTeamSectionOf(team, { hostName: 'm1', onGoToLead, onReopen, onAddMember }),
+    built: newTabTeamSectionOf(team, {
+      hostName: 'm1',
+      onGoToLead,
+      onReopen,
+      onAddMember,
+      onStartFresh
+    }),
     onGoToLead,
     onReopen,
-    onAddMember
+    onAddMember,
+    onStartFresh
   }
 }
 
@@ -55,14 +64,30 @@ describe('newTabTeamSectionOf', () => {
     expect(unread?.actions[1]).toMatchObject({ hint: 'Could not read To Do', disabled: true })
   })
 
-  it('reopens the kept lead, naming its account and desktop', () => {
-    const { built, onReopen } = section({ kind: 'lead-closed', accountEmail: 'maya@acme.dev' })
+  it('reopens the kept lead, naming its account and desktop, or starts a fresh one', () => {
+    const { built, onReopen, onStartFresh } = section({
+      kind: 'lead-closed',
+      accountEmail: 'maya@acme.dev'
+    })
 
     expect(built?.actions.map((a) => [a.label, a.hint])).toEqual([
-      ['Reopen team', 'maya@acme.dev on m1']
+      ['Reopen team', 'maya@acme.dev on m1'],
+      ['Start fresh lead…', undefined]
     ])
     built?.actions[0].onPress()
     expect(onReopen).toHaveBeenCalled()
+    expect(built?.actions[1]).toMatchObject({ icon: 'Plus', closeBeforePress: true })
+    built?.actions[1].onPress()
+    expect(onStartFresh).toHaveBeenCalled()
+  })
+
+  it('offers only Start fresh lead when the project has no live or kept lead', () => {
+    const { built, onStartFresh } = section({ kind: 'none' })
+
+    expect(built?.title).toBe('Team')
+    expect(built?.actions.map((a) => a.label)).toEqual(['Start fresh lead…'])
+    built?.actions[0].onPress()
+    expect(onStartFresh).toHaveBeenCalled()
   })
 
   it('names only the desktop for a kept lead on the default login', () => {
@@ -87,8 +112,8 @@ describe('newTabTeamSectionOf', () => {
     ])
   })
 
-  it("keeps today's sheet when the project has no team", () => {
-    expect(section({ kind: 'none' }).built).toBeNull()
+  it("keeps today's sheet when the phone could not read the project's leads", () => {
+    expect(section({ kind: 'unread' }).built).toBeNull()
   })
 })
 

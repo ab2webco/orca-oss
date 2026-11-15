@@ -25,7 +25,12 @@ export type AddMemberRoster = {
   provider: GameAccountProvider | null
 }
 
-export type AddMemberAccount = { id: string; email: string; usedPercent: number | null }
+export type AddMemberAccount = {
+  id: string
+  email: string
+  usedPercent: number | null
+  weeklyPercent: number | null
+}
 
 export type AddMemberAccounts = { accounts: AddMemberAccount[]; defaultId: string | null }
 
@@ -82,7 +87,8 @@ export function addMemberAccountsOf(
     accounts: usage.map((one) => ({
       id: one.id,
       email: one.email,
-      usedPercent: one.session ? Math.round(one.session.usedPercent) : null
+      usedPercent: one.session ? Math.round(one.session.usedPercent) : null,
+      weeklyPercent: one.weekly ? Math.round(one.weekly.usedPercent) : null
     })),
     defaultId: pick.kind === 'account' ? pick.account.id : (usage[0]?.id ?? null)
   }
