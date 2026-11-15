@@ -125,7 +125,7 @@ export function useTeamDrawer(args: {
       own.questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : []))
     )
     // Why oldest: the desktop's lead card names its oldest open question (the board lists open ones only).
-    const oldest = own.questions.toSorted((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
+    const oldest = [...own.questions].sort((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
     return teamLeadViewOf(
       rawState,
       tickets,
