@@ -1,6 +1,8 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { agentTeamsClientSettingsOf } from '../../../src/shared/agent-teams-client-settings'
+import { settingsGetResultOf } from '../../../src/shared/settings-get-result'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse } from '../transport/types'
 import { useAgentTeamsSettings } from './use-agent-teams-settings'
@@ -15,10 +17,10 @@ const refused = (message: string): RpcResponse =>
     _meta: { runtimeId: 'rt' }
   }) as RpcResponse
 
-const SETTINGS = {
-  agentTeamsPanel: { scene: 'quest', look: 'native', style: 'figures' },
-  statusColors: {}
-}
+// Why built from the host's own functions: a change to settings.get's shape fails these tests.
+const SETTINGS = settingsGetResultOf(
+  agentTeamsClientSettingsOf({ orchestratorGame: { scene: 'quest', panel: { style: 'figures' } } })
+)
 
 type Hook = ReturnType<typeof useAgentTeamsSettings>
 

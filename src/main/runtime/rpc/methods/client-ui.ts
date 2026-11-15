@@ -1,4 +1,5 @@
 import type { PersistedUIState } from '../../../../shared/persisted-ui-state-types'
+import { settingsGetResultOf } from '../../../../shared/settings-get-result'
 import { defineMethod, type RpcMethod } from '../core'
 import {
   FeatureInteractionIdParam,
@@ -15,7 +16,7 @@ export const CLIENT_UI_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'settings.get',
     params: null,
-    handler: (_params, { runtime }) => ({ settings: runtime.getClientSettings() })
+    handler: (_params, { runtime }) => settingsGetResultOf(runtime.getClientSettings())
   }),
   defineMethod({
     name: 'settings.update',
