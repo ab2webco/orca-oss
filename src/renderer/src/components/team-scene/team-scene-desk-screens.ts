@@ -79,10 +79,22 @@ function stroke(
   g.stroke()
 }
 
+// Why: a review or queue screen held still while its member kept working (ORCA-1204); a line
+// typed under it says the work goes on.
+function drawTyping(g: CanvasRenderingContext2D, rect: Rect, t: number): void {
+  const at = unitsOf(rect)
+  const p = (t * 0.6) % 1
+  at(g, INK, 4, 13, 14 * eased(p), 1.4)
+  if (Math.floor(t * 2) % 2 === 0) {
+    at(g, TEXT, 4.4 + 14 * eased(p), 12.6, 1, 2.2)
+  }
+}
+
 function drawReview(
   g: CanvasRenderingContext2D,
   rect: Rect,
-  verdict: 'approved' | 'changes' | 'waiting'
+  verdict: 'approved' | 'changes' | 'waiting',
+  t: number
 ): void {
   const at = unitsOf(rect)
   at(g, CARD, 2, 2, 24, 14)
@@ -93,6 +105,7 @@ function drawReview(
       [12.5, 11],
       [20.5, 3]
     ])
+    drawTyping(g, rect, t)
     return
   }
   if (verdict === 'waiting') {
@@ -101,18 +114,22 @@ function drawReview(
     g.strokeStyle = TEXT
     g.lineWidth = Math.max(1.2, 1.6 * uy)
     g.strokeRect(rect.x + 9 * ux, rect.y + 3 * uy, 10 * ux, 8 * uy)
+    drawTyping(g, rect, t)
     return
   }
-  // Why a marker per row: changes asked are a list to work through, in the waiting amber.
+  // Why a marker per row, ticked in turn: changes asked are a list the member works through.
+  const ticked = Math.floor((t * 0.7) % 4)
   for (let i = 0; i < 3; i++) {
-    at(g, WAIT, 4, 3 + i * 3.4, 2.4, 2.4)
+    at(g, i < ticked ? DONE : WAIT, 4, 3 + i * 3.4, 2.4, 2.4)
     at(g, TEXT, 8, 3.5 + i * 3.4, 10 + ((i * 5) % 6), 1.4)
   }
 }
 
-function drawQueue(g: CanvasRenderingContext2D, rect: Rect, position: number): void {
+function drawQueue(g: CanvasRenderingContext2D, rect: Rect, position: number, t: number): void {
   const at = unitsOf(rect)
   at(g, WAIT, 6, 4, 16, 10)
+  // Why a light running its edge: a place in line is still moving, not finished.
+  at(g, TEXT, 6 + 14 * ((t * 0.5) % 1), 4, 2, 1)
   at(g, CARD, 7, 5, 14, 8)
   g.fillStyle = WAIT
   g.font = `bold ${Math.max(6, rect.height * 0.32)}px sans-serif`
@@ -137,9 +154,9 @@ export function drawDeskScreen(
   } else if (desk.kind === 'checks') {
     drawChecks(g, rect, t)
   } else if (desk.kind === 'review') {
-    drawReview(g, rect, desk.verdict)
+    drawReview(g, rect, desk.verdict, t)
   } else {
-    drawQueue(g, rect, desk.position)
+    drawQueue(g, rect, desk.position, t)
   }
   g.restore()
 }

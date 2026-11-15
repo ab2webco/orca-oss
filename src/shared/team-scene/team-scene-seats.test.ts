@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { seatPlanOf, TEAM_SCENE_MAX_SEATS } from './team-scene-seats'
+import { seatPlanOf, TEAM_SCENE_MAX_SEATS, teamSceneSeatOrderOf } from './team-scene-seats'
 import type { TeamSceneMemberInput } from './team-scene-types'
 
 const member = (key: string, activity: TeamSceneMemberInput['activity'] = 'working') =>
@@ -74,5 +74,73 @@ describe('seatPlanOf', () => {
   it('keeps the input order otherwise', () => {
     const plan = seatPlanOf([member('b'), member('a', 'resting')])
     expect(plan.seats.map((s) => s.key)).toEqual(['b', 'a'])
+  })
+
+  it('closes up one row past its size when the style asks, never opening a second', () => {
+    const six = Array.from({ length: 6 }, (_, i) => member(`m${i}`))
+    const plan = seatPlanOf(six, 5, 0.16, undefined, [], true)
+    expect(new Set(plan.seats.map((s) => s.spot.depth)).size).toBe(1)
+    const xs = plan.seats.map((s) => s.spot.x)
+    expect(xs[0]).toBeCloseTo(0.16)
+    expect(xs.at(-1)).toBeCloseTo(seatPlanOf(six.slice(0, 5), 5, 0.16).seats.at(-1)!.spot.x)
+    expect(new Set(xs).size).toBe(6)
+  })
+})
+
+// ORCA-1204: the Team model sorts members by status, so a seat by list index moved every desk
+// when one member's state changed.
+describe('teamSceneSeatOrderOf', () => {
+  const keys = (plan: { seats: { key: string }[] }) => plan.seats.map((s) => s.key)
+
+  it('keeps every seat when the list is reordered by a state change', () => {
+    const first = seatPlanOf([member('a'), member('b', 'resting'), member('c', 'done')], 5)
+    const resorted = seatPlanOf(
+      [member('b'), member('a'), member('c', 'done')],
+      5,
+      undefined,
+      undefined,
+      first.order
+    )
+    expect(resorted.seats).toEqual(first.seats)
+  })
+
+  it('keeps a member asking the user at its own desk instead of moving it first', () => {
+    const first = seatPlanOf([member('a'), member('b'), member('c')], 5)
+    const asks = seatPlanOf(
+      [member('c', 'needsYou'), member('a'), member('b')],
+      5,
+      undefined,
+      undefined,
+      first.order
+    )
+    expect(keys(asks)).toEqual(['a', 'b', 'c'])
+    expect(asks.seats).toEqual(first.seats)
+  })
+
+  it('leaves a gone member its desk, empty, and gives it to the next newcomer', () => {
+    const first = seatPlanOf([member('a'), member('b'), member('c')], 5)
+    const gone = seatPlanOf([member('a'), member('c')], 5, undefined, undefined, first.order)
+    expect(gone.seats).toEqual([first.seats[0], first.seats[2]])
+    expect(gone.empty).toEqual([first.seats[1]!.spot])
+    const joined = seatPlanOf(
+      [member('a'), member('c'), member('d')],
+      5,
+      undefined,
+      undefined,
+      gone.order
+    )
+    expect(joined.seats.find((s) => s.key === 'd')!.spot).toEqual(first.seats[1]!.spot)
+    expect(joined.empty).toEqual([])
+  })
+
+  it('lets a newcomer who needs the user past a full stage take a seat from one who does not', () => {
+    const full = Array.from({ length: TEAM_SCENE_MAX_SEATS }, (_, i) => `m${i}`)
+    const order = teamSceneSeatOrderOf(
+      [...full.map((k) => member(k)), member('asker', 'needsYou')],
+      full
+    )
+    expect(order).toContain('asker')
+    expect(order.filter((k) => k !== null)).toHaveLength(TEAM_SCENE_MAX_SEATS)
+    expect(order.slice(0, -1)).toEqual(full.slice(0, -1))
   })
 })

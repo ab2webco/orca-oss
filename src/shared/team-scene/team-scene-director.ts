@@ -21,8 +21,7 @@ import {
   type TeamSceneAdvisorWalk,
   syncAdvisorBody
 } from './team-scene-advisor-walk'
-import { seatPlanOf } from './team-scene-seats'
-import type { TeamSceneAttendReach as Reach } from './team-scene-lead-attend'
+import { seatPlanForLayout, type TeamSceneLayout } from './team-scene-seats'
 import {
   grownSite,
   keepTrophy,
@@ -47,6 +46,7 @@ import {
   ENTRY_X,
   queueVisit,
   walkStraight,
+  dismissUnseated,
   visitCanStart,
   type TeamScenePlan,
   callNextVisitor
@@ -96,6 +96,8 @@ export type TeamSceneWorld = {
   overflow: number
   /** Every seat's spot, so a style draws the stations even while their members walk. */
   stations: TeamSceneStation[]
+  /** Who held each seat last, so a member keeps its desk across updates (ORCA-1204). */
+  seatOrder: readonly (string | null)[]
   /** The lead's walks to working members between real events. */
   rounds: TeamSceneRounds
   /** Each seat's build at its real stage, for styles to draw beside the station. */
@@ -111,8 +113,7 @@ export type TeamSceneWorld = {
   advisorWalk: TeamSceneAdvisorWalk
 }
 
-/** How a style seats its team: a row's length, and whether work keeps members at their desks. */
-export type TeamSceneLayout = { rowSize: number; workSeated: boolean; firstX?: number } & Reach
+export type { TeamSceneLayout } from './team-scene-seats'
 const GROUND_LAYOUT: TeamSceneLayout = { rowSize: 4, workSeated: false }
 
 export function createTeamSceneWorld(): TeamSceneWorld {
@@ -129,6 +130,7 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     effects: [],
     overflow: 0,
     stations: [],
+    seatOrder: [],
     rounds: createTeamSceneRounds(),
     sites: [],
     trophies: [],
@@ -186,7 +188,8 @@ export function applyTeamSceneInput(
   syncAdvisorBody(world, input, () => bodyAt('advisor', 'advisor', ADVISOR_SPOT, -1))
 
   const joined = new Set(events.flatMap((e) => (e.kind === 'join' ? [e.key] : [])))
-  const plan = seatPlanOf(input.members, layout.rowSize, layout.firstX, input.desks)
+  const plan = seatPlanForLayout(input.members, layout, input.desks, world.seatOrder)
+  world.seatOrder = plan.order
   const byKey = new Map(input.members.map((m) => [m.key, m]))
   const seatedKeys = new Set(plan.seats.map((s) => s.key))
   let turn = 0
@@ -199,6 +202,9 @@ export function applyTeamSceneInput(
       if (joined.has(key)) {
         walkStraight(world, body, 'enter', turn++)
       }
+    } else if (body.plan.kind === 'seated' && body.x === body.home.x) {
+      // Why: a re-spaced row moves the desk under a sitter, so the sitter moves with it, no walk.
+      Object.assign(body, { x: spot.x, depth: spot.depth, target: spot, v: 0 })
     }
     Object.assign(body, {
       name: m.name,
@@ -211,16 +217,7 @@ export function applyTeamSceneInput(
       site: grownSite(body.site, m.site)
     })
   }
-  for (const body of bodies.values()) {
-    if (body.role !== 'member' || seatedKeys.has(body.key) || body.plan.kind === 'leave') {
-      continue
-    }
-    if (byKey.has(body.key)) {
-      bodies.delete(body.key) // pushed past the seats into +N
-    } else {
-      walkStraight(world, body, 'leave')
-    }
-  }
+  dismissUnseated(world, seatedKeys, byKey)
 
   for (const event of events) {
     const body = 'key' in event ? bodies.get(event.key) : undefined

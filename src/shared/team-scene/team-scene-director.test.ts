@@ -813,3 +813,50 @@ describe('team scene director, a visiting lead attends its member', () => {
     expect(teamSceneGuestAttends(home)).toBe(false)
   })
 })
+
+// ORCA-1204: members changed desk while working whenever another member's state reordered the list.
+describe('team scene seats over updates', () => {
+  const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16, rowGrows: true }
+  const homes = (world: TeamSceneWorld) =>
+    Object.fromEntries([...world.bodies.values()].map((b) => [b.key, b.home.x]))
+
+  it('keeps every working member at its desk while others change state and order', () => {
+    const world = createTeamSceneWorld()
+    const states = (luigi: TeamSceneMemberInput['activity']) => {
+      const team = [
+        member('mario'),
+        member('luigi', { activity: luigi }),
+        member('toad', { activity: 'done' }),
+        member('daisy', { activity: 'needsYou' })
+      ]
+      // Like the Team model: needs-you, working, done, idle.
+      const rank = { needsYou: 0, blocked: 1, working: 2, done: 3, resting: 4 }
+      return team.sort((p, q) => rank[p.activity] - rank[q.activity])
+    }
+    applyTeamSceneInput(world, input(states('resting')), OFFICE)
+    runUntil(world, () => false, 3)
+    const before = homes(world)
+    for (const luigi of ['working', 'done', 'needsYou', 'resting'] as const) {
+      applyTeamSceneInput(world, input(states(luigi)), OFFICE)
+      for (let t = 0; t < 2; t += DT) {
+        stepTeamScene(world, DT, { width: WIDTH })
+        expect(world.bodies.get('mario')!.x).toBe(before.mario)
+      }
+      expect(homes(world)).toEqual(before)
+    }
+  })
+
+  it('gives a sixth Office member a desk in the same row, its sitters moving with their desks', () => {
+    const world = createTeamSceneWorld()
+    const five = ['a', 'b', 'c', 'd', 'e'].map((k) => member(k))
+    applyTeamSceneInput(world, input(five), OFFICE)
+    applyTeamSceneInput(world, input([...five, member('f')]), OFFICE)
+    expect(new Set(world.stations.map((s) => s.depth)).size).toBe(1)
+    expect(world.stations).toHaveLength(6)
+    for (const key of ['a', 'b', 'c', 'd', 'e']) {
+      const body = world.bodies.get(key)!
+      expect(body.x).toBe(body.home.x)
+      expect(actor(world, key)?.pose).toBe('work')
+    }
+  })
+})
