@@ -1,6 +1,7 @@
-import { Crown, Info } from 'lucide-react-native'
+import { Crown, Info, RotateCcw } from 'lucide-react-native'
 import type { ActionSheetAction, ActionSheetSection } from '../components/ActionSheetModal'
 import type { NewTabTeam } from './new-tab-team-read'
+import type { TeamLeadReopen } from './new-tab-team-reopen'
 
 type LiveLead = Extract<NewTabTeam, { kind: 'lead-live' }>['lead']
 
@@ -8,7 +9,7 @@ const noop = (): void => {}
 
 function teamActionOf(
   team: NewTabTeam,
-  args: { hostName: string; onGoToLead: (lead: LiveLead) => void }
+  args: { hostName: string; onGoToLead: (lead: LiveLead) => void; onReopen: () => void }
 ): ActionSheetAction | null {
   switch (team.kind) {
     case 'none':
@@ -30,6 +31,14 @@ function teamActionOf(
         closeBeforePress: true,
         onPress: () => args.onGoToLead(team.lead)
       }
+    case 'lead-closed':
+      return {
+        label: 'Reopen team',
+        hint: team.accountEmail ? `${team.accountEmail} on ${args.hostName}` : args.hostName,
+        icon: RotateCcw,
+        closeBeforePress: true,
+        onPress: args.onReopen
+      }
   }
 }
 
@@ -40,4 +49,18 @@ export function newTabTeamSectionOf(
 ): ActionSheetSection | null {
   const action = teamActionOf(team, args)
   return action ? { title: 'Team', actions: [action] } : null
+}
+
+/** The desktop's Reopen team messages (ORCA-717); null when the lead came back. */
+export function reopenFailureOf(answer: TeamLeadReopen): string | null {
+  switch (answer.kind) {
+    case 'lead':
+      return null
+    case 'failed':
+      return `Could not reopen the team: ${answer.reason}`
+    case 'nothing-kept':
+      return 'No kept lead to reopen'
+    case 'unsupported':
+      return 'This host cannot reopen the team'
+  }
 }
