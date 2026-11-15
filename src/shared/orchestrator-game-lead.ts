@@ -91,7 +91,15 @@ export const DEFAULT_GAME_PUSH_PROMPT =
 export const GAME_MEMBER_CI_NOTE =
   "CI: read your PR's checks from Orca with `orca game state --json` (`.review.ci` is pending, success or failure; `.review.mergeState` is GitHub's merge state, and only `clean` can merge); it shares one cached GitHub read with your lead. Do not poll `gh pr checks` or `gh run view`: they spend the GitHub budget the whole team shares."
 
-export const withGameMemberCiNote = (spec: string): string => `${spec}\n\n${GAME_MEMBER_CI_NOTE}`
+// Why: from the 2026-11-14 lead audits (ORCA-1214); project rules and the lead still come first.
+export const GAME_MEMBER_REPORT_RULES = [
+  'Before your first commit, estimate the diff: when it will pass about 400 lines outside tests, send your lead a split plan (one PR per part, in order) before you commit.',
+  'Send worker_done once, with `--dispatch-capability`. If Orca refuses it for anything but the envelope field errors it lists, send the same text to your lead with `orca orchestration send --to <lead handle> --type escalation --subject report`; never resend worker_done.',
+  'When CI is red and the cause is outside your change, still name the failing job, its run id and the cause, propose who fixes it, and tell your lead. Never go idle on a red PR.'
+].join('\n')
+
+export const withGameMemberNotes = (spec: string): string =>
+  `${spec}\n\n${GAME_MEMBER_CI_NOTE}\n\n${GAME_MEMBER_REPORT_RULES}`
 
 const at = (key: string): string => `orchestratorGame.orchestrator.${key}`
 
