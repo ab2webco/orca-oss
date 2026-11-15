@@ -1,6 +1,6 @@
 import { ACCESSORIES } from '../character-look'
 import { isRasterText, type LocalizedName } from '../game-strings'
-import { castOf } from './cast-shape'
+import { castOf, propOf } from './cast-shape'
 import {
   PLANT_KINDS,
   SCENERIES,
@@ -243,6 +243,7 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
     const roster = rosterOf(value.roster)
     const characters = roster === undefined ? undefined : charactersOf(value)
     const themes = themesOf(value.themes)
+    const prop = propOf(value.prop)
     if (
       !looks ||
       !costumes ||
@@ -268,7 +269,8 @@ export const sceneDefinitionOf = (value: unknown, id: string): SceneDefinition |
       ...(cast === undefined ? {} : { cast }),
       ...(roster === undefined ? {} : { roster }),
       ...(characters === undefined ? {} : { characters }),
-      ...(themes === undefined ? {} : { themes })
+      ...(themes === undefined ? {} : { themes }),
+      ...(prop === undefined ? {} : { prop })
     }
   } catch {
     return undefined

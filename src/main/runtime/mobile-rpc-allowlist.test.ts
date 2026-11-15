@@ -13,6 +13,7 @@ import {
   MOBILE_PLUGIN_PANELS_RUNTIME_CAPABILITY,
   MOBILE_REMOTE_UPDATE_INSTALL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+  MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../../shared/protocol-version'
@@ -187,6 +188,7 @@ describe('mobile RPC allowlist', () => {
       .sort()
 
     expect(gameMethods).toEqual([
+      'game.characters',
       'game.inboxThreads',
       'game.leadReopen',
       'game.leadStored',
@@ -214,6 +216,12 @@ describe('mobile RPC allowlist', () => {
     // Why: without it the phone draws the readable band instead of asking an older host for art.
     expect(RUNTIME_CAPABILITIES).toContain(MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY)
     expect(mobileRpcAllowlist().has('game.sceneArt')).toBe(true)
+  })
+
+  it("opens the characters' XP to the phone as its own advertised capability", () => {
+    // Why: the Team sheet's level bar reads game.characters; an older host refuses it, so the phone shows no bar.
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY)
+    expect(mobileRpcAllowlist().has('game.characters')).toBe(true)
   })
 
   it('advertises the Agent Teams settings fields as their own capability', () => {
