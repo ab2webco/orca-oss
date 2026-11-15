@@ -16,6 +16,8 @@ export type SeededMember = {
   review?: 'open'
   /** Jev's latest decisions in this member's pane, newest last. */
   decisions?: SeededDecision[]
+  /** A paired host's name; absent, this machine. */
+  host?: string
 }
 /** The team as game.state carries it to the panel; `jev` gives the lead an advisor line. */
 export type SeededTeam = { members: SeededMember[]; jev?: string }
@@ -71,6 +73,7 @@ export async function seedOfficeTeam(app: ElectronApplication, team: SeededTeam)
           state: one.state,
           toolName: 'Edit',
           ...(one.decisions ? { advisor: { ...jev, decisions: one.decisions } } : {}),
+          ...(one.host ? { remote: { host: one.host, stateKnown: true } } : {}),
           ...(one.review
             ? {
                 review: {
@@ -212,7 +215,8 @@ async function launchOfficeTeam(
     state.setRightSidebarWidth(640)
   })
   const scene = orcaPage.getByTestId('team-panel').locator('[data-team-scene="office"]')
-  await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
+  // Why the first: a team on several machines draws one stage per floor.
+  await expect(scene.getByRole('img', { name: 'Live team scene' }).first()).toBeVisible({
     timeout: 90_000
   })
   return scene

@@ -7,6 +7,7 @@ import { TeamSceneCanvas } from './TeamSceneCanvas'
 import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { useTeamScenePainter } from './use-team-scene-painter'
+import { teamSceneWhoOf } from './team-scene-who'
 import { TeamScenePainterContext } from './team-scene-painter-context'
 import { TeamSceneLeadLineContext } from './team-scene-lead-line-context'
 import { useAppStore } from '@/store'
@@ -28,6 +29,7 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
     timezone
   })
   const input = useMemo(() => teamSceneInputOf(model), [model])
+  const members = useMemo(() => teamSceneWhoOf(model.members), [model.members])
   // Why agent status: game.state names the lead's question tool, never its question.
   const question = useAppStore((s) => teamLeadQuestionOf(model, s)?.text ?? null)
   const lead = question
@@ -59,6 +61,7 @@ export function TeamPanelScene({ model, style, children }: Props): React.JSX.Ele
               painter={painter}
               leadLine={leadLine}
               onUnplaced={onUnplaced}
+              members={members}
             />
           ) : (
             <div style={{ height: TEAM_SCENE_ART_HEIGHT }} />

@@ -37,6 +37,8 @@ export type TeamScenePainter = {
   height: number
   /** Where a speaker's head tops out, so its bubble sits just above it. */
   headTop: (depth: number, height: number) => number
+  /** Where a figure's feet meet the floor; with `headTop`, the box the pointer hits. */
+  feetAt?: (depth: number, height: number) => number
   /** Pixel's grid size when its bubbles are the game's thought cloud; glass otherwise. */
   cloudPixel?: number
   /** How this style seats the team; absent, the ground layout of Figures and Pixel. */

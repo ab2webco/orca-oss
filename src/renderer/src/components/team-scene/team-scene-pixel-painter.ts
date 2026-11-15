@@ -197,6 +197,7 @@ export function createPixelPainter(args: {
     height: HEIGHT,
     cloudPixel: PIXEL,
     headTop: (depth) => (feetRow(depth) - 10) * PIXEL,
+    feetAt: (depth) => feetRow(depth) * PIXEL,
     portrait: (g, who, size) => {
       const image = imageOf(who, 0)
       const px = Math.max(1, Math.floor(size / Math.max(image.width, image.height)))

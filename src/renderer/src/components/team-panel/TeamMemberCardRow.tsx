@@ -19,6 +19,7 @@ import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 import { teamHelpersOf } from './team-member-helpers'
+import { useTeamSceneHover } from '../team-scene/team-scene-hit'
 
 /** The live count of helpers (subagents) inside a member's session; nothing once they stop. */
 function HelpersMark({ paneKey }: { paneKey: string }): React.JSX.Element | null {
@@ -88,6 +89,9 @@ export function TeamMemberCardRow({
   now: number
 }): React.JSX.Element {
   const ticket = teamTicketBesideName(card, showName)
+  // Why both ways: the scene lights this row's character, and hovering the row lights it there.
+  const lit = useTeamSceneHover((s) => s.key === card.paneKey)
+  const setHover = useTeamSceneHover((s) => s.set)
   const answer = card.needsYou ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
@@ -105,6 +109,9 @@ export function TeamMemberCardRow({
     <article
       data-team-card="member"
       data-pane-key={card.paneKey}
+      data-team-card-lit={lit ? '' : undefined}
+      onPointerEnter={() => setHover(card.paneKey)}
+      onPointerLeave={() => useTeamSceneHover.getState().key === card.paneKey && setHover(null)}
       // Why one surface: V30's .card.sel and .more read as one card, not loose text under a row.
       className={cn(
         expanded &&
@@ -119,7 +126,7 @@ export function TeamMemberCardRow({
           'flex w-full min-w-0 items-start gap-2.5 py-2 pr-3 text-left hover:bg-sidebar-accent',
           // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
           showName ? 'pl-3' : 'pl-5',
-          expanded && 'bg-sidebar-accent'
+          (expanded || lit) && 'bg-sidebar-accent'
         )}
       >
         {showName ? (

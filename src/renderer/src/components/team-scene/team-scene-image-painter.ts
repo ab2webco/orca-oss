@@ -291,6 +291,7 @@ export function createImagePainter(args: {
     ...(maxWidth ? { maxWidth } : {}),
     ...(back ? { layout: OFFICE_BACK_LAYOUT, emoteAt } : {}),
     portrait,
+    feetAt: feetY,
     headTop: (depth, h) => {
       const art = style.roles.lead
       return feetY(depth, h) - feetOf(art).y * sheetPxAt(art, depth)

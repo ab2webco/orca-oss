@@ -139,8 +139,8 @@ describe('TeamSceneBuilding', () => {
     }
     const scroller = host.querySelector<HTMLElement>('[data-team-floors-scroll]')!
     expect(scroller.className).toContain('overflow-y-auto')
-    // Three strips and their slabs: the building's height before every floor was shown.
-    expect(scroller.style.maxHeight).toBe(`${3 * (112 + 4)}px`)
+    // Three strips, each slab inside its strip: the building's height before it is dragged.
+    expect(scroller.style.maxHeight).toBe(`${3 * 112}px`)
   })
 
   // Why: the scroller's top is what is above a floor scrolled to it, and a bubble there was cut
@@ -162,9 +162,9 @@ describe('TeamSceneBuilding', () => {
     expect(tops().map((one) => one.top)).toEqual([tops()[0]!.crop, 0, 0, 0, 0])
     scroller.scrollTop = 200
     act(() => scroller.dispatchEvent(new Event('scroll')))
-    // Floor i starts at i * 116 in the scroller: the visible top is 200 - that, past its crop.
+    // Floor i starts at i * 112 in the scroller: the visible top is 200 - that, past its crop.
     expect(tops().map((one) => one.top)).toEqual(
-      tops().map((one, i) => Math.max(0, one.crop + 200 - i * 116))
+      tops().map((one, i) => Math.max(0, one.crop + 200 - i * 112))
     )
   })
 

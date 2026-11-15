@@ -17563,6 +17563,9 @@
         "queue": "Queue {{count}}, next {{pr}}",
         "working": "{{count}} working"
       }
+    },
+    "building": {
+      "resize": "Resize building"
     }
   },
   "claudeDeadHooks": {
