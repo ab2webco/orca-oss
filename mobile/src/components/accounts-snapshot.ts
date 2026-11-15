@@ -121,7 +121,9 @@ const ClaudeAccountSummarySchema = z
     organizationName: z.string().nullable().optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
-    lastAuthenticatedAt: TimestampSchema.optional()
+    lastAuthenticatedAt: TimestampSchema.optional(),
+    // Why catch: a bad token date must not blank the roster, as with authMethod above.
+    longLivedTokenSetAt: TimestampSchema.nullable().optional().catch(null)
   })
   .passthrough()
 

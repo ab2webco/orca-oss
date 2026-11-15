@@ -173,6 +173,31 @@ describe('decodeAccountsSnapshot', () => {
     expect(snapshot.claude.accounts).toHaveLength(1)
   })
 
+  it("reads a Claude account's long-lived token date, and an older host's missing one", () => {
+    const raw = withClaudeAccount('subscription-oauth') as {
+      claude: { accounts: Record<string, unknown>[] }
+    }
+    raw.claude.accounts[0].longLivedTokenSetAt = 1_763_164_800_000
+    raw.claude.accounts.push({ id: 'claude-b', email: 'b@example.com' })
+
+    const accounts = decodeAccountsSnapshot(raw).claude.accounts
+
+    expect(accounts[0]?.longLivedTokenSetAt).toBe(1_763_164_800_000)
+    expect(accounts[1]?.longLivedTokenSetAt).toBeUndefined()
+  })
+
+  it('drops a malformed token date instead of every account', () => {
+    const raw = withClaudeAccount('subscription-oauth') as {
+      claude: { accounts: Record<string, unknown>[] }
+    }
+    raw.claude.accounts[0].longLivedTokenSetAt = 'yesterday'
+
+    const accounts = decodeAccountsSnapshot(raw).claude.accounts
+
+    expect(accounts).toHaveLength(1)
+    expect(accounts[0]?.longLivedTokenSetAt).toBeNull()
+  })
+
   it('names the failing field, so a schema drift is not read as a host with no accounts', () => {
     expect(() => decodeAccountsSnapshot(withClaudeAccount('unknown', ''))).toThrow(
       /claude\.accounts\.0\.email/
