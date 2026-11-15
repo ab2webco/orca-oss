@@ -50,9 +50,13 @@ export function useTeamSceneArt(
       : null
   // Why keyed by text: every 20 s poll hands a new band, and re-reading the art would cost megabytes.
   const requestRef = useRef(request)
-  requestRef.current = request
   const key = request?.key ?? null
   const [loaded, setLoaded] = useState<{ key: string; load: TeamSceneArtLoad } | null>(null)
+
+  // Why declared first: effects run in order, so the read below sees this render's request.
+  useEffect(() => {
+    requestRef.current = request
+  })
 
   useEffect(() => {
     const request = requestRef.current
