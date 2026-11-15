@@ -359,6 +359,11 @@ describe('gameLeadBriefOf', () => {
       expect(brief).toContain('a ticket moves to In Progress only when a member starts it')
     })
 
+    it('treats the open-PR cap as a stop, passed only with a reason told to the person', () => {
+      expect(brief).toContain('The open-PR cap is a stop: `game launch` refuses at it')
+      expect(brief).toContain('Pass `--past-pr-cap "<why>"` only for a reason')
+    })
+
     it('places on a free paired host and reports refused --on once', () => {
       expect(brief).toContain('when this one is full or busy and a paired')
       expect(brief).toContain(

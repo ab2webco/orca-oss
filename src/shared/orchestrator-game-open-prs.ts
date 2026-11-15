@@ -12,3 +12,23 @@ export function openPrWarningOf(state: OpenPrsInput): string | null {
     ? `${open} open PRs reach the cap of ${cap}: finish them to merge before launching another ticket`
     : null
 }
+
+const mentionsTicket = (title: string, ticket: string): boolean =>
+  new RegExp(
+    `(^|[^A-Za-z0-9])${ticket.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^0-9]|$)`,
+    'i'
+  ).test(title)
+
+// Why a stop, not a warning: a lead launched past the warning and piled up open PRs (ORCA-1214).
+/** Why `game launch` refuses at the open-PR cap; null below it or when the ticket's own PR is open. */
+export function openPrCapRefusalOf(state: OpenPrsInput, ticket: string): string | null {
+  const warning = openPrWarningOf(state)
+  if (warning === null) {
+    return null
+  }
+  // Why: relaunching a ticket whose PR is open adds no PR; only the kept items are known.
+  const own = state.project?.reviews?.items.some((one) => mentionsTicket(one.title, ticket))
+  return own
+    ? null
+    : `${warning}. Merge one first, or pass --past-pr-cap "<why>" to launch ${ticket} anyway.`
+}

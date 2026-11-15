@@ -715,10 +715,11 @@ Los verbos del líder, ejecutados desde la terminal del líder
   conversación de líder guardada del proyecto y esta sesión pasa a ser el nuevo líder en lugar de
   reabrirla. Un líder vivo sigue ganando, y un host más antiguo que descarta el flag reabre el
   anterior y lo dice.
-- `orca game launch` y `orca game wave` imprimen `Warning:` en stderr cuando los PR abiertos del
-  proyecto (el total de la lista de PR) alcanzan el tope, y aun así inician el miembro: lleva
-  primero esos PR hasta el merge. Un PR cuenta incluso después de que su miembro fue liberado, algo
-  que el recuento de miembros vivos no puede ver.
+- Cuando los PR abiertos del proyecto (el total de la lista de PR) alcanzan el tope, `orca game
+  launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea uno de ellos (un
+  relanzamiento no agrega PR) o se pase `--past-pr-cap "<por qué>"`, que lanza e imprime el motivo.
+  `orca game wave` imprime `Warning:` en stderr y aun así inicia sus miembros. Un PR cuenta incluso
+  después de que su miembro fue liberado, algo que el recuento de miembros vivos no puede ver.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — un miembro para
   un ticket; `--repo` lo inicia en otro repo del proyecto (el suyo o uno de `memberRepos`), y `--on` en un host emparejado (consulta
   la sección de la flota más abajo; `--repo` es entonces el repo del host y es obligatorio). `--prompt` reemplaza `launchPrompt` para ese

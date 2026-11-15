@@ -5,7 +5,7 @@ import { isDevCliInvocation, resolveCoordinatorTerminalHandle } from './orchestr
 import { gamePausedRefusalOf } from './orchestrator-game-paused-refusal'
 import { gameFleetReportOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { gameHostRefusalOf } from '../../shared/orchestrator-game-host-load'
-import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
+import { openPrCapRefusalOf } from '../../shared/orchestrator-game-open-prs'
 import {
   DEFAULT_GAME_LEAD,
   renderGameLaunchPrompt,
@@ -297,9 +297,13 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     if (refusal) {
       throw new RuntimeClientError('cap_reached', refusal)
     }
-    const openPrWarning = openPrWarningOf(response.result)
-    if (openPrWarning) {
-      console.error(`Warning: ${openPrWarning}`)
+    const openPrRefusal = openPrCapRefusalOf(response.result, ticket)
+    if (openPrRefusal) {
+      const why = flags.get('past-pr-cap')
+      if (typeof why !== 'string' || why.trim() === '') {
+        throw new RuntimeClientError('cap_reached', openPrRefusal)
+      }
+      console.error(`Launching past the open-PR cap: ${why.trim()}`)
     }
     const launched = await launchGameMember({
       client,
