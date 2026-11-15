@@ -5,7 +5,8 @@ import { getRenderRowKey } from '../listing/render-row'
 import type { RenderRow } from '../listing/render-row'
 
 export const GROUP_HEADER_ROW_HEIGHT = 28
-export const HOST_HEADER_ROW_HEIGHT = 32
+// Why 36: HostSectionHeader is an h-8 row inside a pt-1 wrapper, and headers are never DOM-measured.
+export const HOST_HEADER_ROW_HEIGHT = 36
 export const WORKTREE_SIDEBAR_VIRTUAL_ROW_GAP = 6
 const SECONDARY_GROUP_HEADER_TOP_MARGIN = 4
 const IMPORTED_WORKTREES_LINE_ROW_HEIGHT = 36
@@ -159,10 +160,8 @@ export function getStickyHeaderIndexes(rows: readonly RenderRow[]): number[] {
   return indexes
 }
 
-// Why: the pinned host card is h-8 (32px) inside a pt-1 (4px) wrapper; the
-// group tier pins one pixel up to sit flush beneath it. Keep in sync with
-// HostSectionHeader's layout.
-export const HOST_STICKY_PINNED_HEIGHT = 36
+// Fallback until the pinned host card is measured (usePinnedHostHeight); the group tier pins beneath it.
+export const HOST_STICKY_PINNED_HEIGHT = HOST_HEADER_ROW_HEIGHT
 
 export type ActiveStickyIndexes = {
   /** Pinned host card (tier 1), or null outside host sections. */
@@ -184,6 +183,8 @@ export function getActiveStickyIndexesForScroll(args: {
   scrollOffset: number
   stickyHeaderIndexes: readonly number[]
   virtualItems: readonly VirtualItem[]
+  /** The pinned host card's measured height; falls back to HOST_STICKY_PINNED_HEIGHT. */
+  hostPinnedHeight?: number
 }): ActiveStickyIndexes {
   const hostIndexes = getHostStickyIndexes(args.rows, args.stickyHeaderIndexes)
 
@@ -244,7 +245,7 @@ export function getActiveStickyIndexesForScroll(args: {
   })
   const groupIndex = resolveWithHandoff(
     groupIndexes,
-    hostIndex !== null ? HOST_STICKY_PINNED_HEIGHT : 0,
+    hostIndex !== null ? (args.hostPinnedHeight ?? HOST_STICKY_PINNED_HEIGHT) : 0,
     hostIndex === null
   )
 

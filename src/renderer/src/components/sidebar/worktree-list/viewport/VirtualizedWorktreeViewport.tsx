@@ -24,6 +24,7 @@ import { useWorktreeNativeDrag } from '../drag/use-native-drag'
 import { useWorktreePointerDrag } from '../drag/use-pointer-drag'
 import { useWorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import { useWorktreeSidebarScrollSuppression } from './use-scroll-suppression'
+import { usePinnedHostHeight } from './use-pinned-host-height'
 import { EMPTY_PROJECT_GROUPS, type VirtualizedWorktreeViewportProps } from './viewport-props'
 import { useWorktreeDropCommitContext } from '../drag/use-drop-commit-context'
 import { buildWorktreeVirtualRowContext } from './virtual-row-context'
@@ -166,6 +167,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     cancelPendingRevealFrames: reveal.cancelPendingRevealFrames
   })
 
+  const pinnedHostHeightRef = usePinnedHostHeight(scrollRef)
   const { virtualItems, measureVirtualRowElement } = useVirtualRowMeasurementSync({
     renderRows,
     virtualization,
@@ -173,7 +175,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     scrollOffsetRef,
     scrollAnchorRef,
     hasDirectScrollInput: scrollSuppression.hasDirectScrollInput,
-    shouldSkipScrollAnchorRestore: scrollSuppression.shouldSkipScrollAnchorRestore
+    shouldSkipScrollAnchorRestore: scrollSuppression.shouldSkipScrollAnchorRestore,
+    pinnedHostHeightRef
   })
 
   const { toggleGroupWithScrollAnchor, getLineageToggleHandler } = useGroupToggleWithScrollAnchor({

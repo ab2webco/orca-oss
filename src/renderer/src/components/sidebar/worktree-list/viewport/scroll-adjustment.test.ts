@@ -219,6 +219,26 @@ describe('estimateRenderRowSize', () => {
     expect(activeSize).toBe(32)
   })
 
+  // ORCA-1216 §8: HostSectionHeader draws a 32px row inside a 4px top pad; headers are never DOM-measured.
+  it('estimates a host card at its rendered height, plus the spacer after the first header', () => {
+    const host = (key: string) => ({
+      type: 'host-header' as const,
+      key,
+      hostId: key as `ssh:${string}`,
+      kind: 'ssh' as const,
+      label: key,
+      detail: 'SSH',
+      health: 'available' as const,
+      collapsed: false,
+      count: 1,
+      worktreeIds: []
+    })
+    const rows = [host('ssh:a'), host('ssh:b')]
+
+    expect(estimateRenderRowSize(rows, 0, 0, null)).toBe(36)
+    expect(estimateRenderRowSize(rows, 1, 0, null)).toBe(40)
+  })
+
   it('estimates imported worktree line rows with a stable compact height', () => {
     const rows = [makeHeaderRow('repo:repo-1'), makeImportedCardRow()]
 

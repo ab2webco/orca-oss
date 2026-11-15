@@ -1,4 +1,5 @@
 import React from 'react'
+import { PINNED_TIER_SURFACE_CLASS } from './pinned-tier-surface'
 import { ChevronDown } from 'lucide-react'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
@@ -174,9 +175,12 @@ export function renderWorktreeSectionHeaderRow(args: {
         args.hasHeaderTopSpacing && !isActiveStickyHeader && 'pt-1',
         isActiveStickyHeader
           ? cn(
-              'sticky z-20 bg-worktree-sidebar',
-              // Why: when a host card is pinned, the group tier pins flush beneath it, not at the viewport top.
-              args.hasStickyHost ? 'top-[35px]' : '-top-px'
+              'sticky z-20',
+              PINNED_TIER_SURFACE_CLASS,
+              // Why: when a host card is pinned, the group tier pins flush beneath its measured height (usePinnedHostHeight).
+              args.hasStickyHost
+                ? 'top-[calc(var(--worktree-sidebar-pinned-host-height,36px)-1px)]'
+                : '-top-px'
             )
           : 'absolute top-0'
       )}

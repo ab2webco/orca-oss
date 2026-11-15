@@ -48,6 +48,8 @@ function applyAlpha(color: string, alpha: number | undefined): string {
 
 function buildSurfaceVariables(args: {
   background: string
+  /** Opaque twin of `background` for pinned headers; rows scroll under them. */
+  solidBackground?: string
   foreground: string
   overrideTextTokens?: boolean
 }): LeftSidebarStyleVariables {
@@ -59,6 +61,7 @@ function buildSurfaceVariables(args: {
   const ring = `color-mix(in srgb, ${foreground} 44%, ${background})`
   const vars: LeftSidebarStyleVariables = {
     '--worktree-sidebar': background,
+    '--worktree-sidebar-solid': args.solidBackground ?? background,
     '--worktree-sidebar-foreground': foreground,
     '--worktree-sidebar-accent': accent,
     '--worktree-sidebar-accent-foreground': foreground,
@@ -94,13 +97,17 @@ function resolveTerminalSurfaceVariables(
   systemPrefersDark: boolean
 ): LeftSidebarStyleVariables {
   const appearance = resolveEffectiveTerminalAppearance(settings, systemPrefersDark)
-  const background = applyAlpha(
-    settings.terminalColorOverrides?.background ?? appearance.theme?.background ?? '#000000',
-    settings.terminalBackgroundOpacity
-  )
+  const solidBackground =
+    settings.terminalColorOverrides?.background ?? appearance.theme?.background ?? '#000000'
+  const background = applyAlpha(solidBackground, settings.terminalBackgroundOpacity)
   const foreground =
     settings.terminalColorOverrides?.foreground ?? appearance.theme?.foreground ?? '#fafafa'
-  return buildSurfaceVariables({ background, foreground, overrideTextTokens: true })
+  return buildSurfaceVariables({
+    background,
+    solidBackground,
+    foreground,
+    overrideTextTokens: true
+  })
 }
 
 function resolveTintedSurfaceVariables(

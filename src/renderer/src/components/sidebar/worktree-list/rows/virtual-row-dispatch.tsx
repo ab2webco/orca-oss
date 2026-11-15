@@ -16,6 +16,7 @@ import type { ImportedWorktreeCardActionState } from '../../imported-worktrees-c
 import type { NewExternalWorktreesInboxActionState } from '../../new-external-worktrees-inbox-actions'
 import type { useHostHeaderDrag } from '../../host-header-drag'
 import { HostSectionHeader } from './HostSectionHeader'
+import { PINNED_TIER_SURFACE_CLASS } from './pinned-tier-surface'
 import { renderFolderWorkspaceVirtualRow, type FolderWorkspaceRowContext } from './folder-row'
 import {
   renderImportedWorktreesVirtualRow,
@@ -79,12 +80,13 @@ function renderHostHeaderVirtualRow(
       data-worktree-virtual-row-key={String(vItem.key)}
       data-worktree-sticky-header=""
       data-worktree-sticky-header-active={isActiveStickyHost ? '' : undefined}
+      data-worktree-sticky-host-active={isActiveStickyHost ? '' : undefined}
       data-index={vItem.index}
       ref={ctx.measureVirtualRowElement}
       className={cn(
         'left-0 right-0',
         hasHeaderTopSpacing && !isActiveStickyHost && 'pt-1',
-        isActiveStickyHost ? 'sticky -top-px z-30 bg-worktree-sidebar' : 'absolute top-0'
+        isActiveStickyHost ? cn('sticky -top-px z-30', PINNED_TIER_SURFACE_CLASS) : 'absolute top-0'
       )}
       style={isActiveStickyHost ? undefined : { transform: getVirtualRowTransform(vItem.start) }}
     >

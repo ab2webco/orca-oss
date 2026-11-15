@@ -70,6 +70,8 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-worktree-sidebar: var(--worktree-sidebar);
+  /* Why: pinned sidebar headers need an opaque surface even when the sidebar matches a translucent terminal. */
+  --color-worktree-sidebar-solid: var(--worktree-sidebar-solid, var(--worktree-sidebar));
   --color-worktree-sidebar-foreground: var(--worktree-sidebar-foreground);
   --color-worktree-sidebar-accent: var(--worktree-sidebar-accent);
   --color-worktree-sidebar-accent-foreground: var(--worktree-sidebar-accent-foreground);

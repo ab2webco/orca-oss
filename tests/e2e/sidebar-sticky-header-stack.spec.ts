@@ -1,0 +1,233 @@
+/**
+ * ORCA-1216 §8: with two hosts and a host filter, scrolled mid-list, the host card and the
+ * project header pin as one opaque stack: nothing between them and no row through them.
+ */
+
+import type { Page } from '@stablyai/playwright-test'
+import { PNG } from 'pngjs'
+import { test, expect } from './helpers/orca-app'
+import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { writeSettings } from './helpers/settings-write'
+
+type StackProbe = {
+  pinned: number
+  hostBottom: number
+  groupTop: number
+  /** Background alpha of each pinned tier; below 1 the rows under it show through. */
+  alphas: number[]
+  leaks: { x: number; y: number; row: string }[]
+}
+
+async function seedTwoHosts(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const store = window.__store
+    if (!store) {
+      throw new Error('window.__store is not available')
+    }
+    const state = store.getState()
+    const sourceRepo = state.repos[0]
+    const sourceWorktree = sourceRepo ? (state.worktreesByRepo[sourceRepo.id] ?? [])[0] : undefined
+    if (!sourceRepo || !sourceWorktree) {
+      throw new Error('Sticky stack E2E needs the seeded repo')
+    }
+    const connectionId = 'e2e-sticky-host'
+    const sshHostId = `ssh:${connectionId}`
+    const repos = [...state.repos]
+    const worktreesByRepo = { ...state.worktreesByRepo }
+    const addRepo = (index: number, remote: boolean): void => {
+      const id = `e2e-sticky-${remote ? 'remote' : 'local'}-${index}`
+      repos.push({
+        ...sourceRepo,
+        id,
+        path: `${sourceRepo.path}-${id}`,
+        displayName: `${remote ? 'remote' : 'local'}-project-${index}`,
+        ...(remote ? { connectionId, executionHostId: sshHostId } : {})
+      })
+      worktreesByRepo[id] = [0, 1, 2].map((n) => ({
+        ...sourceWorktree,
+        id: `${id}-wt-${n}`,
+        repoId: id,
+        path: `${sourceWorktree.path}-${id}-${n}`,
+        displayName: n === 0 ? 'main' : `feature-${index}-${n}`,
+        branch: n === 0 ? 'refs/heads/main' : `refs/heads/feature-${index}-${n}`,
+        isMainWorktree: n === 0,
+        isArchived: false,
+        hostId: remote ? sshHostId : 'local'
+      }))
+    }
+    for (let index = 0; index < 6; index += 1) {
+      addRepo(index, false)
+    }
+    for (let index = 0; index < 3; index += 1) {
+      addRepo(index, true)
+    }
+    const sshTargetLabels = new Map(state.sshTargetLabels)
+    sshTargetLabels.set(connectionId, 'm1')
+    store.setState({ repos, worktreesByRepo, sshTargetLabels })
+    const next = store.getState()
+    next.setActiveView('terminal')
+    next.setSidebarOpen(true)
+    // The owner's width.
+    next.setSidebarWidth(470)
+    next.setRightSidebarOpen(false)
+    next.setGroupBy('repo')
+    next.setFilterRepoIds([])
+    next.setVisibleWorkspaceHostIds(['local', sshHostId])
+    return sshHostId
+  })
+}
+
+async function probeStack(page: Page): Promise<StackProbe | null> {
+  return page.evaluate(() => {
+    const pinned = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-worktree-sticky-header-active]')
+    )
+    const host = pinned.find((element) => element.querySelector('[data-host-header-drag-id]'))
+    const group = pinned.find((element) => element !== host)
+    if (!host || !group) {
+      return null
+    }
+    const hostRect = host.getBoundingClientRect()
+    const groupRect = group.getBoundingClientRect()
+    const leaks: { x: number; y: number; row: string }[] = []
+    // Why from the scroll root's top: a row can also peek out above the pinned host card.
+    const scrollRoot = document.querySelector<HTMLElement>('[data-worktree-sidebar]')
+    const top = Math.min(hostRect.top, scrollRoot?.getBoundingClientRect().top ?? hostRect.top)
+    for (const fraction of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      const x = groupRect.left + groupRect.width * fraction
+      for (let y = Math.ceil(top) + 1; y < groupRect.bottom - 1; y += 1) {
+        const hit = document.elementFromPoint(x, y)
+        if (!hit?.closest('[data-worktree-sticky-header-active]')) {
+          const row = hit?.closest<HTMLElement>('[data-worktree-virtual-row]')
+          leaks.push({ x, y, row: row?.dataset.worktreeVirtualRowKey ?? hit?.tagName ?? 'none' })
+        }
+      }
+    }
+    const alphas = [host, group].map((element) => {
+      const match = getComputedStyle(element).backgroundColor.match(/rgba?\(([^)]+)\)/)
+      const parts = match ? match[1].split(/[\s,/]+/).filter(Boolean) : []
+      return parts.length === 4 ? Number(parts[3]) : match ? 1 : 0
+    })
+    return {
+      pinned: pinned.length,
+      hostBottom: hostRect.bottom,
+      groupTop: groupRect.top,
+      alphas,
+      leaks
+    }
+  })
+}
+
+// Pixels inside the pinned stack that change when every unpinned row is hidden: rows painting
+// through it. Catches the sub-pixel seams elementFromPoint cannot see.
+async function countPixelsRowsPaintInStack(page: Page): Promise<number> {
+  const clip = await page.evaluate(() => {
+    const pinned = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-worktree-sticky-header-active]')
+    ).map((element) => element.getBoundingClientRect())
+    const top = Math.floor(Math.min(...pinned.map((rect) => rect.top)))
+    const bottom = Math.ceil(Math.max(...pinned.map((rect) => rect.bottom)))
+    const left = Math.ceil(Math.max(...pinned.map((rect) => rect.left)))
+    const right = Math.floor(Math.min(...pinned.map((rect) => rect.right)))
+    return { x: left, y: top, width: right - left, height: bottom - top }
+  })
+  const withRows = PNG.sync.read(await page.screenshot({ clip }))
+  await page.evaluate(() => {
+    const style = document.createElement('style')
+    style.id = 'e2e-hide-unpinned-rows'
+    style.textContent =
+      '[data-worktree-virtual-row]:not([data-worktree-sticky-header-active]){visibility:hidden!important}'
+    document.head.append(style)
+  })
+  const withoutRows = PNG.sync.read(await page.screenshot({ clip }))
+  await page.evaluate(() => document.getElementById('e2e-hide-unpinned-rows')?.remove())
+  let differing = 0
+  for (let index = 0; index < withRows.data.length; index += 4) {
+    const delta = Math.max(
+      Math.abs(withRows.data[index]! - withoutRows.data[index]!),
+      Math.abs(withRows.data[index + 1]! - withoutRows.data[index + 1]!),
+      Math.abs(withRows.data[index + 2]! - withoutRows.data[index + 2]!)
+    )
+    if (delta > 8) {
+      differing += 1
+    }
+  }
+  return differing
+}
+
+test('the pinned host card and project header stack with nothing between or through them', async ({
+  orcaPage
+}, testInfo) => {
+  await waitForSessionReady(orcaPage)
+  await waitForActiveWorktree(orcaPage)
+  await orcaPage.setViewportSize({ width: 1440, height: 900 })
+  // The owner's appearance: the sidebar matches a terminal drawn at 80% opacity.
+  await writeSettings(orcaPage, {
+    theme: 'dark',
+    leftSidebarAppearanceMode: 'match-terminal',
+    terminalBackgroundOpacity: 0.8
+  })
+  await seedTwoHosts(orcaPage)
+
+  const viewport = orcaPage.locator('[data-worktree-sidebar]')
+  await expect(viewport.locator('[data-host-header-drag-id]')).toHaveCount(2, { timeout: 30_000 })
+
+  const overflow = await viewport.evaluate((element) => element.scrollHeight - element.clientHeight)
+  expect(overflow, 'the list does not overflow: the stack is never tested').toBeGreaterThan(200)
+
+  // Why a sweep: a handoff between headers lasts a few pixels, so one offset can miss it.
+  const failures: { scrollTop: number; probe: StackProbe }[] = []
+  let pinnedOffsets = 0
+  for (let scrollTop = 0; scrollTop <= overflow; scrollTop += 7) {
+    await viewport.evaluate(async (element, top) => {
+      element.scrollTop = top
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    }, scrollTop)
+    const probe = await probeStack(orcaPage)
+    if (!probe) {
+      continue
+    }
+    pinnedOffsets += 1
+    if (
+      Math.abs(probe.groupTop - probe.hostBottom) >= 1 ||
+      probe.leaks.length > 0 ||
+      probe.alphas.some((alpha) => alpha < 1)
+    ) {
+      failures.push({ scrollTop, probe: { ...probe, leaks: probe.leaks.slice(0, 3) } })
+    }
+  }
+  testInfo.annotations.push({
+    type: 'sweep',
+    description: JSON.stringify({ pinnedOffsets, failures: failures.slice(0, 5) })
+  })
+  if (failures[0]) {
+    await viewport.evaluate((element, top) => {
+      element.scrollTop = top
+    }, failures[0].scrollTop)
+    await orcaPage.screenshot({ path: testInfo.outputPath('sticky-stack-first-failure.png') })
+  }
+  expect(pinnedOffsets, 'the two tiers never pinned together').toBeGreaterThan(5)
+  expect(failures, 'offsets where the stack has a gap or a row paints through it').toEqual([])
+
+  await viewport.evaluate(async (element) => {
+    element.scrollTop = Math.round(element.scrollHeight * 0.3)
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  await expect
+    .poll(async () => (await probeStack(orcaPage))?.pinned ?? 0, {
+      message: 'host card and project header never pinned together'
+    })
+    .toBe(2)
+  const stack = await probeStack(orcaPage)
+  await orcaPage.screenshot({ path: testInfo.outputPath('sticky-stack-scrolled.png') })
+  testInfo.annotations.push({ type: 'stack probe', description: JSON.stringify(stack) })
+  if (!stack) {
+    throw new Error('the stack unpinned between the poll and the probe')
+  }
+  expect(
+    Math.abs(stack.groupTop - stack.hostBottom),
+    'gap or overlap between the tiers'
+  ).toBeLessThan(1)
+  expect(stack.leaks, 'rows paint inside the pinned stack').toEqual([])
+  expect(await countPixelsRowsPaintInStack(orcaPage), 'row pixels show inside the stack').toBe(0)
+})
