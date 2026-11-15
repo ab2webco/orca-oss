@@ -28424,6 +28424,8 @@ export class OrcaRuntimeService {
       ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+      // Why here too: a member relaunched into an existing worktree starts through this path.
+      sessionOptionsUnpinned: opts.launchPreferences?.unpinned === true,
       platform,
       shell: resolveLocalWindowsAgentStartupShell({
         platform,

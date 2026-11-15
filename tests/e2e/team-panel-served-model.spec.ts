@@ -130,6 +130,16 @@ test('Team cards show the served model and who chose it', async ({
       effort: 'high',
       modelChosenBy: { by: 'lead', kind: 'implement', source: 'flag' }
     })
+    // The process itself: the lead's default runs on its model with no pin, so Jev may move it.
+    const startOn = (model: string) =>
+      expect
+        .poll(() => agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes(model))))
+        .toBeTruthy()
+        .then(() => agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes(model))))
+    expect(await startOn('claude-opus-5-5')).toMatchObject({
+      modelPinned: null,
+      effortPinned: null
+    })
 
     // Two start on Sonnet and a router moves each to Opus mid-turn, before any Stop; the lead's
     // pick starts on Opus and stays there.
@@ -298,6 +308,13 @@ test('Team cards show the served model and who chose it', async ({
         })
       }
     }
+
+    // A person's --model still pins, so a router keeps off it.
+    await member('ORCA-9004', { model: 'claude-sonnet-5-5', effort: 'medium' })
+    expect(await startOn('claude-sonnet-5-5')).toMatchObject({
+      modelPinned: '1',
+      effortPinned: '1'
+    })
   } finally {
     agent.dispose()
     rmSync(transcripts, { recursive: true, force: true })

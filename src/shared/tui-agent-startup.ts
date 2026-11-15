@@ -65,7 +65,9 @@ export function buildAgentStartupPlan(args: {
     shell,
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
-    sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
+    // Why: Orca's own default never overrides a model the person's agent arguments name.
+    sessionOptionsOverrideAgentArgs:
+      args.sessionOptionsOverrideAgentArgs && !args.sessionOptionsUnpinned,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {
