@@ -696,6 +696,7 @@ describe('createImagePainter office back view', () => {
       }).layout
     expect(at({ chairEnd: 144 })).toEqual({
       rowSize: 5,
+      rowGrows: true,
       workSeated: true,
       firstX: 0.16,
       attendReachPx: 14,
@@ -705,8 +706,18 @@ describe('createImagePainter office back view', () => {
   })
 
   it('keeps five desks apart at the narrowest panel, so no desk covers another', () => {
+    keepsDesksApart(5)
+  })
+
+  // ORCA-1204: a sixth member's desk stood in front of the row, over the first two.
+  it('keeps a row closed up for six or eight desks apart too, one row deep', () => {
+    keepsDesksApart(6)
+    keepsDesksApart(8)
+  })
+
+  function keepsDesksApart(count: number): void {
     const plan = seatPlanOf(
-      Array.from({ length: 5 }, (_, i) => ({
+      Array.from({ length: count }, (_, i) => ({
         key: `m${i}`,
         name: `m${i}`,
         characterKey: null,
@@ -715,7 +726,11 @@ describe('createImagePainter office back view', () => {
         mergedPr: null,
         site: { stage: 0 as const, broken: false }
       })),
-      5
+      5,
+      0.16,
+      undefined,
+      [],
+      true
     )
     // Orca's Office people stand 60 px tall, as office/native.json draws them.
     const real = (sheets: string[]) => ({ ...role(sheets), size: 60 })
@@ -734,12 +749,12 @@ describe('createImagePainter office back view', () => {
         .filter((c) => c.name === 'drawImage' && c.args[0] === IMAGES.get('desk.png'))
         .map((c) => [c.args[5] as number, (c.args[5] as number) + (c.args[7] as number)])
         .sort((p, q) => p[0]! - q[0]!)
-      expect(desks).toHaveLength(5)
+      expect(desks).toHaveLength(count)
       for (let i = 1; i < desks.length; i++) {
-        expect(desks[i]![0], `${width} px`).toBeGreaterThan(desks[i - 1]![1]!)
+        expect(desks[i]![0], `${count} desks at ${width} px`).toBeGreaterThan(desks[i - 1]![1]!)
       }
     }
-  })
+  }
 
   it("says where a sitter's emote is drawn, so its name tag can hang over it", () => {
     const asking = actor('m', { pose: 'raise', x: spot.x, depth: spot.depth, emote: 'alert' })

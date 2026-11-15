@@ -10,6 +10,8 @@ const REST_SECONDS = 2
 const LEAD_STAYS_BELOW_PX = 360
 const GIVE_SECONDS = 0.9
 const BESIDE_X = 0.075
+// Why: a desk reaches past its seat, so the lead steps back only once clear of the last one.
+const ROW_CLEAR_X = 0.1
 
 export type TeamSceneRounds = {
   stage: 'rest' | 'toMember' | 'atMember' | 'home'
@@ -56,6 +58,17 @@ export const teamSceneLeadAttends = (world: TeamSceneWorld): boolean =>
 /** True while the lead is at its spot and free to take a member's visit. */
 export const leadIsHome = (world: TeamSceneWorld): boolean => world.rounds.stage === 'rest'
 
+/**
+ * The way home: in front of the row until past its last desk, then back to its spot. Easing to
+ * the spot's depth while still over the desks drew the lead behind them (ORCA-1204).
+ */
+export function leadHomeTargetOf(world: TeamSceneWorld, lead: TeamSceneBody): TeamSceneSpot {
+  const rowEnd = Math.max(...world.stations.map((s) => s.x)) + ROW_CLEAR_X
+  return lead.x < rowEnd && lead.depth > LEAD_SPOT.depth
+    ? { x: LEAD_SPOT.x, depth: lead.depth }
+    : LEAD_SPOT
+}
+
 function setOut(world: TeamSceneWorld, purpose: TeamSceneRounds['purpose'], key: string): void {
   Object.assign(world.rounds, { stage: 'toMember', purpose, member: key })
 }
@@ -81,7 +94,7 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
   // Why: on a narrow building floor the row has no gap a lead can stand in without covering one.
   if (world.leadStays && width < LEAD_STAYS_BELOW_PX) {
     Object.assign(rounds, { stage: 'rest', member: null })
-    lead.target = LEAD_SPOT
+    lead.target = leadHomeTargetOf(world, lead)
     return
   }
   // Why: the scene never contradicts the lead's card: only a working lead hands out work, and a lead
@@ -97,7 +110,7 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     setOut(world, 'attend', asking.key)
   }
   if (rounds.stage === 'rest') {
-    lead.target = LEAD_SPOT
+    lead.target = leadHomeTargetOf(world, lead)
     if (world.queue.length > 0) {
       return
     }
@@ -110,7 +123,7 @@ export function stepLeadRounds(world: TeamSceneWorld, width: number): void {
     return
   }
   if (rounds.stage === 'home') {
-    lead.target = LEAD_SPOT
+    lead.target = leadHomeTargetOf(world, lead)
     if (near(lead, width)) {
       Object.assign(rounds, { stage: 'rest', at: world.t })
     }

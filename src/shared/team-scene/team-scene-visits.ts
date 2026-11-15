@@ -42,6 +42,24 @@ export function queueVisit(world: TeamSceneWorld, body: TeamSceneBody, kind: Vis
   }
 }
 
+/** Members off the seats: one still on the team goes to the +N, one gone walks off stage. */
+export function dismissUnseated(
+  world: TeamSceneWorld,
+  seatedKeys: ReadonlySet<string>,
+  team: ReadonlyMap<string, unknown>
+): void {
+  for (const body of world.bodies.values()) {
+    if (body.role !== 'member' || seatedKeys.has(body.key) || body.plan.kind === 'leave') {
+      continue
+    }
+    if (team.has(body.key)) {
+      world.bodies.delete(body.key)
+    } else {
+      walkStraight(world, body, 'leave')
+    }
+  }
+}
+
 /**
  * Joins and leaves walk straight to the seat or off stage, out of the lead's queue: behind
  * other visits a relaunched team left its desks empty for a minute while its cards said working.

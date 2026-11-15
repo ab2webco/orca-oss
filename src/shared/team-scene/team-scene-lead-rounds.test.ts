@@ -254,3 +254,44 @@ describe('teamSceneLeadAttends', () => {
     }
   })
 })
+
+// ORCA-1204: easing back to its spot's depth while still over the desks drew the lead behind them.
+describe('the lead walking home', () => {
+  // Where the Office image painter splits the actors drawn behind the row from those in front.
+  const BEHIND_ROW = 0.05
+  const DESK_HALF = 0.06
+
+  for (const width of [220, 640]) {
+    it(`stays in front of the desk row while over it, at ${width} px`, () => {
+      const world = createTeamSceneWorld()
+      const keys = ['a', 'b', 'c', 'd', 'e']
+      applyTeamSceneInput(world, input(keys.map((k) => member(k))), {
+        rowSize: 5,
+        workSeated: true,
+        firstX: 0.16,
+        rowGrows: true
+      })
+      const row = Math.min(...world.stations.map((s) => s.depth)) - BEHIND_ROW
+      const left = Math.min(...world.stations.map((s) => s.x)) - DESK_HALF
+      const right = Math.max(...world.stations.map((s) => s.x)) + DESK_HALF
+      const lead = world.bodies.get('lead')!
+      let returns = 0
+      let wasOut = false
+      for (let t = 0; t < 60; t += DT) {
+        stepTeamScene(world, DT, { width })
+        const out = world.rounds.stage !== 'rest'
+        if (wasOut && !out) {
+          returns++
+        }
+        wasOut = out
+        if (lead.x > left && lead.x < right) {
+          expect(
+            lead.depth,
+            `lead behind the row at x ${lead.x.toFixed(3)}`
+          ).toBeGreaterThanOrEqual(row)
+        }
+      }
+      expect(returns, 'the lead never came home from a round').toBeGreaterThan(1)
+    })
+  }
+})

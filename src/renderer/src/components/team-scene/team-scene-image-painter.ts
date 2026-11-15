@@ -26,6 +26,7 @@ import {
   deskSeatXOf,
   OFFICE_BACK_LAYOUT,
   officeBackEmoteAt,
+  officeRowScaleOf,
   type OfficeBackSeat
 } from './team-scene-office-back'
 import {
@@ -303,7 +304,8 @@ export function createImagePainter(args: {
     },
     paint: (g, f: TeamSceneFrame) => {
       const h = f.height
-      narrow = back && f.width < NARROW_WIDTH ? NARROW_SCALE : 1
+      const base = f.width < NARROW_WIDTH ? NARROW_SCALE : 1
+      narrow = back ? base * officeRowScaleOf(f.stations) : 1
       backdrop.draw(g, f)
       const shown =
         args.builds === 'office' ? boots.take(officeSceneEffects(f.effects), f.t) : f.effects

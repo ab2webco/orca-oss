@@ -1,7 +1,9 @@
+import { teamSceneRowSpacing } from '../../../../shared/team-scene/team-scene-seats'
 import type {
   TeamSceneHold,
   TeamScenePlay,
-  TeamScenePose
+  TeamScenePose,
+  TeamSceneSpot
 } from '../../../../shared/team-scene/team-scene-types'
 import { drawOfficeSleep, officeHoldAlpha, officeHoldHeadDrop } from './team-scene-office-hold'
 import { drawOfficePlay, officePlayArm, officePlayLean } from './team-scene-office-play'
@@ -12,16 +14,35 @@ export type OfficeBackSeat = { chairEnd: number }
 /** Orca's Office desk (office/desk.png): its side chair stops short of x 144. */
 export const OFFICE_BACK_SEAT: OfficeBackSeat = { chairEnd: 144 }
 
-/** Desks in one row of five, members typing at them; a walk to a tray read as a bug at a desk. */
+/**
+ * Desks in one row of five that closes up for more, members typing at them; a walk to a tray read
+ * as a bug at a desk, and a second row in front hid the first behind its monitors (ORCA-1204).
+ */
 // Why first at 0.16: the advisor gestures left of the first desk, past that sitter's own mark.
 export const OFFICE_BACK_LAYOUT = {
   rowSize: 5,
+  rowGrows: true,
   workSeated: true,
   firstX: 0.16,
   // Why: an Office lead holds nothing and its asker shows the back of its head; its mark hangs left.
   attendReachPx: 14,
   attendMarkDxPx: -20
 } as const
+
+/**
+ * How much smaller a row closed up past five draws: as much as its seats closed up, so its desks
+ * keep the gaps five have at the same width; a sixth desk at full size covered its neighbours.
+ */
+export function officeRowScaleOf(stations: readonly TeamSceneSpot[]): number {
+  const row = stations[0]
+  const xs = stations
+    .filter((s) => s.depth === row?.depth)
+    .map((s) => s.x)
+    .sort((p, q) => p - q)
+  const pitch = Math.min(...xs.slice(1).map((x, i) => x - xs[i]!))
+  const full = teamSceneRowSpacing(OFFICE_BACK_LAYOUT.rowSize)
+  return Number.isFinite(pitch) ? Math.min(1, pitch / full) : 1
+}
 
 export type OfficeBackLook = { hair: string; skin: string; shirt: string }
 

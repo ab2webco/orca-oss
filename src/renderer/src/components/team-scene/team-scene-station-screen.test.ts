@@ -60,6 +60,28 @@ describe('station screen', () => {
     expect(stationScreenStateOf({ pose: 'work' }, false)).toBe('code')
   })
 
+  // ORCA-1204: a working member's review and queue screens held still, so the owner saw no work.
+  it('moves every working screen between frames, whatever its desk', () => {
+    const working: (TeamSceneDesk | undefined)[] = [
+      undefined,
+      { kind: 'plan' },
+      { kind: 'tests' },
+      { kind: 'checks' },
+      { kind: 'review', verdict: 'approved' },
+      { kind: 'review', verdict: 'changes' },
+      { kind: 'review', verdict: 'waiting' },
+      { kind: 'queue', position: 2 }
+    ]
+    for (const desk of working) {
+      const frames = [0, 0.4, 0.8, 1.3, 2.1].map((t) => {
+        const r = recordingContext()
+        drawStationScreen(r.g, RECT, desk ? 'desk' : 'code', t, { desk })
+        return JSON.stringify(r.calls)
+      })
+      expect(new Set(frames).size, JSON.stringify(desk ?? 'code')).toBeGreaterThan(1)
+    }
+  })
+
   it('draws each desk its own way, and the queue place as its number', () => {
     const shape = (desk: TeamSceneDesk) => {
       const r = recordingContext()
