@@ -368,6 +368,23 @@ describe('createTeamPanelModelPoller', () => {
     expect(sources.at(-1)).toEqual({ section: { kind: 'ready', value: MODEL }, retry: null })
   })
 
+  // Why: the panel first draws what the sidebar's run published, and its scene measured joins from it.
+  it('marks a read only the sidebar holds as updating, and the panel’s own read as fresh', async () => {
+    const { all, sources } = deps()
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE, { background: true })
+    await flush()
+    expect(sources.at(-1)).toEqual({
+      section: { kind: 'ready', value: MODEL },
+      retry: null,
+      updating: true
+    })
+
+    poller.subscribe(SCOPE)
+    await flush()
+    expect(sources.at(-1)).toEqual({ section: { kind: 'ready', value: MODEL }, retry: null })
+  })
+
   it('keeps the team when the first read after reopening the panel fails', async () => {
     const readState = vi
       .fn()
