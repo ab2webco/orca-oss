@@ -25,6 +25,9 @@ import { teamLeadCardsOf } from './team-sheet-lead'
 import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
 import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
 import type { TeamSceneArtLoad } from './use-team-scene-art'
+import { teamSheetControlOf, type TeamSheetControl } from './team-sheet-control'
+import type { TeamAction } from '../../../src/shared/team-panel-actions'
+import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -79,6 +82,7 @@ export type TeamLeadView = {
   work: TeamSheetWork
   /** The band above the tabs; null when the desktop panel shows no scene. */
   scene: TeamSceneBand | null
+  control: TeamSheetControl
   metrics: TeamMetrics | null
   locale: SupportedUiLocale
 }
@@ -101,6 +105,8 @@ export type TeamDrawerData = {
   level: GameCharacterLevel | null
   /** The scene file's images for the band; null unless the band draws a scene's own art. */
   sceneArt: TeamSceneArtLoad | null
+  /** Sends an action to the lead as a turn; null with no lead terminal to write to. */
+  sendAction: ((action: TeamAction) => Promise<LeadPromptOutcome>) | null
 }
 
 type Rec = Record<string, unknown>
@@ -261,6 +267,7 @@ export function teamLeadViewOf(
     advisor,
     work: teamSheetWorkOf(raw, cards, locale, now),
     scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }, options),
+    control: teamSheetControlOf(raw),
     metrics: metricsOf(raw.metrics),
     locale
   }

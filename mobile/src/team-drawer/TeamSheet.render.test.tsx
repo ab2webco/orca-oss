@@ -204,6 +204,7 @@ function teamWith(
     answer: vi.fn(async () => {}),
     level: null,
     sceneArt: null,
+    sendAction: null,
     ...over
   }
 }
@@ -608,6 +609,11 @@ describe('TeamSheet', () => {
   it('draws no band when the desktop panel is not in the Game look', () => {
     show(teamWith({ questions: [] }, leader, gamePanel('figures', 'plain')))
     expect(container.querySelector('[data-testid="team-scene-band"]')).toBeNull()
+  })
+
+  it('shows no dock without a lead terminal to send to', () => {
+    show(teamWith({ questions: [], sendAction: null }))
+    expect(document.body.querySelector('[aria-label="Stop every member"]')).toBeNull()
   })
 
   it('takes a waiting card to the Inbox in one tap', () => {

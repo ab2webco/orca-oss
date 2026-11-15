@@ -25,6 +25,8 @@ import { TeamPrsTab } from './TeamPrsTab'
 import { teamWorkWordsOf } from './team-work-words'
 import { TeamLevelRow } from './TeamLevelRow'
 import { TeamSceneBand } from './TeamSceneBand'
+import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
+import { teamControlWordsOf } from './team-control-words'
 
 export { TEAM_PEEK_HEIGHT }
 
@@ -115,6 +117,7 @@ export function TeamSheet({
   }
   const words = teamCardWordsOf(view.locale)
   const workWords = teamWorkWordsOf(view.locale)
+  const controlWords = teamControlWordsOf(view.locale)
   const peek = teamPeekOf(
     view,
     questions.length,
@@ -162,6 +165,9 @@ export function TeamSheet({
                       { paddingBottom: insets.bottom + spacing.lg }
                     ]}
                   >
+                    {view.control.stopped ? (
+                      <TeamStoppedBanner stopped={view.control.stopped} words={controlWords} />
+                    ) : null}
                     {view.scene ? (
                       <TeamSceneBand
                         band={view.scene}
@@ -249,6 +255,16 @@ export function TeamSheet({
               </View>
             </GestureDetector>
           )}
+          {!drag.resting && team.sendAction ? (
+            <View style={{ paddingBottom: insets.bottom }}>
+              <TeamActionDock
+                control={view.control}
+                memberCount={view.members.length}
+                words={controlWords}
+                onSend={team.sendAction}
+              />
+            </View>
+          ) : null}
         </GestureHandlerRootView>
       </Animated.View>
     </>
