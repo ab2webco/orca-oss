@@ -19,7 +19,10 @@ const refused = (message: string): RpcResponse =>
 
 // Why built from the host's own functions: a change to settings.get's shape fails these tests.
 const SETTINGS = settingsGetResultOf(
-  agentTeamsClientSettingsOf({ orchestratorGame: { scene: 'quest', panel: { style: 'figures' } } })
+  agentTeamsClientSettingsOf({
+    orchestratorGame: { scene: 'quest', panel: { style: 'figures' } },
+    statusColors: { dark: { idle: '#abcdef' } }
+  })
 )
 
 type Hook = ReturnType<typeof useAgentTeamsSettings>
@@ -65,16 +68,17 @@ describe('useAgentTeamsSettings', () => {
 
     expect(hook().state).toEqual({
       kind: 'ready',
-      settings: { scene: 'quest', style: 'figures' },
+      settings: { scene: 'quest', style: 'figures', dark: { idle: '#abcdef' } },
       saveError: null
     })
   })
 
-  it('writes the scene and the style through settings.update', async () => {
+  it('writes the scene, the style and a role colour through settings.update', async () => {
     const { hook, sendRequest } = await setup({ capabilities: ['mobile.agent-teams-settings.v1'] })
 
     await act(async () => hook().setScene('jrpg'))
     await act(async () => hook().setStyle('office'))
+    await act(async () => hook().setToneColor('info', '#123456'))
 
     expect(sendRequest).toHaveBeenCalledWith('settings.update', {
       agentTeamsPanel: { scene: 'jrpg' }
@@ -82,21 +86,38 @@ describe('useAgentTeamsSettings', () => {
     expect(sendRequest).toHaveBeenCalledWith('settings.update', {
       agentTeamsPanel: { style: 'office' }
     })
-    expect(hook().state).toMatchObject({ settings: { scene: 'jrpg', style: 'office' } })
+    expect(sendRequest).toHaveBeenCalledWith('settings.update', {
+      statusColors: { dark: { idle: '#abcdef', info: '#123456' } }
+    })
+    expect(hook().state).toMatchObject({
+      settings: { scene: 'jrpg', style: 'office', dark: { idle: '#abcdef', info: '#123456' } }
+    })
+  })
+
+  it('resets every role to the defaults', async () => {
+    const { hook, sendRequest } = await setup({ capabilities: ['mobile.agent-teams-settings.v1'] })
+    await act(async () => hook().setToneColor('info', '#123456'))
+
+    await act(async () => hook().resetColors())
+
+    expect(sendRequest).toHaveBeenLastCalledWith('settings.update', {
+      statusColors: { dark: null }
+    })
+    expect(hook().state).toMatchObject({ settings: { dark: {} } })
   })
 
   it('puts the value back and says why when the host refuses the save', async () => {
     const { hook } = await setup({
       capabilities: ['mobile.agent-teams-settings.v1'],
-      update: refused('Invalid enum value')
+      update: refused('Expected a #rrggbb colour')
     })
 
-    await act(async () => hook().setStyle('office'))
+    await act(async () => hook().setToneColor('info', '#123456'))
 
     expect(hook().state).toEqual({
       kind: 'ready',
-      settings: { scene: 'quest', style: 'figures' },
-      saveError: 'Could not save: Invalid enum value'
+      settings: { scene: 'quest', style: 'figures', dark: { idle: '#abcdef' } },
+      saveError: 'Could not save: Expected a #rrggbb colour'
     })
   })
 })

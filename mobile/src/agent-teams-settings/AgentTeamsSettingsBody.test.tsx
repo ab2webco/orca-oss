@@ -29,7 +29,7 @@ vi.mock('../components/ActionSheetModal', () => ({
 
 const READY: AgentTeamsSettingsState = {
   kind: 'ready',
-  settings: { scene: 'quest', style: 'figures' },
+  settings: { scene: 'quest', style: 'figures', dark: {} },
   saveError: null
 }
 
@@ -43,7 +43,9 @@ describe('AgentTeamsSettingsBody', () => {
   function render(state: AgentTeamsSettingsState) {
     const handlers = {
       onScene: vi.fn(),
-      onStyle: vi.fn()
+      onStyle: vi.fn(),
+      onToneColor: vi.fn(),
+      onResetColors: vi.fn()
     }
     act(() => {
       mounted.renderer = create(
@@ -72,15 +74,28 @@ describe('AgentTeamsSettingsBody', () => {
     render({ kind: 'unsupported' })
 
     expect(texts()).toContain('Update Orca on m1 to use this')
-    expect(texts()).not.toContain('Panel')
+    expect(texts()).not.toContain('Status colors')
   })
 
-  it("shows the panel's scene and style", () => {
+  it("shows the panel's scene and style, and the five roles with Reset held", () => {
     render(READY)
 
     expect(texts()).toEqual(
-      expect.arrayContaining(['Panel', 'Scene', 'Quest', 'Scene style', 'Figures'])
+      expect.arrayContaining([
+        'Panel',
+        'Scene',
+        'Quest',
+        'Scene style',
+        'Figures',
+        'Status colors',
+        'Needs you',
+        'At risk',
+        'Working',
+        'Verified',
+        'Idle'
+      ])
     )
+    expect(pressable('Reset').props.disabled).toBe(true)
   })
 
   it('picks a scene and a style from their sheets', () => {
@@ -111,9 +126,38 @@ describe('AgentTeamsSettingsBody', () => {
     expect(texts()).toContain('mario-bros.json')
   })
 
-  it('says when the desktop refused a save', () => {
-    render({ ...READY, saveError: 'Could not save: Invalid enum value' })
+  it('warns on a role too close to another, and Reset clears every edit', () => {
+    const { onResetColors } = render({
+      ...READY,
+      settings: { ...READY.settings, dark: { info: '#30d095' } }
+    })
 
-    expect(texts()).toContain('Could not save: Invalid enum value')
+    expect(texts()).toContain('Too close to Verified')
+    const reset = pressable('Reset')
+    expect(reset.props.disabled).toBe(false)
+    act(() => reset.props.onPress())
+    expect(onResetColors).toHaveBeenCalled()
+  })
+
+  it("opens a role's colour sheet from its swatch and saves the pick", () => {
+    const { onToneColor } = render(READY)
+
+    const swatch = root()
+      .findAllByType('Pressable' as never)
+      .find((node) => node.props.accessibilityLabel === 'Working colour')!
+    act(() => swatch.props.onPress())
+    expect(texts()).toContain('Working colour')
+    const hue = root()
+      .findAllByType('Pressable' as never)
+      .find((node) => node.props.accessibilityLabel === '#e40014')!
+    act(() => hue.props.onPress())
+
+    expect(onToneColor).toHaveBeenCalledWith('info', '#e40014')
+  })
+
+  it('says when the desktop refused a save', () => {
+    render({ ...READY, saveError: 'Could not save: Expected a #rrggbb colour' })
+
+    expect(texts()).toContain('Could not save: Expected a #rrggbb colour')
   })
 })

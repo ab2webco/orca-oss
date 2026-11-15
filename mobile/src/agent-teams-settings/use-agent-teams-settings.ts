@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GamePanelStyle } from '../../../src/shared/orchestrator-game-panel'
 import { MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
+import type { StatusColorTone } from '../../../src/shared/status-colors'
 import type { RpcClient } from '../transport/rpc-client'
 import { startRuntimeCapabilityProbe } from '../transport/runtime-capability-probe'
-import { agentTeamsSettingsOf, type AgentTeamsSettings } from './agent-teams-settings-model'
+import {
+  agentTeamsSettingsOf,
+  statusColorsUpdateOf,
+  withToneColor,
+  type AgentTeamsSettings
+} from './agent-teams-settings-model'
 
 export type AgentTeamsSettingsState =
   | { kind: 'loading' }
@@ -106,6 +112,19 @@ export function useAgentTeamsSettings(args: { client: RpcClient | null; connecte
       const now = current()
       if (now) {
         save({ ...now, style }, { agentTeamsPanel: { style } })
+      }
+    },
+    setToneColor: (tone: StatusColorTone, color: string | null) => {
+      const now = current()
+      if (now) {
+        const dark = withToneColor(now.dark, tone, color)
+        save({ ...now, dark }, statusColorsUpdateOf(dark))
+      }
+    },
+    resetColors: () => {
+      const now = current()
+      if (now) {
+        save({ ...now, dark: {} }, statusColorsUpdateOf({}))
       }
     }
   }
