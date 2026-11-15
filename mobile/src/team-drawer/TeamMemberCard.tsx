@@ -58,6 +58,8 @@ function usageText(account: NonNullable<TeamMemberRow['account']>): string {
 
 type Props = {
   member: TeamMemberRow
+  /** The paired desktop's name, for a member on that desktop. */
+  hostName: string | null
   now: number
   words: TeamCardWords
   expanded: boolean
@@ -69,6 +71,7 @@ type Props = {
 
 export function TeamMemberCard({
   member,
+  hostName,
   now,
   words,
   expanded,
@@ -107,9 +110,11 @@ export function TeamMemberCard({
           {member.ticket && member.ticket !== member.name ? (
             <Text style={styles.mono}>{member.ticket}</Text>
           ) : null}
-          <Text style={[styles.mono, styles.host]} numberOfLines={1}>
-            {member.host ?? words.local}
-          </Text>
+          {(member.host ?? hostName) ? (
+            <Text style={[styles.mono, styles.host]} numberOfLines={1}>
+              {member.host ?? hostName}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.statusLine}>
           <View style={[styles.dot, { backgroundColor: status.tone }]} />

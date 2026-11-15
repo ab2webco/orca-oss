@@ -94,11 +94,36 @@ const member = (
 
 const NOW = 20 * 60_000
 
-function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
+const ADVISOR_LINE =
+  'Approved Sonnet 5.5 · high for ORCA-9: the change only touches its tests, so a smaller model is enough.'
+
+const leader = {
+  paneKey: 'tab-0:leaf',
+  displayName: 'Lead pane',
+  agentType: 'claude',
+  state: 'working',
+  toolName: 'Read',
+  toolInput: 'ORCA-9',
+  isLeader: true,
+  isMember: false,
+  launch: { model: 'Opus 5.5', effort: 'high' },
+  advisor: {
+    model: null,
+    effort: null,
+    pinned: { model: false, effort: false },
+    line: ADVISOR_LINE
+  }
+}
+
+function teamWith(
+  over: Partial<TeamDrawerData> = {},
+  lead: Record<string, unknown> | null = null
+): TeamDrawerData {
   const view = teamLeadViewOf(
     {
       role: 'lead',
       lead: { autostart: false, cap: 4, agent: 'claude' },
+      leadName: 'Castillo',
       worktree: { id: 'repo::/lead' },
       inboxes: [
         {
@@ -109,6 +134,7 @@ function teamWith(over: Partial<TeamDrawerData> = {}): TeamDrawerData {
         }
       ],
       agents: [
+        ...(lead ? [lead] : []),
         member('a', 'ORCA-1 idle one', 'idle'),
         member('b', 'ORCA-7 asker', 'working'),
         member('c', 'Juno', 'working', {
@@ -208,6 +234,7 @@ describe('TeamSheet', () => {
             onOpenChange={onOpenChange}
             team={team}
             now={NOW}
+            hostName="m1"
             onOpenLink={() => {}}
             onOpenTerminal={onOpenTerminal}
           />
@@ -277,6 +304,47 @@ describe('TeamSheet', () => {
     act(() => button('Rho, Logged out').click())
     expect(texts()).toContain('Its terminal is on iMac')
     expect(document.body.querySelector('[aria-label="Open terminal"]')).toBeNull()
+  })
+
+  it("names the desktop for a member on the lead's own host, never 'local'", () => {
+    show(teamWith({ questions: [] }))
+    const shown = texts()
+    expect(shown.filter((one) => one === 'm1')).toHaveLength(3)
+    expect(shown).toContain('iMac')
+    expect(shown).not.toContain('local')
+  })
+
+  it('shows the lead and its advisor after the members, with the whole advisor sentence', () => {
+    show(teamWith({ questions: [] }, leader))
+    const shown = texts()
+    const at = (text: string) => shown.indexOf(text)
+    expect(shown).toContain('Lead')
+    expect(shown).toContain('Orchestrating · Read · ORCA-9')
+    expect(shown).toContain('Opus 5.5 · high · Coordinates 4 agents')
+    expect(at('Castillo')).toBeGreaterThan(at('Rho'))
+    expect(at('Wizard')).toBeGreaterThan(at('Castillo'))
+    expect(at('Metrics')).toBeGreaterThan(at('Wizard'))
+    expect(shown).toContain('Advisor')
+    expect(shown).toContain('Jev')
+    expect(shown).toContain(ADVISOR_LINE)
+    expect(shown.filter((one) => one === 'm1')).toHaveLength(4)
+  })
+
+  it("words the lead and advisor cards in the host's language", () => {
+    const team = teamWith({ questions: [] }, leader)
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    const shown = texts()
+    expect(shown).toContain('Líder')
+    expect(shown).toContain('Orquestando · Read · ORCA-9')
+    expect(shown).toContain('Opus 5.5 · high · Coordina 4 agentes')
+    expect(shown).toContain('Mago')
+  })
+
+  it('shows no lead or advisor card when the host sends no lead agent', () => {
+    show(teamWith({ questions: [] }))
+    const shown = texts()
+    expect(shown).not.toContain('Castillo')
+    expect(shown).not.toContain('Advisor')
   })
 
   it('takes a waiting card to the Inbox in one tap', () => {

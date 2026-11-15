@@ -4891,6 +4891,7 @@ export default function SessionScreen() {
               onOpenChange={setTeamOpen}
               team={team}
               now={teamNow}
+              hostName={hostName || null}
               onOpenLink={openMobilePrUrl}
               onOpenTerminal={openTeamTerminal}
             />

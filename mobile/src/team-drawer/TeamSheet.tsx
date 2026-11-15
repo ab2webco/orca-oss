@@ -13,6 +13,7 @@ import {
   type TeamMetrics
 } from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
+import { TeamAdvisorCardView, TeamLeadCardView } from './TeamLeadCards'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
 import { teamInboxWordsOf } from './team-inbox-words'
@@ -28,6 +29,8 @@ type Props = {
   onOpenChange: (open: boolean) => void
   team: TeamDrawerData
   now: number
+  /** The paired desktop's name; null until the host record loads. */
+  hostName: string | null
   onOpenLink: (url: string) => void
   onOpenTerminal: (terminal: NonNullable<TeamMemberRow['terminal']>) => void
 }
@@ -104,7 +107,15 @@ function TabBar({
 }
 
 /** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that drags or taps open to 84%. */
-export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTerminal }: Props) {
+export function TeamSheet({
+  open,
+  onOpenChange,
+  team,
+  now,
+  hostName,
+  onOpenLink,
+  onOpenTerminal
+}: Props) {
   const { view, questions } = team
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
@@ -217,6 +228,7 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
                               <TeamMemberCard
                                 key={member.key}
                                 member={member}
+                                hostName={hostName}
                                 now={now}
                                 words={words}
                                 expanded={expanded === member.key}
@@ -234,6 +246,17 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
                           ) : (
                             <Text style={styles.empty}>{words.noMembersRunning}</Text>
                           )}
+                          {view.lead ? (
+                            <TeamLeadCardView
+                              lead={view.lead}
+                              memberCount={view.members.length}
+                              hostName={hostName}
+                              words={words}
+                            />
+                          ) : null}
+                          {view.advisor ? (
+                            <TeamAdvisorCardView advisor={view.advisor} words={words} />
+                          ) : null}
                         </View>
                         {view.metrics ? (
                           <View style={styles.section}>
