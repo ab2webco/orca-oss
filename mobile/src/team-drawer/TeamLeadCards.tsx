@@ -1,23 +1,10 @@
 import { StyleSheet, View } from 'react-native'
-import type {
-  TeamAdvisorRow,
-  TeamLeadCard,
-  TeamStatus
-} from '../../../src/shared/team-panel-model-types'
+import type { TeamAdvisorRow, TeamLeadCard } from '../../../src/shared/team-panel-model-types'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { TeamCardWords } from './team-card-words'
 import { teamLeadLiveText } from './team-sheet-lead'
-
-const TONE: Record<TeamStatus, string> = {
-  attention: colors.statusRed,
-  failed: colors.statusRed,
-  risk: colors.statusAmber,
-  working: colors.statusGreen,
-  done: colors.statusPurple,
-  idle: colors.textMuted,
-  closed: colors.textMuted
-}
+import { TEAM_STATUS_TONE } from './team-status-tone'
 
 function Head({ name, badge, side }: { name: string; badge: string; side: string | null }) {
   return (
@@ -47,7 +34,7 @@ export function TeamLeadCardView({
   hostName: string | null
   words: TeamCardWords
 }) {
-  const tone = TONE[lead.status]
+  const tone = TEAM_STATUS_TONE[lead.status]
   const model = lead.model
     ? lead.model.effort
       ? `${lead.model.label} · ${lead.model.effort}`
