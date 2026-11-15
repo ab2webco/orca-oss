@@ -143,8 +143,8 @@ describe("TeamSheet in the person's status colours from Settings > Agent Teams",
     show(teamWith({ tones }, leader, gamePanel('pixel')))
     const band = container.querySelector('[data-testid="team-scene-band"]')!
     expect(paints(lineOf('Juno', band))).toContain(paint(tones.info))
-    expect(paints(lineOf('ORCA-7 asker', band))).toContain(paint(tones.attention))
-    expect(paints(lineOf('ORCA-1 idle one', band))).toContain(paint(tones.idle))
+    expect(paints(lineOf('Merlin', band))).toContain(paint(tones.attention))
+    expect(paints(lineOf('Arthur', band))).toContain(paint(tones.idle))
   })
 
   it('marks the STOP above the lead dock as needing you', () => {

@@ -134,6 +134,18 @@ describe('teamLeadViewOf', () => {
     expect(view?.members[0].ticket).toBe('ORCA-12')
   })
 
+  it('names a member as its desktop card does, so its ticket shows once', () => {
+    const view = teamLeadViewOf(
+      leadState({
+        agents: [
+          member({ paneKey: 'tab-1:leaf', displayName: 'Lead', isLeader: true, isMember: false }),
+          member({ displayName: 'Toadette · ORCA-1216' })
+        ]
+      })
+    )
+    expect(view?.members[0]).toMatchObject({ name: 'Toadette', ticket: 'ORCA-1216' })
+  })
+
   it('sorts needs-you first: a ticket with an open question, then waiting, then working, idle, done', () => {
     const agents = [
       member({ paneKey: 'done', state: 'done' }),
