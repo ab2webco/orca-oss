@@ -12,7 +12,8 @@ const LEAD = { worktreeId: 'repo-a::/w/main', terminal: 'term_lead', tabId: 'tab
 const TICKET = { identifier: 'ORCA-2', title: 'T', prompt: 'P' }
 const roster = (todo: (typeof TICKET)[]) => ({
   todo,
-  hosts: [{ on: null, running: 0, cap: 4 }]
+  hosts: [{ on: null, running: 0, cap: 4 }],
+  provider: 'claude' as const
 })
 
 function section(team: Parameters<typeof newTabTeamSectionOf>[0]) {

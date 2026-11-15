@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing } from '../theme/mobile-theme'
-import type { AddMemberHost, AddMemberRoster } from './add-member-options'
+import type { AddMemberAccounts, AddMemberHost, AddMemberRoster } from './add-member-options'
 import type { AddMemberChoice } from './add-member-send'
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   /** The lead's desktop, named for the host whose `on` is null. */
   hostName: string
   roster: AddMemberRoster
+  /** null while loading, or with no managed accounts: the lead's host picks. */
+  accounts: AddMemberAccounts | null
   onSend: (choice: AddMemberChoice) => void
   onClose: () => void
 }
@@ -64,37 +66,65 @@ function Option(props: {
   )
 }
 
-/** p03 Add member: one ticket per launch, on the picked host; the lead's host picks the account (ORCA-1183). */
-export function AddMemberSheet({ visible, hostName, roster, onSend, onClose }: Props) {
+/** p03 Add member: one ticket per launch, on the picked account and host (ORCA-1183). */
+export function AddMemberSheet({ visible, hostName, roster, accounts, onSend, onClose }: Props) {
+  const [accountId, setAccountId] = useState<string | null>(null)
   const [host, setHost] = useState<AddMemberHost | null>(null)
   const [ticketId, setTicketId] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState<'account' | 'host' | null>(null)
   const [shown, setShown] = useState(visible)
   // Why during render: each opening starts with no ticket picked, without a frame of the last one.
   if (shown !== visible) {
     setShown(visible)
     if (visible) {
       setTicketId(null)
-      setOpen(false)
+      setOpen(null)
     }
   }
 
+  const account =
+    accounts?.accounts.find((one) => one.id === (accountId ?? accounts.defaultId)) ?? null
   const runOn = host ?? roster.hosts[0]
   const ticket = roster.todo.find((one) => one.identifier === ticketId) ?? null
   const hostLabel = (one: AddMemberHost): string => one.on ?? hostName
+  const percent = (value: number | null): string | null => (value === null ? null : `${value}%`)
 
   return (
     <BottomDrawer visible={visible} onClose={onClose}>
       <Text style={styles.title}>Add member</Text>
+      {account && accounts ? (
+        <View style={styles.block}>
+          <Text style={styles.label}>Member account</Text>
+          <Field
+            value={account.email}
+            meta={percent(account.usedPercent)}
+            onPress={() => setOpen(open === 'account' ? null : 'account')}
+          />
+          {open === 'account'
+            ? accounts.accounts.map((one) => (
+                <Option
+                  key={one.id}
+                  value={one.email}
+                  meta={percent(one.usedPercent)}
+                  selected={one.id === account.id}
+                  onPress={() => {
+                    setAccountId(one.id)
+                    setOpen(null)
+                  }}
+                />
+              ))
+            : null}
+        </View>
+      ) : null}
       <View style={styles.block}>
         <Text style={styles.label}>Run on</Text>
         <Field
           icon={<Monitor size={16} color={colors.textSecondary} />}
           value={hostLabel(runOn)}
           meta={agentsOf(runOn)}
-          onPress={() => setOpen(!open)}
+          onPress={() => setOpen(open === 'host' ? null : 'host')}
         />
-        {open
+        {open === 'host'
           ? roster.hosts.map((one) => (
               <Option
                 key={one.on ?? ''}
@@ -103,7 +133,7 @@ export function AddMemberSheet({ visible, hostName, roster, onSend, onClose }: P
                 selected={one.on === runOn.on}
                 onPress={() => {
                   setHost(one)
-                  setOpen(false)
+                  setOpen(null)
                 }}
               />
             ))
@@ -141,7 +171,7 @@ export function AddMemberSheet({ visible, hostName, roster, onSend, onClose }: P
       <Pressable
         disabled={!ticket}
         style={[styles.primary, !ticket && styles.primaryDisabled]}
-        onPress={() => ticket && onSend({ ticket, accountId: null, on: runOn.on })}
+        onPress={() => ticket && onSend({ ticket, accountId: account?.id ?? null, on: runOn.on })}
       >
         <Text style={styles.primaryText}>Add member</Text>
       </Pressable>
