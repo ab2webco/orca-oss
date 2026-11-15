@@ -175,7 +175,8 @@ export function applyTeamSceneInput(
   layout: TeamSceneLayout = GROUND_LAYOUT
 ): void {
   const events = teamSceneEventsBetween(world.last, input)
-  world.last = input
+  // Why: opening on the last team, its first fresh read would replay every join since (ORCA-1199).
+  world.last = input.unconfirmed && world.last === null ? null : input
   world.layout = layout
   world.stopped = input.stopped === true
   world.leadStays = input.leadStays === true

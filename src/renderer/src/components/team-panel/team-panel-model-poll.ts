@@ -133,7 +133,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
           endStreak(scope, false)
           const team = lastTeams.get(scope.key)
           deps.publish(
-            { section: team ? { kind: 'ready', value: team } : { kind: 'loading' }, retry: null },
+            team
+              ? { section: { kind: 'ready', value: team }, retry: null, updating: true }
+              : { section: { kind: 'loading' }, retry: null },
             scope
           )
           run.soon ??= setTimeout(() => {
@@ -171,7 +173,15 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       }
       lastTeams.set(scope.key, model)
       endStreak(scope, true)
-      deps.publish({ section: { kind: 'ready', value: model }, retry: null }, scope)
+      // Why: a panel opening draws the sidebar's read before re-reading, so it is the last team, not news.
+      deps.publish(
+        {
+          section: { kind: 'ready', value: model },
+          retry: null,
+          ...(run.shown === 0 ? { updating: true } : {})
+        },
+        scope
+      )
     } catch (error) {
       if (mine !== generation || active !== run) {
         return
@@ -225,14 +235,25 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     }
   }
 
-  // Why: a panel opening on the sidebar's run reads fresh from loading, as it did with a run of its own.
+  // Why the last team: the loader stood until a fresh read landed, which took up to 16 s (ORCA-1199).
+  const publishOpening = (scope: TeamPanelScope): void => {
+    const team = lastTeams.get(scope.key)
+    deps.publish(
+      team
+        ? { section: { kind: 'ready', value: team }, retry: null, updating: true }
+        : { section: { kind: 'loading' }, retry: null },
+      scope
+    )
+  }
+
+  // Why: a panel opening on the sidebar's run reads fresh, as it did with a run of its own.
   const restart = (run: NonNullable<typeof active>): void => {
     generation += 1
     clearInterval(run.timer)
     run.timer = setInterval(() => void refresh(), intervalMs)
     run.reading = false
     run.again = false
-    deps.publish({ section: { kind: 'loading' }, retry: null }, run.scope)
+    publishOpening(run.scope)
     void refresh()
   }
 
@@ -257,7 +278,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       const shows = options.background !== true
       if (active?.scope.key !== scope.key) {
         stop()
-        deps.publish({ section: { kind: 'loading' }, retry: null }, scope)
+        publishOpening(scope)
         active = {
           scope,
           refs: 0,

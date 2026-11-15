@@ -229,7 +229,7 @@ export function TeamPanelView({
         data-team-panel-state={model?.kind ?? section.kind}
       >
         {model?.kind === 'team' && look === 'game' ? (
-          <TeamPanelScene model={model} style={sceneStyle}>
+          <TeamPanelScene model={model} style={sceneStyle} unconfirmed={source.updating === true}>
             {body}
           </TeamPanelScene>
         ) : (

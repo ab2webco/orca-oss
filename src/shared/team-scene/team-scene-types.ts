@@ -55,6 +55,8 @@ export type TeamSceneInput = {
   advisorEnters?: true
   /** The advisor rides off this floor: it walks into the elevator and is gone. */
   advisorLeaves?: true
+  /** The panel's last team, shown while a read confirms it: no moment is measured from it alone. */
+  unconfirmed?: true
 }
 
 export type TeamSceneEvent =

@@ -278,6 +278,10 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
       })
     ).result.terminal.handle
     await client.call('terminal.send', { terminal: lead, text: agent.command, enter: true })
+    // Why gated before the lead exists: a team the sidebar read first reopens instead of the loader (ORCA-1199).
+    const all = scenes(Date.now())
+    await wrapGameState(electronApp)
+    await setScene(electronApp, all.full)
     await expect
       .poll(async () => {
         const registered = await client.call<{ registered: boolean }>('game.leadRegister', {
@@ -295,14 +299,11 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
       prompt: 'Lead the team'
     })
 
-    // Why: waited before the gated read, whose 15 s timeout would end loading; another feature's first-run hint would sit on the first captures at narrow widths.
+    // Why: waited before opening, whose gated read's 15 s timeout would end loading; another feature's first-run hint would sit on the first captures at narrow widths.
     await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
       timeout: 15_000
     })
 
-    const all = scenes(Date.now())
-    await wrapGameState(electronApp)
-    await setScene(electronApp, all.full)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       state.setRightSidebarOpen(true)

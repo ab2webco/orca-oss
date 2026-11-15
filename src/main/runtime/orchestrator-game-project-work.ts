@@ -4,7 +4,7 @@ import type { GitLabWorkItem } from '../../shared/gitlab-types'
 import type { JiraIssue } from '../../shared/jira-types'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import type { PlaneWorkItem } from '../../shared/plane-types'
-import { gameCacheTtlMs, type GameCacheTtl } from './orchestrator-game-read-cache'
+import { GameReadCache, type GameCacheTtl } from './orchestrator-game-read-cache'
 import {
   readGitHubQueue,
   readGitHubReviews,
@@ -247,32 +247,18 @@ export async function readGameProjectWork(
   return { reviews, todo, ...(queue ? { queue } : {}) }
 }
 
-const CACHE_MAX_ENTRIES = 32
-
-/** One load per key and TTL, shared by concurrent reads, so polling never multiplies provider calls. */
+/**
+ * One load per key and TTL, shared by concurrent reads, so polling never multiplies provider calls.
+ * Why in the background: an expired entry made the lead's game.state wait on GitHub (ORCA-1199).
+ */
 export class GameProjectWorkCache {
-  private readonly entries = new Map<string, { at: number; value: Promise<GameProjectWork> }>()
+  private readonly cache: GameReadCache<GameProjectWork>
 
-  constructor(
-    private readonly ttlMs: GameCacheTtl,
-    private readonly now: () => number = Date.now
-  ) {}
+  constructor(ttlMs: GameCacheTtl, now: () => number = Date.now) {
+    this.cache = new GameReadCache(ttlMs, now, { refreshInBackground: true })
+  }
 
-  read(key: string, load: () => Promise<GameProjectWork>): Promise<GameProjectWork> {
-    const at = this.now()
-    const cached = this.entries.get(key)
-    if (cached && at - cached.at < gameCacheTtlMs(this.ttlMs)) {
-      return cached.value
-    }
-    const value = load().catch(() => ({ reviews: null, todo: null }))
-    this.entries.delete(key)
-    this.entries.set(key, { at, value })
-    if (this.entries.size > CACHE_MAX_ENTRIES) {
-      const oldest = this.entries.keys().next().value
-      if (oldest !== undefined) {
-        this.entries.delete(oldest)
-      }
-    }
-    return value
+  async read(key: string, load: () => Promise<GameProjectWork>): Promise<GameProjectWork> {
+    return (await this.cache.read(key, load)) ?? { reviews: null, todo: null }
   }
 }
