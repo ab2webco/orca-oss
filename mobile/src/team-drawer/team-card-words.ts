@@ -26,6 +26,8 @@ type Words = {
   advisorName: string
   advisor: string
   advisorSource: string
+  level: (level: number) => string
+  xpProgress: (into: number, need: number) => string
   now: string
   needYou: (count: number) => string
   workingOf: (working: number, total: number) => string
@@ -90,6 +92,8 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     advisorName: 'Wizard',
     advisor: 'Advisor',
     advisorSource: 'Jev',
+    level: (level) => `Lv ${level}`,
+    xpProgress: (into, need) => `${into}/${need} XP`,
     now: 'now',
     needYou: (count) => `${count} ${count === 1 ? 'needs' : 'need'} you`,
     workingOf: (working, total) => `${working} working · ${total} member${total === 1 ? '' : 's'}`,
@@ -150,6 +154,8 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     advisorName: 'Mago',
     advisor: 'Advisor',
     advisorSource: 'Jev',
+    level: (level) => `Nv ${level}`,
+    xpProgress: (into, need) => `${into}/${need} XP`,
     now: 'ahora',
     needYou: (count) => `${count} te ${count === 1 ? 'necesita' : 'necesitan'}`,
     workingOf: (working, total) =>

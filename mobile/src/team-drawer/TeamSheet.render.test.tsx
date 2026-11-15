@@ -187,6 +187,7 @@ function teamWith(
       threads: { threads: [thread], waiting: [waiting], answered: [answered] }
     },
     answer: vi.fn(async () => {}),
+    level: null,
     ...over
   }
 }
@@ -345,6 +346,22 @@ describe('TeamSheet', () => {
     const shown = texts()
     expect(shown).not.toContain('Castillo')
     expect(shown).not.toContain('Advisor')
+  })
+
+  it("shows the team's level and XP above the tabs, as the desktop panel does", () => {
+    show(teamWith({ questions: [], level: { level: 11, into: 240, need: 1100 } }))
+    const shown = texts()
+    expect(shown).toContain('Lv 11')
+    expect(shown).toContain('240/1100 XP')
+    expect(button('Lv 11, 240/1100 XP')).toBeDefined()
+  })
+
+  it('words the level in the host language, and shows none when the host sends no XP', () => {
+    const team = teamWith({ questions: [], level: { level: 2, into: 0, need: 200 } })
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    expect(texts()).toContain('Nv 2')
+    show(teamWith({ questions: [] }))
+    expect(texts().some((one) => one.endsWith(' XP'))).toBe(false)
   })
 
   it('takes a waiting card to the Inbox in one tap', () => {

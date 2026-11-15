@@ -58,6 +58,9 @@ function hostReplying(state: unknown) {
     if (method === 'game.state') {
       return ok(state)
     }
+    if (method === 'game.characters') {
+      return ok({ characters: [{ xp: 240 }, { xp: 100 }] })
+    }
     if (method === 'game.inboxThreads') {
       return ok({ threads: [], waiting: [waiting], answered: [] })
     }
@@ -75,9 +78,14 @@ function hostReplying(state: unknown) {
 const renderers: ReactTestRenderer[] = []
 let team: TeamDrawerData | null = null
 
-type ProbeProps = { client: RpcClient; terminalHandle: string | null; paneKey: string | null }
-function Probe(props: ProbeProps) {
-  team = useTeamDrawer({ ...props, connected: true, worktreeId: 'repo::/lead' })
+type ProbeProps = {
+  client: RpcClient
+  terminalHandle: string | null
+  paneKey: string | null
+  levelSupported?: boolean
+}
+function Probe({ levelSupported = false, ...props }: ProbeProps) {
+  team = useTeamDrawer({ ...props, levelSupported, connected: true, worktreeId: 'repo::/lead' })
   return null
 }
 
@@ -142,6 +150,27 @@ describe('useTeamDrawer', () => {
     expect(team?.view).toBeNull()
     expect(team?.questions).toEqual([])
     expect(client.sendRequest).not.toHaveBeenCalledWith('game.inboxThreads', expect.anything())
+  })
+
+  it("reads the team's level from the characters' XP on a host that advertises it", async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf', levelSupported: true })
+
+    expect(sendRequest).toHaveBeenCalledWith('game.characters', {
+      worktreeId: 'repo::/lead',
+      terminalHandle: 'term_1'
+    })
+    expect(team?.level).toEqual({ level: 3, into: 40, need: 300 })
+  })
+
+  it('never asks an older host for XP, and shows no level', async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+
+    expect(sendRequest).not.toHaveBeenCalledWith('game.characters', expect.anything())
+    expect(team?.level).toBeNull()
   })
 
   it('answers once through the board, on the worktree the Inbox answers through', async () => {

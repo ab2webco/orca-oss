@@ -40,3 +40,24 @@ export async function readLeadInboxThreads(
   }
   return { status: 'ok', threads: parseGameInboxThreads(response.result) }
 }
+
+// Mirrors MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY in src/shared/protocol-version.ts.
+export const MOBILE_TEAM_LEVEL_CAPABILITY = 'mobile.team-level.v1'
+
+/** The project's characters XP summed, as the desktop panel reads it; null when the host gives no list. */
+export async function readLeadXp(
+  client: RpcClient,
+  caller: { worktreeId: string; terminalHandle: string }
+): Promise<number | null> {
+  const response = await client.sendRequest('game.characters', caller)
+  const characters = response.ok
+    ? (response.result as { characters?: unknown } | null)?.characters
+    : null
+  if (!Array.isArray(characters)) {
+    return null
+  }
+  return characters.reduce<number>((sum, one: unknown) => {
+    const xp = (one as { xp?: unknown } | null)?.xp
+    return typeof xp === 'number' && Number.isFinite(xp) && xp > 0 ? sum + xp : sum
+  }, 0)
+}
