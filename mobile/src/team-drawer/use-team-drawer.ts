@@ -13,6 +13,7 @@ import {
 import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
 import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
 import { useTeamSceneArt } from './use-team-scene-art'
+import { useHostTeamTones } from './use-host-team-tones'
 import { sendTeamLeadTurn } from './team-lead-turn-send'
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
 import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
@@ -139,6 +140,7 @@ export function useTeamDrawer(args: {
       }
     )
   }, [own.questions, rawState, sceneArtSupported])
+  const tones = useHostTeamTones(client, candidate && view !== null)
   const sceneArt = useTeamSceneArt(
     client,
     terminalHandle ? { worktreeId, terminalHandle } : null,
@@ -174,6 +176,7 @@ export function useTeamDrawer(args: {
     answer,
     level: view && xp !== null ? gameCharacterLevelOf(xp) : null,
     sceneArt,
-    sendAction
+    sendAction,
+    tones
   }
 }

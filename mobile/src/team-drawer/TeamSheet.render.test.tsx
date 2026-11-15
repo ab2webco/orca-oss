@@ -30,6 +30,7 @@ vi.mock('./team-scene-quest-art', () => ({
 
 import { TeamSheet } from './TeamSheet'
 import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
+import { TEAM_TONE_DEFAULTS } from './team-status-tone'
 
 const question = {
   id: 'q1',
@@ -205,6 +206,7 @@ function teamWith(
     level: null,
     sceneArt: null,
     sendAction: null,
+    tones: TEAM_TONE_DEFAULTS,
     ...over
   }
 }

@@ -42,17 +42,24 @@ const recordOf = (value: unknown): Record<string, unknown> | null =>
 const isStyle = (value: unknown): value is GamePanelStyle =>
   (GAME_PANEL_STYLES as readonly unknown[]).includes(value)
 
+const settingsOf = (result: unknown): Record<string, unknown> | null =>
+  recordOf(recordOf(result)?.settings)
+
+/** The dark overrides in settings.get's result; empty from a host that sends none. */
+export function darkStatusColorsOf(result: unknown): StatusColorPalette {
+  return normalizeStatusColorOverrides(settingsOf(result)?.statusColors).dark ?? {}
+}
+
 /** null from a host that sends no Agent Teams fields in settings.get (they sit under `settings`). */
 export function agentTeamsSettingsOf(result: unknown): AgentTeamsSettings | null {
-  const settings = recordOf(recordOf(result)?.settings)
-  const panel = recordOf(settings?.agentTeamsPanel)
+  const panel = recordOf(settingsOf(result)?.agentTeamsPanel)
   if (!panel || typeof panel.scene !== 'string') {
     return null
   }
   return {
     scene: panel.scene,
     style: isStyle(panel.style) ? panel.style : 'pixel',
-    dark: normalizeStatusColorOverrides(settings?.statusColors).dark ?? {}
+    dark: darkStatusColorsOf(result)
   }
 }
 
