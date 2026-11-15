@@ -89,6 +89,19 @@ describe('the Team sheet scene band', () => {
     expect(input.lead.activity).toBe('working')
   })
 
+  it("shows a working member's monitor by what it really runs, never a plan for a Bash run", () => {
+    const input = stageOf({
+      agents: [
+        leader,
+        member('tab-1:leaf', 'working', { toolName: 'Bash', toolInput: 'pnpm vitest run' }),
+        member('tab-2:leaf', 'working', { toolName: 'Bash', toolInput: 'ls src' })
+      ]
+    }).input
+    const desk = new Map(input.members.map((one) => [one.key, one.desk]))
+    expect(desk.get('tab-1:leaf')).toEqual({ kind: 'tests' })
+    expect(desk.get('tab-2:leaf')).toBeUndefined()
+  })
+
   it('names every figure as its Team card does', () => {
     const input = stageOf({
       agents: [leader, member('tab-1:leaf', 'working', { displayName: 'Toadette · ORCA-1216' })]
@@ -117,6 +130,11 @@ describe('the Team sheet scene band', () => {
   it('draws every member, as the desktop stage does with its +N', () => {
     const many = Array.from({ length: 11 }, (_, at) => member(`tab-${at + 1}:leaf`))
     expect(stageOf({ agents: [leader, ...many] }).input.members).toHaveLength(11)
+  })
+
+  it("draws the launch STOP's sign when the project is stopped", () => {
+    expect(stageOf({ stopped: { since: 'x', by: 'lead' } }).input.stopped).toBe(true)
+    expect(stageOf().input.stopped).toBeUndefined()
   })
 
   it('reads an older host with no panel as the readable band', () => {
