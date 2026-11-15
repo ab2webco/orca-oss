@@ -24,6 +24,7 @@ import {
   type TerminalOutputFrameChunk,
   type TerminalOutputMeta
 } from '../terminal-output-frame-chunks'
+import { resolveMobileTerminalSnapshotDims } from '../mobile-terminal-snapshot-dims'
 import { TERMINAL_PANE_SPLIT_SOURCES } from '../../../../shared/feature-education-telemetry'
 import type { TerminalOscLinkRange } from '../../../../shared/terminal-osc-link-ranges'
 import { setTerminalViewAttributes } from '../../terminal-view-attribute-store'
@@ -3603,17 +3604,24 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         const size = runtime.getTerminalSize(ptyId)
         const displayMode = runtime.getMobileDisplayMode(ptyId)
         // Why: layout seq is the mobile stale-event filter's high-water mark (undefined pre-transition is fail-open). See docs/mobile-terminal-layout-state-machine.md.
-        const layoutSeq = runtime.getLayout(ptyId)?.seq
+        const layout = runtime.getLayout(ptyId)
+        const layoutSeq = layout?.seq
         // Why: only an output offset can cover buffered chunks; layout versions are a separate sequence domain.
         let snapshotOutputSeq = serialized?.seq
+        const snapshotDims = resolveMobileTerminalSnapshotDims({
+          isMobile,
+          snapshot: serialized,
+          ptySize: size,
+          appliedLayout: layout
+        })
         emit({
           type: 'subscribed',
           streamId,
           lines: read.tail,
           truncated:
             initialOutputOverflowed || (!sendBinary && isTerminalReadPayloadIncomplete(read)),
-          cols: serialized?.cols ?? size?.cols,
-          rows: serialized?.rows ?? size?.rows,
+          cols: snapshotDims.announced?.cols,
+          rows: snapshotDims.announced?.rows,
           displayMode,
           seq: layoutSeq
         })
@@ -3621,8 +3629,8 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           kind: 'scrollback',
           // Why: prefer the subscriber's viewport over the 80x24 stopgap when the PTY has
           // no size yet — the mismatch made mobile burn its resubscribe budget (STA-3337).
-          cols: serialized?.cols ?? size?.cols ?? params.viewport?.cols ?? 80,
-          rows: serialized?.rows ?? size?.rows ?? params.viewport?.rows ?? 24,
+          cols: snapshotDims.announced?.cols ?? params.viewport?.cols ?? 80,
+          rows: snapshotDims.announced?.rows ?? params.viewport?.rows ?? 24,
           displayMode,
           seq: snapshotOutputSeq,
           cwd: serialized?.cwd,
@@ -3641,7 +3649,20 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           truncatedByByteBudget: serialized?.truncatedByByteBudget === true
         })
         // Why: baseline for resize re-stream gating; the client already rewrapped to these cols via the initial snapshot replay.
-        lastResizeCols = serialized?.cols ?? size?.cols
+        lastResizeCols = snapshotDims.announced?.cols
+        if (snapshotDims.catchUp) {
+          // Why: before buffered output, which the TUI drew at the PTY's dims, not the snapshot's.
+          sendFrame(
+            TerminalStreamOpcode.Resized,
+            encodeTerminalStreamJson({
+              cols: snapshotDims.catchUp.cols,
+              rows: snapshotDims.catchUp.rows,
+              displayMode,
+              reason: 'subscribe-pty-size'
+            })
+          )
+          lastResizeCols = snapshotDims.catchUp.cols
+        }
         let recoveryAttempts = 0
         // Why: if the bounded pre-subscribe tail overflowed, only a fresh model snapshot covers the dropped middle without replay gaps.
         while (pendingOutputOverflowed && recoveryAttempts < 2) {
