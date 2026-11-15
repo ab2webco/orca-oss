@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
+import type { ClaudeSetupTokenStarted } from '../../../../shared/claude-setup-token-types'
 import {
-  beginClaudeSetupToken,
   cancelClaudeSetupToken,
   getClaudeSetupTokenStatus,
   submitClaudeSetupTokenCode
@@ -30,17 +30,23 @@ function messageOf(cause: unknown): string {
 
 export type ClaudeSetupTokenGenerateProps = {
   settings: Settings
-  accountId: string
+  /** Starts the sign-in on the host: for an existing account, or one the token will add. */
+  begin: () => Promise<ClaudeSetupTokenStarted>
   accountLabel: string
   onStored: (accounts: ClaudeRateLimitAccountsState) => void
+  disabled?: boolean
+  /** What a failure leaves behind; defaults to the existing account's wording. */
+  failureNote?: string
 }
 
 /** Runs `claude setup-token` on the account's host; the token is stored there and never shown. */
 export function ClaudeSetupTokenGenerate({
   settings,
-  accountId,
+  begin,
   accountLabel,
-  onStored
+  onStored,
+  disabled = false,
+  failureNote
 }: ClaudeSetupTokenGenerateProps): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const [code, setCode] = useState('')
@@ -107,7 +113,7 @@ export function ClaudeSetupTokenGenerate({
   const start = (): void => {
     setCode('')
     setPhase({ kind: 'starting' })
-    void beginClaudeSetupToken(settingsRef.current, accountId)
+    void begin()
       .then((started) => {
         liveSession.current = started.sessionId
         setPhase({ kind: 'awaiting-code', ...started })
@@ -192,7 +198,7 @@ export function ClaudeSetupTokenGenerate({
   const busy = phase.kind === 'starting' || phase.kind === 'verifying'
   return (
     <div className="space-y-2">
-      <Button onClick={start} disabled={busy} className="w-full gap-1.5">
+      <Button onClick={start} disabled={busy || disabled} className="w-full gap-1.5">
         {busy ? <Loader2 className="size-3 animate-spin" /> : null}
         {phase.kind === 'starting'
           ? translate(
@@ -215,10 +221,11 @@ export function ClaudeSetupTokenGenerate({
         <div role="alert" className="space-y-0.5 text-xs">
           {phase.error ? <p className="break-words text-destructive">{phase.error}</p> : null}
           <p className="text-muted-foreground">
-            {translate(
-              'auto.components.settings.ClaudeSetupTokenGenerate.unchanged',
-              'Nothing changed: the account keeps its current login and token.'
-            )}
+            {failureNote ??
+              translate(
+                'auto.components.settings.ClaudeSetupTokenGenerate.unchanged',
+                'Nothing changed: the account keeps its current login and token.'
+              )}
           </p>
         </div>
       ) : null}

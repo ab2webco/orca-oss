@@ -199,6 +199,19 @@ describe('ClaudeLongLivedTokenDialog', () => {
     expect(onClear).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a typed token out of the page markup', () => {
+    render()
+    openPaste()
+    fireEvent.change(tokenInput(), { target: { value: FIXTURE_TOKEN } })
+    expect(document.body.innerHTML).not.toContain(FIXTURE_TOKEN)
+  })
+
+  it('never offers removal when the token is the account’s only sign-in (ORCA-1215)', () => {
+    render({ hasToken: true, tokenOnly: true })
+    expect(screen.queryByRole('button', { name: 'Remove token' })).toBeNull()
+    expect(document.body.textContent).toContain('only sign-in')
+  })
+
   it('drops the typed token when the dialog closes', () => {
     const view = render()
     openPaste()

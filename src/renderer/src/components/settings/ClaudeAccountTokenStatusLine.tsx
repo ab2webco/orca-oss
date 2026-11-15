@@ -14,11 +14,14 @@ import {
 export function ClaudeAccountTokenStatusLine({
   status,
   usage,
-  now
+  now,
+  tokenOnly = false
 }: {
   status: ClaudeAccountAuthRowStatus
   usage: ProviderRateLimits | null
   now: number
+  /** Added from a token alone: there is no stored login to check (ORCA-1215). */
+  tokenOnly?: boolean
 }): React.JSX.Element {
   const term = describeTokenTerm(status.tokenSavedAt, now)
   const quota = describeQuotaParts(usage, now)
@@ -48,7 +51,9 @@ export function ClaudeAccountTokenStatusLine({
             <span>{term.saved}</span>
           </>
         ) : null}
-        <span>{describeStoredLogin(status, now)}</span>
+        <span>
+          {describeStoredLogin(tokenOnly ? { ...status, kind: 'no-credentials' } : status, now)}
+        </span>
         {quota.length > 0 ? (
           quota.map((part) => <span key={part}>{part}</span>)
         ) : (

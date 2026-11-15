@@ -54,6 +54,20 @@ describe('ClaudeAccountTokenStatusLine', () => {
     expect(markup).not.toContain('could not confirm')
   })
 
+  it('says a token-only account has no stored login instead of an unchecked one (ORCA-1215)', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(ClaudeAccountTokenStatusLine, {
+        status: tokenRow(),
+        usage: null,
+        now: NOW,
+        tokenOnly: true
+      })
+    )
+
+    expect(markup).toContain('No stored login')
+    expect(markup).not.toContain('Stored login not checked')
+  })
+
   it('leads with the token check and states each fact once, with no middle-dot string', () => {
     const markup = render(
       tokenRow({

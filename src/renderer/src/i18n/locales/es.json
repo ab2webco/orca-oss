@@ -5762,7 +5762,11 @@
           "longLivedTokenBadge": "Token",
           "longLivedTokenAction": "Token",
           "longLivedTokenUpdated": "Token de larga duración actualizado.",
-          "longLivedTokenRestart": "Reinicia los terminales de Claude abiertos en esta cuenta para que lo usen."
+          "longLivedTokenRestart": "Reinicia los terminales de Claude abiertos en esta cuenta para que lo usen.",
+          "tokenAccountRemoteHint": "Actualiza {{value0}} para agregar ahí una cuenta desde un token.",
+          "addWithToken": "Agregar con token",
+          "tokenOnlyBadgeHint": "Agregada desde un token de larga duración, sin inicio de sesión guardado. Ejecuta los agentes y miembros asignados a ella, nunca el inicio de sesión compartido.",
+          "tokenOnlyBadge": "Solo token"
         },
         "AdvancedPane": {
           "40b29e0bf3": "Reiniciar",
@@ -11090,7 +11094,8 @@
           "generateDescription": "Orca Lab ejecuta claude setup-token en el host de {{value0}} y guarda allí el token de un año. Los agentes de esta cuenta lo usan en lugar del inicio de sesión guardado, así que dejan de rotarlo.",
           "limitsHost": "El token solo hace solicitudes al modelo: Remote Control y los conectores de claude.ai no funcionan con él. Nunca sale del host de la cuenta.",
           "pasteInstead": "Pegar un token",
-          "pasteHint": "Lo da claude setup-token ejecutado en este host con la sesión de esta cuenta."
+          "pasteHint": "Lo da claude setup-token ejecutado en este host con la sesión de esta cuenta.",
+          "tokenOnlyNote": "Este token es el único inicio de sesión de la cuenta, así que se puede reemplazar pero no quitar. Elimina la cuenta para descartarlo."
         },
         "ClaudeSetupTokenGenerate": {
           "openStep": "1. Abre la página de inicio de sesión y entra como {{value0}}.",
@@ -11106,6 +11111,15 @@
         },
         "GamePanelStylePreview": {
           "lead": "Líder"
+        },
+        "ClaudeTokenAccountDialog": {
+          "nothingAdded": "No se agregó nada.",
+          "title": "Agregar cuenta con un token",
+          "description": "Usa un token de un año de claude setup-token, sin iniciar sesión antes en el navegador. El token no puede leer el correo de la cuenta, así que ponle tú el nombre.",
+          "nameLabel": "Nombre o correo",
+          "limits": "Los agentes y miembros asignados a ella se inician con el token. No puede ser el inicio de sesión compartido y su uso no se puede mostrar. Más tarde puedes volver a iniciar sesión en su fila para darle su correo real.",
+          "add": "Agregar cuenta",
+          "pasteHint": "De claude setup-token, ejecutado con la sesión iniciada en la cuenta que estás agregando."
         }
       },
       "right": {

@@ -72,6 +72,7 @@ import { GrokAccountsSection } from './GrokAccountsSection'
 import { GlobalConfigSyncDialog } from './GlobalConfigSyncDialog'
 import { ClaudeAccountReassignDialog } from './ClaudeAccountReassignDialog'
 import { ClaudeLongLivedTokenDialog } from './ClaudeLongLivedTokenDialog'
+import { ClaudeTokenAccountDialog } from './ClaudeTokenAccountDialog'
 import { ClaudeRefreshChainConflictNotice } from './ClaudeRefreshChainConflictNotice'
 import {
   classifyClaudeAccountBlock,
@@ -128,6 +129,7 @@ import { clearGlobalConfigForProviderAccount } from '@/runtime/runtime-provider-
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import {
   CLAUDE_SETUP_TOKEN_RUNTIME_CAPABILITY,
+  CLAUDE_TOKEN_ACCOUNT_RUNTIME_CAPABILITY,
   CUSTOM_ENDPOINT_EDIT_RUNTIME_CAPABILITY,
   GLOBAL_CONFIG_SYNC_RUNTIME_CAPABILITY,
   HOST_ACCOUNT_LOGIN_RUNTIME_CAPABILITY,
@@ -490,12 +492,14 @@ export function AccountsPane({
   const [remoteEndpointEditSupported, setRemoteEndpointEditSupported] = useState(false)
   const [remoteGlobalConfigSupported, setRemoteGlobalConfigSupported] = useState(false)
   const [remoteSetupTokenSupported, setRemoteSetupTokenSupported] = useState(false)
+  const [remoteTokenAccountSupported, setRemoteTokenAccountSupported] = useState(false)
 
   useEffect(() => {
     if (!isRemoteAccountScope || !activeRuntimeEnvironmentId) {
       setRemoteEndpointEditSupported(false)
       setRemoteGlobalConfigSupported(false)
       setRemoteSetupTokenSupported(false)
+      setRemoteTokenAccountSupported(false)
       return
     }
     let cancelled = false
@@ -511,13 +515,18 @@ export function AccountsPane({
       runtimeEnvironmentSupportsCapability(
         activeRuntimeEnvironmentId,
         CLAUDE_SETUP_TOKEN_RUNTIME_CAPABILITY
+      ),
+      runtimeEnvironmentSupportsCapability(
+        activeRuntimeEnvironmentId,
+        CLAUDE_TOKEN_ACCOUNT_RUNTIME_CAPABILITY
       )
     ])
-      .then(([endpointEdit, globalConfig, setupToken]) => {
+      .then(([endpointEdit, globalConfig, setupToken, tokenAccount]) => {
         if (!cancelled) {
           setRemoteEndpointEditSupported(endpointEdit)
           setRemoteGlobalConfigSupported(globalConfig)
           setRemoteSetupTokenSupported(setupToken)
+          setRemoteTokenAccountSupported(tokenAccount)
         }
       })
       .catch(() => {
@@ -525,6 +534,7 @@ export function AccountsPane({
           setRemoteEndpointEditSupported(false)
           setRemoteGlobalConfigSupported(false)
           setRemoteSetupTokenSupported(false)
+          setRemoteTokenAccountSupported(false)
         }
       })
     return () => {
@@ -599,6 +609,7 @@ export function AccountsPane({
     | 'idle'
     | 'adding'
     | 'adding-endpoint'
+    | 'adding-token'
     | 'resyncing'
     | `reauth:${string}`
     | `remove:${string}`
@@ -607,6 +618,7 @@ export function AccountsPane({
     | `token:${string}`
   >('idle')
   const [tokenDialogAccountId, setTokenDialogAccountId] = useState<string | null>(null)
+  const [tokenAccountOpen, setTokenAccountOpen] = useState(false)
   const [addEndpointOpen, setAddEndpointOpen] = useState(false)
   // null = the dialog is in add mode; an id = editing that endpoint account.
   const [editEndpointAccountId, setEditEndpointAccountId] = useState<string | null>(null)
@@ -1188,6 +1200,20 @@ export function AccountsPane({
   }
 
   const hostReauthUnsupported = hostLoginLane && !hostReauthSupported
+  // Why disabled with a reason and not a failing call: an older host has no new-account token sign-in.
+  const tokenAccountBlockedReason =
+    isRemoteAccountScope && !remoteTokenAccountSupported
+      ? translate(
+          'auto.components.settings.AccountsPane.tokenAccountRemoteHint',
+          'Update {{value0}} to add an account from a token there.',
+          { value0: accountRuntimeSentenceLabel }
+        )
+      : accountRuntime.runtime === 'wsl'
+        ? translate(
+            'auto.components.settings.AccountsPane.longLivedTokenWslHint',
+            'Long-lived tokens are not supported for WSL accounts yet.'
+          )
+        : null
   const hostReauthUnsupportedReason = translate(
     'auto.components.settings.AccountsPane.hostReauthUnsupported',
     'This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself.'
@@ -1597,6 +1623,26 @@ export function AccountsPane({
                 )}
                 {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
               </Button>
+              {/* Why the span carries the reason: a disabled Button never shows its title. */}
+              <span className="inline-flex" title={tokenAccountBlockedReason ?? undefined}>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setTokenAccountOpen(true)}
+                  disabled={
+                    tokenAccountBlockedReason !== null ||
+                    claudeAction !== 'idle' ||
+                    accountRuntimeUnavailable
+                  }
+                  className="gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <KeyRound className="size-3" />
+                  {translate(
+                    'auto.components.settings.AccountsPane.addWithToken',
+                    'Add with token'
+                  )}
+                </Button>
+              </span>
               <Button
                 variant="ghost"
                 size="xs"
@@ -1740,6 +1786,7 @@ export function AccountsPane({
                   )
                 const isReauthing = claudeAction === `reauth:${account.id}`
                 const hasLongLivedToken = !isCustomEndpoint && Boolean(account.longLivedTokenSetAt)
+                const isTokenOnly = !isCustomEndpoint && account.tokenOnly === true
                 // Why: the token lives in a vault on the host that runs the agents; only a
                 // host that can mint it there itself is offered, so it never crosses the wire.
                 const tokenBlockedReason =
@@ -1777,8 +1824,8 @@ export function AccountsPane({
                       <button
                         type="button"
                         onClick={() => {
-                          // Why: custom-endpoint accounts are per-worktree only; global selection would fail in main.
-                          if (isCustomEndpoint) {
+                          // Why: custom-endpoint and token-only accounts are per-worktree only; global selection would fail in main.
+                          if (isCustomEndpoint || isTokenOnly) {
                             return
                           }
                           const accountRuntimeView = getProviderAccountRuntime(account)
@@ -1793,7 +1840,7 @@ export function AccountsPane({
                             account.id
                           )
                         }}
-                        disabled={isBusy || isCustomEndpoint}
+                        disabled={isBusy || isCustomEndpoint || isTokenOnly}
                         className="flex min-w-40 flex-1 flex-col gap-0.5 text-left disabled:cursor-default max-md:w-full max-md:min-w-0"
                       >
                         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -1832,16 +1879,28 @@ export function AccountsPane({
                           {hasLongLivedToken ? (
                             <Badge
                               variant="outline"
-                              title={translate(
-                                'auto.components.settings.AccountsPane.longLivedTokenBadgeHint',
-                                'Agents on this account launch on a long-lived token.'
-                              )}
+                              title={
+                                isTokenOnly
+                                  ? translate(
+                                      'auto.components.settings.AccountsPane.tokenOnlyBadgeHint',
+                                      'Added from a long-lived token, with no stored login. It runs agents and members assigned to it, never the shared login.'
+                                    )
+                                  : translate(
+                                      'auto.components.settings.AccountsPane.longLivedTokenBadgeHint',
+                                      'Agents on this account launch on a long-lived token.'
+                                    )
+                              }
                               className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/80"
                             >
-                              {translate(
-                                'auto.components.settings.AccountsPane.longLivedTokenBadge',
-                                'Token'
-                              )}
+                              {isTokenOnly
+                                ? translate(
+                                    'auto.components.settings.AccountsPane.tokenOnlyBadge',
+                                    'Token only'
+                                  )
+                                : translate(
+                                    'auto.components.settings.AccountsPane.longLivedTokenBadge',
+                                    'Token'
+                                  )}
                             </Badge>
                           ) : null}
                         </div>
@@ -1857,6 +1916,7 @@ export function AccountsPane({
                             status={authStatus}
                             usage={accountUsage}
                             now={authStatusNow}
+                            tokenOnly={isTokenOnly}
                           />
                         ) : (
                           <ClaudeAccountAuthStatusLine
@@ -2928,6 +2988,17 @@ export function AccountsPane({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ClaudeTokenAccountDialog
+        open={tokenAccountOpen}
+        onOpenChange={setTokenAccountOpen}
+        settings={settings}
+        canGenerate={!isRemoteAccountScope || remoteTokenAccountSupported}
+        canPaste={!isRemoteAccountScope}
+        onAdded={(accounts) => {
+          setTokenAccountOpen(false)
+          void runClaudeAccountAction('adding-token', async () => accounts)
+        }}
+      />
       <ClaudeLongLivedTokenDialog
         open={tokenDialogAccount !== null}
         onOpenChange={(open) => {
@@ -2938,6 +3009,7 @@ export function AccountsPane({
         accountId={tokenDialogAccount?.id ?? null}
         accountLabel={tokenDialogAccount?.email ?? ''}
         hasToken={Boolean(tokenDialogAccount?.longLivedTokenSetAt)}
+        tokenOnly={tokenDialogAccount?.tokenOnly === true}
         settings={settings}
         canGenerate={!isRemoteAccountScope || remoteSetupTokenSupported}
         canPaste={!isRemoteAccountScope}

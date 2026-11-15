@@ -228,4 +228,32 @@ describe('AccountsPane', () => {
     expect(addIndex).toBeGreaterThan(0)
     expect(markup.slice(markup.lastIndexOf('<button', addIndex), addIndex)).toContain('disabled=""')
   })
+
+  it('offers Add with token on this device (ORCA-1215)', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+
+    const index = markup.indexOf('Add with token')
+    expect(index).toBeGreaterThan(0)
+    expect(markup.slice(markup.lastIndexOf('<button', index), index)).not.toContain('disabled=""')
+  })
+
+  // Why a reason and not a failing call: an older host has no new-account token sign-in.
+  it('disables Add with token, with the reason, until the remote host advertises it', () => {
+    const markup = renderPane({
+      ...getDefaultSettings('/tmp'),
+      activeRuntimeEnvironmentId: 'env-1'
+    })
+
+    const index = markup.indexOf('Add with token')
+    expect(index).toBeGreaterThan(0)
+    const button = markup.slice(markup.lastIndexOf('<button', index), index)
+    expect(button).toContain('disabled=""')
+    const wrapper = markup.slice(
+      markup.lastIndexOf('<span', markup.lastIndexOf('<button', index)),
+      index
+    )
+    expect(wrapper).toContain(
+      'title="Update the remote server to add an account from a token there."'
+    )
+  })
 })
