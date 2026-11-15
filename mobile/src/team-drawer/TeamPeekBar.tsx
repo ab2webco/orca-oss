@@ -3,6 +3,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import type { TeamPeek } from './team-drawer-model'
 import type { TeamCardWords } from './team-card-words'
+import { useTeamTones } from './team-status-tone'
 
 /** V30's collapsed sheet height. */
 export const TEAM_PEEK_HEIGHT = 60
@@ -18,9 +19,8 @@ export function PeekBar({
   words: TeamCardWords
   onPress: () => void
 }) {
-  const tone = { question: colors.statusRed, working: colors.statusGreen, idle: colors.textMuted }[
-    peek.tone
-  ]
+  const tones = useTeamTones()
+  const tone = { question: tones.attention, working: tones.info, idle: tones.idle }[peek.tone]
   return (
     <Pressable
       style={styles.peek}

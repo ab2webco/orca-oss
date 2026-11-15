@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { StatusColorPalette, StatusColorTone } from '../../../src/shared/status-colors'
+import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
 import type { TeamStatus } from '../../../src/shared/team-panel-model-types'
 import { colors } from '../theme/mobile-theme'
 
@@ -30,19 +31,15 @@ export const TEAM_STATUS_ROLE: Record<TeamStatus, StatusColorTone> = {
   closed: 'idle'
 }
 
+export const MEMBER_STATE_ROLE: Record<GameAgent['state'], StatusColorTone> = {
+  waiting: 'attention',
+  working: 'info',
+  idle: 'idle',
+  done: 'success'
+}
+
 const TeamTonesContext = createContext<TeamTones>(TEAM_TONE_DEFAULTS)
 
 export const TeamTonesProvider = TeamTonesContext.Provider
 
 export const useTeamTones = (): TeamTones => useContext(TeamTonesContext)
-
-/** Today's map, until each mark reads the person's tones from TeamTonesProvider. */
-export const TEAM_STATUS_TONE: Record<TeamStatus, string> = {
-  attention: TEAM_TONE_DEFAULTS.attention,
-  failed: TEAM_TONE_DEFAULTS.attention,
-  risk: TEAM_TONE_DEFAULTS.warning,
-  working: TEAM_TONE_DEFAULTS.info,
-  done: TEAM_TONE_DEFAULTS.success,
-  idle: TEAM_TONE_DEFAULTS.idle,
-  closed: TEAM_TONE_DEFAULTS.idle
-}

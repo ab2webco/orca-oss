@@ -22,6 +22,7 @@ import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/m
 import { teamActionHintOf, teamActionLabelOf, type TeamControlWords } from './team-control-words'
 import type { TeamSheetControl } from './team-sheet-control'
 import { TeamActionMenu } from './TeamActionMenu'
+import { useTeamTones } from './team-status-tone'
 
 // Why these glyphs: the desktop dock's (team-action-icons.tsx), so both surfaces read the same.
 const ICONS: Record<GameActionIcon, typeof Square> = {
@@ -49,9 +50,10 @@ export function TeamStoppedBanner({
   stopped: NonNullable<TeamSheetControl['stopped']>
   words: TeamControlWords
 }) {
+  const tones = useTeamTones()
   return (
     <View style={styles.banner}>
-      <View style={[styles.dot, { backgroundColor: colors.statusRed }]} />
+      <View style={[styles.dot, { backgroundColor: tones.attention }]} />
       {/* Why one paragraph: at 320 the paused part must wrap under the title, not be cut. */}
       <Text style={styles.bannerText}>
         <Text style={styles.bannerTitle}>

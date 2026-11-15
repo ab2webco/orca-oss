@@ -4,13 +4,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamAgeText, type TeamMemberRow } from './team-drawer-model'
 import type { TeamCardWords } from './team-card-words'
-
-const TONE: Record<TeamMemberRow['state'], string> = {
-  waiting: colors.statusRed,
-  working: colors.statusGreen,
-  idle: colors.textMuted,
-  done: colors.statusPurple
-}
+import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-tone'
 
 const PR_HIT_SLOP = { top: 12, bottom: 12 }
 
@@ -29,29 +23,33 @@ const ciText = (ci: CheckStatus | 'none', words: TeamCardWords): string | null =
 function statusOf(
   member: TeamMemberRow,
   now: number,
-  words: TeamCardWords
+  words: TeamCardWords,
+  tones: TeamTones
 ): { text: string; tone: string } {
   if (member.needsYou) {
-    return { text: words.waitingForAnswer, tone: colors.statusRed }
+    return { text: words.waitingForAnswer, tone: tones.attention }
   }
   // Why these tones: the desktop's, paused at risk and a queued launch idle (team-panel-member-cards.ts).
   if (member.hold) {
     return member.hold.kind === 'paused'
-      ? { text: words.condition.paused, tone: colors.statusAmber }
-      : { text: words.condition.queued, tone: colors.textMuted }
+      ? { text: words.condition.paused, tone: tones.warning }
+      : { text: words.condition.queued, tone: tones.idle }
   }
   if (member.limit) {
     if (member.limit.loggedOut) {
-      return { text: words.loggedOut, tone: colors.statusRed }
+      return { text: words.loggedOut, tone: tones.attention }
     }
     const resets = member.limit.resetsAt
     return {
       text:
         resets && resets > now ? words.limitResetsIn(teamAgeText(now, resets)) : words.limitReached,
-      tone: colors.statusAmber
+      tone: tones.warning
     }
   }
-  return { text: member.live ?? words.state[member.state], tone: TONE[member.state] }
+  return {
+    text: member.live ?? words.state[member.state],
+    tone: tones[MEMBER_STATE_ROLE[member.state]]
+  }
 }
 
 function usageText(account: NonNullable<TeamMemberRow['account']>): string {
@@ -86,7 +84,7 @@ export function TeamMemberCard({
   onOpenLink,
   onOpenTerminal
 }: Props) {
-  const status = statusOf(member, now, words)
+  const status = statusOf(member, now, words, useTeamTones())
   const meta = [
     member.model,
     member.phase ? words.phase[member.phase] : null,

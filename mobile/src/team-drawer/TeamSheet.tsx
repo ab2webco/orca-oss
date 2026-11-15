@@ -27,6 +27,7 @@ import { TeamLevelRow } from './TeamLevelRow'
 import { TeamSceneBand } from './TeamSceneBand'
 import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
 import { teamControlWordsOf } from './team-control-words'
+import { TeamTonesProvider } from './team-status-tone'
 
 export { TEAM_PEEK_HEIGHT }
 
@@ -126,7 +127,7 @@ export function TeamSheet({
   )
   const close = (): void => setOpen(false)
   return (
-    <>
+    <TeamTonesProvider value={team.tones}>
       {/* Why: holds the peek's place in the column so the command dock stays above it. */}
       <View style={{ height: TEAM_PEEK_HEIGHT + insets.bottom }} />
       {open ? (
@@ -267,7 +268,7 @@ export function TeamSheet({
           ) : null}
         </GestureHandlerRootView>
       </Animated.View>
-    </>
+    </TeamTonesProvider>
   )
 }
 
