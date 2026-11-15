@@ -84,6 +84,14 @@ export function registerClaudeAccountHandlers(
     }
     return claudeAccounts.setLongLivedToken(request.accountId, request.token)
   })
+  // Why IPC and not RPC: a pasted token is only ever taken on the host's own desktop.
+  ipcMain.handle('claudeAccounts:addFromLongLivedToken', (_event, args: unknown) => {
+    const request = args as { label?: unknown; token?: unknown } | null
+    if (typeof request?.label !== 'string' || typeof request.token !== 'string') {
+      throw new Error('Invalid token account request.')
+    }
+    return claudeAccounts.addLongLivedTokenAccount(request.label, request.token)
+  })
   ipcMain.handle('claudeAccounts:getRefreshChainAliasReport', () =>
     reportManagedClaudeRefreshChainAliases()
   )

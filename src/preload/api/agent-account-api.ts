@@ -133,6 +133,11 @@ export type ClaudeAccountsApi = {
     accountId: string
     token: string | null
   }) => Promise<ClaudeRateLimitAccountsState>
+  /** Host-local only: adds an account from a pasted long-lived token (ORCA-1215). */
+  addFromLongLivedToken: (args: {
+    label: string
+    token: string
+  }) => Promise<ClaudeRateLimitAccountsState>
   select: (args: {
     accountId: string | null
     runtime?: 'host' | 'wsl'

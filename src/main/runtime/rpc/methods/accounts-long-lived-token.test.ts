@@ -98,3 +98,33 @@ describe('accounts.*ClaudeSetupToken', () => {
     }
   })
 })
+
+describe('accounts.beginClaudeSetupTokenForNewAccount (ORCA-1215)', () => {
+  it('lets any caller start a token sign-in that adds an account under a label', async () => {
+    const runtime = {
+      beginClaudeSetupTokenForNewAccount: vi
+        .fn()
+        .mockResolvedValue({ sessionId: 's1', url: 'https://x' })
+    }
+    for (const clientKind of [undefined, 'mobile', 'runtime'] as const) {
+      await expect(
+        requestMethod('accounts.beginClaudeSetupTokenForNewAccount').handler(
+          { label: 'Team Max' },
+          { runtime: runtime as unknown as OrcaRuntimeService, clientKind }
+        )
+      ).resolves.toEqual({ sessionId: 's1', url: 'https://x' })
+    }
+    expect(runtime.beginClaudeSetupTokenForNewAccount).toHaveBeenCalledWith('Team Max')
+  })
+
+  it('takes only a label: no token, path or account crosses the wire', () => {
+    const params = requestMethod('accounts.beginClaudeSetupTokenForNewAccount')
+      .params as unknown as {
+      shape: Record<string, unknown>
+      safeParse: (value: unknown) => { success: boolean }
+    }
+    expect(Object.keys(params.shape)).toEqual(['label'])
+    expect(params.safeParse({ label: '' }).success).toBe(false)
+    expect(params.safeParse({ label: 'x'.repeat(201) }).success).toBe(false)
+  })
+})

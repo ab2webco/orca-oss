@@ -34,6 +34,12 @@ export const CLAUDE_LONG_LIVED_TOKEN_METHODS: readonly RpcAnyMethod[] = [
     params: z.object({ account: z.string().min(1, 'Missing account').max(512) }),
     handler: async (params, { runtime }) => runtime.beginClaudeSetupToken(params.account)
   }),
+  // Why only a label: a token-only account has no readable identity, and the token stays on the host.
+  defineMethod({
+    name: 'accounts.beginClaudeSetupTokenForNewAccount',
+    params: z.object({ label: z.string().min(1, 'Missing label').max(200) }),
+    handler: async (params, { runtime }) => runtime.beginClaudeSetupTokenForNewAccount(params.label)
+  }),
   defineMethod({
     name: 'accounts.submitClaudeSetupTokenCode',
     params: SubmitClaudeSetupTokenCodeParams,

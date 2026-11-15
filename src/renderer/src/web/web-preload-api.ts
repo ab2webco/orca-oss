@@ -3358,6 +3358,10 @@ function createClaudeAccountsApi(): never {
           'Set a long-lived token from the Orca desktop app on the host that runs the agents.'
         )
       ),
+    addFromLongLivedToken: () =>
+      Promise.reject(
+        new Error('Add an account from a pasted token in the Orca desktop app on its host.')
+      ),
     // Why: the live-pty gate and account universes live on the desktop host, so web clients see no binding.
     getLivePtyAccount: () => Promise.resolve(null),
     copySessionForFailover: () =>
