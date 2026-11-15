@@ -1,11 +1,16 @@
 import type { OrchestratorGameState } from '../../../src/shared/orchestrator-game-state'
 import type {
+  TeamMachine,
   TeamMemberCard,
   TeamPrList,
   TeamQueueEntry,
   TeamSection
 } from '../../../src/shared/team-panel-model-types'
-import { teamPrSectionOf, teamQueueSectionOf } from '../../../src/shared/team-panel-work-tabs'
+import {
+  teamMachinesSectionOf,
+  teamPrSectionOf,
+  teamQueueSectionOf
+} from '../../../src/shared/team-panel-work-tabs'
 import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
 import { teamWorkWordsOf } from './team-work-words'
 
@@ -13,9 +18,10 @@ import { teamWorkWordsOf } from './team-work-words'
 export type TeamSheetWork = {
   prs: TeamSection<TeamPrList> | null
   queue: TeamSection<TeamQueueEntry[]> | null
+  machines: TeamSection<TeamMachine[]> | null
 }
 
-/** The PRs tab from the lead's game.state, built by the desktop panel's own builders. */
+/** The PRs and Hosts tabs from the lead's game.state, built by the desktop panel's own builders. */
 export function teamSheetWorkOf(
   state: Record<string, unknown>,
   members: readonly TeamMemberCard[],
@@ -33,6 +39,7 @@ export function teamSheetWorkOf(
   }
   return {
     prs: teamPrSectionOf(work),
-    queue: teamQueueSectionOf(work)
+    queue: teamQueueSectionOf(work),
+    machines: teamMachinesSectionOf(work)
   }
 }

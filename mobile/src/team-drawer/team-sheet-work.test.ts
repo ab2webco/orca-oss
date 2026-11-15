@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { teamLeadViewOf } from './team-drawer-model'
 
+const GB = 1024 ** 3
 const NOW = Date.parse('2026-11-14T12:00:00Z')
 
 const leadState = (over: Record<string, unknown> = {}) => ({
@@ -43,7 +44,7 @@ const project = {
   }
 }
 
-describe('the Team sheet PRs tab', () => {
+describe('the Team sheet PRs and Hosts tabs', () => {
   it('reads the merge queue and open PRs as the desktop panel builds them, failures first', () => {
     const work = teamLeadViewOf(leadState({ project }), new Set(), null, NOW)?.work
     expect(work?.queue).toMatchObject({
@@ -82,9 +83,47 @@ describe('the Team sheet PRs tab', () => {
     expect(work?.queue).toEqual({ kind: 'unavailable' })
   })
 
+  it("lists each host's agents and memory, and an unreachable one as offline", () => {
+    const work = teamLeadViewOf(
+      leadState({
+        hostCapacity: [
+          {
+            host: 'local',
+            status: 'ok',
+            running: 2,
+            cap: 5,
+            cpuCoreCount: 8,
+            totalMemory: 32 * GB,
+            availableMemory: 12 * GB,
+            loadAverage1m: 1
+          },
+          {
+            host: 'imac',
+            status: 'ok',
+            running: 1,
+            cpuCoreCount: 8,
+            totalMemory: 16 * GB,
+            availableMemory: 2 * GB,
+            loadAverage1m: 1
+          },
+          { host: 'contabo', status: 'unreachable', running: 0 }
+        ]
+      })
+    )?.work
+    expect(work?.machines).toMatchObject({
+      kind: 'ready',
+      value: [
+        { host: { kind: 'local' }, running: 2, cap: 5, status: 'working' },
+        { host: { kind: 'remote', name: 'imac' }, status: 'risk' },
+        { host: { kind: 'remote', name: 'contabo' }, reading: { kind: 'unreachable' } }
+      ]
+    })
+  })
+
   it('says an older host publishes neither, instead of claiming nothing is there', () => {
     const work = teamLeadViewOf(leadState())?.work
     expect(work?.prs).toEqual({ kind: 'unavailable' })
     expect(work?.queue).toEqual({ kind: 'unavailable' })
+    expect(work?.machines).toEqual({ kind: 'unavailable' })
   })
 })

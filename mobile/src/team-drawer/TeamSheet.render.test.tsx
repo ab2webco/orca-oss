@@ -368,6 +368,7 @@ describe('TeamSheet', () => {
     expect(texts().some((one) => one.endsWith(' XP'))).toBe(false)
   })
 
+  const GB = 1024 ** 3
   const work = {
     project: {
       reviews: {
@@ -405,7 +406,29 @@ describe('TeamSheet', () => {
           }
         ]
       }
-    }
+    },
+    hostCapacity: [
+      {
+        host: 'local',
+        status: 'ok',
+        running: 2,
+        cap: 5,
+        cpuCoreCount: 8,
+        totalMemory: 100 * GB,
+        availableMemory: 39 * GB,
+        loadAverage1m: 1
+      },
+      {
+        host: 'imac',
+        status: 'ok',
+        running: 1,
+        cpuCoreCount: 8,
+        totalMemory: 16 * GB,
+        availableMemory: 2 * GB,
+        loadAverage1m: 1
+      },
+      { host: 'contabo', status: 'unreachable', running: 0 }
+    ]
   }
 
   it('lists the merge queue, then open PRs failures first, and opens a PR on a tap', () => {
@@ -440,17 +463,37 @@ describe('TeamSheet', () => {
     expect(onOpenLink).toHaveBeenCalledWith('https://pr/415')
   })
 
-  it('words the PRs tab in the host language', () => {
+  it('lists each host with its agents and memory, naming this desktop, and an offline one', () => {
+    show(teamWith({ questions: [] }, null, work))
+    act(() => button('Hosts').click())
+    const shown = texts()
+    expect(shown).toContain('m1')
+    expect(shown).toContain('2 of 5 agents')
+    expect(shown).toContain('Memory used 61%')
+    expect(shown).toContain('imac')
+    expect(shown).toContain('Low memory')
+    expect(shown).toContain('2 of 16 GB free')
+    expect(shown).toContain('contabo')
+    expect(shown).toContain('Offline')
+    expect(shown).not.toContain('local')
+  })
+
+  it('words the PRs and Hosts tabs in the host language', () => {
     const team = teamWith({ questions: [] }, null, work)
     show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
     act(() => button('PRs').click())
     expect(texts()).toContain('Cola de merge')
     expect(texts()).toContain('Check falló')
+    act(() => button('Hosts').click())
+    expect(texts()).toContain('Poca memoria')
+    expect(texts()).toContain('2 de 16 GB libres')
   })
 
-  it('says an older host publishes no PRs, instead of an empty list', () => {
+  it('says an older host publishes no PRs or hosts, instead of an empty list', () => {
     show(teamWith({ questions: [] }))
     act(() => button('PRs').click())
+    expect(texts()).toContain('This Orca host does not publish it yet.')
+    act(() => button('Hosts').click())
     expect(texts()).toContain('This Orca host does not publish it yet.')
   })
 
