@@ -2405,6 +2405,8 @@ const api = {
       ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
     setLongLivedToken: (args: { accountId: string; token: string | null }): Promise<unknown> =>
       ipcRenderer.invoke('claudeAccounts:setLongLivedToken', args),
+    addFromLongLivedToken: (args: { label: string; token: string }): Promise<unknown> =>
+      ipcRenderer.invoke('claudeAccounts:addFromLongLivedToken', args),
     getRefreshChainAliasReport: (): Promise<ManagedClaudeRefreshChainAliasReport> =>
       ipcRenderer.invoke('claudeAccounts:getRefreshChainAliasReport'),
     remove: (args: {

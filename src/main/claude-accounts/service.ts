@@ -109,6 +109,12 @@ import {
   applyLongLivedTokenToVaultSettings,
   normalizeLongLivedToken
 } from './claude-long-lived-token'
+import {
+  findAccountStoringLongLivedToken,
+  findClaudeAccountNamed,
+  normalizeTokenAccountLabel
+} from './claude-token-only-account'
+import { checkClaudeLongLivedToken } from '../rate-limits/claude-long-lived-token-check'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const STATUS_TIMEOUT_MS = 20_000
@@ -274,6 +280,9 @@ export class ClaudeAccountService {
     rawToken: string | null
   ): Promise<ClaudeRateLimitAccountsState> {
     const account = this.resolveOAuthAccountSelector(accountSelector)
+    if (rawToken === null && account.tokenOnly) {
+      throw new Error('The token is this account’s only sign-in. Remove the account instead.')
+    }
     const token = rawToken === null ? null : normalizeLongLivedToken(rawToken)
     return this.serializeMutation(() =>
       this.withManagedAccountMutation(
@@ -282,6 +291,91 @@ export class ClaudeAccountService {
         'account-record'
       )
     )
+  }
+
+  /**
+   * Adds an account from a `claude setup-token` credential alone (ORCA-1215). That token cannot
+   * read the profile, so `rawLabel` stands in for the email and the vault keeps no stored login.
+   */
+  async addLongLivedTokenAccount(
+    rawLabel: string,
+    rawToken: string
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const label = this.assertLongLivedTokenAccountLabelIsFree(rawLabel)
+    const token = normalizeLongLivedToken(rawToken)
+    // Why outside the queue: a slow network check must not hold up other account changes.
+    if ((await checkClaudeLongLivedToken(token)).state === 'rejected') {
+      throw new Error(
+        'Claude rejected this token. Run claude setup-token again and use the new one.'
+      )
+    }
+    return this.serializeMutation(() => this.doAddLongLivedTokenAccount(label, token))
+  }
+
+  /** Refuses up front a label the token add would refuse, before a sign-in is started. */
+  assertLongLivedTokenAccountLabelIsFree(rawLabel: string): string {
+    const label = normalizeTokenAccountLabel(rawLabel)
+    const taken = findClaudeAccountNamed(this.store.getSettings().claudeManagedAccounts, label)
+    if (taken) {
+      throw new DuplicateClaudeAccountError(
+        `${taken.email} is already added. Set its token from its row instead.`
+      )
+    }
+    return label
+  }
+
+  private async doAddLongLivedTokenAccount(
+    label: string,
+    token: string
+  ): Promise<ClaudeRateLimitAccountsState> {
+    this.assertLongLivedTokenAccountLabelIsFree(label)
+    const previousSettings = this.store.getSettings()
+    const holder = findAccountStoringLongLivedToken(previousSettings.claudeManagedAccounts, token)
+    if (holder) {
+      throw new DuplicateClaudeAccountError(`This token is already stored for ${holder.email}.`)
+    }
+    const accountId = randomUUID()
+    const managedAuth = this.createManagedAuthDir(accountId)
+    try {
+      const vault = managedAuth.managedAuthPath
+      writeClaudeManagedAuthFile(
+        vault,
+        'settings.json',
+        applyLongLivedTokenToVaultSettings(readClaudeManagedAuthFile(vault, 'settings.json'), token)
+      )
+      this.seedGlobalConfigIntoVault(accountId, vault, managedAuth.managedAuthRuntime)
+      // Why: with no stored login, an unseeded vault would open the CLI's login wizard on launch.
+      seedVaultOnboardingCompletion(vault)
+      const now = Date.now()
+      const account: ClaudeManagedAccount = {
+        id: accountId,
+        email: label,
+        managedAuthPath: vault,
+        managedAuthRuntime: managedAuth.managedAuthRuntime,
+        wslDistro: managedAuth.wslDistro,
+        wslLinuxAuthPath: managedAuth.wslLinuxAuthPath,
+        authMethod: 'subscription-oauth',
+        organizationUuid: null,
+        organizationName: null,
+        longLivedTokenSetAt: now,
+        tokenOnly: true,
+        createdAt: now,
+        updatedAt: now,
+        lastAuthenticatedAt: now
+      }
+      const selection = normalizeClaudeRuntimeSelection(previousSettings)
+      this.store.updateSettings({
+        claudeManagedAccounts: [...previousSettings.claudeManagedAccounts, account],
+        activeClaudeManagedAccountId: selection.host,
+        activeClaudeManagedAccountIdsByRuntime: selection
+      })
+      this.rateLimits.evictInactiveClaudeCache(accountId)
+      return this.getSnapshot()
+    } catch (error) {
+      this.restoreClaudeSettings(previousSettings)
+      await this.safeRemoveManagedAuth(accountId, managedAuth.managedAuthPath)
+      throw error
+    }
   }
 
   /** Refuses up front what setLongLivedToken would refuse, before a sign-in is started. */
@@ -1015,10 +1109,14 @@ export class ClaudeAccountService {
     // Why: the browser's active claude.ai SSO session decides whose tokens the login
     // captures; silently adopting a different identity would repoint every worktree
     // pinned to this entry at another person's account.
-    if (
-      account.email &&
-      captured.identity.email.trim().toLowerCase() !== account.email.trim().toLowerCase()
-    ) {
+    // Why a token-only entry adopts the identity: its email is a typed label, never a verified one.
+    const identityError = account.tokenOnly
+      ? this.findTokenOnlySignInConflict(account, captured)
+      : account.email &&
+          captured.identity.email.trim().toLowerCase() !== account.email.trim().toLowerCase()
+        ? `Claude sign-in returned ${captured.identity.email.trim()}, but this entry is ${account.email}. Sign out of claude.ai in your browser (or use a private window), then re-authenticate as ${account.email}.`
+        : null
+    if (identityError) {
       try {
         await this.restoreManagedCredentialsSnapshot(
           accountId,
@@ -1032,9 +1130,7 @@ export class ClaudeAccountService {
           rollbackError
         )
       }
-      throw new Error(
-        `Claude sign-in returned ${captured.identity.email.trim()}, but this entry is ${account.email}. Sign out of claude.ai in your browser (or use a private window), then re-authenticate as ${account.email}.`
-      )
+      throw new Error(identityError)
     }
 
     const settings = this.store.getSettings()
@@ -1046,6 +1142,7 @@ export class ClaudeAccountService {
             email: captured.identity.email!,
             organizationUuid: captured.identity.organizationUuid,
             organizationName: captured.identity.organizationName,
+            ...(entry.tokenOnly ? { tokenOnly: false } : {}),
             updatedAt: now,
             lastAuthenticatedAt: now
           }
@@ -1101,6 +1198,28 @@ export class ClaudeAccountService {
       }
       throw error
     }
+  }
+
+  private findTokenOnlySignInConflict(
+    account: ClaudeManagedAccount,
+    captured: CapturedClaudeAuth
+  ): string | null {
+    const duplicate = findDuplicateClaudeAccount(
+      this.store
+        .getSettings()
+        .claudeManagedAccounts.filter(
+          (entry) => entry.id !== account.id && entry.authMethod !== 'custom-endpoint'
+        ),
+      {
+        email: captured.identity.email,
+        organizationUuid: captured.identity.organizationUuid,
+        managedAuthRuntime: account.managedAuthRuntime ?? 'host',
+        wslDistro: account.wslDistro ?? null
+      }
+    )
+    return duplicate
+      ? `Claude sign-in returned ${duplicate.email}, which is already added. Sign in as another account, or remove ${account.email} and set the token on ${duplicate.email}.`
+      : null
   }
 
   private async doRemoveAccount(
@@ -1221,6 +1340,12 @@ export class ClaudeAccountService {
       if (account.authMethod === 'custom-endpoint') {
         throw new Error('Custom endpoint accounts can only be assigned per worktree.')
       }
+      // Why: the shared login is materialized from a stored login, which a token-only vault lacks.
+      if (account.tokenOnly) {
+        throw new Error(
+          'An account added from a token can only be assigned per worktree or to members.'
+        )
+      }
       const accountTarget = getClaudeSelectionTargetForAccount(account)
       const requestedTarget = normalizeClaudeAccountSelectionTarget(target ?? accountTarget)
       const normalizedAccountTarget = normalizeClaudeAccountSelectionTarget(accountTarget)
@@ -1312,6 +1437,7 @@ export class ClaudeAccountService {
       endpointBaseUrl: account.endpointBaseUrl ?? null,
       endpointModel: account.endpointModel ?? null,
       longLivedTokenSetAt: account.longLivedTokenSetAt ?? null,
+      ...(account.tokenOnly ? { tokenOnly: true } : {}),
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
       lastAuthenticatedAt: account.lastAuthenticatedAt

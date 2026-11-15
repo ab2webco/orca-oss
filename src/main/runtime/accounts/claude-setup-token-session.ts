@@ -90,9 +90,13 @@ const spawnNodePty: SetupTokenPtySpawner = async (command, args, options) => {
   }
 }
 
+type StoreToken = (token: string) => Promise<ClaudeRateLimitAccountsState>
+
 type Session = {
   id: string
-  accountId: string
+  /** An account id, or a caller-chosen key for a sign-in that adds a new account. */
+  key: string
+  store: StoreToken
   home: string
   pty: SetupTokenPty
   /** Output since spawn, then only since the code went in, so an old error is not re-read. */
@@ -116,9 +120,10 @@ export class ClaudeSetupTokenSessions {
     this.timeouts = { ...DEFAULT_TIMEOUTS, ...deps.timeouts }
   }
 
-  async begin(accountId: string): Promise<ClaudeSetupTokenStarted> {
+  /** `store` replaces the account-id store, e.g. to add a new account from the token. */
+  async begin(key: string, store?: StoreToken): Promise<ClaudeSetupTokenStarted> {
     for (const session of this.sessions.values()) {
-      if (session.accountId === accountId) {
+      if (session.key === key) {
         this.cancel(session.id)
       }
     }
@@ -145,7 +150,8 @@ export class ClaudeSetupTokenSessions {
     }
     const session: Session = {
       id: randomUUID(),
-      accountId,
+      key,
+      store: store ?? ((token) => this.deps.storeToken(key, token)),
       home,
       pty,
       raw: '',
@@ -274,7 +280,7 @@ export class ClaudeSetupTokenSessions {
     // Why verifying until the write lands: the dialog must not report a token the vault lacks.
     session.status = { state: 'verifying', error: null, accounts: null }
     this.finish(session, 'keep-status')
-    void this.deps.storeToken(session.accountId, token).then(
+    void session.store(token).then(
       (accounts) => {
         session.status = { state: 'stored', error: null, accounts }
       },

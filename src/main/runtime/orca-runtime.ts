@@ -15147,6 +15147,15 @@ export class OrcaRuntimeService {
     return this.setupTokenSessions.begin(accountId)
   }
 
+  // Why remote callers may: the host mints the token and adds the account; only a label crosses.
+  beginClaudeSetupTokenForNewAccount(label: string): Promise<ClaudeSetupTokenStarted> {
+    const claudeAccounts = this.requireAccountServices().claudeAccounts
+    const free = claudeAccounts.assertLongLivedTokenAccountLabelIsFree(label)
+    return this.setupTokenSessions.begin(`new-account:${free.toLowerCase()}`, (token) =>
+      claudeAccounts.addLongLivedTokenAccount(free, token)
+    )
+  }
+
   submitClaudeSetupTokenCode(sessionId: string, code: string): ClaudeSetupTokenStatus {
     return this.setupTokenSessions.submitCode(sessionId, code)
   }

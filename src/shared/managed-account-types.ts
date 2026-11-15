@@ -77,6 +77,9 @@ export type ClaudeManagedAccount = {
   /** When a `claude setup-token` credential was stored in this host's vault; the token
    *  itself lives only in the vault settings.json env (mode 600), never here. */
   longLivedTokenSetAt?: number | null
+  /** Added from a long-lived token alone (ORCA-1215): `email` is a label the person typed and the
+   *  vault has no stored login, so it launches pinned agents only, never the shared login. */
+  tokenOnly?: boolean
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number
@@ -94,6 +97,7 @@ export type ClaudeManagedAccountSummary = {
   endpointBaseUrl?: string | null
   endpointModel?: string | null
   longLivedTokenSetAt?: number | null
+  tokenOnly?: boolean
   createdAt: number
   updatedAt: number
   lastAuthenticatedAt: number

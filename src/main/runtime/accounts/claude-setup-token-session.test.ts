@@ -147,6 +147,22 @@ describe('ClaudeSetupTokenSessions', () => {
     expect(sessions.status(sessionId)).toEqual({ state: 'stored', error: null, accounts: ACCOUNTS })
   })
 
+  it('hands the token to the session’s own store when it adds a new account (ORCA-1215)', async () => {
+    const ctx = setup()
+    const { sessions, storeToken } = ctx
+    const addAccount = vi.fn().mockResolvedValue(ACCOUNTS)
+    const { sessionId } = await sessions.begin('new-account:Team Max', addAccount)
+    sessions.submitCode(sessionId, 'abc123')
+    await vi.advanceTimersByTimeAsync(150)
+
+    ctx.pty.emit(`${SUCCESS_HEAD}${TOKEN}\r\r\n`)
+    await flush()
+
+    expect(addAccount).toHaveBeenCalledWith(TOKEN)
+    expect(storeToken).not.toHaveBeenCalled()
+    expect(sessions.status(sessionId)).toEqual({ state: 'stored', error: null, accounts: ACCOUNTS })
+  })
+
   it('reports a rejected code and never stores anything', async () => {
     const ctx = setup()
     const { sessions, storeToken } = ctx
