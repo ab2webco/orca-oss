@@ -120,6 +120,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   pr: TeamPullRequest | null
   /** Waiting on input, or its ticket has an open question for the user. */
   needsYou: boolean
+  /** What it waits on the person for; absent from a client that predates it (ORCA-1231). */
+  ask?: TeamMemberAsk | null
   /** When its account's usage limit resets, ms; null when not limited or unknown. */
   limitResetsAt: number | null
   /** Started outside `game launch`: stopped by name, never acted on in bulk. */
@@ -127,6 +129,12 @@ export type TeamMemberCard = TeamAgentFacts & {
   /** Runs in the lead's folder, which has no git for a worktree of its own (ORCA-1135). */
   inFolder?: true
 }
+
+/** An open Inbox question, or a prompt in the member's own pane that only its terminal can answer. */
+export type TeamMemberAsk =
+  | { kind: 'inbox' }
+  | { kind: 'permission'; tool: string | null }
+  | { kind: 'question' }
 
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */
 export type TeamLeadCard = TeamAgentFacts & {

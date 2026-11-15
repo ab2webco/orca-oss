@@ -6,6 +6,7 @@ import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
   teamAgeText,
+  teamAskText,
   teamHelpersCountText,
   teamLiveText,
   teamModelText,
@@ -92,12 +93,18 @@ export function TeamMemberCardRow({
   // Why both ways: the scene lights this row's character, and hovering the row lights it there.
   const lit = useTeamSceneHover((s) => s.key === card.paneKey)
   const setHover = useTeamSceneHover((s) => s.set)
-  const answer = card.needsYou ? (
+  const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
+  // Why the pane: only its terminal can answer a prompt there, and the Inbox does not hold it (ORCA-1231).
+  const inPane = card.ask?.kind === 'permission' || card.ask?.kind === 'question'
+  const answer = !card.needsYou ? null : inPane ? (
+    <Button size="xs" onClick={() => void openTeamSession(card, shownName)}>
+      {translate('teamPanel.card.answerInTerminal', 'Answer in its terminal')}
+    </Button>
+  ) : card.ask !== null ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
-  const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   // Why only on opening: a second click folds the card and leaves the center as it is.
   const toggle = (): void => {
     if (!expanded && (card.terminalHandle || card.worktreeId)) {
@@ -171,8 +178,8 @@ export function TeamMemberCardRow({
                 card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
               )}
             >
-              {card.needsYou
-                ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
+              {card.needsYou && card.ask !== null
+                ? teamAskText(card.ask)
                 : teamLiveText(card.liveAction, card.condition)}
             </span>
           </span>

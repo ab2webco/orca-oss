@@ -77,6 +77,7 @@ export type TeamSceneBody = TeamSceneMover & {
   leaving?: true
   desk?: TeamSceneDesk
   hold?: TeamSceneHold
+  paneAsk?: true
   work: TeamSceneWork
 }
 
@@ -214,6 +215,7 @@ export function applyTeamSceneInput(
       away: m.away,
       desk: m.desk,
       hold: m.hold,
+      paneAsk: m.paneAsk,
       home: spot,
       site: grownSite(body.site, m.site)
     })

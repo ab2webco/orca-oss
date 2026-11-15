@@ -7,6 +7,7 @@ import {
   createSceneEffects,
   drawSceneEmote,
   drawSceneOverflow,
+  isAskingEmote,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
 
@@ -167,7 +168,7 @@ export function createOfficePainter(colors: TeamSceneStatusColors): TeamScenePai
     if (!seated) {
       return { background: OFFICE_SCREEN_OFF, line: null }
     }
-    if (seated.emote === 'alert') {
+    if (isAskingEmote(seated.emote)) {
       return { background: SCREEN_ON, line: colors.attention }
     }
     return { background: SCREEN_ON, line: seated.pose === 'work' ? colors.working : null }
@@ -198,8 +199,8 @@ export function createOfficePainter(colors: TeamSceneStatusColors): TeamScenePai
         const y = feetY(a.depth, h)
         const s = teamSceneScaleAt(a.depth) * OFFICE_FIGURE_SCALE
         const deskDir = seatedKeys.get(a.key)
-        g.fillStyle = a.emote === 'alert' ? colors.attention : 'rgb(10 10 15 / 0.45)'
-        g.globalAlpha = a.emote === 'alert' ? 0.6 : 1
+        g.fillStyle = isAskingEmote(a.emote) ? colors.attention : 'rgb(10 10 15 / 0.45)'
+        g.globalAlpha = isAskingEmote(a.emote) ? 0.6 : 1
         g.beginPath()
         g.ellipse(x, y + 1, 16 * s, 4 * s, 0, 0, TAU)
         g.fill()

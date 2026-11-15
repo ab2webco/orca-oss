@@ -51,7 +51,9 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         body.plan.kind !== 'seated'
           ? null
           : body.activity === 'needsYou'
-            ? 'alert'
+            ? body.paneAsk
+              ? 'prompt'
+              : 'alert'
             : body.activity === 'done'
               ? 'check'
               : body.activity === 'blocked'

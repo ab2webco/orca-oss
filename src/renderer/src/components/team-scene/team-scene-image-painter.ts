@@ -14,6 +14,7 @@ import {
   createSceneEffects,
   drawActorMarks,
   drawSceneOverflow,
+  isAskingEmote,
   type TeamSceneStatusColors
 } from './team-scene-painter-marks'
 import { drawFiguresScenery } from './team-scene-figures-props-draw'
@@ -251,8 +252,8 @@ export function createImagePainter(args: {
     const y = feetY(a.depth, f.height)
     const drawnHeight = art.frame.height * px
     const drawnWidth = art.frame.width * px
-    g.fillStyle = a.emote === 'alert' ? colors.attention : 'rgb(20 20 30 / 0.4)'
-    g.globalAlpha = a.emote === 'alert' ? 0.6 : 1
+    g.fillStyle = isAskingEmote(a.emote) ? colors.attention : 'rgb(20 20 30 / 0.4)'
+    g.globalAlpha = isAskingEmote(a.emote) ? 0.6 : 1
     g.beginPath()
     g.ellipse(x, y + 1, drawnHeight * SHADOW_WIDTH, drawnHeight * 0.05, 0, 0, TAU)
     g.fill()

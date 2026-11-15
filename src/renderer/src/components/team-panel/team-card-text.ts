@@ -9,6 +9,7 @@ import type {
   TeamFlowPhase,
   TeamHost,
   TeamLiveAction,
+  TeamMemberAsk,
   TeamModel,
   TeamPullRequest,
   TeamStatus,
@@ -124,6 +125,22 @@ export function teamLiveText(action: TeamLiveAction | null, condition: TeamCondi
       return `${action.name} · ${action.id}`
     case 'question':
       return action.text
+  }
+}
+
+/** What a member waits on the person for; an older client's card without `ask` meant the Inbox. */
+export function teamAskText(ask: TeamMemberAsk | null | undefined): string {
+  switch (ask?.kind) {
+    case 'permission':
+      return ask.tool
+        ? translate('teamPanel.card.permissionPrompt', 'Permission prompt: {{tool}}', {
+            tool: ask.tool
+          })
+        : translate('teamPanel.card.permissionPromptAny', 'Permission prompt in its terminal')
+    case 'question':
+      return translate('teamPanel.card.questionInTerminal', 'Question in its terminal')
+    default:
+      return translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
   }
 }
 

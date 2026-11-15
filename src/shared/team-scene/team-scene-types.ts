@@ -33,6 +33,8 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   hold?: TeamSceneHold
   /** Its open PR's CI reading; absent with no open PR or no reading. */
   ci?: 'pending' | 'failure' | 'success'
+  /** It needs you for a prompt in its own pane, not an Inbox question. */
+  paneAsk?: true
 }
 
 export type TeamSceneInput = {
@@ -108,7 +110,8 @@ export type TeamSceneHold =
   | 'queued'
   | 'starting'
 
-export type TeamSceneEmote = 'alert' | 'check' | 'star' | 'heart' | 'blocked'
+/** `prompt`: it waits on a prompt in its own pane, which only its terminal can answer (ORCA-1231). */
+export type TeamSceneEmote = 'alert' | 'prompt' | 'check' | 'star' | 'heart' | 'blocked'
 
 export type TeamSceneActor = {
   key: string

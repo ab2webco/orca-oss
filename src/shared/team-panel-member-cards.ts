@@ -1,4 +1,5 @@
 import { agentToolLabelOf } from './agent-tool-label'
+import { isAskUserQuestionTool } from './agent-question-answered-intent'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 import {
   characterKeyOf,
@@ -18,6 +19,7 @@ import type {
   TeamHost,
   TeamLeadCard,
   TeamLiveAction,
+  TeamMemberAsk,
   TeamMemberCard,
   TeamPullRequest,
   TeamStatus
@@ -164,6 +166,19 @@ const characterOf = (roster: readonly GameMemberName[], shown: string | null): s
   return name ? characterKeyOf(roster, name) : null
 }
 
+// Why the Inbox first: an answer there is what the member waits on, whatever its pane shows.
+const memberAskOf = (agent: GameAgent, inboxQuestion: boolean): TeamMemberAsk | null => {
+  if (inboxQuestion) {
+    return { kind: 'inbox' }
+  }
+  if (agent.state !== 'waiting' || agent.limit?.loggedOut) {
+    return null
+  }
+  return isAskUserQuestionTool(agent.toolName ?? undefined)
+    ? { kind: 'question' }
+    : { kind: 'permission', tool: agent.toolName ? agentToolLabelOf(agent.toolName) : null }
+}
+
 function memberCardOf(
   agent: GameAgent,
   state: OrchestratorGameState,
@@ -175,8 +190,9 @@ function memberCardOf(
   const ticket = ticketOf(agent, shown, state.project)
   const work = workOf(agent)
   const condition = conditionOf(agent)
-  const needsYou =
-    agent.state === 'waiting' || (ticket !== null && questionTickets.has(ticket.identifier))
+  const ask = memberAskOf(agent, ticket !== null && questionTickets.has(ticket.identifier))
+  // Why the state too: a logged-out member waits on a login, which is no prompt (ORCA-923).
+  const needsYou = ask !== null || agent.state === 'waiting'
   const inbox = ticket && state.inboxes?.find((one) => one.key === ticket.identifier)
   return {
     paneKey: agent.paneKey,
@@ -205,6 +221,7 @@ function memberCardOf(
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
     needsYou,
+    ask,
     limitResetsAt: agent.limit?.resetsAt ?? null,
     found: agent.found === true
   }

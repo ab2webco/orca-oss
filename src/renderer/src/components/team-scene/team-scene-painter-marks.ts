@@ -17,6 +17,10 @@ export type TeamSceneStatusColors = {
 }
 
 const TAU = 2 * Math.PI
+
+/** The marks that ask the person for something, drawn in the attention tone. */
+export const isAskingEmote = (emote: TeamSceneEmote | null | undefined): boolean =>
+  emote === 'alert' || emote === 'prompt'
 // Why stacked: an advisor cheering a merge can also hold up a gesture.
 const GESTURE_OVER_EMOTE = 18
 
@@ -51,6 +55,7 @@ export function drawSceneEmote(
 ): void {
   const background = {
     alert: colors.attention,
+    prompt: colors.attention,
     check: colors.done,
     star: '#ffd24a',
     heart: '#ff8fa8',
@@ -75,6 +80,14 @@ export function drawSceneEmote(
     g.lineTo(0, 0.6)
     g.stroke()
     g.fillRect(-1, 2.6, 2, 2)
+  } else if (kind === 'prompt') {
+    // A terminal prompt `>_`: answered in its pane, not the Inbox.
+    g.moveTo(-3.8, -3)
+    g.lineTo(-1, -0.4)
+    g.lineTo(-3.8, 2.2)
+    g.moveTo(0.6, 2.6)
+    g.lineTo(3.8, 2.6)
+    g.stroke()
   } else if (kind === 'blocked') {
     // A no-entry bar: stopped, not asking.
     g.moveTo(-3.6, 0)

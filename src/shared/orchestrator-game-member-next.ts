@@ -1,6 +1,8 @@
 import type { GameAgent } from './orchestrator-game-state'
 import type { GameMemberPhase } from './orchestrator-game-fleet-verbs'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { isAskUserQuestionTool } from './agent-question-answered-intent'
+import { agentToolLabelOf } from './agent-tool-label'
 
 export function idleNextOf(review: GameAgent['review']): string {
   if (!review) {
@@ -74,7 +76,7 @@ export function phaseNextOf(agent: GameAgent, phase: GameMemberPhase): string {
         ? `game stop ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
         : 'sweep --close'
     case 'needs-you':
-      return agent.limit?.loggedOut ? loggedOutNextOf(agent) : 'answer it'
+      return agent.limit?.loggedOut ? loggedOutNextOf(agent) : paneAskNextOf(agent)
     case 'limited':
       return limitedNextOf(agent)
     case 'working':
@@ -82,6 +84,17 @@ export function phaseNextOf(agent: GameAgent, phase: GameMemberPhase): string {
     case 'idle':
       return idleNextOf(agent.review)
   }
+}
+
+// Why the pane: a prompt in a member's terminal is no Inbox question, so no reply can answer it (ORCA-1231).
+const paneAskNextOf = (agent: GameAgent): string => {
+  const where = `in its pane: open ${agent.terminalHandle ?? agent.displayName ?? agent.paneKey}`
+  if (isAskUserQuestionTool(agent.toolName ?? undefined)) {
+    return `question ${where}`
+  }
+  return agent.toolName
+    ? `permission prompt (${agentToolLabelOf(agent.toolName)}) ${where}`
+    : `permission prompt ${where}`
 }
 
 const loggedOutNextOf = (agent: GameAgent): string =>
