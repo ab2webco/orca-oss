@@ -19,10 +19,10 @@ const mobileRoot = fileURLToPath(new URL('..', import.meta.url))
 const sourceExtension = /\.[jt]sx?$/
 const testOnlyFile = /\.test\.[jt]sx?$|-test-(?:harness|fakes)\.[jt]sx?$/
 
-function mobileCompilerOptions(): ts.CompilerOptions {
+function mobileTsconfig(): ts.ParsedCommandLine {
   const configPath = join(mobileRoot, 'tsconfig.json')
   const { config } = ts.readConfigFile(configPath, ts.sys.readFile)
-  return ts.parseJsonConfigFileContent(config, ts.sys, mobileRoot, undefined, configPath).options
+  return ts.parseJsonConfigFileContent(config, ts.sys, mobileRoot, undefined, configPath)
 }
 
 // Why: `import type` is erased before Metro bundles, so only value imports reach the phone.
@@ -71,7 +71,7 @@ const slashPath = (path: string): string => path.split(sep).join('/')
 // Why: mobile bundles repo-root src/shared modules (see metro.config.js), so follow the import
 // graph out of mobile/ instead of keeping a hand list that the next import silently outgrows.
 function sharedRuntimeFiles(entryFiles: string[]): { files: string[]; unresolved: string[] } {
-  const options = mobileCompilerOptions()
+  const { options } = mobileTsconfig()
   const seen = new Set(entryFiles)
   const queue = [...entryFiles]
   const unresolved: string[] = []
@@ -169,9 +169,11 @@ describe('Hermes built-in support', () => {
   })
 
   it('finds none in mobile production sources or the src/shared modules they import', () => {
-    const entryFiles = ['src', 'app'].flatMap((folder) =>
-      productionFiles(join(mobileRoot, folder)).map(slashPath)
-    )
+    // Why the app tsconfig's files: one it excludes, the Team scene engine, runs in a WebView.
+    const appFiles = new Set(mobileTsconfig().fileNames.map(slashPath))
+    const entryFiles = ['src', 'app']
+      .flatMap((folder) => productionFiles(join(mobileRoot, folder)).map(slashPath))
+      .filter((path) => appFiles.has(path))
     const { files: sharedFiles, unresolved } = sharedRuntimeFiles(entryFiles)
     // Guards the walker itself: a resolver that stops at mobile/ would pass with nothing to scan.
     expect(unresolved).toEqual([])
