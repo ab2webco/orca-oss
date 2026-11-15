@@ -115,6 +115,18 @@ describe('orca mobile pair', () => {
     })
   })
 
+  it('points an automatic pairing that Relay refused at --local-only', async () => {
+    const call = vi
+      .fn()
+      .mockResolvedValue(
+        ok({ available: false, reason: 'relay_mint_failed', guidance: 'Relay is down.' })
+      )
+
+    await expect(runPair([['environment', 'm1']], call, { isRemote: true })).rejects.toMatchObject({
+      message: expect.stringMatching(/Host "m1".*Retry with --local-only/)
+    })
+  })
+
   it('names the host and its version when a paired host is too old for the method', async () => {
     const call = vi.fn(async (method: string) => {
       if (method === 'pairing.createMobileQr') {

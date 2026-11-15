@@ -41,9 +41,14 @@ export const MOBILE_PAIR_HANDLERS: Record<string, CommandHandler> = {
     const response = await mintOnHost(ctx, host, params)
     const qr = response.result
     if (!qr.available) {
+      // Why: automatic mode fails closed without Relay, and an emulator or LAN phone never needs it.
+      const hint =
+        qr.reason === 'relay_mint_failed'
+          ? ' Retry with --local-only to pair over --address alone (LAN, Tailscale or an emulator).'
+          : ''
       throw new RuntimeClientError(
         qr.reason ?? 'pairing_unavailable',
-        `${host ? `Host "${host}"` : 'This Orca Lab'} could not mint a pairing link (${qr.reason ?? 'unknown reason'}). ${qr.guidance ?? ''}`.trim()
+        `${host ? `Host "${host}"` : 'This Orca Lab'} could not mint a pairing link (${qr.reason ?? 'unknown reason'}). ${qr.guidance ?? ''}${hint}`.trim()
       )
     }
     const result: MobilePairResult = {
