@@ -911,6 +911,7 @@ export default function SessionScreen() {
   const deviceTokenRef = useRef<string | null>(null)
   // Why: state (not a ref) so the connection verdict re-renders when the endpoint loads and the Tailscale hint can appear.
   const [hostEndpoint, setHostEndpoint] = useState<string | null>(null)
+  const [hostName, setHostName] = useState<string | null>(null)
   const clientRef = useRef<RpcClient | null>(null)
   const connStateRef = useRef<ConnectionState>(connState)
   // Why: measured once on mount, then passed with every subscribe so the server can auto-fit the PTY to phone dims.
@@ -2389,6 +2390,7 @@ export default function SessionScreen() {
       if (host) {
         deviceTokenRef.current = host.deviceToken
         setHostEndpoint(host.endpoint)
+        setHostName(host.name)
       }
     })
     return () => {
@@ -4870,6 +4872,7 @@ export default function SessionScreen() {
               onOpenChange={setTeamOpen}
               team={team}
               now={teamNow}
+              hostName={hostName}
               onOpenLink={openMobilePrUrl}
               onOpenTerminal={openTeamTerminal}
             />
