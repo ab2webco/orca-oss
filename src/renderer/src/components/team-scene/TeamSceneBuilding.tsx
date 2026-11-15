@@ -42,7 +42,9 @@ type Props = {
 
 // Why these: a floor's strip is the row of desks, its sky cropped, so three floors fit a panel.
 // Each storey up crops less, so higher floors look out over more sky than the lead's street level.
-const STRIP = { height: 112, slab: 4, crop: 66, perLevel: 10, minCrop: 36 }
+// Why the slab is not added: it is the floor's bottom border, inside its border-box height, so a
+// floor starts every `height` px; adding it left a band under the ground floor and a low car.
+const STRIP = { height: 112, crop: 66, perLevel: 10, minCrop: 36 }
 const cropOf = (level: number): number =>
   Math.max(STRIP.minCrop, STRIP.crop - level * STRIP.perLevel)
 const NO_BOXES: readonly TeamSceneRect[] = []
@@ -240,7 +242,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
   const shown = zoomed ? [zoomed] : floors.toReversed()
   const who = useMemo(() => teamSceneWhoOf(props.model.members), [props.model.members])
   // Why a handle: past three floors the building scrolled, and the owner could not see it all.
-  const row = STRIP.height + STRIP.slab
+  const row = STRIP.height
   const bounds = { min: Math.min(VIEW_FLOORS, shown.length) * row, max: shown.length * row }
   const [wanted, setWanted] = useTeamBuildingHeight()
   const viewHeight = teamBuildingHeightOf(wanted, bounds)
@@ -259,7 +261,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
     const boxes = above ? askers[above.key] : undefined
     return boxes && boxes.length > 0
       ? teamSceneRectsFromAbove(boxes, {
-          stripPlusSlab: STRIP.height + STRIP.slab,
+          stripPlusSlab: row,
           cropHere: cropOf(floors.indexOf(shown[index]!)),
           cropAbove: cropOf(floors.indexOf(above!))
         })
@@ -351,7 +353,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
               level={floors.indexOf(floor)}
               legs={legs}
               onBoarded={onBoarded}
-              aboveView={scrollTop - index * (STRIP.height + STRIP.slab)}
+              aboveView={scrollTop - index * row}
               onAskers={onAskers}
               fromAbove={fromAboveOf(index)}
               floorRef={views.register(floor.key)}
@@ -361,7 +363,7 @@ export function TeamSceneBuilding(props: Props): React.JSX.Element {
         </div>
         <TeamSceneElevatorShaft
           rows={shown.map((floor) => floor.key)}
-          rowHeight={zoomed ? TEAM_SCENE_ART_HEIGHT : STRIP.height + STRIP.slab}
+          rowHeight={zoomed ? TEAM_SCENE_ART_HEIGHT : row}
           carAt={car.at}
           rider={leadCar.rider ? 'lead' : advisorCar.rider ? 'advisor' : null}
           envelope={envelope}

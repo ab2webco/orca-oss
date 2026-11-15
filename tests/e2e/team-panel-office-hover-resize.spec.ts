@@ -78,6 +78,12 @@ test('the Office building resizes to every floor, and a character names its agen
       'aria-valuenow',
       (await handle.getAttribute('aria-valuemax')) ?? ''
     )
+    // Why: the pitch once added a slab inside each floor's height; a band showed under the last.
+    const band = await scroller.evaluate((el) => {
+      const last = [...el.querySelectorAll('[data-team-floor]')].at(-1)!
+      return el.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom
+    })
+    expect(band, 'an empty band under the ground floor at full height').toBeLessThanOrEqual(1)
     await building.screenshot({ path: out('building-all-floors.png') })
 
     // A double click resets it; the keyboard moves it a floor at a time.
