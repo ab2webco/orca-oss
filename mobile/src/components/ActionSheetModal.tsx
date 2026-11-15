@@ -18,11 +18,15 @@ export type ActionSheetAction = {
   onPress: () => void
 }
 
+/** A titled group drawn after the main actions, like the + sheet's Team. */
+export type ActionSheetSection = { title: string; actions: ActionSheetAction[] }
+
 type Props = {
   visible: boolean
   title?: string
   message?: string
   actions: ActionSheetAction[]
+  sections?: ActionSheetSection[]
   onClose: () => void
 }
 
@@ -40,10 +44,24 @@ type ContentProps = {
   title?: string
   message?: string
   actions: ActionSheetAction[]
+  sections?: ActionSheetSection[]
   onClose?: () => void
 }
 
-export function ActionSheetContent({ title, message, actions, onClose }: ContentProps) {
+export function ActionSheetContent({ title, message, actions, sections, onClose }: ContentProps) {
+  return (
+    <>
+      <ActionSheetGroup title={title} message={message} actions={actions} onClose={onClose} />
+      {sections?.map((section) => (
+        <View key={section.title} style={styles.section}>
+          <ActionSheetGroup title={section.title} actions={section.actions} onClose={onClose} />
+        </View>
+      ))}
+    </>
+  )
+}
+
+function ActionSheetGroup({ title, message, actions, onClose }: ContentProps) {
   return (
     <>
       {(title || message) && (
@@ -108,18 +126,19 @@ export function ActionSheetContent({ title, message, actions, onClose }: Content
   )
 }
 
-export function ActionSheetModal({ visible, title, message, actions, onClose }: Props) {
+export function ActionSheetModal({ visible, title, message, actions, sections, onClose }: Props) {
   const pendingActionRef = useRef<(() => void) | null>(null)
-  const sequencedActions = actions.map((action) =>
-    action.closeBeforePress
-      ? {
-          ...action,
-          onPress: () => {
-            pendingActionRef.current = action.onPress
+  const sequence = (list: ActionSheetAction[]): ActionSheetAction[] =>
+    list.map((action) =>
+      action.closeBeforePress
+        ? {
+            ...action,
+            onPress: () => {
+              pendingActionRef.current = action.onPress
+            }
           }
-        }
-      : action
-  )
+        : action
+    )
 
   return (
     <BottomDrawer
@@ -137,7 +156,8 @@ export function ActionSheetModal({ visible, title, message, actions, onClose }: 
       <ActionSheetContent
         title={title}
         message={message}
-        actions={sequencedActions}
+        actions={sequence(actions)}
+        sections={sections?.map((section) => ({ ...section, actions: sequence(section.actions) }))}
         onClose={onClose}
       />
     </BottomDrawer>
@@ -145,6 +165,9 @@ export function ActionSheetModal({ visible, title, message, actions, onClose }: 
 }
 
 const styles = StyleSheet.create({
+  section: {
+    marginTop: spacing.md
+  },
   header: {
     paddingHorizontal: spacing.xs,
     paddingBottom: spacing.sm
