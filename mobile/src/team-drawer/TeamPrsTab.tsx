@@ -4,7 +4,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamSectionNote } from './team-section-note'
 import type { TeamSheetWork } from './team-sheet-work'
-import { TEAM_STATUS_TONE } from './team-status-tone'
+import { TEAM_STATUS_ROLE, useTeamTones } from './team-status-tone'
 import type { TeamWorkWords } from './team-work-words'
 
 function Row({
@@ -22,6 +22,7 @@ function Row({
   label: string
   onPress: () => void
 }) {
+  const tones = useTeamTones()
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -33,7 +34,7 @@ function Row({
       <Text style={styles.rowTitle} numberOfLines={1}>
         {title}
       </Text>
-      <View style={[styles.dot, { backgroundColor: TEAM_STATUS_TONE[status] }]} />
+      <View style={[styles.dot, { backgroundColor: tones[TEAM_STATUS_ROLE[status]] }]} />
       <Text style={styles.side}>{side}</Text>
     </Pressable>
   )

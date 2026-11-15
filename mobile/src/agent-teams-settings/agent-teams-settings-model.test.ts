@@ -3,6 +3,7 @@ import { agentTeamsClientSettingsOf } from '../../../src/shared/agent-teams-clie
 import { settingsGetResultOf } from '../../../src/shared/settings-get-result'
 import {
   agentTeamsSettingsOf,
+  darkStatusColorsOf,
   sceneLabelOf,
   statusColorRowsOf,
   statusColorsUpdateOf,
@@ -48,6 +49,24 @@ describe('agentTeamsSettingsOf', () => {
         })
       )
     ).toEqual({ scene: 'jrpg', style: 'pixel', dark: { idle: '#abcdef' } })
+  })
+})
+
+describe('darkStatusColorsOf', () => {
+  it("reads the dark overrides from settings.get's settings key, even without the panel fields", () => {
+    expect(
+      darkStatusColorsOf(
+        settingsGetResultOf({
+          statusColors: { light: { info: '#000000' }, dark: { info: '#123456', warning: 'red' } }
+        })
+      )
+    ).toEqual({ info: '#123456' })
+  })
+
+  it('has none from a host that sends none, or from the flat shape', () => {
+    expect(darkStatusColorsOf(settingsGetResultOf({ terminalFontSize: 13 }))).toEqual({})
+    expect(darkStatusColorsOf({ statusColors: { dark: { info: '#123456' } } })).toEqual({})
+    expect(darkStatusColorsOf(null)).toEqual({})
   })
 })
 

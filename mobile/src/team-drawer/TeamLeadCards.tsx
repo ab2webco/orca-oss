@@ -4,7 +4,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import type { TeamCardWords } from './team-card-words'
 import { teamLeadLiveText } from './team-sheet-lead'
-import { TEAM_STATUS_TONE } from './team-status-tone'
+import { TEAM_STATUS_ROLE, useTeamTones } from './team-status-tone'
 
 function Head({ name, badge, side }: { name: string; badge: string; side: string | null }) {
   return (
@@ -34,7 +34,7 @@ export function TeamLeadCardView({
   hostName: string | null
   words: TeamCardWords
 }) {
-  const tone = TEAM_STATUS_TONE[lead.status]
+  const tone = useTeamTones()[TEAM_STATUS_ROLE[lead.status]]
   const model = lead.model
     ? lead.model.effort
       ? `${lead.model.label} · ${lead.model.effort}`

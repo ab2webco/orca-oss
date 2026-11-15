@@ -5,6 +5,7 @@ import type { TeamMemberRow } from './team-drawer-model'
 import type { TeamSceneBand as Band, TeamSceneBandActor } from './team-scene-band'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 import { teamSceneRoleOf, type TeamSceneArtLoad } from './use-team-scene-art'
+import { MEMBER_STATE_ROLE, useTeamTones } from './team-status-tone'
 
 /** Fixed, so the sheet does not jump when the art decodes or falls back. */
 export const TEAM_SCENE_BAND_HEIGHT = 128
@@ -139,13 +140,6 @@ function StageBand({ stage, actors }: { stage: Stage; actors: TeamSceneBandActor
   )
 }
 
-const TONE: Record<TeamMemberRow['state'], string> = {
-  waiting: colors.statusRed,
-  working: colors.statusGreen,
-  idle: colors.textMuted,
-  done: colors.statusPurple
-}
-
 function ReadableBand({
   leadName,
   members
@@ -153,12 +147,13 @@ function ReadableBand({
   leadName: string | null
   members: TeamMemberRow[]
 }) {
+  const tones = useTeamTones()
   const names = [
     ...(leadName ? [{ key: 'lead', name: leadName, tone: colors.textSecondary }] : []),
     ...members.map((one) => ({
       key: one.key,
       name: one.name,
-      tone: one.needsYou ? colors.statusRed : TONE[one.state]
+      tone: tones[one.needsYou ? 'attention' : MEMBER_STATE_ROLE[one.state]]
     }))
   ]
   return (

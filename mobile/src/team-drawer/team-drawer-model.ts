@@ -23,6 +23,7 @@ import type {
 } from '../../../src/shared/team-panel-model-types'
 import { teamLeadCardsOf } from './team-sheet-lead'
 import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
+import type { TeamTones } from './team-status-tone'
 import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
 import type { TeamSceneArtLoad } from './use-team-scene-art'
 import { teamSheetControlOf, type TeamSheetControl } from './team-sheet-control'
@@ -110,6 +111,8 @@ export type TeamDrawerData = {
   sceneArt: TeamSceneArtLoad | null
   /** Sends an action to the lead as a turn; null with no lead terminal to write to. */
   sendAction: ((action: TeamAction) => Promise<LeadPromptOutcome>) | null
+  /** The status colours, with the person's Settings > Agent Teams overrides. */
+  tones: TeamTones
 }
 
 type Rec = Record<string, unknown>

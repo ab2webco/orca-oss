@@ -5,7 +5,7 @@ import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamSectionNote } from './team-section-note'
 import type { TeamSheetWork } from './team-sheet-work'
-import { TEAM_STATUS_TONE } from './team-status-tone'
+import { TEAM_STATUS_ROLE, useTeamTones } from './team-status-tone'
 import type { TeamWorkWords } from './team-work-words'
 
 const GB = 1024 ** 3
@@ -48,7 +48,8 @@ function MachineCard({
       ? (reading.totalMemory - reading.availableMemory) / reading.totalMemory
       : 0
   const percent = Math.round(used * 100)
-  const tone = TEAM_STATUS_TONE[machine.status]
+  const tones = useTeamTones()
+  const tone = tones[TEAM_STATUS_ROLE[machine.status]]
   return (
     <View style={[styles.card, styles.machine]}>
       <View style={styles.titleLine}>
@@ -68,7 +69,7 @@ function MachineCard({
                 styles.fill,
                 {
                   width: `${percent}%`,
-                  backgroundColor: percent >= FULL_PERCENT ? colors.statusRed : tone
+                  backgroundColor: percent >= FULL_PERCENT ? tones.attention : tone
                 }
               ]}
             />

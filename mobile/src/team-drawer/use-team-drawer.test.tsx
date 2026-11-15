@@ -2,7 +2,9 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient, RpcResponse } from '../transport/rpc-client'
+import { settingsGetResultOf } from '../../../src/shared/settings-get-result'
 import type { TeamDrawerData } from './team-drawer-model'
+import { TEAM_TONE_DEFAULTS, teamTonesOf } from './team-status-tone'
 
 vi.mock('react-native', () => ({ AppState: { currentState: 'active' } }))
 vi.mock('expo-router', async () => {
@@ -53,8 +55,11 @@ const leadState = {
 const ok = (result: unknown): RpcResponse =>
   ({ id: 'x', ok: true, result, _meta: { runtimeId: 'rt' } }) as RpcResponse
 
-function hostReplying(state: unknown) {
+function hostReplying(state: unknown, settings: unknown = { answered: true }) {
   return vi.fn(async (method: string) => {
+    if (method === 'settings.get') {
+      return ok(settings)
+    }
     if (method === 'game.state') {
       return ok(state)
     }
@@ -157,6 +162,36 @@ describe('useTeamDrawer', () => {
     expect(team?.view).toBeNull()
     expect(team?.questions).toEqual([])
     expect(client.sendRequest).not.toHaveBeenCalledWith('game.inboxThreads', expect.anything())
+  })
+
+  it("draws the Team in the host's dark status colour overrides from settings.get", async () => {
+    const sendRequest = hostReplying(
+      leadState,
+      settingsGetResultOf({ statusColors: { dark: { info: '#123456', attention: '#abcdef' } } })
+    )
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+
+    expect(sendRequest).toHaveBeenCalledWith('settings.get')
+    expect(team?.tones).toEqual(teamTonesOf({ info: '#123456', attention: '#abcdef' }))
+  })
+
+  it("keeps today's tones on a host with no overrides, and reads none for a pane that is not the lead", async () => {
+    const sendRequest = hostReplying(leadState, settingsGetResultOf({ terminalFontSize: 13 }))
+    await render({
+      client: { sendRequest } as unknown as RpcClient,
+      terminalHandle: 'term_1',
+      paneKey: 'tab:leaf'
+    })
+    expect(team?.tones).toEqual(TEAM_TONE_DEFAULTS)
+
+    const member = hostReplying({ ...leadState, role: 'member' })
+    await render({
+      client: { sendRequest: member } as unknown as RpcClient,
+      terminalHandle: 't',
+      paneKey: 'p'
+    })
+    expect(member).not.toHaveBeenCalledWith('settings.get')
   })
 
   it("reads the team's level from the characters' XP on a host that advertises it", async () => {

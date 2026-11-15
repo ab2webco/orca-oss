@@ -30,202 +30,17 @@ vi.mock('./team-scene-quest-art', () => ({
 
 import { TeamSheet } from './TeamSheet'
 import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
-
-const question = {
-  id: 'q1',
-  ticket: 'ORCA-7',
-  question: 'Merge the chain now?',
-  options: ['Yes', 'No'],
-  context: null,
-  askedAt: '2026-11-02T10:00:00.000Z',
-  answer: null
-}
-
-const waiting = {
-  id: 'msg_w',
-  ticket: 'ORCA-3',
-  kind: 'decision_gate' as const,
-  subject: 'Pick the port',
-  body: 'Use 6768 or 6769?',
-  at: '2026-11-02T09:00:00.000Z',
-  answerer: 'lead'
-}
-const answered = {
-  id: 'msg_a',
-  ticket: 'ORCA-1',
-  kind: 'question' as const,
-  question: 'Rebase before review?',
-  answer: 'Yes, rebase first.',
-  askedAt: '2026-11-02T08:00:00.000Z',
-  answeredAt: '2026-11-02T08:05:00.000Z'
-}
-const thread = {
-  ticket: 'ORCA-1',
-  last: '2026-11-02T08:05:00.000Z',
-  waiting: 0,
-  messages: [
-    {
-      id: 'm1',
-      at: '2026-11-02T08:00:00.000Z',
-      from: 'ORCA-1',
-      to: 'lead',
-      kind: 'question',
-      subject: 'Rebase?',
-      body: 'Rebase on main?',
-      failure: null
-    },
-    {
-      id: 'm2',
-      at: '2026-11-02T08:05:00.000Z',
-      from: 'lead',
-      to: 'ORCA-1',
-      kind: 'answer',
-      subject: 'Re: Rebase?',
-      body: 'Yes, rebase first.',
-      failure: null
-    }
-  ]
-}
-
-const member = (
-  paneKey: string,
-  displayName: string,
-  state: string,
-  over: Record<string, unknown> = {}
-) => ({
-  paneKey,
-  displayName,
-  agentType: 'claude',
-  state,
-  toolName: null,
-  isLeader: false,
-  isMember: true,
-  ...over
-})
-
-const NOW = 20 * 60_000
-
-const ADVISOR_LINE =
-  'Approved Sonnet 5.5 · high for ORCA-9: the change only touches its tests, so a smaller model is enough.'
-
-const leader = {
-  paneKey: 'tab-0:leaf',
-  displayName: 'Lead pane',
-  agentType: 'claude',
-  state: 'working',
-  toolName: 'Read',
-  toolInput: 'ORCA-9',
-  isLeader: true,
-  isMember: false,
-  launch: { model: 'Opus 5.5', effort: 'high' },
-  advisor: {
-    model: null,
-    effort: null,
-    pinned: { model: false, effort: false },
-    line: ADVISOR_LINE
-  }
-}
-
-function teamWith(
-  over: Partial<TeamDrawerData> = {},
-  lead: Record<string, unknown> | null = null,
-  extra: Record<string, unknown> = {}
-): TeamDrawerData {
-  const view = teamLeadViewOf(
-    {
-      role: 'lead',
-      lead: { autostart: false, cap: 4, agent: 'claude' },
-      leadName: 'Castillo',
-      worktree: { id: 'repo::/lead' },
-      inboxes: [
-        {
-          key: 'ORCA-9',
-          unread: 0,
-          last: { at: 'x', from: 'ORCA-9', subject: 'Tests green, opening the PR' },
-          waiting: []
-        }
-      ],
-      agents: [
-        ...(lead ? [lead] : []),
-        member('a', 'ORCA-1 idle one', 'idle'),
-        member('b', 'ORCA-7 asker', 'working'),
-        member('c', 'Juno', 'working', {
-          workItem: {
-            provider: 'plane',
-            identifier: 'ORCA-9',
-            title: 'Terminal role pill',
-            url: 'u',
-            status: 'In Progress',
-            statusGroup: 'started'
-          },
-          toolName: 'Edit',
-          toolInput: 'terminal-role.ts',
-          stateSince: 8 * 60_000,
-          launch: { model: 'opus', effort: 'high' },
-          account: { provider: 'claude', id: 'a', email: 'dev@example.com' },
-          review: {
-            provider: 'github',
-            number: 850,
-            title: 'p',
-            url: 'https://pr/850',
-            state: 'open',
-            ci: 'success',
-            ciHistory: [
-              { headSha: 'a', ci: 'failure' },
-              { headSha: 'b', ci: 'success' }
-            ],
-            commentCount: 3
-          }
-        }),
-        member('d', 'Rho', 'idle', {
-          limit: { resetsAt: null, loggedOut: true },
-          remote: { host: 'iMac', stateKnown: true }
-        })
-      ],
-      metrics: {
-        claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37, weeklyPercent: 61 }],
-        mergedPerDay: [{ day: '2026-11-02', merged: 4 }],
-        leadTime: { medianMs: 2 * 3_600_000, measured: 4 }
-      },
-      ...extra
-    },
-    new Set(['ORCA-7']),
-    null,
-    NOW
-  )
-  return {
-    view,
-    questions: [question],
-    answerWorktreeId: 'repo::/main',
-    inbox: {
-      kind: 'ready',
-      threads: { threads: [thread], waiting: [waiting], answered: [answered] }
-    },
-    answer: vi.fn(async () => {}),
-    level: null,
-    sceneArt: null,
-    sendAction: null,
-    ...over
-  }
-}
-
-const safeArea = {
-  frame: { x: 0, y: 0, width: 390, height: 844 },
-  insets: { top: 0, left: 0, right: 0, bottom: 0 }
-}
-
-const texts = (): string[] =>
-  [...document.body.querySelectorAll<HTMLElement>('div')]
-    .filter((one) => one.childElementCount === 0)
-    .map((one) => one.textContent ?? '')
-
-function button(label: string): HTMLElement {
-  const found = document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
-  if (!found) {
-    throw new Error(`no control labelled ${label}`)
-  }
-  return found
-}
+import {
+  ADVISOR_LINE,
+  button,
+  gamePanel,
+  leader,
+  NOW,
+  safeArea,
+  teamWith,
+  texts,
+  work
+} from './team-sheet-render-fixtures'
 
 describe('TeamSheet', () => {
   let container: HTMLDivElement
@@ -382,69 +197,6 @@ describe('TeamSheet', () => {
     expect(texts().some((one) => one.endsWith(' XP'))).toBe(false)
   })
 
-  const GB = 1024 ** 3
-  const work = {
-    project: {
-      reviews: {
-        total: 2,
-        url: 'https://github.com/acme/web/pulls',
-        items: [
-          {
-            id: '#416',
-            title: 'Webhook signature check',
-            url: 'https://pr/416',
-            status: 'success'
-          },
-          { id: '#415', title: 'Rate limit dashboard', url: 'https://pr/415', status: 'failure' }
-        ]
-      },
-      todo: null,
-      queue: {
-        provider: 'github',
-        entries: [
-          {
-            id: '#409',
-            title: 'Checkout copy review',
-            url: 'https://pr/409',
-            position: 1,
-            state: 'checks',
-            since: null
-          },
-          {
-            id: '#412',
-            title: 'Retry policy',
-            url: 'https://pr/412',
-            position: 2,
-            state: 'waiting',
-            since: null
-          }
-        ]
-      }
-    },
-    hostCapacity: [
-      {
-        host: 'local',
-        status: 'ok',
-        running: 2,
-        cap: 5,
-        cpuCoreCount: 8,
-        totalMemory: 100 * GB,
-        availableMemory: 39 * GB,
-        loadAverage1m: 1
-      },
-      {
-        host: 'imac',
-        status: 'ok',
-        running: 1,
-        cpuCoreCount: 8,
-        totalMemory: 16 * GB,
-        availableMemory: 2 * GB,
-        loadAverage1m: 1
-      },
-      { host: 'contabo', status: 'unreachable', running: 0 }
-    ]
-  }
-
   it('lists the merge queue, then open PRs failures first, and opens a PR on a tap', () => {
     const onOpenLink = vi.fn()
     act(() =>
@@ -509,16 +261,6 @@ describe('TeamSheet', () => {
     expect(texts()).toContain('This Orca host does not publish it yet.')
     act(() => button('Hosts').click())
     expect(texts()).toContain('This Orca host does not publish it yet.')
-  })
-
-  const gamePanel = (style: string, look = 'game') => ({
-    panel: {
-      look,
-      style,
-      tabs: { prs: true, queue: true, machines: true },
-      advisor: true,
-      arcade: true
-    }
   })
 
   it('draws the scene band 128 pt tall above the tabs, with the lead, members and Jev', () => {
