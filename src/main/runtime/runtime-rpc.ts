@@ -18,7 +18,7 @@ import {
   type RuntimeSocketLivenessWatch
 } from './runtime-socket-liveness-watch'
 import { RpcDispatcher } from './rpc/dispatcher'
-import type { RpcRequest, RpcResponse } from './rpc/core'
+import type { MobilePairingQrRpcContext, RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse, successResponse } from './rpc/errors'
 import { createLocalStreamFrameWriter } from './rpc/local-stream-frame-writer'
 import { fingerprintAuthenticatedPairingCredential } from './rpc/orchestration-mutation-executor'
@@ -818,6 +818,16 @@ export class OrcaRuntimeRpcServer {
         this.webClientRoot && scope === 'runtime' ? createWebClientUrl(endpoint, pairingUrl) : null
     }
   }
+
+  // Why one closure for both transports: the WebSocket wizard and the local CLI must mint identical offers.
+  private readonly mintMobilePairingQr: MobilePairingQrRpcContext = (qrArgs) =>
+    createMobilePairingQrResponse(
+      {
+        resolveDefaultAddress: () => getDefaultPairingAddress(),
+        createOffer: (offerArgs) => this.createMobilePairingOffer(offerArgs)
+      },
+      qrArgs
+    )
 
   async createMobilePairingOffer(args: {
     address?: string | null
@@ -1698,7 +1708,9 @@ export class OrcaRuntimeRpcServer {
 
     try {
       return await this.dispatcher.dispatch(request, {
-        signal: longPoll ? context?.signal : undefined
+        signal: longPoll ? context?.signal : undefined,
+        // Why: the socket token is the 0o600 metadata secret, so its caller is this machine's owner (ORCA-1238).
+        mobilePairingQr: this.mintMobilePairingQr
       })
     } finally {
       this.releaseLongPoll(longPoll)
@@ -1919,14 +1931,7 @@ export class OrcaRuntimeRpcServer {
         // Why unconditional while `pairing` is not: minting a QR needs only this server, so a
         // runtime-scoped client asking for one is the pairing wizard for this very machine.
         // Phones never reach it — the method is absent from MOBILE_RPC_METHOD_ALLOWLIST.
-        mobilePairingQr: (qrArgs) =>
-          createMobilePairingQrResponse(
-            {
-              resolveDefaultAddress: () => getDefaultPairingAddress(),
-              createOffer: (offerArgs) => this.createMobilePairingOffer(offerArgs)
-            },
-            qrArgs
-          ),
+        mobilePairingQr: this.mintMobilePairingQr,
         signal: abortRegistration?.signal,
         sendBinary,
         registerBinaryStreamHandler: (streamId, handler) =>
