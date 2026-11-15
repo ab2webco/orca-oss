@@ -19,5 +19,12 @@ export function GameArcadeEditorTab({ file }: { file: OpenFile }): React.JSX.Ele
     backToConversation()
     useAppStore.getState().closeFile(file.id)
   }, [backToConversation, file.id])
-  return <ArcadeTab isActive onBack={backToConversation} onDone={done} />
+  return (
+    <ArcadeTab
+      isActive
+      keepAs={{ tabId: file.id, play: file.arcadeRunId ?? 0 }}
+      onBack={backToConversation}
+      onDone={done}
+    />
+  )
 }

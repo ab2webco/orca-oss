@@ -1,5 +1,5 @@
 ---
-sourceHash: 8db6f5497d079869
+sourceHash: 73cb5a3722ea2065
 ---
 
 # El juego orquestador de Agent Teams
@@ -592,14 +592,14 @@ orchestratorGame:
   herramienta MCP), las filas del proyecto suben y se fijan en la fila del dock (3 como máximo), y las
   de Orca tienen **Editar** y un interruptor (Detener no).
 - **Dónde se guarda una acción.** El formulario de una acción del proyecto dice **Dónde se guarda**.
-  *Proyecto, orca.yaml*, lo predeterminado para una nueva, escribe solo `orchestratorGame.actions` en
+  _Proyecto, orca.yaml_, lo predeterminado para una nueva, escribe solo `orchestratorGame.actions` en
   el `orca.yaml` del worktree activo (si no, el del principal), en local o por SSH, conserva sus
   comentarios y las entradas que no cambió, y se niega si el archivo cambió desde que se mostró.
-  *Solo esta máquina* la guarda en `machineActions` de `orchestratorGameProjects[repoId]`
+  _Solo esta máquina_ la guarda en `machineActions` de `orchestratorGameProjects[repoId]`
   ([`orchestrator-game-machine-actions.ts`](../../../src/shared/orchestrator-game-machine-actions.ts)),
   que se combinan sobre las de `orca.yaml` por comando: primero van las de `orca.yaml`, una entrada
   con el mismo comando reemplaza a una, `{ command, enabled: false }` oculta una, y después van las
-  propias de esta máquina. **Quitar** con *Solo esta máquina* oculta aquí una acción de `orca.yaml`;
+  propias de esta máquina. **Quitar** con _Solo esta máquina_ oculta aquí una acción de `orca.yaml`;
   su fila se queda, atenuada, y **Mostrar** la devuelve. Una lista `actions` antigua guardada en esta
   máquina, que reemplazaba entera la de `orca.yaml`, se resuelve como antes y pasa a `machineActions`
   al guardar de nuevo. **Volver a la lista de orca.yaml** borra los cambios de esta máquina. Las filas
@@ -716,7 +716,7 @@ Los verbos del líder, ejecutados desde la terminal del líder
   reabrirla. Un líder vivo sigue ganando, y un host más antiguo que descarta el flag reabre el
   anterior y lo dice.
 - Cuando los PR abiertos del proyecto (el total de la lista de PR) alcanzan el tope, `orca game
-  launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea uno de ellos (un
+launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea uno de ellos (un
   relanzamiento no agrega PR) o se pase `--past-pr-cap "<por qué>"`, que lanza e imprime el motivo.
   `orca game wave` imprime `Warning:` en stderr y aun así inicia sus miembros. Un PR cuenta incluso
   después de que su miembro fue liberado, algo que el recuento de miembros vivos no puede ver.
@@ -1992,6 +1992,12 @@ registra, así que un merge visto dos veces paga una sola vez. Se guardan como m
 El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.arcade`
 (`orca game arcade`) las lee, o con `action: play | keep` gasta una o descarta la oferta. Solo el
 proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central.
+
+- Esc vuelve a la conversación y conserva la partida. Una pulsación después de terminar cierra la pestaña.
+- La partida se detiene mientras un agente vivo de cualquier proyecto está bloqueado en un permiso o
+  esperando a la persona, y la pausa lo nombra (`En pausa · Luigi te necesita`). Un panel dormido o
+  desconectado, o una fila que la compuerta de frescura de la barra de pestañas da por vieja (sin
+  confirmar tras restaurar, o callada 30 minutos), no detiene nada.
 
 Las ofertas que hizo la antigua cuenta atrás de 15 segundos se pagan una vez cada una. La terminal
 guardó sus ids bajo `arcade-offers` en `$.store` sin anotar cuáles se jugaron, así que cuentan

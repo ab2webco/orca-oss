@@ -11,7 +11,11 @@ export type ArcadeWords = {
 const KEY = 'auto.components.game-arcade.ArcadeTab'
 
 /** Version 28's arcade copy; the held line is ours, since the prototype never pauses. */
-export function arcadeWordsOf(score: number): ArcadeWords {
+export function arcadeWordsOf(
+  score: number,
+  /** Who the run waits on; empty when the pane has no name to show. */
+  heldBy = ''
+): ArcadeWords {
   return {
     // Why two keys: the extraction check reads literal keys, not i18next plural suffixes.
     score:
@@ -19,7 +23,9 @@ export function arcadeWordsOf(score: number): ArcadeWords {
         ? translate(`${KEY}.scoreOne`, '1 pt')
         : translate(`${KEY}.score`, '{{score}} pts', { score }),
     hint: translate(`${KEY}.hint`, 'Space or tap to jump'),
-    held: translate(`${KEY}.held`, 'Paused · someone needs you'),
+    held: heldBy
+      ? translate(`${KEY}.heldBy`, 'Paused · {{name}} needs you', { name: heldBy })
+      : translate(`${KEY}.held`, 'Paused · someone needs you'),
     over:
       score === 1
         ? translate(`${KEY}.overOne`, 'Game over · 1 pt')
