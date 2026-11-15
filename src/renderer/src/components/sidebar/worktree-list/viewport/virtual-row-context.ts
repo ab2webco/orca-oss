@@ -121,6 +121,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       activeWorktreeId: props.activeWorktreeId,
       currentWorktreeId: props.currentWorktreeId,
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
+      revealedHiddenWorktreeIds: props.revealedHiddenWorktreeIds,
       selectedWorktreeIds: props.selectedWorktreeIds,
       selectedWorktrees: props.selectedWorktrees,
       getActiveSurfaceVariant: primaryActive.getActiveSurfaceVariant,

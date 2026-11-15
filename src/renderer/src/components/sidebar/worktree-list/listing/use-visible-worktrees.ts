@@ -6,7 +6,13 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import { getSettingsFocusedExecutionHostId } from '../../../../../../shared/execution-host'
-import { computeVisibleWorktreeIds } from '../../visible-worktrees'
+import { computeVisibleWorktreeIds, sidebarHasActiveFilters } from '../../visible-worktrees'
+import { createSidebarHidingFilterResolver } from '../../sidebar-hiding-filters'
+import {
+  breakDownWorktreesHiddenByFilters,
+  EMPTY_HIDDEN_BY_FILTERS,
+  type HiddenByFiltersBreakdown
+} from '../../sidebar-filter-hidden-count'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
@@ -22,7 +28,8 @@ import { useReusedArrayIdentity } from './use-reused-array-identity'
 const EMPTY_WORKTREE_ID_SET: ReadonlySet<string> = new Set()
 
 // Applies every sidebar filter to the sorted id stream. Flatten/filter/sort goes through the
-// shared utility so card order matches Cmd+1–9 numbering.
+// shared utility so card order matches Cmd+1–9 numbering. With revealHiddenByFilters, the rows
+// the filters hide come back in their sorted place and are listed in revealedHiddenIds.
 export function useVisibleSidebarWorktrees(args: {
   filterState: SidebarWorktreeFilters['filterState']
   sortBy: SortBy
@@ -32,6 +39,7 @@ export function useVisibleSidebarWorktrees(args: {
   worktreeLineageById: Record<string, WorktreeLineage>
   settings: AppState['settings']
   agentSendTargetWorktreeId: string | null
+  revealHiddenByFilters: boolean
 }) {
   const { filterState, sortBy, sortedIds, repoMap, worktreeMap, worktreeLineageById, settings } =
     args
@@ -69,9 +77,10 @@ export function useVisibleSidebarWorktrees(args: {
     !showSleepingWorkspaces ? getVisibleWorktreeBrowserActivityTabs(s.browserTabsByWorktree) : null
   )
 
-  const recomputedVisibleWorktrees = useMemo(() => {
+  const hasFilters = sidebarHasActiveFilters(filterState)
+  const recomputed = useMemo(() => {
     void agentStatusEpoch
-    const ids = computeVisibleWorktreeIds(worktreesByRepo, sortedIds, {
+    const opts = {
       filterRepoIds,
       showSleepingWorkspaces,
       tabsByWorktree,
@@ -96,14 +105,39 @@ export function useVisibleSidebarWorktrees(args: {
       workspaceHostScope,
       visibleWorkspaceHostIds,
       defaultHostId: getSettingsFocusedExecutionHostId(settings),
-      worktreeLineageById,
-      forcedVisibleWorktreeIds: args.agentSendTargetWorktreeId
-        ? [args.agentSendTargetWorktreeId]
-        : undefined
+      worktreeLineageById
+    }
+    const forced = args.agentSendTargetWorktreeId ? [args.agentSendTargetWorktreeId] : []
+    const ids = computeVisibleWorktreeIds(worktreesByRepo, sortedIds, {
+      ...opts,
+      forcedVisibleWorktreeIds: forced
     })
-    return ids.map((id) => worktreeMap.get(id)).filter((w): w is Worktree => w != null)
+    // Why the hasFilters gate: the line has always counted only what a non-default filter hides.
+    const hidden: HiddenByFiltersBreakdown = hasFilters
+      ? breakDownWorktreesHiddenByFilters(
+          sortedIds,
+          ids,
+          worktreeMap,
+          createSidebarHidingFilterResolver(opts)
+        )
+      : EMPTY_HIDDEN_BY_FILTERS
+    const reveal = args.revealHiddenByFilters && hidden.total > 0
+    // Why forced-visible: the pipeline then sorts them into their usual slot, lineage included.
+    const shownIds = reveal
+      ? computeVisibleWorktreeIds(worktreesByRepo, sortedIds, {
+          ...opts,
+          forcedVisibleWorktreeIds: [...forced, ...hidden.hiddenIds]
+        })
+      : ids
+    return {
+      worktrees: shownIds.map((id) => worktreeMap.get(id)).filter((w): w is Worktree => w != null),
+      hidden,
+      revealedKey: reveal ? hidden.hiddenIds.join('\0') : ''
+    }
   }, [
     args.agentSendTargetWorktreeId,
+    args.revealHiddenByFilters,
+    hasFilters,
     agentStatusEpoch,
     filterRepoIds,
     showSleepingWorkspaces,
@@ -129,7 +163,18 @@ export function useVisibleSidebarWorktrees(args: {
   // Why: agentStatusEpoch bumps recompute this memo even when membership and
   // order are unchanged; keeping the previous identity stops the whole
   // rows/sectionRows/renderedWorktrees chain from churning per epoch.
-  const visibleWorktrees = useReusedArrayIdentity(recomputedVisibleWorktrees)
+  const visibleWorktrees = useReusedArrayIdentity(recomputed.worktrees)
+  // Why keyed on content: an epoch recompute must not hand every row a new set.
+  const { revealedKey } = recomputed
+  const revealedHiddenWorktreeIds = useMemo<ReadonlySet<string>>(
+    () => (revealedKey ? new Set(revealedKey.split('\0')) : EMPTY_WORKTREE_ID_SET),
+    [revealedKey]
+  )
 
-  return { visibleWorktrees, pairedDeviceIdsByEnvironment }
+  return {
+    visibleWorktrees,
+    hiddenByFilters: recomputed.hidden,
+    revealedHiddenWorktreeIds,
+    pairedDeviceIdsByEnvironment
+  }
 }

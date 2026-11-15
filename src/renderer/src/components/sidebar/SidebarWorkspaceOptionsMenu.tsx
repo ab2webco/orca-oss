@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -59,7 +59,6 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
   const setGroupBy = useAppStore((s) => s.setGroupBy)
 
   const [open, setOpen] = useState(false)
-  const sidebarFilterMenuRequest = useAppStore((s) => s.sidebarFilterMenuRequest)
   const { hostOptions } = useSidebarHostScopeOptions()
   const showHostScopeControls = shouldShowHostScopeControls(hostOptions)
 
@@ -87,14 +86,6 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
     },
     [onMenuOpenChange]
   )
-  // Why: open once per request; a new handleOpenChange identity must not re-open a closed menu.
-  const handledFilterMenuRequest = useRef(sidebarFilterMenuRequest)
-  useEffect(() => {
-    if (sidebarFilterMenuRequest !== handledFilterMenuRequest.current) {
-      handledFilterMenuRequest.current = sidebarFilterMenuRequest
-      handleOpenChange(true)
-    }
-  }, [sidebarFilterMenuRequest, handleOpenChange])
 
   // Why: derive from current repos so stale ids (e.g. lingering after a repo
   // is removed) don't inflate counts or falsely signal an applied filter.

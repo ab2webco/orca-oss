@@ -52,7 +52,7 @@ import {
   isCliCreatedWorkspace,
   isDetachedHeadWorkspace,
   isSleepingSweepExemptWorkspace
-} from '@/components/sidebar/visible-worktrees'
+} from '@/components/sidebar/sidebar-hiding-filters'
 import { isDefaultBranchWorkspace } from '@/components/sidebar/default-branch-workspace'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,

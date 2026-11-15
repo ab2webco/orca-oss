@@ -926,9 +926,6 @@ export type UISlice = {
   manualRepoOrder: ManualRepoOrderEntry[]
   hideDefaultBranchWorkspace: boolean
   setHideDefaultBranchWorkspace: (v: boolean) => void
-  // Why: a counter, so each "Ver filtros" click re-opens the menu even when it is already open.
-  sidebarFilterMenuRequest: number
-  requestSidebarFilterMenu: () => void
   hideAutomationGeneratedWorkspaces: boolean
   setHideAutomationGeneratedWorkspaces: (v: boolean) => void
   hideCliCreatedWorkspaces: boolean
@@ -2151,9 +2148,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   hideDefaultBranchWorkspace: false,
   setHideDefaultBranchWorkspace: (v) => set({ hideDefaultBranchWorkspace: v }),
-  sidebarFilterMenuRequest: 0,
-  requestSidebarFilterMenu: () =>
-    set((state) => ({ sidebarFilterMenuRequest: state.sidebarFilterMenuRequest + 1 })),
   hideAutomationGeneratedWorkspaces: false,
   setHideAutomationGeneratedWorkspaces: (v) => set({ hideAutomationGeneratedWorkspaces: v }),
   hideCliCreatedWorkspaces: false,

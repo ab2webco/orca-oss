@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -37,7 +37,6 @@ import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-or
 import { useAgentStatusGroupByWorktree } from './worktree-list/listing/agent-status-group-source'
 import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
-import { countWorktreesHiddenByFilters } from './sidebar-filter-hidden-count'
 import { SidebarHiddenFiltersLine } from './SidebarHiddenFiltersLine'
 
 type WorktreeListProps = {
@@ -107,7 +106,14 @@ const WorktreeList = React.memo(function WorktreeList({
   const agentSendTargetWorktreeId = useAgentSendTargetWorktreeId()
   const { filterState, hasFilters, clearFilters } = useSidebarWorktreeFilters()
   const sortedIds = useSidebarWorktreeSortOrder({ allWorktrees, repoMap, sortBy })
-  const { visibleWorktrees, pairedDeviceIdsByEnvironment } = useVisibleSidebarWorktrees({
+  // Why component state: revealing hidden rows is a glance for this session, never persisted or synced.
+  const [revealHiddenByFilters, setRevealHiddenByFilters] = useState(false)
+  const {
+    visibleWorktrees,
+    hiddenByFilters,
+    revealedHiddenWorktreeIds,
+    pairedDeviceIdsByEnvironment
+  } = useVisibleSidebarWorktrees({
     filterState,
     sortBy,
     sortedIds,
@@ -115,8 +121,18 @@ const WorktreeList = React.memo(function WorktreeList({
     worktreeMap,
     worktreeLineageById,
     settings,
-    agentSendTargetWorktreeId
+    agentSendTargetWorktreeId,
+    revealHiddenByFilters
   })
+  useEffect(() => {
+    if (hiddenByFilters.total === 0) {
+      setRevealHiddenByFilters(false)
+    }
+  }, [hiddenByFilters.total])
+  const toggleRevealHiddenByFilters = useCallback(
+    () => setRevealHiddenByFilters((revealed) => !revealed),
+    []
+  )
   const agentStatusByWorktree = useAgentStatusGroupByWorktree(groupBy, visibleWorktrees)
   const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
     collapsedGroups,
@@ -236,22 +252,6 @@ const WorktreeList = React.memo(function WorktreeList({
     clearFilters
   })
 
-  const hiddenByFiltersCount = useMemo(
-    () =>
-      hasFilters
-        ? countWorktreesHiddenByFilters(
-            sortedIds,
-            visibleWorktrees.map((worktree) => worktree.id),
-            (id) => {
-              const worktree = worktreeMap.get(id)
-              return worktree !== undefined && !worktree.isArchived
-            }
-          )
-        : 0,
-    [hasFilters, sortedIds, visibleWorktrees, worktreeMap]
-  )
-  const requestSidebarFilterMenu = useAppStore((s) => s.requestSidebarFilterMenu)
-
   const filtersHideAllRows =
     hasFilters &&
     visibleWorktrees.length === 0 &&
@@ -324,6 +324,7 @@ const WorktreeList = React.memo(function WorktreeList({
         worktrees={visibleWorktrees}
         folderWorkspaces={folderWorkspaces}
         selectedWorktreeIds={selection.selectedWorktreeIds}
+        revealedHiddenWorktreeIds={revealedHiddenWorktreeIds}
         selectedWorktrees={selection.selectedWorktrees}
         onSelectionGesture={selection.updateSelectionForGesture}
         onImmediateWorktreeActivate={handleImmediateWorktreeActivate}
@@ -360,8 +361,9 @@ const WorktreeList = React.memo(function WorktreeList({
         scrollAnchorRef={scrollAnchorRef}
       />
       <SidebarHiddenFiltersLine
-        count={hiddenByFiltersCount}
-        onShowFilters={requestSidebarFilterMenu}
+        breakdown={hiddenByFilters}
+        revealed={revealHiddenByFilters}
+        onToggleReveal={toggleRevealHiddenByFilters}
       />
     </>
   )
