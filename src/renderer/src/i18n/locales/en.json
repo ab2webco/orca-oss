@@ -5819,6 +5819,11 @@
           "hide": "Hide",
           "overridingGlobal": "Overriding global setting: {{value0}}",
           "projectOnly": "Added in this project only."
+        },
+        "IdleProjectFold": {
+          "fold": "Fold {{project}}",
+          "unfold": "Show workspaces in {{project}}",
+          "count": "{{count}} workspaces"
         }
       },
       "shared": {

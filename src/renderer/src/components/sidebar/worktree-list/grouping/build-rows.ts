@@ -32,6 +32,8 @@ import type {
 } from './row-types'
 import { getRenderedNaturalAnchorRepoIds, withRepoSectionDisplayLabels } from './section-order'
 import { buildOrderedGroups } from './worktree-grouping'
+import { getActiveProjectKeys } from './idle-project-fold'
+import type { ProjectActivityInputs } from './project-activity'
 
 export function buildRows(
   groupBy: WorktreeGroupBy,
@@ -58,7 +60,9 @@ export function buildRows(
   folderWorkspaces: readonly FolderWorkspace[] = [],
   hostLabelById?: ReadonlyMap<string, string>,
   defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID,
-  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings)
+  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings),
+  /** Opts into the ORCA-1216 idle-project fold; absent keeps every project expanded. */
+  idleProjectFold?: ProjectActivityInputs
 ): Row[] {
   const result: Row[] = []
   const projectIndex = buildProjectGroupingIndex(projectGrouping)
@@ -170,7 +174,11 @@ export function buildRows(
     lineageById,
     worktreeMap,
     nestLineage,
-    cyclicLineageIds
+    cyclicLineageIds,
+    activeProjectKeys:
+      groupBy === 'repo' && idleProjectFold
+        ? getActiveProjectKeys(worktrees, repoMap, projectIndex, idleProjectFold)
+        : undefined
   }
 
   if (groupBy !== 'repo' || projectGroups.length === 0) {

@@ -5,13 +5,13 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import { PINNED_GROUP_KEY, getLineageGroupKey } from '../grouping/group-keys'
+import { PINNED_GROUP_KEY, getIdleProjectOpenKey, getLineageGroupKey } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 
-// While the agent send picker targets a workspace, force open every section that hides it.
+// While the agent send picker targets a workspace, force open every section (and idle fold) that hides it.
 export function useEffectiveCollapsedGroups(args: {
   collapsedGroups: Set<string>
   agentSendTargetWorktreeId: string | null
@@ -61,6 +61,8 @@ export function useEffectiveCollapsedGroups(args: {
         projectGrouping
       )) {
         next.delete(groupKey)
+        // Why: an idle project's fold also hides the target; an extra open key on an active project is inert.
+        next.add(getIdleProjectOpenKey(groupKey))
       }
     }
 

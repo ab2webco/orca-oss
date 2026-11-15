@@ -22,6 +22,7 @@ import type {
   WorktreeGroupBy
 } from './row-types'
 import { orderMainWorktreeFirst } from './section-order'
+import { resolveIdleProjectFold } from './idle-project-fold'
 
 /** Everything section emission reads that stays fixed for one buildRows call. */
 export type SectionAppendContext = {
@@ -40,6 +41,18 @@ export type SectionAppendContext = {
   worktreeMap: Map<string, Worktree>
   nestLineage: boolean
   cyclicLineageIds: ReadonlySet<string>
+  /** Set only when the caller opts into the idle-project fold (groupBy 'repo'). */
+  activeProjectKeys?: ReadonlySet<string>
+}
+
+function getSectionRepoIds(key: string, repoIds: ReadonlySet<string>, repo?: Repo): string[] {
+  if (repoIds.size > 0) {
+    return [...repoIds]
+  }
+  if (repo) {
+    return [repo.id]
+  }
+  return key.startsWith('repo:') ? [key.slice('repo:'.length)] : []
 }
 
 export function appendOrderedGroups(
@@ -62,11 +75,30 @@ export function appendOrderedGroups(
     lineageById,
     worktreeMap,
     nestLineage,
-    cyclicLineageIds
+    cyclicLineageIds,
+    activeProjectKeys
   } = ctx
   for (const [key, group] of groupsToAppend) {
-    const isCollapsed = collapsedGroups.has(key)
     const repo = group.repo
+    const repoIds = groupBy === 'repo' ? getSectionRepoIds(key, group.repoIds, repo) : []
+    // Why repo-gated: SectionHeader draws the fold only on a project header that knows its repo.
+    const fold =
+      groupBy === 'repo' && repo && activeProjectKeys
+        ? resolveIdleProjectFold({
+            key,
+            items: group.items,
+            activeProjectKeys,
+            collapsedGroups,
+            hasProjectNotice: repoIds.some(
+              (repoId) =>
+                importedWorktreesByRepo.has(repoId) ||
+                newExternalWorktreesInboxByRepo.has(repoId) ||
+                (pendingByRepo.get(repoId)?.length ?? 0) > 0
+            )
+          })
+        : undefined
+    // Why: while idle, only the fold's open key governs; a stale collapse key must not hide an opened project.
+    const isCollapsed = fold ? fold.state === 'folded' : collapsedGroups.has(key)
     const header =
       groupBy === 'repo'
         ? {
@@ -77,7 +109,8 @@ export function appendOrderedGroups(
             tone: PROJECT_GROUP_META.tone,
             icon: PROJECT_GROUP_META.icon,
             repo,
-            projectGroupDepth
+            projectGroupDepth,
+            ...(fold ? { fold } : {})
           }
         : (() => {
             const meta =
@@ -100,14 +133,6 @@ export function appendOrderedGroups(
     result.push(header)
     if (!isCollapsed) {
       if (groupBy === 'repo') {
-        const repoIds =
-          group.repoIds.size > 0
-            ? [...group.repoIds]
-            : repo
-              ? [repo.id]
-              : key.startsWith('repo:')
-                ? [key.slice('repo:'.length)]
-                : []
         for (const repoId of repoIds) {
           const candidate = importedWorktreesByRepo.get(repoId)
           if (candidate) {

@@ -52,7 +52,9 @@ async function seedTwoHosts(page: Page): Promise<string> {
         branch: n === 0 ? 'refs/heads/main' : `refs/heads/feature-${index}-${n}`,
         isMainWorktree: n === 0,
         isArchived: false,
-        hostId: remote ? sshHostId : 'local'
+        hostId: remote ? sshHostId : 'local',
+        // Why recent: an idle project folds to one row (ORCA-1216); this stack needs every row drawn.
+        lastActivityAt: Date.now()
       }))
     }
     for (let index = 0; index < 6; index += 1) {

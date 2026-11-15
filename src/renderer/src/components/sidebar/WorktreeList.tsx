@@ -30,6 +30,7 @@ import { useSidebarExternalWorktreeCards } from './worktree-list/listing/use-ext
 import { useSidebarHostVisibleScope } from './worktree-list/listing/use-host-visible-scope'
 import { useSidebarRevealRequests } from './worktree-list/navigation/use-reveal-requests'
 import { useSidebarSectionRows } from './worktree-list/listing/use-section-rows'
+import { useIdleProjectFoldInputs } from './worktree-list/listing/use-idle-project-fold-inputs'
 import { useSidebarWorktreeFilters } from './worktree-list/listing/use-filters'
 import { useSidebarWorktreeSelection } from './worktree-list/navigation/use-selection'
 import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-order'
@@ -144,6 +145,7 @@ const WorktreeList = React.memo(function WorktreeList({
     detectedWorktreesByRepo,
     filterRepoIds: filterState.filterRepoIds
   })
+  const idleProjectFold = useIdleProjectFoldInputs()
   const rowModel = useSidebarSectionRows({
     groupBy,
     projectOrderBy,
@@ -166,7 +168,8 @@ const WorktreeList = React.memo(function WorktreeList({
     newExternalWorktreesInboxByRepo: externalWorktreeCards.newExternalWorktreesInboxByRepo,
     filterRepoIds: filterState.filterRepoIds,
     visibleWorkspaceHostIds: filterState.visibleWorkspaceHostIds,
-    workspaceHostScope: filterState.workspaceHostScope
+    workspaceHostScope: filterState.workspaceHostScope,
+    idleProjectFold
   })
   const selection = useSidebarWorktreeSelection({
     sectionRows: rowModel.sectionRows,

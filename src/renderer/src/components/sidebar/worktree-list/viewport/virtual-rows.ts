@@ -45,6 +45,10 @@ export function buildLineageRowRekeyMap(rows: readonly RenderRow[]): ReadonlyMap
   return rekeyed
 }
 
+function isFoldedHeader(row: RenderRow | undefined): boolean {
+  return row?.type === 'header' && row.fold?.state === 'folded'
+}
+
 export function shouldUseHeaderTopSpacing(args: {
   rows: readonly RenderRow[]
   index: number
@@ -53,7 +57,12 @@ export function shouldUseHeaderTopSpacing(args: {
   const previousRenderRow = args.rows[args.index - 1]
   const followsCollapsedPinnedHeader =
     previousRenderRow?.type === 'header' && previousRenderRow.key === PINNED_GROUP_KEY
-  return args.index !== args.firstHeaderIndex && !followsCollapsedPinnedHeader
+  // Why: consecutive one-row idle projects read as one list, as in the ORCA-1216 mock-up.
+  const followsFoldedProject =
+    isFoldedHeader(args.rows[args.index]) && isFoldedHeader(previousRenderRow)
+  return (
+    args.index !== args.firstHeaderIndex && !followsCollapsedPinnedHeader && !followsFoldedProject
+  )
 }
 
 export function estimateRenderRowSize(
@@ -249,7 +258,8 @@ export function getActiveStickyIndexesForScroll(args: {
     hostIndex === null
   )
 
-  return { hostIndex, groupIndex }
+  // Why: a folded idle project has no rows to label; it only ends the previous project's pin.
+  return { hostIndex, groupIndex: isFoldedHeader(args.rows[groupIndex ?? -1]) ? null : groupIndex }
 }
 
 export function getActiveStickyHeaderIndex(

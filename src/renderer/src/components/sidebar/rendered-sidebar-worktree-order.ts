@@ -21,6 +21,7 @@ import {
   filterProjectGroupsForVisibleHosts,
   getVisibleSidebarHostIdSet
 } from './worktree-list/listing/host-filtering'
+import { selectIdleProjectFoldInputs } from './worktree-list/listing/idle-project-fold-inputs'
 
 const EMPTY_REPO_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>())
 const EMPTY_IMPORTED_BY_REPO = Object.freeze(new Map()) as never
@@ -83,7 +84,9 @@ export function computeRenderedSidebarWorktreeOrder(
     // Why no hostLabelById: it only feeds display-only host context labels, never row order.
     undefined,
     defaultHostId,
-    pinnedDisplayPolicy
+    pinnedDisplayPolicy,
+    // Why: folded workspaces are not rendered rows, so they take no number here either.
+    selectIdleProjectFoldInputs(state, Date.now())
   )
 
   // Why lazy: with no host filter, addHostSectionRows is a pass-through, so skip building the whole host registry on a keystroke.

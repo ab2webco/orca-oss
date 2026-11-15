@@ -54,6 +54,13 @@ export function getProjectGroupHeaderKey(groupId: string | null): string {
   return groupId ? `project-group:${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
 }
 
+// Why a separate prefix: presence means "opened", the inverse of a collapse key, so the two never collide.
+export const IDLE_PROJECT_OPEN_KEY_PREFIX = 'idle-open:'
+
+export function getIdleProjectOpenKey(groupKey: string): string {
+  return `${IDLE_PROJECT_OPEN_KEY_PREFIX}${groupKey}`
+}
+
 export const PINNED_GROUP_KEY = 'pinned'
 
 export const PINNED_GROUP_META = {

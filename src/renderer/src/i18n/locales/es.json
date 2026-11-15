@@ -5468,6 +5468,11 @@
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
+        },
+        "IdleProjectFold": {
+          "fold": "Plegar {{project}}",
+          "unfold": "Mostrar los espacios de trabajo de {{project}}",
+          "count": "{{count}} espacios de trabajo"
         }
       },
       "shared": {

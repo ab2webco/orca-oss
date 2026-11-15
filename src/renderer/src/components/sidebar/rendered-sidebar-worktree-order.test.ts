@@ -28,7 +28,8 @@ function makeWorktree(id: string, overrides: Partial<Worktree> = {}): Worktree {
     isUnread: false,
     isPinned: false,
     sortOrder: 0,
-    lastActivityAt: 0,
+    // Why recent: an idle project folds to one row (ORCA-1216); these cases test order, not the fold.
+    lastActivityAt: Date.now(),
     ...overrides
   } as Worktree
 }
@@ -171,6 +172,16 @@ describe('closed-sidebar Cmd+1-9 ordering (#9497)', () => {
     seedStore([main, feature], { collapsedGroups: new Set(['project:repo:repo1']) })
 
     expect(getVisibleWorktreeIds()).toEqual([])
+  })
+
+  it('elides the workspaces of a folded idle project and numbers them once it is opened', () => {
+    const main = makeMainWorktree('wt-main', { lastActivityAt: 0 })
+    const feature = makeWorktree('wt-feature', { lastActivityAt: 0 })
+    seedStore([main, feature])
+    expect(getVisibleWorktreeIds()).toEqual([])
+
+    seedStore([main, feature], { collapsedGroups: new Set(['idle-open:project:repo:repo1']) })
+    expect(getVisibleWorktreeIds()).toEqual(['wt-main', 'wt-feature'])
   })
 
   it('numbers folder workspaces, which the flat fallback omitted entirely', () => {

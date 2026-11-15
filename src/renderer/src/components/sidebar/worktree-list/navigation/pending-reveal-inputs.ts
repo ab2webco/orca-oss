@@ -18,6 +18,7 @@ import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 import { getFolderWorkspaceRevealGroupKeys } from './folder-reveal'
 import { getPinnedWorktreeRevealCollapsedGroupKeys } from './reveal-ancestors'
+import { getFoldedProjectRevealKeys } from './folded-project-reveal'
 
 export const MAX_REVEAL_RETRIES = 8
 
@@ -72,6 +73,10 @@ export function expandGroupsForWorktreeReveal(
   const targetWorktree = args.worktrees.find((w) => w.id === worktreeId)
   if (!targetWorktree) {
     return
+  }
+  // Why from the rendered rows: only a fold on screen needs opening, so a reveal never stores an open key for an active project.
+  for (const openKey of getFoldedProjectRevealKeys(args.renderRows, worktreeId)) {
+    args.toggleGroup(openKey)
   }
   const targetRepo = args.repoMap.get(targetWorktree.repoId)
   const hostGroupKey = `host:${getWorktreeExecutionHostId(targetWorktree, targetRepo, args.defaultHostId)}`

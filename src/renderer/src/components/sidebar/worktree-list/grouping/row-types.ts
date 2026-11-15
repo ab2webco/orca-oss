@@ -14,6 +14,17 @@ export function getPinnedWorktreeDisplayPolicy(
   return settings?.showPinnedWorktreesInGroups === true ? 'duplicate-in-groups' : 'single-location'
 }
 
+/** An idle repo project drawn as one row (ORCA-1216); absent on active projects. */
+export type IdleProjectFold = {
+  state: 'folded' | 'open'
+  /** `collapsedGroups` key (getIdleProjectOpenKey) whose presence means the person unfolded it. */
+  key: string
+  workspaceCount: number
+  /** What clicking the row opens: the most recent workspace, main on a tie. */
+  openWorktree: Worktree
+  worktreeIds: readonly string[]
+}
+
 export type GroupHeaderRow = {
   type: 'header'
   key: string
@@ -28,6 +39,7 @@ export type GroupHeaderRow = {
   hostWorktreeCounts?: ReadonlyMap<ExecutionHostId, number>
   hostWorktreeIds?: ReadonlyMap<ExecutionHostId, readonly string[]>
   worktreeIds?: readonly string[]
+  fold?: IdleProjectFold
 }
 
 export type WorktreeRow = {
