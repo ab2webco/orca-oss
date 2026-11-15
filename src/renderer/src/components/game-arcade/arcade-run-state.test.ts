@@ -2,54 +2,78 @@ import { describe, expect, it } from 'vitest'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
-  arcadeShapesOf,
-  pressArcadeRun,
-  stepArcadeRun
+  inputArcadeRun,
+  stepArcadeRun,
+  type ArcadeInput,
+  type ArcadeRun
 } from './arcade-run-state'
+import { arcadeShapesOf } from './arcade-driver-runner'
 import { ORCHESTRATOR_GAME_ARCADE_RUNNER } from '../../../../shared/orchestrator-game-arcade-file'
 
-const game = JSON.parse(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+const runner = JSON.parse(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+const VIEW = { width: 800, height: 600 }
+const key = (code: string, isDown = true): ArcadeInput => ({ kind: 'key', code, isDown })
+const TAP: ArcadeInput = { kind: 'pointer', x: 10, y: 10, isPress: true }
+const send = (run: ArcadeRun, input: ArcadeInput) => inputArcadeRun(run, input, VIEW)
+
+const playedOut = (run: ArcadeRun): ArcadeRun => {
+  let at = run
+  for (let i = 0; i < 4000 && at.screen !== 'over'; i += 1) {
+    at = stepArcadeRun(at, ARCADE_FRAME_MS, false).run
+  }
+  return at
+}
 
 describe('arcadeShapesOf', () => {
   it("reads each sprite obstacle's column heights and skips the scene's decoration", () => {
-    expect(arcadeShapesOf(game)).toEqual([
+    expect(arcadeShapesOf(runner)).toEqual([
       expect.objectContaining({ heights: [2, 3, 3, 2], weight: 0.35 })
     ])
   })
 })
 
 describe('the arcade run', () => {
-  it('waits for the first press, then runs by real time', () => {
+  it.each([
+    ['Space', runner, 'Space'],
+    ['ArrowUp', runner, 'ArrowUp']
+  ])('waits for the first press (%s), then runs by real time', (_name, game, start) => {
     const ready = arcadeRunOf(game, 7)
-    expect(ready.screen).toBe('ready')
-    expect(stepArcadeRun(ready, 500, false).run.state.ms).toBe(0)
-    const running = pressArcadeRun(ready).run
+    expect(stepArcadeRun(ready, 500, false).run.play.ms).toBe(0)
+    expect(send(ready, key('KeyQ')).run.screen).toBe('ready')
+    const running = send(ready, key(start)).run
     expect(running.screen).toBe('running')
-    expect(stepArcadeRun(running, 80, false).run.state.ms).toBe(80)
+    expect(stepArcadeRun(running, 80, false).run.play.ms).toBe(80)
   })
 
-  it('stands still while someone needs the user and goes on once answered', () => {
-    const running = pressArcadeRun(arcadeRunOf(game, 7)).run
+  it('starts on a tap too', () => {
+    expect(send(arcadeRunOf(runner, 7), TAP).run.screen).toBe('running')
+  })
+
+  it('stands still while someone needs the user, ignores presses, and goes on once answered', () => {
+    const running = send(arcadeRunOf(runner, 7), key('Space')).run
     const held = stepArcadeRun(running, 80, true).run
     expect(held.screen).toBe('held')
-    expect(held.state.ms).toBe(0)
-    expect(pressArcadeRun(held).run.state.air).toBeUndefined()
+    expect(held.play.ms).toBe(0)
+    expect(send(held, key('ArrowUp')).isGame).toBe(false)
     expect(stepArcadeRun(held, 80, false).run).toMatchObject({ screen: 'running' })
   })
 
-  it('ends on a hit, keeps the best score, and a press then asks to close', () => {
-    let run = pressArcadeRun(arcadeRunOf(game, 7, 3)).run
-    for (let i = 0; i < 2000 && run.screen !== 'over'; i += 1) {
-      run = stepArcadeRun(run, ARCADE_FRAME_MS, false).run
+  it.each([['runner', runner]])(
+    'ends the %s run, keeps the best score, and only Space, Enter or a tap closes it',
+    (_name, game) => {
+      const run = playedOut(send(arcadeRunOf(game, 7, 3), key('Space')).run)
+      expect(run.screen).toBe('over')
+      expect(run.best).toBe(Math.max(3, run.play.score))
+      expect(send(run, key('ArrowUp')).close).toBe(false)
+      expect(send(run, key('Space')).close).toBe(true)
+      expect(send(run, key('Enter')).close).toBe(true)
+      expect(send(run, TAP).close).toBe(true)
     }
-    expect(run.screen).toBe('over')
-    expect(run.best).toBe(Math.max(3, run.state.score))
-    expect(pressArcadeRun(run).close).toBe(true)
-  })
+  )
 
   it('reports a new frame only when something moved', () => {
-    const ready = arcadeRunOf(game, 7)
+    const ready = arcadeRunOf(runner, 7)
     expect(stepArcadeRun(ready, 33, false).changed).toBe(false)
-    expect(stepArcadeRun(pressArcadeRun(ready).run, 33, false).changed).toBe(true)
+    expect(stepArcadeRun(send(ready, key('Space')).run, 33, false).changed).toBe(true)
   })
 })

@@ -1,4 +1,5 @@
 import { translate } from '@/i18n/i18n'
+import type { OrchestratorGameArcadeEngine } from '../../../../shared/orchestrator-game-arcade-file'
 /** The lines the canvas draws over the run. */
 export type ArcadeWords = {
   score: string
@@ -10,11 +11,19 @@ export type ArcadeWords = {
 
 const KEY = 'auto.components.game-arcade.ArcadeTab'
 
+const hintOf = (engine: OrchestratorGameArcadeEngine): string => {
+  switch (engine) {
+    case 'runner':
+      return translate(`${KEY}.hint`, 'Space or tap to jump')
+  }
+}
+
 /** Version 28's arcade copy; the held line is ours, since the prototype never pauses. */
 export function arcadeWordsOf(
   score: number,
   /** Who the run waits on; empty when the pane has no name to show. */
-  heldBy = ''
+  heldBy = '',
+  engine: OrchestratorGameArcadeEngine = 'runner'
 ): ArcadeWords {
   return {
     // Why two keys: the extraction check reads literal keys, not i18next plural suffixes.
@@ -22,7 +31,7 @@ export function arcadeWordsOf(
       score === 1
         ? translate(`${KEY}.scoreOne`, '1 pt')
         : translate(`${KEY}.score`, '{{score}} pts', { score }),
-    hint: translate(`${KEY}.hint`, 'Space or tap to jump'),
+    hint: hintOf(engine),
     held: heldBy
       ? translate(`${KEY}.heldBy`, 'Paused · {{name}} needs you', { name: heldBy })
       : translate(`${KEY}.held`, 'Paused · someone needs you'),

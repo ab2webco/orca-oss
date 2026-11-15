@@ -1,8 +1,11 @@
 import {
   HERO_HITBOX,
-  runnerHeightOf
+  runnerHeightOf,
+  type Runner,
+  type RunnerState
 } from '../../../../shared/orchestrator-game-arcade-runner-rules'
-import type { ArcadeRun } from './arcade-run-state'
+import type { ArcadeRun, ArcadeScreen, ArcadeView } from './arcade-run-state'
+import type { ArcadeSpriteShape } from './arcade-driver-runner'
 import type { ArcadeWords } from './arcade-words'
 
 // Draws one frame of the arcade tab, after prototype Version 28's run: a dusk backdrop baked once
@@ -153,7 +156,7 @@ function paintCoin(g: CanvasRenderingContext2D, x: number, y: number, t: number)
 
 function paintText(
   g: CanvasRenderingContext2D,
-  run: ArcadeRun,
+  run: { screen: ArcadeScreen },
   words: ArcadeWords,
   w: number,
   h: number
@@ -188,16 +191,26 @@ export function paintArcadeFrame(
   words: ArcadeWords,
   size: ArcadePaintSize
 ): void {
-  const { width: w, height: h, scale } = size
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.drawImage(backdrop, 0, 0)
+  g.setTransform(size.scale, 0, 0, size.scale, 0, 0)
+  run.play.paint(g, size, run.screen === 'running')
+  paintText(g, run, words, size.width, size.height)
+}
+
+/** The runner's path, obstacles, coins and hero over the backdrop. */
+export function paintRunnerRun(
+  g: CanvasRenderingContext2D,
+  runner: Runner<ArcadeSpriteShape>,
+  state: RunnerState,
+  view: ArcadeView & { isMoving: boolean }
+): void {
+  const { width: w, height: h } = view
   const { unit, floor, heroX } = arcadeGeometryOf(w, h)
-  const { state, runner } = run
   const t = state.ms / 1000
   // Why: world column `distance + HERO_HITBOX.left` sits under the hero's feet.
   const xOf = (column: number): number =>
     heroX + (column - state.distance - HERO_HITBOX.left) * unit
-  g.setTransform(1, 0, 0, 1, 0, 0)
-  g.drawImage(backdrop, 0, 0)
-  g.setTransform(scale, 0, 0, scale, 0, 0)
   g.fillStyle = 'rgb(60 40 20 / 0.22)'
   const gap = 70
   const offset = (state.distance * unit) % gap
@@ -232,12 +245,5 @@ export function paintArcadeFrame(
   g.beginPath()
   g.ellipse(heroX, floor + 1, 20 * shadow, 5 * shadow, 0, 0, Math.PI * 2)
   g.fill()
-  paintHero(
-    g,
-    heroX + (HERO_HITBOX.width * unit) / 2,
-    floor - feet,
-    t,
-    run.screen === 'running' && feet === 0
-  )
-  paintText(g, run, words, w, h)
+  paintHero(g, heroX + (HERO_HITBOX.width * unit) / 2, floor - feet, t, view.isMoving && feet === 0)
 }

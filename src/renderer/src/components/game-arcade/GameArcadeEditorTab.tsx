@@ -22,6 +22,7 @@ export function GameArcadeEditorTab({ file }: { file: OpenFile }): React.JSX.Ele
   return (
     <ArcadeTab
       isActive
+      engine={file.arcadeEngine}
       keepAs={{ tabId: file.id, play: file.arcadeRunId ?? 0 }}
       onBack={backToConversation}
       onDone={done}
