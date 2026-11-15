@@ -44,7 +44,8 @@ import { trackClaudeMonitorTaskIds } from './claude-monitor-task-ids'
 import {
   claudeSessionModelOfHook,
   claudeSessionModelOfTranscriptLine,
-  type ClaudeSessionModel
+  type ClaudeSessionModelState,
+  type ClaudeTranscriptReader
 } from './claude-session-model'
 import {
   codexRosterEffectiveState,
@@ -158,7 +159,7 @@ export type HookListenerState = {
   /** Root Codex state/model, kept separate from child hook traffic. */
   codexLeadStateByPaneKey: Map<string, CodexLeadTurnState>
   /** The lead Claude session's model and effort; only SessionStart and Stop name them. */
-  claudeSessionModelByPaneKey: Map<string, ClaudeSessionModel>
+  claudeSessionModelByPaneKey: Map<string, ClaudeSessionModelState>
 }
 
 export type ClaudeLeadTurnState = {
@@ -3093,6 +3094,17 @@ function trackClaudePostStopContinuation(
   }
 }
 
+const CLAUDE_TRANSCRIPT_MODEL_READER: ClaudeTranscriptReader = {
+  bytesOf: (path) => {
+    try {
+      return statSync(path).size
+    } catch {
+      return undefined
+    }
+  },
+  read: (path) => readLastTextFromTranscriptOnce(path, claudeSessionModelOfTranscriptLine)
+}
+
 function buildClaudeStatusPayload(
   state: HookListenerState,
   eventName: unknown,
@@ -3120,7 +3132,7 @@ function buildClaudeStatusPayload(
         eventName,
         hookPayload,
         state.claudeSessionModelByPaneKey.get(paneKey),
-        (path) => readLastTextFromTranscriptOnce(path, claudeSessionModelOfTranscriptLine)
+        CLAUDE_TRANSCRIPT_MODEL_READER
       )
     )
   }

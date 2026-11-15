@@ -16416,7 +16416,8 @@
       },
       "detail": {
         "branch": "Rama",
-        "tool": "Última herramienta"
+        "tool": "Última herramienta",
+        "modelChoice": "Elección del modelo"
       },
       "usage": {
         "session": "5 h",
@@ -16592,6 +16593,10 @@
     },
     "building": {
       "resize": "Cambiar el alto del edificio"
+    },
+    "model": {
+      "chosenByAdvisor": "Elegido por {{advisor}}",
+      "advisorReason": "{{reason}} ({{advisor}})"
     }
   },
   "claudeDeadHooks": {

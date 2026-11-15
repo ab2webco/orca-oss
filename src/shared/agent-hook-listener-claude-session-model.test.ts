@@ -52,6 +52,27 @@ describe('Claude session model on status payloads', () => {
     expect(stop).toMatchObject({ state: 'done', model: 'claude-opus-5-5', effort: 'xhigh' })
   })
 
+  it('shows the model a router switched to mid-turn, before the turn stops', () => {
+    const transcript = join(dir, 'member.jsonl')
+    writeFileSync(transcript, '')
+    send({
+      hook_event_name: 'SessionStart',
+      source: 'startup',
+      model: 'claude-sonnet-5-5',
+      transcript_path: transcript
+    })
+    send({ hook_event_name: 'UserPromptSubmit', prompt: 'work', transcript_path: transcript })
+    writeFileSync(transcript, `${assistantLine('claude-opus-5-5', 'high')}\n`)
+    expect(
+      send({
+        hook_event_name: 'PostToolUse',
+        tool_name: 'Edit',
+        transcript_path: transcript,
+        effort: { level: 'medium' }
+      })
+    ).toMatchObject({ model: 'claude-opus-5-5', effort: 'high' })
+  })
+
   it('learns the model from the transcript for a pane first seen mid-session', () => {
     const transcript = join(dir, 'resumed.jsonl')
     writeFileSync(transcript, `${assistantLine('claude-haiku-5-5', 'medium')}\n`)

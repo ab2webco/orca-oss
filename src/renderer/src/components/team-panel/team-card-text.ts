@@ -1,6 +1,11 @@
 import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
 import { toolDisplayWords } from '../../../../shared/tool-display-words'
+import {
+  teamModelCreditTextOf,
+  teamModelLabelText
+} from '../../../../shared/team-panel-agent-model'
+import { TEAM_ADVISOR_NAME } from '../../../../shared/team-model-advisor-words'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -194,10 +199,19 @@ export function teamPhaseText(phase: TeamFlowPhase): string {
 }
 
 export function teamModelText(model: TeamModel | null): string | null {
-  if (!model) {
-    return null
-  }
-  return model.effort ? `${model.label} · ${model.effort}` : model.label
+  return model ? teamModelLabelText(model) : null
+}
+
+/** Who picked the model and why; null where no router or chooser is known. */
+export function teamModelCreditText(model: TeamModel | null): string | null {
+  const advisor = TEAM_ADVISOR_NAME
+  return teamModelCreditTextOf(model?.credit, {
+    chosenByAdvisor: translate('teamPanel.model.chosenByAdvisor', 'Chosen by {{advisor}}', {
+      advisor
+    }),
+    advisorReason: (reason) =>
+      translate('teamPanel.model.advisorReason', '{{reason}} ({{advisor}})', { reason, advisor })
+  })
 }
 
 /** `localName` is the user's rename of this machine, which wins over the default label. */

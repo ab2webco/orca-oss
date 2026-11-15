@@ -18,6 +18,7 @@ import {
   teamCiText,
   teamHelperStateText,
   teamLiveText,
+  teamModelCreditText,
   teamPrNumberText,
   teamUsageBarClass
 } from './team-card-text'
@@ -51,7 +52,8 @@ function HelpersList({ paneKey }: { paneKey: string }): React.JSX.Element | null
   )
 }
 
-type Fact = { key: string; label: string; value: ReactNode }
+/** `wraps`: a sentence that must read whole at 320, where a path or tool may be cut. */
+type Fact = { key: string; label: string; value: ReactNode; wraps?: true }
 
 /** A branch cut in the middle: the owner prefix gives way first, the ticket part stays whole. */
 function BranchText({ branch }: { branch: string }): React.JSX.Element {
@@ -70,6 +72,7 @@ function factsOf(card: TeamMemberCard): Fact[] {
     card.liveAction && card.liveAction.kind !== 'question'
       ? teamLiveText(card.liveAction, card.condition)
       : null
+  const credit = teamModelCreditText(card.model)
   const facts: (Fact | null)[] = [
     card.branch
       ? {
@@ -80,6 +83,14 @@ function factsOf(card: TeamMemberCard): Fact[] {
       : null,
     tool
       ? { key: 'tool', label: translate('teamPanel.card.detail.tool', 'Last tool'), value: tool }
+      : null,
+    credit
+      ? {
+          key: 'modelChoice',
+          label: translate('teamPanel.card.detail.modelChoice', 'Model choice'),
+          value: credit,
+          wraps: true as const
+        }
       : null
   ]
   return facts.filter((fact): fact is Fact => fact !== null)
@@ -212,7 +223,9 @@ export function TeamMemberCardDetail({
         {factsOf(card).map((fact) => (
           <div key={fact.key} data-team-detail={fact.key} className="contents">
             <dt className="text-muted-foreground">{fact.label}</dt>
-            <dd className="min-w-0 truncate text-foreground">{fact.value}</dd>
+            <dd className={`min-w-0 text-foreground ${fact.wraps ? 'break-words' : 'truncate'}`}>
+              {fact.value}
+            </dd>
           </div>
         ))}
       </dl>

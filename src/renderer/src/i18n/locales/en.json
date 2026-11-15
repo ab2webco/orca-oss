@@ -17396,7 +17396,8 @@
       },
       "detail": {
         "branch": "Branch",
-        "tool": "Last tool"
+        "tool": "Last tool",
+        "modelChoice": "Model choice"
       },
       "usage": {
         "session": "5 h",
@@ -17572,6 +17573,10 @@
     },
     "building": {
       "resize": "Resize building"
+    },
+    "model": {
+      "chosenByAdvisor": "Chosen by {{advisor}}",
+      "advisorReason": "{{reason}} ({{advisor}})"
     }
   },
   "claudeDeadHooks": {

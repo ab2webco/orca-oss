@@ -4,6 +4,7 @@ import {
   teamHostText,
   teamLeadLiveText,
   teamLiveText,
+  teamModelCreditText,
   teamModelText,
   teamPhaseText,
   teamAgeText,
@@ -143,6 +144,35 @@ describe('card words', () => {
     )
     expect(teamModelText({ label: 'Opus 5.5', effort: null, source: 'launch' })).toBe('Opus 5.5')
     expect(teamModelText(null)).toBeNull()
+  })
+
+  it("leads with the session's own model when Jev's router moved it", () => {
+    expect(
+      teamModelText({
+        label: 'Opus 5.5',
+        effort: 'high',
+        source: 'session',
+        credit: { by: 'advisor', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
+      })
+    ).toBe('Sonnet 5.5 → Opus 5.5 · high')
+  })
+
+  it('credits Jev with its reason, and nobody where no router is known', () => {
+    const model = { label: 'Opus 5.5', effort: 'high', source: 'session' } as const
+    expect(
+      teamModelCreditText({
+        ...model,
+        credit: { by: 'advisor', from: 'Sonnet 5.5', reason: 'code floor (Jev: code)' }
+      })
+    ).toBe('code floor (Jev: code)')
+    expect(
+      teamModelCreditText({ ...model, credit: { by: 'advisor', from: null, reason: 'lowered' } })
+    ).toBe('lowered (Jev)')
+    expect(
+      teamModelCreditText({ ...model, credit: { by: 'advisor', from: null, reason: null } })
+    ).toBe('Chosen by Jev')
+    expect(teamModelCreditText(model)).toBeNull()
+    expect(teamModelCreditText(null)).toBeNull()
   })
 
   it('names the host', () => {

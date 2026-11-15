@@ -203,6 +203,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.host ?? 'local',
     row.agent ?? '-',
     row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
+    row.model ?? '-',
     row.next,
     row.found ? `${row.name} (found)` : row.name
   ])
@@ -217,7 +218,8 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     'BRANCH',
     'HOST',
     'AGENT',
-    'ACCOUNT'
+    'ACCOUNT',
+    'MODEL'
   ]
   return [...top, tableOf([[...header, 'NEXT', 'NAME'], ...rows]), ...paused].join('\n')
 }

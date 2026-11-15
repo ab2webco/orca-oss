@@ -100,6 +100,36 @@ export async function emitCodexHookStatus(
   }
 }
 
+/** Posts one raw Claude hook payload, as Claude Code's own hook would for that pane. */
+export async function emitClaudeHookPayload(
+  endpoint: AgentHookEndpoint,
+  event: {
+    paneKey: string
+    worktreeId: string
+    payload: Record<string, unknown>
+  }
+): Promise<void> {
+  const [tabId] = event.paneKey.split(':')
+  const response = await fetch(`http://127.0.0.1:${endpoint.port}/hook/claude`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Orca-Agent-Hook-Token': endpoint.token
+    },
+    body: JSON.stringify({
+      paneKey: event.paneKey,
+      tabId,
+      worktreeId: event.worktreeId,
+      env: endpoint.env,
+      version: endpoint.version,
+      payload: event.payload
+    })
+  })
+  if (response.status !== 204) {
+    throw new Error(`Claude hook POST returned ${response.status}`)
+  }
+}
+
 export async function emitGrokHookPayload(
   endpoint: AgentHookEndpoint,
   event: {

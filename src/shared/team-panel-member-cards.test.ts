@@ -192,7 +192,12 @@ describe('teamCardsOf', () => {
           }
         })
       ])?.members ?? []
-    expect(card?.model).toEqual({ label: 'Sonnet 5.5', effort: 'low', source: 'advisor' })
+    expect(card?.model).toEqual({
+      label: 'Sonnet 5.5',
+      effort: 'low',
+      source: 'advisor',
+      credit: { by: 'advisor', from: null, reason: null }
+    })
   })
 
   it("carries Jev's latest decisions in the member's pane, and none where it sent none", () => {
