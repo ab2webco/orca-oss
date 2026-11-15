@@ -24,6 +24,10 @@ import {
   orchestratorGameSceneNativeOf,
   type OrchestratorGameSceneNative
 } from './orchestrator-game-scene-native'
+import {
+  orchestratorGameScenePropOf,
+  type OrchestratorGameSceneProp
+} from './orchestrator-game-scene-prop'
 
 /** Scenes a plugin contributes to the Agent Teams game: inert JSON the bundled mod draws. */
 
@@ -136,6 +140,7 @@ export type OrchestratorGameSceneTheme = z.infer<typeof themeSchema>
 export type OrchestratorGameSceneDefinition = z.infer<typeof sceneFileSchema> & {
   id: string
   cast?: OrchestratorGameSceneCast
+  prop?: OrchestratorGameSceneProp
   /** Names a lead's members take, in order. */
   roster?: GameMemberName[]
   /** The roster entries that bring a look of their own; the rest wear the phase costumes. */
@@ -213,6 +218,7 @@ export function orchestratorGameSceneIssues(text: string): string[] {
           (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`
         )),
     ...orchestratorGameSceneCastOf(rawCastOf(raw)).issues,
+    ...orchestratorGameScenePropOf(raw).issues,
     ...rosterOf(raw, parsed.success ? parsed.data.costumes : undefined).issues,
     ...themesOf(raw).issues,
     ...orchestratorGameScene3dOf(raw).issues,
@@ -237,6 +243,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
   }
   // Why apart: a bad pet or advisor is left out with a warning; the scene and its hero still draw.
   const { cast, issues } = orchestratorGameSceneCastOf(rawCastOf(raw))
+  const { prop, issues: propIssues } = orchestratorGameScenePropOf(raw)
   const { roster, characters, issues: rosterIssues } = rosterOf(raw, parsed.data.costumes)
   const { themes, issues: themeIssues } = themesOf(raw)
   const { scene3d, issues: scene3dIssues } = orchestratorGameScene3dOf(raw)
@@ -246,6 +253,7 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
     definition: {
       ...parsed.data,
       ...(cast === undefined ? {} : { cast }),
+      ...(prop === undefined ? {} : { prop }),
       ...(roster === undefined ? {} : { roster }),
       ...(characters === undefined ? {} : { characters }),
       ...(themes === undefined ? {} : { themes }),
@@ -253,7 +261,14 @@ export function parseOrchestratorGameScene(text: string, id: string): SceneParse
       ...(native === undefined ? {} : { native }),
       id
     },
-    warnings: [...issues, ...rosterIssues, ...themeIssues, ...scene3dIssues, ...nativeIssues]
+    warnings: [
+      ...issues,
+      ...propIssues,
+      ...rosterIssues,
+      ...themeIssues,
+      ...scene3dIssues,
+      ...nativeIssues
+    ]
   }
 }
 

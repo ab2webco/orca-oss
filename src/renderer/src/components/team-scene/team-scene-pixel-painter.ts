@@ -17,6 +17,7 @@ import type { SceneDefinition } from '../../../../../resources/claude-plugins/or
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { PILE_FROM_SEAT_X, SITE_FROM_SEAT_X } from '../../../../shared/team-scene/team-scene-sites'
 import { pixelAdvisorSpriteOf, pixelPetOf } from './team-scene-pixel-cast'
+import { drawPixelProp } from './team-scene-pixel-prop'
 import {
   drawPixelCrates,
   drawPixelPlot,
@@ -46,11 +47,6 @@ const feetRow = (depth: number): number => GROUND - 2 + Math.round(depth * 2)
 // Columns from a seat to its bed's middle: half a sprite, a gap, half the bed.
 const BED_FROM_SEAT = 9
 
-// V28's tool and paper tones, and its swing: every 1.15 s, easing out over about 0.43 s.
-const TOOL = '#e8eef4'
-const PAPER = '#f4e6c0'
-const SWING_SECONDS = 1.15
-const SWING_FADE = 2.3
 // The game's SCENE_TICK_MS; its clouds and stars change at most every 6 ticks, so the sky rebakes then.
 const TICK_MS = 120
 const SKY_TICKS = 6
@@ -80,56 +76,6 @@ function bitmapOf(
     }
   }
   return canvas
-}
-
-/** What a seated actor holds in hand, in scene pixels from its middle (`cx`, `hy`), as V28 draws it. */
-function drawTool(
-  g: CanvasRenderingContext2D,
-  a: TeamSceneActor,
-  t: number,
-  cx: number,
-  hy: number
-): void {
-  const hx = cx + a.facing * 4
-  const dot = (dx: number, dy: number, w: number, h: number, color: string): void => {
-    g.fillStyle = color
-    const x = a.facing > 0 ? hx + dx : hx - dx - w + 1
-    g.fillRect(x * PIXEL, (hy + dy) * PIXEL, w * PIXEL, h * PIXEL)
-  }
-  if (a.carrying || a.pose === 'give') {
-    dot(1, 0, 3, 2, PAPER)
-    return
-  }
-  if (a.pose === 'raise' || a.pose === 'wave' || a.pose === 'cheer') {
-    dot(0, -6 + (Math.floor(t * 6) % 2), 1, 4, TOOL)
-    return
-  }
-  if (a.pose === 'done') {
-    // Why shouldered: a raised tool already means asking the user.
-    dot(-1, -3, 1, 1, TOOL)
-    dot(-2, -4, 1, 1, TOOL)
-    dot(-3, -5, 1, 1, TOOL)
-    return
-  }
-  if (a.pose !== 'work') {
-    return
-  }
-  const swing = Math.max(
-    0,
-    1 - (((t % SWING_SECONDS) + SWING_SECONDS) % SWING_SECONDS) * SWING_FADE
-  )
-  if (swing > 0.6) {
-    dot(1, -4, 1, 4, TOOL)
-  } else if (swing > 0.3) {
-    dot(1, -1, 1, 1, TOOL)
-    dot(2, -2, 1, 1, TOOL)
-    dot(3, -3, 1, 1, TOOL)
-  } else if (swing > 0) {
-    dot(1, 1, 4, 1, TOOL)
-  } else {
-    // Why held between swings: a worker at rest must still read apart from a resting member.
-    dot(1, -1, 1, 3, TOOL)
-  }
 }
 
 /** The Pixel style: the game's own scene, sprites and crown, placed by the shared simulation. */
@@ -232,7 +178,15 @@ export function createPixelPainter(args: {
     if (pet) {
       blit(g, spriteFor(pet.sprite, false), pet.left, feetRow(a.depth), a.facing)
     }
-    drawTool(g, a, t, left + Math.floor(image.width / 2), bottom - Math.floor(image.height / 2))
+    drawPixelProp({
+      g,
+      a,
+      t,
+      cx: left + Math.floor(image.width / 2),
+      hy: bottom - Math.floor(image.height / 2),
+      pixel: PIXEL,
+      prop: scene.prop
+    })
     const markX = (left + image.width / 2) * PIXEL
     drawActorMarks(g, markX, (bottom - image.height - 3) * PIXEL, a, colors)
   }
