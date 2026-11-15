@@ -53,7 +53,8 @@ describe('useNewTabTeam', () => {
 
     expect(seen.at(-1)).toEqual({
       kind: 'lead-live',
-      lead: { worktreeId: 'r::/w', terminal: 'term_lead', tabId: 'tab-lead' }
+      lead: { worktreeId: 'r::/w', terminal: 'term_lead', tabId: 'tab-lead' },
+      roster: null
     })
   })
 

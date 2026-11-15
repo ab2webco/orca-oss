@@ -286,6 +286,8 @@ import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
 import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
 import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
+import { useAddMember } from '../../../../src/new-tab-team/use-add-member'
+import { AddMemberSheet } from '../../../../src/new-tab-team/AddMemberSheet'
 import { reopenTeamLeadFromPhone } from '../../../../src/new-tab-team/new-tab-team-reopen'
 import {
   newTabTeamSectionOf,
@@ -2897,9 +2899,15 @@ export default function SessionScreen() {
     supported: teamControlSupported,
     worktreeId
   })
+  const addMember = useAddMember({ client, showToast })
   const newTabTeamSection = newTabTeamSectionOf(newTabTeam, {
     hostName: hostName || 'this computer',
     onGoToLead: openTeamTerminal,
+    onAddMember: (roster) => {
+      if (newTabTeam.kind === 'lead-live') {
+        addMember.start(roster, newTabTeam.lead.terminal)
+      }
+    },
     onReopen: () => {
       if (!client) {
         return
@@ -4993,6 +5001,9 @@ export default function SessionScreen() {
         sections={newTabTeamSection ? [newTabTeamSection] : undefined}
         onClose={() => setShowCreateTabDrawer(false)}
       />
+      {addMember.sheet ? (
+        <AddMemberSheet {...addMember.sheet} hostName={hostName || 'this computer'} />
+      ) : null}
 
       <ActionSheetModal
         visible={pendingDiffNotesDelivery !== null}

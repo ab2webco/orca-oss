@@ -46,9 +46,36 @@ describe('readNewTabTeam', () => {
 
     await expect(read(client)).resolves.toEqual({
       kind: 'lead-live',
-      lead: { worktreeId: 'repo-a::/w/main', terminal: 'term_lead', tabId: 'tab-lead' }
+      lead: { worktreeId: 'repo-a::/w/main', terminal: 'term_lead', tabId: 'tab-lead' },
+      roster: null
     })
     expect(sendRequest).not.toHaveBeenCalledWith('game.leadStored', expect.anything())
+  })
+
+  it("reads the lead's To Do and hosts for Add member", async () => {
+    const { client, sendRequest } = clientAnswering({
+      'game.leads': ok(leadIn('repo-a::/w/main')),
+      'game.state': ok({
+        role: 'lead',
+        agents: [{ paneKey: 'p-lead', isLeader: true, isMember: false, state: 'idle' }],
+        lead: { autostart: false, cap: 4, agent: 'claude' },
+        project: {
+          todo: { items: [{ id: 'ORCA-2', title: 'T', url: 'u', group: 'todo', prompt: 'P' }] }
+        }
+      })
+    })
+
+    const team = await read(client)
+
+    expect(team.kind === 'lead-live' && team.roster).toEqual({
+      todo: [{ identifier: 'ORCA-2', title: 'T', prompt: 'P' }],
+      hosts: [{ on: null, running: 0, cap: 4 }]
+    })
+    expect(sendRequest).toHaveBeenCalledWith('game.state', {
+      worktreeId: 'repo-a::/w/main',
+      terminalHandle: 'term_lead',
+      paneKey: `tab-lead:${LEAF}`
+    })
   })
 
   it("reads a kept lead with its account's email when no lead of this project is live", async () => {
