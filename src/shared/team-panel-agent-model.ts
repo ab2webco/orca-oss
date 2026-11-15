@@ -61,3 +61,46 @@ export const teamAgentModelOf = (
     ? { label: fallback.model, effort: fallback.effort ?? null, source: 'launch' }
     : null
 }
+
+/** The model as one line: `Sonnet 5.5 → Opus 5.5 · high` when a router moved it. */
+export function teamModelLabelText(model: TeamModel): string {
+  const label = model.credit?.from ? `${model.credit.from} → ${model.label}` : model.label
+  return model.effort ? `${label} · ${model.effort}` : label
+}
+
+export type TeamModelCreditWords = {
+  chosenByJev: string
+  jevReason: (reason: string) => string
+}
+
+const ENGLISH_CREDIT_WORDS: TeamModelCreditWords = {
+  chosenByJev: 'Chosen by Jev',
+  jevReason: (reason) => `${reason} (Jev)`
+}
+
+/** Who picked the model and why; null where no router or chooser is known. */
+export function teamModelCreditTextOf(
+  credit: TeamModelCredit | undefined,
+  words: TeamModelCreditWords = ENGLISH_CREDIT_WORDS
+): string | null {
+  if (!credit) {
+    return null
+  }
+  if (!credit.reason) {
+    return words.chosenByJev
+  }
+  // Why: Jev's own reason often already names it (`code floor (Jev: code)`).
+  return /\bjev\b/i.test(credit.reason) ? credit.reason : words.jevReason(credit.reason)
+}
+
+/** A member's model and who chose it as the CLI prints them; null where its host sent none. */
+export function gameMemberModelTextOf(agent: Pick<GameAgent, 'advisor' | 'launch'>): {
+  model: string | null
+  modelBy: string | null
+} {
+  const model = teamAgentModelOf(agent)
+  return {
+    model: model ? teamModelLabelText(model) : null,
+    modelBy: teamModelCreditTextOf(model?.credit)
+  }
+}

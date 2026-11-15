@@ -4,6 +4,7 @@ import {
   type GameMemberPhase
 } from './orchestrator-game-fleet-verbs'
 import type { GameAgent } from './orchestrator-game-state'
+import { gameMemberModelTextOf } from './team-panel-agent-model'
 import { stripTerminalControl } from './terminal-control-stripping'
 import { markClaudeUnsentInput } from './claude-unsent-input'
 
@@ -29,6 +30,9 @@ export type GameMemberReport = {
   name: string
   agent: string | null
   account: string | null
+  /** The model and effort serving it, and who chose them (ORCA-851); null when unknown. */
+  model: string | null
+  modelBy: string | null
   branch: string | null
   terminalHandle: string | null
   /** The paired host it runs on; null when local (ORCA-824). */
@@ -129,6 +133,7 @@ export function gameMemberReportOf(input: GameMemberReportInput): GameMemberRepo
     name: agent.displayName ?? agent.paneKey,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
+    ...gameMemberModelTextOf(agent),
     branch: agent.worktree?.branch ?? null,
     terminalHandle: agent.terminalHandle ?? null,
     host: agent.remote?.host ?? null,

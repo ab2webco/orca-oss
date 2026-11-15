@@ -201,6 +201,9 @@ export function formatGameMember(report: GameMemberReport): string {
   const { now, since } = report
   const lines = [
     `${report.ticket ?? report.name} · ${now.phase} · ${[report.agent, report.account, report.host && `on ${report.host}`].filter(Boolean).join(' · ')}${report.branch ? ` · ⎇ ${report.branch}` : ''}`,
+    ...(report.model
+      ? [`model: ${report.model}${report.modelBy ? ` (${report.modelBy})` : ''}`]
+      : []),
     `now: ${now.state}${now.tool ? `, last tool ${now.tool}` : ''}${now.activity ? `, ${now.activity}` : ''}${now.limitedUntil ? `, limited until ${now.limitedUntil}` : ''}`,
     ...now.terminal.map((line) => `  | ${line}`),
     `PR ${since.review ?? '-'} · CI ${since.ci ?? '-'} · ticket ${since.ticketStatus ?? '-'}`,

@@ -12,6 +12,7 @@ import {
 import type { GameWaitingMessage } from './orchestrator-game-inbox'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
+import { gameMemberModelTextOf } from './team-panel-agent-model'
 import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
 import {
@@ -45,6 +46,10 @@ export type GameFleetRow = {
   account: string | null
   /** Runs on the host's global login: no managed account, so `game move` cannot move it. */
   globalLogin: boolean
+  /** The model and effort serving it (`Sonnet 5.5 → Opus 5.5 · high`); null when its host sent none. */
+  model: string | null
+  /** Who chose that model and why; null when no router or chooser is known (ORCA-851). */
+  modelBy: string | null
   /** When a limited member's account resets (ISO); null when unknown or not limited. */
   limitedUntil: string | null
   /** When the host last saw its terminal work (ISO); null when unknown. */
@@ -114,6 +119,7 @@ export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage):
     agent: agent.agentType,
     account: agent.account?.email ?? null,
     globalLogin: agent.globalLogin === true,
+    ...gameMemberModelTextOf(agent),
     limitedUntil:
       agent.limit?.resetsAt === null || agent.limit === undefined
         ? null

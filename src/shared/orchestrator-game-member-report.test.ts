@@ -175,4 +175,30 @@ describe('gameMemberReportOf', () => {
     )
     expect(report.notes).toEqual(['terminal: closed'])
   })
+
+  it('names the model that serves the member and who chose it (ORCA-851)', () => {
+    const report = gameMemberReportOf({
+      agent: {
+        ...agent,
+        launch: { model: 'Opus 5.5', effort: 'high', source: 'session' },
+        advisor: {
+          model: 'Opus 5.5',
+          effort: 'high',
+          pinned: { model: false, effort: false },
+          routedModel: 'claude-opus-5-5',
+          sessionModel: 'claude-sonnet-5-5',
+          line: 'jev · model: Opus 5.5 · high effort · code floor (Jev: code)'
+        }
+      },
+      terminalLines: [],
+      dispatches: [],
+      current: null,
+      messages: [],
+      leadHandle: 'term_lead',
+      commits: [],
+      notes: []
+    })
+    expect(report.model).toBe('Sonnet 5.5 → Opus 5.5 · high')
+    expect(report.modelBy).toBe('code floor (Jev: code)')
+  })
 })

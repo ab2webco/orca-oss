@@ -1,6 +1,10 @@
 import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from '../../../../shared/agent-question-answered-intent'
 import { toolDisplayWords } from '../../../../shared/tool-display-words'
+import {
+  teamModelCreditTextOf,
+  teamModelLabelText
+} from '../../../../shared/team-panel-agent-model'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -194,26 +198,15 @@ export function teamPhaseText(phase: TeamFlowPhase): string {
 }
 
 export function teamModelText(model: TeamModel | null): string | null {
-  if (!model) {
-    return null
-  }
-  const label = model.credit?.from ? `${model.credit.from} → ${model.label}` : model.label
-  return model.effort ? `${label} · ${model.effort}` : label
+  return model ? teamModelLabelText(model) : null
 }
 
 /** Who picked the model and why; null where no router or chooser is known. */
 export function teamModelCreditText(model: TeamModel | null): string | null {
-  const credit = model?.credit
-  if (!credit) {
-    return null
-  }
-  if (!credit.reason) {
-    return translate('teamPanel.model.chosenByJev', 'Chosen by Jev')
-  }
-  // Why: Jev's own reason often already names it (`code floor (Jev: code)`).
-  return /\bjev\b/i.test(credit.reason)
-    ? credit.reason
-    : translate('teamPanel.model.jevReason', '{{reason}} (Jev)', { reason: credit.reason })
+  return teamModelCreditTextOf(model?.credit, {
+    chosenByJev: translate('teamPanel.model.chosenByJev', 'Chosen by Jev'),
+    jevReason: (reason) => translate('teamPanel.model.jevReason', '{{reason}} (Jev)', { reason })
+  })
 }
 
 /** `localName` is the user's rename of this machine, which wins over the default label. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   gameFleetReportOf,
+  gameFleetRowOf,
   gamePushPlanOf,
   gameSweepOf,
   gameWavePlanOf,
@@ -806,5 +807,19 @@ describe('per-host caps (ORCA-888)', () => {
     expect(
       gameFleetReportOf({ ...state, hosts: undefined, lead: { ...DEFAULT_GAME_LEAD, cap: 9 } }).free
     ).toBe(4)
+  })
+})
+
+describe('gameFleetRowOf model (ORCA-851)', () => {
+  it('names the served model, and leaves who chose it empty without a router', () => {
+    const row = gameFleetRowOf(
+      member({ launch: { model: 'Sonnet 5.5', effort: 'medium', source: 'session' } })
+    )
+    expect(row.model).toBe('Sonnet 5.5 · medium')
+    expect(row.modelBy).toBeNull()
+  })
+
+  it('says - for a member whose host sends no model', () => {
+    expect(gameFleetRowOf(member({})).model).toBeNull()
   })
 })
