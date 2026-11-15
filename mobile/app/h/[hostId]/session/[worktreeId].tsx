@@ -123,7 +123,10 @@ import { dismissTerminalKeyboard } from '../../../../src/terminal/terminal-keybo
 import type { TerminalLiveInputSender } from '../../../../src/terminal/terminal-live-input-sender'
 import { isTerminalSendRpcAccepted } from '../../../../src/terminal/terminal-send-rpc-response'
 import { sendMobileTerminalQueryReply } from '../../../../src/terminal/mobile-terminal-query-reply'
-import { TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY } from '../../../../../src/shared/protocol-version'
+import {
+  MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
+  TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY
+} from '../../../../../src/shared/protocol-version'
 import { useTerminalLiveInputCommit } from '../../../../src/terminal/use-terminal-live-input-commit'
 import { resolveMobileTerminalInputGate } from '../../../../src/terminal/terminal-input-connection-gate'
 import {
@@ -282,6 +285,8 @@ import { LeadMembersStrip } from '../../../../src/session/LeadMembersStrip'
 import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
 import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
+import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
+import { newTabTeamSectionOf } from '../../../../src/new-tab-team/new-tab-team-section'
 import { openMobilePrUrl } from '../../../../src/components/mobile-pr-url'
 import { useNow } from '../../../../src/hooks/use-now'
 import type { DiffComment } from '../../../../../src/shared/diff-comment-types'
@@ -911,6 +916,8 @@ export default function SessionScreen() {
   const deviceTokenRef = useRef<string | null>(null)
   // Why: state (not a ref) so the connection verdict re-renders when the endpoint loads and the Tailscale hint can appear.
   const [hostEndpoint, setHostEndpoint] = useState<string | null>(null)
+  const [hostName, setHostName] = useState('')
+  const [teamControlSupported, setTeamControlSupported] = useState<boolean | null>(null)
   const clientRef = useRef<RpcClient | null>(null)
   const connStateRef = useRef<ConnectionState>(connState)
   // Why: measured once on mount, then passed with every subscribe so the server can auto-fit the PTY to phone dims.
@@ -2360,6 +2367,7 @@ export default function SessionScreen() {
     setAgentSessionHistorySupported(null)
     setQuickCommandsSupported(null)
     setShowQuickCommands(false)
+    setTeamControlSupported(null)
     hostQueryReplyInputSupportedRef.current = false
     // Why: the probe retries — a relay→direct cutover or request timeout rejects
     // status.get without changing connState, which used to latch these hidden.
@@ -2367,6 +2375,7 @@ export default function SessionScreen() {
       setBrowserScreencastSupported(capabilities.includes('browser.screencast.v1'))
       setAgentSessionHistorySupported(capabilities.includes(MOBILE_AI_VAULT_CAPABILITY))
       setQuickCommandsSupported(supportsMobileQuickCommands(capabilities))
+      setTeamControlSupported(capabilities.includes(MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY))
       // Why: hosts without this capability strip inputKind from terminal.send,
       // so a forwarded xterm reply would become floor-stealing shell input.
       hostQueryReplyInputSupportedRef.current = capabilities.includes(
@@ -2389,6 +2398,7 @@ export default function SessionScreen() {
       if (host) {
         deviceTokenRef.current = host.deviceToken
         setHostEndpoint(host.endpoint)
+        setHostName(host.name)
       }
     })
     return () => {
@@ -2875,6 +2885,17 @@ export default function SessionScreen() {
     routeTab,
     sessionTabs,
     selectTab: switchSessionTab
+  })
+  const newTabTeam = useNewTabTeam({
+    client,
+    connected: connState === 'connected',
+    open: showCreateTabDrawer,
+    supported: teamControlSupported,
+    worktreeId
+  })
+  const newTabTeamSection = newTabTeamSectionOf(newTabTeam, {
+    hostName: hostName || 'this computer',
+    onGoToLead: openTeamTerminal
   })
   const activeLeadPaneKey = leadPaneKeyOf(
     sessionTabs.find((tab) => tab.id === activeSessionTabId) ?? null
@@ -4952,6 +4973,7 @@ export default function SessionScreen() {
                 }
               ])
         ]}
+        sections={newTabTeamSection ? [newTabTeamSection] : undefined}
         onClose={() => setShowCreateTabDrawer(false)}
       />
 
