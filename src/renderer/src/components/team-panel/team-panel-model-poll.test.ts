@@ -143,6 +143,23 @@ describe('createTeamPanelModelPoller', () => {
     expect(sources.some((one) => one.section.kind === 'unavailable')).toBe(false)
   })
 
+  // Why (ORCA-1199): a confirmed last team made the scene replay every join on the next read.
+  it('marks the last team it shows while the host restores the lead as updating', async () => {
+    const findCaller = vi.fn().mockReturnValueOnce(CALLER).mockReturnValue('restoring')
+    const { all, sources } = deps({ findCaller })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE)
+    await flush()
+    poller.refresh()
+    await flush()
+
+    expect(sources.at(-1)).toEqual({
+      section: { kind: 'ready', value: MODEL },
+      retry: null,
+      updating: true
+    })
+  })
+
   it('keeps the last team quietly, with no retry, when one later read fails', async () => {
     const readState = vi
       .fn()
