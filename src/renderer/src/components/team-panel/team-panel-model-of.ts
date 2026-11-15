@@ -18,7 +18,7 @@ import {
   teamQueueSectionOf,
   type TeamPrFailureTexts
 } from '../../../../shared/team-panel-work-tabs'
-import { teamTodoTicketsOf } from './team-panel-todo'
+import { teamTodoTicketsOf } from '../../../../shared/team-todo-tickets'
 
 const prFailureTexts = (): TeamPrFailureTexts => ({
   providerFailed: translate(
