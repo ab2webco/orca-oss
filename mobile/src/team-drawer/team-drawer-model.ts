@@ -22,6 +22,7 @@ import type {
   TeamLeadCard
 } from '../../../src/shared/team-panel-model-types'
 import { teamLeadCardsOf } from './team-sheet-lead'
+import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -73,6 +74,7 @@ export type TeamLeadView = {
   lead: TeamLeadCard | null
   /** Jev's card; null without the advisor plugin or from an older host. */
   advisor: TeamAdvisorRow | null
+  work: TeamSheetWork
   metrics: TeamMetrics | null
   locale: SupportedUiLocale
 }
@@ -229,7 +231,8 @@ const rank = (row: TeamMemberRow): number =>
 export function teamLeadViewOf(
   raw: unknown,
   questionTickets: ReadonlySet<string> = new Set(),
-  ownerAsk: { ticket: string | null } | null = null
+  ownerAsk: { ticket: string | null } | null = null,
+  now: number = Date.now()
 ): TeamLeadView | null {
   // Why `lead`: role is `lead` for any root pane; only a project with a lead has a Team.
   if (!isRecord(raw) || raw.role !== 'lead' || !isRecord(raw.lead) || raw.leadElsewhere) {
@@ -244,9 +247,12 @@ export function teamLeadViewOf(
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
   const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+  const { lead, advisor, cards } = teamLeadCardsOf(raw, questionTickets, ownerAsk, locale)
   return {
     members,
-    ...teamLeadCardsOf(raw, questionTickets, ownerAsk, locale),
+    lead,
+    advisor,
+    work: teamSheetWorkOf(raw, cards, locale, now),
     metrics: metricsOf(raw.metrics),
     locale
   }

@@ -3,24 +3,28 @@ import type { GameMemberAdvisor } from '../../../src/shared/orchestrator-game-me
 import type { OrchestratorGameState } from '../../../src/shared/orchestrator-game-state'
 import { teamAdvisorRowOf } from '../../../src/shared/team-panel-activity-rows'
 import { teamCardsOf } from '../../../src/shared/team-panel-member-cards'
-import type { TeamAdvisorRow, TeamLeadCard } from '../../../src/shared/team-panel-model-types'
+import type {
+  TeamAdvisorRow,
+  TeamLeadCard,
+  TeamMemberCard
+} from '../../../src/shared/team-panel-model-types'
 import { toolDisplayWords } from '../../../src/shared/tool-display-words'
 import type { TeamCardWords } from './team-card-words'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-/** The lead and Jev's cards from the lead's own game.state, built as the desktop panel builds them. */
+/** The lead, Jev and the shared member cards from the lead's own game.state, built as the desktop panel builds them. */
 export function teamLeadCardsOf(
   state: Record<string, unknown>,
   questionTickets: ReadonlySet<string>,
   ownerAsk: { ticket: string | null } | null,
   locale: string
-): { lead: TeamLeadCard | null; advisor: TeamAdvisorRow | null } {
+): { lead: TeamLeadCard | null; advisor: TeamAdvisorRow | null; cards: TeamMemberCard[] } {
   const agents = Array.isArray(state.agents) ? state.agents.filter(isRecord) : []
   const leader = agents.find((one) => one.isLeader === true)
   if (!leader) {
-    return { lead: null, advisor: null }
+    return { lead: null, advisor: null, cards: [] }
   }
   const cards = teamCardsOf(
     { ...state, agents } as unknown as OrchestratorGameState,
@@ -30,6 +34,7 @@ export function teamLeadCardsOf(
   )
   return {
     lead: cards?.lead ?? null,
+    cards: cards?.members ?? [],
     advisor: isRecord(leader.advisor)
       ? teamAdvisorRowOf(leader.advisor as unknown as GameMemberAdvisor)
       : null

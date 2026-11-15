@@ -117,7 +117,8 @@ const leader = {
 
 function teamWith(
   over: Partial<TeamDrawerData> = {},
-  lead: Record<string, unknown> | null = null
+  lead: Record<string, unknown> | null = null,
+  extra: Record<string, unknown> = {}
 ): TeamDrawerData {
   const view = teamLeadViewOf(
     {
@@ -174,9 +175,12 @@ function teamWith(
         claudeAccounts: [{ email: 'dev@example.com', sessionPercent: 37, weeklyPercent: 61 }],
         mergedPerDay: [{ day: '2026-11-02', merged: 4 }],
         leadTime: { medianMs: 2 * 3_600_000, measured: 4 }
-      }
+      },
+      ...extra
     },
-    new Set(['ORCA-7'])
+    new Set(['ORCA-7']),
+    null,
+    NOW
   )
   return {
     view,
@@ -362,6 +366,92 @@ describe('TeamSheet', () => {
     expect(texts()).toContain('Nv 2')
     show(teamWith({ questions: [] }))
     expect(texts().some((one) => one.endsWith(' XP'))).toBe(false)
+  })
+
+  const work = {
+    project: {
+      reviews: {
+        total: 2,
+        url: 'https://github.com/acme/web/pulls',
+        items: [
+          {
+            id: '#416',
+            title: 'Webhook signature check',
+            url: 'https://pr/416',
+            status: 'success'
+          },
+          { id: '#415', title: 'Rate limit dashboard', url: 'https://pr/415', status: 'failure' }
+        ]
+      },
+      todo: null,
+      queue: {
+        provider: 'github',
+        entries: [
+          {
+            id: '#409',
+            title: 'Checkout copy review',
+            url: 'https://pr/409',
+            position: 1,
+            state: 'checks',
+            since: null
+          },
+          {
+            id: '#412',
+            title: 'Retry policy',
+            url: 'https://pr/412',
+            position: 2,
+            state: 'waiting',
+            since: null
+          }
+        ]
+      }
+    }
+  }
+
+  it('lists the merge queue, then open PRs failures first, and opens a PR on a tap', () => {
+    const onOpenLink = vi.fn()
+    act(() =>
+      root.render(
+        <SafeAreaProvider initialMetrics={safeArea}>
+          <TeamSheet
+            open
+            onOpenChange={vi.fn()}
+            team={teamWith({ questions: [] }, null, work)}
+            now={NOW}
+            hostName="m1"
+            onOpenLink={onOpenLink}
+            onOpenTerminal={onOpenTerminal}
+          />
+        </SafeAreaProvider>
+      )
+    )
+    act(() => button('PRs').click())
+    const shown = texts()
+    const at = (text: string) => shown.indexOf(text)
+    expect(shown).toContain('Merge queue')
+    expect(shown).toContain('In checks')
+    expect(shown).toContain('In queue')
+    expect(shown).toContain('Open PRs')
+    expect(at('Rate limit dashboard')).toBeLessThan(at('Webhook signature check'))
+    expect(at('Checkout copy review')).toBeLessThan(at('Open PRs'))
+    expect(shown).toContain('Check failed')
+    expect(shown).toContain('Ready')
+    act(() => button('#415 Rate limit dashboard, Check failed').click())
+    expect(onOpenLink).toHaveBeenCalledWith('https://pr/415')
+  })
+
+  it('words the PRs tab in the host language', () => {
+    const team = teamWith({ questions: [] }, null, work)
+    show({ ...team, view: team.view && { ...team.view, locale: 'es' } })
+    act(() => button('PRs').click())
+    expect(texts()).toContain('Cola de merge')
+    expect(texts()).toContain('Check falló')
+  })
+
+  it('says an older host publishes no PRs, instead of an empty list', () => {
+    show(teamWith({ questions: [] }))
+    act(() => button('PRs').click())
+    expect(texts()).toContain('This Orca host does not publish it yet.')
   })
 
   it('takes a waiting card to the Inbox in one tap', () => {
