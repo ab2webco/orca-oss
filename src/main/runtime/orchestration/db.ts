@@ -6485,6 +6485,47 @@ export class OrchestrationDb {
     }
   }
 
+  /**
+   * Stops a remote dispatch at home once its host proved nothing of it is left (ORCA-1196). Its Task
+   * stays as is: a later dispatch in the same worktree may have carried it on.
+   */
+  settleGoneFederatedWorker(dispatchId: string): WorkerDispatchRow {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const worker = this.getWorkerDispatch(dispatchId)
+      if (!worker || !this.getDispatchContextById(dispatchId)) {
+        throw new OrchestrationError(
+          'dispatch_not_found',
+          `Federated Dispatch ${dispatchId} was not found.`
+        )
+      }
+      this.db
+        .prepare(
+          `UPDATE worker_dispatches
+           SET state = 'stopped', stage = 'process_stopped', last_error = NULL,
+               updated_at = datetime('now')
+           WHERE dispatch_id = ?
+             AND state IN ('starting', 'ready', 'start_unknown', 'stopping', 'stop_unknown')`
+        )
+        .run(dispatchId)
+      this.db
+        .prepare(
+          `UPDATE dispatch_contexts
+           SET status = 'failed', completed_at = COALESCE(completed_at, datetime('now')),
+               last_failure = 'stopped',
+               capability_revoked_at = COALESCE(capability_revoked_at, datetime('now'))
+           WHERE id = ? AND status IN ('pending', 'dispatched')`
+        )
+        .run(dispatchId)
+      this.closeQuestionsForDispatch(dispatchId)
+      this.db.exec('COMMIT')
+      return this.getWorkerDispatch(dispatchId) as WorkerDispatchRow
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   reconcileFederatedWorkerStop(dispatchId: string): WorkerDispatchRow {
     this.db.exec('BEGIN IMMEDIATE')
     try {

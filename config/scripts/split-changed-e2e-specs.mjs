@@ -41,7 +41,10 @@ export function readDurations(mapFile = DURATIONS_FILE) {
  * @returns {(file: string) => number}
  */
 export function measuredSecondsOf(files, { durations, sizeOf }) {
-  const measured = files.filter((file) => durations[file] > 0)
+  const isMeasured = (file) => durations[file] > 0 && sizeOf(file) > 0
+  const inList = files.filter(isMeasured)
+  // Why the map as fallback: with no measured spec in the list, 1 s per byte priced #1207's one new spec at 12 shards (ORCA-1217).
+  const measured = inList.length > 0 ? inList : Object.keys(durations).filter(isMeasured)
   const measuredBytes = measured.reduce((sum, file) => sum + sizeOf(file), 0)
   const perByte =
     measuredBytes > 0 ? measured.reduce((sum, file) => sum + durations[file], 0) / measuredBytes : 1
@@ -61,8 +64,10 @@ export function splitChangedSpecs(
 ) {
   const unique = [...new Set(files)]
   const seconds = unique.reduce((sum, file) => sum + secondsOf(file), 0)
+  // Why at most one shard per spec: a shard with no files runs the whole suite.
   const total = Math.min(
     MAX_SHARDS,
+    unique.length,
     Math.max(
       Math.min(COUNT_SHARDS, Math.ceil(unique.length / SPECS_PER_SHARD)),
       Math.ceil(seconds / SHARD_BUDGET_SECONDS)

@@ -6,6 +6,8 @@ import { isOurGameAgentNamed } from './orchestrator-game-adopt'
 import { STOPPABLE, dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
+import { gameDropTargetOf } from '../../shared/orchestrator-game-dropped-agents'
+import { ticketOfMember } from '../../shared/orchestrator-game-member-next'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -92,6 +94,15 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
         host,
         dispatchId: live,
         refusal: `its dispatch ${live} on ${host} is live, and a member on a paired host cannot be detached yet; drop it after its worker_done, or \`orca game stop\` ends it`
+      })
+    }
+    // Why: a drop is kept by worktree, and a host that no longer knows the member shows none.
+    if (!gameDropTargetOf(agent)) {
+      return print({
+        name,
+        dropped: false,
+        ...(host ? { host } : {}),
+        refusal: `${host ?? 'its host'} no longer shows its worktree, so there is nothing to keep the drop by; \`orca game stop ${ticketOfMember(agent) ?? name}\` ends it`
       })
     }
     if (live) {

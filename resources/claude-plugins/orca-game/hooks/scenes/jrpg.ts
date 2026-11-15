@@ -220,6 +220,7 @@ export const JRPG_SCENE: SceneDefinition = {
   // Orca's built-in roster for the scene; its first name wears a look derived from the name.
   roster: ['Aerin', ...CHARACTERS.map((one) => one.name)],
   characters: CHARACTERS,
+  prop: 'sword',
   cast: {
     // A slime that bounced into the party and stayed.
     pet: {
