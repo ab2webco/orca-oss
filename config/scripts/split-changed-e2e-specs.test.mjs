@@ -175,6 +175,21 @@ describe('splitChangedSpecs', () => {
     )
     expect(filesOf(withScene)).not.toContain('tests/e2e/team-panel-work-tabs.spec.ts')
   })
+
+  // Why: a spec with no measured seconds used to weigh its size in bytes, so a 7 KB spec read as 8 shards.
+  // Why: an empty shard hands the run step no files, and Playwright then runs the whole suite.
+  it('never plans an empty shard, however slow the specs read', () => {
+    const files = panelFiles.slice(0, 2)
+    const shards = splitChangedSpecs(files, () => 10_000)
+    expect(shards).toHaveLength(2)
+    expect(shards.every((shard) => filesOf(shard).length > 0)).toBe(true)
+  })
+
+  it('keeps one new, unmeasured spec on one runner', () => {
+    const shards = splitChangedSpecs(['tests/e2e/team-panel-read-failure.spec.ts'])
+    expect(shards).toHaveLength(1)
+    expect(filesOf(shards[0])).toEqual(['tests/e2e/team-panel-read-failure.spec.ts'])
+  })
 })
 
 describe('main', () => {

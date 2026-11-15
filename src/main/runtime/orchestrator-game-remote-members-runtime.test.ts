@@ -135,6 +135,67 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     ])
   })
 
+  // Why: a call's timeout starts only once the host's queue runs it; a silent host held every read (ORCA-1199).
+  it('answers without waiting on a silent host, and skips that host for a while, not the others', async () => {
+    const realSetTimeout = globalThis.setTimeout
+    const realTurn = (): Promise<void> => new Promise((resolve) => realSetTimeout(resolve, 2))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    try {
+      const { runtime, dispatchId } = leadWithRemoteMember()
+      const db = runtime.getOrchestrationDb()
+      const run = db.getCurrentRunForPane(LEAD_PANE)!
+      const task = db.createTask({ spec: 'docs', taskTitle: 'ORCA-1195 docs', runId: run.id })
+      const onM1 = db.createStartingWorkerDispatch({
+        taskId: task.id,
+        startOptions: { on: 'env_m1', serverName: 'm1' },
+        federation: {
+          environmentId: 'env_m1',
+          environmentName: 'm1',
+          peerFingerprint: 'fp_m1',
+          protocolVersion: 1
+        }
+      })
+      db.updateFederatedDispatchResources({
+        dispatchId: onM1.dispatch.id,
+        remoteRuntimeEpoch: 'epoch_m1',
+        worktreeId: 'repo::/home/me/orca-1195',
+        terminalHandle: 'term_on_m1'
+      })
+      const show = vi
+        .spyOn(runtime, 'callOrchestrationWorkerServer')
+        .mockImplementation(async (environmentId) =>
+          environmentId === 'env_imac'
+            ? new Promise(() => {})
+            : { terminal: { branch: 'orca-1195', title: '✳ Claude Code', liveness: 'running' } }
+        )
+      const hostOf = (state: { agents: GameAgent[] }, id: string) =>
+        state.agents.find((agent) => agent.paneKey === `remote:${id}`)?.remote
+
+      const pending = runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+      let first: Awaited<typeof pending> | null = null
+      void pending.then((state) => (first = state))
+      // Why real turns between steps: the read also waits on real file I/O (scenes, orca.yaml).
+      // Before the gate, a silent host held this read however far the clock ran.
+      for (let step = 0; step < 300 && first === null; step += 1) {
+        await vi.advanceTimersByTimeAsync(100)
+        await realTurn()
+      }
+
+      expect(first).not.toBeNull()
+      expect(hostOf(first!, dispatchId)).toMatchObject({ host: 'imac', stateKnown: false })
+      expect(hostOf(first!, onM1.dispatch.id)).toMatchObject({ host: 'm1', stateKnown: true })
+
+      show.mockClear()
+      const second = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+      expect(show.mock.calls.map(([environmentId]) => environmentId)).toEqual(['env_m1'])
+      expect(hostOf(second, dispatchId)).toMatchObject({ host: 'imac', stateKnown: false })
+      expect(hostOf(second, onM1.dispatch.id)).toMatchObject({ host: 'm1', stateKnown: true })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Why: the host answers with no terminal once the member's closed; that is not an offline host (ORCA-854).
   it('marks the member gone, not its host silent, when the host answers without its terminal', async () => {
     const { runtime } = leadWithRemoteMember()

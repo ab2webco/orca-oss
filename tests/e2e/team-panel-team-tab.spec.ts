@@ -10,6 +10,8 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 
 const WIDTHS = [1440, 768, 390, 320]
+// The panel's sustained window (60 s) plus the 20 s poll that lands past it, with room to spare.
+const SUSTAINED_ERROR_TIMEOUT_MS = 120_000
 const COPY = {
   en: {
     team: 'Team',
@@ -22,7 +24,8 @@ const COPY = {
     noTeam: 'Your work',
     readError: 'Could not read the team',
     readErrorText: 'Orca is not responding in this project. Try again.',
-    retry: 'Try again'
+    retry: 'Try again',
+    updating: 'Updating the team…'
   },
   es: {
     team: 'Equipo',
@@ -35,7 +38,8 @@ const COPY = {
     noTeam: 'Tu trabajo',
     readError: 'No se pudo leer el equipo',
     readErrorText: 'Orca no responde en este proyecto. Vuelve a intentarlo.',
-    retry: 'Reintentar'
+    retry: 'Reintentar',
+    updating: 'Actualizando el equipo…'
   }
 } as const
 
@@ -230,7 +234,8 @@ test('the Team tab shows the live lead and its members from the lead game state'
       )
       .toBe(2)
 
-    // A live lead whose game.state fails: the team's error, never the user's own sessions.
+    // A live lead whose game.state fails: first the quiet line, the error only once it is sustained,
+    // and never the user's own sessions (ORCA-1199).
     await wrapPanelReads(electronApp)
     await failPanelReads(electronApp, true)
     await orcaPage.evaluate(() => {
@@ -240,13 +245,42 @@ test('the Team tab shows the live lead and its members from the lead game state'
     })
     const panel = orcaPage.getByTestId('team-panel')
     const cards = panel.locator('[data-team-card="member"]')
-    const readError = async (language: 'en' | 'es'): Promise<void> => {
-      await expect(panel).toContainText(COPY[language].readError, { timeout: 60_000 })
+    const readError = async (language: 'en' | 'es', timeout = 5_000): Promise<void> => {
+      await expect(panel).toContainText(COPY[language].readError, { timeout })
       await expect(panel).toContainText(COPY[language].readErrorText)
       await expect(panel.getByRole('button', { name: COPY[language].retry })).toBeVisible()
       await expect(panel).not.toContainText('runtime:call')
       await expect(panel).not.toContainText(COPY[language].noTeam)
     }
+    /** A miss short of the sustained window: the quiet line, in each language, and no alarm. */
+    const updatingQuietly = async (name: string): Promise<void> => {
+      // Why one theme per language pass: every settings write costs time inside the sustained window.
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        for (const language of ['en', 'es'] as const) {
+          await writeSettings(orcaPage, { uiLanguage: language })
+          await expect(
+            panel.getByRole('status').filter({ hasText: COPY[language].updating })
+          ).toBeVisible({ timeout: 40_000 })
+          await expect(panel).not.toContainText(COPY[language].readError)
+          await expect(panel.getByRole('button', { name: COPY[language].retry })).toHaveCount(0)
+          await expect(panel).not.toContainText(COPY[language].noTeam)
+          await expect(panel).not.toContainText('runtime:call')
+          for (const width of WIDTHS) {
+            await orcaPage.setViewportSize({ width, height: 900 })
+            await orcaPage.screenshot({
+              animations: 'disabled',
+              path: testInfo.outputPath(`${name}-${language}-${width}-${theme}.png`)
+            })
+          }
+        }
+      }
+      await writeSettings(orcaPage, { uiLanguage: 'en' })
+      await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    }
+    await updatingQuietly('read-updating-first')
+    await readError('en', SUSTAINED_ERROR_TIMEOUT_MS)
+    await expect(panel).not.toContainText(COPY.en.updating)
     await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
     // Why Retry while reads still fail: the panel also re-reads on its 20 s poll and on main's change
     // events, so once reads succeed it recovers on its own; the read within a second is Retry's (ORCA-1184).
@@ -287,6 +321,10 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await failPanelReads(electronApp, true)
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+    await updatingQuietly('read-updating-team-kept')
+    await expect(panel.locator('[data-team-card="lead"]')).toBeVisible()
+    await expect(cards).toHaveCount(2)
+    await readError('en', SUSTAINED_ERROR_TIMEOUT_MS)
     await captureEvery(
       orcaPage,
       testInfo.outputPath.bind(testInfo),

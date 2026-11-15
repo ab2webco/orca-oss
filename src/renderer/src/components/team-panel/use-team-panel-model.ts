@@ -33,11 +33,14 @@ import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 import { teamPanelProjectOf } from './team-panel-project'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
 import { publishTeamSceneArtHost } from '../team-scene/team-scene-art-host'
+import { recordRendererCrashBreadcrumb } from '@/lib/crash-breadcrumb-recorder'
 
 export type TeamPanelModelSource = {
   section: TeamSection<TeamPanelModel>
-  /** Null when there is nothing to retry. On a ready section: the read failed, this is the last team. */
+  /** Null when there is nothing to retry. On a ready section: reads keep failing, this is the last team. */
   retry: (() => void) | null
+  /** The latest read failed briefly; the section is the last team, shown without an alarm. */
+  updating?: boolean
 }
 
 // Why 20 s: the same cadence as the mobile Team drawer, which polls the same game.state cache.
@@ -102,7 +105,8 @@ const poller = createTeamPanelModelPoller(
         lastTeam = { scope, members }
       }
       useTeamPanelModelStore.setState({ source })
-    }
+    },
+    record: recordRendererCrashBreadcrumb
   },
   TEAM_REFRESH_MS
 )

@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
-import { createTeamPanelModelPoller, type TeamPanelPollDeps } from './team-panel-model-poll'
+import {
+  createTeamPanelModelPoller,
+  TEAM_READ_SUSTAINED_FAILURE_MS,
+  type TeamPanelPollDeps
+} from './team-panel-model-poll'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 
 const CALLER = { worktreeId: 'wt', terminalHandle: 'term', paneKey: 'pane' }
@@ -139,7 +143,7 @@ describe('createTeamPanelModelPoller', () => {
     expect(sources.some((one) => one.section.kind === 'unavailable')).toBe(false)
   })
 
-  it('keeps the last team and offers a retry when a later read fails', async () => {
+  it('keeps the last team quietly, with no retry, when one later read fails', async () => {
     const readState = vi
       .fn()
       .mockResolvedValueOnce({ role: 'lead' })
@@ -153,11 +157,163 @@ describe('createTeamPanelModelPoller', () => {
     await vi.advanceTimersByTimeAsync(20_000)
 
     expect(last()).toEqual({ kind: 'ready', value: MODEL })
-    expect(sources.at(-1)?.retry).toEqual(expect.any(Function))
-    sources.at(-1)?.retry?.()
-    await flush()
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+
+    await vi.advanceTimersByTimeAsync(20_000)
     expect(last()).toEqual({ kind: 'ready', value: MODEL })
     expect(sources.at(-1)?.retry).toBeNull()
+    expect(sources.at(-1)?.updating).toBeFalsy()
+  })
+
+  it('offers the retry only once reads have failed for the sustained window', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValue({ role: 'lead' })
+    const { all, sources, last } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    // Failures at 20, 40 and 60 s: the streak is 40 s old, short of the window.
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+
+    // The failure at 80 s is TEAM_READ_SUSTAINED_FAILURE_MS after the first.
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(TEAM_READ_SUSTAINED_FAILURE_MS).toBe(60_000)
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+    expect(sources.at(-1)?.retry).toEqual(expect.any(Function))
+    expect(sources.at(-1)?.updating).toBeFalsy()
+
+    sources.at(-1)?.retry?.()
+    await flush()
+    expect(sources.at(-1)?.retry).toBeNull()
+    expect(sources.at(-1)?.updating).toBeFalsy()
+  })
+
+  // Why time, not a count: answers and Jev lines call refresh in bursts, which would trip a count in seconds.
+  it('does not count a burst of failed refreshes as a sustained failure', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValue(new Error('timeout'))
+    const { all, sources } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE)
+    await flush()
+
+    for (let index = 0; index < 6; index += 1) {
+      poller.refresh()
+      await flush()
+      await flush()
+    }
+
+    expect(readState.mock.calls.length).toBeGreaterThan(3)
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+  })
+
+  it('starts a new streak after a read succeeds', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValue({ role: 'lead' })
+    const { all, sources } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    // Failures at 20, 40, 100 and 120 s span 100 s, but a success at 60 s splits them.
+    await vi.advanceTimersByTimeAsync(100_000)
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+  })
+
+  // Why: a streak nobody polled through is not a sustained failure; one miss on return is still brief.
+  it('starts a new streak when the project comes back after a pause in reads', async () => {
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValue(new Error('timeout'))
+    const { all, sources } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+    release()
+
+    const other = poller.subscribe({ ...SCOPE, key: 'local|repo-2', repoId: 'repo-2' })
+    await vi.advanceTimersByTimeAsync(100_000)
+    other()
+
+    poller.subscribe(SCOPE)
+    await flush()
+    await flush()
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
+  })
+
+  it('records the failure class when a streak starts, turns sustained, and recovers', async () => {
+    const record = vi.fn()
+    const readState = vi
+      .fn()
+      .mockResolvedValueOnce({ role: 'lead' })
+      .mockRejectedValueOnce(new Error('Runtime request timed out before game.state completed'))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue({ role: 'lead' })
+    const { all } = deps({ readState, record })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(record).toHaveBeenCalledTimes(1)
+    expect(record).toHaveBeenLastCalledWith('team_panel_read_failed', {
+      stage: 'game.state',
+      failure: 'timeout',
+      sustained: false
+    })
+
+    await vi.advanceTimersByTimeAsync(40_000)
+    expect(record).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(record).toHaveBeenLastCalledWith('team_panel_read_failed', {
+      stage: 'game.state',
+      failure: 'error',
+      sustained: true
+    })
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(record).toHaveBeenLastCalledWith('team_panel_read_recovered', { failedForMs: 80_000 })
+    expect(record).toHaveBeenCalledTimes(3)
+  })
+
+  it('names the leads read when game.leads is the one that fails', async () => {
+    const record = vi.fn()
+    const readLeads = vi
+      .fn()
+      .mockResolvedValueOnce({ leads: [{ handle: 'term' }], restoring: [] })
+      .mockRejectedValue(new Error('host down'))
+    const { all } = deps({ readLeads, record })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(record).toHaveBeenLastCalledWith('team_panel_read_failed', {
+      stage: 'game.leads',
+      failure: 'error',
+      sustained: false
+    })
   })
 
   // Why: leaving the panel ends the run, and a sick host must not cost the team on the way back.
@@ -176,7 +332,7 @@ describe('createTeamPanelModelPoller', () => {
     await flush()
 
     expect(last()).toEqual({ kind: 'ready', value: MODEL })
-    expect(sources.at(-1)?.retry).toEqual(expect.any(Function))
+    expect(sources.at(-1)).toMatchObject({ retry: null, updating: true })
   })
 
   it('forgets the team once the host says there is no lead', async () => {

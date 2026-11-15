@@ -202,11 +202,16 @@ import {
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
 import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
+import { GameHostAnswerGate } from './orchestrator-game-host-answer-gate'
 
 // Why short: a silent host must not hold the lead's game state; its member shows as unknown.
 const REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS = 3_000
 // Why longer: the host answers after a full `ps` sweep, and only a first read waits for it.
 const GAME_HOST_CAPACITY_TIMEOUT_MS = 6_000
+// Why 1 s over the call's timeout: the gate's clock also runs while the call waits in the host's queue.
+const GAME_HOST_QUEUE_GRACE_MS = 1_000
+// Why 30 s: the paired-host reading's own freshness; a host back sooner shows at the next window.
+const GAME_HOST_SILENT_SKIP_MS = 30_000
 const GAME_REMOTE_SESSIONS_LIMIT = 200
 
 const gameHostProfileOfThisMachine = (): GameHostProfile => ({
@@ -3938,37 +3943,56 @@ export class OrcaRuntimeService {
     undefined,
     this.gameStoreNames
   )
+  // Why one gate for every game read of a host: a host silent to one read is skipped by all (ORCA-1199).
+  private readonly gameHostAnswers = new GameHostAnswerGate({ downForMs: GAME_HOST_SILENT_SKIP_MS })
   private readonly gameHostCapacity = new GameHostCapacityReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
     readLocal: collectHostMemory,
     // Why diagnostics.memory: every paired host already answers it, so no wire change (ORCA-841).
     readRemote: (environmentId) =>
-      this.callOrchestrationWorkerServer(
+      this.gameHostAnswers.call(
         environmentId,
-        'diagnostics.memory',
-        undefined,
-        GAME_HOST_CAPACITY_TIMEOUT_MS
+        () =>
+          this.callOrchestrationWorkerServer(
+            environmentId,
+            'diagnostics.memory',
+            undefined,
+            GAME_HOST_CAPACITY_TIMEOUT_MS
+          ),
+        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
+        { marksSilence: false }
       )
   })
   // Why worktree.ps: every paired host already answers it, so no wire change (ORCA-943).
   private readonly gameRemoteSessions = new RemoteHostSessionsReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
     readPs: async (environmentId) =>
-      (await this.callOrchestrationWorkerServer(
+      (await this.gameHostAnswers.call(
         environmentId,
-        'worktree.ps',
-        { limit: GAME_REMOTE_SESSIONS_LIMIT },
-        GAME_HOST_CAPACITY_TIMEOUT_MS
+        () =>
+          this.callOrchestrationWorkerServer(
+            environmentId,
+            'worktree.ps',
+            { limit: GAME_REMOTE_SESSIONS_LIMIT },
+            GAME_HOST_CAPACITY_TIMEOUT_MS
+          ),
+        GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
+        { marksSilence: false }
       )) as { worktrees?: RuntimeWorktreePsSummary[] }
   })
   private readonly gamePairedHosts = new GamePairedHostReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
     statusOf: async (environmentId) => {
-      const response = await this.orchestrationEnvironmentTransport!.call(
+      const response = await this.gameHostAnswers.call(
         environmentId,
-        'status.get',
-        undefined,
-        REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+        () =>
+          this.orchestrationEnvironmentTransport!.call(
+            environmentId,
+            'status.get',
+            undefined,
+            REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+          ),
+        REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS
       )
       if (response.ok === false) {
         throw new Error(response.error.message)
@@ -32876,18 +32900,25 @@ export class OrcaRuntimeService {
     const remote = await remoteGameMembersOf(sources, {
       // Why federationShow: every federation-capable host already answers it, so no wire change.
       showOf: async (source) => {
-        const shown = (await this.callOrchestrationWorkerServer(
-          source.environmentId,
-          'orchestration.federationShow',
-          { dispatchId: source.dispatchId },
-          REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
-        ).catch((error: unknown) => {
-          // Why: a host that no longer knows the dispatch answered; only silence rejects (ORCA-854).
-          if (error instanceof OrchestrationError && error.code === 'dispatch_not_found') {
-            return { terminal: null }
-          }
-          throw error
-        })) as { terminal: RemoteGameMemberShow | null; agent?: unknown; asleep?: unknown }
+        const shown = (await this.gameHostAnswers
+          .call(
+            source.environmentId,
+            () =>
+              this.callOrchestrationWorkerServer(
+                source.environmentId,
+                'orchestration.federationShow',
+                { dispatchId: source.dispatchId },
+                REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
+              ),
+            REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS
+          )
+          .catch((error: unknown) => {
+            // Why: a host that no longer knows the dispatch answered; only silence rejects (ORCA-854).
+            if (error instanceof OrchestrationError && error.code === 'dispatch_not_found') {
+              return { terminal: null }
+            }
+            throw error
+          })) as { terminal: RemoteGameMemberShow | null; agent?: unknown; asleep?: unknown }
         if (!shown.terminal) {
           return remoteAsleepShowOf(shown.asleep)
         }
