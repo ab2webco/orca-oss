@@ -15,11 +15,11 @@ import {
   Tag
 } from 'lucide-react-native'
 import type { GameActionIcon } from '../../../src/shared/orchestrator-game-actions'
-import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 import { teamDockActionsOf, type TeamAction } from '../../../src/shared/team-panel-actions'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, MIN_TOUCH_TARGET, radii, spacing, typography } from '../theme/mobile-theme'
 import { teamActionHintOf, teamActionLabelOf, type TeamControlWords } from './team-control-words'
+import type { TeamTurnResult } from './team-lead-turn-send'
 import type { TeamSheetControl } from './team-sheet-control'
 import { TeamActionMenu } from './TeamActionMenu'
 import { useTeamTones } from './team-status-tone'
@@ -40,7 +40,8 @@ const ICONS: Record<GameActionIcon, typeof Square> = {
 }
 // Why: below this width three labelled chips and Stop do not fit; icon and count say it (p05 at 320).
 const LABELS_FROM_WIDTH = 360
-const NOTE_MS = 4_000
+// Why 8 s: a 4 s line under the thumb went unread, and the owner thought the Wave never fired.
+const NOTE_MS = 8_000
 
 /** A STOP's line above the tabs: who stopped it, and that members still run with pushes paused. */
 export function TeamStoppedBanner({
@@ -75,12 +76,15 @@ export function TeamActionDock({
   control: TeamSheetControl
   memberCount: number
   words: TeamControlWords
-  onSend: (action: TeamAction) => Promise<LeadPromptOutcome>
+  onSend: (action: TeamAction) => Promise<TeamTurnResult>
 }) {
   const { width } = useWindowDimensions()
   const [confirming, setConfirming] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
+  const [note, setNote] = useState<{ text: string; tone: 'info' | 'attention' } | null>(null)
+  // The team's size when a Wave went out, so its launches can be counted as they join.
+  const [waveFrom, setWaveFrom] = useState<number | null>(null)
+  const tones = useTeamTones()
   useEffect(() => {
     if (!note) {
       return
@@ -88,6 +92,12 @@ export function TeamActionDock({
     const timer = setTimeout(() => setNote(null), NOTE_MS)
     return () => clearTimeout(timer)
   }, [note])
+  useEffect(() => {
+    if (waveFrom !== null && memberCount > waveFrom) {
+      setNote({ text: words.launched(memberCount - waveFrom), tone: 'info' })
+      setWaveFrom(null)
+    }
+  }, [memberCount, waveFrom, words])
   const chips = teamDockActionsOf(control.actions, null)
   const stop = control.actions.find((one) => one.orca === 'stop') ?? null
   if (control.actions.length === 0) {
@@ -96,9 +106,14 @@ export function TeamActionDock({
   const run = (action: TeamAction): void => {
     setConfirming(false)
     const label = teamActionLabelOf(action, words)
-    void onSend(action).then((outcome) => {
-      if (outcome !== 'repeat') {
-        setNote(outcome === 'sent' ? words.sent(label) : words.failed(label))
+    setNote({ text: words.sending(label), tone: 'info' })
+    void onSend(action).then(({ outcome, reason }) => {
+      if (outcome === 'sent') {
+        setNote({ text: words.sent(label), tone: 'info' })
+        setWaveFrom(action.orca === 'wave' ? memberCount : null)
+      } else if (outcome === 'failed') {
+        const text = reason ? `${words.failed(label)}: ${reason}` : words.failed(label)
+        setNote({ text, tone: 'attention' })
       }
     })
   }
@@ -148,9 +163,12 @@ export function TeamActionDock({
   return (
     <View style={styles.column} accessibilityLabel={words.actions}>
       {note ? (
-        <Text style={styles.note} accessibilityLiveRegion="polite" numberOfLines={1}>
-          {note}
-        </Text>
+        <View style={styles.noteLine}>
+          <View style={[styles.dot, { backgroundColor: tones[note.tone] }]} />
+          <Text style={styles.note} accessibilityLiveRegion="polite" numberOfLines={2}>
+            {note.text}
+          </Text>
+        </View>
       ) : null}
       <View style={styles.dock}>
         {chips.map((action) => {
@@ -245,9 +263,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  noteLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md
+  },
   note: {
-    color: colors.textSecondary,
-    fontSize: typography.metaSize
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: typography.metaSize + 1
   },
   confirm: {
     flex: 1,

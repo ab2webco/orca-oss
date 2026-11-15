@@ -49,7 +49,7 @@ describe("the Team sheet lead turn against the host's terminal.send", () => {
         result: { send: expect.objectContaining({ accepted: true }) }
       })
     ])
-    expect(outcome).toBe('sent')
+    expect(outcome).toEqual({ outcome: 'sent', reason: null })
     expect(sendTerminal).toHaveBeenCalledWith(
       'term_lead',
       { text: '/orca-game:wave', enter: true, interrupt: false },

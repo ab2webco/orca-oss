@@ -18,7 +18,10 @@ vi.mock('lucide-react-native', async () => {
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
 import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
 import { teamControlWordsOf } from './team-control-words'
+import type { TeamTurnResult } from './team-lead-turn-send'
 import type { TeamSheetControl } from './team-sheet-control'
+
+const SENT: TeamTurnResult = { outcome: 'sent', reason: null }
 
 const action = (
   id: string,
@@ -73,14 +76,15 @@ describe('TeamActionDock', () => {
   })
 
   const show = (
-    onSend: (one: TeamAction) => Promise<'sent' | 'repeat' | 'failed'>,
-    locale: 'en' | 'es' = 'en'
+    onSend: (one: TeamAction) => Promise<TeamTurnResult>,
+    locale: 'en' | 'es' = 'en',
+    memberCount = 4
   ) =>
     act(() =>
       root.render(
         <TeamActionDock
           control={control}
-          memberCount={4}
+          memberCount={memberCount}
           words={teamControlWordsOf(locale)}
           onSend={onSend}
         />
@@ -88,7 +92,7 @@ describe('TeamActionDock', () => {
     )
 
   it('docks Wave, Push and Sweep with their counts, and sends one as a lead turn on a tap', async () => {
-    const onSend = vi.fn(async () => 'sent' as const)
+    const onSend = vi.fn(async () => SENT)
     show(onSend)
     const shown = texts()
     expect(shown).toEqual(expect.arrayContaining(['Wave', '4', 'Push', '2', 'Sweep', '1']))
@@ -99,7 +103,7 @@ describe('TeamActionDock', () => {
   })
 
   it('asks before stopping every member, and sends Stop only on confirm', async () => {
-    const onSend = vi.fn(async () => 'sent' as const)
+    const onSend = vi.fn(async () => SENT)
     show(onSend)
     act(() => button('Stop every member').click())
     expect(texts()).toContain('Stop all 4 members? They stay stopped until you push them.')
@@ -112,12 +116,35 @@ describe('TeamActionDock', () => {
   })
 
   it('says when the lead did not get the turn, and stays quiet on a repeat press', async () => {
-    show(vi.fn(async () => 'failed' as const))
+    show(vi.fn(async () => ({ outcome: 'failed' as const, reason: null })))
     await act(async () => button('Sweep, 1 finished to close').click())
     expect(texts()).toContain('Could not send Sweep')
-    show(vi.fn(async () => 'repeat' as const))
+    show(vi.fn(async () => ({ outcome: 'repeat' as const, reason: null })))
     await act(async () => button('Wave, 4 to do, slots free').click())
     expect(texts()).not.toContain('Sent to the lead: Wave')
+  })
+
+  it('shows the press at once, while the turn is still on its way to the lead', () => {
+    show(vi.fn(() => new Promise<TeamTurnResult>(() => {})))
+    act(() => button('Wave, 4 to do, slots free').click())
+    expect(texts()).toContain('Sending Wave to the lead…')
+  })
+
+  it('says why the lead did not get the turn', async () => {
+    show(vi.fn(async () => ({ outcome: 'failed' as const, reason: 'Terminal not found' })))
+    await act(async () => button('Wave, 4 to do, slots free').click())
+    expect(texts()).toContain('Could not send Wave: Terminal not found')
+  })
+
+  it('confirms how many members a Wave launched once they join the team', async () => {
+    show(vi.fn(async () => SENT))
+    await act(async () => button('Wave, 4 to do, slots free').click())
+    show(
+      vi.fn(async () => SENT),
+      'en',
+      7
+    )
+    expect(texts()).toContain('Wave launched 3 members')
   })
 
   it('words the dock in the host language', () => {
@@ -129,7 +156,7 @@ describe('TeamActionDock', () => {
 
   const ship: TeamAction = { ...action('action-0', null, 'Ship', 'ship', null), command: 'ship' }
   const full: TeamSheetControl = { actions: [wave, status, push, sweep, stop, ship], stopped: null }
-  const showFull = (onSend: (one: TeamAction) => Promise<'sent' | 'repeat' | 'failed'>) =>
+  const showFull = (onSend: (one: TeamAction) => Promise<TeamTurnResult>) =>
     act(() =>
       root.render(
         <TeamActionDock
@@ -174,7 +201,7 @@ describe('TeamActionDock', () => {
   })
 
   it('runs a picked action as a lead turn, and asks before Stop', async () => {
-    const onSend = vi.fn(async () => 'sent' as const)
+    const onSend = vi.fn(async () => SENT)
     showFull(onSend)
     act(() => button('All actions').click())
     await act(async () => button('Status').click())

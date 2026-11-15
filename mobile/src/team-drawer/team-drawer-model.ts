@@ -27,7 +27,7 @@ import type { TeamSceneArtLoad } from './use-team-scene-art'
 import { teamSheetControlOf, type TeamSheetControl } from './team-sheet-control'
 import { teamHeldMemberRowsOf } from './team-held-members'
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
-import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
+import type { TeamTurnResult } from './team-lead-turn-send'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -112,7 +112,7 @@ export type TeamDrawerData = {
   /** The scene file's images for the band; null unless the band draws a scene's own art. */
   sceneArt: TeamSceneArtLoad | null
   /** Sends an action to the lead as a turn; null with no lead terminal to write to. */
-  sendAction: ((action: TeamAction) => Promise<LeadPromptOutcome>) | null
+  sendAction: ((action: TeamAction) => Promise<TeamTurnResult>) | null
   /** The status colours, with the person's Settings > Agent Teams overrides. */
   tones: TeamTones
 }

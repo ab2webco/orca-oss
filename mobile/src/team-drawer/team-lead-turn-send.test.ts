@@ -10,7 +10,10 @@ describe('the Team sheet lead turn', () => {
     const sendRequest = vi.fn(async () => reply(true))
     const send = createTeamLeadTurnSender(() => 0)
     const client = { sendRequest } as unknown as RpcClient
-    await expect(send(client, 'term_lead', 'lead:wave', '/orca-game:wave')).resolves.toBe('sent')
+    await expect(send(client, 'term_lead', 'lead:wave', '/orca-game:wave')).resolves.toEqual({
+      outcome: 'sent',
+      reason: null
+    })
     expect(sendRequest).toHaveBeenCalledWith('terminal.send', {
       terminal: 'term_lead',
       text: '/orca-game:wave',
@@ -25,16 +28,23 @@ describe('the Team sheet lead turn', () => {
     const client = { sendRequest } as unknown as RpcClient
     await send(client, 't', 'lead:wave', '/wave')
     now = 2_000
-    await expect(send(client, 't', 'lead:wave', '/wave')).resolves.toBe('repeat')
+    await expect(send(client, 't', 'lead:wave', '/wave')).resolves.toMatchObject({
+      outcome: 'repeat'
+    })
     now = 3_500
-    await expect(send(client, 't', 'lead:wave', '/wave')).resolves.toBe('sent')
+    await expect(send(client, 't', 'lead:wave', '/wave')).resolves.toMatchObject({
+      outcome: 'sent'
+    })
     expect(sendRequest).toHaveBeenCalledTimes(2)
   })
 
-  it('reports a refused or locked send as failed, and lets the next press through', async () => {
+  it('reports a refused or locked send as failed, with why, and lets the next press through', async () => {
     const send = createTeamLeadTurnSender(() => 0)
     const locked = { sendRequest: vi.fn(async () => reply(false)) } as unknown as RpcClient
-    await expect(send(locked, 't', 'lead:sweep', '/sweep')).resolves.toBe('failed')
+    await expect(send(locked, 't', 'lead:sweep', '/sweep')).resolves.toEqual({
+      outcome: 'failed',
+      reason: null
+    })
     const refused = {
       sendRequest: vi.fn(async () => ({
         id: 'x',
@@ -43,6 +53,18 @@ describe('the Team sheet lead turn', () => {
         _meta: { runtimeId: 'rt' }
       }))
     } as unknown as RpcClient
-    await expect(send(refused, 't', 'lead:sweep', '/sweep')).resolves.toBe('failed')
+    await expect(send(refused, 't', 'lead:sweep', '/sweep')).resolves.toEqual({
+      outcome: 'failed',
+      reason: 'no'
+    })
+    const offline = {
+      sendRequest: vi.fn(async () => {
+        throw new Error('Not connected')
+      })
+    } as unknown as RpcClient
+    await expect(send(offline, 't', 'lead:sweep', '/sweep')).resolves.toEqual({
+      outcome: 'failed',
+      reason: 'Not connected'
+    })
   })
 })
