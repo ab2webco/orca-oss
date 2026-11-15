@@ -58,6 +58,9 @@ function hostReplying(state: unknown) {
     if (method === 'game.state') {
       return ok(state)
     }
+    if (method === 'game.characters') {
+      return ok({ characters: [{ xp: 240 }, { xp: 100 }] })
+    }
     if (method === 'game.inboxThreads') {
       return ok({ threads: [], waiting: [waiting], answered: [] })
     }
@@ -75,9 +78,21 @@ function hostReplying(state: unknown) {
 const renderers: ReactTestRenderer[] = []
 let team: TeamDrawerData | null = null
 
-type ProbeProps = { client: RpcClient; terminalHandle: string | null; paneKey: string | null }
-function Probe(props: ProbeProps) {
-  team = useTeamDrawer({ ...props, connected: true, worktreeId: 'repo::/lead' })
+type ProbeProps = {
+  client: RpcClient
+  terminalHandle: string | null
+  paneKey: string | null
+  levelSupported?: boolean
+  sceneArtSupported?: boolean
+}
+function Probe({ levelSupported = false, sceneArtSupported = false, ...props }: ProbeProps) {
+  team = useTeamDrawer({
+    ...props,
+    levelSupported,
+    sceneArtSupported,
+    connected: true,
+    worktreeId: 'repo::/lead'
+  })
   return null
 }
 
@@ -142,6 +157,137 @@ describe('useTeamDrawer', () => {
     expect(team?.view).toBeNull()
     expect(team?.questions).toEqual([])
     expect(client.sendRequest).not.toHaveBeenCalledWith('game.inboxThreads', expect.anything())
+  })
+
+  it("reads the team's level from the characters' XP on a host that advertises it", async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf', levelSupported: true })
+
+    expect(sendRequest).toHaveBeenCalledWith('game.characters', {
+      worktreeId: 'repo::/lead',
+      terminalHandle: 'term_1'
+    })
+    expect(team?.level).toEqual({ level: 3, into: 40, need: 300 })
+  })
+
+  it('never asks an older host for XP, and shows no level', async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+
+    expect(sendRequest).not.toHaveBeenCalledWith('game.characters', expect.anything())
+    expect(team?.level).toBeNull()
+  })
+
+  const role = (sheets: string[]) => ({
+    sheets,
+    frame: { width: 64, height: 64 },
+    size: 50,
+    animations: { idle: { row: 0, frames: 1 } }
+  })
+  const marioState = {
+    ...leadState,
+    agents: [
+      { ...leadState.agents[0], paneKey: 'lead', isLeader: true, isMember: false },
+      ...leadState.agents
+    ],
+    panel: { look: 'game', style: 'figures', tabs: {}, advisor: true, arcade: true },
+    config: { scene: 'mario' },
+    extensions: {
+      scenes: [
+        {
+          id: 'mario',
+          pluginId: 'project',
+          definition: {
+            native: {
+              figures: {
+                layers: [{ src: 'sky.png' }, { src: 'bush.png', front: true }],
+                roles: { lead: role(['mario.png']), member: role(['toad.png']) }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+  const png = btoa(
+    String.fromCharCode(
+      137,
+      80,
+      78,
+      71,
+      13,
+      10,
+      26,
+      10,
+      0,
+      0,
+      0,
+      13,
+      73,
+      72,
+      68,
+      82,
+      0,
+      0,
+      0,
+      64,
+      0,
+      0,
+      0,
+      64
+    )
+  )
+  const serving = (fail: string | null) => {
+    const base = hostReplying(marioState)
+    return vi.fn(async (method: string, params?: unknown) => {
+      if (method !== 'game.sceneArt') {
+        return base(method)
+      }
+      const src = (params as { src: string }).src
+      return src === fail
+        ? ({
+            id: 'x',
+            ok: false,
+            error: { code: 'internal', message: 'gone' },
+            _meta: { runtimeId: 'rt' }
+          } as RpcResponse)
+        : ok({ contentBase64: png, mimeType: 'image/png' })
+    })
+  }
+
+  it("reads only the images the scene band draws, on a host that serves the scene's art", async () => {
+    const sendRequest = serving(null)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'lead', sceneArtSupported: true })
+
+    const asked = sendRequest.mock.calls
+      .filter(([method]) => method === 'game.sceneArt')
+      .map(([, params]) => (params as { src: string }).src)
+      .toSorted()
+    expect(asked).toEqual(['bush.png', 'mario.png', 'sky.png', 'toad.png'])
+    expect(sendRequest).toHaveBeenCalledWith('game.sceneArt', {
+      worktreeId: 'repo::/lead',
+      terminalHandle: 'term_1',
+      sceneId: 'mario',
+      src: 'sky.png'
+    })
+    expect(team?.sceneArt?.kind).toBe('ready')
+  })
+
+  it("draws the fallback when any of the scene's images fails, as the desktop draws Pixel", async () => {
+    const client = { sendRequest: serving('toad.png') } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'lead', sceneArtSupported: true })
+    expect(team?.sceneArt).toEqual({ kind: 'failed' })
+  })
+
+  it("never asks an older host for the scene's art", async () => {
+    const sendRequest = serving(null)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'lead' })
+    expect(sendRequest).not.toHaveBeenCalledWith('game.sceneArt', expect.anything())
+    expect(team?.sceneArt).toBeNull()
   })
 
   it('answers once through the board, on the worktree the Inbox answers through', async () => {

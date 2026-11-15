@@ -10,7 +10,12 @@ import {
   type TeamDrawerData,
   type TeamInbox
 } from './team-drawer-model'
-import { readLeadGameState, readLeadInboxThreads } from './team-drawer-rpc'
+import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
+import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
+import { useTeamSceneArt } from './use-team-scene-art'
+import { sendTeamLeadTurn } from './team-lead-turn-send'
+import type { TeamAction } from '../../../src/shared/team-panel-actions'
+import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -21,8 +26,13 @@ export function useTeamDrawer(args: {
   worktreeId: string
   terminalHandle: string | null
   paneKey: string | null
+  /** The host advertises MOBILE_TEAM_LEVEL_CAPABILITY. */
+  levelSupported: boolean
+  /** The host advertises MOBILE_TEAM_SCENE_CAPABILITY. */
+  sceneArtSupported: boolean
 }): TeamDrawerData {
-  const { client, connected, worktreeId, terminalHandle, paneKey } = args
+  const { client, connected, worktreeId, terminalHandle, paneKey, levelSupported } = args
+  const { sceneArtSupported } = args
   const [focused, setFocused] = useState(false)
   useFocusEffect(
     useCallback(() => {
@@ -40,6 +50,8 @@ export function useTeamDrawer(args: {
   const [inboxRead, setInboxRead] = useState<{ key: string; inbox: TeamInbox } | null>(null)
   const leadInbox: TeamInbox =
     inboxRead?.key === terminalKey ? inboxRead.inbox : { kind: 'loading' }
+  const [xpRead, setXpRead] = useState<{ key: string; xp: number | null } | null>(null)
+  const xp = xpRead?.key === terminalKey ? xpRead.xp : null
   const generationRef = useRef(0)
 
   useEffect(() => {
@@ -62,6 +74,16 @@ export function useTeamDrawer(args: {
           if (!teamLeadViewOf(state)) {
             return
           }
+          if (levelSupported) {
+            void readLeadXp(client, { worktreeId, terminalHandle })
+              .then((read) => {
+                if (generationRef.current === generation) {
+                  setXpRead({ key: terminalKey, xp: read })
+                }
+              })
+              // Why keep the last level: a failed read says nothing about the XP.
+              .catch(() => {})
+          }
           const threads = await readLeadInboxThreads(client, { worktreeId, terminalHandle })
           if (generationRef.current === generation) {
             const inbox: TeamInbox =
@@ -83,7 +105,16 @@ export function useTeamDrawer(args: {
       generationRef.current++
       clearInterval(interval)
     }
-  }, [candidate, client, paneKey, reloadQuestions, terminalHandle, terminalKey, worktreeId])
+  }, [
+    candidate,
+    client,
+    levelSupported,
+    paneKey,
+    reloadQuestions,
+    terminalHandle,
+    terminalKey,
+    worktreeId
+  ])
 
   const own = useMemo(
     () =>
@@ -96,9 +127,34 @@ export function useTeamDrawer(args: {
     const tickets = new Set(
       own.questions.flatMap((one) => (one.ticket ? [one.ticket.toUpperCase()] : []))
     )
-    return teamLeadViewOf(rawState, tickets)
-  }, [own.questions, rawState])
+    // Why oldest: the desktop's lead card names its oldest open question (the board lists open ones only).
+    const oldest = [...own.questions].sort((a, b) => a.askedAt.localeCompare(b.askedAt))[0]
+    return teamLeadViewOf(
+      rawState,
+      tickets,
+      oldest ? { ticket: oldest.ticket } : null,
+      Date.now(),
+      {
+        sceneArt: sceneArtSupported
+      }
+    )
+  }, [own.questions, rawState, sceneArtSupported])
+  const sceneArt = useTeamSceneArt(
+    client,
+    terminalHandle ? { worktreeId, terminalHandle } : null,
+    view?.scene ?? null
+  )
 
+  const sendAction = useMemo(
+    () =>
+      view && client && terminalHandle
+        ? (action: TeamAction): Promise<LeadPromptOutcome> =>
+            action.send
+              ? sendTeamLeadTurn(client, terminalHandle, action.id, action.send)
+              : Promise.resolve('failed')
+        : null,
+    [client, terminalHandle, view]
+  )
   const inboxAnswer = inbox.answer
   const answer = useCallback(
     async (id: string, reply: OwnerQuestionReply): Promise<void> => {
@@ -115,6 +171,9 @@ export function useTeamDrawer(args: {
     questions: view ? own.questions : [],
     answerWorktreeId: own.worktreeId,
     inbox: leadInbox,
-    answer
+    answer,
+    level: view && xp !== null ? gameCharacterLevelOf(xp) : null,
+    sceneArt,
+    sendAction
   }
 }

@@ -1,5 +1,5 @@
 import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
-import type { TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
+import type { TeamCondition, TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
 import type { TeamMemberRow } from './team-drawer-model'
 
 type Words = {
@@ -17,7 +17,17 @@ type Words = {
   answerInInbox: string
   openTerminal: string
   terminalOnHost: (host: string) => string
-  local: string
+  condition: Record<TeamCondition, string>
+  lead: string
+  orchestrating: (action: string) => string
+  leadAsksOn: (ticket: string) => string
+  leadAsks: string
+  coordinates: (count: number) => string
+  advisorName: string
+  advisor: string
+  advisorSource: string
+  level: (level: number) => string
+  xpProgress: (into: number, need: number) => string
   now: string
   needYou: (count: number) => string
   workingOf: (working: number, total: number) => string
@@ -59,7 +69,31 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     answerInInbox: 'Answer in Inbox',
     openTerminal: 'Open terminal',
     terminalOnHost: (host) => `Its terminal is on ${host}`,
-    local: 'local',
+    condition: {
+      working: 'Working',
+      waiting: 'Waiting for you',
+      idle: 'Idle',
+      done: 'Done',
+      starting: 'Starting',
+      queued: 'Queued',
+      paused: 'Paused',
+      asleep: 'Asleep',
+      limited: 'Usage limit reached',
+      loggedOut: 'Logged out',
+      unreachable: 'Host unreachable',
+      gone: 'Session closed',
+      startFailed: 'Failed to start'
+    },
+    lead: 'Lead',
+    orchestrating: (action) => `Orchestrating · ${action}`,
+    leadAsksOn: (ticket) => `Waiting for you · Question on ${ticket}`,
+    leadAsks: 'Waiting for you',
+    coordinates: (count) => `Coordinates ${count} agent${count === 1 ? '' : 's'}`,
+    advisorName: 'Wizard',
+    advisor: 'Advisor',
+    advisorSource: 'Jev',
+    level: (level) => `Lv ${level}`,
+    xpProgress: (into, need) => `${into}/${need} XP`,
     now: 'now',
     needYou: (count) => `${count} ${count === 1 ? 'needs' : 'need'} you`,
     workingOf: (working, total) => `${working} working · ${total} member${total === 1 ? '' : 's'}`,
@@ -97,7 +131,31 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     answerInInbox: 'Responder en Bandeja',
     openTerminal: 'Abrir terminal',
     terminalOnHost: (host) => `Su terminal está en ${host}`,
-    local: 'local',
+    condition: {
+      working: 'Trabajando',
+      waiting: 'Esperándote',
+      idle: 'En reposo',
+      done: 'Terminado',
+      starting: 'Arrancando',
+      queued: 'En cola',
+      paused: 'En pausa',
+      asleep: 'Dormido',
+      limited: 'Límite de uso alcanzado',
+      loggedOut: 'Sesión cerrada en la cuenta',
+      unreachable: 'Host sin conexión',
+      gone: 'Sesión cerrada',
+      startFailed: 'No pudo arrancar'
+    },
+    lead: 'Líder',
+    orchestrating: (action) => `Orquestando · ${action}`,
+    leadAsksOn: (ticket) => `Te espera · Pregunta sobre ${ticket}`,
+    leadAsks: 'Te espera',
+    coordinates: (count) => `Coordina ${count} agente${count === 1 ? '' : 's'}`,
+    advisorName: 'Mago',
+    advisor: 'Advisor',
+    advisorSource: 'Jev',
+    level: (level) => `Nv ${level}`,
+    xpProgress: (into, need) => `${into}/${need} XP`,
     now: 'ahora',
     needYou: (count) => `${count} te ${count === 1 ? 'necesita' : 'necesitan'}`,
     workingOf: (working, total) =>

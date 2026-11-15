@@ -13,21 +13,30 @@ import {
   type TeamMetrics
 } from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
+import { TeamAdvisorCardView, TeamLeadCardView } from './TeamLeadCards'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
 import { teamInboxWordsOf } from './team-inbox-words'
 import { useTeamSheetDrag } from './use-team-sheet-drag'
 import { PeekBar, TEAM_PEEK_HEIGHT } from './TeamPeekBar'
+import { TeamSheetTabBar, type TeamTab } from './TeamSheetTabBar'
+import { TeamHostsTab } from './TeamHostsTab'
+import { TeamPrsTab } from './TeamPrsTab'
+import { teamWorkWordsOf } from './team-work-words'
+import { TeamLevelRow } from './TeamLevelRow'
+import { TeamSceneBand } from './TeamSceneBand'
+import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
+import { teamControlWordsOf } from './team-control-words'
 
 export { TEAM_PEEK_HEIGHT }
-
-type TeamTab = 'team' | 'inbox'
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   team: TeamDrawerData
   now: number
+  /** The paired desktop's name; null until the host record loads. */
+  hostName: string | null
   onOpenLink: (url: string) => void
   onOpenTerminal: (terminal: NonNullable<TeamMemberRow['terminal']>) => void
 }
@@ -56,55 +65,16 @@ function MetricsSummary({ metrics, words }: { metrics: TeamMetrics; words: TeamC
   )
 }
 
-function TabBar({
-  active,
-  inboxCount,
-  words,
-  onSelect
-}: {
-  active: TeamTab
-  inboxCount: number
-  words: TeamCardWords
-  onSelect: (tab: TeamTab) => void
-}) {
-  const tabs: { tab: TeamTab; label: string }[] = [
-    { tab: 'team', label: words.team },
-    { tab: 'inbox', label: words.inbox }
-  ]
-  return (
-    <View style={styles.tabs} accessibilityRole="tablist">
-      {tabs.map(({ tab, label }) => {
-        const selected = tab === active
-        return (
-          <Pressable
-            key={tab}
-            style={({ pressed }) => [
-              styles.tab,
-              selected && styles.tabActive,
-              pressed && !selected && styles.tabPressed
-            ]}
-            onPress={() => onSelect(tab)}
-            accessibilityRole="tab"
-            aria-selected={selected}
-            accessibilityLabel={label}
-          >
-            <Text style={[styles.tabText, selected && styles.tabTextActive]} numberOfLines={1}>
-              {label}
-            </Text>
-            {tab === 'inbox' && inboxCount > 0 ? (
-              <View style={styles.count}>
-                <Text style={styles.countText}>{String(inboxCount)}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
-
 /** The lead's Team as a bottom sheet over its terminal: a 60 pt peek that drags or taps open to 84%. */
-export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTerminal }: Props) {
+export function TeamSheet({
+  open,
+  onOpenChange,
+  team,
+  now,
+  hostName,
+  onOpenLink,
+  onOpenTerminal
+}: Props) {
   const { view, questions } = team
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
@@ -146,6 +116,8 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
     return null
   }
   const words = teamCardWordsOf(view.locale)
+  const workWords = teamWorkWordsOf(view.locale)
+  const controlWords = teamControlWordsOf(view.locale)
   const peek = teamPeekOf(
     view,
     questions.length,
@@ -193,13 +165,36 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
                       { paddingBottom: insets.bottom + spacing.lg }
                     ]}
                   >
-                    <TabBar
+                    {view.control.stopped ? (
+                      <TeamStoppedBanner stopped={view.control.stopped} words={controlWords} />
+                    ) : null}
+                    {view.scene ? (
+                      <TeamSceneBand
+                        band={view.scene}
+                        ownArt={team.sceneArt}
+                        leadName={view.lead?.name ?? null}
+                        members={view.members}
+                      />
+                    ) : null}
+                    {team.level ? <TeamLevelRow level={team.level} words={words} /> : null}
+                    <TeamSheetTabBar
                       active={tab}
                       inboxCount={questions.length}
+                      work={view.work}
                       words={words}
+                      workWords={workWords}
                       onSelect={setPicked}
                     />
-                    {tab === 'inbox' ? (
+                    {tab === 'prs' ? (
+                      <TeamPrsTab work={view.work} words={workWords} onOpenLink={onOpenLink} />
+                    ) : tab === 'hosts' ? (
+                      <TeamHostsTab
+                        machines={view.work.machines}
+                        hostName={hostName}
+                        locale={view.locale}
+                        words={workWords}
+                      />
+                    ) : tab === 'inbox' ? (
                       <TeamInboxTab
                         team={team}
                         now={now}
@@ -217,6 +212,7 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
                               <TeamMemberCard
                                 key={member.key}
                                 member={member}
+                                hostName={hostName}
                                 now={now}
                                 words={words}
                                 expanded={expanded === member.key}
@@ -234,6 +230,17 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
                           ) : (
                             <Text style={styles.empty}>{words.noMembersRunning}</Text>
                           )}
+                          {view.lead ? (
+                            <TeamLeadCardView
+                              lead={view.lead}
+                              memberCount={view.members.length}
+                              hostName={hostName}
+                              words={words}
+                            />
+                          ) : null}
+                          {view.advisor ? (
+                            <TeamAdvisorCardView advisor={view.advisor} words={words} />
+                          ) : null}
                         </View>
                         {view.metrics ? (
                           <View style={styles.section}>
@@ -248,6 +255,16 @@ export function TeamSheet({ open, onOpenChange, team, now, onOpenLink, onOpenTer
               </View>
             </GestureDetector>
           )}
+          {!drag.resting && team.sendAction ? (
+            <View style={{ paddingBottom: insets.bottom }}>
+              <TeamActionDock
+                control={view.control}
+                memberCount={view.members.length}
+                words={controlWords}
+                onSend={team.sendAction}
+              />
+            </View>
+          ) : null}
         </GestureHandlerRootView>
       </Animated.View>
     </>
@@ -290,49 +307,6 @@ const styles = StyleSheet.create({
     fontSize: typography.metaSize,
     fontWeight: '700',
     textTransform: 'uppercase'
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginBottom: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle
-  },
-  tab: {
-    flex: 1,
-    minHeight: MIN_TOUCH_TARGET,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    // Reserved so the active underline does not shift the row.
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent'
-  },
-  tabActive: {
-    borderBottomColor: colors.textPrimary
-  },
-  tabPressed: {
-    opacity: 0.7
-  },
-  tabText: {
-    color: colors.textSecondary,
-    fontSize: typography.bodySize,
-    fontWeight: '600'
-  },
-  tabTextActive: {
-    color: colors.textPrimary
-  },
-  count: {
-    minWidth: 18,
-    paddingHorizontal: spacing.xs,
-    borderRadius: 9,
-    backgroundColor: colors.statusRed,
-    alignItems: 'center'
-  },
-  countText: {
-    color: colors.onAccent,
-    fontSize: typography.metaSize - 1,
-    fontWeight: '700'
   },
   empty: {
     color: colors.textMuted,

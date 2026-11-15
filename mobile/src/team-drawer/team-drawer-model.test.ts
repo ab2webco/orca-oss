@@ -45,6 +45,7 @@ const row = (over: Partial<TeamMemberRow> = {}): TeamMemberRow => ({
   terminal: null,
   account: null,
   limit: null,
+  hold: null,
   ...over
 })
 
@@ -112,7 +113,8 @@ describe('teamLeadViewOf', () => {
         summary: null,
         terminal: null,
         account: null,
-        limit: null
+        limit: null,
+        hold: null
       }
     ])
   })

@@ -5,6 +5,7 @@ import type {
   GameOwnerQuestionProject
 } from '../../../src/shared/orchestrator-game-owner-questions'
 import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
+import type { GameCharacterLevel } from '../../../src/shared/orchestrator-game-characters'
 import type { GameInboxThreads } from '../../../src/shared/orchestrator-game-inbox-threads'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
@@ -15,7 +16,19 @@ import type { TerminalOpenTarget } from '../session/host-terminal-open'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { teamMemberContextOf, type TeamMemberContext } from './team-drawer-member-context'
 import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
-import type { TeamFlowPhase } from '../../../src/shared/team-panel-model-types'
+import type {
+  TeamAdvisorRow,
+  TeamFlowPhase,
+  TeamLeadCard
+} from '../../../src/shared/team-panel-model-types'
+import { teamLeadCardsOf } from './team-sheet-lead'
+import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
+import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
+import type { TeamSceneArtLoad } from './use-team-scene-art'
+import { teamSheetControlOf, type TeamSheetControl } from './team-sheet-control'
+import { teamHeldMemberRowsOf } from './team-held-members'
+import type { TeamAction } from '../../../src/shared/team-panel-actions'
+import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -52,6 +65,8 @@ export type TeamMemberRow = {
   /** `usedPercent` is the 5 h window, `weeklyPercent` the 7 d one. */
   account: { email: string; usedPercent: number | null; weeklyPercent: number | null } | null
   limit: { resetsAt: number | null; loggedOut: boolean } | null
+  /** A STOP paused it, or its launch waits in the queue; null for a live session. */
+  hold: { kind: 'paused' } | { kind: 'queued'; waitingOn: string } | null
 }
 
 export type TeamMetrics = {
@@ -63,6 +78,14 @@ export type TeamMetrics = {
 
 export type TeamLeadView = {
   members: TeamMemberRow[]
+  /** null when the host sends no lead agent. */
+  lead: TeamLeadCard | null
+  /** Jev's card; null without the advisor plugin or from an older host. */
+  advisor: TeamAdvisorRow | null
+  work: TeamSheetWork
+  /** The band above the tabs; null when the desktop panel shows no scene. */
+  scene: TeamSceneBand | null
+  control: TeamSheetControl
   metrics: TeamMetrics | null
   locale: SupportedUiLocale
 }
@@ -81,6 +104,12 @@ export type TeamDrawerData = {
   answerWorktreeId: string | null
   inbox: TeamInbox
   answer: (id: string, reply: OwnerQuestionReply) => Promise<void>
+  /** The team's level from its characters' XP; null on a host that does not advertise it. */
+  level: GameCharacterLevel | null
+  /** The scene file's images for the band; null unless the band draws a scene's own art. */
+  sceneArt: TeamSceneArtLoad | null
+  /** Sends an action to the lead as a turn; null with no lead terminal to write to. */
+  sendAction: ((action: TeamAction) => Promise<LeadPromptOutcome>) | null
 }
 
 type Rec = Record<string, unknown>
@@ -187,7 +216,8 @@ function memberRowOf(raw: Rec, context: TeamMemberContext): TeamMemberRow | null
       : null,
     limit: isRecord(raw.limit)
       ? { resetsAt: num(raw.limit.resetsAt), loggedOut: raw.limit.loggedOut === true }
-      : null
+      : null,
+    hold: null
   }
 }
 
@@ -216,7 +246,10 @@ const rank = (row: TeamMemberRow): number =>
 /** The lead's Team, or null when this pane is not the live lead of a game project. */
 export function teamLeadViewOf(
   raw: unknown,
-  questionTickets: ReadonlySet<string> = new Set()
+  questionTickets: ReadonlySet<string> = new Set(),
+  ownerAsk: { ticket: string | null } | null = null,
+  now: number = Date.now(),
+  options: { sceneArt?: boolean } = {}
 ): TeamLeadView | null {
   // Why `lead`: role is `lead` for any root pane; only a project with a lead has a Team.
   if (!isRecord(raw) || raw.role !== 'lead' || !isRecord(raw.lead) || raw.leadElsewhere) {
@@ -230,10 +263,18 @@ export function teamLeadViewOf(
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
+    .concat(teamHeldMemberRowsOf(raw))
+  const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+  const { lead, advisor, cards } = teamLeadCardsOf(raw, questionTickets, ownerAsk, locale)
   return {
     members,
+    lead,
+    advisor,
+    work: teamSheetWorkOf(raw, cards, locale, now),
+    scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }, options),
+    control: teamSheetControlOf(raw),
     metrics: metricsOf(raw.metrics),
-    locale: normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
+    locale
   }
 }
 

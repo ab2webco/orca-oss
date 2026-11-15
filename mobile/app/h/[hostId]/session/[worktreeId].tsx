@@ -284,6 +284,8 @@ import { leadMemberRoute, leadPaneKeyOf } from '../../../../src/session/lead-mem
 import { LeadMembersStrip } from '../../../../src/session/LeadMembersStrip'
 import { useLeadMembers } from '../../../../src/session/use-lead-members'
 import { useTeamDrawer } from '../../../../src/team-drawer/use-team-drawer'
+import { MOBILE_TEAM_LEVEL_CAPABILITY } from '../../../../src/team-drawer/team-drawer-rpc'
+import { MOBILE_TEAM_SCENE_CAPABILITY } from '../../../../src/team-drawer/team-scene-art-rpc'
 import { TEAM_PEEK_HEIGHT, TeamSheet } from '../../../../src/team-drawer/TeamSheet'
 import { useNewTabTeam } from '../../../../src/new-tab-team/use-new-tab-team'
 import { useAddMember } from '../../../../src/new-tab-team/use-add-member'
@@ -1027,6 +1029,8 @@ export default function SessionScreen() {
     null
   )
   const [quickCommandsSupported, setQuickCommandsSupported] = useState<boolean | null>(null)
+  const [teamLevelSupported, setTeamLevelSupported] = useState(false)
+  const [teamSceneArtSupported, setTeamSceneArtSupported] = useState(false)
   // Why: stable callbacks (handleFileTap) read the live value via this ref, since
   // the capability probe resolves after the callbacks are created.
   const browserScreencastSupportedRef = useRef(browserScreencastSupported)
@@ -2367,6 +2371,8 @@ export default function SessionScreen() {
       setQuickCommandsSupported(null)
       setShowQuickCommands(false)
       hostQueryReplyInputSupportedRef.current = false
+      setTeamLevelSupported(false)
+      setTeamSceneArtSupported(false)
       return
     }
     // Why: a client swap can keep the route connected while moving to an older
@@ -2377,6 +2383,8 @@ export default function SessionScreen() {
     setShowQuickCommands(false)
     setTeamControlSupported(null)
     hostQueryReplyInputSupportedRef.current = false
+    setTeamLevelSupported(false)
+    setTeamSceneArtSupported(false)
     // Why: the probe retries — a relay→direct cutover or request timeout rejects
     // status.get without changing connState, which used to latch these hidden.
     return startRuntimeCapabilityProbe(client, (capabilities) => {
@@ -2384,6 +2392,8 @@ export default function SessionScreen() {
       setAgentSessionHistorySupported(capabilities.includes(MOBILE_AI_VAULT_CAPABILITY))
       setQuickCommandsSupported(supportsMobileQuickCommands(capabilities))
       setTeamControlSupported(capabilities.includes(MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY))
+      setTeamLevelSupported(capabilities.includes(MOBILE_TEAM_LEVEL_CAPABILITY))
+      setTeamSceneArtSupported(capabilities.includes(MOBILE_TEAM_SCENE_CAPABILITY))
       // Why: hosts without this capability strip inputKind from terminal.send,
       // so a forwarded xterm reply would become floor-stealing shell input.
       hostQueryReplyInputSupportedRef.current = capabilities.includes(
@@ -2942,7 +2952,9 @@ export default function SessionScreen() {
     connected: connState === 'connected',
     worktreeId,
     terminalHandle: activeHandle,
-    paneKey: activeLeadPaneKey
+    paneKey: activeLeadPaneKey,
+    levelSupported: teamLevelSupported,
+    sceneArtSupported: teamSceneArtSupported
   })
   const [teamOpen, setTeamOpen] = useState(false)
   const teamReady = team.view !== null
@@ -4927,6 +4939,7 @@ export default function SessionScreen() {
               onOpenChange={setTeamOpen}
               team={team}
               now={teamNow}
+              hostName={hostName || null}
               onOpenLink={openMobilePrUrl}
               onOpenTerminal={openTeamTerminal}
             />
