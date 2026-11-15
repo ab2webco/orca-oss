@@ -127,6 +127,63 @@ describe('TeamActionDock', () => {
     expect(texts()).toContain('¿Detener a los 4 miembros? Siguen parados hasta que los reactives.')
   })
 
+  const ship: TeamAction = { ...action('action-0', null, 'Ship', 'ship', null), command: 'ship' }
+  const full: TeamSheetControl = { actions: [wave, status, push, sweep, stop, ship], stopped: null }
+  const showFull = (onSend: (one: TeamAction) => Promise<'sent' | 'repeat' | 'failed'>) =>
+    act(() =>
+      root.render(
+        <TeamActionDock
+          control={full}
+          memberCount={4}
+          words={teamControlWordsOf('en')}
+          onSend={onSend}
+        />
+      )
+    )
+
+  it('opens every action grouped as the desktop menu: Now, This project, From Orca', () => {
+    showFull(vi.fn())
+    act(() => button('All actions').click())
+    const shown = texts()
+    const at = (text: string) => shown.indexOf(text)
+    expect(at('Now')).toBeLessThan(at('This project'))
+    expect(at('This project')).toBeLessThan(at('From Orca'))
+    expect(at('Ship')).toBeGreaterThan(at('This project'))
+    expect(at('Status')).toBeGreaterThan(at('From Orca'))
+    expect(shown).toContain('4 to do, slots free')
+    expect(shown).toContain('Stop every member')
+  })
+
+  it('finds an action by name, and says when none matches', () => {
+    showFull(vi.fn())
+    act(() => button('All actions').click())
+    const search = document.body.querySelector<HTMLInputElement>('[aria-label="Search actions"]')!
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(search, 'swe')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(texts()).toContain('Sweep')
+    expect(texts()).not.toContain('Ship')
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(search, 'zzz')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(texts()).toContain('No action with that name.')
+  })
+
+  it('runs a picked action as a lead turn, and asks before Stop', async () => {
+    const onSend = vi.fn(async () => 'sent' as const)
+    showFull(onSend)
+    act(() => button('All actions').click())
+    await act(async () => button('Status').click())
+    expect(onSend).toHaveBeenCalledWith(status)
+    act(() => button('All actions').click())
+    act(() => button('Stop every member').click())
+    expect(texts()).toContain('Stop all 4 members? They stay stopped until you push them.')
+  })
+
   it('shows the STOP, with launches and pushes paused while members run', () => {
     act(() =>
       root.render(

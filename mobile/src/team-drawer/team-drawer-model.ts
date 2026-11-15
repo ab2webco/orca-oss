@@ -26,6 +26,7 @@ import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
 import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
 import type { TeamSceneArtLoad } from './use-team-scene-art'
 import { teamSheetControlOf, type TeamSheetControl } from './team-sheet-control'
+import { teamHeldMemberRowsOf } from './team-held-members'
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
 import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
@@ -64,6 +65,8 @@ export type TeamMemberRow = {
   /** `usedPercent` is the 5 h window, `weeklyPercent` the 7 d one. */
   account: { email: string; usedPercent: number | null; weeklyPercent: number | null } | null
   limit: { resetsAt: number | null; loggedOut: boolean } | null
+  /** A STOP paused it, or its launch waits in the queue; null for a live session. */
+  hold: { kind: 'paused' } | { kind: 'queued'; waitingOn: string } | null
 }
 
 export type TeamMetrics = {
@@ -213,7 +216,8 @@ function memberRowOf(raw: Rec, context: TeamMemberContext): TeamMemberRow | null
       : null,
     limit: isRecord(raw.limit)
       ? { resetsAt: num(raw.limit.resetsAt), loggedOut: raw.limit.loggedOut === true }
-      : null
+      : null,
+    hold: null
   }
 }
 
@@ -259,6 +263,7 @@ export function teamLeadViewOf(
     .map((one, index) => ({ one, index }))
     .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
     .map(({ one }) => one)
+    .concat(teamHeldMemberRowsOf(raw))
   const locale = normalizeSupportedUiLocale(text(raw.locale) ?? undefined)
   const { lead, advisor, cards } = teamLeadCardsOf(raw, questionTickets, ownerAsk, locale)
   return {

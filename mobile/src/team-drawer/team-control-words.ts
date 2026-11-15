@@ -16,6 +16,7 @@ type Words = {
   stoppedBy: (by: string) => string
   stopped: string
   paused: string
+  menu: { label: string; search: string; now: string; project: string; orca: string; none: string }
 }
 
 // Why these words: they match desktop's teamPanel catalog, so both surfaces say the same.
@@ -43,7 +44,15 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     failed: (label) => `Could not send ${label}`,
     stoppedBy: (by) => `Stopped by ${by}`,
     stopped: 'Stopped',
-    paused: 'Launches and pushes paused'
+    paused: 'Launches and pushes paused',
+    menu: {
+      label: 'All actions',
+      search: 'Search actions',
+      now: 'Now',
+      project: 'This project',
+      orca: 'From Orca',
+      none: 'No action with that name.'
+    }
   },
   es: {
     actions: 'Acciones',
@@ -69,7 +78,15 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     failed: (label) => `No se pudo enviar ${label}`,
     stoppedBy: (by) => `Detenido por ${by}`,
     stopped: 'Detenido',
-    paused: 'Lanzamientos y pushes en pausa'
+    paused: 'Lanzamientos y pushes en pausa',
+    menu: {
+      label: 'Todas las acciones',
+      search: 'Buscar acción',
+      now: 'Ahora',
+      project: 'De este proyecto',
+      orca: 'De Orca',
+      none: 'Ninguna acción con ese nombre.'
+    }
   }
 }
 
