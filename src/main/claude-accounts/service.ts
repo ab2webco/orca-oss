@@ -280,6 +280,9 @@ export class ClaudeAccountService {
     rawToken: string | null
   ): Promise<ClaudeRateLimitAccountsState> {
     const account = this.resolveOAuthAccountSelector(accountSelector)
+    if (rawToken === null && account.tokenOnly) {
+      throw new Error('The token is this account’s only sign-in. Remove the account instead.')
+    }
     const token = rawToken === null ? null : normalizeLongLivedToken(rawToken)
     return this.serializeMutation(() =>
       this.withManagedAccountMutation(

@@ -214,6 +214,20 @@ describe('ClaudeAccountService token-only accounts (ORCA-1215)', () => {
     expect(vaultDirs()).toEqual([])
   })
 
+  it('refuses to clear the only credential of a token-only account, but replaces it', async () => {
+    const { service, getSettings } = await createService([])
+    await service.addLongLivedTokenAccount('Team Max', FAKE_TOKEN)
+    const added = getSettings().claudeManagedAccounts[0]
+
+    await expect(service.setLongLivedToken(added.id, null)).rejects.toThrow(/Remove the account/)
+    await service.setLongLivedToken(added.id, `${FAKE_TOKEN}-next`)
+
+    const settingsJson = JSON.parse(
+      readFileSync(join(added.managedAuthPath, 'settings.json'), 'utf-8')
+    )
+    expect(settingsJson.env.CLAUDE_CODE_OAUTH_TOKEN).toBe(`${FAKE_TOKEN}-next`)
+  })
+
   it('never makes a token-only account the shared login', async () => {
     const { service, getSettings } = await createService([])
     await service.addLongLivedTokenAccount('Team Max', FAKE_TOKEN)
