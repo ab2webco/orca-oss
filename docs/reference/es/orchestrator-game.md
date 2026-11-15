@@ -1926,22 +1926,23 @@ de las tarjetas y del narrador pueden ser por idioma (`{ "en": …, "es": … }`
 
 Un juego que el arcade ofrece después de un merge perfecto son datos para uno de los motores integrados
 del juego, nunca código. Los motores son `runner` (una tecla para saltar), `snake` (girar para comer
-y crecer) y `bricks` (una paleta y un muro); los juegos integrados son
-`src/shared/orchestrator-game-arcade-runner.json`, `src/shared/orchestrator-game-arcade-snake.json` y
-`src/shared/orchestrator-game-arcade-bricks.json`. `orca game game validate <file> [--json]`
+y crecer), `bricks` (una paleta y un muro) y `defense` (una torreta que defiende la línea de merge);
+los juegos integrados son `src/shared/orchestrator-game-arcade-runner.json`,
+`src/shared/orchestrator-game-arcade-snake.json`, `src/shared/orchestrator-game-arcade-bricks.json` y
+`src/shared/orchestrator-game-arcade-defense.json`. `orca game game validate <file> [--json]`
 comprueba un archivo con las reglas de `src/shared/orchestrator-game-arcade-file.ts`, lista cada problema
 como `path: message` y sale con 1 mientras quede alguno.
 
-| Clave        | Qué define                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| `engine`     | `runner`, `snake` o `bricks`; las claves de abajo son las del runner, las otras van después |
-| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                   |
-| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                              |
-| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`             |
-| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                       |
-| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms  |
-| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`       |
-| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa  |
+| Clave        | Qué define                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| `engine`     | `runner`, `snake`, `bricks` o `defense`; las claves de abajo son las del runner            |
+| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                  |
+| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                             |
+| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`            |
+| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                      |
+| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms |
+| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`      |
+| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa |
 
 - `{ "from": "scene" }` es la decoración del suelo de la escena activa (`plantKind`), así que una escena
   personalizada cambia el estilo del juego sin trabajo extra. Una escena cuyo `plantKind` es `none` no
@@ -1977,6 +1978,24 @@ una fila de ladrillos):
 Un bloque `portrait` opcional, `{ field, wall: { columns, rows }, paddle: { width } }`, se juega en
 su lugar cuando la pestaña es más alta que ancha al empezar la partida. Su `field` va de 10 a 30
 columnas por 16 a 48 filas y tiene que ser más alto que ancho.
+
+Un archivo `defense` define `name` y `fps` como arriba, y además (en unidades del campo, una unidad es
+el ancho de un enemigo):
+
+| Clave     | Qué define                                                                                   |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `field`   | `{ columns, rows }`: de 12 a 40 por 12 a 36; la línea de merge está dos filas sobre el fondo |
+| `turret`  | `{ speed, cooldownMs }`: de 5 a 60 unidades por segundo, de 80 a 2000 ms entre dos disparos  |
+| `shot`    | `{ speed }`: de 5 a 80 unidades por segundo                                                  |
+| `enemies` | `{ start, max, rampPerWave, spawnMs, spawnMinMs, perWave, buildShare }`, abajo               |
+| `lives`   | Bugs que la línea puede dejar pasar, de 1 a 9                                                |
+| `points`  | `{ bug, build }`: puntos por baja, de 1 a 100                                                |
+| `colors`  | `{ turret, belly, bug, build, shot }`, cada uno un color `#rrggbb` (o entero)                |
+
+`enemies` define la velocidad de caída en unidades por segundo (`start`, que sube `rampPerWave` en cada
+oleada hasta `max`), el intervalo entre dos enemigos (`spawnMs`, más corto en cada oleada hasta
+`spawnMinMs`, ambos de 200 a 5000), las bajas de una oleada (`perWave`) y la parte de builds rojos de
+dos golpes desde la segunda oleada (`buildShare`, de 0 a 1).
 
 ### El runner
 
@@ -2025,8 +2044,11 @@ proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en 
   (hacia el toque desde su cabeza), come bayas para sumar y crecer, y termina contra una pared o su propia cola.
 - El rompeladrillos mueve su paleta con las flechas, A/D o el mouse. Un ladrillo roto puede soltar dos
   bolas más o una paleta ancha; un muro limpio trae otro más rápido, y perder la última bola termina.
+- La defensa de la base mueve su torreta orca con las flechas, A/D o el mouse y dispara con Espacio o
+  un toque. Caen bugs y, desde la segunda oleada, builds rojos de dos golpes hacia la línea de merge;
+  cada uno que llega cuesta una vida, y cada oleada cae más rápido.
 - Cada juego tiene su propia escena: el runner un camino al atardecer, el snake un huerto, el
-  rompeladrillos una cancha de noche.
+  rompeladrillos una cancha de noche, la defensa de la base aguas profundas.
 - Esc vuelve a la conversación y conserva la partida. Una vez terminada, sólo Espacio, Enter o un toque
   cierran la pestaña, así que un giro o un salto tardío no lo hace.
 - La partida se detiene mientras un agente vivo de cualquier proyecto está bloqueado en un permiso o

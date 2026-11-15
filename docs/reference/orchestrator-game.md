@@ -1797,15 +1797,17 @@ format, limits and consent rules are in [Game scenes](./plugin-development.md#ga
 ## Arcade game files
 
 A game the arcade offers after a perfect merge is data for one of the game's built-in engines,
-never code. The engines are `runner` (one key to jump), `snake` (steer to eat and grow) and `bricks`
-(a paddle and a wall); the built-in games are `src/shared/orchestrator-game-arcade-runner.json`,
-`src/shared/orchestrator-game-arcade-snake.json` and `src/shared/orchestrator-game-arcade-bricks.json`. `orca game game validate <file> [--json]`
+never code. The engines are `runner` (one key to jump), `snake` (steer to eat and grow), `bricks`
+(a paddle and a wall) and `defense` (a turret holding the merge line); the built-in games are
+`src/shared/orchestrator-game-arcade-runner.json`, `src/shared/orchestrator-game-arcade-snake.json`,
+`src/shared/orchestrator-game-arcade-bricks.json` and `src/shared/orchestrator-game-arcade-defense.json`.
+`orca game game validate <file> [--json]`
 checks a file with the rules in `src/shared/orchestrator-game-arcade-file.ts`, lists every problem
 as `path: message` and exits 1 while any remain.
 
 | Key          | What it sets                                                                         |
 | ------------ | ------------------------------------------------------------------------------------ |
-| `engine`     | `runner`, `snake` or `bricks`; the keys below are the runner's, the others follow    |
+| `engine`     | `runner`, `snake`, `bricks` or `defense`; the keys below are the runner's            |
 | `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                               |
 | `fps`        | Frame cap, a whole number from 5 to 15                                               |
 | `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`        |
@@ -1846,6 +1848,23 @@ A `bricks` file sets `name` and `fps` as above, plus (in field units, one unit a
 An optional `portrait` block, `{ field, wall: { columns, rows }, paddle: { width } }`, is played
 instead when the tab is taller than wide at the start of a run. Its `field` is 10 to 30 columns by
 16 to 48 rows and must be taller than wide.
+
+A `defense` file sets `name` and `fps` as above, plus (in field units, one unit an enemy wide):
+
+| Key       | What it sets                                                                           |
+| --------- | -------------------------------------------------------------------------------------- |
+| `field`   | `{ columns, rows }`: 12 to 40 by 12 to 36; the merge line is two rows above the bottom |
+| `turret`  | `{ speed, cooldownMs }`: 5 to 60 units per second, 80 to 2000 ms between two shots     |
+| `shot`    | `{ speed }`: 5 to 80 units per second                                                  |
+| `enemies` | `{ start, max, rampPerWave, spawnMs, spawnMinMs, perWave, buildShare }`, below         |
+| `lives`   | Bugs the line can let through, 1 to 9                                                  |
+| `points`  | `{ bug, build }`: points per kill, 1 to 100                                            |
+| `colors`  | `{ turret, belly, bug, build, shot }`, each a `#rrggbb` (or integer) color             |
+
+`enemies` sets the fall speed in units per second (`start`, up by `rampPerWave` each wave to `max`),
+the gap between two enemies (`spawnMs`, shorter each wave down to `spawnMinMs`, both 200 to 5000),
+the kills in a wave (`perWave`) and the share of two-hit red builds from the second wave (`buildShare`,
+0 to 1).
 
 ### The runner
 
@@ -1889,8 +1908,11 @@ them. The Team panel plays the run in a center tab, a built-in game picked at ra
   (toward the tap from its head), eats berries to score and grow, and ends on a wall or its own tail.
 - The brick breaker moves its paddle with the arrows, A/D or the mouse. A broken brick may drop two
   more balls or a wide paddle; a cleared wall brings a faster one, and losing the last ball ends it.
+- The base defense moves its orca turret with the arrows, A/D or the mouse and fires with Space or a
+  tap. Bugs and, from the second wave, two-hit red builds fall toward the merge line; each one that
+  lands costs a life, and every wave falls faster.
 - Each game has its own scene: the runner a dusk path, the snake a garden bed, the brick breaker a
-  night court.
+  night court, the base defense deep water.
 - Esc goes back to the conversation and keeps the run. Once the run ends, only Space, Enter or a tap
   closes the tab, so a late turn or jump does not.
 - The run stands still while a live agent in any project is blocked on a permission or waiting on

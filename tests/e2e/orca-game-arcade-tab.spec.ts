@@ -46,6 +46,14 @@ const GAMES: Record<
       ['D', (b) => b.press('d')],
       ['a tap', (b) => b.click()]
     ]
+  },
+  defense: {
+    start: 'Space',
+    keepsOpen: 'ArrowLeft',
+    inputs: [
+      ['A', (b) => b.press('a')],
+      ['a tap', (b) => b.click()]
+    ]
   }
 }
 
@@ -230,7 +238,8 @@ for (const engine of Object.keys(GAMES) as OrchestratorGameArcadeEngine[]) {
       expect(await canvasPixels(orcaPage), 'Esc keeps the run where it was').toBe(held)
       await seedStatuses(orcaPage, null)
 
-      // Played out: the runner meets an obstacle, the snake a wall, the bricks lose the ball.
+      // Played out: the runner meets an obstacle, the snake a wall, the bricks lose the ball, the base
+      // lets its last bug through.
       await expect
         .poll(
           async () => {

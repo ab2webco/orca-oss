@@ -15629,6 +15629,7 @@
           "hint": "Espacio o toque para saltar",
           "snakeHint": "Flechas, WASD o toque para girar",
           "bricksHint": "Flechas, A/D o el mouse para mover la paleta",
+          "defenseHint": "Flechas o A/D para moverte, Espacio o toque para disparar",
           "heldBy": "En pausa · {{name}} te necesita",
           "held": "En pausa · alguien te necesita",
           "over": "Fin de la partida · {{score}} pts",

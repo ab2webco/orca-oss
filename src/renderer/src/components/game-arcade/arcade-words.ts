@@ -19,6 +19,8 @@ const hintOf = (engine: OrchestratorGameArcadeEngine): string => {
       return translate(`${KEY}.snakeHint`, 'Arrows, WASD or tap to steer')
     case 'bricks':
       return translate(`${KEY}.bricksHint`, 'Arrows, A/D or the mouse to move the paddle')
+    case 'defense':
+      return translate(`${KEY}.defenseHint`, 'Arrows or A/D to move, Space or tap to fire')
   }
 }
 

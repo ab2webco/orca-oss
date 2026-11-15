@@ -6,6 +6,7 @@ import type { ArcadePaintSize } from './arcade-canvas-paint'
 import { RUNNER_DRIVER } from './arcade-driver-runner'
 import { SNAKE_DRIVER } from './arcade-driver-snake'
 import { BRICKS_DRIVER } from './arcade-driver-bricks'
+import { DEFENSE_DRIVER } from './arcade-driver-defense'
 
 // One saved play in Orca's center tab: a built-in game's driver, its screens, and the pause while
 // someone needs the user. The frame clock lives in the view; each game's rules live in src/shared.
@@ -109,6 +110,8 @@ function arcadePlayFor(game: OrchestratorGameArcade, seed: number): ArcadePlay {
       return startedPlayOf(SNAKE_DRIVER, game, seed)
     case 'bricks':
       return startedPlayOf(BRICKS_DRIVER, game, seed)
+    case 'defense':
+      return startedPlayOf(DEFENSE_DRIVER, game, seed)
   }
 }
 
