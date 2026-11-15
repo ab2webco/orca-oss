@@ -4,7 +4,7 @@ import { gameInboxTargetOf } from '@/components/game-inbox/game-owner-questions-
 import { translate } from '@/i18n/i18n'
 import { sendRuntimeAgentPrompt } from '@/runtime/runtime-terminal-inspection'
 import { useAppStore } from '@/store'
-import { createLeadPromptSender } from './team-lead-prompt-sender'
+import { createLeadPromptSender } from '../../../../shared/team-lead-prompt-sender'
 import { useTeamLeadHandle } from './use-team-panel-model'
 
 /** Resolves true once the lead has the turn; `quiet` leaves the success to the caller's own UI. */

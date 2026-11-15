@@ -106,6 +106,7 @@ describe('lead brief', () => {
     expect(context).toContain('compacted')
     expect(context).toContain('CIN-7')
     expect(context).toContain('game lead')
+    expect(context).toContain('Re-arm your report wait now if it is not running')
   })
 
   test('runs the lead skill again for a resumed lead, so its rules and report watcher come back', async ($, on) => {
