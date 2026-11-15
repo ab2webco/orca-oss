@@ -1,3 +1,4 @@
+// Throwaway: runs this spec on Linux CI for ORCA-1199; never merged.
 /**
  * E2E test for terminal keyboard shortcuts.
  *

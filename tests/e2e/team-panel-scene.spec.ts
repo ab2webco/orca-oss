@@ -1,3 +1,4 @@
+// Throwaway: runs this spec on Linux CI for ORCA-1199; never merged.
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@stablyai/playwright-test'
