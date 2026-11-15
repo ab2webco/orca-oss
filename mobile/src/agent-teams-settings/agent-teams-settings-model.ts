@@ -25,9 +25,9 @@ const recordOf = (value: unknown): Record<string, unknown> | null =>
 const isStyle = (value: unknown): value is GamePanelStyle =>
   (GAME_PANEL_STYLES as readonly unknown[]).includes(value)
 
-/** null from a host that sends no Agent Teams fields in settings.get. */
+/** null from a host that sends no Agent Teams fields in settings.get (they sit under `settings`). */
 export function agentTeamsSettingsOf(result: unknown): AgentTeamsSettings | null {
-  const panel = recordOf(recordOf(result)?.agentTeamsPanel)
+  const panel = recordOf(recordOf(recordOf(result)?.settings)?.agentTeamsPanel)
   if (!panel || typeof panel.scene !== 'string') {
     return null
   }
