@@ -355,3 +355,25 @@ describe('teamSceneInputOf and the launch STOP', () => {
     expect(world.stopped).toBe(true)
   })
 })
+
+// Why (ORCA-1231): the scene drew the Inbox's red "!" over a member whose prompt waits in its pane.
+describe('teamSceneInputOf and where a member waits on you', () => {
+  const markOf = (ask: TeamMemberCard['ask']): string | null | undefined => {
+    const model = {
+      lead: lead(),
+      advisor: null,
+      members: [card('m', { needsYou: true, status: 'attention', condition: 'waiting', ask })]
+    }
+    const world = createTeamSceneWorld()
+    applyTeamSceneInput(world, teamSceneInputOf(model), { rowSize: 5, workSeated: true })
+    for (let i = 0; i < 30; i++) {
+      stepTeamScene(world, 1 / 30, { width: 420 })
+    }
+    return teamSceneActors(world).find((a) => a.key === 'm')?.emote
+  }
+
+  it('marks a permission prompt in its pane apart from an Inbox question', () => {
+    expect(markOf({ kind: 'permission', tool: 'Bash' })).toBe('prompt')
+    expect(markOf({ kind: 'inbox' })).toBe('alert')
+  })
+})

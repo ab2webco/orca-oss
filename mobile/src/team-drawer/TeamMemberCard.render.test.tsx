@@ -76,3 +76,69 @@ describe('TeamMemberCard', () => {
     expect(texts()).toContain('En pausa')
   })
 })
+
+// Why (ORCA-1231, ORCA-1205): the phone said "Waiting for your answer" for a prompt in the pane and
+// read a stopped member on red CI by its raw state.
+describe('TeamMemberCard and what it waits on', () => {
+  let container: HTMLDivElement
+  let root: Root
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+  })
+  const terminal = { worktreeId: 'repo::/wt', tabId: 'tab-2', terminal: 'term_2' }
+  const show = (member: TeamMemberRow, onOpenTerminal = vi.fn(), onAnswer = vi.fn()) => {
+    act(() =>
+      root.render(
+        <TeamMemberCard
+          member={member}
+          hostName="m1"
+          now={0}
+          words={teamCardWordsOf('en')}
+          expanded={false}
+          onToggle={vi.fn()}
+          onAnswer={onAnswer}
+          onOpenLink={vi.fn()}
+          onOpenTerminal={onOpenTerminal}
+        />
+      )
+    )
+    return { onOpenTerminal, onAnswer }
+  }
+  const button = (label: string) =>
+    document.body.querySelector<HTMLElement>(`[aria-label="${label}"]`)
+
+  it('names a permission prompt and opens the pane that holds it', () => {
+    const { onOpenTerminal, onAnswer } = show(
+      row({
+        state: 'waiting',
+        needsYou: true,
+        ask: { kind: 'permission', tool: 'Bash' },
+        terminal
+      })
+    )
+    expect(texts()).toContain('Permission prompt: Bash')
+    expect(texts()).not.toContain('Waiting for your answer')
+    expect(button('Answer in Inbox')).toBeNull()
+    act(() => button('Answer in its terminal')?.click())
+    expect(onOpenTerminal).toHaveBeenCalledWith(terminal)
+    expect(onAnswer).not.toHaveBeenCalled()
+  })
+
+  it('keeps the Inbox for a question the Inbox holds', () => {
+    show(row({ needsYou: true, ask: { kind: 'inbox' } }))
+    expect(texts()).toContain('Waiting for your answer')
+    expect(button('Answer in Inbox')).not.toBeNull()
+  })
+
+  it('says CI is failing for a stopped member on red CI', () => {
+    show(row({ state: 'idle', idleCi: 'failure' }))
+    expect(texts()).toContain('CI failing')
+    expect(texts()).not.toContain('Idle')
+  })
+})

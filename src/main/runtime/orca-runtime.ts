@@ -762,6 +762,8 @@ import type {
   OrchestratorGameViewScope
 } from '../../shared/orchestrator-game-view'
 import type { GameMemberWork } from './orchestrator-game-fleet'
+import { screenCheckedRemoteAgentOf } from './orchestrator-game-screen-state'
+import { gameWaitingStateOnScreen } from '../../shared/orchestrator-game-pane-prompt'
 import { GameReadCache } from './orchestrator-game-read-cache'
 import {
   GAME_METRICS_REFRESH_MS,
@@ -32411,10 +32413,13 @@ export class OrcaRuntimeService {
   /** A federated member's agent as this host's hooks report it, relayed to its Run home (ORCA-837). */
   async getFederatedMemberAgent(handle: string): Promise<RemoteMemberAgent | null> {
     const paneKey = this.getTerminalPaneKey(handle)
-    const agent = remoteMemberAgentOf(this.getAgentStatusSnapshotFn?.() ?? [], paneKey)
-    if (!agent || !paneKey) {
+    const hooked = remoteMemberAgentOf(this.getAgentStatusSnapshotFn?.() ?? [], paneKey)
+    if (!hooked || !paneKey) {
       return null
     }
+    const agent = await screenCheckedRemoteAgentOf(hooked, paneKey, (one) =>
+      this.gameScreenStateFor(one)
+    )
     const worktreeId = this.getTerminalWorktreeIdForPaneKey(paneKey)
     const member = { paneKey, agentType: agent.agentType, worktreeId }
     const worktreesById = worktreeId
@@ -32447,6 +32452,19 @@ export class OrcaRuntimeService {
     const advisor = this.gameMemberAdvisors.of(paneKey, Date.now())
     const launch = this.gameMemberLaunchFor(paneKey)
     return { ...(advisor ? { advisor } : {}), ...(launch ? { launch } : {}) }
+  }
+
+  /** A waiting pane's state as its terminal shows it: Claude fires no hook when a prompt ends unanswered. */
+  async gameScreenStateFor(agent: {
+    paneKey: string
+    agentType: string | null
+    state: GameAgent['state']
+  }): Promise<GameAgent['state']> {
+    const handle = this.getTerminalHandleForPaneKey(agent.paneKey)
+    const read = handle
+      ? await this.readTerminal(handle, { limit: GAME_MEMBER_LIMIT_TAIL_LINES }).catch(() => null)
+      : null
+    return gameWaitingStateOnScreen({ ...agent, terminalTail: read ? read.tail.join('\n') : null })
   }
 
   /** A stopped member's usage limit, from its account's reading and the last lines of its terminal. */
@@ -32664,6 +32682,7 @@ export class OrcaRuntimeService {
       globalLoginOf: (member) =>
         this.readGameMemberSeat(member, worktreesById, isGameMemberOnGlobalLogin) === true,
       limitOf: (member) => this.gameMemberLimitFor(member),
+      screenStateOf: (agent) => this.gameScreenStateFor(agent),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,

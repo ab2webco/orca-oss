@@ -11,6 +11,13 @@ import { gameAdvisorDecisionsOf } from './orchestrator-game-member-advisor'
 import { teamAgentModelOf } from './team-panel-agent-model'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { teamFlowPhaseOf } from './team-flow-phase'
+import {
+  isFinishedWork,
+  isPendingMember,
+  isRedCiReview,
+  memberAskOf,
+  shownConditionOf
+} from './team-member-shown-state'
 import { memberNamesOf } from './team-panel-member-names'
 import type {
   TeamAccount,
@@ -58,9 +65,6 @@ const conditionOf = (agent: GameAgent): TeamCondition => {
   return agent.state
 }
 
-const isFinished = (work: Work): boolean =>
-  work.review?.state === 'merged' || work.workItem?.statusGroup === 'done'
-
 // Why: red is "needs you or failed", amber "at risk", green only "done and verified". Failed CI
 // stays on the PR chip, as V28 draws it, so a member fixing it still reads as working.
 const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): TeamStatus => {
@@ -86,7 +90,11 @@ const statusOf = (condition: TeamCondition, needsYou: boolean, work: Work): Team
     case 'idle':
     case 'done':
     case 'queued':
-      return isFinished(work) ? 'done' : 'idle'
+      if (isFinishedWork(work)) {
+        return 'done'
+      }
+      // Why failed: red CI on a stopped member asks for action, yet it asks the person no question.
+      return isRedCiReview(work.review) ? 'failed' : 'idle'
   }
 }
 
@@ -174,9 +182,10 @@ function memberCardOf(
   const shown = agent.displayName ?? agent.worktree?.displayName ?? agent.paneKey
   const ticket = ticketOf(agent, shown, state.project)
   const work = workOf(agent)
-  const condition = conditionOf(agent)
-  const needsYou =
-    agent.state === 'waiting' || (ticket !== null && questionTickets.has(ticket.identifier))
+  const condition = shownConditionOf(conditionOf(agent), work)
+  const ask = memberAskOf(agent, ticket !== null && questionTickets.has(ticket.identifier))
+  // Why the state too: a logged-out member waits on a login, which is no prompt (ORCA-923).
+  const needsYou = ask !== null || agent.state === 'waiting'
   const inbox = ticket && state.inboxes?.find((one) => one.key === ticket.identifier)
   return {
     paneKey: agent.paneKey,
@@ -205,6 +214,7 @@ function memberCardOf(
     summary: inbox?.last?.subject ?? null,
     pr: pullRequestOf(work.review),
     needsYou,
+    ask,
     limitResetsAt: agent.limit?.resetsAt ?? null,
     found: agent.found === true
   }
@@ -253,7 +263,7 @@ export function teamCardsOf(
   if (!leader) {
     return null
   }
-  const condition = conditionOf(leader)
+  const leaderCondition = conditionOf(leader)
   const roster = memberRosterOf({ ...state, config: state.config ?? {} })
   const lead: TeamLeadCard = {
     paneKey: leader.paneKey,
@@ -269,11 +279,11 @@ export function teamCardsOf(
       state.worktree?.displayName ??
       leader.paneKey,
     agentType: leader.agentType,
-    status: statusOf(condition, leader.state === 'waiting' || ownerAsk !== null, {
+    status: statusOf(leaderCondition, leader.state === 'waiting' || ownerAsk !== null, {
       review: null,
       workItem: null
     }),
-    condition,
+    condition: leaderCondition,
     since: leader.stateSince ?? null,
     liveAction: liveActionOf(leader),
     model: teamAgentModelOf(leader, state.lead),
@@ -299,5 +309,8 @@ export function teamCardsOf(
     .map((card, index) => ({ card, index }))
     .sort((a, b) => STATUS_RANK[a.card.status] - STATUS_RANK[b.card.status] || a.index - b.index)
     .map(({ card }) => card)
-  return { lead, members }
+  const waitingOn = members.filter(isPendingMember).length
+  // Why (ORCA-1205): a lead whose turn ended still coordinates while members work.
+  const condition = leaderCondition === 'done' && waitingOn > 0 ? 'idle' : leaderCondition
+  return { lead: { ...lead, condition, waitingOn }, members }
 }

@@ -16402,6 +16402,9 @@
       "ciPassed": "CI en verde",
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
+      "permissionPrompt": "Permiso pendiente: {{tool}}",
+      "permissionPromptAny": "Permiso pendiente en su terminal",
+      "answerInTerminal": "Responder en su terminal",
       "openTerminal": "Abrir terminal",
       "inFolder": "En la carpeta, sin worktree",
       "helpers_one": "{{count}} ayudante",
@@ -16449,6 +16452,8 @@
       "badge": "Líder",
       "coordinatesOne": "Coordina 1 agente",
       "coordinatesMany": "Coordina {{count}} agentes",
+      "waitingOnOne": "Esperando a 1 agente",
+      "waitingOnMany": "Esperando a {{count}} agentes",
       "asksOn": "Te espera · Pregunta sobre {{ticket}}",
       "asks": "Te espera",
       "orchestrating": "Orquestando · {{action}}"

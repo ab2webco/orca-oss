@@ -17382,6 +17382,9 @@
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
+      "permissionPrompt": "Permission prompt: {{tool}}",
+      "permissionPromptAny": "Permission prompt in its terminal",
+      "answerInTerminal": "Answer in its terminal",
       "openTerminal": "Open terminal",
       "inFolder": "In the folder, no worktree",
       "helpers_one": "{{count}} helper",
@@ -17429,6 +17432,8 @@
       "badge": "Lead",
       "coordinatesOne": "Coordinates 1 agent",
       "coordinatesMany": "Coordinates {{count}} agents",
+      "waitingOnOne": "Waiting on 1 agent",
+      "waitingOnMany": "Waiting on {{count}} agents",
       "asksOn": "Waiting for you · Question on {{ticket}}",
       "asks": "Waiting for you",
       "orchestrating": "Orchestrating · {{action}}"

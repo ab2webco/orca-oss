@@ -6,6 +6,9 @@ type Words = {
   state: Record<TeamMemberRow['state'], string>
   phase: Record<TeamFlowPhase, string>
   waitingForAnswer: string
+  permissionPrompt: (tool: string | null) => string
+  answerInTerminal: string
+  waitingOn: (count: number) => string
   loggedOut: string
   limitReached: string
   limitResetsIn: (age: string) => string
@@ -58,6 +61,10 @@ const WORDS: Record<SupportedUiLocale, Words> = {
       merge: 'Merging'
     },
     waitingForAnswer: 'Waiting for your answer',
+    permissionPrompt: (tool) =>
+      tool ? `Permission prompt: ${tool}` : 'Permission prompt in its terminal',
+    answerInTerminal: 'Answer in its terminal',
+    waitingOn: (count) => `Waiting on ${count} agent${count === 1 ? '' : 's'}`,
     loggedOut: 'Logged out',
     limitReached: 'Usage limit reached',
     limitResetsIn: (age) => `Usage limit · resets in ${age}`,
@@ -120,6 +127,10 @@ const WORDS: Record<SupportedUiLocale, Words> = {
       merge: 'En merge'
     },
     waitingForAnswer: 'Esperando tu respuesta',
+    permissionPrompt: (tool) =>
+      tool ? `Permiso pendiente: ${tool}` : 'Permiso pendiente en su terminal',
+    answerInTerminal: 'Responder en su terminal',
+    waitingOn: (count) => `Esperando a ${count} agente${count === 1 ? '' : 's'}`,
     loggedOut: 'Sesión cerrada en la cuenta',
     limitReached: 'Límite de uso alcanzado',
     limitResetsIn: (age) => `Límite de uso · se renueva en ${age}`,

@@ -4,10 +4,12 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
+import { teamIdleCiOf } from '../../../../shared/team-member-shown-state'
 import {
   teamAgeText,
+  teamAskText,
   teamHelpersCountText,
-  teamLiveText,
+  teamMemberLiveText,
   teamModelText,
   teamPhaseText,
   teamTicketBesideName
@@ -92,12 +94,18 @@ export function TeamMemberCardRow({
   // Why both ways: the scene lights this row's character, and hovering the row lights it there.
   const lit = useTeamSceneHover((s) => s.key === card.paneKey)
   const setHover = useTeamSceneHover((s) => s.set)
-  const answer = card.needsYou ? (
+  const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
+  // Why the pane: only its terminal can answer a prompt there, and the Inbox does not hold it (ORCA-1231).
+  const inPane = card.ask?.kind === 'permission'
+  const answer = !card.needsYou ? null : inPane ? (
+    <Button size="xs" onClick={() => void openTeamSession(card, shownName)}>
+      {translate('teamPanel.card.answerInTerminal', 'Answer in its terminal')}
+    </Button>
+  ) : card.ask !== null ? (
     <Button size="xs" onClick={() => selectTab('inbox')}>
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
-  const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   // Why only on opening: a second click folds the card and leaves the center as it is.
   const toggle = (): void => {
     if (!expanded && (card.terminalHandle || card.worktreeId)) {
@@ -168,12 +176,13 @@ export function TeamMemberCardRow({
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
             <span
               className={cn(
-                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
+                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate',
+                !card.needsYou && teamIdleCiOf(card) === 'failure' && 'text-status-attention'
               )}
             >
-              {card.needsYou
-                ? translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer')
-                : teamLiveText(card.liveAction, card.condition)}
+              {card.needsYou && card.ask !== null
+                ? teamAskText(card.ask)
+                : teamMemberLiveText(card)}
             </span>
           </span>
           <MetaLine

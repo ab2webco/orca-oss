@@ -99,7 +99,8 @@ export function teamSceneInputOf(
       ...(m.condition === 'gone' || m.condition === 'startFailed' ? { away: true as const } : {}),
       ...deskOf(m, queue),
       ...(HOLD[m.condition] ? { hold: HOLD[m.condition] } : {}),
-      ...ciOf(m)
+      ...ciOf(m),
+      ...(m.needsYou && m.ask && m.ask.kind !== 'inbox' ? { paneAsk: true as const } : {})
     }))
   }
 }

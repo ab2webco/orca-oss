@@ -17,6 +17,7 @@ import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-ad
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
+import { screenCheckedAgentOf, type GameScreenStateOf } from './orchestrator-game-screen-state'
 
 export type GameAgentRow = Pick<
   RuntimeWorktreeAgentRow,
@@ -117,6 +118,7 @@ export async function gameFleetOf(args: {
   accountOf?: GameMemberAccountOf
   globalLoginOf?: GameMemberGlobalLoginOf
   limitOf?: GameMemberLimitOf
+  screenStateOf?: GameScreenStateOf
   /** What a pane's own Jev last reported; read only for the lead and members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   /** The model and effort Orca dispatched a member on; read only for members. */
@@ -172,7 +174,10 @@ export async function gameFleetOf(args: {
       }
       const account = isMember ? (args.accountOf?.(seat) ?? null) : null
       const globalLogin = isMember && account === null && args.globalLoginOf?.(seat) === true
-      const agent = gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null)
+      const agent = await screenCheckedAgentOf(
+        gameAgentOf(row, leaderPaneKey, args.terminalHandleOf?.(row.paneKey) ?? null),
+        isMember || row.paneKey === leaderPaneKey ? args.screenStateOf : undefined
+      )
       const limitOf = args.limitOf
       const limit =
         isMember && limitOf

@@ -120,6 +120,8 @@ export type TeamMemberCard = TeamAgentFacts & {
   pr: TeamPullRequest | null
   /** Waiting on input, or its ticket has an open question for the user. */
   needsYou: boolean
+  /** What it waits on the person for; absent from a client that predates it (ORCA-1231). */
+  ask?: TeamMemberAsk | null
   /** When its account's usage limit resets, ms; null when not limited or unknown. */
   limitResetsAt: number | null
   /** Started outside `game launch`: stopped by name, never acted on in bulk. */
@@ -128,12 +130,17 @@ export type TeamMemberCard = TeamAgentFacts & {
   inFolder?: true
 }
 
+/** A question the Inbox holds (its ticket's, or one asked in its pane), or a permission prompt only its terminal can answer. */
+export type TeamMemberAsk = { kind: 'inbox' } | { kind: 'permission'; tool: string | null }
+
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */
 export type TeamLeadCard = TeamAgentFacts & {
   characterKey: string | null
   branch: string | null
   /** The oldest question the lead asked the user that is still open; the text stays in Inbox. */
   ownerAsk: { ticket: string | null } | null
+  /** Members not finished yet, which a lead whose turn ended still waits on; absent from an older client. */
+  waitingOn?: number
 }
 
 /** One sub-agent decision Jev made: which agent, on what, and what it did. */

@@ -114,7 +114,9 @@ describe('teamLeadViewOf', () => {
         terminal: null,
         account: null,
         limit: null,
-        hold: null
+        hold: null,
+        ask: null,
+        idleCi: null
       }
     ])
   })
@@ -276,7 +278,8 @@ describe('open card facts', () => {
   it('reads the phase as desktop does, only while active or finished', () => {
     expect(one({ toolName: 'Edit' })?.phase).toBe('code')
     expect(one({ review: review('open') })?.phase).toBe('pr')
-    expect(one({ state: 'waiting' })?.phase).toBe('plan')
+    // Why none: a member waiting on a question is not planning (ORCA-1205).
+    expect(one({ state: 'waiting' })?.phase).toBeNull()
     expect(one({ state: 'idle', review: review('merged') })?.phase).toBe('merge')
     expect(one({ state: 'idle' })?.phase).toBeNull()
   })

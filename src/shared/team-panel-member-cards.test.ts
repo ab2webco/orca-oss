@@ -252,7 +252,8 @@ describe('teamCardsOf', () => {
     expect(byKey.ask).toMatchObject({ status: 'attention', needsYou: true })
     // Why: V28 keeps a working member blue with failed CI; only its PR chip turns red.
     expect(byKey.red).toMatchObject({ status: 'working', needsYou: false, pr: { ci: 'failure' } })
-    expect(byKey.turn).toMatchObject({ status: 'idle', condition: 'done' })
+    // Why idle: a turn that ended with no PR is not finished work (ORCA-1205).
+    expect(byKey.turn).toMatchObject({ status: 'idle', condition: 'idle' })
     expect(byKey.merged).toMatchObject({ status: 'done', flowPhase: 'merge' })
   })
 
@@ -274,7 +275,8 @@ describe('teamCardsOf', () => {
       })
     ])?.members.map((one) => [one.paneKey, one.flowPhase])
     expect(Object.fromEntries(phases ?? [])).toEqual({
-      plan: 'plan',
+      // Why none: no tool says it plans, and "Planning" was wrong for tests and reads (ORCA-1205).
+      plan: null,
       code: 'code',
       pr: 'pr',
       merge: 'merge'

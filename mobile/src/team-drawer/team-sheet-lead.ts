@@ -47,6 +47,11 @@ export function teamLeadLiveText(lead: TeamLeadCard, words: TeamCardWords): stri
     return lead.ownerAsk.ticket ? words.leadAsksOn(lead.ownerAsk.ticket) : words.leadAsks
   }
   const action = lead.liveAction
+  // Why (ORCA-1205): a lead whose turn ended still coordinates while members work.
+  const waitingOn = lead.waitingOn ?? 0
+  if (!action && waitingOn > 0 && (lead.condition === 'idle' || lead.condition === 'done')) {
+    return words.waitingOn(waitingOn)
+  }
   if (!action || (action.kind === 'tool' && isAskUserQuestionTool(action.tool))) {
     return words.condition[action ? 'waiting' : lead.condition]
   }

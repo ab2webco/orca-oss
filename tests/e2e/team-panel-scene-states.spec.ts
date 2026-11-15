@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
+import { seedRendererGameState } from './helpers/game-state-renderer-seed'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
@@ -26,6 +27,9 @@ const MAX_FRAME_GAP_MS = 430
 const LEAD_HALF = 0.05
 const CROPS = {
   member: [0, 0.26, 0.4, 1],
+  // Why: finished work grows the member's build, and Pixel's plants beside it sway; a held pose
+  // is the member's own, so this crop stops short of the build (from x 0.145 in Pixel).
+  body: [0, 0.14, 0.4, 1],
   lead: [0, 0, 0.4, 1],
   sky: [0, 1, 0, 0.4]
 } as const
@@ -305,6 +309,9 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
             )
           }
         }
+        if (round.member === 'done') {
+          seen.set(`${style}:body:done`, await poseFrames(orcaPage, 'body'))
+        }
         if (round.member === 'waiting') {
           // The member sits at x 0.1: the lead goes over to it, wherever its pose was sampled.
           await expect
@@ -345,9 +352,28 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       tool: 'Bash',
       toolInput: { command: 'gh pr view 923' }
     })
+    // Why a done ticket: Done is finished work, a bare ended turn reads Idle (ORCA-1205); and with
+    // no PR the build stays a still foundation, where a merged one's flag and plants keep moving.
+    await seedRendererGameState(electronApp, {
+      fields: {
+        [member.paneKey]: {
+          workItem: {
+            provider: 'plane',
+            identifier: 'ORCA-12',
+            title: 'ORCA-12',
+            url: 'https://plane.example/ORCA-12',
+            status: 'Done',
+            statusGroup: 'done'
+          }
+        }
+      }
+    })
     await emitCodexHookStatus(endpoint, { ...member, state: 'done', lastAssistantMessage: 'Done' })
     await expect.poll(() => agentState(false)).toBe('done')
     await expect.poll(() => agentState(true)).toBe('working')
+    await expect(
+      panel.locator('[data-team-card="member"] [data-status-tone="success"]').first()
+    ).toBeVisible({ timeout: 30_000 })
     settleMs = REFRESH_WAIT_MS
     await capture({ lead: 'working', member: 'done' })
     // AC3: the bubble names the step as V28 does, never the raw `Bash · …` line.
@@ -394,7 +420,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
       for (const key of ['lead:working', 'member:working'] as const) {
         expect.soft(at(style, key).size, `${style}: ${key} stood still`).toBeGreaterThan(1)
       }
-      for (const key of ['lead:done', 'member:done'] as const) {
+      for (const key of ['lead:done', 'body:done'] as const) {
         expect.soft(at(style, key).size, `${style}: ${key} is not a held pose`).toBe(1)
       }
     }
