@@ -41,6 +41,8 @@ export function gameLeadBriefOf(
     '  A member idle on red CI gets its next step from you at once, without waiting to be asked.',
     '- Finish before starting. Drive each member to merge (review, fixes, CI) before you launch another ticket;',
     '  new launches only fill slots freed by merged work. Do not accumulate unfinished workspaces or open PRs.',
+    '  The open-PR cap is a stop: `game launch` refuses at it. Pass `--past-pr-cap "<why>"` only for a reason',
+    '  you would give the person, and tell them.',
     '- Before launching parallel lanes, list the files each will touch, docs and locale files included, and run lanes',
     '  that overlap one after the other. When a ticket looks over 400 changed lines, ask its member for a split plan',
     '  before its first commit.',

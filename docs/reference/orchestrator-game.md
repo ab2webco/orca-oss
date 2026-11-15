@@ -687,9 +687,11 @@ The lead's verbs, run from the lead's terminal
 - `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
   project's stored lead conversation and this session becomes the new lead instead of reopening it.
   A live lead still wins, and an older host that drops the flag reopens the old one and says so.
-- `orca game launch` and `orca game wave` print `Warning:` on stderr when the project's open PRs (the
-  PR list's total) reach the cap, and still start the member: finish those PRs to merge first. A PR
-  counts even after its member was released, which the live member count cannot see.
+- When the project's open PRs (the PR list's total) reach the cap, `orca game launch` refuses before
+  anything starts, unless the ticket's own PR is one of them (a relaunch adds no PR) or
+  `--past-pr-cap "<why>"` is given, which launches and prints why. `orca game wave` prints `Warning:`
+  on stderr and still starts its members. A PR counts even after its member was released, which the
+  live member count cannot see.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — one member for
   one ticket; `--repo` starts it in another repo of the project (its own or one in `memberRepos`), and `--on` on a paired host (see
   the fleet section below; `--repo` is then the host's repo and required). `--prompt` replaces `launchPrompt` for that

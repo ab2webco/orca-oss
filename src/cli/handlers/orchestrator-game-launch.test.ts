@@ -30,24 +30,47 @@ describe('orca game launch', () => {
   })
 
   // Why: a released member's open PR leaves no live row, so only the project's PR list counts it.
-  it('warns on stderr when open PRs reach the cap, and still starts the member', async () => {
+  const atPrCap = (items: { id: string; title: string; url: string }[] = []) =>
+    stateWith({
+      project: {
+        reviews: { provider: 'github', total: 2, url: null, items },
+        todo: { provider: 'jira', total: 1, url: null, items: [TODO_ITEM] }
+      }
+    })
+
+  // Why: ORCA-1214: a lead launched past the old warning and piled up open PRs.
+  it('refuses when open PRs reach the cap, before anything starts', async () => {
+    const { client, calls } = fakeClient(atPrCap())
+
+    await expect(launch(client)).rejects.toThrow(
+      '2 open PRs reach the cap of 2: finish them to merge before launching another ticket. Merge one first, or pass --past-pr-cap "<why>" to launch CIN-12 anyway.'
+    )
+    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerStart')
+  })
+
+  it('launches past the cap with --past-pr-cap and prints why, but not with an empty reason', async () => {
     const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const refused = fakeClient(atPrCap())
+    await expect(launch(refused.client, 'cin-12', [['past-pr-cap', '  ']])).rejects.toThrow(
+      '--past-pr-cap'
+    )
+
+    const { client, calls } = fakeClient(atPrCap())
+    await launch(client, 'cin-12', [['past-pr-cap', 'hotfix for a broken main']])
+
+    expect(warn).toHaveBeenCalledWith('Launching past the open-PR cap: hotfix for a broken main')
+    expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
+    warn.mockRestore()
+  })
+
+  it('relaunches a ticket whose own PR is one of the open ones, since that adds no PR', async () => {
     const { client, calls } = fakeClient(
-      stateWith({
-        project: {
-          reviews: { provider: 'github', total: 2, url: null, items: [] },
-          todo: { provider: 'jira', total: 1, url: null, items: [TODO_ITEM] }
-        }
-      })
+      atPrCap([{ id: '7', title: 'feat: Cartelera page (CIN-12)', url: 'https://x/pull/7' }])
     )
 
     await launch(client)
 
-    expect(warn).toHaveBeenCalledWith(
-      'Warning: 2 open PRs reach the cap of 2: finish them to merge before launching another ticket'
-    )
     expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
-    warn.mockRestore()
   })
 
   it('starts one member for a To Do ticket in its own child worktree, with the project prompt', async () => {
