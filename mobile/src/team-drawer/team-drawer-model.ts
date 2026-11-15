@@ -23,6 +23,7 @@ import type {
 } from '../../../src/shared/team-panel-model-types'
 import { teamLeadCardsOf } from './team-sheet-lead'
 import { teamSheetWorkOf, type TeamSheetWork } from './team-sheet-work'
+import { teamSceneBandOf, type TeamSceneBand } from './team-scene-band'
 import { normalizeSupportedUiLocale, type SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 export type TeamMemberRow = {
@@ -75,6 +76,8 @@ export type TeamLeadView = {
   /** Jev's card; null without the advisor plugin or from an older host. */
   advisor: TeamAdvisorRow | null
   work: TeamSheetWork
+  /** The band above the tabs; null when the desktop panel shows no scene. */
+  scene: TeamSceneBand | null
   metrics: TeamMetrics | null
   locale: SupportedUiLocale
 }
@@ -253,6 +256,7 @@ export function teamLeadViewOf(
     lead,
     advisor,
     work: teamSheetWorkOf(raw, cards, locale, now),
+    scene: teamSceneBandOf(raw, { lead, members: cards, advisor: advisor !== null }),
     metrics: metricsOf(raw.metrics),
     locale
   }

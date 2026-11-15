@@ -24,6 +24,7 @@ import { TeamHostsTab } from './TeamHostsTab'
 import { TeamPrsTab } from './TeamPrsTab'
 import { teamWorkWordsOf } from './team-work-words'
 import { TeamLevelRow } from './TeamLevelRow'
+import { TeamSceneBand } from './TeamSceneBand'
 
 export { TEAM_PEEK_HEIGHT }
 
@@ -161,6 +162,13 @@ export function TeamSheet({
                       { paddingBottom: insets.bottom + spacing.lg }
                     ]}
                   >
+                    {view.scene ? (
+                      <TeamSceneBand
+                        band={view.scene}
+                        leadName={view.lead?.name ?? null}
+                        members={view.members}
+                      />
+                    ) : null}
                     {team.level ? <TeamLevelRow level={team.level} words={words} /> : null}
                     <TeamSheetTabBar
                       active={tab}

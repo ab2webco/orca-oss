@@ -17,6 +17,17 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
+// Why: Metro resolves the band's PNGs by require; the render runner only needs a source per image.
+vi.mock('./team-scene-quest-art', () => ({
+  teamSceneQuestArtOf: (style: string) => ({
+    backdrop: { uri: `${style}/backdrop.png` },
+    front: style === 'figures' ? { uri: 'figures/front.png' } : null,
+    lead: { uri: `${style}/lead.png` },
+    advisor: { uri: `${style}/advisor.png` },
+    members: Array.from({ length: 8 }, (_, at) => ({ uri: `${style}/member-${at + 1}.png` }))
+  })
+}))
+
 import { TeamSheet } from './TeamSheet'
 import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
 
@@ -322,7 +333,8 @@ describe('TeamSheet', () => {
   it('shows the lead and its advisor after the members, with the whole advisor sentence', () => {
     show(teamWith({ questions: [] }, leader))
     const shown = texts()
-    const at = (text: string) => shown.indexOf(text)
+    // Why last: the scene band above the tabs names the team too.
+    const at = (text: string) => shown.lastIndexOf(text)
     expect(shown).toContain('Lead')
     expect(shown).toContain('Orchestrating · Read · ORCA-9')
     expect(shown).toContain('Opus 5.5 · high · Coordinates 4 agents')
@@ -495,6 +507,42 @@ describe('TeamSheet', () => {
     expect(texts()).toContain('This Orca host does not publish it yet.')
     act(() => button('Hosts').click())
     expect(texts()).toContain('This Orca host does not publish it yet.')
+  })
+
+  const gamePanel = (style: string, look = 'game') => ({
+    panel: {
+      look,
+      style,
+      tabs: { prs: true, queue: true, machines: true },
+      advisor: true,
+      arcade: true
+    }
+  })
+
+  it('draws the scene band 128 pt tall above the tabs, with the lead, members and Jev', () => {
+    show(teamWith({ questions: [] }, leader, gamePanel('figures')))
+    const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
+    expect(band).not.toBeNull()
+    expect(getComputedStyle(band!).height).toBe('128px')
+    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(6)
+    const tabs = container.querySelector('[role="tablist"]')!
+    expect(band!.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows the readable band, names in place of art, when the style is Pixel', () => {
+    show(teamWith({ questions: [] }, leader, gamePanel('pixel')))
+    const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
+    expect(getComputedStyle(band!).height).toBe('128px')
+    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(0)
+    const names = [...band!.querySelectorAll('div')]
+      .filter((one) => one.childElementCount === 0)
+      .map((one) => one.textContent)
+    expect(names).toEqual(expect.arrayContaining(['Castillo', 'Juno', 'Rho']))
+  })
+
+  it('draws no band when the desktop panel is not in the Game look', () => {
+    show(teamWith({ questions: [] }, leader, gamePanel('figures', 'plain')))
+    expect(container.querySelector('[data-testid="team-scene-band"]')).toBeNull()
   })
 
   it('takes a waiting card to the Inbox in one tap', () => {
