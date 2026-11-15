@@ -5,7 +5,7 @@ import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { openTeamSession } from '@/components/team-panel/team-session-open'
 import { useTeamLeadPrompt } from '@/components/team-panel/use-team-lead-prompt'
 import type { TeamTodoTicket } from '../../../../shared/team-panel-model-types'
-import { addMemberPromptOf } from './new-tab-add-member-prompt'
+import { addMemberPromptOf } from '../../../../shared/team-add-member-prompt'
 import { reopenTeamLead, type TeamLeadReopen } from './new-tab-lead-reopen'
 import type { NewTabTeamMenu } from './use-new-tab-team-menu'
 

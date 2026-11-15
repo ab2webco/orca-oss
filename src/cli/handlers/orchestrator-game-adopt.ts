@@ -66,8 +66,9 @@ export const isOurGameAgentNamed = (
   leadWorktreeId: string | null
 ): boolean =>
   !agent.isLeader &&
-  agent.worktree !== undefined &&
-  (agent.remote !== undefined || isSameGameProject(agent.worktree.id, leadWorktreeId)) &&
+  // Why remote without a worktree: a host that no longer knows its member shows no branch (ORCA-1196).
+  (agent.remote !== undefined ||
+    (agent.worktree !== undefined && isSameGameProject(agent.worktree.id, leadWorktreeId))) &&
   isGameAgentNamed(agent, name)
 
 /** The found agent's terminal on its paired host, read there, or why it cannot be adopted. */

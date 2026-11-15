@@ -22,7 +22,8 @@ export const leadBriefOf = (source: LeadBriefSource, fleet: string): string =>
     ...(source === 'compact'
       ? [
           '',
-          'If the summary lost your standing rules, run `"$ORCA_GAME_CLI" game lead` again before acting.'
+          'If the summary lost your standing rules, run `"$ORCA_GAME_CLI" game lead` again before acting.',
+          'Re-arm your report wait now if it is not running, then act on every NEXT above.'
         ]
       : [])
   ].join('\n')

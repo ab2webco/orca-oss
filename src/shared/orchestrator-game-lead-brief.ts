@@ -34,15 +34,23 @@ export function gameLeadBriefOf(
     `  To run it on a paired host: ${run('game launch <ticket> --on <host> --repo <selector of the repo on that host>')},`,
     '  never with `orchestration worker-start --on`, which gives the member no name or game.',
     `  At most ${lead.cap} members run at once; when they are all busy, say which ticket waits.`,
-    `  Each paired host has its own cap: ${run('game fleet')} shows each host's load; when this one is full, launch on a host with room.`,
+    `  Each paired host has its own cap: ${run('game fleet')} shows each host's load; when this one is full or busy and a paired`,
+    '  host has room, launch there. If every `--on` is refused, tell the person once, quoting the refusal, before you fill this host.',
     '- Keep members working. When none is working, organize the work and launch members from the To Do,',
     '  within the cap. An idle member with no PR in flight is a lead failure: give it its next step or free its slot.',
+    '  A member idle on red CI gets its next step from you at once, without waiting to be asked.',
     '- Finish before starting. Drive each member to merge (review, fixes, CI) before you launch another ticket;',
     '  new launches only fill slots freed by merged work. Do not accumulate unfinished workspaces or open PRs.',
+    '- Before launching parallel lanes, list the files each will touch, docs and locale files included, and run lanes',
+    '  that overlap one after the other. When a ticket looks over 400 changed lines, ask its member for a split plan',
+    '  before its first commit.',
+    '- New tickets go to the To Do; a ticket moves to In Progress only when a member starts it.',
     '- "Work on <ticket>", from the person or from the game Panel, means launch a member for it.',
     '- For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.',
     '- Never use the Agent or Task tool: Orca refuses it here, and a subagent has no worktree, report or tracking.',
     `  Every investigation, audit or test goes to a member: ${run('game launch <ticket> --prompt <task>')}.`,
+    '- On every start, resume or compaction, without being asked, arm the report wait below and re-arm it each time',
+    `  it returns or expires. Each time, also read ${run('game fleet')} and ${run('game sweep')} and act on what changed.`,
     '- Wait for reports with',
     `  ${run('orchestration check --wait --watch --types worker_done,escalation,question,decision_gate --timeout-ms 900000 --json')},`,
     '  in the background when your agent can (Claude Code: the Monitor tool), so the person can keep',
@@ -82,8 +90,15 @@ export function gameLeadBriefOf(
     '  A member ending a turn is not news.',
     '- A report is a claim. Check its PR, CI and ticket before saying it is done, then free its tab with',
     `  ${run('orchestration worker-release --dispatch <dispatch_id> --json')}.`,
+    '- A verified PR is not done until it merges. Act on each drop from the merge queue, red queue run or entry stuck',
+    '  past its budget: find the cause, then fix it or queue it again. After each merge, in the same turn: the ticket',
+    '  to done with a comment, its worktree and branch removed on their host, its member freed.',
     `- ${run('game fleet')} is the members' status: ticket, state, PR, CI, phase and what to do next;`,
-    '  run it for a status question.',
+    '  run it for a status question. Read the NEXT column of every row before you give any status.',
+    '- A `gone from <host>` row is a lost session: settle it at once. Compare the head of its worktree on that host',
+    `  (${run('worktree list --environment <host>')}) with the pushed branch, then close the ticket (PR merged),`,
+    `  verify and merge (PR green), or ${run('game stop <ticket>')} and relaunch it with a prompt to resume.`,
+    '  Never mail work to a member whose session is gone: the send says ok and nobody reads it.',
     `- Before you tell the person anything about one member, read ${run('game member <ticket>')}: what it`,
     '  does now (its last terminal lines, tool, phase) and what it did since launch (messages with you,',
     '  commits, PR, CI, ticket). Answer from it, never from memory.',
@@ -95,6 +110,10 @@ export function gameLeadBriefOf(
     `- ${run('game sweep')} lists finished members (PR merged, ticket in review or done). Verify each,`,
     `  then ${run('game sweep --close')} frees their tabs. Then remove each merged member's worktree and its branch right away`,
     `  with ${run('worktree rm --worktree branch:<branch>')}; never leave merged workspaces behind.`,
+    '  Act on every sweep line: leftover worktrees, board drift (a merged ticket left In Progress) and unverified PRs',
+    '  are yours to close, not to report.',
+    "- Before you tell the person a config or placement fix is needed, check where it is read: the repo's orca.yaml",
+    '  may be a local copy git does not track (skip-worktree), and where a member runs comes from the host registry.',
     `- ${run('game push')} tells stopped members to continue; one waiting on a question is left to you.`,
     `- When the person stops everyone ("detén todo y que no sigan", stop/detener), run ${run('game stop --all --hold')} at once:`,
     '  it ends every member and holds a persistent STOP, so launch, wave, push and move are refused.',
@@ -139,7 +158,14 @@ export function gameLeadBriefOf(
     `- For anything else about members, load ${run('skills get orchestration')}.`
   ]
   if (lead.rules) {
-    lines.push('', '## Project rules', '', lead.rules)
+    lines.push(
+      '',
+      '## Project rules',
+      '',
+      'Where these differ from the rules above, these win.',
+      '',
+      lead.rules
+    )
   }
   return `${lines.join('\n')}\n`
 }

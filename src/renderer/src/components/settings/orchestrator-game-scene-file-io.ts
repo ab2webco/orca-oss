@@ -122,6 +122,14 @@ export function sceneFileTextOf(scene: SceneDefinition): string {
         }
       : {}),
     ...(scene.cast ? { cast: castText(scene.cast) } : {}),
+    ...(scene.prop === undefined
+      ? {}
+      : {
+          prop:
+            scene.prop === 'sword'
+              ? scene.prop
+              : { rows: scene.prop.rows, colors: colorsText(scene.prop.colors) }
+        }),
     ...(scene.roster ? { roster: rosterText(scene) } : {}),
     ...(scene.themes
       ? { themes: scene.themes.map((theme) => ({ ...theme, look: themeLookText(theme.look) })) }
