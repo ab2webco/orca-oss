@@ -7,7 +7,7 @@ import {
   type OrchestratorGameArcade,
   type OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
-import { arcadeBackdropOf, paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
+import { paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
@@ -166,7 +166,7 @@ export function ArcadeTab({
       const size = { width, height, scale: window.devicePixelRatio || 1 }
       canvas.width = Math.round(width * size.scale)
       canvas.height = Math.round(height * size.scale)
-      paintRef.current = { size, backdrop: arcadeBackdropOf(size) }
+      paintRef.current = { size, backdrop: runRef.current.play.backdropOf(size) }
       paint()
     })
     observer.observe(box)

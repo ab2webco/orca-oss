@@ -2,6 +2,7 @@ import type {
   OrchestratorGameArcade,
   OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
+import type { ArcadePaintSize } from './arcade-canvas-paint'
 import { RUNNER_DRIVER } from './arcade-driver-runner'
 import { SNAKE_DRIVER } from './arcade-driver-snake'
 
@@ -36,6 +37,8 @@ export type ArcadeDriver<G, S> = {
     state: S,
     view: ArcadeView & { isMoving: boolean }
   ) => void
+  /** The still scene behind the play, baked once per size: each game has its own. */
+  backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
 }
 
 /** A game and its state, closed over so the tab never needs to know which game it plays. */
@@ -48,6 +51,7 @@ export type ArcadePlay = {
   isStartKey: (code: string) => boolean
   playsStartPress: boolean
   paint: (g: CanvasRenderingContext2D, view: ArcadeView, isMoving: boolean) => void
+  backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
 }
 
 export function arcadePlayOf<G, S>(driver: ArcadeDriver<G, S>, game: G, state: S): ArcadePlay {
@@ -62,7 +66,8 @@ export function arcadePlayOf<G, S>(driver: ArcadeDriver<G, S>, game: G, state: S
     },
     isStartKey: driver.isStartKey,
     playsStartPress: driver.playsStartPress,
-    paint: (g, view, isMoving) => driver.paint(g, game, state, { ...view, isMoving })
+    paint: (g, view, isMoving) => driver.paint(g, game, state, { ...view, isMoving }),
+    backdropOf: driver.backdropOf
   }
 }
 

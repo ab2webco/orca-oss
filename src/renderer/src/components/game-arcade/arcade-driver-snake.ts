@@ -7,7 +7,7 @@ import {
   type SnakeState
 } from '../../../../shared/orchestrator-game-arcade-snake-rules'
 import type { ArcadeDriver } from './arcade-run-state'
-import { paintSnakeRun, snakeTapTurnOf } from './arcade-snake-paint'
+import { paintSnakeRun, snakeBackdropOf, snakeTapTurnOf } from './arcade-snake-paint'
 
 // Why codes, not keys: WASD stays where it is on any keyboard layout.
 export const ARCADE_TURN_KEYS: Readonly<Record<string, SnakeDirection>> = {
@@ -40,5 +40,6 @@ export const SNAKE_DRIVER: ArcadeDriver<OrchestratorGameArcadeSnake, SnakeState>
   scoreOf: (state) => state.score,
   isOverOf: (state) => state.isOver,
   msOf: (state) => state.ms,
-  paint: (g, game, state, view) => paintSnakeRun(g, game, state, view)
+  paint: (g, game, state, view) => paintSnakeRun(g, game, state, view),
+  backdropOf: snakeBackdropOf
 }

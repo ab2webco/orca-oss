@@ -12,11 +12,43 @@ import {
   type ArcadeBoardSize
 } from './arcade-board'
 
-// Draws the snake on the runner's dusk backdrop: a veiled field on the meadow, a vine of rounded
-// cells with leaves at the joints, and a glowing berry. Colours come from the game file.
+// Draws the snake in its own garden: a soil bed framed in timber on a lawn, a vine of rounded
+// cells with leaves at the joints, and a glowing berry. The vine and berry take the file's colours.
 
 type Size = ArcadeBoardSize
 type SnakeBoard = ArcadeBoard
+
+const BED = { fill: '#5b4331', edge: '#9a7448', check: 'rgb(0 0 0 / 0.12)' }
+
+/** The lawn around the bed: deep green with mown stripes and a scatter of clover. */
+export function snakeBackdropOf(size: ArcadeBoardSize & { scale: number }): HTMLCanvasElement {
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(size.width * size.scale)
+  canvas.height = Math.round(size.height * size.scale)
+  const g = canvas.getContext('2d')
+  if (!g) {
+    return canvas
+  }
+  g.scale(size.scale, size.scale)
+  const lawn = g.createLinearGradient(0, 0, 0, size.height)
+  lawn.addColorStop(0, '#2d5a32')
+  lawn.addColorStop(1, '#1b3a22')
+  g.fillStyle = lawn
+  g.fillRect(0, 0, size.width, size.height)
+  g.fillStyle = 'rgb(255 255 255 / 0.035)'
+  for (let x = 0; x < size.width; x += 48) {
+    g.fillRect(x, 0, 24, size.height)
+  }
+  g.fillStyle = 'rgb(190 230 150 / 0.25)'
+  for (let i = 0; i < 90; i += 1) {
+    const x = ((i * 97) % 101) / 101
+    const y = ((i * 61) % 89) / 89
+    g.beginPath()
+    g.arc(x * size.width, y * size.height, 2 + (i % 3), 0, Math.PI * 2)
+    g.fill()
+  }
+  return canvas
+}
 
 /** A tap steers toward itself from the head, along whichever axis is farther off. */
 export function snakeTapTurnOf(
@@ -142,7 +174,7 @@ export function paintSnakeRun(
   size: Size
 ): void {
   const board = arcadeBoardOf(size, game.grid)
-  paintArcadeField(g, board, game.grid, true)
+  paintArcadeField(g, board, game.grid, BED)
   if (state.food) {
     paintBerry(g, board, state.food, game.colors.food, state.ms / 1000)
   }

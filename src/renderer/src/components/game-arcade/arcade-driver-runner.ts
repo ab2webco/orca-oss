@@ -7,7 +7,7 @@ import {
   type RunnerShape,
   type RunnerState
 } from '../../../../shared/orchestrator-game-arcade-runner-rules'
-import { paintRunnerRun } from './arcade-canvas-paint'
+import { arcadeBackdropOf, paintRunnerRun } from './arcade-canvas-paint'
 import type { ArcadeDriver } from './arcade-run-state'
 
 /** A sprite obstacle as the canvas draws it: its rows and their 24-bit colours. */
@@ -60,5 +60,6 @@ export const RUNNER_DRIVER: ArcadeDriver<OrchestratorGameArcadeRunner, RunnerPla
   scoreOf: (state) => Math.floor(state.course.score),
   isOverOf: (state) => state.course.isOver,
   msOf: (state) => state.course.ms,
-  paint: (g, _game, state, view) => paintRunnerRun(g, state.runner, state.course, view)
+  paint: (g, _game, state, view) => paintRunnerRun(g, state.runner, state.course, view),
+  backdropOf: arcadeBackdropOf
 }
