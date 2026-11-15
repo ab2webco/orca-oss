@@ -1,5 +1,5 @@
 ---
-sourceHash: 6ffa398eee10af99
+sourceHash: a6a1dc7384af239c
 ---
 
 # El juego orquestador de Agent Teams
@@ -975,6 +975,27 @@ fijan el criterio:
   ticket; los lanzamientos nuevos solo llenan huecos liberados por trabajo con merge. El líder elimina
   de inmediato el worktree y la rama de un miembro con merge, para que no se acumulen workspaces sin
   terminar ni con merge.
+- **Vigilancia.** En cada inicio, reanudación o compactación el líder arma su espera de reportes sin
+  que se lo pidan, la vuelve a armar cuando vuelve o vence, y lee `game fleet` y `game sweep` cada vez.
+  Tras una compactación su contexto le recuerda volver a armarla.
+- **Sesiones perdidas.** Una fila `gone from <host>` en `game fleet` se resuelve de inmediato: el líder
+  compara el head del worktree en ese host con la rama publicada, y cierra, hace merge, o detiene y
+  relanza. Nunca envía trabajo a una sesión perdida.
+- **Terminado es con merge.** El líder actúa ante cada salida de la merge queue, corrida roja o entrada
+  atascada, y tras cada merge pasa el ticket a terminado, elimina su worktree y su rama, y libera al
+  miembro. Cierra él mismo cada línea del sweep (worktrees sobrantes, tablero desfasado, PRs sin
+  verificar).
+- **Carriles y ubicación.** Antes de carriles paralelos el líder lista los archivos que toca cada uno,
+  docs y locales incluidos, y serializa los que se solapan; pide al miembro un plan de división cuando
+  un ticket parece pasar de 400 líneas. Lanza en un host emparejado libre cuando este está ocupado, y
+  avisa a la persona una vez cuando todos los `--on` se rechazan. Comprueba dónde se lee la config (un
+  `orca.yaml` local sin seguimiento, el registro de hosts) antes de decir que hace falta un arreglo.
+- **Los miembros** reciben las mismas lecciones con su ticket (`GAME_MEMBER_REPORT_RULES` en
+  [`orchestrator-game-lead.ts`](../../../src/shared/orchestrator-game-lead.ts)): un plan de división
+  antes de un primer commit de más de unas 400 líneas, worker_done enviado una vez, y un CI rojo ajeno
+  a su cambio nombrado (job, id de corrida, causa, quién lo arregla) en vez de quedarse inactivo.
+- **Las reglas del proyecto ganan.** `orchestrator.rules` se imprimen después, sin cambios, bajo
+  `## Project rules`, con una línea que dice que ganan donde difieren.
 
 ### Una instalación a la vez
 

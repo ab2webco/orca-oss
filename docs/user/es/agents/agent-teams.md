@@ -1,5 +1,5 @@
 ---
-sourceHash: f8f32e77254de328
+sourceHash: dad1241f1c0448b5
 ---
 # Agent Teams
 
@@ -16,6 +16,14 @@ todo.
    líder del proyecto y carga las reglas del proyecto desde `orca.yaml`.
 3. Para configurar `orca.yaml` (el tracker del To Do, las reglas del líder, la escena), ejecuta
    `/orca-game:setup` en un pane de Claude del proyecto.
+
+`orca game lead` imprime primero las reglas propias de Orca. Entre ellas, el líder vuelve a armar su
+espera de reportes en cada inicio, reanudación o compactación. Resuelve de inmediato cada miembro
+`gone from` su host y da un PR por terminado solo cuando tiene merge. Planea los carriles paralelos
+por los archivos que tocan y pide a los miembros un plan de división antes de un primer commit
+grande. A los miembros se les indica reportar una vez y nombrar un CI rojo en vez de quedarse
+inactivos. Las `orchestratorGame.orchestrator.rules` de tu proyecto en `orca.yaml` se imprimen
+después, sin cambios, y ganan donde difieren: agrega ahí una regla o contradice una de las propias.
 
 Un proyecto tiene un líder. Cuando ya lo tiene, **+** muestra un grupo **Team** en lugar de una segunda
 entrada **Claude Agent Teams**: **Go to lead** y **Add member…** mientras el líder está en marcha,

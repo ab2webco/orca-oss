@@ -9,7 +9,7 @@ import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import {
   DEFAULT_GAME_LEAD,
   renderGameLaunchPrompt,
-  withGameMemberCiNote
+  withGameMemberNotes
 } from '../../shared/orchestrator-game-lead'
 import {
   gameLaunchChoiceOf,
@@ -185,7 +185,7 @@ async function startGameMember(
   )
   const taskParams = {
     spec: withGameLessons(
-      withGameMemberCiNote(
+      withGameMemberNotes(
         renderGameLaunchPrompt(args.prompt ?? lead.launchPrompt, {
           id: item?.id ?? ticket,
           title: item?.title ?? '',
