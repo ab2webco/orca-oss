@@ -330,11 +330,12 @@ describe('gameLeadBriefOf', () => {
 
     it('arms and re-arms its watches on every start, resume or compaction', () => {
       expect(brief).toContain(
-        'On every start, resume or compaction, without being asked, arm the report wait'
+        'On every start, resume or compaction, without being asked, arm two background watches'
       )
-      expect(brief).toContain('re-arm it each time')
+      expect(brief).toContain('and re-arm each one')
+      expect(brief).toContain('`orca game watch --lead`, which prints one `alert` line')
       expect(brief).toContain(
-        'also read `orca game fleet` and `orca game sweep` and act on what changed'
+        'entry that failed, was dropped or is past its budget. Act on each alert'
       )
     })
 

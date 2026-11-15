@@ -1,5 +1,5 @@
 ---
-sourceHash: dad1241f1c0448b5
+sourceHash: 8a584faadc103db6
 ---
 # Agent Teams
 
@@ -18,7 +18,8 @@ todo.
    `/orca-game:setup` en un pane de Claude del proyecto.
 
 `orca game lead` imprime primero las reglas propias de Orca. Entre ellas, el líder vuelve a armar su
-espera de reportes en cada inicio, reanudación o compactación. Resuelve de inmediato cada miembro
+espera de reportes y `orca game watch --lead` en cada inicio, reanudación o compactación; la segunda
+imprime una alerta por cada miembro o entrada de la merge queue que le pide actuar. Resuelve de inmediato cada miembro
 `gone from` su host y da un PR por terminado solo cuando tiene merge. Planea los carriles paralelos
 por los archivos que tocan y pide a los miembros un plan de división antes de un primer commit
 grande. A los miembros se les indica reportar una vez y nombrar un CI rojo en vez de quedarse

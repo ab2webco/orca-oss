@@ -925,9 +925,15 @@ state the bar:
 - **Finish before starting.** The lead drives each member to merge before it launches another ticket;
   new launches only fill slots freed by merged work. The lead removes a merged member's worktree and
   branch right away, so no unfinished or merged workspaces pile up.
-- **Watches.** On every start, resume or compaction the lead arms its report wait without being
-  asked, re-arms it when it returns or expires, and reads `game fleet` and `game sweep` each time.
-  After a compaction the lead's context says to re-arm it.
+- **Watches.** On every start, resume or compaction the lead arms two background watches without
+  being asked, and re-arms each when it ends: the report wait, and `orca game watch --lead`. The lead
+  watch prints `alert <line>` once per condition to act on: a member gone from its host, limited,
+  needing you, orphaned, idle with no PR, on red CI, with a merged PR, paused, or with a launch
+  queued 20+ min; a merge-queue entry that failed, was dropped, merged, waited 3 h or ran its checks
+  1 h. An alert that clears and comes back prints again. It reads `game.state`, the cached state the
+  band reads, on each fleet change and at most once a minute otherwise, so it adds no GitHub polling;
+  the queue clocks it cannot read from GitHub (a run's checks, a queued launch) start when the watch
+  first sees them. After a compaction the lead's context says to re-arm both.
 - **Lost sessions.** A `gone from <host>` row in `game fleet` is settled at once: the lead compares the
   host worktree's head with the pushed branch, then closes, merges, or stops and relaunches. It never
   mails work to a gone session.

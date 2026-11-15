@@ -1,5 +1,5 @@
 ---
-sourceHash: 047d6f3368a1a553
+sourceHash: 8db6f5497d079869
 ---
 
 # El juego orquestador de Agent Teams
@@ -976,9 +976,17 @@ fijan el criterio:
   ticket; los lanzamientos nuevos solo llenan huecos liberados por trabajo con merge. El líder elimina
   de inmediato el worktree y la rama de un miembro con merge, para que no se acumulen workspaces sin
   terminar ni con merge.
-- **Vigilancia.** En cada inicio, reanudación o compactación el líder arma su espera de reportes sin
-  que se lo pidan, la vuelve a armar cuando vuelve o vence, y lee `game fleet` y `game sweep` cada vez.
-  Tras una compactación su contexto le recuerda volver a armarla.
+- **Vigilancia.** En cada inicio, reanudación o compactación el líder arma dos vigilancias en
+  segundo plano sin que se lo pidan, y vuelve a armar cada una cuando termina: la espera de reportes
+  y `orca game watch --lead`. Esta imprime `alert <línea>` una vez por cada situación que pide actuar:
+  un miembro que desapareció de su host, limitado, que te necesita, huérfano, inactivo sin PR, con CI
+  rojo, con su PR mergeado, en pausa, o con un lanzamiento en cola 20+ min; una entrada de la merge
+  queue que falló, salió, se mergeó, esperó 3 h o lleva 1 h en checks. Una alerta que se resuelve y
+  vuelve se imprime otra vez. Lee `game.state`, el mismo estado en caché que lee la banda, en cada
+  cambio de la flota y como mucho una vez por minuto si no, así que no agrega sondeo a GitHub; los
+  relojes que GitHub no da (los checks de una corrida, un lanzamiento en cola) empiezan cuando la
+  vigilancia los ve por primera vez. Tras una compactación su contexto le recuerda volver a armar
+  ambas.
 - **Sesiones perdidas.** Una fila `gone from <host>` en `game fleet` se resuelve de inmediato: el líder
   compara el head del worktree en ese host con la rama publicada, y cierra, hace merge, o detiene y
   relanza. Nunca envía trabajo a una sesión perdida.

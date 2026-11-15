@@ -1,0 +1,173 @@
+import { gameFleetReportOf, type GameFleetInput } from './orchestrator-game-fleet-verbs'
+import type { GameQueueEntry } from './orchestrator-game-project-work'
+import type { OrchestratorGameState } from './orchestrator-game-state'
+
+/** What `orca game watch --lead` prints: one line per condition the lead must act on (ORCA-1214). */
+
+export const GAME_LEAD_ALERT_BUDGETS_MS = {
+  queueEntry: 180 * 60_000,
+  queueRun: 60 * 60_000,
+  queuedLaunch: 20 * 60_000
+} as const
+
+export type GameLeadAlert = { key: string; line: string }
+
+export type GameLeadAlertInput = GameFleetInput & Pick<OrchestratorGameState, 'project'>
+
+/** What one watch remembers between reads: no host keeps these clocks or the previous queue. */
+export type GameLeadAlertMemory = {
+  /** Merge-queue entries at the last read that could see the queue; null before the first. */
+  queue: GameQueueEntry[] | null
+  /** When this watch first saw each entry run its checks, by PR id. */
+  checksSince: Map<string, number>
+  /** When this watch first saw each launch waiting on setup, by ticket. */
+  queuedSince: Map<string, number>
+}
+
+export const emptyGameLeadAlertMemory = (): GameLeadAlertMemory => ({
+  queue: null,
+  checksSince: new Map(),
+  queuedSince: new Map()
+})
+
+const minutesOf = (ms: number): number => Math.floor(ms / 60_000)
+
+function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {
+  const fleet = gameFleetReportOf(state)
+  const alerts: GameLeadAlert[] = []
+  const add = (who: string, kind: string, line: string): void => {
+    alerts.push({ key: `${kind}:${who}`, line: `${who} ${line}` })
+  }
+  for (const row of fleet.rows) {
+    const who = row.ticket ?? row.name
+    const review = row.review ?? 'no PR'
+    if (row.next.startsWith('gone from ')) {
+      add(who, 'gone', `${row.next}. Compare its host worktree head with the pushed branch first.`)
+    } else if (row.review?.endsWith(' merged')) {
+      add(
+        who,
+        'merged',
+        `PR ${review}: ticket to done with a comment, remove its worktree and branch, free it (${row.next}).`
+      )
+    } else if (row.phase === 'limited' || row.phase === 'needs-you') {
+      add(who, row.phase, `${row.phase === 'limited' ? 'limited' : 'needs you'}: ${row.next}`)
+    } else if (row.orphaned) {
+      add(who, 'orphaned', row.next)
+    } else if (row.phase === 'idle' && row.review === null) {
+      add(who, 'idle-no-pr', `idle with no PR: ${row.next}`)
+    }
+    if (row.ci === 'failure' && row.phase !== 'finished') {
+      add(who, `ci-red:${review}`, `CI red on ${review}: give it its next step now.`)
+    }
+  }
+  for (const one of fleet.paused) {
+    const why = one.lastState ? ` (last ${one.lastState})` : ''
+    add(
+      one.ticket,
+      'paused',
+      `paused${why}: orca game resume-members ${one.ticket}, or --discard to free it`
+    )
+  }
+  const queuedNow = new Set(fleet.queued.map((one) => one.ticket))
+  for (const ticket of memory.queuedSince.keys()) {
+    if (!queuedNow.has(ticket)) {
+      memory.queuedSince.delete(ticket)
+    }
+  }
+  for (const one of fleet.queued) {
+    const since = memory.queuedSince.get(one.ticket) ?? now
+    memory.queuedSince.set(one.ticket, since)
+    if (now - since >= GAME_LEAD_ALERT_BUDGETS_MS.queuedLaunch) {
+      add(
+        one.ticket,
+        'queued',
+        `launch queued ${minutesOf(now - since)}+ min, waiting on ${one.waitingOn}`
+      )
+    }
+  }
+  return alerts
+}
+
+// Why the members' PRs first: the project's open list keeps only its first few items.
+function leftQueueLineOf(entry: GameQueueEntry, state: GameLeadAlertInput): string {
+  const member = state.agents.find((agent) => agent.review?.url === entry.url)?.review
+  const open = state.project?.reviews?.items.some((item) => item.url === entry.url)
+  if (member?.state === 'merged') {
+    return `${entry.id} merged from the queue: close its ticket and clean up its member.`
+  }
+  return member?.state === 'open' || open
+    ? `${entry.id} dropped from the merge queue: find why, then fix it or queue it again.`
+    : `${entry.id} left the merge queue: check whether it merged.`
+}
+
+function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {
+  const entries = state.project?.queue?.entries
+  // Why: an unread queue (absent, or null on a low budget) says nothing about what left it.
+  if (!entries) {
+    return []
+  }
+  const alerts: GameLeadAlert[] = []
+  const ids = new Set(entries.map((one) => one.id))
+  for (const gone of memory.queue?.filter((one) => !ids.has(one.id)) ?? []) {
+    // Why the time in the key: the next drop of the same PR is news again.
+    alerts.push({ key: `left:${gone.id}:${now}`, line: leftQueueLineOf(gone, state) })
+  }
+  for (const id of memory.checksSince.keys()) {
+    if (!entries.some((one) => one.id === id && one.state === 'checks')) {
+      memory.checksSince.delete(id)
+    }
+  }
+  for (const entry of entries) {
+    if (entry.state === 'failed') {
+      alerts.push({
+        key: `failed:${entry.id}`,
+        line: `${entry.id} failed in the merge queue: find the cause.`
+      })
+    }
+    if (entry.since !== null && now - entry.since >= GAME_LEAD_ALERT_BUDGETS_MS.queueEntry) {
+      alerts.push({
+        key: `stuck:${entry.id}`,
+        line: `${entry.id} in the merge queue ${minutesOf(now - entry.since)}+ min, past its budget: find why.`
+      })
+    }
+    if (entry.state === 'checks') {
+      const since = memory.checksSince.get(entry.id) ?? now
+      memory.checksSince.set(entry.id, since)
+      if (now - since >= GAME_LEAD_ALERT_BUDGETS_MS.queueRun) {
+        alerts.push({
+          key: `run:${entry.id}`,
+          line: `${entry.id} queue run ${minutesOf(now - since)}+ min, past its budget: check the merge_group run.`
+        })
+      }
+    }
+  }
+  memory.queue = entries
+  return alerts
+}
+
+/** Every alert that holds now; `memory` is updated in place for the next read. */
+export function gameLeadAlertsOf(
+  state: GameLeadAlertInput,
+  memory: GameLeadAlertMemory,
+  now: number
+): GameLeadAlert[] {
+  return [...memberAlertsOf(state, memory, now), ...queueAlertsOf(state, memory, now)]
+}
+
+/** The alerts not printed yet; a cleared alert is forgotten so it prints again when it returns. */
+export function newGameLeadAlertsOf(
+  alerts: readonly GameLeadAlert[],
+  printed: Set<string>
+): GameLeadAlert[] {
+  const holding = new Set(alerts.map((one) => one.key))
+  for (const key of printed) {
+    if (!holding.has(key)) {
+      printed.delete(key)
+    }
+  }
+  const fresh = alerts.filter((one) => !printed.has(one.key))
+  for (const one of fresh) {
+    printed.add(one.key)
+  }
+  return fresh
+}
