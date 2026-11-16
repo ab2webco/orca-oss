@@ -117,8 +117,10 @@ function drawNames(
   g.textAlign = 'center'
   g.textBaseline = 'top'
   const drawn: { left: number; right: number; y: number }[] = []
-  // Why still figures first: a walker passing a desk must not cover the name of who sits there.
-  const order = [...actors].sort((a, b) => Number(a.pose === 'walk') - Number(b.pose === 'walk'))
+  // Why members, then the lead and advisor, then walkers: a desk's name must never lose its row
+  // to someone standing beside it or passing by.
+  const rank = (a: TeamSceneActor) => (a.pose === 'walk' ? 2 : a.role === 'member' ? 0 : 1)
+  const order = [...actors].sort((a, b) => rank(a) - rank(b))
   for (const a of order) {
     if (a.away) {
       continue

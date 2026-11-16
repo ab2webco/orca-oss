@@ -264,6 +264,31 @@ describe('the phone scene engine', () => {
     expect(drawn).toEqual(expect.arrayContaining(names))
   })
 
+  it('names all six desks of a 390 pt team before the advisor and lead, as on the live host', async () => {
+    const { engine } = mount(390)
+    await officeStage(engine)
+    const names = ['Peach', 'Rosalina', 'Wario', 'Mario', 'Donkey Kong', 'Donkey Kong']
+    const activities = ['needsYou', 'working', 'working', 'done', 'done', 'done'] as const
+    engine.receive({
+      kind: 'input',
+      input: {
+        ...inputOf(names.map((name, at) => member(`m${at}`, name, activities[at]))),
+        advisor: { line: null }
+      },
+      leadLine: null
+    })
+    run(engine, 20)
+    calls = []
+    engine.paint(1 / 30)
+    const drawn = calls.filter((one) => one.name === 'fillText').map((one) => String(one.args[0]))
+    const memberLabels = drawn.filter((text) =>
+      names.some(
+        (name) => text === name || (text.endsWith('…') && name.startsWith(text.slice(0, -1)))
+      )
+    )
+    expect(memberLabels).toHaveLength(names.length)
+  })
+
   it("puts the lead's line in a bubble over the stage", async () => {
     const { engine } = mount()
     await officeStage(engine)
