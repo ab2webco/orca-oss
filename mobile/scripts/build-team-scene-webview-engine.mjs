@@ -1,12 +1,14 @@
 // Builds the Team sheet's scene WebView: the desktop's scene painters and director
 // (mobile/src/team-drawer/team-scene-engine.ts) plus Orca's Quest art, so the phone draws the
 // stage the desktop panel draws instead of a phone-only copy.
+import { realpathSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as esbuild from 'esbuild'
 
 const scriptDir = import.meta.dirname
 const mobileRoot = path.resolve(scriptDir, '..')
+const mobileRealRoot = realpathSync(mobileRoot)
 const questArt = path.resolve(mobileRoot, '..', 'src', 'renderer', 'src', 'assets', 'quest-art')
 const outputPath = path.join(
   mobileRoot,
@@ -60,9 +62,28 @@ const ENTRY = `
   post({ kind: 'loaded' })
 `
 
+const outsideMobile = (dir) => {
+  const relative = path.relative(mobileRealRoot, dir)
+  return relative.startsWith('..') || path.isAbsolute(relative)
+}
+
+// Why: a desktop file's packages (zod) would resolve from the repo-root node_modules, which the
+// release jobs never install; resolve them from mobile's own, so every install builds the same.
+const mobilePackages = {
+  name: 'mobile-packages',
+  setup(build) {
+    build.onResolve({ filter: /^[^./]/ }, (args) =>
+      outsideMobile(args.resolveDir)
+        ? build.resolve(args.path, { kind: args.kind, resolveDir: mobileRoot })
+        : undefined
+    )
+  }
+}
+
 async function buildEngineJs() {
   const result = await esbuild.build({
     stdin: { contents: ENTRY, resolveDir: mobileRoot, sourcefile: 'team-scene-engine-entry.js' },
+    plugins: [mobilePackages],
     bundle: true,
     format: 'iife',
     minify: true,
