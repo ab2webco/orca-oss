@@ -1064,9 +1064,10 @@ html.native-shell .app-layout {
   container: titlebar-left / inline-size;
 }
 
-/* Why 250px: the Mac header's controls need about 247px; below that a clipped "Or…" names nothing. */
+/* Why 250px with the pad: the Mac traffic-light pad brings the controls to about 247px; below that a
+   clipped "Or…" names nothing. Without the pad the name fits at the minimum width. */
 @container titlebar-left (max-width: 250px) {
-  .titlebar-left:not(.titlebar-left-floating) .titlebar-app-name {
+  .titlebar-left:not(.titlebar-left-floating):has(.titlebar-traffic-light-pad) .titlebar-app-name {
     display: none;
   }
 }
