@@ -1,5 +1,5 @@
 ---
-sourceHash: 9bcd71aa78138351
+sourceHash: 5e9657bb127978c0
 ---
 
 # El juego orquestador de Agent Teams
@@ -1996,6 +1996,9 @@ el ancho de un enemigo):
 oleada hasta `max`), el intervalo entre dos enemigos (`spawnMs`, más corto en cada oleada hasta
 `spawnMinMs`, ambos de 200 a 5000), las bajas de una oleada (`perWave`) y la parte de builds rojos de
 dos golpes desde la segunda oleada (`buildShare`, de 0 a 1).
+
+Un bloque `portrait` opcional, `{ field }`, se juega en su lugar cuando la pestaña es más alta que
+ancha al empezar la partida, como en `bricks`.
 
 ### El runner
 

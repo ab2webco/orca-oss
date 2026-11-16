@@ -9,7 +9,16 @@ import {
   type DefenseState
 } from '../../../../shared/orchestrator-game-arcade-defense-rules'
 import { defenseBackdropOf, defenseColumnAtOf, paintDefenseRun } from './arcade-defense-paint'
-import type { ArcadeDriver } from './arcade-run-state'
+import { arcadeIsTallOf } from './arcade-board'
+import type { ArcadeDriver, ArcadeView } from './arcade-run-state'
+
+/** The file's portrait field in a tab taller than wide; the file as is otherwise. */
+export function defenseFitOf(
+  game: OrchestratorGameArcadeDefense,
+  view: ArcadeView
+): OrchestratorGameArcadeDefense {
+  return game.portrait && arcadeIsTallOf(view) ? { ...game, field: game.portrait.field } : game
+}
 
 const MOVE_KEYS: Readonly<Record<string, Exclude<DefenseMove, 0>>> = {
   ArrowLeft: -1,
@@ -20,6 +29,7 @@ const MOVE_KEYS: Readonly<Record<string, Exclude<DefenseMove, 0>>> = {
 
 export const DEFENSE_DRIVER: ArcadeDriver<OrchestratorGameArcadeDefense, DefenseState> = {
   startOf: defenseStartOf,
+  fitOf: defenseFitOf,
   stepOf: defenseStepOf,
   inputOf: (game, state, input, view) => {
     if (input.kind === 'pointer') {

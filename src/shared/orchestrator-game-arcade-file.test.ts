@@ -152,6 +152,7 @@ describe('the brick breaker game file', () => {
       'wall.columns: must be a whole number from 4 to 16',
       'ball.max: must be at least ball.start',
       'colors.bricks: Too small: expected array to have >=1 items',
+      'portrait.field.rows: must be more than columns',
       'portrait.paddle.width: must be from 2 to 10'
     ])
   })
@@ -164,7 +165,7 @@ describe('the brick breaker game file', () => {
       paddle: { width: 4 }
     }
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
-      'portrait.field.rows: must be more than field.columns'
+      'portrait.field.rows: must be more than columns'
     ])
   })
 })
@@ -185,10 +186,21 @@ describe('the base defense game file', () => {
     game.lives = 0
     game.enemies = { ...(game.enemies as object), spawnMs: 300, spawnMinMs: 900 }
     game.colors = { turret: '#000000', belly: '#ffffff', bug: '#00ff00', build: '#ff0000' }
+    game.portrait = { field: { columns: 40, rows: 50 } }
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
       'enemies.spawnMs: must be at least enemies.spawnMinMs',
       'lives: must be a whole number from 1 to 9',
-      'colors.shot: must be a #rrggbb color or an integer from 0 to 16777215'
+      'colors.shot: must be a #rrggbb color or an integer from 0 to 16777215',
+      'portrait.field.columns: must be a whole number from 10 to 30',
+      'portrait.field.rows: must be a whole number from 16 to 48'
+    ])
+  })
+
+  it('wants a portrait field taller than wide', () => {
+    const game = defense()
+    game.portrait = { field: { columns: 20, rows: 18 } }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'portrait.field.rows: must be more than columns'
     ])
   })
 })

@@ -1866,6 +1866,9 @@ the gap between two enemies (`spawnMs`, shorter each wave down to `spawnMinMs`, 
 the kills in a wave (`perWave`) and the share of two-hit red builds from the second wave (`buildShare`,
 0 to 1).
 
+An optional `portrait` block, `{ field }`, is played instead when the tab is taller than wide at
+the start of a run, as for `bricks`.
+
 ### The runner
 
 The mod plays its own copy of the built-in runner

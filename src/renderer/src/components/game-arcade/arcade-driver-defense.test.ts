@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ORCHESTRATOR_GAME_ARCADE_DEFENSE } from '../../../../shared/orchestrator-game-arcade-file'
 import { defenseStartOf } from '../../../../shared/orchestrator-game-arcade-defense-rules'
 import { arcadeBoardOf } from './arcade-board'
-import { DEFENSE_DRIVER } from './arcade-driver-defense'
+import { DEFENSE_DRIVER, defenseFitOf } from './arcade-driver-defense'
 
 const game = JSON.parse(ORCHESTRATOR_GAME_ARCADE_DEFENSE)
 const view = { width: 800, height: 600 }
@@ -41,5 +41,24 @@ describe('DEFENSE_DRIVER', () => {
       view
     )
     expect(pressed).toMatchObject({ target: 6.5, isFiring: true })
+  })
+})
+
+describe('defenseFitOf', () => {
+  // The Arcade column at 768 with both side panels open.
+  const TALL = { width: 176, height: 1080 }
+
+  it('plays the portrait field in a tall tab, so its bugs are not dots', () => {
+    const laid = defenseFitOf(game, TALL)
+    expect(laid.field).toEqual({ columns: 10, rows: 20 })
+    expect(arcadeBoardOf(TALL, game.field).cell).toBeLessThan(7)
+    expect(arcadeBoardOf(TALL, laid.field).cell).toBeGreaterThanOrEqual(15)
+    expect(defenseStartOf(laid, 1).turret).toBe(5)
+  })
+
+  it('keeps the file as is in a wide tab, or when the file has no portrait field', () => {
+    expect(defenseFitOf(game, view)).toBe(game)
+    const { portrait: _portrait, ...wideOnly } = game
+    expect(defenseFitOf(wideOnly, TALL)).toBe(wideOnly)
   })
 })

@@ -138,6 +138,14 @@ const snakeFileSchema = z.object({
   colors: z.object({ head: color, body: color, food: color })
 })
 
+/** The narrower field a game plays in a tab taller than wide. */
+const tallField = z
+  .object({ columns: whole(10, 30), rows: whole(16, 48) })
+  .refine((field) => field.rows > field.columns, {
+    path: ['rows'],
+    message: 'must be more than columns'
+  })
+
 /** Break a wall of bricks with a ball kept up by a paddle; a cleared wall brings a faster one. */
 const bricksFileSchema = z.object({
   engine: z.literal('bricks', { error: engineError }),
@@ -154,16 +162,12 @@ const bricksFileSchema = z.object({
   /** A broken brick drops a power-up this often: three balls, or a wide paddle for `wideMs`. */
   powerUps: z.object({ chance: bounded(0, 0.5), wideMs: bounded(2000, 30000) }),
   colors: z.object({ bricks: z.array(color).min(1).max(8), paddle: color, ball: color }),
-  /** The field a tab taller than wide plays instead: narrower, so its bricks still read. */
+  /** Played instead in a tab taller than wide, so its bricks still read. */
   portrait: z
     .object({
-      field: z.object({ columns: whole(10, 30), rows: whole(16, 48) }),
+      field: tallField,
       wall: z.object({ columns: whole(3, 16), rows: whole(1, 8) }),
       paddle: z.object({ width: bounded(2, 10) })
-    })
-    .refine((p) => p.field.rows > p.field.columns, {
-      path: ['field', 'rows'],
-      message: 'must be more than field.columns'
     })
     .optional()
 })
@@ -191,7 +195,9 @@ const defenseFileSchema = z.object({
     .refine((one) => one.spawnMs >= one.spawnMinMs, atLeast('enemies.spawnMinMs', 'spawnMs')),
   lives: whole(1, 9),
   points: z.object({ bug: whole(1, 100), build: whole(1, 100) }),
-  colors: z.object({ turret: color, belly: color, bug: color, build: color, shot: color })
+  colors: z.object({ turret: color, belly: color, bug: color, build: color, shot: color }),
+  /** Played instead in a tab taller than wide: bugs still fall down a field narrow enough to read. */
+  portrait: z.object({ field: tallField }).optional()
 })
 
 export type OrchestratorGameArcadeRunner = z.infer<typeof runnerFileSchema>

@@ -22,5 +22,6 @@
     "bug": "#7da84a",
     "build": "#d4483b",
     "shot": "#8fd3ff"
-  }
+  },
+  "portrait": { "field": { "columns": 10, "rows": 20 } }
 }
