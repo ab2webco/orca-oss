@@ -63,7 +63,7 @@ async function readFleet($: EngineInterface): Promise<FleetState> {
 }
 
 /** Runs the Orca CLI, through cmd.exe when Orca handed a Windows batch file; undefined when it could not. */
-async function runCli(
+export async function runCli(
   $: EngineInterface,
   argv: readonly string[] | undefined,
   extraEnv: Record<string, string> = {},

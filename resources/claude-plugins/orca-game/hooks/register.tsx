@@ -9,6 +9,7 @@ import { questSessionStart, registerQuest } from './quest'
 import { markLeadStarted, startOrRearmLead, unmarkLeadStarted } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
+import { noteStewardToolCall, noteStewardTurnComplete } from './steward'
 import { registerTextLayer } from './text-layer'
 import { registerLayoutCommand } from './layout-command'
 import { registerLeadName, syncLeadName } from './lead-name'
@@ -53,6 +54,7 @@ export const register: Register = (on) => {
 
   on('turn.complete', async ($, e, next) => {
     questTurnComplete(e.agentId)
+    noteStewardTurnComplete($, e.agentId)
     if (e.agentId === undefined) {
       liveTurnEnd(e, await $.clock.now())
       void bumpLive($)
@@ -68,12 +70,18 @@ export const register: Register = (on) => {
   })
 
   on('tool.call', async ($, e, next) => {
+    // Why every call goes through it: the steward reads each main call's outcome (ORCA-1242).
+    const run = async (input: typeof e) => {
+      const answered = await next(input)
+      noteStewardToolCall($, e, answered)
+      return answered
+    }
     questToolCall(String(e.tool), e, e.agentId)
     if (e.agentId === undefined && String(e.tool) === 'AskUserQuestion') {
       const close = liveAsk(e, await $.clock.now())
       void bumpLive($)
       try {
-        return await next(e)
+        return await run(e)
       } finally {
         close()
         void bumpLive($)
@@ -85,14 +93,14 @@ export const register: Register = (on) => {
       const command: unknown = Reflect.get(e, 'command')
       if (isGameLeadCommand(command)) {
         // Why after the call: only its output says whether this session or another pane leads.
-        const answered = await next(e)
+        const answered = await run(e)
         await (isMadeLeadOutput(answered.result) ? markLeadStarted($) : unmarkLeadStarted($)).catch(
           () => undefined
         )
         return answered
       }
     }
-    return next(e)
+    return run(e)
   })
 
   on('classic.PreToolUse', async ($, e, next) => {

@@ -147,6 +147,17 @@ export const resumeMembersArgvOf = (
     : [path, 'game', 'resume-members', '--tickets', ticket, '--json']
 }
 
+/** Reads the lead's effort plan for this member's ticket (ORCA-1242). */
+export const gamePlanArgvOf = (
+  cli: string | null | undefined,
+  ticket: string
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  return path === undefined || !TICKET_ID.test(ticket)
+    ? undefined
+    : [path, 'game', 'plan', ticket, '--json']
+}
+
 /** Asks Orca to open a link in the desktop's system browser, where the person is signed in. */
 export const openLinkArgvOf = (
   cli: string | null | undefined,

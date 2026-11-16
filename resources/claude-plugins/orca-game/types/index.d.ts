@@ -454,6 +454,6 @@ declare module 'claude-code' {
       live: number
     }
     // Read, never depended on: hooks/allies.ts checks the shape at runtime.
-    'orca-jev-mod-skills': { advisor: unknown }
+    'orca-jev-mod-skills': { advisor: unknown; routerSticky: unknown }
   }
 }

@@ -41,6 +41,7 @@ import { storeHead, storedHeadOf, type MessageHead } from './message-heads'
 import { terminalPalette } from './terminal-palette'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
+import { stewardStepOf } from './steward'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
@@ -148,9 +149,10 @@ const registerView = (on: On) => {
 }
 
 // Zen hides short notes written between tool calls; this learns which text was one.
+// Why the steward here: a plugin holds one turn.step hook, and it rewrites the step's model (ORCA-1242).
 const registerNotes = (on: On) => {
   on('turn.step', async function* ($, e, next) {
-    const stream = next(e)
+    const stream = next(await stewardStepOf($, e))
     const blocks = new Map<number, string>()
     for await (const chunk of stream) {
       if (chunk.kind === 'text') {
