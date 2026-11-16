@@ -1,0 +1,292 @@
+// Runs under `claude plugin test`: the Orca steward picks a member's main-loop model and effort (ORCA-1242).
+import { describe, expect, mock } from 'claude-code/testing'
+import { test } from './test-budget'
+import type { Engine, Plugin } from 'claude-code/testing'
+import type { On } from 'claude-code'
+
+const STATE = {
+  config: {},
+  sources: {},
+  warnings: [],
+  worktree: { id: 'w1', path: '/w', branch: 'b', displayName: 'Herrero · ORCA-7 Fix it' },
+  agents: [],
+  review: null,
+  workItem: null,
+  role: 'member'
+}
+const PLAN = [
+  {
+    phase: 'map',
+    model: 'claude-sonnet-5-5',
+    effort: 'low',
+    why: 'read first'
+  },
+  {
+    phase: 'implement',
+    model: 'claude-opus-5-5',
+    effort: 'xhigh',
+    why: 'risky path'
+  }
+]
+const LAUNCHED = { model: 'claude-sonnet-5-5', effort: 'medium' } as const
+
+type World = {
+  env?: Record<string, string>
+  plan?: unknown[] | null
+  haiku?: unknown
+  stores?: unknown[]
+}
+type Seen = { model: string; effort: unknown; agentId?: string }
+
+// Publishes TEST_ADVISOR and TEST_ROUTER at start, as Jev does (a fake plugin cannot close over values).
+const JEV: Plugin = {
+  name: 'orca-jev-mod-skills',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      const raw = await $.env.get('TEST_ADVISOR')
+      if (raw !== undefined && raw !== null && raw !== '') {
+        await $.state.set({ plugin: 'orca-jev-mod-skills', key: 'advisor' }, JSON.parse(raw))
+      }
+      const router = await $.env.get('TEST_ROUTER')
+      if (router !== undefined && router !== null && router !== '') {
+        await $.state.set(
+          { plugin: 'orca-jev-mod-skills', key: 'routerSticky' },
+          JSON.parse(router)
+        )
+      }
+      return next(e)
+    })
+  }
+}
+const WITH_JEV = { plugins: [JEV] }
+const jevAdvisor = (extra: Record<string, unknown>): string =>
+  JSON.stringify({
+    version: 1,
+    line: 'jev',
+    model: 'Sonnet 5.5',
+    effort: 'medium',
+    subagents: [],
+    ci: [],
+    notices: [],
+    ...extra
+  })
+
+// Jev's router state; `rewrite` is true only in active mode once it picked another model or effort.
+const jevRouter = (rewrite: boolean): string =>
+  JSON.stringify({
+    model: 'claude-sonnet-5-5',
+    effort: 'medium',
+    rewrite,
+    configuredModel: 'claude-sonnet-5-5',
+    configuredEffort: 'medium'
+  })
+
+const answer = (stdout: unknown) => ({
+  value: {
+    exitCode: 0,
+    stdout: JSON.stringify(stdout),
+    stderr: '',
+    isStdoutTruncated: false,
+    isStderrTruncated: false
+  }
+})
+
+const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
+  const clock = mock.clock(on)
+  mock.env(on, { ORCA_GAME_CLI: '/opt/orca/bin/orca', ORCA_GAME_ROLE: 'member', ...world.env })
+  on('session.start', ($s, e) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: '/w' }))
+  on('session.root', () => ({ value: '/w' }))
+  on('session.id', () => ({ value: 's1' }))
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', (_$, e) => {
+    world.stores?.push(e.key === 'steward' ? e.value : undefined)
+    return { value: undefined }
+  })
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
+  on('turn.complete', () => ({ text: 'ok' }))
+  on('tool.call', (_$, e) =>
+    (Reflect.get(e, 'command') as string | undefined)?.includes('fail')
+      ? ({ isError: true, result: 'Exit code 1', text: 'Exit code 1' } as never)
+      : ({ result: {}, text: '' } as never)
+  )
+  on(
+    'model.complete',
+    () => ({ value: world.haiku ?? { isAnswered: false, reason: 'aborted', usage: {} } }) as never
+  )
+  on('process.run', (_$, e) =>
+    e.argv.includes('plan')
+      ? answer({
+          id: 'p',
+          ok: true,
+          result: {
+            ticket: 'ORCA-7',
+            known: true,
+            plan: world.plan ? { source: 'lead', kind: null, phases: world.plan } : null
+          }
+        })
+      : answer(STATE)
+  )
+  on('turn.step', async function* (_$, e) {
+    yield* []
+    seen.push({ model: e.model, effort: e.effort, ...(e.agentId ? { agentId: e.agentId } : {}) })
+    return {
+      turnId: e.turnId,
+      index: e.index,
+      answer: '',
+      toolUses: [],
+      stopReason: 'end_turn',
+      usage: null
+    }
+  })
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/w' })
+  await clock.settle()
+  return clock
+}
+
+const step = async ($: Engine, index: number, over: Record<string, unknown> = {}) => {
+  const stream = $.turn.step({
+    turnId: 't1',
+    index,
+    messageCount: 1,
+    ...LAUNCHED,
+    ...over
+  } as never)
+  for await (const _chunk of stream) {
+    // drain
+  }
+  await stream.result
+}
+
+const edit = ($: Engine) =>
+  $.tool.call({ tool: 'Edit', file_path: '/w/src/a.ts', old_string: 'a', new_string: 'b' } as never)
+
+describe('the Orca steward', () => {
+  test("follows the lead's plan, and an edit raises the member to Opus from the next step", async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await clock.settle()
+    await step($, 1)
+    await edit($)
+    await clock.settle()
+    await step($, 2)
+    expect(seen.map((one) => `${one.model}/${String(one.effort)}`)).toEqual([
+      'claude-sonnet-5-5/medium',
+      'claude-sonnet-5-5/low',
+      'claude-opus-5-5/xhigh'
+    ])
+  })
+
+  test('acts when Jev is installed but its router rewrites nothing', WITH_JEV, async ($, on) => {
+    const seen: Seen[] = []
+    // Why routedModel too: Jev reports it in measure mode as well, where it changes nothing.
+    const env = {
+      TEST_ADVISOR: jevAdvisor({ routedModel: 'claude-sonnet-5-5' }),
+      TEST_ROUTER: jevRouter(false)
+    }
+    const clock = await start($, on, { plan: PLAN, env }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)?.model).toBe('claude-opus-5-5')
+  })
+
+  test("stands down while Jev's router rewrites this member's steps", WITH_JEV, async ($, on) => {
+    const seen: Seen[] = []
+    const env = { TEST_ADVISOR: jevAdvisor({}), TEST_ROUTER: jevRouter(true) }
+    const stores: unknown[] = []
+    const clock = await start($, on, { plan: PLAN, env, stores }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual({ model: 'claude-sonnet-5-5', effort: 'medium' })
+    // Why: the log must not claim a raise Jev's router overrode.
+    const record = Reflect.get(stores.findLast(Boolean) as object, 's1') as {
+      standDown: unknown
+      decisions: { moment: string; applied: boolean }[]
+    }
+    expect(record.standDown).toBe('router')
+    expect(record.decisions.find((one) => one.moment === 'edit')?.applied).toBe(false)
+  })
+
+  test('stands down on a step that already names another model', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1, { model: 'claude-fable-5-2' })
+    expect(seen.at(-1)?.model).toBe('claude-fable-5-2')
+  })
+
+  test('keeps a model Orca pinned at launch and still moves the effort', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN, env: { ORCA_AGENT_MODEL_PINNED: '1' } }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual({ model: 'claude-sonnet-5-5', effort: 'xhigh' })
+  })
+
+  test('never touches a subagent step or a pane that is not a member', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1, { agentId: 'sub-1' })
+    expect(seen.at(-1)).toEqual({ ...LAUNCHED, agentId: 'sub-1' })
+  })
+
+  test('a lead pane is never steered', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN, env: { ORCA_GAME_ROLE: 'lead' } }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual(LAUNCHED)
+  })
+
+  test('without a plan Haiku judges, and a sure answer moves the member', async ($, on) => {
+    const seen: Seen[] = []
+    const haiku = {
+      isAnswered: true,
+      text: '{"kind":"read","confidence":0.9,"why":"audit only"}',
+      usage: { input_tokens: 900, output_tokens: 20 }
+    }
+    const clock = await start($, on, { plan: null, haiku }, seen)
+    await step($, 0, { model: 'claude-opus-5-5', effort: 'high' })
+    await clock.settle()
+    await step($, 1, { model: 'claude-opus-5-5', effort: 'high' })
+    expect(seen.at(-1)).toEqual({ model: 'claude-sonnet-5-5', effort: 'medium' })
+  })
+
+  test('Haiku slow or failing keeps the current model, silently', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: null }, seen)
+    await step($, 0)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual(LAUNCHED)
+  })
+
+  test('the same test failing twice raises the effort to test-fix on Opus', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await clock.settle()
+    for (let i = 0; i < 2; i += 1) {
+      await $.tool.call({ tool: 'Bash', command: 'pnpm vitest run fail.test.ts' } as never)
+    }
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'high' })
+  })
+})
