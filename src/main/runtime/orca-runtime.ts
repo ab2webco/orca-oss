@@ -24286,6 +24286,7 @@ export class OrcaRuntimeService {
       ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+      sessionOptionsUnpinned: launchPreferences?.unpinned === true,
       platform: agentLaunchPlatform,
       shell: queuedShell,
       isRemote,
@@ -28423,6 +28424,8 @@ export class OrcaRuntimeService {
       ),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+      // Why here too: a member relaunched into an existing worktree starts through this path.
+      sessionOptionsUnpinned: opts.launchPreferences?.unpinned === true,
       platform,
       shell: resolveLocalWindowsAgentStartupShell({
         platform,
@@ -32307,11 +32310,16 @@ export class OrcaRuntimeService {
       const seen = this.gameMemberSeenModelFor(paneKey, handle, db)
       // Why named: the card says whose word the model is, so a member without Jev never reads as unknown (ORCA-933).
       const isSession = Boolean(seen?.model) || (!launched?.model && Boolean(seen?.effort))
-      return gameMemberLaunchOf({
+      const shown = gameMemberLaunchOf({
         model: seen?.model ?? launched?.model ?? null,
         effort: seen?.effort ?? launched?.effort ?? null,
         source: isSession ? 'session' : 'launch'
       })
+      // Why only while it serves that model: after Jev or /model moves it, the lead chose nothing shown (ORCA-851).
+      const chosen = gameMemberLaunchOf(launched)
+      return shown && chosen?.chosenBy && chosen.model === shown.model
+        ? { ...shown, chosenBy: chosen.chosenBy }
+        : shown
     } catch {
       return null
     }

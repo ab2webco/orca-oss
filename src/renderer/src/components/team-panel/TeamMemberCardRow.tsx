@@ -20,6 +20,7 @@ import { TeamCardFace } from './TeamCardFace'
 import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
+import { teamHostWorktreeMissing } from './team-session-host-worktree'
 import { teamHelpersOf } from './team-member-helpers'
 import { useTeamSceneHover } from '../team-scene/team-scene-hit'
 
@@ -107,9 +108,13 @@ export function TeamMemberCardRow({
       {translate('teamPanel.card.answerInInbox', 'Answer in Inbox')}
     </Button>
   ) : null
+  const hostWorktreeMissing = useAppStore((state) =>
+    teamHostWorktreeMissing(card, state.getKnownWorktreeById)
+  )
   // Why only on opening: a second click folds the card and leaves the center as it is.
+  // Why not without the host's worktree: the reveal can only fail, so the card says why instead.
   const toggle = (): void => {
-    if (!expanded && (card.terminalHandle || card.worktreeId)) {
+    if (!expanded && !hostWorktreeMissing && (card.terminalHandle || card.worktreeId)) {
       void openTeamSession(card, shownName)
     }
     onToggle()
@@ -200,7 +205,14 @@ export function TeamMemberCardRow({
         </span>
       </button>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}
-      {expanded ? <TeamMemberCardDetail card={card} now={now} answer={answer} /> : null}
+      {expanded ? (
+        <TeamMemberCardDetail
+          card={card}
+          now={now}
+          answer={answer}
+          hostWorktreeMissing={hostWorktreeMissing}
+        />
+      ) : null}
     </article>
   )
 }

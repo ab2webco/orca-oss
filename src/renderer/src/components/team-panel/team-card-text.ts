@@ -6,6 +6,7 @@ import {
   teamModelLabelText
 } from '../../../../shared/team-panel-agent-model'
 import { TEAM_ADVISOR_NAME } from '../../../../shared/team-model-advisor-words'
+import type { GameTicketKind } from '../../../../shared/orchestrator-game-ticket-kind'
 import { translate } from '@/i18n/i18n'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
@@ -210,8 +211,36 @@ export function teamModelCreditText(model: TeamModel | null): string | null {
       advisor
     }),
     advisorReason: (reason) =>
-      translate('teamPanel.model.advisorReason', '{{reason}} ({{advisor}})', { reason, advisor })
+      translate('teamPanel.model.advisorReason', '{{reason}} ({{advisor}})', { reason, advisor }),
+    chosenByLead: (kind, source) => {
+      const words = { kind: teamTicketKindText(kind) }
+      switch (source) {
+        case 'flag':
+          return translate('teamPanel.model.chosenByLead', 'Chosen by the lead: {{kind}}', words)
+        case 'ticket':
+          return translate(
+            'teamPanel.model.inferredFromTicket',
+            'Inferred from the ticket: {{kind}}',
+            words
+          )
+        case 'default':
+          return translate('teamPanel.model.leadDefault', 'Lead default: {{kind}}', words)
+      }
+    }
   })
+}
+
+export function teamTicketKindText(kind: GameTicketKind): string {
+  switch (kind) {
+    case 'audit':
+      return translate('teamPanel.model.kind.audit', 'read-only audit')
+    case 'implement':
+      return translate('teamPanel.model.kind.implement', 'implementation')
+    case 'review':
+      return translate('teamPanel.model.kind.review', 'review or design')
+    case 'captures':
+      return translate('teamPanel.model.kind.captures', 'captures')
+  }
 }
 
 /** `localName` is the user's rename of this machine, which wins over the default label. */

@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/agent-session-option-catalog'
 import { resolveAgentSessionOptionLaunch } from '../../../../shared/agent-session-option-launch'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import type { GameLaunchChosenBy } from '../../../../shared/orchestrator-game-ticket-kind'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 
@@ -17,20 +18,25 @@ export type OrchestrationWorkerLaunchSelection = {
 
 export type OrchestrationWorkerLaunchReceipt = {
   requested: OrchestrationWorkerLaunchSelection
-  effective: OrchestrationWorkerLaunchSelection | null
+  /** `chosenBy` names the lead's ticket-kind default, which the member card credits. */
+  effective: (OrchestrationWorkerLaunchSelection & { chosenBy?: GameLaunchChosenBy }) | null
 }
 
 export function createWorkerLaunchReceipt(args: {
   agent: TuiAgent | null
   model?: string
   effort?: string
+  chosenBy?: GameLaunchChosenBy
 }): OrchestrationWorkerLaunchReceipt {
   const selection = {
     agent: args.agent,
     model: args.model ?? null,
     effort: args.effort ?? null
   }
-  return { requested: selection, effective: { ...selection } }
+  return {
+    requested: selection,
+    effective: { ...selection, ...(args.chosenBy ? { chosenBy: args.chosenBy } : {}) }
+  }
 }
 
 export function createPendingWorkerLaunchReceipt(args: {
@@ -52,6 +58,7 @@ export function resolveWorkerLaunchPreferences(args: {
   agent: TuiAgent
   model?: string
   effort?: string
+  chosenBy?: GameLaunchChosenBy
 }): {
   preferences: AgentLaunchPreferences | undefined
   receipt: OrchestrationWorkerLaunchReceipt
@@ -107,10 +114,17 @@ export function resolveWorkerLaunchPreferences(args: {
     )
   }
 
-  const preferences: AgentLaunchPreferences = requested
+  const preferences: AgentLaunchPreferences = {
+    ...requested,
+    ...(args.chosenBy ? { unpinned: true as const } : {})
+  }
   return {
     preferences,
-    receipt: createWorkerLaunchReceipt({ agent: args.agent, ...preferences })
+    receipt: createWorkerLaunchReceipt({
+      agent: args.agent,
+      ...requested,
+      ...(args.chosenBy ? { chosenBy: args.chosenBy } : {})
+    })
   }
 }
 

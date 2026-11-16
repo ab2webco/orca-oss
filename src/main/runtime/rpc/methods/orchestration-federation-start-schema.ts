@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { ORCHESTRATOR_GAME_SCENE_MAX_BYTES } from '../../../../shared/orchestrator-game-scene'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
-import { OptionalWorkerLaunchPreference } from './orchestration-worker-start-schema'
+import {
+  OptionalWorkerLaunchPreference,
+  OptionalWorkerModelChosenBy
+} from './orchestration-worker-start-schema'
 
 const QuotaWindowParams = z
   .object({ usedPercent: z.number().finite(), resetsAt: z.number().finite().nullable() })
@@ -31,6 +34,8 @@ export const FederationAttachStartParams = z.object({
   agent: OptionalString,
   model: OptionalWorkerLaunchPreference,
   effort: OptionalWorkerLaunchPreference,
+  // Why optional: the home sends it only to a host advertising the launch-chosen-by capability.
+  modelChosenBy: OptionalWorkerModelChosenBy,
   timeoutMs: OptionalFiniteNumber,
   devMode: z.boolean().optional(),
   // Why optional: the home sends both only to a host advertising the game-member capability.

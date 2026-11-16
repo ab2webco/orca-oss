@@ -25,6 +25,21 @@ describe('gameMemberLaunchOf', () => {
     })
   })
 
+  it("carries the lead's ticket-kind choice, and drops one it cannot read (ORCA-851)", () => {
+    expect(
+      gameMemberLaunchOf({
+        ...RECEIPT,
+        chosenBy: { by: 'lead', kind: 'implement', source: 'flag' }
+      })?.chosenBy
+    ).toEqual({ by: 'lead', kind: 'implement', source: 'flag' })
+    expect(
+      gameMemberLaunchOf({ ...RECEIPT, chosenBy: { by: 'lead', kind: 'qa', source: 'flag' } })
+    ).not.toHaveProperty('chosenBy')
+    expect(
+      gameMemberLaunchOf({ ...RECEIPT, chosenBy: { by: 'steward', kind: 'audit' } })
+    ).not.toHaveProperty('chosenBy')
+  })
+
   it('is nothing for a launch that chose neither, or a receipt it cannot read', () => {
     for (const value of [null, undefined, 'x', [], { model: null, effort: null }, { model: 7 }]) {
       expect(gameMemberLaunchOf(value)).toBeNull()

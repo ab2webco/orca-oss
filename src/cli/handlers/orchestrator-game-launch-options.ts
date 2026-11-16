@@ -3,6 +3,11 @@ import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestra
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isAllowedGameAccount } from '../../shared/orchestrator-game-account-usage'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import {
+  GAME_TICKET_KINDS,
+  parseGameTicketKind,
+  type GameTicketKind
+} from '../../shared/orchestrator-game-ticket-kind'
 import { ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   GAME_PROMPT_MAX,
@@ -27,6 +32,8 @@ export type GameLaunchFlags = {
   model?: string
   effort?: string
   account?: string
+  /** The ticket's kind, which picks a Claude member's model when nothing else did (ORCA-851). */
+  kind?: GameTicketKind
 }
 
 /** What one member runs on: the flags over the project lead config. */
@@ -75,11 +82,20 @@ export function parseGameLaunchFlags(flags: Map<string, string | boolean>): Game
     throw new RuntimeClientError('invalid_argument', `--${refusal.slice(LEAD_KEY_PREFIX.length)}.`)
   }
   const account = flagText(flags, 'account')
+  const kindText = flagText(flags, 'kind')
+  const kind = kindText === undefined ? undefined : parseGameTicketKind(kindText)
+  if (kind === null) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `--kind must be ${GAME_TICKET_KINDS.slice(0, -1).join(', ')} or ${GAME_TICKET_KINDS.at(-1)}.`
+    )
+  }
   return {
     ...(agent === undefined ? {} : { agent }),
     ...(model === undefined ? {} : { model }),
     ...(effort === undefined ? {} : { effort }),
-    ...(account === undefined ? {} : { account })
+    ...(account === undefined ? {} : { account }),
+    ...(kind === undefined ? {} : { kind })
   }
 }
 

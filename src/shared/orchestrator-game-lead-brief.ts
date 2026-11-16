@@ -49,6 +49,8 @@ export function gameLeadBriefOf(
     '- New tickets go to the To Do; a ticket moves to In Progress only when a member starts it.',
     '- "Work on <ticket>", from the person or from the game Panel, means launch a member for it.',
     '- For a task that is not implementing the ticket (tests, QA runs, investigations) pass `--prompt <task>` to game launch.',
+    "- Pass `--kind audit|implement|review|captures` to every game launch: it picks a Claude member's model when",
+    '  no --model or orca.yaml does (audit, captures: Sonnet 5.5; implement, review: Opus 5.5), and the card shows it.',
     '- Never use the Agent or Task tool: Orca refuses it here, and a subagent has no worktree, report or tracking.',
     `  Every investigation, audit or test goes to a member: ${run('game launch <ticket> --prompt <task>')}.`,
     '- On every start, resume or compaction, without being asked, arm two background watches and re-arm each one',

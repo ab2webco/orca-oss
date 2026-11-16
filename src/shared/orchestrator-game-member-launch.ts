@@ -1,3 +1,8 @@
+import {
+  GAME_LAUNCH_KIND_SOURCES,
+  parseGameTicketKind,
+  type GameLaunchChosenBy
+} from './orchestrator-game-ticket-kind'
 import { stripTerminalControl } from './terminal-control-stripping'
 
 /** Where a member's model came from without Jev: its own hooks (`session`) or Orca's launch choice. */
@@ -9,6 +14,18 @@ export type GameMemberLaunch = {
   effort: string | null
   /** Absent from an older host, which named no source (ORCA-933). */
   source?: GameMemberModelSource
+  /** The lead picked it by ticket kind; absent for a person's or orca.yaml's choice (ORCA-851). */
+  chosenBy?: GameLaunchChosenBy
+}
+
+const chosenByOf = (value: unknown): GameLaunchChosenBy | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null
+  }
+  const { by, kind, source } = value as Record<string, unknown>
+  const known = typeof kind === 'string' ? parseGameTicketKind(kind) : null
+  const from = GAME_LAUNCH_KIND_SOURCES.find((one) => one === source)
+  return by === 'lead' && known && from ? { by, kind: known, source: from } : null
 }
 
 const MODEL_SOURCES: readonly GameMemberModelSource[] = ['session', 'launch']
@@ -52,9 +69,11 @@ export function gameMemberLaunchOf(value: unknown): GameMemberLaunch | null {
     return null
   }
   const source = MODEL_SOURCES.find((one) => one === selection.source)
+  const chosenBy = chosenByOf(selection.chosenBy)
   return {
     model: model === null ? null : modelLabelOf(model),
     effort,
-    ...(source ? { source } : {})
+    ...(source ? { source } : {}),
+    ...(chosenBy ? { chosenBy } : {})
   }
 }

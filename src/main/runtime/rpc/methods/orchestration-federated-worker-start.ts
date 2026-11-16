@@ -12,6 +12,7 @@ import {
 } from './orchestration-worker-launch-preferences'
 import { validateFederatedWorkerStartPlacement } from './orchestration-worker-start-validation'
 import { negotiateFederatedWorkerStart } from './orchestration-federated-worker-capabilities'
+import { federatedLaunchParamsOf } from './orchestration-federated-launch-chosen-by'
 import { homeAccountReadingsOf } from './orchestration-federation-member-account'
 
 export async function startFederatedWorker(args: {
@@ -27,14 +28,14 @@ export async function startFederatedWorker(args: {
     payloadHash: string
   }
 }): Promise<unknown> {
-  const { params, runtime, db, task, runId, orchestrationMutation } = args
+  const { params: asked, runtime, db, task, runId, orchestrationMutation } = args
   if (!orchestrationMutation) {
     throw new OrchestrationError(
       'invalid_argument',
       'Remote worker-start requires a durable retry request.'
     )
   }
-  const worktree = params.worktree ?? 'current'
+  const worktree = asked.worktree ?? 'current'
   if (worktree === 'current' || worktree === 'new-child') {
     throw new OrchestrationError(
       'invalid_argument',
@@ -42,21 +43,22 @@ export async function startFederatedWorker(args: {
     )
   }
   const createsWorktree = worktree === 'new-top-level'
-  assertWorkerLaunchPreferencesCreateTerminal(params)
-  validateFederatedWorkerStartPlacement(params, createsWorktree)
+  assertWorkerLaunchPreferencesCreateTerminal(asked)
+  validateFederatedWorkerStartPlacement(asked, createsWorktree)
+
+  const server = runtime.resolveOrchestrationWorkerServer(asked.on as string)
+  const status = (await runtime.callOrchestrationWorkerServer(
+    server.environmentId,
+    'status.get',
+    undefined,
+    asked.timeoutMs
+  )) as RuntimeStatus
+  const params = federatedLaunchParamsOf(asked, status.capabilities ?? [])
   const requestedLaunch = createPendingWorkerLaunchReceipt({
     agent: isTuiAgent(params.agent) ? params.agent : null,
     model: params.model,
     effort: params.effort
   })
-
-  const server = runtime.resolveOrchestrationWorkerServer(params.on as string)
-  const status = (await runtime.callOrchestrationWorkerServer(
-    server.environmentId,
-    'status.get',
-    undefined,
-    params.timeoutMs
-  )) as RuntimeStatus
   const negotiation = negotiateFederatedWorkerStart({ status, serverName: server.name, params })
   const { federationProtocolVersion, gameMember, carriesGameScene, memberAccount } = negotiation
   const accountReadings = negotiation.sharesAccountReadings
@@ -130,6 +132,7 @@ export async function startFederatedWorker(args: {
         agent: params.agent,
         model: params.model,
         effort: params.effort,
+        ...(params.modelChosenBy ? { modelChosenBy: params.modelChosenBy } : {}),
         timeoutMs: params.timeoutMs,
         devMode: params.devMode,
         ...gameMember,
@@ -152,6 +155,8 @@ export async function startFederatedWorker(args: {
       remote.state === 'ready'
     )
     if (remote.state === 'ready' && remote.worktreeId && remote.terminalHandle) {
+      // Why kept: the home names a remote member's model from it when the host relays no hook status.
+      db.recordWorkerLaunchReceipt(started.dispatch.id, launch)
       db.updateFederatedDispatchResources({
         dispatchId: started.dispatch.id,
         remoteRuntimeEpoch: remote.runtimeEpoch,

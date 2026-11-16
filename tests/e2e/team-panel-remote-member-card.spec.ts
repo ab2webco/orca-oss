@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -11,7 +11,11 @@ import {
   type HeadlessPairedRuntimeHost
 } from './helpers/headless-paired-runtime-host'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import {
+  getTerminalContent,
+  waitForActivePaneHookDescriptor,
+  waitForActivePanePtyId
+} from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
@@ -25,6 +29,35 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
     )
     .toBe(theme)
+}
+
+/** Words of a wrapped value whose letters land on two lines: the value broke inside a word. */
+function wordsSplitAcrossLines(value: Locator): Promise<string[]> {
+  return value.evaluate((node) => {
+    const split: string[] = []
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+      const content = text.textContent ?? ''
+      const words = /\S+/g
+      for (let word = words.exec(content); word; word = words.exec(content)) {
+        const range = document.createRange()
+        range.setStart(text, word.index)
+        range.setEnd(text, word.index + word[0].length)
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)))
+        if (lines.size > 1) {
+          split.push(word[0])
+        }
+      }
+    }
+    return split
+  })
+}
+
+/** Whether the active terminal shows this machine's user or host name, and a prompt at all. */
+async function namesInTerminal(page: Page): Promise<{ named: boolean; prompt: boolean }> {
+  const shown = await getTerminalContent(page)
+  const names = [os.userInfo().username, os.hostname().split('.')[0]]
+  return { named: names.some((name) => shown.includes(name)), prompt: shown.includes('$') }
 }
 
 function gitRepo(): string {
@@ -84,6 +117,15 @@ test('a member on a paired host gets its card, character, face and host name', a
       pairingCode
     )
 
+    // Why a bare prompt: a capture must not show the person's user or machine name.
+    if (process.platform !== 'win32') {
+      await client.call('terminal.send', {
+        terminal: lead,
+        text: "PS1='$ '; printf '\\033c'",
+        enter: true
+      })
+      await expect.poll(() => namesInTerminal(orcaPage)).toEqual({ named: false, prompt: true })
+    }
     await client.call('terminal.send', {
       terminal: lead,
       text: 'node -e "setInterval(() => {}, 1e9)"',
@@ -129,10 +171,19 @@ test('a member on a paired host gets its card, character, face and host name', a
         name: 'orca-21',
         displayName: title,
         agent: 'codex',
+        // ORCA-851: the lead's ticket-kind default crosses to the host and starts there unpinned.
+        model: 'claude-opus-5-5',
+        effort: 'high',
+        modelChosenBy: { by: 'lead', kind: 'implement', source: 'flag' },
         timeoutMs: 60_000
       },
       { timeoutMs: 90_000 }
     )
+    await expect
+      .poll(() =>
+        agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes('claude-opus-5-5')))
+      )
+      .toMatchObject({ modelPinned: null, effortPinned: null })
 
     await expect
       .poll(
@@ -162,13 +213,32 @@ test('a member on a paired host gets its card, character, face and host name', a
     await expect(card).not.toContainText('Remote look')
     await expect(card).toContainText('imac')
     await expect(card.locator('canvas[data-team-face]')).toHaveCount(1)
+    await expect(card.locator('[data-team-model]')).toHaveText('Opus 5.5 · high', {
+      timeout: 60_000
+    })
+    await card.locator('button[aria-expanded]').first().click()
+    await expect(card).toContainText('Elegido por el lead: implementación')
+    // Why: this window lacks the host's repo, so the card says so instead of a failed reveal.
+    await expect(card.locator('[data-team-card-host-hint]')).toHaveText(
+      'Agrega el repositorio del host a esta ventana para abrir su terminal.'
+    )
+    if (process.platform !== 'win32') {
+      expect(await namesInTerminal(orcaPage)).toEqual({ named: false, prompt: true })
+    }
 
+    const errorToast = orcaPage.locator('[data-sonner-toast][data-type="error"]')
+    const choice = card.locator('[data-team-detail="modelChoice"] dd')
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
+      expect
+        .soft(await wordsSplitAcrossLines(choice), `a word breaks mid-word at ${width}px`)
+        .toEqual([])
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${theme}`).toBeLessThanOrEqual(0)
+        // Why: a capture must not show an error state over the panel.
+        await expect.soft(errorToast, `error toast at ${width}px ${theme}`).toHaveCount(0)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`remote-card-${width}-${theme}.png`)

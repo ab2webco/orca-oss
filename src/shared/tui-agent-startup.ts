@@ -47,6 +47,8 @@ export function buildAgentStartupPlan(args: {
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
+  /** A default Orca picked, applied without the pin env so a router may still move it (ORCA-851). */
+  sessionOptionsUnpinned?: boolean
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must be skipped for remote launches. */
   isRemote?: boolean
@@ -63,7 +65,9 @@ export function buildAgentStartupPlan(args: {
     shell,
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
-    sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
+    // Why: Orca's own default never overrides a model the person's agent arguments name.
+    sessionOptionsOverrideAgentArgs:
+      args.sessionOptionsOverrideAgentArgs && !args.sessionOptionsUnpinned,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {
@@ -71,7 +75,7 @@ export function buildAgentStartupPlan(args: {
   }
   const agentEnv = withAgentLaunchPinEnv(
     args.agentEnv,
-    args.sessionOptions,
+    args.sessionOptionsUnpinned ? undefined : args.sessionOptions,
     baseCommand.appliedSessionOptions
   )
   const launchConfig = buildSleepingAgentLaunchConfig({

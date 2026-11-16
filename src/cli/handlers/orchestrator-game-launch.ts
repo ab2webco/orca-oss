@@ -21,6 +21,7 @@ import {
   type GameLaunchFlags,
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
+import { gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
 import {
   globalLoginHolderOf,
   remoteGlobalLoginOf,
@@ -50,7 +51,6 @@ import {
   nameReusedWorktree,
   type GameLaunchStart
 } from './orchestrator-game-member-name-reserve'
-import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   formatSetupQueue,
   runtimeCapabilitiesOf,
@@ -86,15 +86,6 @@ async function boundRunId(client: Client, from: string, objective: string): Prom
     from
   })
   return created.result.run.id
-}
-
-function requireLaunchPreferences(capabilities: readonly string[]): void {
-  if (!capabilities.includes(ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY)) {
-    throw new RuntimeClientError(
-      'incompatible_runtime',
-      'The connected Orca Lab runtime cannot pick a member model. Update or restart Orca Lab.'
-    )
-  }
 }
 
 type GameRemoteWhere = GameRemotePlacement & { worktree: string }
@@ -174,9 +165,12 @@ async function startGameMember(
   })
   const from = await resolveCoordinatorTerminalHandle(args.flags, args.cwd, client)
   const capabilities = await runtimeCapabilitiesOf(client)
-  if (choice.model) {
-    requireLaunchPreferences(capabilities)
-  }
+  const model = gameMemberModelParamsOf(
+    choice,
+    args.overrides ?? {},
+    item?.title ?? '',
+    capabilities
+  )
   const project = state.worktree?.displayName ?? 'this project'
   const runId = await boundRunId(
     client,
@@ -223,7 +217,7 @@ async function startGameMember(
     ...(createsWorktree ? { name: ticket.toLowerCase() } : {}),
     displayName: title,
     agent: choice.agent,
-    ...(choice.model ? { model: choice.model, effort: choice.effort } : {}),
+    ...model,
     ...memberAccount.pin,
     ...(args.remote ? remoteAccountParamsOf(choice, capabilities) : {}),
     run: runId,

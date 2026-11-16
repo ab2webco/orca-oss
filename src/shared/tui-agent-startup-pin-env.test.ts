@@ -20,6 +20,37 @@ describe('an agent told its model or effort was pinned at launch', () => {
     })
   })
 
+  // Why (ORCA-851): the lead's ticket-kind default is Orca's guess, which Jev may still move.
+  it('applies an unpinned default without telling the agent it was pinned', () => {
+    const plan = buildAgentStartupPlan({
+      ...base,
+      agent: 'claude',
+      prompt: '',
+      agentEnv: { FOO: 'bar' },
+      sessionOptions: { model: 'claude-opus-5-5', effort: 'high' },
+      sessionOptionsUnpinned: true
+    })
+    expect(plan?.launchCommand).toContain('claude-opus-5-5')
+    expect(plan?.env).toEqual({ FOO: 'bar' })
+  })
+
+  it("never overrides a model the person's own agent arguments name", () => {
+    const plan = buildAgentStartupPlan({
+      ...base,
+      agent: 'claude',
+      prompt: '',
+      agentArgs: '--model claude-haiku-5-5',
+      sessionOptions: { model: 'claude-opus-5-5', effort: 'high' },
+      sessionOptionsOverrideAgentArgs: true,
+      sessionOptionsUnpinned: true
+    })
+    // Why the order: the agent takes the last --model, so the person's comes after Orca's default.
+    const command = plan?.launchCommand ?? ''
+    expect(command.lastIndexOf('claude-haiku-5-5')).toBeGreaterThan(
+      command.lastIndexOf('claude-opus-5-5')
+    )
+  })
+
   it('pins only the model for another agent launched with a model alone, also with a prompt', () => {
     const plan = buildAgentStartupPlan({
       ...base,

@@ -90,7 +90,7 @@ test('Team cards show the served model and who chose it', async ({
         return listed.result.worktrees.some((one) => one.id === worktreeId)
       })
       .toBe(true)
-    const member = async (ticket: string) => {
+    const member = async (ticket: string, launch: Record<string, unknown> = {}) => {
       const displayName = `${ticket} Served model`
       const task = await client.call<{ task: { id: string } }>('orchestration.taskCreate', {
         spec: `Work on ${ticket}`,
@@ -106,7 +106,8 @@ test('Team cards show the served model and who chose it', async ({
         worktree: `id:${worktreeId}`,
         displayName,
         agent: 'codex',
-        timeoutMs: 20_000
+        timeoutMs: 20_000,
+        ...launch
       })
       const handle = started.result.effects.find(
         (effect) => effect.kind === 'terminal' && effect.role === 'agent'
@@ -123,9 +124,26 @@ test('Team cards show the served model and who chose it', async ({
     }
     const solo = await member('ORCA-9001')
     const routed = await member('ORCA-9002')
+    // The worker-start `game launch` sends for a ticket without --model: the kind's default, unpinned.
+    const chosen = await member('ORCA-9003', {
+      model: 'claude-opus-5-5',
+      effort: 'high',
+      modelChosenBy: { by: 'lead', kind: 'implement', source: 'flag' }
+    })
+    // The process itself: the lead's default runs on its model with no pin, so Jev may move it.
+    const startOn = (model: string) =>
+      expect
+        .poll(() => agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes(model))))
+        .toBeTruthy()
+        .then(() => agent.readLaunches().find((one) => one.argv.some((arg) => arg.includes(model))))
+    expect(await startOn('claude-opus-5-5')).toMatchObject({
+      modelPinned: null,
+      effortPinned: null
+    })
 
-    // Both start on Sonnet; a router moves each to Opus mid-turn, before any Stop.
-    for (const one of [solo, routed]) {
+    // Two start on Sonnet and a router moves each to Opus mid-turn, before any Stop; the lead's
+    // pick starts on Opus and stays there.
+    for (const one of [solo, routed, chosen]) {
       writeFileSync(one.transcript, '')
       const at = { paneKey: one.paneKey, worktreeId: one.worktreeId }
       await emitClaudeHookPayload(endpoint, {
@@ -133,7 +151,7 @@ test('Team cards show the served model and who chose it', async ({
         payload: {
           hook_event_name: 'SessionStart',
           source: 'startup',
-          model: 'claude-sonnet-5-5',
+          model: one === chosen ? 'claude-opus-5-5' : 'claude-sonnet-5-5',
           transcript_path: one.transcript
         }
       })
@@ -187,12 +205,18 @@ test('Team cards show the served model and who chose it', async ({
         ).result
         return state.agents
           .filter((one) => one.isMember)
-          .map((one) => [one.displayName, one.launch?.model ?? null, Boolean(one.advisor)])
+          .map((one) => [
+            one.displayName,
+            one.launch?.model ?? null,
+            Boolean(one.advisor),
+            one.launch?.chosenBy?.source ?? null
+          ])
           .sort()
       })
       .toEqual([
-        ['ORCA-9001 Served model', 'Opus 5.5', false],
-        ['ORCA-9002 Served model', 'Opus 5.5', true]
+        ['ORCA-9001 Served model', 'Opus 5.5', false, null],
+        ['ORCA-9002 Served model', 'Opus 5.5', true, null],
+        ['ORCA-9003 Served model', 'Opus 5.5', false, 'flag']
       ])
 
     await orcaPage.evaluate(() => {
@@ -202,9 +226,11 @@ test('Team cards show the served model and who chose it', async ({
     })
     const panel = orcaPage.getByTestId('team-panel')
     const cards = panel.locator('[data-team-card="member"]')
-    await expect(cards).toHaveCount(2, { timeout: 90_000 })
+    await expect(cards).toHaveCount(3, { timeout: 90_000 })
     const soloCard = cards.filter({ hasText: 'ORCA-9001' })
     const routedCard = cards.filter({ hasText: 'ORCA-9002' })
+    const chosenCard = cards.filter({ hasText: 'ORCA-9003' })
+    await expect(chosenCard.locator('[data-team-model]')).toHaveText('Opus 5.5 · high')
     await expect(soloCard.locator('[data-team-model]')).toHaveText('Opus 5.5 · high')
     await expect(routedCard.locator('[data-team-model]')).toHaveText('Sonnet 5.5 → Opus 5.5 · high')
 
@@ -237,6 +263,21 @@ test('Team cards show the served model and who chose it', async ({
     await expect(soloCard).not.toContainText('Jev')
     await routedCard.locator('button[aria-expanded]').first().click()
     await expect(routedCard).toContainText('code floor (Jev: code)')
+    // Opening the card opens the member's terminal, whose header says the same.
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    const header = orcaPage.locator(
+      `[data-terminal-overlay-tab-id="${routed.paneKey.split(':')[0]}"] [data-team-member-header]`
+    )
+    await expect(header).toContainText('Sonnet 5.5 → Opus 5.5 · high · code floor (Jev: code)', {
+      timeout: 30_000
+    })
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.screenshot({ path: testInfo.outputPath(`header-${width}-${theme}.png`) })
+      }
+    }
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
       for (const theme of ['dark', 'light'] as const) {
@@ -250,6 +291,30 @@ test('Team cards show the served model and who chose it', async ({
         })
       }
     }
+
+    // A member without Jev on the lead's ticket-kind pick says so.
+    await chosenCard.locator('button[aria-expanded]').first().click()
+    await expect(chosenCard).toContainText('Chosen by the lead: implementation')
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+        expect(overflow, `panel overflows: ${width}px ${theme}`).toBeLessThanOrEqual(0)
+        await chosenCard.evaluate((node) => node.scrollIntoView({ block: 'start' }))
+        await panel.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`card-lead-${width}-${theme}.png`)
+        })
+      }
+    }
+
+    // A person's --model still pins, so a router keeps off it.
+    await member('ORCA-9004', { model: 'claude-sonnet-5-5', effort: 'medium' })
+    expect(await startOn('claude-sonnet-5-5')).toMatchObject({
+      modelPinned: '1',
+      effortPinned: '1'
+    })
   } finally {
     agent.dispose()
     rmSync(transcripts, { recursive: true, force: true })

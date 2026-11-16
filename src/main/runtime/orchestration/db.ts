@@ -4960,6 +4960,16 @@ export class OrchestrationDb {
     return row?.worktree_id ?? null
   }
 
+  /** A federated start's final receipt, so the home names the model with no host hook status (ORCA-851). */
+  recordWorkerLaunchReceipt(dispatchId: string, launch: unknown): void {
+    this.db
+      .prepare(
+        `UPDATE worker_dispatches SET start_options = json_set(start_options, '$.launch', json(?))
+         WHERE dispatch_id = ?`
+      )
+      .run(JSON.stringify(launch), dispatchId)
+  }
+
   /** The newest launch that chose a model or effort for this terminal; a reuse dispatch chooses neither. */
   workerLaunchForTerminal(terminalHandle: string): Record<string, unknown> | null {
     const rows = this.db

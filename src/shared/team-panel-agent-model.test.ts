@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameAgent } from './orchestrator-game-state'
-import { advisorReasonOf, teamAgentModelOf } from './team-panel-agent-model'
+import { advisorReasonOf, gameMemberModelTextOf, teamAgentModelOf } from './team-panel-agent-model'
 
 const unpinned = { model: false, effort: false }
 const agentWith = (fields: Pick<GameAgent, 'advisor' | 'launch'>) => fields
@@ -62,6 +62,50 @@ describe('teamAgentModelOf', () => {
       source: 'advisor',
       credit: { by: 'advisor', from: null, reason: null }
     })
+  })
+})
+
+describe("the lead's ticket-kind choice (ORCA-851)", () => {
+  const launch = {
+    model: 'Opus 5.5',
+    effort: 'high',
+    source: 'session' as const,
+    chosenBy: { by: 'lead' as const, kind: 'implement' as const, source: 'flag' as const }
+  }
+
+  it('credits the lead with the kind it chose for', () => {
+    expect(teamAgentModelOf({ launch })?.credit).toEqual({
+      by: 'lead',
+      from: null,
+      reason: 'implement',
+      source: 'flag'
+    })
+    expect(gameMemberModelTextOf({ launch })).toEqual({
+      model: 'Opus 5.5 · high',
+      modelBy: 'Chosen by the lead: implementation'
+    })
+  })
+
+  // Why (lead, 2026-11-15): the card says honestly whether the lead named the kind or Orca guessed it.
+  it('says when the kind was read from the ticket, or is the default', () => {
+    const inferred = {
+      ...launch,
+      chosenBy: { ...launch.chosenBy, kind: 'audit' as const, source: 'ticket' as const }
+    }
+    expect(gameMemberModelTextOf({ launch: inferred }).modelBy).toBe(
+      'Inferred from the ticket: read-only audit'
+    )
+    const fallback = { ...launch, chosenBy: { ...launch.chosenBy, source: 'default' as const } }
+    expect(gameMemberModelTextOf({ launch: fallback }).modelBy).toBe('Lead default: implementation')
+  })
+
+  it('credits Jev, not the lead, once Jev reports on that member', () => {
+    expect(
+      teamAgentModelOf({
+        launch,
+        advisor: { model: 'Opus 5.5', effort: 'high', pinned: unpinned }
+      })?.credit?.by
+    ).toBe('advisor')
   })
 })
 
