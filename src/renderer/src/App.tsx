@@ -2113,7 +2113,7 @@ function App(): React.JSX.Element {
         leftTitlebarChromeLayout.isFloating ? ' w-max' : ' w-full'
       }`}
     >
-      <div className="flex h-full items-center">
+      <div className="flex h-full min-w-0 items-center">
         {isMac && !isFullScreen ? (
           <div className="titlebar-traffic-light-pad" />
         ) : hasCustomTitleBar ? (

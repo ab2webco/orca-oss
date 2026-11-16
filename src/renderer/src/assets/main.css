@@ -1052,6 +1052,23 @@ html.native-shell .app-layout {
    inherit that panel's contrast instead of the generic titlebar text color. */
 .titlebar-left:not(.titlebar-left-floating) .titlebar-app-name {
   color: var(--worktree-sidebar-foreground);
+  /* Why: the name gives way before Back/Forward when the sidebar is narrower than the header's controls. */
+  display: block;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+/* Why: the docked header shares the sidebar's column; its controls must not widen that column past
+   the sidebar, or an empty strip opens before the center panel (ORCA-1244). */
+.titlebar-left:not(.titlebar-left-floating) {
+  container: titlebar-left / inline-size;
+}
+
+/* Why 250px: the Mac header's controls need about 247px; below that a clipped "Or…" names nothing. */
+@container titlebar-left (max-width: 250px) {
+  .titlebar-left:not(.titlebar-left-floating) .titlebar-app-name {
+    display: none;
+  }
 }
 
 .titlebar-icon-button {
