@@ -11,7 +11,7 @@ export function focusActivePane(manager: PaneManager): void {
     return
   }
   const activeElement = typeof document === 'undefined' ? null : document.activeElement
-  if (shouldPreserveEditableFocus(activeElement)) {
+  if (shouldPreserveEditableFocus(activeElement) || isInOpenPopupLayer(activeElement)) {
     return
   }
   const panes = manager.getPanes()
@@ -40,6 +40,15 @@ export function isLinuxUserAgent(
   userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent
 ): boolean {
   return !isMacUserAgent(userAgent) && !isWindowsUserAgent(userAgent) && userAgent.includes('Linux')
+}
+
+// Why: Radix menus, popovers and dialogs close when focus leaves them, so a deferred refit or
+// window refocus taking focus would shut one the person just opened (ORCA-1193).
+const OPEN_POPUP_LAYER_SELECTOR =
+  '[role="menu"], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]'
+
+function isInOpenPopupLayer(element: Element | null): boolean {
+  return element instanceof HTMLElement && element.closest(OPEN_POPUP_LAYER_SELECTOR) !== null
 }
 
 function shouldPreserveEditableFocus(element: Element | null): boolean {

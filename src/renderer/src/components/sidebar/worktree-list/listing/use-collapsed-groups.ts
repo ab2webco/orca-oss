@@ -5,13 +5,18 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { AgentStatusGroupKey } from '../grouping/agent-status-groups'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import { PINNED_GROUP_KEY, getLineageGroupKey } from '../grouping/group-keys'
+import {
+  IDLE_PROJECTS_GROUP_KEY,
+  PINNED_GROUP_KEY,
+  getIdleProjectOpenKey,
+  getLineageGroupKey
+} from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { WorktreeGroupBy } from '../grouping/row-types'
-import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
+import { getRevealGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 
-// While the agent send picker targets a workspace, force open every section that hides it.
+// While the agent send picker targets a workspace, force open every section (and idle fold) that hides it.
 export function useEffectiveCollapsedGroups(args: {
   collapsedGroups: Set<string>
   agentSendTargetWorktreeId: string | null
@@ -50,7 +55,7 @@ export function useEffectiveCollapsedGroups(args: {
     if (targetWorktree.isPinned) {
       next.delete(PINNED_GROUP_KEY)
     } else {
-      for (const groupKey of getGroupKeysForWorktree(
+      for (const groupKey of getRevealGroupKeysForWorktree(
         groupBy,
         targetWorktree,
         repoMap,
@@ -61,7 +66,11 @@ export function useEffectiveCollapsedGroups(args: {
         projectGrouping
       )) {
         next.delete(groupKey)
+        // Why: an idle project's fold also hides the target; an extra open key on an active project is inert.
+        next.add(getIdleProjectOpenKey(groupKey))
       }
+      // Why unconditional: an idle target may sit in the collapsed idle group; opening it while picking is harmless.
+      next.delete(IDLE_PROJECTS_GROUP_KEY)
     }
 
     for (const parent of getWorktreeLineageAncestors(

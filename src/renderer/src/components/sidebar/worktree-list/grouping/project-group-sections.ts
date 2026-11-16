@@ -5,10 +5,13 @@ import { getEffectiveProjectGroupManualRank } from '../../../../../../shared/pro
 import { PROJECT_GROUP_META, getProjectGroupHeaderKey } from './group-keys'
 import { appendOrderedGroups } from './group-sections'
 import type { SectionAppendContext } from './group-sections'
+import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
 import type { OrderedGroupEntry } from './project-grouping'
+import { orderGroupSectionsByTier } from './section-urgency'
 import {
   compareRecentRank,
   recentRankForEntry,
+  sortProjectEntriesByName,
   withRepoSectionDisplayLabels
 } from './section-order'
 
@@ -35,10 +38,14 @@ export function appendProjectGroupSections(
   }
 
   const sortRepoEntriesWithinGroup = (entries: OrderedGroupEntry[]): OrderedGroupEntry[] => {
-    if (projectOrderBy === 'recent') {
-      return [...entries].sort((left, right) =>
+    if (projectOrderBy === 'name') {
+      return sortProjectEntriesByName(entries, repoOrder)
+    }
+    if (projectOrderBy !== 'manual') {
+      const byRecent = [...entries].sort((left, right) =>
         compareRecentRank(recentRankForEntry(left), recentRankForEntry(right))
       )
+      return ctx.urgency?.orderByTier ? orderGroupSectionsByTier(ctx, byRecent) : byRecent
     }
     // Manual: within a Project Group, projects order by their per-group rank
     // (projectGroupOrder), falling back to global repoOrder when unset so drag
@@ -138,7 +145,8 @@ export function appendProjectGroupSections(
     // not fetched yet; missing metadata must not make those repos disappear.
     remainingRepoEntries.push(...entries)
   }
-  appendOrderedGroups(
+  // Why only ungrouped projects: inside a Project Group, idle projects fold in place under their group.
+  appendRepoSectionsSplitByActivity(
     ctx,
     withRepoSectionDisplayLabels(sortRepoEntriesWithinGroup(remainingRepoEntries)),
     0

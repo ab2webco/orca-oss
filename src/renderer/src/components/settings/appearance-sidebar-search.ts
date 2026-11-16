@@ -127,6 +127,34 @@ export const getShowPinnedWorktreesInGroupsEntry = createLocalizedCatalog(
   })
 )
 
+export const getSidebarActivityWindowEntry = createLocalizedCatalog(
+  (): SettingsSearchEntry => ({
+    title: translate(
+      'auto.components.settings.SidebarActivityWindowSetting.title',
+      'Idle project window'
+    ),
+    description: translate(
+      'auto.components.settings.SidebarActivityWindowSetting.description',
+      'Projects with no activity in this window fold into Idle at the bottom of the sidebar.'
+    ),
+    keywords: [
+      ...translateSearchKeyword(
+        'auto.components.settings.appearance.search.sidebarActivityWindow.idle',
+        'idle'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.appearance.search.sidebarActivityWindow.activity',
+        'activity'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.appearance.search.sidebarActivityWindow.window',
+        'window'
+      ),
+      ...translateSearchKeyword('auto.components.settings.appearance.search.5bff6a2ef0', 'sidebar')
+    ]
+  })
+)
+
 export const getSidebarEntries = createLocalizedCatalog((): SettingsSearchEntry[] => [
   {
     title: translate('auto.components.settings.appearance.search.155a1e7438', 'Show Tasks Button'),
@@ -193,5 +221,6 @@ export const getSidebarEntries = createLocalizedCatalog((): SettingsSearchEntry[
   },
   getWorkspaceCardLayoutEntry(),
   getLeftSidebarAppearanceEntry(),
-  getShowPinnedWorktreesInGroupsEntry()
+  getShowPinnedWorktreesInGroupsEntry(),
+  getSidebarActivityWindowEntry()
 ])

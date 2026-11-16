@@ -65,7 +65,10 @@ describe('fitAndFocusPanes', () => {
       const classNames = new Set(args.classNames ?? [])
       this.classList = { contains: (className) => classNames.has(className) }
       this.closest = vi.fn((selector: string) =>
-        selector === args.closestSelector ? (this as unknown as Element) : null
+        args.closestSelector &&
+        selector.split(',').some((part) => part.trim() === args.closestSelector)
+          ? (this as unknown as Element)
+          : null
       )
     }
 
@@ -117,6 +120,44 @@ describe('fitAndFocusPanes', () => {
 
     expect(manager.fitAllPanes).toHaveBeenCalled()
     expect(terminal.focus).not.toHaveBeenCalled()
+  })
+
+  // Why: Radix closes a menu when focus leaves it, so a deferred refit right after startup
+  // shut the sidebar's options menu under a keyboard user (ORCA-1193).
+  it('fits without taking focus out of an open menu', () => {
+    const menuItem = new FakeHTMLElement({
+      tagName: 'DIV',
+      closestSelector: '[role="menu"]'
+    }) as unknown as Element
+    stubDocument(menuItem)
+    const { manager, terminal } = makeManager()
+
+    fitAndFocusPanes(manager)
+
+    expect(manager.fitAllPanes).toHaveBeenCalled()
+    expect(terminal.focus).not.toHaveBeenCalled()
+  })
+
+  it('fits without taking focus out of an open dialog', () => {
+    const button = new FakeHTMLElement({
+      tagName: 'BUTTON',
+      closestSelector: '[role="dialog"]'
+    }) as unknown as Element
+    stubDocument(button)
+    const { manager, terminal } = makeManager()
+
+    fitAndFocusPanes(manager)
+
+    expect(terminal.focus).not.toHaveBeenCalled()
+  })
+
+  it('still focuses the terminal from a sidebar button outside any popup', () => {
+    stubDocument(new FakeHTMLElement({ tagName: 'BUTTON' }) as unknown as Element)
+    const { manager, terminal } = makeManager()
+
+    fitAndFocusPanes(manager)
+
+    expect(terminal.focus).toHaveBeenCalled()
   })
 
   it('still focuses the active terminal pane when the current focus is xterm', () => {

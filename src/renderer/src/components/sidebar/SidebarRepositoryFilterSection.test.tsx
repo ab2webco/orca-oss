@@ -43,6 +43,11 @@ function setState(overrides: Record<string, unknown> = {}): void {
     repos: REPOS,
     filterRepoIds: [],
     setFilterRepoIds,
+    sshTargetLabels: new Map(),
+    sshConnectionStates: new Map(),
+    runtimeEnvironments: [],
+    runtimeStatusByEnvironmentId: new Map(),
+    settings: null,
     ...overrides
   }
 }
@@ -198,6 +203,32 @@ describe('SidebarRepositoryFilterSection', () => {
     })
 
     expect(searchInput()).toBeNull()
+  })
+
+  it('names the host on a project that repeats on another host (ORCA-1181)', async () => {
+    setState({
+      repos: [
+        { id: 'local', displayName: 'orca-oss', path: '/w/orca-oss' },
+        { id: 'paired', displayName: 'orca-oss', path: '/w/orca-oss', connectionId: 'm1' },
+        REPOS[0]
+      ],
+      filterRepoIds: ['paired'],
+      sshTargetLabels: new Map([['m1', 'm1']])
+    })
+    render()
+
+    const trigger = document.querySelector('[data-slot="dropdown-menu-sub-trigger"]')
+    expect(trigger?.textContent).toContain('orca-oss · m1')
+    openSubmenu()
+    await settle()
+
+    const chips = document.querySelectorAll('[data-slot="badge"]')
+    expect([...chips].map((chip) => chip.textContent)).toEqual(['orca-oss · m1'])
+    const options = document.querySelectorAll('[data-slot="command-item"]')
+    expect([...options].map((option) => option.textContent)).toEqual([
+      'orca-oss · This computer',
+      'alpha'
+    ])
   })
 
   it('hides itself when only one project exists', () => {

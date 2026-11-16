@@ -1,4 +1,5 @@
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import { hostDisplayLabel } from './local-host-display-label'
 
 type RepoDisplayLabelItem = {
   path: string
@@ -45,9 +46,11 @@ export function getRepoDisplayLabelsByPath(
   for (const item of items) {
     const displayName = item.displayName || item.path
     labels.set(getRepoDisplayLabelKey(item), displayName)
-    const colliding = itemsByName.get(displayName) ?? []
+    // Why per host (ORCA-1181): a twin on another host would drag every same-name repo to its full path.
+    const collisionKey = `${getRepoExecutionHostId(item)}\0${displayName}`
+    const colliding = itemsByName.get(collisionKey) ?? []
     colliding.push({ ...item, displayName })
-    itemsByName.set(displayName, colliding)
+    itemsByName.set(collisionKey, colliding)
   }
 
   for (const collidingItems of itemsByName.values()) {
@@ -68,5 +71,32 @@ export function getRepoDisplayLabelsByPath(
     })
   }
 
+  return labels
+}
+
+/** Labels for lists that mix hosts: a label repeated on another host gains " · <host>". */
+export function getRepoHostQualifiedLabels(
+  repos: readonly (RepoDisplayLabelItem & { id: string })[],
+  hostLabelById: ReadonlyMap<string, string>
+): Map<string, string> {
+  const labelsByKey = getRepoDisplayLabelsByPath(repos)
+  const hostIdsByLabel = new Map<string, Set<string>>()
+  const baseById = new Map<string, { label: string; hostId: ExecutionHostId }>()
+  for (const repo of repos) {
+    const label = labelsByKey.get(getRepoDisplayLabelKey(repo)) ?? repo.displayName
+    const hostId = getRepoExecutionHostId(repo)
+    baseById.set(repo.id, { label, hostId })
+    hostIdsByLabel.set(label, (hostIdsByLabel.get(label) ?? new Set()).add(hostId))
+  }
+  const labels = new Map<string, string>()
+  for (const [id, { label, hostId }] of baseById) {
+    const repeatsOnAnotherHost = (hostIdsByLabel.get(label)?.size ?? 0) > 1
+    labels.set(
+      id,
+      repeatsOnAnotherHost
+        ? `${label} · ${hostLabelById.get(hostId) ?? hostDisplayLabel(hostId)}`
+        : label
+    )
+  }
   return labels
 }

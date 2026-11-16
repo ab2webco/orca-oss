@@ -14,26 +14,11 @@ import { AgentStallTimerControl } from './AgentStallTimerControl'
 import { teamLiveText, teamModelText } from '@/components/team-panel/team-card-text'
 import { redactDispatchCapability } from '../../../../shared/dispatch-capability-redaction'
 import { agentToolLabelOf } from '../../../../shared/agent-tool-label'
+import { formatShortActivityAge } from './short-activity-age'
 import {
   teamLiveActionOfEntry,
   teamSessionModelOf
 } from '../../../../shared/team-panel-activity-rows'
-
-function formatShortTimeAgo(ts: number, now: number): string {
-  const delta = now - ts
-  if (delta < 60_000) {
-    return 'now'
-  }
-  const minutes = Math.floor(delta / 60_000)
-  if (minutes < 60) {
-    return `${minutes}m`
-  }
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) {
-    return `${hours}h`
-  }
-  return `${Math.floor(hours / 24)}d`
-}
 
 function getCompactAgentPrimary(agent: DashboardAgentRowData): string {
   const prompt = getAgentRowPrimaryText(agent.entry)
@@ -68,10 +53,10 @@ function getCompactAgentSecondary(agent: DashboardAgentRowData): string {
 function getCompactAgentTime(agent: DashboardAgentRowData, now: number): string | null {
   const doneAt = lastEnteredDoneAt(agent)
   if (doneAt !== null) {
-    return formatShortTimeAgo(doneAt, now)
+    return formatShortActivityAge(doneAt, now)
   }
   const startedAt = agent.startedAt > 0 ? agent.startedAt : agent.entry.stateStartedAt
-  return startedAt > 0 ? formatShortTimeAgo(startedAt, now) : null
+  return formatShortActivityAge(startedAt, now)
 }
 
 function stopActivationKeyPropagation(e: React.KeyboardEvent): void {

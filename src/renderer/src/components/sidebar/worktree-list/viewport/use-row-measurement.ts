@@ -37,6 +37,7 @@ export function useVirtualRowMeasurementSync(args: {
   scrollAnchorRef: React.MutableRefObject<VirtualizedScrollAnchor>
   hasDirectScrollInput: () => boolean
   shouldSkipScrollAnchorRestore: () => boolean
+  pinnedHostHeightRef?: React.MutableRefObject<number | undefined>
 }) {
   const {
     renderRows,
@@ -63,7 +64,8 @@ export function useVirtualRowMeasurementSync(args: {
     rangeStartIndex: virtualization.stickyRangeStartIndexRef.current,
     scrollOffset: virtualizer.scrollOffset ?? scrollOffsetRef.current,
     stickyHeaderIndexes: virtualization.stickyHeaderIndexes,
-    virtualItems
+    virtualItems,
+    hostPinnedHeight: args.pinnedHostHeightRef?.current
   })
   virtualization.activeStickyHeaderIndexRef.current = activeStickyIndexes.groupIndex
   virtualization.activeStickyHostIndexRef.current = activeStickyIndexes.hostIndex

@@ -33,6 +33,7 @@ export type WorktreeItemRowContext = {
   activeWorktreeId: string | null
   currentWorktreeId: string | null
   highlightedRevealRowKey: string | null
+  revealedHiddenWorktreeIds: ReadonlySet<string>
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
   getActiveSurfaceVariant: (row: WorktreeItemRow) => ActiveSurfaceVariant
@@ -136,6 +137,7 @@ export function renderWorktreeItemRow(
       itemRow.worktree.id ||
       ctx.nativeLineageDropTargetId === itemRow.worktree.id)
   const isActiveWorktree = ctx.activeWorktreeId === itemRow.worktree.id
+  const isRevealedHidden = ctx.revealedHiddenWorktreeIds.has(itemRow.worktree.id)
   return (
     <div
       key={itemRow.rowKey}
@@ -149,9 +151,12 @@ export function renderWorktreeItemRow(
       data-worktree-drag-id={worktreeDragGroupKey ? itemRow.worktree.id : undefined}
       data-worktree-drag-group-key={worktreeDragGroupKey}
       data-worktree-drag-group-index={ctx.groupIndexByRowKey.get(itemRow.rowKey)}
+      data-sidebar-revealed-hidden={isRevealedHidden ? 'true' : undefined}
       className={cn(
         // Why: don't transition 'transform' — it lags/flashes when TanStack Virtual repositions adjacent rows.
         'relative transition-[opacity,filter] duration-150 ease-out',
+        // Why the card surface's disconnected dim: still reachable, but plainly not part of the filtered list.
+        isRevealedHidden && 'opacity-60',
         ctx.worktreeDragState.draggingWorktreeId === itemRow.worktree.id &&
           // Why: the fixed drag preview is the affordance; a translucent source row would bleed through sticky headers/footers.
           'pointer-events-none opacity-0'

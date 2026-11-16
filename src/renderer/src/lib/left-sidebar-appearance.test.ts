@@ -52,6 +52,29 @@ describe('resolveLeftSidebarStyleVariables', () => {
     expect(vars?.['--worktree-sidebar']).toBe('rgba(18, 52, 86, 0.5)')
   })
 
+  // ORCA-1216 §8: pinned headers paint the solid surface, or the rows under them show through.
+  it('keeps an opaque surface for pinned headers when the terminal is translucent', () => {
+    const vars = resolveLeftSidebarStyleVariables(
+      settings({
+        leftSidebarAppearanceMode: 'match-terminal',
+        terminalColorOverrides: { background: '#123456' },
+        terminalBackgroundOpacity: 0.8
+      }),
+      true
+    )
+
+    expect(vars?.['--worktree-sidebar-solid']).toBe('#123456')
+  })
+
+  it('uses the tinted surface itself as the solid surface, since it is already opaque', () => {
+    const vars = resolveLeftSidebarStyleVariables(
+      settings({ leftSidebarAppearanceMode: 'tinted', leftSidebarTintColor: '#336699' }),
+      true
+    )
+
+    expect(vars?.['--worktree-sidebar-solid']).toBe(vars?.['--worktree-sidebar'])
+  })
+
   it('builds a tinted surface from normalized tint settings', () => {
     const vars = resolveLeftSidebarStyleVariables(
       settings({

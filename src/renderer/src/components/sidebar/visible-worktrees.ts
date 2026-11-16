@@ -1,9 +1,7 @@
-import type { Repo } from '../../../../shared/repo-types'
-import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { buildWorktreeComparator, sortWorktreesSmart } from './smart-sort'
-import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import { getWorktreeIdsWithLiveAgent } from '@/lib/worktree-activity-state'
 import { useAppStore } from '@/store'
 import {
   getAllWorktreesFromState,
@@ -14,7 +12,6 @@ import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import {
   ALL_EXECUTION_HOSTS_SCOPE,
   getSettingsFocusedExecutionHostId,
-  getWorktreeExecutionHostId,
   type ExecutionHostId,
   type ExecutionHostScope
 } from '../../../../shared/execution-host'
@@ -23,32 +20,14 @@ import {
   getLineageRenderInfo
 } from './worktree-lineage-projection'
 import { computeRenderedSidebarWorktreeOrder } from './rendered-sidebar-worktree-order'
-import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
-  getPairedDeviceIdsByEnvironment,
-  isWorkspaceFromOtherDevice
+  getPairedDeviceIdsByEnvironment
 } from './workspace-creator-visibility'
-import { isDefaultBranchWorkspace } from './default-branch-workspace'
-
-/**
- * Whether the "Hide sleeping" sweep must keep this row (#8873).
- *
- * Why isMainWorktree and not isDefaultBranchWorkspace: the project's primary
- * checkout is the repo's only guaranteed entry point. Folder workspaces and
- * detached-HEAD mains fail the default-branch predicate yet often have no
- * sibling row at all, so sweeping them drops the entire project out of the
- * sidebar, Cmd+J and the board with no way back except changing a filter.
- *
- * Why shared: the sidebar pipeline and the jump palette both apply this, and a
- * second copy is how the two surfaces drift.
- */
-export function isSleepingSweepExemptWorkspace(
-  worktree: Worktree,
-  alwaysShowDefaultBranchWorkspace: boolean | undefined
-): boolean {
-  return alwaysShowDefaultBranchWorkspace !== false && worktree.isMainWorktree
-}
+import {
+  createSidebarHidingFilterResolver,
+  type SidebarHidingFilterInputs
+} from './sidebar-hiding-filters'
 
 /**
  * Whether turning the exemption off is currently narrowing the list. It only
@@ -60,26 +39,6 @@ export function isSleepingSweepExemptionNarrowingList(
   alwaysShowDefaultBranchWorkspace: boolean | undefined
 ): boolean {
   return !showSleepingWorkspaces && alwaysShowDefaultBranchWorkspace === false
-}
-
-export function isAutomationGeneratedWorkspace(worktree: Worktree): boolean {
-  return worktree.automationProvenance?.kind === 'created-by-automation'
-}
-
-export function isCliCreatedWorkspace(worktree: Worktree): boolean {
-  return worktree.cliProvenance?.kind === 'created-by-cli'
-}
-
-/**
- * Whether a worktree sits on a detached HEAD (a commit, not a branch).
- *
- * Why the head check: folder workspaces and SSH-synthesized rows carry both an
- * empty branch and an empty head, so branch-emptiness alone would sweep them
- * into this filter. Requiring a real head keeps the predicate to genuine
- * detached-HEAD checkouts, matching what DetachedHeadBadge renders on the card.
- */
-export function isDetachedHeadWorkspace(worktree: Worktree): boolean {
-  return getWorktreeGitIdentityDisplay(worktree)?.kind === 'detached'
 }
 
 /** Inputs describing sidebar filter settings that the Clear Filters path owns. */
@@ -176,34 +135,7 @@ export function computeClearFilterActions(state: SidebarFilterState): ClearFilte
 export function computeVisibleWorktreeIds(
   worktreesByRepo: Record<string, Worktree[]>,
   sortedIds: string[],
-  opts: {
-    filterRepoIds: readonly string[]
-    showSleepingWorkspaces: boolean
-    tabsByWorktree: Record<string, Pick<TerminalTab, 'id'>[]> | null
-    ptyIdsByTabId: Record<string, string[]> | null
-    browserTabsByWorktree?: Record<string, { id: string }[]> | null
-    // Why required: every filter caller must preserve running agents through
-    // temporary PTY gaps instead of silently reverting #7197.
-    worktreeIdsWithLiveAgent: ReadonlySet<string>
-    // Why required: every caller (WorktreeList, getVisibleWorktreeIds
-    // fallback, tests) reads the flag from the UI store. Making the field
-    // required prevents a future caller from silently dropping the filter by
-    // forgetting to pass it.
-    hideDefaultBranchWorkspace: boolean
-    hideAutomationGeneratedWorkspaces: boolean
-    hideCliCreatedWorkspaces: boolean
-    hideDetachedHeadWorkspaces: boolean
-    hideWorkspacesFromOtherDevices: boolean
-    pairedDeviceIdsByEnvironment: ReadonlyMap<string, string>
-    // Why optional here, against the "why required" rule above: omitting it
-    // must fail *open*. A caller that forgets the flag then shows an extra row
-    // instead of silently re-hiding the project's entry point, which is the
-    // exact regression #8873 reports.
-    alwaysShowDefaultBranchWorkspace?: boolean
-    repoMap: Map<string, Repo>
-    workspaceHostScope: ExecutionHostScope
-    visibleWorkspaceHostIds?: readonly ExecutionHostId[] | null
-    defaultHostId: ExecutionHostId
+  opts: SidebarHidingFilterInputs & {
     worktreeLineageById: Record<string, WorktreeLineage>
     injectLineageAncestors?: boolean
     forcedVisibleWorktreeIds?: readonly string[]
@@ -218,64 +150,9 @@ export function computeVisibleWorktreeIds(
   // every other valid ancestor can bypass filters so children never orphan.
   const lineageAncestorById = new Map(all.map((w) => [w.id, w]))
 
-  if (opts.hideWorkspacesFromOtherDevices) {
-    all = all.filter(
-      (worktree) => !isWorkspaceFromOtherDevice(worktree, opts.pairedDeviceIdsByEnvironment)
-    )
-  }
-
-  if (opts.hideDefaultBranchWorkspace) {
-    all = all.filter((w) => !isDefaultBranchWorkspace(w))
-  }
-
-  if (opts.hideAutomationGeneratedWorkspaces) {
-    all = all.filter((w) => !isAutomationGeneratedWorkspace(w))
-  }
-
-  if (opts.hideCliCreatedWorkspaces) {
-    all = all.filter((w) => !isCliCreatedWorkspace(w))
-  }
-
-  if (opts.hideDetachedHeadWorkspaces) {
-    all = all.filter((w) => !isDetachedHeadWorkspace(w))
-  }
-
-  const visibleHostIds =
-    opts.visibleWorkspaceHostIds ??
-    (opts.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE ? null : [opts.workspaceHostScope])
-  if (visibleHostIds) {
-    const visibleHostIdSet = new Set(visibleHostIds)
-    all = all.filter((w) => {
-      const repo = opts.repoMap.get(w.repoId)
-      if (!repo) {
-        return false
-      }
-      const hostId = getWorktreeExecutionHostId(w, repo, opts.defaultHostId)
-      return visibleHostIdSet.has(hostId)
-    })
-  }
-
-  // Filter by repo
-  if (opts.filterRepoIds.length > 0) {
-    const selectedRepoIds = new Set(opts.filterRepoIds)
-    all = all.filter((w) => selectedRepoIds.has(w.repoId))
-  }
-
-  if (!opts.showSleepingWorkspaces) {
-    // Why no !hideDefaultBranchWorkspace term: that filter already ran above, so
-    // an explicit hide still wins over the exemption.
-    all = all.filter(
-      (w) =>
-        isSleepingSweepExemptWorkspace(w, opts.alwaysShowDefaultBranchWorkspace) ||
-        !isInactiveWorkspace(
-          w.id,
-          opts.tabsByWorktree,
-          opts.ptyIdsByTabId,
-          opts.browserTabsByWorktree,
-          opts.worktreeIdsWithLiveAgent
-        )
-    )
-  }
+  // Why the shared resolver: the hidden-by-filters line counts with it too, so the two never disagree.
+  const hidingFilterOf = createSidebarHidingFilterResolver(opts)
+  all = all.filter((w) => hidingFilterOf(w) === null)
 
   if (opts.forcedVisibleWorktreeIds && opts.forcedVisibleWorktreeIds.length > 0) {
     const includedIds = new Set(all.map((worktree) => worktree.id))

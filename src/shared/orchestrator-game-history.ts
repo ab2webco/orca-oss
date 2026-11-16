@@ -23,6 +23,10 @@ export type GameHistoryRecord = {
   character?: string | null
   /** The paired host it ran on; absent when it ran on this Orca. */
   host?: string | null
+  /** The member's worktree, so a restart can nest it under its lead; absent from an older build. */
+  worktreeId?: string
+  /** The lead's worktree it nests under; absent from an older build or once detached by hand. */
+  leadWorktreeId?: string
 }
 
 // Why 200: a few weeks of one project's tickets, small enough to read whole on every call.
@@ -80,6 +84,14 @@ const textOrNull = (value: unknown, max = TEXT_MAX): string | null | undefined =
   return typeof value === 'string' ? value.slice(0, max) : undefined
 }
 
+// Why no slice: a worktree id is a path, and a cut one names no worktree.
+const idOrAbsent = (value: unknown): string | null | undefined => {
+  if (value === null || value === undefined) {
+    return null
+  }
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
 /** A record as it arrives over RPC or from disk; null when any field is malformed. */
 export function parseGameHistoryRecord(raw: unknown): GameHistoryRecord | null {
   if (!isRecord(raw) || typeof raw.endedAt !== 'string' || Number.isNaN(Date.parse(raw.endedAt))) {
@@ -96,7 +108,9 @@ export function parseGameHistoryRecord(raw: unknown): GameHistoryRecord | null {
     pr: textOrNull(raw.pr),
     lastReport: textOrNull(raw.lastReport, REPORT_MAX),
     character: textOrNull(raw.character),
-    host: textOrNull(raw.host)
+    host: textOrNull(raw.host),
+    worktreeId: idOrAbsent(raw.worktreeId),
+    leadWorktreeId: idOrAbsent(raw.leadWorktreeId)
   }
   if (!outcome || Object.values(fields).some((value) => value === undefined)) {
     return null
@@ -113,6 +127,8 @@ export function parseGameHistoryRecord(raw: unknown): GameHistoryRecord | null {
     pr: fields.pr ?? null,
     lastReport: fields.lastReport ?? null,
     ...(fields.character ? { character: fields.character } : {}),
-    ...(fields.host ? { host: fields.host } : {})
+    ...(fields.host ? { host: fields.host } : {}),
+    ...(fields.worktreeId ? { worktreeId: fields.worktreeId } : {}),
+    ...(fields.leadWorktreeId ? { leadWorktreeId: fields.leadWorktreeId } : {})
   }
 }

@@ -14,10 +14,11 @@ import type { RenderRow } from '../listing/render-row'
 import { getLineageGroupKey } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
-import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
+import { getRevealGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 import { getFolderWorkspaceRevealGroupKeys } from './folder-reveal'
 import { getPinnedWorktreeRevealCollapsedGroupKeys } from './reveal-ancestors'
+import { getFoldedProjectRevealKeys } from './folded-project-reveal'
 
 export const MAX_REVEAL_RETRIES = 8
 
@@ -47,6 +48,8 @@ export type PendingSidebarRevealArgs = {
   projectGrouping?: ProjectGroupingModel
   flashRevealedRow: (rowKey: string) => void
   markRevealScroll: (targetTop: number) => void
+  /** True while the person is wheeling or dragging the list; a held reveal lets go. */
+  hasDirectScrollInput: () => boolean
   schedulePendingRevealFrame: (callback: FrameRequestCallback) => void
   cancelPendingRevealFrames: () => void
 }
@@ -73,6 +76,10 @@ export function expandGroupsForWorktreeReveal(
   if (!targetWorktree) {
     return
   }
+  // Why from the rendered rows: only a fold on screen needs opening, so a reveal never stores an open key for an active project.
+  for (const openKey of getFoldedProjectRevealKeys(args.renderRows, worktreeId)) {
+    args.toggleGroup(openKey)
+  }
   const targetRepo = args.repoMap.get(targetWorktree.repoId)
   const hostGroupKey = `host:${getWorktreeExecutionHostId(targetWorktree, targetRepo, args.defaultHostId)}`
   if (args.collapsedGroups.has(hostGroupKey)) {
@@ -96,7 +103,7 @@ export function expandGroupsForWorktreeReveal(
           worktree: targetWorktree,
           collapsedGroups: args.collapsedGroups
         })
-      : getGroupKeysForWorktree(
+      : getRevealGroupKeysForWorktree(
           args.groupBy,
           targetWorktree,
           args.repoMap,

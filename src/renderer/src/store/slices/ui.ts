@@ -80,6 +80,7 @@ import {
   DEFAULT_SHOW_SLEEPING_WORKSPACES,
   DEFAULT_STATUS_BAR_ITEMS,
   DEFAULT_WORKTREE_CARD_PROPERTIES,
+  FLOATING_TERMINAL_WORKTREE_ID,
   getWorktreeCardModeUpdates,
   normalizeAgentActivityDisplayMode,
   normalizeWorktreeCardProperties
@@ -134,12 +135,15 @@ import { buildAgentNotificationId } from '../../../../shared/agent-notification-
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { translate } from '@/i18n/i18n'
 import { getRepoHostIdentity } from './repo-host-identity'
+import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
 
 export type PendingSidebarWorktreeReveal = {
   worktreeId: string
   behavior: 'auto' | 'smooth'
   highlight?: boolean
   beginRename?: boolean
+  // Why: a reveal nobody asked for (a background terminal) must not land later when filters change.
+  passive?: boolean
 }
 
 export type PendingSidebarRowReveal = {
@@ -926,9 +930,6 @@ export type UISlice = {
   manualRepoOrder: ManualRepoOrderEntry[]
   hideDefaultBranchWorkspace: boolean
   setHideDefaultBranchWorkspace: (v: boolean) => void
-  // Why: a counter, so each "Ver filtros" click re-opens the menu even when it is already open.
-  sidebarFilterMenuRequest: number
-  requestSidebarFilterMenu: () => void
   hideAutomationGeneratedWorkspaces: boolean
   setHideAutomationGeneratedWorkspaces: (v: boolean) => void
   hideCliCreatedWorkspaces: boolean
@@ -1005,8 +1006,13 @@ export type UISlice = {
       behavior?: PendingSidebarWorktreeReveal['behavior']
       highlight?: boolean
       beginRename?: boolean
+      passive?: boolean
     }
   ) => void
+  /** Session-only: the restored workspace the Retomar strip names until it is clicked or dismissed. */
+  resumeStripWorkspaceId: string | null
+  revealRestoredWorkspace: () => void
+  dismissResumeStrip: () => void
   revealSidebarRow: (
     rowKey: string,
     options?: {
@@ -2107,7 +2113,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setSortBy: (s) => set({ sortBy: s }),
 
   // Why: bare set — persists only via the debounced window.api.ui.set writer in App.tsx, not on its own.
-  projectOrderBy: 'manual',
+  projectOrderBy: 'needs-you',
   setProjectOrderBy: (p) => set({ projectOrderBy: p }),
 
   showActiveOnly: false,
@@ -2151,9 +2157,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   hideDefaultBranchWorkspace: false,
   setHideDefaultBranchWorkspace: (v) => set({ hideDefaultBranchWorkspace: v }),
-  sidebarFilterMenuRequest: 0,
-  requestSidebarFilterMenu: () =>
-    set((state) => ({ sidebarFilterMenuRequest: state.sidebarFilterMenuRequest + 1 })),
   hideAutomationGeneratedWorkspaces: false,
   setHideAutomationGeneratedWorkspaces: (v) => set({ hideAutomationGeneratedWorkspaces: v }),
   hideCliCreatedWorkspaces: false,
@@ -2446,9 +2449,23 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         worktreeId,
         behavior: options?.behavior ?? 'smooth',
         ...(options?.highlight ? { highlight: true } : {}),
-        ...(options?.beginRename ? { beginRename: true } : {})
+        ...(options?.beginRename ? { beginRename: true } : {}),
+        ...(options?.passive ? { passive: true } : {})
       }
     }),
+  resumeStripWorkspaceId: null,
+  revealRestoredWorkspace: () => {
+    const workspaceId = getActiveSidebarWorkspaceId(
+      get().activeWorkspaceKey,
+      get().activeWorktreeId
+    )
+    if (!workspaceId || workspaceId === FLOATING_TERMINAL_WORKTREE_ID) {
+      return
+    }
+    set({ resumeStripWorkspaceId: workspaceId })
+    get().revealWorktreeInSidebar(workspaceId, { behavior: 'auto' })
+  },
+  dismissResumeStrip: () => set({ resumeStripWorkspaceId: null }),
   revealSidebarRow: (rowKey, options) =>
     set({
       pendingRevealSidebarRow: {
@@ -2557,7 +2574,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           ? ui.groupBy
           : 'repo',
         sortBy,
-        // Why: main-process getUI() already normalized this (defaulting to 'manual'); read it through without migrating.
+        // Why: main-process getUI() already normalized and migrated this (defaulting to 'needs-you'); read it through without migrating.
         projectOrderBy: ui.projectOrderBy,
         // Why: Active-only was retired; force the old flag off so an old profile can't invisibly narrow the workspace list.
         showActiveOnly: false,

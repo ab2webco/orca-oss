@@ -37,6 +37,8 @@ function projectCommandFilter(_value: string, search: string, keywords?: string[
 type SidebarProjectFilterPanelProps = {
   availableRepos: Repo[]
   selectedRepos: Repo[]
+  /** Host-qualified names: a project repeated on another host reads "orca-oss · m1". */
+  labelByRepoId: ReadonlyMap<string, string>
   hasRepoFilter: boolean
   filterRepoIds: readonly string[]
   setFilterRepoIds: (ids: string[]) => void
@@ -50,10 +52,12 @@ type SidebarProjectFilterPanelProps = {
 export function SidebarProjectFilterPanel({
   availableRepos,
   selectedRepos,
+  labelByRepoId,
   hasRepoFilter,
   filterRepoIds,
   setFilterRepoIds
 }: SidebarProjectFilterPanelProps): React.JSX.Element {
+  const labelOf = (repo: Repo): string => labelByRepoId.get(repo.id) ?? repo.displayName
   const [query, setQuery] = useState('')
   const [highlightedRepoId, setHighlightedRepoId] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -134,7 +138,11 @@ export function SidebarProjectFilterPanel({
       onValueChange={setHighlightedRepoId}
       className="bg-transparent"
     >
-      <SelectedProjectPills selectedRepos={selectedRepos} onRemoveProject={handleRemoveProject} />
+      <SelectedProjectPills
+        selectedRepos={selectedRepos}
+        labelOf={labelOf}
+        onRemoveProject={handleRemoveProject}
+      />
       <CommandInput
         ref={inputRef}
         placeholder={
@@ -171,16 +179,12 @@ export function SidebarProjectFilterPanel({
           <CommandItem
             key={repo.id}
             value={repo.id}
-            keywords={[repo.displayName, repo.path]}
+            keywords={[labelOf(repo), repo.path]}
             onSelect={() => handleSelectRepo(repo.id)}
             className="mx-1 my-0.5 items-center gap-2 rounded-[7px] px-2 py-1 text-[12px] leading-5 font-medium data-[selected=true]:bg-black/8 dark:data-[selected=true]:bg-white/14"
           >
             <span className="inline-flex min-w-0 flex-1 items-center gap-1.5">
-              <RepoBadgeLabel
-                name={repo.displayName}
-                color={repo.badgeColor}
-                className="max-w-full"
-              />
+              <RepoBadgeLabel name={labelOf(repo)} color={repo.badgeColor} className="max-w-full" />
               {repo.connectionId && (
                 <span className="shrink-0 inline-flex items-center gap-0.5 rounded bg-muted px-1 py-0.5 text-[9px] font-medium leading-none text-muted-foreground">
                   <Server className="size-2.5" />
@@ -200,9 +204,11 @@ export function SidebarProjectFilterPanel({
 
 function SelectedProjectPills({
   selectedRepos,
+  labelOf,
   onRemoveProject
 }: {
   selectedRepos: Repo[]
+  labelOf: (repo: Repo) => string
   onRemoveProject: (repoId: string) => void
 }) {
   if (selectedRepos.length === 0) {
@@ -218,7 +224,7 @@ function SelectedProjectPills({
           className="h-5 max-w-full gap-1 border-border/70 bg-background px-1.5 py-0 text-[11px] font-medium"
         >
           <RepoBadgeLabel
-            name={repo.displayName}
+            name={labelOf(repo)}
             color={repo.badgeColor}
             className="max-w-[8rem]"
             badgeClassName="size-1.5"
@@ -230,7 +236,7 @@ function SelectedProjectPills({
             aria-label={translate(
               'auto.components.sidebar.SidebarRepositoryFilterSection.f10ca29601',
               'Remove {{value0}} filter',
-              { value0: repo.displayName }
+              { value0: labelOf(repo) }
             )}
             className="-mr-1 size-4 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
             onMouseDown={(event) => event.preventDefault()}

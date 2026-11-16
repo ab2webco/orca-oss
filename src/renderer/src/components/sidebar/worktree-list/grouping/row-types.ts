@@ -4,6 +4,7 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { DetectedWorktree, Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ProjectUrgency } from './project-urgency-tier'
 
 export type WorktreeGroupBy = 'none' | 'agent-status' | 'repo' | 'pr-status'
 export type PinnedWorktreeDisplayPolicy = 'single-location' | 'duplicate-in-groups'
@@ -12,6 +13,17 @@ export function getPinnedWorktreeDisplayPolicy(
   settings?: { showPinnedWorktreesInGroups?: boolean } | null
 ): PinnedWorktreeDisplayPolicy {
   return settings?.showPinnedWorktreesInGroups === true ? 'duplicate-in-groups' : 'single-location'
+}
+
+/** An idle repo project drawn as one row (ORCA-1216); absent on active projects. */
+export type IdleProjectFold = {
+  state: 'folded' | 'open'
+  /** `collapsedGroups` key (getIdleProjectOpenKey) whose presence means the person unfolded it. */
+  key: string
+  workspaceCount: number
+  /** What clicking the row opens: the most recent workspace, main on a tie. */
+  openWorktree: Worktree
+  worktreeIds: readonly string[]
 }
 
 export type GroupHeaderRow = {
@@ -28,6 +40,13 @@ export type GroupHeaderRow = {
   hostWorktreeCounts?: ReadonlyMap<ExecutionHostId, number>
   hostWorktreeIds?: ReadonlyMap<ExecutionHostId, readonly string[]>
   worktreeIds?: readonly string[]
+  fold?: IdleProjectFold
+  /** Repo headers: the newest workspace activity, absent when none has a timestamp. */
+  lastActivityAt?: number
+  /** The collapsible group that holds idle projects (ORCA-1216 §2.3); `count` is its project count. */
+  idleProjectsGroup?: { collapsed: boolean }
+  /** Active repo headers (ORCA-1216 §4): tier, the reason the header shows, and its frozen entry. */
+  urgency?: ProjectUrgency & { enteredAt: number }
 }
 
 export type WorktreeRow = {

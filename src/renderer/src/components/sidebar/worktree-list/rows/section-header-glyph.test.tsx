@@ -66,4 +66,19 @@ describe('SectionHeaderGlyph draws V30 tree glyphs (ORCA-1149)', () => {
     expect(html.querySelector('[data-sidebar-tree-glyph]')).toBeNull()
     expect(html.querySelector('svg')).not.toBeNull()
   })
+
+  it('marks a folder-backed project with the folder glyph (ORCA-1216 §9)', () => {
+    const html = render(
+      <SectionHeaderGlyph
+        icon={PROJECT_GROUP_META.icon}
+        tone="text-foreground"
+        isProject
+        isFolderProject
+        isProjectGroup={false}
+      />
+    )
+
+    expect(html.querySelector('[data-sidebar-tree-glyph="folder"]')).not.toBeNull()
+    expect(html.querySelector('[data-sidebar-tree-glyph="repo"]')).toBeNull()
+  })
 })

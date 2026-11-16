@@ -80,8 +80,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     title: workerTabTitleOf({ displayName: args.displayName, taskId: args.taskId, host: 'local' }),
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.codexAccountId ? { codexAccountId: args.codexAccountId } : {}),
-    // Why: dispatching a worker is background work; it must not pull the sidebar
-    // to the worker's workspace while the user is reading somewhere else.
+    // Why: dispatching a worker is background work; it must not activate or focus
+    // the worker's workspace while the user is reading somewhere else.
     surfaceOwner: false
   })
   args.effects.push({

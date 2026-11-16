@@ -4800,6 +4800,15 @@
           "keepDefaultBranch": "Except default branch",
           "keepDefaultBranchAria": "Keep the default branch visible while hiding sleeping workspaces"
         },
+        "SidebarProjectOrderMenu": {
+          "title": "Order projects",
+          "needsYouFirst": "Needs you first",
+          "recent": "Recent activity",
+          "name": "Name",
+          "manual": "Manual (drag)",
+          "defaultTag": "default",
+          "footer": "Saved for your user. Idle stays by age."
+        },
         "SidebarHeader": {
           "25a95899c9": "Add Project",
           "92154beb7e": "New workspace",
@@ -4811,8 +4820,35 @@
           "workspaces": "Workspaces"
         },
         "SidebarHiddenFiltersLine": {
-          "04e60bbc42": "{{count}} hidden by filters",
-          "aec1ffd95a": "View filters"
+          "total": "{{count}} hidden:",
+          "total_one": "{{count}} hidden:",
+          "total_other": "{{count}} hidden:",
+          "otherDevice": "{{count}} from other devices",
+          "otherDevice_one": "{{count}} from another device",
+          "otherDevice_other": "{{count}} from other devices",
+          "defaultBranch": "{{count}} default branch",
+          "defaultBranch_one": "{{count}} default branch",
+          "defaultBranch_other": "{{count}} default branch",
+          "automationCreated": "{{count}} automation-created",
+          "automationCreated_one": "{{count}} automation-created",
+          "automationCreated_other": "{{count}} automation-created",
+          "cliCreated": "{{count}} CLI-created",
+          "cliCreated_one": "{{count}} CLI-created",
+          "cliCreated_other": "{{count}} CLI-created",
+          "detachedHead": "{{count}} detached HEAD",
+          "detachedHead_one": "{{count}} detached HEAD",
+          "detachedHead_other": "{{count}} detached HEAD",
+          "otherHost": "{{count}} on other hosts",
+          "otherHost_one": "{{count}} on another host",
+          "otherHost_other": "{{count}} on other hosts",
+          "otherProject": "{{count}} in other projects",
+          "otherProject_one": "{{count}} in another project",
+          "otherProject_other": "{{count}} in other projects",
+          "sleeping": "{{count}} sleeping",
+          "sleeping_one": "{{count}} sleeping",
+          "sleeping_other": "{{count}} sleeping",
+          "show": "Show",
+          "hide": "Hide"
         },
         "SidebarNav": {
           "80611a8b10": "Search",
@@ -4907,15 +4943,12 @@
             "source": "Source"
           },
           "prAndChecks": "Pull request and checks",
-          "09faabd875": "Project order",
           "7bada3b1ab": "Sort by",
           "dc0bb670bc": "Group by",
           "631b97eea9": "Host scope",
           "9919ae1082": "Workspace options",
           "bc96dbd041": "Workspace options ({{value0}})",
-          "af9249c505": "Most recent workspace activity",
           "b451c8b162": "Recent",
-          "6664282a7b": "Drag projects to arrange them",
           "7b316bdd51": "Manual",
           "7153d07485": "Drag workspaces to arrange them within each group.",
           "2170d553cf": "Project",
@@ -5137,7 +5170,8 @@
         "WorktreeList": {
           "7a8b9c0d1e": "Update required",
           "hostAuthNeeded": "Authentication needed",
-          "hostDisconnected": "Disconnected",
+          "hostOffline": "Offline",
+          "hostOfflineSince": "Offline · {{age}}",
           "hostActiveAgents": "{{count}} active",
           "hostActiveAgents_one": "{{count}} active",
           "hostActiveAgents_other": "{{count}} active",
@@ -5819,6 +5853,63 @@
           "hide": "Hide",
           "overridingGlobal": "Overriding global setting: {{value0}}",
           "projectOnly": "Added in this project only."
+        },
+        "IdleProjectFold": {
+          "fold": "Fold {{project}}",
+          "unfold": "Show workspaces in {{project}}",
+          "count": "{{count}} workspaces"
+        },
+        "ShortActivityAge": {
+          "now": "now",
+          "minutes": "{{count}} min",
+          "hours": "{{count}} h",
+          "days": "{{count}} d",
+          "weeks": "{{count}} wk"
+        },
+        "SidebarDelivered": {
+          "group": "Delivered",
+          "foldedCount": "{{count}} delivered · over 24 h",
+          "foldedCount_one": "{{count}} delivered · over 24 h",
+          "foldedCount_other": "{{count}} delivered · over 24 h",
+          "merged": "merged",
+          "open": "open",
+          "queued": "queued",
+          "ciFailing": "CI failing",
+          "closed": "closed",
+          "noPr": "No PR",
+          "doneBy": "Done by {{name}}",
+          "label": {
+            "pr": "PR",
+            "title": "Title",
+            "branch": "Branch",
+            "lead": "Lead",
+            "freed": "Freed"
+          },
+          "today": "today {{time}}",
+          "freedValue": "{{time}} · worktree waiting",
+          "freed": "freed",
+          "inProgress": "in progress",
+          "also": "{{name}} also: {{tickets}}"
+        },
+        "SidebarResumeStrip": {
+          "resume": "Resume",
+          "dismiss": "Dismiss"
+        },
+        "IdleProjectsGroup": {
+          "label": "Idle",
+          "count": "{{count}} projects",
+          "count_one": "{{count}} project",
+          "count_other": "{{count}} projects"
+        },
+        "ProjectHeaderReason": {
+          "questions": "{{count}} questions",
+          "questions_one": "{{count}} question",
+          "questions_other": "{{count}} questions",
+          "accountLimited": "Account limited",
+          "ciFailing": "CI failing",
+          "working": "{{count}} working",
+          "working_one": "{{count}} working",
+          "working_other": "{{count}} working"
         }
       },
       "shared": {
@@ -8715,7 +8806,12 @@
             "d6c0a9e2f4": "grok",
             "c5b9f8d1e3": "xai",
             "usagePercentageDisplayTitle": "Usage percentages",
-            "usagePercentageDisplayDescription": "Choose whether provider limits show the percentage used or remaining."
+            "usagePercentageDisplayDescription": "Choose whether provider limits show the percentage used or remaining.",
+            "sidebarActivityWindow": {
+              "idle": "idle",
+              "activity": "activity",
+              "window": "window"
+            }
           }
         },
         "auto": {
@@ -11731,6 +11827,14 @@
           "limits": "Agents and members assigned to it launch on the token. It cannot be the shared login, and its usage cannot be shown. Sign in again on its row later to give it its real email.",
           "add": "Add account",
           "pasteHint": "From claude setup-token, run while signed in as the account you are adding."
+        },
+        "SidebarActivityWindowSetting": {
+          "title": "Idle project window",
+          "description": "Projects with no activity in this window fold into Idle at the bottom of the sidebar.",
+          "hours12": "12 h",
+          "hours24": "24 h",
+          "days3": "3 d",
+          "days7": "7 d"
         }
       },
       "right": {
@@ -17522,12 +17626,6 @@
         "new": "New action",
         "edit": "Edit"
       }
-    },
-    "age": {
-      "now": "now",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h",
-      "days": "{{count}} d"
     },
     "display": {
       "label": "Team metrics",

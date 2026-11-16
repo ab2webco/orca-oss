@@ -127,7 +127,9 @@ test.describe('Card display groups', () => {
       await expect(orcaPage.getByRole('menu')).toHaveCount(0)
       expect(await scrolledSideways(orcaPage), `${width}px before opening`).toEqual([])
       // Why the keyboard: the right drawer covers this button at 390, as a keyboard user can still reach it.
-      await orcaPage.locator('button[aria-label^="Workspace options"]').first().focus()
+      const trigger = orcaPage.locator('button[aria-label^="Workspace options"]').first()
+      await trigger.focus()
+      await expect(trigger).toBeFocused()
       await orcaPage.keyboard.press('Enter')
       await orcaPage.getByRole('menuitem', { name: /Card display/ }).focus()
       await orcaPage.keyboard.press('ArrowRight')
@@ -136,6 +138,35 @@ test.describe('Card display groups', () => {
       await orcaPage.keyboard.press('Escape')
       await orcaPage.keyboard.press('Escape')
     }
+  })
+
+  // Why: on CI the terminal's first fit runs a frame after startup, about a second late on a
+  // hidden window, and its focus closed the menu this spec had just opened (ORCA-1193). A window
+  // refocus runs the same terminal focus, so it stands in for that late frame.
+  test('a terminal refit while the options menu is open leaves the menu open', async ({
+    orcaPage
+  }) => {
+    await waitForSessionReady(orcaPage)
+    await waitForActiveWorktree(orcaPage)
+    await writeSettings(orcaPage, { experimentalNewWorktreeCardStyle: true })
+    await orcaPage.setViewportSize({ width: 390, height: 900 })
+    await orcaPage.evaluate(() => {
+      const state = window.__store!.getState()
+      state.setSidebarOpen(true)
+      state.setRightSidebarOpen(true)
+    })
+    await expect(orcaPage.getByRole('menu')).toHaveCount(0)
+    const trigger = orcaPage.locator('button[aria-label^="Workspace options"]').first()
+    await trigger.focus()
+    await orcaPage.keyboard.press('Enter')
+    const cardDisplay = orcaPage.getByRole('menuitem', { name: /Card display/ })
+    await cardDisplay.focus()
+    await orcaPage.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await expect(cardDisplay).toBeFocused()
+    await orcaPage.keyboard.press('ArrowRight')
+    await expect(orcaPage.locator('[data-card-display-group]').first()).toBeVisible()
+    await orcaPage.keyboard.press('Escape')
+    await orcaPage.keyboard.press('Escape')
   })
 
   test('heads the toggles with Work, Agent and Source and offers the PR toggle', async ({
@@ -158,7 +189,7 @@ test.describe('Card display groups', () => {
         // Why wait for zero: a menu still animating out reads as visible for ~100 ms and swallows the click.
         await expect(orcaPage.getByRole('menu')).toHaveCount(0)
         await orcaPage.locator('button[aria-label^="Workspace options"]:visible').first().click()
-        // Why the keyboard: at 390 the menu opens below, so a hover crosses Project order first and
+        // Why the keyboard: at 390 the menu opens below, so a hover crosses Sort by first and
         // Radix's pointer grace keeps that submenu open instead (CI run 42983047371).
         await orcaPage.getByRole('menuitem', { name: /Card display/ }).focus()
         await orcaPage.keyboard.press('ArrowRight')
@@ -205,9 +236,9 @@ test.describe('Card display groups', () => {
     }
   })
 
-  // Why both paths: at 390 the menu opens below its button, so Sort by and Project order sit on the
-  // way from the button to Card display (CI run 42983047371).
-  test('opens Card display with the mouse at narrow widths and leaves Project order shut', async ({
+  // Why both paths: at 390 the menu opens below its button, so Sort by sits on the way from the
+  // button to Card display (CI run 42983047371). Project order moved to its own header button (ORCA-1216).
+  test('opens Card display with the mouse at narrow widths and leaves Sort by shut', async ({
     orcaPage
   }) => {
     await waitForSessionReady(orcaPage)
@@ -215,7 +246,7 @@ test.describe('Card display groups', () => {
     await writeSettings(orcaPage, { experimentalNewWorktreeCardStyle: true })
     const cardDisplay = orcaPage.getByRole('menuitem', { name: /Card display/ })
     const groups = orcaPage.locator('[data-card-display-group]')
-    const projectOrderMenu = orcaPage
+    const sortByMenu = orcaPage
       .getByRole('menu')
       .filter({ has: orcaPage.getByRole('menuitemradio', { name: 'Manual' }) })
     for (const width of [390, 320]) {
@@ -237,9 +268,7 @@ test.describe('Card display groups', () => {
           await orcaPage.mouse.move(target.x, target.y)
         }
         await expect(groups.first(), `${width}px ${path}: Card display did not open`).toBeVisible()
-        await expect(projectOrderMenu, `${width}px ${path}: Project order stayed open`).toHaveCount(
-          0
-        )
+        await expect(sortByMenu, `${width}px ${path}: Sort by stayed open`).toHaveCount(0)
         await orcaPage.keyboard.press('Escape')
         await orcaPage.keyboard.press('Escape')
       }

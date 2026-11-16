@@ -6,6 +6,7 @@ import { renderWorktreeSidebarDropIndicators } from './drop-indicators'
 import { useWorktreeListScrollToTop } from './use-scroll-to-top'
 import { getActiveDescendantOptionId } from '../navigation/active-descendant-option'
 import { buildRenderableRows } from '../listing/renderable-rows'
+import { getOfflineHostRowIndexes } from '../../host-offline'
 import { useFolderWorkspacePathStatusRows } from '../listing/use-folder-path-statuses'
 import { useGroupToggleWithScrollAnchor } from './use-group-toggle'
 import { usePendingSidebarReveal } from '../navigation/use-pending-reveal'
@@ -24,6 +25,7 @@ import { useWorktreeNativeDrag } from '../drag/use-native-drag'
 import { useWorktreePointerDrag } from '../drag/use-pointer-drag'
 import { useWorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import { useWorktreeSidebarScrollSuppression } from './use-scroll-suppression'
+import { usePinnedHostHeight } from './use-pinned-host-height'
 import { EMPTY_PROJECT_GROUPS, type VirtualizedWorktreeViewportProps } from './viewport-props'
 import { useWorktreeDropCommitContext } from '../drag/use-drop-commit-context'
 import { buildWorktreeVirtualRowContext } from './virtual-row-context'
@@ -69,6 +71,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     () => renderRows.findIndex((row) => row.type === 'header' || row.type === 'host-header'),
     [renderRows]
   )
+  const offlineHostRowIndexes = useMemo(() => getOfflineHostRowIndexes(renderRows), [renderRows])
   const folderBackedProjectGroupIds = useMemo(
     () =>
       new Set(
@@ -162,10 +165,12 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     projectGrouping: props.projectGrouping,
     flashRevealedRow: reveal.flashRevealedRow,
     markRevealScroll: scrollSuppression.markRevealScroll,
+    hasDirectScrollInput: scrollSuppression.hasDirectScrollInput,
     schedulePendingRevealFrame: reveal.schedulePendingRevealFrame,
     cancelPendingRevealFrames: reveal.cancelPendingRevealFrames
   })
 
+  const pinnedHostHeightRef = usePinnedHostHeight(scrollRef)
   const { virtualItems, measureVirtualRowElement } = useVirtualRowMeasurementSync({
     renderRows,
     virtualization,
@@ -173,7 +178,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     scrollOffsetRef,
     scrollAnchorRef,
     hasDirectScrollInput: scrollSuppression.hasDirectScrollInput,
-    shouldSkipScrollAnchorRestore: scrollSuppression.shouldSkipScrollAnchorRestore
+    shouldSkipScrollAnchorRestore: scrollSuppression.shouldSkipScrollAnchorRestore,
+    pinnedHostHeightRef
   })
 
   const { toggleGroupWithScrollAnchor, getLineageToggleHandler } = useGroupToggleWithScrollAnchor({
@@ -293,6 +299,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const rowContext = buildWorktreeVirtualRowContext({
     props,
     renderRows,
+    offlineHostRowIndexes,
     firstHeaderIndex,
     virtualization,
     measureVirtualRowElement,

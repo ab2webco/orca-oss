@@ -136,6 +136,29 @@ describe('getActiveStickyIndexesForScroll', () => {
     expect(after).toEqual({ hostIndex: 4, groupIndex: 5 })
   })
 
+  // ORCA-1216 §8: the project tier pins at the host card's measured height, not a constant.
+  it('hands the group tier off at the measured host height when one is given', () => {
+    const measured = HOST_STICKY_PINNED_HEIGHT + 12
+    const before = getActiveStickyIndexesForScroll({
+      rows,
+      rangeStartIndex: 5,
+      scrollOffset: 500 - measured - 1,
+      stickyHeaderIndexes,
+      virtualItems,
+      hostPinnedHeight: measured
+    })
+    const after = getActiveStickyIndexesForScroll({
+      rows,
+      rangeStartIndex: 5,
+      scrollOffset: 500 - measured,
+      stickyHeaderIndexes,
+      virtualItems,
+      hostPinnedHeight: measured
+    })
+    expect(before.groupIndex).not.toBe(5)
+    expect(after).toEqual({ hostIndex: 4, groupIndex: 5 })
+  })
+
   it('degrades to single-tier rules when no host sections exist', () => {
     const flatRows: RenderRow[] = [
       groupRow('g1'),

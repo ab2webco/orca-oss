@@ -82,4 +82,15 @@ describe('game history', () => {
     ).toHaveLength(600)
     expect(parseGameHistoryRecord('CIN-1')).toBeNull()
   })
+
+  // ORCA-1216 §6: the worktree ids nest a freed member under its lead after a restart.
+  it('keeps the member and lead worktree ids whole, however long their paths are', () => {
+    const long = `repo-1::/${'deep/'.repeat(80)}orca-1203`
+    const good = { ...record('CIN-1', '2026-10-16T10:00:00.000Z'), worktreeId: long }
+    expect(parseGameHistoryRecord({ ...good, leadWorktreeId: 'repo-1::/lead' })).toEqual({
+      ...good,
+      leadWorktreeId: 'repo-1::/lead'
+    })
+    expect(parseGameHistoryRecord({ ...good, worktreeId: 42 })).toBeNull()
+  })
 })

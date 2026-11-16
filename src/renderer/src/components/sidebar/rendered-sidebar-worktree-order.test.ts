@@ -28,7 +28,8 @@ function makeWorktree(id: string, overrides: Partial<Worktree> = {}): Worktree {
     isUnread: false,
     isPinned: false,
     sortOrder: 0,
-    lastActivityAt: 0,
+    // Why recent: an idle project folds to one row (ORCA-1216); these cases test order, not the fold.
+    lastActivityAt: Date.now(),
     ...overrides
   } as Worktree
 }
@@ -173,6 +174,16 @@ describe('closed-sidebar Cmd+1-9 ordering (#9497)', () => {
     expect(getVisibleWorktreeIds()).toEqual([])
   })
 
+  it('elides the workspaces of a folded idle project and numbers them once it is opened', () => {
+    const main = makeMainWorktree('wt-main', { lastActivityAt: 0 })
+    const feature = makeWorktree('wt-feature', { lastActivityAt: 0 })
+    seedStore([main, feature])
+    expect(getVisibleWorktreeIds()).toEqual([])
+
+    seedStore([main, feature], { collapsedGroups: new Set(['idle-open:project:repo:repo1']) })
+    expect(getVisibleWorktreeIds()).toEqual(['wt-main', 'wt-feature'])
+  })
+
   it('numbers folder workspaces, which the flat fallback omitted entirely', () => {
     const group = makeProjectGroup('group-1')
     const folderWorkspace = makeFolderWorkspace('fw-1', group.id)
@@ -226,7 +237,7 @@ describe('closed-sidebar Cmd+1-9 ordering (#9497)', () => {
     } as Partial<AppState>
 
     seedStore([], storeOverrides)
-    // Default all-hosts scope adds no host sections, so repo grouping alone orders it.
+    // Each repo already sits on one host, so the default host sections keep this order.
     expect(getVisibleWorktreeIds()).toEqual([
       'wt-local-main',
       'wt-local-feature',
@@ -249,6 +260,22 @@ describe('closed-sidebar Cmd+1-9 ordering (#9497)', () => {
       'wt-remote-main',
       'wt-remote-feature'
     ])
+  })
+
+  it('numbers by host section in the default view once two hosts own rows (ORCA-1181)', () => {
+    const sshRepo = makeRepo('repo-ssh', { connectionId: 'my-target' })
+    const otherLocal = makeRepo('repo-z')
+    seedStore([], {
+      repos: [makeRepo('repo1'), sshRepo, otherLocal],
+      worktreesByRepo: {
+        repo1: [makeMainWorktree('wt-local-a')],
+        'repo-ssh': [makeMainWorktree('wt-remote', { repoId: 'repo-ssh' })],
+        'repo-z': [makeMainWorktree('wt-local-z', { repoId: 'repo-z' })]
+      },
+      sshTargetLabels: new Map([['my-target', 'My Target']])
+    } as Partial<AppState>)
+
+    expect(getVisibleWorktreeIds()).toEqual(['wt-local-a', 'wt-local-z', 'wt-remote'])
   })
 
   it('keeps the sort layer intact for smart and comparator sort modes', () => {

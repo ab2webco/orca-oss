@@ -1,4 +1,5 @@
 import React from 'react'
+import { PINNED_TIER_SURFACE_CLASS } from './pinned-tier-surface'
 import { ChevronDown } from 'lucide-react'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,16 @@ import {
 } from './header-event-guards'
 import type { WorktreeSidebarHeaderDrag } from '../drag/use-header-drag'
 import { getWorktreeOptionId } from './option-dom'
+import { isFolderRepo } from '../../../../../../shared/repo-kind'
+import { ShortActivityAgeLabel } from '../../ShortActivityAgeLabel'
+import { ProjectHeaderReason } from './project-header-reason'
+import {
+  activateIdleProjectWorkspace,
+  getIdleProjectFoldKeyAction,
+  hasIdleProjectFoldChevron,
+  IdleProjectCountPill,
+  IdleProjectFoldChevron
+} from './idle-project-fold-parts'
 
 export type SectionHeaderRowContext = {
   groupBy: WorktreeGroupBy
@@ -153,10 +164,18 @@ export function renderWorktreeSectionHeaderRow(args: {
       })
     : null
   const isHeaderCollapsed = ctx.collapsedGroups.has(row.key)
+  // Why: an idle project is one row that opens its workspace; its own left chevron folds it (ORCA-1216).
+  const fold = isRepoHeader ? row.fold : undefined
+  const showFoldChevron = fold ? hasIdleProjectFoldChevron(fold) : false
   // Why: repo/project/status/pinned share compact section chrome; flat "All" stays a simple label.
   const showHeaderCollapseAffordance =
+    !fold &&
     row.count > 0 &&
     (isRepoHeader || isProjectGroupHeader || ctx.groupBy === 'agent-status' || isPinnedHeader)
+  const headerPaddingLeft =
+    isRepoHeader || isProjectGroupHeader
+      ? getProjectGroupHeaderPaddingLeft(row.projectGroupDepth ?? 0)
+      : WORKTREE_SECTION_HEADER_PADDING_LEFT
   return (
     <div
       key={vItem.key}
@@ -174,9 +193,12 @@ export function renderWorktreeSectionHeaderRow(args: {
         args.hasHeaderTopSpacing && !isActiveStickyHeader && 'pt-1',
         isActiveStickyHeader
           ? cn(
-              'sticky z-20 bg-worktree-sidebar',
-              // Why: when a host card is pinned, the group tier pins flush beneath it, not at the viewport top.
-              args.hasStickyHost ? 'top-[35px]' : '-top-px'
+              'sticky z-20',
+              PINNED_TIER_SURFACE_CLASS,
+              // Why: when a host card is pinned, the group tier pins flush beneath its measured height (usePinnedHostHeight).
+              args.hasStickyHost
+                ? 'top-[calc(var(--worktree-sidebar-pinned-host-height,36px)-1px)]'
+                : '-top-px'
             )
           : 'absolute top-0'
       )}
@@ -184,9 +206,19 @@ export function renderWorktreeSectionHeaderRow(args: {
     >
       <div
         id={getWorktreeOptionId(row.key)}
-        role="button"
+        role={fold ? 'option' : 'button'}
+        aria-selected={fold ? false : undefined}
         tabIndex={0}
-        aria-expanded={showHeaderCollapseAffordance ? !isHeaderCollapsed : undefined}
+        aria-expanded={
+          fold
+            ? showFoldChevron
+              ? fold.state === 'open'
+              : undefined
+            : showHeaderCollapseAffordance
+              ? !isHeaderCollapsed
+              : undefined
+        }
+        data-idle-project-fold={fold?.state}
         data-repo-header-id={projectIdForHeader}
         data-repo-header-index={repoHeaderIndex}
         data-repo-header-bucket={repoHeaderBucketKey}
@@ -222,13 +254,8 @@ export function renderWorktreeSectionHeaderRow(args: {
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
           row.repo && 'overflow-hidden'
         )}
-        style={{
-          // Why: non-project headers like "All" are flat-list labels; don't reserve project hierarchy indent.
-          paddingLeft:
-            isRepoHeader || isProjectGroupHeader
-              ? getProjectGroupHeaderPaddingLeft(row.projectGroupDepth ?? 0)
-              : WORKTREE_SECTION_HEADER_PADDING_LEFT
-        }}
+        // Why: non-project headers like "All" are flat-list labels; don't reserve project hierarchy indent.
+        style={{ paddingLeft: headerPaddingLeft }}
         onDragOver={isPinnedHeader ? ctx.onWorkspacePinDragOver : undefined}
         onDragLeave={isPinnedHeader ? ctx.onWorkspacePinDragLeave : undefined}
         onPointerDown={
@@ -243,10 +270,26 @@ export function renderWorktreeSectionHeaderRow(args: {
           if (shouldIgnoreRepoHeaderToggle(event)) {
             return
           }
+          if (fold) {
+            activateIdleProjectWorkspace(fold, row.repo)
+            return
+          }
           ctx.toggleGroupWithScrollAnchor(row.key)
         }}
         onKeyDown={(e) => {
           if (shouldIgnoreRepoHeaderToggle(e)) {
+            return
+          }
+          if (fold) {
+            const action = getIdleProjectFoldKeyAction(e.key, fold)
+            if (action) {
+              e.preventDefault()
+            }
+            if (action === 'open-workspace') {
+              activateIdleProjectWorkspace(fold, row.repo)
+            } else if (action === 'toggle-fold') {
+              ctx.toggleGroupWithScrollAnchor(fold.key)
+            }
             return
           }
           if (e.key === 'Enter' || e.key === ' ') {
@@ -255,6 +298,14 @@ export function renderWorktreeSectionHeaderRow(args: {
           }
         }}
       >
+        {fold && showFoldChevron ? (
+          <IdleProjectFoldChevron
+            fold={fold}
+            label={row.label}
+            paddingLeft={headerPaddingLeft}
+            onToggle={() => ctx.toggleGroupWithScrollAnchor(fold.key)}
+          />
+        ) : null}
         {/* Why: grab cursor on icon+title only. Row still has handle attrs so
             indent/padding can arm drag; actions are excluded via data-repo-header-actions.
             self-stretch fills h-7 so grab matches the full title column height. */}
@@ -272,6 +323,7 @@ export function renderWorktreeSectionHeaderRow(args: {
               icon={row.icon}
               tone={row.tone}
               isProject={isRepoHeader}
+              isFolderProject={row.repo ? isFolderRepo(row.repo) : false}
               isProjectGroup={isProjectGroupHeader && !row.repo}
             />
           ) : null}
@@ -286,11 +338,25 @@ export function renderWorktreeSectionHeaderRow(args: {
               >
                 {row.label}
               </div>
+              {fold?.state === 'folded' && fold.workspaceCount > 1 ? (
+                <IdleProjectCountPill count={fold.workspaceCount} />
+              ) : null}
               <RepoForkIndicator upstream={row.repo?.upstream} />
               <FolderPathStatusIndicator status={projectGroupPathStatus} />
             </div>
           </div>
         </div>
+
+        {/* Why a slot: a project's reason (ORCA-1216 §4) takes this place; without one it shows the age. */}
+        {isRepoHeader ? (
+          <span data-project-header-trailing="" className="flex shrink-0 items-center pr-1.5">
+            {row.urgency?.reason ? (
+              <ProjectHeaderReason reason={row.urgency.reason} />
+            ) : (
+              <ShortActivityAgeLabel since={row.lastActivityAt} />
+            )}
+          </span>
+        ) : null}
 
         <ProjectHeaderActions>
           {showHeaderCollapseAffordance ? (

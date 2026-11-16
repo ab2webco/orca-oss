@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,7 @@ import SidebarWorkspaceFilterSection from './SidebarWorkspaceFilterSection'
 import { getSidebarHostVisibilityLabel, shouldShowHostScopeControls } from './sidebar-host-options'
 import { useSidebarHostScopeOptions } from './use-sidebar-host-scope-options'
 import { SidebarHostScopeMenuSection } from './SidebarHostScopeMenuSection'
-import { PROJECT_ORDER_OPTIONS, SORT_OPTIONS } from './sidebar-workspace-option-items'
+import { SORT_OPTIONS } from './sidebar-workspace-option-items'
 import { WorktreeCardDisplayMenuSection } from './WorktreeCardDisplayMenuSection'
 import { translate } from '@/i18n/i18n'
 import { SidebarGroupByToggle } from './SidebarGroupByToggle'
@@ -57,11 +57,8 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
   const setSortBy = useAppStore((s) => s.setSortBy)
   const groupBy = useAppStore((s) => s.groupBy)
   const setGroupBy = useAppStore((s) => s.setGroupBy)
-  const projectOrderBy = useAppStore((s) => s.projectOrderBy)
-  const setProjectOrderBy = useAppStore((s) => s.setProjectOrderBy)
 
   const [open, setOpen] = useState(false)
-  const sidebarFilterMenuRequest = useAppStore((s) => s.sidebarFilterMenuRequest)
   const { hostOptions } = useSidebarHostScopeOptions()
   const showHostScopeControls = shouldShowHostScopeControls(hostOptions)
 
@@ -89,14 +86,6 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
     },
     [onMenuOpenChange]
   )
-  // Why: open once per request; a new handleOpenChange identity must not re-open a closed menu.
-  const handledFilterMenuRequest = useRef(sidebarFilterMenuRequest)
-  useEffect(() => {
-    if (sidebarFilterMenuRequest !== handledFilterMenuRequest.current) {
-      handledFilterMenuRequest.current = sidebarFilterMenuRequest
-      handleOpenChange(true)
-    }
-  }, [sidebarFilterMenuRequest, handleOpenChange])
 
   // Why: derive from current repos so stale ids (e.g. lingering after a repo
   // is removed) don't inflate counts or falsely signal an applied filter.
@@ -140,8 +129,6 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
     selectedCount
   const activeFilterLabel = `${activeFilterCount} ${activeFilterCount === 1 ? 'filter' : 'filters'}`
   const sortLabel = SORT_OPTIONS.find((opt) => opt.id === sortBy)?.label ?? 'Sort'
-  const projectOrderLabel =
-    PROJECT_ORDER_OPTIONS.find((opt) => opt.id === projectOrderBy)?.label ?? 'Manual'
   const hostVisibilityLabel = getSidebarHostVisibilityLabel(visibleWorkspaceHostIds, hostOptions)
 
   return (
@@ -283,52 +270,6 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-
-        {/* Why: project order only has a visible effect when grouping by
-            project; hide it in none/status/PR modes to avoid a dead control. */}
-        {groupBy === 'repo' && (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <span className="flex flex-1 items-center justify-between">
-                <span>
-                  {translate(
-                    'auto.components.sidebar.SidebarWorkspaceOptionsMenu.09faabd875',
-                    'Project order'
-                  )}
-                </span>
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {projectOrderLabel}
-                </span>
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent
-              className="w-44"
-              data-workspace-board-preserve-open={preserveWorkspaceBoardOpen ? '' : undefined}
-            >
-              <DropdownMenuRadioGroup
-                value={projectOrderBy}
-                onValueChange={(v) => setProjectOrderBy(v as typeof projectOrderBy)}
-              >
-                {PROJECT_ORDER_OPTIONS.map((opt) => (
-                  <Tooltip key={opt.id}>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuRadioItem
-                        value={opt.id}
-                        // Keep the menu open so people can compare order modes.
-                        onSelect={(e) => e.preventDefault()}
-                      >
-                        {opt.label}
-                      </DropdownMenuRadioItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={6}>
-                      {opt.description}
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
 
         <WorktreeCardDisplayMenuSection preserveWorkspaceBoardOpen={preserveWorkspaceBoardOpen} />
 

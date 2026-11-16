@@ -22,6 +22,8 @@ export function makeRepo(): Repo {
   }
 }
 
+const FIXTURE_RECENT_ACTIVITY_AT = Date.now() - 60_000
+
 export function makeWorktree(args: {
   id: string
   displayName: string
@@ -47,7 +49,8 @@ export function makeWorktree(args: {
     isUnread: false,
     isPinned: false,
     sortOrder: args.sortOrder,
-    lastActivityAt: args.sortOrder
+    // Why recent: an idle project folds to one row (ORCA-1216); sortOrder still orders them.
+    lastActivityAt: FIXTURE_RECENT_ACTIVITY_AT + args.sortOrder
   }
 }
 

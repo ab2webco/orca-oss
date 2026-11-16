@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getRepoDisplayLabelKey, getRepoDisplayLabelsByPath } from './repo-display-labels'
+import {
+  getRepoDisplayLabelKey,
+  getRepoDisplayLabelsByPath,
+  getRepoHostQualifiedLabels
+} from './repo-display-labels'
 
 describe('getRepoDisplayLabelsByPath', () => {
   it('keeps non-colliding repository names basename-only', () => {
@@ -56,19 +60,33 @@ describe('getRepoDisplayLabelsByPath', () => {
     expect(labels.size).toBe(2)
   })
 
-  it('keeps cross-host repos with identical path AND name as separate entries', () => {
-    // Hardening: when paths are byte-identical the same-name collision loop runs
-    // and re-sets each entry, so host scoping must survive that pass too — neither
-    // host may overwrite the other. Label text can still coincide; that residual is
-    // disambiguated by the host section/badge, not this map.
+  it('keeps cross-host repos with identical path AND name on their bare name', () => {
+    // Why: the host header names the host; a path suffix would only repeat the shared path.
     const localRepo = { path: '/Users/alice', displayName: 'home' }
     const sshRepo = { path: '/Users/alice', displayName: 'home', connectionId: 'prod-ssh' }
     const labels = getRepoDisplayLabelsByPath([localRepo, sshRepo])
 
     expect(getRepoDisplayLabelKey(localRepo)).not.toBe(getRepoDisplayLabelKey(sshRepo))
-    expect(labels.size).toBe(2)
-    expect(labels.get(getRepoDisplayLabelKey(localRepo))).toBeDefined()
-    expect(labels.get(getRepoDisplayLabelKey(sshRepo))).toBeDefined()
+    expect(labels.get(getRepoDisplayLabelKey(localRepo))).toBe('home')
+    expect(labels.get(getRepoDisplayLabelKey(sshRepo))).toBe('home')
+  })
+
+  it('disambiguates same-name repos only among the repos of one host (ORCA-1181)', () => {
+    const projects = { path: '/Users/me/Projects/orca-oss', displayName: 'orca-oss' }
+    const workspaces = { path: '/Users/me/workspaces/orca-oss', displayName: 'orca-oss' }
+    const paired = {
+      path: '/Users/me/Projects/orca-oss',
+      displayName: 'orca-oss',
+      executionHostId: 'runtime:m1' as const
+    }
+    // SSH folder repo: connectionId set, executionHostId unset.
+    const sshFolder = { path: '/srv/orca-oss', displayName: 'orca-oss', connectionId: 'contabo' }
+    const labels = getRepoDisplayLabelsByPath([projects, workspaces, paired, sshFolder])
+
+    expect(labels.get(getRepoDisplayLabelKey(projects))).toBe('Projects/orca-oss')
+    expect(labels.get(getRepoDisplayLabelKey(workspaces))).toBe('workspaces/orca-oss')
+    expect(labels.get(getRepoDisplayLabelKey(paired))).toBe('orca-oss')
+    expect(labels.get(getRepoDisplayLabelKey(sshFolder))).toBe('orca-oss')
   })
 
   it('normalizes Windows separators to slash display labels', () => {
@@ -83,5 +101,51 @@ describe('getRepoDisplayLabelsByPath', () => {
     expect(labels.get(getRepoDisplayLabelKey({ path: 'C:\\workspace\\billing\\api' }))).toBe(
       'billing/api'
     )
+  })
+
+  it('disambiguates Windows paths on one host while another host keeps the bare name', () => {
+    const payments = { path: 'C:\\work\\payments\\api', displayName: 'api' }
+    const billing = { path: 'C:\\work\\billing\\api', displayName: 'api' }
+    const remote = { path: 'C:\\work\\payments\\api', displayName: 'api', connectionId: 'win-box' }
+    const labels = getRepoDisplayLabelsByPath([payments, billing, remote])
+
+    expect(labels.get(getRepoDisplayLabelKey(payments))).toBe('payments/api')
+    expect(labels.get(getRepoDisplayLabelKey(billing))).toBe('billing/api')
+    expect(labels.get(getRepoDisplayLabelKey(remote))).toBe('api')
+  })
+})
+
+describe('getRepoHostQualifiedLabels', () => {
+  const hostLabels = new Map([
+    ['local', 'Este equipo'],
+    ['ssh:m1', 'm1']
+  ])
+
+  it('names the host only on repos whose label repeats on another host', () => {
+    const labels = getRepoHostQualifiedLabels(
+      [
+        { id: 'a', path: '/w/orca-oss', displayName: 'orca-oss' },
+        { id: 'b', path: '/w/orca-oss', displayName: 'orca-oss', connectionId: 'm1' },
+        { id: 'c', path: '/w/web', displayName: 'web' }
+      ],
+      hostLabels
+    )
+
+    expect(labels.get('a')).toBe('orca-oss · Este equipo')
+    expect(labels.get('b')).toBe('orca-oss · m1')
+    expect(labels.get('c')).toBe('web')
+  })
+
+  it('keeps the per-host parent suffix when one host has two of the same name', () => {
+    const labels = getRepoHostQualifiedLabels(
+      [
+        { id: 'a', path: '/w/Projects/orca-oss', displayName: 'orca-oss' },
+        { id: 'b', path: '/w/workspaces/orca-oss', displayName: 'orca-oss' }
+      ],
+      hostLabels
+    )
+
+    expect(labels.get('a')).toBe('Projects/orca-oss')
+    expect(labels.get('b')).toBe('workspaces/orca-oss')
   })
 })

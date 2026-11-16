@@ -748,33 +748,46 @@ describe('Store', () => {
     expect(store.getUI().groupBy).toBe('repo')
   })
 
-  it('defaults projectOrderBy to manual when absent, even with recent sortBy', async () => {
+  it('defaults projectOrderBy to needs-you when absent, even with recent sortBy', async () => {
     writeDataFile({
       schemaVersion: 1,
       ui: { sortBy: 'recent' }
     })
     const store = await createStore()
-    expect(store.getUI().projectOrderBy).toBe('manual')
+    expect(store.getUI().projectOrderBy).toBe('needs-you')
   })
 
-  it('falls back invalid projectOrderBy to manual', async () => {
+  it('falls back invalid projectOrderBy to needs-you', async () => {
     writeDataFile({
       schemaVersion: 1,
       ui: { projectOrderBy: 'bogus' }
     })
     const store = await createStore()
-    expect(store.getUI().projectOrderBy).toBe('manual')
+    expect(store.getUI().projectOrderBy).toBe('needs-you')
   })
 
-  it('preserves and round-trips an explicit recent projectOrderBy', async () => {
+  it('preserves and round-trips an explicit recent projectOrderBy chosen after the migration', async () => {
     writeDataFile({
       schemaVersion: 1,
-      ui: { projectOrderBy: 'recent' }
+      ui: { projectOrderBy: 'recent', _projectOrderNeedsYouMigrated: true }
     })
     const store = await createStore()
     expect(store.getUI().projectOrderBy).toBe('recent')
 
     store.updateUI({ projectOrderBy: 'manual' })
     expect(store.getUI().projectOrderBy).toBe('manual')
+  })
+
+  it('keeps a stored name projectOrderBy and round-trips it through updateUI', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      ui: { projectOrderBy: 'name', _projectOrderNeedsYouMigrated: true }
+    })
+    const store = await createStore()
+    expect(store.getUI().projectOrderBy).toBe('name')
+
+    store.updateUI({ projectOrderBy: 'recent' })
+    store.updateUI({ projectOrderBy: 'name' })
+    expect(store.getUI().projectOrderBy).toBe('name')
   })
 })

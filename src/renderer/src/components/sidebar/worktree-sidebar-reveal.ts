@@ -35,6 +35,21 @@ export function getScrollTopToRevealBounds(
   return null
 }
 
+/** True when the element already sits where a reveal would leave it. */
+export function isElementRevealedInScrollContainer(
+  container: HTMLElement,
+  element: Element
+): boolean {
+  return (
+    container.contains(element) &&
+    getScrollTopToRevealBounds(
+      container,
+      getElementScrollBounds(container, element),
+      WORKTREE_SIDEBAR_REVEAL_TOP_INSET
+    ) === null
+  )
+}
+
 export function revealElementInScrollContainer(
   container: HTMLElement,
   element: Element,

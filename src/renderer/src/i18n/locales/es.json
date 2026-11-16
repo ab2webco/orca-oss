@@ -4556,6 +4556,15 @@
           "keepDefaultBranch": "Excepto la rama predeterminada",
           "keepDefaultBranchAria": "Mantener visible la rama predeterminada al ocultar los espacios de trabajo en reposo"
         },
+        "SidebarProjectOrderMenu": {
+          "title": "Ordenar proyectos",
+          "needsYouFirst": "Te necesita primero",
+          "recent": "Actividad reciente",
+          "name": "Nombre",
+          "manual": "Manual (arrastrar)",
+          "defaultTag": "predeterminado",
+          "footer": "Se guarda para tu usuario. En reposo sigue por antigüedad."
+        },
         "SidebarHeader": {
           "92154beb7e": "Nuevo espacio de trabajo",
           "49f62c5665": "Tablero de espacios de trabajo",
@@ -4567,8 +4576,35 @@
           "workspaces": "Espacios de trabajo"
         },
         "SidebarHiddenFiltersLine": {
-          "04e60bbc42": "{{count}} oculto(s) por filtros",
-          "aec1ffd95a": "Ver filtros"
+          "total": "{{count}} ocultos:",
+          "total_one": "{{count}} oculto:",
+          "total_other": "{{count}} ocultos:",
+          "otherDevice": "{{count}} de otros dispositivos",
+          "otherDevice_one": "{{count}} de otro dispositivo",
+          "otherDevice_other": "{{count}} de otros dispositivos",
+          "defaultBranch": "{{count}} rama predeterminada",
+          "defaultBranch_one": "{{count}} rama predeterminada",
+          "defaultBranch_other": "{{count}} rama predeterminada",
+          "automationCreated": "{{count}} creados por automatizaciones",
+          "automationCreated_one": "{{count}} creado por automatizaciones",
+          "automationCreated_other": "{{count}} creados por automatizaciones",
+          "cliCreated": "{{count}} creados por CLI",
+          "cliCreated_one": "{{count}} creado por CLI",
+          "cliCreated_other": "{{count}} creados por CLI",
+          "detachedHead": "{{count}} HEAD desacoplado",
+          "detachedHead_one": "{{count}} HEAD desacoplado",
+          "detachedHead_other": "{{count}} HEAD desacoplado",
+          "otherHost": "{{count}} en otros hosts",
+          "otherHost_one": "{{count}} en otro host",
+          "otherHost_other": "{{count}} en otros hosts",
+          "otherProject": "{{count}} en otros proyectos",
+          "otherProject_one": "{{count}} en otro proyecto",
+          "otherProject_other": "{{count}} en otros proyectos",
+          "sleeping": "{{count}} en reposo",
+          "sleeping_one": "{{count}} en reposo",
+          "sleeping_other": "{{count}} en reposo",
+          "show": "Mostrar",
+          "hide": "Ocultar"
         },
         "SidebarNav": {
           "80611a8b10": "Buscar",
@@ -4645,14 +4681,11 @@
             "source": "Origen"
           },
           "prAndChecks": "Pull request y checks",
-          "09faabd875": "Orden del proyecto",
           "7bada3b1ab": "Ordenar por",
           "dc0bb670bc": "Agrupar por",
           "9919ae1082": "Opciones de espacio de trabajo",
           "bc96dbd041": "Opciones de espacio de trabajo ({{value0}})",
-          "af9249c505": "Actividad más reciente en el espacio de trabajo",
           "b451c8b162": "Reciente",
-          "6664282a7b": "Arrastra proyectos para organizarlos",
           "7b316bdd51": "Manual",
           "7153d07485": "Arrastra los espacios de trabajo para organizarlos dentro de cada grupo.",
           "2170d553cf": "Proyecto",
@@ -4909,7 +4942,8 @@
           "groupDeleteFailedDesc": "Algo salió mal al eliminar el grupo. No se eliminó ningún proyecto.",
           "7a8b9c0d1e": "Actualización requerida",
           "hostAuthNeeded": "Autenticación requerida",
-          "hostDisconnected": "Desconectado",
+          "hostOffline": "Sin conexión",
+          "hostOfflineSince": "Sin conexión · {{age}}",
           "hostActiveAgents": "{{count}} activos",
           "hostActiveAgents_one": "{{count}} activo",
           "hostActiveAgents_other": "{{count}} activos",
@@ -5468,6 +5502,63 @@
           "inherited": "Claude account (inherited from global): {{value0}}",
           "pinned": "Pinned Claude account: {{value0}}",
           "globalMarker": "(global)"
+        },
+        "IdleProjectFold": {
+          "fold": "Plegar {{project}}",
+          "unfold": "Mostrar los espacios de trabajo de {{project}}",
+          "count": "{{count}} espacios de trabajo"
+        },
+        "ShortActivityAge": {
+          "now": "ahora",
+          "minutes": "{{count}} min",
+          "hours": "{{count}} h",
+          "days": "{{count}} d",
+          "weeks": "{{count}} sem"
+        },
+        "SidebarDelivered": {
+          "group": "Entregados",
+          "foldedCount": "{{count}} entregados · más de 24 h",
+          "foldedCount_one": "{{count}} entregado · más de 24 h",
+          "foldedCount_other": "{{count}} entregados · más de 24 h",
+          "merged": "mergeado",
+          "open": "abierto",
+          "queued": "en cola",
+          "ciFailing": "CI falla",
+          "closed": "cerrado",
+          "noPr": "Sin PR",
+          "doneBy": "Hecho por {{name}}",
+          "label": {
+            "pr": "PR",
+            "title": "Título",
+            "branch": "Rama",
+            "lead": "Lead",
+            "freed": "Liberado"
+          },
+          "today": "hoy {{time}}",
+          "freedValue": "{{time}} · worktree en espera",
+          "freed": "liberado",
+          "inProgress": "en curso",
+          "also": "{{name}} también: {{tickets}}"
+        },
+        "SidebarResumeStrip": {
+          "resume": "Retomar",
+          "dismiss": "Descartar"
+        },
+        "IdleProjectsGroup": {
+          "label": "En reposo",
+          "count": "{{count}} proyectos",
+          "count_one": "{{count}} proyecto",
+          "count_other": "{{count}} proyectos"
+        },
+        "ProjectHeaderReason": {
+          "questions": "{{count}} preguntas",
+          "questions_one": "{{count}} pregunta",
+          "questions_other": "{{count}} preguntas",
+          "accountLimited": "Cuenta limitada",
+          "ciFailing": "CI falla",
+          "working": "{{count}} trabajando",
+          "working_one": "{{count}} trabajando",
+          "working_other": "{{count}} trabajando"
         }
       },
       "shared": {
@@ -8319,7 +8410,12 @@
             "d6c0a9e2f4": "grok",
             "c5b9f8d1e3": "xai",
             "usagePercentageDisplayTitle": "Porcentajes de uso",
-            "usagePercentageDisplayDescription": "Elige si los límites del proveedor muestran el porcentaje usado o restante."
+            "usagePercentageDisplayDescription": "Elige si los límites del proveedor muestran el porcentaje usado o restante.",
+            "sidebarActivityWindow": {
+              "idle": "en reposo",
+              "activity": "actividad",
+              "window": "ventana"
+            }
           }
         },
         "auto": {
@@ -11120,6 +11216,14 @@
           "limits": "Los agentes y miembros asignados a ella se inician con el token. No puede ser el inicio de sesión compartido y su uso no se puede mostrar. Más tarde puedes volver a iniciar sesión en su fila para darle su correo real.",
           "add": "Agregar cuenta",
           "pasteHint": "De claude setup-token, ejecutado con la sesión iniciada en la cuenta que estás agregando."
+        },
+        "SidebarActivityWindowSetting": {
+          "title": "Ventana de proyectos en reposo",
+          "description": "Los proyectos sin actividad en esta ventana se pliegan en En reposo, al final de la barra lateral.",
+          "hours12": "12 h",
+          "hours24": "24 h",
+          "days3": "3 d",
+          "days7": "7 d"
         }
       },
       "right": {
@@ -16542,12 +16646,6 @@
         "new": "Nueva acción",
         "edit": "Editar"
       }
-    },
-    "age": {
-      "now": "ahora",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} h",
-      "days": "{{count}} d"
     },
     "display": {
       "label": "Métricas del equipo",

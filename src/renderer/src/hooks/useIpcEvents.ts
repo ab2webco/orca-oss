@@ -1611,7 +1611,13 @@ export function useIpcEvents(): void {
             }
             if (shouldSurfaceOwner) {
               store.revealWorktreeInSidebar(worktreeId)
-              focusTerminalInitiatedTab(tab.id, leafId)
+              // Why (ORCA-1192): a fresh tab nobody activated must not pull focus; `orca terminal focus` reuses its tab.
+              if (shouldActivate || reusedTab) {
+                focusTerminalInitiatedTab(tab.id, leafId)
+              }
+            } else if (!reusedTab) {
+              // Why (ORCA-1192): a background open still brings its row into view, never activating or focusing it.
+              store.revealWorktreeInSidebar(worktreeId, { passive: true })
             }
             // Why: only stamp the runtime title on fresh tabs; reused tabs may have a user customTitle it would overwrite on focus.
             if (title && !reusedTab) {
@@ -1860,7 +1866,11 @@ export function useIpcEvents(): void {
           }
           if (shouldSurfaceOwner) {
             store.revealWorktreeInSidebar(worktreeId)
-            focusTerminalInitiatedTab(tab.id)
+            if (shouldActivate) {
+              focusTerminalInitiatedTab(tab.id)
+            }
+          } else {
+            store.revealWorktreeInSidebar(worktreeId, { passive: true })
           }
           if (data.title) {
             store.setTabCustomTitle(tab.id, data.title, { recordInteraction: false })

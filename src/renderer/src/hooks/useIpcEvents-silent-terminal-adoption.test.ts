@@ -26,7 +26,13 @@ describe('useIpcEvents silent terminal adoption (surfaceOwner: false)', () => {
     })
   }
 
-  it('adopts a background workspace terminal without scrolling the sidebar to it', async () => {
+  async function focusMocks(): Promise<ReturnType<typeof vi.fn>[]> {
+    const { focusTerminalTabSurface } = await import('@/lib/focus-terminal-tab-surface')
+    const { focusRuntimeTerminalSurface } = await import('@/runtime/sync-runtime-graph')
+    return [asMock(focusTerminalTabSurface), asMock(focusRuntimeTerminalSurface)]
+  }
+
+  it('adopts a background workspace terminal with a passive reveal and no focus move (ORCA-1192)', async () => {
     const storeState = createBackgroundWorkspaceState()
     const harness = await loadIpcEventsHarness(storeState)
     harness.useIpcEvents()
@@ -54,8 +60,11 @@ describe('useIpcEvents silent terminal adoption (surfaceOwner: false)', () => {
     asMock(storeState.setActiveTabType).mockClear()
     asMock(storeState.setActiveTab).mockClear()
 
-    // Regression: a workspace created in the background spawns its agent terminal
-    // here; the tab must still be adopted, but the sidebar must not scroll to it.
+    for (const focus of await focusMocks()) {
+      focus.mockClear()
+    }
+    // A lead member launch / background workspace spawns its terminal here: the tab is
+    // adopted and its row scrolled into view, but nothing is activated or focused.
     harness.createTerminal({
       worktreeId: 'wt-2',
       ptyId: 'pty-background-create',
@@ -69,14 +78,17 @@ describe('useIpcEvents silent terminal adoption (surfaceOwner: false)', () => {
       activate: false,
       id: 'tab-background-create'
     })
-    expect(storeState.revealWorktreeInSidebar).not.toHaveBeenCalled()
+    expect(storeState.revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2', { passive: true })
+    for (const focus of await focusMocks()) {
+      expect(focus).not.toHaveBeenCalled()
+    }
     expect(storeState.setActiveView).not.toHaveBeenCalled()
     expect(storeState.setActiveWorktree).not.toHaveBeenCalled()
     expect(storeState.setActiveTabType).not.toHaveBeenCalled()
     expect(storeState.setActiveTab).not.toHaveBeenCalled()
   })
 
-  it('replies to a requested terminal create without scrolling the sidebar when surfaceOwner is false', async () => {
+  it('replies to a requested terminal create with a passive reveal when surfaceOwner is false', async () => {
     const storeState = createBackgroundWorkspaceState()
     const harness = await loadIpcEventsHarness(storeState)
     harness.useIpcEvents()
@@ -102,6 +114,9 @@ describe('useIpcEvents silent terminal adoption (surfaceOwner: false)', () => {
     asMock(storeState.setActiveTabType).mockClear()
     asMock(storeState.setActiveTab).mockClear()
     harness.replyTerminalCreate.mockClear()
+    for (const focus of await focusMocks()) {
+      focus.mockClear()
+    }
 
     harness.requestTerminalCreate({
       requestId: 'req-background-create',
@@ -119,10 +134,26 @@ describe('useIpcEvents silent terminal adoption (surfaceOwner: false)', () => {
       tabId: 'tab-minted',
       title: 'Claude'
     })
-    expect(storeState.revealWorktreeInSidebar).not.toHaveBeenCalled()
+    expect(storeState.revealWorktreeInSidebar).toHaveBeenCalledWith('wt-2', { passive: true })
+    for (const focus of await focusMocks()) {
+      expect(focus).not.toHaveBeenCalled()
+    }
     expect(storeState.setActiveView).not.toHaveBeenCalled()
     expect(storeState.setActiveWorktree).not.toHaveBeenCalled()
     expect(storeState.setActiveTabType).not.toHaveBeenCalled()
     expect(storeState.setActiveTab).not.toHaveBeenCalled()
+  })
+
+  it('keeps the sidebar put when a background create adopts a tab that already exists', async () => {
+    const storeState = createBackgroundWorkspaceState()
+    storeState.tabsByWorktree = { 'wt-2': [{ id: 'tab-existing', ptyId: 'pty-bg' }] }
+    storeState.ptyIdsByTabId = { 'tab-existing': ['pty-bg'] }
+    const harness = await loadIpcEventsHarness(storeState)
+    harness.useIpcEvents()
+
+    harness.createTerminal({ worktreeId: 'wt-2', ptyId: 'pty-bg', presentation: 'background' })
+
+    expect(storeState.createTab).not.toHaveBeenCalled()
+    expect(storeState.revealWorktreeInSidebar).not.toHaveBeenCalled()
   })
 })

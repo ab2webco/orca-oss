@@ -9,6 +9,8 @@ import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
 import { WorktreeCardAgentHoverDetails } from './WorktreeCardAgentHoverDetails'
 import { WorktreeCardRowContent, WorktreeCardTeamChildren } from './worktree-card-row-content'
 import { useSidebarTeamCard } from './sidebar-team-roster'
+import { useSidebarDeliveredView } from './use-sidebar-delivered-view'
+import { SidebarDeliveredHoverCard } from './SidebarDeliveredHoverCard'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -70,7 +72,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     presentation
 
   const team = useSidebarTeamCard(worktree.id)
-  const teamCard = team.row !== null
+  const delivered = useSidebarDeliveredView(worktree.id, team.delivered, card.prDisplay)
+  // Why a freed member reads as a team child: it stays under its lead at the members' weight (ORCA-1216 §6).
+  const teamCard = team.row !== null || delivered !== null
+  const teamChild = team.child || delivered !== null
   // Why: V30 marks only the open agent's row; a lead's card wraps its members' rows, so it never
   // lights up for an open member, and its own selection fills its row (main.css), not a card.
   const surfaceActive = isActiveSurface && (!teamCard || card.isActive)
@@ -79,6 +84,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       card={card}
       row={team.row}
       child={team.child}
+      delivered={delivered}
       presentation={presentation}
     />
   )
@@ -89,7 +95,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     </div>
   )
 
-  const parentCardBodyWithHoverDetails =
+  const classicCardBodyWithHoverDetails =
     hasHoverDetails && !titleRenaming && !card.activityViewOpen ? (
       <WorktreeCardDetailsHover
         issue={hoverIssue}
@@ -138,14 +144,20 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       parentHoverTriggerBody
     )
 
+  const parentCardBodyWithHoverDetails = delivered ? (
+    <SidebarDeliveredHoverCard view={delivered}>{parentHoverTriggerBody}</SidebarDeliveredHoverCard>
+  ) : (
+    classicCardBodyWithHoverDetails
+  )
+
   const cardBody = (
     <div
       className={cn(
         'relative flex cursor-pointer flex-col transition-[background-color,border-color,opacity,box-shadow] duration-200 outline-none select-none',
         // Why: V30's rows share one height, so a team card adds no padding of its own around its row.
-        team.row ? 'py-0' : titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
+        teamCard ? 'py-0' : titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
         // Why: under the lead the child row takes V30's step; the tree's own insets would add to it.
-        team.child
+        teamChild
           ? 'w-full pl-2'
           : ['pr-1.5', flushSurface ? 'ml-1 w-[calc(100%-0.25rem)]' : 'ml-1'],
         'rounded-lg',
@@ -167,9 +179,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         ],
         titleRenaming && '!border-transparent !bg-transparent !shadow-none !ring-0',
         isDeleting && 'opacity-50 grayscale cursor-not-allowed',
-        // Why: no SSH dim — the inline host control now states the disconnected state
-        // explicitly, and a subtree opacity would composite its destructive tint and spinner
-        // down to an illegible alpha (a descendant cannot escape an ancestor's opacity).
+        // Why: no SSH dim — the inline host control states the disconnected state explicitly,
+        // and a subtree opacity would composite its destructive tint and spinner down to an
+        // illegible alpha. An offline host section (ORCA-1181) dims only its headers for the
+        // same reason; runtime cards dim here.
         isRuntimeDisconnected && !isDeleting && 'opacity-60'
       )}
       data-worktree-card-surface="true"
@@ -181,7 +194,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       onDragStart={!affiliateListMode && nativeDragEnabled ? handleDragStart : undefined}
       onDragEnd={!affiliateListMode && nativeDragEnabled ? handleDragEnd : undefined}
       aria-busy={isDeleting}
-      style={team.child ? undefined : cardStyle}
+      style={teamChild ? undefined : cardStyle}
     >
       {isDeleting && (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/50 backdrop-blur-[1px]">
@@ -195,10 +208,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       )}
       {parentCardBodyWithHoverDetails}
       {/* Why outside the hover trigger: pointing at a member must open only that member's card. */}
-      {teamCard ? <WorktreeCardTeamChildren card={card} /> : null}
+      {team.row ? <WorktreeCardTeamChildren card={card} /> : null}
 
       {/* Why not for a team card: its content draws the children as V30's child rows. */}
-      {newCardStyle && lineageChildren && !team.row ? (
+      {newCardStyle && lineageChildren && !teamCard ? (
         <div
           className="mt-1.5 space-y-1"
           data-worktree-lineage-children=""

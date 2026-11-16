@@ -20,6 +20,7 @@ type BuildArgs = {
   props: VirtualizedWorktreeViewportProps
   projectGroups: readonly ProjectGroup[]
   renderRows: RenderRow[]
+  offlineHostRowIndexes: ReadonlySet<number>
   firstHeaderIndex: number
   virtualization: WorktreeListVirtualizer
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
@@ -52,6 +53,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
   const { props, runtime, session, statusDrag, headerDrag, primaryActive, reveal } = args
   return {
     renderRows: args.renderRows,
+    offlineHostRowIndexes: args.offlineHostRowIndexes,
     firstHeaderIndex: args.firstHeaderIndex,
     activeStickyHeaderIndexRef: args.virtualization.activeStickyHeaderIndexRef,
     activeStickyHostIndexRef: args.virtualization.activeStickyHostIndexRef,
@@ -121,6 +123,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       activeWorktreeId: props.activeWorktreeId,
       currentWorktreeId: props.currentWorktreeId,
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
+      revealedHiddenWorktreeIds: props.revealedHiddenWorktreeIds,
       selectedWorktreeIds: props.selectedWorktreeIds,
       selectedWorktrees: props.selectedWorktrees,
       getActiveSurfaceVariant: primaryActive.getActiveSurfaceVariant,

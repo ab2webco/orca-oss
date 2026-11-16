@@ -32,6 +32,10 @@ import type {
 } from './row-types'
 import { getRenderedNaturalAnchorRepoIds, withRepoSectionDisplayLabels } from './section-order'
 import { buildOrderedGroups } from './worktree-grouping'
+import { getActiveProjectKeys } from './idle-project-fold'
+import { buildProjectHostKeying } from './project-host-split'
+import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
+import type { ProjectActivityInputs } from './project-activity'
 
 export function buildRows(
   groupBy: WorktreeGroupBy,
@@ -58,7 +62,11 @@ export function buildRows(
   folderWorkspaces: readonly FolderWorkspace[] = [],
   hostLabelById?: ReadonlyMap<string, string>,
   defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID,
-  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings)
+  pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings),
+  /** Opts into the ORCA-1216 idle-project fold; absent keeps every project expanded. */
+  idleProjectFold?: ProjectActivityInputs,
+  /** canDrawHostSections: a project spanning hosts splits per host only when host cards can draw. */
+  splitProjectsByHost = false
 ): Row[] {
   const result: Row[] = []
   const projectIndex = buildProjectGroupingIndex(projectGrouping)
@@ -139,6 +147,10 @@ export function buildRows(
     return result
   }
 
+  const projectHostKeying =
+    groupBy === 'repo' && splitProjectsByHost
+      ? buildProjectHostKeying({ worktrees, repoMap, projectIndex, defaultHostId })
+      : undefined
   const orderedGroups = buildOrderedGroups({
     groupBy,
     naturalWorktrees,
@@ -152,7 +164,8 @@ export function buildRows(
     newExternalWorktreesInboxByRepo,
     pendingByRepo,
     repoOrder,
-    projectOrderBy
+    projectOrderBy,
+    projectHostKeying
   })
 
   const sectionContext: SectionAppendContext = {
@@ -170,14 +183,23 @@ export function buildRows(
     lineageById,
     worktreeMap,
     nestLineage,
-    cyclicLineageIds
+    cyclicLineageIds,
+    activeProjectKeys:
+      groupBy === 'repo' && idleProjectFold
+        ? getActiveProjectKeys(worktrees, repoMap, projectIndex, idleProjectFold, projectHostKeying)
+        : undefined,
+    urgency:
+      groupBy === 'repo' && idleProjectFold?.urgency
+        ? { ...idleProjectFold.urgency, orderByTier: projectOrderBy === 'needs-you' }
+        : undefined
   }
 
-  if (groupBy !== 'repo' || projectGroups.length === 0) {
-    appendOrderedGroups(
-      sectionContext,
-      groupBy === 'repo' ? withRepoSectionDisplayLabels(orderedGroups) : orderedGroups
-    )
+  if (groupBy !== 'repo') {
+    appendOrderedGroups(sectionContext, orderedGroups)
+    return result
+  }
+  if (projectGroups.length === 0) {
+    appendRepoSectionsSplitByActivity(sectionContext, withRepoSectionDisplayLabels(orderedGroups))
     return result
   }
 

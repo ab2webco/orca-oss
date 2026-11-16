@@ -3,6 +3,7 @@ import { useAppStore } from '@/store'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSidebarResize } from '@/hooks/useSidebarResize'
 import SidebarHeader from './SidebarHeader'
+import { SidebarResumeStrip } from './SidebarResumeStrip'
 import SidebarNav from './SidebarNav'
 import SetupScriptPromptCard from './SetupScriptPromptCard'
 import WorktreeList from './WorktreeList'
@@ -119,6 +120,7 @@ function Sidebar({
             {/* Fixed controls */}
             <SidebarNav />
             <SidebarHeader onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen} />
+            <SidebarResumeStrip />
 
             <WorktreeList
               scrollOffsetRef={worktreeScrollOffsetRef}

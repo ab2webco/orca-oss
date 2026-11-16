@@ -107,7 +107,8 @@ export type RightSidebarTab =
 export type ActiveRightSidebarTab = Exclude<RightSidebarTab, 'search'>
 export type RightSidebarExplorerView = 'files' | 'search'
 
-export type ProjectOrderBy = 'manual' | 'recent'
+/** 'needs-you' (default, ORCA-1216): active projects by urgency tier, frozen inside a tier. 'name': A–Z. */
+export type ProjectOrderBy = 'needs-you' | 'recent' | 'name' | 'manual'
 export type WorkspaceHostScope = 'all' | 'local' | `ssh:${string}` | `runtime:${string}`
 export type VisibleWorkspaceHostIds = Exclude<WorkspaceHostScope, 'all'>[] | null
 export type WorkspaceHostOrder = Exclude<WorkspaceHostScope, 'all'>[]

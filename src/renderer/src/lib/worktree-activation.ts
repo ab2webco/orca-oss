@@ -36,7 +36,7 @@ import {
   getFolderWorkspacePathStatusTitle
 } from './folder-workspace-path-status'
 import { toast } from 'sonner'
-import { isDetachedHeadWorkspace } from '@/components/sidebar/visible-worktrees'
+import { isDetachedHeadWorkspace } from '@/components/sidebar/sidebar-hiding-filters'
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { findFolderWorkspaceOwner } from './folder-workspace-runtime-owner'

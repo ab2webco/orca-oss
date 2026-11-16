@@ -8,13 +8,18 @@ import {
 import { SidebarProjectFilterPanel } from './SidebarProjectFilterPanel'
 import type { Repo } from '../../../../shared/repo-types'
 import { translate } from '@/i18n/i18n'
+import { getRepoHostQualifiedLabels } from '@/lib/repo-display-labels'
+import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
+import { buildSidebarHostOptions } from './sidebar-host-options'
 
 function getProjectFilterVisibilityLabel({
   selectedCount,
-  selectedRepos
+  selectedRepos,
+  labelByRepoId
 }: {
   selectedCount: number
   selectedRepos: readonly Repo[]
+  labelByRepoId: ReadonlyMap<string, string>
 }): string {
   if (selectedCount === 0) {
     return translate(
@@ -23,8 +28,9 @@ function getProjectFilterVisibilityLabel({
     )
   }
   if (selectedCount === 1) {
+    const selected = selectedRepos[0]
     return (
-      selectedRepos[0]?.displayName ??
+      (selected ? (labelByRepoId.get(selected.id) ?? selected.displayName) : undefined) ??
       translate('auto.components.sidebar.SidebarRepositoryFilterSection.7679f0c268', 'Projects')
     )
   }
@@ -45,6 +51,31 @@ const SidebarRepositoryFilterSection = React.memo(function SidebarRepositoryFilt
   const filterRepoIds = useAppStore((s) => s.filterRepoIds)
   const setFilterRepoIds = useAppStore((s) => s.setFilterRepoIds)
   const repos = useAppStore((s) => s.repos)
+  const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
+  const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
+  const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
+  const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
+  const settings = useAppStore((s) => s.settings)
+  // Why: this list mixes hosts, so a name repeated on another host reads "orca-oss · m1" (ORCA-1181).
+  const labelByRepoId = useMemo(() => {
+    const hosts = buildSidebarHostOptions({
+      repos,
+      sshTargetLabels,
+      sshConnectionStates,
+      settings,
+      runtimeEnvironments,
+      runtimeStatusByEnvironmentId,
+      hostLabelOverrides: getHostDisplayLabelOverrides(settings)
+    })
+    return getRepoHostQualifiedLabels(repos, new Map(hosts.map((host) => [host.id, host.label])))
+  }, [
+    repos,
+    sshTargetLabels,
+    sshConnectionStates,
+    settings,
+    runtimeEnvironments,
+    runtimeStatusByEnvironmentId
+  ])
 
   const canFilterRepos = repos.length > 1
   // Why: derive from current repos so stale ids (e.g. lingering after a repo
@@ -68,7 +99,11 @@ const SidebarRepositoryFilterSection = React.memo(function SidebarRepositoryFilt
     () => repos.filter((repo) => !selectedRepoIdSet.has(repo.id)),
     [repos, selectedRepoIdSet]
   )
-  const visibilityLabel = getProjectFilterVisibilityLabel({ selectedCount, selectedRepos })
+  const visibilityLabel = getProjectFilterVisibilityLabel({
+    selectedCount,
+    selectedRepos,
+    labelByRepoId
+  })
 
   const clearRepos = useCallback(() => setFilterRepoIds([]), [setFilterRepoIds])
 
@@ -123,6 +158,7 @@ const SidebarRepositoryFilterSection = React.memo(function SidebarRepositoryFilt
         <SidebarProjectFilterPanel
           availableRepos={availableRepos}
           selectedRepos={selectedRepos}
+          labelByRepoId={labelByRepoId}
           hasRepoFilter={hasRepoFilter}
           filterRepoIds={filterRepoIds}
           setFilterRepoIds={setFilterRepoIds}

@@ -8,6 +8,11 @@ import type { ProjectGroupingModel } from './project-grouping'
 import type { WorktreeGroupBy } from './row-types'
 import { getAgentStatusGroupHeaderKey } from './agent-status-groups'
 import type { AgentStatusGroupKey } from './agent-status-groups'
+import {
+  getSettingsFocusedExecutionHostId,
+  getWorktreeExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { getHostScopedProjectKey } from './project-host-split'
 
 export function getGroupKeyForWorktree(
   groupBy: WorktreeGroupBy,
@@ -77,4 +82,23 @@ export function getGroupKeysForWorktree(
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
   return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
+}
+
+/** The keys to open to reveal a workspace, including its project's per-host section key. */
+export function getRevealGroupKeysForWorktree(
+  ...args: Parameters<typeof getGroupKeysForWorktree>
+): string[] {
+  const keys = getGroupKeysForWorktree(...args)
+  const [groupBy, worktree, repoMap, , , settings] = args
+  const projectKey = keys.at(-1)
+  if (groupBy !== 'repo' || projectKey === undefined) {
+    return keys
+  }
+  // Why: a project spanning hosts renders per-host sections (ORCA-1181); an unused key is inert.
+  const hostId = getWorktreeExecutionHostId(
+    worktree,
+    repoMap.get(worktree.repoId),
+    getSettingsFocusedExecutionHostId(settings)
+  )
+  return [...keys, getHostScopedProjectKey(projectKey, hostId)]
 }

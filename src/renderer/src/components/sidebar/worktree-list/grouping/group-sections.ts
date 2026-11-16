@@ -22,6 +22,10 @@ import type {
   WorktreeGroupBy
 } from './row-types'
 import { orderMainWorktreeFirst } from './section-order'
+import { getSectionRepoIds, resolveSectionFold } from './section-fold'
+import { getLatestActivityAt } from './project-activity'
+import { resolveSectionUrgency } from './section-urgency'
+import type { SectionUrgencyContext } from './section-urgency'
 
 /** Everything section emission reads that stays fixed for one buildRows call. */
 export type SectionAppendContext = {
@@ -40,6 +44,10 @@ export type SectionAppendContext = {
   worktreeMap: Map<string, Worktree>
   nestLineage: boolean
   cyclicLineageIds: ReadonlySet<string>
+  /** Set only when the caller opts into the idle-project fold (groupBy 'repo'). */
+  activeProjectKeys?: ReadonlySet<string>
+  /** Set only when the caller passes the Needs you first inputs (groupBy 'repo'). */
+  urgency?: SectionUrgencyContext
 }
 
 export function appendOrderedGroups(
@@ -65,8 +73,13 @@ export function appendOrderedGroups(
     cyclicLineageIds
   } = ctx
   for (const [key, group] of groupsToAppend) {
-    const isCollapsed = collapsedGroups.has(key)
     const repo = group.repo
+    const repoIds = groupBy === 'repo' ? getSectionRepoIds(key, group.repoIds, repo) : []
+    const fold = resolveSectionFold(ctx, key, group)
+    const lastActivityAt = groupBy === 'repo' ? getLatestActivityAt(group.items) : null
+    const urgency = fold ? undefined : resolveSectionUrgency(ctx, key, group)
+    // Why: while idle, only the fold's open key governs; a stale collapse key must not hide an opened project.
+    const isCollapsed = fold ? fold.state === 'folded' : collapsedGroups.has(key)
     const header =
       groupBy === 'repo'
         ? {
@@ -77,7 +90,11 @@ export function appendOrderedGroups(
             tone: PROJECT_GROUP_META.tone,
             icon: PROJECT_GROUP_META.icon,
             repo,
-            projectGroupDepth
+            projectGroupDepth,
+            ...(group.hostId ? { hostId: group.hostId } : {}),
+            ...(fold ? { fold } : {}),
+            ...(lastActivityAt !== null ? { lastActivityAt } : {}),
+            ...(urgency ? { urgency } : {})
           }
         : (() => {
             const meta =
@@ -100,14 +117,6 @@ export function appendOrderedGroups(
     result.push(header)
     if (!isCollapsed) {
       if (groupBy === 'repo') {
-        const repoIds =
-          group.repoIds.size > 0
-            ? [...group.repoIds]
-            : repo
-              ? [repo.id]
-              : key.startsWith('repo:')
-                ? [key.slice('repo:'.length)]
-                : []
         for (const repoId of repoIds) {
           const candidate = importedWorktreesByRepo.get(repoId)
           if (candidate) {

@@ -6,6 +6,10 @@ import type { HostHeaderRow } from '../../host-section-rows'
 import { HostSectionHeaderMenu } from '../../HostSectionHeaderMenu'
 import { useHostActiveAgentCount } from '../../host-header-active-count'
 import { SidebarTreeGlyph } from '../../sidebar-tree-glyphs'
+import { isHostOffline } from '../../host-offline'
+import { useHostLastLiveAt } from '../../host-last-live-store'
+import { formatShortActivityAge } from '../../short-activity-age'
+import { useNow } from '../../../dashboard/useNow'
 
 function HostActiveCount({ worktreeIds }: { worktreeIds: readonly string[] }): React.JSX.Element {
   const active = useHostActiveAgentCount(worktreeIds)
@@ -17,6 +21,25 @@ function HostActiveCount({ worktreeIds }: { worktreeIds: readonly string[] }): R
       {translate('auto.components.sidebar.WorktreeList.hostActiveAgents', '{{count}} active', {
         count: active
       })}
+    </span>
+  )
+}
+
+// Why no count: an offline host's rows are last-known data, so "0 active" would read as a fact.
+function HostOfflineDetail({ hostId }: { hostId: HostHeaderRow['hostId'] }): React.JSX.Element {
+  const lastLiveAt = useHostLastLiveAt(hostId)
+  const now = useNow(30_000)
+  const age = lastLiveAt === null ? null : formatShortActivityAge(lastLiveAt, now)
+  return (
+    <span
+      data-host-header-offline=""
+      className="ml-auto shrink-0 truncate text-[11px] leading-none tabular-nums text-muted-foreground/70 transition-opacity can-hover:group-hover/host-header:opacity-0 group-focus-within/host-header:opacity-0"
+    >
+      {age
+        ? translate('auto.components.sidebar.WorktreeList.hostOfflineSince', 'Offline · {{age}}', {
+            age
+          })
+        : translate('auto.components.sidebar.WorktreeList.hostOffline', 'Offline')}
     </span>
   )
 }
@@ -54,12 +77,6 @@ function getHostHeaderDetail(row: HostHeaderRow): { text: string; isWarning: boo
       isWarning: true
     }
   }
-  if (row.health === 'disconnected') {
-    return {
-      text: translate('auto.components.sidebar.WorktreeList.hostDisconnected', 'Disconnected'),
-      isWarning: false
-    }
-  }
   // Why: V30 names a healthy host and its active count only; the transport sits in the menu.
   return null
 }
@@ -76,7 +93,7 @@ export function HostSectionHeader({
   dragging?: boolean
 }): React.JSX.Element {
   const isBlocked = row.health === 'blocked'
-  const isDisconnected = row.health === 'disconnected'
+  const isDisconnected = isHostOffline(row)
   const detail = getHostHeaderDetail(row)
   return (
     <div className="px-2 pt-1">
@@ -125,6 +142,8 @@ export function HostSectionHeader({
             >
               {detail.text}
             </span>
+          ) : isDisconnected ? (
+            <HostOfflineDetail hostId={row.hostId} />
           ) : (
             <HostActiveCount worktreeIds={row.worktreeIds} />
           )}

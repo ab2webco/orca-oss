@@ -16,6 +16,8 @@ import type { ImportedWorktreeCardActionState } from '../../imported-worktrees-c
 import type { NewExternalWorktreesInboxActionState } from '../../new-external-worktrees-inbox-actions'
 import type { useHostHeaderDrag } from '../../host-header-drag'
 import { HostSectionHeader } from './HostSectionHeader'
+import { dimOfflineHostRow } from '../../host-offline'
+import { PINNED_TIER_SURFACE_CLASS } from './pinned-tier-surface'
 import { renderFolderWorkspaceVirtualRow, type FolderWorkspaceRowContext } from './folder-row'
 import {
   renderImportedWorktreesVirtualRow,
@@ -28,10 +30,13 @@ import {
   type WorktreeItemRowContext
 } from './item-row'
 import { renderWorktreeSectionHeaderRow, type SectionHeaderRowContext } from './SectionHeader'
+import { renderIdleProjectsGroupHeaderRow } from './idle-projects-group-header'
 import type { WorktreeRowDragState } from '../drag/row-state'
 
 export type WorktreeVirtualRowContext = {
   renderRows: RenderRow[]
+  /** Rows under an offline host card; they dim like a disconnected card (ORCA-1181). */
+  offlineHostRowIndexes: ReadonlySet<number>
   firstHeaderIndex: number
   activeStickyHeaderIndexRef: React.MutableRefObject<number | null>
   activeStickyHostIndexRef: React.MutableRefObject<number | null>
@@ -79,12 +84,13 @@ function renderHostHeaderVirtualRow(
       data-worktree-virtual-row-key={String(vItem.key)}
       data-worktree-sticky-header=""
       data-worktree-sticky-header-active={isActiveStickyHost ? '' : undefined}
+      data-worktree-sticky-host-active={isActiveStickyHost ? '' : undefined}
       data-index={vItem.index}
       ref={ctx.measureVirtualRowElement}
       className={cn(
         'left-0 right-0',
         hasHeaderTopSpacing && !isActiveStickyHost && 'pt-1',
-        isActiveStickyHost ? 'sticky -top-px z-30 bg-worktree-sidebar' : 'absolute top-0'
+        isActiveStickyHost ? cn('sticky -top-px z-30', PINNED_TIER_SURFACE_CLASS) : 'absolute top-0'
       )}
       style={isActiveStickyHost ? undefined : { transform: getVirtualRowTransform(vItem.start) }}
     >
@@ -143,15 +149,38 @@ function renderLineageGroupVirtualRow(
   )
 }
 
+export function renderWorktreeVirtualRow(
+  ctx: WorktreeVirtualRowContext,
+  row: RenderRow,
+  vItem: VirtualItem
+): React.JSX.Element | null {
+  const frame = renderWorktreeVirtualRowFrame(ctx, row, vItem)
+  return frame && ctx.offlineHostRowIndexes.has(vItem.index) ? dimOfflineHostRow(frame) : frame
+}
+
 // One virtual slot -> one row renderer. Every branch owns its own absolute/sticky frame
 // because sticky headers and lineage groups position differently from plain cards.
-export function renderWorktreeVirtualRow(
+function renderWorktreeVirtualRowFrame(
   ctx: WorktreeVirtualRowContext,
   row: RenderRow,
   vItem: VirtualItem
 ): React.JSX.Element | null {
   if (row.type === 'host-header') {
     return renderHostHeaderVirtualRow(ctx, row, vItem)
+  }
+
+  if (row.type === 'header' && row.idleProjectsGroup) {
+    return renderIdleProjectsGroupHeaderRow({
+      ctx: ctx.header,
+      row,
+      vItem,
+      hasHeaderTopSpacing: shouldUseHeaderTopSpacing({
+        rows: ctx.renderRows,
+        index: vItem.index,
+        firstHeaderIndex: ctx.firstHeaderIndex
+      }),
+      measureVirtualRowElement: ctx.measureVirtualRowElement
+    })
   }
 
   if (row.type === 'header') {

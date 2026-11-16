@@ -1,15 +1,12 @@
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { AppState } from '@/store/types'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
-import {
-  ALL_EXECUTION_HOSTS_SCOPE,
-  getSettingsFocusedExecutionHostId
-} from '../../../../shared/execution-host'
+import { getSettingsFocusedExecutionHostId } from '../../../../shared/execution-host'
 import { getRepoMapFromState, getWorktreeMapFromState } from '@/store/selectors'
 import { getProjectHostSetupProjectionFromState } from '@/store/project-host-setup-selector'
 import { buildRows } from './worktree-list/grouping/build-rows'
 import { getPinnedWorktreeDisplayPolicy } from './worktree-list/grouping/row-types'
-import { addHostSectionRows } from './host-section-rows'
+import { addHostSectionRows, canDrawHostSections } from './host-section-rows'
 import { orderHostSectionOptions } from './host-section-order'
 import { buildSidebarHostOptions } from './sidebar-host-options'
 import { getLogicalRepoOrderRankById } from './project-header-drop'
@@ -21,6 +18,8 @@ import {
   filterProjectGroupsForVisibleHosts,
   getVisibleSidebarHostIdSet
 } from './worktree-list/listing/host-filtering'
+import { selectIdleProjectFoldInputs } from './worktree-list/listing/idle-project-fold-inputs'
+import { selectProjectUrgencyInputs } from './worktree-list/listing/workspace-urgency-signals'
 
 const EMPTY_REPO_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>())
 const EMPTY_IMPORTED_BY_REPO = Object.freeze(new Map()) as never
@@ -54,10 +53,29 @@ export function computeRenderedSidebarWorktreeOrder(
     state.worktreeCardProperties
   )
 
+  const now = Date.now()
+  const repoMap = getRepoMapFromState(state)
+  const hostOptions = orderHostSectionOptions(
+    buildSidebarHostOptions({
+      repos: state.repos,
+      sshTargetLabels: state.sshTargetLabels,
+      sshConnectionStates: state.sshConnectionStates,
+      settings: state.settings,
+      runtimeEnvironments: state.runtimeEnvironments,
+      runtimeStatusByEnvironmentId: state.runtimeStatusByEnvironmentId,
+      hostLabelOverrides: getHostDisplayLabelOverrides(state.settings)
+    }),
+    state.workspaceHostOrder
+  )
+  const sectionScope = {
+    hostOptions,
+    workspaceHostScope: state.workspaceHostScope,
+    visibleWorkspaceHostIds: state.visibleWorkspaceHostIds
+  }
   const rows = buildRows(
     state.groupBy,
     [...visibleWorktrees],
-    getRepoMapFromState(state),
+    repoMap,
     prCache,
     state.collapsedGroups,
     getLogicalRepoOrderRankById(state.repos.map((repo) => repo.id)),
@@ -83,36 +101,25 @@ export function computeRenderedSidebarWorktreeOrder(
     // Why no hostLabelById: it only feeds display-only host context labels, never row order.
     undefined,
     defaultHostId,
-    pinnedDisplayPolicy
+    pinnedDisplayPolicy,
+    // Why: folded workspaces are not rendered rows, so they take no number here either.
+    {
+      ...selectIdleProjectFoldInputs(state, now),
+      urgency: selectProjectUrgencyInputs(state, visibleWorktrees, repoMap, now)
+    },
+    canDrawHostSections(sectionScope)
   )
 
-  // Why lazy: with no host filter, addHostSectionRows is a pass-through, so skip building the whole host registry on a keystroke.
-  // Deliberately a superset of its internal guards — on <=1 host it still no-ops, wasting only the registry build.
-  const needsHostSections =
-    state.workspaceHostScope !== ALL_EXECUTION_HOSTS_SCOPE || state.visibleWorkspaceHostIds != null
-  const sectionRows = needsHostSections
-    ? addHostSectionRows({
-        rows,
-        hostOptions: orderHostSectionOptions(
-          buildSidebarHostOptions({
-            repos: state.repos,
-            sshTargetLabels: state.sshTargetLabels,
-            sshConnectionStates: state.sshConnectionStates,
-            settings: state.settings,
-            runtimeEnvironments: state.runtimeEnvironments,
-            runtimeStatusByEnvironmentId: state.runtimeStatusByEnvironmentId,
-            hostLabelOverrides: getHostDisplayLabelOverrides(state.settings)
-          }),
-          state.workspaceHostOrder
-        ),
-        workspaceHostScope: state.workspaceHostScope,
-        visibleWorkspaceHostIds: state.visibleWorkspaceHostIds,
-        defaultHostId,
-        collapsedHostKeys: state.collapsedGroups,
-        forceCollapseHosts: false,
-        preferProjectGrouping: true
-      })
-    : rows
+  // Why always: two hosts with rows draw host sections even without a host filter (ORCA-1181).
+  const sectionRows = addHostSectionRows({
+    rows,
+    hostOptions,
+    workspaceHostScope: state.workspaceHostScope,
+    visibleWorkspaceHostIds: state.visibleWorkspaceHostIds,
+    defaultHostId,
+    collapsedHostKeys: state.collapsedGroups,
+    forceCollapseHosts: false
+  })
 
   return Array.from(
     new Set(

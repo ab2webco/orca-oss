@@ -52,8 +52,10 @@ vi.mock('@/store', () => {
     selector: (state: Record<string, unknown>) => unknown
   ) => unknown) & {
     getState: () => Record<string, unknown>
+    subscribe: () => () => void
   }
   useAppStore.getState = () => mockStore.state
+  useAppStore.subscribe = () => () => {}
   return { useAppStore }
 })
 

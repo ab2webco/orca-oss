@@ -59,6 +59,8 @@ export type VirtualizedWorktreeViewportProps = {
   worktrees: Worktree[]
   folderWorkspaces: readonly FolderWorkspace[]
   selectedWorktreeIds: ReadonlySet<string>
+  // Rows the filters hide but the hidden line revealed; drawn dimmed.
+  revealedHiddenWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
   onSelectionGesture: (event: React.MouseEvent<HTMLElement>, worktreeId: string) => boolean
   onImmediateWorktreeActivate: (worktreeId: string, rowKey: string | undefined) => void

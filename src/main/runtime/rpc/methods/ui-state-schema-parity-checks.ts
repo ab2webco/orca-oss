@@ -14,6 +14,7 @@ type MainOwnedUIState =
   | '_planeIssueCardPropertyDefaulted'
   | '_jiraIssueWorktreeCardPropertyDefaulted'
   | '_agentFocusWorktreeCardPropertiesDefaulted'
+  | '_projectOrderNeedsYouMigrated'
   | 'starNagBaselineAgents'
   | 'starNagAppVersion'
   | 'starNagNextThreshold'

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   recordFeatureInteraction: vi.fn(),
   setActiveBrowserTab: vi.fn(),
   setActiveFile: vi.fn(),
+  revealWorktreeInSidebar: vi.fn(),
   setActiveTab: vi.fn(),
   setActiveTabType: vi.fn(),
   setActiveWorktree: vi.fn(),
@@ -154,6 +155,7 @@ function resetStore(): void {
     recordFeatureInteraction: mocks.recordFeatureInteraction,
     setActiveBrowserTab: mocks.setActiveBrowserTab,
     setActiveFile: mocks.setActiveFile,
+    revealWorktreeInSidebar: mocks.revealWorktreeInSidebar,
     setActiveTab: mocks.setActiveTab,
     setActiveTabType: mocks.setActiveTabType,
     setActiveWorktree: mocks.setActiveWorktree,
@@ -206,6 +208,8 @@ describe('useTabGroupWorkspaceModel terminal activation focus', () => {
 
     expect(mocks.createTab).toHaveBeenCalledWith('wt-1', 'group-1', 'zsh')
     expect(mocks.setActiveTab).toHaveBeenCalledWith('terminal-new')
+    // ORCA-1192: the group's + shell terminal brings its owner row into view, passively.
+    expect(mocks.revealWorktreeInSidebar).toHaveBeenCalledWith('wt-1', { passive: true })
   })
 
   it('returns keyboard focus to the active split pane leaf when a terminal tab is activated', async () => {
