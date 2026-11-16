@@ -146,10 +146,24 @@ describe('the brick breaker game file', () => {
     game.wall = { columns: 20, rows: 5, points: 5 }
     game.ball = { start: 20, max: 10, rampPerWall: 1 }
     game.colors = { bricks: [], paddle: '#ffffff', ball: '#ffffff' }
+    game.portrait = { field: { columns: 20, rows: 20 }, wall: { columns: 5, rows: 5 }, paddle: {} }
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
       'wall.columns: must be a whole number from 4 to 16',
       'ball.max: must be at least ball.start',
-      'colors.bricks: Too small: expected array to have >=1 items'
+      'colors.bricks: Too small: expected array to have >=1 items',
+      'portrait.paddle.width: must be from 2 to 10'
+    ])
+  })
+
+  it('wants a portrait field taller than wide', () => {
+    const game = bricks()
+    game.portrait = {
+      field: { columns: 20, rows: 20 },
+      wall: { columns: 5, rows: 5 },
+      paddle: { width: 4 }
+    }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'portrait.field.rows: must be more than field.columns'
     ])
   })
 })

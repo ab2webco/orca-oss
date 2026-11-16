@@ -1843,6 +1843,10 @@ A `bricks` file sets `name` and `fps` as above, plus (in field units, one unit a
 | `powerUps` | `{ chance, wideMs }`: drop chance per brick (0 to 0.5), how long a wide paddle lasts |
 | `colors`   | `{ bricks, paddle, ball }`; `bricks` is 1 to 8 colours, one per row in turn          |
 
+An optional `portrait` block, `{ field, wall: { columns, rows }, paddle: { width } }`, is played
+instead when the tab is taller than wide at the start of a run. Its `field` is 10 to 30 columns by
+16 to 48 rows and must be taller than wide.
+
 ### The runner
 
 The mod plays its own copy of the built-in runner

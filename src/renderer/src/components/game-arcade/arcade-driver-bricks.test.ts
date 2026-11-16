@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ORCHESTRATOR_GAME_ARCADE_BRICKS } from '../../../../shared/orchestrator-game-arcade-file'
 import { bricksStartOf } from '../../../../shared/orchestrator-game-arcade-bricks-rules'
 import { arcadeBoardOf } from './arcade-board'
-import { BRICKS_DRIVER } from './arcade-driver-bricks'
+import { BRICKS_DRIVER, bricksFitOf } from './arcade-driver-bricks'
 
 const game = JSON.parse(ORCHESTRATOR_GAME_ARCADE_BRICKS)
 const view = { width: 800, height: 600 }
@@ -31,5 +31,26 @@ describe('BRICKS_DRIVER', () => {
       view
     )
     expect(aimed?.target).toBeCloseTo(7.5)
+  })
+})
+
+describe('bricksFitOf', () => {
+  // The Arcade column at 768 with both side panels open.
+  const TALL = { width: 176, height: 1080 }
+
+  it('plays the portrait field in a tall tab, so its bricks are not dots', () => {
+    const laid = bricksFitOf(game, TALL)
+    expect(laid.field).toEqual({ columns: 15, rows: 24 })
+    expect(laid.wall).toEqual({ columns: 5, rows: 5, points: 5 })
+    expect(laid.paddle).toEqual({ width: 4, speed: 26 })
+    expect(arcadeBoardOf(TALL, game.field).cell).toBeLessThan(6)
+    expect(arcadeBoardOf(TALL, laid.field).cell).toBeGreaterThanOrEqual(10)
+    expect(bricksStartOf(laid, 1).bricks).toHaveLength(25)
+  })
+
+  it('keeps the file as is in a wide tab, or when the file has no portrait field', () => {
+    expect(bricksFitOf(game, view)).toBe(game)
+    const { portrait: _portrait, ...wideOnly } = game
+    expect(bricksFitOf(wideOnly, TALL)).toBe(wideOnly)
   })
 })

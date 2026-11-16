@@ -152,7 +152,19 @@ const bricksFileSchema = z.object({
     .refine((ball) => ball.max >= ball.start, atLeast('ball.start', 'max')),
   /** A broken brick drops a power-up this often: three balls, or a wide paddle for `wideMs`. */
   powerUps: z.object({ chance: bounded(0, 0.5), wideMs: bounded(2000, 30000) }),
-  colors: z.object({ bricks: z.array(color).min(1).max(8), paddle: color, ball: color })
+  colors: z.object({ bricks: z.array(color).min(1).max(8), paddle: color, ball: color }),
+  /** The field a tab taller than wide plays instead: narrower, so its bricks still read. */
+  portrait: z
+    .object({
+      field: z.object({ columns: whole(10, 30), rows: whole(16, 48) }),
+      wall: z.object({ columns: whole(3, 16), rows: whole(1, 8) }),
+      paddle: z.object({ width: bounded(2, 10) })
+    })
+    .refine((p) => p.field.rows > p.field.columns, {
+      path: ['field', 'rows'],
+      message: 'must be more than field.columns'
+    })
+    .optional()
 })
 
 export type OrchestratorGameArcadeRunner = z.infer<typeof runnerFileSchema>

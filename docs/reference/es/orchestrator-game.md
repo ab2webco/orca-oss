@@ -1,5 +1,5 @@
 ---
-sourceHash: 883e1b882543e059
+sourceHash: 9bcd71aa78138351
 ---
 
 # El juego orquestador de Agent Teams
@@ -1973,6 +1973,10 @@ una fila de ladrillos):
 | `ball`     | `{ start, max, rampPerWall }` en unidades por segundo; `max` al menos `start`                  |
 | `powerUps` | `{ chance, wideMs }`: probabilidad por ladrillo (de 0 a 0.5), cuánto dura la paleta ancha      |
 | `colors`   | `{ bricks, paddle, ball }`; `bricks` son de 1 a 8 colores, uno por fila por turno              |
+
+Un bloque `portrait` opcional, `{ field, wall: { columns, rows }, paddle: { width } }`, se juega en
+su lugar cuando la pestaña es más alta que ancha al empezar la partida. Su `field` va de 10 a 30
+columnas por 16 a 48 filas y tiene que ser más alto que ancho.
 
 ### El runner
 

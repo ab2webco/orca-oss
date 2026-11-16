@@ -11,5 +11,10 @@
     "bricks": ["#d4483b", "#f0a57a", "#f2c14e", "#7da84a", "#5f6f93"],
     "paddle": "#2f5fb3",
     "ball": "#fff4d6"
+  },
+  "portrait": {
+    "field": { "columns": 15, "rows": 24 },
+    "wall": { "columns": 5, "rows": 5 },
+    "paddle": { "width": 4 }
   }
 }

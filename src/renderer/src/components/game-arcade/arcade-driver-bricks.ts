@@ -8,7 +8,24 @@ import {
   type BricksState
 } from '../../../../shared/orchestrator-game-arcade-bricks-rules'
 import { bricksBackdropOf, bricksColumnAtOf, paintBricksRun } from './arcade-bricks-paint'
-import type { ArcadeDriver } from './arcade-run-state'
+import { arcadeIsTallOf } from './arcade-board'
+import type { ArcadeDriver, ArcadeView } from './arcade-run-state'
+
+/** The file's portrait field, wall and paddle in a tab taller than wide; the file as is otherwise. */
+export function bricksFitOf(
+  game: OrchestratorGameArcadeBricks,
+  view: ArcadeView
+): OrchestratorGameArcadeBricks {
+  const tall = game.portrait
+  return tall && arcadeIsTallOf(view)
+    ? {
+        ...game,
+        field: tall.field,
+        wall: { ...game.wall, ...tall.wall },
+        paddle: { ...game.paddle, ...tall.paddle }
+      }
+    : game
+}
 
 const MOVE_KEYS: Readonly<Record<string, Exclude<BricksMove, 0>>> = {
   ArrowLeft: -1,
@@ -19,6 +36,7 @@ const MOVE_KEYS: Readonly<Record<string, Exclude<BricksMove, 0>>> = {
 
 export const BRICKS_DRIVER: ArcadeDriver<OrchestratorGameArcadeBricks, BricksState> = {
   startOf: bricksStartOf,
+  fitOf: bricksFitOf,
   stepOf: bricksStepOf,
   inputOf: (game, state, input, view) => {
     if (input.kind === 'pointer') {
