@@ -11,7 +11,11 @@ import {
   type HeadlessPairedRuntimeHost
 } from './helpers/headless-paired-runtime-host'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import {
+  getTerminalContent,
+  waitForActivePaneHookDescriptor,
+  waitForActivePanePtyId
+} from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
@@ -47,6 +51,13 @@ function wordsSplitAcrossLines(value: Locator): Promise<string[]> {
     }
     return split
   })
+}
+
+/** Whether the active terminal shows this machine's user or host name, and a prompt at all. */
+async function namesInTerminal(page: Page): Promise<{ named: boolean; prompt: boolean }> {
+  const shown = await getTerminalContent(page)
+  const names = [os.userInfo().username, os.hostname().split('.')[0]]
+  return { named: names.some((name) => shown.includes(name)), prompt: shown.includes('$') }
 }
 
 function gitRepo(): string {
@@ -106,6 +117,15 @@ test('a member on a paired host gets its card, character, face and host name', a
       pairingCode
     )
 
+    // Why a bare prompt: a capture must not show the person's user or machine name.
+    if (process.platform !== 'win32') {
+      await client.call('terminal.send', {
+        terminal: lead,
+        text: "PS1='$ '; printf '\\033c'",
+        enter: true
+      })
+      await expect.poll(() => namesInTerminal(orcaPage)).toEqual({ named: false, prompt: true })
+    }
     await client.call('terminal.send', {
       terminal: lead,
       text: 'node -e "setInterval(() => {}, 1e9)"',
@@ -198,6 +218,13 @@ test('a member on a paired host gets its card, character, face and host name', a
     })
     await card.locator('button[aria-expanded]').first().click()
     await expect(card).toContainText('Elegido por el lead: implementación')
+    // Why: this window lacks the host's repo, so the card says so instead of a failed reveal.
+    await expect(card.locator('[data-team-card-host-hint]')).toHaveText(
+      'Agrega el repositorio del host a esta ventana para abrir su terminal.'
+    )
+    if (process.platform !== 'win32') {
+      expect(await namesInTerminal(orcaPage)).toEqual({ named: false, prompt: true })
+    }
 
     const errorToast = orcaPage.locator('[data-sonner-toast][data-type="error"]')
     const choice = card.locator('[data-team-detail="modelChoice"] dd')

@@ -16417,7 +16417,8 @@
       "detail": {
         "branch": "Rama",
         "tool": "Última herramienta",
-        "modelChoice": "Elección del modelo"
+        "modelChoice": "Elección del modelo",
+        "hostWorktreeMissing": "Agrega el repositorio del host a esta ventana para abrir su terminal."
       },
       "usage": {
         "session": "5 h",

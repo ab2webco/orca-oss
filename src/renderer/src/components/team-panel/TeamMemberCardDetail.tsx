@@ -202,11 +202,13 @@ function AccountUsage({ account, now }: { account: TeamAccount; now: number }): 
 export function TeamMemberCardDetail({
   card,
   now,
-  answer
+  answer,
+  hostWorktreeMissing = false
 }: {
   card: TeamMemberCard
   now: number
   answer: ReactNode
+  hostWorktreeMissing?: boolean
 }): React.JSX.Element {
   // Why not the summary: it is the last message's subject ("Re: Question"); the text is in Inbox.
   const title = card.ticket?.title ?? card.pr?.title ?? null
@@ -236,6 +238,14 @@ export function TeamMemberCardDetail({
           </div>
         ))}
       </dl>
+      {hostWorktreeMissing ? (
+        <p data-team-card-host-hint="" className="break-words text-muted-foreground">
+          {translate(
+            'teamPanel.card.detail.hostWorktreeMissing',
+            "Add the host's repository to this window to open its terminal."
+          )}
+        </p>
+      ) : null}
       {card.pr ? (
         <a
           data-team-pr-chip=""
