@@ -81,6 +81,7 @@ function runtimeWithLeadPane(leadPtyId: string, leadConnectionId: string | null 
   }
   const internals = runtime as unknown as {
     getTerminalHandleForPaneKey: (paneKey: string) => string | null
+    getPaneKeyForTerminalHandle: (handle: string) => string | null
     gameBoardProjectOf: (caller: { terminalHandle?: string }) => Promise<unknown>
   }
   const handleOf = (pane: typeof LEAD) =>
@@ -89,7 +90,10 @@ function runtimeWithLeadPane(leadPtyId: string, leadConnectionId: string | null 
     key: 'repo:lead',
     isMember: false,
     memberTicket: null,
-    lead: { handle: args.terminalHandle!, paneKey: null }
+    lead: {
+      handle: args.terminalHandle!,
+      paneKey: internals.getPaneKeyForTerminalHandle(args.terminalHandle!)
+    }
   }))
   const leads = runtime.getGameLeads()
   return {
@@ -105,6 +109,11 @@ function runtimeWithLeadPane(leadPtyId: string, leadConnectionId: string | null 
       if (renderer !== 'notSynced') {
         syncGraph()
       }
+    },
+    /** A reattached PTY brings its spawn-time handle, and the pane's earlier handle still resolves (ORCA-1221). */
+    reattachLeadAs: (handle: string) => {
+      runtime.registerPreAllocatedHandleForPty(leadPtyId, handle)
+      return handleOf(LEAD)
     },
     listed: async () => (await leads.list()).leads.map((one) => one.handle),
     claimFrom: (terminalHandle: string) =>
@@ -161,6 +170,21 @@ describe('game lead liveness, through the runtime', () => {
     await expect(game.claimFrom(game.caller)).resolves.toEqual({
       registered: false,
       live: { handle: game.lead }
+    })
+  })
+
+  it('keeps the lead pane as the lead after it answers to a new handle (ORCA-1221)', async () => {
+    const game = runtimeWithLeadPane('pty-lead')
+    await game.claimFrom(game.lead)
+
+    const lead = game.reattachLeadAs('term_env')
+
+    expect(lead).toBe('term_env')
+    await expect(game.claimFrom(lead)).resolves.toEqual({ registered: true })
+    expect(await game.listed()).toEqual([lead])
+    await expect(game.claimFrom(game.caller)).resolves.toEqual({
+      registered: false,
+      live: { handle: lead }
     })
   })
 })
