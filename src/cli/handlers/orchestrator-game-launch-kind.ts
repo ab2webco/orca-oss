@@ -1,5 +1,9 @@
 import { RuntimeClientError } from '../runtime-client'
 import {
+  gameKindEffortPlanOf,
+  type GameEffortPlan
+} from '../../shared/orchestrator-game-effort-plan'
+import {
   gameKindLaunchOf,
   gameLaunchChosenByOf,
   type GameLaunchChosenBy,
@@ -32,6 +36,13 @@ export function gameKindLaunchParamsOf(
   const chosenBy = gameLaunchChosenByOf(typed.kind ?? null, title)
   const { model, effort } = gameKindLaunchOf(chosenBy.kind)
   return { model, effort, modelChosenBy: chosenBy }
+}
+
+/** The ticket's seeded effort plan when its kind picked the model (ORCA-1242); a pin plans nothing. */
+export function gameKindEffortPlanSeedOf(model: { modelChosenBy?: GameLaunchChosenBy }): {
+  effortPlan?: GameEffortPlan
+} {
+  return model.modelChosenBy ? { effortPlan: gameKindEffortPlanOf(model.modelChosenBy.kind) } : {}
 }
 
 /** A member's worker-start model: the flag or orca.yaml choice, else its ticket kind's default. */

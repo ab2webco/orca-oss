@@ -1,0 +1,81 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ORCHESTRATOR_GAME_PLAN_HANDLERS } from './orchestrator-game-plan'
+import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
+import { REPEATED_FLAG_SEPARATOR } from '../args'
+import { gameKindEffortPlanOf } from '../../shared/orchestrator-game-effort-plan'
+
+function fakeClient(answer: unknown) {
+  const calls: [string, Record<string, unknown>][] = []
+  const client = {
+    call: async (method: string, params: Record<string, unknown>) => {
+      calls.push([method, params])
+      if (answer instanceof Error) {
+        throw answer
+      }
+      return { ok: true, result: answer }
+    }
+  } as unknown as RuntimeClient
+  return { client, calls }
+}
+
+const run = (client: RuntimeClient, flags: [string, string][], json = false) =>
+  ORCHESTRATOR_GAME_PLAN_HANDLERS['game plan']({ flags: new Map(flags), client, cwd: '/r', json })
+
+let printed: string[]
+beforeEach(() => {
+  printed = []
+  vi.spyOn(console, 'log').mockImplementation((line: unknown) => {
+    printed.push(String(line))
+  })
+})
+afterEach(() => vi.restoreAllMocks())
+
+describe('orca game plan', () => {
+  it("prints a ticket's plan when no phase is given", async () => {
+    const { client, calls } = fakeClient({
+      ticket: 'ORCA-7',
+      known: true,
+      plan: gameKindEffortPlanOf('audit')
+    })
+    await run(client, [['ticket', 'orca-7']])
+    expect(calls).toEqual([['game.effortPlan', expect.objectContaining({ ticket: 'ORCA-7' })]])
+    expect(calls[0]?.[1]).not.toHaveProperty('phases')
+    expect(printed.join('')).toContain('ORCA-7 · plan: audit ticket default')
+    expect(printed.join('')).toContain('map  Sonnet 5.5 · medium')
+  })
+
+  it('sends every --phase in order as the lead plan', async () => {
+    const { client, calls } = fakeClient({ ticket: 'ORCA-7', known: true, plan: null })
+    const phases = ['map:sonnet-5-5:medium:read', 'implement:opus-5-5:high:risky path'].join(
+      REPEATED_FLAG_SEPARATOR
+    )
+    await run(client, [
+      ['ticket', 'ORCA-7'],
+      ['phase', phases]
+    ])
+    expect(calls[0]?.[1].phases).toEqual([
+      { phase: 'map', model: 'claude-sonnet-5-5', effort: 'medium', why: 'read' },
+      { phase: 'implement', model: 'claude-opus-5-5', effort: 'high', why: 'risky path' }
+    ])
+  })
+
+  it('refuses a bad phase before calling Orca, and names a ticket nobody launched', async () => {
+    const { client, calls } = fakeClient({ ticket: 'ORCA-8', known: false, plan: null })
+    await expect(
+      run(client, [
+        ['ticket', 'ORCA-8'],
+        ['phase', 'deploy:opus-5-5:high:x']
+      ])
+    ).rejects.toThrow('Unknown phase "deploy"')
+    expect(calls).toEqual([])
+    await expect(run(client, [])).rejects.toThrow('orca game plan <ticket>')
+
+    await run(client, [['ticket', 'ORCA-8']])
+    expect(printed.join('')).toContain('No member is saved for ORCA-8 in this project.')
+  })
+
+  it('says to update Orca when the runtime has no plans yet', async () => {
+    const { client } = fakeClient(new RuntimeClientError('method_not_found', 'Unknown method'))
+    await expect(run(client, [['ticket', 'ORCA-7']])).rejects.toThrow('Update or restart Orca Lab')
+  })
+})

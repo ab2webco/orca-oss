@@ -3,7 +3,12 @@ import {
   ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
 } from '../../shared/protocol-version'
-import { gameKindLaunchParamsOf, gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
+import {
+  gameKindEffortPlanSeedOf,
+  gameKindLaunchParamsOf,
+  gameMemberModelParamsOf
+} from './orchestrator-game-launch-kind'
+import { gameKindEffortPlanOf } from '../../shared/orchestrator-game-effort-plan'
 import { parseGameLaunchFlags } from './orchestrator-game-launch-options'
 
 const CAPABLE = [
@@ -60,6 +65,15 @@ describe('gameKindLaunchParamsOf', () => {
     expect(gameMemberModelParamsOf(claude, {}, 'Audit it', CAPABLE)).toMatchObject({
       modelChosenBy: { kind: 'audit', source: 'ticket' }
     })
+  })
+
+  // ORCA-1242: the kind that picked the launch model also seeds the ticket's effort plan.
+  it("seeds the kind's effort plan only when the kind picked the model", () => {
+    const picked = gameMemberModelParamsOf(claude, { kind: 'review' }, 'x', CAPABLE)
+    expect(gameKindEffortPlanSeedOf(picked)).toEqual({ effortPlan: gameKindEffortPlanOf('review') })
+    const typed = { agent: 'claude', model: 'claude-haiku-5-5', effort: 'low' }
+    expect(gameKindEffortPlanSeedOf(gameMemberModelParamsOf(typed, {}, 'x', CAPABLE))).toEqual({})
+    expect(gameKindEffortPlanSeedOf(gameKindLaunchParamsOf(claude, {}, 'x', []))).toEqual({})
   })
 
   // Why: an older runtime would pin the default, locking a router (Jev) out of the member.

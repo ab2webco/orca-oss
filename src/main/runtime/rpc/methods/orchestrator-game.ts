@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isHttpUrl } from '../../../../shared/orchestrator-game-integrations'
+import { gameEffortPlanOf } from '../../../../shared/orchestrator-game-effort-plan'
 import { GAME_PANEL_TABS } from '../../../../shared/orchestrator-game-panel'
 import {
   ORCHESTRATOR_GAME_VIEWS,
@@ -81,7 +82,18 @@ const GameMemberRecordParams = z.object({
     accountId: memberText,
     account: memberText,
     lastState: memberText,
-    adoptedPaneKey: memberText
+    adoptedPaneKey: memberText,
+    effortPlan: z
+      .unknown()
+      .optional()
+      .transform((raw, ctx) => {
+        const plan = raw === undefined ? undefined : gameEffortPlanOf(raw)
+        if (plan === null) {
+          ctx.addIssue({ code: 'custom', message: 'The effort plan cannot be read.' })
+          return z.NEVER
+        }
+        return plan
+      })
   })
 })
 

@@ -45,6 +45,14 @@ describe('gameLeadBriefOf', () => {
     )
   })
 
+  // ORCA-1242: the lead plans each ticket's effort; the steward follows the plan.
+  it("tells the lead to plan each ticket's effort per phase and fix the plan when scope moves", () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+    expect(brief).toContain('`orca game plan <ticket>`')
+    expect(brief).toContain('--phase name:model:effort:why')
+    expect(brief).toContain('when the scope changes')
+  })
+
   it('names the fleet verbs: status, a wave from the To Do, a verified sweep and a push', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 

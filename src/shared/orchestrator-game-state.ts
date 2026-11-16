@@ -22,7 +22,8 @@ import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 import { gameToolInputOf } from './orchestrator-game-tool-input'
-import type { GameQueuedMember, GameUnlistedMember } from './orchestrator-game-member-sessions'
+import type { GameUnlistedMember } from './orchestrator-game-member-sessions'
+import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import type { GameStatePausedMember } from './orchestrator-game-adopted-members'
 
 export type GameStatusGroup =

@@ -14,7 +14,8 @@ import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orches
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { gameMemberModelTextOf } from './team-panel-agent-model'
 import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
-import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import type { GamePausedMember } from './orchestrator-game-member-sessions'
+import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
   gameFleetHostLoadsOf,
   localGameFreeOf,

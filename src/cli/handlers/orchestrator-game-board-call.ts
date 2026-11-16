@@ -2,6 +2,7 @@ import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { RuntimeRpcSuccess } from '../../shared/runtime-rpc-envelope'
 import type { GameEventKind } from '../../shared/orchestrator-game-events'
+import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { gameDropTargetOf } from '../../shared/orchestrator-game-dropped-agents'
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
@@ -86,7 +87,10 @@ export async function postGameEvents(
 /** Saves what the lead needs to resume a member after a restart; never fails the launch it rides on. */
 export async function recordGameMember(
   client: Client,
-  member: { ticket: string } & Record<string, string | undefined>
+  member: { ticket: string; effortPlan?: GameEffortPlan } & Record<
+    string,
+    string | GameEffortPlan | undefined
+  >
 ): Promise<void> {
   await client.call('game.memberRecord', { ...gameBoardCaller(), member }).catch(() => undefined)
 }
