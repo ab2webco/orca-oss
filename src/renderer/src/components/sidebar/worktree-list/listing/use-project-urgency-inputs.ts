@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
@@ -7,6 +7,7 @@ import type { ProjectActivityInputs, ProjectUrgencyInputs } from '../grouping/pr
 import type { WorkspaceUrgencySignal } from '../grouping/project-urgency-tier'
 import { useProjectTierMemory } from './project-tier-memory-store'
 import { useIdleProjectFoldInputs } from './use-idle-project-fold-inputs'
+import { useStableIdentity } from './use-stable-identity'
 import {
   selectCIFailingWorktreeIds,
   selectWorkspaceUrgencySignals
@@ -22,15 +23,6 @@ function sameIds(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean
   return left.size === right.size && [...left].every((id) => right.has(id))
 }
 
-/** Keeps the previous value while the next one is equal, so buildRows' memo holds. */
-function useStable<T>(next: T, same: (left: T, right: T) => boolean): T {
-  const previous = useRef<T | null>(null)
-  if (previous.current === null || !same(previous.current, next)) {
-    previous.current = next
-  }
-  return previous.current
-}
-
 function useProjectUrgencyInputs(
   worktrees: readonly Worktree[],
   repoMap: Map<string, Repo>,
@@ -43,7 +35,7 @@ function useProjectUrgencyInputs(
   const settings = useAppStore((s) => s.settings)
   const roster = useSidebarTeamRosterStore((s) => s.model)
   const tierMemory = useProjectTierMemory()
-  const signals = useStable(
+  const signals = useStableIdentity(
     useMemo(() => {
       void sortEpoch
       void agentStatusEpoch
@@ -51,7 +43,7 @@ function useProjectUrgencyInputs(
     }, [agentStatusEpoch, now, roster, sortEpoch, worktrees]),
     sameSignals
   )
-  const ciFailing = useStable(
+  const ciFailing = useStableIdentity(
     useMemo(
       () => selectCIFailingWorktreeIds(worktrees, repoMap, prCache, settings),
       [prCache, repoMap, settings, worktrees]

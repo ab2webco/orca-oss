@@ -1,8 +1,9 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { useNow } from '../../../dashboard/useNow'
 import type { ProjectActivityInputs } from '../grouping/project-activity'
 import { selectIdleProjectFoldInputs } from './idle-project-fold-inputs'
+import { useStableIdentity } from './use-stable-identity'
 
 // Why coarse: the window is 24 h, and every tick rebuilds the whole row model.
 const FOLD_CLOCK_INTERVAL_MS = 5 * 60 * 1000
@@ -23,12 +24,11 @@ export function useIdleProjectFoldInputs(): ProjectActivityInputs {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const agentStatusEpoch = useAppStore((s) => s.agentStatusEpoch)
   const windowHours = useAppStore((s) => s.settings?.sidebarActivityWindowHours)
-  const previous = useRef<ProjectActivityInputs | null>(null)
-  return useMemo(() => {
+  const next = useMemo(() => {
     void agentStatusEpoch
     // Why snapshot on agentStatusEpoch: membership changes bump it; hook pings do not repaint the list.
     const { agentStatusByPaneKey, tabsByWorktree } = useAppStore.getState()
-    const next = selectIdleProjectFoldInputs(
+    return selectIdleProjectFoldInputs(
       {
         activeWorkspaceKey,
         activeWorktreeId,
@@ -38,11 +38,7 @@ export function useIdleProjectFoldInputs(): ProjectActivityInputs {
       },
       now
     )
-    // Why reuse: these inputs feed the buildRows memo; a fresh identity per epoch rebuilds every row.
-    if (previous.current && sameInputs(previous.current, next)) {
-      return previous.current
-    }
-    previous.current = next
-    return next
   }, [activeWorkspaceKey, activeWorktreeId, agentStatusEpoch, now, windowHours])
+  // Why reuse: these inputs feed the buildRows memo; a fresh identity per epoch rebuilds every row.
+  return useStableIdentity(next, sameInputs)
 }
