@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -25,6 +25,28 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
       page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
     )
     .toBe(theme)
+}
+
+/** Words of a wrapped value whose letters land on two lines: the value broke inside a word. */
+function wordsSplitAcrossLines(value: Locator): Promise<string[]> {
+  return value.evaluate((node) => {
+    const split: string[] = []
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+      const content = text.textContent ?? ''
+      const words = /\S+/g
+      for (let word = words.exec(content); word; word = words.exec(content)) {
+        const range = document.createRange()
+        range.setStart(text, word.index)
+        range.setEnd(text, word.index + word[0].length)
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)))
+        if (lines.size > 1) {
+          split.push(word[0])
+        }
+      }
+    }
+    return split
+  })
 }
 
 function gitRepo(): string {
@@ -177,12 +199,19 @@ test('a member on a paired host gets its card, character, face and host name', a
     await card.locator('button[aria-expanded]').first().click()
     await expect(card).toContainText('Elegido por el lead: implementación')
 
+    const errorToast = orcaPage.locator('[data-sonner-toast][data-type="error"]')
+    const choice = card.locator('[data-team-detail="modelChoice"] dd')
     for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 900 })
+      expect
+        .soft(await wordsSplitAcrossLines(choice), `a word breaks mid-word at ${width}px`)
+        .toEqual([])
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
         const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
         expect(overflow, `panel overflows at ${width}px ${theme}`).toBeLessThanOrEqual(0)
+        // Why: a capture must not show an error state over the panel.
+        await expect.soft(errorToast, `error toast at ${width}px ${theme}`).toHaveCount(0)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`remote-card-${width}-${theme}.png`)

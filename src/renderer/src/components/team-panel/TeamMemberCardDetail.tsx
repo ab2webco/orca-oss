@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { StatusDot } from '@/components/StatusDot'
 import { formatUsagePercentageLabel } from '@/components/status-bar/usage-percentage-label'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import { accountLimitsOf } from '../../../../shared/orchestrator-game-member-limit'
 import { formatResetDuration } from '../../../../shared/rate-limit-reset-format'
@@ -212,17 +213,23 @@ export function TeamMemberCardDetail({
   const ci = card.pr ? teamCiText(card.pr) : null
   const ciTone = card.pr ? statusToneOfCi(card.pr) : null
   return (
-    <div data-team-card-detail="" className="flex min-w-0 flex-col gap-2.5 px-3 pb-3 pt-1 text-xs">
+    <div
+      data-team-card-detail=""
+      className="@container flex min-w-0 flex-col gap-2.5 px-3 pb-3 pt-1 text-xs"
+    >
       {answer}
       {title ? (
         <p data-team-card-title="" className="break-words text-[13px] font-medium text-foreground">
           {title}
         </p>
       ) : null}
-      <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
-        {factsOf(card).map((fact) => (
+      {/* Why stacked when narrow: beside a full label the value column is narrower than one word. */}
+      <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 @max-[16rem]:grid-cols-1 @max-[16rem]:gap-y-0">
+        {factsOf(card).map((fact, index) => (
           <div key={fact.key} data-team-detail={fact.key} className="contents">
-            <dt className="text-muted-foreground">{fact.label}</dt>
+            <dt className={cn('text-muted-foreground', index > 0 && '@max-[16rem]:mt-1.5')}>
+              {fact.label}
+            </dt>
             <dd className={`min-w-0 text-foreground ${fact.wraps ? 'break-words' : 'truncate'}`}>
               {fact.value}
             </dd>
