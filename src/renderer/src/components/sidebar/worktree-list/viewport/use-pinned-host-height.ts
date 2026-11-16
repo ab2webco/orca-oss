@@ -10,41 +10,30 @@ export function usePinnedHostHeight(
   scrollRef: React.RefObject<HTMLDivElement | null>
 ): React.MutableRefObject<number | undefined> {
   const heightRef = useRef<number | undefined>(undefined)
-  const observedRef = useRef<{ element: Element; observer: ResizeObserver } | null>(null)
 
+  // Why no deps: the pinned host card is whichever row is sticky now, so it can change on any render.
   useLayoutEffect(() => {
     const root = scrollRef.current
     const host = root?.querySelector(PINNED_HOST_SELECTOR) ?? null
-    const publish = (element: Element): void => {
-      const height = element.getBoundingClientRect().height
-      if (!root || height <= 0 || height === heightRef.current) {
+    if (!root || !host) {
+      return undefined
+    }
+    const publish = (): void => {
+      const height = host.getBoundingClientRect().height
+      if (height <= 0 || height === heightRef.current) {
         return
       }
       heightRef.current = height
       root.style.setProperty(PINNED_HOST_HEIGHT_VARIABLE, `${height}px`)
     }
-    if (host) {
-      publish(host)
+    publish()
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined
     }
-    if (observedRef.current?.element === host) {
-      return
-    }
-    observedRef.current?.observer.disconnect()
-    observedRef.current = null
-    if (host && typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(() => publish(host))
-      observer.observe(host)
-      observedRef.current = { element: host, observer }
-    }
+    const observer = new ResizeObserver(publish)
+    observer.observe(host)
+    return () => observer.disconnect()
   })
-
-  useLayoutEffect(
-    () => () => {
-      observedRef.current?.observer.disconnect()
-      observedRef.current = null
-    },
-    []
-  )
 
   return heightRef
 }

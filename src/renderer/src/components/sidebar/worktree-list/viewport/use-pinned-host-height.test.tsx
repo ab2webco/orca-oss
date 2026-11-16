@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, renderHook } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PINNED_HOST_HEIGHT_VARIABLE, usePinnedHostHeight } from './use-pinned-host-height'
 
 function scrollRootWithPinnedHost(height: number | null): HTMLDivElement {
@@ -28,6 +28,32 @@ describe('usePinnedHostHeight', () => {
 
     expect(result.current.current).toBe(44)
     expect(root.style.getPropertyValue(PINNED_HOST_HEIGHT_VARIABLE)).toBe('44px')
+  })
+
+  it('disconnects every observer it created once unmounted', () => {
+    const live = new Set<object>()
+    class TrackedResizeObserver {
+      observe(): void {
+        live.add(this)
+      }
+      unobserve(): void {}
+      disconnect(): void {
+        live.delete(this)
+      }
+    }
+    vi.stubGlobal('ResizeObserver', TrackedResizeObserver)
+    try {
+      const root = scrollRootWithPinnedHost(44)
+      const { rerender, unmount } = renderHook(() => usePinnedHostHeight({ current: root }))
+      root.querySelector('[data-worktree-sticky-host-active]')?.remove()
+      root.append(scrollRootWithPinnedHost(52).firstElementChild!)
+      rerender()
+      expect(live.size).toBe(1)
+      unmount()
+      expect(live.size).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('leaves the fallback in place while no host card is pinned', () => {
