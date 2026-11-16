@@ -11,7 +11,9 @@ type Words = {
   stopAll: string
   stopConfirm: (count: number) => string
   cancel: string
+  sending: (label: string) => string
   sent: (label: string) => string
+  launched: (count: number) => string
   failed: (label: string) => string
   stoppedBy: (by: string) => string
   stopped: string
@@ -40,7 +42,9 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     stopAll: 'Stop every member',
     stopConfirm: (count) => `Stop all ${count} members? They stay stopped until you push them.`,
     cancel: 'Cancel',
+    sending: (label) => `Sending ${label} to the lead…`,
     sent: (label) => `Sent to the lead: ${label}`,
+    launched: (count) => `Wave launched ${count} ${count === 1 ? 'member' : 'members'}`,
     failed: (label) => `Could not send ${label}`,
     stoppedBy: (by) => `Stopped by ${by}`,
     stopped: 'Stopped',
@@ -74,7 +78,9 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     stopConfirm: (count) =>
       `¿Detener a los ${count} miembros? Siguen parados hasta que los reactives.`,
     cancel: 'Cancelar',
+    sending: (label) => `Enviando ${label} al líder…`,
     sent: (label) => `Enviado al líder: ${label}`,
+    launched: (count) => `La ola lanzó ${count} ${count === 1 ? 'miembro' : 'miembros'}`,
     failed: (label) => `No se pudo enviar ${label}`,
     stoppedBy: (by) => `Detenido por ${by}`,
     stopped: 'Detenido',

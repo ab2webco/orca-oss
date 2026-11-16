@@ -84,10 +84,12 @@ export function memberRowOf(
   const state = hooked === 'done' && card?.condition === 'idle' ? 'idle' : hooked
   const item = isRecord(raw.workItem) && text(raw.workItem.identifier) ? raw.workItem : null
   const worktree = isRecord(raw.worktree) ? raw.worktree : {}
-  const name = text(raw.displayName) ?? text(worktree.displayName) ?? key
+  const paneName = text(raw.displayName) ?? text(worktree.displayName) ?? key
   const ticket = item
     ? (item.identifier as string).toUpperCase()
-    : (ticketInText(name) ?? ticketInText(text(worktree.branch)))
+    : (ticketInText(paneName) ?? ticketInText(text(worktree.branch)))
+  // Why the card's name: the pane's display name carries the ticket the card already shows.
+  const name = card?.name ?? paneName
   const remote = isRecord(raw.remote) ? raw.remote : null
   const ask = memberAskOf(
     { state, toolName: text(raw.toolName), limit: raw.limit } as GameAgent,

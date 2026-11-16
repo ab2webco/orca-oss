@@ -14,9 +14,8 @@ import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-char
 import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
 import { useTeamSceneArt } from './use-team-scene-art'
 import { useHostTeamTones } from './use-host-team-tones'
-import { sendTeamLeadTurn } from './team-lead-turn-send'
+import { sendTeamLeadTurn, type TeamTurnResult } from './team-lead-turn-send'
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
-import type { LeadPromptOutcome } from '../../../src/shared/team-lead-prompt-sender'
 
 // Why 20 s: game.state reads reviews and metrics; the desktop Panel already polls the same cache.
 const TEAM_REFRESH_MS = 20_000
@@ -150,10 +149,10 @@ export function useTeamDrawer(args: {
   const sendAction = useMemo(
     () =>
       view && client && terminalHandle
-        ? (action: TeamAction): Promise<LeadPromptOutcome> =>
+        ? (action: TeamAction): Promise<TeamTurnResult> =>
             action.send
               ? sendTeamLeadTurn(client, terminalHandle, action.id, action.send)
-              : Promise.resolve('failed')
+              : Promise.resolve({ outcome: 'failed', reason: null })
         : null,
     [client, terminalHandle, view]
   )

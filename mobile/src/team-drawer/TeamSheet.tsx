@@ -140,12 +140,14 @@ export function TeamSheet({
         />
       ) : null}
       <Animated.View
-        style={[styles.dock, styles.sheet, { height: sheetHeight }, drag.sheetStyle]}
+        style={[styles.sheet, { height: sheetHeight }, drag.sheetStyle]}
         onLayout={(event) => setLaidOut(Math.round(event.nativeEvent.layout.height))}
         accessibilityViewIsModal={open}
       >
+        {/* Why: the rounded corners showed the terminal row behind them as a stray glyph in the drag area. */}
+        <View testID="team-sheet-corners" style={styles.corners} />
         {/* Why inside the sheet: a root over the column would swallow the terminal's touches on Android. */}
-        <GestureHandlerRootView style={styles.body}>
+        <GestureHandlerRootView style={[styles.dock, styles.body, styles.clip]}>
           <GestureDetector gesture={drag.handlePan}>
             <View collapsable={false}>
               <PeekBar peek={peek} open={open} words={words} onPress={() => setOpen(!open)} />
@@ -290,8 +292,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 30,
-    maxHeight: '100%',
+    maxHeight: '100%'
+  },
+  clip: {
     overflow: 'hidden'
+  },
+  corners: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: radii.card,
+    backgroundColor: colors.terminalBg
   },
   body: {
     flex: 1
