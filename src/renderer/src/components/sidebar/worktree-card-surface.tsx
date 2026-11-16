@@ -11,6 +11,7 @@ import { WorktreeCardRowContent, WorktreeCardTeamChildren } from './worktree-car
 import { useSidebarTeamCard } from './sidebar-team-roster'
 import { useSidebarDeliveredView } from './use-sidebar-delivered-view'
 import { SidebarDeliveredHoverCard } from './SidebarDeliveredHoverCard'
+import { SidebarTeamHoverCard } from './SidebarTeamHoverCard'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -144,7 +145,12 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       parentHoverTriggerBody
     )
 
-  const parentCardBodyWithHoverDetails = delivered ? (
+  // Why: V30 gives a team row its agent's card under any card style, not the worktree's details.
+  const parentCardBodyWithHoverDetails = team.row ? (
+    <SidebarTeamHoverCard row={team.row} repoName={card.repo?.displayName ?? null}>
+      {parentHoverTriggerBody}
+    </SidebarTeamHoverCard>
+  ) : delivered ? (
     <SidebarDeliveredHoverCard view={delivered}>{parentHoverTriggerBody}</SidebarDeliveredHoverCard>
   ) : (
     classicCardBodyWithHoverDetails
