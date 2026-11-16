@@ -4,6 +4,10 @@ import type { AppState } from '../types'
 import { gameArcadeTabIdOf } from '../../components/game-arcade/arcade-tab-id'
 import { arcadeTabTitle } from '../../components/game-arcade/arcade-words'
 import {
+  pickOrchestratorGameArcadeEngine,
+  type OrchestratorGameArcadeEngine
+} from '../../../../shared/orchestrator-game-arcade-file'
+import {
   createRecentlyClosedTabPositionIndex,
   getRecentlyClosedTabPosition,
   restoreRecentlyClosedTabPosition,
@@ -275,6 +279,8 @@ export type OpenFile = {
   conflictReview?: ConflictReviewState
   /** Renewed by every saved play, so the Arcade tab remounts with a fresh run. */
   arcadeRunId?: number
+  /** The built-in game this play runs, picked at random per play. */
+  arcadeEngine?: OrchestratorGameArcadeEngine
   isPreview?: boolean // preview tabs are replaced when another file is single-clicked
   isUntitled?: boolean // true for files created via "New Markdown" that haven't been renamed yet
   // Why: templated New Markdown files have real content at creation, unlike blank placeholders that can be discarded.
@@ -611,7 +617,7 @@ export type EditorSlice = {
     source: ConflictReviewState['source']
   ) => void
   /** Opens or focuses this worktree's Arcade tab; the caller has already spent a credit. */
-  openGameArcadeTab: (worktreeId: string) => void
+  openGameArcadeTab: (worktreeId: string, engine?: OrchestratorGameArcadeEngine) => void
   openCheckRunDetails: (
     worktreeId: string,
     contextKey: string,
@@ -3848,13 +3854,13 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     void openWorkspaceEditorItem(get(), id, worktreeId, 'Conflict Review', 'conflict-review')
   },
 
-  openGameArcadeTab: (worktreeId) => {
+  openGameArcadeTab: (worktreeId, engine = pickOrchestratorGameArcadeEngine(Math.random())) => {
     const id = gameArcadeTabIdOf(worktreeId)
     const label = arcadeTabTitle()
     const arcadeRunId = Date.now()
     set((s) => ({
       openFiles: s.openFiles.some((f) => f.id === id)
-        ? s.openFiles.map((f) => (f.id === id ? { ...f, arcadeRunId } : f))
+        ? s.openFiles.map((f) => (f.id === id ? { ...f, arcadeRunId, arcadeEngine: engine } : f))
         : [
             ...s.openFiles,
             {
@@ -3865,7 +3871,8 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
               language: 'plaintext',
               isDirty: false,
               mode: 'arcade' as const,
-              arcadeRunId
+              arcadeRunId,
+              arcadeEngine: engine
             }
           ],
       activeFileId: id,

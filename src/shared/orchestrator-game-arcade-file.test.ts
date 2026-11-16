@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   ORCHESTRATOR_GAME_ARCADE_FPS_MAX,
   ORCHESTRATOR_GAME_ARCADE_MAX_BYTES,
+  ORCHESTRATOR_GAME_ARCADE_ENGINES,
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
   orchestratorGameArcadeIssues,
-  parseOrchestratorGameArcade
+  parseOrchestratorGameArcade,
+  pickOrchestratorGameArcadeEngine
 } from './orchestrator-game-arcade-file'
 
 const runner = (): Record<string, unknown> => JSON.parse(ORCHESTRATOR_GAME_ARCADE_RUNNER)
@@ -91,5 +93,12 @@ describe('orchestratorGameArcadeIssues', () => {
 
   it('says when the text is not JSON at all', () => {
     expect(orchestratorGameArcadeIssues('{ engine: ')).toEqual(['not valid JSON'])
+  })
+})
+
+describe('pickOrchestratorGameArcadeEngine', () => {
+  it('reaches every built-in game across the roll, the edges included', () => {
+    const picked = new Set([0, 0.25, 0.5, 0.75, 0.999999, 1].map(pickOrchestratorGameArcadeEngine))
+    expect([...picked].sort()).toEqual([...ORCHESTRATOR_GAME_ARCADE_ENGINES].sort())
   })
 })

@@ -5,6 +5,16 @@ import runnerData from './orchestrator-game-arcade-runner.json'
 /** A game the arcade offers after a perfect merge: inert data one of the game's built-in engines plays. */
 
 export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner'] as const
+export type OrchestratorGameArcadeEngine = (typeof ORCHESTRATOR_GAME_ARCADE_ENGINES)[number]
+
+/** One of the built-in games for `roll` in [0, 1). */
+export const pickOrchestratorGameArcadeEngine = (roll: number): OrchestratorGameArcadeEngine =>
+  ORCHESTRATOR_GAME_ARCADE_ENGINES[
+    Math.min(
+      ORCHESTRATOR_GAME_ARCADE_ENGINES.length - 1,
+      Math.max(0, Math.floor(roll * ORCHESTRATOR_GAME_ARCADE_ENGINES.length))
+    )
+  ]
 export const ORCHESTRATOR_GAME_ARCADE_MAX_BYTES = 16 * 1024
 // Why 15: the scene already repaints every 120 ms; past ~15 fps a terminal Raster drops frames.
 export const ORCHESTRATOR_GAME_ARCADE_FPS_MIN = 5
@@ -106,6 +116,7 @@ const arcadeFileSchema = z.object({
 })
 
 export type OrchestratorGameArcade = z.infer<typeof arcadeFileSchema>
+export type OrchestratorGameArcadeRunner = OrchestratorGameArcade
 
 /** The runner every scene can play: the scene's own decoration plus a rock for scenes without one. */
 export const ORCHESTRATOR_GAME_ARCADE_RUNNER = `${JSON.stringify(runnerData, null, 2)}\n`

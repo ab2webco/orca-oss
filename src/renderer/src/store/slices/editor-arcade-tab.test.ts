@@ -16,4 +16,15 @@ describe('openGameArcadeTab', () => {
     expect(store.getState().activeTabTypeByWorktree['wt-1']).toBe('editor')
     now.mockRestore()
   })
+
+  it('keeps the engine a play asked for, and picks a built-in one when none is given', () => {
+    const store = createEditorTabsStore()
+    store.getState().openGameArcadeTab('wt-1', 'runner')
+    const arcadeOf = () => store.getState().openFiles.find((file) => file.mode === 'arcade')
+    expect(arcadeOf()?.arcadeEngine).toBe('runner')
+    const roll = vi.spyOn(Math, 'random').mockReturnValue(0)
+    store.getState().openGameArcadeTab('wt-1')
+    expect(arcadeOf()?.arcadeEngine).toBe('runner')
+    roll.mockRestore()
+  })
 })

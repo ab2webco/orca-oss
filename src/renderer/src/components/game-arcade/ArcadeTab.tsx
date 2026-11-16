@@ -2,32 +2,39 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   parseOrchestratorGameArcade,
-  ORCHESTRATOR_GAME_ARCADE_RUNNER
+  ORCHESTRATOR_GAME_ARCADE_RUNNER,
+  type OrchestratorGameArcade,
+  type OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
 import { arcadeBackdropOf, paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
-  pressArcadeRun,
+  inputArcadeRun,
   stepArcadeRun,
+  type ArcadeInput,
   type ArcadeRun
 } from './arcade-run-state'
 import { arcadeCanvasLabel, arcadeWordsOf } from './arcade-words'
 import { whoIsWaitingOnUser } from './arcade-hold'
 import { keepArcadeRun, keptArcadeRunOf } from './arcade-kept-runs'
 
-const GAME = (() => {
-  const parsed = parseOrchestratorGameArcade(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+const builtInOf = (text: string): OrchestratorGameArcade => {
+  const parsed = parseOrchestratorGameArcade(text)
   if (!parsed.ok) {
-    throw new Error(`The built-in runner is invalid: ${parsed.error}`)
+    throw new Error(`A built-in arcade game is invalid: ${parsed.error}`)
   }
   return parsed.game
-})()
+}
 
-const JUMP_KEYS = new Set(['Space', 'ArrowUp'])
+const GAMES: Record<OrchestratorGameArcadeEngine, OrchestratorGameArcade> = {
+  runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+}
 
 type Props = {
   isActive: boolean
+  /** The built-in game this play runs. */
+  engine?: OrchestratorGameArcadeEngine
   /** The tab and play the run is kept under while the tab is hidden. */
   keepAs?: { tabId: string; play: number }
   /** Esc: back to the conversation, keeping the run. */
@@ -36,15 +43,23 @@ type Props = {
   onDone: () => void
 }
 
-/** One saved play of the runner, beside Claude in the center. */
-export function ArcadeTab({ isActive, keepAs, onBack, onDone }: Props): React.JSX.Element {
+/** One saved play of a built-in game, beside Claude in the center. */
+export function ArcadeTab({
+  isActive,
+  engine = 'runner',
+  keepAs,
+  onBack,
+  onDone
+}: Props): React.JSX.Element {
   // Why a string: null runs, any string holds, and a primitive keeps the selector stable.
   const heldBy = useAppStore((s) => whoIsWaitingOnUser(s)?.name ?? null)
   const isHeld = heldBy !== null
   const boxRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [firstRun] = useState(
-    () => (keepAs && keptArcadeRunOf(keepAs.tabId, keepAs.play)) ?? arcadeRunOf(GAME, Date.now())
+    () =>
+      (keepAs && keptArcadeRunOf(keepAs.tabId, keepAs.play)) ??
+      arcadeRunOf(GAMES[engine], Date.now())
   )
   const runRef = useRef<ArcadeRun>(firstRun)
   const heldRef = useRef(isHeld)
@@ -61,7 +76,7 @@ export function ArcadeTab({ isActive, keepAs, onBack, onDone }: Props): React.JS
         g,
         painted.backdrop,
         runRef.current,
-        arcadeWordsOf(Math.floor(runRef.current.state.score), heldByRef.current),
+        arcadeWordsOf(runRef.current.play.score, heldByRef.current, runRef.current.engine),
         painted.size
       )
     }
@@ -115,15 +130,24 @@ export function ArcadeTab({ isActive, keepAs, onBack, onDone }: Props): React.JS
     [keepTabId, keepPlay]
   )
 
-  const press = useCallback(() => {
-    const pressed = pressArcadeRun(runRef.current)
-    if (pressed.close) {
-      onDone()
-      return
-    }
-    runRef.current = pressed.run
-    startLoop()
-  }, [onDone, startLoop])
+  /** Hands an input to the run; true when it was the game's, so the page should not act on it. */
+  const send = useCallback(
+    (input: ArcadeInput): boolean => {
+      const box = boxRef.current
+      const view = { width: box?.clientWidth ?? 0, height: box?.clientHeight ?? 0 }
+      const sent = inputArcadeRun(runRef.current, input, view)
+      if (sent.close) {
+        onDone()
+        return true
+      }
+      runRef.current = sent.run
+      if (sent.isGame) {
+        startLoop()
+      }
+      return sent.isGame
+    },
+    [onDone, startLoop]
+  )
 
   useEffect(() => {
     const box = boxRef.current
@@ -185,20 +209,40 @@ export function ArcadeTab({ isActive, keepAs, onBack, onDone }: Props): React.JS
       aria-label={arcadeCanvasLabel()}
       tabIndex={-1}
       className="relative h-full w-full bg-background outline-none"
-      style={{ touchAction: 'manipulation' }}
+      style={{ touchAction: 'none' }}
+      data-arcade-engine={runRef.current.engine}
       onKeyDown={(event) => {
-        if (JUMP_KEYS.has(event.code)) {
-          event.preventDefault()
-          press()
-        } else if (event.key === 'Escape') {
+        if (event.key === 'Escape') {
           event.preventDefault()
           onBack()
+        } else if (send({ kind: 'key', code: event.code, isDown: true })) {
+          event.preventDefault()
+        }
+      }}
+      onKeyUp={(event) => {
+        if (send({ kind: 'key', code: event.code, isDown: false })) {
+          event.preventDefault()
         }
       }}
       onPointerDown={(event) => {
         event.preventDefault()
         boxRef.current?.focus()
-        press()
+        const rect = event.currentTarget.getBoundingClientRect()
+        send({
+          kind: 'pointer',
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+          isPress: true
+        })
+      }}
+      onPointerMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        send({
+          kind: 'pointer',
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+          isPress: false
+        })
       }}
     >
       <canvas ref={canvasRef} aria-hidden="true" className="block h-full w-full" />

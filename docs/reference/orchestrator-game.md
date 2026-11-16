@@ -1859,7 +1859,8 @@ merge seen twice pays once. At most 9 plays are kept. The lead's `game state` ca
 `action: play | keep` spends one or dismisses the offer. Only the lead's project reads or spends
 them. The Team panel plays the run in a center tab.
 
-- Esc goes back to the conversation and keeps the run. A press after the run ended closes the tab.
+- Esc goes back to the conversation and keeps the run. Once the run ends, only Space, Enter or a tap
+  closes the tab, so a late jump does not.
 - The run stands still while a live agent in any project is blocked on a permission or waiting on
   the person, and the pause names it (`Paused · Luigi needs you`). A sleeping or disconnected pane,
   or a row the tab bar's freshness gate calls stale (unconfirmed after a restore, or silent for

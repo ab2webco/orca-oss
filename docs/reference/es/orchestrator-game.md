@@ -1,5 +1,5 @@
 ---
-sourceHash: 73cb5a3722ea2065
+sourceHash: 8823e61bd225de31
 ---
 
 # El juego orquestador de Agent Teams
@@ -1993,7 +1993,8 @@ El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.a
 (`orca game arcade`) las lee, o con `action: play | keep` gasta una o descarta la oferta. Solo el
 proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central.
 
-- Esc vuelve a la conversación y conserva la partida. Una pulsación después de terminar cierra la pestaña.
+- Esc vuelve a la conversación y conserva la partida. Una vez terminada, sólo Espacio, Enter o un toque
+  cierran la pestaña, así que un salto tardío no lo hace.
 - La partida se detiene mientras un agente vivo de cualquier proyecto está bloqueado en un permiso o
   esperando a la persona, y la pausa lo nombra (`En pausa · Luigi te necesita`). Un panel dormido o
   desconectado, o una fila que la compuerta de frescura de la barra de pestañas da por vieja (sin
