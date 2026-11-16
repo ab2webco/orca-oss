@@ -1,0 +1,27 @@
+{
+  "engine": "defense",
+  "name": { "en": "Merge line", "es": "Línea de merge" },
+  "fps": 12,
+  "field": { "columns": 24, "rows": 20 },
+  "turret": { "speed": 18, "cooldownMs": 260 },
+  "shot": { "speed": 28 },
+  "enemies": {
+    "start": 2.2,
+    "max": 6,
+    "rampPerWave": 0.6,
+    "spawnMs": 1400,
+    "spawnMinMs": 450,
+    "perWave": 10,
+    "buildShare": 0.3
+  },
+  "lives": 3,
+  "points": { "bug": 10, "build": 25 },
+  "colors": {
+    "turret": "#1d1a22",
+    "belly": "#f4f1ea",
+    "bug": "#7da84a",
+    "build": "#d4483b",
+    "shot": "#8fd3ff"
+  },
+  "portrait": { "field": { "columns": 10, "rows": 20 } }
+}

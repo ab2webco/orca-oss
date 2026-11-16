@@ -25,10 +25,14 @@ describe('arcadeWordsOf', () => {
     expect(arcadeWordsOf(0).held).toBe('Paused · someone needs you')
     expect(arcadeWordsOf(0, '', 'snake').hint).toBe('Arrows, WASD or tap to steer')
     expect(arcadeWordsOf(0, '', 'bricks').hint).toBe('Arrows, A/D or the mouse to move the paddle')
+    expect(arcadeWordsOf(0, '', 'defense').hint).toBe('Arrows or A/D to move, Space or tap to fire')
 
     await i18n.changeLanguage('es')
     expect(arcadeWordsOf(0, 'Luigi').held).toBe('En pausa · Luigi te necesita')
     expect(arcadeWordsOf(0, '', 'snake').hint).toBe('Flechas, WASD o toque para girar')
     expect(arcadeWordsOf(0, '', 'bricks').hint).toBe('Flechas, A/D o el mouse para mover la paleta')
+    expect(arcadeWordsOf(0, '', 'defense').hint).toBe(
+      'Flechas o A/D para moverte, Espacio o toque para disparar'
+    )
   })
 })

@@ -9,6 +9,7 @@
     "../src/shared/orchestrator-game-arcade-runner.json",
     "../src/shared/orchestrator-game-arcade-snake.json",
     "../src/shared/orchestrator-game-arcade-bricks.json",
+    "../src/shared/orchestrator-game-arcade-defense.json",
     "../src/main/agent-state-file-reader.ts",
     "../src/main/agent-hooks/hook-config-types.ts",
     "../src/main/agent-hooks/hook-stdin-contract.ts",

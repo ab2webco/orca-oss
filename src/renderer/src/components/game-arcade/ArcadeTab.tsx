@@ -5,6 +5,7 @@ import {
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
   ORCHESTRATOR_GAME_ARCADE_SNAKE,
   ORCHESTRATOR_GAME_ARCADE_BRICKS,
+  ORCHESTRATOR_GAME_ARCADE_DEFENSE,
   type OrchestratorGameArcade,
   type OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
@@ -33,7 +34,8 @@ const builtInOf = (text: string): OrchestratorGameArcade => {
 const GAMES: Record<OrchestratorGameArcadeEngine, OrchestratorGameArcade> = {
   runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER),
   snake: builtInOf(ORCHESTRATOR_GAME_ARCADE_SNAKE),
-  bricks: builtInOf(ORCHESTRATOR_GAME_ARCADE_BRICKS)
+  bricks: builtInOf(ORCHESTRATOR_GAME_ARCADE_BRICKS),
+  defense: builtInOf(ORCHESTRATOR_GAME_ARCADE_DEFENSE)
 }
 
 type Props = {

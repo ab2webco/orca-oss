@@ -6,6 +6,7 @@ import {
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
   ORCHESTRATOR_GAME_ARCADE_SNAKE,
   ORCHESTRATOR_GAME_ARCADE_BRICKS,
+  ORCHESTRATOR_GAME_ARCADE_DEFENSE,
   orchestratorGameArcadeIssues,
   parseOrchestratorGameArcade,
   pickOrchestratorGameArcadeEngine
@@ -54,7 +55,7 @@ describe('orchestratorGameArcadeIssues', () => {
     game.difficulty = { minGap: 40, maxGap: 20 }
     game.obstacles = [{ from: 'scene' }, { rows: ['XY', 'X'], colors: { X: '#ffffff' } }]
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
-      'engine: must be one of: runner, snake, bricks',
+      'engine: must be one of: runner, snake, bricks, defense',
       'speed.max: must be at least speed.start',
       'difficulty.maxGap: must be at least difficulty.minGap',
       'obstacles.1.rows: every row must be the same width',
@@ -151,6 +152,7 @@ describe('the brick breaker game file', () => {
       'wall.columns: must be a whole number from 4 to 16',
       'ball.max: must be at least ball.start',
       'colors.bricks: Too small: expected array to have >=1 items',
+      'portrait.field.rows: must be more than columns',
       'portrait.paddle.width: must be from 2 to 10'
     ])
   })
@@ -163,7 +165,42 @@ describe('the brick breaker game file', () => {
       paddle: { width: 4 }
     }
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
-      'portrait.field.rows: must be more than field.columns'
+      'portrait.field.rows: must be more than columns'
+    ])
+  })
+})
+
+describe('the base defense game file', () => {
+  const defense = (): Record<string, unknown> => JSON.parse(ORCHESTRATOR_GAME_ARCADE_DEFENSE)
+
+  it('finds nothing in the built-in base defense', () => {
+    expect(orchestratorGameArcadeIssues(ORCHESTRATOR_GAME_ARCADE_DEFENSE)).toEqual([])
+    expect(parseOrchestratorGameArcade(ORCHESTRATOR_GAME_ARCADE_DEFENSE)).toMatchObject({
+      ok: true,
+      game: { engine: 'defense' }
+    })
+  })
+
+  it('lists every base defense problem with its path', () => {
+    const game = defense()
+    game.lives = 0
+    game.enemies = { ...(game.enemies as object), spawnMs: 300, spawnMinMs: 900 }
+    game.colors = { turret: '#000000', belly: '#ffffff', bug: '#00ff00', build: '#ff0000' }
+    game.portrait = { field: { columns: 40, rows: 50 } }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'enemies.spawnMs: must be at least enemies.spawnMinMs',
+      'lives: must be a whole number from 1 to 9',
+      'colors.shot: must be a #rrggbb color or an integer from 0 to 16777215',
+      'portrait.field.columns: must be a whole number from 10 to 30',
+      'portrait.field.rows: must be a whole number from 16 to 48'
+    ])
+  })
+
+  it('wants a portrait field taller than wide', () => {
+    const game = defense()
+    game.portrait = { field: { columns: 20, rows: 18 } }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'portrait.field.rows: must be more than columns'
     ])
   })
 })

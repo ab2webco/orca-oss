@@ -46,6 +46,14 @@ const GAMES: Record<
       ['D', (b) => b.press('d')],
       ['a tap', (b) => b.click()]
     ]
+  },
+  defense: {
+    start: 'Space',
+    keepsOpen: 'ArrowLeft',
+    inputs: [
+      ['A', (b) => b.press('a')],
+      ['a tap', (b) => b.click()]
+    ]
   }
 }
 
@@ -230,15 +238,17 @@ for (const engine of Object.keys(GAMES) as OrchestratorGameArcadeEngine[]) {
       expect(await canvasPixels(orcaPage), 'Esc keeps the run where it was').toBe(held)
       await seedStatuses(orcaPage, null)
 
-      // Played out: the runner meets an obstacle, the snake a wall, the bricks lose the ball.
+      // Played out: the runner meets an obstacle, the snake a wall, the bricks lose the ball, the base
+      // lets its last bug through.
+      // Why 2 s still: an empty sea waits up to 1.4 s for its next bug, and that is not an end.
       await expect
         .poll(
           async () => {
             const before = await canvasPixels(orcaPage)
-            await orcaPage.waitForTimeout(400)
+            await orcaPage.waitForTimeout(2000)
             return (await canvasPixels(orcaPage)) === before
           },
-          { timeout: 20_000, message: 'the run ends' }
+          { timeout: 40_000, message: 'the run ends' }
         )
         .toBe(true)
       await orcaPage.screenshot({ path: testInfo.outputPath(`arcade-${engine}-over-${theme}.png`) })

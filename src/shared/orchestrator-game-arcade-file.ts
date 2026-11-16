@@ -3,10 +3,11 @@ import { color, localizedSceneName, uncoloredGlyphOf } from './orchestrator-game
 import runnerData from './orchestrator-game-arcade-runner.json'
 import snakeData from './orchestrator-game-arcade-snake.json'
 import bricksData from './orchestrator-game-arcade-bricks.json'
+import defenseData from './orchestrator-game-arcade-defense.json'
 
 /** A game the arcade offers after a perfect merge: inert data one of the game's built-in engines plays. */
 
-export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner', 'snake', 'bricks'] as const
+export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner', 'snake', 'bricks', 'defense'] as const
 export type OrchestratorGameArcadeEngine = (typeof ORCHESTRATOR_GAME_ARCADE_ENGINES)[number]
 
 /** One of the built-in games for `roll` in [0, 1). */
@@ -137,6 +138,14 @@ const snakeFileSchema = z.object({
   colors: z.object({ head: color, body: color, food: color })
 })
 
+/** The narrower field a game plays in a tab taller than wide. */
+const tallField = z
+  .object({ columns: whole(10, 30), rows: whole(16, 48) })
+  .refine((field) => field.rows > field.columns, {
+    path: ['rows'],
+    message: 'must be more than columns'
+  })
+
 /** Break a wall of bricks with a ball kept up by a paddle; a cleared wall brings a faster one. */
 const bricksFileSchema = z.object({
   engine: z.literal('bricks', { error: engineError }),
@@ -153,35 +162,68 @@ const bricksFileSchema = z.object({
   /** A broken brick drops a power-up this often: three balls, or a wide paddle for `wideMs`. */
   powerUps: z.object({ chance: bounded(0, 0.5), wideMs: bounded(2000, 30000) }),
   colors: z.object({ bricks: z.array(color).min(1).max(8), paddle: color, ball: color }),
-  /** The field a tab taller than wide plays instead: narrower, so its bricks still read. */
+  /** Played instead in a tab taller than wide, so its bricks still read. */
   portrait: z
     .object({
-      field: z.object({ columns: whole(10, 30), rows: whole(16, 48) }),
+      field: tallField,
       wall: z.object({ columns: whole(3, 16), rows: whole(1, 8) }),
       paddle: z.object({ width: bounded(2, 10) })
     })
-    .refine((p) => p.field.rows > p.field.columns, {
-      path: ['field', 'rows'],
-      message: 'must be more than field.columns'
-    })
     .optional()
+})
+
+/** Hold the merge line: the orca turret fires at bugs and red builds falling toward it. */
+const defenseFileSchema = z.object({
+  engine: z.literal('defense', { error: engineError }),
+  name: localizedSceneName,
+  fps,
+  field: z.object({ columns: whole(12, 40), rows: whole(12, 36) }),
+  turret: z.object({ speed: bounded(5, 60), cooldownMs: bounded(80, 2000) }),
+  shot: z.object({ speed: bounded(5, 80) }),
+  /** Fall speed in units per second, faster each wave of `perWave` kills, up to `max`. */
+  enemies: z
+    .object({
+      start: bounded(0.5, 15),
+      max: bounded(0.5, 15),
+      rampPerWave: bounded(0, 5),
+      spawnMs: bounded(200, 5000),
+      spawnMinMs: bounded(200, 5000),
+      perWave: whole(1, 50),
+      buildShare: bounded(0, 1)
+    })
+    .refine((one) => one.max >= one.start, atLeast('enemies.start', 'max'))
+    .refine((one) => one.spawnMs >= one.spawnMinMs, atLeast('enemies.spawnMinMs', 'spawnMs')),
+  lives: whole(1, 9),
+  points: z.object({ bug: whole(1, 100), build: whole(1, 100) }),
+  colors: z.object({ turret: color, belly: color, bug: color, build: color, shot: color }),
+  /** Played instead in a tab taller than wide: bugs still fall down a field narrow enough to read. */
+  portrait: z.object({ field: tallField }).optional()
 })
 
 export type OrchestratorGameArcadeRunner = z.infer<typeof runnerFileSchema>
 export type OrchestratorGameArcadeSnake = z.infer<typeof snakeFileSchema>
 export type OrchestratorGameArcadeBricks = z.infer<typeof bricksFileSchema>
+export type OrchestratorGameArcadeDefense = z.infer<typeof defenseFileSchema>
 export type OrchestratorGameArcade =
   | OrchestratorGameArcadeRunner
   | OrchestratorGameArcadeSnake
   | OrchestratorGameArcadeBricks
+  | OrchestratorGameArcadeDefense
 
-const OTHER_SCHEMAS = { snake: snakeFileSchema, bricks: bricksFileSchema } as const
+const OTHER_SCHEMAS = {
+  snake: snakeFileSchema,
+  bricks: bricksFileSchema,
+  defense: defenseFileSchema
+} as const
+
+const isOtherEngine = (engine: unknown): engine is keyof typeof OTHER_SCHEMAS =>
+  typeof engine === 'string' && Object.hasOwn(OTHER_SCHEMAS, engine)
 
 // Why not a discriminated union: a bad engine still lists every other problem, as a runner's.
 const schemaOf = (raw: unknown) => {
   const engine =
     typeof raw === 'object' && raw !== null ? (raw as { engine?: unknown }).engine : null
-  return engine === 'snake' || engine === 'bricks' ? OTHER_SCHEMAS[engine] : runnerFileSchema
+  return isOtherEngine(engine) ? OTHER_SCHEMAS[engine] : runnerFileSchema
 }
 
 /** The runner every scene can play: the scene's own decoration plus a rock for scenes without one. */
@@ -192,6 +234,9 @@ export const ORCHESTRATOR_GAME_ARCADE_SNAKE = `${JSON.stringify(snakeData, null,
 
 /** The brick breaker, played on its own night-court field. */
 export const ORCHESTRATOR_GAME_ARCADE_BRICKS = `${JSON.stringify(bricksData, null, 2)}\n`
+
+/** The base defense, played in its own deep water. */
+export const ORCHESTRATOR_GAME_ARCADE_DEFENSE = `${JSON.stringify(defenseData, null, 2)}\n`
 
 type ArcadeRead = { ok: true; raw: unknown } | { ok: false; issue: string }
 
