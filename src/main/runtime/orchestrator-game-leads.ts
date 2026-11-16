@@ -70,7 +70,7 @@ export class GameLeads {
       await this.settle(project.key)
       const live =
         (await this.leadOf(project.key)) ?? (await this.afterRestore(project.key, callerPane))
-      if (live && live.handle !== caller) {
+      if (live && !this.isCaller(live.handle, caller, callerPane)) {
         await this.deps.focus?.(live.handle).catch(() => undefined)
         return { registered: false, live: { handle: live.handle } }
       }
@@ -165,7 +165,12 @@ export class GameLeads {
     const lead =
       (await this.leadOf(project.key))?.handle ??
       (restoring ? this.deps.handleOfPane?.(restoring.paneKey) : null)
-    return lead && lead !== project.lead.handle ? lead : null
+    return lead && !this.isCaller(lead, project.lead.handle, project.lead.paneKey) ? lead : null
+  }
+
+  // Why the pane too: a restart or account switch re-mints the lead pane's handle while the old one still resolves (ORCA-1221).
+  private isCaller(handle: string, caller: string, callerPane: string | null): boolean {
+    return handle === caller || (callerPane !== null && this.deps.paneOf?.(handle) === callerPane)
   }
 
   /** A lead kept from before the restart, not yet back in its own pane, that still leads the project. */

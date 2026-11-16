@@ -279,6 +279,56 @@ describe('GameLeads claim', () => {
     expect(focused).toEqual(['term_a'])
   })
 
+  // Why (ORCA-1221): the old handle still resolves to the pane, so the lead was told it is not the lead.
+  it.each([false, true])(
+    'rebinds the lead to the handle its own pane has now (fresh: %s)',
+    async (fresh) => {
+      let caller = 'term_old'
+      const focused: string[] = []
+      const panes: Record<string, string> = {
+        term_old: 'tab:leaf',
+        term_new: 'tab:leaf',
+        term_b: 'tab:other'
+      }
+      const game = new GameLeads({
+        projectOf: async () => ({
+          ...LEAD,
+          lead: { handle: caller, paneKey: panes[caller] ?? null }
+        }),
+        isLive: () => true,
+        sessions: {
+          read: async () => SESSION,
+          write: async () => undefined,
+          clear: async () => undefined
+        },
+        sessionOf: async () => null,
+        resume: async () => 'never',
+        focus: async (handle) => {
+          focused.push(handle)
+        },
+        paneOf: (handle) => panes[handle] ?? null
+      })
+      await game.register({ project: 'cineco', label: 'Ana', claim: true, fresh: true })
+
+      caller = 'term_new'
+      await expect(
+        game.register({ project: 'cineco', label: 'Ana', claim: true, fresh })
+      ).resolves.toEqual({
+        registered: true
+      })
+      expect(focused).toEqual([])
+      expect((await game.list()).leads.map((one) => one.handle)).toEqual(['term_new'])
+
+      caller = 'term_b'
+      await expect(
+        game.register({ project: 'cineco', label: 'Ana', claim: true, fresh })
+      ).resolves.toEqual({
+        registered: false,
+        live: { handle: 'term_new' }
+      })
+    }
+  )
+
   it('neither enforces nor resumes for a caller Orca cannot place in a project', async () => {
     const { game, resumed, stored } = claiming({
       project: { ...LEAD, key: 'no-project' },
@@ -365,6 +415,20 @@ describe('GameLeads leadElsewhere', () => {
     await expect(game.leadElsewhere({})).resolves.toBeNull()
     caller = 'term_b'
     await expect(game.leadElsewhere({})).resolves.toBe('term_a')
+  })
+
+  // Why (ORCA-1221): a restart or account switch gives the lead's pane a new handle while the old one still resolves.
+  it('names no lead elsewhere to the lead pane after its handle changed', async () => {
+    let caller = 'term_old'
+    const game = new GameLeads({
+      projectOf: async () => ({ ...LEAD, lead: { handle: caller, paneKey: 'tab:leaf' } }),
+      isLive: () => true,
+      paneOf: () => 'tab:leaf'
+    })
+    await game.register({ project: 'cineco', label: 'Ana', claim: true })
+
+    caller = 'term_new'
+    await expect(game.leadElsewhere({})).resolves.toBeNull()
   })
 
   it('names no lead for a member or a caller Orca cannot place', async () => {
