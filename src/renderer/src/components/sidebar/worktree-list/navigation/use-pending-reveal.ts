@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
+import { VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT } from '@/hooks/useVirtualizedScrollAnchor'
 import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
 import { getRenderRowOptionId } from './active-descendant-option'
 import { findPreferredRenderRowIndexForWorktree, getRenderRowSidebarKey } from './render-row-lookup'
@@ -27,10 +28,17 @@ import { usePendingSidebarRowReveal } from './use-pending-row-reveal'
 type WorktreeRevealProgress = {
   reveal: PendingSidebarWorktreeReveal
   startedAt: number
+  stagings: number
   hold: RevealHold | null
   /** The folds the row landed under; any other set means the person folded or unfolded since. */
   landedGroups: Set<string> | null
   announced: boolean
+}
+
+// Why: the list's scroll event, which re-records the anchor, waits for a frame; a restore
+// that runs first would put back the row that was on top before the reveal.
+function recordScrollAnchorHere(container: HTMLElement | null): void {
+  container?.dispatchEvent(new Event(VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT))
 }
 
 function readRevealLayout(container: HTMLElement): RevealHoldLayout {
@@ -86,6 +94,7 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
       progressRef.current = {
         reveal: pendingRevealWorktree,
         startedAt: window.performance.now(),
+        stagings: 0,
         hold: null,
         landedGroups: null,
         announced: false
@@ -191,6 +200,7 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
           )
         : null
       if (container && revealedOption) {
+        recordScrollAnchorHere(container)
         if (!progress.announced) {
           progress.announced = true
           if (pendingRevealWorktree.highlight) {
@@ -214,8 +224,13 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
 
       // Why: virtual indexing can leave the card edge clipped; stage it into the window, then retry the exact DOM reveal.
       virtualizer.scrollToIndex(targetIndex, { align: 'auto', behavior: 'auto' })
-      // Why by time: a slow runner can spend many frames re-measuring after a resize.
-      if (window.performance.now() - progress.startedAt < REVEAL_HOLD_MAX_MS) {
+      recordScrollAnchorHere(container)
+      progress.stagings += 1
+      // Why time or attempts: a slow runner re-measures for many frames, a hidden window paints once a second.
+      if (
+        window.performance.now() - progress.startedAt < REVEAL_HOLD_MAX_MS ||
+        progress.stagings < MAX_REVEAL_RETRIES
+      ) {
         scheduleRetryTick(() => cancelled)
         return
       }

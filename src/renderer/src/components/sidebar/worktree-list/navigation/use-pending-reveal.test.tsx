@@ -7,6 +7,7 @@ import type { Virtualizer } from '@tanstack/react-virtual'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
 import { makeWorktree } from '@/store/slices/store-test-helpers'
+import { VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT } from '@/hooks/useVirtualizedScrollAnchor'
 import type { RenderRow } from '../listing/render-row'
 import { getWorktreeOptionId } from '../rows/option-dom'
 import { MAX_REVEAL_RETRIES, type PendingSidebarRevealArgs } from './pending-reveal-inputs'
@@ -105,10 +106,10 @@ function makeArgs(
 let frames: FrameRequestCallback[] = []
 let now = 0
 
-/** Runs the queued reveal frames `count` times, 16ms apart, inside act. */
-function runFrames(count: number): void {
+/** Runs the queued reveal frames `count` times, `gapMs` apart (a painting window is 16ms), inside act. */
+function runFrames(count: number, gapMs = 16): void {
   for (let index = 0; index < count; index += 1) {
-    now += 16
+    now += gapMs
     const batch = frames.splice(0)
     act(() => {
       for (const callback of batch) {
@@ -123,6 +124,7 @@ function mountSidebar(): {
   container: HTMLDivElement
   typing: HTMLTextAreaElement
   setClientHeight: (height: number) => void
+  option: HTMLDivElement
 } {
   let scrollTop = 0
   let clientHeight = 100
@@ -156,9 +158,13 @@ function mountSidebar(): {
     typing,
     setClientHeight: (height) => {
       clientHeight = height
-    }
+    },
+    option
   }
 }
+
+// A hidden window, like the headless E2E one on Linux, paints about once a second.
+const HIDDEN_WINDOW_FRAME_MS = 1000
 
 function render(args: PendingSidebarRevealArgs): void {
   host = document.createElement('div')
@@ -231,6 +237,59 @@ describe('usePendingSidebarReveal', () => {
     expect(args.clearPendingRevealWorktreeId).not.toHaveBeenCalled()
     runFrames(Math.ceil(REVEAL_HOLD_QUIET_MS / 16) + 1)
     expect(args.clearPendingRevealWorktreeId).toHaveBeenCalledOnce()
+  })
+
+  it('keeps staging an unmounted row on a window that paints once a second', () => {
+    const { container, option } = mountSidebar()
+    option.remove()
+    const args = makeArgs({ worktreeId: 'wt-target', behavior: 'auto' }, [targetRow], {
+      current: container
+    })
+    const scrollToIndex = args.virtualizer.scrollToIndex as Mock<() => void>
+    // The virtualizer needs a few staging passes before the row's element exists.
+    scrollToIndex.mockImplementation(() => {
+      if (scrollToIndex.mock.calls.length === 4) {
+        container.append(option)
+      }
+    })
+
+    render(args)
+    runFrames(12, HIDDEN_WINDOW_FRAME_MS)
+
+    expect(container.scrollTo).toHaveBeenCalledWith({ top: 440, behavior: 'auto' })
+  })
+
+  it('brings a landed row back when something rewinds the list between two slow frames', () => {
+    const { container } = mountSidebar()
+    const args = makeArgs({ worktreeId: 'wt-target', behavior: 'auto' }, [targetRow], {
+      current: container
+    })
+
+    render(args)
+    runFrames(1, HIDDEN_WINDOW_FRAME_MS)
+    expect(container.scrollTop).toBe(440)
+    // A scroll anchor restore puts back the row that was on top before the reveal.
+    container.scrollTop = 0
+    runFrames(3, HIDDEN_WINDOW_FRAME_MS)
+
+    expect(container.scrollTop).toBe(440)
+    expect(args.clearPendingRevealWorktreeId).not.toHaveBeenCalled()
+  })
+
+  it('records the scroll anchor where a landed reveal leaves the list', () => {
+    const { container } = mountSidebar()
+    const recordedAt: number[] = []
+    container.addEventListener(VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT, () =>
+      recordedAt.push(container.scrollTop)
+    )
+    const args = makeArgs({ worktreeId: 'wt-target', behavior: 'auto' }, [targetRow], {
+      current: container
+    })
+
+    render(args)
+    runFrames(1)
+
+    expect(recordedAt).toContain(440)
   })
 
   it('lets go of a landed reveal once the person folds a group, and leaves the fold alone', () => {
