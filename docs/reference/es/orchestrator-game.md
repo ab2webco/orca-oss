@@ -1,5 +1,5 @@
 ---
-sourceHash: b217d6d86f7d5f67
+sourceHash: 9bcd71aa78138351
 ---
 
 # El juego orquestador de Agent Teams
@@ -1925,22 +1925,23 @@ de las tarjetas y del narrador pueden ser por idioma (`{ "en": …, "es": … }`
 ## Archivos de juegos del arcade
 
 Un juego que el arcade ofrece después de un merge perfecto son datos para uno de los motores integrados
-del juego, nunca código. Los motores son `runner` (una tecla para saltar) y `snake` (girar para comer
-y crecer); los juegos integrados son `src/shared/orchestrator-game-arcade-runner.json` y
-`src/shared/orchestrator-game-arcade-snake.json`. `orca game game validate <file> [--json]`
+del juego, nunca código. Los motores son `runner` (una tecla para saltar), `snake` (girar para comer
+y crecer) y `bricks` (una paleta y un muro); los juegos integrados son
+`src/shared/orchestrator-game-arcade-runner.json`, `src/shared/orchestrator-game-arcade-snake.json` y
+`src/shared/orchestrator-game-arcade-bricks.json`. `orca game game validate <file> [--json]`
 comprueba un archivo con las reglas de `src/shared/orchestrator-game-arcade-file.ts`, lista cada problema
 como `path: message` y sale con 1 mientras quede alguno.
 
-| Clave        | Qué define                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------ |
-| `engine`     | `runner` o `snake`; las claves de abajo son las del runner, las del snake van después      |
-| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                  |
-| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                             |
-| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`            |
-| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                      |
-| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms |
-| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`      |
-| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa |
+| Clave        | Qué define                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `engine`     | `runner`, `snake` o `bricks`; las claves de abajo son las del runner, las otras van después |
+| `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                   |
+| `fps`        | Tope de fotogramas, un número entero de 5 a 15                                              |
+| `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`             |
+| `difficulty` | `{ minGap, maxGap }`, columnas de suelo entre obstáculos (de 8 a 120)                       |
+| `jump`       | `{ rows, ms }`: altura de 2 a 8 filas, tiempo en el aire a `speed.start`, de 200 a 2000 ms  |
+| `obstacles`  | De 1 a 8, cada uno `{ "from": "scene" }` o un sprite `{ rows, colors }`, con `weight`       |
+| `theme`      | Opcional. Colores del look (`skyTop`, `ground`, …) dibujados sobre los de la escena activa  |
 
 - `{ "from": "scene" }` es la decoración del suelo de la escena activa (`plantKind`), así que una escena
   personalizada cambia el estilo del juego sin trabajo extra. Una escena cuyo `plantKind` es `none` no
@@ -1960,6 +1961,22 @@ Un archivo `snake` define `name` y `fps` como arriba, y además:
 | `start`  | `{ length }`: celdas con que empieza la serpiente, de 2 a 8                             |
 | `food`   | `{ points, growth }`: puntos por baya (de 1 a 50) y celdas que crece (de 1 a 5)         |
 | `colors` | `{ head, body, food }`, cada uno un color `#rrggbb` (o entero)                          |
+
+Un archivo `bricks` define `name` y `fps` como arriba, y además (en unidades del campo, una unidad es
+una fila de ladrillos):
+
+| Clave      | Qué define                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `field`    | `{ columns, rows }`: de 16 a 48 por 14 a 36                                                    |
+| `wall`     | `{ columns, rows, points }`: de 4 a 16 ladrillos por fila, de 1 a 8 filas, puntos por ladrillo |
+| `paddle`   | `{ width, speed }`: de 2 a 10 unidades de ancho, de 5 a 60 unidades por segundo                |
+| `ball`     | `{ start, max, rampPerWall }` en unidades por segundo; `max` al menos `start`                  |
+| `powerUps` | `{ chance, wideMs }`: probabilidad por ladrillo (de 0 a 0.5), cuánto dura la paleta ancha      |
+| `colors`   | `{ bricks, paddle, ball }`; `bricks` son de 1 a 8 colores, uno por fila por turno              |
+
+Un bloque `portrait` opcional, `{ field, wall: { columns, rows }, paddle: { width } }`, se juega en
+su lugar cuando la pestaña es más alta que ancha al empezar la partida. Su `field` va de 10 a 30
+columnas por 16 a 48 filas y tiene que ser más alto que ancho.
 
 ### El runner
 
@@ -2006,6 +2023,10 @@ proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en 
 
 - El runner salta con Espacio, flecha arriba o un toque. El snake gira con las flechas, WASD o un toque
   (hacia el toque desde su cabeza), come bayas para sumar y crecer, y termina contra una pared o su propia cola.
+- El rompeladrillos mueve su paleta con las flechas, A/D o el mouse. Un ladrillo roto puede soltar dos
+  bolas más o una paleta ancha; un muro limpio trae otro más rápido, y perder la última bola termina.
+- Cada juego tiene su propia escena: el runner un camino al atardecer, el snake un huerto, el
+  rompeladrillos una cancha de noche.
 - Esc vuelve a la conversación y conserva la partida. Una vez terminada, sólo Espacio, Enter o un toque
   cierran la pestaña, así que un giro o un salto tardío no lo hace.
 - La partida se detiene mientras un agente vivo de cualquier proyecto está bloqueado en un permiso o

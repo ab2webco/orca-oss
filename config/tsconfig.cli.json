@@ -8,6 +8,7 @@
     // Why: the arcade's built-in runner is read the same way.
     "../src/shared/orchestrator-game-arcade-runner.json",
     "../src/shared/orchestrator-game-arcade-snake.json",
+    "../src/shared/orchestrator-game-arcade-bricks.json",
     "../src/main/agent-state-file-reader.ts",
     "../src/main/agent-hooks/hook-config-types.ts",
     "../src/main/agent-hooks/hook-stdin-contract.ts",

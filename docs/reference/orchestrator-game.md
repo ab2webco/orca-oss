@@ -1797,15 +1797,15 @@ format, limits and consent rules are in [Game scenes](./plugin-development.md#ga
 ## Arcade game files
 
 A game the arcade offers after a perfect merge is data for one of the game's built-in engines,
-never code. The engines are `runner` (one key to jump) and `snake` (steer to eat and grow); the
-built-in games are `src/shared/orchestrator-game-arcade-runner.json` and
-`src/shared/orchestrator-game-arcade-snake.json`. `orca game game validate <file> [--json]`
+never code. The engines are `runner` (one key to jump), `snake` (steer to eat and grow) and `bricks`
+(a paddle and a wall); the built-in games are `src/shared/orchestrator-game-arcade-runner.json`,
+`src/shared/orchestrator-game-arcade-snake.json` and `src/shared/orchestrator-game-arcade-bricks.json`. `orca game game validate <file> [--json]`
 checks a file with the rules in `src/shared/orchestrator-game-arcade-file.ts`, lists every problem
 as `path: message` and exits 1 while any remain.
 
 | Key          | What it sets                                                                         |
 | ------------ | ------------------------------------------------------------------------------------ |
-| `engine`     | `runner` or `snake`; the keys below are the runner's, the snake's follow             |
+| `engine`     | `runner`, `snake` or `bricks`; the keys below are the runner's, the others follow    |
 | `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                               |
 | `fps`        | Frame cap, a whole number from 5 to 15                                               |
 | `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`        |
@@ -1831,6 +1831,21 @@ A `snake` file sets `name` and `fps` as above, plus:
 | `start`  | `{ length }`: cells the snake starts with, 2 to 8                                   |
 | `food`   | `{ points, growth }`: points per berry (1 to 50) and cells it grows by (1 to 5)     |
 | `colors` | `{ head, body, food }`, each a `#rrggbb` (or integer) color                         |
+
+A `bricks` file sets `name` and `fps` as above, plus (in field units, one unit a brick row tall):
+
+| Key        | What it sets                                                                         |
+| ---------- | ------------------------------------------------------------------------------------ |
+| `field`    | `{ columns, rows }`: 16 to 48 by 14 to 36                                            |
+| `wall`     | `{ columns, rows, points }`: 4 to 16 bricks across, 1 to 8 rows, points per brick    |
+| `paddle`   | `{ width, speed }`: 2 to 10 units wide, 5 to 60 units per second                     |
+| `ball`     | `{ start, max, rampPerWall }` in units per second; `max` at least `start`            |
+| `powerUps` | `{ chance, wideMs }`: drop chance per brick (0 to 0.5), how long a wide paddle lasts |
+| `colors`   | `{ bricks, paddle, ball }`; `bricks` is 1 to 8 colours, one per row in turn          |
+
+An optional `portrait` block, `{ field, wall: { columns, rows }, paddle: { width } }`, is played
+instead when the tab is taller than wide at the start of a run. Its `field` is 10 to 30 columns by
+16 to 48 rows and must be taller than wide.
 
 ### The runner
 
@@ -1872,6 +1887,10 @@ them. The Team panel plays the run in a center tab, a built-in game picked at ra
 
 - The runner jumps on Space, ArrowUp or a tap. The snake steers with the arrows, WASD or a tap
   (toward the tap from its head), eats berries to score and grow, and ends on a wall or its own tail.
+- The brick breaker moves its paddle with the arrows, A/D or the mouse. A broken brick may drop two
+  more balls or a wide paddle; a cleared wall brings a faster one, and losing the last ball ends it.
+- Each game has its own scene: the runner a dusk path, the snake a garden bed, the brick breaker a
+  night court.
 - Esc goes back to the conversation and keeps the run. Once the run ends, only Space, Enter or a tap
   closes the tab, so a late turn or jump does not.
 - The run stands still while a live agent in any project is blocked on a permission or waiting on

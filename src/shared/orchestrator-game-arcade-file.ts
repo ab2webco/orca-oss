@@ -2,10 +2,11 @@ import { z } from 'zod'
 import { color, localizedSceneName, uncoloredGlyphOf } from './orchestrator-game-scene-values'
 import runnerData from './orchestrator-game-arcade-runner.json'
 import snakeData from './orchestrator-game-arcade-snake.json'
+import bricksData from './orchestrator-game-arcade-bricks.json'
 
 /** A game the arcade offers after a perfect merge: inert data one of the game's built-in engines plays. */
 
-export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner', 'snake'] as const
+export const ORCHESTRATOR_GAME_ARCADE_ENGINES = ['runner', 'snake', 'bricks'] as const
 export type OrchestratorGameArcadeEngine = (typeof ORCHESTRATOR_GAME_ARCADE_ENGINES)[number]
 
 /** One of the built-in games for `roll` in [0, 1). */
@@ -136,21 +137,61 @@ const snakeFileSchema = z.object({
   colors: z.object({ head: color, body: color, food: color })
 })
 
+/** Break a wall of bricks with a ball kept up by a paddle; a cleared wall brings a faster one. */
+const bricksFileSchema = z.object({
+  engine: z.literal('bricks', { error: engineError }),
+  name: localizedSceneName,
+  fps,
+  /** In field units: one unit is a brick row tall. */
+  field: z.object({ columns: whole(16, 48), rows: whole(14, 36) }),
+  wall: z.object({ columns: whole(4, 16), rows: whole(1, 8), points: whole(1, 50) }),
+  paddle: z.object({ width: bounded(2, 10), speed: bounded(5, 60) }),
+  /** Units per second; each cleared wall adds `rampPerWall` until `max`. */
+  ball: z
+    .object({ start: bounded(4, 30), max: bounded(4, 30), rampPerWall: bounded(0, 10) })
+    .refine((ball) => ball.max >= ball.start, atLeast('ball.start', 'max')),
+  /** A broken brick drops a power-up this often: three balls, or a wide paddle for `wideMs`. */
+  powerUps: z.object({ chance: bounded(0, 0.5), wideMs: bounded(2000, 30000) }),
+  colors: z.object({ bricks: z.array(color).min(1).max(8), paddle: color, ball: color }),
+  /** The field a tab taller than wide plays instead: narrower, so its bricks still read. */
+  portrait: z
+    .object({
+      field: z.object({ columns: whole(10, 30), rows: whole(16, 48) }),
+      wall: z.object({ columns: whole(3, 16), rows: whole(1, 8) }),
+      paddle: z.object({ width: bounded(2, 10) })
+    })
+    .refine((p) => p.field.rows > p.field.columns, {
+      path: ['field', 'rows'],
+      message: 'must be more than field.columns'
+    })
+    .optional()
+})
+
 export type OrchestratorGameArcadeRunner = z.infer<typeof runnerFileSchema>
 export type OrchestratorGameArcadeSnake = z.infer<typeof snakeFileSchema>
-export type OrchestratorGameArcade = OrchestratorGameArcadeRunner | OrchestratorGameArcadeSnake
+export type OrchestratorGameArcadeBricks = z.infer<typeof bricksFileSchema>
+export type OrchestratorGameArcade =
+  | OrchestratorGameArcadeRunner
+  | OrchestratorGameArcadeSnake
+  | OrchestratorGameArcadeBricks
+
+const OTHER_SCHEMAS = { snake: snakeFileSchema, bricks: bricksFileSchema } as const
 
 // Why not a discriminated union: a bad engine still lists every other problem, as a runner's.
-const schemaOf = (raw: unknown) =>
-  typeof raw === 'object' && raw !== null && (raw as { engine?: unknown }).engine === 'snake'
-    ? snakeFileSchema
-    : runnerFileSchema
+const schemaOf = (raw: unknown) => {
+  const engine =
+    typeof raw === 'object' && raw !== null ? (raw as { engine?: unknown }).engine : null
+  return engine === 'snake' || engine === 'bricks' ? OTHER_SCHEMAS[engine] : runnerFileSchema
+}
 
 /** The runner every scene can play: the scene's own decoration plus a rock for scenes without one. */
 export const ORCHESTRATOR_GAME_ARCADE_RUNNER = `${JSON.stringify(runnerData, null, 2)}\n`
 
-/** The snake every scene can play on the runner's backdrop. */
+/** The snake, played in its own garden bed. */
 export const ORCHESTRATOR_GAME_ARCADE_SNAKE = `${JSON.stringify(snakeData, null, 2)}\n`
+
+/** The brick breaker, played on its own night-court field. */
+export const ORCHESTRATOR_GAME_ARCADE_BRICKS = `${JSON.stringify(bricksData, null, 2)}\n`
 
 type ArcadeRead = { ok: true; raw: unknown } | { ok: false; issue: string }
 

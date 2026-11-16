@@ -5,6 +5,7 @@ import {
   ORCHESTRATOR_GAME_ARCADE_ENGINES,
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
   ORCHESTRATOR_GAME_ARCADE_SNAKE,
+  ORCHESTRATOR_GAME_ARCADE_BRICKS,
   orchestratorGameArcadeIssues,
   parseOrchestratorGameArcade,
   pickOrchestratorGameArcadeEngine
@@ -53,7 +54,7 @@ describe('orchestratorGameArcadeIssues', () => {
     game.difficulty = { minGap: 40, maxGap: 20 }
     game.obstacles = [{ from: 'scene' }, { rows: ['XY', 'X'], colors: { X: '#ffffff' } }]
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
-      'engine: must be one of: runner, snake',
+      'engine: must be one of: runner, snake, bricks',
       'speed.max: must be at least speed.start',
       'difficulty.maxGap: must be at least difficulty.minGap',
       'obstacles.1.rows: every row must be the same width',
@@ -126,5 +127,43 @@ describe('pickOrchestratorGameArcadeEngine', () => {
     const picked = new Set([0, 0.25, 0.5, 0.75, 0.999999].map(pickOrchestratorGameArcadeEngine))
     expect([...picked].sort()).toEqual([...ORCHESTRATOR_GAME_ARCADE_ENGINES].sort())
     expect(pickOrchestratorGameArcadeEngine(1)).toBe(ORCHESTRATOR_GAME_ARCADE_ENGINES.at(-1))
+  })
+})
+
+describe('the brick breaker game file', () => {
+  const bricks = (): Record<string, unknown> => JSON.parse(ORCHESTRATOR_GAME_ARCADE_BRICKS)
+
+  it('finds nothing in the built-in brick breaker', () => {
+    expect(orchestratorGameArcadeIssues(ORCHESTRATOR_GAME_ARCADE_BRICKS)).toEqual([])
+    expect(parseOrchestratorGameArcade(ORCHESTRATOR_GAME_ARCADE_BRICKS)).toMatchObject({
+      ok: true,
+      game: { engine: 'bricks' }
+    })
+  })
+
+  it('lists every brick breaker problem with its path', () => {
+    const game = bricks()
+    game.wall = { columns: 20, rows: 5, points: 5 }
+    game.ball = { start: 20, max: 10, rampPerWall: 1 }
+    game.colors = { bricks: [], paddle: '#ffffff', ball: '#ffffff' }
+    game.portrait = { field: { columns: 20, rows: 20 }, wall: { columns: 5, rows: 5 }, paddle: {} }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'wall.columns: must be a whole number from 4 to 16',
+      'ball.max: must be at least ball.start',
+      'colors.bricks: Too small: expected array to have >=1 items',
+      'portrait.paddle.width: must be from 2 to 10'
+    ])
+  })
+
+  it('wants a portrait field taller than wide', () => {
+    const game = bricks()
+    game.portrait = {
+      field: { columns: 20, rows: 20 },
+      wall: { columns: 5, rows: 5 },
+      paddle: { width: 4 }
+    }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'portrait.field.rows: must be more than field.columns'
+    ])
   })
 })

@@ -16552,6 +16552,7 @@
           "scoreOne": "1 pt",
           "hint": "Space or tap to jump",
           "snakeHint": "Arrows, WASD or tap to steer",
+          "bricksHint": "Arrows, A/D or the mouse to move the paddle",
           "heldBy": "Paused · {{name}} needs you",
           "held": "Paused · someone needs you",
           "over": "Game over · {{score}} pts",
