@@ -1,7 +1,7 @@
 import type { Project, ProjectHostSetup } from '../../../../../../shared/project-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { toSshExecutionHostId } from '../../../../../../shared/execution-host'
+import { toSshExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { parseWslUncPath } from '../../../../../../shared/wsl-paths'
 import {
   isWindowsAbsolutePathLike,
@@ -20,6 +20,8 @@ export type WorktreeGroupEntry = {
   items: Worktree[]
   repo?: Repo
   repoIds: Set<string>
+  /** Set when a project spanning hosts is split; the section belongs to this host. */
+  hostId?: ExecutionHostId
 }
 
 export type ProjectGroupingIndex = {

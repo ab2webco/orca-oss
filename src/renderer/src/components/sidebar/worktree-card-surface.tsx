@@ -179,9 +179,10 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         ],
         titleRenaming && '!border-transparent !bg-transparent !shadow-none !ring-0',
         isDeleting && 'opacity-50 grayscale cursor-not-allowed',
-        // Why: no SSH dim — the inline host control now states the disconnected state
-        // explicitly, and a subtree opacity would composite its destructive tint and spinner
-        // down to an illegible alpha (a descendant cannot escape an ancestor's opacity).
+        // Why: no SSH dim — the inline host control states the disconnected state explicitly,
+        // and a subtree opacity would composite its destructive tint and spinner down to an
+        // illegible alpha. An offline host section (ORCA-1181) dims only its headers for the
+        // same reason; runtime cards dim here.
         isRuntimeDisconnected && !isDeleting && 'opacity-60'
       )}
       data-worktree-card-surface="true"

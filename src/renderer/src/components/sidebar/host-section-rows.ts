@@ -16,6 +16,7 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { Row } from './worktree-list/grouping/row-types'
 import { getProjectGroupExecutionHostIdForRows } from './worktree-list/listing/host-filtering'
 import { localHostDisplayLabel, localHostPlatformDetail } from '../../lib/local-host-display-label'
+import { countWorktreeRows } from './host-section-worktree-count'
 
 export type HostHeaderRow = {
   type: 'host-header'
@@ -83,6 +84,10 @@ function getRowHostId(row: Row, defaultHostId: ExecutionHostId): ExecutionHostId
     case 'folder-workspace':
       return getFolderWorkspaceHostId(row.folderWorkspace, row.projectGroup, defaultHostId)
     case 'header':
+      // Why: a project split per host (ORCA-1181) names its host; its anchor repo could differ.
+      if (row.repo && row.hostId) {
+        return row.hostId
+      }
       if (row.projectGroup?.id != null) {
         return getProjectGroupExecutionHostIdForRows(row.projectGroup, defaultHostId)
       }
@@ -99,48 +104,6 @@ function getFallbackHost(hostId: ExecutionHostId): HostSectionOption {
     detail: isLocal ? localHostPlatformDetail() : 'Host',
     health: isLocal ? 'local' : 'available'
   }
-}
-
-function countWorktreeRows(rows: readonly Row[]): { count: number; worktreeIds: string[] } {
-  // Why: a collapsed repo group contributes a header row but no item rows;
-  // fall back to the header's own count so the host badge doesn't read 0
-  // while a visibly populated project sits right under it.
-  let count = 0
-  const seenWorktreeIds = new Set<string>()
-  let pendingHeader: Extract<Row, { type: 'header' }> | null = null
-  let pendingHeaderHadItems = false
-  const flushHeader = (): void => {
-    if (pendingHeader && !pendingHeaderHadItems) {
-      if (pendingHeader.worktreeIds) {
-        for (const worktreeId of pendingHeader.worktreeIds) {
-          if (!seenWorktreeIds.has(worktreeId)) {
-            count += 1
-            seenWorktreeIds.add(worktreeId)
-          }
-        }
-      } else {
-        count += pendingHeader.count
-      }
-    }
-    pendingHeader = null
-    pendingHeaderHadItems = false
-  }
-  for (const row of rows) {
-    if (row.type === 'header') {
-      flushHeader()
-      pendingHeader = row
-      continue
-    }
-    if (row.type === 'item') {
-      if (!seenWorktreeIds.has(row.worktree.id)) {
-        count += 1
-        seenWorktreeIds.add(row.worktree.id)
-      }
-      pendingHeaderHadItems = pendingHeader !== null
-    }
-  }
-  flushHeader()
-  return { count, worktreeIds: [...seenWorktreeIds] }
 }
 
 function localizePendingRowsForHost(
@@ -181,13 +144,36 @@ function flatUnderHost(row: Row): Row {
     return row.projectGroupDepth ? { ...row, projectGroupDepth: 0 } : row
   }
   if (row.type === 'item') {
-    return row.groupDepth ? { ...row, groupDepth: 0 } : row
+    // Why no host chip: the host header above already names the host (ORCA-1181).
+    if (!row.groupDepth && row.hostContextLabel === undefined) {
+      return row
+    }
+    const flat = { ...row, groupDepth: 0 }
+    delete flat.hostContextLabel
+    return flat
   }
   // Why 1: a folder workspace's depth counts its own folder group, which now sits at 0.
   if (row.type === 'folder-workspace') {
     return row.groupDepth > 1 ? { ...row, groupDepth: 1 } : row
   }
   return row
+}
+
+/**
+ * Whether host cards can be drawn at all: the scope shows more than one host and the registry
+ * knows more than one. They draw when, in addition, two hosts own rows.
+ */
+export function canDrawHostSections(
+  args: Pick<
+    Parameters<typeof addHostSectionRows>[0],
+    'hostOptions' | 'workspaceHostScope' | 'visibleWorkspaceHostIds'
+  >
+): boolean {
+  // Why no default-view bypass (ORCA-1181): two hosts with rows always get headers, filter or not.
+  const visibleHostIds =
+    args.visibleWorkspaceHostIds ??
+    (args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE ? null : [args.workspaceHostScope])
+  return !(visibleHostIds && visibleHostIds.length <= 1) && args.hostOptions.length > 1
 }
 
 export function addHostSectionRows(args: {
@@ -200,22 +186,8 @@ export function addHostSectionRows(args: {
   // (`host:<hostId>`) so collapse state survives restarts like other groups.
   collapsedHostKeys?: ReadonlySet<string>
   forceCollapseHosts?: boolean
-  // Why: in the default Projects view, project is the user's primary object
-  // and host is context inside it. Explicit host filters still keep host
-  // headers as an operational/troubleshooting view.
-  preferProjectGrouping?: boolean
 }): HostSectionRow[] {
-  const visibleHostIds =
-    args.visibleWorkspaceHostIds ??
-    (args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE ? null : [args.workspaceHostScope])
-  if (
-    args.preferProjectGrouping &&
-    args.workspaceHostScope === ALL_EXECUTION_HOSTS_SCOPE &&
-    !args.visibleWorkspaceHostIds
-  ) {
-    return [...args.rows]
-  }
-  if ((visibleHostIds && visibleHostIds.length <= 1) || args.hostOptions.length <= 1) {
+  if (!canDrawHostSections(args)) {
     return [...args.rows]
   }
 
@@ -252,24 +224,27 @@ export function addHostSectionRows(args: {
     }
   }
 
+  const pushHostRow = (rowHostId: ExecutionHostId, row: Row): void => {
+    const hostRows = rowsByHostId.get(rowHostId) ?? []
+    if (pendingRows.length > 0) {
+      const localizedPendingRows = localizePendingRowsForHost(pendingRows, rowHostId)
+      const pendingRowsKey = getPendingRowsKey(localizedPendingRows)
+      if (
+        localizedPendingRows.length > 0 &&
+        pendingRowsKeyByHostId.get(rowHostId) !== pendingRowsKey
+      ) {
+        hostRows.push(...localizedPendingRows)
+        pendingRowsKeyByHostId.set(rowHostId, pendingRowsKey)
+      }
+      pendingRowsWereUsed = pendingRowsWereUsed || localizedPendingRows.length > 0
+    }
+    hostRows.push(row)
+    rowsByHostId.set(rowHostId, hostRows)
+  }
   for (const row of args.rows) {
     const rowHostId = getRowHostId(row, args.defaultHostId)
     if (rowHostId) {
-      const hostRows = rowsByHostId.get(rowHostId) ?? []
-      if (pendingRows.length > 0) {
-        const localizedPendingRows = localizePendingRowsForHost(pendingRows, rowHostId)
-        const pendingRowsKey = getPendingRowsKey(localizedPendingRows)
-        if (
-          localizedPendingRows.length > 0 &&
-          pendingRowsKeyByHostId.get(rowHostId) !== pendingRowsKey
-        ) {
-          hostRows.push(...localizedPendingRows)
-          pendingRowsKeyByHostId.set(rowHostId, pendingRowsKey)
-        }
-        pendingRowsWereUsed = pendingRowsWereUsed || localizedPendingRows.length > 0
-      }
-      hostRows.push(row)
-      rowsByHostId.set(rowHostId, hostRows)
+      pushHostRow(rowHostId, row)
       continue
     }
     // Why: status/"All" headers describe the rows that follow. Buffer them

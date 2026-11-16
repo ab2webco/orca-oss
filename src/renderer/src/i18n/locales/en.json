@@ -5170,7 +5170,8 @@
         "WorktreeList": {
           "7a8b9c0d1e": "Update required",
           "hostAuthNeeded": "Authentication needed",
-          "hostDisconnected": "Disconnected",
+          "hostOffline": "Offline",
+          "hostOfflineSince": "Offline · {{age}}",
           "hostActiveAgents": "{{count}} active",
           "hostActiveAgents_one": "{{count}} active",
           "hostActiveAgents_other": "{{count}} active",

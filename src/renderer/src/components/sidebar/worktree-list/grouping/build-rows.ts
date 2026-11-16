@@ -33,6 +33,7 @@ import type {
 import { getRenderedNaturalAnchorRepoIds, withRepoSectionDisplayLabels } from './section-order'
 import { buildOrderedGroups } from './worktree-grouping'
 import { getActiveProjectKeys } from './idle-project-fold'
+import { buildProjectHostKeying } from './project-host-split'
 import { appendRepoSectionsSplitByActivity } from './idle-projects-group'
 import type { ProjectActivityInputs } from './project-activity'
 
@@ -63,7 +64,9 @@ export function buildRows(
   defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID,
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings),
   /** Opts into the ORCA-1216 idle-project fold; absent keeps every project expanded. */
-  idleProjectFold?: ProjectActivityInputs
+  idleProjectFold?: ProjectActivityInputs,
+  /** canDrawHostSections: a project spanning hosts splits per host only when host cards can draw. */
+  splitProjectsByHost = false
 ): Row[] {
   const result: Row[] = []
   const projectIndex = buildProjectGroupingIndex(projectGrouping)
@@ -144,6 +147,10 @@ export function buildRows(
     return result
   }
 
+  const projectHostKeying =
+    groupBy === 'repo' && splitProjectsByHost
+      ? buildProjectHostKeying({ worktrees, repoMap, projectIndex, defaultHostId })
+      : undefined
   const orderedGroups = buildOrderedGroups({
     groupBy,
     naturalWorktrees,
@@ -157,7 +164,8 @@ export function buildRows(
     newExternalWorktreesInboxByRepo,
     pendingByRepo,
     repoOrder,
-    projectOrderBy
+    projectOrderBy,
+    projectHostKeying
   })
 
   const sectionContext: SectionAppendContext = {
@@ -178,7 +186,7 @@ export function buildRows(
     cyclicLineageIds,
     activeProjectKeys:
       groupBy === 'repo' && idleProjectFold
-        ? getActiveProjectKeys(worktrees, repoMap, projectIndex, idleProjectFold)
+        ? getActiveProjectKeys(worktrees, repoMap, projectIndex, idleProjectFold, projectHostKeying)
         : undefined,
     urgency:
       groupBy === 'repo' && idleProjectFold?.urgency

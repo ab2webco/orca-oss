@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
@@ -19,11 +19,12 @@ import type { ProjectActivityInputs } from '../grouping/project-activity'
 import type { PinnedWorktreeDisplayPolicy, Row, WorktreeGroupBy } from '../grouping/row-types'
 import { getLogicalRepoOrderRankById } from '../../project-header-drop'
 import { getEmptyProjectPlaceholderRepoIds } from '../../empty-project-placeholder-repos'
-import { addHostSectionRows } from '../../host-section-rows'
+import { addHostSectionRows, canDrawHostSections } from '../../host-section-rows'
 import { orderHostSectionOptions } from '../../host-section-order'
 import { buildSidebarHostOptions } from '../../sidebar-host-options'
 import { localHostDisplayLabel } from '../../../../lib/local-host-display-label'
 import { useCommitProjectTierMemory } from './project-tier-memory-store'
+import { ensureHostLastLiveTracking } from '../../host-last-live-store'
 
 type SectionRowsArgs = {
   groupBy: WorktreeGroupBy
@@ -85,6 +86,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
+  useEffect(() => ensureHostLastLiveTracking(useAppStore), [])
 
   // Why: manual header order is bound to state.repos; Recent/Smart derive order from the sorted worktree stream.
   const repoOrder = useMemo(
@@ -153,6 +155,11 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     [hostOptions]
   )
 
+  const splitProjectsByHost = canDrawHostSections({
+    hostOptions,
+    workspaceHostScope: args.workspaceHostScope,
+    visibleWorkspaceHostIds: args.visibleWorkspaceHostIds
+  })
   const rows: Row[] = useMemo(
     () =>
       buildRows(
@@ -178,7 +185,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         hostLabelById,
         defaultHostId,
         args.pinnedDisplayPolicy,
-        args.idleProjectFold
+        args.idleProjectFold,
+        splitProjectsByHost
       ),
     [
       args.groupBy,
@@ -202,7 +210,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       pendingCreations,
       hostLabelById,
       args.pinnedDisplayPolicy,
-      args.idleProjectFold
+      args.idleProjectFold,
+      splitProjectsByHost
     ]
   )
   useCommitProjectTierMemory(rows)
@@ -239,9 +248,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         visibleWorkspaceHostIds: args.visibleWorkspaceHostIds,
         defaultHostId,
         collapsedHostKeys: effectiveCollapsedGroups,
-        forceCollapseHosts: hostDragActive,
-        // Why: projects/workspaces are the primary sidebar object; host sections are only an explicit host-filter view.
-        preferProjectGrouping: true
+        forceCollapseHosts: hostDragActive
       }),
     [
       args.visibleWorkspaceHostIds,

@@ -14,6 +14,12 @@ vi.mock('../../HostSectionHeaderMenu', () => ({ HostSectionHeaderMenu: () => nul
 vi.mock('../../host-header-active-count', () => ({
   useHostActiveAgentCount: (worktreeIds: readonly string[]) => worktreeIds.length - 1
 }))
+const NOW = 10 * 3_600_000
+const lastLiveAt = new Map<string, number>()
+vi.mock('../../host-last-live-store', () => ({
+  useHostLastLiveAt: (hostId: string) => lastLiveAt.get(hostId) ?? null
+}))
+vi.mock('../../../dashboard/useNow', () => ({ useNow: () => NOW }))
 
 function host(overrides: Partial<HostHeaderRow> = {}): HostHeaderRow {
   return {
@@ -43,6 +49,7 @@ function render(row: HostHeaderRow): HTMLElement {
 }
 
 afterEach(() => {
+  lastLiveAt.clear()
   act(() => root?.unmount())
   container?.remove()
   root = null
@@ -78,9 +85,39 @@ describe('HostSectionHeader as a V30 tree row (ORCA-1149)', () => {
     expect(controls.contains(header.querySelector('[data-host-header-action]'))).toBe(true)
   })
 
-  it('still words a host that needs attention', () => {
-    const header = render(host({ kind: 'ssh', health: 'disconnected', detail: 'SSH' }))
+  it('names an offline host with the age of its last data, never an active count', () => {
+    lastLiveAt.set('ssh:contabo', NOW - 3 * 3_600_000)
+    const header = render(
+      host({
+        hostId: 'ssh:contabo' as HostHeaderRow['hostId'],
+        kind: 'ssh',
+        health: 'disconnected'
+      })
+    )
 
-    expect(header.textContent).toContain('Disconnected')
+    expect(header.querySelector('[data-host-header-offline]')?.textContent).toBe('Offline · 3 h')
+    expect(header.querySelector('[data-host-header-active]')).toBeNull()
+  })
+
+  it('says only Offline when this session never saw the host connected', () => {
+    const header = render(
+      host({
+        hostId: 'ssh:contabo' as HostHeaderRow['hostId'],
+        kind: 'ssh',
+        health: 'error',
+        connectionStatus: 'reconnection-failed'
+      })
+    )
+
+    expect(header.querySelector('[data-host-header-offline]')?.textContent).toBe('Offline')
+    expect(header.querySelector('[data-host-header-active]')).toBeNull()
+  })
+
+  it('still words a host that needs authentication', () => {
+    const header = render(
+      host({ kind: 'ssh', health: 'error', connectionStatus: 'auth-failed', detail: 'SSH' })
+    )
+
+    expect(header.textContent).toContain('Authentication needed')
   })
 })

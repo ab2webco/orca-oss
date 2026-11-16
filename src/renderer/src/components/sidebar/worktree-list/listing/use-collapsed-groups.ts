@@ -13,7 +13,7 @@ import {
 } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { WorktreeGroupBy } from '../grouping/row-types'
-import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
+import { getRevealGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 
 // While the agent send picker targets a workspace, force open every section (and idle fold) that hides it.
@@ -55,7 +55,7 @@ export function useEffectiveCollapsedGroups(args: {
     if (targetWorktree.isPinned) {
       next.delete(PINNED_GROUP_KEY)
     } else {
-      for (const groupKey of getGroupKeysForWorktree(
+      for (const groupKey of getRevealGroupKeysForWorktree(
         groupBy,
         targetWorktree,
         repoMap,

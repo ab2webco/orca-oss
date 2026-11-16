@@ -6,6 +6,7 @@ import { renderWorktreeSidebarDropIndicators } from './drop-indicators'
 import { useWorktreeListScrollToTop } from './use-scroll-to-top'
 import { getActiveDescendantOptionId } from '../navigation/active-descendant-option'
 import { buildRenderableRows } from '../listing/renderable-rows'
+import { getOfflineHostRowIndexes } from '../../host-offline'
 import { useFolderWorkspacePathStatusRows } from '../listing/use-folder-path-statuses'
 import { useGroupToggleWithScrollAnchor } from './use-group-toggle'
 import { usePendingSidebarReveal } from '../navigation/use-pending-reveal'
@@ -70,6 +71,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     () => renderRows.findIndex((row) => row.type === 'header' || row.type === 'host-header'),
     [renderRows]
   )
+  const offlineHostRowIndexes = useMemo(() => getOfflineHostRowIndexes(renderRows), [renderRows])
   const folderBackedProjectGroupIds = useMemo(
     () =>
       new Set(
@@ -296,6 +298,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const rowContext = buildWorktreeVirtualRowContext({
     props,
     renderRows,
+    offlineHostRowIndexes,
     firstHeaderIndex,
     virtualization,
     measureVirtualRowElement,

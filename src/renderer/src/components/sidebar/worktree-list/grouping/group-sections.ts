@@ -132,6 +132,7 @@ export function appendOrderedGroups(
             icon: PROJECT_GROUP_META.icon,
             repo,
             projectGroupDepth,
+            ...(group.hostId ? { hostId: group.hostId } : {}),
             ...(fold ? { fold } : {}),
             ...(lastActivityAt !== null ? { lastActivityAt } : {}),
             ...(urgency ? { urgency } : {})

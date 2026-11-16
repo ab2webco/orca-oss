@@ -14,7 +14,7 @@ import type { RenderRow } from '../listing/render-row'
 import { getLineageGroupKey } from '../grouping/group-keys'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
-import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
+import { getRevealGroupKeysForWorktree } from '../grouping/worktree-group-keys'
 import { getWorktreeLineageAncestors } from '../../worktree-lineage-projection'
 import { getFolderWorkspaceRevealGroupKeys } from './folder-reveal'
 import { getPinnedWorktreeRevealCollapsedGroupKeys } from './reveal-ancestors'
@@ -101,7 +101,7 @@ export function expandGroupsForWorktreeReveal(
           worktree: targetWorktree,
           collapsedGroups: args.collapsedGroups
         })
-      : getGroupKeysForWorktree(
+      : getRevealGroupKeysForWorktree(
           args.groupBy,
           targetWorktree,
           args.repoMap,

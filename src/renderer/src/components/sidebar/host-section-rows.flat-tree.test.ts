@@ -92,8 +92,7 @@ describe('host sections draw orgs and projects flat, as V30 (ORCA-1149)', () => 
         rows,
         hostOptions: [...HOSTS],
         workspaceHostScope: 'all',
-        defaultHostId: 'local',
-        preferProjectGrouping: true
+        defaultHostId: 'local'
       })
     ).toEqual(rows)
   })

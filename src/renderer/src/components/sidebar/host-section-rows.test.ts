@@ -136,6 +136,23 @@ function folderWorkspaceRow(
   }
 }
 
+const TWO_HOSTS = [
+  {
+    id: 'local' as const,
+    kind: 'local' as const,
+    label: 'Local Mac',
+    detail: 'This computer',
+    health: 'local' as const
+  },
+  {
+    id: 'ssh:ssh-1' as const,
+    kind: 'ssh' as const,
+    label: 'Builder',
+    detail: 'SSH',
+    health: 'available' as const
+  }
+]
+
 function rowKey(row: HostSectionRow): string {
   return row.type === 'item' ? row.worktree.id : row.key
 }
@@ -222,29 +239,26 @@ describe('addHostSectionRows', () => {
     ])
   })
 
-  it('keeps project grouping outermost in the default Projects view', () => {
+  it('draws host sections in the default view whenever two hosts own rows (ORCA-1181)', () => {
     const local = repo('local')
     const ssh = repo('ssh', 'ssh-1')
     const rows = [repoHeader(local), item('local-wt', local), repoHeader(ssh), item('ssh-wt', ssh)]
 
     const sectioned = addHostSectionRows({
       rows,
-      hostOptions: [
-        {
-          id: 'local',
-          kind: 'local',
-          label: 'Local Mac',
-          detail: 'This computer',
-          health: 'local'
-        },
-        { id: 'ssh:ssh-1', kind: 'ssh', label: 'Builder', detail: 'SSH', health: 'available' }
-      ],
+      hostOptions: TWO_HOSTS,
       workspaceHostScope: 'all',
-      defaultHostId: 'local',
-      preferProjectGrouping: true
+      defaultHostId: 'local'
     })
 
-    expect(sectioned).toEqual(rows)
+    expect(sectioned.map(rowKey)).toEqual([
+      'host:local',
+      'repo:local',
+      'local-wt',
+      'host:ssh:ssh-1',
+      'repo:ssh',
+      'ssh-wt'
+    ])
   })
 
   it('keeps host headers for a custom multi-host visibility filter', () => {
@@ -254,20 +268,10 @@ describe('addHostSectionRows', () => {
     const sectionsOf = (rows: Row[]): HostSectionRow[] =>
       addHostSectionRows({
         rows,
-        hostOptions: [
-          {
-            id: 'local',
-            kind: 'local',
-            label: 'Local Mac',
-            detail: 'This computer',
-            health: 'local'
-          },
-          { id: 'ssh:ssh-1', kind: 'ssh', label: 'Builder', detail: 'SSH', health: 'available' }
-        ],
+        hostOptions: TWO_HOSTS,
         workspaceHostScope: 'all',
         visibleWorkspaceHostIds: ['local', 'ssh:ssh-1'],
-        defaultHostId: 'local',
-        preferProjectGrouping: true
+        defaultHostId: 'local'
       })
 
     // Why: a filtered host that owns no rows draws no header, so the other host gets none either.

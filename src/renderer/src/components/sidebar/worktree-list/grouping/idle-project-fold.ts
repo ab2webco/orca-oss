@@ -6,18 +6,21 @@ import type { ProjectActivityInputs } from './project-activity'
 import { getProjectGroupingForRepo } from './project-grouping'
 import type { ProjectGroupingIndex } from './project-grouping'
 import type { IdleProjectFold } from './row-types'
+import type { ProjectHostKeying } from './project-host-split'
 
 /** Project header keys with any active workspace, pinned ones included. */
 export function getActiveProjectKeys(
   worktrees: readonly Worktree[],
   repoMap: Map<string, Repo>,
   projectIndex: ProjectGroupingIndex | null,
-  inputs: ProjectActivityInputs
+  inputs: ProjectActivityInputs,
+  projectHostKeying?: ProjectHostKeying
 ): Set<string> {
   const keys = new Set<string>()
   for (const worktree of worktrees) {
     if (isWorkspaceActive(worktree, inputs)) {
-      keys.add(getProjectGroupingForRepo(worktree.repoId, repoMap, projectIndex).key)
+      const key = getProjectGroupingForRepo(worktree.repoId, repoMap, projectIndex).key
+      keys.add(projectHostKeying ? projectHostKeying.forWorktree(worktree, key).key : key)
     }
   }
   return keys

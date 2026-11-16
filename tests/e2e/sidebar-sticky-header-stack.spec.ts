@@ -8,6 +8,12 @@ import { PNG } from 'pngjs'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
+import {
+  seedPairedHostSidebar,
+  setSeededHostConnection,
+  sshHostId,
+  type SeededHostRepo
+} from './helpers/paired-host-sidebar-fixture'
 
 type StackProbe = {
   pinned: number
@@ -18,65 +24,26 @@ type StackProbe = {
   leaks: { x: number; y: number; row: string }[]
 }
 
-async function seedTwoHosts(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const store = window.__store
-    if (!store) {
-      throw new Error('window.__store is not available')
-    }
-    const state = store.getState()
-    const sourceRepo = state.repos[0]
-    const sourceWorktree = sourceRepo ? (state.worktreesByRepo[sourceRepo.id] ?? [])[0] : undefined
-    if (!sourceRepo || !sourceWorktree) {
-      throw new Error('Sticky stack E2E needs the seeded repo')
-    }
-    const connectionId = 'e2e-sticky-host'
-    const sshHostId = `ssh:${connectionId}`
-    const repos = [...state.repos]
-    const worktreesByRepo = { ...state.worktreesByRepo }
-    const addRepo = (index: number, remote: boolean): void => {
-      const id = `e2e-sticky-${remote ? 'remote' : 'local'}-${index}`
-      repos.push({
-        ...sourceRepo,
-        id,
-        path: `${sourceRepo.path}-${id}`,
-        displayName: `${remote ? 'remote' : 'local'}-project-${index}`,
-        ...(remote ? { connectionId, executionHostId: sshHostId } : {})
-      })
-      worktreesByRepo[id] = [0, 1, 2].map((n) => ({
-        ...sourceWorktree,
-        id: `${id}-wt-${n}`,
-        repoId: id,
-        path: `${sourceWorktree.path}-${id}-${n}`,
-        displayName: n === 0 ? 'main' : `feature-${index}-${n}`,
-        branch: n === 0 ? 'refs/heads/main' : `refs/heads/feature-${index}-${n}`,
-        isMainWorktree: n === 0,
-        isArchived: false,
-        hostId: remote ? sshHostId : 'local',
-        // Why recent: an idle project folds to one row (ORCA-1216); this stack needs every row drawn.
-        lastActivityAt: Date.now()
-      }))
-    }
-    for (let index = 0; index < 6; index += 1) {
-      addRepo(index, false)
-    }
-    for (let index = 0; index < 3; index += 1) {
-      addRepo(index, true)
-    }
-    const sshTargetLabels = new Map(state.sshTargetLabels)
-    sshTargetLabels.set(connectionId, 'm1')
-    store.setState({ repos, worktreesByRepo, sshTargetLabels })
-    const next = store.getState()
-    next.setActiveView('terminal')
-    next.setSidebarOpen(true)
+const M1 = 'e2e-sticky-host'
+
+// Why recent: an idle project folds to one row (ORCA-1216); this stack needs every row drawn.
+const recentProjects = (prefix: string, count: number): SeededHostRepo[] =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `e2e-sticky-${prefix}-${index}`,
+    displayName: `${prefix}-project-${index}`,
+    workspaces: 3,
+    activityAgeMs: 0
+  }))
+
+async function seedTwoHosts(page: Page): Promise<void> {
+  await seedPairedHostSidebar(page, {
+    local: recentProjects('local', 6),
+    hosts: [{ connectionId: M1, label: 'm1', repos: recentProjects('remote', 3) }],
+    visibleHostIds: ['local', sshHostId(M1)],
     // The owner's width.
-    next.setSidebarWidth(470)
-    next.setRightSidebarOpen(false)
-    next.setGroupBy('repo')
-    next.setFilterRepoIds([])
-    next.setVisibleWorkspaceHostIds(['local', sshHostId])
-    return sshHostId
+    sidebarWidth: 470
   })
+  await setSeededHostConnection(page, M1, 'connected')
 }
 
 async function probeStack(page: Page): Promise<StackProbe | null> {
