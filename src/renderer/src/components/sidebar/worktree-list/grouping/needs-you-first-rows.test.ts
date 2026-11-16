@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRows } from './build-rows'
-import { isWorktreeCIFailing } from './group-keys'
-import { IDLE_PROJECTS_GROUP_KEY } from './group-keys'
+import { IDLE_PROJECTS_GROUP_KEY, isWorktreeCIFailing } from './group-keys'
 import { nextProjectTierMemory } from './project-tier-order'
 import type { ProjectTierMemory } from './project-tier-order'
 import type { ProjectActivityInputs } from './project-activity'

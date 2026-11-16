@@ -1,5 +1,5 @@
 import type { SectionAppendContext } from './group-sections'
-import { resolveSectionFold } from './group-sections'
+import { resolveSectionFold } from './section-fold'
 import { getLatestActivityAt } from './project-activity'
 import type { ProjectUrgencyInputs } from './project-activity'
 import type { OrderedGroupEntry, WorktreeGroupEntry } from './project-grouping'

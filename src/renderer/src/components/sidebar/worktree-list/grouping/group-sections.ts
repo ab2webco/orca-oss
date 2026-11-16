@@ -7,11 +7,7 @@ import type { PRGroupKey } from './group-keys'
 import { AGENT_STATUS_GROUP_META } from './agent-status-groups'
 import type { AgentStatusGroupKey } from './agent-status-groups'
 import { getHostWorktreeCounts, getHostWorktreeIds, getMixedHostContextLabels } from './host-labels'
-import type {
-  OrderedGroupEntry,
-  ProjectGroupingIndex,
-  WorktreeGroupEntry
-} from './project-grouping'
+import type { OrderedGroupEntry, ProjectGroupingIndex } from './project-grouping'
 import {
   appendWorktreeRows,
   buildImportedWorktreesCardRow,
@@ -19,7 +15,6 @@ import {
   buildPendingCreationRow
 } from './row-builders'
 import type {
-  IdleProjectFold,
   ImportedWorktreesCardCandidate,
   NewExternalWorktreesInboxCandidate,
   PendingCreationRef,
@@ -27,7 +22,7 @@ import type {
   WorktreeGroupBy
 } from './row-types'
 import { orderMainWorktreeFirst } from './section-order'
-import { resolveIdleProjectFold } from './idle-project-fold'
+import { getSectionRepoIds, resolveSectionFold } from './section-fold'
 import { getLatestActivityAt } from './project-activity'
 import { resolveSectionUrgency } from './section-urgency'
 import type { SectionUrgencyContext } from './section-urgency'
@@ -53,42 +48,6 @@ export type SectionAppendContext = {
   activeProjectKeys?: ReadonlySet<string>
   /** Set only when the caller passes the Needs you first inputs (groupBy 'repo'). */
   urgency?: SectionUrgencyContext
-}
-
-function getSectionRepoIds(key: string, repoIds: ReadonlySet<string>, repo?: Repo): string[] {
-  if (repoIds.size > 0) {
-    return [...repoIds]
-  }
-  if (repo) {
-    return [repo.id]
-  }
-  return key.startsWith('repo:') ? [key.slice('repo:'.length)] : []
-}
-
-/** The idle fold of a repo section, or undefined when it is active or the fold is off. */
-export function resolveSectionFold(
-  ctx: SectionAppendContext,
-  key: string,
-  group: WorktreeGroupEntry
-): IdleProjectFold | undefined {
-  const { groupBy, activeProjectKeys, collapsedGroups } = ctx
-  // Why repo-gated: SectionHeader draws the fold only on a project header that knows its repo.
-  if (groupBy !== 'repo' || !group.repo || !activeProjectKeys) {
-    return undefined
-  }
-  const repoIds = getSectionRepoIds(key, group.repoIds, group.repo)
-  return resolveIdleProjectFold({
-    key,
-    items: group.items,
-    activeProjectKeys,
-    collapsedGroups,
-    hasProjectNotice: repoIds.some(
-      (repoId) =>
-        ctx.importedWorktreesByRepo.has(repoId) ||
-        ctx.newExternalWorktreesInboxByRepo.has(repoId) ||
-        (ctx.pendingByRepo.get(repoId)?.length ?? 0) > 0
-    )
-  })
 }
 
 export function appendOrderedGroups(
