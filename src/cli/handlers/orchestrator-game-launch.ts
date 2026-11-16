@@ -21,7 +21,7 @@ import {
   type GameLaunchFlags,
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
-import { gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
+import { gameKindEffortPlanSeedOf, gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
 import {
   globalLoginHolderOf,
   remoteGlobalLoginOf,
@@ -207,7 +207,8 @@ async function startGameMember(
     agent: choice.agent,
     accountId: memberAccount.account?.id,
     account: memberAccount.account?.email,
-    lastState: 'launching'
+    lastState: 'launching',
+    ...gameKindEffortPlanSeedOf(model)
   })
   const createsWorktree = where.worktree === 'new-child' || where.worktree === 'new-top-level'
   const workerParams = {

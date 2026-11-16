@@ -1,5 +1,6 @@
 import { agentToolLabelOf } from './agent-tool-label'
-import type { GamePausedMember, GameQueuedMember } from './orchestrator-game-member-sessions'
+import type { GamePausedMember } from './orchestrator-game-member-sessions'
+import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
   characterKeyOf,
   leadCharacterOf,

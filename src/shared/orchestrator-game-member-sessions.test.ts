@@ -5,11 +5,11 @@ import {
   mergeGameMemberSession,
   parseGameMemberSessionsFile,
   pausedMembersOf,
-  queuedMembersOf,
   serializeGameMemberSessions,
   unlistedMembersOf,
   type GameMemberSession
 } from './orchestrator-game-member-sessions'
+import { queuedMembersOf } from './orchestrator-game-queued-members'
 
 const member = (ticket: string, extra: Partial<GameMemberSession> = {}): GameMemberSession => ({
   ticket,

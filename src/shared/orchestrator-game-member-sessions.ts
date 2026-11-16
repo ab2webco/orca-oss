@@ -1,6 +1,11 @@
 /** What the lead needs to resume a member after Orca or the machine restarts: `orca game resume-members`. */
 
 import {
+  gameEffortPlanOf,
+  sameGameEffortPlan,
+  type GameEffortPlan
+} from './orchestrator-game-effort-plan'
+import {
   WORKTREE_ID_MAX,
   savedWorktreeId,
   savedWorktreeIdFields
@@ -30,6 +35,8 @@ export type GameMemberSession = {
   updatedAt: string
   /** Set for an agent `game adopt` took: its own tab, resumed there and never relaunched (ORCA-1141). */
   adoptedPaneKey?: string
+  /** The lead's per-phase model and effort for this ticket, or the kind's seed (ORCA-1242). */
+  effortPlan?: GameEffortPlan
 }
 
 export type GameMemberSessionPatch = { ticket: string } & Partial<
@@ -79,11 +86,13 @@ function parseMember(raw: unknown): GameMemberSession | null {
   const member = Object.fromEntries(
     [...REQUIRED_FIELDS, ...NULLABLE_FIELDS].map((key) => [key, raw[key]])
   ) as GameMemberSession
+  const effortPlan = gameEffortPlanOf(raw.effortPlan)
   return {
     ...member,
     ticket: member.ticket.toUpperCase(),
     worktreeId: savedWorktreeId(member.worktreeId, raw.fullWorktreeId, TEXT_MAX),
-    ...(isText(raw.adoptedPaneKey) ? { adoptedPaneKey: raw.adoptedPaneKey } : {})
+    ...(isText(raw.adoptedPaneKey) ? { adoptedPaneKey: raw.adoptedPaneKey } : {}),
+    ...(effortPlan ? { effortPlan } : {})
   }
 }
 
@@ -93,6 +102,7 @@ const MEMBER_KEYS: ReadonlySet<string> = new Set([
   'fullWorktreeId',
   'adoptedPaneKey'
 ])
+const MEMBER_KEYS_WITH_PLAN: ReadonlySet<string> = new Set([...MEMBER_KEYS, 'effortPlan'])
 const FILE_KEYS: ReadonlySet<string> = new Set(['version', 'members'])
 
 const keysOutside = (
@@ -136,7 +146,8 @@ export function parseGameMemberSessionsFile(text: string): GameMemberSessionsRea
       }
     }
     members.push(member)
-    const extra = keysOutside(raw, MEMBER_KEYS)
+    // Why an unread plan stays an unknown key: the next write must not drop its bytes.
+    const extra = keysOutside(raw, member.effortPlan ? MEMBER_KEYS_WITH_PLAN : MEMBER_KEYS)
     if (Object.keys(extra).length > 0) {
       kept.members[member.ticket] = extra
     }
@@ -219,36 +230,6 @@ export type GamePausedMember = {
   terminal?: string
   /** Its saved worktree no longer exists, so only `--discard` clears it (ORCA-832). */
   worktreeGone?: true
-}
-
-/** A start the host holds until its setup slot frees (ORCA-746). */
-export type GameSetupQueueEntry = { taskId: string; position: number; waitingOn: string }
-
-/** A member whose start waits for the setup in flight: neither live nor paused. */
-export type GameQueuedMember = {
-  ticket: string
-  name: string | null
-  position: number
-  waitingOn: string
-}
-
-export function queuedMembersOf(
-  members: readonly GameMemberSession[],
-  setupQueue: readonly GameSetupQueueEntry[]
-): GameQueuedMember[] {
-  return setupQueue.flatMap((entry) => {
-    const member = members.find((one) => one.taskId === entry.taskId)
-    return member
-      ? [
-          {
-            ticket: member.ticket,
-            name: member.name,
-            position: entry.position,
-            waitingOn: entry.waitingOn
-          }
-        ]
-      : []
-  })
 }
 
 /**
@@ -352,7 +333,15 @@ export function mergeGameMemberSession(
     return [...members, added].slice(-GAME_MEMBER_SESSIONS_MAX)
   }
   // Why keep launchedAt: a relaunch on the same task is the same member's work.
-  const { launchedAt: _launchedAt, ticket: _ticket, ...changes } = patch
+  const { launchedAt: _launchedAt, ticket: _ticket, effortPlan, ...changes } = patch
+  // Why: a relaunch re-seeds the kind's plan, which must never replace the one the lead wrote.
+  const keepsPlan =
+    !effortPlan ||
+    sameGameEffortPlan(effortPlan, current.effortPlan) ||
+    (effortPlan.source === 'kind' && current.effortPlan?.source === 'lead')
+  if (!keepsPlan) {
+    Object.assign(changes, { effortPlan })
+  }
   const changed = (Object.keys(changes) as (keyof typeof changes)[]).some(
     (key) => changes[key] !== undefined && changes[key] !== current[key]
   )

@@ -2,16 +2,18 @@ import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-
 import { ticketOfMember } from '../../shared/orchestrator-game-fleet-verbs'
 import { finishedSignalOf } from '../../shared/orchestrator-game-member-finished'
 import { pausedAndUnlistedMembersOf } from '../../shared/orchestrator-game-adopted-members'
+import type {
+  GameMemberSession,
+  GameMemberSessionPatch,
+  GamePausedCauseOf,
+  GamePausedMember,
+  GameUnlistedMember
+} from '../../shared/orchestrator-game-member-sessions'
 import {
   queuedMembersOf,
-  type GameMemberSession,
-  type GameMemberSessionPatch,
-  type GamePausedCauseOf,
-  type GamePausedMember,
   type GameQueuedMember,
-  type GameSetupQueueEntry,
-  type GameUnlistedMember
-} from '../../shared/orchestrator-game-member-sessions'
+  type GameSetupQueueEntry
+} from '../../shared/orchestrator-game-queued-members'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import type { GameMemberSessionStore } from './orchestrator-game-member-session-store'
 

@@ -10,6 +10,7 @@ import {
   type GameMemberSessionPatch,
   type GameMemberSessionsRead
 } from '../../shared/orchestrator-game-member-sessions'
+import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
 import type { GameStoreNaming } from './orchestrator-game-store-names'
 
 /** Each project's live members, one file per project, so a lead can resume them after a restart. */
@@ -46,6 +47,35 @@ export class GameMemberSessionStore {
       const now = this.now()
       return list.reduce((current, patch) => mergeGameMemberSession(current, patch, now), members)
     })
+  }
+
+  /** `known` false when no member was ever launched for the ticket here. */
+  async effortPlanOf(
+    projectKey: string,
+    ticket: string
+  ): Promise<{ known: boolean; plan: GameEffortPlan | null }> {
+    const read = await this.read(projectKey)
+    if (!read.ok) {
+      throw new Error(`Plan not read: ${read.reason}`)
+    }
+    const member = read.members.find((one) => one.ticket === ticket.toUpperCase())
+    return { known: Boolean(member), plan: member?.effortPlan ?? null }
+  }
+
+  // Why only for a saved member: a plan for a ticket nobody launched would never reach a member.
+  async writeEffortPlan(
+    projectKey: string,
+    ticket: string,
+    plan: GameEffortPlan
+  ): Promise<GameEffortPlan> {
+    const upper = ticket.toUpperCase()
+    const members = await this.update(projectKey, (current) => {
+      if (!current.some((one) => one.ticket === upper)) {
+        throw new Error(`No member is saved for ${upper} in this project; launch it first.`)
+      }
+      return mergeGameMemberSession(current, { ticket: upper, effortPlan: plan }, this.now())
+    })
+    return members.find((one) => one.ticket === upper)?.effortPlan ?? plan
   }
 
   remove(projectKey: string, tickets: readonly string[]): Promise<GameMemberSession[]> {

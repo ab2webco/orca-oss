@@ -860,6 +860,7 @@ import type {
   GameMemberSession,
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
+import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
@@ -31861,6 +31862,26 @@ export class OrcaRuntimeService {
     await this.gamePausedMembers.record(project.key, args.member)
     this.gameFleetChange.changed()
     return { recorded: true }
+  }
+
+  /** Reads a ticket's effort plan, or replaces it with `plan`, which only the lead may (ORCA-1242). */
+  async gameEffortPlan(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+    plan?: GameEffortPlan
+  }): Promise<{ ticket: string; known: boolean; plan: GameEffortPlan | null }> {
+    const project = await this.gameBoardProjectOf(args)
+    const ticket = args.ticket.toUpperCase()
+    if (!args.plan) {
+      return { ticket, ...(await this.gameMemberSessions.effortPlanOf(project.key, ticket)) }
+    }
+    if (project.isMember) {
+      throw new Error('Only the lead writes a ticket plan.')
+    }
+    const plan = await this.gameMemberSessions.writeEffortPlan(project.key, ticket, args.plan)
+    this.gameFleetChange.changed()
+    return { ticket, known: true, plan }
   }
 
   // Why the whole project: a lead sees only its own members, so another lead's names come from here.

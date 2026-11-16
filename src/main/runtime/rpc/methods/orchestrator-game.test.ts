@@ -4,6 +4,7 @@ import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
 import { ORCHESTRATOR_GAME_VIEWS } from '../../../../shared/orchestrator-game-view'
+import { gameKindEffortPlanOf } from '../../../../shared/orchestrator-game-effort-plan'
 
 function request(params?: unknown): RpcRequest {
   return { id: 'game-state-test', authToken: 'test', method: 'game.state', params }
@@ -249,6 +250,28 @@ describe('game.memberRecord RPC', () => {
         member: { ticket: 'CIN-1', taskId: 'task_1', runId: 'run_1' }
       }
     ])
+  })
+
+  // Why (ORCA-1242): a launch seeds the kind's effort plan with the member it saves.
+  it("keeps the launch's seeded effort plan and refuses one it cannot read", async () => {
+    const recorded: { member: Record<string, unknown> }[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      recordGameMember: async (args: { member: Record<string, unknown> }) => {
+        recorded.push(args)
+        return { recorded: true }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const send = (params: unknown) =>
+      dispatcher.dispatch({ id: 'm', authToken: 'test', method: 'game.memberRecord', params })
+    const effortPlan = gameKindEffortPlanOf('audit')
+
+    await send({ member: { ticket: 'CIN-1', taskId: 't', runId: 'r', effortPlan } })
+    expect(recorded[0]?.member.effortPlan).toEqual(effortPlan)
+    await expect(
+      send({ member: { ticket: 'CIN-1', effortPlan: { source: 'kind', phases: [] } } })
+    ).resolves.toMatchObject({ ok: false })
   })
 })
 
