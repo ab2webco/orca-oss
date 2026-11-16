@@ -17,19 +17,14 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
-// Why: Metro resolves the band's PNGs by require; the render runner only needs a source per image.
-vi.mock('./team-scene-quest-art', () => ({
-  teamSceneQuestArtOf: (style: string) => ({
-    backdrop: { uri: `${style}/backdrop.png` },
-    front: style === 'figures' ? { uri: 'figures/front.png' } : null,
-    lead: { uri: `${style}/lead.png` },
-    advisor: { uri: `${style}/advisor.png` },
-    members: Array.from({ length: 8 }, (_, at) => ({ uri: `${style}/member-${at + 1}.png` }))
-  })
-}))
+// Why a stand-in: react-native-webview ships native source; the stage's page is tested on its own.
+vi.mock('react-native-webview', async () => {
+  const { forwardRef, createElement: h } = await import('react')
+  return { WebView: forwardRef(() => h('div', { 'data-testid': 'team-scene-webview' })) }
+})
 
 import { TeamSheet } from './TeamSheet'
-import { teamLeadViewOf, type TeamDrawerData } from './team-drawer-model'
+import type { TeamDrawerData } from './team-drawer-model'
 import { colors, radii } from '../theme/mobile-theme'
 import {
   ADVISOR_LINE,
@@ -265,89 +260,25 @@ describe('TeamSheet', () => {
     expect(texts()).toContain('This Orca host does not publish it yet.')
   })
 
-  it('draws the scene band 128 pt tall above the tabs, with the lead, members and Jev', () => {
-    show(teamWith({ questions: [] }, leader, gamePanel('figures')))
-    const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
-    expect(band).not.toBeNull()
-    expect(getComputedStyle(band!).height).toBe('128px')
-    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(6)
-    const tabs = container.querySelector('[role="tablist"]')!
-    expect(band!.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  it("draws the desktop's live stage 176 pt tall above the tabs, in every Game style", () => {
+    for (const style of ['figures', 'office', 'pixel']) {
+      show(teamWith({ questions: [] }, leader, gamePanel(style)))
+      const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
+      expect(getComputedStyle(band!).height).toBe('176px')
+      expect(band!.querySelector('[data-testid="team-scene-webview"]')).not.toBeNull()
+      const tabs = container.querySelector('[role="tablist"]')!
+      expect(band!.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
   })
 
-  it('shows the readable band, names in place of art, when the style is Pixel', () => {
-    show(teamWith({ questions: [] }, leader, gamePanel('pixel')))
+  it('shows the readable band, names in place of art, for a host that sends no panel', () => {
+    show(teamWith({ questions: [] }, leader))
     const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
-    expect(getComputedStyle(band!).height).toBe('128px')
-    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(0)
+    expect(band!.querySelector('[data-testid="team-scene-webview"]')).toBeNull()
     const names = [...band!.querySelectorAll('div')]
       .filter((one) => one.childElementCount === 0)
       .map((one) => one.textContent)
     expect(names).toEqual(expect.arrayContaining(['Castillo', 'Juno', 'Rho']))
-  })
-
-  const role = (sheets: string[]) => ({
-    sheets,
-    frame: { width: 64, height: 64 },
-    size: 50,
-    animations: { idle: { row: 1, frames: 2 } }
-  })
-  const mario = {
-    ...gamePanel('figures'),
-    config: { scene: 'mario' },
-    extensions: {
-      scenes: [
-        {
-          id: 'mario',
-          pluginId: 'project',
-          definition: {
-            native: {
-              figures: {
-                layers: [{ src: 'sky.png' }],
-                roles: { lead: role(['mario.png']), member: role(['toad.png']) }
-              }
-            }
-          }
-        }
-      ]
-    }
-  }
-  const sceneTeam = (sceneArt: TeamDrawerData['sceneArt']) => {
-    const team = teamWith({ questions: [] }, leader, mario)
-    const view =
-      team.view &&
-      teamLeadViewOf(
-        { role: 'lead', lead: {}, leadName: 'Castillo', agents: [leader], ...mario },
-        new Set(),
-        null,
-        NOW,
-        { sceneArt: true }
-      )
-    return { ...team, view: team.view && view && { ...team.view, scene: view.scene }, sceneArt }
-  }
-  const image = (uri: string) => ({ uri, width: 128, height: 256 })
-
-  it("draws the scene file's own art, one frame of each sheet, once its images load", () => {
-    const images = new Map(['sky.png', 'mario.png', 'toad.png'].map((src) => [src, image(src)]))
-    show(sceneTeam({ kind: 'ready', images }))
-    const actors = container.querySelectorAll<HTMLElement>('[data-testid="team-scene-actor"]')
-    expect(actors).toHaveLength(2)
-    const px = (50 / 64) * (128 / 176)
-    expect(Number.parseFloat(getComputedStyle(actors[0]!).width)).toBeCloseTo(64 * px, 3)
-    expect(getComputedStyle(actors[0]!).overflowX).toBe('hidden')
-    // Why: the idle row is row 1 here, so the sheet sits one frame up inside its clip.
-    const sheet = actors[0]!.firstElementChild as HTMLElement
-    expect(Number.parseFloat(getComputedStyle(sheet).top)).toBeCloseTo(-64 * px, 3)
-    expect(Number.parseFloat(getComputedStyle(sheet).height)).toBeCloseTo(256 * px, 3)
-  })
-
-  it('holds the band empty while the art loads, and draws the names when it fails', () => {
-    show(sceneTeam({ kind: 'loading' }))
-    const band = () => container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')
-    expect(getComputedStyle(band()!).height).toBe('128px')
-    expect(container.querySelectorAll('[data-testid="team-scene-actor"]')).toHaveLength(0)
-    show(sceneTeam({ kind: 'failed' }))
-    expect(band()!.textContent).toContain('Castillo')
   })
 
   it('covers the terminal behind its rounded top corners, so no glyph shows in the drag area', () => {

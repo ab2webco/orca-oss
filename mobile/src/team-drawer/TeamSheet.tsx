@@ -14,6 +14,7 @@ import {
 } from './team-drawer-model'
 import { TeamMemberCard } from './TeamMemberCard'
 import { TeamAdvisorCardView, TeamLeadCardView } from './TeamLeadCards'
+import { teamSceneLeadLineOf } from './team-sheet-lead'
 import { teamCardWordsOf, type TeamCardWords } from './team-card-words'
 import { TeamInboxTab } from './TeamInboxTab'
 import { teamInboxWordsOf } from './team-inbox-words'
@@ -175,6 +176,7 @@ export function TeamSheet({
                       <TeamSceneBand
                         band={view.scene}
                         ownArt={team.sceneArt}
+                        leadLine={view.lead ? teamSceneLeadLineOf(view.lead, words) : null}
                         leadName={view.lead?.name ?? null}
                         members={view.members}
                       />

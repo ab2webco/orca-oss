@@ -1,62 +1,62 @@
 import { GAME_PANEL_STYLES, type GamePanelStyle } from '../../../src/shared/orchestrator-game-panel'
+import type { OrchestratorGameSceneExtension } from '../../../src/shared/orchestrator-game-scene'
 import {
   orchestratorGameSceneArtOf,
   orchestratorGameSceneNativeOf,
   type OrchestratorGameSceneNativeStyle
 } from '../../../src/shared/orchestrator-game-scene-native'
-import type { TeamLeadCard, TeamMemberCard } from '../../../src/shared/team-panel-model-types'
+import type {
+  TeamAdvisorRow,
+  TeamLeadCard,
+  TeamMemberCard
+} from '../../../src/shared/team-panel-model-types'
+import { teamSceneInputOf } from '../../../src/shared/team-scene/team-scene-input'
+import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 
-export type TeamSceneBandActor = {
-  key: string
-  role: 'lead' | 'member' | 'advisor'
-  /** Picks which of the role's sheets it wears, modulo how many the art has. */
-  seed: number
-}
-
-type BandFallback =
-  | { kind: 'art'; style: 'figures' | 'office'; actors: TeamSceneBandActor[] }
-  | { kind: 'readable'; actors: TeamSceneBandActor[] }
-
-/** `art` is Orca's own Quest art, `scene` the scene file's art read from the host, `readable` names only. */
-export type TeamSceneBand =
-  | BandFallback
+/** Where the stage's art comes from: Orca's Quest art, the scene file's own, or Pixel's sprites. */
+export type TeamSceneArtPick =
+  | { kind: 'bundled'; style: 'figures' | 'office' }
   | {
       kind: 'scene'
       style: 'figures' | 'office'
       sceneId: string
       native: OrchestratorGameSceneNativeStyle
-      actors: TeamSceneBandActor[]
-      /** Drawn when the scene's images do not load. */
-      fallback: BandFallback
+    }
+  | { kind: 'pixel'; sceneId: string }
+
+/** `stage` is the desktop's live scene; `readable` names only, for a host that sends no panel. */
+export type TeamSceneBand =
+  | { kind: 'readable' }
+  | {
+      kind: 'stage'
+      art: TeamSceneArtPick
+      /** Drawn when the scene file's images do not load. */
+      fallback: TeamSceneArtPick
+      /** The host's scene files, which Pixel draws its themes from. */
+      scenes: OrchestratorGameSceneExtension[]
+      timezone: string
+      /** What the desktop's scene director reads: who is on stage and what each one does. */
+      input: TeamSceneInput
     }
 
 const QUEST = 'quest'
-// Why: past eight the figures overlap at 320 pt; the Team tab still lists every member.
-const MEMBERS_DRAWN = 8
 
 type Rec = Record<string, unknown>
 const isRecord = (value: unknown): value is Rec =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-// Why FNV-1a: the desktop's figureSeedOf, so a member wears the same sheet on both.
-function figureSeedOf(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) {
-    h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
-  }
-  return h >>> 0
-}
-
 const styleOf = (panel: Rec): GamePanelStyle =>
   GAME_PANEL_STYLES.find((one) => one === panel.style) ?? 'pixel'
 
-/**
- * The band above the tabs, chosen as the desktop's Game look chooses its stage; null when the
- * desktop panel shows no scene. Pixel draws as `readable` until the phone has a Pixel painter.
- */
+/** The band above the tabs, chosen as the desktop's Game look chooses its stage; null when it shows none. */
 export function teamSceneBandOf(
   state: Rec,
-  cards: { lead: TeamLeadCard | null; members: readonly TeamMemberCard[]; advisor: boolean },
+  cards: {
+    lead: TeamLeadCard | null
+    members: readonly TeamMemberCard[]
+    advisor: TeamAdvisorRow | null
+    stopped: boolean
+  },
   /** `sceneArt`: the host advertises mobile.team-scene.v1, so a scene file's own art can be read. */
   options: { sceneArt?: boolean } = {}
 ): TeamSceneBand | null {
@@ -64,48 +64,67 @@ export function teamSceneBandOf(
   if (panel && panel.look !== 'game') {
     return null
   }
-  const actors: TeamSceneBandActor[] = [
-    ...(cards.lead ? [{ key: 'lead', role: 'lead' as const, seed: 0 }] : []),
-    ...cards.members.slice(0, MEMBERS_DRAWN).map((card) => ({
-      key: card.paneKey,
-      role: 'member' as const,
-      seed: figureSeedOf(card.characterKey ?? card.paneKey)
-    })),
-    ...(cards.advisor ? [{ key: 'advisor', role: 'advisor' as const, seed: 0 }] : [])
-  ]
-  if (!panel) {
-    return { kind: 'readable', actors }
+  if (!panel || !cards.lead) {
+    return { kind: 'readable' }
   }
   const config = isRecord(state.config) ? state.config : {}
   const sceneId = typeof config.scene === 'string' ? config.scene : QUEST
   const style = styleOf(panel)
-  const fallback = fallbackOf(style, sceneId, actors)
-  const native = options.sceneArt ? sceneNativeOf(state, sceneId) : undefined
-  const own = orchestratorGameSceneArtOf({ style, sceneId, scene: native ? { native } : undefined })
+  const scenes = scenesOf(state)
+  const native = options.sceneArt ? sceneNativeOf(scenes, sceneId) : undefined
+  const fallback = pickOf(
+    orchestratorGameSceneArtOf({ style, sceneId, sceneArtFailed: true }),
+    sceneId,
+    undefined
+  )
+  const art = pickOf(
+    orchestratorGameSceneArtOf({ style, sceneId, scene: native ? { native } : undefined }),
+    sceneId,
+    native
+  )
+  return {
+    kind: 'stage',
+    art,
+    fallback,
+    scenes,
+    timezone: typeof config.timezone === 'string' ? config.timezone : 'local',
+    input: teamSceneInputOf({
+      lead: cards.lead,
+      advisor: cards.advisor,
+      members: [...cards.members],
+      // Why no detail: the director only draws whether the STOP is set.
+      stopped: cards.stopped ? { since: null, by: null } : null
+    })
+  }
+}
+
+function pickOf(
+  own: ReturnType<typeof orchestratorGameSceneArtOf>,
+  sceneId: string,
+  native: ReturnType<typeof orchestratorGameSceneNativeOf>['native'] | undefined
+): TeamSceneArtPick {
   const drawn = own.drawn === 'figures' || own.drawn === 'office' ? own.drawn : null
   const art = drawn && native?.[drawn]
-  return own.art === 'scene' && drawn && art
-    ? { kind: 'scene', style: drawn, sceneId, native: art, actors, fallback }
-    : fallback
+  if (drawn && own.art === 'scene' && art) {
+    return { kind: 'scene', style: drawn, sceneId, native: art }
+  }
+  return drawn && own.art === 'bundled'
+    ? { kind: 'bundled', style: drawn }
+    : { kind: 'pixel', sceneId }
 }
 
 // Why parsed again: a paired host may run another build, and a bad block only costs the art.
-function sceneNativeOf(state: Rec, sceneId: string) {
+function scenesOf(state: Rec): OrchestratorGameSceneExtension[] {
   const scenes =
     isRecord(state.extensions) && Array.isArray(state.extensions.scenes)
       ? state.extensions.scenes
       : []
-  const scene = scenes.find((one) => isRecord(one) && one.id === sceneId)
-  return isRecord(scene) ? orchestratorGameSceneNativeOf(scene.definition).native : undefined
+  return scenes.filter(
+    (one): one is OrchestratorGameSceneExtension => isRecord(one) && typeof one.id === 'string'
+  )
 }
 
-function fallbackOf(
-  style: GamePanelStyle,
-  sceneId: string,
-  actors: TeamSceneBandActor[]
-): BandFallback {
-  const art = orchestratorGameSceneArtOf({ style, sceneId, sceneArtFailed: true })
-  return art.art === 'bundled' && (art.drawn === 'figures' || art.drawn === 'office')
-    ? { kind: 'art', style: art.drawn, actors }
-    : { kind: 'readable', actors }
+function sceneNativeOf(scenes: readonly OrchestratorGameSceneExtension[], sceneId: string) {
+  const scene = scenes.find((one) => one.id === sceneId)
+  return scene ? orchestratorGameSceneNativeOf(scene.definition).native : undefined
 }

@@ -1,0 +1,6 @@
+{
+  "extends": "../config/tsconfig.web.json",
+  "include": [],
+  "files": ["../src/renderer/src/env.d.ts", "src/team-drawer/team-scene-engine.ts"],
+  "compilerOptions": { "composite": false, "noEmit": true }
+}

@@ -13,7 +13,7 @@ import { startFreshLeadFromPhone } from './new-tab-team/fresh-lead-start'
 import { readNewTabTeam } from './new-tab-team/new-tab-team-read'
 import { reopenTeamLeadFromPhone } from './new-tab-team/new-tab-team-reopen'
 import { readLeadXp } from './team-drawer/team-drawer-rpc'
-import { teamSceneBandOf } from './team-drawer/team-scene-band'
+import { teamLeadViewOf } from './team-drawer/team-drawer-model'
 import { isTerminalSendRpcAccepted } from './terminal/terminal-send-rpc-response'
 import type { RpcClient } from './transport/rpc-client'
 import type { RpcResponse } from './transport/types'
@@ -154,12 +154,11 @@ describe('mock host answers in the host shapes mobile reads', () => {
     vi.stubEnv('MOCK_CUSTOM_SCENE', '1')
     vi.stubEnv('MOCK_PANEL_STYLE', 'figures')
     const state = await resultOf('game.state', { worktreeId: await activeWorktreeId() })
-    const cards = { lead: null, members: [], advisor: false }
+    const view = teamLeadViewOf(state, new Set(), null, Date.now(), { sceneArt: true })
 
-    expect(teamSceneBandOf(state, cards, { sceneArt: true })).toMatchObject({
-      kind: 'scene',
-      style: 'figures',
-      sceneId: 'mock/neon-heist'
+    expect(view?.scene).toMatchObject({
+      kind: 'stage',
+      art: { kind: 'scene', style: 'figures', sceneId: 'mock/neon-heist' }
     })
   })
 

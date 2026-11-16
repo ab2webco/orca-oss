@@ -10,14 +10,15 @@ const leader = {
   isLeader: true,
   isMember: false
 }
-const member = (paneKey: string, state = 'working') => ({
+const member = (paneKey: string, state = 'working', over: Record<string, unknown> = {}) => ({
   paneKey,
   displayName: paneKey,
   agentType: 'claude',
   state,
   toolName: null,
   isLeader: false,
-  isMember: true
+  isMember: true,
+  ...over
 })
 
 const panel = (look: string, style: string) => ({
@@ -44,47 +45,113 @@ const sceneOf = (over: Record<string, unknown> = {}, sceneArt = false) =>
     { sceneArt }
   )?.scene
 
+const stageOf = (over: Record<string, unknown> = {}, sceneArt = false) => {
+  const band = sceneOf(over, sceneArt)
+  if (band?.kind !== 'stage') {
+    throw new Error(`expected a stage, got ${band?.kind}`)
+  }
+  return band
+}
+
 describe('the Team sheet scene band', () => {
-  it("draws Quest's own art in the desktop's Figures or Office style, lead first", () => {
-    const band = sceneOf()
-    expect(band).toMatchObject({ kind: 'art', style: 'figures' })
-    expect(band?.actors.map((one) => one.role)).toEqual(['lead', 'member', 'member'])
-    expect(sceneOf({ panel: panel('game', 'office') })).toMatchObject({
-      kind: 'art',
+  it("draws the desktop's own stage in its Figures, Office and Pixel styles", () => {
+    expect(stageOf().art).toEqual({ kind: 'bundled', style: 'figures' })
+    expect(stageOf({ panel: panel('game', 'office') }).art).toEqual({
+      kind: 'bundled',
       style: 'office'
+    })
+    // Why: Pixel was a names-only strip; the desktop draws it as a live stage.
+    expect(stageOf({ panel: panel('game', 'pixel') }).art).toEqual({
+      kind: 'pixel',
+      sceneId: 'quest'
     })
   })
 
-  it('gives a member the seed its persistent character wears on the desktop', () => {
-    const seeds = sceneOf()?.actors.map((one) => one.seed)
-    expect(seeds).toEqual(sceneOf()?.actors.map((one) => one.seed))
-    expect(new Set(seeds).size).toBe(3)
-    expect(sceneOf()?.actors[0]?.seed).toBe(0)
+  it("feeds the desktop's scene director each member's real state, so it walks, sits and waits", () => {
+    const input = stageOf({
+      agents: [
+        leader,
+        member('tab-1:leaf', 'working'),
+        member('tab-2:leaf', 'waiting'),
+        member('tab-3:leaf', 'idle'),
+        member('tab-4:leaf', 'done', { review: { state: 'merged', number: 4, url: 'u' } })
+      ]
+    }).input
+    const activity = new Map(input.members.map((one) => [one.key, one.activity]))
+    expect(activity).toEqual(
+      new Map([
+        ['tab-1:leaf', 'working'],
+        ['tab-2:leaf', 'needsYou'],
+        ['tab-3:leaf', 'resting'],
+        ['tab-4:leaf', 'done']
+      ])
+    )
+    expect(input.lead.activity).toBe('working')
   })
 
-  it('adds the advisor at the end when the lead has Jev', () => {
-    const band = sceneOf({
+  it("shows a working member's monitor by what it really runs, never a plan for a Bash run", () => {
+    const input = stageOf({
+      agents: [
+        leader,
+        member('tab-1:leaf', 'working', { toolName: 'Bash', toolInput: 'pnpm vitest run' }),
+        member('tab-2:leaf', 'working', { toolName: 'Bash', toolInput: 'ls src' })
+      ]
+    }).input
+    const desk = new Map(input.members.map((one) => [one.key, one.desk]))
+    expect(desk.get('tab-1:leaf')).toEqual({ kind: 'tests' })
+    expect(desk.get('tab-2:leaf')).toBeUndefined()
+  })
+
+  it('names every figure as its Team card does', () => {
+    const input = stageOf({
+      agents: [leader, member('tab-1:leaf', 'working', { displayName: 'Toadette · ORCA-1216' })]
+    }).input
+    expect(input.members.map((one) => one.name)).toEqual(['Toadette'])
+  })
+
+  it('brings the advisor on stage when the lead has Jev, with its line', () => {
+    const input = stageOf({
       agents: [
         {
           ...leader,
-          advisor: { model: null, effort: null, pinned: { model: false, effort: false } }
+          advisor: {
+            model: null,
+            effort: null,
+            pinned: { model: false, effort: false },
+            line: 'Ship it'
+          }
         },
         member('tab-1:leaf')
       ]
-    })
-    expect(band?.actors.map((one) => one.role)).toEqual(['lead', 'member', 'advisor'])
+    }).input
+    expect(input.advisor).toEqual({ line: 'Ship it' })
   })
 
-  it('reads the Pixel style, a themed scene in Figures, or an older host as the readable band', () => {
-    expect(sceneOf({ panel: panel('game', 'pixel') })?.kind).toBe('readable')
-    expect(sceneOf({ config: { scene: 'night-watch' } })?.kind).toBe('readable')
+  it('draws every member, as the desktop stage does with its +N', () => {
+    const many = Array.from({ length: 11 }, (_, at) => member(`tab-${at + 1}:leaf`))
+    expect(stageOf({ agents: [leader, ...many] }).input.members).toHaveLength(11)
+  })
+
+  it("draws the launch STOP's sign when the project is stopped", () => {
+    expect(stageOf({ stopped: { since: 'x', by: 'lead' } }).input.stopped).toBe(true)
+    expect(stageOf().input.stopped).toBeUndefined()
+  })
+
+  it('reads an older host with no panel as the readable band', () => {
     expect(sceneOf({ panel: undefined })?.kind).toBe('readable')
   })
 
   it("keeps Orca's office in a themed scene, as the desktop does", () => {
     expect(
-      sceneOf({ config: { scene: 'night-watch' }, panel: panel('game', 'office') })
-    ).toMatchObject({ kind: 'art', style: 'office' })
+      stageOf({ config: { scene: 'night-watch' }, panel: panel('game', 'office') }).art
+    ).toEqual({ kind: 'bundled', style: 'office' })
+  })
+
+  it('draws a themed scene in Figures as its Pixel stage, as the desktop does', () => {
+    expect(stageOf({ config: { scene: 'night-watch' } }).art).toEqual({
+      kind: 'pixel',
+      sceneId: 'night-watch'
+    })
   })
 
   it('draws no band when the desktop panel is not in the Game look', () => {
@@ -120,11 +187,12 @@ const mario = {
 }
 
 describe("the scene band with a scene's own art", () => {
-  it('offers the scene file art on a host that serves it, with the band it falls back to', () => {
-    const band = sceneOf(mario, true)
-    expect(band).toMatchObject({ kind: 'scene', style: 'figures', sceneId: 'mario' })
-    expect(band?.kind === 'scene' && band.native.roles.lead.sheets).toEqual(['mario.png'])
-    expect(band?.kind === 'scene' && band.fallback.kind).toBe('readable')
+  it('offers the scene file art on a host that serves it, with the stage it falls back to', () => {
+    const band = stageOf(mario, true)
+    expect(band.art).toMatchObject({ kind: 'scene', style: 'figures', sceneId: 'mario' })
+    expect(band.art.kind === 'scene' && band.art.native.roles.lead.sheets).toEqual(['mario.png'])
+    expect(band.fallback).toEqual({ kind: 'pixel', sceneId: 'mario' })
+    expect(band.scenes.map((one) => one.id)).toEqual(['mario'])
   })
 
   it("falls back to Orca's office for the Office style, as the desktop does when that art fails", () => {
@@ -142,12 +210,11 @@ describe("the scene band with a scene's own art", () => {
         ]
       }
     }
-    const band = sceneOf(office, true)
-    expect(band?.kind === 'scene' && band.fallback).toMatchObject({ kind: 'art', style: 'office' })
-    expect(sceneOf(office)).toMatchObject({ kind: 'art', style: 'office' })
+    expect(stageOf(office, true).fallback).toEqual({ kind: 'bundled', style: 'office' })
+    expect(stageOf(office).art).toEqual({ kind: 'bundled', style: 'office' })
   })
 
   it("never asks a host without mobile.team-scene.v1 for the scene's own art", () => {
-    expect(sceneOf(mario)?.kind).toBe('readable')
+    expect(stageOf(mario).art).toEqual({ kind: 'pixel', sceneId: 'mario' })
   })
 })

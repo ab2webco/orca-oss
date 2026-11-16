@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { teamCardWordsOf } from './team-card-words'
 import { teamLeadViewOf } from './team-drawer-model'
-import { teamLeadLiveText } from './team-sheet-lead'
+import { teamLeadLiveText, teamSceneLeadLineOf } from './team-sheet-lead'
 
 const leader = (over: Record<string, unknown> = {}) => ({
   paneKey: 'tab-1:leaf',
@@ -111,5 +111,19 @@ describe('the advisor card on the Team sheet', () => {
   it('has no advisor card when the lead has no Jev, or the host is older', () => {
     expect(teamLeadViewOf(stateWith())?.advisor).toBeNull()
     expect(teamLeadViewOf(stateWith({ advisor: 'garbled' }))?.advisor).toBeNull()
+  })
+})
+
+describe("the lead's bubble on the scene stage", () => {
+  const leadOf = (lead: Record<string, unknown>) =>
+    teamLeadViewOf(stateWith(lead), new Set(), null, 0)!.lead!
+
+  it('says what the lead does now, as its card line does', () => {
+    const lead = leadOf({})
+    expect(teamSceneLeadLineOf(lead, en)).toBe(teamLeadLiveText(lead, en))
+  })
+
+  it('shows no bubble while the lead rests with nothing to say', () => {
+    expect(teamSceneLeadLineOf(leadOf({ state: 'idle', toolName: null }), en)).toBeNull()
   })
 })

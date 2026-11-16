@@ -14,5 +14,7 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+  // Why the scene engine apart: it runs the desktop's painters in a WebView, typechecked with the
+  // desktop's compiler by tsconfig.scene-engine.json.
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "src/team-drawer/team-scene-engine.ts"]
 }
