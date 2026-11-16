@@ -26,6 +26,11 @@ vi.mock('./WorktreeCardMeta', () => ({
 }))
 vi.mock('./WorktreeCardPorts', () => ({ WorktreeCardPortsDetails: () => null }))
 vi.mock('./WorktreeCardAgentHoverDetails', () => ({ WorktreeCardAgentHoverDetails: () => null }))
+vi.mock('./SidebarTeamHoverCard', () => ({
+  SidebarTeamHoverCard: ({ children }: { children: React.ReactNode }) => (
+    <div data-team-hover="">{children}</div>
+  )
+}))
 
 const { WorktreeCardSurface } = await import('./worktree-card-surface')
 
@@ -103,7 +108,25 @@ describe('WorktreeCardSurface', () => {
 
     const children = surface.querySelector('[data-team-children]')
     expect(children).not.toBeNull()
-    expect(children!.closest('[data-details-hover]')).toBeNull()
+    expect(children!.closest('[data-team-hover]')).toBeNull()
+    expect(surface.querySelector('[data-team-hover] [data-row-content]')).not.toBeNull()
+  })
+
+  // ORCA-1149 S7: a team row opens its agent's card, never the worktree's details card.
+  it("gives a team row its agent's hover card in place of the worktree details", async () => {
+    team.value = { row: leadRow, child: false }
+    hover.details = true
+    const surface = await surfaceOf(cardOf({}))
+
+    expect(surface.querySelector('[data-details-hover]')).toBeNull()
+    expect(surface.querySelector('[data-team-hover]')).not.toBeNull()
+  })
+
+  it('keeps the worktree details card on a card with no team row', async () => {
+    hover.details = true
+    const surface = await surfaceOf(cardOf({}))
+
+    expect(surface.querySelector('[data-team-hover]')).toBeNull()
     expect(surface.querySelector('[data-details-hover] [data-row-content]')).not.toBeNull()
   })
 })

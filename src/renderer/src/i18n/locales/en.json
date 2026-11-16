@@ -17528,6 +17528,7 @@
       "pr": "PR",
       "ticket": "Ticket",
       "ports": "Ports",
+      "host": "Host",
       "notes": "Notes",
       "needsYou": "Needs you",
       "otherSessions": "Other sessions",

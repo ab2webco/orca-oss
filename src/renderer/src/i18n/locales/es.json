@@ -16548,6 +16548,7 @@
       "pr": "PR",
       "ticket": "Ticket",
       "ports": "Puertos",
+      "host": "Host",
       "notes": "Notas",
       "needsYou": "Te necesita",
       "otherSessions": "Otras sesiones",

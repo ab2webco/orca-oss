@@ -48,6 +48,7 @@ function cardOf(
     lineageChildren: null,
     lineageCollapsed: false,
     showLineageChildChip: false,
+    workspacePorts: [],
     ...extra
   } as unknown as WorktreeCardController
 }

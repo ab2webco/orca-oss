@@ -67,7 +67,11 @@ async function expectV30TreeGeometry(page: Page, where: string): Promise<void> {
         x: rect.x,
         y: rect.y,
         height: rect.height,
-        connector: getComputedStyle(node, '::before').borderLeftWidth
+        // Why the name line: act-lines make the row taller, and the elbow belongs on the name.
+        connector: getComputedStyle(
+          node.querySelector('[data-team-row-part="name"]')!.parentElement!,
+          '::before'
+        ).borderLeftWidth
       }
     })
   )
@@ -82,6 +86,24 @@ async function expectV30TreeGeometry(page: Page, where: string): Promise<void> {
   expect([...heights], `row heights differ at ${where}`).toHaveLength(1)
   const pitches = [members[0]!.y - lead!.y, members[1]!.y - members[0]!.y].map(Math.round)
   expect(pitches[0], `row pitch differs at ${where}`).toBe(pitches[1])
+}
+
+// Why: beside a row on a phone-width window the card ran past the right edge, cut in half.
+async function expectInsideWindow(
+  page: Page,
+  card: ReturnType<Page['locator']>,
+  where: string
+): Promise<void> {
+  const width = page.viewportSize()!.width
+  await expect
+    .poll(
+      async () => {
+        const box = await card.boundingBox()
+        return box !== null && box.x >= 0 && box.x + box.width <= width
+      },
+      { message: `hover card leaves the window at ${where}` }
+    )
+    .toBe(true)
 }
 
 const CLEAR = 'rgba(0, 0, 0, 0)'
@@ -309,9 +331,17 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
     })
     expect(
       await knightRow.evaluate((node) =>
-        [...node.children].map((child) => child.getAttribute('data-team-row-part'))
+        [...node.querySelectorAll('[data-team-row-part]')].map((part) =>
+          part.getAttribute('data-team-row-part')
+        )
       )
-    ).toEqual(['state', 'kind', 'name', 'age'])
+    ).toEqual(['state', 'kind', 'name', 'age', 'act'])
+    // S4: with the Team tab closed each row says what its agent does; a waiting member asks in red.
+    await expect(knightRow.locator('[data-team-row-part="act"]')).toHaveText(/\S/)
+    await expect(leadRow.locator('[data-team-row-part="act"]')).toHaveText(/\S/)
+    await expect(squireRow.locator('[data-team-row-part="act"]')).toHaveAttribute('data-asks', '')
+    // Card display's account, model and ports stay off by default, so no extra line.
+    await expect(orcaPage.locator('[data-team-row-part="extra"]')).toHaveCount(0)
     // S2: members sit under the lead as children.
     expect(
       await orcaPage.evaluate(
@@ -337,7 +367,9 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
           list
             .filter((node) => {
               const right = node.getBoundingClientRect().right
-              return [...node.children].some((part) => part.getBoundingClientRect().right > right)
+              return [...node.querySelectorAll('[data-team-row-part]')].some(
+                (part) => part.getBoundingClientRect().right > right
+              )
             })
             .map((node) => node.textContent)
         )
@@ -384,36 +416,60 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
       }
     }
 
-    // V30's hoverHtml: pointing at a member opens its card alone, never the lead's behind it.
-    // Why: only the new card style gives a card its hover card; the write is not awaited in the
-    // evaluate (ORCA-895), the store is polled instead.
-    await orcaPage.evaluate(() => {
-      void window.__store!.getState().updateSettings({ experimentalNewWorktreeCardStyle: true })
-    })
-    await expect
-      .poll(() =>
-        orcaPage.evaluate(
-          () => window.__store!.getState().settings?.experimentalNewWorktreeCardStyle === true
-        )
-      )
-      .toBe(true)
+    // S7, V30's hoverHtml: a member's or the lead's own card, under the default card style, and
+    // never the lead's behind a member.
     const hoverCards = orcaPage.locator('[data-slot="hover-card-content"]')
-    for (const width of [1440, 320]) {
+    for (const width of WIDTHS) {
       await orcaPage.setViewportSize({ width, height: 720 })
       for (const theme of ['dark', 'light'] as const) {
+        const where = `${width}px ${theme}`
         await setTheme(orcaPage, theme)
         await orcaPage.mouse.move(0, 0)
         await expect(hoverCards).toHaveCount(0)
         await knightRow.hover()
-        await expect(hoverCards, `hover cards at ${width}px ${theme}`).toHaveCount(1)
-        await expect(hoverCards).toContainText('orca-1142')
+        await expect(hoverCards, `hover cards at ${where}`).toHaveCount(1)
+        const memberCard = hoverCards.locator('[data-sidebar-team-hover="member"]')
+        await expect(memberCard.locator('[data-team-hover-title]')).toHaveText(
+          'Caballero · ORCA-1142'
+        )
+        await expect(memberCard).toContainText('Ahora')
+        await expect(memberCard).toContainText('#923')
+        await expect(memberCard).toContainText('Host')
+        await expectInsideWindow(orcaPage, hoverCards, `member ${where}`)
         await orcaPage.screenshot({
           animations: 'disabled',
           path: testInfo.outputPath(`rows-member-hover-${width}-${theme}.png`)
         })
+        await orcaPage.mouse.move(0, 0)
+        await expect(hoverCards).toHaveCount(0)
+        await leadRow.hover()
+        const leadCard = hoverCards.locator('[data-sidebar-team-hover="lead"]')
+        await expect(
+          leadCard.locator('[data-team-hover-title]'),
+          `lead card at ${where}`
+        ).toHaveText(`Castillo · ${leadBranch.replace(/^refs\/heads\//, '')}`)
+        await expect(leadCard).toContainText('Ahora')
+        await expectInsideWindow(orcaPage, hoverCards, `lead ${where}`)
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`rows-lead-hover-${width}-${theme}.png`)
+        })
       }
     }
     await orcaPage.mouse.move(0, 0)
+    await expect(hoverCards, 'a hover card stayed open after the pointer left').toHaveCount(0)
+
+    // S4: with the Team tab open its cards already say what each agent does, so the rows drop it.
+    await orcaPage.setViewportSize({ width: 1440, height: 720 })
+    await orcaPage.evaluate(() => {
+      const state = window.__store!.getState()
+      state.setRightSidebarTab('team')
+      state.setRightSidebarOpen(true)
+    })
+    await expect(orcaPage.locator('[data-team-row-part="act"]')).toHaveCount(0)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+    await expect(knightRow.locator('[data-team-row-part="act"]')).toHaveCount(1)
+    await expect(hoverCards, 'a hover card opened with the Team tab toggle').toHaveCount(0)
 
     // Plain mode names a member by its ticket only and the lead by its role.
     await orcaPage.setViewportSize({ width: 1440, height: 720 })
@@ -428,6 +484,7 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
       timeout: 60_000
     })
     await expect(leadRow.locator('[data-team-row-part="name"] b')).toHaveText('Líder')
+    await expect(hoverCards, 'a hover card opened with no pointer on a row').toHaveCount(0)
     await orcaPage.screenshot({
       animations: 'disabled',
       path: testInfo.outputPath('rows-plain-1440-dark.png')
