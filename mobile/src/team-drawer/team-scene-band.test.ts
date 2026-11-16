@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { teamLeadViewOf } from './team-drawer-model'
+import { teamSceneBandShown } from './team-scene-band'
 
 const leader = {
   paneKey: 'tab-0:leaf',
@@ -216,5 +217,18 @@ describe("the scene band with a scene's own art", () => {
 
   it("never asks a host without mobile.team-scene.v1 for the scene's own art", () => {
     expect(stageOf(mario).art).toEqual({ kind: 'pixel', sceneId: 'mario' })
+  })
+})
+
+describe('whether the open sheet still shows the scene band', () => {
+  it('shows it until the sheet scrolls past its bottom edge', () => {
+    expect(teamSceneBandShown(0, 200)).toBe(true)
+    expect(teamSceneBandShown(199, 200)).toBe(true)
+    expect(teamSceneBandShown(200, 200)).toBe(false)
+    expect(teamSceneBandShown(640, 200)).toBe(false)
+  })
+
+  it('counts it shown before it is laid out', () => {
+    expect(teamSceneBandShown(640, null)).toBe(true)
   })
 })

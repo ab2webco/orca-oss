@@ -34,6 +34,7 @@ const ENTRY = `
   const engine = createTeamSceneEngine({
     canvas,
     overlay: document.getElementById('overlay'),
+    names: document.getElementById('names'),
     width: () => canvas.clientWidth,
     ratio: () => window.devicePixelRatio || 1,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,

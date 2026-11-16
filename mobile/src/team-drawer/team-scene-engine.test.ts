@@ -13,6 +13,7 @@ import {
   type TeamSceneEngine,
   type TeamSceneEngineEvent
 } from './team-scene-engine'
+import { TEAM_SCENE_NAME_STRIP } from './team-scene-engine-names'
 
 const QUEST_ART = join(import.meta.dirname, '../../../src/renderer/src/assets/quest-art')
 const COLORS = { attention: '#f00', done: '#0f0', working: '#00f', risk: '#fa0' }
@@ -95,12 +96,14 @@ const inputOf = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
 function mount(width = 390): { engine: TeamSceneEngine; events: TeamSceneEngineEvent[] } {
   const stage = document.createElement('div')
   const canvas = document.createElement('canvas')
-  stage.appendChild(canvas)
+  const names = document.createElement('div')
+  stage.append(canvas, names)
   document.body.replaceChildren(stage)
   const events: TeamSceneEngineEvent[] = []
   const engine = createTeamSceneEngine({
     canvas,
     overlay: stage,
+    names,
     width: () => width,
     ratio: () => 1,
     reducedMotion: false,
@@ -140,6 +143,25 @@ async function officeStage(engine: TeamSceneEngine): Promise<void> {
   })
 }
 
+/** The name labels in the strip under the stage, as boxes. */
+const nameBoxes = () =>
+  [...document.querySelectorAll<HTMLElement>('[data-scene-name]')].map((el) => {
+    const [left, top, width, height] = ['left', 'top', 'width', 'height'].map((side) =>
+      Number.parseFloat(el.style.getPropertyValue(side))
+    )
+    return { name: el.textContent, left, top, right: left! + width!, bottom: top! + height! }
+  })
+
+const named = (): (string | null)[] => nameBoxes().map((one) => one.name)
+
+const clashOf = (boxes: ReturnType<typeof nameBoxes>): boolean =>
+  boxes.some((a, i) =>
+    boxes.some(
+      (b, j) =>
+        i < j && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+    )
+  )
+
 /** Runs every frame asked for, 40 ms on, as the WebView does. */
 const tick = (count: number): void => {
   for (let at = 0; at < count; at++) {
@@ -172,10 +194,10 @@ const run = (engine: TeamSceneEngine, seconds: number): void => {
 }
 
 describe('the phone scene engine', () => {
-  it('tells the sheet how tall the stage is once its art is ready', async () => {
+  it('tells the sheet how tall the stage and its names are once its art is ready', async () => {
     const { engine, events } = mount()
     await officeStage(engine)
-    expect(events).toEqual([{ kind: 'ready', height: 176 }])
+    expect(events).toEqual([{ kind: 'ready', height: 176 + TEAM_SCENE_NAME_STRIP }])
   })
 
   it('walks a member who joins to its desk and seats it working, as the desktop office does', async () => {
@@ -241,8 +263,7 @@ describe('the phone scene engine', () => {
       .filter((one) => one.name === 'drawImage')
       .map((one) => (one.args[0] as Partial<Bitmap>).src)
     expect(drawn).toContain('office/desk.png')
-    const names = calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])
-    expect(names).toEqual(expect.arrayContaining(['Alfred', 'Toadette']))
+    expect(named()).toEqual(expect.arrayContaining(['Alfred', 'Toadette']))
   })
 
   it("never lets a walker's name cover the name of a member at its desk", async () => {
@@ -259,22 +280,8 @@ describe('the phone scene engine', () => {
       leadLine: null
     })
     for (let frame = 0; frame < 90; frame++) {
-      calls = []
       engine.paint(1 / 30)
-      // Why 6 px a letter: the recording context measures text that way; +6 is the label's padding.
-      const boxes = calls
-        .filter((one) => one.name === 'fillText')
-        .map((one) => {
-          const [text, x, y] = one.args as [string, number, number]
-          const half = (text.length * 6 + 6) / 2
-          return { left: x - half, right: x + half, y }
-        })
-      const clash = boxes.some((a, i) =>
-        boxes.some(
-          (b, j) => i < j && a.left < b.right && b.left < a.right && Math.abs(a.y - b.y) < 13
-        )
-      )
-      expect(clash, `frame ${frame}`).toBe(false)
+      expect(clashOf(nameBoxes()), `frame ${frame}`).toBe(false)
     }
   })
 
@@ -288,13 +295,10 @@ describe('the phone scene engine', () => {
       leadLine: null
     })
     run(engine, 2)
-    calls = []
-    engine.paint(1 / 30)
-    const drawn = calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])
-    expect(drawn).toEqual(expect.arrayContaining(names))
+    expect(named()).toEqual(expect.arrayContaining(names))
   })
 
-  it('names all six desks of a 390 pt team before the advisor and lead, as on the live host', async () => {
+  it('names all six desks of a 390 pt team, the advisor and the lead, as on the live host', async () => {
     const { engine } = mount(390)
     await officeStage(engine)
     const names = ['Peach', 'Rosalina', 'Wario', 'Mario', 'Donkey Kong', 'Donkey Kong']
@@ -308,15 +312,9 @@ describe('the phone scene engine', () => {
       leadLine: null
     })
     run(engine, 20)
-    calls = []
-    engine.paint(1 / 30)
-    const drawn = calls.filter((one) => one.name === 'fillText').map((one) => String(one.args[0]))
-    const memberLabels = drawn.filter((text) =>
-      names.some(
-        (name) => text === name || (text.endsWith('…') && name.startsWith(text.slice(0, -1)))
-      )
-    )
-    expect(memberLabels).toHaveLength(names.length)
+    expect(nameBoxes()).toHaveLength(names.length + 2)
+    expect(named()).toEqual(expect.arrayContaining([...names, 'Alfred']))
+    expect(clashOf(nameBoxes())).toBe(false)
   })
 
   it("puts the lead's line in a bubble over the stage", async () => {
@@ -349,9 +347,7 @@ describe('the phone scene engine', () => {
     })
     run(engine, 1)
     expect(events[0]).toMatchObject({ kind: 'ready' })
-    expect(calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])).toContain(
-      'Toadette'
-    )
+    expect(named()).toContain('Toadette')
   })
 
   it('says when the art does not load, so the sheet draws the fallback stage', async () => {
@@ -410,8 +406,55 @@ describe('the phone scene engine', () => {
     await engine.receive({ kind: 'motion', run: true, reduced: true })
     expect(frames.size).toBe(0)
     expect(engine.actors().find((one) => one.key === 'm1')?.pose).toBe('work')
-    expect(calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])).toContain(
-      'Toadette'
-    )
+    expect(calls.some((one) => one.name === 'drawImage' || one.name === 'fillRect')).toBe(true)
+    expect(named()).toContain('Toadette')
+  })
+
+  it("sizes the canvas to its stage's height, as the desktop does, also when the style changes", async () => {
+    const { engine } = mount()
+    const canvas = document.querySelector('canvas')!
+    await officeStage(engine)
+    await engine.receive({ kind: 'input', input: inputOf([]), leadLine: null })
+    engine.paint(1 / 30)
+    expect([canvas.style.height, canvas.height]).toEqual(['176px', 176])
+    await pixelStage(engine)
+    engine.paint(1 / 30)
+    expect([canvas.style.height, canvas.height]).toEqual(['126px', 126])
+  })
+
+  it('names every figure in a strip under the stage at 320, no two labels touching and none past the band', async () => {
+    const { engine, events } = mount(320)
+    await pixelStage(engine)
+    const names = ['Toadette', 'Wario', 'Bartholomew Montgomery-Smythe', 'Peach']
+    const team = (count: number): TeamSceneInput => ({
+      ...inputOf(names.slice(0, count).map((name, at) => member(`m${at}`, name, 'working'))),
+      advisor: { line: null }
+    })
+    await engine.receive({ kind: 'input', input: team(2), leadLine: null })
+    run(engine, 1)
+    await engine.receive({ kind: 'input', input: team(4), leadLine: null })
+    const ready = events.find((one) => one.kind === 'ready') as { height: number }
+    const strip = ready.height - 126
+    expect(strip).toBeGreaterThan(0)
+    // Why every frame: two members walk to their seats past the others' names.
+    for (let frame = 0; frame < 120; frame++) {
+      calls = []
+      engine.paint(1 / 30)
+      const boxes = nameBoxes()
+      expect(boxes, `frame ${frame}`).toHaveLength(6)
+      expect(boxes.map((one) => one.name)).toEqual(expect.arrayContaining(['Alfred', ...names]))
+      for (const one of boxes) {
+        expect(one.left, `frame ${frame} ${one.name}`).toBeGreaterThanOrEqual(0)
+        expect(one.right, `frame ${frame} ${one.name}`).toBeLessThanOrEqual(320)
+        expect(one.top, `frame ${frame} ${one.name}`).toBeGreaterThanOrEqual(0)
+        expect(one.bottom, `frame ${frame} ${one.name}`).toBeLessThanOrEqual(strip)
+        // Why 20: room for a letter and the ellipsis, so every figure keeps a name.
+        expect(one.right - one.left, `frame ${frame} ${one.name}`).toBeGreaterThanOrEqual(20)
+      }
+      expect(clashOf(boxes), `frame ${frame}`).toBe(false)
+      // Why: the art stays the desktop's; no name is painted over a figure.
+      const painted = calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])
+      expect(painted.filter((text) => names.includes(String(text)))).toEqual([])
+    }
   })
 })

@@ -20,7 +20,6 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "src/team-drawer/team-scene-engine.ts",
-    "src/team-drawer/team-scene-engine-names.ts",
     "src/team-drawer/team-scene-webview-shims.ts"
   ]
 }

@@ -247,4 +247,30 @@ describe('the Team sheet scene band', () => {
     send({ kind: 'loaded' })
     expect(messages()[0]).toEqual({ kind: 'motion', run: true, reduced: true })
   })
+
+  it('stops the stage while the sheet is scrolled past it, and runs it again in view', () => {
+    const view = render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+        shown={false}
+      />
+    )
+    send({ kind: 'loaded' })
+    expect(messages()[0]).toEqual({ kind: 'motion', run: false, reduced: false })
+    view.rerender(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+        shown
+      />
+    )
+    expect(messages().at(-1)).toEqual({ kind: 'motion', run: true, reduced: false })
+  })
 })

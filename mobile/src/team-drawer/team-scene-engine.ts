@@ -36,7 +36,7 @@ import { OFFICE_BACK_SEAT } from '../../../src/renderer/src/components/team-scen
 import type { TeamScenePainter } from '../../../src/renderer/src/components/team-scene/team-scene-painter'
 import { createPixelPainter } from '../../../src/renderer/src/components/team-scene/team-scene-pixel-painter'
 import { teamScenePixelSceneOf } from '../../../src/renderer/src/components/team-scene/team-scene-pixel-scene'
-import { drawTeamSceneNames } from './team-scene-engine-names'
+import { createTeamSceneNameStrip, TEAM_SCENE_NAME_STRIP } from './team-scene-engine-names'
 import type {
   TeamSceneEngineEvent,
   TeamSceneEngineMessage,
@@ -96,6 +96,8 @@ export function createTeamSceneEngine(deps: {
   canvas: HTMLCanvasElement
   /** The element over the canvas that holds the speech bubbles. */
   overlay: HTMLElement
+  /** The strip under the canvas that holds the figures' names. */
+  names: HTMLElement
   width: () => number
   ratio: () => number
   reducedMotion: boolean
@@ -111,7 +113,7 @@ export function createTeamSceneEngine(deps: {
   let actors: TeamSceneActor[] = []
   let bubblesKey = ''
   const bubbles = new Map<string, HTMLElement>()
-
+  const placeNames = createTeamSceneNameStrip(deps.names)
   const placeBubbles = (width: number, height: number): void => {
     const p = painter
     if (!p) {
@@ -180,9 +182,15 @@ export function createTeamSceneEngine(deps: {
     }
     const ratio = deps.ratio()
     const { height } = painter
-    if (canvas.width !== Math.round(width * ratio)) {
+    // Why the CSS height too: the page's canvas starts at the band's 176 pt, and the band shrinks to
+    // the stage's height once ready, so a shorter stage left at 176 is stretched and cut off.
+    if (
+      canvas.width !== Math.round(width * ratio) ||
+      canvas.height !== Math.round(height * ratio)
+    ) {
       canvas.width = Math.round(width * ratio)
       canvas.height = Math.round(height * ratio)
+      canvas.style.height = `${height}px`
     }
     stepTeamScene(world, dt, { width, elapsed })
     const g = canvas.getContext('2d')
@@ -205,7 +213,7 @@ export function createTeamSceneEngine(deps: {
       trophies: world.trophies,
       stopped: world.stopped
     })
-    drawTeamSceneNames(g, actors, painter, width, height)
+    placeNames(g, actors, width)
     placeBubbles(width, height)
   }
 
@@ -276,7 +284,10 @@ export function createTeamSceneEngine(deps: {
       }
       painter?.dispose()
       painter = painterOf(stage, images)
-      deps.post({ kind: 'ready', height: painter?.height ?? TEAM_SCENE_ART_HEIGHT })
+      deps.post({
+        kind: 'ready',
+        height: (painter?.height ?? TEAM_SCENE_ART_HEIGHT) + TEAM_SCENE_NAME_STRIP
+      })
       apply()
     },
     paint,

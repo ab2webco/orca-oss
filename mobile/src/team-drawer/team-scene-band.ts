@@ -128,3 +128,13 @@ function sceneNativeOf(scenes: readonly OrchestratorGameSceneExtension[], sceneI
   const scene = scenes.find((one) => one.id === sceneId)
   return scene ? orchestratorGameSceneNativeOf(scene.definition).native : undefined
 }
+
+/**
+ * Whether the open sheet, scrolled `scrollY` down, still shows any of the scene band, whose bottom
+ * edge sits `bandBottom` down its content; unknown until the band is laid out. The band leads the
+ * content, so scrolling past its bottom is the only way it leaves the view.
+ */
+export function teamSceneBandShown(scrollY: number, bandBottom: number | null): boolean {
+  'worklet'
+  return bandBottom === null || scrollY < bandBottom
+}

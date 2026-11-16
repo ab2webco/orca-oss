@@ -14,8 +14,11 @@ const STRIP_NEWER_BUILT_INS = `
 type Page = {
   realm: Context
   posted: { kind: string; [key: string]: unknown }[]
+  /** What the page's canvas painted as text; names belong in the strip, not here. */
   drawn: string[]
-  stage: { width: number }
+  /** The name labels the page put in its strip. */
+  named: () => string[]
+  stage: { width: number; style: { height?: string } }
   /** Uncaught throws out of a frame, as the WebView would report each one. */
   thrown: string[]
   /** The frames asked for and not yet run or cancelled, by id. */
@@ -51,6 +54,7 @@ function loadPage(strip: boolean): Page {
       return true
     }
   })
+  const created: { textContent?: string; dataset: { sceneName?: string } }[] = []
   const element = () => ({
     style: {},
     dataset: {},
@@ -62,6 +66,11 @@ function loadPage(strip: boolean): Page {
     appendChild: () => undefined,
     remove: () => undefined
   })
+  const createElement = () => {
+    const one = element()
+    created.push(one)
+    return one
+  }
   const stage = { ...element(), clientWidth: 390 }
   const realm = createContext({
     devicePixelRatio: 3,
@@ -78,8 +87,8 @@ function loadPage(strip: boolean): Page {
     Image: function Image() {},
     document: {
       getElementById: (id: string) =>
-        id === 'stage' ? stage : id === 'overlay' ? element() : null,
-      createElement: element
+        id === 'stage' ? stage : id === 'overlay' || id === 'names' ? element() : null,
+      createElement
     }
   })
   runInContext('var window = globalThis', realm)
@@ -92,6 +101,7 @@ function loadPage(strip: boolean): Page {
     realm,
     posted,
     drawn,
+    named: () => created.flatMap((one) => (one.dataset.sceneName ? [one.textContent ?? ''] : [])),
     stage,
     thrown,
     frames,
@@ -181,7 +191,12 @@ describe('the Team scene WebView bundle', () => {
     expect(page.thrown).toEqual([])
     expect(page.posted.map((one) => one.kind)).toEqual(['loaded', 'ready'])
     expect(page.stage.width).toBe(390 * 3)
-    expect(page.drawn).toEqual(expect.arrayContaining(['Mario', 'Luigi', 'Daisy']))
+    // Why: the band takes the page's height once ready; a canvas left taller is cut off there.
+    expect(page.stage.style.height).toBe('126px')
+    expect(page.named()).toEqual(expect.arrayContaining(['Peach', 'Mario', 'Luigi', 'Daisy']))
+    expect(
+      page.drawn.filter((text) => ['Peach', 'Mario', 'Luigi', 'Daisy'].includes(text))
+    ).toEqual([])
   })
 
   it('answers as the built-ins do where it fills them in, and leaves present ones alone', () => {

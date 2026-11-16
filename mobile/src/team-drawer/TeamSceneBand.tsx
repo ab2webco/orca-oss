@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
 import { useAppInForeground } from '../plugin-panels/use-plugin-panel-session'
@@ -17,6 +17,11 @@ import {
   TEAM_SCENE_QUEST_IMAGES
 } from './team-scene-webview-engine.generated'
 import type { TeamSceneArtLoad } from './use-team-scene-art'
+import {
+  TEAM_SCENE_NAME_FONT,
+  TEAM_SCENE_NAME_ROW,
+  TEAM_SCENE_NAME_STRIP
+} from './team-scene-engine-names'
 import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-tone'
 
 /** The desktop stage's height (TEAM_SCENE_ART_HEIGHT), held until the page says its own. */
@@ -36,9 +41,13 @@ const HTML = `<!DOCTYPE html>
     background: #f4f4f5; color: #18181b; font: 500 11px/14px -apple-system, system-ui, sans-serif;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     white-space: pre-line; overflow-wrap: anywhere; }
+  #names { position: relative; height: ${TEAM_SCENE_NAME_STRIP}px; }
+  .name { position: absolute; box-sizing: border-box; padding: 0 4px; color: #eef0f4; text-align: center;
+    font: ${TEAM_SCENE_NAME_FONT}; line-height: ${TEAM_SCENE_NAME_ROW}px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
-<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div></div>
+<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div><div id="names"></div></div>
 <script>${TEAM_SCENE_ENGINE_JS}</script>
 </body>
 </html>`
@@ -81,11 +90,15 @@ function StageBand({
   band,
   ownArt,
   leadLine,
+  shown,
+  onLayout,
   onBroken
 }: {
   band: Extract<Band, { kind: 'stage' }>
   ownArt: TeamSceneArtLoad | null
   leadLine: string | null
+  shown: boolean
+  onLayout?: (event: LayoutChangeEvent) => void
   /** The stage stopped drawing, so the sheet shows the names instead. */
   onBroken: () => void
 }) {
@@ -112,7 +125,7 @@ function StageBand({
     [stageKey]
   )
   const inputKey = JSON.stringify([band.input, leadLine])
-  const run = useAppInForeground()
+  const run = useAppInForeground() && shown
   const reduced = useReducedMotionEnabled()
   // Why before the stage: a page that loads with the app in the background must not start frames.
   useEffect(() => {
@@ -134,6 +147,7 @@ function StageBand({
     <View
       testID="team-scene-band"
       style={[styles.band, { height }]}
+      onLayout={onLayout}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
@@ -167,10 +181,12 @@ function StageBand({
 
 function ReadableBand({
   leadName,
-  members
+  members,
+  onLayout
 }: {
   leadName: string | null
   members: TeamMemberRow[]
+  onLayout?: (event: LayoutChangeEvent) => void
 }) {
   const tones = useTeamTones()
   const names = [
@@ -182,7 +198,7 @@ function ReadableBand({
     }))
   ]
   return (
-    <View testID="team-scene-band" style={[styles.band, styles.readable]}>
+    <View testID="team-scene-band" style={[styles.band, styles.readable]} onLayout={onLayout}>
       {names.map((one) => (
         <View key={one.key} style={styles.chip}>
           <View style={[styles.dot, { backgroundColor: one.tone }]} />
@@ -201,7 +217,9 @@ export function TeamSceneBand({
   ownArt,
   leadLine,
   leadName,
-  members
+  members,
+  shown = true,
+  onLayout
 }: {
   band: Band
   /** The scene file's images, for a stage drawn in a scene's own art. */
@@ -210,13 +228,23 @@ export function TeamSceneBand({
   leadLine: string | null
   leadName: string | null
   members: TeamMemberRow[]
+  /** False while the sheet is scrolled past the band, so its stage runs no frames unseen. */
+  shown?: boolean
+  onLayout?: (event: LayoutChangeEvent) => void
 }) {
   // Why for the band's life: a stage that threw once would only throw again; reopening retries it.
   const [broken, setBroken] = useState(false)
   return band.kind === 'stage' && !broken ? (
-    <StageBand band={band} ownArt={ownArt} leadLine={leadLine} onBroken={() => setBroken(true)} />
+    <StageBand
+      band={band}
+      ownArt={ownArt}
+      leadLine={leadLine}
+      shown={shown}
+      onLayout={onLayout}
+      onBroken={() => setBroken(true)}
+    />
   ) : (
-    <ReadableBand leadName={leadName} members={members} />
+    <ReadableBand leadName={leadName} members={members} onLayout={onLayout} />
   )
 }
 
