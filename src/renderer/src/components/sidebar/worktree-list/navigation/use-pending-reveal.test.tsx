@@ -4,12 +4,13 @@
 import { act, type RefObject } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { Virtualizer } from '@tanstack/react-virtual'
-import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { PendingSidebarWorktreeReveal } from '@/store/slices/ui'
 import { makeWorktree } from '@/store/slices/store-test-helpers'
 import type { RenderRow } from '../listing/render-row'
 import { getWorktreeOptionId } from '../rows/option-dom'
 import { MAX_REVEAL_RETRIES, type PendingSidebarRevealArgs } from './pending-reveal-inputs'
+import { REVEAL_HOLD_QUIET_MS } from './reveal-hold'
 import { usePendingSidebarReveal } from './use-pending-reveal'
 
 vi.mock('@/store', () => ({
@@ -34,7 +35,14 @@ const targetRow: RenderRow = {
 let root: Root | null = null
 let host: HTMLDivElement | null = null
 
+beforeEach(() => {
+  frames = []
+  now = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => now)
+})
+
 afterEach(() => {
+  vi.restoreAllMocks()
   act(() => root?.unmount())
   root = null
   host?.remove()
@@ -84,29 +92,72 @@ function makeArgs(
     projectGroups: [],
     flashRevealedRow: vi.fn(),
     markRevealScroll: vi.fn<(targetTop: number) => void>(),
-    // Why synchronous: the reveal's frame work runs inside act so the assertions see it.
-    schedulePendingRevealFrame: (callback) => callback(0),
-    cancelPendingRevealFrames: vi.fn()
+    hasDirectScrollInput: () => false,
+    schedulePendingRevealFrame: (callback) => {
+      frames.push(callback)
+    },
+    cancelPendingRevealFrames: () => {
+      frames.length = 0
+    }
+  }
+}
+
+let frames: FrameRequestCallback[] = []
+let now = 0
+
+/** Runs the queued reveal frames `count` times, 16ms apart, inside act. */
+function runFrames(count: number): void {
+  for (let index = 0; index < count; index += 1) {
+    now += 16
+    const batch = frames.splice(0)
+    act(() => {
+      for (const callback of batch) {
+        callback(now)
+      }
+    })
   }
 }
 
 /** A 100px sidebar with the target row 500px down, and a textarea the person is typing in. */
-function mountSidebar(): { container: HTMLDivElement; typing: HTMLTextAreaElement } {
+function mountSidebar(): {
+  container: HTMLDivElement
+  typing: HTMLTextAreaElement
+  setClientHeight: (height: number) => void
+} {
+  let scrollTop = 0
+  let clientHeight = 100
   const container = document.createElement('div')
-  Object.defineProperty(container, 'clientHeight', { value: 100 })
-  container.getBoundingClientRect = () => new DOMRect(0, 0, 240, 100)
-  container.scrollTo = vi.fn()
+  Object.defineProperty(container, 'clientHeight', { get: () => clientHeight })
+  Object.defineProperty(container, 'scrollHeight', { get: () => 1000 })
+  Object.defineProperty(container, 'scrollTop', {
+    get: () => scrollTop,
+    set: (top: number) => {
+      scrollTop = top
+    }
+  })
+  container.getBoundingClientRect = () => new DOMRect(0, 0, 240, clientHeight)
+  container.scrollTo = vi.fn((options?: ScrollToOptions | number) => {
+    if (typeof options === 'object' && options.top !== undefined) {
+      scrollTop = options.top
+    }
+  }) as HTMLDivElement['scrollTo']
   const option = document.createElement('div')
   option.id = getWorktreeOptionId('wt-target')
   option.dataset.worktreeId = 'wt-target'
   // Focusable like a real row, so a stray focus() on it would show in activeElement.
   option.tabIndex = -1
-  option.getBoundingClientRect = () => new DOMRect(0, 500, 240, 40)
+  option.getBoundingClientRect = () => new DOMRect(0, 500 - scrollTop, 240, 40)
   container.append(option)
   const typing = document.createElement('textarea')
   document.body.append(container, typing)
   typing.focus()
-  return { container, typing }
+  return {
+    container,
+    typing,
+    setClientHeight: (height) => {
+      clientHeight = height
+    }
+  }
 }
 
 function render(args: PendingSidebarRevealArgs): void {
@@ -126,9 +177,11 @@ describe('usePendingSidebarReveal', () => {
     )
 
     render(args)
+    runFrames(1)
 
     expect(args.markRevealScroll).toHaveBeenCalledWith(440)
     expect(container.scrollTo).toHaveBeenCalledWith({ top: 440, behavior: 'auto' })
+    runFrames(Math.ceil(REVEAL_HOLD_QUIET_MS / 16) + 1)
     expect(args.clearPendingRevealWorktreeId).toHaveBeenCalledOnce()
     expect(document.activeElement).toBe(typing)
   })
@@ -140,6 +193,7 @@ describe('usePendingSidebarReveal', () => {
     })
 
     render(args)
+    runFrames(MAX_REVEAL_RETRIES * 2 + 2)
 
     expect(args.clearPendingRevealWorktreeId).toHaveBeenCalledOnce()
     expect(container.scrollTo).not.toHaveBeenCalled()
@@ -153,8 +207,46 @@ describe('usePendingSidebarReveal', () => {
     })
 
     render(args)
+    runFrames(MAX_REVEAL_RETRIES * 2 + 2)
 
     expect(MAX_REVEAL_RETRIES).toBeGreaterThan(0)
     expect(args.clearPendingRevealWorktreeId).not.toHaveBeenCalled()
+  })
+
+  it('keeps a landed reveal and brings the row back when the list shrinks under it', () => {
+    const { container, setClientHeight } = mountSidebar()
+    const args = makeArgs({ worktreeId: 'wt-target', behavior: 'auto' }, [targetRow], {
+      current: container
+    })
+
+    render(args)
+    runFrames(1)
+    expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 440, behavior: 'auto' })
+
+    // A late card takes 20px off the list: the row, flush with the bottom edge, drops out.
+    setClientHeight(80)
+    runFrames(4)
+
+    expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 460, behavior: 'auto' })
+    expect(args.clearPendingRevealWorktreeId).not.toHaveBeenCalled()
+    runFrames(Math.ceil(REVEAL_HOLD_QUIET_MS / 16) + 1)
+    expect(args.clearPendingRevealWorktreeId).toHaveBeenCalledOnce()
+  })
+
+  it('lets go of a landed reveal once the person folds a group, and leaves the fold alone', () => {
+    const { container } = mountSidebar()
+    const args = makeArgs({ worktreeId: 'wt-target', behavior: 'auto' }, [targetRow], {
+      current: container
+    })
+    render(args)
+    runFrames(2)
+    const toggles = args.toggleGroup as Mock<(key: string) => void>
+    toggles.mockClear()
+
+    act(() => root?.render(<Probe args={{ ...args, collapsedGroups: new Set(['repo:repo-1']) }} />))
+    runFrames(2)
+
+    expect(toggles).not.toHaveBeenCalled()
+    expect(args.clearPendingRevealWorktreeId).toHaveBeenCalledOnce()
   })
 })

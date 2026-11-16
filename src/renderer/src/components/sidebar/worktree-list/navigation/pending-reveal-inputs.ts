@@ -48,6 +48,8 @@ export type PendingSidebarRevealArgs = {
   projectGrouping?: ProjectGroupingModel
   flashRevealedRow: (rowKey: string) => void
   markRevealScroll: (targetTop: number) => void
+  /** True while the person is wheeling or dragging the list; a held reveal lets go. */
+  hasDirectScrollInput: () => boolean
   schedulePendingRevealFrame: (callback: FrameRequestCallback) => void
   cancelPendingRevealFrames: () => void
 }

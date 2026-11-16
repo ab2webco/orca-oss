@@ -442,18 +442,6 @@ test('a restore reveals the active workspace and names it on the Retomar strip',
       const name = worktree.displayName || worktree.branch.replace(/^refs\/heads\//, '')
       return { repoId: repo.id, display: `${repo.displayName} · ${name}` }
     }, targetId)
-    // Why: the repo's detected-setup card opens late on a slow runner and shrinks the list under a landed reveal.
-    await page.evaluate(
-      (id) => window.__store!.getState().dismissSetupScriptPrompt(`local\0${id}`),
-      repoId
-    )
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          async () => (await window.api.ui.get()).setupScriptPromptDismissedRepoIds ?? []
-        )
-      )
-      .toHaveLength(1)
     const [repoKey] = await hideTargets(page, [`[data-repo-header-id="${repoId}"]`])
     expect(await rowFolded(page, targetId)).toBe(true)
     await expect.poll(() => activeWorkspace(page)).toBe(targetId)
