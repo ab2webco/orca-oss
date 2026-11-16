@@ -2,8 +2,15 @@ import { useLayoutEffect, useState } from 'react'
 
 const RECHECK_MS = 250
 
-/** Whether nothing is drawn over the element's centre, re-read while `active`; false when inactive. */
-export function useElementUncovered(element: HTMLElement | null, active: boolean): boolean {
+/**
+ * Whether nothing is drawn over the element's centre, re-read while `active`; false when inactive.
+ * A change of `recheckKey` re-reads in the same frame, before paint.
+ */
+export function useElementUncovered(
+  element: HTMLElement | null,
+  active: boolean,
+  recheckKey?: unknown
+): boolean {
   const [uncovered, setUncovered] = useState(false)
   useLayoutEffect(() => {
     if (!active || !element) {
@@ -19,6 +26,6 @@ export function useElementUncovered(element: HTMLElement | null, active: boolean
     // Why polled: a narrow window lays the Team panel over the left sidebar with no event to hear.
     const timer = window.setInterval(read, RECHECK_MS)
     return () => window.clearInterval(timer)
-  }, [active, element])
+  }, [active, element, recheckKey])
   return active && uncovered
 }

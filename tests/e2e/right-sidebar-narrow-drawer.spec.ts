@@ -16,6 +16,39 @@ function focusIsIn(page: Page, selector: string): Promise<boolean> {
   return page.evaluate((target) => Boolean(document.activeElement?.closest(target)), selector)
 }
 
+// Read once, with no retry: what a person sees in the frame the drawer opens.
+function tooltipsOverDrawer(page: Page): Promise<string[]> {
+  return page.evaluate((drawerSelector) => {
+    const drawer = document.querySelector(drawerSelector)?.getBoundingClientRect()
+    if (!drawer) {
+      return ['no drawer']
+    }
+    return [...document.querySelectorAll('[data-slot="tooltip-content"]')]
+      .filter((node) => {
+        const box = node.getBoundingClientRect()
+        return (
+          box.width > 0 &&
+          box.right > drawer.left &&
+          box.left < drawer.right &&
+          box.bottom > drawer.top &&
+          box.top < drawer.bottom
+        )
+      })
+      .map((node) => node.textContent ?? '')
+  }, DRAWER)
+}
+
+// As team-panel-action-dock.spec.ts does: clearing the seen flag and remounting the toolbar shows it.
+async function reopenBoardHint(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.localStorage.removeItem('orca.workspaceBoardMovedHintSeen.v1')
+    window.__store!.getState().setSidebarOpen(false)
+  })
+  await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(0)
+  await page.evaluate(() => window.__store!.getState().setSidebarOpen(true))
+  await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(1)
+}
+
 // ORCA-1220: below the column breakpoint the right panel used to float over the left sidebar with
 // no way past it but its own toggle.
 test('below the column breakpoint the right panel is a drawer that a scrim or Escape closes', async ({
@@ -32,22 +65,24 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
   })
 
   await orcaPage.setViewportSize({ width: 390, height: 844 })
+  // Why the hint: a tooltip from the covered sidebar floated over the drawer and took its Escape.
+  await reopenBoardHint(orcaPage)
+  await expect(
+    orcaPage.locator('[data-slot="tooltip-content"]', { hasText: 'Workspace board moved' }),
+    'the board-moved hint is not showing, so the checks below prove nothing'
+  ).toBeVisible()
   const toggle = orcaPage.locator('[data-right-sidebar-toggle]:visible').first()
   await toggle.click()
   await expect(orcaPage.locator(DRAWER)).toBeVisible()
+  expect(await tooltipsOverDrawer(orcaPage), 'a tooltip lies over the drawer as it opens').toEqual(
+    []
+  )
   await expect(orcaPage.locator(SCRIM)).toBeVisible()
   await expect
     .poll(() => focusIsIn(orcaPage, DRAWER), { message: 'focus never entered' })
     .toBe(true)
 
-  // Why: an open tooltip takes Escape first. The board-moved hint hides once the drawer covers its
-  // button (re-read every 250 ms), and the pointer leaves the close button so its tooltip stays shut.
-  const drawerBox = await orcaPage.locator(DRAWER).boundingBox()
-  await orcaPage.mouse.move(
-    drawerBox!.x + drawerBox!.width / 2,
-    drawerBox!.y + drawerBox!.height / 2
-  )
-  await expect(orcaPage.getByRole('tooltip')).toHaveCount(0)
+  // One Escape closes the drawer.
   await orcaPage.keyboard.press('Escape')
   await expect(orcaPage.locator(DRAWER)).toHaveCount(0)
   await expect(orcaPage.locator(SCRIM)).toHaveCount(0)
@@ -108,8 +143,10 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
         const drawerOpen = open && width < 768
         await expect(orcaPage.locator(SCRIM)).toHaveCount(drawerOpen ? 1 : 0)
         if (drawerOpen) {
-          // Nothing from the covered sidebar, such as the board-moved hint, floats over the drawer.
-          await expect(orcaPage.getByRole('tooltip')).toHaveCount(0)
+          expect(
+            await tooltipsOverDrawer(orcaPage),
+            `a tooltip over the drawer at ${width}`
+          ).toEqual([])
         }
         await orcaPage.screenshot({
           path: testInfo.outputPath(`${width}-${theme}-${open ? 'open' : 'closed'}.png`)
