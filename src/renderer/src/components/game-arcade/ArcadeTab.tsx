@@ -11,6 +11,7 @@ import { paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
+  fitArcadeRun,
   inputArcadeRun,
   stepArcadeRun,
   type ArcadeInput,
@@ -164,6 +165,7 @@ export function ArcadeTab({
         return
       }
       const size = { width, height, scale: window.devicePixelRatio || 1 }
+      runRef.current = fitArcadeRun(runRef.current, size)
       canvas.width = Math.round(width * size.scale)
       canvas.height = Math.round(height * size.scale)
       paintRef.current = { size, backdrop: runRef.current.play.backdropOf(size) }

@@ -6,6 +6,7 @@ import {
   type SnakeDirection,
   type SnakeState
 } from '../../../../shared/orchestrator-game-arcade-snake-rules'
+import { arcadeGridFitOf } from './arcade-board'
 import type { ArcadeDriver } from './arcade-run-state'
 import { paintSnakeRun, snakeBackdropOf, snakeTapTurnOf } from './arcade-snake-paint'
 
@@ -23,6 +24,7 @@ export const ARCADE_TURN_KEYS: Readonly<Record<string, SnakeDirection>> = {
 
 export const SNAKE_DRIVER: ArcadeDriver<OrchestratorGameArcadeSnake, SnakeState> = {
   startOf: snakeStartOf,
+  fitOf: (game, view) => ({ ...game, grid: arcadeGridFitOf(view, game.grid) }),
   stepOf: snakeStepOf,
   inputOf: (game, state, input, view) => {
     const turn =

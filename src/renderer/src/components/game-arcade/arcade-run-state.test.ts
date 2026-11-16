@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
+  fitArcadeRun,
   inputArcadeRun,
   stepArcadeRun,
   type ArcadeInput,
@@ -92,5 +93,34 @@ describe('the snake through the run', () => {
     const turned = send(steered, key('KeyA'))
     expect(turned.isGame).toBe(true)
     expect(send(steered, key('KeyQ')).isGame).toBe(false)
+  })
+})
+
+describe('fitArcadeRun', () => {
+  const TALL = { width: 176, height: 1080 }
+
+  it('lays a ready snake out for the tab, and a started run keeps its field', () => {
+    const ready = arcadeRunOf(snake, 7)
+    const laid = fitArcadeRun(ready, TALL)
+    expect(laid.play).not.toBe(ready.play)
+    expect(laid.play.fitTo).toBeDefined()
+    expect(fitArcadeRun(ready, { width: 0, height: 0 })).toBe(ready)
+    const started = send(laid, key('ArrowUp')).run
+    expect(started.play.fitTo).toBeUndefined()
+    expect(fitArcadeRun(started, VIEW)).toBe(started)
+  })
+
+  it('leaves a game without a layout alone', () => {
+    const ready = arcadeRunOf(runner, 7)
+    expect(fitArcadeRun(ready, TALL)).toBe(ready)
+  })
+
+  it('lays the run out for the view its start press came from', () => {
+    const ready = arcadeRunOf(runner, 7)
+    const laid = { ...ready.play }
+    const fitTo = vi.fn(() => laid)
+    const started = inputArcadeRun({ ...ready, play: { ...ready.play, fitTo } }, TAP, TALL).run
+    expect(fitTo).toHaveBeenCalledWith(TALL)
+    expect(started.play).toBe(laid)
   })
 })

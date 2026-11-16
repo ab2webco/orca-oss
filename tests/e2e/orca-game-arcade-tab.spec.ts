@@ -101,6 +101,18 @@ async function seedStatuses(page: Page, blockedTab: string | null): Promise<void
   }, blockedTab)
 }
 
+// Why remount the toolbar: the board hint opens once per launch and only its toolbar's unmount
+// closes it early; with its seen flag set, it does not open again and cover the sidebar.
+async function closeBoardHint(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    window.localStorage.setItem('orca.workspaceBoardMovedHintSeen.v1', 'true')
+    window.__store!.getState().setSidebarOpen(false)
+  })
+  await expect(page.locator('[data-workspace-board-trigger]')).toHaveCount(0)
+  await page.evaluate(() => window.__store!.getState().setSidebarOpen(true))
+  await expect(page.getByText('Workspace board moved to the bottom bar')).toHaveCount(0)
+}
+
 async function openArcade(
   page: Page,
   worktreeId: string,
@@ -155,6 +167,7 @@ for (const engine of Object.keys(GAMES) as OrchestratorGameArcadeEngine[]) {
       const worktreeId = await waitForActiveWorktree(orcaPage)
       const liveTab = await liveTabOf(orcaPage, worktreeId)
       await setTheme(orcaPage, theme)
+      await closeBoardHint(orcaPage)
       await seedStatuses(orcaPage, null)
 
       // Each width gets a fresh play, so a run never lasts long enough to crash mid-check.

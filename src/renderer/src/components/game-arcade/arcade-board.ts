@@ -25,6 +25,12 @@ export function arcadeBoardOf(size: ArcadeBoardSize, grid: ArcadeGrid): ArcadeBo
   }
 }
 
+/** The grid as the file has it, or turned a quarter so a tall tab plays it tall and not as dots. */
+export function arcadeGridFitOf(size: ArcadeBoardSize, grid: ArcadeGrid): ArcadeGrid {
+  const isTall = size.height - TEXT_ROOM > size.width
+  return isTall === grid.columns > grid.rows ? { columns: grid.rows, rows: grid.columns } : grid
+}
+
 export type ArcadeFieldLook = { fill: string; edge: string; check: string }
 
 /** The field; a `check` colour adds the checkerboard a cell-by-cell game reads by. */
