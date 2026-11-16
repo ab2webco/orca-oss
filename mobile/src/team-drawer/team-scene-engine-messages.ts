@@ -26,5 +26,11 @@ export type TeamSceneEngineStage = {
 export type TeamSceneEngineMessage =
   | { kind: 'stage'; stage: TeamSceneEngineStage }
   | { kind: 'input'; input: TeamSceneInput; leadLine: string | null }
+  /** `run` is false while nobody can see the band; `reduced` is the phone's Reduce Motion. */
+  | { kind: 'motion'; run: boolean; reduced: boolean }
 
-export type TeamSceneEngineEvent = { kind: 'ready'; height: number } | { kind: 'artFailed' }
+export type TeamSceneEngineEvent =
+  | { kind: 'ready'; height: number }
+  | { kind: 'artFailed' }
+  /** The stage stopped drawing; the sheet shows the names instead. */
+  | { kind: 'error'; message: string }

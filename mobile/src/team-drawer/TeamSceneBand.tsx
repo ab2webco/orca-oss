@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView } from 'react-native-webview'
+import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
+import { useAppInForeground } from '../plugin-panels/use-plugin-panel-session'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import type { TeamMemberRow } from './team-drawer-model'
 import type { TeamSceneArtPick, TeamSceneBand as Band } from './team-scene-band'
-import type { TeamSceneEngineMessage, TeamSceneEngineStage } from './team-scene-engine-messages'
+import type {
+  TeamSceneEngineEvent,
+  TeamSceneEngineMessage,
+  TeamSceneEngineStage
+} from './team-scene-engine-messages'
 import {
   TEAM_SCENE_ENGINE_JS,
   TEAM_SCENE_QUEST_IMAGES
@@ -37,11 +43,7 @@ const HTML = `<!DOCTYPE html>
 </body>
 </html>`
 
-type PageEvent =
-  | { kind: 'loaded' }
-  | { kind: 'ready'; height: number }
-  | { kind: 'artFailed' }
-  | { kind: 'error'; message: string }
+type PageEvent = { kind: 'loaded' } | TeamSceneEngineEvent
 
 const pageEventOf = (data: string): PageEvent | null => {
   try {
@@ -78,11 +80,14 @@ function imagesOf(art: TeamSceneArtPick, ownArt: TeamSceneArtLoad | null): Recor
 function StageBand({
   band,
   ownArt,
-  leadLine
+  leadLine,
+  onBroken
 }: {
   band: Extract<Band, { kind: 'stage' }>
   ownArt: TeamSceneArtLoad | null
   leadLine: string | null
+  /** The stage stopped drawing, so the sheet shows the names instead. */
+  onBroken: () => void
 }) {
   const ref = useRef<WebView>(null)
   const tones = useTeamTones()
@@ -107,6 +112,14 @@ function StageBand({
     [stageKey]
   )
   const inputKey = JSON.stringify([band.input, leadLine])
+  const run = useAppInForeground()
+  const reduced = useReducedMotionEnabled()
+  // Why before the stage: a page that loads with the app in the background must not start frames.
+  useEffect(() => {
+    if (loaded > 0) {
+      ref.current?.injectJavaScript(scriptOf({ kind: 'motion', run, reduced }))
+    }
+  }, [loaded, run, reduced])
   useEffect(() => {
     if (loaded > 0 && !waitsForArt) {
       ref.current?.injectJavaScript(scriptOf({ kind: 'stage', stage }))
@@ -143,6 +156,8 @@ function StageBand({
             setHeight(page.height)
           } else if (page?.kind === 'artFailed') {
             setFailed(true)
+          } else if (page?.kind === 'error') {
+            onBroken()
           }
         }}
       />
@@ -196,8 +211,10 @@ export function TeamSceneBand({
   leadName: string | null
   members: TeamMemberRow[]
 }) {
-  return band.kind === 'stage' ? (
-    <StageBand band={band} ownArt={ownArt} leadLine={leadLine} />
+  // Why for the band's life: a stage that threw once would only throw again; reopening retries it.
+  const [broken, setBroken] = useState(false)
+  return band.kind === 'stage' && !broken ? (
+    <StageBand band={band} ownArt={ownArt} leadLine={leadLine} onBroken={() => setBroken(true)} />
   ) : (
     <ReadableBand leadName={leadName} members={members} />
   )

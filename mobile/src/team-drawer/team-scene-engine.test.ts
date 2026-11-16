@@ -59,11 +59,13 @@ function recordingContext(calls: Call[]): CanvasRenderingContext2D {
 }
 
 let calls: Call[] = []
-let frames: ((now: number) => void)[] = []
+/** The frames the engine asked for and has not cancelled, by id. */
+let frames = new Map<number, (now: number) => void>()
+let frameId = 0
 
 beforeEach(() => {
   calls = []
-  frames = []
+  frames = new Map()
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
     () => recordingContext(calls) as never
   )
@@ -103,8 +105,12 @@ function mount(width = 390): { engine: TeamSceneEngine; events: TeamSceneEngineE
     ratio: () => 1,
     reducedMotion: false,
     scheduler: {
-      request: (cb) => frames.push(cb),
-      cancel: () => {}
+      request: (cb) => {
+        frameId += 1
+        frames.set(frameId, cb)
+        return frameId
+      },
+      cancel: (id) => frames.delete(id)
     },
     decode: async (url) => ({ src: url, ...pngSize(url) }) as Bitmap as never,
     post: (event) => events.push(event)
@@ -133,6 +139,30 @@ async function officeStage(engine: TeamSceneEngine): Promise<void> {
     }
   })
 }
+
+/** Runs every frame asked for, 40 ms on, as the WebView does. */
+const tick = (count: number): void => {
+  for (let at = 0; at < count; at++) {
+    const due = [...frames.values()]
+    frames.clear()
+    for (const cb of due) {
+      cb(performance.now() + at * 40)
+    }
+  }
+}
+
+const pixelStage = (engine: TeamSceneEngine): Promise<void> =>
+  engine.receive({
+    kind: 'stage',
+    stage: {
+      art: { kind: 'pixel', sceneId: 'quest' },
+      images: {},
+      scenes: [],
+      timezone: 'UTC',
+      nowMs: 0,
+      colors: COLORS
+    }
+  })
 
 /** Runs the scene for `seconds` at 30 frames a second, as the frame loop drives it. */
 const run = (engine: TeamSceneEngine, seconds: number): void => {
@@ -338,5 +368,50 @@ describe('the phone scene engine', () => {
       }
     })
     expect(events).toEqual([{ kind: 'artFailed' }])
+  })
+
+  it('stops its frames after a paint throws and says so once, so the sheet can fall back', async () => {
+    const { engine, events } = mount()
+    await pixelStage(engine)
+    await engine.receive({ kind: 'input', input: inputOf([]), leadLine: null })
+    tick(3)
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockImplementation(() => {
+      throw new Error('canvas lost')
+    })
+    expect(() => tick(30)).not.toThrow()
+    expect(events.filter((one) => one.kind === 'error')).toEqual([
+      { kind: 'error', message: 'Error: canvas lost' }
+    ])
+    expect(frames.size).toBe(0)
+  })
+
+  it('runs no frames while nobody sees the band, and picks up when someone does', async () => {
+    const { engine } = mount()
+    await engine.receive({ kind: 'motion', run: false, reduced: false })
+    await pixelStage(engine)
+    await engine.receive({ kind: 'input', input: inputOf([]), leadLine: null })
+    expect(frames.size).toBe(0)
+    await engine.receive({ kind: 'motion', run: true, reduced: false })
+    expect(frames.size).toBe(1)
+    await engine.receive({ kind: 'motion', run: false, reduced: false })
+    expect(frames.size).toBe(0)
+  })
+
+  it("settles the stage and paints it once, with no frames, under the phone's Reduce Motion", async () => {
+    const { engine } = mount()
+    await pixelStage(engine)
+    await engine.receive({
+      kind: 'input',
+      input: inputOf([member('m1', 'Toadette', 'working')]),
+      leadLine: null
+    })
+    expect(frames.size).toBe(1)
+    calls = []
+    await engine.receive({ kind: 'motion', run: true, reduced: true })
+    expect(frames.size).toBe(0)
+    expect(engine.actors().find((one) => one.key === 'm1')?.pose).toBe('work')
+    expect(calls.filter((one) => one.name === 'fillText').map((one) => one.args[0])).toContain(
+      'Toadette'
+    )
   })
 })

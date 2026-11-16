@@ -1,5 +1,6 @@
 import { act, forwardRef, useImperativeHandle, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { AccessibilityInfo } from 'react-native'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import type { TeamSceneBand as Band } from './team-scene-band'
@@ -43,7 +44,16 @@ afterEach(() => {
   root = null
   webview.props = null
   webview.injected = []
+  Reflect.deleteProperty(document, 'visibilityState')
+  vi.restoreAllMocks()
 })
+
+// Why the document: react-native-web's AppState reads the app's state from its visibility.
+const showApp = (state: 'hidden' | 'visible') =>
+  act(() => {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
 
 const input: TeamSceneInput = {
   lead: { key: 'lead', name: 'Alfred', characterKey: null, activity: 'working' },
@@ -91,7 +101,8 @@ describe('the Team sheet scene band', () => {
     expect(webview.props?.source.html).toContain('window.__teamScene')
     expect(webview.injected).toEqual([])
     send({ kind: 'loaded' })
-    const [stage, team] = messages()
+    const [motion, stage, team] = messages()
+    expect(motion).toEqual({ kind: 'motion', run: true, reduced: false })
     expect(stage).toMatchObject({ kind: 'stage', stage: { art: officeBand.art } })
     expect(Object.keys((stage!.stage as { images: object }).images)).toContain('office/desk.png')
     expect(team).toEqual({ kind: 'input', input, leadLine: 'Reviewing #1249' })
@@ -117,8 +128,8 @@ describe('the Team sheet scene band', () => {
       <TeamSceneBand band={waiting} ownArt={null} leadLine={null} leadName="Alfred" members={[]} />
     )
     expect(webview.props!.source.html).toBe(html)
-    expect(messages().map((one) => one.kind)).toEqual(['stage', 'input', 'input'])
-    expect(messages()[2]).toMatchObject({ input: { members: [{ activity: 'needsYou' }] } })
+    expect(messages().map((one) => one.kind)).toEqual(['motion', 'stage', 'input', 'input'])
+    expect(messages()[3]).toMatchObject({ input: { members: [{ activity: 'needsYou' }] } })
   })
 
   it('hands the stage and team again when the page reloads, as after its renderer was killed', () => {
@@ -133,7 +144,14 @@ describe('the Team sheet scene band', () => {
     )
     send({ kind: 'loaded' })
     send({ kind: 'loaded' })
-    expect(messages().map((one) => one.kind)).toEqual(['stage', 'input', 'stage', 'input'])
+    expect(messages().map((one) => one.kind)).toEqual([
+      'motion',
+      'stage',
+      'input',
+      'motion',
+      'stage',
+      'input'
+    ])
   })
 
   it('lets the inline page load from a data URL, as Android serves it, and nothing else', () => {
@@ -178,5 +196,55 @@ describe('the Team sheet scene band', () => {
       kind: 'stage',
       stage: { art: { kind: 'pixel', sceneId: 'quest' } }
     })
+  })
+
+  it('shows the names in place of the stage once the stage stops drawing', () => {
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+      />
+    )
+    send({ kind: 'loaded' })
+    expect(document.body.textContent).toBe('')
+    send({ kind: 'error', message: 'Error: canvas lost' })
+    expect(document.body.textContent).toBe('Alfred')
+  })
+
+  it("stops the stage's frames while the app is in the background", () => {
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+      />
+    )
+    send({ kind: 'loaded' })
+    expect(messages()[0]).toEqual({ kind: 'motion', run: true, reduced: false })
+    showApp('hidden')
+    expect(messages().at(-1)).toEqual({ kind: 'motion', run: false, reduced: false })
+    showApp('visible')
+    expect(messages().at(-1)).toEqual({ kind: 'motion', run: true, reduced: false })
+  })
+
+  it("keeps the stage still when the phone's Reduce Motion is on", async () => {
+    vi.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true)
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        members={[]}
+      />
+    )
+    await act(async () => {})
+    send({ kind: 'loaded' })
+    expect(messages()[0]).toEqual({ kind: 'motion', run: true, reduced: true })
   })
 })

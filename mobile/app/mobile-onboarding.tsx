@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AccessibilityInfo, Animated, BackHandler, useWindowDimensions, View } from 'react-native'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Animated, BackHandler, useWindowDimensions, View } from 'react-native'
 import { Text } from '../src/theme/dynamic-type-text'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { OrcaLogo } from '../src/components/OrcaLogo'
+import { useReducedMotionEnabled } from '../src/hooks/use-reduced-motion-enabled'
 import { ensureNotificationPermissions } from '../src/notifications/mobile-notifications'
 import {
   MobileOnboardingPage,
@@ -184,26 +185,4 @@ function MobileOnboardingFlow({
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
-}
-
-function useReducedMotionEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((nextEnabled) => {
-        if (mounted) {
-          setEnabled(nextEnabled)
-        }
-      })
-      .catch(() => undefined)
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setEnabled)
-    return () => {
-      mounted = false
-      subscription.remove()
-    }
-  }, [])
-
-  return enabled
 }
