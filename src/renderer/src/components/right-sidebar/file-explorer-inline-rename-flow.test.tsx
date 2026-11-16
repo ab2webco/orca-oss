@@ -116,9 +116,11 @@ describe('file explorer inline rename flow', () => {
     const { input } = await startSettledRename()
 
     fireEvent.change(input, { target: { value: 'renamed-components' } })
-    fireEvent.keyDown(input, { key: 'Escape' })
+    const notHandled = fireEvent.keyDown(input, { key: 'Escape' })
     await advance(200)
 
     expect(mocks.renameFileOnDisk).not.toHaveBeenCalled()
+    // Why: a handled Escape keeps the narrow-width drawer open (ORCA-1220).
+    expect(notHandled).toBe(false)
   })
 })

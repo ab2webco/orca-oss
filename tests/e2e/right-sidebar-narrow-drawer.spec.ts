@@ -3,7 +3,7 @@ import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
 
-const CAPTURE_WIDTHS = [768, 390, 320]
+const CAPTURE_WIDTHS = [1440, 768, 390, 320]
 const DRAWER = '[data-right-sidebar-overlay]'
 const SCRIM = '[data-right-sidebar-scrim]'
 const LEFT_SIDEBAR = '[data-worktree-sidebar-root]'
@@ -40,7 +40,8 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
     .poll(() => focusIsIn(orcaPage, DRAWER), { message: 'focus never entered' })
     .toBe(true)
 
-  // Why: the click leaves the pointer on the drawer's close button, whose tooltip takes the first Escape.
+  // Why: an open tooltip takes Escape first. The board-moved hint hides once the drawer covers its
+  // button (re-read every 250 ms), and the pointer leaves the close button so its tooltip stays shut.
   const drawerBox = await orcaPage.locator(DRAWER).boundingBox()
   await orcaPage.mouse.move(
     drawerBox!.x + drawerBox!.width / 2,
@@ -76,6 +77,22 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
   // The drawer never closes or narrows the left sidebar.
   expect(await orcaPage.evaluate(() => window.__store!.getState().sidebarOpen)).toBe(true)
 
+  // A field that handles Escape keeps the drawer open: the first clears the search, the next closes.
+  await orcaPage.evaluate(() => window.__store!.getState().showRightSidebarSearch())
+  const search = orcaPage.getByRole('textbox', { name: 'Search files' })
+  await search.click()
+  await search.fill('README')
+  await orcaPage.keyboard.press('Escape')
+  await expect(search).toHaveValue('')
+  await expect(orcaPage.locator(DRAWER)).toBeVisible()
+  await orcaPage.keyboard.press('Escape')
+  await expect(orcaPage.locator(DRAWER)).toHaveCount(0)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.showRightSidebarFiles()
+    state.setRightSidebarOpen(false)
+  })
+
   await orcaPage.setViewportSize({ width: 768, height: 900 })
   await setRightPanelOpen(orcaPage, true)
   await expect(orcaPage.locator('[data-right-sidebar-resize]')).toBeVisible()
@@ -88,7 +105,12 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
       await writeSettings(orcaPage, { theme })
       for (const open of [false, true]) {
         await setRightPanelOpen(orcaPage, open)
-        await expect(orcaPage.locator(SCRIM)).toHaveCount(open && width < 768 ? 1 : 0)
+        const drawerOpen = open && width < 768
+        await expect(orcaPage.locator(SCRIM)).toHaveCount(drawerOpen ? 1 : 0)
+        if (drawerOpen) {
+          // Nothing from the covered sidebar, such as the board-moved hint, floats over the drawer.
+          await expect(orcaPage.getByRole('tooltip')).toHaveCount(0)
+        }
         await orcaPage.screenshot({
           path: testInfo.outputPath(`${width}-${theme}-${open ? 'open' : 'closed'}.png`)
         })

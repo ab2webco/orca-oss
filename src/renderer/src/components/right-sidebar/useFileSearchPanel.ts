@@ -215,6 +215,8 @@ export function useFileSearchPanel(explorerView: 'files' | 'search'): FileSearch
       }
       if (e.key === 'Escape') {
         if (fileSearchQuery) {
+          // Why: the first Escape clears the query; only an empty field lets it close the drawer (ORCA-1220).
+          e.preventDefault()
           handleClearSearch()
         }
       }

@@ -1,12 +1,11 @@
 import type React from 'react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 export const RIGHT_SIDEBAR_TOGGLE_SELECTOR = '[data-right-sidebar-toggle]'
 
 type RightSidebarDrawer = {
   showScrim: boolean
   tabIndex: number | undefined
-  onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void
 }
 
 function focusVisibleToggle(): void {
@@ -69,22 +68,33 @@ export function useRightSidebarDrawer(args: {
     }
   }, [open, containerRef])
 
-  const onKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      // Why: a menu or field inside the panel that handled Escape marks it handled; leave it be.
-      if (!drawerOpen || event.key !== 'Escape' || event.defaultPrevented) {
+  useEffect(() => {
+    if (!drawerOpen) {
+      return
+    }
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
+        return
+      }
+      const target = event.target
+      const fromDrawer =
+        target === document.body ||
+        (target instanceof Node && containerRef.current?.contains(target))
+      if (!fromDrawer) {
         return
       }
       event.preventDefault()
       onDismiss()
-    },
-    [drawerOpen, onDismiss]
-  )
+    }
+    // Why window bubble: it runs after React and document listeners, so any field, menu or list
+    // inside the panel that handled (or stopped) Escape keeps the drawer open.
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [drawerOpen, containerRef, onDismiss])
 
   return {
     showScrim: drawerOpen,
-    tabIndex: drawerOpen ? -1 : undefined,
-    onKeyDown
+    tabIndex: drawerOpen ? -1 : undefined
   }
 }
 

@@ -37,12 +37,7 @@ function Harness({
         terminal
       </button>
       {drawer.showScrim ? <RightSidebarDrawerScrim onDismiss={close} /> : null}
-      <div
-        ref={containerRef}
-        data-testid="drawer"
-        tabIndex={drawer.tabIndex}
-        onKeyDown={drawer.onKeyDown}
-      >
+      <div ref={containerRef} data-testid="drawer" tabIndex={drawer.tabIndex}>
         {open ? <input data-testid="drawer-input" autoFocus={autoFocusInput} /> : null}
       </div>
     </div>
@@ -61,7 +56,9 @@ function query(selector: string): HTMLElement | null {
 
 function pressEscape(target: HTMLElement): void {
   act(() => {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
   })
 }
 
@@ -114,6 +111,27 @@ describe('useRightSidebarDrawer', () => {
 
     pressEscape(input)
     expect(query('[data-testid="drawer-input"]')).toBeNull()
+  })
+
+  it('stays open when a document listener in the panel handled Escape first', () => {
+    // As the source-control list does to clear its selection.
+    const clearSelection = (event: KeyboardEvent): void => event.preventDefault()
+    document.addEventListener('keydown', clearSelection)
+    try {
+      render(true)
+      act(() => setOpenFromTest(true))
+      pressEscape(query('[data-testid="drawer-input"]')!)
+      expect(query('[data-testid="drawer-input"]')).not.toBeNull()
+    } finally {
+      document.removeEventListener('keydown', clearSelection)
+    }
+  })
+
+  it('ignores Escape typed outside the drawer', () => {
+    render(true)
+    act(() => setOpenFromTest(true))
+    pressEscape(query('[data-testid="terminal"]')!)
+    expect(query('[data-testid="drawer-input"]')).not.toBeNull()
   })
 
   it('leaves Escape alone when the panel is a column', () => {

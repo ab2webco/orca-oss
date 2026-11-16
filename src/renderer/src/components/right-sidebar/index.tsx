@@ -162,7 +162,6 @@ function RightSidebarInner(): React.JSX.Element {
       <div
         ref={containerRef}
         tabIndex={drawer.tabIndex}
-        onKeyDown={drawer.onKeyDown}
         className={cn(
           overlaysContent
             ? 'absolute inset-y-0 right-0 z-30 flex flex-row shadow-lg outline-none'

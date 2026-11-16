@@ -2736,6 +2736,8 @@ export default function ChecksPanel(): React.JSX.Element {
         e.preventDefault()
         void handleSaveTitle()
       } else if (e.key === 'Escape') {
+        // Why: marks Escape handled so the narrow-width drawer stays open (ORCA-1220).
+        e.preventDefault()
         handleCancelEdit()
       }
     },
