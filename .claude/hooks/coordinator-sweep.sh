@@ -20,12 +20,16 @@ sweep_line() {
   # A running check has no conclusion, so "settled" is an allowlist: a denylist called a PR
   # mergeable while its E2E shards ran. Mergeable also needs verify SUCCESS and CLEAN, because
   # the rollup lists only checks that started, so accessory checks alone read green (ORCA-1103).
+  # The rollup keeps superseded runs, so only each check's latest run counts: a cancelled run a
+  # rerun passed read red (ORCA-1243). gh prints an unset time as year 1; no time means queued.
   # shellcheck disable=SC2016
   buckets=$(jq -c '
-    def states: [.statusCheckRollup[]?|(.conclusion//.state)];
+    def stamp: [.startedAt,.completedAt,.createdAt]|map(select(.!=null and .!="" and (startswith("0001-")|not)))|.[0]//"9999";
+    def latest: [.statusCheckRollup[]?]|group_by([.__typename//"",.workflowName//"",.name//.context//""])|map(max_by(stamp));
+    def states: [latest[]|(.conclusion//.state)];
     def red: states|any(. as $s|["FAILURE","CANCELLED","TIMED_OUT","ERROR","STARTUP_FAILURE","ACTION_REQUIRED"]|index($s));
     def running: states|any(. as $s|["SUCCESS","SKIPPED","NEUTRAL"]|index($s)|not);
-    def verified: .mergeStateStatus=="CLEAN" and any(.statusCheckRollup[]?;(.name//.context)=="verify" and .conclusion=="SUCCESS");
+    def verified: .mergeStateStatus=="CLEAN" and any(latest[];(.name//.context)=="verify" and .conclusion=="SUCCESS");
     map(.number) as $open
     | map((([(.body//"")|scan("(?:#|/pull/)([0-9]+)")|.[0]|tonumber]|unique|map(select(. as $n|$open|index($n)))) - [.number]) as $after
       | {n:"#\(.number)", b:(if red then "red" elif running then "pending" elif verified|not then (if .mergeStateStatus=="DIRTY" then "" else "unverified" end) elif $after==[] then "mergeable" else "held" end), after:$after})' <<<"$prs" 2>/dev/null)
