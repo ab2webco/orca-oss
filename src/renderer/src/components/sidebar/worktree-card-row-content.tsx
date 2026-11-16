@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { useNow } from '@/components/dashboard/useNow'
+import { useLocalHostName } from '@/lib/use-local-host-name'
 import { WorktreeCardParentContent } from './worktree-card-parent-content'
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
@@ -11,6 +12,7 @@ import {
   type SidebarTeamRow
 } from './sidebar-team-roster'
 import { SidebarTeamAgentRow } from './SidebarTeamAgentRow'
+import { sidebarTeamRowLines } from './sidebar-team-row-lines'
 import { WorktreeLineageChildChip } from './worktree-lineage-child-chip'
 import { SidebarDeliveredRow } from './SidebarDeliveredRow'
 import { SidebarDeliveredGroup, splitTeamChildren } from './SidebarDeliveredGroup'
@@ -32,7 +34,7 @@ export function WorktreeCardRowContent({
   presentation: WorktreeCardPresentation
 }): React.JSX.Element {
   if (row) {
-    return <WorktreeCardTeamContent row={row} child={child} />
+    return <WorktreeCardTeamContent row={row} child={child} ports={card.workspacePorts} />
   }
   return delivered ? (
     <WorktreeCardDeliveredContent view={delivered} />
@@ -52,15 +54,32 @@ function WorktreeCardDeliveredContent({ view }: { view: DeliveredView }): React.
 
 function WorktreeCardTeamContent({
   row,
-  child
+  child,
+  ports
 }: {
   row: SidebarTeamRow
   child: boolean
+  ports: WorktreeCardController['workspacePorts']
 }): React.JSX.Element {
   const look = useSidebarTeamLook()
-  const showPr = useAppStore((s) => s.worktreeCardProperties?.includes('pr') === true)
+  const properties = useAppStore((s) => s.worktreeCardProperties)
+  const showPr = properties?.includes('pr') === true
+  const teamTabOpen = useAppStore((s) => s.rightSidebarOpen && s.rightSidebarTab === 'team')
+  const flat = useAppStore((s) => s.groupBy !== 'repo')
+  const localHostName = useLocalHostName()
   const now = useNow(30_000)
   const since = useSidebarTeamRowSince(row)
+  const lines = useMemo(
+    () =>
+      sidebarTeamRowLines(row, {
+        teamTabOpen,
+        properties: properties ?? [],
+        flat,
+        ports: ports.map((one) => one.port),
+        localHostName
+      }),
+    [row, teamTabOpen, properties, flat, ports, localHostName]
+  )
   return (
     <div className="flex w-full min-w-0 flex-col" data-worktree-card-team-content="">
       <SidebarTeamAgentRow
@@ -70,6 +89,7 @@ function WorktreeCardTeamContent({
         now={now}
         since={since}
         child={child}
+        lines={lines}
       />
     </div>
   )

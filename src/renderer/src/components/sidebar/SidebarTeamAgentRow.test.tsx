@@ -123,7 +123,9 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
       />
     )
     const row = host.querySelector('[data-sidebar-team-row="member"]')!
-    const parts = [...row.children].map((child) => child.getAttribute('data-team-row-part'))
+    const parts = [...row.querySelectorAll('[data-team-row-part]')].map((child) =>
+      child.getAttribute('data-team-row-part')
+    )
     expect(parts).toEqual(['state', 'kind', 'name', 'age'])
     expect(
       row.querySelector('[data-team-row-part="state"] [data-status-glyph="spinner"]')
@@ -206,7 +208,12 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
   it('names a member with no character by its ticket once in game mode', async () => {
     const card = member({
       name: 'ORCA-1034 Replace marketing-site people photos',
-      ticket: { identifier: 'ORCA-1034', title: null, url: null, statusGroup: null }
+      ticket: {
+        identifier: 'ORCA-1034',
+        title: null,
+        url: null,
+        statusGroup: null
+      }
     })
     const host = await render(
       <SidebarTeamAgentRow
@@ -308,6 +315,70 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
     expect(top.querySelector('[data-sidebar-team-row]')!.hasAttribute('data-team-row-child')).toBe(
       false
     )
+  })
+
+  it('keeps the tree connector on the name line when act-lines make the row taller', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+        child
+        lines={{ activity: { text: 'Editing files', asks: false }, extra: 'm1' }}
+      />
+    )
+    const row = host.querySelector('[data-sidebar-team-row]')!
+    const nameLine = row.querySelector('[data-team-row-part="name"]')!.parentElement!
+    // Why: `before:bottom-1/2` on the whole row would land the elbow between the two act-lines.
+    expect(row.className).not.toContain('before:')
+    expect(nameLine.className).toContain('before:bottom-1/2')
+    expect(nameLine.className).toContain('h-6.5')
+  })
+
+  it('draws the activity line and the extra line under the name, as V30 act-lines', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+        lines={{
+          activity: { text: 'Waiting for your answer', asks: true },
+          extra: 'm1 · @fabiana'
+        }}
+      />
+    )
+    const row = host.querySelector('[data-sidebar-team-row="member"]')!
+    const parts = [...row.querySelectorAll('[data-team-row-part]')].map((child) =>
+      child.getAttribute('data-team-row-part')
+    )
+    expect(parts).toEqual(['state', 'kind', 'name', 'age', 'act', 'extra'])
+    const act = row.querySelector('[data-team-row-part="act"]')!
+    expect(act.textContent).toBe('Waiting for your answer')
+    expect(act.hasAttribute('data-asks')).toBe(true)
+    expect(row.querySelector('[data-team-row-part="extra"]')!.textContent).toBe('m1 · @fabiana')
+  })
+
+  it('draws no line it was not given', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: lead }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+        lines={{
+          activity: { text: 'Orchestrating · Bash', asks: false },
+          extra: null
+        }}
+      />
+    )
+    const act = host.querySelector('[data-team-row-part="act"]')!
+    expect(act.hasAttribute('data-asks')).toBe(false)
+    expect(host.querySelector('[data-team-row-part="extra"]')).toBeNull()
   })
 
   it('calls the lead by its role in plain mode', async () => {
