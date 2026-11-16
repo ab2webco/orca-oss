@@ -2230,6 +2230,7 @@ function App(): React.JSX.Element {
       <TooltipTrigger asChild>
         <button
           className="sidebar-toggle mr-2"
+          data-right-sidebar-toggle=""
           onClick={actions.toggleRightSidebar}
           aria-label={translate('auto.App.9e0b441a91', 'Toggle right sidebar')}
         >
