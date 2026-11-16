@@ -25,7 +25,7 @@ export type TeamSceneEngineStage = {
 
 export type TeamSceneEngineMessage =
   | { kind: 'stage'; stage: TeamSceneEngineStage }
-  | { kind: 'input'; input: TeamSceneInput; leadLine: string | null }
+  | { kind: 'input'; input: TeamSceneInput; leadLine: string | null; advisorName: string }
   /** `run` is false while nobody can see the band; `reduced` is the phone's Reduce Motion. */
   | { kind: 'motion'; run: boolean; reduced: boolean }
 

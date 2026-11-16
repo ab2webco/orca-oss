@@ -186,6 +186,24 @@ const pixelStage = (engine: TeamSceneEngine): Promise<void> =>
     }
   })
 
+/** Each sprite's left and right edge in stage px: Pixel moves to it, flips by scale, then draws at 0, 0. */
+const spriteSpans = (drawn: readonly Call[]): [number, number][] => {
+  let x = 0
+  let flip = 1
+  return drawn.flatMap((one): [number, number][] => {
+    if (one.name === 'translate') {
+      x = Number(one.args[0])
+    } else if (one.name === 'scale') {
+      flip = Number(one.args[0])
+    }
+    if (one.name !== 'drawImage' || one.args.length !== 3) {
+      return []
+    }
+    const right = x + (one.args[0] as { width: number }).width * flip
+    return [[Math.min(x, right), Math.max(x, right)]]
+  })
+}
+
 /** Runs the scene for `seconds` at 30 frames a second, as the frame loop drives it. */
 const run = (engine: TeamSceneEngine, seconds: number): void => {
   for (let at = 0; at < seconds * 30; at++) {
@@ -315,6 +333,50 @@ describe('the phone scene engine', () => {
     expect(nameBoxes()).toHaveLength(names.length + 2)
     expect(named()).toEqual(expect.arrayContaining([...names, 'Alfred']))
     expect(clashOf(nameBoxes())).toBe(false)
+  })
+
+  it("names the advisor in the strip as the advisor's card does", async () => {
+    const { engine } = mount()
+    await pixelStage(engine)
+    await engine.receive({
+      kind: 'input',
+      input: { ...inputOf([member('m1', 'Toadette', 'working')]), advisor: { line: null } },
+      leadLine: null,
+      advisorName: 'Mago'
+    })
+    run(engine, 1)
+    expect(named()).toEqual(expect.arrayContaining(['Alfred', 'Toadette', 'Mago']))
+    expect(named()).not.toContain('advisor')
+  })
+
+  it('keeps every figure whole on a 320 pt stage while the first desk fetches or strolls', async () => {
+    for (const activity of ['working', 'resting'] as const) {
+      const { engine } = mount(320)
+      await pixelStage(engine)
+      await engine.receive({
+        kind: 'input',
+        input: {
+          ...inputOf(
+            ['Mario', 'Arthur', 'Rosalina'].map((name, at) => member(`m${at}`, name, activity))
+          ),
+          advisor: { line: null }
+        },
+        leadLine: null,
+        advisorName: 'Mago'
+      })
+      const spans: [number, number][] = []
+      for (let frame = 0; frame < 30 * 30; frame++) {
+        calls = []
+        engine.paint(1 / 30)
+        spans.push(...spriteSpans(calls))
+      }
+      expect(spans.length).toBeGreaterThan(0)
+      expect(
+        spans.filter(([left, right]) => left < 0 || right > 320),
+        activity
+      ).toEqual([])
+      engine.dispose()
+    }
   })
 
   it("puts the lead's line in a bubble over the stage", async () => {

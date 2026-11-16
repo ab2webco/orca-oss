@@ -84,23 +84,30 @@ export function layoutTeamSceneNames(
 }
 
 /** Keeps `strip`'s labels on the figures' names; writes the page only when a label moves. */
-export function createTeamSceneNameStrip(
-  strip: HTMLElement
-): (g: CanvasRenderingContext2D, actors: readonly TeamSceneActor[], width: number) => void {
+export function createTeamSceneNameStrip(strip: HTMLElement): (
+  g: CanvasRenderingContext2D,
+  actors: readonly TeamSceneActor[],
+  width: number,
+  /** The advisor's name on its card; the director names it by its role. */
+  advisorName: string
+) => void {
   const labels = new Map<string, HTMLElement>()
   let shown = ''
-  return (g, actors, width) => {
+  return (g, actors, width, advisorName) => {
     g.font = TEAM_SCENE_NAME_FONT
     const boxes = layoutTeamSceneNames(
       actors
         .filter((a) => !a.away)
-        .map((a) => ({
-          key: a.key,
-          name: a.name,
-          x: a.x * width,
-          // Why up to a whole px: a box a fraction narrower than its text shows an ellipsis.
-          width: Math.ceil(g.measureText(a.name).width) + PAD
-        })),
+        .map((a) => {
+          const name = a.role === 'advisor' ? advisorName : a.name
+          return {
+            key: a.key,
+            name,
+            x: a.x * width,
+            // Why up to a whole px: a box a fraction narrower than its text shows an ellipsis.
+            width: Math.ceil(g.measureText(name).width) + PAD
+          }
+        }),
       width
     )
     // Why by a few px: a walker's label follows it without a page write every frame.

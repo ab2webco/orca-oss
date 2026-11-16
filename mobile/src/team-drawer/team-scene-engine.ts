@@ -110,6 +110,7 @@ export function createTeamSceneEngine(deps: {
   let painter: TeamScenePainter | null = null
   let input: TeamSceneInput | null = null
   let leadLine: string | null = null
+  let advisorName = ''
   let actors: TeamSceneActor[] = []
   let bubblesKey = ''
   const bubbles = new Map<string, HTMLElement>()
@@ -213,7 +214,7 @@ export function createTeamSceneEngine(deps: {
       trophies: world.trophies,
       stopped: world.stopped
     })
-    placeNames(g, actors, width)
+    placeNames(g, actors, width, advisorName)
     placeBubbles(width, height)
   }
 
@@ -259,6 +260,7 @@ export function createTeamSceneEngine(deps: {
       if (message.kind === 'input') {
         input = message.input
         leadLine = message.leadLine
+        advisorName = message.advisorName
         bubblesKey = ''
         apply()
         return

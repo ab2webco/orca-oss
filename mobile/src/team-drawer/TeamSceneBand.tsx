@@ -37,7 +37,9 @@ const HTML = `<!DOCTYPE html>
   #wrap { position: relative; }
   #stage { display: block; width: 100%; }
   #overlay { position: absolute; inset: 0; pointer-events: none; }
-  .bubble { position: absolute; box-sizing: border-box; padding: 3px 8px; border-radius: 8px;
+  /* Why a border, not padding: overflow clips at the padding box, so padding showed a cut line. */
+  .bubble { position: absolute; box-sizing: border-box; padding: 0 8px; border-radius: 8px;
+    border: solid transparent; border-width: 3px 0;
     background: #f4f4f5; color: #18181b; font: 500 11px/14px -apple-system, system-ui, sans-serif;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     white-space: pre-line; overflow-wrap: anywhere; }
@@ -90,6 +92,7 @@ function StageBand({
   band,
   ownArt,
   leadLine,
+  advisorName,
   shown,
   onLayout,
   onBroken
@@ -97,6 +100,7 @@ function StageBand({
   band: Extract<Band, { kind: 'stage' }>
   ownArt: TeamSceneArtLoad | null
   leadLine: string | null
+  advisorName: string
   shown: boolean
   onLayout?: (event: LayoutChangeEvent) => void
   /** The stage stopped drawing, so the sheet shows the names instead. */
@@ -124,7 +128,7 @@ function StageBand({
     // Why by text: every 20 s poll hands a new band, and a new stage re-decodes megabytes of art.
     [stageKey]
   )
-  const inputKey = JSON.stringify([band.input, leadLine])
+  const inputKey = JSON.stringify([band.input, leadLine, advisorName])
   const run = useAppInForeground() && shown
   const reduced = useReducedMotionEnabled()
   // Why before the stage: a page that loads with the app in the background must not start frames.
@@ -140,7 +144,9 @@ function StageBand({
   }, [loaded, waitsForArt, stage])
   useEffect(() => {
     if (loaded > 0 && !waitsForArt) {
-      ref.current?.injectJavaScript(scriptOf({ kind: 'input', input: band.input, leadLine }))
+      ref.current?.injectJavaScript(
+        scriptOf({ kind: 'input', input: band.input, leadLine, advisorName })
+      )
     }
   }, [loaded, waitsForArt, stage, inputKey])
   return (
@@ -217,6 +223,7 @@ export function TeamSceneBand({
   ownArt,
   leadLine,
   leadName,
+  advisorName,
   members,
   shown = true,
   onLayout
@@ -227,6 +234,8 @@ export function TeamSceneBand({
   /** The lead's bubble; null shows none. */
   leadLine: string | null
   leadName: string | null
+  /** The advisor's name on its card, for its label under the stage. */
+  advisorName: string
   members: TeamMemberRow[]
   /** False while the sheet is scrolled past the band, so its stage runs no frames unseen. */
   shown?: boolean
@@ -239,6 +248,7 @@ export function TeamSceneBand({
       band={band}
       ownArt={ownArt}
       leadLine={leadLine}
+      advisorName={advisorName}
       shown={shown}
       onLayout={onLayout}
       onBroken={() => setBroken(true)}

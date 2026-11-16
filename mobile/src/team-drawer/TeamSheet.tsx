@@ -180,6 +180,7 @@ export function TeamSheet({
                         ownArt={team.sceneArt}
                         leadLine={view.lead ? teamSceneLeadLineOf(view.lead, words) : null}
                         leadName={view.lead?.name ?? null}
+                        advisorName={words.advisorName}
                         members={view.members}
                         shown={sceneBand.shown}
                         onLayout={sceneBand.onLayout}

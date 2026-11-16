@@ -95,6 +95,7 @@ describe('the Team sheet scene band', () => {
         ownArt={null}
         leadLine="Reviewing #1249"
         leadName="Alfred"
+        advisorName="Mago"
         members={[]}
       />
     )
@@ -105,7 +106,38 @@ describe('the Team sheet scene band', () => {
     expect(motion).toEqual({ kind: 'motion', run: true, reduced: false })
     expect(stage).toMatchObject({ kind: 'stage', stage: { art: officeBand.art } })
     expect(Object.keys((stage!.stage as { images: object }).images)).toContain('office/desk.png')
-    expect(team).toEqual({ kind: 'input', input, leadLine: 'Reviewing #1249' })
+    expect(team).toEqual({
+      kind: 'input',
+      input,
+      leadLine: 'Reviewing #1249',
+      advisorName: 'Mago'
+    })
+  })
+
+  it('ends a long bubble on a whole line: the box that clamps its lines has no vertical padding', () => {
+    render(
+      <TeamSceneBand
+        band={officeBand}
+        ownArt={null}
+        leadLine={null}
+        leadName="Alfred"
+        advisorName="Mago"
+        members={[]}
+      />
+    )
+    const page = new DOMParser().parseFromString(webview.props!.source.html, 'text/html')
+    const clamped = [...page.styleSheets]
+      .flatMap((sheet) => [...sheet.cssRules])
+      .flatMap((rule) => ('style' in rule ? [rule.style as CSSStyleDeclaration] : []))
+      .filter((style) => style.getPropertyValue('-webkit-line-clamp') !== '')
+    expect(clamped).not.toHaveLength(0)
+    // Why: overflow clips at the padding box, so a bottom padding shows the top of the next line.
+    for (const style of clamped) {
+      expect([
+        style.getPropertyValue('padding-top'),
+        style.getPropertyValue('padding-bottom')
+      ]).toEqual(['0px', '0px'])
+    }
   })
 
   it('sends a new reading of the team without reloading the stage', () => {
