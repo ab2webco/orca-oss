@@ -19,9 +19,9 @@ describe('openGameArcadeTab', () => {
 
   it('keeps the engine a play asked for, and picks a built-in one when none is given', () => {
     const store = createEditorTabsStore()
-    store.getState().openGameArcadeTab('wt-1', 'runner')
+    store.getState().openGameArcadeTab('wt-1', 'snake')
     const arcadeOf = () => store.getState().openFiles.find((file) => file.mode === 'arcade')
-    expect(arcadeOf()?.arcadeEngine).toBe('runner')
+    expect(arcadeOf()?.arcadeEngine).toBe('snake')
     const roll = vi.spyOn(Math, 'random').mockReturnValue(0)
     store.getState().openGameArcadeTab('wt-1')
     expect(arcadeOf()?.arcadeEngine).toBe('runner')

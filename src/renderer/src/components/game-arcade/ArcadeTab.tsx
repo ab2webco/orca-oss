@@ -3,13 +3,15 @@ import { useAppStore } from '@/store'
 import {
   parseOrchestratorGameArcade,
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
+  ORCHESTRATOR_GAME_ARCADE_SNAKE,
   type OrchestratorGameArcade,
   type OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
-import { arcadeBackdropOf, paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
+import { paintArcadeFrame, type ArcadePaintSize } from './arcade-canvas-paint'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
+  fitArcadeRun,
   inputArcadeRun,
   stepArcadeRun,
   type ArcadeInput,
@@ -28,7 +30,8 @@ const builtInOf = (text: string): OrchestratorGameArcade => {
 }
 
 const GAMES: Record<OrchestratorGameArcadeEngine, OrchestratorGameArcade> = {
-  runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+  runner: builtInOf(ORCHESTRATOR_GAME_ARCADE_RUNNER),
+  snake: builtInOf(ORCHESTRATOR_GAME_ARCADE_SNAKE)
 }
 
 type Props = {
@@ -162,9 +165,10 @@ export function ArcadeTab({
         return
       }
       const size = { width, height, scale: window.devicePixelRatio || 1 }
+      runRef.current = fitArcadeRun(runRef.current, size)
       canvas.width = Math.round(width * size.scale)
       canvas.height = Math.round(height * size.scale)
-      paintRef.current = { size, backdrop: arcadeBackdropOf(size) }
+      paintRef.current = { size, backdrop: runRef.current.play.backdropOf(size) }
       paint()
     })
     observer.observe(box)

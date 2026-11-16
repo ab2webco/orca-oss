@@ -1,5 +1,5 @@
 ---
-sourceHash: 8823e61bd225de31
+sourceHash: b217d6d86f7d5f67
 ---
 
 # El juego orquestador de Agent Teams
@@ -1925,14 +1925,15 @@ de las tarjetas y del narrador pueden ser por idioma (`{ "en": …, "es": … }`
 ## Archivos de juegos del arcade
 
 Un juego que el arcade ofrece después de un merge perfecto son datos para uno de los motores integrados
-del juego, nunca código. El único motor es `runner` (una tecla para saltar), y el runner integrado es
-`src/shared/orchestrator-game-arcade-runner.json`. `orca game game validate <file> [--json]`
+del juego, nunca código. Los motores son `runner` (una tecla para saltar) y `snake` (girar para comer
+y crecer); los juegos integrados son `src/shared/orchestrator-game-arcade-runner.json` y
+`src/shared/orchestrator-game-arcade-snake.json`. `orca game game validate <file> [--json]`
 comprueba un archivo con las reglas de `src/shared/orchestrator-game-arcade-file.ts`, lista cada problema
 como `path: message` y sale con 1 mientras quede alguno.
 
 | Clave        | Qué define                                                                                 |
 | ------------ | ------------------------------------------------------------------------------------------ |
-| `engine`     | `runner`                                                                                   |
+| `engine`     | `runner` o `snake`; las claves de abajo son las del runner, las del snake van después      |
 | `name`       | De 1 a 32 caracteres, una cadena o `{ "en": …, "es": … }`                                  |
 | `fps`        | Tope de fotogramas, un número entero de 5 a 15                                             |
 | `speed`      | `{ start, max, rampPerMinute }` en columnas por segundo; `max` al menos `start`            |
@@ -1949,6 +1950,16 @@ como `path: message` y sale con 1 mientras quede alguno.
 - `weight` (de 0.05 a 1, por defecto 1) es la frecuencia con que se elige un obstáculo frente a los demás.
 - El archivo ocupa como máximo 16 KB. Las claves desconocidas se ignoran, así que un archivo más nuevo
   sigue cargando.
+
+Un archivo `snake` define `name` y `fps` como arriba, y además:
+
+| Clave    | Qué define                                                                              |
+| -------- | --------------------------------------------------------------------------------------- |
+| `grid`   | `{ columns, rows }`: el tablero, de 12 a 40 columnas por 8 a 30 filas                   |
+| `speed`  | `{ start, max, rampPerFood }` en celdas por segundo (de 2 a 20); `max` al menos `start` |
+| `start`  | `{ length }`: celdas con que empieza la serpiente, de 2 a 8                             |
+| `food`   | `{ points, growth }`: puntos por baya (de 1 a 50) y celdas que crece (de 1 a 5)         |
+| `colors` | `{ head, body, food }`, cada uno un color `#rrggbb` (o entero)                          |
 
 ### El runner
 
@@ -1991,10 +2002,12 @@ El store del juego del host suma el crédito en la misma escritura que el evento
 registra, así que un merge visto dos veces paga una sola vez. Se guardan como máximo 9 partidas.
 El `game state` del líder las trae como `arcade: { credits, offer }`, y `game.arcade`
 (`orca game arcade`) las lee, o con `action: play | keep` gasta una o descarta la oferta. Solo el
-proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central.
+proyecto del líder las lee o las gasta. El panel de Equipo juega la partida en una pestaña central, con un juego integrado elegido al azar en cada partida.
 
+- El runner salta con Espacio, flecha arriba o un toque. El snake gira con las flechas, WASD o un toque
+  (hacia el toque desde su cabeza), come bayas para sumar y crecer, y termina contra una pared o su propia cola.
 - Esc vuelve a la conversación y conserva la partida. Una vez terminada, sólo Espacio, Enter o un toque
-  cierran la pestaña, así que un salto tardío no lo hace.
+  cierran la pestaña, así que un giro o un salto tardío no lo hace.
 - La partida se detiene mientras un agente vivo de cualquier proyecto está bloqueado en un permiso o
   esperando a la persona, y la pausa lo nombra (`En pausa · Luigi te necesita`). Un panel dormido o
   desconectado, o una fila que la compuerta de frescura de la barra de pestañas da por vieja (sin

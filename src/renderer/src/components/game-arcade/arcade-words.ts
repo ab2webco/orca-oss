@@ -15,6 +15,8 @@ const hintOf = (engine: OrchestratorGameArcadeEngine): string => {
   switch (engine) {
     case 'runner':
       return translate(`${KEY}.hint`, 'Space or tap to jump')
+    case 'snake':
+      return translate(`${KEY}.snakeHint`, 'Arrows, WASD or tap to steer')
   }
 }
 

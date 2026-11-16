@@ -1797,14 +1797,15 @@ format, limits and consent rules are in [Game scenes](./plugin-development.md#ga
 ## Arcade game files
 
 A game the arcade offers after a perfect merge is data for one of the game's built-in engines,
-never code. The only engine is `runner` (one key to jump), and the built-in runner is
-`src/shared/orchestrator-game-arcade-runner.json`. `orca game game validate <file> [--json]`
+never code. The engines are `runner` (one key to jump) and `snake` (steer to eat and grow); the
+built-in games are `src/shared/orchestrator-game-arcade-runner.json` and
+`src/shared/orchestrator-game-arcade-snake.json`. `orca game game validate <file> [--json]`
 checks a file with the rules in `src/shared/orchestrator-game-arcade-file.ts`, lists every problem
 as `path: message` and exits 1 while any remain.
 
 | Key          | What it sets                                                                         |
 | ------------ | ------------------------------------------------------------------------------------ |
-| `engine`     | `runner`                                                                             |
+| `engine`     | `runner` or `snake`; the keys below are the runner's, the snake's follow             |
 | `name`       | 1 to 32 characters, a string or `{ "en": …, "es": … }`                               |
 | `fps`        | Frame cap, a whole number from 5 to 15                                               |
 | `speed`      | `{ start, max, rampPerMinute }` in columns per second; `max` at least `start`        |
@@ -1820,6 +1821,16 @@ as `path: message` and exits 1 while any remain.
   transparent and every other glyph needs a `#rrggbb` (or integer) color.
 - `weight` (0.05 to 1, default 1) is how often an obstacle is picked against the others.
 - The file is at most 16 KB. Unknown keys are ignored, so a newer file still loads.
+
+A `snake` file sets `name` and `fps` as above, plus:
+
+| Key      | What it sets                                                                        |
+| -------- | ----------------------------------------------------------------------------------- |
+| `grid`   | `{ columns, rows }`: the board, 12 to 40 columns by 8 to 30 rows                    |
+| `speed`  | `{ start, max, rampPerFood }` in cells per second (2 to 20); `max` at least `start` |
+| `start`  | `{ length }`: cells the snake starts with, 2 to 8                                   |
+| `food`   | `{ points, growth }`: points per berry (1 to 50) and cells it grows by (1 to 5)     |
+| `colors` | `{ head, body, food }`, each a `#rrggbb` (or integer) color                         |
 
 ### The runner
 
@@ -1857,10 +1868,12 @@ The host's game store adds the credit in the same write as the `merged` event it
 merge seen twice pays once. At most 9 plays are kept. The lead's `game state` carries them as
 `arcade: { credits, offer }`, and `game.arcade` (`orca game arcade`) reads them, or with
 `action: play | keep` spends one or dismisses the offer. Only the lead's project reads or spends
-them. The Team panel plays the run in a center tab.
+them. The Team panel plays the run in a center tab, a built-in game picked at random for each play.
 
+- The runner jumps on Space, ArrowUp or a tap. The snake steers with the arrows, WASD or a tap
+  (toward the tap from its head), eats berries to score and grow, and ends on a wall or its own tail.
 - Esc goes back to the conversation and keeps the run. Once the run ends, only Space, Enter or a tap
-  closes the tab, so a late jump does not.
+  closes the tab, so a late turn or jump does not.
 - The run stands still while a live agent in any project is blocked on a permission or waiting on
   the person, and the pause names it (`Paused · Luigi needs you`). A sleeping or disconnected pane,
   or a row the tab bar's freshness gate calls stale (unconfirmed after a restore, or silent for

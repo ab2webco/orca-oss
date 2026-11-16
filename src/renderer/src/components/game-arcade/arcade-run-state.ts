@@ -2,7 +2,9 @@ import type {
   OrchestratorGameArcade,
   OrchestratorGameArcadeEngine
 } from '../../../../shared/orchestrator-game-arcade-file'
+import type { ArcadePaintSize } from './arcade-canvas-paint'
 import { RUNNER_DRIVER } from './arcade-driver-runner'
+import { SNAKE_DRIVER } from './arcade-driver-snake'
 
 // One saved play in Orca's center tab: a built-in game's driver, its screens, and the pause while
 // someone needs the user. The frame clock lives in the view; each game's rules live in src/shared.
@@ -19,6 +21,8 @@ export type ArcadeInput =
 /** What a built-in game gives the tab: its rules over its own state, and how it draws. */
 export type ArcadeDriver<G, S> = {
   startOf: (game: G, seed: number) => S
+  /** The game laid out for the tab's shape, chosen before the run starts and kept until it ends. */
+  fitOf?: (game: G, view: ArcadeView) => G
   stepOf: (game: G, state: S, dtMs: number) => S
   /** The state after an input while running; null when the input is not this game's. */
   inputOf: (game: G, state: S, input: ArcadeInput, view: ArcadeView) => S | null
@@ -35,6 +39,8 @@ export type ArcadeDriver<G, S> = {
     state: S,
     view: ArcadeView & { isMoving: boolean }
   ) => void
+  /** The still scene behind the play, baked once per size: each game has its own. */
+  backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
 }
 
 /** A game and its state, closed over so the tab never needs to know which game it plays. */
@@ -47,6 +53,9 @@ export type ArcadePlay = {
   isStartKey: (code: string) => boolean
   playsStartPress: boolean
   paint: (g: CanvasRenderingContext2D, view: ArcadeView, isMoving: boolean) => void
+  backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
+  /** A not-yet-started play, laid out again for a view; absent once it has moved. */
+  fitTo?: (view: ArcadeView) => ArcadePlay
 }
 
 export function arcadePlayOf<G, S>(driver: ArcadeDriver<G, S>, game: G, state: S): ArcadePlay {
@@ -61,7 +70,8 @@ export function arcadePlayOf<G, S>(driver: ArcadeDriver<G, S>, game: G, state: S
     },
     isStartKey: driver.isStartKey,
     playsStartPress: driver.playsStartPress,
-    paint: (g, view, isMoving) => driver.paint(g, game, state, { ...view, isMoving })
+    paint: (g, view, isMoving) => driver.paint(g, game, state, { ...view, isMoving }),
+    backdropOf: driver.backdropOf
   }
 }
 
@@ -76,15 +86,39 @@ export type ArcadeRun = {
 // Why 30: the epic caps every panel animation there; the rules step by real time either way.
 export const ARCADE_FRAME_MS = 1000 / 30
 
+// Why from the file's game each time: a tab resized while ready lays the field out afresh.
+function startedPlayOf<G, S>(
+  driver: ArcadeDriver<G, S>,
+  game: G,
+  seed: number,
+  laid = game
+): ArcadePlay {
+  const play = arcadePlayOf(driver, laid, driver.startOf(laid, seed))
+  const fitOf = driver.fitOf
+  return fitOf
+    ? { ...play, fitTo: (view: ArcadeView) => startedPlayOf(driver, game, seed, fitOf(game, view)) }
+    : play
+}
+
 function arcadePlayFor(game: OrchestratorGameArcade, seed: number): ArcadePlay {
   switch (game.engine) {
     case 'runner':
-      return arcadePlayOf(RUNNER_DRIVER, game, RUNNER_DRIVER.startOf(game, seed))
+      return startedPlayOf(RUNNER_DRIVER, game, seed)
+    case 'snake':
+      return startedPlayOf(SNAKE_DRIVER, game, seed)
   }
 }
 
 export function arcadeRunOf(game: OrchestratorGameArcade, seed: number, best = 0): ArcadeRun {
   return { engine: game.engine, play: arcadePlayFor(game, seed), screen: 'ready', best }
+}
+
+/** A ready run laid out for the tab's shape; a started one keeps its field. */
+export function fitArcadeRun(run: ArcadeRun, view: ArcadeView): ArcadeRun {
+  const fitTo = run.play.fitTo
+  return run.screen === 'ready' && fitTo && view.width > 0 && view.height > 0
+    ? { ...run, play: fitTo(view) }
+    : run
 }
 
 // Why not arrows: a turn or jump pressed as the run ends must not close the tab under the player.
@@ -110,7 +144,8 @@ export function inputArcadeRun(
       if (!isStart) {
         return same
       }
-      const play = run.play.playsStartPress ? (run.play.input(input, view) ?? run.play) : run.play
+      const laid = fitArcadeRun(run, view).play
+      const play = laid.playsStartPress ? (laid.input(input, view) ?? laid) : laid
       return { run: { ...run, play, screen: 'running' }, close: false, isGame: true }
     }
     case 'running': {

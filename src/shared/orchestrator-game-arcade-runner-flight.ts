@@ -1,10 +1,10 @@
-import type { OrchestratorGameArcade } from './orchestrator-game-arcade-file'
+import type { OrchestratorGameArcadeRunner } from './orchestrator-game-arcade-file'
 
 // The runner's flight and course, ported from the mod's arcade-runner-jump.ts and
 // arcade-runner-course.ts so Orca's panel plays the same game; the mod's copy goes with ORCA-1055.
 
 /** What the rules read of a game file. */
-export type RunnerGame = Pick<OrchestratorGameArcade, 'speed' | 'difficulty' | 'jump'>
+export type RunnerGame = Pick<OrchestratorGameArcadeRunner, 'speed' | 'difficulty' | 'jump'>
 
 // Why its own copy: the mod's pixel-canvas hash is not importable from src.
 const hash = (x: number, y: number): number => {

@@ -4,6 +4,7 @@ import {
   ORCHESTRATOR_GAME_ARCADE_MAX_BYTES,
   ORCHESTRATOR_GAME_ARCADE_ENGINES,
   ORCHESTRATOR_GAME_ARCADE_RUNNER,
+  ORCHESTRATOR_GAME_ARCADE_SNAKE,
   orchestratorGameArcadeIssues,
   parseOrchestratorGameArcade,
   pickOrchestratorGameArcadeEngine
@@ -19,7 +20,7 @@ describe('orchestratorGameArcadeIssues', () => {
   it('parses the built-in runner with its colors as numbers and the scene obstacle kept', () => {
     const parsed = parseOrchestratorGameArcade(ORCHESTRATOR_GAME_ARCADE_RUNNER)
     expect(parsed.ok).toBe(true)
-    const game = parsed.ok ? parsed.game : undefined
+    const game = parsed.ok && parsed.game.engine === 'runner' ? parsed.game : undefined
     expect(game?.engine).toBe('runner')
     expect(game?.fps).toBeLessThanOrEqual(ORCHESTRATOR_GAME_ARCADE_FPS_MAX)
     expect(game?.obstacles.some((one) => 'from' in one && one.from === 'scene')).toBe(true)
@@ -52,7 +53,7 @@ describe('orchestratorGameArcadeIssues', () => {
     game.difficulty = { minGap: 40, maxGap: 20 }
     game.obstacles = [{ from: 'scene' }, { rows: ['XY', 'X'], colors: { X: '#ffffff' } }]
     expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
-      'engine: must be one of: runner',
+      'engine: must be one of: runner, snake',
       'speed.max: must be at least speed.start',
       'difficulty.maxGap: must be at least difficulty.minGap',
       'obstacles.1.rows: every row must be the same width',
@@ -96,9 +97,34 @@ describe('orchestratorGameArcadeIssues', () => {
   })
 })
 
+describe('the snake game file', () => {
+  const snake = (): Record<string, unknown> => JSON.parse(ORCHESTRATOR_GAME_ARCADE_SNAKE)
+
+  it('finds nothing in the built-in snake, inert data well under the size cap', () => {
+    expect(orchestratorGameArcadeIssues(ORCHESTRATOR_GAME_ARCADE_SNAKE)).toEqual([])
+    expect(new TextEncoder().encode(ORCHESTRATOR_GAME_ARCADE_SNAKE).length).toBeLessThan(
+      ORCHESTRATOR_GAME_ARCADE_MAX_BYTES
+    )
+  })
+
+  it('lists every snake problem with its path', () => {
+    const game = snake()
+    game.grid = { columns: 4, rows: 8.5 }
+    game.speed = { start: 10, max: 5, rampPerFood: 0 }
+    game.colors = { head: 'green', body: '#00ff00', food: '#ff0000' }
+    expect(orchestratorGameArcadeIssues(JSON.stringify(game))).toEqual([
+      'grid.columns: must be a whole number from 12 to 40',
+      'grid.rows: must be a whole number from 8 to 30',
+      'speed.max: must be at least speed.start',
+      'colors.head: must be a #rrggbb color or an integer from 0 to 16777215'
+    ])
+  })
+})
+
 describe('pickOrchestratorGameArcadeEngine', () => {
-  it('reaches every built-in game across the roll, the edges included', () => {
-    const picked = new Set([0, 0.25, 0.5, 0.75, 0.999999, 1].map(pickOrchestratorGameArcadeEngine))
+  it('reaches every built-in game across the roll', () => {
+    const picked = new Set([0, 0.25, 0.5, 0.75, 0.999999].map(pickOrchestratorGameArcadeEngine))
     expect([...picked].sort()).toEqual([...ORCHESTRATOR_GAME_ARCADE_ENGINES].sort())
+    expect(pickOrchestratorGameArcadeEngine(1)).toBe(ORCHESTRATOR_GAME_ARCADE_ENGINES.at(-1))
   })
 })

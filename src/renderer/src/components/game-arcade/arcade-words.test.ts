@@ -19,12 +19,14 @@ describe('arcadeWordsOf', () => {
     expect(arcadeWordsOf(3).score).toBe('3 pts')
   })
 
-  it('names who the run waits on, in English and Spanish', async () => {
+  it('names who the run waits on and gives each game its hint, in English and Spanish', async () => {
     await i18n.changeLanguage('en')
     expect(arcadeWordsOf(0, 'Luigi').held).toBe('Paused · Luigi needs you')
     expect(arcadeWordsOf(0).held).toBe('Paused · someone needs you')
+    expect(arcadeWordsOf(0, '', 'snake').hint).toBe('Arrows, WASD or tap to steer')
 
     await i18n.changeLanguage('es')
     expect(arcadeWordsOf(0, 'Luigi').held).toBe('En pausa · Luigi te necesita')
+    expect(arcadeWordsOf(0, '', 'snake').hint).toBe('Flechas, WASD o toque para girar')
   })
 })

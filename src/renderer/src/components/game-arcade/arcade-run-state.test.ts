@@ -1,16 +1,21 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ARCADE_FRAME_MS,
   arcadeRunOf,
+  fitArcadeRun,
   inputArcadeRun,
   stepArcadeRun,
   type ArcadeInput,
   type ArcadeRun
 } from './arcade-run-state'
 import { arcadeShapesOf } from './arcade-driver-runner'
-import { ORCHESTRATOR_GAME_ARCADE_RUNNER } from '../../../../shared/orchestrator-game-arcade-file'
+import {
+  ORCHESTRATOR_GAME_ARCADE_RUNNER,
+  ORCHESTRATOR_GAME_ARCADE_SNAKE
+} from '../../../../shared/orchestrator-game-arcade-file'
 
 const runner = JSON.parse(ORCHESTRATOR_GAME_ARCADE_RUNNER)
+const snake = JSON.parse(ORCHESTRATOR_GAME_ARCADE_SNAKE)
 const VIEW = { width: 800, height: 600 }
 const key = (code: string, isDown = true): ArcadeInput => ({ kind: 'key', code, isDown })
 const TAP: ArcadeInput = { kind: 'pointer', x: 10, y: 10, isPress: true }
@@ -34,9 +39,9 @@ describe('arcadeShapesOf', () => {
 
 describe('the arcade run', () => {
   it.each([
-    ['Space', runner, 'Space'],
-    ['ArrowUp', runner, 'ArrowUp']
-  ])('waits for the first press (%s), then runs by real time', (_name, game, start) => {
+    ['runner', runner, 'Space'],
+    ['snake', snake, 'ArrowUp']
+  ])('waits for the first press of the %s, then runs by real time', (_name, game, start) => {
     const ready = arcadeRunOf(game, 7)
     expect(stepArcadeRun(ready, 500, false).run.play.ms).toBe(0)
     expect(send(ready, key('KeyQ')).run.screen).toBe('ready')
@@ -50,7 +55,7 @@ describe('the arcade run', () => {
   })
 
   it('stands still while someone needs the user, ignores presses, and goes on once answered', () => {
-    const running = send(arcadeRunOf(runner, 7), key('Space')).run
+    const running = send(arcadeRunOf(snake, 7), key('Space')).run
     const held = stepArcadeRun(running, 80, true).run
     expect(held.screen).toBe('held')
     expect(held.play.ms).toBe(0)
@@ -58,7 +63,10 @@ describe('the arcade run', () => {
     expect(stepArcadeRun(held, 80, false).run).toMatchObject({ screen: 'running' })
   })
 
-  it.each([['runner', runner]])(
+  it.each([
+    ['runner', runner],
+    ['snake', snake]
+  ])(
     'ends the %s run, keeps the best score, and only Space, Enter or a tap closes it',
     (_name, game) => {
       const run = playedOut(send(arcadeRunOf(game, 7, 3), key('Space')).run)
@@ -75,5 +83,44 @@ describe('the arcade run', () => {
     const ready = arcadeRunOf(runner, 7)
     expect(stepArcadeRun(ready, 33, false).changed).toBe(false)
     expect(stepArcadeRun(send(ready, key('Space')).run, 33, false).changed).toBe(true)
+  })
+})
+
+describe('the snake through the run', () => {
+  it('steers with its first arrow and with WASD, and leaves other keys to the page', () => {
+    const started = send(arcadeRunOf(snake, 7), key('ArrowUp')).run
+    const steered = stepArcadeRun(started, 1000 / 6, false).run
+    const turned = send(steered, key('KeyA'))
+    expect(turned.isGame).toBe(true)
+    expect(send(steered, key('KeyQ')).isGame).toBe(false)
+  })
+})
+
+describe('fitArcadeRun', () => {
+  const TALL = { width: 176, height: 1080 }
+
+  it('lays a ready snake out for the tab, and a started run keeps its field', () => {
+    const ready = arcadeRunOf(snake, 7)
+    const laid = fitArcadeRun(ready, TALL)
+    expect(laid.play).not.toBe(ready.play)
+    expect(laid.play.fitTo).toBeDefined()
+    expect(fitArcadeRun(ready, { width: 0, height: 0 })).toBe(ready)
+    const started = send(laid, key('ArrowUp')).run
+    expect(started.play.fitTo).toBeUndefined()
+    expect(fitArcadeRun(started, VIEW)).toBe(started)
+  })
+
+  it('leaves a game without a layout alone', () => {
+    const ready = arcadeRunOf(runner, 7)
+    expect(fitArcadeRun(ready, TALL)).toBe(ready)
+  })
+
+  it('lays the run out for the view its start press came from', () => {
+    const ready = arcadeRunOf(runner, 7)
+    const laid = { ...ready.play }
+    const fitTo = vi.fn(() => laid)
+    const started = inputArcadeRun({ ...ready, play: { ...ready.play, fitTo } }, TAP, TALL).run
+    expect(fitTo).toHaveBeenCalledWith(TALL)
+    expect(started.play).toBe(laid)
   })
 })
