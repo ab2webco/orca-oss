@@ -108,3 +108,86 @@ describe('coordinator-sweep mergeable', () => {
     expect(out.pending).toBe('none')
   })
 })
+
+const run = (workflowName, name, conclusion, startedAt, extra = {}) => ({
+  __typename: 'CheckRun',
+  workflowName,
+  name,
+  conclusion,
+  startedAt,
+  completedAt: startedAt,
+  ...extra
+})
+const context = (name, state, startedAt) => ({
+  __typename: 'StatusContext',
+  context: name,
+  state,
+  startedAt
+})
+const verify = run('PR Checks', 'verify', 'SUCCESS', '2026-11-16T18:31:06Z')
+
+// ORCA-1243: a rollup keeps superseded runs, so only the latest run of each check decides.
+describe('coordinator-sweep latest run per check', () => {
+  it('does not call a PR red when a cancelled run was superseded by a passing one', () => {
+    // Listed newest first, as #1275's rollup did, so array order cannot decide it.
+    const out = sweep([
+      pr(1275, 'CLEAN', [
+        run('PR text', 'pr text attribution', 'SUCCESS', '2026-11-16T18:18:58Z'),
+        run('PR text', 'pr text attribution', 'CANCELLED', '2026-11-16T18:17:56Z'),
+        verify
+      ])
+    ])
+    expect(out.red).toBe('none')
+    expect(out.mergeable).toBe('#1275')
+  })
+
+  it('still calls a PR red when a passing run was followed by a failing one', () => {
+    const out = sweep([
+      pr(1276, 'BLOCKED', [
+        run('PR text', 'pr text attribution', 'FAILURE', '2026-11-16T18:18:58Z'),
+        run('PR text', 'pr text attribution', 'SUCCESS', '2026-11-16T18:17:56Z'),
+        verify
+      ])
+    ])
+    expect(out.red).toBe('#1276')
+    expect(out.mergeable).toBe('none')
+  })
+
+  it('reduces status contexts, which have no workflowName, by their context', () => {
+    const out = sweep([
+      pr(1277, 'CLEAN', [
+        context('ci/external', 'SUCCESS', '2026-11-16T18:20:00Z'),
+        context('ci/external', 'ERROR', '2026-11-16T18:10:00Z'),
+        verify
+      ])
+    ])
+    expect(out.red).toBe('none')
+    expect(out.mergeable).toBe('#1277')
+  })
+
+  it('keeps checks of the same name in different workflows apart', () => {
+    const out = sweep([
+      pr(1278, 'BLOCKED', [
+        run('Mobile Checks', 'lint', 'FAILURE', '2026-11-16T18:10:00Z'),
+        run('PR Checks', 'lint', 'SUCCESS', '2026-11-16T18:20:00Z'),
+        verify
+      ])
+    ])
+    expect(out.red).toBe('#1278')
+  })
+
+  it('reads a queued re-run with no start time as pending, not the cancelled run before it', () => {
+    const out = sweep([
+      pr(1279, 'BLOCKED', [
+        run('PR text', 'pr text attribution', 'CANCELLED', '2026-11-16T18:17:56Z'),
+        run('PR text', 'pr text attribution', '', '0001-01-01T00:00:00Z', {
+          completedAt: '0001-01-01T00:00:00Z',
+          status: 'QUEUED'
+        }),
+        verify
+      ])
+    ])
+    expect(out.red).toBe('none')
+    expect(out.pending).toBe('#1279')
+  })
+})
