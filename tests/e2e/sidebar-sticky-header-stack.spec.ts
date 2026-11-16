@@ -8,6 +8,7 @@ import { PNG } from 'pngjs'
 import { test, expect } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
+import { dismissWorkspaceBoardMovedHint } from './helpers/workspace-board-moved-hint'
 import {
   seedPairedHostSidebar,
   setSeededHostConnection,
@@ -136,6 +137,8 @@ test('the pinned host card and project header stack with nothing between or thro
     leftSidebarAppearanceMode: 'match-terminal',
     terminalBackgroundOpacity: 0.8
   })
+  // Why before seeding: it remounts the sidebar, and its bubble covered the last row in the capture.
+  await dismissWorkspaceBoardMovedHint(orcaPage)
   await seedTwoHosts(orcaPage)
 
   const viewport = orcaPage.locator('[data-worktree-sidebar]')

@@ -7,6 +7,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { getActiveWorktreeId, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
+import { dismissWorkspaceBoardMovedHint } from './helpers/workspace-board-moved-hint'
 import { worktreeRow } from './worktree-row-locators'
 
 const WIDTHS = [1440, 768, 390, 320]
@@ -103,6 +104,8 @@ test('an idle project is one row that opens its workspace, and its chevron unfol
   await waitForActiveWorktree(orcaPage)
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   await setTheme(orcaPage, 'dark')
+  // Why: the board-moved bubble sits over the sidebar's lower rows in every capture.
+  await dismissWorkspaceBoardMovedHint(orcaPage)
   const seeded = await seedProjects(orcaPage)
   const sidebar = orcaPage.locator('[data-worktree-sidebar]')
 
