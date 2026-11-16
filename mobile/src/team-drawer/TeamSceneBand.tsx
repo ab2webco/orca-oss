@@ -1,16 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { WebView } from 'react-native-webview'
+import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
+import { useAppInForeground } from '../plugin-panels/use-plugin-panel-session'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 import type { TeamMemberRow } from './team-drawer-model'
 import type { TeamSceneArtPick, TeamSceneBand as Band } from './team-scene-band'
-import type { TeamSceneEngineMessage, TeamSceneEngineStage } from './team-scene-engine-messages'
+import type {
+  TeamSceneEngineEvent,
+  TeamSceneEngineMessage,
+  TeamSceneEngineStage
+} from './team-scene-engine-messages'
 import {
   TEAM_SCENE_ENGINE_JS,
   TEAM_SCENE_QUEST_IMAGES
 } from './team-scene-webview-engine.generated'
 import type { TeamSceneArtLoad } from './use-team-scene-art'
+import {
+  TEAM_SCENE_NAME_FONT,
+  TEAM_SCENE_NAME_ROW,
+  TEAM_SCENE_NAME_STRIP
+} from './team-scene-engine-names'
 import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-tone'
 
 /** The desktop stage's height (TEAM_SCENE_ART_HEIGHT), held until the page says its own. */
@@ -26,22 +37,24 @@ const HTML = `<!DOCTYPE html>
   #wrap { position: relative; }
   #stage { display: block; width: 100%; }
   #overlay { position: absolute; inset: 0; pointer-events: none; }
-  .bubble { position: absolute; box-sizing: border-box; padding: 3px 8px; border-radius: 8px;
+  /* Why a border, not padding: overflow clips at the padding box, so padding showed a cut line. */
+  .bubble { position: absolute; box-sizing: border-box; padding: 0 8px; border-radius: 8px;
+    border: solid transparent; border-width: 3px 0;
     background: #f4f4f5; color: #18181b; font: 500 11px/14px -apple-system, system-ui, sans-serif;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     white-space: pre-line; overflow-wrap: anywhere; }
+  #names { position: relative; height: ${TEAM_SCENE_NAME_STRIP}px; }
+  .name { position: absolute; box-sizing: border-box; padding: 0 4px; color: #eef0f4; text-align: center;
+    font: ${TEAM_SCENE_NAME_FONT}; line-height: ${TEAM_SCENE_NAME_ROW}px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
-<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div></div>
+<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div><div id="names"></div></div>
 <script>${TEAM_SCENE_ENGINE_JS}</script>
 </body>
 </html>`
 
-type PageEvent =
-  | { kind: 'loaded' }
-  | { kind: 'ready'; height: number }
-  | { kind: 'artFailed' }
-  | { kind: 'error'; message: string }
+type PageEvent = { kind: 'loaded' } | TeamSceneEngineEvent
 
 const pageEventOf = (data: string): PageEvent | null => {
   try {
@@ -78,11 +91,20 @@ function imagesOf(art: TeamSceneArtPick, ownArt: TeamSceneArtLoad | null): Recor
 function StageBand({
   band,
   ownArt,
-  leadLine
+  leadLine,
+  advisorName,
+  shown,
+  onLayout,
+  onBroken
 }: {
   band: Extract<Band, { kind: 'stage' }>
   ownArt: TeamSceneArtLoad | null
   leadLine: string | null
+  advisorName: string
+  shown: boolean
+  onLayout?: (event: LayoutChangeEvent) => void
+  /** The stage stopped drawing, so the sheet shows the names instead. */
+  onBroken: () => void
 }) {
   const ref = useRef<WebView>(null)
   const tones = useTeamTones()
@@ -106,7 +128,15 @@ function StageBand({
     // Why by text: every 20 s poll hands a new band, and a new stage re-decodes megabytes of art.
     [stageKey]
   )
-  const inputKey = JSON.stringify([band.input, leadLine])
+  const inputKey = JSON.stringify([band.input, leadLine, advisorName])
+  const run = useAppInForeground() && shown
+  const reduced = useReducedMotionEnabled()
+  // Why before the stage: a page that loads with the app in the background must not start frames.
+  useEffect(() => {
+    if (loaded > 0) {
+      ref.current?.injectJavaScript(scriptOf({ kind: 'motion', run, reduced }))
+    }
+  }, [loaded, run, reduced])
   useEffect(() => {
     if (loaded > 0 && !waitsForArt) {
       ref.current?.injectJavaScript(scriptOf({ kind: 'stage', stage }))
@@ -114,13 +144,16 @@ function StageBand({
   }, [loaded, waitsForArt, stage])
   useEffect(() => {
     if (loaded > 0 && !waitsForArt) {
-      ref.current?.injectJavaScript(scriptOf({ kind: 'input', input: band.input, leadLine }))
+      ref.current?.injectJavaScript(
+        scriptOf({ kind: 'input', input: band.input, leadLine, advisorName })
+      )
     }
   }, [loaded, waitsForArt, stage, inputKey])
   return (
     <View
       testID="team-scene-band"
       style={[styles.band, { height }]}
+      onLayout={onLayout}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
@@ -143,6 +176,8 @@ function StageBand({
             setHeight(page.height)
           } else if (page?.kind === 'artFailed') {
             setFailed(true)
+          } else if (page?.kind === 'error') {
+            onBroken()
           }
         }}
       />
@@ -152,10 +187,12 @@ function StageBand({
 
 function ReadableBand({
   leadName,
-  members
+  members,
+  onLayout
 }: {
   leadName: string | null
   members: TeamMemberRow[]
+  onLayout?: (event: LayoutChangeEvent) => void
 }) {
   const tones = useTeamTones()
   const names = [
@@ -167,7 +204,7 @@ function ReadableBand({
     }))
   ]
   return (
-    <View testID="team-scene-band" style={[styles.band, styles.readable]}>
+    <View testID="team-scene-band" style={[styles.band, styles.readable]} onLayout={onLayout}>
       {names.map((one) => (
         <View key={one.key} style={styles.chip}>
           <View style={[styles.dot, { backgroundColor: one.tone }]} />
@@ -186,7 +223,10 @@ export function TeamSceneBand({
   ownArt,
   leadLine,
   leadName,
-  members
+  advisorName,
+  members,
+  shown = true,
+  onLayout
 }: {
   band: Band
   /** The scene file's images, for a stage drawn in a scene's own art. */
@@ -194,12 +234,27 @@ export function TeamSceneBand({
   /** The lead's bubble; null shows none. */
   leadLine: string | null
   leadName: string | null
+  /** The advisor's name on its card, for its label under the stage. */
+  advisorName: string
   members: TeamMemberRow[]
+  /** False while the sheet is scrolled past the band, so its stage runs no frames unseen. */
+  shown?: boolean
+  onLayout?: (event: LayoutChangeEvent) => void
 }) {
-  return band.kind === 'stage' ? (
-    <StageBand band={band} ownArt={ownArt} leadLine={leadLine} />
+  // Why for the band's life: a stage that threw once would only throw again; reopening retries it.
+  const [broken, setBroken] = useState(false)
+  return band.kind === 'stage' && !broken ? (
+    <StageBand
+      band={band}
+      ownArt={ownArt}
+      leadLine={leadLine}
+      advisorName={advisorName}
+      shown={shown}
+      onLayout={onLayout}
+      onBroken={() => setBroken(true)}
+    />
   ) : (
-    <ReadableBand leadName={leadName} members={members} />
+    <ReadableBand leadName={leadName} members={members} onLayout={onLayout} />
   )
 }
 

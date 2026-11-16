@@ -12,11 +12,12 @@ on:
       # Why: the mobile terminal link parsers are conformance-tested against
       # these shared fixtures; desktop-side fixture edits must re-run this suite.
       - 'src/shared/terminal-file-link-conformance.ts'
-      # Why: the app and the Team scene WebView engine bundle these desktop files.
+      # Why: the app and the Team scene WebView engine bundle these desktop files
+      # (team-scene-engine-ci-paths.test.ts checks the list against the bundle).
       - 'src/shared/**'
       - 'src/renderer/src/components/team-scene/**'
       - 'src/renderer/src/assets/quest-art/**'
-      - 'resources/claude-plugins/orca-game/hooks/hd-daylight.ts'
+      - 'resources/claude-plugins/orca-game/hooks/**'
 
 permissions:
   contents: read

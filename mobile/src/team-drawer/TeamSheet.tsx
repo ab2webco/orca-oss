@@ -26,6 +26,7 @@ import { TeamPrsTab } from './TeamPrsTab'
 import { teamWorkWordsOf } from './team-work-words'
 import { TeamLevelRow } from './TeamLevelRow'
 import { TeamSceneBand } from './TeamSceneBand'
+import { useTeamSceneBandShown } from './use-team-scene-band-shown'
 import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
 import { teamControlWordsOf } from './team-control-words'
 import { TeamTonesProvider } from './team-status-tone'
@@ -99,6 +100,7 @@ export function TeamSheet({
   )
   const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
   const { scrollY } = drag
+  const sceneBand = useTeamSceneBandShown(scrollY)
   // Why: a keyed tab remounts its ScrollView at the top without a scroll event to say so.
   useEffect(() => {
     scrollY.value = 0
@@ -178,7 +180,10 @@ export function TeamSheet({
                         ownArt={team.sceneArt}
                         leadLine={view.lead ? teamSceneLeadLineOf(view.lead, words) : null}
                         leadName={view.lead?.name ?? null}
+                        advisorName={words.advisorName}
                         members={view.members}
+                        shown={sceneBand.shown}
+                        onLayout={sceneBand.onLayout}
                       />
                     ) : null}
                     {team.level ? <TeamLevelRow level={team.level} words={words} /> : null}

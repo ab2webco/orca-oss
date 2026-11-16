@@ -271,6 +271,13 @@ describe('TeamSheet', () => {
     }
   })
 
+  it('mounts no stage while the sheet rests at its peek, so no frame runs unseen', () => {
+    render(teamWith({ questions: [] }, leader, gamePanel('pixel')), false)
+    expect(container.querySelector('[data-testid="team-scene-band"]')).toBeNull()
+    show(teamWith({ questions: [] }, leader, gamePanel('pixel')))
+    expect(container.querySelector('[data-testid="team-scene-webview"]')).not.toBeNull()
+  })
+
   it('shows the readable band, names in place of art, for a host that sends no panel', () => {
     show(teamWith({ questions: [] }, leader))
     const band = container.querySelector<HTMLElement>('[data-testid="team-scene-band"]')

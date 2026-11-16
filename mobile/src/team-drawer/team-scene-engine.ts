@@ -36,6 +36,7 @@ import { OFFICE_BACK_SEAT } from '../../../src/renderer/src/components/team-scen
 import type { TeamScenePainter } from '../../../src/renderer/src/components/team-scene/team-scene-painter'
 import { createPixelPainter } from '../../../src/renderer/src/components/team-scene/team-scene-pixel-painter'
 import { teamScenePixelSceneOf } from '../../../src/renderer/src/components/team-scene/team-scene-pixel-scene'
+import { createTeamSceneNameStrip, TEAM_SCENE_NAME_STRIP } from './team-scene-engine-names'
 import type {
   TeamSceneEngineEvent,
   TeamSceneEngineMessage,
@@ -56,10 +57,6 @@ export const teamSceneQuestNativeOf = (
   style: 'figures' | 'office'
 ): OrchestratorGameSceneNativeStyle => orchestratorGameSceneNativeOf(questArt).native![style]!
 
-const NAME_FONT = '600 10px -apple-system, system-ui, sans-serif'
-const NAME_MAX = 64
-// Why below the feet: names over the heads would sit where the bubbles and alert marks go.
-const NAME_GAP = 3
 const BUBBLE_MAX = 200
 const ANCHOR_STEP_PX = 4
 
@@ -94,63 +91,13 @@ function painterOf(
   })
 }
 
-const ellipsized = (g: CanvasRenderingContext2D, name: string): string => {
-  if (g.measureText(name).width <= NAME_MAX) {
-    return name
-  }
-  let cut = name
-  while (cut.length > 1 && g.measureText(`${cut}…`).width > NAME_MAX) {
-    cut = cut.slice(0, -1)
-  }
-  return `${cut}…`
-}
-
-/** Each figure's name under its feet, so the phone tells who is who without hovering. */
-function drawNames(
-  g: CanvasRenderingContext2D,
-  actors: readonly TeamSceneActor[],
-  painter: TeamScenePainter,
-  width: number,
-  height: number
-): void {
-  g.font = NAME_FONT
-  g.textAlign = 'center'
-  g.textBaseline = 'top'
-  const drawn: { left: number; right: number; y: number }[] = []
-  // Why members, then the lead and advisor, then walkers: a desk's name must never lose its row
-  // to someone standing beside it or passing by.
-  const rank = (a: TeamSceneActor) => (a.pose === 'walk' ? 2 : a.role === 'member' ? 0 : 1)
-  const order = [...actors].sort((a, b) => rank(a) - rank(b))
-  for (const a of order) {
-    if (a.away) {
-      continue
-    }
-    const name = ellipsized(g, a.name)
-    const w = g.measureText(name).width + 6
-    const x = Math.min(Math.max(a.x * width, w / 2 + 1), width - w / 2 - 1)
-    const feet = painter.feetAt?.(a.depth, height) ?? height - 14
-    const top = Math.min(feet + NAME_GAP, height - 26)
-    const [left, right] = [x - w / 2, x + w / 2]
-    const free = (y: number) =>
-      !drawn.some((o) => o.left < right && left < o.right && Math.abs(o.y - y) < 13)
-    // Why a second row: at 320 pt neighbouring desks sit closer than a name is wide.
-    const y = [top, top + 13].find(free)
-    if (y === undefined) {
-      continue
-    }
-    drawn.push({ left, right, y })
-    g.fillStyle = 'rgb(10 12 16 / 0.72)'
-    g.fillRect(x - w / 2, y - 1, w, 13)
-    g.fillStyle = '#eef0f4'
-    g.fillText(name, x, y)
-  }
-}
-
 /** The desktop stage driven by the sheet's messages, painting into `canvas`. */
 export function createTeamSceneEngine(deps: {
   canvas: HTMLCanvasElement
   /** The element over the canvas that holds the speech bubbles. */
   overlay: HTMLElement
+  /** The strip under the canvas that holds the figures' names. */
+  names: HTMLElement
   width: () => number
   ratio: () => number
   reducedMotion: boolean
@@ -163,10 +110,11 @@ export function createTeamSceneEngine(deps: {
   let painter: TeamScenePainter | null = null
   let input: TeamSceneInput | null = null
   let leadLine: string | null = null
+  let advisorName = ''
   let actors: TeamSceneActor[] = []
   let bubblesKey = ''
   const bubbles = new Map<string, HTMLElement>()
-
+  const placeNames = createTeamSceneNameStrip(deps.names)
   const placeBubbles = (width: number, height: number): void => {
     const p = painter
     if (!p) {
@@ -235,9 +183,15 @@ export function createTeamSceneEngine(deps: {
     }
     const ratio = deps.ratio()
     const { height } = painter
-    if (canvas.width !== Math.round(width * ratio)) {
+    // Why the CSS height too: the page's canvas starts at the band's 176 pt, and the band shrinks to
+    // the stage's height once ready, so a shorter stage left at 176 is stretched and cut off.
+    if (
+      canvas.width !== Math.round(width * ratio) ||
+      canvas.height !== Math.round(height * ratio)
+    ) {
       canvas.width = Math.round(width * ratio)
       canvas.height = Math.round(height * ratio)
+      canvas.style.height = `${height}px`
     }
     stepTeamScene(world, dt, { width, elapsed })
     const g = canvas.getContext('2d')
@@ -260,23 +214,45 @@ export function createTeamSceneEngine(deps: {
       trophies: world.trophies,
       stopped: world.stopped
     })
-    drawNames(g, actors, painter, width, height)
+    placeNames(g, actors, width, advisorName)
     placeBubbles(width, height)
   }
 
-  const loop = createTeamSceneFrameLoop(paint, deps.scheduler)
+  let run = true
+  let reduced = deps.reducedMotion
+  let failed = false
+  // Why: a paint that throws throws again on every frame; stop, and let the sheet fall back.
+  const paintOrStop = (dt: number, elapsed = dt): void => {
+    if (failed) {
+      return
+    }
+    try {
+      paint(dt, elapsed)
+    } catch (error) {
+      failed = true
+      loop.dispose()
+      deps.post({ kind: 'error', message: String(error) })
+    }
+  }
+  const loop = createTeamSceneFrameLoop(paintOrStop, deps.scheduler)
+
+  const animate = (): void => {
+    if (!painter || !input) {
+      return
+    }
+    loop.setRunning(run && !reduced)
+    if (reduced) {
+      settleTeamScene(world)
+      paintOrStop(0)
+    }
+  }
 
   const apply = (): void => {
     if (!painter || !input) {
       return
     }
     applyTeamSceneInput(world, input, painter.layout)
-    if (deps.reducedMotion) {
-      settleTeamScene(world)
-      paint(0)
-    } else {
-      loop.setRunning(true)
-    }
+    animate()
   }
 
   return {
@@ -284,8 +260,16 @@ export function createTeamSceneEngine(deps: {
       if (message.kind === 'input') {
         input = message.input
         leadLine = message.leadLine
+        advisorName = message.advisorName
         bubblesKey = ''
         apply()
+        return
+      }
+      if (message.kind === 'motion') {
+        run = message.run
+        // Why either: both read the phone's setting, and a still stage is the safe side.
+        reduced = message.reduced || deps.reducedMotion
+        animate()
         return
       }
       const { stage } = message
@@ -302,7 +286,10 @@ export function createTeamSceneEngine(deps: {
       }
       painter?.dispose()
       painter = painterOf(stage, images)
-      deps.post({ kind: 'ready', height: painter?.height ?? TEAM_SCENE_ART_HEIGHT })
+      deps.post({
+        kind: 'ready',
+        height: (painter?.height ?? TEAM_SCENE_ART_HEIGHT) + TEAM_SCENE_NAME_STRIP
+      })
       apply()
     },
     paint,

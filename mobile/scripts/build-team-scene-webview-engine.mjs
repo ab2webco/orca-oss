@@ -20,20 +20,9 @@ const target = 'chrome74'
 
 const ENTRY = `
   import { createTeamSceneEngine } from './src/team-drawer/team-scene-engine'
+  import { installTeamSceneShims } from './src/team-drawer/team-scene-webview-shims'
 
-  // Why: the painters use these, and esbuild lowers syntax but not runtime APIs; an old WebView
-  // must still draw rather than throw on the first frame.
-  const define = (proto, name, value) => {
-    if (!proto[name]) Object.defineProperty(proto, name, { value, writable: true, configurable: true })
-  }
-  define(Array.prototype, 'at', function (i) { const n = Math.trunc(i) || 0; return this[n < 0 ? this.length + n : n] })
-  define(Array.prototype, 'findLast', function (f) { for (let i = this.length - 1; i >= 0; i--) if (f(this[i], i, this)) return this[i] })
-  define(Array.prototype, 'findLastIndex', function (f) { for (let i = this.length - 1; i >= 0; i--) if (f(this[i], i, this)) return i; return -1 })
-  define(Array.prototype, 'toSorted', function (f) { return this.slice().sort(f) })
-  define(String.prototype, 'replaceAll', function (a, b) { return typeof a === 'string' ? this.split(a).join(b) : this.replace(a, b) })
-  define(Object, 'hasOwn', (o, k) => Object.prototype.hasOwnProperty.call(o, k))
-  define(CanvasRenderingContext2D.prototype, 'roundRect', function (x, y, w, h) { this.rect(x, y, w, h) })
-
+  installTeamSceneShims()
   const canvas = document.getElementById('stage')
   const post = (event) => window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(event))
   const decode = async (url) => {
@@ -45,6 +34,7 @@ const ENTRY = `
   const engine = createTeamSceneEngine({
     canvas,
     overlay: document.getElementById('overlay'),
+    names: document.getElementById('names'),
     width: () => canvas.clientWidth,
     ratio: () => window.devicePixelRatio || 1,
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
