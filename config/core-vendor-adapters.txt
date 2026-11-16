@@ -12,6 +12,7 @@ jev resources/claude-plugins/orca-game/hooks/allies.ts -- builds Jev's ally rows
 jev resources/claude-plugins/orca-game/hooks/fleet-sync.ts -- sends the Jev report when one reads, null otherwise
 jev resources/claude-plugins/orca-game/hooks/jev-alerts.ts -- alerts from a held Jev report; empty for null
 jev resources/claude-plugins/orca-game/hooks/member-advisor.ts -- labels a member's Jev line, drawn only with a report
+jev resources/claude-plugins/orca-game/hooks/steward-router.ts -- reads Jev's router state, which catches to null; without it the steward acts
 jev resources/claude-plugins/orca-game/hooks/text-layer.tsx -- reads Jev's alerts, which are empty without a report
 jev src/cli/bundled-skill-guides.ts -- generated skill guide text that mentions Jev
 jev src/renderer/src/components/settings/use-advisor-plugin-presence.ts -- asks whether Jev's plugin is installed; missing is an answer

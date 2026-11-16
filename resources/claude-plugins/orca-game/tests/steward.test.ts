@@ -34,6 +34,7 @@ type World = {
   env?: Record<string, string>
   plan?: unknown[] | null
   haiku?: unknown
+  quota?: number
   stores?: unknown[]
 }
 type Seen = { model: string; effort: unknown; agentId?: string }
@@ -107,6 +108,17 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: [] }) as never)
   on('turn.complete', () => ({ text: 'ok' }))
+  on(
+    'session.usage',
+    () =>
+      ({
+        value: {
+          startedAt: 0,
+          context: {},
+          rateLimits: [{ kind: 'five_hour', percentUsed: world.quota ?? 10 }]
+        }
+      }) as never
+  )
   on('tool.call', (_$, e) =>
     (Reflect.get(e, 'command') as string | undefined)?.includes('fail')
       ? ({ isError: true, result: 'Exit code 1', text: 'Exit code 1' } as never)
@@ -288,5 +300,51 @@ describe('the Orca steward', () => {
     await clock.settle()
     await step($, 1)
     expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'high' })
+  })
+
+  test('a review that never edits stays on Opus: its plan starts in design', async ($, on) => {
+    const seen: Seen[] = []
+    const review = [
+      { phase: 'map', model: 'claude-sonnet-5-5', effort: 'medium', why: 'read the diff' },
+      { phase: 'design', model: 'claude-opus-5-5', effort: 'high', why: 'judge it' }
+    ]
+    const opus = { model: 'claude-opus-5-5', effort: 'high' }
+    const clock = await start($, on, { plan: review }, seen)
+    await step($, 0, opus)
+    await clock.settle()
+    await $.tool.call({ tool: 'Read', file_path: '/w/src/a.ts' } as never)
+    await step($, 1, opus)
+    expect(seen.at(-1)).toEqual(opus)
+  })
+
+  test('past 85 % of a usage window the effort drops one level, the model stays', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN, quota: 90 }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'xhigh' })
+    await $.turn.complete({
+      reason: 'answer',
+      answer: 'ok',
+      durationMs: 1,
+      isAborted: false,
+      turnId: 't1'
+    } as never)
+    await clock.settle()
+    await step($, 2)
+    expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'high' })
+  })
+
+  test('a push after editing lowers the effort, never the model the next edit runs on', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await edit($)
+    await $.tool.call({ tool: 'Bash', command: 'git push -u origin x' } as never)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'low' })
   })
 })

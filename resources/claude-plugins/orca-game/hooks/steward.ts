@@ -17,6 +17,7 @@ import {
   stewardChoiceOf,
   stewardEffortOf,
   stewardMomentOf,
+  stewardStartPhaseOf,
   withPins,
   withQuota,
   type StewardPhase,
@@ -59,7 +60,7 @@ const runtime: Runtime = {
   base: null,
   pins: { model: false, effort: false },
   pick: null,
-  track: { phase: null, failing: null },
+  track: { phase: null, failing: null, hasEdited: false },
   ticket: null,
   title: '',
   plan: null,
@@ -125,6 +126,7 @@ function decide(
     phase,
     plan: runtime.plan,
     current,
+    hasEdited: runtime.track.hasEdited,
     ...(judged ? { confidence: judged.confidence } : {})
   })
   const to = withPins(withQuota(choice.pick, runtime.quota), base, runtime.pins)
@@ -192,10 +194,10 @@ async function refreshPlan($: EngineInterface): Promise<void> {
   const isChanged = JSON.stringify(read.phases) !== JSON.stringify(runtime.plan)
   runtime.plan = read.phases
   runtime.planState = read.state
-  const phase = runtime.track.phase ?? read.phases?.[0]?.phase
+  const phase = runtime.track.phase ?? stewardStartPhaseOf(read.phases ?? [])
   if (read.state === 'none') {
     await (isFirst ? judge($) : saveRecord($))
-  } else if (phase !== undefined && (isFirst || isChanged)) {
+  } else if (phase !== null && (isFirst || isChanged)) {
     decide($, phase, 'plan')
   }
 }

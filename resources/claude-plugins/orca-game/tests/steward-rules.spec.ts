@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   stewardChoiceOf,
+  stewardStartPhaseOf,
   stewardMomentOf,
   withPins,
   withQuota,
@@ -25,7 +26,7 @@ const PLAN: StewardPlanPhase[] = [
   { phase: 'pr-ci', model: 'claude-haiku-5-5', effort: 'low', why: 'watch CI' }
 ]
 const SONNET = { model: 'claude-sonnet-5-5', effort: 'medium' } as const
-const START: StewardTrack = { phase: null, failing: null }
+const START: StewardTrack = { phase: null, failing: null, hasEdited: false }
 
 describe('stewardChoiceOf (ORCA-1242)', () => {
   it("follows the plan's phase when the plan has it", () => {
@@ -105,6 +106,29 @@ describe('stewardChoiceOf (ORCA-1242)', () => {
   })
 })
 
+describe('after the first edit', () => {
+  it('a later phase lowers only the effort, never the model below Opus 5.5', () => {
+    const opus = { model: 'claude-opus-5-5', effort: 'xhigh' } as const
+    const choice = stewardChoiceOf({ phase: 'pr-ci', plan: PLAN, current: opus, hasEdited: true })
+    expect(choice.pick).toEqual({ model: 'claude-opus-5-5', effort: 'low' })
+    expect(choice.isFloored).toBe(true)
+    const before = stewardChoiceOf({ phase: 'pr-ci', plan: PLAN, current: opus, hasEdited: false })
+    expect(before.pick.model).toBe('claude-haiku-5-5')
+  })
+})
+
+describe('stewardStartPhaseOf', () => {
+  it('a review plan starts in design, since a review never shows an edit to move it there', () => {
+    const review: StewardPlanPhase[] = [
+      { phase: 'map', model: 'claude-sonnet-5-5', effort: 'medium', why: 'read' },
+      { phase: 'design', model: 'claude-opus-5-5', effort: 'high', why: 'judge' }
+    ]
+    expect(stewardStartPhaseOf(review)).toBe('design')
+    expect(stewardStartPhaseOf(PLAN)).toBe('map')
+    expect(stewardStartPhaseOf([])).toBeNull()
+  })
+})
+
 describe('withPins', () => {
   it('keeps what Orca pinned at launch and changes only the rest', () => {
     const next = { model: 'claude-opus-5-5', effort: 'high' } as const
@@ -134,7 +158,7 @@ describe('stewardMomentOf', () => {
     expect(read.phase).toBeUndefined()
     const edit = stewardMomentOf(read.track, { tool: 'Edit', isError: false })
     expect(edit).toEqual({
-      track: { phase: 'implement', failing: null },
+      track: { phase: 'implement', failing: null, hasEdited: true },
       phase: 'implement',
       reason: 'edit'
     })
@@ -143,7 +167,7 @@ describe('stewardMomentOf', () => {
 
   it('the same test failing twice in a row is a test-fix moment, not one failure', () => {
     const test = { tool: 'Bash', command: 'pnpm vitest run src/a.test.ts', isError: true }
-    const once = stewardMomentOf({ phase: 'implement', failing: null }, test)
+    const once = stewardMomentOf({ phase: 'implement', failing: null, hasEdited: true }, test)
     expect(once.phase).toBeUndefined()
     const twice = stewardMomentOf(once.track, test)
     expect(twice).toMatchObject({ phase: 'test-fix', reason: 'test-loop' })
@@ -154,22 +178,34 @@ describe('stewardMomentOf', () => {
   })
 
   it('editing while fixing tests stays in test-fix', () => {
-    const fixing: StewardTrack = { phase: 'test-fix', failing: null }
+    const fixing: StewardTrack = { phase: 'test-fix', failing: null, hasEdited: true }
     expect(stewardMomentOf(fixing, { tool: 'Edit', isError: false }).phase).toBeUndefined()
   })
 
-  it('pushing or watching CI is pr-ci, and capture work is captures', () => {
-    const working: StewardTrack = { phase: 'implement', failing: null }
-    expect(
-      stewardMomentOf(working, { tool: 'Bash', command: 'git push -u origin x', isError: false })
-        .phase
-    ).toBe('pr-ci')
-    expect(
-      stewardMomentOf(working, { tool: 'Bash', command: 'gh pr checks 12 --watch', isError: false })
-        .phase
-    ).toBe('pr-ci')
-    expect(
-      stewardMomentOf(working, { tool: 'Read', path: '/w/tmp/shot-390.png', isError: false }).phase
-    ).toBe('captures')
+  it('pushing or watching CI is pr-ci', () => {
+    const working: StewardTrack = { phase: 'implement', failing: null, hasEdited: true }
+    const bash = (command: string) => ({ tool: 'Bash', command, isError: false })
+    expect(stewardMomentOf(working, bash('git push -u origin x')).phase).toBe('pr-ci')
+    expect(stewardMomentOf(working, bash('gh pr checks 12 --watch')).phase).toBe('pr-ci')
+    expect(stewardMomentOf(working, bash('gh run list --branch x')).phase).toBeUndefined()
+  })
+
+  it('only running a capture script, or reading a shot outside implementing, is captures', () => {
+    const reading: StewardTrack = { phase: 'map', failing: null, hasEdited: false }
+    const working: StewardTrack = { phase: 'implement', failing: null, hasEdited: true }
+    const bash = (command: string) => ({ tool: 'Bash', command, isError: false })
+    const shot = { tool: 'Read', path: '/w/tmp/shot-390.png', isError: false }
+    expect(stewardMomentOf(reading, bash('pnpm run capture:orca-game-scenes')).phase).toBe(
+      'captures'
+    )
+    expect(stewardMomentOf(reading, shot).phase).toBe('captures')
+    expect(stewardMomentOf(working, shot).phase).toBeUndefined()
+    for (const command of [
+      'ls tmp/captures-1262',
+      'git commit -m "add screenshots"',
+      'grep -rn screenshot src'
+    ]) {
+      expect(stewardMomentOf(working, bash(command)).phase).toBeUndefined()
+    }
   })
 })

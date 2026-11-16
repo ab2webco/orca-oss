@@ -33,7 +33,8 @@ export type StewardDecision = {
 /** The why a decision carries when no plan or judgment gives one; the card words it in PR 3. */
 export const STEWARD_MOMENT_WHY: Readonly<Record<StewardDecision['moment'], string>> = {
   plan: "the lead's plan for this phase",
-  edit: 'editing code, from the next step on',
+  // Why both: the engine sends a new effort only on a step with input, so it lands on the next turn.
+  edit: 'editing code: the model from the next step, the effort from the next turn',
   'test-loop': 'the same test failed twice',
   'pr-ci': 'watching the PR and CI',
   captures: 'taking or reading captures',

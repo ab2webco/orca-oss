@@ -59,12 +59,16 @@ const higherOf = (a: StewardPick, b: StewardPick): StewardPick => ({
 
 export type StewardChoice = { pick: StewardPick; source: 'plan' | 'default'; isFloored: boolean }
 
-/** The phase's planned pick, else the kind table's; a judgment under 0.7 only raises; floors last. */
+/**
+ * The phase's planned pick, else the kind table's; a judgment under 0.7 only raises; floors last.
+ * Why the floor after an edit: a lower model would write the next edit before a moment raised it.
+ */
 export function stewardChoiceOf(input: {
   phase: StewardPhase
   plan: readonly StewardPlanPhase[] | null
   current: StewardPick
   confidence?: number
+  hasEdited?: boolean
 }): StewardChoice {
   const planned = input.plan?.find((one) => one.phase === input.phase)
   const base = planned ?? PHASE_DEFAULTS[input.phase]
@@ -72,12 +76,19 @@ export function stewardChoiceOf(input: {
   if (input.confidence !== undefined && input.confidence < SURE) {
     pick = higherOf(input.current, pick)
   }
-  const isFloored = FLOORED.has(input.phase) && modelRankOf(pick.model) < modelRankOf(FLOOR_MODEL)
+  const isFloorPhase = FLOORED.has(input.phase) || input.hasEdited === true
+  const isFloored = isFloorPhase && modelRankOf(pick.model) < modelRankOf(FLOOR_MODEL)
   return {
     pick: isFloored ? { ...pick, model: FLOOR_MODEL } : pick,
     source: planned ? 'plan' : 'default',
     isFloored
   }
+}
+
+/** Where a plan starts; a review plan starts in design, since a review shows no edit to move it. */
+export function stewardStartPhaseOf(plan: readonly StewardPlanPhase[]): StewardPhase | null {
+  const has = (phase: StewardPhase) => plan.some((one) => one.phase === phase)
+  return has('design') && !has('implement') ? 'design' : (plan[0]?.phase ?? null)
 }
 
 /** What Orca pinned at launch (`--model`, `--effort`, orca.yaml) stays as it is. */
@@ -98,7 +109,11 @@ export function withQuota(pick: StewardPick, percentUsed: number): StewardPick {
     : { ...pick, effort: STEWARD_EFFORTS[rank - 1] ?? pick.effort }
 }
 
-export type StewardTrack = { phase: StewardPhase | null; failing: string | null }
+export type StewardTrack = {
+  phase: StewardPhase | null
+  failing: string | null
+  hasEdited: boolean
+}
 export type StewardToolCall = { tool: string; command?: string; path?: string; isError: boolean }
 export type StewardMomentReason = 'edit' | 'test-loop' | 'pr-ci' | 'captures'
 export type StewardMoment = {
@@ -110,8 +125,9 @@ export type StewardMoment = {
 const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const TEST_COMMAND =
   /\b(?:vitest|jest|pytest|mocha|playwright test|go test|cargo test|(?:npm|pnpm|yarn|bun)(?: run)? test)\b/
-const PR_CI_COMMAND = /\b(?:git push|gh pr (?:create|checks)|gh run (?:watch|view|list))\b/
-const CAPTURE_COMMAND = /\b(?:screenshots?|captures?)\b/i
+const PR_CI_COMMAND = /\b(?:git push|gh pr (?:create|checks)|gh run (?:watch|view))\b/
+// Why a script, not the word: `ls tmp/captures-1262` or a commit message is no capture work.
+const CAPTURE_COMMAND = /\b(?:(?:npm|pnpm|yarn|bun) (?:run )?capture[:\w-]*|screencapture)\b/
 const IMAGE_PATH = /\.(?:png|jpe?g|webp)$/i
 
 const moved = (
@@ -139,11 +155,14 @@ export function stewardMomentOf(track: StewardTrack, call: StewardToolCall): Ste
   if (call.tool === 'Bash' && command !== undefined && CAPTURE_COMMAND.test(command)) {
     return moved(track, 'captures', 'captures')
   }
-  if (call.tool === 'Read' && call.path !== undefined && IMAGE_PATH.test(call.path)) {
+  const isEditing = track.phase === 'implement' || track.phase === 'test-fix'
+  // Why not while editing: checking a shot of the change is part of implementing it.
+  if (call.tool === 'Read' && !isEditing && call.path !== undefined && IMAGE_PATH.test(call.path)) {
     return moved(track, 'captures', 'captures')
   }
-  if (EDIT_TOOLS.has(call.tool) && track.phase !== 'implement' && track.phase !== 'test-fix') {
-    return moved(track, 'implement', 'edit')
+  if (EDIT_TOOLS.has(call.tool)) {
+    const edited = { ...track, hasEdited: true }
+    return isEditing ? { track: edited } : moved(edited, 'implement', 'edit')
   }
   return { track }
 }
