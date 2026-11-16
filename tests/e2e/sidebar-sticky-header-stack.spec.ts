@@ -26,6 +26,9 @@ type StackProbe = {
 }
 
 const M1 = 'e2e-sticky-host'
+// Why 7 px: a handoff between headers lasts a few pixels, so a coarser step can miss it.
+const SWEEP_STEP_PX = 7
+const SWEEP_CHUNK_PX = 280
 
 // Why recent: an idle project folds to one row (ORCA-1216); this stack needs every row drawn.
 const recentProjects = (prefix: string, count: number): SeededHostRepo[] =>
@@ -137,6 +140,8 @@ async function countPixelsRowsPaintInStack(page: Page): Promise<number> {
 test('the pinned host card and project header stack with nothing between or through them', async ({
   orcaPage
 }, testInfo) => {
+  // Why: about 250 offsets at two frames each, and a CI frame takes ~0.25 s.
+  test.setTimeout(360_000)
   await waitForSessionReady(orcaPage)
   await waitForActiveWorktree(orcaPage)
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
@@ -160,16 +165,35 @@ test('the pinned host card and project header stack with nothing between or thro
   const failures: { scrollTop: number; probe: StackProbe }[] = []
   let pinnedOffsets = 0
   await installStackProbe(orcaPage)
-  // Why in-page: a round trip per offset outlasted the test timeout on the CI runner.
-  const sweep = await viewport.evaluate(async (element, max) => {
-    const probes: { scrollTop: number; probe: StackProbe | null }[] = []
-    for (let top = 0; top <= max; top += 7) {
-      element.scrollTop = top
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-      probes.push({ scrollTop: top, probe: (window as ProbeWindow).__e2eProbeStack?.() ?? null })
-    }
-    return probes
-  }, overflow)
+  // Why chunks: the CI runner paints a frame in ~0.25 s, so a timeout must still say how far the sweep got.
+  const chunks: { from: number; offsets: number; ms: number }[] = []
+  const sweep: { scrollTop: number; probe: StackProbe | null }[] = []
+  for (let from = 0; from <= overflow; from += SWEEP_CHUNK_PX) {
+    const chunk = await viewport.evaluate(
+      async (element, [start, end, step]) => {
+        const began = performance.now()
+        const probes: { scrollTop: number; probe: StackProbe | null }[] = []
+        for (let top = start; top < end; top += step) {
+          element.scrollTop = top
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          )
+          probes.push({
+            scrollTop: top,
+            probe: (window as ProbeWindow).__e2eProbeStack?.() ?? null
+          })
+        }
+        return { probes, ms: Math.round(performance.now() - began) }
+      },
+      [from, Math.min(from + SWEEP_CHUNK_PX, overflow + 1), SWEEP_STEP_PX] as const
+    )
+    sweep.push(...chunk.probes)
+    chunks.push({ from, offsets: chunk.probes.length, ms: chunk.ms })
+    testInfo.annotations.push({ type: 'sweep chunk', description: JSON.stringify(chunks.at(-1)) })
+  }
+  expect(sweep.at(-1)?.scrollTop, 'the sweep stopped before the end of the list').toBeGreaterThan(
+    overflow - SWEEP_STEP_PX
+  )
   for (const { scrollTop, probe } of sweep) {
     if (!probe) {
       continue

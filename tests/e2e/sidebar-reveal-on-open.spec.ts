@@ -364,6 +364,31 @@ test('opening a terminal brings its row into view without taking focus (ORCA-119
   }
 })
 
+/** Where a reveal that never landed left the list: scroll, pending request, row box, and what covers it. */
+async function revealMissProbe(page: Page, worktreeId: string): Promise<unknown> {
+  return page.evaluate((id) => {
+    const scroller = document.querySelector<HTMLElement>('[data-worktree-sidebar]')
+    const view = scroller?.getBoundingClientRect()
+    const row = scroller
+      ? [...scroller.querySelectorAll<HTMLElement>('[data-worktree-id]')].find(
+          (candidate) => candidate.dataset.worktreeId === id
+        )
+      : undefined
+    const box = row?.getBoundingClientRect()
+    const state = window.__store!.getState()
+    return {
+      scrollTop: scroller?.scrollTop,
+      scrollHeight: scroller?.scrollHeight,
+      clientHeight: scroller?.clientHeight,
+      view: view ? [Math.round(view.top), Math.round(view.bottom)] : null,
+      row: box ? [Math.round(box.top), Math.round(box.bottom)] : null,
+      pending: state.pendingRevealWorktree ?? null,
+      mountedRows: scroller?.querySelectorAll('[data-worktree-virtual-row]').length ?? 0,
+      setupCard: Boolean(document.querySelector('[data-setup-script-prompt-layer]'))
+    }
+  }, worktreeId)
+}
+
 /** The restored session's active workspace, as the renderer sees it. */
 async function activeWorkspace(page: Page): Promise<string | null> {
   return page.evaluate(() => {
@@ -417,6 +442,18 @@ test('a restore reveals the active workspace and names it on the Retomar strip',
       const name = worktree.displayName || worktree.branch.replace(/^refs\/heads\//, '')
       return { repoId: repo.id, display: `${repo.displayName} · ${name}` }
     }, targetId)
+    // Why: the repo's detected-setup card opens late on a slow runner and shrinks the list under a landed reveal.
+    await page.evaluate(
+      (id) => window.__store!.getState().dismissSetupScriptPrompt(`local\0${id}`),
+      repoId
+    )
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          async () => (await window.api.ui.get()).setupScriptPromptDismissedRepoIds ?? []
+        )
+      )
+      .toHaveLength(1)
     const [repoKey] = await hideTargets(page, [`[data-repo-header-id="${repoId}"]`])
     expect(await rowFolded(page, targetId)).toBe(true)
     await expect.poll(() => activeWorkspace(page)).toBe(targetId)
@@ -474,7 +511,16 @@ test('a restore reveals the active workspace and names it on the Retomar strip',
           (id) => window.__store!.getState().revealWorktreeInSidebar(id, { behavior: 'auto' }),
           targetId
         )
-        await expect.poll(() => rowInView(page, targetId), { message: where }).toBe(true)
+        try {
+          await expect.poll(() => rowInView(page, targetId), { message: where }).toBe(true)
+        } catch (error) {
+          // Why: this miss has only shown on the CI runner; keep the state it left in the report.
+          testInfo.annotations.push({
+            type: 'reveal miss',
+            description: JSON.stringify(await revealMissProbe(page, targetId))
+          })
+          throw error
+        }
         await page.mouse.move(width - 5, 700)
         await page.screenshot({
           animations: 'disabled',
