@@ -47,45 +47,54 @@ async function seedTwoHosts(page: Page): Promise<void> {
   await setSeededHostConnection(page, M1, 'connected')
 }
 
-async function probeStack(page: Page): Promise<StackProbe | null> {
-  return page.evaluate(() => {
-    const pinned = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-worktree-sticky-header-active]')
-    )
-    const host = pinned.find((element) => element.querySelector('[data-host-header-drag-id]'))
-    const group = pinned.find((element) => element !== host)
-    if (!host || !group) {
-      return null
-    }
-    const hostRect = host.getBoundingClientRect()
-    const groupRect = group.getBoundingClientRect()
-    const leaks: { x: number; y: number; row: string }[] = []
-    // Why from the scroll root's top: a row can also peek out above the pinned host card.
-    const scrollRoot = document.querySelector<HTMLElement>('[data-worktree-sidebar]')
-    const top = Math.min(hostRect.top, scrollRoot?.getBoundingClientRect().top ?? hostRect.top)
-    for (const fraction of [0.1, 0.3, 0.5, 0.7, 0.9]) {
-      const x = groupRect.left + groupRect.width * fraction
-      for (let y = Math.ceil(top) + 1; y < groupRect.bottom - 1; y += 1) {
-        const hit = document.elementFromPoint(x, y)
-        if (!hit?.closest('[data-worktree-sticky-header-active]')) {
-          const row = hit?.closest<HTMLElement>('[data-worktree-virtual-row]')
-          leaks.push({ x, y, row: row?.dataset.worktreeVirtualRowKey ?? hit?.tagName ?? 'none' })
+type ProbeWindow = Window & { __e2eProbeStack?: () => StackProbe | null }
+
+// Why installed once: the sweep runs inside the page, so one round trip covers every offset.
+async function installStackProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    ;(window as ProbeWindow).__e2eProbeStack = () => {
+      const pinned = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-worktree-sticky-header-active]')
+      )
+      const host = pinned.find((element) => element.querySelector('[data-host-header-drag-id]'))
+      const group = pinned.find((element) => element !== host)
+      if (!host || !group) {
+        return null
+      }
+      const hostRect = host.getBoundingClientRect()
+      const groupRect = group.getBoundingClientRect()
+      const leaks: { x: number; y: number; row: string }[] = []
+      // Why from the scroll root's top: a row can also peek out above the pinned host card.
+      const scrollRoot = document.querySelector<HTMLElement>('[data-worktree-sidebar]')
+      const top = Math.min(hostRect.top, scrollRoot?.getBoundingClientRect().top ?? hostRect.top)
+      for (const fraction of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        const x = groupRect.left + groupRect.width * fraction
+        for (let y = Math.ceil(top) + 1; y < groupRect.bottom - 1; y += 1) {
+          const hit = document.elementFromPoint(x, y)
+          if (!hit?.closest('[data-worktree-sticky-header-active]')) {
+            const row = hit?.closest<HTMLElement>('[data-worktree-virtual-row]')
+            leaks.push({ x, y, row: row?.dataset.worktreeVirtualRowKey ?? hit?.tagName ?? 'none' })
+          }
         }
       }
-    }
-    const alphas = [host, group].map((element) => {
-      const match = getComputedStyle(element).backgroundColor.match(/rgba?\(([^)]+)\)/)
-      const parts = match ? match[1].split(/[\s,/]+/).filter(Boolean) : []
-      return parts.length === 4 ? Number(parts[3]) : match ? 1 : 0
-    })
-    return {
-      pinned: pinned.length,
-      hostBottom: hostRect.bottom,
-      groupTop: groupRect.top,
-      alphas,
-      leaks
+      const alphas = [host, group].map((element) => {
+        const match = getComputedStyle(element).backgroundColor.match(/rgba?\(([^)]+)\)/)
+        const parts = match ? match[1].split(/[\s,/]+/).filter(Boolean) : []
+        return parts.length === 4 ? Number(parts[3]) : match ? 1 : 0
+      })
+      return {
+        pinned: pinned.length,
+        hostBottom: hostRect.bottom,
+        groupTop: groupRect.top,
+        alphas,
+        leaks
+      }
     }
   })
+}
+
+async function probeStack(page: Page): Promise<StackProbe | null> {
+  return page.evaluate(() => (window as ProbeWindow).__e2eProbeStack?.() ?? null)
 }
 
 // Pixels inside the pinned stack that change when every unpinned row is hidden: rows painting
@@ -150,12 +159,18 @@ test('the pinned host card and project header stack with nothing between or thro
   // Why a sweep: a handoff between headers lasts a few pixels, so one offset can miss it.
   const failures: { scrollTop: number; probe: StackProbe }[] = []
   let pinnedOffsets = 0
-  for (let scrollTop = 0; scrollTop <= overflow; scrollTop += 7) {
-    await viewport.evaluate(async (element, top) => {
+  await installStackProbe(orcaPage)
+  // Why in-page: a round trip per offset outlasted the test timeout on the CI runner.
+  const sweep = await viewport.evaluate(async (element, max) => {
+    const probes: { scrollTop: number; probe: StackProbe | null }[] = []
+    for (let top = 0; top <= max; top += 7) {
       element.scrollTop = top
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    }, scrollTop)
-    const probe = await probeStack(orcaPage)
+      probes.push({ scrollTop: top, probe: (window as ProbeWindow).__e2eProbeStack?.() ?? null })
+    }
+    return probes
+  }, overflow)
+  for (const { scrollTop, probe } of sweep) {
     if (!probe) {
       continue
     }
