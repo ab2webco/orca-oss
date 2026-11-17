@@ -3,6 +3,7 @@ import type {
   TeamPrRow,
   TeamQueueEntry
 } from '../../../src/shared/team-panel-model-types'
+import type { TeamMachineWarning } from '../../../src/shared/team-machine-board'
 import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 type Words = {
@@ -31,8 +32,15 @@ type Words = {
   unknownNote: string
   running: (count: number) => string
   runningOfCap: (count: number, cap: number) => string
-  memoryUsed: (percent: number) => string
+  used: (label: string, percent: number) => string
   memoryFree: (free: string, total: string) => string
+  warning: Record<TeamMachineWarning, string>
+  cpu: string
+  memory: string
+  disk: string
+  load: (load: string) => string
+  cores: (count: number) => string
+  slotsFree: (count: number) => string
   aloneTitle: string
   aloneText: string
 }
@@ -81,8 +89,15 @@ const WORDS: Record<SupportedUiLocale, Words> = {
       'This Orca does not say if members can start here. Update Orca Lab on this machine.',
     running: (count) => (count === 1 ? '1 agent' : `${count} agents`),
     runningOfCap: (count, cap) => `${count} of ${cap} agents`,
-    memoryUsed: (percent) => `Memory used ${percent}%`,
+    used: (label, percent) => `${label} used ${percent}%`,
     memoryFree: (free, total) => `${free} of ${total} GB free`,
+    warning: { busy: 'Busy', lowMemory: 'Low memory', lowDisk: 'Low disk' },
+    cpu: 'CPU',
+    memory: 'Memory',
+    disk: 'Disk',
+    load: (load) => `load ${load}`,
+    cores: (count) => `${count} cores`,
+    slotsFree: (count) => (count === 1 ? '1 slot free' : `${count} slots free`),
     aloneTitle: 'Only this machine',
     aloneText: 'Pair another machine to spread agents across hosts.'
   },
@@ -130,8 +145,15 @@ const WORDS: Record<SupportedUiLocale, Words> = {
       'Este Orca no dice si los miembros pueden arrancar aquí. Actualiza Orca Lab en esta máquina.',
     running: (count) => (count === 1 ? '1 agente' : `${count} agentes`),
     runningOfCap: (count, cap) => `${count} de ${cap} agentes`,
-    memoryUsed: (percent) => `Memoria usada ${percent}%`,
+    used: (label, percent) => `${label} en uso ${percent}%`,
     memoryFree: (free, total) => `${free} de ${total} GB libres`,
+    warning: { busy: 'Ocupada', lowMemory: 'Poca memoria', lowDisk: 'Poco disco' },
+    cpu: 'CPU',
+    memory: 'Memoria',
+    disk: 'Disco',
+    load: (load) => `carga ${load}`,
+    cores: (count) => `${count} núcleos`,
+    slotsFree: (count) => (count === 1 ? '1 lugar libre' : `${count} lugares libres`),
     aloneTitle: 'Solo esta máquina',
     aloneText: 'Empareja otra máquina para repartir agentes entre hosts.'
   }
