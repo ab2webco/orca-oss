@@ -1,5 +1,5 @@
 {
-  "source": "E2E run 42563987741 on 5d710a704cb; shard 8 (cancelled at its cap) from job log 128986774174; team-panel-team-tab and team-panel-work-tabs, cut off there, from runs 42534345470 and 42527729456; the ten specs that skipped there for want of Claude Code are left out until a run with it measures them",
+  "source": "E2E run 42563987741 on 5d710a704cb; shard 8 (cancelled at its cap) from job log 128986774174; team-panel-team-tab and team-panel-work-tabs, cut off there, from runs 42534345470 and 42527729456; the ten specs that skipped there for want of Claude Code are left out until a run with it measures them; team-panel-action-dock from merge-queue run 44119435559 after ORCA-1262 rewrote it",
   "seconds": {
     "tests/e2e/active-view-restart-restore.spec.ts": 19,
     "tests/e2e/activity-agent-pane-isolation.spec.ts": 111,
@@ -263,7 +263,7 @@
     "tests/e2e/tab-sidebar-closed-overlap.spec.ts": 31,
     "tests/e2e/tabs.spec.ts": 151,
     "tests/e2e/tasks-page.spec.ts": 95,
-    "tests/e2e/team-panel-action-dock.spec.ts": 78,
+    "tests/e2e/team-panel-action-dock.spec.ts": 80,
     "tests/e2e/team-panel-activity-final.spec.ts": 13,
     "tests/e2e/team-panel-activity.spec.ts": 258,
     "tests/e2e/team-panel-agent-questions.spec.ts": 62,
