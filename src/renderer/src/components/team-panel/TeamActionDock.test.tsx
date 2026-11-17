@@ -166,6 +166,46 @@ describe('TeamActionDock', () => {
     }
   })
 
+  it('hides a chip that stops fitting in the resize callback itself, before the frame paints', async () => {
+    let rowRight = 200
+    const rect = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        if (!this.hasAttribute('data-team-action')) {
+          return { right: rowRight } as DOMRect
+        }
+        const chips = [...(this.parentElement?.children ?? [])]
+        return { right: (chips.indexOf(this) + 1) * 60 } as DOMRect
+      })
+    const observed = new Map<Element, ResizeObserverCallback>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element): void {
+          observed.set(target, this.callback)
+        }
+        disconnect(): void {}
+      }
+    )
+    try {
+      const { container } = await render()
+      expect(container.querySelectorAll('[data-team-action][aria-hidden]')).toHaveLength(0)
+      rowRight = 100
+      // Why outside act: the browser paints right after its observers, so the hide must commit inside the callback.
+      const row = container.querySelector('[data-team-action]')!.parentElement!
+      observed.get(row)!([], {} as ResizeObserver)
+      expect(
+        [...container.querySelectorAll('[data-team-action][aria-hidden]')].map(
+          (one) => one.textContent
+        )
+      ).toEqual(['Release'])
+    } finally {
+      rect.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("holds the rest in the menu after Stop, whose Stop asks inline like the icon's", async () => {
     const { container, props } = await render()
     const controls = [

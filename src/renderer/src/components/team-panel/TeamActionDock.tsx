@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { AgentWorkingSpinner } from '@/components/AgentWorkingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -73,7 +74,8 @@ function useChipsThatFit(): [(node: HTMLDivElement | null) => void, number] {
     if (!row) {
       return
     }
-    const observer = new ResizeObserver(measure)
+    // Why flushSync: an observer's update otherwise renders after this frame paints, drawing a chip cut.
+    const observer = new ResizeObserver(() => flushSync(measure))
     observer.observe(row)
     return () => observer.disconnect()
   }, [row, measure])
