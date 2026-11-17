@@ -1,13 +1,44 @@
-/* Docs: the landing's terminal type for headings and code; colours come from scene-palette.ts. */
+/* Docs: the shared design language with the landing (ORCA-1176): Geist 400/600, mono only for
+   commands, ink as the one accent; colours come from main.css via scene-palette.ts. */
 :root {
+  --sl-font: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --sl-font-mono:
-    'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
-    monospace;
+    'Geist Mono', 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --sl-line-height: 1.6;
 }
 
 .sl-markdown-content :is(h1, h2, h3, h4),
 h1#_top,
 .site-title {
-  font-family: var(--sl-font-mono);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.sl-markdown-content :is(h1, h2),
+h1#_top {
+  letter-spacing: -0.035em;
+}
+
+.sl-markdown-content :is(h3, h4),
+.site-title {
   letter-spacing: -0.01em;
+}
+
+.sl-markdown-content code {
+  font-weight: 400;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sl-color-white);
+  outline-offset: 2px;
+}
+
+/* The current page: the surface with the ink label, as the app's sidebar marks it. */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
+  font-weight: 600;
 }

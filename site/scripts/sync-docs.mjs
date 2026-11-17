@@ -88,12 +88,22 @@ function darkVariant(repoPath) {
   return existsSync(path.join(REPO_DIR, dark)) ? dark : null
 }
 
+// A PNG's pixel size, from its IHDR chunk.
+function imageSize(repoPath) {
+  if (!repoPath.endsWith('.png')) {
+    return null
+  }
+  const header = readFileSync(path.join(REPO_DIR, repoPath)).subarray(16, 24)
+  return { width: header.readUInt32BE(0), height: header.readUInt32BE(4) }
+}
+
 function writePage(repoPath, source, route, routes) {
   const { markdown, images } = transformDoc(source, repoPath, {
     base: BASE,
     repoUrl: REPO_URL,
     routes,
-    darkVariant
+    darkVariant,
+    imageSize
   })
   const target = path.join(
     CONTENT_ROOT,

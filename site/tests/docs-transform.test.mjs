@@ -87,7 +87,7 @@ describe('transformDoc', () => {
     const out = transformDoc(
       '# T\n\n![The "Add" dialog](../assets/x/shot.png)\n\n![Other](../assets/x/other.png)\n',
       'docs/user/get-started.md',
-      { ...opts, darkVariant }
+      { ...opts, darkVariant, imageSize: () => ({ width: 1024, height: 751 }) }
     )
     assert.deepEqual(out.images, [
       'docs/assets/x/shot.png',
@@ -96,7 +96,7 @@ describe('transformDoc', () => {
     ])
     assert.match(
       out.markdown,
-      /<img class="orca-shot dark:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.png" alt="The &quot;Add&quot; dialog" loading="lazy" \/><img class="orca-shot light:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.dark.png"/
+      /<img class="orca-shot dark:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.png" alt="The &quot;Add&quot; dialog" width="512" height="376" loading="lazy" \/><img class="orca-shot light:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.dark.png"/
     )
     assert.match(out.markdown, /!\[Other\]\(\/orca-oss\/media\/docs\/assets\/x\/other.png\)/)
   })

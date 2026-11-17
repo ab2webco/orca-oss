@@ -84,8 +84,13 @@ function themedShot(line, sourcePath, opts, images) {
     return null
   }
   images.push(repoPath, dark)
+  // Why half: the capture spec shoots at 2x, so this shows the UI at its own size.
+  const size = opts.imageSize?.(repoPath)
+  const dims = size
+    ? ` width="${Math.round(size.width / 2)}" height="${Math.round(size.height / 2)}"`
+    : ''
   const img = (file, hiddenIn) =>
-    `<img class="orca-shot ${hiddenIn}:sl-hidden" src="${opts.base}/media/${file}" alt="${escapeAttr(match[1])}" loading="lazy" />`
+    `<img class="orca-shot ${hiddenIn}:sl-hidden" src="${opts.base}/media/${file}" alt="${escapeAttr(match[1])}"${dims} loading="lazy" />`
   return img(repoPath, 'dark') + img(dark, 'light')
 }
 
