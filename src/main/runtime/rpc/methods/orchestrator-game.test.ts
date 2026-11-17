@@ -52,6 +52,26 @@ describe('game.state RPC', () => {
     ])
   })
 
+  it("passes a member pane's steward report on as it came, beside or without Jev's (ORCA-1242)", async () => {
+    const calls: Record<string, unknown>[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getOrchestratorGameState: async (args: Record<string, unknown>) => {
+        calls.push(args)
+        return { config: { mode: 'on' } }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+    const steward = { version: 9, model: ['a newer shape'] }
+
+    await expect(
+      dispatcher.dispatch(request({ paneKey: 'tab:member', steward }))
+    ).resolves.toMatchObject({ ok: true })
+    await dispatcher.dispatch(request({ paneKey: 'tab:member' }))
+    expect(calls[0]).toMatchObject({ paneKey: 'tab:member', steward })
+    expect(calls[1]?.steward).toBeUndefined()
+  })
+
   it('rejects a non-string worktree id', async () => {
     const runtime = { getRuntimeId: () => 'runtime' } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })

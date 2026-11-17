@@ -12,6 +12,11 @@ import {
 
 export const STEWARD_LOG_MAX = 50
 export const STEWARD_SESSIONS_MAX = 20
+export const STEWARD_STORE_KEY = 'steward'
+/** The CLI hands it to `game.state` as `steward`; an older CLI or host ignores it. */
+export const STEWARD_REPORT_ENV = 'ORCA_GAME_STEWARD'
+// Why 10: a 30 s poll carries every decision since the last one, and main skips those it kept.
+const REPORT_DECISIONS = 10
 
 export type StewardPlanState = 'none-yet' | 'none' | 'plan'
 
@@ -52,6 +57,9 @@ export type StewardRecord = {
   standDown: 'router' | 'override' | null
   stepsSeen: number
   decisions: StewardDecision[]
+  /** Absent from a record an older mod stored. */
+  ticket?: string | null
+  pins?: { model: boolean; effort: boolean }
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -105,4 +113,26 @@ export function stewardSessionsWith(
   delete sessions[session]
   const kept = Object.entries(sessions).slice(1 - STEWARD_SESSIONS_MAX)
   return Object.fromEntries([...kept, [session, record]]) as Record<string, StewardRecord>
+}
+
+/** This session's record as Orca reads it on the state poll; null where the steward kept none. */
+export function stewardReportOf(held: unknown, session: string): string | null {
+  const record = isRecord(held) ? held[session] : undefined
+  if (!isRecord(record) || record.version !== 1 || !Array.isArray(record.decisions)) {
+    return null
+  }
+  const kept = record as StewardRecord
+  return JSON.stringify({
+    version: 1,
+    session,
+    ticket: kept.ticket ?? null,
+    model: kept.pick?.model ?? null,
+    effort: kept.pick?.effort ?? null,
+    phase: kept.phase,
+    plan: kept.planState,
+    standDown: kept.standDown,
+    pinned: kept.pins ?? { model: false, effort: false },
+    stepsSeen: kept.stepsSeen,
+    decisions: kept.decisions.slice(-REPORT_DECISIONS)
+  })
 }

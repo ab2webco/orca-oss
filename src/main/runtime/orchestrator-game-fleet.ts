@@ -14,6 +14,7 @@ import {
   type GameMemberLimit
 } from '../../shared/orchestrator-game-member-limit'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
+import type { GameMemberSteward } from '../../shared/orchestrator-game-member-steward'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { RuntimeWorktreeAgentRow } from '../../shared/runtime-types'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
@@ -121,6 +122,8 @@ export async function gameFleetOf(args: {
   screenStateOf?: GameScreenStateOf
   /** What a pane's own Jev last reported; read only for the lead and members. */
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
+  /** What a member pane's Orca steward last reported (ORCA-1242); read only for members. */
+  stewardOf?: (paneKey: string) => GameMemberSteward | null
   /** The model and effort Orca dispatched a member on; read only for members. */
   launchOf?: (paneKey: string) => GameMemberLaunch | null
   /** The lead's worktree, where a member without one of its own runs. */
@@ -193,6 +196,7 @@ export async function gameFleetOf(args: {
       const advisor =
         isMember || row.paneKey === leaderPaneKey ? (args.advisorOf?.(row.paneKey) ?? null) : null
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
+      const steward = isMember ? (args.stewardOf?.(row.paneKey) ?? null) : null
       return {
         ...agent,
         state: gameMemberStateOf(agent.state, limit),
@@ -208,6 +212,7 @@ export async function gameFleetOf(args: {
         ...(globalLogin ? { globalLogin: true as const } : {}),
         ...(limit ? { limit } : {}),
         ...(advisor ? { advisor } : {}),
+        ...(steward ? { steward } : {}),
         ...(launch ? { launch } : {}),
         ...(isMember && row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
         ...(isMember && row.stateStartedAt && !row.restoredUnconfirmed

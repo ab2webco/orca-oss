@@ -11,6 +11,10 @@ import {
   type GameMemberAdvisor
 } from './orchestrator-game-member-advisor'
 import { gameMemberLaunchOf, type GameMemberLaunch } from './orchestrator-game-member-launch'
+import {
+  parseRelayedGameMemberSteward,
+  type GameMemberSteward
+} from './orchestrator-game-member-steward'
 import { gameToolInputOf } from './orchestrator-game-tool-input'
 
 /**
@@ -35,6 +39,8 @@ export type RemoteMemberAgent = {
   toolInput?: string
   /** The Jev report the member's pane posted to its host; absent without Jev or from an older host. */
   advisor?: GameMemberAdvisor
+  /** The member pane's Orca steward report (ORCA-1242); absent from an older host. */
+  steward?: GameMemberSteward
   /** The model its hooks named, else its launch's; absent when neither named one or from an older host. */
   launch?: GameMemberLaunch
 }
@@ -72,7 +78,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   }
   const { state, agentType, updatedAt, stateStartedAt, limit, account, globalLogin } =
     value as Record<string, unknown>
-  const { toolName, toolInput, advisor, launch } = value as Record<string, unknown>
+  const { toolName, toolInput, advisor, steward, launch } = value as Record<string, unknown>
   if (
     !AGENT_STATUS_STATES.includes(state as AgentStatusState) ||
     typeof updatedAt !== 'number' ||
@@ -84,6 +90,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
   const relayed = relayedAccountOf(account)
   const relayedAdvisor = relayedAdvisorOf(advisor)
   const relayedLaunch = gameMemberLaunchOf(launch)
+  const relayedSteward = parseRelayedGameMemberSteward(steward)
   return {
     state: state as AgentStatusState,
     agentType: typeof agentType === 'string' ? agentType : null,
@@ -111,6 +118,7 @@ export function parseRemoteMemberAgent(value: unknown): RemoteMemberAgent | null
       : {}),
     ...toolInputField(toolInput),
     ...(relayedAdvisor ? { advisor: relayedAdvisor } : {}),
+    ...(relayedSteward ? { steward: relayedSteward } : {}),
     ...(relayedLaunch ? { launch: relayedLaunch } : {})
   }
 }

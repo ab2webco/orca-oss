@@ -36,6 +36,9 @@ type World = {
   haiku?: unknown
   quota?: number
   stores?: unknown[]
+  /** Set for a store that keeps what the steward writes, and the env each state poll ran with. */
+  memory?: Record<string, unknown>
+  polls?: (Record<string, string> | undefined)[]
 }
 type Seen = { model: string; effort: unknown; agentId?: string }
 
@@ -99,9 +102,12 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
-  on('store.get', () => ({ value: undefined }))
+  on('store.get', (_$, e) => ({ value: world.memory?.[e.key] }))
   on('store.set', (_$, e) => {
     world.stores?.push(e.key === 'steward' ? e.value : undefined)
+    if (world.memory) {
+      world.memory[e.key] = e.value
+    }
     return { value: undefined }
   })
   on('ui.toast', () => ({ value: undefined }))
@@ -128,8 +134,11 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
     'model.complete',
     () => ({ value: world.haiku ?? { isAnswered: false, reason: 'aborted', usage: {} } }) as never
   )
-  on('process.run', (_$, e) =>
-    e.argv.includes('plan')
+  on('process.run', (_$, e) => {
+    if (e.argv.includes('state')) {
+      world.polls?.push(e.init?.env)
+    }
+    return e.argv.includes('plan')
       ? answer({
           id: 'p',
           ok: true,
@@ -140,7 +149,7 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
           }
         })
       : answer(STATE)
-  )
+  })
   on('turn.step', async function* (_$, e) {
     yield* []
     seen.push({ model: e.model, effort: e.effort, ...(e.agentId ? { agentId: e.agentId } : {}) })
@@ -346,5 +355,54 @@ describe('the Orca steward', () => {
     await clock.settle()
     await step($, 1)
     expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'low' })
+  })
+})
+
+describe("the steward's report to Orca (ORCA-1242)", () => {
+  test('rides the state poll with its pick, plan, ticket and the edit decision', async ($, on) => {
+    const seen: Seen[] = []
+    const world: World = { plan: PLAN, memory: {}, polls: [] }
+    const clock = await start($, on, world, seen)
+    await step($, 0)
+    await clock.settle()
+    await step($, 1)
+    await edit($)
+    await clock.settle()
+    await $.turn.complete({
+      reason: 'answer',
+      answer: 'ok',
+      durationMs: 1,
+      isAborted: false,
+      turnId: 't1'
+    })
+    await clock.settle()
+    const raw = world.polls?.findLast((env) => env?.ORCA_GAME_STEWARD)?.ORCA_GAME_STEWARD
+    const report = JSON.parse(raw ?? 'null') as Record<string, unknown> & {
+      decisions: { moment: string; applied: boolean }[]
+    }
+    expect(report).toMatchObject({
+      version: 1,
+      session: 's1',
+      ticket: 'ORCA-7',
+      model: 'claude-opus-5-5',
+      effort: 'xhigh',
+      phase: 'implement',
+      plan: 'plan',
+      standDown: null,
+      pinned: { model: false, effort: false }
+    })
+    expect(report.decisions.map((one) => `${one.moment}:${String(one.applied)}`)).toEqual([
+      'plan:true',
+      'edit:true'
+    ])
+  })
+
+  test('a lead pane sends no steward report', async ($, on) => {
+    const world: World = { env: { ORCA_GAME_ROLE: 'lead' }, memory: {}, polls: [] }
+    const clock = await start($, on, world, [])
+    await step($, 0)
+    await clock.settle()
+    expect(world.polls?.length).toBeGreaterThan(0)
+    expect(world.polls?.some((env) => env?.ORCA_GAME_STEWARD)).toBe(false)
   })
 })

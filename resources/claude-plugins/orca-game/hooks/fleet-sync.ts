@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { FleetState, GameState, RecentReward } from '../types'
 import { syncActionCommands } from './action-commands'
-import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf } from './advisor-report'
+import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf, withSteward } from './advisor-report'
 import { advisorLogOf, readJevAdvisor } from './advisor-state'
 import { celebrateArcadeOnUnlock, migrateKeptArcadeOffers } from './arcade-unlock'
 import { cliInvocationOf } from './cli-invocation'
@@ -98,7 +98,7 @@ async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>>
 
 async function readState($: EngineInterface): Promise<GameState | undefined> {
   const argv = gameStateArgvOf(await $.env.get('ORCA_GAME_CLI').catch(() => undefined))
-  const out = await runCli($, argv, await advisorEnvOf($), STATE_TIMEOUT_MS)
+  const out = await runCli($, argv, await withSteward($, await advisorEnvOf($)), STATE_TIMEOUT_MS)
   return out?.exitCode === 0 ? parseGameState(out.stdout) : undefined
 }
 

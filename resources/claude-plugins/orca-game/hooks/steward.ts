@@ -6,6 +6,7 @@ import { readStewardPlan, readStewardTicket } from './steward-plan-read'
 import { routerRouteOf } from './steward-router'
 import {
   STEWARD_MOMENT_WHY,
+  STEWARD_STORE_KEY,
   stewardLogWith,
   stewardSessionsWith,
   type StewardDecision,
@@ -31,7 +32,6 @@ import {
 // since a step's rewrite lasts one step. It stands down when Jev routed or the step was overridden.
 
 const PLAN_EVERY_MS = 120_000
-const STORE_KEY = 'steward'
 const TOOL_LINES = 10
 const ANNOUNCE_TOOLS: ReadonlySet<string> = new Set(['ExitPlanMode', 'TodoWrite'])
 
@@ -89,16 +89,18 @@ const recordOf = (): StewardRecord => ({
   planState: runtime.planState,
   standDown: runtime.standDown,
   stepsSeen: runtime.stepsSeen,
-  decisions: runtime.decisions
+  decisions: runtime.decisions,
+  ticket: runtime.ticket,
+  pins: runtime.pins
 })
 
 async function saveRecord($: EngineInterface): Promise<void> {
-  const [session, held] = await Promise.all([$.session.id(), $.store.get(STORE_KEY)]).catch(
+  const [session, held] = await Promise.all([$.session.id(), $.store.get(STEWARD_STORE_KEY)]).catch(
     () => []
   )
   if (session !== undefined) {
     const sessions = stewardSessionsWith(held, session, recordOf())
-    await $.store.set(STORE_KEY, sessions).catch(() => undefined)
+    await $.store.set(STEWARD_STORE_KEY, sessions).catch(() => undefined)
   }
 }
 

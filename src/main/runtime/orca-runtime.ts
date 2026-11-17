@@ -804,6 +804,8 @@ import {
 import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
+import { GameMemberStewards } from './orchestrator-game-member-stewards'
+import { GameStewardLog } from './orchestrator-game-steward-log'
 import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 import {
   ClaudePaneLiveSessions,
@@ -3895,6 +3897,7 @@ export class OrcaRuntimeService {
     read: (paneKey) => this.keptGameMemberAdvisorFor(paneKey),
     write: (paneKey, report) => this.keepGameMemberAdvisorFor(paneKey, report)
   })
+  private readonly gameMemberStewards = new GameMemberStewards()
   // Why 90s: the band polls every few seconds, and these lists cost the user's GitHub and tracker quota.
   private readonly gameProjectWork = new GameProjectWorkCache(
     () => 90_000 * gameGitHubPollStretch()
@@ -3945,6 +3948,10 @@ export class OrcaRuntimeService {
   private readonly gameMemberSessions = new GameMemberSessionStore(
     () => join(app.getPath('userData'), 'orchestrator-game-members'),
     undefined,
+    this.gameStoreNames
+  )
+  private readonly gameStewardLog = new GameStewardLog(
+    () => join(app.getPath('userData'), 'orchestrator-game-steward'),
     this.gameStoreNames
   )
   private readonly gameDroppedAgents = new GameDroppedAgentStore(
@@ -32488,10 +32495,35 @@ export class OrcaRuntimeService {
   }
 
   // Why here: a member posts its Jev report to its own host, so a lead elsewhere sees it only relayed (ORCA-933).
-  private gameMemberModelsFor(paneKey: string): Pick<RemoteMemberAgent, 'advisor' | 'launch'> {
+  private gameMemberModelsFor(
+    paneKey: string
+  ): Pick<RemoteMemberAgent, 'advisor' | 'steward' | 'launch'> {
     const advisor = this.gameMemberAdvisors.of(paneKey, Date.now())
+    const steward = this.gameMemberStewards.of(paneKey, Date.now())
     const launch = this.gameMemberLaunchFor(paneKey)
-    return { ...(advisor ? { advisor } : {}), ...(launch ? { launch } : {}) }
+    return {
+      ...(advisor ? { advisor } : {}),
+      ...(steward ? { steward } : {}),
+      ...(launch ? { launch } : {})
+    }
+  }
+
+  // Why the log write is not awaited: a slow disk must never hold the member's 30 s poll.
+  private noteGameMemberSteward(
+    paneKey: string,
+    raw: unknown,
+    caller: { worktreeId?: string; terminalHandle?: string }
+  ): void {
+    const { steward, changed } = this.gameMemberStewards.noteReport(paneKey, raw, Date.now())
+    if (changed) {
+      this.notifier?.gameAdvisorChanged?.()
+      this.emitClientEvent({ type: 'gameAdvisorChanged' })
+    }
+    if (steward?.ticket && steward.decisions.length > 0) {
+      void this.gameBoardProjectOf(caller)
+        .then((project) => this.gameStewardLog.append(project.key, steward))
+        .catch(() => undefined)
+    }
   }
 
   /** A waiting pane's state as its terminal shows it: Claude fires no hook when a prompt ends unanswered. */
@@ -32612,6 +32644,8 @@ export class OrcaRuntimeService {
     paneKey?: string
     /** The calling pane's Jev report, kept for its lead's state. */
     advisor?: unknown
+    /** The calling member pane's Orca steward report (ORCA-1242). */
+    steward?: unknown
     /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
     role?: string
   }): Promise<OrchestratorGameState> {
@@ -32623,6 +32657,9 @@ export class OrcaRuntimeService {
       // Why: the Team panel reads every 20 s, and a new Jev line or model is news now.
       this.notifier?.gameAdvisorChanged?.()
       this.emitClientEvent({ type: 'gameAdvisorChanged' })
+    }
+    if (args.paneKey && args.steward !== undefined) {
+      this.noteGameMemberSteward(args.paneKey, args.steward, args)
     }
     const worktreesById = await this.getResolvedWorktreeMap()
     let worktreeId = args.worktreeId
@@ -32724,6 +32761,7 @@ export class OrcaRuntimeService {
       limitOf: (member) => this.gameMemberLimitFor(member),
       screenStateOf: (agent) => this.gameScreenStateFor(agent),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
+      stewardOf: (paneKey) => this.gameMemberStewards.of(paneKey, Date.now()),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
       leaderUnreported:
