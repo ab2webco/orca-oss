@@ -175,6 +175,14 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
       await expect(row('veteran')).not.toContainText('0%')
       await expect(row('veteran')).toContainText(words.unknown)
 
+      // The strip: 3 of 6 ready (atelier unregistered, veteran unknown, nas-02 offline), 5 of 17 agents.
+      const figure = (name: string) =>
+        panel.locator(`[data-team-machines-summary] [data-team-machines-figure="${name}"]`)
+      await expect(figure('ready')).toContainText(/3 (of|de) 6/)
+      await expect(figure('agents')).toContainText(/5 (of|de) 17/)
+      await expect(figure('agents')).toContainText(/6 (slots free|lugares libres)/)
+      await expect(figure('warned')).toHaveText(/1.*buildbox$/)
+
       await panel.getByRole('tab', { name: words.tab }).click()
       await orcaPage.mouse.move(0, 0)
       for (const width of CHECK_WIDTHS) {
@@ -218,6 +226,15 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
                 .map((bar) => bar.getAttribute('aria-label'))
             )
           expect.soft(flatBars, `bars with no width: ${label}`).toEqual([])
+          // Why: a long label once ran past its strip tile and was clipped, in Spanish at 1440.
+          const spilled = await panel
+            .locator('[data-team-machines-figure]')
+            .evaluateAll((figures) =>
+              figures
+                .filter((one) => one.scrollWidth > one.clientWidth)
+                .map((one) => one.getAttribute('data-team-machines-figure'))
+            )
+          expect.soft(spilled, `strip figures spill: ${label}`).toEqual([])
           if (CAPTURE_EVIDENCE) {
             await panel.screenshot({
               animations: 'disabled',

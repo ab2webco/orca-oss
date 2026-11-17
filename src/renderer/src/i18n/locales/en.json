@@ -17401,7 +17401,13 @@
       "memory": "Memory",
       "disk": "Disk",
       "cores": "{{count}} cores",
-      "load": "load {{load}}"
+      "load": "load {{load}}",
+      "ofTotal": "of {{total}}",
+      "ready": "Ready",
+      "blocked": "{{count}} can't launch",
+      "offlineCount": "{{count}} offline",
+      "agents": "Agents",
+      "busyOrLow": "Busy / low"
     },
     "activityBar": {
       "teamTitle": "Team",

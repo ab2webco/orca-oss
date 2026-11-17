@@ -16421,7 +16421,13 @@
       "memory": "Memoria",
       "disk": "Disco",
       "cores": "{{count}} núcleos",
-      "load": "carga {{load}}"
+      "load": "carga {{load}}",
+      "ofTotal": "de {{total}}",
+      "ready": "Listas",
+      "blocked": "{{count}} no pueden lanzar",
+      "offlineCount": "{{count}} sin conexión",
+      "agents": "Agentes",
+      "busyOrLow": "Ocupadas / bajas"
     },
     "activityBar": {
       "teamTitle": "Equipo",
