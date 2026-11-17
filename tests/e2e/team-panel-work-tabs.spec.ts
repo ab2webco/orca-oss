@@ -50,6 +50,9 @@ const COPY = {
   }
 } as const
 
+// Why koombea: its orca-oss is a partial clone, which never gets a remote identity (ORCA-1250).
+const KOOMBEA_REFUSAL =
+  "orca-oss on koombea has no remote identity yet, so Orca cannot tell whether it is orca-oss's clone. See ORCA-1250."
 const CONTABO_REFUSAL =
   "orca-oss on orca-contabo names github.com/stablyai/orca, the upstream every fork of it shares, so Orca cannot tell it is orca-oss's clone. If it is, list github.com/stablyai/orca in orchestratorGame.orchestrator.memberRepos."
 
@@ -141,11 +144,18 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
         { host: 'imac', running: 0, cap: 2, status: 'unreachable' },
         // ORCA-1207: the QA's hosts that read "Free" though `game launch --on` refuses them.
         {
+          host: 'mini',
+          running: 0,
+          cap: 4,
+          ...machine(8, 32, 28, 1),
+          launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on mini' }
+        },
+        {
           host: 'koombea',
           running: 0,
           cap: 4,
           ...machine(8, 32, 28, 1),
-          launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on koombea' }
+          launch: { kind: 'refused', reason: KOOMBEA_REFUSAL }
         },
         {
           host: 'orca-contabo',
@@ -363,9 +373,12 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
           'https://github.com/o/r/pull/924'
         )
         await panel.getByRole('tab', { name: words.tabs.machines }).click()
-        const koombea = panel.locator('[data-team-machine="koombea"]')
-        await expect(koombea).toContainText(words.notRegistered)
-        await expect(koombea.locator('[data-team-machine-launch="unregistered"]')).toBeVisible()
+        const mini = panel.locator('[data-team-machine="mini"]')
+        await expect(mini).toContainText(words.notRegistered)
+        await expect(mini.locator('[data-team-machine-launch="unregistered"]')).toBeVisible()
+        await expect(
+          panel.locator('[data-team-machine="koombea"] [data-team-machine-launch="refused"]')
+        ).toHaveText(KOOMBEA_REFUSAL)
         const contabo = panel.locator('[data-team-machine="orca-contabo"]')
         await expect(contabo).toContainText(words.refused)
         await expect(contabo.locator('[data-team-machine-launch="refused"]')).toHaveText(

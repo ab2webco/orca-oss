@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameHostCapacity } from '../../../../shared/orchestrator-game-host-capacity'
+import { gameHostLaunchOf } from '../../../../shared/orchestrator-game-member-repo-scope'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { TeamPanelModel } from '../../../../shared/team-panel-model-types'
 import { teamMachinesSectionOf } from '../../../../shared/team-panel-work-tabs'
@@ -84,6 +85,22 @@ describe('TeamPanelMachinesTab launch eligibility (ORCA-1207)', () => {
     expect(row.textContent).toContain('Refused')
     expect(row.textContent).not.toContain('Free')
     expect(row.querySelector('[data-team-machine-launch="refused"]')?.textContent).toBe(REFUSAL)
+  })
+
+  it('shows in full why a partial clone with no remote identity cannot take members (ORCA-1250)', () => {
+    const lead = {
+      id: 'r',
+      displayName: 'orca-oss',
+      path: '/w',
+      remoteKey: 'github.com/ab2webco/orca-oss'
+    }
+    const partial = { id: 'h', displayName: 'orca-oss', path: '/w', remoteKey: null }
+    const launch = gameHostLaunchOf({ lead, host: 'koombea', repos: [partial] })
+    const row = rowOf(host('koombea', launch))
+    expect(row.textContent).not.toContain('Free')
+    expect(row.querySelector('[data-team-machine-launch="refused"]')?.textContent).toBe(
+      "orca-oss on koombea has no remote identity yet, so Orca cannot tell whether it is orca-oss's clone. See ORCA-1250."
+    )
   })
 
   it('keeps showing a ready host as free, with no note', () => {
