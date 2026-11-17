@@ -128,7 +128,8 @@ jobs:
     runs-on: ubuntu-latest
     # Why 45: one shard took 27.0 min against the old 30 when --shard cut the sorted list by test
     # count (ORCA-215), and shard 8 later hit 45 with the team-panel specs stacked on it (ORCA-1148).
-    # The build job now balances shards by measured duration; the cap stays as headroom.
+    # The build job now balances shards by measured duration and adds shards to keep each within 28
+    # measured minutes (ORCA-1272); the cap stays as headroom.
     timeout-minutes: 45
     strategy:
       fail-fast: false

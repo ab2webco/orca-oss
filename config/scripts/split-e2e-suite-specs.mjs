@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Plans the full E2E suite's shards for e2e.yml's e2e job, and writes the GitHub matrix to
-// $GITHUB_OUTPUT as `matrix=[{ shard_name, files }]`.
+// $GITHUB_OUTPUT as `matrix=[{ shard_name, files }]`. The shard count grows with the suite.
 //
 // Why not Playwright's --shard: it cuts the sorted list into runs of equal test count, so the
 // one-test team-panel-* specs, about 40 minutes together, all fell in shard 8 of run 42563987741,
@@ -28,6 +28,10 @@ import {
 
 export { DURATIONS_FILE, readDurations }
 export const SUITE_SHARDS = 12
+// Why 28 of the 45-minute cap: a shard runs about 6% over its tests' sum plus 2 minutes of setup,
+// and the queue wants every shard done in 35 (ORCA-1272).
+export const SUITE_BUDGET_SECONDS = 28 * 60
+const MAX_SUITE_SHARDS = 24
 const SPEC_DIR = 'tests/e2e'
 
 export function listSpecs(dir = SPEC_DIR) {
@@ -39,13 +43,20 @@ export function listSpecs(dir = SPEC_DIR) {
 }
 
 /**
- * Balances the suite by measured seconds; see measuredSecondsOf for specs the record lacks.
+ * Balances the suite by measured seconds over the fewest shards, from minShards up, that keep each
+ * within the budget; see measuredSecondsOf for specs the record lacks.
  * @param {string[]} files
- * @param {{ durations: Record<string, number>, sizeOf: (file: string) => number, total?: number }} options
+ * @param {{ durations: Record<string, number>, sizeOf: (file: string) => number, minShards?: number }} options
  */
-export function planSuiteShards(files, { durations, sizeOf, total = SUITE_SHARDS }) {
+export function planSuiteShards(files, { durations, sizeOf, minShards = SUITE_SHARDS }) {
   const weightOf = measuredSecondsOf(files, { durations, sizeOf })
-  return balanceByWeight(files, total, weightOf).map((shard, index) => ({
+  let total = minShards
+  let shards = balanceByWeight(files, total, weightOf)
+  while (total < MAX_SUITE_SHARDS && shards.some((shard) => shard.weight > SUITE_BUDGET_SECONDS)) {
+    total += 1
+    shards = balanceByWeight(files, total, weightOf)
+  }
+  return shards.map((shard, index) => ({
     shard_name: `${index + 1}-of-${total}`,
     files: JSON.stringify(shard.files),
     seconds: Math.round(shard.weight)
