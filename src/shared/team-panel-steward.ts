@@ -19,6 +19,8 @@ export type TeamStewardCredit = {
   kept: 'override' | 'pinned' | null
   /** Haiku could not judge, so it kept the model. */
   failed: boolean
+  /** Its pick, when the session still serves another model long after (risk 4b). */
+  notServed: string | null
 }
 
 export type TeamStewardStep = {
@@ -48,13 +50,15 @@ const latestOf = (steward: GameMemberSteward) =>
 export function teamStewardCreditOf(steward: GameMemberSteward, label: string): TeamStewardCredit {
   const latest = latestOf(steward)
   const before = latest?.applied ? teamStewardLabelOf(latest.from.model) : null
+  const notServed = steward.skipped && steward.model ? teamStewardLabelOf(steward.model) : null
   return {
     by: 'steward',
-    from: before && before !== label ? before : null,
+    from: before && before !== label && !notServed ? before : null,
     reason: latest?.moment ?? null,
     phase: steward.phase,
     kept: steward.standDown === 'override' ? 'override' : steward.pinned.model ? 'pinned' : null,
-    failed: latest?.moment === 'judged' && latest.failure !== undefined
+    failed: latest?.moment === 'judged' && latest.failure !== undefined,
+    notServed
   }
 }
 
@@ -81,6 +85,8 @@ export function teamStewardOf(steward: GameMemberSteward | undefined): { steward
 
 const ENGLISH_MOMENTS: Readonly<Record<string, string>> = {
   edit: 'editing code',
+  'high-risk': 'editing a high-risk path',
+  announce: 'the plan is approved, implementing next',
   'test-loop': 'the same test failed twice',
   'pr-ci': 'watching the PR and CI',
   captures: 'taking or reading captures',
@@ -92,6 +98,9 @@ const ENGLISH_MOMENTS: Readonly<Record<string, string>> = {
 /** The steward's credit in English, as the CLI prints it; the renderer words its own. */
 export function teamStewardCreditEnglish(credit: TeamStewardCredit): string {
   const name = TEAM_STEWARD_NAME
+  if (credit.notServed) {
+    return `picked ${credit.notServed}, not served: another plugin may skip its hooks (${name})`
+  }
   if (credit.kept === 'override') {
     return `kept the model you chose (${name})`
   }

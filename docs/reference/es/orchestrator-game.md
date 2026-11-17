@@ -1,5 +1,5 @@
 ---
-sourceHash: dccdd0512d3c79da
+sourceHash: ea57ef12661728cb
 ---
 
 # El juego orquestador de Agent Teams
@@ -272,6 +272,8 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
+  steward: # the Orca steward in each member pane
+    highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
 ```
 
 `openLinks: system` abre todos los enlaces del juego (PR, CI, ticket, actividad, los encabezados de las
@@ -297,6 +299,13 @@ Soft no es un estilo que se pueda elegir, porque nada lo dibuja: un `style: soft
 Se edita en la sección del juego del proyecto y, como valor por defecto para todos los proyectos, en
 Settings, Agents, Panel; el engranaje del panel abre la primera con equipo y la segunda sin él. Un Orca
 anterior a `panel` lo informa como ajuste desconocido y lo ignora.
+
+`steward.highRiskPaths` agrega partes de ruta a la lista de alto riesgo integrada del Orca steward
+(`migrations/`, `.github/workflows/`, `auth/`, `security/`, `crypto/`, `billing/`, `payments/`,
+`infra/`, `terraform/`); nunca la reemplaza. La primera edición de una ruta que coincide sube el
+esfuerzo del miembro a `xhigh` sobre el plan del lead, una vez por sesión; el piso de Opus 5.5 para
+editar no cambia. Se lee solo de `orca.yaml` y llega al miembro con el plan que lee (`orca game plan`).
+`orca game steward-log <ticket>` imprime las decisiones del steward para un ticket.
 
 `rewardWeights` se fusiona clave por clave como `orchestrator`: el proyecto puede bajar una recompensa
 en `orca.yaml` mientras un dev desactiva otra en el JSON de Settings del proyecto. Igual que las listas

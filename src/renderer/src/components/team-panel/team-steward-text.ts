@@ -13,6 +13,13 @@ export function teamStewardMomentText(moment: string): string {
   switch (moment) {
     case 'edit':
       return translate('teamPanel.steward.moment.edit', 'editing code')
+    case 'high-risk':
+      return translate('teamPanel.steward.moment.highRisk', 'editing a high-risk path')
+    case 'announce':
+      return translate(
+        'teamPanel.steward.moment.announce',
+        'the plan is approved, implementing next'
+      )
     case 'test-loop':
       return translate('teamPanel.steward.moment.testLoop', 'the same test failed twice')
     case 'pr-ci':
@@ -32,6 +39,13 @@ export function teamStewardMomentText(moment: string): string {
 
 /** Why the steward picked or kept the model, as the card's model choice reads it. */
 export function teamStewardCreditText(credit: TeamStewardCredit): string {
+  if (credit.notServed) {
+    return translate(
+      'teamPanel.steward.notServed',
+      'picked {{model}}, not served: another plugin may skip its hooks ({{steward}})',
+      { model: credit.notServed, steward }
+    )
+  }
   if (credit.kept === 'override') {
     return translate('teamPanel.steward.keptOverride', 'kept the model you chose ({{steward}})', {
       steward

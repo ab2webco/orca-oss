@@ -17699,7 +17699,9 @@
         "captures": "taking or reading captures",
         "quota": "a usage window is past 85 %",
         "plan": "the lead's plan",
-        "judged": "judged by Haiku"
+        "judged": "judged by Haiku",
+        "highRisk": "editing a high-risk path",
+        "announce": "the plan is approved, implementing next"
       },
       "keptOverride": "kept the model you chose ({{steward}})",
       "keptPinned": "kept the model pinned at launch ({{steward}})",
@@ -17709,7 +17711,8 @@
       "following": "Following the plan · {{phase}}",
       "deviated": "Off the plan · {{phase}}",
       "timing": "A new model applies from the next step, a new effort from the next turn.",
-      "notApplied": "not applied"
+      "notApplied": "not applied",
+      "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})"
     }
   },
   "claudeDeadHooks": {

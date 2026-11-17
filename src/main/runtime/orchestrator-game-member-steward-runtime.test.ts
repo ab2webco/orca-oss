@@ -108,3 +108,27 @@ describe("a member pane's steward report through the runtime (ORCA-1242)", () =>
     )
   })
 })
+
+describe('a steward pick the session does not serve (ORCA-1242 PR 3c, risk 4b)', () => {
+  it("is flagged on the lead's member row two minutes after the decision", async () => {
+    const { runtime } = runtimeWithMember()
+    vi.spyOn(
+      runtime as unknown as { gameMemberLaunchFor(paneKey: string): unknown },
+      'gameMemberLaunchFor'
+    ).mockReturnValue({ model: 'Sonnet 5.5', effort: 'medium', source: 'session' })
+    const at = Date.now()
+    const fresh = { ...decision, at }
+    await runtime.getOrchestratorGameState({
+      paneKey: 'tab-4:member',
+      steward: report('ORCA-12', [fresh])
+    })
+    const memberOf = async () =>
+      (await runtime.getOrchestratorGameState({ paneKey: 'tab-1:lead' })).agents.find(
+        (agent) => agent.paneKey === 'tab-4:member'
+      )?.steward
+    expect((await memberOf())?.skipped).toBeUndefined()
+    vi.spyOn(Date, 'now').mockReturnValue(at + 120_000)
+    expect((await memberOf())?.skipped).toBe(true)
+    vi.mocked(Date.now).mockRestore()
+  })
+})

@@ -258,6 +258,8 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
+  steward: # the Orca steward in each member pane
+    highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
 ```
 
 `openLinks: system` opens every game link (PR, CI, ticket, activity, the PR and To Do list
@@ -282,6 +284,13 @@ Soft is not a style to pick, because nothing draws it: a `style: soft` saved ear
 It is edited in the project's game section and, as the default for every project, in Settings,
 Agents, Panel; the panel's gear opens the first with a team and the second without one. An Orca
 older than `panel` reports it as an unknown setting and ignores it.
+
+`steward.highRiskPaths` adds path parts to the Orca steward's built-in high-risk list
+(`migrations/`, `.github/workflows/`, `auth/`, `security/`, `crypto/`, `billing/`, `payments/`,
+`infra/`, `terraform/`); it never replaces it. The first edit of a matching path raises the member's
+effort to `xhigh` over the lead's plan, once per session; the Opus 5.5 floor for edits is unchanged.
+It is read from `orca.yaml` only and reaches the member with the plan it reads (`orca game plan`).
+`orca game steward-log <ticket>` prints the steward's decisions for a ticket.
 
 `rewardWeights` merges key by key like `orchestrator`: the project can lower one reward in
 `orca.yaml` while a dev turns another off in the project's Settings JSON. Like the lists below it

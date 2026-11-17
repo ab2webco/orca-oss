@@ -1,4 +1,5 @@
 import { parseGameActions, type OrchestratorGameAction } from './orchestrator-game-actions'
+import type { GameStewardConfig } from './orchestrator-game-steward-config'
 import {
   gameMachineActionsOf,
   parseGameMachineActions,
@@ -101,6 +102,8 @@ export type OrchestratorGameLayer = Partial<OrchestratorGameConfig> &
     /** Settings' per-action changes over orca.yaml's actions, keyed by command; read only from the
      *  local layer, so old hosts keep the whole-list `actions` override. */
     machineActions?: GameMachineAction[]
+    /** The Orca steward's high-risk paths (ORCA-1242); read only from orca.yaml. */
+    steward?: GameStewardConfig
   }
 
 export type OrchestratorGameSource = 'default' | 'global' | 'project' | 'local'

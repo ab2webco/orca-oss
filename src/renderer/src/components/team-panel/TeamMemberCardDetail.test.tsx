@@ -113,7 +113,8 @@ describe('TeamMemberCardDetail', () => {
             reason: 'edit',
             phase: 'implement',
             kept: null,
-            failed: false
+            failed: false,
+            notServed: null
           }
         },
         steward: {

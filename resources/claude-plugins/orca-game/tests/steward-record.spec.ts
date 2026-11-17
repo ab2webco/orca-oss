@@ -33,13 +33,14 @@ describe('stewardPlanOf (ORCA-1242)', () => {
       stewardPlanOf(
         envelope({ ticket: 'ORCA-7', known: true, plan: { source: 'lead', kind: null, phases } })
       )
-    ).toEqual({ state: 'plan', phases })
+    ).toEqual({ state: 'plan', phases, highRiskPaths: [] })
   })
 
   it('a ticket with no plan reads as none, and output it cannot read as unknown', () => {
     expect(stewardPlanOf(envelope({ ticket: 'ORCA-7', known: true, plan: null }))).toEqual({
       state: 'none',
-      phases: null
+      phases: null,
+      highRiskPaths: []
     })
     expect(stewardPlanOf(envelope({ ticket: 'ORCA-7', known: false, plan: null }))?.state).toBe(
       'none'
@@ -168,5 +169,16 @@ describe('stewardReportOf (ORCA-1242)', () => {
     expect(stewardReportOf({ s2: record }, 's1')).toBeNull()
     expect(stewardReportOf({ s1: { ...record, version: 2 } }, 's1')).toBeNull()
     expect(stewardReportOf(undefined, 's1')).toBeNull()
+  })
+})
+
+describe("the plan answer's high-risk paths (ORCA-1242 PR 3c)", () => {
+  it('reads the paths orca.yaml adds, and none from an older Orca', () => {
+    const answer = (extra: Record<string, unknown>) =>
+      stewardPlanOf(envelope({ ticket: 'ORCA-7', known: false, plan: null, ...extra }))
+    expect(answer({ highRiskPaths: ['src/main/runtime/', 4] })?.highRiskPaths).toEqual([
+      'src/main/runtime/'
+    ])
+    expect(answer({})).toEqual({ state: 'none', phases: null, highRiskPaths: [] })
   })
 })

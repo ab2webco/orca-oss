@@ -35,6 +35,19 @@ const PHASE_DEFAULTS: Readonly<Record<StewardPhase, Required<StewardPick>>> = {
 const FLOOR_MODEL = 'claude-opus-5-5'
 const FLOORED: ReadonlySet<StewardPhase> = new Set(['implement', 'test-fix', 'design'])
 const SURE = 0.7
+const RISK_EFFORT: StewardEffort = 'xhigh'
+/** Built-in high-risk path parts; orca.yaml `orchestratorGame.steward.highRiskPaths` adds to them. */
+export const STEWARD_HIGH_RISK_PATHS: readonly string[] = [
+  'migrations/',
+  '.github/workflows/',
+  'auth/',
+  'security/',
+  'crypto/',
+  'billing/',
+  'payments/',
+  'infra/',
+  'terraform/'
+]
 const QUOTA_NEAR = 85
 
 const FAMILY_RANK: Readonly<Record<string, number>> = { haiku: 1, sonnet: 2, opus: 3, fable: 4 }
@@ -69,6 +82,8 @@ export function stewardChoiceOf(input: {
   current: StewardPick
   confidence?: number
   hasEdited?: boolean
+  /** A high-risk path was edited: implementing runs at xhigh or above. */
+  isHighRisk?: boolean
 }): StewardChoice {
   const planned = input.plan?.find((one) => one.phase === input.phase)
   const base = planned ?? PHASE_DEFAULTS[input.phase]
@@ -77,9 +92,17 @@ export function stewardChoiceOf(input: {
     pick = higherOf(input.current, pick)
   }
   const isFloorPhase = FLOORED.has(input.phase) || input.hasEdited === true
-  const isFloored = isFloorPhase && modelRankOf(pick.model) < modelRankOf(FLOOR_MODEL)
+  const isModelFloored = isFloorPhase && modelRankOf(pick.model) < modelRankOf(FLOOR_MODEL)
+  const isRiskRaise =
+    input.isHighRisk === true &&
+    (input.phase === 'implement' || input.phase === 'test-fix') &&
+    effortRankOf(pick.effort) < effortRankOf(RISK_EFFORT)
+  const isFloored = isModelFloored || isRiskRaise
   return {
-    pick: isFloored ? { ...pick, model: FLOOR_MODEL } : pick,
+    pick: {
+      model: isModelFloored ? FLOOR_MODEL : pick.model,
+      effort: isRiskRaise ? RISK_EFFORT : pick.effort
+    },
     source: planned ? 'plan' : 'default',
     isFloored
   }
@@ -113,9 +136,10 @@ export type StewardTrack = {
   phase: StewardPhase | null
   failing: string | null
   hasEdited: boolean
+  hasRiskyEdit?: boolean
 }
 export type StewardToolCall = { tool: string; command?: string; path?: string; isError: boolean }
-export type StewardMomentReason = 'edit' | 'test-loop' | 'pr-ci' | 'captures'
+export type StewardMomentReason = 'edit' | 'high-risk' | 'test-loop' | 'pr-ci' | 'captures'
 export type StewardMoment = {
   track: StewardTrack
   phase?: StewardPhase
@@ -137,8 +161,18 @@ const moved = (
 ): StewardMoment =>
   track.phase === phase ? { track } : { track: { ...track, phase }, phase, reason }
 
+// Why a path part, not a prefix: the tool's path is absolute and the list is relative to any root.
+export const isHighRiskPath = (path: string, parts: readonly string[]): boolean => {
+  const at = `/${path.replace(/\\/g, '/').replace(/^\/+/, '')}`
+  return parts.some((part) => part !== '' && at.includes(`/${part.replace(/^\/+/, '')}`))
+}
+
 /** A tool call the member just made: a key moment when it moves the member to another phase. */
-export function stewardMomentOf(track: StewardTrack, call: StewardToolCall): StewardMoment {
+export function stewardMomentOf(
+  track: StewardTrack,
+  call: StewardToolCall,
+  riskyPaths: readonly string[] = STEWARD_HIGH_RISK_PATHS
+): StewardMoment {
   const command = call.command?.trim().replace(/\s+/g, ' ')
   if (call.tool === 'Bash' && command !== undefined && TEST_COMMAND.test(command)) {
     if (!call.isError) {
@@ -162,6 +196,11 @@ export function stewardMomentOf(track: StewardTrack, call: StewardToolCall): Ste
   }
   if (EDIT_TOOLS.has(call.tool)) {
     const edited = { ...track, hasEdited: true }
+    // Why once: every later edit of the path would re-send the same raise.
+    if (!track.hasRiskyEdit && call.path !== undefined && isHighRiskPath(call.path, riskyPaths)) {
+      const phase = isEditing && track.phase ? track.phase : 'implement'
+      return { track: { ...edited, phase, hasRiskyEdit: true }, phase, reason: 'high-risk' }
+    }
     return isEditing ? { track: edited } : moved(edited, 'implement', 'edit')
   }
   return { track }

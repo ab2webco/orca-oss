@@ -805,7 +805,11 @@ import type { GameActivityCall } from '../../shared/orchestrator-game-activity'
 import { GameActivityMemory } from './orchestrator-game-activity-memory'
 import { GameMemberAdvisors } from './orchestrator-game-member-advisors'
 import { GameMemberStewards } from './orchestrator-game-member-stewards'
-import { GameStewardLog } from './orchestrator-game-steward-log'
+import {
+  isGameStewardSkipped,
+  type GameMemberSteward
+} from '../../shared/orchestrator-game-member-steward'
+import { GameStewardLog, type GameStewardLogEntry } from './orchestrator-game-steward-log'
 import { gameMemberAccountOf, isGameMemberOnGlobalLogin } from './orchestrator-game-member-account'
 import {
   ClaudePaneLiveSessions,
@@ -31888,11 +31892,20 @@ export class OrcaRuntimeService {
     terminalHandle?: string
     ticket: string
     plan?: GameEffortPlan
-  }): Promise<{ ticket: string; known: boolean; plan: GameEffortPlan | null }> {
+  }): Promise<{
+    ticket: string
+    known: boolean
+    plan: GameEffortPlan | null
+    highRiskPaths?: string[]
+  }> {
     const project = await this.gameBoardProjectOf(args)
     const ticket = args.ticket.toUpperCase()
     if (!args.plan) {
-      return { ticket, ...(await this.gameMemberSessions.effortPlanOf(project.key, ticket)) }
+      const [read, highRiskPaths] = await Promise.all([
+        this.gameMemberSessions.effortPlanOf(project.key, ticket),
+        this.gameStewardHighRiskPathsOf(args)
+      ])
+      return { ticket, ...read, ...(highRiskPaths.length > 0 ? { highRiskPaths } : {}) }
     }
     if (project.isMember) {
       throw new Error('Only the lead writes a ticket plan.')
@@ -32499,13 +32512,24 @@ export class OrcaRuntimeService {
     paneKey: string
   ): Pick<RemoteMemberAgent, 'advisor' | 'steward' | 'launch'> {
     const advisor = this.gameMemberAdvisors.of(paneKey, Date.now())
-    const steward = this.gameMemberStewards.of(paneKey, Date.now())
+    const steward = this.gameMemberStewardFor(paneKey)
     const launch = this.gameMemberLaunchFor(paneKey)
     return {
       ...(advisor ? { advisor } : {}),
       ...(steward ? { steward } : {}),
       ...(launch ? { launch } : {})
     }
+  }
+
+  private gameMemberStewardFor(paneKey: string): GameMemberSteward | null {
+    const now = Date.now()
+    const steward = this.gameMemberStewards.of(paneKey, now)
+    const served = steward ? this.gameMemberLaunchFor(paneKey) : null
+    const label = served?.source === 'session' ? served.model : null
+    const toLabel = (model: string) => gameMemberLaunchOf({ model, effort: null })?.model ?? model
+    return steward && isGameStewardSkipped(steward, label, toLabel, now)
+      ? { ...steward, skipped: true }
+      : steward
   }
 
   // Why the log write is not awaited: a slow disk must never hold the member's 30 s poll.
@@ -32524,6 +32548,31 @@ export class OrcaRuntimeService {
         .then((project) => this.gameStewardLog.append(project.key, steward))
         .catch(() => undefined)
     }
+  }
+
+  // Why the caller's own worktree: a member reads the orca.yaml it edits under.
+  private async gameStewardHighRiskPathsOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+  }): Promise<string[]> {
+    const { worktree } = await this.gameHistoryProjectOf(args).catch(() => ({ worktree: null }))
+    if (!worktree) {
+      return []
+    }
+    const connectionId = this.store?.getRepo?.(worktree.repoId)?.connectionId ?? null
+    const yaml = await readWorktreeOrcaYaml(worktree.path, connectionId).catch(() => null)
+    return yaml?.orchestratorGame?.steward?.highRiskPaths ?? []
+  }
+
+  /** A ticket's durable steward log in this project, oldest first (ORCA-1242). */
+  async gameStewardLogOf(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    ticket: string
+  }): Promise<{ ticket: string; entries: GameStewardLogEntry[] }> {
+    const project = await this.gameBoardProjectOf(args)
+    const ticket = args.ticket.toUpperCase()
+    return { ticket, entries: await this.gameStewardLog.read(project.key, ticket) }
   }
 
   /** A waiting pane's state as its terminal shows it: Claude fires no hook when a prompt ends unanswered. */
@@ -32761,7 +32810,7 @@ export class OrcaRuntimeService {
       limitOf: (member) => this.gameMemberLimitFor(member),
       screenStateOf: (agent) => this.gameScreenStateFor(agent),
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
-      stewardOf: (paneKey) => this.gameMemberStewards.of(paneKey, Date.now()),
+      stewardOf: (paneKey) => this.gameMemberStewardFor(paneKey),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
       leaderPaneKey: args.paneKey ?? null,
       leaderUnreported:

@@ -80,6 +80,15 @@ describe("a member card's Orca steward (ORCA-1242)", () => {
     )
   })
 
+  it('says when its pick is not served, with no switch shown (risk 4b)', () => {
+    const skipped = steward({ skipped: true })
+    const launch = { model: 'Sonnet 5.5', effort: 'medium', source: 'session' as const }
+    expect(gameMemberModelTextOf(agent({ steward: skipped, launch }))).toEqual({
+      model: 'Sonnet 5.5 · medium',
+      modelBy: 'picked Opus 5.5, not served: another plugin may skip its hooks (Orca steward)'
+    })
+  })
+
   it('a decision not applied shows no switch', () => {
     const kept = steward({ decisions: [decision({ applied: false })] })
     expect(teamAgentModelOf(agent({ steward: kept }))?.credit).toMatchObject({ from: null })

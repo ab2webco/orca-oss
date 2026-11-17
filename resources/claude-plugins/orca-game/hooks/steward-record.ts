@@ -4,6 +4,7 @@ import {
   type StewardEffort,
   type StewardPhase,
   type StewardPick,
+  type StewardMomentReason,
   type StewardPlanPhase
 } from './steward-rules'
 
@@ -22,7 +23,7 @@ export type StewardPlanState = 'none-yet' | 'none' | 'plan'
 
 export type StewardDecision = {
   at: number
-  moment: 'plan' | 'edit' | 'test-loop' | 'pr-ci' | 'captures' | 'judged' | 'quota' | 'stand-down'
+  moment: StewardMomentReason | 'plan' | 'announce' | 'judged' | 'quota' | 'stand-down'
   phase: StewardPhase | null
   from: StewardPick
   to: StewardPick
@@ -40,6 +41,8 @@ export const STEWARD_MOMENT_WHY: Readonly<Record<StewardDecision['moment'], stri
   plan: "the lead's plan for this phase",
   // Why both: the engine sends a new effort only on a step with input, so it lands on the next turn.
   edit: 'editing code: the model from the next step, the effort from the next turn',
+  'high-risk': 'the first edit of a high-risk path',
+  announce: "the member announced its plan: the lead's implement phase",
   'test-loop': 'the same test failed twice',
   'pr-ci': 'watching the PR and CI',
   captures: 'taking or reading captures',
@@ -78,10 +81,13 @@ const planPhaseOf = (value: unknown): StewardPlanPhase | null => {
     : null
 }
 
+export type StewardPlanRead = (
+  | { state: 'plan'; phases: StewardPlanPhase[] }
+  | { state: 'none'; phases: null }
+) & { highRiskPaths: string[] }
+
 /** `orca game plan <ticket> --json`'s answer; null when the CLI did not answer one. */
-export function stewardPlanOf(
-  stdout: string
-): { state: 'plan'; phases: StewardPlanPhase[] } | { state: 'none'; phases: null } | null {
+export function stewardPlanOf(stdout: string): StewardPlanRead | null {
   let raw: unknown
   try {
     raw = JSON.parse(stdout)
@@ -95,7 +101,12 @@ export function stewardPlanOf(
   const phases =
     isRecord(result.plan) && Array.isArray(result.plan.phases) ? result.plan.phases : []
   const read = phases.flatMap((one) => planPhaseOf(one) ?? [])
-  return read.length === 0 ? { state: 'none', phases: null } : { state: 'plan', phases: read }
+  // Why optional: an older Orca answers no paths, and the built-in list still applies.
+  const paths = Array.isArray(result.highRiskPaths) ? result.highRiskPaths : []
+  const highRiskPaths = paths.filter((one): one is string => typeof one === 'string').slice(0, 50)
+  return read.length === 0
+    ? { state: 'none', phases: null, highRiskPaths }
+    : { state: 'plan', phases: read, highRiskPaths }
 }
 
 export const stewardLogWith = (

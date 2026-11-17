@@ -79,3 +79,48 @@ describe('orca game plan', () => {
     await expect(run(client, [['ticket', 'ORCA-7']])).rejects.toThrow('Update or restart Orca Lab')
   })
 })
+
+describe('orca game steward-log (ORCA-1242)', () => {
+  const runLog = (client: RuntimeClient, flags: [string, string][]) =>
+    ORCHESTRATOR_GAME_PLAN_HANDLERS['game steward-log']({
+      flags: new Map(flags),
+      client,
+      cwd: '/r',
+      json: false
+    })
+
+  it("prints a ticket's decisions oldest first, marking one not applied", async () => {
+    const entry = {
+      at: 0,
+      moment: 'edit',
+      phase: 'implement',
+      from: { model: 'claude-sonnet-5-5', effort: 'medium' },
+      to: { model: 'claude-opus-5-5', effort: 'high' },
+      source: 'plan',
+      why: 'editing code',
+      session: 's1'
+    }
+    const { client, calls } = fakeClient({
+      ticket: 'ORCA-7',
+      entries: [
+        { ...entry, applied: true },
+        { ...entry, at: 1000, applied: false }
+      ]
+    })
+    await runLog(client, [['ticket', 'orca-7']])
+    expect(calls).toEqual([['game.stewardLog', expect.objectContaining({ ticket: 'ORCA-7' })]])
+    const lines = printed.join('\n').split('\n')
+    expect(lines[0]).toBe(
+      '1970-01-01T00:00:00.000Z edit implement claude-sonnet-5-5 medium → claude-opus-5-5 high · plan: editing code'
+    )
+    expect(lines[1]).toContain('high (not applied) · plan')
+  })
+
+  it('says so when nothing is logged, and an older Orca asks for an update', async () => {
+    await runLog(fakeClient({ ticket: 'ORCA-7', entries: [] }).client, [['ticket', 'ORCA-7']])
+    expect(printed.join('')).toContain('no decision for ORCA-7')
+    const old = fakeClient(new RuntimeClientError('method_not_found', 'no'))
+    await expect(runLog(old.client, [['ticket', 'ORCA-7']])).rejects.toThrow('steward logs')
+    await expect(runLog(old.client, [])).rejects.toThrow('orca game steward-log <ticket>')
+  })
+})

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  STEWARD_HIGH_RISK_PATHS,
+  isHighRiskPath,
   stewardChoiceOf,
   stewardStartPhaseOf,
   stewardMomentOf,
@@ -207,5 +209,50 @@ describe('stewardMomentOf', () => {
     ]) {
       expect(stewardMomentOf(working, bash(command)).phase).toBeUndefined()
     }
+  })
+})
+
+describe('a high-risk path (ORCA-1242 PR 3c)', () => {
+  const HIGH: StewardPlanPhase[] = [{ ...PLAN[1]!, effort: 'high' }]
+  const edit = (path: string) => ({ tool: 'Edit', path, isError: false })
+
+  it('matches a path part anywhere under any root, on either separator', () => {
+    expect(isHighRiskPath('/w/repo/db/migrations/001.sql', STEWARD_HIGH_RISK_PATHS)).toBe(true)
+    expect(isHighRiskPath('C:\\w\\repo\\.github\\workflows\\ci.yml', STEWARD_HIGH_RISK_PATHS)).toBe(
+      true
+    )
+    expect(isHighRiskPath('/w/repo/src/main/runtime/a.ts', ['src/main/runtime/'])).toBe(true)
+    expect(isHighRiskPath('/w/repo/src/author/a.ts', STEWARD_HIGH_RISK_PATHS)).toBe(false)
+    expect(isHighRiskPath('/w/repo/src/a.ts', ['', 'src/b/'])).toBe(false)
+  })
+
+  it('its first edit is a moment once, even while already implementing', () => {
+    const implementing = { ...START, phase: 'implement' as const, hasEdited: true }
+    const first = stewardMomentOf(implementing, edit('/w/infra/main.tf'))
+    expect(first).toMatchObject({ phase: 'implement', reason: 'high-risk' })
+    expect(first.track.hasRiskyEdit).toBe(true)
+    expect(stewardMomentOf(first.track, edit('/w/infra/b.tf'))).toEqual({ track: first.track })
+  })
+
+  it("orca.yaml's paths add to the built-in list", () => {
+    const paths = [...STEWARD_HIGH_RISK_PATHS, 'src/main/runtime/']
+    expect(stewardMomentOf(START, edit('/w/src/main/runtime/x.ts'), paths).reason).toBe('high-risk')
+    expect(stewardMomentOf(START, edit('/w/src/main/runtime/x.ts')).reason).toBe('edit')
+  })
+
+  it('raises implementing to xhigh over the plan, and marks it a floor', () => {
+    expect(
+      stewardChoiceOf({ phase: 'implement', plan: HIGH, current: SONNET, isHighRisk: true })
+    ).toEqual({
+      pick: { model: 'claude-opus-5-5', effort: 'xhigh' },
+      source: 'plan',
+      isFloored: true
+    })
+    expect(
+      stewardChoiceOf({ phase: 'implement', plan: PLAN, current: SONNET, isHighRisk: true })
+    ).toMatchObject({ pick: { effort: 'xhigh' }, isFloored: false })
+    expect(
+      stewardChoiceOf({ phase: 'pr-ci', plan: PLAN, current: SONNET, isHighRisk: true }).pick.effort
+    ).toBe('low')
   })
 })
