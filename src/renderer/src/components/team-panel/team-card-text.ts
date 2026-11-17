@@ -8,6 +8,7 @@ import {
 import { TEAM_ADVISOR_NAME } from '../../../../shared/team-model-advisor-words'
 import type { GameTicketKind } from '../../../../shared/orchestrator-game-ticket-kind'
 import { translate } from '@/i18n/i18n'
+import { teamStewardCreditText } from './team-steward-text'
 import type { StatusTone } from '@/components/status-tone'
 import type { StatusDotGlyph } from '@/components/StatusDot'
 import type {
@@ -196,6 +197,7 @@ export function teamModelText(model: TeamModel | null): string | null {
 export function teamModelCreditText(model: TeamModel | null): string | null {
   const advisor = TEAM_ADVISOR_NAME
   return teamModelCreditTextOf(model?.credit, {
+    steward: teamStewardCreditText,
     chosenByAdvisor: translate('teamPanel.model.chosenByAdvisor', 'Chosen by {{advisor}}', {
       advisor
     }),

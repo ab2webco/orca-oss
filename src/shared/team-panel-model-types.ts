@@ -5,6 +5,7 @@ import type { GameReviewVerdict, GameStatusGroup } from './orchestrator-game-sta
 import type { GameLaunchChosenBy, GameTicketKind } from './orchestrator-game-ticket-kind'
 import type { TeamLeadAction } from './team-panel-list-action'
 import type { TeamAction } from './team-panel-actions'
+import type { TeamSteward, TeamStewardCredit } from './team-panel-steward'
 
 // Why: one view model for the desktop Team panel and the mobile sheet (ORCA-1048). It holds ids
 // and facts only; each client translates words and maps a status to its own tokens.
@@ -45,8 +46,9 @@ export type TeamLiveAction =
   /** The agent asks the user, as written; `options` are its choices when it offers some. */
   | { kind: 'question'; text: string; options: string[] }
 
-/** Who picked the model a card names: the advisor's (Jev's) router, or the lead by ticket kind. */
+/** Who picked the model a card names: the advisor's (Jev's) router, Orca's steward, or the lead by ticket kind. */
 export type TeamModelCredit =
+  | TeamStewardCredit
   | {
       by: 'advisor'
       /** The session's own model when the router moved it; null when it kept it. */
@@ -59,7 +61,7 @@ export type TeamModelCredit =
 export type TeamModel = {
   label: string
   effort: string | null
-  source: 'advisor' | 'session' | 'launch'
+  source: 'advisor' | 'steward' | 'session' | 'launch'
   /** Absent where no router or chooser is known, so the card names the model alone. */
   credit?: TeamModelCredit
 }
@@ -116,6 +118,8 @@ export type TeamAgentFacts = TeamSessionRef & {
   account: TeamAccount | null
   /** Jev's latest decisions in this pane, newest last; absent when its Jev sent none. */
   decisions?: TeamAdvisorDecision[]
+  /** Orca's steward in a member pane (ORCA-1242); absent without one or from an older host. */
+  steward?: TeamSteward
 }
 
 /** One decision Jev made in a pane: its id, verdict and the gesture the game plays for it. */

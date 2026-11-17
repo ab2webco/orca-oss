@@ -10,6 +10,7 @@ import {
 } from './orchestrator-game-member-names'
 import { gameAdvisorDecisionsOf } from './orchestrator-game-member-advisor'
 import { teamAgentModelOf } from './team-panel-agent-model'
+import { teamStewardOf } from './team-panel-steward'
 import type { GameAgent, GameReview, OrchestratorGameState } from './orchestrator-game-state'
 import { teamFlowPhaseOf } from './team-flow-phase'
 import {
@@ -204,6 +205,7 @@ function memberCardOf(
     model: teamAgentModelOf(agent),
     account: accountOf(agent, state),
     ...gameAdvisorDecisionsOf(agent.advisor),
+    ...teamStewardOf(agent.steward),
     characterKey: given ? characterKeyOf(roster, given) : characterOf(roster, agent.displayName),
     ticket,
     branch:

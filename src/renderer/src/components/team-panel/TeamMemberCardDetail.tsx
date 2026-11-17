@@ -25,6 +25,7 @@ import {
 } from './team-card-text'
 import { teamAccountWindowsOf } from './team-account-usage'
 import { teamHelpersOf } from './team-member-helpers'
+import { TeamStewardSteps } from './TeamStewardSteps'
 
 /** One line per helper (subagent) in the member's session, from the pane's live roster. */
 function HelpersList({ paneKey }: { paneKey: string }): React.JSX.Element | null {
@@ -90,6 +91,14 @@ function factsOf(card: TeamMemberCard): Fact[] {
           key: 'modelChoice',
           label: translate('teamPanel.card.detail.modelChoice', 'Model choice'),
           value: credit,
+          wraps: true as const
+        }
+      : null,
+    card.steward
+      ? {
+          key: 'steward',
+          label: translate('teamPanel.card.detail.steward', 'Steward'),
+          value: <TeamStewardSteps row={card.steward} />,
           wraps: true as const
         }
       : null
