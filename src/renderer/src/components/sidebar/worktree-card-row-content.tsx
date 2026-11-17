@@ -18,6 +18,8 @@ import { SidebarDeliveredRow } from './SidebarDeliveredRow'
 import { SidebarDeliveredGroup, splitTeamChildren } from './SidebarDeliveredGroup'
 import { useSidebarDeliveredStore } from './sidebar-delivered-store'
 import type { DeliveredView } from './use-sidebar-delivered-view'
+import type { SidebarSoloAgent } from './sidebar-solo-row'
+import { WorktreeCardSoloContent } from './worktree-card-solo-content'
 
 /** The lead's or a member's card reads as V30's agent row, a freed member's as its delivery. */
 export function WorktreeCardRowContent({
@@ -25,16 +27,22 @@ export function WorktreeCardRowContent({
   row,
   child = false,
   delivered = null,
+  solo = null,
   presentation
 }: {
   card: WorktreeCardController
   row: SidebarTeamRow | null
   child?: boolean
   delivered?: DeliveredView | null
+  /** The worktree's one live agent, drawn as V30's soloRow. */
+  solo?: SidebarSoloAgent | null
   presentation: WorktreeCardPresentation
 }): React.JSX.Element {
   if (row) {
     return <WorktreeCardTeamContent row={row} child={child} ports={card.workspacePorts} />
+  }
+  if (solo) {
+    return <WorktreeCardSoloContent card={card} solo={solo} />
   }
   return delivered ? (
     <WorktreeCardDeliveredContent view={delivered} />
