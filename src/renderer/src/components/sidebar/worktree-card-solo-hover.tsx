@@ -17,7 +17,9 @@ function ticketOpenerOf(card: WorktreeCardController): Opener {
       return card.hoverIssue && 'url' in card.hoverIssue && card.hoverIssue.url
         ? card.handleOpenGitHubIssueInOrca
         : undefined
-    default:
+    // Why none for Jira: Orca has no Jira page; the classic card links it out instead.
+    case 'jira':
+    case null:
       return undefined
   }
 }

@@ -265,12 +265,14 @@ describe('closed-sidebar Cmd+1-9 ordering (#9497)', () => {
   it('numbers by host section in the default view once two hosts own rows (ORCA-1181)', () => {
     const sshRepo = makeRepo('repo-ssh', { connectionId: 'my-target' })
     const otherLocal = makeRepo('repo-z')
+    // Why one recent time: Date.now() per fixture let a millisecond tick reorder a and z.
+    const at = Date.now()
     seedStore([], {
       repos: [makeRepo('repo1'), sshRepo, otherLocal],
       worktreesByRepo: {
-        repo1: [makeMainWorktree('wt-local-a')],
-        'repo-ssh': [makeMainWorktree('wt-remote', { repoId: 'repo-ssh' })],
-        'repo-z': [makeMainWorktree('wt-local-z', { repoId: 'repo-z' })]
+        repo1: [makeMainWorktree('wt-local-a', { lastActivityAt: at })],
+        'repo-ssh': [makeMainWorktree('wt-remote', { repoId: 'repo-ssh', lastActivityAt: at })],
+        'repo-z': [makeMainWorktree('wt-local-z', { repoId: 'repo-z', lastActivityAt: at })]
       },
       sshTargetLabels: new Map([['my-target', 'My Target']])
     } as Partial<AppState>)
