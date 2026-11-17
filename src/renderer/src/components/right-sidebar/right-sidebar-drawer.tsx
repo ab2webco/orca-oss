@@ -28,9 +28,13 @@ export function useRightSidebarDrawer(args: {
   const { open, overlay, containerRef, onDismiss } = args
   const drawerOpen = open && overlay
   const overlayRef = useRef(overlay)
-  overlayRef.current = overlay
   const openerRef = useRef<HTMLElement | null>(null)
   const managingFocusRef = useRef(false)
+
+  // Why declared first: effects run in order, so the focus effect below reads this commit's value.
+  useEffect(() => {
+    overlayRef.current = overlay
+  }, [overlay])
 
   useEffect(() => {
     const container = containerRef.current

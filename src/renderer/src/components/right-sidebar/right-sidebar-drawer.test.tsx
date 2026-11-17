@@ -152,6 +152,16 @@ describe('useRightSidebarDrawer', () => {
     expect(document.activeElement).toBe(terminal)
   })
 
+  it('leaves focus where it is when the window narrows with the panel already open', () => {
+    render(false)
+    act(() => setOpenFromTest(true))
+    const terminal = query('[data-testid="terminal"]')!
+    terminal.focus()
+    render(true)
+    expect(query('[data-right-sidebar-scrim]')).not.toBeNull()
+    expect(document.activeElement).toBe(terminal)
+  })
+
   it('keeps focus that the panel already placed inside the drawer', () => {
     render(true, true)
     act(() => setOpenFromTest(true))
