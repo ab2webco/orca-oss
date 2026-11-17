@@ -2,6 +2,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
+import { waitForRuntimeWorktree } from './helpers/game-cycle-contract'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
@@ -84,6 +85,8 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
       run: run.result.run.id,
       callerTerminalHandle: lead
     })
+    // Why: right after launch the runtime's worktree scan may not list the lead's worktree yet (ORCA-1145).
+    await waitForRuntimeWorktree(client, worktreeId)
     await client.call('orchestration.workerStart', {
       task: task.result.task.id,
       from: lead,
@@ -116,8 +119,11 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
 
     // Row 2: a merged task pays its character 100 XP, the real path `orca game free` takes.
     const xp = panel.locator('[data-team-xp]')
-    await expect(xp).toContainText('Lv 1', { timeout: 60_000 })
-    await expect(xp).toContainText('0/100 XP')
+    const level = xp.locator('[data-team-xp-level]')
+    // Why exact: '190 XP to Lv 3' contains '90 XP to Lv 3'.
+    const left = xp.locator('[data-team-xp-left]')
+    await expect(level).toHaveText('Lv 1', { timeout: 60_000 })
+    await expect(left).toHaveText('100 XP to Lv 2')
     await client.call('game.historyRecord', {
       worktreeId,
       terminalHandle: lead,
@@ -135,8 +141,8 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
       { worktreeId, terminalHandle: lead }
     )
     expect(characters.result.characters).toEqual([expect.objectContaining({ xp: 100 })])
-    await expect(xp).toContainText('Lv 2', { timeout: 60_000 })
-    await expect(xp).toContainText('0/200 XP')
+    await expect(level).toHaveText('Lv 2', { timeout: 60_000 })
+    await expect(left).toHaveText('200 XP to Lv 3')
 
     // ORCA-1264: a reward the mod toasts moves the bar by its XP, on top of the characters'.
     await client.call('game.xp', {
@@ -146,7 +152,108 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
         { id: 'member-claimed:wt-12', kind: 'member-claimed', xp: 10, label: 'Merlín took ORCA-12' }
       ]
     })
-    await expect(xp).toContainText('10/200 XP', { timeout: 60_000 })
+    await expect(left).toHaveText('190 XP to Lv 3', { timeout: 60_000 })
+
+    // ORCA-1264: the bar before and after a merge, then a level-up that keeps the carry-over.
+    const award = (reward: { id: string; kind: string; xp: number; label: string }) =>
+      client.call('game.xp', { worktreeId, terminalHandle: lead, rewards: [reward] })
+    // Why: a capture or a watch must not start while the last gain still plays.
+    const atRest = () =>
+      expect(
+        xp.locator('[data-team-xp-gain], [data-team-xp-float], [data-team-xp-note]')
+      ).toHaveCount(0, { timeout: 15_000 })
+    const captureMatrix = async (stage: string): Promise<void> => {
+      await atRest()
+      for (const width of WIDTHS) {
+        await orcaPage.setViewportSize({ width, height: 900 })
+        for (const theme of ['dark', 'light'] as const) {
+          await setTheme(orcaPage, theme)
+          await orcaPage.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`xp-${stage}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+    // Why sampled each frame: the label rises and fades, so one capture cannot show it never
+    // crosses the project name above the row.
+    const watchFloat = () =>
+      orcaPage.evaluate(
+        () =>
+          new Promise<{ top: number; titleBottom: number }>((resolve) => {
+            const title = document.querySelector('[data-testid="team-panel"] h2')!
+            let top = Number.POSITIVE_INFINITY
+            let seen = false
+            const tick = (): void => {
+              const float = document.querySelector('[data-team-xp-float]')
+              if (float) {
+                seen = true
+                top = Math.min(top, float.getBoundingClientRect().top)
+              }
+              if (seen && !float) {
+                resolve({ top, titleBottom: title.getBoundingClientRect().bottom })
+                return
+              }
+              requestAnimationFrame(tick)
+            }
+            tick()
+          })
+      )
+    // Why mid-play: the gained segment and the rising label exist only while the gain plays.
+    const playAward = async (
+      stage: string,
+      reward: Parameters<typeof award>[0],
+      settled: string
+    ): Promise<void> => {
+      await atRest()
+      const watched = watchFloat()
+      await award(reward)
+      await expect(left).toHaveText(settled, { timeout: 60_000 })
+      await orcaPage.screenshot({ path: testInfo.outputPath(`xp-${stage}-playing.png`) })
+      const { top, titleBottom } = await watched
+      expect(top, `the ${stage} label stays below the project name`).toBeGreaterThanOrEqual(
+        titleBottom
+      )
+    }
+    await captureMatrix('before-merge')
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await setTheme(orcaPage, 'dark')
+    await playAward(
+      'merge',
+      { id: 'review-merged:github#13@wt-12', kind: 'review-merged', xp: 100, label: '#13 merged' },
+      '90 XP to Lv 3'
+    )
+    await captureMatrix('after-merge')
+
+    await orcaPage.setViewportSize({ width: 390, height: 844 })
+    await setTheme(orcaPage, 'dark')
+    // 90 XP to Lv 3, then +100: Lv 3 starts at 300 and keeps the 10 over.
+    await playAward(
+      'level-up',
+      {
+        id: 'perfect-merge:github#13@wt-12',
+        kind: 'perfect-merge',
+        xp: 100,
+        label: '#13 perfect merge'
+      },
+      '290 XP to Lv 4'
+    )
+    await expect(level).toHaveText('Lv 3')
+    await expect(xp.locator('[data-team-xp-gain]')).toHaveCount(0, { timeout: 10_000 })
+    const fill = await xp.locator('.bg-foreground\\/60').evaluate((bar) => bar.style.width)
+    expect(Number.parseFloat(fill)).toBeCloseTo((10 / 300) * 100, 3)
+    await captureMatrix('after-level-up')
+
+    // The tooltip says what earns XP and keeps a margin inside a phone-width window.
+    await orcaPage.setViewportSize({ width: 390, height: 844 })
+    await xp.hover()
+    const tip = orcaPage.locator('[data-slot="tooltip-content"]')
+    await expect(tip).toContainText('What earns XP')
+    const box = (await tip.boundingBox())!
+    expect(box.x, 'the tooltip keeps a left margin').toBeGreaterThanOrEqual(8)
+    expect(box.x + box.width, 'the tooltip keeps a right margin').toBeLessThanOrEqual(390 - 8)
+    await orcaPage.screenshot({ path: testInfo.outputPath('xp-tooltip-390-dark.png') })
+    await orcaPage.mouse.move(0, 0)
     const state = (
       await client.call<OrchestratorGameState>('game.state', {
         worktreeId,
@@ -158,7 +265,7 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
 
     for (const language of ['en', 'es'] as const) {
       await writeSettings(orcaPage, { uiLanguage: language })
-      await expect(xp).toContainText(language === 'es' ? 'Nv 2' : 'Lv 2')
+      await expect(xp).toContainText(language === 'es' ? '290 XP para Nv 4' : '290 XP to Lv 4')
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {

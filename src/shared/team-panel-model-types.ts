@@ -6,6 +6,7 @@ import type { GameLaunchChosenBy, GameTicketKind } from './orchestrator-game-tic
 import type { TeamLeadAction } from './team-panel-list-action'
 import type { TeamAction } from './team-panel-actions'
 import type { TeamSteward, TeamStewardCredit } from './team-panel-steward'
+import type { TeamXp } from './team-xp-model'
 
 // Why: one view model for the desktop Team panel and the mobile sheet (ORCA-1048). It holds ids
 // and facts only; each client translates words and maps a status to its own tokens.
@@ -313,8 +314,8 @@ export type TeamPanelGameModel = TeamPanelTabs & {
   /** Needs-you first, then by status. */
   members: TeamMemberCard[]
   metrics: TeamSection<TeamMetrics>
-  /** The lead character's level; null outside the Game look or without rewards. */
-  xp: { level: number; into: number; need: number } | null
+  /** The team's level; null outside the Game look or without rewards. */
+  xp: TeamXp | null
   /** Saved arcade plays and the perfect merge that offers one; null when the arcade is off. */
   arcade: { credits: number; offerPr: number | null } | null
   /** The project's STOP; null when clear. */

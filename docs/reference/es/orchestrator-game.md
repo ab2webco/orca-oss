@@ -1,5 +1,5 @@
 ---
-sourceHash: ac07d764970de58f
+sourceHash: 2edf93b30f64d8a4
 ---
 
 # El juego orquestador de Agent Teams
@@ -1306,6 +1306,14 @@ ven el mismo PR lo cobran una vez, y un merge que el host ya pagó a un personaj
 toast en vez de 100. El primer total es la XP de los personajes que la barra ya mostraba, así que el
 nivel nunca baja. Un host más antiguo no manda `teamXp` y rechaza `game.xp`: el panel suma entonces
 los personajes y el mod muestra su propio registro, como antes.
+
+La fila dice cuánto falta (`300 XP para Nv 18`; con menos de 17rem de panel sólo `300 XP`), y su
+tooltip lista cuánto da cada recompensa. Cuando un sondeo trae un total mayor, la ganancia se llena
+en verde y `+N · razón` sube desde la barra, con la recompensa más nueva que trajo el sondeo. Una
+subida de nivel llena el nivel viejo, cambia la ficha del nivel y aterriza en el nivel nuevo con el
+sobrante del total
+([`use-team-xp-motion.ts`](../../../src/renderer/src/components/team-panel/use-team-xp-motion.ts)).
+Con movimiento reducido la fila cambia de una vez y la razón queda como una línea debajo durante 4 s.
 
 ### El merge perfecto
 

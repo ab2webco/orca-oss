@@ -16593,7 +16593,21 @@
     },
     "xp": {
       "level": "Nv {{level}}",
-      "progress": "{{into}}/{{need}} XP"
+      "left": "{{left}} XP",
+      "toLevel": "para Nv {{level}}",
+      "gain": "+{{xp}}",
+      "gainWith": "+{{xp}} · {{reason}}",
+      "levelUp": "¡Nivel {{level}}!",
+      "title": "XP del equipo: {{into}}/{{need}} para Nv {{level}}",
+      "earnsTitle": "Qué da XP",
+      "earns": {
+        "merged": "Un PR fusionado",
+        "perfectMerge": "Una fusión perfecta",
+        "ciGreen": "El CI pasa a verde",
+        "review": "Un ticket pasa a revisión",
+        "done": "Un ticket queda hecho",
+        "claimed": "Un miembro toma un ticket"
+      }
     },
     "stopped": {
       "by": "Detenido por {{by}}",

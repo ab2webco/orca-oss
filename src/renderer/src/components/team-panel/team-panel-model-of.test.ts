@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { DEFAULT_GAME_REWARD_WEIGHTS } from '../../../../shared/orchestrator-game-reward-weights'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { TeamCards } from '../../../../shared/team-panel-member-cards'
@@ -52,9 +53,39 @@ describe('teamPanelModelOf', () => {
   it('levels the project from its characters XP, and draws none when it could not be read', () => {
     teamCardsOf.mockReturnValue(CARDS)
 
-    expect(teamPanelModelOf(args({ xp: 350 }))?.xp).toEqual({ level: 3, into: 50, need: 300 })
-    expect(teamPanelModelOf(args({ xp: 0 }))?.xp).toEqual({ level: 1, into: 0, need: 100 })
+    expect(teamPanelModelOf(args({ xp: 350 }))?.xp).toMatchObject({ level: 3, into: 50, need: 300 })
+    expect(teamPanelModelOf(args({ xp: 0 }))?.xp).toMatchObject({ level: 1, into: 0, need: 100 })
     expect(teamPanelModelOf(args({ xp: null }))?.xp).toBeNull()
+  })
+
+  // ORCA-1264: the row plays a rise of the total, names it by the newest reward, and lists the weights.
+  it('hands the row the total, the newest rewards and what each reward earns', () => {
+    teamCardsOf.mockReturnValue(CARDS)
+    const award = {
+      id: 'ci-green:#41',
+      kind: 'ci-green' as const,
+      xp: 20,
+      label: '#41 CI is green',
+      at: 5
+    }
+    const leveled = state({
+      teamXp: { total: 370, recent: [award] },
+      rewardWeights: { ...DEFAULT_GAME_REWARD_WEIGHTS, 'ci-green': 30 }
+    })
+
+    expect(teamPanelModelOf(args({ state: leveled, xp: 370 }))?.xp).toEqual({
+      level: 3,
+      into: 70,
+      need: 300,
+      total: 370,
+      recent: [{ id: 'ci-green:#41', label: '#41 CI is green', xp: 20 }],
+      earns: { ...DEFAULT_GAME_REWARD_WEIGHTS, 'ci-green': 30 }
+    })
+    // An older host sends neither: the row still lists the baseline weights.
+    expect(teamPanelModelOf(args({ xp: 350 }))?.xp).toMatchObject({
+      recent: [],
+      earns: DEFAULT_GAME_REWARD_WEIGHTS
+    })
   })
 
   it('builds the cards with the tickets that have an open question for the user', () => {

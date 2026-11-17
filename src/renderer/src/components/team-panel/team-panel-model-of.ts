@@ -1,4 +1,5 @@
 import { gameCharacterLevelOf } from '../../../../shared/orchestrator-game-characters'
+import { DEFAULT_GAME_REWARD_WEIGHTS } from '../../../../shared/orchestrator-game-reward-weights'
 import { translate } from '@/i18n/i18n'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
@@ -19,6 +20,7 @@ import {
   type TeamPrFailureTexts
 } from '../../../../shared/team-panel-work-tabs'
 import { teamTodoTicketsOf } from '../../../../shared/team-todo-tickets'
+import type { TeamXp } from '../../../../shared/team-xp-model'
 
 const prFailureTexts = (): TeamPrFailureTexts => ({
   providerFailed: translate(
@@ -59,6 +61,20 @@ function advisorOf(state: OrchestratorGameState): TeamAdvisorRow | null {
 }
 
 // Why null when absent: a host older than the saved plays publishes none, and none is not zero.
+// Why the game's curve: the level is what the team earned, not a figure drawn here (ORCA-1094).
+function teamXpOf(state: OrchestratorGameState, total: number | null | undefined): TeamXp | null {
+  if (typeof total !== 'number') {
+    return null
+  }
+  const recent = (state.teamXp?.recent ?? []).map(({ id, label, xp }) => ({ id, label, xp }))
+  return {
+    ...gameCharacterLevelOf(total),
+    total,
+    recent,
+    earns: state.rewardWeights ?? DEFAULT_GAME_REWARD_WEIGHTS
+  }
+}
+
 function arcadeOf(state: OrchestratorGameState): TeamPanelGameModel['arcade'] {
   return state.arcade
     ? { credits: state.arcade.credits, offerPr: state.arcade.offer?.number ?? null }
@@ -127,8 +143,7 @@ export function teamPanelModelOf(args: {
     advisor: advisorOf(state),
     members: cards.members,
     metrics: teamMetricsOf(state),
-    // Why the game's curve: the level is what the characters earned, not a figure drawn here (ORCA-1094).
-    xp: typeof args.xp === 'number' ? gameCharacterLevelOf(args.xp) : null,
+    xp: teamXpOf(state, args.xp),
     arcade: arcadeOf(state),
     stopped: state.stopped
       ? {

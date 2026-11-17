@@ -17573,7 +17573,21 @@
     },
     "xp": {
       "level": "Lv {{level}}",
-      "progress": "{{into}}/{{need}} XP"
+      "left": "{{left}} XP",
+      "toLevel": "to Lv {{level}}",
+      "gain": "+{{xp}}",
+      "gainWith": "+{{xp}} · {{reason}}",
+      "levelUp": "Level {{level}}!",
+      "title": "Team XP: {{into}}/{{need}} to Lv {{level}}",
+      "earnsTitle": "What earns XP",
+      "earns": {
+        "merged": "A PR merged",
+        "perfectMerge": "A perfect merge",
+        "ciGreen": "CI turns green",
+        "review": "A ticket goes to review",
+        "done": "A ticket is done",
+        "claimed": "A member claims a ticket"
+      }
     },
     "stopped": {
       "by": "Stopped by {{by}}",
