@@ -16,15 +16,20 @@ import { getCodexManagedScriptFileName } from './codex-hook-identity'
 import { reconcileManagedHookDefinition } from './codex-real-home-managed-hook-slot'
 import {
   CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS,
-  grantManagedCodexHookTrust,
+  grantManagedCodexHookTrustSteps,
   type CodexTrustGrantFallbackReason
 } from './codex-hook-trust-grant'
+import {
+  driveCodexAppServerSessionSteps,
+  driveCodexAppServerSessionStepsSync,
+  type CodexAppServerSessionSteps
+} from './codex-app-server-session-steps'
 import { removeCodexManagedHookTrustEntries } from './codex-managed-trust-reconciliation'
 import { getCodexManagedHookInstallMaterial } from './hook-service'
 import { getSystemCodexHomePath } from './codex-home-paths'
 import type { CodexTrustEntry } from './config-toml-trust'
 import { restoreCodexTrustConfig } from './codex-trust-config-rollback'
-import { mutateRealHomeHooksPreservingUserTrust } from './codex-user-hook-trust-rebase'
+import { mutateRealHomeHooksPreservingUserTrustSteps } from './codex-user-hook-trust-rebase'
 import {
   assertHooksJsonGeneration,
   backupRealHomeHooksJsonOnce,
@@ -47,6 +52,7 @@ export type RealHomeCodexHookLane = 'pending' | 'installed' | 'unavailable' | 'r
 
 let currentLane: RealHomeCodexHookLane = 'pending'
 let installRetryAfterMs = 0
+let settling: Promise<RealHomeCodexHookLane> | null = null
 
 export function getRealHomeCodexHookLane(): RealHomeCodexHookLane {
   return currentLane
@@ -58,7 +64,17 @@ export function getRealHomeCodexHookLane(): RealHomeCodexHookLane {
  * can diverge from PTY, rate-limit, or commit-message routing.
  */
 export function isRealHomeCodexHookLaneUsable(): boolean {
-  return currentLane !== 'unavailable'
+  // Why: mid-transaction the real hooks.json can hold an entry Codex has not trusted yet.
+  return currentLane !== 'unavailable' && settling === null
+}
+
+/** True while the async ensure owns ~/.codex/hooks.json; sweeps must wait. */
+export function isRealHomeCodexHookStateSettling(): boolean {
+  return settling !== null
+}
+
+export function getSettlingRealHomeCodexHookState(): Promise<RealHomeCodexHookLane> | null {
+  return settling
 }
 
 function getRealHomeHooksJsonPath(): string {
@@ -75,11 +91,44 @@ function getRealHomeConfigTomlPath(): string {
  * synchronous (launch prep); repeat calls are cheap — an unchanged hooks.json
  * write no-ops and a valid grant ledger skips the RPC session entirely.
  * Never throws: any failure logs and leaves the host on the managed lane.
+ * While the async startup ensure is settling this is a no-op: the lane gate
+ * already routes launches to the managed home until it finishes.
  */
 export function ensureRealHomeCodexHookState(args: {
   hooksEnabled: boolean
   userDataPath: string
 }): RealHomeCodexHookLane {
+  if (settling) {
+    return currentLane
+  }
+  return driveCodexAppServerSessionStepsSync(ensureRealHomeCodexHookStateSteps(args))
+}
+
+/**
+ * Startup variant: same transaction, but codex app-server sessions are awaited
+ * so a hung codex never holds the main process (ORCA-1248).
+ */
+export function ensureRealHomeCodexHookStateAsync(args: {
+  hooksEnabled: boolean
+  userDataPath: string
+}): Promise<RealHomeCodexHookLane> {
+  if (settling) {
+    return settling
+  }
+  const run = driveCodexAppServerSessionSteps(ensureRealHomeCodexHookStateSteps(args))
+  const tracked = run.finally(() => {
+    if (settling === tracked) {
+      settling = null
+    }
+  })
+  settling = tracked
+  return tracked
+}
+
+function* ensureRealHomeCodexHookStateSteps(args: {
+  hooksEnabled: boolean
+  userDataPath: string
+}): CodexAppServerSessionSteps<RealHomeCodexHookLane> {
   if (getSharedHookFilePolicy() === 'keep-existing') {
     // Why: the installed Orca owns ~/.codex/hooks.json; a dev Orca's panes use its managed home (ORCA-1131).
     return (currentLane = 'unavailable')
@@ -91,8 +140,8 @@ export function ensureRealHomeCodexHookState(args: {
   }
   try {
     currentLane = args.hooksEnabled
-      ? installRealHomeCodexHook(args.userDataPath)
-      : sweepRealHomeCodexHook()
+      ? yield* installRealHomeCodexHookSteps(args.userDataPath)
+      : yield* sweepRealHomeCodexHookSteps()
     if (!args.hooksEnabled || currentLane === 'installed') {
       installRetryAfterMs = 0
     }
@@ -106,7 +155,9 @@ export function ensureRealHomeCodexHookState(args: {
   return currentLane
 }
 
-function installRealHomeCodexHook(userDataPath: string): RealHomeCodexHookLane {
+function* installRealHomeCodexHookSteps(
+  userDataPath: string
+): CodexAppServerSessionSteps<RealHomeCodexHookLane> {
   const material = getCodexManagedHookInstallMaterial()
   const hooksJsonPath = getRealHomeHooksJsonPath()
   const hooksWritePath = resolveHooksJsonWritePath(hooksJsonPath)
@@ -166,7 +217,7 @@ function installRealHomeCodexHook(userDataPath: string): RealHomeCodexHookLane {
   backupRealHomeHooksJsonOnce(userDataPath, previousRaw)
   // Why: unknown top-level fields belong to the user (other managers'
   // metadata); unlike the managed-home writer, preserve them verbatim.
-  const trustConfigSnapshot = mutateRealHomeHooksPreservingUserTrust({
+  const trustConfigSnapshot = yield* mutateRealHomeHooksPreservingUserTrustSteps({
     sourcePath: hooksJsonPath,
     runtimeHomePath: getSystemCodexHomePath(),
     tomlPath: getRealHomeConfigTomlPath(),
@@ -181,7 +232,7 @@ function installRealHomeCodexHook(userDataPath: string): RealHomeCodexHookLane {
     restoreHooks: () => restoreRealHomeHooksJson(hooksWritePath, previousRaw, previousMode)
   })
 
-  const grant = grantManagedCodexHookTrust({
+  const grant = yield* grantManagedCodexHookTrustSteps({
     runtimeHomePath: getSystemCodexHomePath(),
     tomlPath: getRealHomeConfigTomlPath(),
     managedCommand: material.command,
@@ -220,7 +271,7 @@ function getInstallRetryAfterMs(reason: CodexTrustGrantFallbackReason): number {
     : Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
 }
 
-function sweepRealHomeCodexHook(): RealHomeCodexHookLane {
+function* sweepRealHomeCodexHookSteps(): CodexAppServerSessionSteps<RealHomeCodexHookLane> {
   const hooksJsonPath = getRealHomeHooksJsonPath()
   // Why: single read — the pre-write generation guard must compare against
   // the exact bytes this sweep's parse came from.
@@ -252,7 +303,7 @@ function sweepRealHomeCodexHook(): RealHomeCodexHookLane {
   if (removedAny) {
     const hooksWritePath = resolveHooksJsonWritePath(hooksJsonPath)
     const previousMode = statSync(hooksWritePath).mode
-    mutateRealHomeHooksPreservingUserTrust({
+    yield* mutateRealHomeHooksPreservingUserTrustSteps({
       sourcePath: hooksJsonPath,
       runtimeHomePath: getSystemCodexHomePath(),
       tomlPath: getRealHomeConfigTomlPath(),
@@ -295,5 +346,6 @@ export const _internals = {
   setLaneForTesting(lane: RealHomeCodexHookLane): void {
     currentLane = lane
     installRetryAfterMs = 0
+    settling = null
   }
 }

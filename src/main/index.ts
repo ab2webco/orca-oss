@@ -266,7 +266,10 @@ import {
 import { reconcileRetainedCodexHookHomes } from './codex/retained-codex-hook-state'
 import {
   ensureRealHomeCodexHookState,
-  isRealHomeCodexHookLaneUsable
+  ensureRealHomeCodexHookStateAsync,
+  getSettlingRealHomeCodexHookState,
+  isRealHomeCodexHookLaneUsable,
+  isRealHomeCodexHookStateSettling
 } from './codex/codex-real-home-hook-install'
 import { setCodexTrustGrantTelemetry } from './codex/codex-trust-grant-telemetry'
 import { startCodexSessionBackfillInBackground } from './codex/codex-session-backfill'
@@ -1370,6 +1373,8 @@ async function prepareCodexSessionResumeForLaunch(args: {
       const hooksEnabled = isAgentStatusHooksEnabled(settingsStore.getSettings())
       try {
         if (isSystemHome) {
+          // Why: the sync ensure no-ops while the startup grant settles; a resumed pane must see its outcome.
+          await getSettlingRealHomeCodexHookState()
           ensureRealHomeCodexHookState({ hooksEnabled, userDataPath: app.getPath('userData') })
         } else if (hooksEnabled) {
           codexHookService.install(resumeHome)
@@ -2651,7 +2656,8 @@ void app.whenReady().then(async () => {
   setSystemCodexHomeHookSweepSuppressed(
     () =>
       codexRuntimeHome !== null &&
-      codexRuntimeHome.isHostSystemDefaultRealHome() &&
+      // Why: the startup grant owns ~/.codex/hooks.json until it settles (ORCA-1248).
+      (codexRuntimeHome.isHostSystemDefaultRealHome() || isRealHomeCodexHookStateSettling()) &&
       isAgentStatusHooksEnabled(store?.getSettings())
   )
   codexSessionMigration = createCodexSessionMigrationScheduler({
@@ -3260,30 +3266,35 @@ void app.whenReady().then(async () => {
   const shouldReconcileStartupManagedHooks =
     shouldInstallManagedHooks(is.dev) &&
     resolveStartupManagedHookAction(startupManagedHookSettings) === 'install'
-  if (
+  // Why async: the grant runs codex app-server, and a codex that never answers
+  // held the main process (no window, no IPC) for its 10 s deadline (ORCA-1248).
+  const startupRealHomeHookState =
     shouldReconcileStartupManagedHooks &&
     shouldInstallStartupManagedAgentHook(startupManagedHookSettings, 'codex') &&
     codexRuntimeHome.isHostSystemDefaultRealHomeSelected()
-  ) {
-    // Why: establish capability before managed-hook reconciliation so an
-    // incapable host re-arms and completes the legacy real-home sweep now.
-    ensureRealHomeCodexHookState({
-      hooksEnabled: true,
-      userDataPath: app.getPath('userData')
-    })
-  }
+      ? ensureRealHomeCodexHookStateAsync({
+          hooksEnabled: true,
+          userDataPath: app.getPath('userData')
+        })
+      : Promise.resolve()
   // Why skip rather than remove when the off switch is set: the hook files are user-global, so a
   // startup removal deletes the hooks every other Orca instance depends on (upstream #16980).
   if (shouldReconcileStartupManagedHooks) {
     const managedHookStore = store
-    void reconcileStartupManagedAgentHooks(managedHookStore.getSettings(), {
-      shouldHydrateShellPath: app.isPackaged,
-      onInstallError: recordManagedHookInstallFailure,
-      shouldContinue: (agent) =>
-        shouldInstallStartupManagedAgentHook(managedHookStore.getSettings(), agent)
-    }).catch((error) => {
-      console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
-    })
+    // Why after: establish capability before managed-hook reconciliation so an
+    // incapable host re-arms and completes the legacy real-home sweep now.
+    void startupRealHomeHookState
+      .then(() =>
+        reconcileStartupManagedAgentHooks(managedHookStore.getSettings(), {
+          shouldHydrateShellPath: app.isPackaged,
+          onInstallError: recordManagedHookInstallFailure,
+          shouldContinue: (agent) =>
+            shouldInstallStartupManagedAgentHook(managedHookStore.getSettings(), agent)
+        })
+      )
+      .catch((error) => {
+        console.warn('[agent-hooks] failed to reconcile managed hooks on startup:', error)
+      })
   }
   startDeadClaudeHookReporter()
   app.on('child-process-gone', (_event, details) => {

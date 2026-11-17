@@ -1,2 +1,7 @@
 #!/bin/sh
+# Why: Orca's hook trust grant runs `codex app-server`; the stub TUI never answers it, which held every spec's startup for the 10 s deadline (ORCA-1248). Answer like an old codex.
+if [ "$1" = "app-server" ]; then
+  echo "error: unrecognized subcommand 'app-server'" >&2
+  exit 2
+fi
 exec "$(dirname "$0")/golden-stub-agent" "$@"
