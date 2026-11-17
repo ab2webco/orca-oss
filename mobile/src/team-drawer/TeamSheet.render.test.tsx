@@ -241,6 +241,41 @@ describe('TeamSheet', () => {
     expect(shown).not.toContain('local')
   })
 
+  // Why: a host the launch refuses must not read as free capacity (ORCA-1207).
+  it('says which hosts cannot take this project and why, and never calls them free', () => {
+    const idle = { status: 'ok' as const, running: 0, cpuCoreCount: 8, totalMemory: 32e9 }
+    const refusal = 'orca-oss on m1 names github.com/stablyai/orca, the upstream every fork shares.'
+    const hostCapacity = [
+      ...work.hostCapacity!,
+      {
+        ...idle,
+        host: 'koombea',
+        availableMemory: 30e9,
+        loadAverage1m: 1,
+        launch: { kind: 'unregistered' as const, project: 'orca-oss', reason: 'x' }
+      },
+      {
+        ...idle,
+        host: 'orca-contabo',
+        availableMemory: 30e9,
+        loadAverage1m: 1,
+        launch: { kind: 'refused' as const, reason: refusal }
+      },
+      { ...idle, host: 'older', availableMemory: 30e9, loadAverage1m: 1 }
+    ]
+    show(teamWith({ questions: [] }, null, { ...work, hostCapacity }))
+    act(() => button('Hosts').click())
+    const shown = texts()
+    expect(shown).toContain('Not registered')
+    expect(shown).toContain(
+      "orca-oss is not registered here. With the owner's OK, clone and register it."
+    )
+    expect(shown).toContain('Refused')
+    expect(shown).toContain(refusal)
+    expect(shown).toContain('Unknown')
+    expect(shown).not.toContain('Free')
+  })
+
   it('words the PRs and Hosts tabs in the host language', () => {
     const team = teamWith({ questions: [] }, null, work)
     show({ ...team, view: team.view && { ...team.view, locale: 'es' } })

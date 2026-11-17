@@ -172,7 +172,7 @@ export function TeamMemberCardRow({
             ) : null}
             <span
               data-team-host=""
-              className="ml-auto shrink-0 text-right font-mono text-[11px] text-muted-foreground"
+              className="ml-auto shrink-0 text-right text-[11px] text-muted-foreground"
             >
               <TeamHostName host={card.host} />
             </span>

@@ -13,9 +13,54 @@ const FULL_PERCENT = 95
 
 type MachineReading = Extract<TeamMachine['reading'], { kind: 'ok' }>
 
+function launchWord(launch: TeamMachine['launch']): string | null {
+  switch (launch.kind) {
+    case 'unregistered':
+      return translate('teamPanel.machines.notRegistered', 'Not registered')
+    case 'refused':
+      return translate('teamPanel.machines.refused', 'Refused')
+    case 'unanswered':
+      return translate('teamPanel.machines.notAnswering', 'Not answering')
+    case 'unknown':
+      return translate('teamPanel.machines.unknown', 'Unknown')
+    default:
+      return null
+  }
+}
+
+/** What to do about a host this lead cannot launch on; the refusal is the launch's own text. */
+function launchNote(launch: TeamMachine['launch']): string | null {
+  switch (launch.kind) {
+    case 'unregistered':
+      return translate(
+        'teamPanel.machines.notRegisteredNote',
+        "{{project}} is not registered here. With the owner's OK, clone and register it.",
+        { project: launch.project }
+      )
+    case 'refused':
+      return launch.reason
+    case 'unanswered':
+      return translate(
+        'teamPanel.machines.notAnsweringNote',
+        'It did not list its repos, so Orca cannot tell if members can start here.'
+      )
+    case 'unknown':
+      return translate(
+        'teamPanel.machines.unknownNote',
+        'This Orca does not say if members can start here. Update Orca Lab on this machine.'
+      )
+    default:
+      return null
+  }
+}
+
 function statusWord(machine: TeamMachine): string {
   if (machine.reading.kind === 'unreachable') {
     return translate('teamPanel.machines.offline', 'Offline')
+  }
+  const launch = machine.running === 0 ? launchWord(machine.launch) : null
+  if (launch) {
+    return launch
   }
   if (machine.status === 'risk') {
     return translate('teamPanel.machines.lowMemory', 'Low memory')
@@ -79,13 +124,14 @@ const machineId = (host: TeamMachine['host']): string =>
 
 function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
   const tone = teamStatusTone(machine.status)
+  const note = machine.reading.kind === 'unreachable' ? null : launchNote(machine.launch)
   return (
     <div
       data-team-machine={machineId(machine.host)}
       className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5 last:border-b-0"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <b className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-medium">
+        <b className="min-w-0 flex-1 truncate text-[12.5px] font-medium">
           <TeamHostName host={machine.host} />
         </b>
         <span
@@ -98,6 +144,14 @@ function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
           {statusWord(machine)}
         </span>
       </div>
+      {note ? (
+        <small
+          data-team-machine-launch={machine.launch.kind}
+          className="break-words text-[11.5px] text-muted-foreground"
+        >
+          {note}
+        </small>
+      ) : null}
       {machine.reading.kind === 'ok' ? (
         <MemoryBar machine={machine} reading={machine.reading} />
       ) : null}

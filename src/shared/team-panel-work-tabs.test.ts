@@ -358,6 +358,55 @@ describe('teamMachinesSectionOf', () => {
     })
   })
 
+  describe('launch eligibility (ORCA-1207)', () => {
+    const repo = { id: 'h', displayName: 'orca-oss', path: '/w', remoteKey: null }
+    const refusal = 'orca-oss on m1 names github.com/stablyai/orca, the upstream every fork shares.'
+
+    it("reads a host without the project's repo as not registered, never free", () => {
+      const [, koombea] = machines([
+        ok(),
+        ok({
+          host: 'koombea',
+          launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on koombea' }
+        })
+      ])
+      expect(koombea).toMatchObject({
+        status: 'closed',
+        launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on koombea' }
+      })
+    })
+
+    it('carries the refusal of a host the repo-scope check refuses', () => {
+      const [m1] = machines([ok({ host: 'm1', launch: { kind: 'refused', reason: refusal } })])
+      expect(m1).toMatchObject({ status: 'closed', launch: { kind: 'refused', reason: refusal } })
+    })
+
+    it('keeps a ready host idle, with its free slots', () => {
+      const [m1] = machines([ok({ host: 'm1', cap: 5, launch: { kind: 'ready', repo } })])
+      expect(m1).toMatchObject({ status: 'idle', running: 0, cap: 5, launch: { kind: 'ready' } })
+      expect(m1.launch).not.toHaveProperty('repo')
+    })
+
+    it("reads a paired host an older Orca's state says nothing about as unknown; this machine as ready", () => {
+      const [local, m1] = machines([ok(), ok({ host: 'm1' })])
+      expect(local.launch).toEqual({ kind: 'ready' })
+      expect(m1.launch).toEqual({ kind: 'unknown' })
+    })
+
+    it('reads a kind a newer host publishes as unknown', () => {
+      const launch = { kind: 'quarantined' } as unknown as GameHostCapacity['launch']
+      expect(machines([ok({ host: 'm1', launch })])[0].launch).toEqual({ kind: 'unknown' })
+    })
+
+    it('reads a silent repo list as attention, and members already there as working', () => {
+      const rows = machines([
+        ok({ host: 'imac', launch: { kind: 'unanswered' } }),
+        ok({ host: 'm1', running: 2, launch: { kind: 'refused', reason: refusal } })
+      ])
+      expect(rows.map((one) => one.status)).toEqual(['attention', 'working'])
+    })
+  })
+
   it('hides the tab when the project turned it off', () => {
     const state = stateOf({ hostCapacity: [ok()] })
     state.panel = { tabs: { machines: false } } as OrchestratorGameState['panel']

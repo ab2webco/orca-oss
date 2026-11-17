@@ -28,6 +28,8 @@ type Scene = { set: Record<string, unknown>; remove: string[] }
 const COPY = {
   en: {
     tabs: { team: 'Team', prs: 'PRs', machines: 'Machines' },
+    notRegistered: 'Not registered',
+    refused: 'Refused',
     prsEmpty: 'No open pull requests',
     prsError: 'Could not read pull requests',
     queueTitle: 'Merge queue · 16',
@@ -37,6 +39,8 @@ const COPY = {
   },
   es: {
     tabs: { team: 'Equipo', prs: 'PRs', machines: 'Máquinas' },
+    notRegistered: 'Sin registrar',
+    refused: 'Rechazada',
     prsEmpty: 'No hay pull requests abiertos',
     prsError: 'No se pudieron leer los pull requests',
     queueTitle: 'Cola de merge · 16',
@@ -45,6 +49,9 @@ const COPY = {
     sent: 'Enviado al líder: Review'
   }
 } as const
+
+const CONTABO_REFUSAL =
+  "orca-oss on orca-contabo names github.com/stablyai/orca, the upstream every fork of it shares, so Orca cannot tell it is orca-oss's clone. If it is, list github.com/stablyai/orca in orchestratorGame.orchestrator.memberRepos."
 
 const pull = (number: number, title: string, over: Record<string, unknown>) => ({
   id: `#${number}`,
@@ -131,7 +138,22 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
       hostCapacity: [
         { host: 'local', running: 2, cap: 4, ...machine(14, 36, 21.4, 3.2) },
         { host: 'm1', running: 1, cap: 2, ...machine(8, 16, 2.1, 5) },
-        { host: 'imac', running: 0, cap: 2, status: 'unreachable' }
+        { host: 'imac', running: 0, cap: 2, status: 'unreachable' },
+        // ORCA-1207: the QA's hosts that read "Free" though `game launch --on` refuses them.
+        {
+          host: 'koombea',
+          running: 0,
+          cap: 4,
+          ...machine(8, 32, 28, 1),
+          launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on koombea' }
+        },
+        {
+          host: 'orca-contabo',
+          running: 0,
+          cap: 4,
+          ...machine(8, 32, 28, 1),
+          launch: { kind: 'refused', reason: CONTABO_REFUSAL }
+        }
       ]
     }
   },
@@ -262,7 +284,8 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(900_000)
+  // Why longer to capture: evidence mode walks every width and theme, 8x the checked set.
+  test.setTimeout(CAPTURE_EVIDENCE ? 2_400_000 : 900_000)
   const agent = createStdinLoggingAgent()
   try {
     await waitForSessionReady(orcaPage)
@@ -339,6 +362,16 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
           'href',
           'https://github.com/o/r/pull/924'
         )
+        await panel.getByRole('tab', { name: words.tabs.machines }).click()
+        const koombea = panel.locator('[data-team-machine="koombea"]')
+        await expect(koombea).toContainText(words.notRegistered)
+        await expect(koombea.locator('[data-team-machine-launch="unregistered"]')).toBeVisible()
+        const contabo = panel.locator('[data-team-machine="orca-contabo"]')
+        await expect(contabo).toContainText(words.refused)
+        await expect(contabo.locator('[data-team-machine-launch="refused"]')).toHaveText(
+          CONTABO_REFUSAL
+        )
+        await panel.getByRole('tab', { name: words.tabs.prs }).click()
       } else if (name === 'empty') {
         await expect(panel).toContainText(words.prsEmpty, { timeout: 30_000 })
       } else {
