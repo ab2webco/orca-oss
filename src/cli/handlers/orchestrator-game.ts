@@ -71,17 +71,23 @@ const callerParams = () => ({
 })
 
 // Why the env: an older CLI ignores a variable it does not know, where an unknown flag could fail the poll.
-const advisorParams = (): { advisor?: unknown } => {
-  const raw = process.env.ORCA_GAME_ADVISOR
+const reportParam = <K extends string>(key: K, env: string): Partial<Record<K, unknown>> => {
+  const raw = process.env[env]
   if (raw === undefined || raw === '') {
     return {}
   }
   try {
-    return { advisor: JSON.parse(raw) as unknown }
+    return { [key]: JSON.parse(raw) as unknown } as Partial<Record<K, unknown>>
   } catch {
     return {}
   }
 }
+
+// Why the steward apart from Jev: an older host strips the unknown key and still reads the advisor.
+export const paneReportParams = (): { advisor?: unknown; steward?: unknown } => ({
+  ...reportParam('advisor', 'ORCA_GAME_ADVISOR'),
+  ...reportParam('steward', 'ORCA_GAME_STEWARD')
+})
 
 function formatGameState(state: OrchestratorGameState): string {
   const lines = [
@@ -129,7 +135,7 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
   'game state': async ({ client, json }) => {
     const response = await client.call<OrchestratorGameState>('game.state', {
       ...callerParams(),
-      ...advisorParams()
+      ...paneReportParams()
     })
     // Why here, not on the host: an older host's members get the fields too.
     printResult(

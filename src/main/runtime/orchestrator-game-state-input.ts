@@ -31,6 +31,7 @@ import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
 import type { GameMetricsSummary } from '../../shared/orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from '../../shared/orchestrator-game-member-advisor'
+import type { GameMemberSteward } from '../../shared/orchestrator-game-member-steward'
 import type { GameMemberLaunch } from '../../shared/orchestrator-game-member-launch'
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
 import type { PairedGameHostEntry } from './orchestrator-game-paired-hosts'
@@ -92,6 +93,7 @@ export type OrchestratorGameStateInput = {
   limitOf?: GameMemberLimitOf
   screenStateOf?: GameScreenStateOf
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
+  stewardOf?: (paneKey: string) => GameMemberSteward | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>

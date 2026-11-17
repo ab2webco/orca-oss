@@ -20,8 +20,9 @@ const GameStateParams = z
     worktreeId: z.string().optional(),
     terminalHandle: z.string().optional(),
     paneKey: z.string().optional(),
-    // Why unknown: a report this host cannot read must cost the member its Jev row, never its state.
+    // Why unknown: a report this host cannot read costs the member its Jev or steward row, never its state.
     advisor: z.unknown().optional(),
+    steward: z.unknown().optional(),
     // Why a string: a role this host does not know must not fail the poll.
     role: z.string().optional()
   })
@@ -310,13 +311,8 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
     name: 'game.state',
     params: GameStateParams,
     handler: async (params, { runtime }) => {
-      const state = await runtime.getOrchestratorGameState({
-        worktreeId: params?.worktreeId,
-        terminalHandle: params?.terminalHandle,
-        paneKey: params?.paneKey,
-        advisor: params?.advisor,
-        role: params?.role
-      })
+      // Why whole: zod already stripped every key this host does not know.
+      const state = await runtime.getOrchestratorGameState(params ?? {})
       const caller = { worktreeId: params?.worktreeId, terminalHandle: params?.terminalHandle }
       // Why first: auto-release drops a merged member's row from this very state.
       await recordGameMerges(runtime, state, caller)

@@ -182,6 +182,35 @@ describe('orca game state', () => {
     expect(Object.keys(calls[2] as object)).not.toContain('advisor')
   })
 
+  it("hands on the member pane's steward report beside Jev's; an unset env sends no key (ORCA-1242)", async () => {
+    const calls: Record<string, unknown>[] = []
+    const client = {
+      call: async (_method: string, params: Record<string, unknown>) => {
+        calls.push(params)
+        return { ok: true, result: { config: { mode: 'on' }, agents: [] } }
+      }
+    } as unknown as RuntimeClient
+    const run = () =>
+      ORCHESTRATOR_GAME_HANDLERS['game state']({
+        flags: new Map(),
+        client,
+        cwd: '/tmp',
+        json: true
+      })
+    delete process.env.ORCA_GAME_ADVISOR
+    process.env.ORCA_GAME_STEWARD = '{"version":1,"model":"claude-opus-5-5"}'
+    await run()
+    process.env.ORCA_GAME_STEWARD = '{not json'
+    await run()
+    delete process.env.ORCA_GAME_STEWARD
+    await run()
+
+    expect(calls[0]).toMatchObject({ steward: { version: 1, model: 'claude-opus-5-5' } })
+    expect(calls[0]).not.toHaveProperty('advisor')
+    expect(calls[1]).not.toHaveProperty('steward')
+    expect(calls[2]).not.toHaveProperty('steward')
+  })
+
   it('says in text when the project is on STOP and how many messages the lead has unread', async () => {
     const client = {
       call: async () => ({

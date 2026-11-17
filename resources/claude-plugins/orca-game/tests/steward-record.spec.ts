@@ -7,6 +7,7 @@ import {
   stewardLogWith,
   stewardSessionsWith,
   stewardPlanOf,
+  stewardReportOf,
   type StewardDecision
 } from '../hooks/steward-record'
 
@@ -119,5 +120,53 @@ describe('stewardSessionsWith', () => {
     const kept = Object.keys(held as object)
     expect(kept).toHaveLength(STEWARD_SESSIONS_MAX)
     expect(kept[0]).toBe('s3')
+  })
+})
+
+describe('stewardReportOf (ORCA-1242)', () => {
+  const pick = { model: 'claude-opus-5-5', effort: 'high' } as const
+  const one = (at: number): StewardDecision => ({
+    at,
+    moment: 'edit',
+    phase: 'implement',
+    from: pick,
+    to: pick,
+    applied: true,
+    source: 'plan',
+    why: 'edit'
+  })
+  const record = {
+    version: 1,
+    phase: 'implement',
+    pick,
+    planState: 'plan',
+    standDown: null,
+    stepsSeen: 3,
+    decisions: Array.from({ length: 12 }, (_, i) => one(i))
+  }
+
+  it("sends this session's record with its latest ten decisions", () => {
+    const sent = JSON.parse(stewardReportOf({ s1: record }, 's1') ?? 'null') as {
+      decisions: StewardDecision[]
+    }
+    expect(sent).toMatchObject({
+      version: 1,
+      session: 's1',
+      ticket: null,
+      model: 'claude-opus-5-5',
+      effort: 'high',
+      phase: 'implement',
+      plan: 'plan',
+      standDown: null,
+      pinned: { model: false, effort: false },
+      stepsSeen: 3
+    })
+    expect(sent.decisions.map((d) => d.at)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+  })
+
+  it('sends nothing for another session or a record it cannot read', () => {
+    expect(stewardReportOf({ s2: record }, 's1')).toBeNull()
+    expect(stewardReportOf({ s1: { ...record, version: 2 } }, 's1')).toBeNull()
+    expect(stewardReportOf(undefined, 's1')).toBeNull()
   })
 })

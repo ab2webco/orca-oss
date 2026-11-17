@@ -170,6 +170,7 @@ export async function buildOrchestratorGameState(
     limitOf: input.limitOf,
     screenStateOf: input.screenStateOf,
     advisorOf: input.advisorOf,
+    stewardOf: input.stewardOf,
     launchOf: input.launchOf,
     leadWorktreeId: input.worktree?.id ?? null
   })

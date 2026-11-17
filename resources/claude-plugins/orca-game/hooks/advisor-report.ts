@@ -2,6 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { AdvisorLogEntry, GameMemberAdvisor } from '../types'
 import type { Advisor } from './allies'
+import { STEWARD_REPORT_ENV, STEWARD_STORE_KEY, stewardReportOf } from './steward-record'
 
 // What this pane tells Orca about its Jev, so a lead's Panel can show it on this pane's card.
 
@@ -58,3 +59,15 @@ export const advisorReportOf = (
             : {})
         }
   )
+
+/** `env` plus this session's Orca steward report (ORCA-1242); unchanged in a pane it does not steer. */
+export async function withSteward(
+  $: EngineInterface,
+  env: Record<string, string>
+): Promise<Record<string, string>> {
+  const [session, held] = await Promise.all([$.session.id(), $.store.get(STEWARD_STORE_KEY)]).catch(
+    () => []
+  )
+  const report = session === undefined ? null : stewardReportOf(held, session)
+  return report === null ? env : { ...env, [STEWARD_REPORT_ENV]: report }
+}

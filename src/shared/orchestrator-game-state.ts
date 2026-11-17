@@ -19,6 +19,7 @@ import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameMetricsSummary } from './orchestrator-game-metrics-summary'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
+import type { GameMemberSteward } from './orchestrator-game-member-steward'
 import type { SupportedUiLocale } from './ui-locale'
 import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 import { gameToolInputOf } from './orchestrator-game-tool-input'
@@ -73,6 +74,8 @@ export type GameAgent = {
   limit?: { resetsAt: number | null; loggedOut?: true }
   /** What Jev in this pane (a member's or the lead's) has it on; absent without Jev there or from an older host. */
   advisor?: GameMemberAdvisor
+  /** A member's Orca steward (ORCA-1242): its pick, plan and latest decisions; absent from an older host. */
+  steward?: GameMemberSteward
   /** The model and effort Orca dispatched the member on; absent when it chose neither or from an older host. */
   launch?: GameMemberLaunch
   /** When the host last saw the member's terminal work (ORCA-746); absent when unknown or from an older host. */

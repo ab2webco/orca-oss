@@ -336,6 +336,7 @@ export async function remoteGameMembersOf(
             ? { globalLogin: true as const }
             : {}),
         ...(agent?.advisor ? { advisor: agent.advisor } : {}),
+        ...(agent?.steward ? { steward: agent.steward } : {}),
         ...(launch ? { launch } : {}),
         ...(lastActivityAt ? { lastActivityAt } : {}),
         ...(agent?.stateStartedAt ? { stateSince: agent.stateStartedAt } : {})
