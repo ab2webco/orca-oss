@@ -25,7 +25,11 @@ export default defineConfig({
       },
       // Why a component: the config loads outside the pinned tsconfig, so it must not import TS.
       components: { Head: './src/components/DocsHead.astro' },
-      customCss: ['./src/styles/fonts.css', './src/styles/starlight-theme.css'],
+      customCss: [
+        './src/styles/fonts.css',
+        './src/styles/starlight-theme.css',
+        './src/styles/docs-diagrams.css'
+      ],
       sidebar: docsSidebar
     })
   ]

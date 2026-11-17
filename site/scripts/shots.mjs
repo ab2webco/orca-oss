@@ -1,6 +1,7 @@
 // Screenshots of the built site at 1440/768/390/320 in light and dark, into .shots/.
-// Fails when any page scrolls horizontally. Playwright comes from the repo root's
-// node_modules (the desktop app's dev dependency), so site/ does not install it again.
+// Fails when any page scrolls horizontally; arguments keep only the pages whose name contains one.
+// Playwright comes from the repo root's node_modules (the desktop app's dev dependency), so site/
+// does not install it again.
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
@@ -114,11 +115,13 @@ mkdirSync(OUT, { recursive: true })
 const server = await serve()
 const origin = `http://127.0.0.1:${server.address().port}`
 const browser = await chromium.launch()
+const only = process.argv.slice(2)
+const picked = PAGES.filter((p) => !only.length || only.some((part) => p.name.includes(part)))
 const jobs = [
-  ...PAGES.flatMap((p) =>
+  ...picked.flatMap((p) =>
     THEMES.flatMap((theme) => WIDTHS.map((width) => ({ ...p, theme, width })))
   ),
-  ...EXTRA
+  ...(only.length ? [] : EXTRA)
 ]
 const failures = []
 try {
