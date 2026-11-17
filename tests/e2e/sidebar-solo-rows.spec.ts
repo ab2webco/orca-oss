@@ -110,10 +110,13 @@ async function capture(page: Page, testInfo: TestInfo, name: string, row: Locato
     expect(fits, `${name} row overflows the sidebar at ${width}`).toBe(true)
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(page, theme)
-      await page.screenshot({
+      const file = `sidebar-solo-${name}-${width}-${theme}.png`
+      const shot = await page.screenshot({
         animations: 'disabled',
-        path: testInfo.outputPath(`sidebar-solo-${name}-${width}-${theme}.png`)
+        path: testInfo.outputPath(file)
       })
+      // Why attached: CI keeps test-results only on failure; the JSON report carries captures on green runs too.
+      await testInfo.attach(file, { body: shot, contentType: 'image/png' })
     }
   }
   await page.setViewportSize({ width: 1440, height: 900 })
