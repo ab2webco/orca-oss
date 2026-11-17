@@ -17,6 +17,7 @@ import { useAppStore } from '@/store'
 import { useWorktreeAgentRows } from './useWorktreeAgentRows'
 import { selectLiveAgentStatusEntriesForWorktree } from './worktree-agent-row-selectors'
 import { sidebarSoloAgentOf } from './sidebar-solo-row'
+import { WorktreeCardSoloFacts } from './worktree-card-solo-hover'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function WorktreeCardSurface({ card }: { card: WorktreeCardController }): React.JSX.Element {
@@ -112,8 +113,9 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     </div>
   )
 
+  // Why solo too: its V30 facts lead the card even when the worktree has no other details.
   const classicCardBodyWithHoverDetails =
-    hasHoverDetails && !titleRenaming && !card.activityViewOpen ? (
+    (hasHoverDetails || solo) && !titleRenaming && !card.activityViewOpen ? (
       <WorktreeCardDetailsHover
         issue={hoverIssue}
         linearIssue={hoverLinearIssue}
@@ -124,12 +126,14 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         automationProvenance={metaAutomationProvenance}
         cliProvenance={metaCliProvenance}
         automationHostId={worktree.hostId}
+        detailsBefore={solo ? <WorktreeCardSoloFacts card={card} solo={solo} /> : undefined}
         branchName={hoverBranchName}
         workspaceTitle={hoverWorkspaceTitle}
         workspaceTitleRenameDisabled={isDeleting || affiliateListMode}
         detailsAfter={
           <>
-            <WorktreeCardAgentHoverDetails worktree={worktree} repo={card.repo} />
+            {/* Why not for solo: its V30 facts above already give the model, account and cache. */}
+            {solo ? null : <WorktreeCardAgentHoverDetails worktree={worktree} repo={card.repo} />}
             {workspacePorts.length > 0 ? <WorktreeCardPortsDetails ports={workspacePorts} /> : null}
           </>
         }

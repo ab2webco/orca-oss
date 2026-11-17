@@ -48,6 +48,38 @@ describe('WorktreeCardDetailsHover', () => {
     expect(markup).not.toContain('truncate text-[13px]')
   })
 
+  it('leads with the details placed before, then the workspace identity', () => {
+    const markup = renderToStaticMarkup(
+      <WorktreeCardDetailsHover
+        workspaceTitle="Fix stale GH PR"
+        issue={null}
+        linearIssue={null}
+        review={null}
+        comment={null}
+        detailsBefore={<section data-solo-facts="">Agent facts</section>}
+      >
+        <span>card</span>
+      </WorktreeCardDetailsHover>
+    )
+    expect(markup.indexOf('Agent facts')).toBeGreaterThan(-1)
+    expect(markup.indexOf('Agent facts')).toBeLessThan(markup.indexOf('Fix stale GH PR'))
+  })
+
+  it('opens for details placed before even with nothing else to show', () => {
+    const markup = renderToStaticMarkup(
+      <WorktreeCardDetailsHover
+        issue={null}
+        linearIssue={null}
+        review={null}
+        comment={null}
+        detailsBefore={<section>Agent facts</section>}
+      >
+        <span>card</span>
+      </WorktreeCardDetailsHover>
+    )
+    expect(markup).toContain('Agent facts')
+  })
+
   it('puts workspace title before branch identity and metadata details', () => {
     const markup = renderToStaticMarkup(
       <WorktreeCardDetailsHover

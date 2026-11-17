@@ -34,11 +34,13 @@ function sessionInputsOf(s: AppState): TeamSoloSessionsState {
 export function SidebarSoloHoverContent({
   worktree,
   repo,
-  paneKey
+  paneKey,
+  onOpen
 }: {
   worktree: Worktree
   repo: Repo | undefined
   paneKey: string
+  onOpen?: React.ComponentProps<typeof SidebarSoloHoverDetails>['onOpen']
 }): React.JSX.Element | null {
   const inputs = useAppStore(useShallow(sessionInputsOf))
   const entry = inputs.agentStatusByPaneKey[paneKey]
@@ -53,6 +55,10 @@ export function SidebarSoloHoverContent({
     return null
   }
   return (
-    <SidebarSoloHoverDetails hover={hover} cacheTtlMs={inputs.settings?.promptCacheTtlMs ?? 0} />
+    <SidebarSoloHoverDetails
+      hover={hover}
+      cacheTtlMs={inputs.settings?.promptCacheTtlMs ?? 0}
+      onOpen={onOpen}
+    />
   )
 }

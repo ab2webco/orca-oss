@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from 'react'
+import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SidebarSoloHover } from './sidebar-solo-hover'
@@ -14,11 +14,17 @@ vi.mock('./CacheTimer', () => ({
 let root: Root | null = null
 let host: HTMLDivElement | null = null
 
-function render(hover: SidebarSoloHover, cacheTtlMs = 300_000): HTMLDivElement {
+function render(
+  hover: SidebarSoloHover,
+  cacheTtlMs = 300_000,
+  onOpen?: React.ComponentProps<typeof SidebarSoloHoverDetails>['onOpen']
+): HTMLDivElement {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  act(() => root?.render(<SidebarSoloHoverDetails hover={hover} cacheTtlMs={cacheTtlMs} />))
+  act(() =>
+    root?.render(<SidebarSoloHoverDetails hover={hover} cacheTtlMs={cacheTtlMs} onOpen={onOpen} />)
+  )
   return host
 }
 
@@ -68,6 +74,22 @@ describe('SidebarSoloHoverDetails', () => {
       'State',
       'Prompt'
     ])
+  })
+
+  it('opens the PR and the ticket in Orca from their lines', () => {
+    const pr = vi.fn()
+    const lines: SidebarSoloHover['lines'] = [
+      { kind: 'text', label: 'PR', value: '#912 · CI green', opens: 'pr' },
+      { kind: 'text', label: 'Ticket', value: 'CIN-1145', opens: 'ticket' }
+    ]
+    const el = render({ ...HOVER, lines }, 300_000, { pr })
+    const button = el.querySelector<HTMLButtonElement>('dd button')
+    expect(button?.textContent).toBe('#912 · CI green')
+    act(() => button?.click())
+    expect(pr).toHaveBeenCalledTimes(1)
+    // Why plain text: with no way to open it in Orca, a button would do nothing.
+    expect(el.querySelectorAll('dd button')).toHaveLength(1)
+    expect(el.querySelectorAll('dd')[1]?.textContent).toBe('CIN-1145')
   })
 
   it('has no subtitle line when there is none', () => {

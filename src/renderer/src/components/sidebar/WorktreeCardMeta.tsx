@@ -67,6 +67,7 @@ export function WorktreeCardDetailsHover({
   identityOrder = 'workspace-first',
   workspaceTitleRenameDisabled = false,
   automationHostId,
+  detailsBefore,
   detailsAfter,
   openDelay = 250,
   closeDelay = 120,
@@ -176,6 +177,7 @@ export function WorktreeCardDetailsHover({
       automationProvenance,
       cliProvenance
     }) &&
+    !detailsBefore &&
     !detailsAfter
   ) {
     return children
@@ -199,6 +201,7 @@ export function WorktreeCardDetailsHover({
         onDoubleClick={(event) => event.stopPropagation()}
       >
         <SelectedTextCopyMenu className="space-y-3">
+          {detailsBefore}
           {showIdentityHeader && (
             <WorktreeCardHoverIdentityHeader
               branchName={branchName}

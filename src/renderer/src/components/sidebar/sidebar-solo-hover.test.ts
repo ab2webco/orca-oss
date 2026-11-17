@@ -4,7 +4,7 @@ import {
   teamActivityRowOf,
   type TeamSoloSession
 } from '../../../../shared/team-panel-activity-rows'
-import { sidebarSoloHoverOf } from './sidebar-solo-hover'
+import { sidebarSoloHoverOf, sidebarSoloTicketSource } from './sidebar-solo-hover'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
@@ -84,6 +84,13 @@ describe('sidebarSoloHoverOf (V30 hoverHtml for a solo row)', () => {
     ])
   })
 
+  it('marks the PR and Ticket lines as the ones that open in Orca', () => {
+    const opens = hoverOf().lines.flatMap((line) =>
+      line.kind === 'text' && line.opens ? [`${line.label}:${line.opens}`] : []
+    )
+    expect(opens).toEqual(['PR:pr', 'Ticket:ticket'])
+  })
+
   it('marks the primary worktree and names no host on this machine', () => {
     const hover = hoverOf({ isPrimary: true, host: { kind: 'local' } })
     expect(hover.title).toBe('cin-1145 · primary')
@@ -132,5 +139,29 @@ describe('sidebarSoloHoverOf (V30 hoverHtml for a solo row)', () => {
       entry: entryOf({ model: undefined, effort: undefined, toolName: undefined })
     })
     expect(textOf(bare)).toEqual(['State: Working', 'Prompt: Add booking validation'])
+  })
+})
+
+describe('sidebarSoloTicketSource', () => {
+  const none = {
+    linkedPlaneWorkItem: null,
+    linkedLinearIssue: null,
+    linkedWorkItem: null,
+    linkedIssue: null,
+    linkedGitLabIssue: null
+  }
+  it('picks the tracker the Ticket line names, in the same order', () => {
+    const plane = { identifier: 'ORCA-1', id: 'p', projectId: 'x' } as never
+    const jira = { provider: 'jira', type: 'issue', number: 7, title: 'T', url: 'u' } as never
+    expect(
+      sidebarSoloTicketSource({ ...none, linkedPlaneWorkItem: plane, linkedLinearIssue: 'L-1' })
+    ).toBe('plane')
+    expect(sidebarSoloTicketSource({ ...none, linkedLinearIssue: 'L-1', linkedIssue: 3 })).toBe(
+      'linear'
+    )
+    expect(sidebarSoloTicketSource({ ...none, linkedWorkItem: jira, linkedIssue: 3 })).toBe('jira')
+    expect(sidebarSoloTicketSource({ ...none, linkedIssue: 3 })).toBe('issue')
+    expect(sidebarSoloTicketSource({ ...none, linkedGitLabIssue: 4 })).toBe('issue')
+    expect(sidebarSoloTicketSource(none)).toBeNull()
   })
 })

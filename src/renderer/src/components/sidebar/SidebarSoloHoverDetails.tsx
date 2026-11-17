@@ -1,15 +1,18 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import CacheTimer from './CacheTimer'
-import type { SidebarSoloHover } from './sidebar-solo-hover'
+import type { SidebarSoloHover, SidebarSoloHoverOpen } from './sidebar-solo-hover'
 
 /** V30's hoverHtml for a solo row, laid out like the member and lead cards. */
 export function SidebarSoloHoverDetails({
   hover,
-  cacheTtlMs
+  cacheTtlMs,
+  onOpen
 }: {
   hover: SidebarSoloHover
   cacheTtlMs: number
+  /** Opens the line's PR or ticket in Orca; a line with no handler stays text. */
+  onOpen?: Partial<Record<SidebarSoloHoverOpen, (event: React.MouseEvent) => void>>
 }): React.JSX.Element {
   // Why: a timer with no length counts nothing down, so its line would only read 0:00.
   const lines = hover.lines.filter((line) => line.kind !== 'cache' || cacheTtlMs > 0)
@@ -39,7 +42,17 @@ export function SidebarSoloHoverDetails({
                   line.asks && 'text-agent-question-text'
                 )}
               >
-                {line.value}
+                {line.opens && onOpen?.[line.opens] ? (
+                  <button
+                    type="button"
+                    className="text-left hover:underline"
+                    onClick={onOpen[line.opens]}
+                  >
+                    {line.value}
+                  </button>
+                ) : (
+                  line.value
+                )}
               </dd>
             )}
           </React.Fragment>
