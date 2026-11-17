@@ -1,5 +1,5 @@
 {
-  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them",
+  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them; user-docs-path-shots from the changed-spec report of merge group 44169926136",
   "seconds": {
     "tests/e2e/active-view-restart-restore.spec.ts": 20,
     "tests/e2e/activity-agent-pane-isolation.spec.ts": 114,
@@ -435,6 +435,7 @@
     "tests/e2e/update-install-renderer-checkpoint-recovery.spec.ts": 15,
     "tests/e2e/usage-overview.spec.ts": 34,
     "tests/e2e/user-docs-help-screens.spec.ts": 126,
+    "tests/e2e/user-docs-path-shots.spec.ts": 65,
     "tests/e2e/voice-microphone-selection.spec.ts": 35,
     "tests/e2e/windows-project-runtime-smoke.spec.ts": 14,
     "tests/e2e/windows-terminal-env-icons.spec.ts": 30,
