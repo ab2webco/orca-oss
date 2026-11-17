@@ -41,7 +41,9 @@ import { collectHostMemory, fallbackHostMemory } from './host-memory'
 import { getProcessMemoryMetric } from './process-memory-metric'
 import { collectMacFootprintByPid, sumFootprint } from './mac-footprint-sweep'
 
-export type MemorySnapshotStore = Pick<Store, 'getRepo' | 'getWorktreeMeta'>
+export type MemorySnapshotStore = Pick<Store, 'getRepo' | 'getWorktreeMeta'> & {
+  getSettings?: () => { workspaceDir: string }
+}
 
 // ─── Module state ───────────────────────────────────────────────────
 
@@ -346,7 +348,7 @@ function makeEmptyBucket(
 async function runSnapshot(store: MemorySnapshotStore): Promise<MemorySnapshot> {
   const [processIndex, host, footprintByPid] = await Promise.all([
     enumerateProcesses(),
-    collectHostMemory(),
+    collectHostMemory({ workspaceDir: store.getSettings?.().workspaceDir }),
     // Why swept alongside and not instead: `memory` keeps meaning RSS, and every
     // number already recorded against it stays comparable (ORCA-325).
     // Why os.platform() and not the module default: the rest of this sweep reads

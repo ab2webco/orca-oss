@@ -57,6 +57,39 @@ describe('gameHostMachineOf', () => {
   it('never reports more free memory than the machine has', () => {
     expect(gameHostMachineOf({ ...imac, availableMemory: 99 * GB })?.availableMemory).toBe(52 * GB)
   })
+
+  it('reads the CPU use and workspaces disk a newer host adds, an idle CPU and a full disk included', () => {
+    const newer = {
+      ...imac,
+      cpuUsagePercent: 0,
+      workspaceDiskTotal: 500 * GB,
+      workspaceDiskFree: 0
+    }
+
+    expect(gameHostMachineOf(newer)).toEqual(newer)
+  })
+
+  it('leaves out what an older host does not send, so it reads unknown and never zero', () => {
+    const machine = gameHostMachineOf(imac)
+
+    expect(machine).not.toHaveProperty('cpuUsagePercent')
+    expect(machine).not.toHaveProperty('workspaceDiskTotal')
+    expect(machine).not.toHaveProperty('workspaceDiskFree')
+  })
+
+  it('drops a CPU or disk figure it cannot trust', () => {
+    const machine = gameHostMachineOf({
+      ...imac,
+      cpuUsagePercent: 140,
+      workspaceDiskTotal: 0,
+      workspaceDiskFree: 5 * GB
+    })
+
+    expect(machine).toEqual(imac)
+    expect(
+      gameHostMachineOf({ ...imac, workspaceDiskTotal: 5 * GB, workspaceDiskFree: 9 * GB })
+    ).toEqual({ ...imac, workspaceDiskTotal: 5 * GB, workspaceDiskFree: 5 * GB })
+  })
 })
 
 describe('gameHostCapacitiesOf', () => {

@@ -3973,7 +3973,7 @@ export class OrcaRuntimeService {
   private readonly gameHostAnswers = new GameHostAnswerGate({ downForMs: GAME_HOST_SILENT_SKIP_MS })
   private readonly gameHostCapacity = new GameHostCapacityReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
-    readLocal: collectHostMemory,
+    readLocal: () => collectHostMemory({ workspaceDir: this.store?.getSettings().workspaceDir }),
     // Why diagnostics.memory: every paired host already answers it, so no wire change (ORCA-841).
     readRemote: (environmentId) =>
       this.gameHostAnswers.call(

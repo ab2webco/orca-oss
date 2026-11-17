@@ -69,6 +69,11 @@ export type HostMemory = {
   memoryUsagePercent: number
   cpuCoreCount: number
   loadAverage1m: number
+  /** Percent of every core busy now; absent from older hosts and where it cannot be read. */
+  cpuUsagePercent?: number
+  /** Bytes on the disk holding the workspaces folder; absent from older hosts and where unreadable. */
+  workspaceDiskTotal?: number
+  workspaceDiskFree?: number
 }
 
 export type MemorySnapshot = {

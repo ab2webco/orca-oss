@@ -11,6 +11,10 @@ export type GameHostMachine = {
   availableMemory: number
   /** Null where the host reports none. */
   loadAverage1m: number | null
+  /** Absent from a host older than ORCA-1252 or one that cannot read it: unknown, never zero. */
+  cpuUsagePercent?: number
+  workspaceDiskTotal?: number
+  workspaceDiskFree?: number
 }
 
 export type GameHostReading = { kind: 'ok'; machine: GameHostMachine } | { kind: 'unreachable' }
@@ -33,11 +37,24 @@ const LOW_MEMORY_BYTES = 4 * GB
 const isPositive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0
 
+const isAtLeastZero = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
+
+export function gameHostCpuAndDiskOf(
+  fields: Record<string, unknown>
+): Pick<GameHostMachine, 'cpuUsagePercent' | 'workspaceDiskTotal' | 'workspaceDiskFree'> {
+  const { cpuUsagePercent, workspaceDiskTotal, workspaceDiskFree } = fields
+  return {
+    ...(isAtLeastZero(cpuUsagePercent) && cpuUsagePercent <= 100 ? { cpuUsagePercent } : {}),
+    ...(isPositive(workspaceDiskTotal) && isAtLeastZero(workspaceDiskFree)
+      ? { workspaceDiskTotal, workspaceDiskFree: Math.min(workspaceDiskFree, workspaceDiskTotal) }
+      : {})
+  }
+}
+
 export function gameHostMachineOf(raw: unknown): GameHostMachine | null {
-  const { cpuCoreCount, totalMemory, availableMemory, loadAverage1m } = (raw ?? {}) as Record<
-    string,
-    unknown
-  >
+  const fields = (raw ?? {}) as Record<string, unknown>
+  const { cpuCoreCount, totalMemory, availableMemory, loadAverage1m } = fields
   if (!isPositive(cpuCoreCount) || !isPositive(totalMemory)) {
     return null
   }
@@ -46,7 +63,8 @@ export function gameHostMachineOf(raw: unknown): GameHostMachine | null {
     totalMemory,
     availableMemory: isPositive(availableMemory) ? Math.min(availableMemory, totalMemory) : 0,
     // Why a zero is none: Windows' os.loadavg() is always zero, and a live Orca host never idles at 0.00.
-    loadAverage1m: isPositive(loadAverage1m) ? loadAverage1m : null
+    loadAverage1m: isPositive(loadAverage1m) ? loadAverage1m : null,
+    ...gameHostCpuAndDiskOf(fields)
   }
 }
 

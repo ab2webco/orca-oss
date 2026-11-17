@@ -324,6 +324,19 @@ describe('collectMemorySnapshot', () => {
     expect(psCalls).toHaveLength(count)
   }
 
+  it("reads the disk of this host's own workspaces folder into the host figures", async () => {
+    mockPsResponse('')
+    const { collectMemorySnapshot } = await loadCollector()
+
+    const { host } = await collectMemorySnapshot({
+      ...emptyStore,
+      getSettings: () => ({ workspaceDir: os.tmpdir() })
+    })
+
+    expect(host.workspaceDiskTotal).toBeGreaterThan(0)
+    expect(host.workspaceDiskFree).toBeLessThanOrEqual(host.workspaceDiskTotal!)
+  })
+
   it('uses one CIM process for Windows memory and CPU sampling', async () => {
     vi.spyOn(os, 'platform').mockReturnValue('win32')
     mockPsResponse('10 1 0 1024')

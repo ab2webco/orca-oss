@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import os from 'node:os'
 
-const { execFileMock, readFileMock } = vi.hoisted(() => ({
+const { execFileMock, readFileMock, statfsMock, cpuUsageMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
-  readFileMock: vi.fn()
+  readFileMock: vi.fn(),
+  statfsMock: vi.fn(),
+  cpuUsageMock: vi.fn()
 }))
 
 vi.mock('node:child_process', () => ({
@@ -16,8 +18,11 @@ vi.mock('node:child_process', () => ({
 }))
 
 vi.mock('node:fs/promises', () => ({
-  readFile: (file: string, encoding: string) => readFileMock(file, encoding)
+  readFile: (file: string, encoding: string) => readFileMock(file, encoding),
+  statfs: (dir: string) => statfsMock(dir)
 }))
+
+vi.mock('./host-cpu-usage', () => ({ readHostCpuUsage: () => cpuUsageMock() }))
 
 async function loadHostMemory() {
   vi.resetModules()
@@ -29,6 +34,8 @@ describe('host memory', () => {
     vi.restoreAllMocks()
     execFileMock.mockReset()
     readFileMock.mockReset()
+    statfsMock.mockReset()
+    cpuUsageMock.mockReset()
     vi.spyOn(os, 'totalmem').mockReturnValue(1_000)
     vi.spyOn(os, 'freemem').mockReturnValue(100)
     vi.spyOn(os, 'cpus').mockReturnValue([{}, {}] as ReturnType<typeof os.cpus>)
@@ -105,6 +112,42 @@ describe('host memory', () => {
     expect(host.availableMemorySource).toBe('free-memory')
     expect(execFileMock).not.toHaveBeenCalled()
     expect(readFileMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('host CPU use and workspaces disk', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    statfsMock.mockReset()
+    cpuUsageMock.mockReset()
+    vi.spyOn(os, 'platform').mockReturnValue('win32')
+  })
+
+  it('adds the CPU use now and the workspaces folder disk', async () => {
+    cpuUsageMock.mockResolvedValue(42)
+    statfsMock.mockResolvedValue({ bsize: 1_000, blocks: 900, bavail: 300 })
+    const { collectHostMemory } = await loadHostMemory()
+
+    const host = await collectHostMemory({ workspaceDir: '/home/me/orca/workspaces' })
+
+    expect(host).toMatchObject({
+      cpuUsagePercent: 42,
+      workspaceDiskTotal: 900_000,
+      workspaceDiskFree: 300_000
+    })
+    expect(statfsMock).toHaveBeenCalledWith('/home/me/orca/workspaces')
+  })
+
+  it('leaves out what it cannot read, so a reader shows it unknown and never zero', async () => {
+    cpuUsageMock.mockResolvedValue(undefined)
+    const { collectHostMemory } = await loadHostMemory()
+
+    const host = await collectHostMemory()
+
+    expect(host).not.toHaveProperty('cpuUsagePercent')
+    expect(host).not.toHaveProperty('workspaceDiskTotal')
+    expect(host).not.toHaveProperty('workspaceDiskFree')
+    expect(statfsMock).not.toHaveBeenCalled()
   })
 })
 
