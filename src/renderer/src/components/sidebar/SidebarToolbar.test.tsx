@@ -197,6 +197,13 @@ describe('SidebarToolbar moved workspace board hint', () => {
         await act(async () => {
           vi.advanceTimersByTime(250)
         })
+        // A custom role="dialog" chip is not a Radix layer and cannot take the Escape.
+        expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+
+        layer.setAttribute('data-state', 'open')
+        await act(async () => {
+          vi.advanceTimersByTime(250)
+        })
         expect(container.textContent).not.toContain('Workspace board moved to the bottom bar')
 
         layer.remove()

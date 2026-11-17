@@ -1,7 +1,10 @@
 import { useLayoutEffect, useState } from 'react'
 
 const RECHECK_MS = 250
-const OPEN_LAYER_SELECTOR = '[role="menu"], [role="dialog"], [role="alertdialog"]'
+// Why data-state: only Radix layers carry it, and only they take Escape from the top of their stack.
+const OPEN_LAYER_SELECTOR = ['menu', 'dialog', 'alertdialog']
+  .map((role) => `[role="${role}"][data-state="open"]`)
+  .join(', ')
 
 /**
  * Whether nothing is drawn over the element's centre and no menu or dialog is open, re-read while

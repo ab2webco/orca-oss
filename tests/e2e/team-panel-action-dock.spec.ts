@@ -414,10 +414,11 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await reopenBoardHint(orcaPage)
     // Why the wait: the hint re-reads its cover every 250 ms; two reads prove it stayed closed.
     await orcaPage.waitForTimeout(600)
-    await expect(orcaPage.getByRole('tooltip')).toHaveCount(0)
+    const boardHint = orcaPage.getByRole('tooltip', { name: /tablero|Workspace board moved/ })
+    await expect(boardHint).toHaveCount(0)
     await orcaPage.keyboard.press('Escape')
     await expect(menu).toBeHidden()
-    await expect(orcaPage.getByRole('tooltip'), 'the hint was never eligible').toBeVisible()
+    await expect(boardHint, 'the hint was never eligible').toBeVisible()
 
     // Stop asks inline, in the dock, and sends nothing on Cancel.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
