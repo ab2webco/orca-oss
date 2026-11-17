@@ -44,8 +44,12 @@ export type TeamSoloSessionsState = Pick<
   | 'terminalLayoutsByTabId'
 >
 
-function hostOf(
-  state: TeamSoloSessionsState,
+/** The machine a workspace's agents run on, as the right panel names it. */
+export function teamSoloHostOf(
+  state: Pick<
+    TeamSoloSessionsState,
+    'sshConnectionStates' | 'sshTargetLabels' | 'runtimeEnvironments'
+  >,
   worktree: Worktree,
   repo: Repo | undefined
 ): TeamHost {
@@ -229,7 +233,7 @@ export function teamSoloSessionsOf(
       return []
     }
     const repo = state.repos.find((one) => one.id === worktree.repoId)
-    const host = hostOf(state, worktree, repo)
+    const host = teamSoloHostOf(state, worktree, repo)
     // Why local for SSH: its panes run under this machine's runtime, which keeps its leads.
     const hostKey =
       host.kind === 'remote' && host.environmentId ? host.environmentId : TEAM_LOCAL_HOST_KEY
