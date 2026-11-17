@@ -149,6 +149,8 @@ export function InlineInputRow({
             e.preventDefault()
             submit(e.currentTarget.value)
           } else if (e.key === 'Escape') {
+            // Why: marks Escape handled so the narrow-width drawer stays open (ORCA-1220).
+            e.preventDefault()
             clearBlurTimeout()
             submitted.current = true
             onCancel()

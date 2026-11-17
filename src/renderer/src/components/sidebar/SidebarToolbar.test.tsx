@@ -42,7 +42,7 @@ const roots: Root[] = []
 
 async function renderToolbar(onWorkspaceBoardToggle = vi.fn()): Promise<{
   container: HTMLDivElement
-  rerender: () => Promise<void>
+  rerender: (nextToggle?: () => void) => Promise<void>
   onWorkspaceBoardToggle: ReturnType<typeof vi.fn>
 }> {
   const container = document.createElement('div')
@@ -50,14 +50,10 @@ async function renderToolbar(onWorkspaceBoardToggle = vi.fn()): Promise<{
   const root = createRoot(container)
   roots.push(root)
 
-  const render = async (): Promise<void> => {
+  // Why a new toggle: the mocked store does not notify, so a new prop stands in for a store update past the memo.
+  const render = async (nextToggle: () => void = onWorkspaceBoardToggle): Promise<void> => {
     await act(async () => {
-      root.render(
-        <SidebarToolbar
-          workspaceBoardOpen={false}
-          onWorkspaceBoardToggle={onWorkspaceBoardToggle}
-        />
-      )
+      root.render(<SidebarToolbar workspaceBoardOpen={false} onWorkspaceBoardToggle={nextToggle} />)
     })
   }
   await render()
@@ -150,6 +146,31 @@ describe('SidebarToolbar moved workspace board hint', () => {
         vi.advanceTimersByTime(250)
       })
       expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // ORCA-1220: the narrow-width drawer must not open under the hint, which would also take its Escape.
+  it('hides the moved hint as soon as the right panel opens over the board button', async () => {
+    vi.useFakeTimers()
+    let covering: Element | null = null
+    vi.spyOn(document, 'elementFromPoint').mockImplementation(() => covering)
+    mocks.state = {
+      persistedUIReady: true,
+      rightSidebarOpen: false,
+      featureInteractions: {
+        'workspace-board': { firstInteractedAt: 100, interactionCount: 2 }
+      }
+    }
+    try {
+      const { container, rerender } = await renderToolbar()
+      expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+
+      covering = document.createElement('div')
+      mocks.state = { ...mocks.state, rightSidebarOpen: true }
+      await rerender(vi.fn())
+      expect(container.textContent).not.toContain('Workspace board moved to the bottom bar')
     } finally {
       vi.useRealTimers()
     }

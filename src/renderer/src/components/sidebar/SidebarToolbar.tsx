@@ -33,8 +33,14 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
   const [workspaceBoardMovedHintOpen, setWorkspaceBoardMovedHintOpen] = React.useState(false)
   const movedHintEligibleRef = React.useRef<boolean | null>(null)
   const [boardTrigger, setBoardTrigger] = React.useState<HTMLButtonElement | null>(null)
-  // Why: a narrow window draws the Team panel over this button; a hint pointing at it would cover the panel's dock.
-  const boardTriggerSeen = useElementUncovered(boardTrigger, workspaceBoardMovedHintOpen)
+  const rightSidebarOpen = useAppStore((state) => state.rightSidebarOpen)
+  // Why: a narrow window draws the right panel over this button; a hint pointing at it would cover the panel.
+  // Re-read when the panel opens so the hint is gone in the frame the drawer appears (ORCA-1220).
+  const boardTriggerSeen = useElementUncovered(
+    boardTrigger,
+    workspaceBoardMovedHintOpen,
+    rightSidebarOpen
+  )
   const sidebar = boardTrigger?.closest<HTMLElement>('[data-worktree-sidebar-root]') ?? null
   const persistedUIReady = useAppStore((state) => state.persistedUIReady)
   const hasUsedWorkspaceBoard = useAppStore((state) =>
@@ -112,7 +118,10 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
               sideOffset={4}
               collisionPadding={8}
               collisionBoundary={sidebar}
-              className="max-w-(--radix-tooltip-content-available-width)"
+              // Why hidden on close: a fading hint would still lie over the drawer and take its Escape.
+              className={`max-w-(--radix-tooltip-content-available-width)${
+                workspaceBoardMovedHintOpen ? ' data-[state=closed]:hidden' : ''
+              }`}
             >
               {workspaceBoardMovedHintOpen
                 ? translate(
