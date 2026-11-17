@@ -1,0 +1,213 @@
+/* Docs diagrams are plain HTML lists in the Markdown (a numbered list on GitHub), drawn here from
+   Starlight's tokens so they follow the docs theme and its light/dark picker. */
+.orca-diagram {
+  container-type: inline-size;
+  margin: 2rem 0;
+}
+
+.sl-markdown-content .orca-diagram figcaption {
+  margin-top: 0.75rem;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  text-align: center;
+}
+
+.orca-diagram :is(ol, ul) {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sl-markdown-content .orca-diagram li + li {
+  margin-top: 0;
+}
+
+/* A node: one step, actor or host. */
+.orca-flow > li,
+.orca-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
+  line-height: 1.35;
+}
+
+.orca-flow strong,
+.orca-node strong {
+  font-family: var(--sl-font-mono);
+  font-size: var(--sl-text-base);
+  font-weight: 600;
+  overflow-wrap: normal;
+}
+
+.orca-flow strong {
+  font-size: var(--sl-text-sm);
+}
+
+.orca-flow span,
+.orca-node span {
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-xs);
+}
+
+.orca-node.is-lead,
+.orca-flow > li.is-goal {
+  border-color: var(--sl-color-accent);
+  box-shadow: inset 0 0 0 1px var(--sl-color-accent);
+}
+
+.orca-node.is-you {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* A flow: numbered steps joined by arrows, across; down when the column is narrow. */
+.orca-flow {
+  counter-reset: orca-step;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.orca-flow > li {
+  counter-increment: orca-step;
+  padding: 2.75rem 0.75rem 0.875rem;
+}
+
+.orca-flow > li::before {
+  content: counter(orca-step);
+  position: absolute;
+  top: 0.875rem;
+  left: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--sl-color-accent);
+  color: var(--sl-color-black);
+  font-family: var(--sl-font-mono);
+  font-size: var(--sl-text-xs);
+  font-weight: 700;
+}
+
+.orca-flow > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1.625rem;
+  right: -1.5rem;
+  width: 1.5rem;
+  height: 0.75rem;
+  background: var(--sl-color-accent);
+  clip-path: polygon(0 45%, 65% 45%, 65% 0, 100% 50%, 65% 100%, 65% 55%, 0 55%);
+}
+
+@container (max-width: 40rem) {
+  .orca-flow {
+    grid-auto-flow: row;
+    gap: 1.25rem;
+  }
+
+  .orca-flow > li {
+    padding: 0.75rem 1rem 0.75rem 3.25rem;
+  }
+
+  .orca-flow > li::before {
+    top: 0.75rem;
+  }
+
+  .orca-flow > li:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -1.25rem;
+    left: 1.375rem;
+    width: 0.75rem;
+    height: 1.25rem;
+    clip-path: polygon(45% 0, 55% 0, 55% 65%, 100% 65%, 50% 100%, 0 65%, 45% 65%);
+  }
+}
+
+/* Stages: rows of nodes top to bottom, each row reached by an arrow that may name what happens. */
+.orca-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 2.75rem;
+}
+
+.orca-stages > ul {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.orca-stages > ul > li {
+  flex: 1 1 10rem;
+  max-width: 16rem;
+}
+
+.orca-stages > ul + ul::before {
+  content: '';
+  position: absolute;
+  top: -2.5rem;
+  left: calc(50% - 0.375rem);
+  width: 0.75rem;
+  height: 2.25rem;
+  background: var(--sl-color-accent);
+  clip-path: polygon(45% 0, 55% 0, 55% 70%, 100% 70%, 50% 100%, 0 70%, 45% 70%);
+}
+
+.orca-stages > ul[data-via]::after {
+  content: attr(data-via);
+  position: absolute;
+  top: -2.5rem;
+  right: 0;
+  left: calc(50% + 1rem);
+  display: flex;
+  align-items: center;
+  height: 2.25rem;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  line-height: 1.2;
+}
+
+/* State dots, in the order the Team panel uses them. */
+.orca-node[class*='is-state-'] strong::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.5rem;
+  border-radius: 999px;
+  vertical-align: 0.1em;
+}
+
+.orca-node.is-state-working strong::before {
+  background: var(--sl-color-blue);
+}
+
+.orca-node.is-state-waiting strong::before {
+  background: var(--sl-color-orange);
+}
+
+.orca-node.is-state-done strong::before {
+  background: var(--sl-color-green);
+}
+
+/* Screenshots: framed like a window, light or dark capture per theme when both exist. */
+.sl-markdown-content img.orca-shot,
+.sl-markdown-content p > img:only-child {
+  display: block;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.08),
+    0 18px 40px -20px rgb(0 0 0 / 0.45);
+}

@@ -80,4 +80,31 @@ describe('transformDoc', () => {
       /!\[grid\]\(\/orca-oss\/media\/docs\/assets\/readme\/agent-grid.gif\)/
     )
   })
+
+  it('shows the light or dark capture of a screenshot that has a .dark sibling', () => {
+    const darkVariant = (repoPath) =>
+      repoPath === 'docs/assets/x/shot.png' ? 'docs/assets/x/shot.dark.png' : null
+    const out = transformDoc(
+      '# T\n\n![The "Add" dialog](../assets/x/shot.png)\n\n![Other](../assets/x/other.png)\n',
+      'docs/user/get-started.md',
+      { ...opts, darkVariant }
+    )
+    assert.deepEqual(out.images, [
+      'docs/assets/x/shot.png',
+      'docs/assets/x/shot.dark.png',
+      'docs/assets/x/other.png'
+    ])
+    assert.match(
+      out.markdown,
+      /<img class="orca-shot dark:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.png" alt="The &quot;Add&quot; dialog" loading="lazy" \/><img class="orca-shot light:sl-hidden" src="\/orca-oss\/media\/docs\/assets\/x\/shot.dark.png"/
+    )
+    assert.match(out.markdown, /!\[Other\]\(\/orca-oss\/media\/docs\/assets\/x\/other.png\)/)
+  })
+
+  it('keeps a diagram figure as HTML', () => {
+    const src =
+      '# T\n\n<figure class="orca-diagram">\n<ol class="orca-flow">\n<li><strong>Install</strong><span>any OS</span></li>\n</ol>\n<figcaption>Flow</figcaption>\n</figure>\n'
+    const out = transformDoc(src, 'docs/user/get-started.md', opts)
+    assert.ok(out.markdown.endsWith(src.slice('# T\n'.length)))
+  })
 })

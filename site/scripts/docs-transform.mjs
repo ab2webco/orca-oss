@@ -11,6 +11,8 @@ const HTML_TAGS = new Set([
   'details',
   'div',
   'em',
+  'figcaption',
+  'figure',
   'h1',
   'h2',
   'h3',
@@ -64,6 +66,27 @@ function resolveTarget(target, sourcePath, opts, images) {
     return `${opts.base}/media/${repoPath}`
   }
   return `${opts.repoUrl}/blob/main/${repoPath}${hash}`
+}
+
+function escapeAttr(value) {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
+
+// A screenshot on a line of its own with a `.dark` sibling shows the copy that matches the theme.
+function themedShot(line, sourcePath, opts, images) {
+  const match = /^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line)
+  if (!match || isExternal(match[2]) || !opts.darkVariant) {
+    return null
+  }
+  const repoPath = path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), match[2]))
+  const dark = IMAGE_EXT.test(repoPath) ? opts.darkVariant(repoPath) : null
+  if (!dark) {
+    return null
+  }
+  images.push(repoPath, dark)
+  const img = (file, hiddenIn) =>
+    `<img class="orca-shot ${hiddenIn}:sl-hidden" src="${opts.base}/media/${file}" alt="${escapeAttr(match[1])}" loading="lazy" />`
+  return img(repoPath, 'dark') + img(dark, 'light')
 }
 
 function escapePlaceholderTags(text) {
@@ -126,7 +149,9 @@ export function transformDoc(source, sourcePath, opts) {
       titleTaken = true
       continue
     }
-    body.push(rewriteProse(line, sourcePath, opts, images))
+    body.push(
+      themedShot(line, sourcePath, opts, images) ?? rewriteProse(line, sourcePath, opts, images)
+    )
   }
   const frontmatter = [
     '---',

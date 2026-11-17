@@ -82,11 +82,18 @@ export function localeRoutes(routes, locale, hasTranslation) {
   return localized
 }
 
+// `shot.png` → `shot.dark.png`, when that capture exists.
+function darkVariant(repoPath) {
+  const dark = repoPath.replace(/(\.[a-z]+)$/i, '.dark$1')
+  return existsSync(path.join(REPO_DIR, dark)) ? dark : null
+}
+
 function writePage(repoPath, source, route, routes) {
   const { markdown, images } = transformDoc(source, repoPath, {
     base: BASE,
     repoUrl: REPO_URL,
-    routes
+    routes,
+    darkVariant
   })
   const target = path.join(
     CONTENT_ROOT,
