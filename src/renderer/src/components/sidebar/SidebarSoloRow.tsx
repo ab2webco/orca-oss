@@ -62,6 +62,8 @@ export const SidebarSoloRow = React.memo(function SidebarSoloRow({
   return (
     <div
       data-sidebar-solo-row=""
+      role="treeitem"
+      aria-level={1}
       data-agent-send-target={sendTargetStatus}
       title={sendTargetDisabledReason}
       onClick={handleClick}

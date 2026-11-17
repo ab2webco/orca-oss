@@ -83,7 +83,13 @@ export function WorktreeCardSoloContent({
   )
   const target = send.active ? send.targetsByPaneKey.get(solo.agent.paneKey) : undefined
   return (
-    <div className="flex w-full min-w-0 flex-col" data-worktree-card-solo-content="">
+    // Why a tree: the inline list it replaces is one, so assistive tech finds the agent the same way.
+    <div
+      className="flex w-full min-w-0 flex-col"
+      data-worktree-card-solo-content=""
+      role="tree"
+      aria-label={translate('auto.components.sidebar.WorktreeCardAgents.1b0a156717', 'Agents')}
+    >
       <SidebarSoloRow
         agent={solo.agent}
         name={worktree.displayName}

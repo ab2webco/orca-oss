@@ -95,6 +95,12 @@ describe('SidebarSoloRow', () => {
     expect(part(el, 'kind')?.dataset.ciTone).toBe('success')
   })
 
+  it('stays a treeitem, as the inline list row was, so assistive tech still finds the agent', () => {
+    const row = render().querySelector('[data-sidebar-solo-row]')!
+    expect(row.getAttribute('role')).toBe('treeitem')
+    expect(row.getAttribute('aria-level')).toBe('1')
+  })
+
   it('focuses the agent pane on click, as the inline list row did', () => {
     const onActivate = vi.fn()
     const el = render({ onActivate })
