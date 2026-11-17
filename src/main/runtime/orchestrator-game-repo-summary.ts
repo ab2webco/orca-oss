@@ -4,7 +4,7 @@ import { detectGitOwnRemoteKey } from '../repo-git-remote-identity'
 
 export type GameRepoRecord = Pick<
   Repo,
-  'id' | 'displayName' | 'path' | 'gitRemoteIdentity' | 'connectionId'
+  'id' | 'displayName' | 'path' | 'gitRemoteIdentity' | 'connectionId' | 'kind'
 >
 
 const namesUpstream = (repo: GameRepoRecord): boolean =>
@@ -18,7 +18,8 @@ export const gameRepoSummaryOf = (repo: GameRepoRecord): GameRepoSummary => {
     displayName: repo.displayName,
     path: repo.path,
     remoteKey,
-    ownRemoteKey: namesUpstream(repo) ? null : remoteKey
+    ownRemoteKey: namesUpstream(repo) ? null : remoteKey,
+    ...(repo.kind ? { kind: repo.kind } : {})
   }
 }
 

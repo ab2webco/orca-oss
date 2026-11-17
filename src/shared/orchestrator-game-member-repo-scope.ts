@@ -1,4 +1,6 @@
 import { normalizeGitRemoteUrl } from './git-remote-identity'
+import { isFolderRepo } from './repo-kind'
+import type { RepoKind } from './repo-types'
 
 /** A repo as the member-repo check reads it, on this host or a paired one. */
 export type GameRepoSummary = {
@@ -12,6 +14,7 @@ export type GameRepoSummary = {
    * unknown. Absent from an older runtime's read, which then matches by `remoteKey` (ORCA-1198).
    */
   ownRemoteKey?: string | null
+  kind?: RepoKind
 }
 
 /** What `game.memberRepoScope` reads: the lead's repo here, and the target repo where it would run. */
@@ -109,6 +112,14 @@ export function gameHostLaunchOf(args: {
     return {
       kind: 'refused',
       reason: `${namedByUpstream.displayName} on ${host} names ${upstream}, the upstream every fork of it shares, so Orca cannot tell it is ${lead.displayName}'s clone. If it is, list ${upstream} in orchestratorGame.orchestrator.memberRepos.`
+    }
+  }
+  // Why not unregistered: a partial clone never gets a remote identity, so it may be this project (ORCA-1250).
+  const unidentified = repos.find((repo) => repo.remoteKey === null && !isFolderRepo(repo))
+  if (unidentified) {
+    return {
+      kind: 'refused',
+      reason: `${unidentified.displayName} on ${host} has no remote identity yet, so Orca cannot tell whether it is ${lead.displayName}'s clone. See ORCA-1250.`
     }
   }
   return {

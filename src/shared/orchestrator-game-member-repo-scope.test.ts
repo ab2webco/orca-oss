@@ -175,12 +175,14 @@ describe('gameMemberRepoRefusalOf for a fork (ORCA-1198)', () => {
     expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toBeNull()
   })
 
-  it("keeps today's refusal for a host whose repo.list carries no remote identity", () => {
+  it('says a host repo with no remote identity cannot be told apart, not that the project is missing (ORCA-1250)', () => {
     const bare = repo('h_orca', 'orca-oss', null, null)
     const read = { host: 'm1', lead: leadFork, repo: bare, repos: [bare] }
-    expect(gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })).toMatch(
-      /orca-oss is not registered on m1, so no member can start there for it/
+    const refusal = gameMemberRepoRefusalOf({ read, selector: 'name:orca-oss' })
+    expect(refusal).toMatch(
+      /orca-oss on m1 has no remote identity yet, so Orca cannot tell whether it is orca-oss's clone/
     )
+    expect(refusal).not.toMatch(/is not registered on m1/)
   })
 
   it('says why a host clone named by the shared upstream is refused, not that the project is missing', () => {
@@ -217,6 +219,7 @@ describe('gameHostLaunchOf (ORCA-1207)', () => {
   const leadFork = repo('r_orca', 'orca-oss', upstream, 'github.com/ab2webco/orca-oss')
   const hostFork = repo('h_orca', 'orca-oss', 'github.com/ab2webco/orca-oss')
   const upstreamClone = repo('h_up', 'orca-oss', upstream, null)
+  const partialClone = repo('h_partial', 'orca-oss', null, null)
 
   it('finds the project on a host that has its clone', () => {
     expect(gameHostLaunchOf({ lead: leadFork, host: 'm1', repos: [front, hostFork] })).toEqual({
@@ -240,13 +243,30 @@ describe('gameHostLaunchOf (ORCA-1207)', () => {
     })
   })
 
+  it('refuses a host whose only candidate has no remote identity yet (koombea partial clone, ORCA-1250)', () => {
+    expect(
+      gameHostLaunchOf({ lead: leadFork, host: 'koombea', repos: [front, partialClone] })
+    ).toEqual({
+      kind: 'refused',
+      reason:
+        "orca-oss on koombea has no remote identity yet, so Orca cannot tell whether it is orca-oss's clone. See ORCA-1250."
+    })
+  })
+
+  it('keeps a host with no candidate repo as not registered, folder workspaces included', () => {
+    const folder = { ...repo('h_notes', 'notes', null, null), kind: 'folder' as const }
+    for (const repos of [[], [front], [folder]]) {
+      expect(gameHostLaunchOf({ lead: leadFork, host: 'koombea', repos }).kind).toBe('unregistered')
+    }
+  })
+
   it('refuses every host for a lead whose project Orca cannot tell', () => {
     expect(gameHostLaunchOf({ lead: null, host: 'm1', repos: [hostFork] }).kind).toBe('refused')
   })
 
   // Why: the tab and `game launch --on` must never disagree about a host.
   it('says what game launch --on refuses with, minus the launch-only clause', () => {
-    for (const repos of [[front], [upstreamClone]]) {
+    for (const repos of [[front], [upstreamClone], [partialClone]]) {
       const launch = gameHostLaunchOf({ lead: leadFork, host: 'm1', repos })
       const refusal = gameMemberRepoRefusalOf({
         read: { host: 'm1', lead: leadFork, repo: null, repos },
