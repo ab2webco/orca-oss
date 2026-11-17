@@ -223,9 +223,6 @@ export function teamSoloSessionsOf(
     const worktree = folderWorkspaceToWorktree(folder)
     worktrees.set(worktree.id, worktree)
   }
-  const ports = getWorkspacePortsByWorktreeId(state.workspacePortScan?.result)
-  const cacheOn = state.settings?.promptCacheTimerEnabled ?? false
-  const ttlMs = state.settings?.promptCacheTtlMs ?? 0
   return Object.values(state.agentStatusByPaneKey).flatMap((entry) => {
     const worktreeId = worktreeIdOf(state, entry)
     const worktree = worktreeId ? worktrees.get(worktreeId) : undefined
@@ -233,33 +230,45 @@ export function teamSoloSessionsOf(
       return []
     }
     const repo = state.repos.find((one) => one.id === worktree.repoId)
-    const host = teamSoloHostOf(state, worktree, repo)
-    // Why local for SSH: its panes run under this machine's runtime, which keeps its leads.
-    const hostKey =
-      host.kind === 'remote' && host.environmentId ? host.environmentId : TEAM_LOCAL_HOST_KEY
-    const cache = cacheOn
-      ? getPromptCacheCountdownForPane(entry.paneKey, state.cacheTimerByKey, ttlMs)
-      : null
-    return [
-      {
-        entry,
-        repoName: repo?.displayName ?? '',
-        worktreeName: worktree.displayName,
-        worktreeId: worktree.id,
-        isPrimary: worktree.isMainWorktree === true,
-        inTeam: isTeamPane(state, entry, leadsByHost.get(hostKey)),
-        host,
-        ticket: ticketOf(worktree),
-        pr: pullRequestOf(state, worktree, repo),
-        note: worktree.comment.trim() || null,
-        ports: (ports.get(worktree.id) ?? []).map((one) => one.port),
-        account: accountOf(state, entry, worktree, repo),
-        cacheExpiresAt: cache ? cache.startedAt + cache.ttlMs : null,
-        // Why null: only a pane running the mod reports it; `game.paneAdvisors` fills that one in.
-        advisor: null
-      }
-    ]
+    return [teamSoloSessionOf(state, entry, worktree, repo, leadsByHost)]
   })
+}
+
+/** One live agent pane with its workspace's facts, as `teamSoloSessionsOf` lists each. */
+export function teamSoloSessionOf(
+  state: TeamSoloSessionsState,
+  entry: AgentStatusEntry,
+  worktree: Worktree,
+  repo: Repo | undefined,
+  leadsByHost: ReadonlyMap<string, ReadonlySet<string>> = new Map()
+): TeamSoloSession {
+  const ports = getWorkspacePortsByWorktreeId(state.workspacePortScan?.result)
+  const cacheOn = state.settings?.promptCacheTimerEnabled ?? false
+  const ttlMs = state.settings?.promptCacheTtlMs ?? 0
+  const host = teamSoloHostOf(state, worktree, repo)
+  // Why local for SSH: its panes run under this machine's runtime, which keeps its leads.
+  const hostKey =
+    host.kind === 'remote' && host.environmentId ? host.environmentId : TEAM_LOCAL_HOST_KEY
+  const cache = cacheOn
+    ? getPromptCacheCountdownForPane(entry.paneKey, state.cacheTimerByKey, ttlMs)
+    : null
+  return {
+    entry,
+    repoName: repo?.displayName ?? '',
+    worktreeName: worktree.displayName,
+    worktreeId: worktree.id,
+    isPrimary: worktree.isMainWorktree === true,
+    inTeam: isTeamPane(state, entry, leadsByHost.get(hostKey)),
+    host,
+    ticket: ticketOf(worktree),
+    pr: pullRequestOf(state, worktree, repo),
+    note: worktree.comment.trim() || null,
+    ports: (ports.get(worktree.id) ?? []).map((one) => one.port),
+    account: accountOf(state, entry, worktree, repo),
+    cacheExpiresAt: cache ? cache.startedAt + cache.ttlMs : null,
+    // Why null: only a pane running the mod reports it; `game.paneAdvisors` fills that one in.
+    advisor: null
+  }
 }
 
 /** Each host that can hold a report, and its panes. Why no SSH: the relay drops that env var. */
