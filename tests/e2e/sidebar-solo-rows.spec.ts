@@ -163,10 +163,22 @@ test('a one-agent worktree draws V30 solo row; two agents keep the inline list',
   await capture(orcaPage, testInfo, 'done', row)
 
   // The inline list's actions stay on the row: click focuses the pane, the X dismisses.
+  // Why the ack key: only the agent row's focus acks its pane; a click that reached the card would not.
+  await orcaPage.evaluate(() => {
+    const acks: string[] = []
+    ;(window as unknown as { __soloAcks: string[] }).__soloAcks = acks
+    window.addEventListener('orca-focus-terminal-pane', (event) => {
+      const ack = (event as CustomEvent<{ ackPaneKeyOnSuccess?: string }>).detail
+        .ackPaneKeyOnSuccess
+      if (ack) {
+        acks.push(ack)
+      }
+    })
+  })
   await row.locator('[data-team-row-part="name"]').click()
   await expect
-    .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeWorktreeId))
-    .toBe(worktreeId)
+    .poll(() => orcaPage.evaluate(() => (window as unknown as { __soloAcks: string[] }).__soloAcks))
+    .toContain(paneKey)
   await row.hover()
   await row.getByRole('button', { name: 'Dismiss agent' }).click()
   await expect(row).toHaveCount(0)
