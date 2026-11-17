@@ -44,14 +44,19 @@ describe('baked hd land', () => {
     vi.mocked(material.backdropMaterialPixel).mockClear()
   })
 
-  it('draws the same far range, hills and lit ground as the per-pixel layers', () => {
-    for (const scene of Object.values(SCENES)) {
-      for (const look of Object.values(scene.looks)) {
+  // Why one `it` per scene and one assertion per frame: an `expect` per pixel was ~80% of the
+  // cost and pushed the whole sweep past 30 s on the Windows runner.
+  it.each(Object.keys(SCENES))(
+    'draws %s like the per-pixel far range, hills and lit ground',
+    (id) => {
+      const diverged: string[] = []
+      for (const [phase, look] of Object.entries(SCENES[id]?.looks ?? {})) {
         // Why several scrolls: the sun's column flips the facing as the layers pass under it.
         for (const scroll of [0, 1, 5, 6, 37, 240]) {
-          for (const light of [NOON, daylightAt(22), daylightAt(18.5)]) {
+          for (const [hour, light] of [12, 22, 18.5].map((h) => [h, daylightAt(h)] as const)) {
             const frame = frameAt(scroll, look, light)
             const bake = hdLandBakeOf(frame)
+            let first: string | undefined
             for (let y = 0; y < frame.pixels; y += 1) {
               for (let x = 0; x < WIDTH; x += 1) {
                 const want =
@@ -69,14 +74,20 @@ describe('baked hd land', () => {
                   y >= frame.ground
                     ? hdBakedGroundOf(bake, frame, x, y)
                     : hdBakedLandOf(bake, frame, x, y)
-                expect(got).toBe(want)
+                if (first === undefined && !Object.is(got, want)) {
+                  first = `${phase} scroll ${scroll} hour ${hour} at (${x}, ${y}): ${got} != ${want}`
+                }
               }
+            }
+            if (first !== undefined) {
+              diverged.push(first)
             }
           }
         }
       }
+      expect(diverged).toEqual([])
     }
-  })
+  )
 
   it('computes no land material on a second frame at rest', () => {
     gridAt(400, true)
