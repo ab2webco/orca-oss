@@ -64,6 +64,8 @@ const members = [
   { host: null, ticket: 'LAB-9' }
 ] as unknown as TeamMemberRow[]
 
+const words = teamWorkWordsOf('en')
+
 describe('TeamHostsTab board (ORCA-1252)', () => {
   let container: HTMLDivElement
   let root: Root
@@ -125,6 +127,28 @@ describe('TeamHostsTab board (ORCA-1252)', () => {
     expect(shown.filter((one) => one === 'LAB-7')).toHaveLength(1)
     expect(shown).not.toContain('LAB-9')
     expect(shown).toContain('1 slot free')
+  })
+
+  // Why: the status and the launch note say what to do, so an ellipsis would hide the instruction.
+  it('never cuts the status or the note that says what to do', () => {
+    show([
+      BUSY,
+      machine('unready', { launch: { kind: 'unregistered', project: 'lab', reason: 'x' } })
+    ])
+    const cut = [...document.body.querySelectorAll<HTMLElement>('div')]
+      .filter((one) => one.childElementCount === 0)
+      .filter((one) =>
+        ['Busy · 2 of 3 agents', words.notRegisteredNote('lab')].includes(one.textContent ?? '')
+      )
+      .map((one) => getComputedStyle(one))
+      .filter(
+        (style) =>
+          style.textOverflow === 'ellipsis' ||
+          (style.getPropertyValue('-webkit-line-clamp') !== '' &&
+            style.getPropertyValue('-webkit-line-clamp') !== 'none')
+      )
+
+    expect(cut).toHaveLength(0)
   })
 
   it('opens a host on a tap and keeps the choice while the sheet stays open', () => {

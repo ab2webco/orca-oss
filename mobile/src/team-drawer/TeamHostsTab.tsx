@@ -199,18 +199,12 @@ function MachineCard({
           {name ?? ''}
         </Text>
         <View style={[styles.dot, { backgroundColor: tone }]} />
-        <Text
-          style={[styles.side, styles.status, shown !== 'idle' && { color: tone }]}
-          numberOfLines={1}
-        >
+        {/* Why no line limit: the status and the note below say what to do. */}
+        <Text style={[styles.side, styles.status, shown !== 'idle' && { color: tone }]}>
           {statusWord(machine, warnings, words)}
         </Text>
       </Pressable>
-      {note ? (
-        <Text style={styles.side} numberOfLines={open ? undefined : 2}>
-          {note}
-        </Text>
-      ) : null}
+      {note ? <Text style={styles.side}>{note}</Text> : null}
       {gauges && !open ? (
         <View style={styles.row}>
           <Gauge
@@ -330,14 +324,18 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm
   },
+  // Why its own width: with flex 1 a wrapping status squeezes the name to nothing.
   machineName: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    maxWidth: '60%',
     color: colors.textPrimary,
     fontSize: typography.bodySize,
     fontWeight: '600'
   },
   status: {
-    flexShrink: 1
+    flexShrink: 1,
+    textAlign: 'right'
   },
   row: {
     flexDirection: 'row',
