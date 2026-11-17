@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { HostAvailableMemorySource, HostMemory } from '../../shared/process-stats-types'
+import { readHostCpuUsage } from './host-cpu-usage'
+import { readWorkspaceDisk } from './host-workspace-disk'
 
 const MEMORY_PRESSURE_TIMEOUT_MS = 1_000
 const MEMORY_PRESSURE_MAX_BUFFER = 64 * 1024
@@ -11,10 +13,16 @@ const KIB = 1024
 let darwinAvailabilitySupported = true
 let linuxAvailabilitySupported = true
 
-export async function collectHostMemory(): Promise<HostMemory> {
+export async function collectHostMemory({
+  workspaceDir
+}: { workspaceDir?: string } = {}): Promise<HostMemory> {
   const total = nonNegativeNumber(os.totalmem())
   const free = Math.min(total, nonNegativeNumber(os.freemem()))
-  const preferred = await readAvailableMemory(os.platform(), total)
+  const [preferred, cpuUsagePercent, disk] = await Promise.all([
+    readAvailableMemory(os.platform(), total),
+    readHostCpuUsage(),
+    workspaceDir ? readWorkspaceDisk(workspaceDir) : null
+  ])
   const available = Math.min(total, Math.max(free, preferred?.bytes ?? free))
   const used = Math.max(0, total - available)
 
@@ -26,7 +34,9 @@ export async function collectHostMemory(): Promise<HostMemory> {
     usedMemory: used,
     memoryUsagePercent: total > 0 ? (used / total) * 100 : 0,
     cpuCoreCount: Math.max(1, os.cpus().length),
-    loadAverage1m: nonNegativeNumber(os.loadavg()[0])
+    loadAverage1m: nonNegativeNumber(os.loadavg()[0]),
+    ...(cpuUsagePercent === undefined ? {} : { cpuUsagePercent }),
+    ...(disk ? { workspaceDiskTotal: disk.total, workspaceDiskFree: disk.free } : {})
   }
 }
 

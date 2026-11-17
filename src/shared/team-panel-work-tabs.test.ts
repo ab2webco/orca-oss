@@ -319,6 +319,26 @@ describe('teamMachinesSectionOf', () => {
     expect(rows[0].status).toBe('risk')
   })
 
+  it('carries the CPU use and workspaces disk a newer host reports', () => {
+    const rows = machines([
+      ok({ cpuUsagePercent: 37, workspaceDiskTotal: 900 * GB, workspaceDiskFree: 400 * GB })
+    ])
+
+    expect(rows[0].reading).toMatchObject({
+      kind: 'ok',
+      cpuUsagePercent: 37,
+      workspaceDiskTotal: 900 * GB,
+      workspaceDiskFree: 400 * GB
+    })
+  })
+
+  it('carries no CPU use or disk for an older host, so neither reads as zero', () => {
+    const rows = machines([ok()])
+
+    expect(rows[0].reading).not.toHaveProperty('cpuUsagePercent')
+    expect(rows[0].reading).not.toHaveProperty('workspaceDiskFree')
+  })
+
   it('reads an unreachable host as red, with no figures', () => {
     const rows = machines([{ host: 'm1', running: 1, status: 'unreachable' }])
 

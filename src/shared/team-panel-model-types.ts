@@ -241,6 +241,10 @@ export type TeamMachine = {
         totalMemory: number
         availableMemory: number
         loadAverage1m: number | null
+        /** Absent from a host older than ORCA-1252: shown unknown, never zero. */
+        cpuUsagePercent?: number
+        workspaceDiskTotal?: number
+        workspaceDiskFree?: number
       }
     | { kind: 'unreachable'; lastSeenAt: number | null }
     /** No figures to show: an SSH target has no Orca to ask, and a saved host may not have answered yet. */

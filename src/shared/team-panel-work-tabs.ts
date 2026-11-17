@@ -1,4 +1,8 @@
-import { gameHostMemoryIsLow, type GameHostCapacity } from './orchestrator-game-host-capacity'
+import {
+  gameHostCpuAndDiskOf,
+  gameHostMemoryIsLow,
+  type GameHostCapacity
+} from './orchestrator-game-host-capacity'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameProjectItem, GameQueueEntry } from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
@@ -185,7 +189,8 @@ function machineOf(one: GameHostCapacity, members: readonly TeamMemberCard[]): T
       cpuCoreCount: one.cpuCoreCount,
       totalMemory: one.totalMemory,
       availableMemory: one.availableMemory,
-      loadAverage1m: one.loadAverage1m
+      loadAverage1m: one.loadAverage1m,
+      ...gameHostCpuAndDiskOf(one)
     }
   }
 }
