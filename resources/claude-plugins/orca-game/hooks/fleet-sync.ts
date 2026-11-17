@@ -44,8 +44,6 @@ import { RECENT_KEY, recentRewardsOf, withRecent } from './recent-rewards'
 import { awardXp, hostTeamXpOf, levelOf, signedXpOf, xpLedgerOf, type Reward } from './rewards'
 import { setContributedScenes } from './scenes/index'
 
-export { runCli }
-
 export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
 // Why longer: a lead's state reads GitHub and paired hosts, and a cut read only keeps the old fleet.
