@@ -106,9 +106,11 @@ export const gaugeStyles = StyleSheet.create({
     fontSize: typography.titleSize,
     fontWeight: '600'
   },
+  // Why a set line height: without one iOS can drop a wrapped note's last line.
   side: {
     color: colors.textSecondary,
-    fontSize: typography.metaSize
+    fontSize: typography.metaSize,
+    lineHeight: 16
   },
   divided: {
     borderLeftWidth: StyleSheet.hairlineWidth,

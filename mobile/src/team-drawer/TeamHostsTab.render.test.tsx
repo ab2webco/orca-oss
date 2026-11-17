@@ -151,6 +151,22 @@ describe('TeamHostsTab board (ORCA-1252)', () => {
     expect(cut).toHaveLength(0)
   })
 
+  // Why: on iOS a wrapped note with no set line height lost its last line ("clone and register it.").
+  it('gives the status and the note a set line height, so iOS draws their last line', () => {
+    show([
+      BUSY,
+      machine('unready', { launch: { kind: 'unregistered', project: 'lab', reason: 'x' } })
+    ])
+    const heights = [...document.body.querySelectorAll<HTMLElement>('div')]
+      .filter((one) => one.childElementCount === 0)
+      .filter((one) =>
+        ['Busy · 2 of 3 agents', words.notRegisteredNote('lab')].includes(one.textContent ?? '')
+      )
+      .map((one) => getComputedStyle(one).lineHeight)
+
+    expect(heights).toEqual(['16px', '16px'])
+  })
+
   it('opens a host on a tap and keeps the choice while the sheet stays open', () => {
     show([machine('keeper')])
     act(() => button('keeper').click())

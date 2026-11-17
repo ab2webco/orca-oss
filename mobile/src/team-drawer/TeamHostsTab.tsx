@@ -312,9 +312,11 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4
   },
+  // Why a set line height: without one iOS can drop a wrapped note's last line.
   side: {
     color: colors.textSecondary,
-    fontSize: typography.metaSize
+    fontSize: typography.metaSize,
+    lineHeight: 16
   },
   note: {
     color: colors.textMuted,
