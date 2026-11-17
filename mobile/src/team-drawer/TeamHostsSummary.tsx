@@ -14,21 +14,30 @@ import type { TeamWorkWords } from './team-work-words'
 type Segment = 'on' | 'off' | 'warning' | 'none'
 
 /** One segment per host, so the strip shows which share of the fleet a figure is. */
-function Segments({ of }: { of: Segment[] }) {
+function Segments({
+  machines,
+  kindOf
+}: {
+  machines: TeamMachine[]
+  kindOf: (machine: TeamMachine) => Segment
+}) {
   const tones = useTeamTones()
   return (
     <View style={styles.segments}>
-      {of.map((one, index) => (
-        <View
-          key={index}
-          style={[
-            styles.segment,
-            one === 'on' && { backgroundColor: colors.textMuted },
-            one === 'warning' && { backgroundColor: tones.warning },
-            one === 'off' && styles.off
-          ]}
-        />
-      ))}
+      {machines.map((machine) => {
+        const one = kindOf(machine)
+        return (
+          <View
+            key={machine.host.kind === 'local' ? 'local' : machine.host.name}
+            style={[
+              styles.segment,
+              one === 'on' && { backgroundColor: colors.textMuted },
+              one === 'warning' && { backgroundColor: tones.warning },
+              one === 'off' && styles.off
+            ]}
+          />
+        )
+      })}
     </View>
   )
 }
@@ -95,9 +104,8 @@ export function TeamHostsSummary({
         total={words.ofTotal(summary.hosts)}
         meter={
           <Segments
-            of={machines.map((one) =>
-              offline(one) ? 'off' : one.launch.kind === 'ready' ? 'on' : 'none'
-            )}
+            machines={machines}
+            kindOf={(one) => (offline(one) ? 'off' : one.launch.kind === 'ready' ? 'on' : 'none')}
           />
         }
         caption={[
@@ -130,9 +138,10 @@ export function TeamHostsSummary({
         warn={summary.warned.length > 0}
         meter={
           <Segments
-            of={machines.map((one) =>
+            machines={machines}
+            kindOf={(one) =>
               offline(one) ? 'off' : teamMachineWarningsOf(one).length ? 'warning' : 'none'
-            )}
+            }
           />
         }
         caption={summary.warned.map(nameOf).join(' · ')}
