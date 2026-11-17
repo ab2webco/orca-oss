@@ -148,10 +148,63 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
             `a tooltip over the drawer at ${width}`
           ).toEqual([])
         }
-        await orcaPage.screenshot({
-          path: testInfo.outputPath(`${width}-${theme}-${open ? 'open' : 'closed'}.png`)
-        })
+        const name = `${width}-${theme}-${open ? 'open' : 'closed'}.png`
+        const shot = await orcaPage.screenshot({ path: testInfo.outputPath(name) })
+        // Why attached: CI keeps test-results only on failure; the JSON report carries the narrow captures on green runs too.
+        if (width < 768) {
+          await testInfo.attach(name, { body: shot, contentType: 'image/png' })
+        }
       }
     }
+  }
+})
+
+// ORCA-1220: Windows and Linux draw their window controls over the titlebar's top right, and at 390 the
+// toggle sat under the left sidebar, where no click reached it.
+test('with custom window controls the right toggle stays reachable at narrow widths', async ({
+  orcaPage
+}) => {
+  await orcaPage.addInitScript(() => {
+    const userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/146 Safari/537.36'
+    Object.defineProperty(navigator, 'userAgent', { get: () => userAgent, configurable: true })
+  })
+  await orcaPage.reload({ waitUntil: 'domcontentloaded' })
+  await orcaPage.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
+  await waitForSessionReady(orcaPage)
+  await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await expect(orcaPage.locator('.window-controls')).toBeVisible()
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSidebarOpen(true)
+    state.setRightSidebarOpen(false)
+  })
+
+  for (const width of [390, 320]) {
+    await orcaPage.setViewportSize({ width, height: 844 })
+    const toggle = orcaPage.locator('[data-right-sidebar-toggle]:visible').first()
+    await expect(toggle).toBeVisible()
+    const placement = await toggle.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const controls = document.querySelector('.window-controls')!.getBoundingClientRect()
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return {
+        reachable: Boolean(hit && node.contains(hit)),
+        underWindowControls:
+          box.right > controls.left &&
+          box.left < controls.right &&
+          box.bottom > controls.top &&
+          box.top < controls.bottom
+      }
+    })
+    expect(placement, `the right toggle at ${width}`).toEqual({
+      reachable: true,
+      underWindowControls: false
+    })
+    await toggle.click()
+    await expect(orcaPage.locator(DRAWER)).toBeVisible()
+    await orcaPage.keyboard.press('Escape')
+    await expect(orcaPage.locator(DRAWER)).toHaveCount(0)
   }
 })

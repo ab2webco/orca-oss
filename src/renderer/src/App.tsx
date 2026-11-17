@@ -2404,20 +2404,26 @@ function App(): React.JSX.Element {
                       ) : null}
                       <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
                         {/* Why: match the RightSidebar header's 36px/top-0 so the toggle's vertical center is identical open vs closed — else the icon jitters. */}
-                        {workspaceChromeActive && !rightSidebarOpen && (
-                          <div
-                            className="absolute top-0 z-10 flex items-center h-[36px]"
-                            style={
-                              {
+                        {workspaceChromeActive &&
+                          !rightSidebarOpen && (
+                            // Why a toggle-only container: a query on the content column would contain its fixed descendants.
+                            <div
+                              className={`absolute inset-x-0 top-0 z-10${hasCustomTitleBar ? ' @container' : ''}`}
+                            >
+                              <div
                                 // Why: --window-controls-width keeps the toggle clear of the fixed window-controls overlay (138px on custom chrome, 0px otherwise); no internal spacer — one would cover the pane-actions Ellipsis button with an unclickable div.
-                                right: 'var(--window-controls-width)',
-                                WebkitAppRegion: 'no-drag'
-                              } as React.CSSProperties
-                            }
-                          >
-                            {rightSidebarToggle}
-                          </div>
-                        )}
+                                // Below 178px (138px controls + the 40px toggle) it has no room beside them, so it drops under them (ORCA-1220).
+                                className={`absolute top-0 right-(--window-controls-width) flex items-center h-[36px]${
+                                  hasCustomTitleBar
+                                    ? ' @max-[178px]:top-(--window-controls-height) @max-[178px]:right-0'
+                                    : ''
+                                }`}
+                                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                              >
+                                {rightSidebarToggle}
+                              </div>
+                            </div>
+                          )}
                         <div className="flex flex-1 min-w-0 min-h-0 flex-col">
                           {shouldMountTerminalWorkbench ? (
                             <div
