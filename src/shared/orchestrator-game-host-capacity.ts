@@ -1,6 +1,7 @@
 import { gameFleetReportOf } from './orchestrator-game-fleet-verbs'
 import { LOCAL_GAME_HOST, type GameHostLoad } from './orchestrator-game-host-load'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
+import type { GameHostLaunch } from './orchestrator-game-member-repo-scope'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** The host fields of a `diagnostics.memory` snapshot, which every paired host answers. */
@@ -14,11 +15,16 @@ export type GameHostMachine = {
 
 export type GameHostReading = { kind: 'ok'; machine: GameHostMachine } | { kind: 'unreachable' }
 
-/** One host as a lead's game state publishes it (ORCA-841); `cap` while it publishes one (ORCA-888). */
-export type GameHostCapacity = { host: string; running: number; cap?: number } & (
-  | ({ status: 'ok' } & GameHostMachine)
-  | { status: 'unreachable' }
-)
+/**
+ * One host as a lead's game state publishes it (ORCA-841); `cap` while it publishes one (ORCA-888).
+ * `launch` on a paired host only, and absent from an older Orca's state (ORCA-1207).
+ */
+export type GameHostCapacity = {
+  host: string
+  running: number
+  cap?: number
+  launch?: GameHostLaunch
+} & (({ status: 'ok' } & GameHostMachine) | { status: 'unreachable' })
 
 const GB = 1024 ** 3
 // Why: one member's share in the default cap (orchestrator-game-lead.ts); under 10% free macOS compresses.
@@ -46,32 +52,43 @@ export function gameHostMachineOf(raw: unknown): GameHostMachine | null {
 
 type Readings = readonly { host: string; reading: GameHostReading }[]
 
+/** Paired host name to whether this lead's members can start there. */
+export type GameHostLaunches = ReadonlyMap<string, GameHostLaunch>
+
 /** Each host's machine over its ORCA-888 load, so its count is the one `game launch` refuses on. */
 export function gameHostCapacitiesOf(
   readings: Readings,
-  loads: readonly GameHostLoad[]
+  loads: readonly GameHostLoad[],
+  launches?: GameHostLaunches | null
 ): GameHostCapacity[] {
   const machines = new Map(readings.map((one) => [one.host, one.reading]))
   return loads.map(({ host, running, cap, status }): GameHostCapacity => {
     const reading = machines.get(host)
-    const capped = status === 'ok' ? { cap } : {}
+    const launch = host === LOCAL_GAME_HOST ? undefined : launches?.get(host)
+    const base = {
+      host,
+      running,
+      ...(status === 'ok' ? { cap } : {}),
+      ...(launch ? { launch } : {})
+    }
     return reading?.kind === 'ok'
-      ? { host, running, ...capped, status: 'ok', ...reading.machine }
-      : { host, running, ...capped, status: 'unreachable' }
+      ? { ...base, status: 'ok', ...reading.machine }
+      : { ...base, status: 'unreachable' }
   })
 }
 
 /** A lead with per-host caps gets the rows; one with no saved host gets this machine as `localHost`. */
 export function withGameHostCapacity(
   state: OrchestratorGameState,
-  readings: Readings | null
+  readings: Readings | null,
+  launches?: GameHostLaunches | null
 ): OrchestratorGameState {
   if (state.role !== 'lead' || !readings) {
     return state
   }
   const loads = gameFleetReportOf(state).hosts
   if (loads) {
-    return { ...state, hostCapacity: gameHostCapacitiesOf(readings, loads) }
+    return { ...state, hostCapacity: gameHostCapacitiesOf(readings, loads, launches) }
   }
   // Why only alone: a saved host whose cap could not be read is still another machine.
   if (readings.length !== 1) {
@@ -98,6 +115,13 @@ const flagsOf = (one: GameHostMachine): string[] => [
   ...(one.loadAverage1m !== null && one.loadAverage1m >= one.cpuCoreCount ? ['busy'] : [])
 ]
 
+const LAUNCH_FLAGS: Record<GameHostLaunch['kind'], string | null> = {
+  ready: null,
+  unregistered: 'project not registered',
+  refused: 'refused by repo scope',
+  unanswered: 'repos not answering'
+}
+
 /** `game fleet` and `game state` text: one line per host under `Hosts:`. */
 export function formatGameHostCapacity(hosts: readonly GameHostCapacity[]): string[] {
   const width = Math.max(...hosts.map((one) => one.host.length))
@@ -114,7 +138,8 @@ export function formatGameHostCapacity(hosts: readonly GameHostCapacity[]): stri
             ]
           : ['not answering']
       const running = one.cap === undefined ? one.running : `${one.running}/${one.cap}`
-      return `  ${one.host.padEnd(width)}  ${[`${running} running`, ...figures].join(' · ')}`
+      const launch = one.launch ? LAUNCH_FLAGS[one.launch.kind] : null
+      return `  ${one.host.padEnd(width)}  ${[`${running} running`, ...figures, ...(launch ? [launch] : [])].join(' · ')}`
     })
   ]
 }

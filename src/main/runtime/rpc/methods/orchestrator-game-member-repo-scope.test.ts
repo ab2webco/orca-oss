@@ -118,6 +118,28 @@ describe('game.memberRepoScope (ORCA-1156)', () => {
     ])
   })
 
+  // Why: a folder workspace has no remote by design, so it must not read as an unidentified clone (ORCA-1250).
+  it("keeps a host repo's kind, so a folder workspace is never taken for a clone", async () => {
+    const notes = { ...record('h_notes', 'notes', null), kind: 'folder' }
+    const send = dispatcherWith({
+      showRepo: async () => netsat,
+      resolveOrchestrationWorkerServer: () => ({ environmentId: 'env_m1', name: 'm1' }),
+      callOrchestrationWorkerServer: async (_env: string, method: string) =>
+        method === 'repo.list' ? { repos: [notes, orca] } : { repo: orca }
+    })
+
+    await expect(
+      send({ leadRepo: 'r_netsat', repo: 'name:orca-oss', on: 'm1' })
+    ).resolves.toMatchObject({
+      result: {
+        repos: [
+          { id: 'h_notes', kind: 'folder' },
+          { id: 'h_orca', kind: 'git' }
+        ]
+      }
+    })
+  })
+
   it('reads a selector the host does not know as no repo', async () => {
     const send = dispatcherWith({
       showRepo: async () => netsat,
