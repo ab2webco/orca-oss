@@ -27,110 +27,110 @@ const message = (
 })
 
 export function createShowcaseInboxThreads(): GameInboxThreads {
-  const iris = [
+  const pico = [
     message(
-      'm-216-1',
-      'ACME-216',
+      'm-14-1',
+      'LUM-14',
       'lead',
       'status',
       'Started',
-      'Reading the webhook worker and its retry table.',
+      'Reading the feed store and its cache table.',
       52
     ),
     message(
-      'm-216-2',
-      'ACME-216',
+      'm-14-2',
+      'LUM-14',
       'lead',
       'decision_gate',
-      'Retry ceiling for failed webhooks',
-      'Stop at 8 attempts with exponential backoff, or keep retrying for 24 hours?',
+      'Cache size for the offline feed',
+      'Keep the last 200 posts, or everything from the past 7 days?',
       6
     )
   ]
-  const leo = [
+  const nova = [
     message(
-      'm-214-1',
-      'ACME-214',
+      'm-25-1',
+      'LUM-25',
       'lead',
       'escalation',
-      'Sandbox key missing on CI',
-      'The payment sandbox job has no SANDBOX_KEY secret, so every run fails at setup.',
+      'Upload sandbox missing on CI',
+      'The photo upload job has no UPLOAD_SANDBOX_URL secret, so every run fails at setup.',
       41
     ),
     message(
-      'm-214-2',
+      'm-25-2',
       'lead',
-      'ACME-214',
+      'LUM-25',
       'reply',
-      'Re: Sandbox key missing on CI',
-      'Use the test key from the vault entry acme-sandbox and mark the job required.',
+      'Re: Upload sandbox missing on CI',
+      'Use the sandbox URL from the vault entry lumen-uploads and mark the job required.',
       35
     ),
     message(
-      'm-214-3',
-      'ACME-214',
+      'm-25-3',
+      'LUM-25',
       'lead',
       'status',
       'CI rerun',
-      'Rerunning with the key; two flaky specs left.',
+      'Rerunning with the URL; two flaky specs left.',
       12
     )
   ]
-  const theo = [
+  const vega = [
     message(
-      'm-205-1',
-      'ACME-205',
+      'm-21-1',
+      'LUM-21',
       'lead',
       'question',
-      'Invoice footer colour',
-      'Keep the brand footer in dark mode or switch to the neutral grey?',
+      'Card border in dark mode',
+      'Keep the brand border on cards in dark mode, or switch to the neutral grey?',
       95
     ),
     message(
-      'm-205-2',
+      'm-21-2',
       'lead',
-      'ACME-205',
+      'LUM-21',
       'answer',
-      'Re: Invoice footer colour',
-      'Neutral grey; the brand footer stays for print.',
+      'Re: Card border in dark mode',
+      'Neutral grey; the brand border stays in light mode.',
       90
     ),
     message(
-      'm-205-3',
-      'ACME-205',
+      'm-21-3',
+      'LUM-21',
       'lead',
       'worker_done',
       'Dark mode ready for review',
-      'PR 409 is green with screenshots at four widths.',
+      'PR 45 is green with screenshots at four widths.',
       30
     )
   ]
   return {
     threads: [
-      { ticket: 'ACME-216', messages: iris, last: iris[1].at, waiting: 1 },
-      { ticket: 'ACME-214', messages: leo, last: leo[2].at, waiting: 0 },
-      { ticket: 'ACME-205', messages: theo, last: theo[2].at, waiting: 0 }
+      { ticket: 'LUM-14', messages: pico, last: pico[1].at, waiting: 1 },
+      { ticket: 'LUM-25', messages: nova, last: nova[2].at, waiting: 0 },
+      { ticket: 'LUM-21', messages: vega, last: vega[2].at, waiting: 0 }
     ],
     waiting: [
       {
-        id: 'm-216-2',
-        ticket: 'ACME-216',
+        id: 'm-14-2',
+        ticket: 'LUM-14',
         kind: 'decision_gate',
-        subject: iris[1].subject,
-        body: iris[1].body,
-        at: iris[1].at,
+        subject: pico[1].subject,
+        body: pico[1].body,
+        at: pico[1].at,
         answerer: 'lead'
       }
     ],
     answered: [
       {
-        id: 'm-205-1',
-        ticket: 'ACME-205',
+        id: 'm-21-1',
+        ticket: 'LUM-21',
         kind: 'question',
-        question: theo[0].body,
-        answer: theo[1].body,
-        askedAt: theo[0].at,
-        answeredAt: theo[1].at
+        question: vega[0].body,
+        answer: vega[1].body,
+        askedAt: vega[0].at,
+        answeredAt: vega[1].at
       }
     ]
   }

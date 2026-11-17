@@ -14,65 +14,65 @@ const out = (text: string) => `  ${DIM}⎿${RESET} ${text}\n`
 
 type TerminalScript = { scrollback: string; chunks: string[]; reply: string[] }
 
-const CHECKOUT: TerminalScript = {
+const FEED: TerminalScript = {
   scrollback: [
-    `${DIM}~/code/acme-web/checkout-summary${RESET}\n`,
-    `${MAGENTA}>${RESET} ACME-212: redesign the checkout\n`,
-    '  summary card\n',
+    `${DIM}~/code/lumen-app/offline-feed${RESET}\n`,
+    `${MAGENTA}>${RESET} LUM-14: cache the feed for\n`,
+    '  offline reading\n',
     '\n',
-    say('Plan: totals row, then tests.')
+    say('Plan: one cache, then tests.')
   ].join(''),
   chunks: [
-    tool('Read', 'SummaryCard.tsx'),
-    out('212 lines'),
-    tool('Read', 'checkout/totals.ts'),
-    out('88 lines'),
-    say('Totals render in three places.'),
-    say('Moving them into one TotalsRow.'),
-    tool('Update', 'SummaryCard.tsx'),
-    `  ${GREEN}+ <TotalsRow label="Shipping" />${RESET}\n`,
-    `  ${GREEN}+ <TotalsRow label="Total" bold />${RESET}\n`,
-    `  ${RED}- <div className="totals">${RESET}\n`,
-    tool('Bash', 'pnpm test checkout'),
-    out(`${GREEN}✓${RESET} totals.test.ts ${DIM}(14)${RESET}`),
-    out(`${GREEN}✓${RESET} SummaryCard.test.tsx ${DIM}(9)${RESET}`),
-    say('Tests pass. Pushing to PR #412.'),
+    tool('Read', 'FeedStore.ts'),
+    out('146 lines'),
+    tool('Read', 'feed/cache.ts'),
+    out('64 lines'),
+    say('The feed hits the network twice.'),
+    say('Moving reads behind FeedCache.'),
+    tool('Update', 'FeedStore.ts'),
+    `  ${GREEN}+ const cache = new FeedCache(db)${RESET}\n`,
+    `  ${GREEN}+ return cache.read(page)${RESET}\n`,
+    `  ${RED}- return api.feed(page)${RESET}\n`,
+    tool('Bash', 'pnpm test feed-cache'),
+    out(`${GREEN}✓${RESET} cache.test.ts ${DIM}(12)${RESET}`),
+    out(`${GREEN}✓${RESET} FeedStore.test.ts ${DIM}(8)${RESET}`),
+    say('Tests pass. Pushing to PR #42.'),
     `\n${MAGENTA}>${RESET} `
   ],
   reply: [
-    say('Adding a tax line under Shipping.'),
-    tool('Update', 'SummaryCard.tsx'),
-    `  ${GREEN}+ <TotalsRow label="Tax" />${RESET}\n`,
-    tool('Bash', 'pnpm test checkout'),
-    out(`${GREEN}✓${RESET} 24 tests passed`),
-    say('Done. Tax shows above Total.'),
+    say('Adding a 7-day expiry.'),
+    tool('Update', 'feed/cache.ts'),
+    `  ${GREEN}+ const MAX_AGE = 7 * DAY${RESET}\n`,
+    tool('Bash', 'pnpm test feed-cache'),
+    out(`${GREEN}✓${RESET} 21 tests passed`),
+    say('Done. Old posts drop after 7 days.'),
     `\n${MAGENTA}>${RESET} `
   ]
 }
 
 const LEAD: TerminalScript = {
   scrollback: [
-    `${DIM}~/code/acme-web${RESET}\n`,
-    `${BOLD}Lead${RESET} · acme-web · 5 members\n`,
+    `${DIM}~/code/lumen-app${RESET}\n`,
+    `${BOLD}Atlas${RESET} · lumen-app · 5 members\n`,
     '\n',
-    say('Maya is on ACME-212, PR #412.'),
-    say('Leo: ACME-214 CI is red on'),
-    '  the payment sandbox timeout.\n',
-    say('Asked you about the timeout.')
+    say('Pico is on LUM-14, PR #42.'),
+    say('Nova: LUM-25 CI is red on'),
+    '  the upload sandbox.\n',
+    say('Asked you about push opt-in.')
   ].join(''),
   chunks: [
-    tool('Plane', 'ACME-216 → In Progress'),
-    say('Iris is waiting on a retry'),
-    '  policy for ACME-216.\n',
-    tool('CI', `#409 ${GREEN}passed${RESET}`),
-    say('Theo: ACME-205 ready to merge.'),
+    tool('Plane', 'LUM-23 → In Progress'),
+    say('Orin is building the push'),
+    '  opt-in screen on render-01.\n',
+    tool('CI', `#45 ${GREEN}passed${RESET}`),
+    say('Vega: LUM-21 ready to merge.'),
     `\n${MAGENTA}>${RESET} `
   ],
   reply: [say('Noted. Relaying to the team.'), `\n${MAGENTA}>${RESET} `]
 }
 
 export function showcaseTerminalScript(handle: string): TerminalScript {
-  return handle === 'term-lead' ? LEAD : CHECKOUT
+  return handle === 'term-lead' ? LEAD : FEED
 }
 
 /** The lines the lead's terminal prints when the owner answers from the phone. */
