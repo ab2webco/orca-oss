@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export const RIGHT_SIDEBAR_TOGGLE_SELECTOR = '[data-right-sidebar-toggle]'
 
@@ -18,29 +18,36 @@ function focusVisibleToggle(): void {
 /**
  * Drawer behaviour for the right panel when it overlays the content at narrow widths (ORCA-1220):
  * a scrim and Escape close it, focus moves in on open and back to the opener on close.
+ * Only an open the person makes while the panel overlays is a drawer; a restored open state, a narrower
+ * window or a wider sidebar leaves the panel without a scrim (ORCA-1256).
  */
 export function useRightSidebarDrawer(args: {
   open: boolean
   overlay: boolean
+  ready: boolean
   containerRef: React.RefObject<HTMLElement | null>
   onDismiss: () => void
 }): RightSidebarDrawer {
-  const { open, overlay, containerRef, onDismiss } = args
-  const drawerOpen = open && overlay
-  const overlayRef = useRef(overlay)
+  const { open, overlay, ready, containerRef, onDismiss } = args
+  const [openedAsDrawer, setOpenedAsDrawer] = useState(false)
+  const [previous, setPrevious] = useState({ open, ready })
+  if (previous.open !== open || previous.ready !== ready) {
+    setPrevious({ open, ready })
+    // Why previous.ready: hydration lands the persisted open state in the render that marks the UI ready.
+    const opened = open && !previous.open
+    setOpenedAsDrawer(opened ? overlay && previous.ready : open && openedAsDrawer)
+  } else if (openedAsDrawer && !overlay) {
+    // Why: once the panel is a column again, overlaying later is not an open from the person.
+    setOpenedAsDrawer(false)
+  }
+  const drawerOpen = open && overlay && openedAsDrawer
   const openerRef = useRef<HTMLElement | null>(null)
   const managingFocusRef = useRef(false)
 
-  // Why declared first: effects run in order, so the focus effect below reads this commit's value.
-  useEffect(() => {
-    overlayRef.current = overlay
-  }, [overlay])
-
   useEffect(() => {
     const container = containerRef.current
-    if (open) {
-      // Why: only an open in drawer mode moves focus; widening or narrowing an open panel does not.
-      if (!overlayRef.current || !container) {
+    if (drawerOpen) {
+      if (!container) {
         return
       }
       const active = document.activeElement
@@ -57,6 +64,10 @@ export function useRightSidebarDrawer(args: {
     managingFocusRef.current = false
     const opener = openerRef.current
     openerRef.current = null
+    // Why: a drawer that widened into a column is still open, so focus stays where the person is.
+    if (open) {
+      return
+    }
     const active = document.activeElement
     // Why: a click outside already chose where focus goes; only reclaim focus the drawer held.
     const focusWasInDrawer =
@@ -70,7 +81,7 @@ export function useRightSidebarDrawer(args: {
       // Why: the toggle that opened the panel unmounts while it is open, so its old node is gone.
       focusVisibleToggle()
     }
-  }, [open, containerRef])
+  }, [drawerOpen, open, containerRef])
 
   useEffect(() => {
     if (!drawerOpen) {

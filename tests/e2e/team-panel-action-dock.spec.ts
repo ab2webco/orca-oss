@@ -410,11 +410,15 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     }
     await menu.getByPlaceholder('Buscar acción').fill('dep')
     await expect(menu.getByRole('menuitem')).toHaveText([/^Deploy staging/])
-    // Escape still closes it when a hint opened after it, as the board hint does when it reappears.
+    // The board hint stays closed over an open menu, so it never takes the menu's Escape (ORCA-1256).
     await reopenBoardHint(orcaPage)
-    await expect(orcaPage.getByRole('tooltip')).toBeVisible()
+    // Why the wait: the hint re-reads its cover every 250 ms; two reads prove it stayed closed.
+    await orcaPage.waitForTimeout(600)
+    const boardHint = orcaPage.getByRole('tooltip', { name: /tablero|Workspace board moved/ })
+    await expect(boardHint).toHaveCount(0)
     await orcaPage.keyboard.press('Escape')
     await expect(menu).toBeHidden()
+    await expect(boardHint, 'the hint was never eligible').toBeVisible()
 
     // Stop asks inline, in the dock, and sends nothing on Cancel.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })

@@ -11,18 +11,25 @@ let setOpenFromTest: (open: boolean) => void = () => {}
 
 function Harness({
   overlay,
-  autoFocusInput = false
+  autoFocusInput = false,
+  ready = true,
+  restoredOpen = false
 }: {
   overlay: boolean
   autoFocusInput?: boolean
+  ready?: boolean
+  restoredOpen?: boolean
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [personOpen, setOpen] = useState(false)
   setOpenFromTest = setOpen
+  // As hydration does: the persisted open state lands in the same render that marks the UI ready.
+  const open = personOpen || restoredOpen
   const containerRef = useRef<HTMLDivElement | null>(null)
   const close = (): void => setOpen(false)
   const drawer = useRightSidebarDrawer({
     open,
     overlay,
+    ready,
     containerRef,
     onDismiss: close
   })
@@ -44,9 +51,13 @@ function Harness({
   )
 }
 
-function render(overlay: boolean, autoFocusInput = false): void {
+function render(
+  overlay: boolean,
+  autoFocusInput = false,
+  hydration: { ready?: boolean; restoredOpen?: boolean } = {}
+): void {
   act(() => {
-    root.render(<Harness overlay={overlay} autoFocusInput={autoFocusInput} />)
+    root.render(<Harness overlay={overlay} autoFocusInput={autoFocusInput} {...hydration} />)
   })
 }
 
@@ -152,14 +163,37 @@ describe('useRightSidebarDrawer', () => {
     expect(document.activeElement).toBe(terminal)
   })
 
-  it('leaves focus where it is when the window narrows with the panel already open', () => {
+  it('raises no scrim and leaves focus alone when an open column starts to overlay', () => {
+    // A narrower window or a wider left sidebar, with no open from the person (ORCA-1256).
     render(false)
     act(() => setOpenFromTest(true))
     const terminal = query('[data-testid="terminal"]')!
     terminal.focus()
     render(true)
-    expect(query('[data-right-sidebar-scrim]')).not.toBeNull()
+    expect(query('[data-right-sidebar-scrim]')).toBeNull()
+    expect(query('[data-testid="drawer"]')!.getAttribute('tabindex')).toBeNull()
     expect(document.activeElement).toBe(terminal)
+    pressEscape(terminal)
+    expect(query('[data-testid="drawer-input"]')).not.toBeNull()
+  })
+
+  it('raises no scrim for an open state restored at startup', () => {
+    render(true, false, { ready: false })
+    const terminal = query('[data-testid="terminal"]')!
+    terminal.focus()
+    render(true, false, { ready: true, restoredOpen: true })
+    expect(query('[data-testid="drawer-input"]')).not.toBeNull()
+    expect(query('[data-right-sidebar-scrim]')).toBeNull()
+    expect(document.activeElement).toBe(terminal)
+  })
+
+  it('ends the drawer once the panel is a column again', () => {
+    render(true)
+    act(() => setOpenFromTest(true))
+    render(false)
+    expect(query('[data-right-sidebar-scrim]')).toBeNull()
+    render(true)
+    expect(query('[data-right-sidebar-scrim]')).toBeNull()
   })
 
   it('keeps focus that the panel already placed inside the drawer', () => {
