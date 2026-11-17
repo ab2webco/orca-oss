@@ -43,9 +43,16 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     .toBe(theme === 'dark')
 }
 
-/** Every chip the row shows sits on one line inside it; the ones that do not fit are hidden. */
-async function expectOneLine(dock: Locator, where: string): Promise<number> {
-  const fit = await dock.evaluate((node) => {
+type ChipFit = {
+  shown: number
+  tops: number
+  spill: number
+  dockSpill: number
+}
+
+/** How the shown chips sit in the row right now. */
+function readChipFit(dock: Locator): Promise<ChipFit | null> {
+  return dock.evaluate((node) => {
     const row = node.querySelector('[data-team-action]')?.parentElement
     if (!row) {
       return null
@@ -59,12 +66,81 @@ async function expectOneLine(dock: Locator, where: string): Promise<number> {
       dockSpill: node.scrollWidth - node.clientWidth
     }
   })
-  expect(fit, `no chip row at ${where}`).not.toBeNull()
-  expect(fit!.shown, `no chip shown at ${where}`).toBeGreaterThan(0)
-  expect(fit!.tops, `chips wrap at ${where}`).toBe(1)
-  expect(fit!.spill, `a shown chip is cut at ${where}`).toBeLessThanOrEqual(1)
-  expect(fit!.dockSpill, `the dock overflows at ${where}`).toBeLessThanOrEqual(0)
-  return fit!.shown
+}
+
+/** Every chip the row shows sits on one line inside it; the ones that do not fit are hidden. */
+async function expectOneLine(dock: Locator, where: string): Promise<number> {
+  let shown = 0
+  // Why retried: the dock re-fits on its ResizeObserver's frame, and a hidden CI window gives about one a second.
+  await expect(async () => {
+    const fit = await readChipFit(dock)
+    expect(fit, `no chip row at ${where}`).not.toBeNull()
+    expect(fit!.shown, `no chip shown at ${where}`).toBeGreaterThan(0)
+    expect(fit!.tops, `chips wrap at ${where}`).toBe(1)
+    expect(fit!.spill, `a shown chip is cut at ${where}`).toBeLessThanOrEqual(1)
+    expect(fit!.dockSpill, `the dock overflows at ${where}`).toBeLessThanOrEqual(0)
+    shown = fit!.shown
+  }).toPass({ timeout: 15_000 })
+  return shown
+}
+
+/**
+ * Resizes the window and returns how far a shown chip spills in the first frame the row has its
+ * new width, or null when the row kept its width. Read from a ResizeObserver made after the dock's,
+ * so it runs after the dock's own in that frame and before it is painted.
+ */
+async function resizeAndReadPaintedSpill(
+  page: Page,
+  dock: Locator,
+  width: number
+): Promise<number | null> {
+  type Frame = { width: number; spill: number }
+  const before = await dock.evaluate((node) => {
+    const row = node.querySelector('[data-team-action]')!.parentElement!
+    const frames: Frame[] = []
+    // Why every report with its width: observe() reports once on its own, and in a hidden window
+    // that first report can land before the resize or in the resized frame itself.
+    const observer = new ResizeObserver(() => {
+      const box = row.getBoundingClientRect()
+      const shown = [...row.querySelectorAll<HTMLElement>('[data-team-action]:not([aria-hidden])')]
+      frames.push({
+        width: box.width,
+        spill: Math.max(...shown.map((chip) => chip.getBoundingClientRect().right - box.right))
+      })
+    })
+    observer.observe(row)
+    Object.assign(window, { __dockPaintProbe: { observer, frames } })
+    return row.getBoundingClientRect().width
+  })
+  try {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width)
+    const after = await dock.evaluate(
+      (node) =>
+        node.querySelector('[data-team-action]')!.parentElement!.getBoundingClientRect().width
+    )
+    if (Math.abs(after - before) < 0.5) {
+      return null
+    }
+    const resized = async (): Promise<Frame | undefined> =>
+      (
+        await page.evaluate(
+          () =>
+            (window as unknown as { __dockPaintProbe: { frames: Frame[] } }).__dockPaintProbe.frames
+        )
+      ).find((frame) => Math.abs(frame.width - after) < 0.5)
+    await expect
+      .poll(resized, { timeout: 15_000, message: `no frame reached the ${width}px row` })
+      .toBeDefined()
+    return (await resized())!.spill
+  } finally {
+    await page.evaluate(() => {
+      const probe = (window as unknown as { __dockPaintProbe?: { observer: ResizeObserver } })
+        .__dockPaintProbe
+      probe?.observer.disconnect()
+      delete (window as unknown as { __dockPaintProbe?: unknown }).__dockPaintProbe
+    })
+  }
 }
 
 // Why: the app's star and update cards can open mid-run over the panel's foot, where the dock is.
@@ -176,7 +252,12 @@ async function captureDock(page: Page, panel: Locator, file: string): Promise<vo
   await page.screenshot({
     animations: 'disabled',
     path: file,
-    clip: { x: box.x, y: box.y + box.height - height, width: box.width, height }
+    clip: {
+      x: box.x,
+      y: box.y + box.height - height,
+      width: box.width,
+      height
+    }
   })
 }
 
@@ -233,7 +314,11 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
       .toBe(true)
     const endpoint = await readHookEndpoint(electronApp)
     const leadHook = { paneKey: pane.paneKey, worktreeId }
-    await emitCodexHookStatus(endpoint, { ...leadHook, state: 'working', prompt: 'Lead' })
+    await emitCodexHookStatus(endpoint, {
+      ...leadHook,
+      state: 'working',
+      prompt: 'Lead'
+    })
 
     await waitForRuntimeWorktree(client, worktreeId)
     const run = await client.call<{ run: { id: string } }>('orchestration.runCreate', {
@@ -305,9 +390,13 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     })
     const panel = orcaPage.getByTestId('team-panel')
     const dock = panel.locator('[data-team-action-dock]')
-    await expect(panel.getByRole('region', { name: 'Actions' })).toBeVisible({ timeout: 90_000 })
+    await expect(panel.getByRole('region', { name: 'Actions' })).toBeVisible({
+      timeout: 90_000
+    })
     const chips = dock.locator('[data-team-action]')
-    await expect(chips).toHaveText(['Push2', 'Release', 'Deploy staging'], { timeout: 90_000 })
+    await expect(chips).toHaveText(['Push2', 'Release', 'Deploy staging'], {
+      timeout: 90_000
+    })
     await expect(dock.getByRole('button', { name: 'Stop every member' })).toBeEnabled()
     await expect(dock).not.toContainText(/Board|Wave|Sweep|Status/)
 
@@ -322,7 +411,12 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
         language === 'en' ? 'Push, 2 stopped' : 'Reactivar, 2 detenidos'
       )
       for (const width of WIDTHS) {
-        await orcaPage.setViewportSize({ width, height: 900 })
+        const painted = await resizeAndReadPaintedSpill(orcaPage, dock, width)
+        // A person resizing sees this frame, so no chip may be drawn cut in it (ORCA-1262).
+        expect(
+          painted ?? 0,
+          `a chip is drawn cut after the resize to ${width}px ${language}`
+        ).toBeLessThanOrEqual(1)
         const shown = await expectOneLine(dock, `${width}px ${language}`)
         await reopenBoardHint(orcaPage)
         await expectDockUncovered(orcaPage, dock, `${width}px ${language}`)
@@ -402,7 +496,12 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
           await orcaPage.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`menu-es-${width}-${theme}.png`),
-            clip: { x: panelBox!.x, y: 300, width: panelBox!.width, height: 600 }
+            clip: {
+              x: panelBox!.x,
+              y: 300,
+              width: panelBox!.width,
+              height: 600
+            }
           })
         }
       }
@@ -414,7 +513,9 @@ test('the action dock shows what applies now, runs it on the lead and shows its 
     await reopenBoardHint(orcaPage)
     // Why the wait: the hint re-reads its cover every 250 ms; two reads prove it stayed closed.
     await orcaPage.waitForTimeout(600)
-    const boardHint = orcaPage.getByRole('tooltip', { name: /tablero|Workspace board moved/ })
+    const boardHint = orcaPage.getByRole('tooltip', {
+      name: /tablero|Workspace board moved/
+    })
     await expect(boardHint).toHaveCount(0)
     await orcaPage.keyboard.press('Escape')
     await expect(menu).toBeHidden()
