@@ -1,4 +1,8 @@
-import type { TeamPrRow, TeamQueueEntry } from '../../../src/shared/team-panel-model-types'
+import type {
+  TeamMachine,
+  TeamPrRow,
+  TeamQueueEntry
+} from '../../../src/shared/team-panel-model-types'
 import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
 
 type Words = {
@@ -21,6 +25,10 @@ type Words = {
   offline: string
   lowMemory: string
   free: string
+  launch: Record<Exclude<TeamMachine['launch']['kind'], 'ready'>, string>
+  notRegisteredNote: (project: string) => string
+  notAnsweringNote: string
+  unknownNote: string
   running: (count: number) => string
   runningOfCap: (count: number, cap: number) => string
   memoryUsed: (percent: number) => string
@@ -60,6 +68,17 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     offline: 'Offline',
     lowMemory: 'Low memory',
     free: 'Free',
+    launch: {
+      unregistered: 'Not registered',
+      refused: 'Refused',
+      unanswered: 'Not answering',
+      unknown: 'Unknown'
+    },
+    notRegisteredNote: (project) =>
+      `${project} is not registered here. With the owner's OK, clone and register it.`,
+    notAnsweringNote: 'It did not list its repos, so Orca cannot tell if members can start here.',
+    unknownNote:
+      'This Orca does not say if members can start here. Update Orca Lab on this machine.',
     running: (count) => (count === 1 ? '1 agent' : `${count} agents`),
     runningOfCap: (count, cap) => `${count} of ${cap} agents`,
     memoryUsed: (percent) => `Memory used ${percent}%`,
@@ -97,6 +116,18 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     offline: 'Sin conexión',
     lowMemory: 'Poca memoria',
     free: 'Libre',
+    launch: {
+      unregistered: 'Sin registrar',
+      refused: 'Rechazada',
+      unanswered: 'No responde',
+      unknown: 'Desconocida'
+    },
+    notRegisteredNote: (project) =>
+      `${project} no está registrado aquí. Con el visto bueno del dueño, clónalo y regístralo.`,
+    notAnsweringNote:
+      'No listó sus repos, así que Orca no sabe si los miembros pueden arrancar aquí.',
+    unknownNote:
+      'Este Orca no dice si los miembros pueden arrancar aquí. Actualiza Orca Lab en esta máquina.',
     running: (count) => (count === 1 ? '1 agente' : `${count} agentes`),
     runningOfCap: (count, cap) => `${count} de ${cap} agentes`,
     memoryUsed: (percent) => `Memoria usada ${percent}%`,

@@ -20,6 +20,9 @@ function statusWord(machine: TeamMachine, words: TeamWorkWords): string {
   if (machine.reading.kind === 'unreachable') {
     return words.offline
   }
+  if (machine.running === 0 && machine.launch.kind !== 'ready') {
+    return words.launch[machine.launch.kind]
+  }
   if (machine.status === 'risk') {
     return words.lowMemory
   }
@@ -29,6 +32,22 @@ function statusWord(machine: TeamMachine, words: TeamWorkWords): string {
   return machine.cap === null
     ? words.running(machine.running)
     : words.runningOfCap(machine.running, machine.cap)
+}
+
+/** Why members cannot start there, as desktop's Machines tab says it (ORCA-1207). */
+function launchNote(launch: TeamMachine['launch'], words: TeamWorkWords): string | null {
+  switch (launch.kind) {
+    case 'unregistered':
+      return words.notRegisteredNote(launch.project)
+    case 'refused':
+      return launch.reason
+    case 'unanswered':
+      return words.notAnsweringNote
+    case 'unknown':
+      return words.unknownNote
+    default:
+      return null
+  }
 }
 
 function MachineCard({
@@ -50,10 +69,11 @@ function MachineCard({
   const percent = Math.round(used * 100)
   const tones = useTeamTones()
   const tone = tones[TEAM_STATUS_ROLE[machine.status]]
+  const note = reading.kind === 'unreachable' ? null : launchNote(machine.launch, words)
   return (
     <View style={[styles.card, styles.machine]}>
       <View style={styles.titleLine}>
-        <Text style={[styles.mono, styles.machineName]} numberOfLines={1}>
+        <Text style={styles.machineName} numberOfLines={1}>
           {name ?? ''}
         </Text>
         <View style={[styles.dot, { backgroundColor: tone }]} />
@@ -61,6 +81,7 @@ function MachineCard({
           {statusWord(machine, words)}
         </Text>
       </View>
+      {note ? <Text style={styles.side}>{note}</Text> : null}
       {reading.kind === 'ok' ? (
         <>
           <View style={styles.track}>
@@ -146,11 +167,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBase,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle
-  },
-  mono: {
-    color: colors.textMuted,
-    fontFamily: typography.monoFamily,
-    fontSize: typography.metaSize
   },
   rowTitle: {
     flex: 1,

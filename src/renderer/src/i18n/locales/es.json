@@ -16405,7 +16405,14 @@
       "runningOne": "1 agente",
       "runningOfCap": "{{count}} de {{cap}} agentes",
       "memoryUsed": "Memoria usada {{percent}}%",
-      "memoryFree": "{{free}} de {{total}} GB libres"
+      "memoryFree": "{{free}} de {{total}} GB libres",
+      "notRegistered": "Sin registrar",
+      "refused": "Rechazada",
+      "notAnswering": "No responde",
+      "unknown": "Desconocida",
+      "notRegisteredNote": "{{project}} no está registrado aquí. Con el visto bueno del dueño, clónalo y regístralo.",
+      "notAnsweringNote": "No listó sus repos, así que Orca no sabe si los miembros pueden arrancar aquí.",
+      "unknownNote": "Este Orca no dice si los miembros pueden arrancar aquí. Actualiza Orca Lab en esta máquina."
     },
     "activityBar": {
       "teamTitle": "Equipo",

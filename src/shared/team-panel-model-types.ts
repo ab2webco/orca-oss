@@ -245,6 +245,16 @@ export type TeamMachine = {
     | { kind: 'unreachable'; lastSeenAt: number | null }
     /** No figures to show: an SSH target has no Orca to ask, and a saved host may not have answered yet. */
     | { kind: 'unread' }
+  /**
+   * Whether this lead's members can start there, by `game launch --on`'s own check (ORCA-1207).
+   * `unknown`: an older Orca's state does not say, so the row never reads as free.
+   */
+  launch:
+    | { kind: 'ready' }
+    | { kind: 'unregistered'; project: string; reason: string }
+    | { kind: 'refused'; reason: string }
+    | { kind: 'unanswered' }
+    | { kind: 'unknown' }
 }
 
 /** Display's figures; each is null when Orca has no data for it, and the page says so. */

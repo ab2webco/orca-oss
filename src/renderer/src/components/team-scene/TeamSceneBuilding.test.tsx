@@ -60,6 +60,7 @@ const machine = (host: TeamHost, cap: number, running: number): TeamMachine => (
   host,
   running,
   cap,
+  launch: { kind: 'ready' },
   status: 'working',
   reading:
     host.kind === 'remote' && !host.reachable

@@ -27,6 +27,7 @@ const machine = (host: TeamHost, cap: number | null, running = 0): TeamMachine =
   host: host.kind === 'remote' ? { ...host, environmentId: null } : host,
   running,
   cap,
+  launch: { kind: 'ready' },
   status: 'working',
   reading:
     host.kind === 'remote' && !host.reachable

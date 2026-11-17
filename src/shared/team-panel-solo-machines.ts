@@ -35,7 +35,8 @@ export function teamSoloMachinesOf(args: {
   return args.hosts.map((host) => {
     const key = teamHostKeyOf(host)
     const running = args.sessions.filter((one) => teamHostKeyOf(one.host) === key).length
-    const base = { host, running, cap: null }
+    // Why ready: no lead's project to check, so the row only counts this person's sessions.
+    const base = { host, running, cap: null, launch: { kind: 'ready' } as const }
     const reading = args.readingOf(host)
     if (reading?.kind === 'unreachable' || (host.kind === 'remote' && !host.reachable)) {
       return { ...base, status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } }

@@ -1,5 +1,6 @@
 import { gameHostMemoryIsLow, type GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
+import { LOCAL_GAME_HOST } from './orchestrator-game-host-load'
 import type { GameProjectItem, GameQueueEntry } from './orchestrator-game-project-work'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 import { teamListActionOf } from './team-panel-list-action'
@@ -172,14 +173,53 @@ function hostOf(one: GameHostCapacity, members: readonly TeamMemberCard[]): Team
   }
 }
 
+// Why ready for local: the lead runs here, so its own repo is registered here.
+function launchOf(one: GameHostCapacity): TeamMachine['launch'] {
+  if (one.host === LOCAL_GAME_HOST) {
+    return { kind: 'ready' }
+  }
+  const launch = one.launch
+  // Why each kind checked: a newer host may publish one this client does not know.
+  switch (launch?.kind) {
+    case 'ready':
+    case 'unanswered':
+      return { kind: launch.kind }
+    case 'unregistered':
+      return { kind: 'unregistered', project: launch.project, reason: launch.reason }
+    case 'refused':
+      return { kind: 'refused', reason: launch.reason }
+    case undefined:
+      return { kind: 'unknown' }
+  }
+  return { kind: 'unknown' }
+}
+
+const LAUNCH_STATUS: Record<TeamMachine['launch']['kind'], TeamStatus> = {
+  ready: 'idle',
+  unregistered: 'closed',
+  refused: 'closed',
+  unanswered: 'attention',
+  unknown: 'idle'
+}
+
 function machineOf(one: GameHostCapacity, members: readonly TeamMemberCard[]): TeamMachine {
-  const base = { host: hostOf(one, members), running: one.running, cap: one.cap ?? null }
+  const launch = launchOf(one)
+  const base = { host: hostOf(one, members), running: one.running, cap: one.cap ?? null, launch }
   if (one.status === 'unreachable') {
     return { ...base, status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } }
   }
+  // Why launch before memory: a host that cannot take a member has no memory to warn about.
+  const status: TeamStatus =
+    one.running === 0 && launch.kind !== 'ready'
+      ? LAUNCH_STATUS[launch.kind]
+      : gameHostMemoryIsLow(one)
+        ? 'risk'
+        : one.running > 0
+          ? 'working'
+          : 'idle'
   return {
     ...base,
-    status: gameHostMemoryIsLow(one) ? 'risk' : one.running > 0 ? 'working' : 'idle',
+    status,
     reading: {
       kind: 'ok',
       cpuCoreCount: one.cpuCoreCount,

@@ -35,6 +35,7 @@ const machines: TeamMachine[] = [
     host: { kind: 'local' },
     running: 2,
     cap: 4,
+    launch: { kind: 'ready' },
     status: 'working',
     reading: {
       kind: 'ok',
@@ -48,6 +49,7 @@ const machines: TeamMachine[] = [
     host: { kind: 'remote', name: 'm1', environmentId: null, reachable: false },
     running: 0,
     cap: null,
+    launch: { kind: 'ready' },
     status: 'attention',
     reading: { kind: 'unreachable', lastSeenAt: null }
   }

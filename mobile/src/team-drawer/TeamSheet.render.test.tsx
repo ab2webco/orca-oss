@@ -23,6 +23,7 @@ vi.mock('react-native-webview', async () => {
   return { WebView: forwardRef(() => h('div', { 'data-testid': 'team-scene-webview' })) }
 })
 
+import { gameHostLaunchOf } from '../../../src/shared/orchestrator-game-member-repo-scope'
 import { TeamSheet } from './TeamSheet'
 import type { TeamDrawerData } from './team-drawer-model'
 import { colors, radii } from '../theme/mobile-theme'
@@ -239,6 +240,68 @@ describe('TeamSheet', () => {
     expect(shown).toContain('contabo')
     expect(shown).toContain('Offline')
     expect(shown).not.toContain('local')
+  })
+
+  // Why: a host the launch refuses must not read as free capacity (ORCA-1207).
+  it('says which hosts cannot take this project and why, and never calls them free', () => {
+    const idle = { status: 'ok' as const, running: 0, cpuCoreCount: 8, totalMemory: 32e9 }
+    const refusal = 'orca-oss on m1 names github.com/stablyai/orca, the upstream every fork shares.'
+    const hostCapacity = [
+      ...work.hostCapacity!,
+      {
+        ...idle,
+        host: 'koombea',
+        availableMemory: 30e9,
+        loadAverage1m: 1,
+        launch: { kind: 'unregistered' as const, project: 'orca-oss', reason: 'x' }
+      },
+      {
+        ...idle,
+        host: 'orca-contabo',
+        availableMemory: 30e9,
+        loadAverage1m: 1,
+        launch: { kind: 'refused' as const, reason: refusal }
+      },
+      { ...idle, host: 'older', availableMemory: 30e9, loadAverage1m: 1 }
+    ]
+    show(teamWith({ questions: [] }, null, { ...work, hostCapacity }))
+    act(() => button('Hosts').click())
+    const shown = texts()
+    expect(shown).toContain('Not registered')
+    expect(shown).toContain(
+      "orca-oss is not registered here. With the owner's OK, clone and register it."
+    )
+    expect(shown).toContain('Refused')
+    expect(shown).toContain(refusal)
+    expect(shown).toContain('Unknown')
+    expect(shown).not.toContain('Free')
+  })
+
+  it('shows in full why a partial clone with no remote identity cannot take members (ORCA-1250)', () => {
+    const lead = {
+      id: 'r',
+      displayName: 'orca-oss',
+      path: '/w',
+      remoteKey: 'github.com/ab2webco/orca-oss'
+    }
+    const partial = { id: 'h', displayName: 'orca-oss', path: '/w', remoteKey: null }
+    const launch = gameHostLaunchOf({ lead, host: 'koombea', repos: [partial] })
+    const koombea = {
+      host: 'koombea',
+      status: 'ok' as const,
+      running: 0,
+      cpuCoreCount: 8,
+      totalMemory: 32e9,
+      availableMemory: 30e9,
+      loadAverage1m: 1,
+      launch
+    }
+    show(teamWith({ questions: [] }, null, { ...work, hostCapacity: [koombea] }))
+    act(() => button('Hosts').click())
+    expect(texts()).toContain(
+      "orca-oss on koombea has no remote identity yet, so Orca cannot tell whether it is orca-oss's clone. See ORCA-1250."
+    )
+    expect(texts()).not.toContain('Free')
   })
 
   it('words the PRs and Hosts tabs in the host language', () => {

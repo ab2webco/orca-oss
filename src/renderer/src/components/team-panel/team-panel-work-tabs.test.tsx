@@ -188,6 +188,7 @@ const machine = (over: Partial<TeamMachine> = {}): TeamMachine => ({
   host: { kind: 'remote', name: 'm1', environmentId: null, reachable: true },
   running: 0,
   cap: 5,
+  launch: { kind: 'ready' },
   status: 'idle',
   reading: {
     kind: 'ok',
