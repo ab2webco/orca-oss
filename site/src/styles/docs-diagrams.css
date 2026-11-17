@@ -54,7 +54,7 @@
   clip-path: polygon(0 45%, 70% 45%, 70% 0, 100% 50%, 70% 100%, 70% 55%, 0 55%);
 }
 
-@container (max-width: 34rem) {
+@container (max-width: 40rem) {
   .sl-markdown-content .orca-chain {
     grid-auto-flow: row;
     gap: 1.5rem;

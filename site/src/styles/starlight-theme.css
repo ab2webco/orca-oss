@@ -6,6 +6,8 @@
     'Geist Mono', 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas,
     'Liberation Mono', monospace;
   --sl-line-height: 1.6;
+  /* About 72 characters of Geist a line; 70ch would be ~89, since ch is the wide "0". */
+  --sl-content-width: 35rem;
 }
 
 .sl-markdown-content :is(h1, h2, h3, h4),
@@ -41,4 +43,21 @@ h1#_top {
   background: var(--sl-color-gray-6);
   color: var(--sl-color-white);
   font-weight: 600;
+}
+
+/* The header's theme and language pickers read as controls; why gray-3: a field edge needs 3:1,
+   which the lines token (1.3:1) does not reach. */
+:is(starlight-theme-select, starlight-lang-select) select {
+  border: 1px solid var(--sl-color-gray-3);
+  border-radius: 0.5rem;
+  padding-block: 0.5rem;
+}
+
+:is(starlight-theme-select, starlight-lang-select) select:active {
+  background-color: var(--sl-color-gray-6);
+}
+
+:is(starlight-theme-select, starlight-lang-select) select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
