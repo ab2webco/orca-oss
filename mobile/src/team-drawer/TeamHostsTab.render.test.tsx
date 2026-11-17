@@ -178,11 +178,29 @@ describe('TeamHostsTab board (ORCA-1252)', () => {
     expect(texts()).toContain('24 of 32 GB free')
   })
 
+  it('sums the hosts ready to launch, the agents and the busy or low hosts', () => {
+    show([
+      machine('studio', { running: 1, status: 'working' }),
+      BUSY,
+      machine('blocked', { launch: { kind: 'refused', reason: 'no' }, status: 'attention' }),
+      machine('away', { status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } })
+    ])
+    const shown = texts()
+
+    expect(shown).toEqual(
+      expect.arrayContaining(['Ready', 'of 4', 'Agents', 'of 11', 'Busy / low'])
+    )
+    expect(shown).toContain("1 can't launch · 1 offline")
+    expect(shown).toContain('4 slots free')
+    expect(shown).toContain('buildbox')
+  })
+
   it('words the board in the host language', () => {
     show([machine('studio'), BUSY], 'es')
     const shown = texts()
 
     expect(shown).toContain('Ocupada · 2 de 3 agentes')
     expect(shown).toContain('carga 9,4 · 8 núcleos')
+    expect(shown).toContain('Listas')
   })
 })
