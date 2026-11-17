@@ -17384,7 +17384,6 @@
       "running": "{{count}} agents",
       "runningOne": "1 agent",
       "runningOfCap": "{{count}} of {{cap}} agents",
-      "memoryUsed": "Memory used {{percent}}%",
       "memoryFree": "{{free}} of {{total}} GB free",
       "notRegistered": "Not registered",
       "refused": "Refused",
@@ -17392,7 +17391,17 @@
       "unknown": "Unknown",
       "notRegisteredNote": "{{project}} is not registered here. With the owner's OK, clone and register it.",
       "notAnsweringNote": "It did not list its repos, so Orca cannot tell if members can start here.",
-      "unknownNote": "This Orca does not say if members can start here. Update Orca Lab on this machine."
+      "unknownNote": "This Orca does not say if members can start here. Update Orca Lab on this machine.",
+      "used": "{{label}} used {{percent}}%",
+      "busy": "Busy",
+      "lowDisk": "Low disk",
+      "slotFreeOne": "1 slot free",
+      "slotsFree": "{{count}} slots free",
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "cores": "{{count}} cores",
+      "load": "load {{load}}"
     },
     "activityBar": {
       "teamTitle": "Team",

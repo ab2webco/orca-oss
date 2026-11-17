@@ -1,17 +1,22 @@
+import { useState } from 'react'
+import { ChevronRight, Cpu, HardDrive, MemoryStick } from 'lucide-react'
 import { statusToneTextClass } from '@/components/status-tone'
-import { getIntlLocale, translate } from '@/i18n/i18n'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
-import type { TeamMachine } from '../../../../shared/team-panel-model-types'
+import {
+  teamMachineGaugesOf,
+  teamMachineTicketsOf,
+  teamMachineWarningsOf,
+  type TeamMachineWarning
+} from '../../../../shared/team-machine-board'
+import type { TeamMachine, TeamPanelModel } from '../../../../shared/team-panel-model-types'
 import { teamStatusTone } from './team-card-text'
 import { TeamHostName } from './TeamHostName'
+import { Gauge, gbText, Readout, slotsFreeText } from './team-panel-machine-gauges'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import { TeamStatusMark } from './TeamStatusMark'
-
-const GB = 1024 ** 3
-const FULL_PERCENT = 95
-
-type MachineReading = Extract<TeamMachine['reading'], { kind: 'ok' }>
 
 function launchWord(launch: TeamMachine['launch']): string | null {
   switch (launch.kind) {
@@ -54,20 +59,13 @@ function launchNote(launch: TeamMachine['launch']): string | null {
   }
 }
 
-function statusWord(machine: TeamMachine): string {
-  if (machine.reading.kind === 'unreachable') {
-    return translate('teamPanel.machines.offline', 'Offline')
-  }
-  const launch = machine.running === 0 ? launchWord(machine.launch) : null
-  if (launch) {
-    return launch
-  }
-  if (machine.status === 'risk') {
-    return translate('teamPanel.machines.lowMemory', 'Low memory')
-  }
-  if (machine.running === 0) {
-    return translate('teamPanel.machines.free', 'Free')
-  }
+const WARNING_WORDS: Record<TeamMachineWarning, () => string> = {
+  busy: () => translate('teamPanel.machines.busy', 'Busy'),
+  lowMemory: () => translate('teamPanel.machines.lowMemory', 'Low memory'),
+  lowDisk: () => translate('teamPanel.machines.lowDisk', 'Low disk')
+}
+
+function agentsWord(machine: TeamMachine): string {
   if (machine.cap !== null) {
     return translate('teamPanel.machines.runningOfCap', '{{count}} of {{cap}} agents', {
       count: machine.running,
@@ -79,83 +77,198 @@ function statusWord(machine: TeamMachine): string {
     : translate('teamPanel.machines.running', '{{count}} agents', { count: machine.running })
 }
 
-function MemoryBar({
-  machine,
-  reading
-}: {
-  machine: TeamMachine
-  reading: MachineReading
-}): React.JSX.Element {
-  const { totalMemory, availableMemory } = reading
-  const used = (totalMemory - availableMemory) / totalMemory
-  const percent = Math.round(used * 100)
-  const gb = new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 1 })
-  return (
-    <>
-      <span
-        role="img"
-        aria-label={translate('teamPanel.machines.memoryUsed', 'Memory used {{percent}}%', {
-          percent
-        })}
-        className="block h-1 w-full overflow-hidden rounded-full bg-muted"
-      >
-        <span
-          style={{ transform: `scaleX(${used})` }}
-          className={cn('block h-full origin-left', {
-            'bg-status-attention': percent >= FULL_PERCENT,
-            'bg-status-warning': percent < FULL_PERCENT && machine.status === 'risk',
-            'bg-muted-foreground': percent < FULL_PERCENT && machine.status !== 'risk'
-          })}
-        />
-      </span>
-      <small className="text-[11.5px] tabular-nums text-muted-foreground">
-        {translate('teamPanel.machines.memoryFree', '{{free}} of {{total}} GB free', {
-          free: gb.format(availableMemory / GB),
-          total: gb.format(totalMemory / GB)
-        })}
-      </small>
-    </>
-  )
+function statusWord(machine: TeamMachine, warnings: TeamMachineWarning[]): string {
+  if (machine.reading.kind === 'unreachable') {
+    return translate('teamPanel.machines.offline', 'Offline')
+  }
+  const launch = machine.running === 0 ? launchWord(machine.launch) : null
+  if (launch) {
+    return launch
+  }
+  if (warnings.length) {
+    const words = warnings.map((one) => WARNING_WORDS[one]())
+    return [...words, ...(machine.running > 0 ? [agentsWord(machine)] : [])].join(' · ')
+  }
+  if (machine.status === 'risk') {
+    return translate('teamPanel.machines.lowMemory', 'Low memory')
+  }
+  return machine.running === 0 ? translate('teamPanel.machines.free', 'Free') : agentsWord(machine)
 }
 
 // Why not the shown name: it is translated, and E2E and React need an id that stays put.
 const machineId = (host: TeamMachine['host']): string =>
   host.kind === 'local' ? 'local' : host.name
 
-function MachineRow({ machine }: { machine: TeamMachine }): React.JSX.Element {
-  const tone = teamStatusTone(machine.status)
-  const note = machine.reading.kind === 'unreachable' ? null : launchNote(machine.launch)
+// Why module-wide: a tab switch unmounts the rows, and the user's choice must outlive it.
+const openChoices = new Map<string, boolean>()
+
+function MachineCard({
+  machine,
+  warnings,
+  tickets
+}: {
+  machine: TeamMachine
+  warnings: TeamMachineWarning[]
+  tickets: string[]
+}): React.JSX.Element | null {
+  const gauges = teamMachineGaugesOf(machine)
+  if (!gauges || machine.reading.kind !== 'ok') {
+    return null
+  }
+  const { reading } = machine
+  const cores = translate('teamPanel.machines.cores', '{{count}} cores', {
+    count: reading.cpuCoreCount
+  })
+  const free = (avail: number, total: number): string =>
+    translate('teamPanel.machines.memoryFree', '{{free}} of {{total}} GB free', {
+      free: gbText(avail),
+      total: gbText(total)
+    })
+  const slots = machine.cap === null ? 0 : Math.max(0, machine.cap - machine.running)
   return (
-    <div
-      data-team-machine={machineId(machine.host)}
-      className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5 last:border-b-0"
+    <div className="flex flex-col gap-2.5 pt-1">
+      <div className="grid grid-cols-1 gap-2 @[300px]:grid-cols-3 @[300px]:gap-0">
+        <Readout
+          name="cpu"
+          icon={Cpu}
+          label={translate('teamPanel.machines.cpu', 'CPU')}
+          percent={gauges.cpu}
+          warn={warnings.includes('busy')}
+          caption={
+            reading.loadAverage1m === null
+              ? cores
+              : `${translate('teamPanel.machines.load', 'load {{load}}', {
+                  load: reading.loadAverage1m.toFixed(1)
+                })} · ${cores}`
+          }
+        />
+        <Readout
+          name="memory"
+          icon={MemoryStick}
+          label={translate('teamPanel.machines.memory', 'Memory')}
+          percent={gauges.memory}
+          warn={warnings.includes('lowMemory')}
+          caption={free(reading.availableMemory, reading.totalMemory)}
+        />
+        <Readout
+          name="disk"
+          icon={HardDrive}
+          label={translate('teamPanel.machines.disk', 'Disk')}
+          percent={gauges.disk}
+          warn={warnings.includes('lowDisk')}
+          caption={
+            reading.workspaceDiskFree === undefined || reading.workspaceDiskTotal === undefined
+              ? null
+              : free(reading.workspaceDiskFree, reading.workspaceDiskTotal)
+          }
+        />
+      </div>
+      {tickets.length || slots ? (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px] tabular-nums">
+          {tickets.map((ticket) => (
+            <span key={ticket} className="font-medium">
+              {ticket}
+            </span>
+          ))}
+          {slots ? <span className="text-muted-foreground">{slotsFreeText(slots)}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function MachineRow({
+  machine,
+  model
+}: {
+  machine: TeamMachine
+  model: TeamPanelModel
+}): React.JSX.Element {
+  const id = machineId(machine.host)
+  const warnings = teamMachineWarningsOf(machine)
+  const [open, setOpen] = useState(() => openChoices.get(id) ?? warnings.length > 0)
+  const gauges = teamMachineGaugesOf(machine)
+  const shown = warnings.length && machine.status !== 'attention' ? 'risk' : machine.status
+  const tone = teamStatusTone(shown)
+  const note = machine.reading.kind === 'unreachable' ? null : launchNote(machine.launch)
+  const toggle = (next: boolean): void => {
+    openChoices.set(id, next)
+    setOpen(next)
+  }
+  return (
+    <Collapsible
+      open={gauges ? open : false}
+      onOpenChange={toggle}
+      data-team-machine={id}
+      className="@container flex flex-col gap-2 border-b border-border px-3 py-2.5 last:border-b-0 data-[state=open]:bg-muted/30"
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <b className="min-w-0 flex-1 truncate text-[12.5px] font-medium">
+      <CollapsibleTrigger
+        disabled={!gauges}
+        className="-mx-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-md px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 enabled:hover:bg-accent"
+      >
+        <ChevronRight
+          className={cn('size-3.5 flex-none text-muted-foreground transition-transform', {
+            'rotate-90': open && gauges,
+            invisible: !gauges
+          })}
+        />
+        {/* Why wrap, not shrink: a long status pushed to its own line keeps the host's name whole. */}
+        <b
+          data-team-machine-name
+          className="min-w-0 max-w-[calc(100%-1.25rem)] truncate text-[13px] font-medium"
+        >
           <TeamHostName host={machine.host} />
         </b>
         <span
-          className={cn('inline-flex flex-none items-center gap-1.5 text-[11.5px]', {
-            [statusToneTextClass(tone)]: machine.status !== 'idle',
-            'text-muted-foreground': machine.status === 'idle'
+          className={cn('ml-auto inline-flex min-w-0 max-w-full items-center gap-1.5 text-[12px]', {
+            [statusToneTextClass(tone)]: shown !== 'idle',
+            'text-muted-foreground': shown === 'idle'
           })}
         >
-          <TeamStatusMark status={machine.status} />
-          {statusWord(machine)}
+          <TeamStatusMark status={shown} />
+          <span className="truncate">{statusWord(machine, warnings)}</span>
         </span>
-      </div>
+      </CollapsibleTrigger>
       {note ? (
         <small
           data-team-machine-launch={machine.launch.kind}
-          className="break-words text-[11.5px] text-muted-foreground"
+          className={cn('break-words text-[12px] text-muted-foreground', {
+            'line-clamp-2': !open
+          })}
         >
           {note}
         </small>
       ) : null}
-      {machine.reading.kind === 'ok' ? (
-        <MemoryBar machine={machine} reading={machine.reading} />
+      {gauges && !open ? (
+        <div className="grid grid-cols-1 gap-2 @[300px]:grid-cols-3 @[300px]:gap-3">
+          <Gauge
+            name="cpu"
+            label={translate('teamPanel.machines.cpu', 'CPU')}
+            percent={gauges.cpu}
+            warn={warnings.includes('busy')}
+          />
+          <Gauge
+            name="memory"
+            label={translate('teamPanel.machines.memory', 'Memory')}
+            percent={gauges.memory}
+            warn={warnings.includes('lowMemory')}
+          />
+          <Gauge
+            name="disk"
+            label={translate('teamPanel.machines.disk', 'Disk')}
+            percent={gauges.disk}
+            warn={warnings.includes('lowDisk')}
+          />
+        </div>
       ) : null}
-    </div>
+      <CollapsibleContent>
+        <MachineCard
+          machine={machine}
+          warnings={warnings}
+          tickets={model.kind === 'team' ? teamMachineTicketsOf(machine, model.members) : []}
+        />
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -169,13 +282,14 @@ export const teamMachinesAloneCopy = (): { title: string; text: string } => ({
 })
 
 export function TeamPanelMachinesTab({
-  value
+  value,
+  model
 }: TeamPanelTabBodyProps<TeamMachine[]>): React.JSX.Element {
   const alone = value.every((machine) => machine.host.kind === 'local')
   return (
-    <div className={cn('flex flex-col pt-1.5', { 'pb-3': !alone })}>
+    <div className={cn('@container flex flex-col pt-1.5', { 'pb-3': !alone })}>
       {value.map((machine) => (
-        <MachineRow key={machineId(machine.host)} machine={machine} />
+        <MachineRow key={machineId(machine.host)} machine={machine} model={model} />
       ))}
       {alone ? <TeamPanelMessageState {...teamMachinesAloneCopy()} /> : null}
     </div>

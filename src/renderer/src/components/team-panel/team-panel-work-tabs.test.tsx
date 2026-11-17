@@ -204,12 +204,12 @@ const machines = (value: TeamMachine[]): HTMLElement =>
   mount(<TeamPanelMachinesTab value={value} model={model} selectTab={selectTab} />)
 
 describe('TeamPanelMachinesTab', () => {
-  it('reads a free host with its memory', () => {
+  it('reads a free host with its memory in use', () => {
     const view = machines([machine()])
 
     expect(view.textContent).toContain('m1')
     expect(view.textContent).toContain('Free')
-    expect(view.textContent).toContain('28 of 32 GB free')
+    expect(view.textContent).toContain('Memory13%')
   })
 
   it('names the local machine in the UI language', () => {
@@ -254,13 +254,13 @@ describe('TeamPanelMachinesTab', () => {
 
     expect(bar?.getAttribute('aria-label')).toBe('Memory used 13%')
     const fill = bar?.firstElementChild as HTMLElement | null | undefined
-    expect(fill?.style.transform).toBe('scaleX(0.125)')
+    expect(fill?.style.transform).toBe('scaleX(0.13)')
   })
 
   // Why: V28's state-empty-hosts keeps this machine's row and offers pairing below it.
   it('offers pairing under this machine alone, and not beside another host', () => {
     const alone = machines([machine({ host: { kind: 'local' } })])
-    expect(alone.textContent).toContain('28 of 32 GB free')
+    expect(alone.textContent).toContain('Memory13%')
     expect(alone.textContent).toContain('Only this machine')
     expect(alone.textContent).toContain('Pair another machine to spread agents across hosts.')
     act(() => root?.unmount())
