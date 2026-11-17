@@ -43,7 +43,10 @@ describe('the generated Quest art', () => {
     const { native } = orchestratorGameSceneNativeOf(await manifest())
     for (const style of [native.figures, native.office]) {
       expect(style.roles.member.sheets).toHaveLength(8)
-      for (const role of [style.roles.lead, style.roles.member, style.roles.advisor]) {
+      // ORCA-1242: the Orca steward has its own sheet, apart from Jev's advisor.
+      expect(style.roles.steward?.sheets).toEqual([expect.stringMatching(/\/steward\.png$/)])
+      const roles = [style.roles.lead, style.roles.member, style.roles.advisor, style.roles.steward]
+      for (const role of roles) {
         expect(Object.keys(role.animations).sort()).toEqual(Object.keys(QUEST_ACTIONS).sort())
       }
     }

@@ -377,3 +377,34 @@ describe('teamSceneInputOf and where a member waits on you', () => {
     expect(markOf({ kind: 'inbox' })).toBe('alert')
   })
 })
+
+// ORCA-1242: the steward's latest move that raised or lowered the pick, for its visit.
+describe('teamSceneInputOf and the Orca steward', () => {
+  const step = (at: number, lift: 'raise' | 'lower' | 'same', applied = true) => ({
+    at,
+    moment: 'edit',
+    from: 'Sonnet 5.5 · medium',
+    to: `pick ${at}`,
+    applied,
+    lift
+  })
+  const moveOf = (steps: ReturnType<typeof step>[]) =>
+    teamSceneInputOf({
+      lead: lead(),
+      advisor: null,
+      members: [card('m', { steward: { phase: 'implement', plan: 'following', steps } })]
+    }).members[0]?.steward
+
+  it('carries its newest applied move that changed the pick', () => {
+    expect(
+      moveOf([step(1, 'raise'), step(2, 'lower'), step(3, 'same'), step(4, 'raise', false)])
+    ).toEqual({ at: 2, lift: 'lower', to: 'pick 2', moment: 'edit' })
+  })
+
+  it('carries none with no move that changed it, or with no steward', () => {
+    expect(moveOf([step(1, 'same')])).toBeUndefined()
+    expect(
+      teamSceneInputOf({ lead: lead(), advisor: null, members: [card('m')] }).members[0]
+    ).not.toHaveProperty('steward')
+  })
+})

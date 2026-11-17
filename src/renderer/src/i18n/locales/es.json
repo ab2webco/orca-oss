@@ -16732,7 +16732,9 @@
       "deviated": "Fuera del plan · {{phase}}",
       "timing": "Un modelo nuevo aplica desde el siguiente paso, un esfuerzo nuevo desde el siguiente turno.",
       "notApplied": "no aplicado",
-      "notServed": "eligió {{model}}, no se sirve: otro plugin puede saltarse sus hooks ({{steward}})"
+      "notServed": "eligió {{model}}, no se sirve: otro plugin puede saltarse sus hooks ({{steward}})",
+      "raised": "Sube a {{to}}: {{reason}}",
+      "lowered": "Baja a {{to}}: {{reason}}"
     }
   },
   "claudeDeadHooks": {

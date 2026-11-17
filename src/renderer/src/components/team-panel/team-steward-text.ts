@@ -4,6 +4,7 @@ import {
   type TeamSteward,
   type TeamStewardCredit
 } from '../../../../shared/team-panel-steward'
+import type { TeamSceneStewardMove } from '../../../../shared/team-scene/team-scene-types'
 
 // The Orca steward's words on a member card (ORCA-1242); the shared model carries only ids.
 
@@ -70,6 +71,14 @@ export function teamStewardCreditText(credit: TeamStewardCredit): string {
   }
   const reason = teamStewardMomentText(credit.reason)
   return translate('teamPanel.steward.reason', '{{reason}} ({{steward}})', { reason, steward })
+}
+
+/** Its line beside the member it visits in the scene. */
+export function teamStewardVisitText({ lift, to, moment }: TeamSceneStewardMove): string {
+  const reason = teamStewardMomentText(moment)
+  return lift === 'raise'
+    ? translate('teamPanel.steward.raised', 'Up to {{to}}: {{reason}}', { to, reason })
+    : translate('teamPanel.steward.lowered', 'Down to {{to}}: {{reason}}', { to, reason })
 }
 
 /** How its latest pick stands against the lead's plan; null without a plan. */

@@ -1,4 +1,5 @@
 import type { GameMemberSteward, GameStewardPick } from './orchestrator-game-member-steward'
+import { GAME_PLAN_EFFORTS } from './orchestrator-game-effort-plan'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 
 // What a member card says about its Orca steward (ORCA-1242): who picked the model and why, whether
@@ -29,6 +30,8 @@ export type TeamStewardStep = {
   from: string
   to: string
   applied: boolean
+  /** Whether it raised or lowered the pick, for the scene's visit. */
+  lift: 'raise' | 'lower' | 'same'
 }
 
 /** The card detail's steward rows; `plan` is how its latest pick stands against the lead's plan. */
@@ -43,6 +46,21 @@ export const teamStewardLabelOf = (model: string): string =>
 
 const pickText = (pick: GameStewardPick): string =>
   [teamStewardLabelOf(pick.model), pick.effort].filter(Boolean).join(' · ')
+
+// Why unknown ranks as Opus: as the plugin ranks it, so a model this build lacks never reads lowered.
+const modelRankOf = (model: string): number =>
+  ['haiku', 'sonnet', 'opus', 'fable'].indexOf(
+    /(haiku|sonnet|opus|fable)/i.exec(model)?.[1]?.toLowerCase() ?? 'opus'
+  )
+const effortRankOf = (effort: string | null): number =>
+  GAME_PLAN_EFFORTS.indexOf(effort as (typeof GAME_PLAN_EFFORTS)[number])
+
+const liftOf = (from: GameStewardPick, to: GameStewardPick): TeamStewardStep['lift'] => {
+  const by =
+    modelRankOf(to.model) - modelRankOf(from.model) ||
+    effortRankOf(to.effort) - effortRankOf(from.effort)
+  return by > 0 ? 'raise' : by < 0 ? 'lower' : 'same'
+}
 
 const latestOf = (steward: GameMemberSteward) =>
   steward.decisions.findLast((one) => one.moment !== 'stand-down')
@@ -77,7 +95,8 @@ export function teamStewardOf(steward: GameMemberSteward | undefined): { steward
       moment: one.moment,
       from: pickText(one.from),
       to: pickText(one.to),
-      applied: one.applied
+      applied: one.applied,
+      lift: liftOf(one.from, one.to)
     }))
   const plan = steward.plan !== 'plan' ? 'none' : isPlanned ? 'following' : 'deviated'
   return { steward: { phase: steward.phase, plan, steps } }

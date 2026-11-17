@@ -24,6 +24,16 @@ export const FIGURES_CAST = {
     beard: '#efe9dc',
     skin: skin[1]
   }),
+  // The Orca steward (ORCA-1242): a herald in rose with a clipboard, its mark in every style.
+  steward: hero({
+    body: '#b0417a',
+    trim: '#f4efe0',
+    cape: '#6b2347',
+    hat: null,
+    tool: 'clipboard',
+    hair: '#2a1a12',
+    skin: skin[3]
+  }),
   members: [
     hero({
       body: '#aab4c4',
@@ -131,6 +141,16 @@ export const OFFICE_CAST = {
     hair: '#7d7a78',
     skin: skin[1],
     leg: '#3a3a42',
+    seatedWork: false
+  }),
+  // The Orca steward: a floor manager in teal with a clipboard, standing like the advisor.
+  steward: worker({
+    body: '#1f8a8a',
+    trim: '#156666',
+    hair: '#17120f',
+    skin: skin[2],
+    leg: '#2a3038',
+    tool: 'clipboard',
     seatedWork: false
   }),
   members: [

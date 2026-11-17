@@ -137,3 +137,26 @@ describe('teamSceneEventsBetween and CI turning green', () => {
     expect(greens(at(), at('success'))).toEqual([])
   })
 })
+
+// ORCA-1242: the Orca steward visits a member when it raises or lowers its model.
+describe('teamSceneEventsBetween and the Orca steward', () => {
+  const move = { at: 5, lift: 'raise', to: 'Opus 5.5 · high', moment: 'edit' } as const
+
+  it('sends the steward once per move, to the member it moved', () => {
+    const prev = input([member('a'), member('b')])
+    const next = input([member('a'), member('b', { steward: move })])
+    expect(teamSceneEventsBetween(prev, next)).toEqual([{ kind: 'stewarded', key: 'b', move }])
+    expect(teamSceneEventsBetween(next, next)).toEqual([])
+    const later = { ...move, at: 9, lift: 'lower' as const }
+    expect(
+      teamSceneEventsBetween(next, input([member('a'), member('b', { steward: later })]))
+    ).toEqual([{ kind: 'stewarded', key: 'b', move: later }])
+  })
+
+  it('never on opening, nor for a member that just joined', () => {
+    expect(teamSceneEventsBetween(null, input([member('a', { steward: move })]))).toEqual([])
+    expect(teamSceneEventsBetween(input([]), input([member('a', { steward: move })]))).toEqual([
+      { kind: 'join', key: 'a' }
+    ])
+  })
+})

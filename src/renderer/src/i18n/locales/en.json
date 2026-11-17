@@ -17712,7 +17712,9 @@
       "deviated": "Off the plan · {{phase}}",
       "timing": "A new model applies from the next step, a new effort from the next turn.",
       "notApplied": "not applied",
-      "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})"
+      "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})",
+      "raised": "Up to {{to}}: {{reason}}",
+      "lowered": "Down to {{to}}: {{reason}}"
     }
   },
   "claudeDeadHooks": {

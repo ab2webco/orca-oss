@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { advisorLineShown } from './team-scene-advisor-walk'
 import {
-  advisorLineShown,
   applyTeamSceneInput,
   createTeamSceneWorld,
   drainTeamSceneEffects,

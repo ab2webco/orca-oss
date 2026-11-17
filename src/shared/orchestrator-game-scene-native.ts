@@ -110,8 +110,9 @@ const styleSchema = z.object({
   roles: z.object({
     lead: roleSchema,
     member: roleSchema,
-    /** Wears the member art when absent. */
-    advisor: roleSchema.optional()
+    /** Each wears the member art when absent. */
+    advisor: roleSchema.optional(),
+    steward: roleSchema.optional()
   }),
   props: z
     .object({

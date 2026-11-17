@@ -94,6 +94,9 @@ export function teamSceneEventsBetween(
     if (m.ci === 'success' && (old.ci === 'pending' || old.ci === 'failure')) {
       events.push({ kind: 'ciGreen', key: m.key })
     }
+    if (m.steward && m.steward.at !== old.steward?.at) {
+      events.push({ kind: 'stewarded', key: m.key, move: m.steward })
+    }
   }
   const panes: [string, TeamSceneAgentInput, TeamSceneAgentInput | undefined][] = [
     ['lead', next.lead, prev.lead],

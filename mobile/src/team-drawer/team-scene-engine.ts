@@ -6,8 +6,8 @@ import {
   type OrchestratorGameSceneNativeStyle
 } from '../../../src/shared/orchestrator-game-scene-native'
 import { teamSceneActors } from '../../../src/shared/team-scene/team-scene-actors'
+import { advisorLineShown } from '../../../src/shared/team-scene/team-scene-advisor-walk'
 import {
-  advisorLineShown,
   applyTeamSceneInput,
   createTeamSceneWorld,
   drainTeamSceneEffects,

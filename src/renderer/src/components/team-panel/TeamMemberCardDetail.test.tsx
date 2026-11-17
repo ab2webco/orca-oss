@@ -126,14 +126,16 @@ describe('TeamMemberCardDetail', () => {
               moment: 'plan',
               from: 'Haiku 5.5 · low',
               to: 'Sonnet 5.5 · medium',
-              applied: true
+              applied: true,
+              lift: 'raise'
             },
             {
               at: NOW,
               moment: 'edit',
               from: 'Sonnet 5.5 · medium',
               to: 'Opus 5.5 · high',
-              applied: false
+              applied: false,
+              lift: 'raise'
             }
           ]
         }

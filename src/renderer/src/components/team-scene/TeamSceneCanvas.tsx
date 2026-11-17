@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { teamSceneActors } from '../../../../shared/team-scene/team-scene-actors'
+import { advisorLineShown } from '../../../../shared/team-scene/team-scene-advisor-walk'
 import {
-  advisorLineShown,
   applyTeamSceneInput,
   createTeamSceneWorld,
   drainTeamSceneEffects,
@@ -14,6 +14,8 @@ import {
   teamSceneGuestAttends
 } from '../../../../shared/team-scene/team-scene-elevator'
 import { teamSceneLeadAttends } from '../../../../shared/team-scene/team-scene-lead-rounds'
+import { stewardSaysOf } from '../../../../shared/team-scene/team-scene-steward-visit'
+import { teamStewardVisitText } from '../team-panel/team-steward-text'
 import type { TeamSceneActor, TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { teamSceneLabel } from './team-scene-copy'
@@ -92,13 +94,22 @@ export function TeamSceneCanvas({
   const [speakers, setSpeakers] = useState<{
     width: number
     advisor: string | null
+    steward: string | null
     anchors: Map<string, TeamSceneSpeech['anchor']>
     askers: TeamSceneAsker[]
     /** The lead stands by a member who asks, under that member's tag. */
     leadAttends: boolean
     /** The member lit from the stage or the Team list, where its label hangs. */
     lit: { key: string; x: number; top: number } | null
-  }>({ width: 0, advisor: null, anchors: new Map(), askers: [], leadAttends: false, lit: null })
+  }>({
+    width: 0,
+    advisor: null,
+    steward: null,
+    anchors: new Map(),
+    askers: [],
+    leadAttends: false,
+    lit: null
+  })
   const actorsRef = useRef<TeamSceneActor[]>([])
   const colors = useTeamSceneStatusColors()
   const pointer = useTeamScenePointer({ canvasRef, actorsRef, painter, members })
@@ -152,6 +163,8 @@ export function TeamSceneCanvas({
         top: Math.round(litBox.top)
       }
       const advisor = advisorLineShown(world)
+      const said = stewardSaysOf(world)
+      const steward = said ? teamStewardVisitText(said.move) : null
       const anchors = new Map(
         actors
           .filter((a) => a.role !== 'member')
@@ -182,12 +195,12 @@ export function TeamSceneCanvas({
       }
       // Why keyed, and by a few px: the overlay re-renders only when a line, size or speaker moves,
       // so a walking lead's bubble follows it without a render every frame.
-      const key = `${width}|${advisor}|${leadAttends}|${[...anchors]
+      const key = `${width}|${advisor}|${steward}|${leadAttends}|${[...anchors]
         .map(([k, a]) => `${k}:${Math.round(a.x / ANCHOR_STEP_PX)}`)
         .join()}|${askers.map((a) => `${a.key}:${a.name}:${a.x}:${a.top}`).join()}|${lit ? `${lit.key}:${Math.round(lit.x / ANCHOR_STEP_PX)}:${lit.top}` : ''}`
       if (key !== speakersKeyRef.current) {
         speakersKeyRef.current = key
-        setSpeakers({ width, advisor, anchors, askers, leadAttends, lit })
+        setSpeakers({ width, advisor, steward, anchors, askers, leadAttends, lit })
       }
       painter.paint(g, {
         width,
@@ -322,6 +335,10 @@ export function TeamSceneCanvas({
       align: 'end',
       yields: true
     })
+  }
+  const stewardAnchor = speakers.anchors.get('steward')
+  if (speakers.steward && stewardAnchor) {
+    speeches.push({ key: 'steward', text: speakers.steward, anchor: stewardAnchor, yields: true })
   }
   const leadAnchor = speakers.anchors.get('lead')
   if (leadLine && leadAnchor) {

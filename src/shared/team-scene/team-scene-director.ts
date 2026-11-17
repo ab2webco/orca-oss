@@ -24,6 +24,7 @@ import {
   syncAdvisorBody
 } from './team-scene-advisor-walk'
 import { seatPlanForLayout, type TeamSceneLayout } from './team-scene-seats'
+import * as steward from './team-scene-steward-visit'
 import {
   grownSite,
   keepTrophy,
@@ -57,7 +58,6 @@ import {
 const CHEER_SECONDS = 2.2
 const CHECK_SECONDS = 1.2
 const ADVISOR_RAISE_SECONDS = 1.4
-const ADVISOR_BUBBLE_SECONDS = 6
 
 type Plan = TeamScenePlan
 
@@ -112,6 +112,7 @@ export type TeamSceneWorld = {
   leadStays: boolean
   layout: TeamSceneLayout
   advisorWalk: TeamSceneAdvisorWalk
+  stewardVisit: steward.TeamSceneStewardVisit
 }
 
 export type { TeamSceneLayout } from './team-scene-seats'
@@ -139,7 +140,8 @@ export function createTeamSceneWorld(): TeamSceneWorld {
     ride: null,
     leadStays: false,
     layout: GROUND_LAYOUT,
-    advisorWalk: createAdvisorWalk()
+    advisorWalk: createAdvisorWalk(),
+    stewardVisit: steward.createStewardVisit()
   }
 }
 
@@ -221,6 +223,7 @@ export function applyTeamSceneInput(
     })
   }
   dismissUnseated(world, seatedKeys, byKey)
+  steward.queueStewardVisits(world, events)
 
   for (const event of events) {
     const body = 'key' in event ? bodies.get(event.key) : undefined
@@ -291,6 +294,7 @@ export function stepTeamScene(
     stepLeadRounds(world, opts.width)
   }
   stepAdvisorWalk(world, opts.width)
+  steward.stepStewardVisit(world, opts.width, (at) => bodyAt('steward', 'steward', at, 1))
   for (const body of world.bodies.values()) {
     moveTeamSceneBody(body, dt, opts.width)
   }
@@ -298,6 +302,7 @@ export function stepTeamScene(
 
 /** Reduced motion: every pending walk ends where it would, with no frames in between. */
 export function settleTeamScene(world: TeamSceneWorld): void {
+  steward.endStewardVisit(world)
   for (const body of world.bodies.values()) {
     if (body.plan.kind === 'leave') {
       world.bodies.delete(body.key)
@@ -321,9 +326,4 @@ export function settleTeamScene(world: TeamSceneWorld): void {
 
 export function drainTeamSceneEffects(world: TeamSceneWorld): TeamSceneEffect[] {
   return world.effects.splice(0)
-}
-
-export function advisorLineShown(world: TeamSceneWorld): string | null {
-  const said = world.advisorSaid
-  return said && world.clock - said.at < ADVISOR_BUBBLE_SECONDS ? said.line : null
 }

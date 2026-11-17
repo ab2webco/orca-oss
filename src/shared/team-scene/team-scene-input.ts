@@ -72,6 +72,13 @@ const ciOf = (m: TeamMemberCard): Pick<TeamSceneMemberInput, 'ci'> => {
   return ci === 'pending' || ci === 'failure' || ci === 'success' ? { ci } : {}
 }
 
+const stewardOf = ({ steward }: TeamMemberCard): Pick<TeamSceneMemberInput, 'steward'> => {
+  const move = steward?.steps.findLast((one) => one.applied && one.lift !== 'same')
+  return move && move.lift !== 'same'
+    ? { steward: { at: move.at, lift: move.lift, to: move.to, moment: move.moment } }
+    : {}
+}
+
 const deskOf = (
   m: TeamMemberCard,
   queue: readonly TeamQueueEntry[] | null
@@ -100,6 +107,7 @@ export function teamSceneInputOf(
       ...deskOf(m, queue),
       ...(HOLD[m.condition] ? { hold: HOLD[m.condition] } : {}),
       ...ciOf(m),
+      ...stewardOf(m),
       ...(m.needsYou && m.ask && m.ask.kind !== 'inbox' ? { paneAsk: true as const } : {})
     }))
   }
