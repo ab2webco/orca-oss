@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  SUITE_BUDGET_SECONDS,
   SUITE_SHARDS,
   durationsFromReports,
   main,
@@ -27,14 +28,12 @@ const filesOf = (shard) => JSON.parse(shard.files)
 const durations = readDurations()
 // Why the map's own figure where it has one: that is what each spec took on CI.
 const secondsOf = (file) => durations[file] ?? 0
-const shardMinutes = (shards) =>
-  shards.map((shard) => filesOf(shard).reduce((sum, file) => sum + secondsOf(file), 0) / 60)
-
 describe('planSuiteShards', () => {
-  it('runs every spec on disk exactly once, across the twelve shards', () => {
+  it('runs every spec on disk exactly once, across at least twelve shards', () => {
     const shards = planSuiteShards(specsOnDisk, { durations, sizeOf })
+    expect(shards.length).toBeGreaterThanOrEqual(SUITE_SHARDS)
     expect(shards.map((shard) => shard.shard_name)).toEqual(
-      Array.from({ length: SUITE_SHARDS }, (_, i) => `${i + 1}-of-${SUITE_SHARDS}`)
+      Array.from({ length: shards.length }, (_, i) => `${i + 1}-of-${shards.length}`)
     )
     expect(shards.flatMap(filesOf).sort()).toEqual([...specsOnDisk].sort())
     expect(shards.every((shard) => filesOf(shard).length > 0)).toBe(true)
@@ -51,9 +50,31 @@ describe('planSuiteShards', () => {
     expect(most).toBeLessThanOrEqual(panelMinutes(specsOnDisk) / 3)
   })
 
-  it('keeps every shard within 35 of its 45 minutes on the measured durations', () => {
-    const minutes = shardMinutes(planSuiteShards(specsOnDisk, { durations, sizeOf }))
-    expect(Math.max(...minutes)).toBeLessThanOrEqual(35)
+  // Merge group 44166014367: twelve shards held about 34 measured minutes each, and shard 12 hit its
+  // 45-minute cap; a run takes about 6% longer than its tests' sum, plus 2 minutes of setup (ORCA-1272).
+  it('plans no shard of the suite over its budget', () => {
+    const shards = planSuiteShards(specsOnDisk, { durations, sizeOf })
+    expect(Math.max(...shards.map((shard) => shard.seconds))).toBeLessThanOrEqual(
+      SUITE_BUDGET_SECONDS
+    )
+  })
+
+  it('adds shards until none is over the budget', () => {
+    const files = Array.from({ length: 30 }, (_, i) => `slow-${i}.spec.ts`)
+    const shards = planSuiteShards(files, {
+      durations: Object.fromEntries(files.map((file) => [file, 600])),
+      sizeOf: () => 1000
+    })
+    // Twelve shards would put three 10-minute specs on six of them, past the 28-minute budget.
+    expect(shards).toHaveLength(15)
+    expect(shards.every((shard) => shard.seconds <= SUITE_BUDGET_SECONDS)).toBe(true)
+  })
+
+  // Why: an unmeasured spec is priced by guess, and seven of them sat on shard 12 of 44166014367.
+  // A spec on a PR's changed list gets its figure from that run's e2e-json-report-changed-* reports;
+  // one that only runs @headful or @ondemand never runs in the suite's shards, so its figure is 0.
+  it('has a figure for every spec on disk', () => {
+    expect(specsOnDisk.filter((file) => !(file in durations))).toEqual([])
   })
 
   it('weighs a spec the map has no figure for by its size', () => {
@@ -61,7 +82,7 @@ describe('planSuiteShards', () => {
     const shards = planSuiteShards(files, {
       durations: { 'a.spec.ts': 100, 'b.spec.ts': 100 },
       sizeOf: (file) => (file === 'new-heavy.spec.ts' ? 3000 : 1000),
-      total: 2
+      minShards: 2
     })
     // At the map's 0.1 s per byte the new spec weighs 300 s, so it rides alone.
     expect(shards.map(filesOf)).toEqual([['new-heavy.spec.ts'], ['a.spec.ts', 'b.spec.ts']])
@@ -77,16 +98,15 @@ describe('planSuiteShards', () => {
         ...Object.fromEntries(skipped.map((file) => [file, 0]))
       },
       sizeOf: () => 1000,
-      total: 2
+      minShards: 2
     })
     const counts = shards.map((shard) => filesOf(shard).filter((f) => f.startsWith('skipped')))
     expect(Math.abs(counts[0].length - counts[1].length)).toBeLessThanOrEqual(6)
     expect(counts.every((one) => one.length > 0)).toBe(true)
   })
 
-  // Why: e2e.yml installs Claude Code now (ORCA-1148 T2), so the specs that skipped for want of it in
-  // run 42563987741 run; their skip time would underweigh them, so they weigh by size until a refresh.
-  it('carries no skip-time figure for the specs that skipped for want of Claude Code', () => {
+  // Why: they skipped for want of Claude Code in run 42563987741; e2e.yml installs it now (ORCA-1148 T2).
+  it('carries a run time, not a skip time, for the specs gated on Claude Code', () => {
     // The other five tested the terminal band and arcade ORCA-1055 removed, and were deleted.
     const skippedForClaude = [
       'game-text-layer-without-plugins',
@@ -98,7 +118,7 @@ describe('planSuiteShards', () => {
     for (const file of skippedForClaude) {
       expect(readFileSync(file, 'utf8')).toContain('claudeVersionOk')
     }
-    expect(skippedForClaude.filter((file) => file in durations)).toEqual([])
+    expect(skippedForClaude.filter((file) => !(durations[file] > 0))).toEqual([])
   })
 
   it('gives the same plan for the same input, whatever the listing order', () => {
@@ -184,7 +204,7 @@ describe('main', () => {
     }
   })
 
-  it('writes the twelve-shard matrix the e2e job expands', () => {
+  it('writes the matrix the e2e job expands', () => {
     dir = mkdtempSync(join(tmpdir(), 'e2e-suite-shards-'))
     const output = join(dir, 'github-output')
     writeFileSync(output, '')
@@ -194,7 +214,7 @@ describe('main', () => {
     expect(written.startsWith('matrix=')).toBe(true)
     expect(JSON.parse(written.slice('matrix='.length))).toEqual(matrix)
     expect(matrix.flatMap(filesOf).sort()).toEqual([...specsOnDisk].sort())
-    expect(lines).toHaveLength(SUITE_SHARDS)
-    expect(lines[0]).toMatch(/^e2e 1-of-12: ~\d+ min, \d+ specs$/)
+    expect(lines).toHaveLength(matrix.length)
+    expect(lines[0]).toMatch(new RegExp(`^e2e 1-of-${matrix.length}: ~\\d+ min, \\d+ specs$`))
   })
 })

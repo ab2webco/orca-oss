@@ -35,7 +35,7 @@ export function readDurations(mapFile = DURATIONS_FILE) {
 
 /**
  * Measured seconds (at least the floor) where the map has them; otherwise size at the list's own
- * seconds per byte, so a new spec lands somewhere sensible until the next refresh measures it.
+ * seconds per byte, but no less than nine in ten measured specs.
  * @param {string[]} files
  * @param {{ durations: Record<string, number>, sizeOf: (file: string) => number }} options
  * @returns {(file: string) => number}
@@ -48,8 +48,13 @@ export function measuredSecondsOf(files, { durations, sizeOf }) {
   const measuredBytes = measured.reduce((sum, file) => sum + sizeOf(file), 0)
   const perByte =
     measuredBytes > 0 ? measured.reduce((sum, file) => sum + durations[file], 0) / measuredBytes : 1
+  // Why a percentile floor: by size, 52 new specs read 56 min and took 65, one of them 63 s for 301 (ORCA-1272).
+  const figures = Object.values(durations).sort((a, b) => a - b)
+  const unmeasuredFloor = figures[Math.floor(figures.length * 0.9)] ?? 0
   return (file) =>
-    file in durations ? Math.max(durations[file], FLOOR_SECONDS) : sizeOf(file) * perByte
+    file in durations
+      ? Math.max(durations[file], FLOOR_SECONDS)
+      : Math.max(sizeOf(file) * perByte, unmeasuredFloor)
 }
 
 /**

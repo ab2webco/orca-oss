@@ -168,6 +168,19 @@ describe('splitChangedSpecs', () => {
     expect(splitChangedSpecs([spec, panelFiles[0]], secondsOf)).toHaveLength(1)
   })
 
+  // Why: by size alone sidebar-sticky-header-stack read 63 s; merge group 44166014367 measured 301 s (ORCA-1272).
+  it('prices an unmeasured spec no lower than nine in ten measured specs', () => {
+    const durations = Object.fromEntries(
+      Array.from({ length: 20 }, (_, i) => [`measured-${i}.spec.ts`, (i + 1) * 10])
+    )
+    const secondsOf = measuredSecondsOf(['measured-0.spec.ts', 'new.spec.ts', 'big.spec.ts'], {
+      durations,
+      sizeOf: (file) => (file === 'big.spec.ts' ? 30_000 : 1000)
+    })
+    expect(secondsOf('new.spec.ts')).toBe(190)
+    expect(secondsOf('big.spec.ts')).toBe(300)
+  })
+
   it('weighs the specs by their measured seconds when no weight is given', () => {
     const shards = splitChangedSpecs(panelFiles)
     const withScene = shards.find((shard) =>
