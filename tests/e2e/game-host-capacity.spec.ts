@@ -51,19 +51,32 @@ test('a lead lists each paired host with its cap, cores, memory and load, and na
       loadAverage1m: process.platform === 'win32' ? null : expect.any(Number)
     }
     expect(state.role).toBe('lead')
+    // Why refused: this lead has no project repo, so `game launch --on` refuses every host (ORCA-1207).
     expect(state.hostCapacity).toEqual([
       { host: 'local', ...ok, cap: expect.any(Number) },
-      { host: 'imac', ...ok, cap: memberCap },
-      { host: 'm1', running: 0, status: 'unreachable' }
+      {
+        host: 'imac',
+        ...ok,
+        cap: memberCap,
+        launch: {
+          kind: 'refused',
+          reason: "Orca cannot tell this lead's project, so it launches no member with --repo."
+        }
+      },
+      { host: 'm1', running: 0, status: 'unreachable', launch: { kind: 'unanswered' } }
     ])
+    expect(state.hostCapacity![0], 'this host is never checked against itself').not.toHaveProperty(
+      'launch'
+    )
     const text = formatGameHostCapacity(state.hostCapacity!).join('\n')
     await testInfo.attach('hosts.txt', { body: text, contentType: 'text/plain' })
     expect(text).toMatch(
       new RegExp(
-        `imac   0/${memberCap} running · ${own.cpuCoreCount} cores · [\\d.]+ of \\d+(\\.\\d)? GB free`
+        `imac   0/${memberCap} running · ${own.cpuCoreCount} cores · [\\d.]+ of \\d+(\\.\\d)? GB free.* · refused by repo scope$`,
+        'm'
       )
     )
-    expect(text).toContain('m1     0 running · not answering')
+    expect(text).toContain('m1     0 running · not answering · repos not answering')
   } finally {
     for (const host of hosts.toReversed()) {
       await host.dispose()
