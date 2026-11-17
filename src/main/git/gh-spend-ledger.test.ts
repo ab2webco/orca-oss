@@ -54,7 +54,9 @@ describe('ghSpendSince', () => {
         { shape: 'pr checks', bucket: 'graphql', calls: 2 },
         { shape: 'api repos/:owner/:repo/pulls/:n', bucket: 'core', calls: 1 },
         { shape: 'pr view', bucket: 'graphql', calls: 1 }
-      ]
+      ],
+      pollers: [{ poller: 'untagged', calls: 4, shape: 'pr checks' }],
+      notModified: 0
     })
   })
 

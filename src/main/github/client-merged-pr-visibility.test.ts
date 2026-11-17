@@ -219,7 +219,8 @@ describe('getPRForBranch', () => {
     const second = await getPRForBranch('/repo-root', 'fix-hibernation-wake')
 
     expect(second).toBeNull()
-    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(5)
+    // The branch list again; the unchanged PR version reuses its `pr view` (ORCA-1213).
+    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(4)
   })
 
   it('keeps hiding a merged branch PR when the commit membership probe fails', async () => {
@@ -258,8 +259,8 @@ describe('getPRForBranch', () => {
     const second = await getPRForBranch('/repo-root', 'fix-hibernation-wake')
 
     expect(second).toMatchObject({ number: 6011, confirmedContainedHeadOid: 'bbbb2222bbbb2222' })
-    // No fourth membership call: the confirmed answer is immutable and cached.
-    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(5)
+    // No membership call, and the unchanged PR version reuses its `pr view` (ORCA-1213).
+    expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(4)
   })
 
   it('uses the caller-supplied worktree head for the membership probe without shelling out', async () => {

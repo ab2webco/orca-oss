@@ -41,10 +41,13 @@ async function probeGameGitHubBudget(now: number): Promise<GameGitHubBudget | nu
   // Why: GitHub's window is the hour that ends at the bucket's reset.
   const orcaCalls = (resetAt: number, bucket: 'graphql' | 'core'): number =>
     ghSpendSince(resetAt * 1000 - HOUR_MS, now).calls[bucket]
+  const { top, pollers, notModified } = ghSpendSince(now - HOUR_MS, now)
   const budget = gameGitHubBudgetOf({
     graphql: { ...graphql, orcaCalls: orcaCalls(graphql.resetAt, 'graphql') },
     core: { ...core, orcaCalls: orcaCalls(core.resetAt, 'core') },
-    top: ghSpendSince(now - HOUR_MS, now).top
+    top,
+    pollers,
+    notModified
   })
   lowUntilMs = Math.max(
     0,

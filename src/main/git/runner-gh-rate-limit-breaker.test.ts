@@ -19,6 +19,7 @@ import {
   registerGhRateLimitResetProbe
 } from './gh-rate-limit-breaker'
 import { _resetGhSpendLedger, ghSpendSince } from './gh-spend-ledger'
+import { runWithGhCallOrigin } from './gh-call-origin'
 
 const PRIMARY_RATE_LIMIT_STDERR =
   'gh: API rate limit exceeded for user ID 1775218. Please wait. (HTTP 403)'
@@ -225,7 +226,38 @@ describe('ghExecFileAsync spend ledger', () => {
 
     expect(ghSpendSince(0)).toEqual({
       calls: { core: 0, graphql: 1, search: 0 },
-      top: [{ shape: 'pr view', bucket: 'graphql', calls: 1 }]
+      top: [{ shape: 'pr view', bucket: 'graphql', calls: 1 }],
+      pollers: [{ poller: 'untagged', calls: 1, shape: 'pr view' }],
+      notModified: 0
     })
+  })
+
+  it('names the poller that sent each call', async () => {
+    mockGhSuccess('{}')
+    await runWithGhCallOrigin('rpc game.state', () => ghExecFileAsync(['pr', 'view', '1']))
+    await runWithGhCallOrigin('pr-refresh active', async () => {
+      await ghExecFileAsync(['api', 'repos/a/b/pulls?head=a%3Ax'])
+      await ghExecFileAsync(['api', 'repos/a/b/pulls?head=a%3Ay'])
+    })
+
+    expect(ghSpendSince(0).pollers).toEqual([
+      { poller: 'pr-refresh active', calls: 2, shape: 'api repos/:owner/:repo/pulls' },
+      { poller: 'rpc game.state', calls: 1, shape: 'pr view' }
+    ])
+  })
+
+  it('does not bill a conditional read GitHub answered 304', async () => {
+    mockGhFailure('gh: HTTP 304')
+    await expect(
+      ghExecFileAsync([
+        'api',
+        'repos/a/b/pulls?head=a%3Ax',
+        '--include',
+        '--header',
+        'If-None-Match: "e"'
+      ])
+    ).rejects.toThrow()
+
+    expect(ghSpendSince(0)).toMatchObject({ calls: { core: 0 }, top: [], notModified: 1 })
   })
 })

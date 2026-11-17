@@ -27,7 +27,7 @@ import {
   notifyGhPrimaryRateLimit,
   type GhRateLimitBucket
 } from './gh-rate-limit-breaker'
-import { recordGhSpend } from './gh-spend-ledger'
+import { recordGhSpend, refundGhSpendAsNotModified } from './gh-spend-ledger'
 import { getDefaultWslDistro, parseWslPath, toWindowsWslPath, type WslPathInfo } from '../wsl'
 import { addWslEnvKeys } from '../wsl-env'
 import {
@@ -1768,10 +1768,13 @@ export async function ghExecFileAsync(
   let lastError: unknown
   let attemptedHostFallback = false
   let attemptedDefaultWslFallback = false
+  let spendRecorded = false
   for (let attempt = 0; attempt <= GH_RETRY_DELAYS_MS.length; attempt++) {
     try {
       // Why only native github.com: that is the shared account budget the game reports (ORCA-877).
-      if (!rateLimitProbe && ghRateLimitScope(args, options, resolved) === GH_DEFAULT_SCOPE) {
+      spendRecorded =
+        !rateLimitProbe && ghRateLimitScope(args, options, resolved) === GH_DEFAULT_SCOPE
+      if (spendRecorded) {
         recordGhSpend(args, rateLimitBucket)
       }
       const { stdout, stderr } = await execFileCapture(resolved.binary, resolved.args, {
@@ -1787,6 +1790,10 @@ export async function ghExecFileAsync(
     } catch (err) {
       lastError = err
       const { stderr } = extractExecError(err)
+      // Why: GitHub does not bill a conditional read it answers 304 (ORCA-1213).
+      if (spendRecorded && /\bHTTP 304\b/.test(stderr)) {
+        refundGhSpendAsNotModified(args)
+      }
       if (isGhPrimaryRateLimitStderr(stderr)) {
         notifyGhPrimaryRateLimit(rateLimitBucket, ghRateLimitScope(args, options, resolved))
       }
