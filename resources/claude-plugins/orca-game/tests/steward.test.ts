@@ -39,6 +39,7 @@ type World = {
   /** Set for a store that keeps what the steward writes, and the env each state poll ran with. */
   memory?: Record<string, unknown>
   polls?: (Record<string, string> | undefined)[]
+  highRiskPaths?: string[]
 }
 type Seen = { model: string; effort: unknown; agentId?: string }
 
@@ -145,7 +146,8 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
           result: {
             ticket: 'ORCA-7',
             known: true,
-            plan: world.plan ? { source: 'lead', kind: null, phases: world.plan } : null
+            plan: world.plan ? { source: 'lead', kind: null, phases: world.plan } : null,
+            ...(world.highRiskPaths ? { highRiskPaths: world.highRiskPaths } : {})
           }
         })
       : answer(STATE)
@@ -404,5 +406,43 @@ describe("the steward's report to Orca (ORCA-1242)", () => {
     await clock.settle()
     expect(world.polls?.length).toBeGreaterThan(0)
     expect(world.polls?.some((env) => env?.ORCA_GAME_STEWARD)).toBe(false)
+  })
+})
+
+describe('the key moments PR 3c adds (ORCA-1242)', () => {
+  const HIGH = PLAN.map((one) => (one.phase === 'implement' ? { ...one, effort: 'high' } : one))
+  const editAt = ($: Engine, path: string) =>
+    $.tool.call({ tool: 'Edit', file_path: path, old_string: 'a', new_string: 'b' } as never)
+  const picks = (seen: Seen[]) => seen.map((one) => `${one.model}/${String(one.effort)}`)
+
+  test("an approved plan moves the member to the lead's implement phase before any edit", async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN }, seen)
+    await step($, 0)
+    await clock.settle()
+    await step($, 1)
+    await $.tool.call({ tool: 'ExitPlanMode', plan: 'do it' } as never)
+    await clock.settle()
+    await step($, 2)
+    expect(picks(seen)).toEqual([
+      'claude-sonnet-5-5/medium',
+      'claude-sonnet-5-5/low',
+      'claude-opus-5-5/xhigh'
+    ])
+  })
+
+  test("the first edit of an orca.yaml high-risk path runs at xhigh over the plan's high", async ($, on) => {
+    const seen: Seen[] = []
+    const world = { plan: HIGH, highRiskPaths: ['src/main/runtime/'] }
+    const clock = await start($, on, world, seen)
+    await step($, 0)
+    await clock.settle()
+    await editAt($, '/w/src/a.ts')
+    await clock.settle()
+    await step($, 1)
+    await editAt($, '/w/src/main/runtime/b.ts')
+    await clock.settle()
+    await step($, 2)
+    expect(picks(seen).slice(1)).toEqual(['claude-opus-5-5/high', 'claude-opus-5-5/xhigh'])
   })
 })

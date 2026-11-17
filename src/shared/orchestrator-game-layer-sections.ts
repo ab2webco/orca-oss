@@ -5,6 +5,7 @@ import { parseGameOrcaActions } from './orchestrator-game-orca-actions'
 import { parseGamePanel } from './orchestrator-game-panel'
 import { parseGameReviewsSource, parseGameTodoSource } from './orchestrator-game-project-work'
 import { parseGameRewardWeights } from './orchestrator-game-reward-weights'
+import { parseGameStewardConfig } from './orchestrator-game-steward-config'
 
 /** The layer's nested sections, each parsed on its own and dropped when it yields nothing. */
 export const ORCHESTRATOR_GAME_SECTION_PARSERS = {
@@ -16,5 +17,6 @@ export const ORCHESTRATOR_GAME_SECTION_PARSERS = {
   rewardWeights: parseGameRewardWeights,
   panel: parseGamePanel,
   reviews: parseGameReviewsSource,
-  todo: parseGameTodoSource
+  todo: parseGameTodoSource,
+  steward: parseGameStewardConfig
 } satisfies Record<string, (raw: unknown) => { value: unknown; warnings: string[] }>

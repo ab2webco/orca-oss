@@ -36,6 +36,8 @@ export type GameMemberSteward = {
   pinned: { model: boolean; effort: boolean }
   stepsSeen: number
   decisions: GameStewardDecision[]
+  /** Set by the host: its applied pick is still not served, so another plugin may skip its hooks. */
+  skipped?: true
 }
 
 type Shape = Record<string, unknown>
@@ -111,6 +113,7 @@ export function parseGameMemberSteward(value: unknown): GameMemberSteward | null
     standDown: oneOf(['router', 'override'], raw.standDown),
     pinned: { model: pinned.model === true, effort: pinned.effort === true },
     stepsSeen: countOf(raw.stepsSeen) ?? 0,
+    ...(raw.skipped === true ? { skipped: true as const } : {}),
     decisions: decisions
       .slice(-GAME_MEMBER_STEWARD_DECISIONS_MAX)
       .flatMap((one) => parseGameStewardDecision(one) ?? [])
@@ -122,3 +125,24 @@ export const parseRelayedGameMemberSteward = (value: unknown): GameMemberSteward
   typeof value === 'object' && value !== null
     ? (parseGameMemberSteward({ ...value, version: GAME_MEMBER_STEWARD_VERSION }) ?? null)
     : null
+
+// Why 2 minutes: a new model lands on the next step, so a busy member serves it well within that.
+const SKIP_GRACE_MS = 120_000
+
+/** Risk 4b: the steward's applied pick is not what the session serves, long after it decided. */
+export function isGameStewardSkipped(
+  steward: GameMemberSteward,
+  servedLabel: string | null,
+  labelOf: (model: string) => string,
+  now: number
+): boolean {
+  const applied = steward.decisions.findLast((one) => one.applied && one.moment !== 'stand-down')
+  return (
+    steward.standDown === null &&
+    steward.model !== null &&
+    servedLabel !== null &&
+    applied !== undefined &&
+    now - applied.at >= SKIP_GRACE_MS &&
+    labelOf(steward.model) !== servedLabel
+  )
+}

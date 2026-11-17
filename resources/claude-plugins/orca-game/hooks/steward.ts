@@ -19,6 +19,7 @@ import {
   stewardEffortOf,
   stewardMomentOf,
   stewardStartPhaseOf,
+  STEWARD_HIGH_RISK_PATHS,
   withPins,
   withQuota,
   type StewardPhase,
@@ -44,6 +45,7 @@ type Runtime = {
   ticket: string | null
   title: string
   plan: StewardPlanPhase[] | null
+  riskyPaths: readonly string[]
   planState: StewardPlanState
   planReadAt: number | null
   budget: StewardJudgeBudget
@@ -64,6 +66,7 @@ const runtime: Runtime = {
   ticket: null,
   title: '',
   plan: null,
+  riskyPaths: STEWARD_HIGH_RISK_PATHS,
   planState: 'none-yet',
   planReadAt: null,
   budget: { calls: 0, lastAt: null },
@@ -129,6 +132,7 @@ function decide(
     plan: runtime.plan,
     current,
     hasEdited: runtime.track.hasEdited,
+    isHighRisk: runtime.track.hasRiskyEdit === true,
     ...(judged ? { confidence: judged.confidence } : {})
   })
   const to = withPins(withQuota(choice.pick, runtime.quota), base, runtime.pins)
@@ -196,6 +200,7 @@ async function refreshPlan($: EngineInterface): Promise<void> {
   const isChanged = JSON.stringify(read.phases) !== JSON.stringify(runtime.plan)
   runtime.plan = read.phases
   runtime.planState = read.state
+  runtime.riskyPaths = [...STEWARD_HIGH_RISK_PATHS, ...read.highRiskPaths]
   const phase = runtime.track.phase ?? stewardStartPhaseOf(read.phases ?? [])
   if (read.state === 'none') {
     await (isFirst ? judge($) : saveRecord($))
@@ -215,12 +220,17 @@ function onToolCall($: EngineInterface, tool: string, e: object, isError: boolea
   }
   runtime.tools = [...runtime.tools, `${tool} ${call.path ?? call.command ?? ''}`.slice(0, 120)]
   runtime.tools = runtime.tools.slice(-TOOL_LINES)
-  const moment = stewardMomentOf(runtime.track, call)
+  const moment = stewardMomentOf(runtime.track, call, runtime.riskyPaths)
   runtime.track = moment.track
+  const isPlanned = runtime.planState === 'plan'
+  const isEditing = runtime.track.phase === 'implement' || runtime.track.phase === 'test-fix'
   if (moment.phase !== undefined && moment.reason !== undefined) {
     decide($, moment.phase, moment.reason)
   } else if (ANNOUNCE_TOOLS.has(tool) && runtime.planState === 'none') {
     void judge($).catch(() => undefined)
+  } else if (tool === 'ExitPlanMode' && isPlanned && !isEditing) {
+    // Why ExitPlanMode alone: a plan approved means editing is next; a todo list is only bookkeeping.
+    decide($, 'implement', 'announce')
   }
 }
 

@@ -12,6 +12,14 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => userData.dir) }
 }))
 
+const yaml = vi.hoisted(() => ({ text: null as unknown, paths: [] as string[] }))
+vi.mock('../worktree-orca-yaml', () => ({
+  readWorktreeOrcaYaml: vi.fn(async (path: string) => {
+    yaml.paths.push(path)
+    return yaml.text
+  })
+}))
+
 import { OrcaRuntimeService } from './orca-runtime'
 
 userData.dir = mkdtempSync(join(tmpdir(), 'orca-effort-plan-runtime-'))
@@ -20,6 +28,7 @@ afterAll(() => rmSync(userData.dir, { recursive: true, force: true }))
 // Why the cast: the project a caller resolves to needs live panes; the store under it is real.
 type Internals = {
   gameBoardProjectOf: () => Promise<{ key: string; isMember: boolean }>
+  gameHistoryProjectOf: () => Promise<{ key: string; worktree: unknown }>
 }
 
 const leadPlan = {
@@ -58,5 +67,31 @@ describe("a ticket's effort plan, through the runtime (ORCA-1242)", () => {
     await expect(
       runtime.gameEffortPlan({ ticket: 'ORCA-7', plan: { ...leadPlan, phases: [] } })
     ).rejects.toThrow('Only the lead writes a ticket plan.')
+  })
+})
+
+describe("the steward's high-risk paths on the plan read (ORCA-1242 PR 3c)", () => {
+  it("answers the paths the member worktree's orca.yaml adds, and none without any", async () => {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime as unknown as Internals, 'gameBoardProjectOf').mockResolvedValue({
+      key: 'repo:plan-2',
+      isMember: true
+    })
+    vi.spyOn(runtime as unknown as Internals, 'gameHistoryProjectOf').mockResolvedValue({
+      key: 'repo:plan-2',
+      worktree: { path: '/w/member', repoId: 'r2' }
+    })
+    yaml.text = { orchestratorGame: { steward: { highRiskPaths: ['src/main/runtime/'] } } }
+    await expect(runtime.gameEffortPlan({ ticket: 'ORCA-8' })).resolves.toEqual({
+      ticket: 'ORCA-8',
+      known: false,
+      plan: null,
+      highRiskPaths: ['src/main/runtime/']
+    })
+    expect(yaml.paths.at(-1)).toBe('/w/member')
+    yaml.text = null
+    await expect(runtime.gameEffortPlan({ ticket: 'ORCA-8' })).resolves.not.toHaveProperty(
+      'highRiskPaths'
+    )
   })
 })

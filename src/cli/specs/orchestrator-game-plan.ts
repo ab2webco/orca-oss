@@ -19,5 +19,18 @@ export const ORCHESTRATOR_GAME_PLAN_COMMAND_SPECS: CommandSpec[] = [
       'orca game plan ORCA-12',
       'orca game plan ORCA-12 --phase "map:sonnet-5-5:medium:map the relay" --phase "implement:opus-5-5:high:risky path src/main/runtime" --phase "pr-ci:haiku-5-5:low:watch CI"'
     ]
+  },
+  {
+    path: ['game', 'steward-log'],
+    summary:
+      "Print the Orca steward's decisions for a ticket: moment, phase, model and effort moves, and why",
+    usage: 'orca game steward-log <ticket> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket'],
+    positionalArgs: ['ticket'],
+    notes: [
+      "Each member pane's steward sends its latest decisions on its state poll; Orca appends them, oldest first, to one log per project and ticket.",
+      'A decision marked "not applied" was made while another router or a person\'s /model was in charge.'
+    ],
+    examples: ['orca game steward-log ORCA-12', 'orca game steward-log ORCA-12 --json']
   }
 ]

@@ -53,6 +53,7 @@ import { ORCHESTRATOR_GAME_PANE_ACCOUNTS_METHODS } from './orchestrator-game-pan
 import { ORCHESTRATOR_GAME_MEMBER_MCP_METHODS } from './orchestrator-game-member-mcp'
 import { ORCHESTRATOR_GAME_MEMBER_REPO_SCOPE_METHODS } from './orchestrator-game-member-repo-scope'
 import { ORCHESTRATOR_GAME_EFFORT_PLAN_METHODS } from './orchestrator-game-effort-plan'
+import { ORCHESTRATOR_GAME_STEWARD_LOG_METHODS } from './orchestrator-game-steward-log'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -71,6 +72,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ORCHESTRATOR_GAME_MEMBER_MCP_METHODS,
   ...ORCHESTRATOR_GAME_MEMBER_REPO_SCOPE_METHODS,
   ...ORCHESTRATOR_GAME_EFFORT_PLAN_METHODS,
+  ...ORCHESTRATOR_GAME_STEWARD_LOG_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,
   ...WORKTREE_METHODS,
