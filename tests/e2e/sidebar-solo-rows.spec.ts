@@ -186,8 +186,23 @@ test('a one-agent worktree draws V30 solo row; two agents keep the inline list',
   const remotePane = 'tab-imac:66666666-6666-4666-8666-666666666666'
   await seedRemoteSession(orcaPage, remotePane)
   const remoteRow = worktreeRow(orcaPage, 'on-imac').locator('[data-sidebar-solo-row]')
-  await expect(remoteRow.locator('[data-team-row-part="extra"]')).toContainText('imac')
+  const remoteExtra = remoteRow.locator('[data-team-row-part="extra"]')
+  const imacHeader = orcaPage.locator(
+    '[data-worktree-sidebar] [data-host-header-drag-id="ssh:imac-id"]'
+  )
+  // Under its host header, which already names imac, the row does not repeat the host.
+  await expect(imacHeader).toContainText('imac')
+  await expect(remoteRow).toBeVisible()
+  await expect(remoteExtra).toHaveCount(0)
   await capture(orcaPage, testInfo, 'remote', remoteRow)
+  // Filtered to that host alone, no header is drawn, so the row names it.
+  await orcaPage.evaluate(() =>
+    window.__store!.getState().setVisibleWorkspaceHostIds(['ssh:imac-id'])
+  )
+  await expect(imacHeader).toHaveCount(0)
+  await expect(remoteExtra).toHaveText('imac')
+  await capture(orcaPage, testInfo, 'remote-filtered', remoteRow)
+  await orcaPage.evaluate(() => window.__store!.getState().setVisibleWorkspaceHostIds(null))
   await orcaPage.evaluate((pane) => window.__store!.getState().dropAgentStatus(pane), remotePane)
 
   await splitActiveTerminalPane(orcaPage, 'vertical')

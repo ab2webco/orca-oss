@@ -54,11 +54,21 @@ export function WorktreeCardSoloContent({
         flat,
         repoName: repo?.displayName ?? '',
         remoteHost,
+        underHostHeader: card.underHostHeader === true,
         subagents: solo.subagents,
         ports: workspacePorts.map((one) => one.port),
         account: account?.label ?? null
       }),
-    [solo, properties, flat, repo?.displayName, remoteHost, workspacePorts, account?.label]
+    [
+      solo,
+      properties,
+      flat,
+      repo?.displayName,
+      remoteHost,
+      card.underHostHeader,
+      workspacePorts,
+      account?.label
+    ]
   )
   const showPr = properties?.includes('pr') === true
   const prState = prDisplay?.state

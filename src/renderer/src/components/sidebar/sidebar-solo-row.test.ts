@@ -46,6 +46,7 @@ const OPTIONS: SidebarSoloRowLineOptions = {
   flat: false,
   repoName: 'orca-oss',
   remoteHost: null,
+  underHostHeader: false,
   subagents: 0,
   ports: [],
   account: null
@@ -106,11 +107,25 @@ describe('sidebarSoloRowLines', () => {
       flat: true,
       repoName: 'cineco',
       remoteHost: 'imac',
+      underHostHeader: false,
       subagents: 1,
       ports: [5173],
       account: 'fabiana@example.com'
     }).extra
     expect(extra).toBe('cineco · imac · 1 subagent · Ports 5173 · @fabiana · Opus 5.5')
+  })
+
+  it('drops the host under a host header, which already names it, and keeps the rest', () => {
+    const lines = (underHostHeader: boolean): string | null =>
+      sidebarSoloRowLines(entryOf(), {
+        ...OPTIONS,
+        flat: true,
+        remoteHost: 'imac',
+        underHostHeader,
+        subagents: 1
+      }).extra
+    expect(lines(false)).toBe('orca-oss · imac · 1 subagent')
+    expect(lines(true)).toBe('orca-oss · 1 subagent')
   })
 
   it('has no extra line for a local agent grouped by project', () => {

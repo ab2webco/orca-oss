@@ -76,9 +76,11 @@ describe('host sections with project groups', () => {
       (row) => row.type === 'host-header' && row.hostId === 'ssh:gpu-vm'
     )
     expect(sectioned.slice(remoteIndex + 1)).toEqual(
-      rows.filter(
-        (row) => (row.type === 'header' || row.type === 'item') && row.repo?.id === remoteRepo.id
-      )
+      rows
+        .filter(
+          (row) => (row.type === 'header' || row.type === 'item') && row.repo?.id === remoteRepo.id
+        )
+        .map((row) => (row.type === 'item' ? { ...row, underHostHeader: true } : row))
     )
     const collapsedHostRows = addHostSectionRows({
       rows,

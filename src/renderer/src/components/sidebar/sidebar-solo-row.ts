@@ -26,6 +26,8 @@ export type SidebarSoloRowLineOptions = {
   repoName: string
   /** The remote host's name; null on this machine, where V30 names none. */
   remoteHost: string | null
+  /** A host header above already names the host. */
+  underHostHeader: boolean
   subagents: number
   ports: readonly number[]
   /** The account label the worktree resolves to; only an email is shown. */
@@ -69,7 +71,7 @@ export function sidebarSoloRowLines(
   const account = options.account?.includes('@') ? options.account.split('@')[0] : null
   const parts = [
     options.flat ? options.repoName : null,
-    options.remoteHost,
+    options.underHostHeader ? null : options.remoteHost,
     options.subagents > 0 ? subagentText(options.subagents) : null,
     shown('ports') && options.ports.length > 0
       ? `${translate('teamPanel.activity.ports', 'Ports')} ${options.ports.join(', ')}`
