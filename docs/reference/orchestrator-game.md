@@ -585,8 +585,10 @@ orchestratorGame:
   writes `orca.yaml`.
 - **The native panel's dock** ([`TeamActionDock.tsx`](../../src/renderer/src/components/team-panel/TeamActionDock.tsx)):
   one line under the Team panel with Orca's actions that apply now and their count (wave: To Do
-  with free slots, push: stopped members, sweep: finished members; wave and sweep stand down during a
-  STOP), then up to 3 pinned project actions, Stop with an inline confirmation, and ⋯ with every
+  with free slots, push: stopped members, sweep: finished members; wave, push and sweep stand down
+  during a STOP, as `game push` refuses then), then up to 3 pinned project actions, Stop with an
+  inline confirmation (still enabled under a STOP while any member works or waits; the panel then
+  reads "Launches and pushes paused" instead of "Stopped"), and ⋯ with every
   action grouped Now, This project and From Orca. A run shows the lead's reply from its pane's
   `lastAssistantMessage`. An MCP action runs from the dock as its `/command`; one without a command
   runs only from the terminal.

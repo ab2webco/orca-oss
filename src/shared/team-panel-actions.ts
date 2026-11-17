@@ -71,10 +71,13 @@ function orcaStateOf(
         ? { now: null, off: 'stopped' }
         : counted(gameWavePlanOf(state, []).launch.length, 'nothingToDo')
     case 'push':
-      return counted(
-        gamePushPlanOf(state).filter((one) => one.action === 'push').length,
-        'nobodyStopped'
-      )
+      // Why: `game push` refuses while STOP is set, so offering it here only fails (ORCA-1157).
+      return stopped
+        ? { now: null, off: 'stopped' }
+        : counted(
+            gamePushPlanOf(state).filter((one) => one.action === 'push').length,
+            'nobodyStopped'
+          )
     case 'sweep':
       return stopped
         ? { now: null, off: 'stopped' }

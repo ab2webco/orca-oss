@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e9657bb127978c0
+sourceHash: dccdd0512d3c79da
 ---
 
 # El juego orquestador de Agent Teams
@@ -606,8 +606,10 @@ orchestratorGame:
   de Orca son solo de esta máquina. `/orca-game:setup` escribe `orca.yaml`.
 - **El dock del panel nativo**: una línea bajo el panel Equipo con las acciones de Orca que aplican
   ahora y su número (ola: Por hacer con cupos libres, reactivar: miembros detenidos, barrer: miembros
-  terminados; ola y barrer se apartan durante un STOP), luego hasta 3 acciones fijadas del proyecto,
-  Detener con confirmación en línea y ⋯ con todas agrupadas en Ahora, De este proyecto y De Orca. Una
+  terminados; ola, reactivar y barrer se apartan durante un STOP, como `game push` se niega entonces),
+  luego hasta 3 acciones fijadas del proyecto, Detener con confirmación en línea (sigue activo bajo un
+  STOP mientras algún miembro trabaja o espera; el panel dice entonces "Lanzamientos y pushes en
+  pausa" en vez de "Detenido") y ⋯ con todas agrupadas en Ahora, De este proyecto y De Orca. Una
   ejecución muestra la respuesta del líder desde el `lastAssistantMessage` de su panel. Una acción MCP
   corre desde el dock como su `/command`; una sin comando solo corre desde la terminal.
 - **Cambiar las de Orca** (`orcaActions`): `wave`, `status`, `push`, `sweep` y `stop` aceptan

@@ -66,7 +66,7 @@ describe('teamActionsOf', () => {
     expect(actions['lead:wave']?.send).toBe((GAME_LEAD_ACTIONS[0] as { prompt: string }).prompt)
   })
 
-  it('says why one does not apply, and hides wave and sweep but not push during a STOP', () => {
+  it('says why one does not apply, and hides wave, push and sweep during a STOP', () => {
     const idle = byId(stateOf({ agents: [], project: undefined }))
     expect(idle['lead:wave']).toMatchObject({ now: null, off: 'nothingToDo' })
     expect(idle['lead:push']).toMatchObject({ now: null, off: 'nobodyStopped' })
@@ -75,7 +75,8 @@ describe('teamActionsOf', () => {
     const stopped = byId(stateOf({ stopped: { since: null, by: null } as never }))
     expect(stopped['lead:wave']).toMatchObject({ now: null, off: 'stopped' })
     expect(stopped['lead:sweep']).toMatchObject({ now: null, off: 'stopped' })
-    expect(stopped['lead:push']).toMatchObject({ now: { count: 2 } })
+    // Why: `game push` refuses while STOP is set, so the panel must not offer it (ORCA-1157).
+    expect(stopped['lead:push']).toMatchObject({ now: null, off: 'stopped' })
     expect(stopped['lead:stop']).toMatchObject({ off: 'alreadyStopped' })
   })
 
