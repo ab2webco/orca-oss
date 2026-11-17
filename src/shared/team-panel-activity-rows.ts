@@ -126,7 +126,8 @@ const finalMessageOf = (entry: AgentStatusEntry): string | undefined =>
     ? entry.lastAssistantMessage
     : entry.lastCompletedAssistantMessage || entry.lastAssistantMessage
 
-function activityRowOf(session: TeamSoloSession): TeamActivityRow {
+/** One session as the Activity tab and the sidebar's solo row read it. */
+export function teamActivityRowOf(session: TeamSoloSession): TeamActivityRow {
   const { entry } = session
   const condition = conditionOf(entry)
   return {
@@ -177,7 +178,7 @@ export function teamSoloModelOf(input: {
   tabs: TeamPanelTabs
 }): TeamPanelSoloModel {
   const rows = input.sessions
-    .map((session, index) => ({ row: activityRowOf(session), index }))
+    .map((session, index) => ({ row: teamActivityRowOf(session), index }))
     .sort((a, b) => STATUS_RANK[a.row.status] - STATUS_RANK[b.row.status] || a.index - b.index)
     .map(({ row }) => row)
   const selected = rows.find((one) => one.paneKey === input.selectedPaneKey) ?? rows[0]
