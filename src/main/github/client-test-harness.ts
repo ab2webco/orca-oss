@@ -10,6 +10,8 @@ import { resetMergedPRCommitMembershipCacheForTest } from './merged-pr-commit-me
 import { __resetRepoDefaultBranchCacheForTests } from '../source-control/repo-default-branch'
 import { _resetOriginGitHubApiRepositoryCache } from './github-api-repository'
 import { _resetGitHubPRStackCacheForTests } from './github-pr-stack'
+import { _resetGhConditionalRestCache } from './gh-conditional-rest'
+import { _resetPRViewShareForTests } from './pr-view-share'
 
 // The origin-repository cache is module-level state; reset it so slugs
 // resolved by one test cannot leak into the next.
@@ -56,6 +58,8 @@ export function resetPRForBranchMocks(mocks: GitHubClientMocks): void {
   __resetTrackedUpstreamBranchCacheForTests()
   __resetPRConflictSummaryCachesForTests()
   resetMergedPRCommitMembershipCacheForTest()
+  _resetGhConditionalRestCache()
+  _resetPRViewShareForTests()
   // Why: the #9171 guard caches default-branch resolutions per repoPath;
   // reset so non-open implicit lookups stay order-independent across tests.
   __resetRepoDefaultBranchCacheForTests()

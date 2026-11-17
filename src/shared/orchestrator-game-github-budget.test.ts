@@ -43,6 +43,22 @@ describe('formatGameGitHubBudget', () => {
     ])
   })
 
+  it('names the busiest pollers and the unchanged reads GitHub did not bill', () => {
+    const withPollers: GameGitHubBudget = {
+      ...budget(4100),
+      pollers: [
+        { poller: 'rpc game.state', calls: 150, shape: 'pr checks' },
+        { poller: 'pr-refresh active', calls: 40, shape: 'pr view' }
+      ],
+      notModified: 300
+    }
+
+    expect(formatGameGitHubBudget(withPollers, NOW).slice(2)).toEqual([
+      "Orca's busiest pollers this hour: rpc game.state 150 (pr checks) · pr-refresh active 40 (pr view)",
+      'Unchanged reads GitHub did not bill: 300'
+    ])
+  })
+
   it('leads with a warning when the budget is low', () => {
     expect(formatGameGitHubBudget(budget(400), NOW)[0]).toMatch(
       /^GitHub API LOW, game reads slowed 5x: GraphQL 400\/5000 left/

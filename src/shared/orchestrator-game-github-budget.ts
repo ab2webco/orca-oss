@@ -14,6 +14,10 @@ export type GameGitHubBudget = {
   core: GameGitHubBucket
   /** Orca's busiest call shapes this hour, most first. */
   top: { shape: string; bucket: 'core' | 'graphql' | 'search'; calls: number }[]
+  /** Who sent Orca's calls this hour, most first, with each one's busiest shape (ORCA-1213). */
+  pollers?: { poller: string; calls: number; shape: string }[]
+  /** Conditional reads GitHub answered 304 this hour; they cost nothing. */
+  notModified?: number
   /** A bucket is down to a fifth of its limit. */
   low: boolean
 }
@@ -45,8 +49,13 @@ export function formatGameGitHubBudget(
 ): string[] {
   const head = budget.low ? 'GitHub API LOW, game reads slowed 5x:' : 'GitHub API:'
   const top = budget.top.map((one) => `${one.shape} ${one.calls}`).join(' · ')
+  const pollers = (budget.pollers ?? [])
+    .map((one) => `${one.poller} ${one.calls} (${one.shape})`)
+    .join(' · ')
   return [
     `${head} ${bucketLine('GraphQL', budget.graphql, now)} · ${bucketLine('REST', budget.core, now)}`,
-    ...(top ? [`Orca's busiest calls this hour: ${top}`] : [])
+    ...(top ? [`Orca's busiest calls this hour: ${top}`] : []),
+    ...(pollers ? [`Orca's busiest pollers this hour: ${pollers}`] : []),
+    ...(budget.notModified ? [`Unchanged reads GitHub did not bill: ${budget.notModified}`] : [])
   ]
 }

@@ -9,6 +9,7 @@ import type {
   PRRefreshOutcome
 } from '../../shared/github/pull-request-refresh-types'
 import { getPRForBranchOutcome, type GitHubPRBranchLookupOptions } from './client'
+import { runWithGhCallOrigin } from '../git/gh-call-origin'
 import { getOriginGitHubApiRepository } from './github-api-repository'
 import { ghRepoExecOptions, githubRepoContext } from './gh-utils'
 import { getRateLimit, repositoryRateLimitGuard, spendsSharedGitHubComQuota } from './rate-limit'
@@ -776,13 +777,15 @@ async function drainQueue(): Promise<void> {
         // caller is accounted for; debiting here too would double-count.
       }
 
-      const outcome = await getPRForBranchOutcome(
-        next.candidate.repoPath,
-        next.candidate.branch,
-        next.candidate.linkedPRNumber ?? null,
-        next.candidate.connectionId ?? null,
-        next.candidate.linkedPRNumber == null ? (next.candidate.fallbackPRNumber ?? null) : null,
-        ...hostedReviewOptionArgs(next.candidate)
+      const outcome = await runWithGhCallOrigin(`pr-refresh ${next.reason}`, () =>
+        getPRForBranchOutcome(
+          next.candidate.repoPath,
+          next.candidate.branch,
+          next.candidate.linkedPRNumber ?? null,
+          next.candidate.connectionId ?? null,
+          next.candidate.linkedPRNumber == null ? (next.candidate.fallbackPRNumber ?? null) : null,
+          ...hostedReviewOptionArgs(next.candidate)
+        )
       )
       // Why: compute the retry schedule before broadcasting so the outcome and its follow-up share one timing; only visible keys auto-retry.
       let plannedRetryAt: number | undefined
@@ -989,13 +992,15 @@ export async function refreshPRNow(candidate: GitHubPRRefreshCandidate): Promise
   const requestSequence = nextSequence()
   const requestStartedAt = Date.now()
   broadcast({ aliases, reason: 'manual', status: 'in-flight', requestStartedAt }, requestSequence)
-  const outcome = await getPRForBranchOutcome(
-    candidate.repoPath,
-    candidate.branch,
-    candidate.linkedPRNumber ?? null,
-    candidate.connectionId ?? null,
-    candidate.linkedPRNumber == null ? (candidate.fallbackPRNumber ?? null) : null,
-    ...hostedReviewOptionArgs(candidate)
+  const outcome = await runWithGhCallOrigin('pr-refresh manual', () =>
+    getPRForBranchOutcome(
+      candidate.repoPath,
+      candidate.branch,
+      candidate.linkedPRNumber ?? null,
+      candidate.connectionId ?? null,
+      candidate.linkedPRNumber == null ? (candidate.fallbackPRNumber ?? null) : null,
+      { ...hostedReviewOptionArgs(candidate)[0], refreshPRView: true }
+    )
   )
   let plannedRetryAt: number | undefined
   let broadcastOutcome = outcome

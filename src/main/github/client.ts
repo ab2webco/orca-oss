@@ -133,6 +133,8 @@ import {
   GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
 } from '../../shared/github/check-details-deadline'
 import { hydrateGitHubPRStack, mergeGitHubPRStack } from './github-pr-stack'
+import { readGhRestConditionally } from './gh-conditional-rest'
+import { sharePRView } from './pr-view-share'
 import { ORCA_REPOSITORY_SLUG } from '../../shared/orca-repository-url'
 
 type GhExecOptions = GitHubRepoExecOptions & { signal?: AbortSignal }
@@ -2264,6 +2266,8 @@ export type GitHubPRBranchLookupOptions = HostedReviewExecutionOptions & {
   acceptMergedFallbackPR?: boolean
   // Why: compare merged implicit PRs against the worktree HEAD, not main repo HEAD, without a worktree-scoped git call.
   currentHeadOid?: string | null
+  /** A person asked for this refresh, so the shared `pr view` must not answer for GitHub. */
+  refreshPRView?: boolean
 }
 
 function mapRestPRMergeable(pr: RestPullRequest): PRMergeableState {
@@ -2517,15 +2521,21 @@ async function hydrateBranchLookupWithExactPR(
   ownerRepo: OwnerRepo,
   branchData: PullRequestLookupData | null,
   ghOptions: GhExecOptions,
-  executionScope: string
+  executionScope: string,
+  refreshPRView = false
 ): Promise<PullRequestLookupData | null> {
   if (!branchData) {
     return null
   }
+  const version = `${branchData.updatedAt ?? ''}|${branchData.headRefOid ?? ''}`
+  const key = `${executionScope}\0${githubRepoIdentityKey(ownerRepo)}#${branchData.number}@${version}`
   try {
     return (
-      (await getPRByNumber(ownerRepo, branchData.number, ghOptions, executionScope, branchData)) ??
-      branchData
+      (await sharePRView(
+        key,
+        () => getPRByNumber(ownerRepo, branchData.number, ghOptions, executionScope, branchData),
+        refreshPRView
+      )) ?? branchData
     )
   } catch {
     return branchData
@@ -2536,11 +2546,14 @@ async function getRestPRForBranch(
   prRepo: GitHubApiRepository,
   headOwner: string,
   branchName: string,
-  ghOptions: ReturnType<typeof ghRepoExecOptions>
+  ghOptions: ReturnType<typeof ghRepoExecOptions>,
+  executionScope: string
 ): Promise<PullRequestLookupData | null> {
   const head = encodeURIComponent(`${headOwner}:${branchName}`)
-  const { stdout } = await ghExecFileAsync(
-    ['api', `repos/${prRepo.owner}/${prRepo.repo}/pulls?head=${head}&state=all&per_page=1`],
+  // Why conditional: every member's worktree polls this from the sidebar, the panel and the game (ORCA-1213).
+  const stdout = await readGhRestConditionally(
+    `${executionScope}\0${prRepo.host ?? 'github.com'}`,
+    `repos/${prRepo.owner}/${prRepo.repo}/pulls?head=${head}&state=all&per_page=1`,
     { ...ghOptions, ...githubHostExecOptions(prRepo) }
   )
   const list = JSON.parse(stdout) as RestPullRequest[]
@@ -2880,6 +2893,7 @@ async function lookupPRByBranchName(args: {
   branchName: string
   ghOptions: GhExecOptions
   executionScope: string
+  refreshPRView?: boolean
 }): Promise<{
   data: PullRequestLookupData | null
   dataRepo: OwnerRepo | null
@@ -2895,7 +2909,8 @@ async function lookupPRByBranchName(args: {
               candidate,
               args.headRepo.owner,
               args.branchName,
-              args.ghOptions
+              args.ghOptions,
+              args.executionScope
             )
           : await getFallbackPRListForBranch(candidate, args.branchName, args.ghOptions)
         // Why: REST/list branch lookup identifies the PR cheaply; exact `gh pr view` carries review, merge-queue, and auto-merge state.
@@ -2903,7 +2918,8 @@ async function lookupPRByBranchName(args: {
           candidate,
           branchData,
           args.ghOptions,
-          args.executionScope
+          args.executionScope,
+          args.refreshPRView
         )
         if (data) {
           return { data, dataRepo: candidate }
@@ -2921,13 +2937,15 @@ async function lookupPRByBranchName(args: {
             candidate,
             candidate.owner,
             args.branchName,
-            args.ghOptions
+            args.ghOptions,
+            args.executionScope
           )
           const data = await hydrateBranchLookupWithExactPR(
             candidate,
             branchData,
             args.ghOptions,
-            args.executionScope
+            args.executionScope,
+            args.refreshPRView
           )
           if (data) {
             return { data, dataRepo: candidate }
@@ -3391,7 +3409,8 @@ export async function getPRForBranchOutcome(
         headRepo,
         branchName,
         ghOptions,
-        executionScope
+        executionScope,
+        refreshPRView: options.refreshPRView
       })
       data = branchLookup.data
       dataRepo = branchLookup.dataRepo
@@ -3424,7 +3443,8 @@ export async function getPRForBranchOutcome(
               headRepo: upstreamHeadRepo,
               branchName: upstreamBranch.branchName,
               ghOptions,
-              executionScope
+              executionScope,
+              refreshPRView: options.refreshPRView
             })
             data = upstreamLookup.data
             dataRepo = upstreamLookup.dataRepo
