@@ -23,7 +23,7 @@ function launchWord(launch: TeamMachine['launch']): string | null {
       return translate('teamPanel.machines.notAnswering', 'Not answering')
     case 'unknown':
       return translate('teamPanel.machines.unknown', 'Unknown')
-    default:
+    case 'ready':
       return null
   }
 }
@@ -49,7 +49,7 @@ function launchNote(launch: TeamMachine['launch']): string | null {
         'teamPanel.machines.unknownNote',
         'This Orca does not say if members can start here. Update Orca Lab on this machine.'
       )
-    default:
+    case 'ready':
       return null
   }
 }

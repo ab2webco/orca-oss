@@ -188,9 +188,10 @@ function launchOf(one: GameHostCapacity): TeamMachine['launch'] {
       return { kind: 'unregistered', project: launch.project, reason: launch.reason }
     case 'refused':
       return { kind: 'refused', reason: launch.reason }
-    default:
+    case undefined:
       return { kind: 'unknown' }
   }
+  return { kind: 'unknown' }
 }
 
 const LAUNCH_STATUS: Record<TeamMachine['launch']['kind'], TeamStatus> = {
