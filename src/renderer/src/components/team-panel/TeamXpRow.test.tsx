@@ -78,7 +78,10 @@ describe('TeamXpRow', () => {
     expect(chip()).toBe('Lv 17')
     expect(pick('[data-team-xp]')?.textContent).toContain('200 XP to Lv 18')
     expect(pick('[data-team-xp-float]')?.textContent).toBe('Level 18!')
-    expect(pick('[data-team-xp-note]')?.textContent).toBe('+300 · ORCA-12 Done')
+    // Under 17rem the float hides and the line under the bar names the level too.
+    expect(pick('[data-team-xp-note]')?.textContent).toBe('Level 18! +300 · ORCA-12 Done')
+    expect(pick('[data-team-xp-note] > span')?.className).toBe('@min-[17rem]/xp:hidden')
+    expect(pick('[data-team-xp-float]')?.className).toContain('@max-[17rem]/xp:hidden')
 
     advance(450)
     expect(chip()).toBe('Lv 18')
@@ -106,10 +109,24 @@ describe('TeamXpRow', () => {
     )
     expect(pick('[data-team-xp-float]')?.textContent).toBe('+100 · #41 merged')
 
-    advance(2800)
+    // Why two steps: each phase's timer starts once the last phase has rendered.
+    advance(1600)
+    advance(1200)
     expect(pick('[data-team-xp-float]')).toBeNull()
     expect(fillWidth()).toBe(`${(1500 / 1700) * 100}%`)
     expect(pick('[data-team-xp]')?.textContent).toContain('200 XP to Lv 18')
+  })
+
+  it('ends the play when the total falls before it finishes', () => {
+    reduceMotion(false)
+    draw(xpAt(LV17 + 1400, []))
+    draw(xpAt(LV17 + 1500, [merged]))
+    expect(pick('[data-team-xp-gain]')).not.toBeNull()
+
+    draw(xpAt(LV17 + 1450, [merged]))
+    expect(pick('[data-team-xp-gain]')).toBeNull()
+    expect(pick('[data-team-xp-float]')).toBeNull()
+    expect(fillWidth()).toBe(`${(1450 / 1700) * 100}%`)
   })
 
   it('shows a level-up at once and in words when motion is reduced', () => {

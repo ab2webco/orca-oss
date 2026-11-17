@@ -14,6 +14,19 @@ import { isTeamLevelUp } from './team-xp-gain'
 import { TEAM_XP_COUNT_MS, useTeamXpMotion, type TeamXpMotion } from './use-team-xp-motion'
 
 const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const GROW: Keyframe[] = [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }]
+// Why a short rise: any higher and it crosses the project name above the row.
+const RISE: Keyframe[] = [
+  { opacity: 0, translate: '0 6px' },
+  { opacity: 1, translate: '0 1px', offset: 0.2 },
+  { opacity: 1, translate: '0 -1px', offset: 0.75 },
+  { opacity: 0, translate: '0 -2px' }
+]
+// Why from below: the line under the bar rises into place, never over the bar row.
+const NOTE_IN: Keyframe[] = [
+  { opacity: 0, translate: '0 4px' },
+  { opacity: 1, translate: '0 0' }
+]
 // Why a container query: the panel is ~215 px at a phone width, whatever the window says.
 const WIDE_ONLY = '@max-[17rem]/xp:hidden'
 
@@ -68,6 +81,7 @@ export function TeamXpRow({ xp }: { xp: TeamXp }): React.JSX.Element {
   const sweepRef = useRef<HTMLSpanElement>(null)
   const chipRef = useRef<HTMLSpanElement>(null)
   const floatRef = useRef<HTMLSpanElement>(null)
+  const noteRef = useRef<HTMLDivElement>(null)
   const levelUp = motion ? isTeamLevelUp(motion.gain) : false
   const old = motion?.phase === 'fill' || motion?.phase === 'sweep'
   const level = motion?.phase === 'fill' ? motion.gain.from.level : xp.level
@@ -79,36 +93,21 @@ export function TeamXpRow({ xp }: { xp: TeamXp }): React.JSX.Element {
   const motionKey = motion?.key
   // Why the key too: a gain that lands mid-play starts its own timeline at the same phase.
   useEffect(() => {
-    const play = (el: HTMLElement | null, frames: Keyframe[], options: KeyframeAnimationOptions) =>
-      el?.animate?.(frames, options)
+    const play = (
+      el: HTMLElement | null,
+      frames: Keyframe[],
+      duration: number,
+      easing = EASE_OUT
+    ) => el?.animate?.(frames, { duration, easing, fill: 'forwards' })
     if (phase === 'grow' || phase === 'fill') {
-      const ms = phase === 'grow' ? TEAM_XP_COUNT_MS : 450
-      play(gainRef.current, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], {
-        duration: ms,
-        easing: EASE_OUT
-      })
-      play(
-        floatRef.current,
-        [
-          // Why a short rise: any higher and it crosses the project name above the row.
-          { opacity: 0, translate: '0 6px' },
-          { opacity: 1, translate: '0 1px', offset: 0.2 },
-          { opacity: 1, translate: '0 -1px', offset: 0.75 },
-          { opacity: 0, translate: '0 -2px' }
-        ],
-        { duration: 1800, easing: 'ease-out', fill: 'forwards' }
-      )
+      play(gainRef.current, GROW, phase === 'grow' ? TEAM_XP_COUNT_MS : 450)
+      play(floatRef.current, RISE, 1800, 'ease-out')
+      play(noteRef.current, NOTE_IN, 300)
     } else if (phase === 'settle') {
-      play(gainRef.current, [{ opacity: 1 }, { opacity: 0 }], { duration: 500, fill: 'forwards' })
+      play(gainRef.current, [{ opacity: 1 }, { opacity: 0 }], 500)
     } else if (phase === 'sweep') {
-      play(sweepRef.current, [{ translate: '-100%' }, { translate: '100%' }], {
-        duration: 700,
-        easing: 'ease-in-out'
-      })
-      play(chipRef.current, [{ scale: 1 }, { scale: 1.14 }, { scale: 1 }], {
-        duration: 450,
-        easing: 'ease-out'
-      })
+      play(sweepRef.current, [{ translate: '-100%' }, { translate: '100%' }], 700, 'ease-in-out')
+      play(chipRef.current, [{ scale: 1 }, { scale: 1.14 }, { scale: 1 }], 450, 'ease-out')
     }
   }, [motionKey, phase])
 
@@ -164,19 +163,14 @@ export function TeamXpRow({ xp }: { xp: TeamXp }): React.JSX.Element {
                   ref={floatRef}
                   data-team-xp-float=""
                   aria-hidden
-                  className="pointer-events-none absolute bottom-full pb-0.5 leading-none font-semibold whitespace-nowrap text-status-success opacity-0"
+                  className={cn(
+                    'pointer-events-none absolute bottom-full pb-0.5 leading-none font-semibold whitespace-nowrap text-status-success opacity-0',
+                    // Why: a phone-width row has no room above its bar; the line under it speaks.
+                    WIDE_ONLY
+                  )}
                   style={{ left: `${floatAt}%`, transform: `translateX(-${floatAt}%)` }}
                 >
-                  {levelUp ? (
-                    levelUpText(xp.level)
-                  ) : (
-                    <>
-                      {translate('teamPanel.xp.gain', '+{{xp}}', { xp: motion.gain.gained })}
-                      {motion.gain.reason ? (
-                        <span className={WIDE_ONLY}> · {motion.gain.reason}</span>
-                      ) : null}
-                    </>
-                  )}
+                  {levelUp ? levelUpText(xp.level) : gainText(motion)}
                 </span>
               ) : null}
             </span>
@@ -190,6 +184,7 @@ export function TeamXpRow({ xp }: { xp: TeamXp }): React.JSX.Element {
           </div>
           {note ? (
             <div
+              ref={noteRef}
               data-team-xp-note=""
               role="status"
               className={cn(
@@ -198,6 +193,9 @@ export function TeamXpRow({ xp }: { xp: TeamXp }): React.JSX.Element {
                 !motion?.still && !levelUp && '@min-[17rem]/xp:hidden'
               )}
             >
+              {motion && !motion.still && levelUp ? (
+                <span className="@min-[17rem]/xp:hidden">{levelUpText(xp.level)} </span>
+              ) : null}
               {note}
             </div>
           ) : null}

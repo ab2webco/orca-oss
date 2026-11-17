@@ -168,7 +168,8 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
           await setTheme(orcaPage, theme)
-          await orcaPage.screenshot({
+          // Why the panel: a full window shows the terminal's real user@host prompt.
+          await panel.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`xp-${stage}-${width}-${theme}.png`)
           })
@@ -176,28 +177,40 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
       }
     }
     // Why sampled each frame: the label rises and fades, so one capture cannot show it never
-    // crosses the project name above the row.
-    const watchFloat = () =>
+    // crosses the project name above the row, nor that the line under the bar stays off the bar row.
+    const watchPlay = () =>
       orcaPage.evaluate(
         () =>
-          new Promise<{ top: number; titleBottom: number }>((resolve) => {
-            const title = document.querySelector('[data-testid="team-panel"] h2')!
-            let top = Number.POSITIVE_INFINITY
-            let seen = false
-            const tick = (): void => {
-              const float = document.querySelector('[data-team-xp-float]')
-              if (float) {
-                seen = true
-                top = Math.min(top, float.getBoundingClientRect().top)
+          new Promise<{ floatTop: number | null; titleBottom: number; noteGap: number | null }>(
+            (resolve) => {
+              const title = document.querySelector('[data-testid="team-panel"] h2')!
+              let floatTop: number | null = null
+              let noteGap: number | null = null
+              let seen = false
+              const tick = (): void => {
+                const playing = document.querySelector('[data-team-xp-gain]')
+                const float = document
+                  .querySelector('[data-team-xp-float]')
+                  ?.getBoundingClientRect()
+                // Why width: a label hidden at phone width has an empty box, which is no overlap.
+                if (float && float.width > 0) {
+                  floatTop = Math.min(floatTop ?? float.top, float.top)
+                }
+                const note = document.querySelector('[data-team-xp-note]')?.getBoundingClientRect()
+                const row = document.querySelector('[data-team-xp] > div')?.getBoundingClientRect()
+                if (note && note.width > 0 && row) {
+                  noteGap = Math.min(noteGap ?? note.top - row.bottom, note.top - row.bottom)
+                }
+                seen ||= playing !== null
+                if (seen && !playing) {
+                  resolve({ floatTop, titleBottom: title.getBoundingClientRect().bottom, noteGap })
+                  return
+                }
+                requestAnimationFrame(tick)
               }
-              if (seen && !float) {
-                resolve({ top, titleBottom: title.getBoundingClientRect().bottom })
-                return
-              }
-              requestAnimationFrame(tick)
+              tick()
             }
-            tick()
-          })
+          )
       )
     // Why mid-play: the gained segment and the rising label exist only while the gain plays.
     const playAward = async (
@@ -206,14 +219,23 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
       settled: string
     ): Promise<void> => {
       await atRest()
-      const watched = watchFloat()
+      const width = orcaPage.viewportSize()!.width
+      const watched = watchPlay()
       await award(reward)
       await expect(left).toHaveText(settled, { timeout: 60_000 })
-      await orcaPage.screenshot({ path: testInfo.outputPath(`xp-${stage}-playing.png`) })
-      const { top, titleBottom } = await watched
-      expect(top, `the ${stage} label stays below the project name`).toBeGreaterThanOrEqual(
-        titleBottom
-      )
+      await panel.screenshot({ path: testInfo.outputPath(`xp-${stage}-playing-${width}.png`) })
+      const { floatTop, titleBottom, noteGap } = await watched
+      if (width <= 390) {
+        expect(floatTop, `no label floats over the ${width}px bar row`).toBeNull()
+      } else {
+        expect(floatTop, `the ${stage} label floats`).not.toBeNull()
+        expect(floatTop!, `the ${stage} label stays below the project name`).toBeGreaterThanOrEqual(
+          titleBottom
+        )
+      }
+      if (noteGap !== null) {
+        expect(noteGap, `the ${stage} line stays under the bar row`).toBeGreaterThanOrEqual(0)
+      }
     }
     await captureMatrix('before-merge')
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
@@ -244,6 +266,20 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     expect(Number.parseFloat(fill)).toBeCloseTo((10 / 300) * 100, 3)
     await captureMatrix('after-level-up')
 
+    // A second level-up at the narrowest width: Lv 4 starts at 600, 310 XP into Lv 3 keeps 10.
+    await orcaPage.setViewportSize({ width: 320, height: 844 })
+    await playAward(
+      'level-up',
+      {
+        id: 'work-item-done:plane:ORCA-12',
+        kind: 'work-item-done',
+        xp: 300,
+        label: 'ORCA-12 Done'
+      },
+      '390 XP to Lv 5'
+    )
+    await expect(level).toHaveText('Lv 4')
+
     // The tooltip says what earns XP and keeps a margin inside a phone-width window.
     await orcaPage.setViewportSize({ width: 390, height: 844 })
     await xp.hover()
@@ -252,7 +288,7 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     const box = (await tip.boundingBox())!
     expect(box.x, 'the tooltip keeps a left margin').toBeGreaterThanOrEqual(8)
     expect(box.x + box.width, 'the tooltip keeps a right margin').toBeLessThanOrEqual(390 - 8)
-    await orcaPage.screenshot({ path: testInfo.outputPath('xp-tooltip-390-dark.png') })
+    await panel.screenshot({ path: testInfo.outputPath('xp-tooltip-390.png') })
     await orcaPage.mouse.move(0, 0)
     const state = (
       await client.call<OrchestratorGameState>('game.state', {
@@ -265,14 +301,14 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
 
     for (const language of ['en', 'es'] as const) {
       await writeSettings(orcaPage, { uiLanguage: language })
-      await expect(xp).toContainText(language === 'es' ? '290 XP para Nv 4' : '290 XP to Lv 4')
+      await expect(xp).toContainText(language === 'es' ? '390 XP para Nv 5' : '390 XP to Lv 5')
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         for (const theme of ['dark', 'light'] as const) {
           await setTheme(orcaPage, theme)
           const cut = await xp.evaluate((node) => node.scrollWidth > node.clientWidth)
           expect(cut, `the XP row is cut at ${width}px ${theme}`).toBe(false)
-          await orcaPage.screenshot({
+          await panel.screenshot({
             animations: 'disabled',
             path: testInfo.outputPath(`lead-defaults-${language}-${width}-${theme}.png`)
           })

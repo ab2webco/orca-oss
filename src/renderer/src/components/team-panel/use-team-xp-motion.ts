@@ -9,57 +9,59 @@ import { isTeamLevelUp, teamXpGainOf, teamXpLeftOf, type TeamXpGain } from './te
  */
 export type TeamXpPhase = 'grow' | 'settle' | 'fill' | 'sweep' | 'landed'
 
-export type TeamXpMotion = { key: number; gain: TeamXpGain; phase: TeamXpPhase; still: boolean }
+/** `at` is each phase's start in ms; `done` ends the play. */
+type Steps = Partial<Record<TeamXpPhase | 'done', number>>
 
-type Step = readonly [TeamXpPhase | null, number]
+export type TeamXpMotion = {
+  key: number
+  gain: TeamXpGain
+  phase: TeamXpPhase
+  still: boolean
+  steps: Steps
+}
 
 // The clip the owner approved on ORCA-1264, in ms from the poll that brought the gain.
-const GAIN_STEPS: Step[] = [
-  ['grow', 0],
-  ['settle', 1600],
-  [null, 2800]
-]
-const LEVEL_STEPS: Step[] = [
-  ['fill', 0],
-  ['sweep', 450],
-  ['landed', 1150],
-  [null, 3800]
-]
+const GAIN_STEPS: Steps = { grow: 0, settle: 1600, done: 2800 }
+const LEVEL_STEPS: Steps = { fill: 0, sweep: 450, landed: 1150, done: 3800 }
 // Why longer: with no motion, the words under the row are the whole notice.
-const STILL_STEPS: Step[] = [
-  ['landed', 0],
-  [null, 4000]
-]
+const STILL_STEPS: Steps = { landed: 0, done: 4000 }
 export const TEAM_XP_COUNT_MS = 700
 
 /** The gain the row is playing, if any, and the XP left as it counts down. */
 export function useTeamXpMotion(xp: TeamXp): { motion: TeamXpMotion | null; left: number } {
   const reduced = usePrefersReducedMotion()
-  const latest = useRef({ xp, reduced })
-  latest.current = { xp, reduced }
   const previous = useRef(xp)
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const [motion, setMotion] = useState<TeamXpMotion | null>(null)
   const [counted, setCounted] = useState<{ key: number; value: number } | null>(null)
 
   // Why layout: the poll's new figures must not paint once before the gain starts from the old.
+  // A total that falls mid-play ends it rather than leave a phase on screen.
   useLayoutEffect(() => {
-    const { xp: next, reduced: still } = latest.current
-    const gain = teamXpGainOf(previous.current, next)
-    previous.current = next
-    if (!gain) {
+    const before = previous.current
+    previous.current = xp
+    if (before.total === xp.total) {
       return
     }
-    timers.current.forEach(clearTimeout)
-    const key = Date.now()
-    const steps = still ? STILL_STEPS : isTeamLevelUp(gain) ? LEVEL_STEPS : GAIN_STEPS
-    const show = (phase: TeamXpPhase | null): void =>
-      setMotion(phase ? { key, gain, phase, still } : null)
-    show(steps[0][0])
-    timers.current = steps.slice(1).map(([phase, at]) => setTimeout(() => show(phase), at))
-  }, [xp.total])
+    const gain = teamXpGainOf(before, xp)
+    const still = reduced
+    const steps = still ? STILL_STEPS : gain && isTeamLevelUp(gain) ? LEVEL_STEPS : GAIN_STEPS
+    const phase = Object.keys(steps)[0] as TeamXpPhase
+    setMotion(gain ? { key: Date.now(), gain, phase, still, steps } : null)
+  }, [xp, reduced])
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  useEffect(() => {
+    if (!motion) {
+      return
+    }
+    const order = Object.keys(motion.steps) as (TeamXpPhase | 'done')[]
+    const next = order[order.indexOf(motion.phase) + 1]
+    const wait = (motion.steps[next] ?? 0) - (motion.steps[motion.phase] ?? 0)
+    const timer = setTimeout(
+      () => setMotion(next === 'done' ? null : { ...motion, phase: next }),
+      wait
+    )
+    return () => clearTimeout(timer)
+  }, [motion])
 
   const counting = motion?.phase === 'grow' ? motion : null
   const countFrom = counting ? teamXpLeftOf(counting.gain.to) + counting.gain.gained : 0
