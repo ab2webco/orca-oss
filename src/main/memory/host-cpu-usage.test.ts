@@ -42,6 +42,18 @@ describe('createHostCpuUsage', () => {
     expect(wait).toHaveBeenCalledTimes(1)
   })
 
+  it('gives back the last figure to a read under a second after it, instead of a few-ms window', async () => {
+    const samples = [cpuTimesOf([core(0, 0)]), cpuTimesOf([core(10, 30)])]
+    const sample = vi.fn(() => samples.shift()!)
+    let clock = 0
+    const read = createHostCpuUsage({ sample, now: () => clock, wait: async () => {} })
+
+    expect(await read()).toBe(25)
+    clock = 5
+    expect(await read()).toBe(25)
+    expect(sample).toHaveBeenCalledTimes(2)
+  })
+
   it('measures a fresh window when the last read is too old to say what is happening now', async () => {
     const samples = [
       cpuTimesOf([core(0, 0)]),

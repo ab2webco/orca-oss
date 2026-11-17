@@ -5,6 +5,8 @@ export type CpuTimes = { busy: number; total: number }
 // Why: a read 15 s after the last one measures those 15 s; a gap this long no longer says "now".
 const STALE_MS = 60_000
 const FIRST_WINDOW_MS = 250
+// Why: os.cpus() times tick in ~10 ms steps, so a window of a few ms reads 0% or 100%.
+const MIN_WINDOW_MS = 1_000
 
 export function cpuTimesOf(cpus: readonly os.CpuInfo[]): CpuTimes {
   let busy = 0
@@ -36,16 +38,20 @@ export function createHostCpuUsage({
   now?: () => number
   wait?: (ms: number) => Promise<void>
 } = {}): () => Promise<number | undefined> {
-  let last: { at: number; times: CpuTimes } | null = null
+  let last: { at: number; times: CpuTimes; percent: number | undefined } | null = null
   return async () => {
-    let before = last
+    if (last && now() - last.at < MIN_WINDOW_MS) {
+      return last.percent
+    }
+    let before: { at: number; times: CpuTimes } | null = last
     if (!before || now() - before.at > STALE_MS) {
       before = { at: now(), times: sample() }
       await wait(FIRST_WINDOW_MS)
     }
     const times = sample()
-    last = { at: now(), times }
-    return cpuUsagePercentOf(before.times, times)
+    const percent = cpuUsagePercentOf(before.times, times)
+    last = { at: now(), times, percent }
+    return percent
   }
 }
 
