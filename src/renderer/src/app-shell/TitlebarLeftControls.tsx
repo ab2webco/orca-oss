@@ -41,7 +41,7 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
         layout.leftTitlebarChromeLayout.isFloating ? ' w-max' : ' w-full'
       }`}
     >
-      <div className="flex h-full items-center">
+      <div className="flex h-full min-w-0 items-center">
         {isMac && !layout.isFullScreen ? (
           <div className="titlebar-traffic-light-pad" />
         ) : hasCustomTitleBar ? (
