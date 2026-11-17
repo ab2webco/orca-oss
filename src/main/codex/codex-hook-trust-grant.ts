@@ -1,5 +1,6 @@
 import {
   isCodexAppServerUnsupportedError,
+  runCodexHookTrustGrantSession,
   type CodexHookTrustGrantRequest,
   type CodexHookTrustGrantSessionResult
 } from './codex-app-server-client'
@@ -11,6 +12,12 @@ import {
   type CodexTrustGrantVerifyClass
 } from './codex-trust-grant-telemetry'
 import { runCodexHookTrustGrantSessionSync } from './codex-app-server-grant-bridge'
+import {
+  driveCodexAppServerSessionStepsSync,
+  isCodexAppServerSessionBusyError,
+  runCodexAppServerSessionStep,
+  type CodexAppServerSessionSteps
+} from './codex-app-server-session-steps'
 import {
   codexAppServerCapabilityCache,
   getCodexAppServerHostKey,
@@ -86,7 +93,12 @@ type GrantSessionRunnerSync = (
   request: CodexHookTrustGrantRequest
 ) => CodexHookTrustGrantSessionResult
 
+type GrantSessionRunner = (
+  request: CodexHookTrustGrantRequest
+) => Promise<CodexHookTrustGrantSessionResult>
+
 let runSessionSync: GrantSessionRunnerSync = runCodexHookTrustGrantSessionSync
+let runSession: GrantSessionRunner = runCodexHookTrustGrantSession
 
 function fallback(
   plan: CodexManagedTrustGrantPlan,
@@ -181,6 +193,13 @@ function findLedgerGrant(
 export function grantManagedCodexHookTrust(
   plan: CodexManagedTrustGrantPlan
 ): CodexManagedTrustGrantOutcome {
+  return driveCodexAppServerSessionStepsSync(grantManagedCodexHookTrustSteps(plan))
+}
+
+/** The grant as session steps, so the startup install can await it (ORCA-1248). */
+export function* grantManagedCodexHookTrustSteps(
+  plan: CodexManagedTrustGrantPlan
+): CodexAppServerSessionSteps<CodexManagedTrustGrantOutcome> {
   try {
     if (process.env[DISABLE_ENV_FLAG] === '1') {
       return fallback(plan, 'disabled')
@@ -223,16 +242,23 @@ export function grantManagedCodexHookTrust(
       // Why: Windows fallback writes equivalent separator variants that Codex's
       // canonical RPC key may not overwrite, leaving conflicting logical trust.
       removeSelfComputedTrustBeforeGrant(plan)
-      result = runSessionSync(
-        resolvedHost.buildRequest({
-          runtimeHomePath: plan.runtimeHomePath,
-          managedCommand: plan.managedCommand,
-          expectedTrustKeys: expected.map(({ normalizedKey }) => normalizedKey),
-          useDefaultCodexHome: plan.useDefaultCodexHome
-        })
-      )
+      const request = resolvedHost.buildRequest({
+        runtimeHomePath: plan.runtimeHomePath,
+        managedCommand: plan.managedCommand,
+        expectedTrustKeys: expected.map(({ normalizedKey }) => normalizedKey),
+        useDefaultCodexHome: plan.useDefaultCodexHome
+      })
+      result = yield* runCodexAppServerSessionStep({
+        hostKey,
+        runSync: () => runSessionSync(request),
+        run: () => runSession(request)
+      })
     } catch (error) {
       restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
+      if (isCodexAppServerSessionBusyError(error)) {
+        // Why: the in-flight session sets this host's cooldown; this caller takes the legacy lane.
+        return fallback(plan, 'retry-cached', error)
+      }
       if (isCodexAppServerUnsupportedError(error)) {
         transientRetryAfterByHost.delete(hostKey)
         codexAppServerCapabilityCache.rememberUnsupported(hostKey)
@@ -307,6 +333,9 @@ export function grantManagedCodexHookTrust(
 export const _internals = {
   setGrantSessionRunnerSync(runner: GrantSessionRunnerSync | null): void {
     runSessionSync = runner ?? runCodexHookTrustGrantSessionSync
+  },
+  setGrantSessionRunner(runner: GrantSessionRunner | null): void {
+    runSession = runner ?? runCodexHookTrustGrantSession
   },
   resetDiagnostics(): void {
     diagnostics.granted = 0

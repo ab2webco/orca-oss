@@ -34,7 +34,14 @@ vi.mock('node:os', async () => {
 
 vi.mock('./codex-hook-trust-grant', () => ({
   CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS: 300_000,
-  grantManagedCodexHookTrust: grantMock
+  grantManagedCodexHookTrust: grantMock,
+  // A step sequence that runs no session: the mocked grant settles inline.
+  grantManagedCodexHookTrustSteps: (plan: unknown) => ({
+    [Symbol.iterator]() {
+      return this
+    },
+    next: () => ({ done: true, value: grantMock(plan) })
+  })
 }))
 
 import {

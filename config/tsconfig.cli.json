@@ -49,6 +49,7 @@
     "../src/main/codex/codex-app-server-grant-bridge.ts",
     "../src/main/codex/codex-app-server-grant-envelope.ts",
     "../src/main/codex/codex-app-server-session.ts",
+    "../src/main/codex/codex-app-server-session-steps.ts",
     "../src/main/codex/codex-config-mirror.ts",
     "../src/main/codex/codex-config-path-reference-rewrite.ts",
     "../src/main/codex/codex-config-settings-preservation.ts",

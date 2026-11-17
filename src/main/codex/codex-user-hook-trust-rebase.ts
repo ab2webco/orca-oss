@@ -6,6 +6,12 @@ import {
 } from './codex-app-server-capability-cache'
 import { runCodexUserHookTrustRebaseSessionSync } from './codex-app-server-grant-bridge'
 import { isCodexAppServerUnsupportedError } from './codex-app-server-session'
+import {
+  driveCodexAppServerSessionStepsSync,
+  isCodexAppServerSessionBusyError,
+  runCodexAppServerSessionStep,
+  type CodexAppServerSessionSteps
+} from './codex-app-server-session-steps'
 import { CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS } from './codex-hook-trust-grant'
 import { createCodexHookTrustEntry } from './codex-hook-identity'
 import { resolveCodexTrustGrantHost } from './codex-trust-grant-host'
@@ -15,10 +21,11 @@ import {
   type CodexTrustConfigSnapshot
 } from './codex-trust-config-rollback'
 import { computeTrustKey, type CodexTrustEntry } from './config-toml-trust'
-import type {
-  CodexUserHookTrustRebaseRequest,
-  CodexUserHookTrustRebaseResult,
-  CodexUserHookTrustMove
+import {
+  runCodexUserHookTrustRebaseSession,
+  type CodexUserHookTrustRebaseRequest,
+  type CodexUserHookTrustRebaseResult,
+  type CodexUserHookTrustMove
 } from './codex-user-hook-trust-rebase-client'
 
 type HooksByEvent = Record<string, HookDefinition[]>
@@ -27,7 +34,12 @@ type RebaseSessionRunnerSync = (
   request: CodexUserHookTrustRebaseRequest
 ) => CodexUserHookTrustRebaseResult
 
+type RebaseSessionRunner = (
+  request: CodexUserHookTrustRebaseRequest
+) => Promise<CodexUserHookTrustRebaseResult>
+
 let runSessionSync: RebaseSessionRunnerSync = runCodexUserHookTrustRebaseSessionSync
+let runSession: RebaseSessionRunner = runCodexUserHookTrustRebaseSession
 
 // Why: launch prep re-runs the callers on every pane spawn. A host stuck
 // without a usable rebase lane (old CLI, unmatched keys) must not pay a codex
@@ -35,6 +47,9 @@ let runSessionSync: RebaseSessionRunnerSync = runCodexUserHookTrustRebaseSession
 const rebaseRetryAfterByHost = new Map<CodexAppServerHostKey, number>()
 
 function rememberRebaseSessionFailure(hostKey: CodexAppServerHostKey, error: unknown): void {
+  if (isCodexAppServerSessionBusyError(error)) {
+    return
+  }
   if (isCodexAppServerUnsupportedError(error)) {
     codexAppServerCapabilityCache.rememberUnsupported(hostKey)
     return
@@ -121,7 +136,7 @@ function rollbackMutation(
   throw originalError
 }
 
-export function mutateRealHomeHooksPreservingUserTrust(args: {
+type RealHomeHooksMutation = {
   sourcePath: string
   runtimeHomePath: string
   tomlPath: string
@@ -129,7 +144,28 @@ export function mutateRealHomeHooksPreservingUserTrust(args: {
   afterHooks: HooksByEvent
   writeHooks: () => void
   restoreHooks: () => void
-}): CodexTrustConfigSnapshot | null {
+}
+
+function rebaseSessionStep(
+  hostKey: CodexAppServerHostKey,
+  request: CodexUserHookTrustRebaseRequest
+): CodexAppServerSessionSteps<CodexUserHookTrustRebaseResult> {
+  return runCodexAppServerSessionStep({
+    hostKey,
+    runSync: () => runSessionSync(request),
+    run: () => runSession(request)
+  })
+}
+
+export function mutateRealHomeHooksPreservingUserTrust(
+  args: RealHomeHooksMutation
+): CodexTrustConfigSnapshot | null {
+  return driveCodexAppServerSessionStepsSync(mutateRealHomeHooksPreservingUserTrustSteps(args))
+}
+
+export function* mutateRealHomeHooksPreservingUserTrustSteps(
+  args: RealHomeHooksMutation
+): CodexAppServerSessionSteps<CodexTrustConfigSnapshot | null> {
   const moves = getMovedCodexUserHookTrust(args.sourcePath, args.beforeHooks, args.afterHooks)
   if (moves.length === 0) {
     args.writeHooks()
@@ -158,7 +194,7 @@ export function mutateRealHomeHooksPreservingUserTrust(args: {
   // without shifting a user's positional trust key.
   let inspected: CodexUserHookTrustRebaseResult
   try {
-    inspected = runSessionSync({
+    inspected = yield* rebaseSessionStep(hostKey, {
       operation: 'inspect-user-hook-trust',
       invocation: baseRequest.invocation,
       hooksListCwd: baseRequest.hooksListCwd,
@@ -177,7 +213,7 @@ export function mutateRealHomeHooksPreservingUserTrust(args: {
   try {
     args.writeHooks()
     hooksWritten = true
-    const repaired = runSessionSync({
+    const repaired = yield* rebaseSessionStep(hostKey, {
       operation: 'repair-user-hook-trust',
       invocation: baseRequest.invocation,
       hooksListCwd: baseRequest.hooksListCwd,
@@ -199,6 +235,9 @@ export function mutateRealHomeHooksPreservingUserTrust(args: {
 export const _internals = {
   setSessionRunnerSync(runner: RebaseSessionRunnerSync | null): void {
     runSessionSync = runner ?? runCodexUserHookTrustRebaseSessionSync
+  },
+  setSessionRunner(runner: RebaseSessionRunner | null): void {
+    runSession = runner ?? runCodexUserHookTrustRebaseSession
   },
   resetRetryState(): void {
     rebaseRetryAfterByHost.clear()
