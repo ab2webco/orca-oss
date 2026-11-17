@@ -48,7 +48,10 @@ test('a lead lists each paired host with its cap, cores, memory and load, and na
       cpuCoreCount: own.cpuCoreCount,
       totalMemory: own.totalMemory,
       availableMemory: expect.any(Number),
-      loadAverage1m: process.platform === 'win32' ? null : expect.any(Number)
+      loadAverage1m: process.platform === 'win32' ? null : expect.any(Number),
+      cpuUsagePercent: expect.any(Number),
+      workspaceDiskTotal: expect.any(Number),
+      workspaceDiskFree: expect.any(Number)
     }
     expect(state.role).toBe('lead')
     // Why refused: this lead has no project repo, so `game launch --on` refuses every host (ORCA-1207).
@@ -65,6 +68,13 @@ test('a lead lists each paired host with its cap, cores, memory and load, and na
       },
       { host: 'm1', running: 0, status: 'unreachable', launch: { kind: 'unanswered' } }
     ])
+    for (const row of state.hostCapacity!) {
+      if (row.status === 'ok') {
+        expect(row.workspaceDiskFree!, `${row.host} disk free`).toBeLessThanOrEqual(
+          row.workspaceDiskTotal!
+        )
+      }
+    }
     expect(state.hostCapacity![0], 'this host is never checked against itself').not.toHaveProperty(
       'launch'
     )
