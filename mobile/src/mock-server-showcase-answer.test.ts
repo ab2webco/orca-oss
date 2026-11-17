@@ -24,17 +24,17 @@ describe('mock server showcase owner answer', () => {
         projects: { questions: { id: string; ticket: string | null }[] }[]
       }
     ).projects
-    const leoQuestion = projects
+    const orinQuestion = projects
       .flatMap((project) => project.questions)
-      .find((question) => question.ticket === 'ACME-214')!
+      .find((question) => question.ticket === 'LUM-23')!
     call('terminal.subscribe', { terminal: 'term-lead' })
-    call('game.ownerAnswer', { id: leoQuestion.id, option: 1 })
+    call('game.ownerAnswer', { id: orinQuestion.id, option: 1 })
     vi.advanceTimersByTime(5000)
 
     const output = sent
       .map((response) => (response.result as { chunk?: string } | undefined)?.chunk ?? '')
       .join('')
-    expect(output).toContain('to Leo.')
-    expect(output).not.toContain('to Iris.')
+    expect(output).toContain('to Orin.')
+    expect(output).not.toContain('to Nova.')
   })
 })
