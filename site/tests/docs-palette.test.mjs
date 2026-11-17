@@ -29,11 +29,12 @@ const EXPECTED = {
 }
 
 function paletteOf(html, selector) {
-  const escaped = selector.replace(/[[\]'()]/g, '\\$&')
-  const block = new RegExp(`${escaped}\\{(--sl-color[^}]*)\\}`).exec(html)
-  assert.ok(block, `no ${selector} Starlight palette in the built docs`)
+  const opener = `${selector}{--sl-color`
+  const start = html.indexOf(opener)
+  assert.ok(start !== -1, `no ${selector} Starlight palette in the built docs`)
+  const block = html.slice(start + selector.length + 1, html.indexOf('}', start))
   return Object.fromEntries(
-    [...block[1].matchAll(/--sl-color-([\w-]+):([^;]+);/g)].map((m) => [m[1], m[2]])
+    [...block.matchAll(/--sl-color-([\w-]+):([^;]+);/g)].map((m) => [m[1], m[2]])
   )
 }
 
