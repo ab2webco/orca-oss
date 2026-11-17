@@ -296,6 +296,8 @@ test.describe('Worktree Lineage', () => {
     const parentAgentPrompt = await seedWorkspaceAgentStatus(orcaPage, parentId, 'PARENT')
     const childAgentPrompt = await seedWorkspaceAgentStatus(orcaPage, childId, 'CHILD')
 
+    // ORCA-1149 S9: a one-agent parent draws as a solo row, which must keep its child in view.
+    await expect(childRow, 'the solo parent hid its child workspace').toBeVisible()
     await expect(
       parentRow.getByRole('treeitem').filter({ hasText: parentAgentPrompt })
     ).toBeVisible()

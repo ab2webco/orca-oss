@@ -150,9 +150,9 @@ test('a one-agent worktree draws V30 solo row; two agents keep the inline list',
   await expect(act).toHaveText(QUESTION)
   await expect(act).toHaveAttribute('data-asks', '')
   await expect(row.locator('[data-status-glyph="question"]')).toBeVisible()
-  // The inline list is gone, but the solo row is still a treeitem in an Agents tree.
+  // The inline list is gone, but the solo row is still a treeitem in a tree.
   await expect(
-    card.getByRole('tree', { name: 'Agents' }).locator('[data-sidebar-solo-row][role="treeitem"]')
+    card.getByRole('tree').locator('[data-sidebar-solo-row][role="treeitem"]')
   ).toHaveCount(1)
   await capture(orcaPage, testInfo, 'waiting', row)
 

@@ -8,6 +8,7 @@ import { canPinClaudeAccountToWorktree } from '@/lib/claude-account-runtime-filt
 import { buildWorktreeClaudeAccountChipModel } from './worktree-claude-account-chip-model'
 import { teamSoloHostOf } from '@/components/team-panel/team-panel-solo-sessions'
 import { SidebarSoloRow } from './SidebarSoloRow'
+import { WorktreeCardLineageChildren } from './worktree-card-lineage-children'
 import { sidebarSoloRowLines, type SidebarSoloAgent } from './sidebar-solo-row'
 import {
   activateWorktreeAgentTab,
@@ -83,27 +84,26 @@ export function WorktreeCardSoloContent({
   )
   const target = send.active ? send.targetsByPaneKey.get(solo.agent.paneKey) : undefined
   return (
-    // Why a tree: the inline list it replaces is one, so assistive tech finds the agent the same way.
-    <div
-      className="flex w-full min-w-0 flex-col"
-      data-worktree-card-solo-content=""
-      role="tree"
-      aria-label={translate('auto.components.sidebar.WorktreeCardAgents.1b0a156717', 'Agents')}
-    >
-      <SidebarSoloRow
-        agent={solo.agent}
-        name={worktree.displayName}
-        pr={pr}
-        now={now}
-        lines={lines}
-        onActivate={onActivate}
-        onDismiss={dismissWorktreeAgent}
-        sendTargetStatus={send.active ? (target?.status ?? 'disabled') : undefined}
-        sendTargetDisabledReason={
-          send.active ? (target?.disabledReason ?? 'Agent is not available') : undefined
-        }
-        onSendTargetClick={send.active ? send.onSendTargetClick : undefined}
-      />
+    <div className="flex w-full min-w-0 flex-col" data-worktree-card-solo-content="">
+      {/* Why a tree: the inline list it replaces is one. Why the worktree's name: the sidebar
+          option takes its name from this label, and "Agents" would name every one-agent row. */}
+      <div role="tree" aria-label={worktree.displayName}>
+        <SidebarSoloRow
+          agent={solo.agent}
+          name={worktree.displayName}
+          pr={pr}
+          now={now}
+          lines={lines}
+          onActivate={onActivate}
+          onDismiss={dismissWorktreeAgent}
+          sendTargetStatus={send.active ? (target?.status ?? 'disabled') : undefined}
+          sendTargetDisabledReason={
+            send.active ? (target?.disabledReason ?? 'Agent is not available') : undefined
+          }
+          onSendTargetClick={send.active ? send.onSendTargetClick : undefined}
+        />
+      </div>
+      <WorktreeCardLineageChildren card={card} />
     </div>
   )
 }
