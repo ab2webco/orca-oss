@@ -172,12 +172,9 @@ export function createImagePainter(args: {
   )
   const effects = createSceneEffects(feetY)
   const monitors = createDeskMonitors(feetY, colors)
+  // Why the member's art for a missing role: a scene's own art may draw no advisor or steward.
   const roleOf = (a: Pick<TeamSceneActor, 'role'>): RoleArt =>
-    a.role === 'lead'
-      ? style.roles.lead
-      : a.role === 'advisor'
-        ? (style.roles.advisor ?? style.roles.member)
-        : style.roles.member
+    style.roles[a.role] ?? style.roles.member
   const feetOf = (art: RoleArt) => art.feet ?? { x: art.frame.width / 2, y: art.frame.height }
   // Why: below 360 px five desks touch; a slightly smaller row keeps a gap (set on each paint).
   let narrow = 1

@@ -1,4 +1,7 @@
-import { characterCostumeOf } from '../../../../../resources/claude-plugins/orca-game/hooks/character-look'
+import {
+  characterCostumeOf,
+  stewardCostumeOf
+} from '../../../../../resources/claude-plugins/orca-game/hooks/character-look'
 import { createVerdictFlights } from './team-scene-verdict-flights'
 import { hdBackdropPixel } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-backdrop'
 import type { Daylight } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
@@ -92,6 +95,7 @@ export function createPixelPainter(args: {
   let sprites = new WeakMap<HdSprite, Map<string, HTMLCanvasElement>>()
   const effects = createSceneEffects((depth) => feetRow(depth) * PIXEL)
   const verdicts = createVerdictFlights((depth) => feetRow(depth) * PIXEL, colors)
+  const steward = stewardCostumeOf(scene)
 
   const backdropFor = (columns: number, t: number): HTMLCanvasElement => {
     const step = Math.floor((t * 1000) / TICK_MS / SKY_TICKS)
@@ -144,7 +148,10 @@ export function createPixelPainter(args: {
     if (own) {
       return spriteFor(own, false)
     }
-    const costume = characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
+    const costume =
+      a.role === 'steward'
+        ? steward
+        : characterCostumeOf(scene, a.role === 'advisor' ? undefined : a.name, 'working')
     return spriteFor(costumeSpriteOf(costume, leg, false), a.role === 'lead')
   }
   const blit = (

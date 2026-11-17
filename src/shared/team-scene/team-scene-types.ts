@@ -35,6 +35,16 @@ export type TeamSceneMemberInput = TeamSceneAgentInput & {
   ci?: 'pending' | 'failure' | 'success'
   /** It needs you for a prompt in its own pane, not an Inbox question. */
   paneAsk?: true
+  /** The Orca steward's latest move that raised or lowered its pick (ORCA-1242). */
+  steward?: TeamSceneStewardMove
+}
+
+/** `to` is the pick as the card prints it; `moment` the reason id, worded by each client. */
+export type TeamSceneStewardMove = {
+  at: number
+  lift: 'raise' | 'lower'
+  to: string
+  moment: string
 }
 
 export type TeamSceneInput = {
@@ -72,6 +82,8 @@ export type TeamSceneEvent =
   | { kind: 'advisorSpoke'; line: string }
   /** Jev decided in `key`'s pane ('lead' for the lead); the advisor walks over and gestures. */
   | { kind: 'judged'; key: string; gesture: TeamSceneGesture; tone: TeamSceneVerdictTone }
+  /** The Orca steward moved `key`'s model; it walks over and says why. */
+  | { kind: 'stewarded'; key: string; move: TeamSceneStewardMove }
 
 /** A Jev decision's colour: allow, ask and deny as the card draws them; note for advice alone. */
 export type TeamSceneVerdictTone = 'allow' | 'ask' | 'deny' | 'note'
@@ -115,7 +127,7 @@ export type TeamSceneEmote = 'alert' | 'prompt' | 'check' | 'star' | 'heart' | '
 
 export type TeamSceneActor = {
   key: string
-  role: 'lead' | 'member' | 'advisor'
+  role: 'lead' | 'member' | 'advisor' | 'steward'
   name: string
   characterKey: string | null
   x: number
@@ -131,7 +143,7 @@ export type TeamSceneActor = {
   emote: TeamSceneEmote | null
   /** Hop height in px while cheering. */
   jump: number
-  /** The advisor's gesture for a Jev decision while it stands by the judged pane. */
+  /** The advisor's gesture for a Jev decision, or the steward's raise or lower, by the pane. */
   gesture?: TeamSceneGesture | null
   /** A resting member's play in its chair, only where members work seated. */
   play?: TeamScenePlay

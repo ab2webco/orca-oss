@@ -1,6 +1,7 @@
 import { advisorGestureOf } from './team-scene-advisor-walk'
 import type { TeamSceneBody, TeamSceneWorld } from './team-scene-director'
 import { teamSceneStrideAt } from './team-scene-motion'
+import { stewardGestureOf } from './team-scene-steward-visit'
 import { seatedPlayOf, workPoseOf } from './team-scene-work-loop'
 import type { TeamSceneActivity, TeamSceneActor, TeamScenePose } from './team-scene-types'
 
@@ -33,6 +34,9 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   }
   if (body.role === 'advisor') {
     return world.t < world.advisorRaiseUntil || advisorGestureOf(world) ? 'raise' : 'idle'
+  }
+  if (body.role === 'steward') {
+    return stewardGestureOf(world) ? 'raise' : 'idle'
   }
   if (body.plan.kind === 'leave') {
     return 'idle'
@@ -81,6 +85,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
             world.rounds.purpose === 'give'),
         emote: timed ?? seatedMark,
         ...(body.role === 'advisor' ? { gesture: advisorGestureOf(world) } : {}),
+        ...(body.role === 'steward' ? { gesture: stewardGestureOf(world) } : {}),
         ...(play ? { play } : {}),
         ...(body.away ? { away: true as const } : {}),
         ...(body.desk ? { desk: body.desk } : {}),

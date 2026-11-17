@@ -49,6 +49,7 @@ const IMAGES = new Map<string, TeamSceneArtImage>([
   ['desk.png', image(240, 128)],
   ['lead.png', image(1024, 896)],
   ['advisor.png', image(1024, 896)],
+  ['steward.png', image(1024, 896)],
   ['m1.png', image(1024, 896)],
   ['m2.png', image(1024, 896)]
 ])
@@ -205,17 +206,18 @@ describe('createImagePainter', () => {
     expect(looks).toEqual(new Set([IMAGES.get('m1.png'), IMAGES.get('m2.png')]))
   })
 
-  it('dresses the advisor in the member art when it has none, and in its own otherwise', () => {
+  // ORCA-1242: a member's art when the scene draws no such role, never another role's.
+  it.each(['advisor', 'steward'] as const)('dresses the %s in its own art', (who) => {
     const sheetOf = (art: OrchestratorGameSceneNativeStyle): unknown => {
       const { g, calls } = recordingContext()
-      painterOf(art).paint(g, frame({ actors: [actor('advisor')] }))
+      painterOf(art).paint(g, frame({ actors: [actor(who, { role: who })] }))
       return sprites(calls)[0]!.args[0]
     }
-    expect([IMAGES.get('m1.png'), IMAGES.get('m2.png')]).toContain(sheetOf(style()))
-    const own = style({
-      roles: { ...style().roles, advisor: role(['advisor.png']) }
-    })
-    expect(sheetOf(own)).toBe(IMAGES.get('advisor.png'))
+    const other = { [who === 'advisor' ? 'steward' : 'advisor']: role(['lead.png']) }
+    const roles = { ...style().roles, ...other }
+    expect([IMAGES.get('m1.png'), IMAGES.get('m2.png')]).toContain(sheetOf(style({ roles })))
+    const own = style({ roles: { ...roles, [who]: role([`${who}.png`]) } })
+    expect(sheetOf(own)).toBe(IMAGES.get(`${who}.png`))
   })
 
   it('mirrors a figure that faces left', () => {

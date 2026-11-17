@@ -120,7 +120,20 @@ describe('teamStewardOf', () => {
       moment: 'edit',
       from: 'Sonnet 5.5 · medium',
       to: 'Opus 5.5 · high',
-      applied: true
+      applied: true,
+      lift: 'raise'
     })
+  })
+
+  it('says whether a move raised or lowered the pick: the model first, then the effort', () => {
+    const liftOf = (from: typeof opus, to: typeof opus) =>
+      teamStewardOf(steward({ decisions: [decision({ from, to })] })).steward?.steps[0]?.lift
+    expect(liftOf(sonnet, opus)).toBe('raise')
+    expect(liftOf(opus, sonnet)).toBe('lower')
+    expect(liftOf(opus, { ...opus, effort: 'xhigh' })).toBe('raise')
+    expect(liftOf({ ...opus, effort: 'xhigh' }, { model: 'claude-haiku-5-5', effort: 'max' })).toBe(
+      'lower'
+    )
+    expect(liftOf(opus, opus)).toBe('same')
   })
 })

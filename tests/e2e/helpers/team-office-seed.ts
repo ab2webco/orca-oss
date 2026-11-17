@@ -7,6 +7,7 @@ import { writeSettings } from './settings-write'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './terminal'
 import { RuntimeClient } from '../../../src/cli/runtime-client'
+import type { GameMemberSteward } from '../../../src/shared/orchestrator-game-member-steward'
 import type { RuntimeTerminalListResult } from '../../../src/shared/runtime-types'
 
 export type SeededDecision = { id: string; verdict: string; gesture: string | null }
@@ -18,6 +19,8 @@ export type SeededMember = {
   decisions?: SeededDecision[]
   /** A paired host's name; absent, this machine. */
   host?: string
+  /** Its Orca steward's report, as the member's plugin sends it (ORCA-1242). */
+  steward?: GameMemberSteward
 }
 /** The team as game.state carries it to the panel; `jev` gives the lead an advisor line. */
 export type SeededTeam = { members: SeededMember[]; jev?: string }
@@ -74,6 +77,7 @@ export async function seedOfficeTeam(app: ElectronApplication, team: SeededTeam)
           toolName: 'Edit',
           ...(one.decisions ? { advisor: { ...jev, decisions: one.decisions } } : {}),
           ...(one.host ? { remote: { host: one.host, stateKnown: true } } : {}),
+          ...(one.steward ? { steward: one.steward } : {}),
           ...(one.review
             ? {
                 review: {

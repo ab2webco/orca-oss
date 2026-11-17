@@ -59,7 +59,7 @@ const cellFaults = (g, rows) => {
   return faults
 }
 const casts = { figures: FIGURES_CAST, office: OFFICE_CAST }
-const looksOf = (cast) => ({ lead: cast.lead, advisor: cast.advisor,
+const looksOf = (cast) => ({ lead: cast.lead, advisor: cast.advisor, steward: cast.steward,
   ...Object.fromEntries(cast.members.map((look, at) => ['member-' + (at + 1), look])) })
 window.questArt = {
   actions: {
@@ -127,7 +127,8 @@ const styleOf = (style, names, layers, station, stationFeet, stationScreen, acti
       names.filter((name) => name.startsWith('member-')).map((name) => `${style}/${name}.png`),
       actions
     ),
-    advisor: roleOf([`${style}/advisor.png`], actions)
+    advisor: roleOf([`${style}/advisor.png`], actions),
+    steward: roleOf([`${style}/steward.png`], actions)
   },
   props: { station, stationFeet, ...(stationScreen ? { stationScreen } : {}) }
 })

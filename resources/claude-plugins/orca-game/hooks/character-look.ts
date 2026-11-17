@@ -186,6 +186,29 @@ export const characterCostumeOf = (
   return characterOf(scene, memberName)?.costumes?.[phase] ?? lookOf(scene, memberName)
 }
 
+// Why its own mark: no character wears a clipboard, so the Orca steward (ORCA-1242) reads apart
+// from the lead, Jev's advisor and every member, in the scene's own colours.
+export const stewardCostumeOf = (scene: SceneDefinition): Costume => {
+  const costume = scene.costumes.working
+  const head = headOf(costume.rows)
+  const [clip, paper] = [...SPARE_GLYPHS].filter((one) => !Object.hasOwn(costume.colors, one))
+  const x = (costume.rows[0]?.length ?? 1) - 1
+  if (!head || !clip || !paper || costume.rows.some((row) => row[x] !== '.')) {
+    return costume
+  }
+  // Why two columns, one past the costume: one column reads as the sword or staff members hold.
+  const glyphAt = (y: number) => (y === head.top + 1 ? clip : y > head.top + 1 ? paper : '.')
+  return {
+    rows: costume.rows.map((row, y) => row.slice(0, x) + glyphAt(y).repeat(2)),
+    legs: [`${costume.legs[0]}.`, `${costume.legs[1]}.`],
+    colors: {
+      ...costume.colors,
+      [clip]: scene.looks.working.sun,
+      [paper]: scene.looks.working.cloud
+    }
+  }
+}
+
 const mostDrawnColorOf = (costume: Costume): number | undefined => {
   const counts = new Map<string, number>()
   for (const glyph of costume.rows.join('').replaceAll('.', '')) {

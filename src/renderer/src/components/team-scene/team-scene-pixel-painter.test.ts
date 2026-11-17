@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { characterCostumeOf } from '../../../../../resources/claude-plugins/orca-game/hooks/character-look'
+import {
+  characterCostumeOf,
+  stewardCostumeOf
+} from '../../../../../resources/claude-plugins/orca-game/hooks/character-look'
 import { NOON } from '../../../../../resources/claude-plugins/orca-game/hooks/hd-daylight'
 import { SCENES } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/index'
 import { QUEST_SCENE } from '../../../../../resources/claude-plugins/orca-game/hooks/scenes/quest'
@@ -168,6 +171,32 @@ describe('createPixelPainter', () => {
     )
     expect(offscreen.at(-1)!.calls.filter((c) => c.name === 'fillRect').length).toBeGreaterThan(20)
   })
+
+  // ORCA-1242: the Orca steward is the scene's own hero with a clipboard no character wears.
+  it.each(Object.values(SCENES))(
+    'draws the Orca steward in the $id scene, apart from its advisor and members',
+    (scene) => {
+      const costume = stewardCostumeOf(scene)
+      const board = costume.rows.map((row) => row.at(-1)).join('')
+      expect(board).toMatch(/^\.+(.)(.)\2+$/)
+      expect(costume.rows.map((row) => row.at(-2)).join('')).toBe(board)
+      expect(costume.legs.every((row) => row.length === costume.rows[0]!.length)).toBe(true)
+      const [clip, paper] = [board.replaceAll('.', '')[0]!, board.at(-1)!]
+      expect(costume.colors[clip]).toBe(scene.looks.working.sun)
+      expect(costume.colors[paper]).toBe(scene.looks.working.cloud)
+      const fillsOf = (a: TeamSceneActor) => {
+        offscreen = []
+        createPixelPainter({ scene, light: NOON, colors: COLORS }).paint(
+          recordingContext().g,
+          frame([a])
+        )
+        return JSON.stringify(offscreen.at(-1)!.calls.map((c) => c.fillStyle))
+      }
+      const steward = fillsOf(actor('steward', { role: 'steward', x: 0.3 }))
+      expect(steward).not.toBe(fillsOf(actor('advisor', { role: 'advisor', x: 0.3 })))
+      expect(steward).not.toBe(fillsOf(actor('steward', { x: 0.3 })))
+    }
+  )
 
   it("asks for the game's thought cloud, not the glass bubble", () => {
     expect(createPixelPainter({ scene: QUEST_SCENE, light: NOON, colors: COLORS }).cloudPixel).toBe(

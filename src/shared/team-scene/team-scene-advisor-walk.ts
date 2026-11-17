@@ -225,3 +225,10 @@ export function syncAdvisorBody(
   }
   world.bodies.get('advisor')!.leaving = input.advisorLeaves
 }
+
+const ADVISOR_BUBBLE_SECONDS = 6
+
+export function advisorLineShown(world: TeamSceneWorld): string | null {
+  const said = world.advisorSaid
+  return said && world.clock - said.at < ADVISOR_BUBBLE_SECONDS ? said.line : null
+}

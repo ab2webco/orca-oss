@@ -323,6 +323,11 @@ const TOOLS = {
   },
   scroll(g) {
     fill(g, '#f4e6c0', () => g.roundRect(-2, -8, 4, 11, 1.6))
+  },
+  clipboard(g, look) {
+    fill(g, '#8a6a44', () => g.roundRect(-3.4, -9, 6.8, 9.4, 0.8))
+    fill(g, '#f4efe0', () => g.rect(-2.6, -7.6, 5.2, 7.2))
+    fill(g, look.trim, () => g.rect(-1.6, -9.6, 3.2, 1.6))
   }
 }
 

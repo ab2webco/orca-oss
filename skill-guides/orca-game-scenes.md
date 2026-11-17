@@ -480,7 +480,8 @@ and swaps the station prop.
   matters low and centered: the stage is 176 px tall and as wide as the panel, from 320 px up.
   `front: true` draws over the characters. `drift` (CSS px a second, -60 to 60) scrolls a layer
   across the stage and wraps it, for clouds: keep it transparent around what moves.
-- **`roles`.** `lead` and `member` are required; `advisor` is optional and wears the member art.
+- **`roles`.** `lead` and `member` are required; `advisor` (Jev's) and `steward` (the Orca steward)
+  are optional, and each wears the member art when left out.
 - **`sheets`.** 1 to 16 images with the same layout. Each is one look, and a member keeps the look
   its persistent character picks, so eight members can differ.
 - **`frame`.** The size of one frame in sheet pixels, up to 512. `size` is the height drawn at the
