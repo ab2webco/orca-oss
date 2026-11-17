@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { main, selectPrE2eScope } from './select-pr-e2e-scope.mjs'
+import { main, RENDERER_AREA_SPECS, selectPrE2eScope } from './select-pr-e2e-scope.mjs'
 
 // The real file list of 2993035166 — `fix(orchestration): confirm the agent is
 // ready before injecting a dispatch (ORCA-191) (#67)`, the PR that merged with
@@ -133,17 +133,73 @@ describe('PR E2E scope selection', () => {
     expect(scope.testFiles).toBe('')
   })
 
-  it('leaves renderer-only changes to the scheduled and release runs', () => {
-    // A deliberate, named gap: zero of the two measured escapes were
-    // renderer-only, and adding src/renderer/** would trigger the full suite on
-    // very nearly every PR. Changing this line is a cost decision, not a typo
-    // fix — see the PR body for ORCA-196.
+  it('leaves an unmapped renderer area to the scheduled and release runs', () => {
+    // src/renderer/** as a full-suite path would trigger on very nearly every
+    // PR; only areas in RENDERER_AREA_SPECS run their specs (ORCA-1187).
     const scope = selectPrE2eScope([
       'src/renderer/src/components/TerminalPane.tsx',
       'src/renderer/src/assets/main.css'
     ])
     expect(scope.mode).toBe('none')
     expect(scope.shouldRun).toBe(false)
+  })
+
+  it('runs the team-panel specs for a team-scene-only diff', () => {
+    // ORCA-1187: #1186's queue group ran `none` on exactly this diff, so
+    // team-panel-building.spec.ts, the spec it fixed, never ran before merge.
+    const specFiles = [
+      'tests/e2e/sidebar-agent-rows.spec.ts',
+      'tests/e2e/team-panel-building.spec.ts',
+      'tests/e2e/team-panel-scene.spec.ts'
+    ]
+    const changed = [
+      'src/renderer/src/components/team-scene/use-team-scene-ride-legs.ts',
+      'src/renderer/src/components/team-scene/use-team-scene-ride-legs.test.ts'
+    ]
+    const scope = selectPrE2eScope(changed, { specFiles })
+    expect(scope.mode).toBe('changed-specs')
+    expect(scope.shouldRun).toBe(true)
+    expect(JSON.parse(scope.testFiles)).toEqual([
+      'tests/e2e/team-panel-building.spec.ts',
+      'tests/e2e/team-panel-scene.spec.ts'
+    ])
+    expect(scope.triggeredBy).toEqual(changed)
+  })
+
+  it('maps team-panel too, and adds a changed spec without duplicating it', () => {
+    const specFiles = ['tests/e2e/team-panel-shell.spec.ts', 'tests/e2e/sidebar-x.spec.ts']
+    const scope = selectPrE2eScope(
+      [
+        'src/renderer/src/components/team-panel/TeamPanel.tsx',
+        'tests/e2e/team-panel-shell.spec.ts',
+        'tests/e2e/sidebar-x.spec.ts'
+      ],
+      { specFiles }
+    )
+    expect(JSON.parse(scope.testFiles)).toEqual([
+      'tests/e2e/team-panel-shell.spec.ts',
+      'tests/e2e/sidebar-x.spec.ts'
+    ])
+  })
+
+  it('keeps an unmapped renderer area at none', () => {
+    const scope = selectPrE2eScope(['src/renderer/src/components/sidebar/Sidebar.tsx'], {
+      specFiles: ['tests/e2e/team-panel-building.spec.ts']
+    })
+    expect(scope.mode).toBe('none')
+    expect(scope.shouldRun).toBe(false)
+  })
+
+  it('maps every area to specs that exist on disk', () => {
+    // A renamed spec family would otherwise turn its area back into a silent `none`.
+    for (const { area } of RENDERER_AREA_SPECS) {
+      const dir = area.source.match(/\((.*?)\)/)[1].split('|')
+      for (const name of dir) {
+        const scope = selectPrE2eScope([`src/renderer/src/components/${name}/x.ts`])
+        expect(scope.mode, name).toBe('changed-specs')
+        expect(JSON.parse(scope.testFiles).length, name).toBeGreaterThan(0)
+      }
+    }
   })
 
   it('runs the full suite when the lane itself changes', () => {
@@ -191,6 +247,14 @@ describe('PR E2E scope with the full suite deferred to the merge queue', () => {
   it('keeps the cheap lanes unchanged', () => {
     expect(selectPrE2eScope(['docs/README.md'], deferred).mode).toBe('none')
     expect(selectPrE2eScope(['tests/e2e/a.spec.ts'], deferred).mode).toBe('changed-specs')
+  })
+
+  it('leaves a mapped renderer area to the merge queue on a push', () => {
+    const file = 'src/renderer/src/components/team-scene/use-team-scene-ride-legs.ts'
+    const scope = selectPrE2eScope([file], deferred)
+    expect(scope.mode).toBe('merge-queue')
+    expect(scope.shouldRun).toBe(false)
+    expect(scope.triggeredBy).toEqual([file])
   })
 
   it('reads the deferral from the command line', () => {

@@ -13,7 +13,7 @@ sat queued for 2 hours or more, and each merge from `main` into a branch restart
 | ---------------------------------------------------- | ------------------ | ------------------------------------------------------- |
 | static analysis, root directory guard, typecheck     | yes                | yes                                                     |
 | unit tests (`tests node 24 n/N`)                     | 8 shards           | 16 shards                                               |
-| detect e2e scope + `e2e (<mode>)`                    | changed specs only | scope from the queued diff (full suite when it matches) |
+| detect e2e scope + `e2e (<mode>)`                    | changed specs only | scope from the queued diff (full suite or area's specs) |
 | Git compatibility, shell contracts, cli subprocess   | —                  | yes                                                     |
 | managed hooks on Node 18, Claude hooks on Python 3.9 | —                  | yes                                                     |
 | cross-version wire compatibility                     | —                  | yes                                                     |
@@ -35,13 +35,29 @@ that only run when their own paths change (`mobile.yml`, `computer-e2e.yml`,
 
 - If the PR changed a spec, that spec runs on one runner (`changed-specs`), even when the PR also
   touched a full-suite path.
-- If the PR touched a full-suite path and no spec, the push reports `e2e (merge-queue)` and the job
-  is skipped. The queue runs the full suite.
+- If the PR touched a full-suite path or a mapped renderer area and no spec, the push reports
+  `e2e (merge-queue)` and the job is skipped. The queue runs the full suite or the area's specs.
 - Otherwise nothing runs (`none`), as before.
 
 The merge queue runs the script without the flag, on the queued diff
 (`merge_group.base_sha..head_sha`), so the rules for when the full suite gates a merge are the same
 as before this change.
+
+## Renderer areas in the merge queue
+
+`src/renderer/**` is not a full-suite path: it would trigger on nearly every PR. A renderer change in
+an area listed in `RENDERER_AREA_SPECS` instead runs that area's specs in `changed-specs` mode,
+together with any changed spec:
+
+| Renderer area                                                | Specs                            |
+| ------------------------------------------------------------ | -------------------------------- |
+| `src/renderer/src/components/team-scene/`, `.../team-panel/` | `tests/e2e/team-panel-*.spec.ts` |
+
+Any other renderer area still selects `none`. The gap is measured: #1186 (ORCA-1185) fixed the
+ride timer behind a red `team-panel-building.spec.ts` with a team-scene-only diff, and merge-group
+run 43318228413 reported `E2E scope: none`, so the spec it fixed never ran before merge. Add an
+area when a queue red shows it escaping, not before. The team-panel family is 34 specs, which
+`split-changed-e2e-specs.mjs` puts on 6 shards.
 
 ## `verify` in both paths
 
