@@ -8,6 +8,7 @@ import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
 import { useElementUncovered } from './use-element-uncovered'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { cn } from '@/lib/utils'
 import { hasFeatureInteraction } from '../../../../shared/feature-interactions'
 
 const WORKSPACE_BOARD_MOVED_HINT_STORAGE_KEY = 'orca.workspaceBoardMovedHintSeen.v1'
@@ -119,9 +120,11 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
               collisionPadding={8}
               collisionBoundary={sidebar}
               // Why hidden on close: a fading hint would still lie over the drawer and take its Escape.
-              className={`max-w-(--radix-tooltip-content-available-width)${
-                workspaceBoardMovedHintOpen ? ' data-[state=closed]:hidden' : ''
-              }`}
+              // Why cn: Tailwind does not extract a class glued to a template `${`, so the cap went missing (ORCA-1256).
+              className={cn(
+                'max-w-(--radix-tooltip-content-available-width)',
+                workspaceBoardMovedHintOpen && 'data-[state=closed]:hidden'
+              )}
             >
               {workspaceBoardMovedHintOpen
                 ? translate(

@@ -176,6 +176,40 @@ describe('SidebarToolbar moved workspace board hint', () => {
     }
   })
 
+  // ORCA-1256: a hint opened over the Help menu became the top layer and took the Escape meant for the menu.
+  it('keeps the moved hint closed while a menu or dialog is open', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'elementFromPoint').mockImplementation(() => null)
+    mocks.state = {
+      persistedUIReady: true,
+      featureInteractions: {
+        'workspace-board': { firstInteractedAt: 100, interactionCount: 2 }
+      }
+    }
+    try {
+      const { container } = await renderToolbar()
+      expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+
+      for (const role of ['menu', 'dialog']) {
+        const layer = document.createElement('div')
+        layer.setAttribute('role', role)
+        document.body.appendChild(layer)
+        await act(async () => {
+          vi.advanceTimersByTime(250)
+        })
+        expect(container.textContent).not.toContain('Workspace board moved to the bottom bar')
+
+        layer.remove()
+        await act(async () => {
+          vi.advanceTimersByTime(250)
+        })
+        expect(container.textContent).toContain('Workspace board moved to the bottom bar')
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Why: the toolbar is a React.memo boundary whose props never change on a
   // language switch, so without its own useTranslation() subscription it keeps
   // the English copy it rendered at boot (the persisted locale is applied

@@ -134,6 +134,32 @@ test('below the column breakpoint the right panel is a drawer that a scrim or Es
   await expect(orcaPage.locator(DRAWER)).toHaveCount(0)
   await expect(orcaPage.locator(SCRIM)).toHaveCount(0)
 
+  // ORCA-1256: narrowing with the panel open, or starting narrow with it open, floats it with no scrim.
+  await orcaPage.setViewportSize({ width: 390, height: 844 })
+  await expect(orcaPage.locator(DRAWER)).toBeVisible()
+  await expect(orcaPage.locator(SCRIM)).toHaveCount(0)
+  // Why: the UI writer is debounced; reload only once the open state is on disk, or it restores closed.
+  await expect
+    .poll(() => orcaPage.evaluate(() => window.api.ui.get().then((ui) => ui.rightSidebarOpen)))
+    .toBe(true)
+  await orcaPage.reload({ waitUntil: 'domcontentloaded' })
+  await orcaPage.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
+  await waitForSessionReady(orcaPage)
+  await expect
+    .poll(() => orcaPage.evaluate(() => window.__store!.getState().rightSidebarOpen))
+    .toBe(true)
+  await expect(orcaPage.locator(DRAWER)).toBeVisible()
+  await expect(orcaPage.locator(SCRIM)).toHaveCount(0)
+  // Read the hit point rather than click, so no Help tooltip is left over the later captures.
+  const helpReachable = await orcaPage
+    .getByRole('button', { name: 'Help', exact: true })
+    .evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return Boolean(hit && node.contains(hit))
+    })
+  expect(helpReachable, 'the restored panel blocks the Help button').toBe(true)
+
   for (const width of CAPTURE_WIDTHS) {
     await orcaPage.setViewportSize({ width, height: 844 })
     for (const theme of ['dark', 'light'] as const) {

@@ -80,6 +80,7 @@ function RightSidebarInner(): React.JSX.Element {
       leftSidebarWidth: leftSidebarOpen ? leftSidebarWidth : 0,
       rightPanelWidth: renderedRightSidebarWidth + activityBarSideWidth
     })
+  const persistedUIReady = useAppStore((s) => s.persistedUIReady)
   const { containerRef, onResizeStart } = useSidebarResize<HTMLDivElement>({
     isOpen: rightSidebarOpen,
     width: renderedRightSidebarWidth,
@@ -94,6 +95,7 @@ function RightSidebarInner(): React.JSX.Element {
   const drawer = useRightSidebarDrawer({
     open: rightSidebarOpen,
     overlay: overlaysContent,
+    ready: persistedUIReady,
     containerRef,
     onDismiss: closeDrawer
   })
