@@ -145,6 +145,27 @@ describe('Machines board rows (ORCA-1252)', () => {
     expect(row.textContent).not.toContain('1 slots')
   })
 
+  // Why: these lines tell the person what to do, so an ellipsis would hide the instruction.
+  it('never cuts the status or the note that says what to do', () => {
+    const row = rowOf(
+      mount([
+        machine('unready', {
+          launch: { kind: 'unregistered', project: 'lab', reason: 'not here' },
+          status: 'attention'
+        })
+      ]),
+      'unready'
+    )
+    const status = row.querySelector('[data-team-machine-status]')
+    const note = row.querySelector('[data-team-machine-launch]')
+
+    expect(status?.textContent).toContain('Not registered')
+    expect(
+      row.querySelector('[data-team-machine-status] .truncate, [data-team-machine-status].truncate')
+    ).toBeNull()
+    expect(note?.className).not.toMatch(/line-clamp|truncate/)
+  })
+
   it('names a low workspaces disk in the warning tone', () => {
     const low = machine('tight', { reading: reading({ workspaceDiskFree: 6 * GB }) })
     const row = rowOf(mount([low]), 'tight')

@@ -192,6 +192,21 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
               names.filter((one) => one.scrollWidth > one.clientWidth).map((one) => one.textContent)
             )
           expect.soft(cutNames, `host names cut: ${label}`).toEqual([])
+          // Why: the status and the launch note say what to do; an ellipsis hid them at 320 and 390.
+          const cutSentences = await panel
+            .locator('[data-team-machine-status], [data-team-machine-launch]')
+            .evaluateAll((lines) =>
+              lines
+                .filter((line) =>
+                  [line, ...line.querySelectorAll('*')].some(
+                    (one) =>
+                      one.scrollWidth > one.clientWidth + 1 ||
+                      one.scrollHeight > one.clientHeight + 1
+                  )
+                )
+                .map((one) => one.textContent)
+            )
+          expect.soft(cutSentences, `status or note cut: ${label}`).toEqual([])
           if (CAPTURE_EVIDENCE) {
             await panel.screenshot({
               animations: 'disabled',

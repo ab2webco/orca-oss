@@ -220,21 +220,21 @@ function MachineRow({
           <TeamHostName host={machine.host} />
         </b>
         <span
+          data-team-machine-status
           className={cn('ml-auto inline-flex min-w-0 max-w-full items-center gap-1.5 text-[12px]', {
             [statusToneTextClass(tone)]: shown !== 'idle',
             'text-muted-foreground': shown === 'idle'
           })}
         >
           <TeamStatusMark status={shown} />
-          <span className="truncate">{statusWord(machine, warnings)}</span>
+          {/* Why wrap, never cut: the status and the note below say what to do. */}
+          <span className="min-w-0 break-words">{statusWord(machine, warnings)}</span>
         </span>
       </CollapsibleTrigger>
       {note ? (
         <small
           data-team-machine-launch={machine.launch.kind}
-          className={cn('break-words text-[12px] text-muted-foreground', {
-            'line-clamp-2': !open
-          })}
+          className="break-words text-[12px] text-muted-foreground"
         >
           {note}
         </small>
