@@ -17505,7 +17505,8 @@
         "branch": "Branch",
         "tool": "Last tool",
         "modelChoice": "Model choice",
-        "hostWorktreeMissing": "Add the host's repository to this window to open its terminal."
+        "hostWorktreeMissing": "Add the host's repository to this window to open its terminal.",
+        "steward": "Steward"
       },
       "usage": {
         "session": "5 h",
@@ -17689,6 +17690,26 @@
       },
       "inferredFromTicket": "Inferred from the ticket: {{kind}}",
       "leadDefault": "Lead default: {{kind}}"
+    },
+    "steward": {
+      "moment": {
+        "edit": "editing code",
+        "testLoop": "the same test failed twice",
+        "prCi": "watching the PR and CI",
+        "captures": "taking or reading captures",
+        "quota": "a usage window is past 85 %",
+        "plan": "the lead's plan",
+        "judged": "judged by Haiku"
+      },
+      "keptOverride": "kept the model you chose ({{steward}})",
+      "keptPinned": "kept the model pinned at launch ({{steward}})",
+      "failed": "could not judge, kept the model ({{steward}})",
+      "chosen": "Chosen by {{steward}}",
+      "reason": "{{reason}} ({{steward}})",
+      "following": "Following the plan · {{phase}}",
+      "deviated": "Off the plan · {{phase}}",
+      "timing": "A new model applies from the next step, a new effort from the next turn.",
+      "notApplied": "not applied"
     }
   },
   "claudeDeadHooks": {

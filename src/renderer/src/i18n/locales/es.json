@@ -16525,7 +16525,8 @@
         "branch": "Rama",
         "tool": "Última herramienta",
         "modelChoice": "Elección del modelo",
-        "hostWorktreeMissing": "Agrega el repositorio del host a esta ventana para abrir su terminal."
+        "hostWorktreeMissing": "Agrega el repositorio del host a esta ventana para abrir su terminal.",
+        "steward": "Administrador"
       },
       "usage": {
         "session": "5 h",
@@ -16709,6 +16710,26 @@
       },
       "inferredFromTicket": "Inferido del ticket: {{kind}}",
       "leadDefault": "Por defecto del lead: {{kind}}"
+    },
+    "steward": {
+      "moment": {
+        "edit": "editando código",
+        "testLoop": "la misma prueba falló dos veces",
+        "prCi": "vigilando el PR y la CI",
+        "captures": "tomando o leyendo capturas",
+        "quota": "una ventana de uso pasó el 85 %",
+        "plan": "el plan del lead",
+        "judged": "juzgado por Haiku"
+      },
+      "keptOverride": "mantuvo el modelo que elegiste ({{steward}})",
+      "keptPinned": "mantuvo el modelo fijado al lanzar ({{steward}})",
+      "failed": "no pudo juzgar, mantuvo el modelo ({{steward}})",
+      "chosen": "Elegido por {{steward}}",
+      "reason": "{{reason}} ({{steward}})",
+      "following": "Sigue el plan · {{phase}}",
+      "deviated": "Fuera del plan · {{phase}}",
+      "timing": "Un modelo nuevo aplica desde el siguiente paso, un esfuerzo nuevo desde el siguiente turno.",
+      "notApplied": "no aplicado"
     }
   },
   "claudeDeadHooks": {

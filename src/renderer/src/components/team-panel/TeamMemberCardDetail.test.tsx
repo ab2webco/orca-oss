@@ -100,6 +100,59 @@ describe('TeamMemberCardDetail', () => {
     expect(text(container, '[data-team-detail="tool"] dd')).toContain('pnpm test')
   })
 
+  it("shows the Orca steward's credit, its plan line and latest moves (ORCA-1242)", async () => {
+    const container = await render(
+      card({
+        model: {
+          label: 'Opus 5.5',
+          effort: 'high',
+          source: 'steward',
+          credit: {
+            by: 'steward',
+            from: 'Sonnet 5.5',
+            reason: 'edit',
+            phase: 'implement',
+            kept: null,
+            failed: false
+          }
+        },
+        steward: {
+          phase: 'implement',
+          plan: 'deviated',
+          steps: [
+            {
+              at: NOW,
+              moment: 'plan',
+              from: 'Haiku 5.5 · low',
+              to: 'Sonnet 5.5 · medium',
+              applied: true
+            },
+            {
+              at: NOW,
+              moment: 'edit',
+              from: 'Sonnet 5.5 · medium',
+              to: 'Opus 5.5 · high',
+              applied: false
+            }
+          ]
+        }
+      })
+    )
+    expect(text(container, '[data-team-detail="modelChoice"] dd')).toBe(
+      'editing code (Orca steward)'
+    )
+    expect(text(container, '[data-team-steward-plan]')).toBe('Off the plan · implement')
+    const steps = [...container.querySelectorAll('[data-team-steward-step]')].map(
+      (one) => one.textContent
+    )
+    expect(steps).toHaveLength(2)
+    expect(steps[0]).toContain("the lead's plan · Haiku 5.5 · low → Sonnet 5.5 · medium")
+    expect(steps[1]).toMatch(
+      /editing code · Sonnet 5\.5 · medium → Opus 5\.5 · high \(not applied\)$/
+    )
+    expect(text(container, '[data-team-detail="steward"] dd')).toContain('next turn')
+  })
+
   it('cuts a long branch in the middle, keeping the ticket part whole', async () => {
     const container = await render(card({ branch: 'fabolivark/netsa-121-auth' }))
     const parts = [...container.querySelectorAll('[data-team-detail="branch"] dd code > span')]

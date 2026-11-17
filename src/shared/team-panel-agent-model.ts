@@ -4,6 +4,12 @@ import type { GameAgent } from './orchestrator-game-state'
 import type { GameLaunchChosenBy, GameTicketKind } from './orchestrator-game-ticket-kind'
 import { advisorReasonNamesIt, TEAM_ADVISOR_NAME } from './team-model-advisor-words'
 import type { TeamModel, TeamModelCredit } from './team-panel-model-types'
+import {
+  teamStewardCreditEnglish,
+  teamStewardCreditOf,
+  teamStewardLabelOf,
+  type TeamStewardCredit
+} from './team-panel-steward'
 
 const ADVISOR_LINE_SEPARATOR = ' · '
 
@@ -39,11 +45,21 @@ const advisorCreditOf = (advisor: GameMemberAdvisor, served: string): TeamModelC
  * exists (ORCA-851).
  */
 export const teamAgentModelOf = (
-  agent: Pick<GameAgent, 'advisor' | 'launch'>,
+  agent: Pick<GameAgent, 'advisor' | 'launch' | 'steward'>,
   fallback?: { model?: string; effort?: string }
 ): TeamModel | null => {
   const served = agent.launch?.source === 'session' && agent.launch.model ? agent.launch : null
-  const { advisor } = agent
+  const { advisor, steward } = agent
+  // Why before Jev: the steward picks only while Jev's router rewrites nothing, and says when it does.
+  if (steward?.model && steward.standDown !== 'router') {
+    const label = served?.model ?? teamStewardLabelOf(steward.model)
+    return {
+      label,
+      effort: served ? served.effort : steward.effort,
+      source: served ? 'session' : 'steward',
+      credit: teamStewardCreditOf(steward, label)
+    }
+  }
   if (advisor && (served?.model || advisor.model)) {
     const label = served?.model ?? advisor.model ?? ''
     return {
@@ -76,6 +92,7 @@ export function teamModelLabelText(model: TeamModel): string {
 }
 
 export type TeamModelCreditWords = {
+  steward: (credit: TeamStewardCredit) => string
   chosenByAdvisor: string
   advisorReason: (reason: string) => string
   /** `source`: the lead named the kind, Orca read it from the ticket title, or it is the default. */
@@ -96,6 +113,7 @@ const ENGLISH_KIND_SOURCE_WORDS: Record<GameLaunchChosenBy['source'], string> = 
 }
 
 const ENGLISH_CREDIT_WORDS: TeamModelCreditWords = {
+  steward: teamStewardCreditEnglish,
   chosenByAdvisor: `Chosen by ${TEAM_ADVISOR_NAME}`,
   advisorReason: (reason) => `${reason} (${TEAM_ADVISOR_NAME})`,
   chosenByLead: (kind, source) =>
@@ -113,6 +131,9 @@ export function teamModelCreditTextOf(
   if (credit.by === 'lead') {
     return words.chosenByLead(credit.reason, credit.source)
   }
+  if (credit.by === 'steward') {
+    return words.steward(credit)
+  }
   if (!credit.reason) {
     return words.chosenByAdvisor
   }
@@ -120,7 +141,7 @@ export function teamModelCreditTextOf(
 }
 
 /** A member's model and who chose it as the CLI prints them; null where its host sent none. */
-export function gameMemberModelTextOf(agent: Pick<GameAgent, 'advisor' | 'launch'>): {
+export function gameMemberModelTextOf(agent: Pick<GameAgent, 'advisor' | 'launch' | 'steward'>): {
   model: string | null
   modelBy: string | null
 } {
