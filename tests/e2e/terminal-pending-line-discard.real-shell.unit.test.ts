@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IPty } from 'node-pty'
@@ -24,6 +24,8 @@ const SHELLS = [
 
 let proc: IPty | null = null
 let home: string | null = null
+let exited: { exitCode: number; signal?: number } | null = null
+let spawnedAt = 0
 
 afterEach(() => {
   try {
@@ -32,17 +34,54 @@ afterEach(() => {
     // already gone
   }
   proc = null
+  exited = null
   if (home) {
     rmSync(home, { recursive: true, force: true })
     home = null
   }
 })
 
+// Why no larger budget (ORCA-1246): bash prompts in 5-11 ms idle and 11-43 ms on 4x oversubscribed
+// CPUs, so 5 s of silence is a spawn or reader fault, and the diagnosis below names which.
 async function waitFor(read: () => string, predicate: (output: string) => boolean): Promise<void> {
   const deadline = Date.now() + 5_000
-  while (!predicate(read()) && Date.now() < deadline) {
+  while (!predicate(read()) && !exited && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
+  // Why: a stall past the deadline resumes in the timers phase, before the pty's pending reads.
+  await new Promise((resolve) => setImmediate(resolve))
+}
+
+function procState(pid: number): string {
+  if (process.platform !== 'linux') {
+    return 'n/a'
+  }
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const wchan = readFileSync(`/proc/${pid}/wchan`, 'utf8')
+    return `${stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0]} wchan=${wchan || '0'}`
+  } catch {
+    return 'gone'
+  }
+}
+
+function describePty(pty: IPty, output: string, what: string): string {
+  let alive = false
+  try {
+    process.kill(pty.pid, 0)
+    alive = true
+  } catch {
+    // not running
+  }
+  return `${what}: ${JSON.stringify({
+    pid: pty.pid,
+    alive,
+    state: procState(pty.pid),
+    exit: exited,
+    bytes: output.length,
+    elapsedMs: Date.now() - spawnedAt,
+    tail: output.slice(-300)
+  })}`
 }
 
 describe.skipIf(SHELLS.length === 0)('pending line discard against a real shell', () => {
@@ -62,6 +101,10 @@ describe.skipIf(SHELLS.length === 0)('pending line discard against a real shell'
         PS1: PROMPT
       }
     })
+    spawnedAt = Date.now()
+    proc.onExit((event) => {
+      exited = event
+    })
     let output = ''
     proc.onData((chunk) => {
       output += chunk
@@ -69,16 +112,19 @@ describe.skipIf(SHELLS.length === 0)('pending line discard against a real shell'
     const read = (): string => output
 
     await waitFor(read, (text) => text.includes(PROMPT))
-    expect(output, 'shell never printed its prompt').toContain(PROMPT)
+    expect(output, describePty(proc, output, 'shell never printed its prompt')).toContain(PROMPT)
     const beforeJunk = output.length
     proc.write(SHIFT_ENTER_CSI_U)
     await waitFor(read, (text) => text.slice(beforeJunk).includes('2u'))
-    expect(output.slice(beforeJunk), 'shell never echoed the CSI-u remainder').toContain('2u')
+    expect(
+      output.slice(beforeJunk),
+      describePty(proc, output, 'shell never echoed the CSI-u remainder')
+    ).toContain('2u')
 
     // Why one write: the IPC hop and the line discipline can hand both chunks to the shell
     // in one read, the worst case of the race; separate writes only lose it sometimes.
     proc.write(buildPendingLineDiscardInputSequence(RESET_COMMAND).join(''))
     await waitFor(read, (text) => text.includes(RESET_OUTPUT))
-    expect(output, JSON.stringify(output.slice(-300))).toContain(RESET_OUTPUT)
+    expect(output, describePty(proc, output, 'reset never ran')).toContain(RESET_OUTPUT)
   })
 })
