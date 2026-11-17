@@ -98,6 +98,22 @@ export const gameArcadeMigrateArgvOf = (
     : [path, 'game', 'arcade', 'migrate', '--offers', JSON.stringify(offers), '--json']
 }
 
+/** Reports the rewards this pane toasted, so the lead's panel bar moves with them (ORCA-1264). */
+export const gameXpArgvOf = (
+  cli: string | null | undefined,
+  rewards: readonly { id: string; kind: string; xp: number; label: string }[]
+): readonly string[] | undefined => {
+  const path = cliOf(cli)
+  // Why the host's bounds: one reward it would refuse must not cost the others.
+  const sent = rewards
+    .filter((one) => one.id.length <= 400)
+    .slice(0, 50)
+    .map(({ id, kind, xp, label }) => ({ id, kind, xp, label: label.slice(0, 200) }))
+  return path === undefined
+    ? undefined
+    : [path, 'game', 'xp', '--rewards', JSON.stringify(sent), '--json']
+}
+
 export const gameWatchArgvOf = (cli: string | null | undefined): readonly string[] | undefined => {
   const path = cliOf(cli)
   return path === undefined ? undefined : [path, 'game', 'watch']

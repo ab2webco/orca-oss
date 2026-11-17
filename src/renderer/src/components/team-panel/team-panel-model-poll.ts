@@ -27,7 +27,7 @@ export type TeamPanelPollDeps = {
     target: RuntimeClientTarget,
     caller: TeamLeadCaller
   ) => Promise<GameOwnerQuestion[] | null>
-  /** The project's characters XP summed; null when the host keeps no list. */
+  /** The project's characters XP summed, for a host older than `teamXp`; null when it keeps no list. */
   readXp: (target: RuntimeClientTarget, caller: TeamLeadCaller) => Promise<number | null>
   modelOf: (args: {
     repoId: string
@@ -152,7 +152,10 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         caller && state
           ? await Promise.all([
               deps.readQuestions(scope.target, caller).catch(() => null),
-              deps.readXp(scope.target, caller).catch(() => null)
+              // Why the state's first: it counts every reward the mod toasted; an older host sends none.
+              state.teamXp
+                ? state.teamXp.total
+                : deps.readXp(scope.target, caller).catch(() => null)
             ])
           : [null, null]
       const model = state

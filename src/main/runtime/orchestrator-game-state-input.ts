@@ -26,6 +26,7 @@ import type {
 import type { GlobalSettings } from '../../shared/types'
 import type { GameMerge } from '../../shared/orchestrator-game-events'
 import type { GameArcadeCredits } from '../../shared/orchestrator-game-arcade-credits'
+import type { GameTeamXp } from '../../shared/orchestrator-game-team-xp'
 import type { GameStop } from '../../shared/orchestrator-game-stop-state'
 import type { GameInboxSummary } from '../../shared/orchestrator-game-inbox'
 import type { GameGitHubBudget } from '../../shared/orchestrator-game-github-budget'
@@ -110,6 +111,8 @@ export type OrchestratorGameStateInput = {
   readMerges?: () => Promise<GameMerge[]>
   /** The project's saved arcade plays; read only for a lead. */
   readArcade?: () => Promise<GameArcadeCredits | null>
+  /** The team's XP the panel bar and the mod's score line show; read only for a lead. */
+  readTeamXp?: () => Promise<GameTeamXp>
   /** The view the host's resources suggest; absent leaves `suggestedView` out. */
   suggestedView?: () => Promise<OrchestratorGameViewId | undefined>
   /** github.com's budget and Orca's share of it; absent leaves `githubBudget` out. */

@@ -6,11 +6,12 @@ import { syncActionCommands } from './action-commands'
 import { ADVISOR_REPORT_ENV, advisorPinsOf, advisorReportOf, withSteward } from './advisor-report'
 import { advisorLogOf, readJevAdvisor } from './advisor-state'
 import { celebrateArcadeOnUnlock, migrateKeptArcadeOffers } from './arcade-unlock'
-import { cliInvocationOf } from './cli-invocation'
+import { runCli } from './orca-cli-run'
 import {
   gameArcadeMigrateArgvOf,
   gameFleetArgvOf,
   gameHideTabArgvOf,
+  gameXpArgvOf,
   gameStateArgvOf,
   gameViewArgvOf,
   openLinkArgvOf,
@@ -40,12 +41,13 @@ import {
 import { fleetNoteOf } from './fleet-age'
 import { earnedRewardsOf } from './fleet-rewards'
 import { RECENT_KEY, recentRewardsOf, withRecent } from './recent-rewards'
-import { awardXp, levelOf, signedXpOf, xpLedgerOf } from './rewards'
+import { awardXp, hostTeamXpOf, levelOf, signedXpOf, xpLedgerOf, type Reward } from './rewards'
 import { setContributedScenes } from './scenes/index'
+
+export { runCli }
 
 export const POLL_EVERY_MS = 30000
 const STUCK_MS = 60000
-const CLI_TIMEOUT_MS = 15000
 // Why longer: a lead's state reads GitHub and paired hosts, and a cut read only keeps the old fleet.
 const STATE_TIMEOUT_MS = 45000
 // Why sooner than the poll: a failed read leaves the band drawing an old fleet.
@@ -60,26 +62,6 @@ export const fleet = atom({ plugin: 'orca-game', key: 'fleet' } as const, EMPTY)
 async function readFleet($: EngineInterface): Promise<FleetState> {
   const v = await read($, fleet)
   return { ...v, state: v.state === null ? null : (gameStateOf(v.state) ?? null) }
-}
-
-/** Runs the Orca CLI, through cmd.exe when Orca handed a Windows batch file; undefined when it could not. */
-export async function runCli(
-  $: EngineInterface,
-  argv: readonly string[] | undefined,
-  extraEnv: Record<string, string> = {},
-  timeoutMs = CLI_TIMEOUT_MS
-) {
-  if (argv === undefined) {
-    return undefined
-  }
-  const comspec = await $.env.get('ComSpec').catch(() => undefined)
-  const invocation = cliInvocationOf(argv, comspec)
-  if (invocation === undefined) {
-    return undefined
-  }
-  const env = { ...invocation.env, ...extraEnv }
-  const init = Object.keys(env).length > 0 ? { timeoutMs, env } : { timeoutMs }
-  return await $.process.run(invocation.argv, init).catch(() => undefined)
 }
 
 // Module state: whether Orca holds a report from this pane that a Jev gone quiet must take back.
@@ -214,6 +196,16 @@ async function migrateTabsOnce($: EngineInterface, state: GameState): Promise<vo
 
 type Score = { xp: number; recent: readonly RecentReward[] }
 
+/** The lead's team total after this pane's rewards; undefined when Orca keeps none. */
+async function reportXp(
+  $: EngineInterface,
+  awarded: readonly Reward[]
+): Promise<number | undefined> {
+  const cli = await $.env.get('ORCA_GAME_CLI').catch(() => undefined)
+  const out = await runCli($, gameXpArgvOf(cli, awarded))
+  return out?.exitCode === 0 ? hostTeamXpOf(out.stdout) : undefined
+}
+
 async function syncXp(
   $: EngineInterface,
   before: GameState | null,
@@ -226,9 +218,12 @@ async function syncXp(
   const earned = earnedRewardsOf(before, next)
   const now = await $.clock.now()
   const { ledger, awarded } = awardXp(stored, earned, now)
+  // Why the host's total: the panel's level bar shows it, and the score line must agree (ORCA-1264).
   if (awarded.length === 0) {
-    return { xp: stored.total, recent: kept }
+    return { xp: next.teamXp?.total ?? stored.total, recent: kept }
   }
+  const xp = (await reportXp($, awarded)) ?? next.teamXp?.total ?? ledger.total
+  const gained = awarded.reduce((total, one) => total + one.xp, 0)
   const recent = withRecent(kept, awarded, now)
   await $.store.set(XP_KEY, ledger).catch(() => undefined)
   await $.store.set(RECENT_KEY, recent).catch(() => undefined)
@@ -240,13 +235,12 @@ async function syncXp(
   if (merged !== undefined) {
     raiseTeamEvent($, 'merged', art.mergedFloat(merged))
   } else {
-    const sum = awarded.reduce((total, one) => total + one.xp, 0)
-    raiseTeamEvent($, 'xp', `${signedXpOf(sum)} ${art.xp}`)
+    raiseTeamEvent($, 'xp', `${signedXpOf(gained)} ${art.xp}`)
   }
-  if (levelOf(ledger.total).level > levelOf(stored.total).level) {
+  if (levelOf(xp).level > levelOf(xp - gained).level) {
     clawdReact($, 'level')
   }
-  return { xp: ledger.total, recent }
+  return { xp, recent }
 }
 
 export async function refresh($: EngineInterface): Promise<void> {

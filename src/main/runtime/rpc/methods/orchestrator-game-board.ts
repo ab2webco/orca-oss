@@ -8,6 +8,10 @@ import {
   GAME_OWNER_QUESTION_TEXT_MAX
 } from '../../../../shared/orchestrator-game-owner-questions'
 import { GAME_ARCADE_ACTIONS } from '../../../../shared/orchestrator-game-arcade-credits'
+import {
+  GAME_REWARD_KINDS,
+  GAME_REWARD_WEIGHT_MAX
+} from '../../../../shared/orchestrator-game-reward-weights'
 
 // Why the caller's worktree or terminal: the board belongs to the lead's project, and a member's to its lead's.
 const Caller = {
@@ -58,6 +62,22 @@ const GameArcadeParams = z
     message: 'migrate needs the offers to pay',
     path: ['offers']
   })
+
+// Why rewards optional: without them the call only reads the team's XP.
+const GameXpAwardParams = z.object({
+  ...Caller,
+  rewards: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(400),
+        kind: z.enum(GAME_REWARD_KINDS),
+        xp: z.number().int().min(-GAME_REWARD_WEIGHT_MAX).max(GAME_REWARD_WEIGHT_MAX),
+        label: z.string().max(200)
+      })
+    )
+    .max(50)
+    .optional()
+})
 
 const GameInboxParams = z
   .object({
@@ -143,6 +163,22 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
       return params.action === 'migrate'
         ? ledger.migrate(caller, params.offers ?? [])
         : ledger.apply(caller, params.action)
+    }
+  }),
+  defineMethod({
+    name: 'game.xp',
+    params: GameXpAwardParams,
+    handler: async (params, { runtime }) => {
+      const ledger = runtime.getGameTeamXp()
+      const caller = { worktreeId: params.worktreeId, terminalHandle: params.terminalHandle }
+      if (!params.rewards?.length) {
+        return { added: 0, teamXp: await ledger.read(caller) }
+      }
+      const result = await ledger.award(caller, params.rewards)
+      if (result.added > 0) {
+        runtime.noteGameFleetChanged()
+      }
+      return result
     }
   }),
   defineMethod({

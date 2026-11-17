@@ -156,6 +156,20 @@ export class GameHistoryStore {
     return result as R
   }
 
+  /** `change` sees the team XP rows (ORCA-1264) and the characters; null rows leave the file. */
+  async changeTeamXp<R>(
+    projectKey: string,
+    change: (raw: unknown, characters: Record<string, unknown>) => { next: unknown; result: R }
+  ): Promise<R> {
+    let result: R | undefined
+    await this.update(projectKey, (current) => {
+      const { next, result: changed } = change(current.data.teamXp, current.characters ?? {})
+      result = changed
+      return next === null ? null : { ...current, data: { ...current.data, teamXp: next } }
+    })
+    return result as R
+  }
+
   async arcade(projectKey: string): Promise<GameArcadeCredits> {
     return parseGameArcadeCredits((await this.read(projectKey)).log.arcade)
   }

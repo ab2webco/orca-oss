@@ -12,6 +12,14 @@ export type GameRewardKind = (typeof GAME_REWARD_KINDS)[number]
 
 export type GameRewardWeights = Record<GameRewardKind, number>
 
+/** A reward as the mod toasted it: `+xp XP · label`. */
+export type GameXpReward = { id: string; kind: GameRewardKind; xp: number; label: string }
+
+export type GameXpAward = GameXpReward & { at: number }
+
+/** The team (ORCA-1264)'s XP and its newest awards, newest first. */
+export type GameTeamXp = { total: number; recent: GameXpAward[] }
+
 export const DEFAULT_GAME_REWARD_WEIGHTS: Readonly<GameRewardWeights> = {
   'review-merged': 100,
   'ci-green': 20,
