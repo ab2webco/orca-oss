@@ -1,5 +1,5 @@
 ---
-sourceHash: 8cb24c7fc9b86213
+sourceHash: 311dc9a728cf111a
 ---
 # Primeros pasos
 
@@ -25,7 +25,7 @@ comandos sin preguntarte antes. Desmárcalo si quieres aprobar cada uno.
 
 Un agente que ya tiene la sesión iniciada en esta máquina funciona tal cual. Para tener varias
 cuentas y ver cuánto le queda del límite a cada una, abre **Settings > AI Provider Accounts** y
-elige **Add account**. [Uso y cuentas](agents/usage-tracking.md) explica cómo cambiar de cuenta y
+elige **Add Account**. [Uso y cuentas](agents/usage-tracking.md) explica cómo cambiar de cuenta y
 los tokens de larga duración.
 
 ## 3. Abre un repositorio

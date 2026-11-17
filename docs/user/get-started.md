@@ -22,7 +22,7 @@ without asking you first. Untick it if you want to approve each one.
 
 An agent that is already signed in on this machine works as it is. To keep several accounts and
 see how much of each one's limit is left, open **Settings > AI Provider Accounts** and choose
-**Add account**. [Usage tracking and accounts](agents/usage-tracking.md) covers switching and
+**Add Account**. [Usage tracking and accounts](agents/usage-tracking.md) covers switching and
 long-lived tokens.
 
 ## 3. Open a repository
