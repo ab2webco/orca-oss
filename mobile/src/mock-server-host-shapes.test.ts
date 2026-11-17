@@ -6,6 +6,7 @@ import {
   MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY
 } from '../../src/shared/protocol-version'
+import { teamMachineGaugesOf, teamMachineWarningsOf } from '../../src/shared/team-machine-board'
 import { claudeTokenAccountStatusOf } from './accounts/claude-token-account'
 import { agentTeamsSettingsOf } from './agent-teams-settings/agent-teams-settings-model'
 import { AccountsSnapshotSchema } from './components/accounts-snapshot'
@@ -14,6 +15,7 @@ import { readNewTabTeam } from './new-tab-team/new-tab-team-read'
 import { reopenTeamLeadFromPhone } from './new-tab-team/new-tab-team-reopen'
 import { readLeadXp } from './team-drawer/team-drawer-rpc'
 import { teamLeadViewOf } from './team-drawer/team-drawer-model'
+import { teamSheetWorkOf } from './team-drawer/team-sheet-work'
 import { isTerminalSendRpcAccepted } from './terminal/terminal-send-rpc-response'
 import type { RpcClient } from './transport/rpc-client'
 import type { RpcResponse } from './transport/types'
@@ -100,7 +102,69 @@ describe('mock host answers in the host shapes mobile reads', () => {
     expect(roster?.todo.map((one) => one.identifier)).toEqual(['ACME-221', 'ACME-224', 'ACME-230'])
     expect(roster?.hosts).toEqual([
       { on: null, running: 3, cap: 5 },
-      { on: 'mac-studio', running: 2, cap: 4 }
+      { on: 'mac-studio', running: 2, cap: 4 },
+      { on: 'render-node', running: 2, cap: 3 },
+      { on: 'atelier', running: 0, cap: 4 },
+      { on: 'veteran', running: 0, cap: 2 }
+    ])
+  })
+
+  it('draws a calm, a busy, a refused, an older and an offline host in the Hosts tab', async () => {
+    const state = await resultOf('game.state', { worktreeId: await activeWorktreeId() })
+    const { machines } = teamSheetWorkOf(state, [], 'en', Date.now())
+    const list = machines?.kind === 'ready' ? machines.value : []
+    const shapes = list.map((one) => ({
+      name: one.host.kind === 'local' ? 'local' : one.host.name,
+      reading: one.reading.kind,
+      launch: one.launch.kind,
+      gauges: teamMachineGaugesOf(one),
+      warnings: teamMachineWarningsOf(one)
+    }))
+
+    expect(shapes).toEqual([
+      {
+        name: 'local',
+        reading: 'ok',
+        launch: 'ready',
+        gauges: { cpu: 58, memory: 67, disk: 58 },
+        warnings: []
+      },
+      {
+        name: 'mac-studio',
+        reading: 'ok',
+        launch: 'ready',
+        gauges: { cpu: 14, memory: 38, disk: 30 },
+        warnings: []
+      },
+      {
+        name: 'render-node',
+        reading: 'ok',
+        launch: 'ready',
+        gauges: { cpu: 96, memory: 93, disk: 70 },
+        warnings: ['busy', 'lowMemory']
+      },
+      {
+        name: 'atelier',
+        reading: 'ok',
+        launch: 'unregistered',
+        gauges: { cpu: 7, memory: 38, disk: 36 },
+        warnings: []
+      },
+      // Why null: an Orca older than ORCA-1252 sends no CPU or disk, and the tab must say unknown, not 0.
+      {
+        name: 'veteran',
+        reading: 'ok',
+        launch: 'unknown',
+        gauges: { cpu: null, memory: 38, disk: null },
+        warnings: []
+      },
+      {
+        name: 'build-box-linux-02',
+        reading: 'unreachable',
+        launch: 'unknown',
+        gauges: null,
+        warnings: []
+      }
     ])
   })
 
