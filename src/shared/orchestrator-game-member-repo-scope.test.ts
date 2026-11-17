@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  gameHostLaunchOf,
   gameMemberRepoRefusalOf,
   memberRepoKeyOf,
   type GameRepoSummary
@@ -208,5 +209,53 @@ describe('gameMemberRepoRefusalOf for a fork (ORCA-1198)', () => {
         memberRepos: [upstream]
       })
     ).toBeNull()
+  })
+})
+
+describe('gameHostLaunchOf (ORCA-1207)', () => {
+  const upstream = 'github.com/stablyai/orca'
+  const leadFork = repo('r_orca', 'orca-oss', upstream, 'github.com/ab2webco/orca-oss')
+  const hostFork = repo('h_orca', 'orca-oss', 'github.com/ab2webco/orca-oss')
+  const upstreamClone = repo('h_up', 'orca-oss', upstream, null)
+
+  it('finds the project on a host that has its clone', () => {
+    expect(gameHostLaunchOf({ lead: leadFork, host: 'm1', repos: [front, hostFork] })).toEqual({
+      kind: 'ready',
+      repo: hostFork
+    })
+  })
+
+  it('names a host without the project as not registered (koombea)', () => {
+    expect(gameHostLaunchOf({ lead: leadFork, host: 'koombea', repos: [front] })).toEqual({
+      kind: 'unregistered',
+      project: 'orca-oss',
+      reason: expect.stringMatching(/orca-oss is not registered on koombea.*orca repo add/)
+    })
+  })
+
+  it('quotes the fork refusal for a clone named by the shared upstream (ORCA-1198)', () => {
+    expect(gameHostLaunchOf({ lead: leadFork, host: 'imac', repos: [upstreamClone] })).toEqual({
+      kind: 'refused',
+      reason: expect.stringMatching(/names github\.com\/stablyai\/orca, the upstream every fork/)
+    })
+  })
+
+  it('refuses every host for a lead whose project Orca cannot tell', () => {
+    expect(gameHostLaunchOf({ lead: null, host: 'm1', repos: [hostFork] }).kind).toBe('refused')
+  })
+
+  // Why: the tab and `game launch --on` must never disagree about a host.
+  it('says what game launch --on refuses with, minus the launch-only clause', () => {
+    for (const repos of [[front], [upstreamClone]]) {
+      const launch = gameHostLaunchOf({ lead: leadFork, host: 'm1', repos })
+      const refusal = gameMemberRepoRefusalOf({
+        read: { host: 'm1', lead: leadFork, repo: null, repos },
+        selector: 'name:orca-oss'
+      })
+      expect(launch.kind).not.toBe('ready')
+      expect(refusal).toBe(
+        `${launch.kind === 'ready' ? '' : launch.reason} No worktree was created.`
+      )
+    }
   })
 })

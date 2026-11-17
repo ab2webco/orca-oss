@@ -87,6 +87,34 @@ describe('gameHostCapacitiesOf', () => {
   })
 })
 
+describe('gameHostCapacitiesOf with launches (ORCA-1207)', () => {
+  const launches = new Map([
+    ['local', { kind: 'unanswered' as const }],
+    ['koombea', { kind: 'unregistered' as const, project: 'orca-oss', reason: 'not on koombea' }]
+  ])
+
+  it('carries each paired host its launch, and never one for this machine', () => {
+    const rows = gameHostCapacitiesOf(
+      [
+        { host: 'local', reading: { kind: 'ok', machine: local } },
+        { host: 'koombea', reading: { kind: 'ok', machine: imac } }
+      ],
+      [
+        { host: 'local', cap: 4, status: 'ok', running: 0, free: 4 },
+        { host: 'koombea', id: 'env_k', cap: 6, status: 'ok', running: 0, free: 6 },
+        { host: 'm1', id: 'env_m1', cap: 0, status: 'unreachable', running: 0, free: 0 }
+      ],
+      launches
+    )
+    expect(rows.map((one) => [one.host, one.launch])).toEqual([
+      ['local', undefined],
+      ['koombea', launches.get('koombea')],
+      ['m1', undefined]
+    ])
+    expect(rows[0]).not.toHaveProperty('launch')
+  })
+})
+
 describe('withGameHostCapacity', () => {
   const state = {
     role: 'lead',
@@ -152,6 +180,19 @@ describe('formatGameHostCapacity', () => {
       '  local  3/4 running · 10 cores · 9.0 of 16 GB free · load 2.1',
       '  imac   2 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory',
       '  m1     0/6 running · not answering'
+    ])
+  })
+
+  it('flags a paired host this lead cannot launch on, and says nothing for a ready one', () => {
+    const repo = { id: 'h', displayName: 'orca-oss', path: '/w', remoteKey: null }
+    expect(
+      formatGameHostCapacity([
+        { host: 'm1', running: 0, status: 'ok', ...imac, launch: { kind: 'ready', repo } },
+        { host: 'k', running: 0, status: 'ok', ...local, launch: { kind: 'refused', reason: 'x' } }
+      ]).slice(1)
+    ).toEqual([
+      '  m1  0 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory',
+      '  k   0 running · 10 cores · 9.0 of 16 GB free · load 2.1 · refused by repo scope'
     ])
   })
 

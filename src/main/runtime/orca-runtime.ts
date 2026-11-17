@@ -838,6 +838,12 @@ import {
   remoteWorktreeKeyOf
 } from './orchestrator-game-remote-found'
 import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import { GameHostLaunchReader, gameHostLaunchesOf } from './orchestrator-game-host-launch-reader'
+import {
+  gameRepoSummaryOf,
+  localGameRepoSummaryOf,
+  type GameRepoRecord
+} from './orchestrator-game-repo-summary'
 import { collectHostMemory } from '../memory/host-memory'
 import { GamePairedHostReader } from './orchestrator-game-paired-hosts'
 import { defaultGameMemberCapOf, type GameHostProfile } from '../../shared/orchestrator-game-lead'
@@ -3971,6 +3977,26 @@ export class OrcaRuntimeService {
         GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
         { marksSilence: false }
       )
+  })
+  // Why repo.list: every paired host answers it, so the Machines tab needs no wire change (ORCA-1207).
+  private readonly gameHostLaunches = new GameHostLaunchReader({
+    list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
+    readRepos: async (environmentId) =>
+      (
+        (await this.gameHostAnswers.call(
+          environmentId,
+          () =>
+            this.callOrchestrationWorkerServer(
+              environmentId,
+              'repo.list',
+              undefined,
+              GAME_HOST_CAPACITY_TIMEOUT_MS
+            ),
+          GAME_HOST_CAPACITY_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS,
+          { marksSilence: false }
+        )) as { repos: GameRepoRecord[] }
+      ).repos.map(gameRepoSummaryOf),
+    readLead: async (repoId) => await localGameRepoSummaryOf(await this.showRepo(`id:${repoId}`))
   })
   // Why worktree.ps: every paired host already answers it, so no wire change (ORCA-943).
   private readonly gameRemoteSessions = new RemoteHostSessionsReader({
@@ -32667,6 +32693,10 @@ export class OrcaRuntimeService {
       callerParentPaneKey || callerRole
         ? Promise.resolve(null)
         : this.gameHostCapacity.read().catch(() => null)
+    const hostRepos =
+      callerParentPaneKey || callerRole
+        ? Promise.resolve(null)
+        : this.gameHostLaunches.read(worktree?.repoId ?? null).catch(() => null)
     const state = await buildOrchestratorGameState({
       settings: this.store?.getSettings?.(),
       systemLocale: getPreferredSystemLocale(),
@@ -32881,7 +32911,12 @@ export class OrcaRuntimeService {
       withPaused,
       args.paneKey ? worktree?.repoId : undefined
     )
-    return withGameHostCapacity(visible, await hostReadings)
+    const repos = await hostRepos
+    return withGameHostCapacity(
+      visible,
+      await hostReadings,
+      repos ? gameHostLaunchesOf(repos, visible.lead?.memberRepos) : null
+    )
   }
 
   // Why last: an agent the lead dropped stays out however it was listed, found or member (ORCA-943).

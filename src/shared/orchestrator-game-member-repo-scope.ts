@@ -50,6 +50,75 @@ const ownKeyOf = (repo: GameRepoSummary): string | null =>
   repo.ownRemoteKey === undefined ? repo.remoteKey : repo.ownRemoteKey
 
 /**
+ * Whether a lead's members can start on a paired host, as `game launch --on` decides it, so the
+ * Machines tab never offers a host the launch refuses (ORCA-1207). `reason` is the launch's text.
+ */
+export type GameHostLaunch =
+  | { kind: 'ready'; repo: GameRepoSummary }
+  | { kind: 'unregistered'; project: string; reason: string }
+  | { kind: 'refused'; reason: string }
+  /** The host did not list its repos in time (ORCA-1199). */
+  | { kind: 'unanswered' }
+
+const NO_LEAD_PROJECT =
+  "Orca cannot tell this lead's project, so it launches no member with --repo."
+const NO_WORKTREE = ' No worktree was created.'
+const PROJECT_RULE =
+  'A lead launches members only into its own repo or a repo listed in orchestratorGame.orchestrator.memberRepos.'
+
+// Why own keys: a fork's identity is its upstream, which every other fork of it shares.
+function inProjectOf(
+  lead: GameRepoSummary,
+  host: string | null,
+  memberRepos: readonly string[] = []
+): (repo: GameRepoSummary) => boolean {
+  const leadKey = ownKeyOf(lead)?.toLowerCase() ?? null
+  const listed = memberRepos.flatMap((entry) => {
+    const key = memberRepoKeyOf(entry)
+    return key ? [key.toLowerCase()] : []
+  })
+  return (repo) =>
+    // Why only here: an id names a repo in one Orca's store, never the same one on another host.
+    (host === null && repo.id === lead.id) ||
+    (leadKey !== null && sameKey(ownKeyOf(repo), leadKey)) ||
+    listed.some((key) => sameKey(repo.remoteKey, key) || sameKey(ownKeyOf(repo), key))
+}
+
+/** The lead's project among a paired host's repos, or why a member cannot start there. */
+export function gameHostLaunchOf(args: {
+  lead: GameRepoSummary | null
+  host: string
+  repos: readonly GameRepoSummary[]
+  memberRepos?: readonly string[]
+}): Exclude<GameHostLaunch, { kind: 'unanswered' }> {
+  const { lead, host, repos } = args
+  if (lead === null) {
+    return { kind: 'refused', reason: NO_LEAD_PROJECT }
+  }
+  const own = repos.find(inProjectOf(lead, host, args.memberRepos))
+  if (own) {
+    return { kind: 'ready', repo: own }
+  }
+  const upstream = lead.remoteKey?.toLowerCase() ?? null
+  // A host clone named by its upstream may be this fork or any other one (ORCA-1198).
+  const namedByUpstream =
+    upstream === null
+      ? undefined
+      : repos.find((repo) => ownKeyOf(repo) === null && sameKey(repo.remoteKey, upstream))
+  if (namedByUpstream) {
+    return {
+      kind: 'refused',
+      reason: `${namedByUpstream.displayName} on ${host} names ${upstream}, the upstream every fork of it shares, so Orca cannot tell it is ${lead.displayName}'s clone. If it is, list ${upstream} in orchestratorGame.orchestrator.memberRepos.`
+    }
+  }
+  return {
+    kind: 'unregistered',
+    project: lead.displayName,
+    reason: `${lead.displayName} is not registered on ${host}, so no member can start there for it. With the owner's OK, clone it on ${host} and register it: orca repo add --path <path on ${host}> --environment ${host}.`
+  }
+}
+
+/**
  * Why a refusal text, not a boolean: a lead must launch only into its own project, the same scope as
  * ORCA-970, and say what to do instead of borrowing another project's repo (ORCA-1156).
  */
@@ -58,49 +127,30 @@ export function gameMemberRepoRefusalOf(args: {
   selector: string
   memberRepos?: readonly string[]
 }): string | null {
-  const { read, selector } = args
+  const { read, selector, memberRepos } = args
   const lead = read.lead
   if (lead === null) {
-    return "Orca cannot tell this lead's project, so it launches no member with --repo."
+    return NO_LEAD_PROJECT
   }
-  const leadKey = ownKeyOf(lead)?.toLowerCase() ?? null
-  const listed = (args.memberRepos ?? []).flatMap((entry) => {
-    const key = memberRepoKeyOf(entry)
-    return key ? [key.toLowerCase()] : []
-  })
-  // Why own keys: a fork's identity is its upstream, which every other fork of it shares.
-  const inProject = (repo: GameRepoSummary): boolean =>
-    // Why only here: an id names a repo in one Orca's store, never the same one on another host.
-    (read.host === null && repo.id === lead.id) ||
-    (leadKey !== null && sameKey(ownKeyOf(repo), leadKey)) ||
-    listed.some((key) => sameKey(repo.remoteKey, key) || sameKey(ownKeyOf(repo), key))
-  const rule = `A lead launches members only into its own repo or a repo listed in orchestratorGame.orchestrator.memberRepos.`
+  const inProject = inProjectOf(lead, read.host, memberRepos)
   if (read.host === null) {
     if (read.repo === null) {
       return `--repo ${selector} is not a repo registered in this Orca Lab.`
     }
     return inProject(read.repo)
       ? null
-      : `--repo ${selector} is ${read.repo.displayName}, outside this lead's project (${lead.displayName}). ${rule}`
+      : `--repo ${selector} is ${read.repo.displayName}, outside this lead's project (${lead.displayName}). ${PROJECT_RULE}`
   }
   if (read.repo && inProject(read.repo)) {
     return null
   }
-  const own = read.repos.find(inProject)
-  const upstream = lead.remoteKey?.toLowerCase() ?? null
-  // A host clone named by its upstream may be this fork or any other one (ORCA-1198).
-  const namedByUpstream =
-    upstream === null
-      ? undefined
-      : read.repos.find((repo) => ownKeyOf(repo) === null && sameKey(repo.remoteKey, upstream))
-  if (!own && namedByUpstream) {
-    return `${namedByUpstream.displayName} on ${read.host} names ${upstream}, the upstream every fork of it shares, so Orca cannot tell it is ${lead.displayName}'s clone. If it is, list ${upstream} in orchestratorGame.orchestrator.memberRepos. No worktree was created.`
+  const launch = gameHostLaunchOf({ lead, host: read.host, repos: read.repos, memberRepos })
+  if (launch.kind !== 'ready') {
+    return `${launch.reason}${NO_WORKTREE}`
   }
-  if (!own) {
-    return `${lead.displayName} is not registered on ${read.host}, so no member can start there for it. With the owner's OK, clone it on ${read.host} and register it: orca repo add --path <path on ${read.host}> --environment ${read.host}. No worktree was created.`
-  }
+  const own = launch.repo
   const there = `use --repo id:${own.id} (${own.path}).`
   return read.repo === null
     ? `--repo ${selector} is not a repo on ${read.host}; ${lead.displayName} is there: ${there}`
-    : `--repo ${selector} on ${read.host} is ${read.repo.displayName}, outside this lead's project (${lead.displayName}); ${there} ${rule}`
+    : `--repo ${selector} on ${read.host} is ${read.repo.displayName}, outside this lead's project (${lead.displayName}); ${there} ${PROJECT_RULE}`
 }
