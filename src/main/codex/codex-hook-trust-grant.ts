@@ -13,7 +13,8 @@ import {
 import { runCodexHookTrustGrantSessionSync } from './codex-app-server-grant-bridge'
 import {
   codexAppServerCapabilityCache,
-  getCodexAppServerHostKey
+  getCodexAppServerHostKey,
+  type CodexAppServerHostKey
 } from './codex-app-server-capability-cache'
 import {
   writeCodexTrustGrantLedgerHome,
@@ -73,7 +74,11 @@ const diagnostics = {
   lastFallbackReason: null as CodexTrustGrantFallbackReason | null
 }
 export type CodexTrustGrantDiagnostics = typeof diagnostics
-const transientRetryAfterByHost = new Map<string, number>()
+const transientRetryAfterByHost = new Map<CodexAppServerHostKey, number>()
+
+function rememberTransientFailure(hostKey: CodexAppServerHostKey): void {
+  transientRetryAfterByHost.set(hostKey, Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS)
+}
 
 export const getCodexTrustGrantDiagnostics = (): CodexTrustGrantDiagnostics => ({ ...diagnostics })
 
@@ -233,22 +238,22 @@ export function grantManagedCodexHookTrust(
         codexAppServerCapabilityCache.rememberUnsupported(hostKey)
         return fallback(plan, 'unsupported', error)
       }
-      transientRetryAfterByHost.set(
-        hostKey,
-        Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
-      )
+      rememberTransientFailure(hostKey)
       return fallback(plan, 'error', error)
     }
     // Why: the RPC surface answered, even if our entries were not verifiable —
     // remember support so a later drift event retries the preferred lane.
     codexAppServerCapabilityCache.rememberSupported(hostKey)
-    if (result.outcome === 'verify-failed') {
+    const verifyFailed = (
+      detail: unknown,
+      verifyClass: CodexTrustGrantVerifyClass
+    ): CodexManagedTrustGrantOutcome => {
       restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
-      transientRetryAfterByHost.set(
-        hostKey,
-        Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
-      )
-      return fallback(plan, 'verify-failed', result.reason, result.reasonClass)
+      rememberTransientFailure(hostKey)
+      return fallback(plan, 'verify-failed', detail, verifyClass)
+    }
+    if (result.outcome === 'verify-failed') {
+      return verifyFailed(result.reason, result.reasonClass)
     }
 
     const byNormalizedKey = new Map(expected.map((item) => [item.normalizedKey, item]))
@@ -258,30 +263,10 @@ export function grantManagedCodexHookTrust(
     for (const granted of result.entries) {
       const match = byNormalizedKey.get(granted.normalizedKey)
       if (!match) {
-        restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
-        transientRetryAfterByHost.set(
-          hostKey,
-          Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
-        )
-        return fallback(
-          plan,
-          'verify-failed',
-          `unexpected granted key ${granted.key}`,
-          'unexpected-key'
-        )
+        return verifyFailed(`unexpected granted key ${granted.key}`, 'unexpected-key')
       }
       if (seenNormalizedKeys.has(granted.normalizedKey)) {
-        restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
-        transientRetryAfterByHost.set(
-          hostKey,
-          Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
-        )
-        return fallback(
-          plan,
-          'verify-failed',
-          `duplicate granted key ${granted.key}`,
-          'duplicate-key'
-        )
+        return verifyFailed(`duplicate granted key ${granted.key}`, 'duplicate-key')
       }
       seenNormalizedKeys.add(granted.normalizedKey)
       grantedEntries.push({ ...match.entry, trustedHash: granted.trustedHash })
@@ -291,17 +276,7 @@ export function grantManagedCodexHookTrust(
       }
     }
     if (seenNormalizedKeys.size !== expected.length) {
-      restoreCodexTrustConfig(plan.tomlPath, configSnapshot)
-      transientRetryAfterByHost.set(
-        hostKey,
-        Date.now() + CODEX_TRUST_GRANT_TRANSIENT_RETRY_INTERVAL_MS
-      )
-      return fallback(
-        plan,
-        'verify-failed',
-        'granted entry set did not cover expected entries',
-        'coverage'
-      )
+      return verifyFailed('granted entry set did not cover expected entries', 'coverage')
     }
     transientRetryAfterByHost.delete(hostKey)
     try {
