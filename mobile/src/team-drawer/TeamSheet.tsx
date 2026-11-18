@@ -200,6 +200,7 @@ export function TeamSheet({
                     ) : tab === 'hosts' ? (
                       <TeamHostsTab
                         machines={view.work.machines}
+                        members={view.members}
                         hostName={hostName}
                         locale={view.locale}
                         words={workWords}
