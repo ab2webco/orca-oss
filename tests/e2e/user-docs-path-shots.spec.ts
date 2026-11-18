@@ -21,11 +21,15 @@ const DOCS_REPO = '/Users/Shared/orca-docs/lumen-app'
 const ONBOARDING_ADVANCE = /^Continue\b|^Add your first project\b/
 const OPTIONAL_STEPS = [/Set up GitHub tasks|Connect your task sources/i, /Set Windows terminal/i]
 
-async function setWindowSize(app: ElectronApplication, page: Page): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, size) => {
-    BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
-  }, WINDOW)
-  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(WINDOW.width)
+async function setWindowSize(
+  app: ElectronApplication,
+  page: Page,
+  size: { width: number; height: number } = WINDOW
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, target) => {
+    BrowserWindow.getAllWindows()[0]?.setSize(target.width, target.height)
+  }, size)
+  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(size.width)
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -294,5 +298,53 @@ test.describe('Get started: a workspace, its agent and the pull request', () => 
     } finally {
       rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
     }
+  })
+})
+
+test.describe('Install: accounts', () => {
+  test.use({ seedTestRepo: false })
+
+  test('the accounts pane offers Add Account and Add with token beside System default', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 940: the pane then lays out within the docs column (560px), so 12px text stays 12px.
+    await setWindowSize(electronApp, page, { width: 940, height: 1000 })
+    await page.evaluate(() => {
+      const state = window.__store!.getState()
+      state.openSettingsTarget({ pane: 'accounts', repoId: null })
+      state.openSettingsPage()
+    })
+    await expect(page.getByText('AI Provider Accounts').first()).toBeVisible({ timeout: 15_000 })
+    // The install page's claim: an existing login needs no setup.
+    await expect
+      .soft(page.getByText(/Orca Lab works with your existing provider logins/).first())
+      .toBeVisible()
+    const claude = page.getByText('Claude', { exact: true }).first()
+    await expect(claude).toBeVisible()
+    const addAccount = page.getByRole('button', { name: 'Add Account' }).first()
+    await expect(addAccount).toBeVisible()
+    await expect.soft(page.getByRole('button', { name: 'Add with token' })).toBeVisible()
+    await expect.soft(page.getByText('System default', { exact: true }).first()).toBeVisible()
+    const empty = page.getByText(/No managed Claude accounts/).first()
+    await expect(empty).toBeVisible()
+    // The docs show this capture at 1:1 at most, so the app's own size is the floor on the page.
+    const descriptionPx = await page
+      .getByText(/Showing accounts for this device/)
+      .first()
+      .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+    testInfo.annotations.push({ type: 'description-font-px', description: String(descriptionPx) })
+    expect.soft(descriptionPx).toBeGreaterThanOrEqual(12)
+    // The Claude section: its heading and buttons down to the empty-list note.
+    await captureBothThemes(page, testInfo, 'accounts', async () => {
+      const head = (await claude.boundingBox())!
+      const end = (await empty.boundingBox())!
+      // Why 8: the text box starts at the Claude mark; 8px keeps the card's border out.
+      const x = head.x - 8
+      const y = head.y - 16
+      return { x, y, width: end.x + end.width + 8 - x, height: end.y + end.height + 4 - y }
+    })
   })
 })
