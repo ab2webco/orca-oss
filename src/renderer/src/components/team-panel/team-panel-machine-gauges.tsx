@@ -117,7 +117,8 @@ export function Readout({
       >
         {percent === null ? translate('teamPanel.machines.unknown', 'Unknown') : `${percent}%`}
       </span>
-      <span className="col-span-2">
+      {/* Why self-stretch: the column's baseline alignment shrank the bar to no width. */}
+      <span className="col-span-2 @[300px]:self-stretch">
         <Meter label={label} percent={percent} warn={warn} />
       </span>
       {caption ? (

@@ -207,6 +207,17 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
                 .map((one) => one.textContent)
             )
           expect.soft(cutSentences, `status or note cut: ${label}`).toEqual([])
+          // Why: an open card's bars once shrank to no width beside its big readouts.
+          const flatBars = await panel
+            .locator(
+              '[data-team-machine-gauge] [role="img"], [data-team-machine-readout] [role="img"]'
+            )
+            .evaluateAll((bars) =>
+              bars
+                .filter((bar) => bar.getBoundingClientRect().width < 8)
+                .map((bar) => bar.getAttribute('aria-label'))
+            )
+          expect.soft(flatBars, `bars with no width: ${label}`).toEqual([])
           if (CAPTURE_EVIDENCE) {
             await panel.screenshot({
               animations: 'disabled',

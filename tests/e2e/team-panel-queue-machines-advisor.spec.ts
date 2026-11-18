@@ -159,8 +159,19 @@ test('PRs opens with the GitHub merge queue, Machines lists this machine alone, 
     await panel.getByRole('tab', { name: 'Machines' }).click()
     const local = panel.locator('[data-team-machine="local"]')
     await expect(local).toBeVisible()
-    await expect(local.getByRole('img', { name: /^Memory used \d+%$/ })).toBeVisible()
+    // Why closed first: a loaded host reads busy and starts open, with its row bars unmounted.
+    const trigger = local.getByRole('button').first()
+    if ((await local.getAttribute('data-state')) === 'open') {
+      await trigger.click()
+    }
+    await expect(local).toHaveAttribute('data-state', 'closed')
+    for (const gauge of ['cpu', 'memory', 'disk']) {
+      await expect(local.locator(`[data-team-machine-gauge="${gauge}"] [role="img"]`)).toBeVisible()
+    }
+    await trigger.click()
+    await expect(local).toHaveAttribute('data-state', 'open')
     await expect(local).toContainText(/GB free/)
+    await expect(local.locator('[data-team-machine-readout="memory"] [role="img"]')).toBeVisible()
     await expect(panel).toContainText('Only this machine')
     await expect(panel).toContainText('Pair another machine to spread agents across hosts.')
     await expect(panel).not.toContainText('Could not read the machines')
