@@ -109,17 +109,32 @@ describe('orca_cli resolver', () => {
 })
 
 /** The system's tools minus anything named orca*: a real orca-ide here would reach the real board. */
-function toolsWithoutOrca() {
+function toolsWithoutOrca(dirs = ['/usr/bin', '/bin']) {
   const tools = tempDir()
-  for (const dir of ['/usr/bin', '/bin']) {
+  // Why a set: existsSync follows the link, so a dangling one reads as unlinked.
+  const linked = new Set()
+  for (const dir of dirs) {
     for (const name of existsSync(dir) ? readdirSync(dir) : []) {
-      if (!name.startsWith('orca') && !existsSync(join(tools, name))) {
+      if (!name.startsWith('orca') && !linked.has(name)) {
         symlinkSync(join(dir, name), join(tools, name))
+        linked.add(name)
       }
     }
   }
   return tools
 }
+
+// Why: on ubuntu-26.04 /bin lists /usr/bin's names, and a dangling link there (grub-ntldr-img)
+// reads as absent to existsSync, so the second dir linked it again and hit EEXIST.
+describe.runIf(process.platform !== 'win32')('toolsWithoutOrca', () => {
+  it('links a name once when both dirs hold it as a dangling link', () => {
+    const [first, second] = [tempDir(), tempDir()]
+    for (const dir of [first, second]) {
+      symlinkSync(join(dir, 'missing-target'), join(dir, 'dangling-tool'))
+    }
+    expect(readdirSync(toolsWithoutOrca([first, second]))).toEqual(['dangling-tool'])
+  })
+})
 
 // Why not on macOS or Windows: there a bare `orca` is Orca's own CLI and the resolver accepts it
 // (see 'accepts a bare orca on darwin'), so the fake reader would be started by design.
