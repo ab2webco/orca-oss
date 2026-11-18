@@ -28,7 +28,11 @@ export const docsSidebar = [
   group('Browser', 'Navegador', [page('docs/browser/design-mode')]),
   group('Remote', 'Remoto', [page('docs/ssh'), page('docs/remote/headless-linux-server')]),
   group('CLI', 'CLI', [page('docs/cli/overview')]),
-  group('Extend', 'Extender', [page('docs/extend/plugins'), page('docs/extend/orca-sonar')]),
+  group('Extend', 'Extender', [
+    page('docs/plugins-and-skills'),
+    page('docs/extend/plugins'),
+    page('docs/extend/orca-sonar')
+  ]),
   group('Mobile', 'Móvil', [page('docs/mobile'), page('docs/artifacts-and-automations')]),
   group('Privacy', 'Privacidad', [page('docs/telemetry')])
 ]

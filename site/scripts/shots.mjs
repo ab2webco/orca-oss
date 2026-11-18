@@ -25,6 +25,7 @@ const DOCS = [
   'review/linear',
   'orchestrator/orca-game',
   'cli/overview',
+  'plugins-and-skills',
   'extend/plugins',
   'ssh',
   'agents/agent-teams',
