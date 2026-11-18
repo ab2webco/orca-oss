@@ -38,7 +38,7 @@ describe('otherProjectMembersOf (ORCA-1284)', () => {
               worktree('wt-own-1', 'orca-oss', [row('own-1', { dispatched: true })]),
               worktree('wt-own-2', 'orca-oss', [row('own-2', { dispatched: true })]),
               worktree('wt-c1', 'cineco', [row('c1', { dispatched: true })]),
-              worktree('wt-c2', 'cineco', [row('c2', { dispatched: true, state: 'idle' })]),
+              worktree('wt-c2', 'cineco', [row('c2', { dispatched: true, state: 'done' })]),
               worktree('wt-k1', 'koombea', [row('k1', { dispatched: true })])
             ]
           },
