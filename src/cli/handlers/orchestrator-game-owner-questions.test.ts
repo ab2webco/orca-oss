@@ -178,6 +178,33 @@ describe('orca game owner questions', () => {
     expect(output[0]).toContain('Answered oq_1: Wait. The lead was told.')
   })
 
+  it("reads one question by id as a member, with the person's answer and where it came from", async () => {
+    process.env.ORCA_GAME_ROLE = 'member'
+    process.env.ORCA_TERMINAL_HANDLE = 'term_member'
+    const answered = {
+      ...QUESTION,
+      answer: { text: 'Yes', at: '2026-10-29T10:05:00.000Z', via: 'phone' }
+    }
+    const { client, calls } = fakeClient({ question: answered })
+
+    await run('game owner-question', client, [['id', 'oq_1']], false)
+    await expect(run('game owner-question', client, [])).rejects.toThrow(/--id/)
+
+    expect(calls).toEqual([
+      [
+        'game.ownerQuestion',
+        { worktreeId: 'wt1', terminalHandle: 'term_member', role: 'member', id: 'oq_1' }
+      ]
+    ])
+    expect(output[0]).toContain("answered 2026-10-29T10:05:00.000Z on the person's phone: Yes")
+  })
+
+  it('says a question read by id is not answered yet', async () => {
+    const { client } = fakeClient({ question: QUESTION })
+    await run('game owner-question', client, [['id', 'oq_1']], false)
+    expect(output[0]).toContain('not answered yet')
+  })
+
   it('says the Orca host is too old instead of a bare RPC error', async () => {
     const { client } = fakeClient({}, true)
     await expect(run('game owner-questions', client, [])).rejects.toThrow(

@@ -1,6 +1,7 @@
 ---
-sourceHash: b7bff96884cf1c9b
+sourceHash: b9f35cbf31ea17d1
 ---
+
 # CLI
 
 El comando `orca` controla una instancia de Orca Lab en ejecución desde cualquier terminal. Los scripts y los
@@ -59,6 +60,7 @@ lectura. [Agent Teams](../agents/agent-teams.md) explica el líder y sus miembro
 - `orca game history`: los miembros liberados del proyecto: ticket, resultado, PR, personaje, agente, cuenta y host. Filtra con `--ticket`, `--character` o `--since`.
 - `orca game resume-members`: recupera los miembros que un reinicio dejó en pausa, o los libera con `--discard`.
 - `orca game owner-questions`: lo que el líder te preguntó y sigue esperando respuesta. Responde con `orca game answer-owner`.
+- `orca game owner-question <id>`: una pregunta y tu respuesta, con cuándo y desde dónde la diste. Un miembro lo usa para comprobar una respuesta que su líder le transmite en lugar de volver a preguntarte.
 - `orca game metrics`: tickets terminados, lead time y miembros liberados por resultado.
 - `orca game stop <ticket>|--all [--hold]`: detiene miembros y los registra en el historial. `--all --hold` además pone un STOP que rechaza nuevos lanzamientos hasta `orca game resume`.
 - `orca game adopt-history --from-repo-id <id>`: incorpora a este proyecto el historial, las lecciones y el STOP que dejó un id de repo eliminado.

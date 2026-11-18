@@ -1,12 +1,15 @@
 import { z } from 'zod'
-import { defineMethod, type RpcMethod } from '../core'
+import { defineMethod, type RpcContext, type RpcMethod } from '../core'
 import { GAME_EVENT_KINDS, GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
 import {
   GAME_OWNER_CONTEXT_MAX,
   GAME_OWNER_OPTIONS_MAX,
   GAME_OWNER_OPTION_TEXT_MAX,
-  GAME_OWNER_QUESTION_TEXT_MAX
+  GAME_OWNER_QUESTION_TEXT_MAX,
+  GAME_OWNER_QUESTIONS_MAX,
+  type GameOwnerAnswerVia
 } from '../../../../shared/orchestrator-game-owner-questions'
+import { DESKTOP_IPC_REQUEST_ID } from '../desktop-ipc-request-id'
 import { GAME_ARCADE_ACTIONS } from '../../../../shared/orchestrator-game-arcade-credits'
 import {
   GAME_REWARD_KINDS,
@@ -109,6 +112,30 @@ const GameOwnerAskParams = z.object({
 })
 
 const GameOwnerQuestionsParams = z.object({ ...Caller, all: z.boolean().optional() }).optional()
+
+// Why role: a remote member's lead is on another host, so this one finds no parent pane for it.
+const GameOwnerQuestionParams = z.object({
+  ...Caller,
+  id: z.string().min(1).max(40),
+  role: z.literal('member').optional()
+})
+
+// Why unknown items: the member's host parses each, so one from a newer build is dropped, not fatal.
+const GameOwnerQuestionsImportParams = z.object({
+  dispatchId: z.string().min(1).max(200),
+  ticket: z.string().min(1).max(40),
+  questions: z.array(z.unknown()).max(GAME_OWNER_QUESTIONS_MAX)
+})
+
+// Why from the transport, never a param: `game answer-owner` must not pass itself off as the Inbox.
+function ownerAnswerViaOf(context: RpcContext): GameOwnerAnswerVia {
+  if (context.clientKind === 'mobile') {
+    return 'phone'
+  }
+  return context.clientKind === 'runtime' || context.requestId === DESKTOP_IPC_REQUEST_ID
+    ? 'inbox'
+    : 'cli'
+}
 
 // Why exactly one of option and text: the person picks a button or writes an answer.
 const GameOwnerAnswerParams = z
@@ -242,6 +269,18 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
         all: params?.all
       })
   }),
+  defineMethod({
+    name: 'game.ownerQuestion',
+    params: GameOwnerQuestionParams,
+    handler: async (params, { runtime }) => runtime.readGameOwnerQuestion(params)
+  }),
+  // Why the caller's fingerprint: only the lead's paired host may write what its member checks.
+  defineMethod({
+    name: 'game.ownerQuestionsImport',
+    params: GameOwnerQuestionsImportParams,
+    handler: async (params, { runtime, authenticatedCallerFingerprint }) =>
+      runtime.keepGameOwnerAnswersFromLeadHost(params, authenticatedCallerFingerprint)
+  }),
   // Why no caller: the person's app shows every project's questions, not one worktree's.
   defineMethod({
     name: 'game.ownerQuestionsAll',
@@ -253,13 +292,14 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'game.ownerAnswer',
     params: GameOwnerAnswerParams,
-    handler: async (params, { runtime }) =>
-      runtime.getGameBoard().answerOwner({
+    handler: async (params, context) =>
+      context.runtime.getGameBoard().answerOwner({
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         id: params.id,
         option: params.option,
-        text: params.text
+        text: params.text,
+        via: ownerAnswerViaOf(context)
       })
   }),
   defineMethod({

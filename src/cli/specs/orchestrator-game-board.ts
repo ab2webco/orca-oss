@@ -132,6 +132,21 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game owner-questions', 'orca game owner-questions --all --json']
   },
   {
+    path: ['game', 'owner-question'],
+    summary: "Read one question the lead asked the person and the person's answer, by its id",
+    usage: 'orca game owner-question <id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id'],
+    positionalArgs: ['id'],
+    notes: [
+      "A member checks an owner answer its lead relays before a hard-to-undo step, instead of asking the person again. It reads only its own ticket's questions, from any host.",
+      'Shows when and where it was answered: the Inbox, a phone, or `game answer-owner` in a terminal.'
+    ],
+    examples: [
+      'orca game owner-question oq_1a2b3c4d5e6f',
+      'orca game owner-question oq_1a2b3c4d5e6f --json'
+    ]
+  },
+  {
     path: ['game', 'answer-owner'],
     summary: 'Answer a question the lead asked the person; the lead is told',
     usage: 'orca game answer-owner <id> (--pick <n> | --answer <text>) [--json]',

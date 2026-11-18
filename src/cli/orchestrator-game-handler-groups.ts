@@ -132,7 +132,7 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'orchestrator-game-owner-questions',
-    keys: ['game ask-owner', 'game owner-questions', 'game answer-owner'],
+    keys: ['game ask-owner', 'game owner-questions', 'game owner-question', 'game answer-owner'],
     load: async () =>
       (await import('./handlers/orchestrator-game-owner-questions.js'))
         .ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS

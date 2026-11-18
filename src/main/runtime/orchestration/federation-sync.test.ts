@@ -309,10 +309,20 @@ describe('federation relay acknowledgments', () => {
         throw new Error(`Unexpected method ${method}`)
       })
 
+    const share = vi.spyOn(runtime, 'shareGameOwnerAnswersWithRemoteMember')
+
     const result = await syncFederatedDispatch(runtime, 'dispatch_remote')
 
     expect(result).toEqual({ imported: 51, acknowledgedThrough: 51 })
     expect(pending).toHaveLength(0)
+    // ORCA-1281: the member's host has the owner answers before the mail that relays one.
+    const importAt = remoteCall.mock.calls.findIndex(
+      ([, method]) => method === 'orchestration.federationImport'
+    )
+    expect(share).toHaveBeenCalledWith('dispatch_remote')
+    expect(share.mock.invocationCallOrder[0]).toBeLessThan(
+      remoteCall.mock.invocationCallOrder[importAt]
+    )
     expect(remoteCall.mock.calls.map(([, method]) => method)).toEqual([
       'orchestration.federationPull',
       'orchestration.federationAck',

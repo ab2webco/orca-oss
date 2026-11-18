@@ -136,7 +136,8 @@ test('an Inbox answer wakes a lead that has no Run, and a held one shows until i
   })
   expect(kept.result.questions.find((one) => one.id === second.id)?.answer).toEqual({
     text: 'Yes',
-    at: expect.any(String)
+    at: expect.any(String),
+    via: 'inbox'
   })
   const mail = await client.call<Mail>('orchestration.check', {
     terminal: lead,
