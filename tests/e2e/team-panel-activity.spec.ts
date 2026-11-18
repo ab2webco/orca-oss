@@ -37,7 +37,8 @@ const COPY = {
     openTerminal: 'Open terminal',
     machines: 'Machines',
     offline: 'Offline',
-    oneAgent: '1 agent'
+    oneAgent: '1 agent',
+    memoryUsed: /^Memory used \d+%$/
   },
   es: {
     title: 'Tu trabajo',
@@ -49,7 +50,8 @@ const COPY = {
     openTerminal: 'Abrir terminal',
     machines: 'Máquinas',
     offline: 'Sin conexión',
-    oneAgent: '1 agente'
+    oneAgent: '1 agente',
+    memoryUsed: /^Memoria en uso \d+%$/
   }
 } as const
 
@@ -471,7 +473,9 @@ test('the no-team panel shows Activity for the selected agent and live sidebar r
     await expect(panel.getByRole('tab', { name: copy.machines })).toBeVisible()
     await expect(rows).toHaveCount(3)
     // Why this long: a read that gave up while held lands on the next 20 s poll.
-    await expect(rows.nth(0).getByRole('img')).toBeVisible({ timeout: 30_000 })
+    await expect(rows.nth(0).getByRole('img', { name: copy.memoryUsed })).toBeVisible({
+      timeout: 30_000
+    })
     await expect(panel.locator('[data-team-machine="mini"]')).toContainText(copy.offline)
     const box = panel.locator('[data-team-machine="box"]')
     await expect(box).toContainText(copy.oneAgent)
