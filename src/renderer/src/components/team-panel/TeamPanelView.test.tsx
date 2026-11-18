@@ -382,7 +382,7 @@ describe('TeamPanelView scene area', () => {
     )
     const row = container.querySelector('[data-team-xp]')
     expect(row?.textContent).toContain('Lv 3')
-    expect(row?.textContent).toContain('50/300 XP')
+    expect(row?.textContent).toContain('250 XP to Lv 4')
     const tabList = container.querySelector('[role="tablist"]')!
     expect(row!.compareDocumentPosition(tabList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 

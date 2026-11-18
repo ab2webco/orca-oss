@@ -1226,6 +1226,13 @@ The first total is the characters' XP the bar already showed, so the level never
 host sends no `teamXp` and refuses `game.xp`: the panel then sums the characters, and the mod
 shows its own ledger, as before.
 
+The row says what is left (`300 XP to Lv 18`; under 17rem of panel only `300 XP`), and its
+tooltip lists what each reward earns. When a poll brings a higher total, the gain fills in green
+and `+N · reason` rises from the bar, named by the newest reward the poll brought. A level-up fills
+the old level, changes the level chip, then lands on the new level with the total's carry-over
+([`use-team-xp-motion.ts`](../../src/renderer/src/components/team-panel/use-team-xp-motion.ts)).
+With reduced motion the row changes at once and the reason stays as a line under it for 4 s.
+
 ### The perfect merge
 
 `review.perfectMerge` is the owner's quality gate (ORCA-686), and the arcade (ORCA-775) reads it to
