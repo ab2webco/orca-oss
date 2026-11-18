@@ -23,6 +23,7 @@ tracker.
 - [File explorer](editing/file-explorer.md): browse, edit and drag files.
 - [File viewers](editing/viewers.md): images, PDFs, Markdown and other file types.
 - [Browser and Design Mode](browser/design-mode.md): preview pages and send element feedback to an agent.
+- [Plugins, the advisor and skills](plugins-and-skills.md): turn plugins on, install and review one, the Jev advisor, and the skills your agents load.
 - [CLI](cli/overview.md): script Orca Lab from a terminal with the `orca` command.
 - [Artifacts and automations](artifacts-and-automations.md): share a file as a public link, and run an agent on a schedule.
 - [Mobile](mobile.md): install and pair the phone app, see each desktop's team and accounts, answer the lead.

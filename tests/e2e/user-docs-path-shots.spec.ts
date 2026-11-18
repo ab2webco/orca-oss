@@ -862,3 +862,34 @@ test.describe('Artifacts: the publishing settings', () => {
     await captureBothThemes(page, testInfo, 'artifacts-settings', artifacts)
   })
 })
+
+test.describe('Plugins: the plugin system in Settings', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Settings > Plugins starts with the plugin system off and Install plugin waiting', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so the section fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    await page.evaluate(() => {
+      const state = window.__store!.getState()
+      state.openSettingsTarget({ pane: 'plugins', repoId: null, sectionId: 'plugins' })
+      state.openSettingsPage()
+    })
+    const plugins = page.locator('section#plugins')
+    await expect(plugins).toBeVisible({ timeout: 15_000 })
+    await expect.soft(plugins.getByText('Plugin system', { exact: true }).first()).toBeVisible()
+    // The page's claim: off by default, and nothing installs until it is on.
+    await expect.soft(plugins.getByRole('switch').first()).not.toBeChecked()
+    await expect.soft(plugins.getByRole('button', { name: 'Install plugin' })).toBeDisabled()
+    const box = (await plugins.boundingBox())!
+    testInfo.annotations.push({ type: 'plugins-css-px', description: `${box.width}x${box.height}` })
+    expect.soft(box.width).toBeLessThanOrEqual(560)
+    // Why: past the window's height an element capture comes out blank (PR 6's first try).
+    expect(box.height).toBeLessThan(900)
+    await captureBothThemes(page, testInfo, 'plugin-system', plugins)
+  })
+})
