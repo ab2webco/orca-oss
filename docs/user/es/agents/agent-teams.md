@@ -1,5 +1,5 @@
 ---
-sourceHash: f32901a5e627330a
+sourceHash: 04e83994cc227505
 ---
 # Agent Teams
 
@@ -103,47 +103,10 @@ En la apariencia **Game**, la cabecera muestra el nivel del equipo (**Lv 3**) y 
 solo lo que llegó: cada miembro que termina con su pull request mergeado suma 100 XP, y uno que
 termina en QA suma 50. El nivel 2 pide 100 XP, y cada nivel siguiente 100 más que el anterior.
 
-## Apariencias, estilos y escenas
+## Apariencias, escenas y ajustes
 
-El panel tiene tres apariencias con los mismos datos y acciones: **Game** (una escena, niveles y XP),
-**Display** (un carrusel de métricas del equipo) y **Plain**. En la apariencia **Game** la escena viene
-en tres estilos, todos representan el estado real del trabajo, nunca un temporizador:
-
-- **Pixel**: un huerto; el bancal de cada miembro crece con su fase, y el trabajo con merge llena cajas
-  de cosecha.
-- **Figures**: una torre de castillo por miembro que sube de los cimientos a terminada; las torres con
-  merge se convierten en trofeos.
-- **Office**: pizarras cuyas notas avanzan hacia terminado, con placas por cada merge. Con miembros en
-  más de una máquina se convierte en un edificio con una planta por máquina, primero la del líder, y
-  **All** muestra todas las plantas.
-
-Un CI en rojo muestra la obra rota. Una escena es una de las incluidas (Quest, Night Watch, Crystal
-Saga, Beast Tamer), una que agrega un plugin o un archivo de escena del proyecto. Pixel dibuja todas
-las escenas. Cuando una escena no tiene arte para Figures u Office, una nota en Settings dice qué dibuja
-el panel en su lugar: la oficina propia de Orca, o los personajes de la escena en Pixel. La vista previa
-del estilo en Settings muestra el estilo elegido.
-
-## Dónde están los ajustes
-
-- **Settings > Agents > Panel**: escena, apariencia, estilo y los interruptores **PRs**, **Queue** y
-  **Machines** para todos los proyectos.
-- La página del proyecto en **Settings**, sección **Agent Teams game**: las mismas filas para un
-  proyecto, cada una con **Inherit**, más **Advisor**, **Arcade** y un archivo de escena propio.
-- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`),
-  `orchestratorGame.scene` y `orchestratorGame.sceneFile`, compartidos con todos en el repo.
-
-Cada capa posterior manda: los Settings globales, luego `orca.yaml`, luego los Settings del proyecto en
-esta máquina. Un proyecto nuevo empieza en **Game**, **Pixel** y la escena Quest.
-
-**Settings > Appearance > Status colors** define un color por estado (**Needs you**, **At risk**,
-**Working**, **Verified**, **Idle**), para claro y oscuro. El panel y la escena los usan.
-
-## La banda de la terminal
-
-La banda pixel sobre el prompt del líder está apagada por defecto. Actívala con **Show the band** en
-**Terminal band** dentro de **Settings > Agents > Agent Teams game**, o eligiendo Zen o una vista 2D en
-**Default view**. **Render**, **Time zone** y **Teammate HUD** aparecen mientras está activa. Un pane
-toma la banda al iniciarse.
+Las apariencias, estilos y escenas del panel, qué capa de ajustes gana y qué cambia al momento están
+en [Escenas, estilos y ajustes](scenes-and-settings.md).
 
 ## Historial y lecciones
 

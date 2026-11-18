@@ -100,46 +100,10 @@ In the **Game** look, the header shows the team's level (**Lv 3**) and its XP. X
 landed: each member that ends with its pull request merged adds 100 XP, one that ends in QA adds 50.
 Level 2 takes 100 XP, and each level after takes 100 more than the last.
 
-## Looks, styles and scenes
+## Looks, scenes and settings
 
-The panel has three looks with the same data and actions: **Game** (a scene, levels and XP),
-**Display** (a carousel of team metrics) and **Plain**. In the **Game** look the scene comes in three
-styles, all acting out the real state of the work, never a timer:
-
-- **Pixel**: a garden; each member's bed grows with its phase, and merged work fills harvest
-  crates.
-- **Figures**: a castle tower per member that rises from foundation to finished; merged towers
-  become trophies.
-- **Office**: whiteboards whose notes move toward done, with plaques for merges. With members on
-  more than one machine it becomes a building with one floor per machine, the lead's first, and
-  **All** shows every floor.
-
-Red CI shows the build broken. A scene is a built-in one (Quest, Night Watch, Crystal Saga, Beast
-Tamer), one a plugin adds, or a scene file in the project. Pixel draws every scene. When a scene has
-no art for Figures or Office, a note in Settings says what the panel draws instead: Orca's own
-office, or the scene's characters in Pixel. The style preview in Settings shows the chosen style.
-
-## Where the settings live
-
-- **Settings > Agents > Panel**: scene, look, style and the **PRs**, **Queue** and **Machines**
-  switches for every project.
-- The project's page in **Settings**, section **Agent Teams game**: the same rows for one project,
-  each with **Inherit**, plus **Advisor**, **Arcade** and a custom scene file.
-- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`),
-  `orchestratorGame.scene` and `orchestratorGame.sceneFile`, shared with everyone on the repo.
-
-Each later layer wins: global Settings, then `orca.yaml`, then the project's Settings on this
-machine. A new project starts on **Game**, **Pixel** and the Quest scene.
-
-**Settings > Appearance > Status colors** sets one color per state (**Needs you**, **At risk**,
-**Working**, **Verified**, **Idle**), for light and dark. The panel and the scene use them.
-
-## The terminal band
-
-The pixel band above the lead's prompt is off by default. Turn it on with **Show the band** under
-**Terminal band** in **Settings > Agents > Agent Teams game**, or by choosing Zen or a 2D view under
-**Default view**. **Render**, **Time zone** and **Teammate HUD** appear while it is on. A pane picks
-the band up when it starts.
+The panel's looks, styles and scenes, which settings layer wins, and what changes at once are in
+[Scenes, styles and settings](scenes-and-settings.md).
 
 ## History and lessons
 

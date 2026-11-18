@@ -20,6 +20,7 @@ export const docsSidebar = [
   group('Agents', 'Agentes', [page('docs/agents/supported'), page('docs/agents/usage-tracking')]),
   group('Orchestrator', 'Orquestador', [
     page('docs/agents/agent-teams'),
+    page('docs/agents/scenes-and-settings'),
     page('docs/orchestrator/orca-game')
   ]),
   group('Review', 'Revisión', [page('docs/review/annotate-ai-diff')]),

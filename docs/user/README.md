@@ -17,6 +17,7 @@ tracker.
 - [Supported agents](agents/supported.md): which coding agents Orca Lab can launch and track.
 - [Usage tracking and accounts](agents/usage-tracking.md): rate-limit usage, switching accounts, and long-lived Claude tokens.
 - [Agent Teams](agents/agent-teams.md): a lead and its members, the Team panel, scenes and the Inbox.
+- [Scenes, styles and settings](agents/scenes-and-settings.md): the panel's looks and scenes, which settings layer wins, what changes at once, and an existing project.
 - [SSH](ssh.md): remote worktrees and terminals over SSH.
 - [Annotate AI diffs](review/annotate-ai-diff.md): leave notes on a diff and send them to an agent.
 - [File explorer](editing/file-explorer.md): browse, edit and drag files.

@@ -733,3 +733,39 @@ test.describe('Agent Teams: the Team panel and the Inbox', () => {
     }
   })
 })
+
+test.describe('Scenes and settings: the Panel group', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Settings > Agents > Panel holds the scene, look, style, preview and tab switches', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so the group fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    await page.evaluate(() => {
+      const state = window.__store!.getState()
+      state.openSettingsTarget({ pane: 'agents', repoId: null, sectionId: 'agents-game-panel' })
+      state.openSettingsPage()
+    })
+    const group = page.locator('#agents-game-panel')
+    await expect(group).toBeVisible({ timeout: 15_000 })
+    for (const label of ['Scene', 'Panel look', 'Scene style', 'PRs', 'Queue', 'Machines']) {
+      await expect.soft(group.getByText(label, { exact: true }).first()).toBeVisible()
+    }
+    // A new profile starts on the defaults the page names: Game, Pixel and the Quest scene.
+    await expect.soft(group.getByRole('radio', { name: 'Game' })).toBeChecked()
+    await expect.soft(group.getByRole('radio', { name: 'Pixel' })).toBeChecked()
+    const box = (await group.boundingBox())!
+    testInfo.annotations.push({
+      type: 'panel-group-css-px',
+      description: `${box.width}x${box.height}`
+    })
+    expect.soft(box.width).toBeLessThanOrEqual(560)
+    // Why: past the window's height an element capture comes out blank (PR 6's first try).
+    expect(box.height).toBeLessThan(900)
+    await captureBothThemes(page, testInfo, 'panel-settings', group)
+  })
+})
