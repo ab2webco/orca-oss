@@ -21,7 +21,8 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 // ORCA-1094 rows 1, 2 and 6: with no Lead name the lead is a character, a member's tab reads
-// `name · ticket · host`, and the header levels the team from its characters' real XP.
+// `name · ticket · host`, and the header levels the team from its characters' real XP plus the
+// rewards the mod reported (ORCA-1264).
 test('the lead is a character, the member tab names who runs, and XP comes from the characters', async ({
   electronApp,
   orcaPage
@@ -136,6 +137,16 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     expect(characters.result.characters).toEqual([expect.objectContaining({ xp: 100 })])
     await expect(xp).toContainText('Lv 2', { timeout: 60_000 })
     await expect(xp).toContainText('0/200 XP')
+
+    // ORCA-1264: a reward the mod toasts moves the bar by its XP, on top of the characters'.
+    await client.call('game.xp', {
+      worktreeId,
+      terminalHandle: lead,
+      rewards: [
+        { id: 'member-claimed:wt-12', kind: 'member-claimed', xp: 10, label: 'Merlín took ORCA-12' }
+      ]
+    })
+    await expect(xp).toContainText('10/200 XP', { timeout: 60_000 })
     const state = (
       await client.call<OrchestratorGameState>('game.state', {
         worktreeId,

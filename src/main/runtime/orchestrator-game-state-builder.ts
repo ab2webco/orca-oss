@@ -76,7 +76,8 @@ export async function buildOrchestratorGameState(
     githubBudget,
     merges,
     metrics,
-    arcade
+    arcade,
+    teamXp
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -91,7 +92,8 @@ export async function buildOrchestratorGameState(
     readGitHubBudget ? settle(readGitHubBudget) : Promise.resolve(null),
     leadOnly(input.readMerges),
     leadOnly(readMetrics && (() => readMetrics(timezone))),
-    leadOnly(input.readArcade)
+    leadOnly(input.readArcade),
+    leadOnly(input.readTeamXp)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -250,6 +252,7 @@ export async function buildOrchestratorGameState(
     ...(githubBudget ? { githubBudget } : {}),
     ...(merges ? { merges } : {}),
     ...(arcade ? { arcade } : {}),
+    ...(teamXp ? { teamXp } : {}),
     ...(metrics ? { metrics } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     locale,

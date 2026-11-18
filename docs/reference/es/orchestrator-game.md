@@ -1,5 +1,5 @@
 ---
-sourceHash: ea57ef12661728cb
+sourceHash: ac07d764970de58f
 ---
 
 # El juego orquestador de Agent Teams
@@ -1292,6 +1292,20 @@ se quita nada.
 El registro también acepta filas que restan XP, para las señales de calidad que costarán puntos
 (ORCA-686): el total puede bajar de 0 mientras el nivel se queda en 1, y el toast y la línea de
 puntuación muestran el signo menos (`-30 XP`, en rojo en la línea de puntuación plana).
+
+#### Un solo total del equipo (ORCA-1264)
+
+El registro del mod vive en su propio store, pero cada recompensa que muestra en un toast también se
+reporta al host de Orca que corre el líder con `orca game xp --rewards <json>` (RPC `game.xp`). El
+host guarda esas filas en el archivo de historial del proyecto bajo `teamXp` y las suma a la XP de
+los personajes: esa suma es el `teamXp.total` del líder en `game state`, que muestran la barra de
+nivel del panel y la línea de puntuación del mod, así que cada toast `+N XP` mueve la barra N en un
+sondeo ([`orchestrator-game-team-xp.ts`](../../../src/shared/orchestrator-game-team-xp.ts)). Las
+filas de una revisión se guardan sin el worktree (`ci-green:#41`), así que un líder y su miembro que
+ven el mismo PR lo cobran una vez, y un merge que el host ya pagó a un personaje cuenta con la XP del
+toast en vez de 100. El primer total es la XP de los personajes que la barra ya mostraba, así que el
+nivel nunca baja. Un host más antiguo no manda `teamXp` y rechaza `game.xp`: el panel suma entonces
+los personajes y el mod muestra su propio registro, como antes.
 
 ### El merge perfecto
 

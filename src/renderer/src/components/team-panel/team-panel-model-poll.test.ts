@@ -65,6 +65,24 @@ describe('createTeamPanelModelPoller', () => {
     again()
   })
 
+  // ORCA-1264: the state's team XP counts every reward the mod toasted, so the bar moves with them.
+  it("hands the model the state's team XP and skips the characters read", async () => {
+    const read = deps({
+      readState: vi.fn(
+        async () =>
+          ({
+            role: 'lead',
+            teamXp: { total: 1530, recent: [] }
+          }) as unknown as OrchestratorGameState
+      )
+    })
+    const release = createTeamPanelModelPoller(read.all, 20_000).subscribe(SCOPE)
+    await flush()
+    expect(read.all.modelOf).toHaveBeenLastCalledWith(expect.objectContaining({ xp: 1530 }))
+    expect(read.all.readXp).not.toHaveBeenCalled()
+    release()
+  })
+
   it('reads once for every subscriber of the same project and stops when the last leaves', async () => {
     const { all, last } = deps()
     const poller = createTeamPanelModelPoller(all, 20_000)

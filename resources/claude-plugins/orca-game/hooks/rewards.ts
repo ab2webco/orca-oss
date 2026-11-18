@@ -43,6 +43,28 @@ export const rewardWeightsOf = (value: unknown): { rewardWeights?: RewardWeights
   return { rewardWeights: Object.fromEntries(entries) }
 }
 
+const teamTotalOf = (value: unknown): unknown =>
+  typeof value === 'object' && value !== null ? Reflect.get(value, 'total') : undefined
+
+/** The host's team XP; none from an older host. */
+export const teamXpOf = (value: unknown): { teamXp?: { total: number } } => {
+  const total = teamTotalOf(value)
+  return typeof total === 'number' && Number.isFinite(total) ? { teamXp: { total } } : {}
+}
+
+/** The total `orca game xp --json` answered; undefined from an older Orca or a reply it cannot read. */
+export const hostTeamXpOf = (stdout: string): number | undefined => {
+  try {
+    const reply: unknown = JSON.parse(stdout)
+    const result = typeof reply === 'object' && reply !== null ? Reflect.get(reply, 'result') : null
+    const teamXp =
+      typeof result === 'object' && result !== null ? Reflect.get(result, 'teamXp') : null
+    return teamXpOf(teamXp).teamXp?.total
+  } catch {
+    return undefined
+  }
+}
+
 export const signedXpOf = (xp: number): string => (xp < 0 ? `${xp}` : `+${xp}`)
 
 export const reviewLabelOf = (review: Pick<GameReview, 'provider' | 'number'>): string =>

@@ -7,7 +7,7 @@ import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameHostCap } from './orchestrator-game-host-load'
-import type { GameRewardWeights } from './orchestrator-game-reward-weights'
+import type { GameRewardWeights, GameTeamXp } from './orchestrator-game-reward-weights'
 import type { OrchestratorGamePanel } from './orchestrator-game-panel'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { GameMerge } from './orchestrator-game-events'
@@ -229,6 +229,8 @@ export type OrchestratorGameState = {
   hosts?: GameHostCap[]
   /** XP per reward after every layer; absent from an older host, whose mod uses the baseline. */
   rewardWeights?: GameRewardWeights
+  /** The team's XP, characters plus the rewards the mod toasted; only for a lead, absent from an older host. */
+  teamXp?: GameTeamXp
   /** Whether the calling pane leads or was launched by a lead; absent from an older host. */
   role?: 'lead' | 'member'
   /** The project's live lead when it is another pane; absent when this pane is it, or none is live. */

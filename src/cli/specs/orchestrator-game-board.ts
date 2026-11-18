@@ -77,6 +77,18 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca game arcade', 'orca game arcade play --json']
   },
   {
+    path: ['game', 'xp'],
+    summary:
+      "The lead's team XP and its newest rewards, or a report of rewards the game mod toasted",
+    usage: 'orca game xp [--rewards <json>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'rewards'],
+    notes: [
+      "The total is the project's characters' XP plus every reward reported here, kept on the Orca host that runs the lead. The panel's level bar and the mod's score line both show it.",
+      'A reward is counted once by its id, and one PR earns once whichever pane saw it; the game mod reports by itself.'
+    ],
+    examples: ['orca game xp', 'orca game xp --json']
+  },
+  {
     path: ['game', 'inbox'],
     summary: "Messages to the lead or to one ticket's member, kept after the member closed",
     usage: 'orca game inbox [--ticket <id>] [--unread] [--mark-read] [--json]',

@@ -1212,6 +1212,20 @@ The ledger also takes rows that subtract XP, for the quality signals that will c
 (ORCA-686): the total can go below 0 while the level stays at 1, and the toast and the score line
 show the minus sign (`-30 XP`, in red on the flat score line).
 
+#### One team total (ORCA-1264)
+
+The mod's ledger lives in its own store, but every reward it toasts is also reported to the Orca
+host that runs the lead with `orca game xp --rewards <json>` (RPC `game.xp`). The host keeps those
+rows in the project's history file under `teamXp` and adds them to the characters' XP: that sum is
+the lead's `teamXp.total` in `game state`, which both the panel's level bar and the mod's score line
+show, so every `+N XP` toast moves the bar by N within one poll
+([`orchestrator-game-team-xp.ts`](../../src/shared/orchestrator-game-team-xp.ts)). A review's
+rows are keyed without the worktree (`ci-green:#41`), so a lead and its member seeing one PR pay it
+once, and a merge the host already paid to a character counts at the toast's XP instead of 100.
+The first total is the characters' XP the bar already showed, so the level never drops. An older
+host sends no `teamXp` and refuses `game.xp`: the panel then sums the characters, and the mod
+shows its own ledger, as before.
+
 ### The perfect merge
 
 `review.perfectMerge` is the owner's quality gate (ORCA-686), and the arcade (ORCA-775) reads it to

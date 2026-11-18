@@ -14,7 +14,7 @@ import type {
 } from '../types'
 import { gameActionsOf, gamePromptOf } from './game-action-shape'
 import { gameLeadOf } from './game-lead'
-import { rewardWeightsOf } from './rewards'
+import { rewardWeightsOf, teamXpOf } from './rewards'
 import { gameSourcesOf } from './game-sources'
 import { isTerminalHandle } from './game-config'
 import { lookConfigOf } from './game-render'
@@ -294,6 +294,7 @@ export const gameStateOf = (body: unknown): GameState | undefined => {
       : {}),
     ...viewSwitchOf(body),
     ...githubLowOf(body),
-    ...gameMergesOf(body.merges)
+    ...gameMergesOf(body.merges),
+    ...teamXpOf(body.teamXp)
   }
 }

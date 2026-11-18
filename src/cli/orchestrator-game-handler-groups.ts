@@ -119,6 +119,12 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
         .ORCHESTRATOR_GAME_ARCADE_CREDIT_HANDLERS
   },
   {
+    name: 'orchestrator-game-team-xp',
+    keys: ['game xp'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-team-xp.js')).ORCHESTRATOR_GAME_TEAM_XP_HANDLERS
+  },
+  {
     name: 'orchestrator-game-inbox',
     keys: ['game inbox'],
     load: async () =>

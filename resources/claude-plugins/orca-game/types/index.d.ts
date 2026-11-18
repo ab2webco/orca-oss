@@ -363,6 +363,8 @@ export type GameState = {
   githubLow?: { remaining: number; limit: number }
   /** The project's latest member merges, newest last; only for a lead, absent from an older host. */
   merges?: GameMerge[]
+  /** The team XP the panel's level bar shows; only for a lead, absent from an older host. */
+  teamXp?: { total: number }
   /** This Orca and each paired host, for a lead with a saved environment; absent otherwise (ORCA-841). */
   hostCapacity?: GameHostCapacity[]
   /** The lead's delivery numbers, read at most once a minute; absent for a member or an older host. */

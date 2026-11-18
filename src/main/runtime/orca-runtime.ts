@@ -877,6 +877,7 @@ import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
 import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
+import { GameTeamXpLedger } from './orchestrator-game-team-xp-ledger'
 import {
   gameOwnerQuestionMobileNotification,
   gameOwnerQuestionNotificationId,
@@ -4146,6 +4147,10 @@ export class OrcaRuntimeService {
     store: this.gameHistory,
     projectOf: (caller) => this.gameBoardProjectOf(caller),
     changed: () => this.noteGameFleetChanged()
+  })
+  private readonly gameTeamXp = new GameTeamXpLedger({
+    store: this.gameHistory,
+    projectOf: (caller) => this.gameBoardProjectOf(caller)
   })
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
@@ -31663,6 +31668,10 @@ export class OrcaRuntimeService {
     return this.gameArcade
   }
 
+  getGameTeamXp(): GameTeamXpLedger {
+    return this.gameTeamXp
+  }
+
   /** What each pane running the mod reports now, for a panel with no lead to read it through. */
   getGamePaneAdvisors(paneKeys: readonly string[]): {
     advisors: { paneKey: string; advisor: GameMemberAdvisor }[]
@@ -32880,6 +32889,8 @@ export class OrcaRuntimeService {
         this.gameBoard.merges({ worktreeId, terminalHandle: callerHandle ?? undefined }),
       readArcade: () =>
         this.gameArcade.read({ worktreeId, terminalHandle: callerHandle ?? undefined }),
+      readTeamXp: () =>
+        this.gameTeamXp.read({ worktreeId, terminalHandle: callerHandle ?? undefined }),
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
           worktreeId,
