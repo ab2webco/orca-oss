@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TeamMachine, TeamMemberCard } from './team-panel-model-types'
 import {
   teamMachineGaugesOf,
+  teamMachinesSummaryOf,
   teamMachineTicketsOf,
   teamMachineWarningsOf
 } from './team-machine-board'
@@ -114,5 +115,41 @@ describe('teamMachineTicketsOf', () => {
     expect(teamMachineTicketsOf(machine('x', { host: { kind: 'local' } }), members)).toEqual([
       'LAB-14'
     ])
+  })
+})
+
+describe('teamMachinesSummaryOf', () => {
+  // Why free on ready hosts only: a slot on a refused or offline host takes no member.
+  it('counts the hosts ready to launch, the agents against the answering caps, and the warned hosts', () => {
+    const busy = machine('busy', {
+      running: 2,
+      reading: reading({ cpuUsagePercent: 97 })
+    })
+    const summary = teamMachinesSummaryOf([
+      machine('studio', { running: 3 }),
+      busy,
+      machine('blocked', { launch: { kind: 'refused', reason: 'no' } }),
+      machine('bare', { cap: null, running: 1 }),
+      offline('away')
+    ])
+
+    expect(summary).toEqual({
+      hosts: 5,
+      ready: 3,
+      blocked: 1,
+      offline: 1,
+      running: 6,
+      cap: 12,
+      free: 3,
+      warned: [busy]
+    })
+  })
+
+  it('has no cap when no host publishes one', () => {
+    expect(teamMachinesSummaryOf([machine('studio', { cap: null, running: 2 })])).toMatchObject({
+      running: 2,
+      cap: null,
+      free: null
+    })
   })
 })

@@ -64,3 +64,35 @@ export function teamMachineTicketsOf(
     .map((one) => one.ticket!.identifier)
   return [...new Set(tickets)]
 }
+
+export type TeamMachinesSummary = {
+  hosts: number
+  /** Answering and able to take this lead's members. */
+  ready: number
+  blocked: number
+  offline: number
+  running: number
+  /** The answering hosts' caps; null when none publishes one. */
+  cap: number | null
+  /** Slots where a member can start now; null without a cap. */
+  free: number | null
+  warned: TeamMachine[]
+}
+
+export function teamMachinesSummaryOf(machines: readonly TeamMachine[]): TeamMachinesSummary {
+  const answering = machines.filter((one) => one.reading.kind !== 'unreachable')
+  const ready = answering.filter((one) => one.launch.kind === 'ready')
+  const capped = answering.filter((one) => one.cap !== null)
+  return {
+    hosts: machines.length,
+    ready: ready.length,
+    blocked: answering.length - ready.length,
+    offline: machines.length - answering.length,
+    running: machines.reduce((sum, one) => sum + one.running, 0),
+    cap: capped.length ? capped.reduce((sum, one) => sum + one.cap!, 0) : null,
+    free: capped.length
+      ? ready.reduce((sum, one) => sum + Math.max(0, (one.cap ?? one.running) - one.running), 0)
+      : null,
+    warned: machines.filter((one) => teamMachineWarningsOf(one).length > 0)
+  }
+}

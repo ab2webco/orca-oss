@@ -14,6 +14,7 @@ import type { TeamMachine, TeamPanelModel } from '../../../../shared/team-panel-
 import { teamStatusTone } from './team-card-text'
 import { TeamHostName } from './TeamHostName'
 import { Gauge, gbText, Readout, slotsFreeText } from './team-panel-machine-gauges'
+import { TeamMachinesSummary } from './team-panel-machines-summary'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelMessageState } from './team-panel-section-state'
 import { TeamStatusMark } from './TeamStatusMark'
@@ -288,6 +289,7 @@ export function TeamPanelMachinesTab({
   const alone = value.every((machine) => machine.host.kind === 'local')
   return (
     <div className={cn('@container flex flex-col pt-1.5', { 'pb-3': !alone })}>
+      {value.length > 1 ? <TeamMachinesSummary machines={value} /> : null}
       {value.map((machine) => (
         <MachineRow key={machineId(machine.host)} machine={machine} model={model} />
       ))}

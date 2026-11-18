@@ -176,3 +176,34 @@ describe('Machines board rows (ORCA-1252)', () => {
     ).not.toBeNull()
   })
 })
+
+describe('Machines summary strip (ORCA-1252)', () => {
+  const strip = (view: HTMLElement) => view.querySelector('[data-team-machines-summary]')!
+  const figure = (view: HTMLElement, name: string): string | null | undefined =>
+    strip(view).querySelector(`[data-team-machines-figure="${name}"]`)?.textContent
+
+  it('sums the hosts ready to launch, the agents and the busy or low hosts', () => {
+    const view = mount([
+      machine('studio', { running: 1, status: 'working' }),
+      BUSY,
+      machine('blocked', { launch: { kind: 'refused', reason: 'no' }, status: 'attention' }),
+      machine('away', { status: 'attention', reading: { kind: 'unreachable', lastSeenAt: null } })
+    ])
+
+    expect(figure(view, 'ready')).toContain('2 of 4')
+    expect(figure(view, 'ready')).toContain("1 can't launch")
+    expect(figure(view, 'ready')).toContain('1 offline')
+    expect(figure(view, 'agents')).toContain('3 of 12')
+    expect(figure(view, 'agents')).toContain('5 slots free')
+    expect(figure(view, 'warned')).toContain('busybox')
+    expect(
+      strip(view).querySelector('[data-team-machines-figure="warned"] .text-status-warning')
+    ).not.toBeNull()
+  })
+
+  it('is not drawn for this machine alone', () => {
+    const view = mount([machine('studio', { host: { kind: 'local' } })])
+
+    expect(view.querySelector('[data-team-machines-summary]')).toBeNull()
+  })
+})
