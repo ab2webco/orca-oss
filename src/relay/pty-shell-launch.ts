@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION } from '../main/pty/bash-prompt-command-normalize'
 import { getPosixOmpShellWrapper } from '../main/pty/omp-shell-wrapper'
 import {
   getZshFinalZdotdirRestoreBlock,
@@ -182,25 +183,7 @@ __orca_osc133_preexec() {
   printf "\\033]133;C\\007"
   __orca_in_command=1
 }
-__orca_normalize_prompt_command() {
-  local __orca_joined="" __orca_prompt_part
-  if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-    for __orca_prompt_part in "\${PROMPT_COMMAND[@]}"; do
-      [[ -n "$__orca_prompt_part" ]] || continue
-      if [[ -n "$__orca_joined" ]]; then
-        __orca_joined="$__orca_joined;$__orca_prompt_part"
-      else
-        __orca_joined="$__orca_prompt_part"
-      fi
-    done
-    PROMPT_COMMAND="$__orca_joined"
-  fi
-  # Why: RHEL-family /etc/bashrc can leave an inherited PROMPT_COMMAND ending in
-  # a ";"/whitespace separator; trim it so Orca's prepend/append never form ";;".
-  while [[ "\${PROMPT_COMMAND:-}" == *[[:space:]\\;] ]]; do
-    PROMPT_COMMAND="\${PROMPT_COMMAND%?}"
-  done
-}
+${BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION}
 __orca_prepend_prompt_command() {
   __orca_normalize_prompt_command
   PROMPT_COMMAND="__orca_osc133_precmd\${PROMPT_COMMAND:+;\${PROMPT_COMMAND}}"

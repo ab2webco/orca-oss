@@ -4,6 +4,7 @@
  * Why: bash gets a single `--rcfile` wrapper (not a ZDOTDIR tree), so the login
  * startup-file chain, OSC 133 hooks, and the shell-ready marker all live here.
  */
+import { BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION } from '../pty/bash-prompt-command-normalize'
 import { getPosixOmpShellWrapper } from '../pty/omp-shell-wrapper'
 import { getPosixCodexShellLaunchPreflight } from '../pty/codex-shell-launch-preflight'
 import { SHELL_STARTUP_IDENTITY_MARKER_BLOCK } from '../shell-templates'
@@ -87,20 +88,7 @@ __orca_osc133_preexec() {
   __orca_in_command=1
 }
 # Why: prepend so we capture $? before the user's PROMPT_COMMAND chain mutates it.
-__orca_normalize_prompt_command() {
-  local __orca_joined="" __orca_prompt_part
-  if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-    for __orca_prompt_part in "\${PROMPT_COMMAND[@]}"; do
-      [[ -n "$__orca_prompt_part" ]] || continue
-      if [[ -n "$__orca_joined" ]]; then
-        __orca_joined="$__orca_joined;$__orca_prompt_part"
-      else
-        __orca_joined="$__orca_prompt_part"
-      fi
-    done
-    PROMPT_COMMAND="$__orca_joined"
-  fi
-}
+${BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION}
 __orca_prepend_prompt_command() {
   __orca_normalize_prompt_command
   PROMPT_COMMAND="__orca_osc133_precmd\${PROMPT_COMMAND:+;\${PROMPT_COMMAND}}"
