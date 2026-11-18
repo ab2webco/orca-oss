@@ -35,12 +35,8 @@ record_status() {
   fi
 }
 
-major_of() {
-  local major="${1##*version }"
-  major="${major%%.*}"
-  case "$major" in '' | *[!0-9]*) major=0 ;; esac
-  printf '%s' "$major"
-}
+# shellcheck source=fish-version-floor.sh
+source "$(dirname "${BASH_SOURCE[0]}")/fish-version-floor.sh"
 
 download() {
   if [ -n "${ORCA_FISH4_DOWNLOAD_COMMAND:-}" ]; then
@@ -61,7 +57,7 @@ sha256_of() {
 }
 
 current="$($VERSION_COMMAND 2>/dev/null || true)"
-if [ "$(major_of "$current")" -ge 4 ]; then
+if fish_meets_floor "$current"; then
   exit 0
 fi
 log "apt left '${current:-no fish}'; installing the fish ${RELEASE} release"
@@ -89,9 +85,9 @@ if ! tar -xJf "$work/fish.tar.xz" -C "$work" fish || [ ! -x "$work/fish" ]; then
 fi
 
 shipped="$("$work/fish" --version 2>/dev/null || true)"
-if [ "$(major_of "$shipped")" -lt 4 ]; then
+if ! fish_meets_floor "$shipped"; then
   record_status 'release-not-fish4'
-  log "the fish ${RELEASE} tarball reports '${shipped:-nothing}', not fish 4"
+  log "the fish ${RELEASE} tarball reports '${shipped:-nothing}', not fish ${FISH_FLOOR}+"
   exit 1
 fi
 

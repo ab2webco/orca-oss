@@ -296,8 +296,15 @@ describe('require-fish4 gate', () => {
     expect(output).toContain('INFRASTRUCTURE, not this PR')
   })
 
-  it('passes on fish 4 without printing either diagnosis', () => {
-    const { status, output } = runGate({ fishVersion: '4.0.2', sourceStatus: 'ppa' })
+  // Why (ORCA-1280): Ubuntu 26.04's own fish 4.2.1 neither arms DECSET 2031 nor re-queries OSC 11.
+  it('fails on fish 4.2.1, older than the 4.3 floor', () => {
+    const { status, output } = runGate({ fishVersion: '4.2.1', sourceStatus: 'release' })
+    expect(status).toBe(1)
+    expect(output).toContain('fish 4.3+')
+  })
+
+  it('passes on fish 4.3 without printing either diagnosis', () => {
+    const { status, output } = runGate({ fishVersion: '4.3.0', sourceStatus: 'ppa' })
     expect(status).toBe(0)
     expect(output).not.toContain('::error::')
   })

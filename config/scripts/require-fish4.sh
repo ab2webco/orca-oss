@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The fish 4+ gate for `shell contracts` (ORCA-287).
+# The fish 4.3+ gate for `shell contracts` (ORCA-287, floor raised in ORCA-1280).
 #
 # A script and not inline YAML for the same reason the acquisition is: the two
 # diagnoses below are the thing under test, and a step body can only be exercised
@@ -11,7 +11,7 @@
 #   ORCA_FISH4_VERSION_COMMAND      how to ask fish its version (default: fish --version)
 #   ORCA_FISH4_SOURCE_STATUS_FILE   where the acquisition recorded its outcome
 #
-# Fails closed either way: fish 4 is what arms DECSET 2031 (#9993), so a lane that
+# Fails closed either way: fish 4.3 is what arms DECSET 2031 (#9993), so a lane that
 # skips on 3.7 is a gate that does not gate.
 
 set -uo pipefail
@@ -19,13 +19,13 @@ set -uo pipefail
 VERSION_COMMAND="${ORCA_FISH4_VERSION_COMMAND:-fish --version}"
 STATUS_FILE="${ORCA_FISH4_SOURCE_STATUS_FILE:-${RUNNER_TEMP:-/tmp}/fish4-source-status}"
 
+# shellcheck source=fish-version-floor.sh
+source "$(dirname "${BASH_SOURCE[0]}")/fish-version-floor.sh"
+
 version="$($VERSION_COMMAND 2>/dev/null || true)"
-major="${version##*version }"
-major="${major%%.*}"
-case "$major" in '' | *[!0-9]*) major=0 ;; esac
 printf '%s\n' "${version:-<fish not installed>}"
 
-if [ "$major" -ge 4 ]; then
+if fish_meets_floor "$version"; then
   exit 0
 fi
 
@@ -35,14 +35,14 @@ fi
 status="$(cat "$STATUS_FILE" 2>/dev/null || echo unknown)"
 case "$status" in
   release)
-    echo "::error::shell contracts needs fish 4+ (DECSET 2031 arming, #9993) but got '${version:-none}'. The fish 4 release was installed, so this is the install or PATH order, not an outage." >&2
+    echo "::error::shell contracts needs fish ${FISH_FLOOR}+ (DECSET 2031 arming, #9993) but got '${version:-none}'. The fish 4 release was installed, so this is the install or PATH order, not an outage." >&2
     ;;
   ppa)
     # Why not "the source was reachable": an added PPA can still 503 its Packages index (ORCA-732).
     echo "::error::INFRASTRUCTURE, not this PR: ppa:fish-shell/release-4 was added but apt still installed '${version:-none}', so its Packages index was not served, and no fish 4 release fallback ran. Re-run this job. See ORCA-732." >&2
     ;;
   release-*)
-    echo "::error::INFRASTRUCTURE, not this PR: neither ppa:fish-shell/release-4 nor the pinned fish 4 release gave the runner fish 4 (status=${status}), so it kept '${version:-none}'. Re-run this job. See ORCA-732." >&2
+    echo "::error::INFRASTRUCTURE, not this PR: neither ppa:fish-shell/release-4 nor the pinned fish 4 release gave the runner fish ${FISH_FLOOR}+ (status=${status}), so it kept '${version:-none}'. Re-run this job. See ORCA-732." >&2
     ;;
   *)
     echo "::error::INFRASTRUCTURE, not this PR: the ppa:fish-shell/release-4 apt source could not be reached (status=${status}), so the runner kept '${version:-none}'. Launchpad's key API returns HTTP 500 intermittently - re-run this job. See ORCA-287." >&2

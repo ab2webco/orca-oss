@@ -22,8 +22,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { fishRequirementViolation, resolveFishBinary } from './fish-binary-requirement'
 import { PtyStartupIngress } from './pty-startup-ingress'
 
-// Why fish 4: the DA1-sentinel handoff this measures lives in the 4.0 Rust tty_handoff.
-const FISH = resolveFishBinary(4)
+// Why fish 4.3: the DA1-sentinel handoff lives in the 4.0 Rust tty_handoff, but fish re-queries
+// OSC 11 on handoff only since 4.3's color-theme-aware themes (ORCA-1280: 26.04's 4.2.1 does not).
+const FISH = resolveFishBinary(4, 3)
 const itWithFish = FISH.available ? it : it.skip
 
 const PROMPT_MARK = 'ORCA13892> '

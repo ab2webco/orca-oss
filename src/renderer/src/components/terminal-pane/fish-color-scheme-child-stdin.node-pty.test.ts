@@ -27,10 +27,10 @@ import {
   resolveFishBinary
 } from '../../../../shared/fish-binary-requirement'
 
-// Why a version floor and not just presence: DECSET 2031 arming lives in the Rust
-// tty_handoff introduced by the fish 4.0 rewrite. An older fish cannot produce the
-// subscribe at all, so the test would pass vacuously instead of guarding anything.
-const FISH = resolveFishBinary(4)
+// Why a version floor and not just presence: fish arms DECSET 2031 around its prompt only
+// since 4.3's color-theme-aware themes (ORCA-1280: Ubuntu 26.04's 4.2.1 never arms it). An
+// older fish cannot produce the subscribe at all, so the test would guard nothing.
+const FISH = resolveFishBinary(4, 3)
 const FISH_BIN = FISH.path
 const itWithFish = FISH.available ? it : it.skip
 
