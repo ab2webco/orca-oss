@@ -6,88 +6,32 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, renameSync, rmSync } from 'node:fs'
+import { appendFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
+import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
-import { createShowcaseRepo } from './helpers/showcase-repo'
 import { demoMember } from './helpers/game-showcase-demo-party'
 import { seedRendererGameState } from './helpers/game-state-renderer-seed'
 import { openTeamPanelWithLead } from './helpers/team-panel-lead'
 import { RuntimeClient } from '../../src/cli/runtime-client'
-import { writeSettings } from './helpers/settings-write'
-import { ensureTerminalVisible, switchToWorktree, waitForSessionReady } from './helpers/store'
-import { waitForPaneIdentitySnapshot } from './helpers/terminal'
+import { waitForSessionReady } from './helpers/store'
+import {
+  DOCS_REPO,
+  WINDOW,
+  captureBothThemes,
+  docsRepo,
+  fromLeftEdge,
+  setWindowSize
+} from './helpers/user-docs-capture'
+import {
+  seedAgentStatus,
+  seedOpenPullRequest,
+  seedPullRequestForm
+} from './helpers/user-docs-review-seeds'
 
-const WINDOW = { width: 1280, height: 800 }
-const DOCS_REPO = '/Users/Shared/orca-docs/lumen-app'
 const ONBOARDING_ADVANCE = /^Continue\b|^Add your first project\b/
 const OPTIONAL_STEPS = [/Set up GitHub tasks|Connect your task sources/i, /Set Windows terminal/i]
-
-async function setWindowSize(
-  app: ElectronApplication,
-  page: Page,
-  size: { width: number; height: number } = WINDOW
-): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, target) => {
-    BrowserWindow.getAllWindows()[0]?.setSize(target.width, target.height)
-  }, size)
-  await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(size.width)
-}
-
-async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await writeSettings(page, { theme })
-  await expect
-    .poll(() =>
-      page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'))
-    )
-    .toBe(theme)
-}
-
-type Region = Locator | (() => Promise<{ x: number; y: number; width: number; height: number }>)
-
-/** The Lumen repo; at DOCS_REPO when capturing for the docs, else in a temp folder. */
-function docsRepo(): string {
-  const repo = createShowcaseRepo()
-  if (process.env.ORCA_DOCS_CAPTURE !== '1' || process.platform !== 'darwin') {
-    return repo
-  }
-  rmSync(dirname(DOCS_REPO), { recursive: true, force: true })
-  mkdirSync(dirname(DOCS_REPO), { recursive: true })
-  renameSync(repo, DOCS_REPO)
-  return DOCS_REPO
-}
-
-/** Saves `<name>.png` and `<name>.dark.png`, the names the docs transform pairs by theme. */
-async function captureBothThemes(
-  page: Page,
-  testInfo: TestInfo,
-  name: string,
-  region: Region
-): Promise<void> {
-  for (const theme of ['light', 'dark'] as const) {
-    await setTheme(page, theme)
-    // Why: theme tokens repaint over a transition; a capture mid-way mixes both themes.
-    await page.waitForTimeout(400)
-    const path = testInfo.outputPath(`${name}${theme === 'dark' ? '.dark' : ''}.png`)
-    await (typeof region === 'function'
-      ? page.screenshot({ path, clip: await region() })
-      : region.screenshot({ path }))
-  }
-}
-
-/** The box around `target` from the window's left edge, so a sidebar shows its header too. */
-function fromLeftEdge(target: Locator, pad = 6, right = -2) {
-  return async () => {
-    const box = await target.boundingBox()
-    if (!box) {
-      throw new Error('capture target is not on screen')
-    }
-    // Why `right` stops short of the row: past it the panel's border and the title bar show.
-    return { x: 0, y: 0, width: box.x + box.width + right, height: box.y + box.height + pad }
-  }
-}
 
 async function visible(page: Page, heading: RegExp): Promise<boolean> {
   return page
@@ -99,163 +43,6 @@ async function visible(page: Page, heading: RegExp): Promise<boolean> {
 
 async function continueOnboarding(page: Page): Promise<void> {
   await page.locator('footer').getByRole('button', { name: ONBOARDING_ADVANCE }).first().click()
-}
-
-async function seedAgentStatus(
-  page: Page,
-  worktreeId: string,
-  prompt: string,
-  state: 'working' | 'waiting' | 'done' = 'working'
-): Promise<void> {
-  await switchToWorktree(page, worktreeId)
-  await ensureTerminalVisible(page)
-  const snapshot = await waitForPaneIdentitySnapshot(page, 1)
-  const paneKey = `${snapshot.tabId}:${snapshot.panes[0]!.leafId}`
-  await page.evaluate(
-    ({ paneKey, prompt, state }) => {
-      const now = Date.now()
-      window
-        .__store!.getState()
-        .setAgentStatus(
-          paneKey,
-          { state, prompt, agentType: 'claude', lastAssistantMessage: prompt },
-          prompt,
-          { updatedAt: now, stateStartedAt: now - 1_000 }
-        )
-    },
-    { paneKey, prompt, state }
-  )
-}
-
-/** Stubs the hosted-review reads so Source Control offers a new pull request for `branch`. */
-async function seedPullRequestForm(page: Page, worktreeId: string, branch: string): Promise<void> {
-  await page.evaluate(
-    ({ worktreeId, branch }) => {
-      const store = window.__store!
-      const state = store.getState()
-      const worktree = Object.values(state.worktreesByRepo)
-        .flat()
-        .find((entry) => entry.id === worktreeId)!
-      // Why the cast: these stubs return just the fields Source Control reads, not whole results.
-      store.setState(
-        (current) =>
-          ({
-            repos: current.repos.map((repo) =>
-              repo.id === worktree.repoId ? { ...repo, worktreeBaseRef: 'origin/main' } : repo
-            ),
-            gitStatusByWorktree: { ...current.gitStatusByWorktree, [worktreeId]: [] },
-            remoteStatusesByWorktree: {
-              ...current.remoteStatusesByWorktree,
-              [worktreeId]: {
-                hasUpstream: true,
-                upstreamName: `origin/${branch}`,
-                ahead: 0,
-                behind: 0
-              }
-            },
-            getHostedReviewCreationEligibility: async () => ({
-              provider: 'github' as const,
-              review: null,
-              canCreate: true,
-              blockedReason: null,
-              nextAction: null,
-              defaultBaseRef: 'origin/main',
-              head: branch
-            }),
-            fetchHostedReviewForBranch: async () => null,
-            setUpstreamStatus: () => undefined,
-            fetchUpstreamStatus: async () => undefined,
-            fetchPRForBranch: async () => null,
-            fetchPRChecks: async () => [],
-            fetchPRComments: async () => []
-          }) as unknown as Partial<typeof current>
-      )
-      state.setActiveWorktree(worktreeId)
-      state.setRightSidebarOpen(true)
-      state.setRightSidebarTab('source-control')
-    },
-    { worktreeId, branch }
-  )
-}
-
-type SeededChecks = { conclusion: 'success' | 'failure'; mergeStateStatus: 'BLOCKED' | 'CLEAN' }
-
-/** Seeds a fictitious open PR (#42 on lumen/lumen-app) with three checks, then opens Checks. */
-async function seedOpenPullRequest(
-  page: Page,
-  worktreeId: string,
-  branch: string,
-  seeded: SeededChecks
-): Promise<void> {
-  await page.evaluate(
-    ({ worktreeId, branch, seeded }) => {
-      const store = window.__store!
-      const state = store.getState()
-      const worktree = Object.values(state.worktreesByRepo)
-        .flat()
-        .find((entry) => entry.id === worktreeId)!
-      const repo = state.repos.find((entry) => entry.id === worktree.repoId)!
-      const pr = {
-        number: 42,
-        title: 'Cache the feed so it reads offline',
-        state: 'open' as const,
-        url: 'https://github.com/lumen/lumen-app/pull/42',
-        checksStatus: seeded.conclusion,
-        updatedAt: new Date().toISOString(),
-        mergeable: 'MERGEABLE' as const,
-        mergeStateStatus: seeded.mergeStateStatus,
-        autoMergeAllowed: false,
-        mergeMethodSettings: {
-          defaultMethod: 'squash' as const,
-          allowedMethods: { squash: true, merge: true, rebase: true }
-        },
-        prRepo: { owner: 'lumen', repo: 'lumen-app' }
-      }
-      const checks = ['build', 'lint', 'unit tests'].map((name) => ({
-        name,
-        status: 'completed' as const,
-        conclusion: name === 'unit tests' ? seeded.conclusion : ('success' as const),
-        url: null
-      }))
-      const entries = {
-        [`${repo.id}::${branch}`]: { data: pr, fetchedAt: Date.now() },
-        [`${repo.path}::${branch}`]: { data: pr, fetchedAt: Date.now() }
-      }
-      // Why the cast: these stubs return just the fields Checks reads, not whole results.
-      store.setState(
-        (current) =>
-          ({
-            prCache: { ...current.prCache, ...entries },
-            gitStatusByWorktree: { ...current.gitStatusByWorktree, [worktreeId]: [] },
-            remoteStatusesByWorktree: {
-              ...current.remoteStatusesByWorktree,
-              [worktreeId]: {
-                hasUpstream: true,
-                upstreamName: `origin/${branch}`,
-                ahead: 0,
-                behind: 0
-              }
-            },
-            fetchPRForBranch: async (_repoPath: string, target: string) => {
-              if (target !== branch) {
-                return null
-              }
-              store.setState((next) => ({ prCache: { ...next.prCache, ...entries } }))
-              return pr
-            },
-            fetchHostedReviewForBranch: async () => null,
-            fetchPRChecks: async () => checks,
-            fetchPRComments: async () => [],
-            fetchUpstreamStatus: async () => undefined,
-            setUpstreamStatus: () => undefined
-          }) as unknown as Partial<typeof current>
-      )
-      state.setActiveWorktree(worktreeId)
-      state.setRightSidebarOpen(true)
-      state.setRightSidebarTab('checks')
-    },
-    { worktreeId, branch, seeded }
-  )
 }
 
 test.describe('Get started: first launch to a project', () => {
