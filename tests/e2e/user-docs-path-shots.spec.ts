@@ -680,3 +680,42 @@ test.describe('Plugins: the plugin system in Settings', () => {
     await captureBothThemes(page, testInfo, 'plugin-system', plugins)
   })
 })
+
+test.describe('Troubleshooting: a stuck terminal', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Settings > Terminal > Manage Sessions offers Restart daemon and Kill all sessions', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so the block fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    await page.evaluate(() => {
+      const state = window.__store!.getState()
+      state.openSettingsTarget({
+        pane: 'terminal',
+        repoId: null,
+        sectionId: 'terminal-manage-sessions'
+      })
+      state.openSettingsPage()
+    })
+    const sessions = page.locator('#terminal-manage-sessions')
+    await expect(sessions).toBeVisible({ timeout: 15_000 })
+    for (const name of ['Restart daemon', 'Kill all sessions']) {
+      await expect.soft(sessions.getByRole('button', { name }).first()).toBeVisible()
+    }
+    // Why hard: a listed session carries a real working directory, which no capture may show.
+    await expect(sessions.getByText('No sessions.')).toBeVisible({ timeout: 10_000 })
+    await expect(sessions.getByText(/\/Users\/|\/home\/|[A-Z]:\\/)).toHaveCount(0)
+    const box = (await sessions.boundingBox())!
+    testInfo.annotations.push({
+      type: 'sessions-css-px',
+      description: `${box.width}x${box.height}`
+    })
+    expect.soft(box.width).toBeLessThanOrEqual(560)
+    expect(box.height).toBeLessThan(900)
+    await captureBothThemes(page, testInfo, 'manage-sessions', sessions)
+  })
+})

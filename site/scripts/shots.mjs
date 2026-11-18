@@ -34,7 +34,8 @@ const DOCS = [
   'model/sidebar',
   'terminal',
   'mobile',
-  'artifacts-and-automations'
+  'artifacts-and-automations',
+  'settings-and-troubleshooting'
 ]
 const PAGES = [
   { name: 'landing', path: '/' },

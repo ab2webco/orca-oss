@@ -34,5 +34,6 @@ export const docsSidebar = [
     page('docs/extend/orca-sonar')
   ]),
   group('Mobile', 'Móvil', [page('docs/mobile'), page('docs/artifacts-and-automations')]),
+  group('Help', 'Ayuda', [page('docs/settings-and-troubleshooting')]),
   group('Privacy', 'Privacidad', [page('docs/telemetry')])
 ]
