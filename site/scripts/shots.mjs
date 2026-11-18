@@ -28,6 +28,7 @@ const DOCS = [
   'extend/plugins',
   'ssh',
   'agents/agent-teams',
+  'agents/scenes-and-settings',
   'agents/usage-tracking',
   'model/sidebar',
   'terminal',
