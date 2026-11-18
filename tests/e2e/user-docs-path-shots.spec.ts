@@ -348,3 +348,72 @@ test.describe('Install: accounts', () => {
     })
   })
 })
+
+test.describe('Projects: a folder, the sidebar and the new-tab menu', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Open as Folder, the Lumen worktrees in the sidebar and the New tab menu', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(180_000)
+    await waitForSessionReady(page)
+    await setWindowSize(electronApp, page)
+    const repo = docsRepo()
+    try {
+      await attachRepoAndOpenTerminal(page, repo)
+
+      // The dialog only reads this path; nothing is created there.
+      await page.evaluate(
+        (folderPath) => {
+          window.__store!.getState().openModal('confirm-non-git-folder', { folderPath })
+        },
+        `${dirname(DOCS_REPO)}/field-notes`
+      )
+      const folder = page.getByRole('dialog', { name: 'Open as Folder' })
+      await expect(folder).toBeVisible()
+      await expect.soft(folder.getByText(/isn't a Git repository/)).toBeVisible()
+      await expect.soft(folder.getByRole('button', { name: 'Open as Folder' })).toBeVisible()
+      await captureBothThemes(page, testInfo, 'open-as-folder', folder)
+      await folder.getByRole('button', { name: 'Cancel' }).click()
+      await expect(folder).toBeHidden()
+
+      const ids = await page.evaluate(async () => {
+        const state = window.__store!.getState()
+        const repoId = Object.values(state.worktreesByRepo).flat()[0]!.repoId
+        const made: string[] = []
+        for (const name of ['offline-feed', 'search-filters']) {
+          made.push((await state.createWorktree(repoId, name)).worktree.id)
+        }
+        return made
+      })
+      await seedWorkingAgent(page, ids[0]!, 'Cache the feed so it reads offline')
+      const rows = page.locator('[data-worktree-card-surface]')
+      await expect(rows.filter({ hasText: 'search-filters' }).first()).toBeVisible()
+      // One host: no host row, the projects sit straight under Projects.
+      await expect.soft(page.getByText('Projects', { exact: true }).first()).toBeVisible()
+      await captureBothThemes(page, testInfo, 'sidebar', fromLeftEdge(rows.last()))
+
+      // Why: the same as Keep on the emulator tip, which would sit mid-menu in the capture.
+      await page.evaluate(() => window.__store!.getState().dismissMobileEmulatorTabIntro())
+      const plus = page.getByRole('button', { name: 'New tab' }).first()
+      await plus.click()
+      const menu = page.getByRole('menu')
+      await expect(menu.getByRole('menuitem', { name: /New Terminal/ }).first()).toBeVisible()
+      await expect.soft(menu.getByRole('menuitem', { name: /New Browser Tab/ })).toBeVisible()
+      await expect.soft(menu.getByText(/Preview iOS simulators/)).toHaveCount(0)
+      await captureBothThemes(page, testInfo, 'new-tab-menu', async () => {
+        const button = (await plus.boundingBox())!
+        const list = (await menu.boundingBox())!
+        // Why 1: left of the menu's border is the pane behind it, with its own text.
+        const x = list.x - 1
+        const y = button.y - 8
+        const right = Math.max(button.x + button.width, list.x + list.width) + 12
+        return { x, y, width: right - x, height: list.y + list.height + 12 - y }
+      })
+      await page.keyboard.press('Escape')
+    } finally {
+      rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
+    }
+  })
+})

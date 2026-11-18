@@ -6,7 +6,8 @@ export const docsSidebar = [
   group('Start here', 'Empieza aquí', [
     page('docs/get-started'),
     page('docs'),
-    page('docs/install')
+    page('docs/install'),
+    page('docs/projects')
   ]),
   group('Workspaces', 'Espacios de trabajo', [
     page('docs/model/worktrees'),

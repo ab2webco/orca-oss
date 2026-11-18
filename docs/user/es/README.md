@@ -1,5 +1,5 @@
 ---
-sourceHash: e175e69948265825
+sourceHash: b900633d48efd4a3
 ---
 # Documentación de usuario de Orca Lab
 
@@ -10,6 +10,7 @@ de issues.
 ## Temas
 
 - [Instalación](install.md): builds de escritorio para macOS, Windows y Linux, la CLI y hosts sin interfaz gráfica.
+- [Proyectos y espacios de trabajo](projects.md): agrega un repositorio o una carpeta, un espacio por tarea, la barra lateral, las pestañas, las terminales y el navegador.
 - [Worktrees](model/worktrees.md): un worktree de git aislado por tarea, y cómo cambiar entre ellos.
 - [Apertura rápida](model/quick-open.md): busca archivos y salta a worktrees, chats y acciones.
 - [Barra lateral y pestañas nuevas](model/sidebar.md): hosts, agrupación y filtros, y el menú **+**.

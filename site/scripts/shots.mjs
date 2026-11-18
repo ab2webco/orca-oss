@@ -20,6 +20,7 @@ const THEMES = ['dark', 'light']
 const DOCS = [
   'get-started',
   'install',
+  'projects',
   'orchestrator/orca-game',
   'cli/overview',
   'extend/plugins',
