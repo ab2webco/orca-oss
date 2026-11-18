@@ -7,6 +7,7 @@ tracker.
 ## Topics
 
 - [Install](install.md): desktop builds for macOS, Windows and Linux, the CLI, and headless hosts.
+- [Projects and workspaces](projects.md): add a repository or a folder, one workspace per task, the sidebar, tabs, terminals and the browser.
 - [Worktrees](model/worktrees.md): one isolated git worktree per task, and how to switch between them.
 - [Quick open](model/quick-open.md): find files, and jump to worktrees, chats and actions.
 - [Sidebar and new tabs](model/sidebar.md): hosts, grouping and filters, and the **+** menu.
