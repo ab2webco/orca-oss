@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 const team = vi.hoisted(() => ({ value: { row: null as unknown, child: false } }))
-const hover = vi.hoisted(() => ({ details: false }))
+const hover = vi.hoisted(() => ({
+  details: false,
+  title: undefined as string | undefined,
+  branch: undefined as string | undefined
+}))
 const live = vi.hoisted(() => ({ agents: [] as unknown[] }))
 vi.mock('./worktree-agent-row-selectors', () => ({
   selectLiveAgentStatusEntriesForWorktree: () =>
@@ -21,7 +25,12 @@ vi.mock('./worktree-card-row-content', () => ({
   WorktreeCardTeamChildren: () => <div data-team-children="" />
 }))
 vi.mock('./worktree-card-presentation', () => ({
-  buildWorktreeCardPresentation: () => ({ titleOnlyCard: false, hasHoverDetails: hover.details })
+  buildWorktreeCardPresentation: () => ({
+    titleOnlyCard: false,
+    hasHoverDetails: hover.details,
+    hoverWorkspaceTitle: hover.title,
+    hoverBranchName: hover.branch
+  })
 }))
 vi.mock('./WorktreeContextMenu', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>
@@ -30,12 +39,16 @@ vi.mock('./AutoRenameFailedDialog', () => ({ AutoRenameFailedDialog: () => null 
 vi.mock('./WorktreeCardMeta', () => ({
   WorktreeCardDetailsHover: ({
     children,
-    detailsBefore
+    detailsBefore,
+    workspaceTitle,
+    branchName
   }: {
     children: React.ReactNode
     detailsBefore?: React.ReactNode
+    workspaceTitle?: string
+    branchName?: string
   }) => (
-    <div data-details-hover="">
+    <div data-details-hover="" data-workspace-title={workspaceTitle} data-branch={branchName}>
       {detailsBefore ? <div data-details-before="">{detailsBefore}</div> : null}
       {children}
     </div>
@@ -68,6 +81,8 @@ afterEach(async () => {
   })
   team.value = { row: null, child: false }
   hover.details = false
+  hover.title = undefined
+  hover.branch = undefined
   live.agents = []
   soloHover.onOpen = undefined
 })
@@ -199,6 +214,24 @@ describe('WorktreeCardSurface', () => {
       'tab-1:leaf-1'
     )
     expect(surface.querySelector('[data-details-hover] [data-row-content]')).not.toBeNull()
+  })
+
+  it("drops the workspace title that repeats the solo facts' title, keeping a branch that differs", async () => {
+    hover.title = 'master'
+    hover.branch = 'fabolivark/orca-1149'
+    live.agents = [oneAgent]
+    const card = (await surfaceOf(cardOf({}))).querySelector('[data-details-hover]')!
+
+    expect(card.hasAttribute('data-workspace-title')).toBe(false)
+    expect(card.getAttribute('data-branch')).toBe('fabolivark/orca-1149')
+  })
+
+  it('keeps the workspace title on a card that is not a solo row', async () => {
+    hover.details = true
+    hover.title = 'master'
+    const card = (await surfaceOf(cardOf({}))).querySelector('[data-details-hover]')!
+
+    expect(card.getAttribute('data-workspace-title')).toBe('master')
   })
 
   it('opens no solo card while the Activity view shows the same facts', async () => {

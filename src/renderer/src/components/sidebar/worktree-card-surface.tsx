@@ -128,7 +128,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         automationHostId={worktree.hostId}
         detailsBefore={solo ? <WorktreeCardSoloFacts card={card} solo={solo} /> : undefined}
         branchName={hoverBranchName}
-        workspaceTitle={hoverWorkspaceTitle}
+        // Why not for solo: the facts' title already names the worktree; rename stays in the menu.
+        workspaceTitle={solo ? undefined : hoverWorkspaceTitle}
         workspaceTitleRenameDisabled={isDeleting || affiliateListMode}
         detailsAfter={
           <>

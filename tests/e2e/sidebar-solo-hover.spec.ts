@@ -88,8 +88,8 @@ test("a solo row's card shows V30's agent facts above the worktree's own details
       await expect(facts).toContainText('Fix the checks panel tooltip')
       await expect(facts).toContainText('Bash · gh pr checks 912')
       await expect(facts).toContainText('Opus 5.5 · high')
-      // The worktree's own details card is still there, below the facts.
-      await expect(cards.locator('[data-worktree-hover-identity-header]')).toBeVisible()
+      // Why none: the facts' title already names the worktree, and its branch is the same name.
+      await expect(cards.locator('[data-worktree-hover-identity-header]')).toHaveCount(0)
       await expectInsideWindow(orcaPage, cards, where)
       const file = `sidebar-solo-hover-${width}-${theme}.png`
       const shot = await orcaPage.screenshot({
