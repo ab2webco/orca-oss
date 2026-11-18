@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatGameHostCapacity,
+  gameHostBusyRefusalOf,
   gameHostCapacitiesOf,
   gameHostMachineOf,
   withGameHostCapacity
@@ -284,5 +285,44 @@ describe('formatGameHostCapacity', () => {
       '  win   1 running · 10 cores · 9.0 of 16 GB free',
       '  mini  4 running · 4 cores · 20 of 52 GB free · load 6.0 · busy'
     ])
+  })
+})
+
+describe('gameHostBusyRefusalOf (ORCA-1284)', () => {
+  const row = (host: string, machine: typeof local) =>
+    ({ host, running: 0, status: 'ok', ...machine }) as const
+
+  it('refuses on this lead’s machine at three quarters of its cores, keeping room for its leads', () => {
+    const busy = row('local', { ...local, loadAverage1m: 7.5 })
+    expect(gameHostBusyRefusalOf([busy], 'local', 'ORCA-1')).toBe(
+      'local is busy (load 7.5 on 10 cores, 9.0 of 16 GB free; this lead’s machine keeps a quarter of its cores for its leads): launch ORCA-1 later, on another host, or with --past-busy "<why>".'
+    )
+    expect(
+      gameHostBusyRefusalOf([row('local', { ...local, loadAverage1m: 7.4 })], 'local', 'ORCA-1')
+    ).toBeNull()
+  })
+
+  it('refuses on a paired host at its cores, or low on memory, naming the reading', () => {
+    expect(
+      gameHostBusyRefusalOf([row('m1', { ...local, loadAverage1m: 10 })], 'm1', 'ORCA-1')
+    ).toBe(
+      'm1 is busy (load 10.0 on 10 cores, 9.0 of 16 GB free): launch ORCA-1 later, on another host, or with --past-busy "<why>".'
+    )
+    expect(
+      gameHostBusyRefusalOf([row('m1', { ...local, loadAverage1m: 9.9 })], 'm1', 'ORCA-1')
+    ).toBeNull()
+    expect(gameHostBusyRefusalOf([row('imac', imac)], 'imac', 'ORCA-1')).toBe(
+      'imac is low on memory (load 3.8 on 4 cores, 4.9 of 52 GB free): launch ORCA-1 later, on another host, or with --past-busy "<why>".'
+    )
+  })
+
+  it('leaves a host it has no reading for, or one not answering, to the launch itself', () => {
+    expect(gameHostBusyRefusalOf([], 'local', 'ORCA-1')).toBeNull()
+    expect(
+      gameHostBusyRefusalOf([{ host: 'm1', running: 0, status: 'unreachable' }], 'm1', 'ORCA-1')
+    ).toBeNull()
+    expect(
+      gameHostBusyRefusalOf([row('local', { ...local, loadAverage1m: null })], 'local', 'ORCA-1')
+    ).toBeNull()
   })
 })

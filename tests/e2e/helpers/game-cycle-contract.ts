@@ -139,6 +139,9 @@ export async function launchMember(
     ticket,
     '--agent',
     launchAgent,
+    // Why: a CI runner's load can pass the lead machine's busy line (ORCA-1284).
+    '--past-busy',
+    'e2e',
     '--json'
   ])
   expect(launch.status, `game launch ${ticket}\n${launch.stdout}\n${launch.stderr}`).toBe(0)

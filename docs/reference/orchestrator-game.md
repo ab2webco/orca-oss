@@ -703,6 +703,12 @@ The lead's verbs, run from the lead's terminal
   `--past-pr-cap "<why>"` is given, which launches and prints why. `orca game wave` prints `Warning:`
   on stderr and still starts its members. A PR counts even after its member was released, which the
   live member count cannot see.
+- A host's cap counts every member Orca launched there, whatever project's lead launched it: a
+  lead's state lists the others as `otherProjectMembers`, `orca game fleet` shows each host's split
+  (`5/5 running (this project 2, cineco 3)`), and a launch at the cap names the projects holding it.
+  `orca game launch` also refuses on a busy host (load at its cores; on the lead's own machine at
+  three quarters of them, to keep room for its leads) or one low on memory, with the reading, unless
+  `--past-busy "<why>"` is given. A host older than this lists no other project's members.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — one member for
   one ticket; `--repo` starts it in another repo of the project (its own or one in `memberRepos`), and `--on` on a paired host (see
   the fleet section below; `--repo` is then the host's repo and required). `--prompt` replaces `launchPrompt` for that

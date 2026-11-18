@@ -143,6 +143,37 @@ const LAUNCH_FLAGS: Record<GameHostLaunch['kind'], string | null> = {
   unanswered: 'repos not answering'
 }
 
+// Why: the lead's own machine keeps a quarter of its cores for its leads, so it refuses sooner (ORCA-1284).
+const LEAD_MACHINE_LOAD_SHARE = 0.75
+
+/** Why a launch on `host` must wait while it is busy or low on memory, or null when it may start. */
+export function gameHostBusyRefusalOf(
+  capacity: readonly GameHostCapacity[],
+  host: string,
+  ticket: string
+): string | null {
+  const one = capacity.find((row) => row.host === host)
+  if (one?.status !== 'ok') {
+    return null
+  }
+  const lead = host === LOCAL_GAME_HOST
+  const load = one.loadAverage1m
+  const busy = load !== null && load >= one.cpuCoreCount * (lead ? LEAD_MACHINE_LOAD_SHARE : 1)
+  const low = gameHostMemoryIsLow(one)
+  if (!busy && !low) {
+    return null
+  }
+  const what = [...(busy ? ['busy'] : []), ...(low ? ['low on memory'] : [])].join(' and ')
+  const headroom =
+    busy && lead ? '; this lead’s machine keeps a quarter of its cores for its leads' : ''
+  const cores =
+    load === null
+      ? `${one.cpuCoreCount} cores`
+      : `load ${load.toFixed(1)} on ${one.cpuCoreCount} cores`
+  const reading = `${cores}, ${gbOf(one.availableMemory)} of ${gbOf(one.totalMemory)} GB free${headroom}`
+  return `${host} is ${what} (${reading}): launch ${ticket} later, on another host, or with --past-busy "<why>".`
+}
+
 /** `game fleet` and `game state` text: one line per host under `Hosts:`. */
 export function formatGameHostCapacity(hosts: readonly GameHostCapacity[]): string[] {
   const width = Math.max(...hosts.map((one) => one.host.length))
