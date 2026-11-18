@@ -509,6 +509,21 @@ describe('orca game launch', () => {
     expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
   })
 
+  it('refuses a third launch when another project’s members fill this machine (ORCA-1284)', async () => {
+    const { client, calls } = fakeClient(
+      stateWith({
+        agents: [{ paneKey: 'm', state: 'working', isMember: true }],
+        lead: { autostart: false, cap: 3, agent: 'claude' },
+        otherProjectMembers: [{ host: 'local', repo: 'cineco', running: 2 }]
+      })
+    )
+
+    await expect(launch(client)).rejects.toThrow(
+      'local at cap 3/3 (this project 1, cineco 2): close one on local before launching CIN-12.'
+    )
+    expect(calls.map(([method]) => method)).toEqual(['game.state'])
+  })
+
   it('counts a member whose turn ended as running until its PR is merged', async () => {
     const member = { paneKey: 'm', state: 'done', isMember: true }
     const { client, calls } = fakeClient(

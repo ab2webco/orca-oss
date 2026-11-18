@@ -18,8 +18,10 @@ import type { GamePausedMember } from './orchestrator-game-member-sessions'
 import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
   gameFleetHostLoadsOf,
+  LOCAL_GAME_HOST,
   localGameFreeOf,
-  type GameHostLoad
+  type GameHostLoad,
+  type GameHostProjectLoad
 } from './orchestrator-game-host-load'
 
 export { ticketInText, ticketOfMember, isFinishedMember, localGameFreeOf }
@@ -78,6 +80,8 @@ export type GameFleet = {
   free: number
   /** Running members and free slots per host, local first; absent when the state has no per-host caps. */
   hosts?: GameHostLoad[]
+  /** Other projects' members on each host, counted against its cap; absent when there are none. */
+  others?: GameHostProjectLoad[]
   /** Members not live now (terminal ended, Orca restarted or not reporting): `game resume-members`. */
   paused: GamePausedMember[]
   /** Members whose start waits for the setup in flight (ORCA-746). */
@@ -85,7 +89,10 @@ export type GameFleet = {
   pausedError?: string
 }
 
-export type GameFleetInput = Pick<OrchestratorGameState, 'agents' | 'lead' | 'hosts'> &
+export type GameFleetInput = Pick<
+  OrchestratorGameState,
+  'agents' | 'lead' | 'hosts' | 'otherProjectMembers'
+> &
   Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
@@ -182,11 +189,20 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
     (agent) => (agent.remote?.gone || agent.found) && !isFinishedMember(agent)
   )
   const running = rows.length - counts.finished - slotless.length + holding.length + queued.length
+  const others = state.otherProjectMembers ?? []
   // Why every member here: a found session still loads the machine it runs on.
   const hosts =
     state.hosts &&
-    gameFleetHostLoadsOf(state.hosts, gameFleetMembersOf(state), holding.length + queued.length)
-  const free = Math.max(0, cap - running)
+    gameFleetHostLoadsOf(
+      state.hosts,
+      gameFleetMembersOf(state),
+      holding.length + queued.length,
+      others
+    )
+  const here = hosts
+    ? 0
+    : others.reduce((total, one) => total + (one.host === LOCAL_GAME_HOST ? one.running : 0), 0)
+  const free = Math.max(0, cap - running - here)
   const hostsFree = hosts?.reduce((total, one) => total + one.free, 0) ?? free
   return {
     rows,
@@ -195,6 +211,7 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
     running,
     free: Math.min(free, hostsFree),
     ...(hosts ? { hosts } : {}),
+    ...(others.length > 0 ? { others } : {}),
     paused: state.pausedMembers ?? [],
     queued,
     ...(state.pausedMembersError ? { pausedError: state.pausedMembersError } : {})

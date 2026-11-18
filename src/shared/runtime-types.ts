@@ -864,6 +864,8 @@ export type RuntimeWorktreeAgentRow = {
   lastActivityAt?: string
   /** Its dispatch failed for silence yet it keeps working, unreopened (ORCA-658). */
   orphaned?: boolean
+  /** An Orca dispatch started it, whatever project's lead; absent from an older host (ORCA-1284). */
+  dispatched?: true
 }
 
 export type RuntimeWorktreePsSummary = {

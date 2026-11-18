@@ -1,5 +1,5 @@
 import { gameFleetReportOf } from './orchestrator-game-fleet-verbs'
-import { LOCAL_GAME_HOST, type GameHostLoad } from './orchestrator-game-host-load'
+import { gameHostSplitOf, LOCAL_GAME_HOST, type GameHostLoad } from './orchestrator-game-host-load'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameHostLaunch } from './orchestrator-game-member-repo-scope'
 import type { OrchestratorGameState } from './orchestrator-game-state'
@@ -27,6 +27,8 @@ export type GameHostCapacity = {
   host: string
   running: number
   cap?: number
+  /** Other projects' members within `running` (ORCA-1284). */
+  others?: { repo: string; running: number }[]
   launch?: GameHostLaunch
 } & (({ status: 'ok' } & GameHostMachine) | { status: 'unreachable' })
 
@@ -80,13 +82,14 @@ export function gameHostCapacitiesOf(
   launches?: GameHostLaunches | null
 ): GameHostCapacity[] {
   const machines = new Map(readings.map((one) => [one.host, one.reading]))
-  return loads.map(({ host, running, cap, status }): GameHostCapacity => {
+  return loads.map(({ host, running, cap, status, others }): GameHostCapacity => {
     const reading = machines.get(host)
     const launch = host === LOCAL_GAME_HOST ? undefined : launches?.get(host)
     const base = {
       host,
       running,
       ...(status === 'ok' ? { cap } : {}),
+      ...(others ? { others } : {}),
       ...(launch ? { launch } : {})
     }
     return reading?.kind === 'ok'
@@ -155,9 +158,9 @@ export function formatGameHostCapacity(hosts: readonly GameHostCapacity[]): stri
               ...flagsOf(one)
             ]
           : ['not answering']
-      const running = one.cap === undefined ? one.running : `${one.running}/${one.cap}`
+      const running = `${one.cap === undefined ? one.running : `${one.running}/${one.cap}`} running${gameHostSplitOf(one)}`
       const launch = one.launch ? LAUNCH_FLAGS[one.launch.kind] : null
-      return `  ${one.host.padEnd(width)}  ${[`${running} running`, ...figures, ...(launch ? [launch] : [])].join(' · ')}`
+      return `  ${one.host.padEnd(width)}  ${[running, ...figures, ...(launch ? [launch] : [])].join(' · ')}`
     })
   ]
 }

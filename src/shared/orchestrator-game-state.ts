@@ -6,7 +6,7 @@ import type { OrchestratorGameViewId, OrchestratorGameViewScope } from './orches
 import type { GameAction } from './orchestrator-game-actions'
 import type { OrchestratorGameLead } from './orchestrator-game-lead'
 import type { GameHostCapacity } from './orchestrator-game-host-capacity'
-import type { GameHostCap } from './orchestrator-game-host-load'
+import type { GameHostCap, GameOtherProjectsState } from './orchestrator-game-host-load'
 import type { GameRewardWeights, GameTeamXp } from './orchestrator-game-reward-weights'
 import type { OrchestratorGamePanel } from './orchestrator-game-panel'
 import type { GameProjectWork } from './orchestrator-game-project-work'
@@ -192,7 +192,7 @@ export type GameLink = {
   tone?: GameLinkTone
 }
 
-export type OrchestratorGameState = {
+export type OrchestratorGameState = GameOtherProjectsState & {
   config: OrchestratorGameConfig
   sources: Record<keyof OrchestratorGameConfig, OrchestratorGameSource>
   warnings: string[]

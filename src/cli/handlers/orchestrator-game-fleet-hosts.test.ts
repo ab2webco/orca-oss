@@ -137,4 +137,31 @@ describe('orca game fleet per host (ORCA-841)', () => {
     })
     expect(output.join('\n')).not.toContain('Hosts:')
   })
+
+  it('alone, shows this machine’s row once other projects share it, split by project (ORCA-1284)', async () => {
+    const localHost = {
+      ...hostCapacity[0],
+      running: 4,
+      others: [{ repo: 'cineco', running: 3 }]
+    }
+    const { client } = fakeClient(
+      stateWith({
+        agents: [LEAD, member({})],
+        lead: { autostart: false, cap: 4, agent: 'claude' },
+        localHost,
+        otherProjectMembers: [{ host: 'local', repo: 'cineco', running: 3 }]
+      })
+    )
+    await ORCHESTRATOR_GAME_FLEET_HANDLERS['game fleet']({
+      flags: new Map(),
+      client,
+      cwd: '/repo',
+      json: false
+    })
+    expect(output.join('\n').split('\n').slice(0, 3)).toEqual([
+      expect.stringMatching(/ 1\/4 running, 0 free$/),
+      'Hosts:',
+      '  local  4/4 running (this project 1, cineco 3) · 10 cores · 9.0 of 16 GB free · load 2.1'
+    ])
+  })
 })

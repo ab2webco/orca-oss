@@ -198,6 +198,23 @@ describe('withGameHostCapacity', () => {
       withGameHostCapacity({ ...alone, role: 'member' }, readings.slice(0, 1))
     ).not.toHaveProperty('localHost')
   })
+
+  it('counts other projects’ members on this machine in its running, and names them (ORCA-1284)', () => {
+    const alone = {
+      ...state,
+      hosts: undefined,
+      agents: [member('a')],
+      otherProjectMembers: [{ host: 'local', repo: 'cineco', running: 2 }]
+    }
+    expect(withGameHostCapacity(alone, readings.slice(0, 1)).localHost).toEqual({
+      host: 'local',
+      running: 4,
+      cap: 10,
+      others: [{ repo: 'cineco', running: 2 }],
+      status: 'ok',
+      ...local
+    })
+  })
 })
 
 describe('formatGameHostCapacity', () => {
@@ -213,6 +230,27 @@ describe('formatGameHostCapacity', () => {
       '  local  3/4 running · 10 cores · 9.0 of 16 GB free · load 2.1',
       '  imac   2 running · 4 cores · 4.9 of 52 GB free · load 3.8 · low memory',
       '  m1     0/6 running · not answering'
+    ])
+  })
+
+  it('splits a host’s running between this project and the others on it (ORCA-1284)', () => {
+    expect(
+      formatGameHostCapacity([
+        {
+          host: 'local',
+          running: 5,
+          cap: 5,
+          others: [
+            { repo: 'cineco', running: 2 },
+            { repo: 'koombea', running: 1 }
+          ],
+          status: 'ok',
+          ...local
+        }
+      ])
+    ).toEqual([
+      'Hosts:',
+      '  local  5/5 running (this project 2, cineco 2, koombea 1) · 10 cores · 9.0 of 16 GB free · load 2.1'
     ])
   })
 

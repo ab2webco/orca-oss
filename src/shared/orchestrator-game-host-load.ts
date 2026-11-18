@@ -21,7 +21,18 @@ export type GameHostCap = {
   status: GameHostCapStatus
 }
 
-export type GameHostLoad = GameHostCap & { running: number; free: number }
+/** Members other projects' leads launched on a host; they take its slots too (ORCA-1284). */
+export type GameHostProjectLoad = { host: string; repo: string; running: number }
+
+/** `game.state` for a lead: other projects' members on its hosts, when any; absent from an older host. */
+export type GameOtherProjectsState = { otherProjectMembers?: GameHostProjectLoad[] }
+
+/** `running` includes `others`, other projects' members on the host. */
+export type GameHostLoad = GameHostCap & {
+  running: number
+  free: number
+  others?: { repo: string; running: number }[]
+}
 
 /** What a host publishes on `status.get`; `memberCap` is its own per-machine cap. */
 export type PairedGameHost = GameHostProfile & { memberCap?: number }
@@ -119,27 +130,54 @@ export function gameHostLoadFor(
   return loads.find((one) => one.host === target || one.id === target)
 }
 
+const othersSum = (others: readonly { running: number }[]): number =>
+  others.reduce((total, one) => total + one.running, 0)
+
+/** ` (this project 2, cineco 3)`, or nothing when only this project runs on the host. */
+export const gameHostSplitOf = (load: Pick<GameHostLoad, 'running' | 'others'>): string =>
+  load.others?.length
+    ? ` (this project ${load.running - othersSum(load.others)}, ${load.others.map((one) => `${one.repo} ${one.running}`).join(', ')})`
+    : ''
+
+// Why: alone there are no per-host loads, yet other projects still fill this machine.
+function aloneLoadsOf(total: {
+  cap: number
+  running: number
+  others?: readonly GameHostProjectLoad[]
+}): GameHostLoad[] {
+  const others = (total.others ?? [])
+    .filter((one) => one.host === LOCAL_GAME_HOST)
+    .map(({ repo, running }) => ({ repo, running }))
+  if (others.length === 0) {
+    return []
+  }
+  const running = total.running + othersSum(others)
+  const free = Math.max(0, total.cap - running)
+  return [{ host: LOCAL_GAME_HOST, cap: total.cap, status: 'ok', running, free, others }]
+}
+
 /** Why a launch on `on` (local when null) cannot start, or null when it may. */
 export function gameHostRefusalOf(
   loads: readonly GameHostLoad[],
-  total: { cap: number; running: number },
+  total: { cap: number; running: number; others?: readonly GameHostProjectLoad[] },
   on: string | null,
   ticket: string
 ): string | null {
   if (total.running >= total.cap) {
     return `${total.running} of ${total.cap} members are running, the lead’s cap; close one before launching ${ticket}.`
   }
-  const named = gameHostLoadFor(loads, on)
+  const hosts = loads.length > 0 ? loads : aloneLoadsOf(total)
+  const named = gameHostLoadFor(hosts, on)
   // Why: a stale reading must not block a host that answers again; the launch itself reports one that does not.
   if (named === undefined || named.status === 'unreachable') {
     return null
   }
-  const target = named.status === 'older' ? gameHostLoadFor(loads, null) : named
+  const target = named.status === 'older' ? gameHostLoadFor(hosts, null) : named
   if (target === undefined || target.free > 0) {
     return null
   }
-  const room = loads.filter((one) => one.free > 0 && one.host !== target.host)
-  const at = `${target.host} at cap ${target.running}/${target.cap}`
+  const room = hosts.filter((one) => one.free > 0 && one.host !== target.host)
+  const at = `${target.host} at cap ${target.running}/${target.cap}${gameHostSplitOf(target)}`
   if (room.length === 0) {
     return `${at}: close one on ${target.host} before launching ${ticket}.`
   }
@@ -151,12 +189,27 @@ export function gameHostRefusalOf(
 export function gameFleetHostLoadsOf(
   hosts: readonly GameHostCap[],
   members: readonly GameAgent[],
-  localHeld: number
+  localHeld: number,
+  otherProjects: readonly GameHostProjectLoad[] = []
 ): GameHostLoad[] {
   const runningOn = members
     .filter((agent) => !isFinishedMember(agent) && !agent.remote?.gone)
     .map((agent) => agent.remote?.host ?? LOCAL_GAME_HOST)
-  return gameHostLoadsOf(hosts, [...runningOn, ...Array<string>(localHeld).fill(LOCAL_GAME_HOST)])
+  const loads = gameHostLoadsOf(hosts, [
+    ...runningOn,
+    ...Array<string>(localHeld).fill(LOCAL_GAME_HOST)
+  ])
+  return loads.map((one) => {
+    const others = otherProjects
+      .filter((other) => other.host === one.host)
+      .map(({ repo, running }) => ({ repo, running }))
+    if (others.length === 0) {
+      return one
+    }
+    const running = one.running + othersSum(others)
+    const free = one.status === 'ok' ? Math.max(0, one.cap - running) : 0
+    return { ...one, running, free, others }
+  })
 }
 
 /** Slots a launch on this Orca may take: its own free ones, never past the lead's total. */

@@ -844,7 +844,9 @@ import {
   remoteWorktreeKeyOf
 } from './orchestrator-game-remote-found'
 import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import { LOCAL_GAME_HOST } from '../../shared/orchestrator-game-host-load'
 import { GameHostLaunchReader, gameHostLaunchesOf } from './orchestrator-game-host-launch-reader'
+import { withOtherProjectMembers } from '../../shared/orchestrator-game-host-projects'
 import {
   gameRepoSummaryOf,
   localGameRepoSummaryOf,
@@ -20983,7 +20985,8 @@ export class OrcaRuntimeService {
         updatedAt: src.updatedAt,
         ...(src.restoredUnconfirmed ? { restoredUnconfirmed: true } : {}),
         ...(orchestration?.lastActivityAt ? { lastActivityAt: orchestration.lastActivityAt } : {}),
-        ...(orchestration?.orphaned ? { orphaned: true } : {})
+        ...(orchestration?.orphaned ? { orphaned: true } : {}),
+        ...(orchestration ? { dispatched: true as const } : {})
       }
       // Why: SSH/runtime projections can spell an equivalent path differently;
       // bucket by the canonical summary id so mobile keeps the agent activity.
@@ -33010,8 +33013,20 @@ export class OrcaRuntimeService {
       args.paneKey ? worktree?.repoId : undefined
     )
     const repos = await hostRepos
+    // Why before capacity: each host's running count there must include other projects' members.
+    const shared =
+      visible.role === 'lead'
+        ? withOtherProjectMembers(
+            visible,
+            [
+              { host: LOCAL_GAME_HOST, worktrees: summaries },
+              ...(await this.gameRemoteSessions.read().catch(() => []))
+            ],
+            worktree?.id ?? null
+          )
+        : visible
     return withGameHostCapacity(
-      visible,
+      shared,
       await hostReadings,
       repos ? gameHostLaunchesOf(repos, visible.lead?.memberRepos) : null
     )
