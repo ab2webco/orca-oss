@@ -1,82 +1,107 @@
 ---
-sourceHash: 8a584faadc103db6
+sourceHash: f32901a5e627330a
 ---
 # Agent Teams
 
-Un equipo es un **líder** y sus **miembros**. El líder es una sesión de Claude que habla contigo, elige
-tickets e inicia un miembro por ticket, cada uno en su propio worktree. Los miembros trabajan, abren su
-pull request e informan; el líder te transmite solo lo que te necesita. El panel **Team** lo muestra
-todo.
+Un equipo es un **líder** y sus **miembros**. El líder es una sesión de Claude que habla contigo,
+elige tickets e inicia un miembro por ticket, cada uno en su propio worktree. Los miembros trabajan,
+abren su pull request e informan; el líder te transmite solo lo que te necesita y mergea lo que está
+verificado. Orca Game es ese equipo, dibujado como un juego en el panel **Team**. Esta página lo
+monta en un proyecto nuevo, paso a paso.
 
-## Iniciar un líder
+<figure class="orca-diagram" aria-label="Un líder y sus miembros, de los tickets a los pull requests mergeados">
+<ol class="orca-chain">
+<li><strong>Líder</strong><span>toma tus tickets y lanza miembros</span></li>
+<li><strong>Miembros</strong><span>uno por ticket, cada uno en su propio worktree</span></li>
+<li><strong>Inbox</strong><span>sus preguntas, para que las respondas</span></li>
+<li><strong>Merge</strong><span>lo hace el líder cuando el CI está en verde</span></li>
+</ol>
+</figure>
 
-1. En el proyecto, abre **+** y elige **Claude Agent Teams** en **Agents**. Si no está en la lista,
-   actívalo en **Settings > Agents**.
-2. Ejecuta `/orca-game:lead`, u `orca game lead` desde esa terminal. La sesión se convierte en el
-   líder del proyecto y carga las reglas del proyecto desde `orca.yaml`.
-3. Para configurar `orca.yaml` (el tracker del To Do, las reglas del líder, la escena), ejecuta
-   `/orca-game:setup` en un pane de Claude del proyecto.
+## 1. Inicia un líder
 
-`orca game lead` imprime primero las reglas propias de Orca. Entre ellas, el líder vuelve a armar su
-espera de reportes y `orca game watch --lead` en cada inicio, reanudación o compactación; la segunda
-imprime una alerta por cada miembro o entrada de la merge queue que le pide actuar. Resuelve de inmediato cada miembro
-`gone from` su host y da un PR por terminado solo cuando tiene merge. Planea los carriles paralelos
-por los archivos que tocan y pide a los miembros un plan de división antes de un primer commit
-grande. A los miembros se les indica reportar una vez y nombrar un CI rojo en vez de quedarse
-inactivos. Las `orchestratorGame.orchestrator.rules` de tu proyecto en `orca.yaml` se imprimen
-después, sin cambios, y ganan donde difieren: agrega ahí una regla o contradice una de las propias.
+1. Abre el proyecto y elige **+** al final de la barra de pestañas. En **Agents**, elige
+   **Claude Agent Teams**. Si no aparece, ponlo en **Enabled** en **Settings > Agents**.
+2. En ese panel, ejecuta `/orca-game:lead` (u `orca game lead`). La sesión pasa a ser el líder del
+   proyecto e imprime sus reglas de base y luego las de tu proyecto.
+3. Una vez, en el mismo panel, ejecuta `/orca-game:setup`. Pregunta qué conectar, de a una
+   pregunta: el tracker del To Do, las reglas del líder, la escena. Escribe en el `orca.yaml` del
+   proyecto solo lo que confirmas.
 
-Un proyecto tiene un líder. Cuando ya lo tiene, **+** muestra un grupo **Team** en lugar de una segunda
-entrada **Claude Agent Teams**: **Go to lead** y **Add member…** mientras el líder está en marcha,
-**Reopen team** y **Start fresh lead…** después de cerrarlo. `/orca-game:lead fresh` (`orca game lead
---fresh`) inicia una conversación de líder nueva en lugar de reabrir la anterior. Consulta
-[Barra lateral y pestañas nuevas](../model/sidebar.md#el-menú-).
+Las reglas de base hacen que el líder vuelva a armar su espera de informes y `orca game watch --lead`
+en cada inicio, reanudación o compactación, planifique carriles en paralelo según los archivos que
+tocan, pida a los miembros un plan de división antes de un primer commit grande y dé un pull request
+por terminado solo cuando se mergea. Las `orchestratorGame.orchestrator.rules` de tu proyecto en
+`orca.yaml` se imprimen después, sin cambios, y ganan donde difieren.
 
-## Agregar miembros
+Un proyecto tiene un solo líder. Cuando ya lo tiene, **+** muestra un grupo **Team** en lugar de una
+segunda entrada **Claude Agent Teams**: **Go to lead** y **Add member…** mientras el líder corre,
+**Reopen team** y **Start fresh lead…** después de cerrarlo. `/orca-game:lead fresh`
+(`orca game lead --fresh`) inicia una conversación de líder nueva en lugar de reabrir la anterior.
 
-- Pídeselo al líder con tus palabras ("toma ORCA-101 y ORCA-102").
-- O abre **+ > Add member…**, elige una cuenta en **Member account** y un ticket del To Do.
-- O ejecuta `orca game launch <ticket>` desde la terminal del líder. `--on <host>` inicia el miembro en
-  un host de Orca Lab emparejado.
+## 2. Agrega miembros
 
-Cada miembro es un personaje durante toda su ejecución: el mismo nombre y retrato en su tarjeta, en su
-terminal y en el historial.
+- Pídeselo al líder con palabras simples ("toma LUM-14 y LUM-17").
+- O abre **+ > Add member…**, elige una cuenta en **Member account** y un ticket del To Do
+  ([Trackers y tareas](../review/linear.md#el-to-do-de-un-equipo) dice de dónde sale).
+- O ejecuta `orca game launch <ticket>` desde la terminal del líder. `--on <host>` inicia el miembro
+  en un host de Orca Lab emparejado.
 
-## El panel Team
+## 3. Lee el panel Team
 
-Abre **Team** en la barra de actividad de la barra lateral derecha. Sin equipo, el mismo elemento se
-llama **Your work** y lista tus propias sesiones de agente.
+Abre **Team** en la barra lateral derecha. Sin equipo, el mismo elemento se llama **Your work** y
+lista tus propias sesiones de agente en **Activity**. Con equipo, la cabecera nombra el proyecto,
+muestra el nivel y la XP del equipo, y su engranaje abre **Project settings**. Las pestañas son
+**Team**, **Inbox**, **PRs** y **Machines**.
 
-- **Team**, solo con equipo: el líder, el advisor si está instalado y una tarjeta por miembro.
-- **Activity**, solo sin equipo: el prompt, el paso actual, la pregunta, el modelo y la cuenta de
-  cada sesión.
-- **Inbox**: las preguntas para ti, con un contador rojo.
-- **PRs**: los PR abiertos con su estado, y la cola de merge arriba.
-- **Machines**: cada host con su memoria libre y cuántos agentes ejecuta.
+![La pestaña Team con el líder, tres miembros y el nivel del equipo](../../../assets/agent-teams/team-tab.png)
 
-En la pestaña **Team**:
+En **Team**, primero va el líder, con una corona y lo que está haciendo: **Orchestrating**,
+**Waiting on 2 agents** o **Waiting for you**; haz clic para abrir la sesión del líder. Si el
+asesor está instalado va después, y luego una tarjeta por miembro:
 
-- Haz clic en la tarjeta de un miembro para abrir su terminal y expandir la tarjeta: título del ticket,
-  rama, última herramienta, PR con CI, ayudantes y el uso de 5 horas y semanal de la cuenta. Haz clic
-  otra vez para plegarla.
-- Una tarjeta que te necesita dice **Waiting for your answer** y tiene **Answer in Inbox**.
-- Hacer clic en la fila del líder abre la sesión del líder.
-- El engranaje abre **Project settings** del equipo.
+- La línea de la tarjeta dice qué hace el miembro ahora, y su línea de detalle su fase:
+  **Planning**, **Documenting**, **Coding**, **Testing**, **In PR** o **Merging**.
+- Un miembro que te necesita dice **Waiting for your answer** y tiene **Answer in Inbox**; uno
+  detenido en un permiso tiene **Answer in its terminal**.
+- Haz clic en una tarjeta para abrir la terminal del miembro y expandirla: título del ticket,
+  **Branch**, **Last tool**, el PR con su CI (**CI running**, **CI green**, **CI failing**,
+  **Merged**), sus ayudantes y el uso de su cuenta en **5 h** y **Week**. Otro clic la pliega.
 
-## Responder desde el Inbox
+## 4. Responde desde el Inbox
 
-**Inbox** tiene **For you**, **Waiting**, **Threads** y **Answered**. Las preguntas de este proyecto van
-primero; las de otros proyectos quedan plegadas en **Other projects**. Cuando llega una pregunta nueva,
-su notificación abre el panel en el Inbox. El teléfono muestra las mismas preguntas; consulta
-[Móvil](../mobile.md).
+Cuando un miembro o el líder necesita una decisión, la pregunta llega al **Inbox** con un contador
+rojo, y su notificación abre el panel ahí. **Inbox** tiene **For you**, **Waiting**, **Threads** y
+**Answered**; las preguntas de otros proyectos quedan plegadas en **Other projects**.
 
-## Del PR al merge
+![El Inbox con una pregunta para ti, sus dos opciones y el botón Answer](../../../assets/agent-teams/inbox.png)
 
-Un miembro pasa por **Planning**, **Coding**, **Testing** e **In PR**. Su tarjeta muestra el PR y su CI
-(**CI running**, **CI green**, **CI failing**, **Merged**). Desde la terminal de un miembro,
-`orca game state` informa el mismo CI como `review.ci` y el estado de merge de GitHub como
-`review.mergeState`; solo `clean` puede hacer merge. Cuando el miembro termina,
-`orca game sweep --close` lo registra en el historial y libera su pestaña.
+Elige una de las opciones de la pregunta, o elige **Answer**, escribe en **Your answer** y
+**Send**. La respuesta llega al correo del líder, y el líder sigue. El teléfono muestra las mismas
+preguntas; consulta [Móvil](../mobile.md).
+
+## 5. Del pull request al merge
+
+**PRs** lista los pull requests abiertos del equipo, cada uno con lo que espera: **Check failed**,
+**Conflict**, **In review**, **Ready**, etc. Cuando la rama por defecto usa la merge queue de
+GitHub, **Merge queue** va arriba con el estado de cada entrada.
+
+El líder mergea. Revisa el trabajo de cada miembro, lo mergea o lo encola cuando el CI está en verde,
+y actúa ante una ejecución en rojo o una entrada atascada en la cola. Un miembro lee su propio CI
+con `orca game state --json`: `review.ci`, y `review.mergeState`, donde solo `clean` se puede
+mergear. Después de cada merge, el líder pasa el ticket a terminado, elimina el worktree y su rama,
+y libera al miembro con `orca game sweep --close`, que lo registra en el historial.
+
+## 6. Machines
+
+**Machines** lista cada host que el equipo puede usar, con cuánto tiene libre y cuántos agentes
+corre. Con una sola máquina dice **Only this machine**; [SSH](../ssh.md) explica cómo sumar más.
+
+## 7. Niveles
+
+En la apariencia **Game**, la cabecera muestra el nivel del equipo (**Lv 3**) y su XP. La XP premia
+solo lo que llegó: cada miembro que termina con su pull request mergeado suma 100 XP, y uno que
+termina en QA suma 50. El nivel 2 pide 100 XP, y cada nivel siguiente 100 más que el anterior.
 
 ## Apariencias, estilos y escenas
 

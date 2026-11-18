@@ -12,6 +12,10 @@ import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/pla
 import { expect, test } from './helpers/orca-app'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { createShowcaseRepo } from './helpers/showcase-repo'
+import { demoMember } from './helpers/game-showcase-demo-party'
+import { seedRendererGameState } from './helpers/game-state-renderer-seed'
+import { openTeamPanelWithLead } from './helpers/team-panel-lead'
+import { RuntimeClient } from '../../src/cli/runtime-client'
 import { writeSettings } from './helpers/settings-write'
 import { ensureTerminalVisible, switchToWorktree, waitForSessionReady } from './helpers/store'
 import { waitForPaneIdentitySnapshot } from './helpers/terminal'
@@ -630,5 +634,102 @@ test.describe('Trackers: connecting Plane', () => {
     }
     await captureBothThemes(page, testInfo, 'connect-plane', plane)
     await page.keyboard.press('Escape')
+  })
+})
+
+test.describe('Agent Teams: the Team panel and the Inbox', () => {
+  test.use({ seedTestRepo: false })
+
+  test('a lead with three Lumen members, and a question for you in the Inbox', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(240_000)
+    await waitForSessionReady(page)
+    await setWindowSize(electronApp, page)
+    const repo = docsRepo()
+    try {
+      await attachRepoAndOpenTerminal(page, repo)
+      const { worktreeId } = await openTeamPanelWithLead(electronApp, page)
+      // Why no account: the demo party's account field is an email, which no capture may show.
+      await seedRendererGameState(electronApp, {
+        agents: [
+          demoMember({
+            name: 'Pico',
+            ticket: 'LUM-14',
+            title: 'Offline cache for the feed',
+            state: 'waiting',
+            pr: { number: 42, ci: 'success', state: 'open' }
+          }),
+          demoMember({
+            name: 'Juno',
+            ticket: 'LUM-17',
+            title: 'Share sheet on Android',
+            state: 'working',
+            tool: 'Edit'
+          }),
+          demoMember({
+            name: 'Vega',
+            ticket: 'LUM-21',
+            title: 'Dark theme for the reader',
+            state: 'working',
+            tool: 'Bash',
+            pr: { number: 44, ci: 'pending', state: 'open' }
+          })
+        ]
+      })
+      // Why: the panel re-reads game.state on this event at once, not at its next poll.
+      await electronApp.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().forEach((w) =>
+          w.webContents.send('runtime:gameAdvisorChanged')
+        )
+      )
+      const panel = page.getByTestId('team-panel')
+      const members = panel.locator('[data-team-card="member"]')
+      await expect(members).toHaveCount(3, { timeout: 30_000 })
+      await expect.soft(panel.locator('[data-team-card="lead"]')).toBeVisible()
+      await expect.soft(panel.getByText(/^Lv \d+$/).first()).toBeVisible()
+      // A waiting member with no Inbox question is at a permission prompt in its own terminal.
+      await expect.soft(panel.getByText('Permission prompt in its terminal').first()).toBeVisible()
+      await expect.soft(panel.getByRole('button', { name: 'Answer in its terminal' })).toBeVisible()
+      const panelBox = async () => (await panel.boundingBox())!
+      testInfo.annotations.push({
+        type: 'panel-css-px',
+        description: String((await panelBox()).width)
+      })
+      expect.soft((await panelBox()).width).toBeLessThanOrEqual(560)
+      await captureBothThemes(page, testInfo, 'team-tab', async () => {
+        const box = await panelBox()
+        const last = (await members.last().boundingBox())!
+        return { x: box.x, y: box.y, width: box.width, height: last.y + last.height + 8 - box.y }
+      })
+
+      const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+      const client = new RuntimeClient(userDataDir, 30_000, null, null)
+      await client.call('game.ownerAsk', {
+        worktreeId,
+        ticket: 'LUM-14',
+        question: 'The offline cache needs 40 MB on older phones. Ship it in 2.3 or wait for 2.4?',
+        options: ['Ship in 2.3', 'Wait for 2.4'],
+        context: 'PR #42 has both builds.'
+      })
+      const inboxTab = panel.getByRole('tab', { name: /Inbox/ })
+      await inboxTab.click()
+      await expect(inboxTab).toHaveAttribute('aria-selected', 'true')
+      const asked = panel.locator('[data-team-inbox-project="active"]')
+      await expect(asked.getByText(/Ship it in 2\.3/)).toBeVisible({ timeout: 15_000 })
+      // Each sub-tab carries its count in the same element: "For you 1".
+      for (const label of ['For you', 'Waiting', 'Threads', 'Answered']) {
+        await expect.soft(panel.getByText(new RegExp(`^${label}\\s*\\d+$`)).first()).toBeVisible()
+      }
+      await expect.soft(asked.getByRole('button', { name: 'Ship in 2.3' })).toBeVisible()
+      await captureBothThemes(page, testInfo, 'inbox', async () => {
+        const box = await panelBox()
+        const end = (await asked.boundingBox())!
+        return { x: box.x, y: box.y, width: box.width, height: end.y + end.height + 12 - box.y }
+      })
+    } finally {
+      rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
+    }
   })
 })
