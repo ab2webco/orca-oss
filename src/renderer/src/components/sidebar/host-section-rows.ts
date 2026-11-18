@@ -13,7 +13,7 @@ import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
-import type { Row } from './worktree-list/grouping/row-types'
+import type { Row, WorktreeRow } from './worktree-list/grouping/row-types'
 import { getProjectGroupExecutionHostIdForRows } from './worktree-list/listing/host-filtering'
 import { localHostDisplayLabel, localHostPlatformDetail } from '../../lib/local-host-display-label'
 import { countWorktreeRows } from './host-section-worktree-count'
@@ -145,16 +145,13 @@ function flatUnderHost(row: Row): Row {
   }
   if (row.type === 'item') {
     // Why no host chip: the host header above already names the host (ORCA-1181).
-    if (!row.groupDepth && row.hostContextLabel === undefined) {
-      return row
-    }
-    const flat = { ...row, groupDepth: 0 }
+    const flat: WorktreeRow = { ...row, groupDepth: 0, underHostHeader: true }
     delete flat.hostContextLabel
     return flat
   }
   // Why 1: a folder workspace's depth counts its own folder group, which now sits at 0.
   if (row.type === 'folder-workspace') {
-    return row.groupDepth > 1 ? { ...row, groupDepth: 1 } : row
+    return { ...row, groupDepth: Math.min(row.groupDepth, 1), underHostHeader: true }
   }
   return row
 }

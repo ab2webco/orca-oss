@@ -5,7 +5,7 @@ import { translate } from '@/i18n/i18n'
 import { LinearAgentSkillSetupPrompt } from './LinearAgentSkillSetupPrompt'
 import WorktreeCardAgents from './WorktreeCardAgents'
 import { WorktreeStallBanner } from './WorktreeStallBanner'
-import { WorktreeLineageChildChip } from './worktree-lineage-child-chip'
+import { WorktreeCardLineageChildren } from './worktree-card-lineage-children'
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
@@ -21,17 +21,10 @@ export function WorktreeCardSecondaryRows({
     repo,
     settings,
     isActive,
-    newCardStyle,
-    lineageChildren,
-    lineageCollapsed,
-    onLineageToggle,
     remoteBranchConflict,
     showInlineAgentList,
     agentActivityDisplayMode,
-    compactInlineAgentRows,
-    showLineageChildChip,
-    lineageChildAriaLabel,
-    childWorkspaceShortLabel
+    compactInlineAgentRows
   } = card
   const { hasMetaRow } = presentation
 
@@ -74,21 +67,7 @@ export function WorktreeCardSecondaryRows({
         />
       )}
 
-      {showLineageChildChip && (
-        <WorktreeLineageChildChip
-          newCardStyle={newCardStyle}
-          collapsed={lineageCollapsed}
-          ariaLabel={lineageChildAriaLabel}
-          shortLabel={childWorkspaceShortLabel}
-          onToggle={onLineageToggle}
-        />
-      )}
-
-      {!newCardStyle && lineageChildren && (
-        <div className="-ml-[1.125rem] mt-1.5 w-[calc(100%+1.125rem)] space-y-1">
-          {lineageChildren}
-        </div>
-      )}
+      <WorktreeCardLineageChildren card={card} />
     </>
   )
 }

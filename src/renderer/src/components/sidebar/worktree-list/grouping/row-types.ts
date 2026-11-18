@@ -63,6 +63,8 @@ export type WorktreeRow = {
   lineageGroupKey?: string
   lineageCollapsed?: boolean
   hostContextLabel?: string
+  /** Drawn under a host header, which already names the host. */
+  underHostHeader?: true
 }
 
 export type ImportedWorktreesCardCandidate = {
@@ -104,6 +106,7 @@ export type FolderWorkspaceRow = {
   projectGroup: ProjectGroup
   depth: number
   groupDepth: number
+  underHostHeader?: true
 }
 
 /** Minimal shape buildRows needs for an in-flight create. Deliberately not the

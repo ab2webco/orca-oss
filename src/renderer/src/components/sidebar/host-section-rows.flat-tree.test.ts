@@ -79,6 +79,28 @@ describe('host sections draw orgs and projects flat, as V30 (ORCA-1149)', () => 
     ])
   })
 
+  it('marks each card under a drawn host header, so its own lines need not name the host again', () => {
+    const local = repo('netsat')
+    const remote = repo('contabo', 'm1')
+    const rows = addHostSectionRows({
+      rows: [
+        header('repo:netsat', 0, local),
+        item('netsa-81', local, 0),
+        header('repo:contabo', 0, remote),
+        item('c-1', remote, 0)
+      ],
+      hostOptions: [...HOSTS],
+      workspaceHostScope: 'all',
+      visibleWorkspaceHostIds: ['local', 'ssh:m1'],
+      defaultHostId: 'local'
+    })
+
+    const marks = rows.flatMap((row) =>
+      row.type === 'item' ? [`${row.worktree.id}:${row.underHostHeader === true}`] : []
+    )
+    expect(marks).toEqual(['netsa-81:true', 'c-1:true'])
+  })
+
   it('leaves the nested tree as it is when no host section is drawn', () => {
     const local = repo('netsat')
     const rows: Row[] = [

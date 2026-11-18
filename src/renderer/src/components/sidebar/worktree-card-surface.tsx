@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { LoaderCircle } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -13,6 +13,10 @@ import { useSidebarDeliveredView } from './use-sidebar-delivered-view'
 import { SidebarDeliveredHoverCard } from './SidebarDeliveredHoverCard'
 import { SidebarTeamHoverCard } from './SidebarTeamHoverCard'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
+import { useAppStore } from '@/store'
+import { useWorktreeAgentRows } from './useWorktreeAgentRows'
+import { selectLiveAgentStatusEntriesForWorktree } from './worktree-agent-row-selectors'
+import { sidebarSoloAgentOf } from './sidebar-solo-row'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function WorktreeCardSurface({ card }: { card: WorktreeCardController }): React.JSX.Element {
@@ -77,6 +81,17 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
   // Why a freed member reads as a team child: it stays under its lead at the members' weight (ORCA-1216 §6).
   const teamCard = team.row !== null || delivered !== null
   const teamChild = team.child || delivered !== null
+  // Why: a disconnected host keeps the classic card, whose header holds its reconnect control.
+  const soloBlocked = teamCard || titleRenaming || card.isSshDisconnected || isRuntimeDisconnected
+  // Why the count first: building agent rows for every card costs more than one indexed lookup.
+  const liveAgents = useAppStore((s) =>
+    soloBlocked ? 0 : selectLiveAgentStatusEntriesForWorktree(s, worktree.id).length
+  )
+  const agents = useWorktreeAgentRows(worktree.id, liveAgents === 1)
+  const solo = useMemo(
+    () => (liveAgents === 1 ? sidebarSoloAgentOf(agents) : null),
+    [liveAgents, agents]
+  )
   // Why: V30 marks only the open agent's row; a lead's card wraps its members' rows, so it never
   // lights up for an open member, and its own selection fills its row (main.css), not a card.
   const surfaceActive = isActiveSurface && (!teamCard || card.isActive)
@@ -86,6 +101,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       row={team.row}
       child={team.child}
       delivered={delivered}
+      solo={solo}
       presentation={presentation}
     />
   )
@@ -161,7 +177,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       className={cn(
         'relative flex cursor-pointer flex-col transition-[background-color,border-color,opacity,box-shadow] duration-200 outline-none select-none',
         // Why: V30's rows share one height, so a team card adds no padding of its own around its row.
-        teamCard ? 'py-0' : titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
+        teamCard ? 'py-0' : solo ? 'py-0.5' : titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
         // Why: under the lead the child row takes V30's step; the tree's own insets would add to it.
         teamChild
           ? 'w-full pl-2'

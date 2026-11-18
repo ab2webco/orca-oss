@@ -7,9 +7,17 @@ import type { WorktreeCardController } from './use-worktree-card-controller'
 
 const team = vi.hoisted(() => ({ value: { row: null as unknown, child: false } }))
 const hover = vi.hoisted(() => ({ details: false }))
+const live = vi.hoisted(() => ({ agents: [] as unknown[] }))
+vi.mock('./worktree-agent-row-selectors', () => ({
+  selectLiveAgentStatusEntriesForWorktree: () =>
+    live.agents.map((row) => (row as { entry: unknown }).entry)
+}))
+vi.mock('./useWorktreeAgentRows', () => ({ useWorktreeAgentRows: () => live.agents }))
 vi.mock('./sidebar-team-roster', () => ({ useSidebarTeamCard: () => team.value }))
 vi.mock('./worktree-card-row-content', () => ({
-  WorktreeCardRowContent: () => <div data-row-content="" />,
+  WorktreeCardRowContent: ({ solo }: { solo?: unknown }) => (
+    <div data-row-content="" data-solo={solo ? '' : undefined} />
+  ),
   WorktreeCardTeamChildren: () => <div data-team-children="" />
 }))
 vi.mock('./worktree-card-presentation', () => ({
@@ -43,7 +51,15 @@ afterEach(async () => {
   })
   team.value = { row: null, child: false }
   hover.details = false
+  live.agents = []
 })
+
+const oneAgent = {
+  paneKey: 'tab-1:leaf-1',
+  entry: { state: 'working', paneKey: 'tab-1:leaf-1' },
+  tab: { id: 'tab-1' },
+  rowSource: 'live'
+}
 
 function cardOf(extra: Partial<WorktreeCardController>): WorktreeCardController {
   return {
@@ -128,5 +144,28 @@ describe('WorktreeCardSurface', () => {
 
     expect(surface.querySelector('[data-team-hover]')).toBeNull()
     expect(surface.querySelector('[data-details-hover] [data-row-content]')).not.toBeNull()
+  })
+
+  // ORCA-1149 S9: one live agent draws V30's solo row.
+  it('passes the one live agent to the row content as a solo row', async () => {
+    live.agents = [oneAgent]
+    const surface = await surfaceOf(cardOf({}))
+
+    expect(surface.querySelector('[data-row-content]')!.hasAttribute('data-solo')).toBe(true)
+  })
+
+  // Why: the classic card's header holds the reconnect control a disconnected host needs.
+  it('keeps the classic card for one agent on a disconnected SSH host', async () => {
+    live.agents = [oneAgent]
+    const surface = await surfaceOf(cardOf({ isSshDisconnected: true }))
+
+    expect(surface.querySelector('[data-row-content]')!.hasAttribute('data-solo')).toBe(false)
+  })
+
+  it('keeps the classic card for one agent on a disconnected runtime', async () => {
+    live.agents = [oneAgent]
+    const surface = await surfaceOf(cardOf({ isRuntimeDisconnected: true }))
+
+    expect(surface.querySelector('[data-row-content]')!.hasAttribute('data-solo')).toBe(false)
   })
 })

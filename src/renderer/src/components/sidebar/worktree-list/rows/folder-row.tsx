@@ -113,6 +113,7 @@ export function renderFolderWorkspaceVirtualRow(args: {
           isCurrentWorktree={ctx.currentWorktreeId === folderWorktree.id}
           contentIndent={cardContentIndent}
           flushSurface
+          underHostHeader={row.underHostHeader === true}
           nativeDragEnabled={false}
           onImmediateActivate={activationDisabled ? undefined : ctx.onImmediateActivate}
           activationRowKey={folderWorktree.id}
