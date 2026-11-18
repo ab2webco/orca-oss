@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
+import { OrchestrationDb } from './orchestration/db'
 
 const agentRow = (paneKey: string, parentPaneKey: string | null, dispatched: boolean) => ({
   paneKey,
@@ -45,5 +46,35 @@ describe("a lead's game state counts other projects' members on its machine (ORC
 
     expect(lead.otherProjectMembers).toEqual([{ host: 'local', repo: 'cineco', running: 2 }])
     expect(member).not.toHaveProperty('otherProjectMembers')
+  })
+
+  it('counts what another project’s lead in this Orca placed on m1, which m1 never marks', async () => {
+    const runtime = new OrcaRuntimeService(null)
+    vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({
+      worktrees: [worktree('wt-lead', 'orca-oss', [agentRow('tab-1:lead', null, false)])]
+    } as never)
+    const db = new OrchestrationDb(':memory:')
+    const cineco = db.createRun({
+      objective: 'cineco lead',
+      coordinatorHandle: 'term_cin',
+      coordinatorPaneKey: 'tab_cin:22222222-2222-4222-9222-222222222222'
+    })
+    const task = db.createTask({ spec: 'CIN-1', taskTitle: 'CIN-1', runId: cineco.id })
+    db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_m1', leadWorktreeId: 'wt-cineco-lead' },
+      federation: {
+        environmentId: 'env_m1',
+        environmentName: 'm1',
+        peerFingerprint: 'fp_m1',
+        protocolVersion: 1
+      }
+    })
+    runtime.setOrchestrationDb(db)
+
+    const lead = await runtime.getOrchestratorGameState({ paneKey: 'tab-1:lead' })
+
+    expect(lead.otherProjectMembers).toEqual([{ host: 'm1', repo: 'another project', running: 1 }])
+    db.close()
   })
 })

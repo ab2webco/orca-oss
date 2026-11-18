@@ -110,6 +110,19 @@ describe('withOtherProjectMembers (ORCA-1284)', () => {
     ])
   })
 
+  it('adds the members other projects’ leads in this Orca placed on paired hosts, never its own (ORCA-1284)', () => {
+    const launched = [
+      { host: 'm1', repo: 'orca-oss', dispatchId: 'ctx-1' },
+      { host: 'm1', repo: 'koombea', dispatchId: 'ctx-2' },
+      { host: 'm1', repo: 'cineco', dispatchId: 'ctx-3' }
+    ]
+    expect(withOtherProjectMembers(lead, hosts, 'wt-lead', launched).otherProjectMembers).toEqual([
+      { host: 'local', repo: 'cineco', running: 1 },
+      { host: 'm1', repo: 'koombea', running: 2 },
+      { host: 'm1', repo: 'cineco', running: 1 }
+    ])
+  })
+
   it('leaves a member’s state, and a lead with no other project around, as they were', () => {
     const member = { ...lead, role: 'member' } as OrchestratorGameState
     expect(withOtherProjectMembers(member, hosts, 'wt-lead')).toBe(member)

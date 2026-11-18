@@ -27,11 +27,15 @@ export function otherProjectMembersOf(
   return [...counts.values()]
 }
 
-/** The lead's state with other projects' members on its hosts; `leadWorktreeId` is its own checkout's. */
+/**
+ * The lead's state with other projects' members on its hosts; `leadWorktreeId` is its own checkout's.
+ * `launched` are the members this Orca's leads placed on paired hosts, which a host never marks.
+ */
 export function withOtherProjectMembers(
   state: OrchestratorGameState,
   hosts: readonly { host: string; worktrees: readonly RuntimeWorktreePsSummary[] }[],
-  leadWorktreeId: string | null
+  leadWorktreeId: string | null,
+  launched: readonly { host: string; repo: string; dispatchId: string }[] = []
 ): OrchestratorGameState {
   if (state.role !== 'lead') {
     return state
@@ -47,5 +51,17 @@ export function withOtherProjectMembers(
     paneKeys: new Set(local.map((agent) => agent.paneKey)),
     worktrees
   })
+  const own = new Set(state.agents.map((agent) => agent.paneKey))
+  for (const { host, repo, dispatchId } of launched) {
+    if (own.has(`remote:${dispatchId}`)) {
+      continue
+    }
+    const load = others.find((one) => one.host === host && one.repo === repo)
+    if (load) {
+      load.running += 1
+    } else {
+      others.push({ host, repo, running: 1 })
+    }
+  }
   return others.length > 0 ? { ...state, otherProjectMembers: others } : state
 }
