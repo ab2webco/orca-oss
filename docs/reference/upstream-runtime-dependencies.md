@@ -23,7 +23,7 @@ gate: `fetchPluginKillList` never checks whether the build is packaged (`plugin-
 ## 1. What happens today if a Lab user uses it
 
 **Artifacts.** Two gates before any byte leaves the machine: `artifactSharingEnabled` defaults to
-`false` (`src/shared/constants.ts:286`, enforced for the UI, the CLI and agents alike through
+`false` (`src/shared/constants.ts:292`, enforced for the UI, the CLI and agents alike through
 `src/shared/artifact-sharing-gate.ts`), and publishing requires a signed-in Orca Cloud session
 (`artifact-cloud-service.ts:276-293`). Without sign-in the operation returns
 `reconnect-required` / `unconfigured` — it does not half-upload. With an upstream Orca account, the
@@ -54,13 +54,13 @@ code; this one line is not.
 
 This is the question that matters, and the three answers differ.
 
-**Artifacts — no, not before the upload.** The publish confirmation says "This publishes the current
-file at a link anyone with the URL can view" (`ArtifactPublishButton.tsx:161`) and the account row
-says "Sign in to create and manage this link" (`:178`). Settings says "Use your Orca account to
-upload artifacts" (`ArtifactsSettingsPane.tsx:129`) — in a Lab build that reads as *this fork's*
-account. No hostname appears anywhere in the pre-publish flow. `share.onorca.dev` becomes visible
-only in the returned URL, i.e. after the file contents are already on upstream's server. The user
-does consent to publishing publicly; they are never told to whom.
+**Artifacts — yes, before the upload.** The setting that turns sharing on says "File contents are
+uploaded to {{host}}, which upstream Orca Lab operates — this build does not host it"
+(`ArtifactsSettingsPane.tsx:105`), and the publish confirmation says "This uploads the current file
+to {{host}} and creates a link anyone with the URL can view" (`ArtifactPublishButton.tsx:162`), both
+with `ARTIFACT_SHARE_HOST` = `share.onorca.dev` (`src/shared/artifacts.ts:5`). Settings asks for an
+"Orca Lab account" (`ArtifactsSettingsPane.tsx:134`), which in a Lab build still reads as *this
+fork's* account rather than upstream's.
 
 **Sign-in — partially.** `shell.openExternal` puts `login.onorca.dev` in the user's own address bar
 at consent time, so the domain is visible where it counts. Nothing in the app frames it as a
@@ -79,9 +79,10 @@ plaintext** to upstream's store. Relay carries payloads sealed with NaCl `secret
 pairing QR (`src/shared/mobile-relay-pairing-offer.ts:75-77`) — so the relay routes ciphertext and
 sees metadata (host id, cell placement, timing, volume), not terminal content. Login sees identity.
 
-**Conclusion:** the disclosure gap worth naming is artifacts, not relay. Relay discloses the
-mechanism and offers an account-free alternative in the same radio group. Artifacts discloses the
-consequence ("anyone with the URL") but not the destination.
+**Conclusion:** relay and artifacts both disclose what happens. Relay names the mechanism and
+offers an account-free alternative in the same radio group; artifacts names the destination
+(`share.onorca.dev`) and that upstream runs it before any upload. The gap left is sign-in: the
+account the app asks for is upstream's, which neither flow says.
 
 ## 3. Can we host these with reasonable effort
 
@@ -107,8 +108,8 @@ list revokes plugins from upstream's marketplace, which the fork still consumes 
 
 1. A Lab user who signs in is authenticating against upstream's identity provider with an upstream
    account. The fork has no accounts of its own.
-2. Publishing an artifact sends file contents to upstream-operated storage, and the UI does not name
-   that destination before the upload. Default-off is the mitigation that exists today.
+2. Publishing an artifact sends file contents to upstream-operated storage. The UI names that
+   destination (`share.onorca.dev`) before the upload, and sharing is off by default.
 3. Relay-brokered mobile sessions transit upstream infrastructure. Contents are end-to-end
    encrypted; metadata is not. LAN pairing avoids it entirely and needs no account.
 4. Self-hosting a share endpoint is blocked by the first-party host guard, not merely unimplemented.

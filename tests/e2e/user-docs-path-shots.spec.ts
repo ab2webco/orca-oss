@@ -822,3 +822,43 @@ test.describe('Hosts: pairing and SSH in Settings', () => {
     await expect(form).toBeHidden()
   })
 })
+
+test.describe('Artifacts: the publishing settings', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Settings > Artifacts is off by default and names its upload host', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so each capture fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    const open = (pane: 'artifacts') =>
+      page.evaluate((target) => {
+        const state = window.__store!.getState()
+        state.openSettingsTarget({ pane: target, repoId: null, sectionId: target })
+        state.openSettingsPage()
+      }, pane)
+    const fits = async (name: string, target: ReturnType<typeof page.locator>) => {
+      const box = (await target.boundingBox())!
+      testInfo.annotations.push({
+        type: `${name}-css-px`,
+        description: `${box.width}x${box.height}`
+      })
+      expect.soft(box.width).toBeLessThanOrEqual(560)
+      expect(box.height).toBeLessThan(900)
+    }
+
+    await open('artifacts')
+    const artifacts = page.locator('section#artifacts')
+    await expect(artifacts).toBeVisible({ timeout: 15_000 })
+    await expect
+      .soft(artifacts.getByText('Allow publishing public artifact links').first())
+      .toBeVisible()
+    await expect.soft(artifacts.getByText(/share\.onorca\.dev/).first()).toBeVisible()
+    await expect(artifacts.getByText(/\b\d{1,3}(\.\d{1,3}){3}\b/)).toHaveCount(0)
+    await fits('artifacts-settings', artifacts)
+    await captureBothThemes(page, testInfo, 'artifacts-settings', artifacts)
+  })
+})

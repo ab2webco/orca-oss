@@ -1,19 +1,38 @@
 # Mobile
 
 The Orca Lab app pairs with your desktop and puts your agents in your pocket. This page describes
-version 0.0.62.
+version 0.0.64.
+
+<figure class="orca-diagram" aria-label="From installing the phone app to answering your team">
+<ol class="orca-chain">
+<li><strong>Install</strong><span>TestFlight on iPhone, the APK on Android</span></li>
+<li><strong>Pair</strong><span>scan the desktop's QR code, or paste its code</span></li>
+<li><strong>Watch</strong><span>each desktop's team, accounts and terminals</span></li>
+<li><strong>Answer</strong><span>your team's questions from the Inbox</span></li>
+</ol>
+</figure>
 
 ## Install
 
-Open **Settings > Mobile** on the desktop. It links the
-[TestFlight](https://testflight.apple.com/join/xbePNDGj) build for iPhone and the **Android APK**
-from the [`mobile-android-v*` releases](https://github.com/ab2webco/orca-oss/releases?q=mobile-android).
-The app is not in the App Store or on Google Play yet.
+Open **Settings > Mobile** on the desktop, or **Orca Lab Mobile** in the sidebar. They link the
+[TestFlight](https://testflight.apple.com/join/xbePNDGj) build for iPhone and the **Android APK**,
+which downloads the latest `mobile-android-v*` release. The app is not in the App Store or on
+Google Play yet.
 
 ## Pair
 
-On the same **Settings > Mobile** page, scan the QR code from the app. After that the phone reaches
-the desktop directly on your network, or through an end-to-end encrypted relay when it cannot.
+Under **Pair a phone**, choose how the phone reaches this computer:
+
+- **Orca Relay**: the phone works on cellular or any Wi-Fi. It needs you signed in to an Orca Lab
+  account, and **Also use a faster local path** lets the phone go direct when it is nearby. The
+  relay runs on upstream Orca's servers (`relay.onorca.dev`), not this build's: what it carries is
+  end-to-end encrypted, but metadata such as timing and volume is not.
+- **LAN**: the phone must be on the same network as the computer, or reach it through Tailscale.
+  No account is needed.
+
+Choose **Generate QR code**, then in the app tap **Pair Desktop** and scan it, or paste the code
+from **Copy pairing code**. **Paired Devices** lists each phone; revoking one disconnects it at
+once.
 
 ## Home
 
