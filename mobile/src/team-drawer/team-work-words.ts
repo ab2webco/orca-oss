@@ -41,6 +41,12 @@ type Words = {
   load: (load: string) => string
   cores: (count: number) => string
   slotsFree: (count: number) => string
+  ready: string
+  agents: string
+  busyOrLow: string
+  ofTotal: (total: number) => string
+  blocked: (count: number) => string
+  offlineCount: (count: number) => string
   aloneTitle: string
   aloneText: string
 }
@@ -98,6 +104,12 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     load: (load) => `load ${load}`,
     cores: (count) => `${count} cores`,
     slotsFree: (count) => (count === 1 ? '1 slot free' : `${count} slots free`),
+    ready: 'Ready',
+    agents: 'Agents',
+    busyOrLow: 'Busy / low',
+    ofTotal: (total) => `of ${total}`,
+    blocked: (count) => `${count} can't launch`,
+    offlineCount: (count) => `${count} offline`,
     aloneTitle: 'Only this machine',
     aloneText: 'Pair another machine to spread agents across hosts.'
   },
@@ -154,6 +166,12 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     load: (load) => `carga ${load}`,
     cores: (count) => `${count} núcleos`,
     slotsFree: (count) => (count === 1 ? '1 lugar libre' : `${count} lugares libres`),
+    ready: 'Listas',
+    agents: 'Agentes',
+    busyOrLow: 'Ocupadas / bajas',
+    ofTotal: (total) => `de ${total}`,
+    blocked: (count) => `${count} no pueden lanzar`,
+    offlineCount: (count) => `${count} sin conexión`,
     aloneTitle: 'Solo esta máquina',
     aloneText: 'Empareja otra máquina para repartir agentes entre hosts.'
   }

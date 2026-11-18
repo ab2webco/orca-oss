@@ -11,6 +11,7 @@ import type { SupportedUiLocale } from '../../../src/shared/ui-locale'
 import { Text } from '../theme/dynamic-type-text'
 import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { Gauge, Readout } from './TeamHostGauges'
+import { TeamHostsSummary } from './TeamHostsSummary'
 import type { TeamMemberRow } from './team-drawer-model'
 import { teamSectionNote } from './team-section-note'
 import type { TeamSheetWork } from './team-sheet-work'
@@ -263,6 +264,13 @@ export function TeamHostsTab({
   return (
     <View style={styles.tab}>
       {note ? <Text style={styles.note}>{note}</Text> : null}
+      {list.length > 1 ? (
+        <TeamHostsSummary
+          machines={list}
+          nameOf={(one) => (one.host.kind === 'local' ? (hostName ?? '') : one.host.name)}
+          words={words}
+        />
+      ) : null}
       {list.map((machine) => (
         <MachineCard
           key={machine.host.kind === 'local' ? 'local' : machine.host.name}
