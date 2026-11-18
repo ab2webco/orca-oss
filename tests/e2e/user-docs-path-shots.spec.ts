@@ -97,24 +97,29 @@ async function continueOnboarding(page: Page): Promise<void> {
   await page.locator('footer').getByRole('button', { name: ONBOARDING_ADVANCE }).first().click()
 }
 
-async function seedWorkingAgent(page: Page, worktreeId: string, prompt: string): Promise<void> {
+async function seedAgentStatus(
+  page: Page,
+  worktreeId: string,
+  prompt: string,
+  state: 'working' | 'waiting' | 'done' = 'working'
+): Promise<void> {
   await switchToWorktree(page, worktreeId)
   await ensureTerminalVisible(page)
   const snapshot = await waitForPaneIdentitySnapshot(page, 1)
   const paneKey = `${snapshot.tabId}:${snapshot.panes[0]!.leafId}`
   await page.evaluate(
-    ({ paneKey, prompt }) => {
+    ({ paneKey, prompt, state }) => {
       const now = Date.now()
       window
         .__store!.getState()
         .setAgentStatus(
           paneKey,
-          { state: 'working', prompt, agentType: 'claude', lastAssistantMessage: prompt },
+          { state, prompt, agentType: 'claude', lastAssistantMessage: prompt },
           prompt,
           { updatedAt: now, stateStartedAt: now - 1_000 }
         )
     },
-    { paneKey, prompt }
+    { paneKey, prompt, state }
   )
 }
 
@@ -166,6 +171,86 @@ async function seedPullRequestForm(page: Page, worktreeId: string, branch: strin
       state.setRightSidebarTab('source-control')
     },
     { worktreeId, branch }
+  )
+}
+
+type SeededChecks = { conclusion: 'success' | 'failure'; mergeStateStatus: 'BLOCKED' | 'CLEAN' }
+
+/** Seeds a fictitious open PR (#42 on lumen/lumen-app) with three checks, then opens Checks. */
+async function seedOpenPullRequest(
+  page: Page,
+  worktreeId: string,
+  branch: string,
+  seeded: SeededChecks
+): Promise<void> {
+  await page.evaluate(
+    ({ worktreeId, branch, seeded }) => {
+      const store = window.__store!
+      const state = store.getState()
+      const worktree = Object.values(state.worktreesByRepo)
+        .flat()
+        .find((entry) => entry.id === worktreeId)!
+      const repo = state.repos.find((entry) => entry.id === worktree.repoId)!
+      const pr = {
+        number: 42,
+        title: 'Cache the feed so it reads offline',
+        state: 'open' as const,
+        url: 'https://github.com/lumen/lumen-app/pull/42',
+        checksStatus: seeded.conclusion,
+        updatedAt: new Date().toISOString(),
+        mergeable: 'MERGEABLE' as const,
+        mergeStateStatus: seeded.mergeStateStatus,
+        autoMergeAllowed: false,
+        mergeMethodSettings: {
+          defaultMethod: 'squash' as const,
+          allowedMethods: { squash: true, merge: true, rebase: true }
+        },
+        prRepo: { owner: 'lumen', repo: 'lumen-app' }
+      }
+      const checks = ['build', 'lint', 'unit tests'].map((name) => ({
+        name,
+        status: 'completed' as const,
+        conclusion: name === 'unit tests' ? seeded.conclusion : ('success' as const),
+        url: null
+      }))
+      const entries = {
+        [`${repo.id}::${branch}`]: { data: pr, fetchedAt: Date.now() },
+        [`${repo.path}::${branch}`]: { data: pr, fetchedAt: Date.now() }
+      }
+      // Why the cast: these stubs return just the fields Checks reads, not whole results.
+      store.setState(
+        (current) =>
+          ({
+            prCache: { ...current.prCache, ...entries },
+            gitStatusByWorktree: { ...current.gitStatusByWorktree, [worktreeId]: [] },
+            remoteStatusesByWorktree: {
+              ...current.remoteStatusesByWorktree,
+              [worktreeId]: {
+                hasUpstream: true,
+                upstreamName: `origin/${branch}`,
+                ahead: 0,
+                behind: 0
+              }
+            },
+            fetchPRForBranch: async (_repoPath: string, target: string) => {
+              if (target !== branch) {
+                return null
+              }
+              store.setState((next) => ({ prCache: { ...next.prCache, ...entries } }))
+              return pr
+            },
+            fetchHostedReviewForBranch: async () => null,
+            fetchPRChecks: async () => checks,
+            fetchPRComments: async () => [],
+            fetchUpstreamStatus: async () => undefined,
+            setUpstreamStatus: () => undefined
+          }) as unknown as Partial<typeof current>
+      )
+      state.setActiveWorktree(worktreeId)
+      state.setRightSidebarOpen(true)
+      state.setRightSidebarTab('checks')
+    },
+    { worktreeId, branch, seeded }
   )
 }
 
@@ -272,7 +357,7 @@ test.describe('Get started: a workspace, its agent and the pull request', () => 
           GIT_COMMITTER_EMAIL: 'team@example.com'
         }
       })
-      await seedWorkingAgent(page, worktreeId, 'Cache the feed so it reads offline')
+      await seedAgentStatus(page, worktreeId, 'Cache the feed so it reads offline')
       const row = page.locator('[data-worktree-card-surface]', { hasText: 'offline-feed' }).first()
       await expect(row).toBeVisible()
       await expect.soft(row.locator('[data-status-tone="info"]').first()).toBeVisible()
@@ -387,7 +472,7 @@ test.describe('Projects: a folder, the sidebar and the new-tab menu', () => {
         }
         return made
       })
-      await seedWorkingAgent(page, ids[0]!, 'Cache the feed so it reads offline')
+      await seedAgentStatus(page, ids[0]!, 'Cache the feed so it reads offline')
       const rows = page.locator('[data-worktree-card-surface]')
       await expect(rows.filter({ hasText: 'search-filters' }).first()).toBeVisible()
       // One host: no host row, the projects sit straight under Projects.
@@ -412,6 +497,99 @@ test.describe('Projects: a folder, the sidebar and the new-tab menu', () => {
         return { x, y, width: right - x, height: list.y + list.height + 12 - y }
       })
       await page.keyboard.press('Escape')
+    } finally {
+      rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
+    }
+  })
+})
+
+test.describe('One agent: its state, the checks and the merge', () => {
+  test.use({ seedTestRepo: false })
+
+  test('agent states in the sidebar, a failing check with Fix, and Squash and merge', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(180_000)
+    await waitForSessionReady(page)
+    await setWindowSize(electronApp, page)
+    const repo = docsRepo()
+    try {
+      await attachRepoAndOpenTerminal(page, repo)
+      const agents = [
+        { name: 'offline-feed', state: 'working', prompt: 'Cache the feed so it reads offline' },
+        { name: 'search-filters', state: 'waiting', prompt: 'Which filters should stay visible?' },
+        { name: 'dark-mode', state: 'done', prompt: 'Add a dark theme to the reader' }
+      ] as const
+      const ids = await page.evaluate(
+        async (names) => {
+          const state = window.__store!.getState()
+          const repoId = Object.values(state.worktreesByRepo).flat()[0]!.repoId
+          const made: Record<string, { id: string; path: string }> = {}
+          for (const name of names) {
+            const { worktree } = await state.createWorktree(repoId, name)
+            made[name] = { id: worktree.id, path: worktree.path }
+          }
+          return made
+        },
+        agents.map((agent) => agent.name)
+      )
+      for (const agent of agents) {
+        await seedAgentStatus(page, ids[agent.name]!.id, agent.prompt, agent.state)
+      }
+      const rows = page.locator('[data-worktree-card-surface]')
+      for (const tone of ['info', 'attention', 'success']) {
+        await expect.soft(rows.locator(`[data-status-tone="${tone}"]`).first()).toBeVisible()
+      }
+      await captureBothThemes(page, testInfo, 'agent-states', fromLeftEdge(rows.last()))
+
+      const feed = ids['offline-feed']!
+      expect(feed.path.startsWith(process.cwd()), 'commit only inside the seeded repo').toBe(false)
+      appendFileSync(join(feed.path, 'README.md'), '\nThe feed reads offline.\n')
+      execFileSync('git', ['-C', feed.path, 'commit', '-qam', 'Cache the feed offline'], {
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Lumen',
+          GIT_AUTHOR_EMAIL: 'team@example.com',
+          GIT_COMMITTER_NAME: 'Lumen',
+          GIT_COMMITTER_EMAIL: 'team@example.com'
+        }
+      })
+      await seedOpenPullRequest(page, feed.id, 'offline-feed', {
+        conclusion: 'failure',
+        mergeStateStatus: 'BLOCKED'
+      })
+      const fix = page.getByRole('button', { name: 'Fix', exact: true })
+      await expect(fix).toBeVisible({ timeout: 15_000 })
+      await expect.soft(page.getByText(/1 failing/).first()).toBeVisible()
+      const blocked = page.getByRole('button', { name: /^Blocked$/ })
+      await expect.soft(blocked).toBeVisible()
+      const title = page.getByText('Cache the feed so it reads offline', { exact: true }).last()
+      await captureBothThemes(page, testInfo, 'checks-failing', async () => {
+        const top = (await title.boundingBox())!
+        const end = (await fix.boundingBox())!
+        // Why 12 and 48: inside the panel's left border and below the activity bar's tab mark.
+        const x = top.x - 12
+        const y = Math.max(0, top.y - 48)
+        return { x, y, width: WINDOW.width - x, height: end.y + end.height + 16 - y }
+      })
+
+      await seedOpenPullRequest(page, feed.id, 'offline-feed', {
+        conclusion: 'success',
+        mergeStateStatus: 'CLEAN'
+      })
+      await page.getByRole('button', { name: 'Refresh' }).first().click()
+      const merge = page.getByRole('button', { name: /^Squash and merge$/ })
+      await expect(merge).toBeVisible({ timeout: 15_000 })
+      await expect.soft(page.getByText(/3 passing/).first()).toBeVisible()
+      await captureBothThemes(page, testInfo, 'merge', async () => {
+        const top = (await title.boundingBox())!
+        const end = (await merge.boundingBox())!
+        // Why 12 and 48: inside the panel's left border and below the activity bar's tab mark.
+        const x = top.x - 12
+        const y = Math.max(0, top.y - 48)
+        return { x, y, width: WINDOW.width - x, height: end.y + end.height + 16 - y }
+      })
     } finally {
       rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
     }
