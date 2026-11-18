@@ -1,5 +1,5 @@
 ---
-sourceHash: 835a2330f31d34c1
+sourceHash: 1194db3cd3065065
 ---
 # Documentación de usuario de Orca Lab
 
@@ -30,6 +30,7 @@ de issues.
 - [CLI](cli/overview.md): automatiza Orca Lab desde una terminal con el comando `orca`.
 - [Artefactos y automatizaciones](artifacts-and-automations.md): comparte un archivo como enlace público, y ejecuta un agente según un horario.
 - [Móvil](mobile.md): instala y empareja la app del teléfono, mira el equipo y las cuentas de cada escritorio y responde al líder.
+- [Ajustes y solución de problemas](settings-and-troubleshooting.md): dónde vive cada ajuste y qué capa gana, y qué hacer cuando un login, un límite, un miembro o el CI se interponen.
 - [Telemetría y privacidad](telemetry.md): qué datos envía Orca Lab y cómo desactivarlo.
 
 Las notas de versión se publican en la [página de releases de GitHub](https://github.com/ab2webco/orca-oss/releases).

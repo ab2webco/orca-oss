@@ -27,6 +27,7 @@ tracker.
 - [CLI](cli/overview.md): script Orca Lab from a terminal with the `orca` command.
 - [Artifacts and automations](artifacts-and-automations.md): share a file as a public link, and run an agent on a schedule.
 - [Mobile](mobile.md): install and pair the phone app, see each desktop's team and accounts, answer the lead.
+- [Settings and troubleshooting](settings-and-troubleshooting.md): where each setting lives and which layer wins, and what to do when a login, a limit, a member or CI gets in the way.
 - [Telemetry and privacy](telemetry.md): what data Orca Lab sends, and how to turn it off.
 
 Release notes are published on the [GitHub releases page](https://github.com/ab2webco/orca-oss/releases).
