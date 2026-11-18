@@ -41,7 +41,7 @@ concurrency:
 jobs:
   build:
     if: github.event_name != 'workflow_dispatch' || inputs.deploy_unmerged
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,7 +60,7 @@ jobs:
   deploy:
     needs: build
     if: github.event_name != 'workflow_dispatch' || inputs.deploy_unmerged
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

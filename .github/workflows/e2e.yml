@@ -43,7 +43,7 @@ on:
 jobs:
   build:
     name: build e2e app
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       changed_shards: ${{ steps.changed-shards.outputs.matrix }}
@@ -125,7 +125,7 @@ jobs:
     name: e2e ${{ matrix.shard_name }}
     needs: build
     if: inputs.test_files == ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why 45: one shard took 27.0 min against the old 30 when --shard cut the sorted list by test
     # count (ORCA-215), and shard 8 later hit 45 with the team-panel specs stacked on it (ORCA-1148).
     # The build job now balances shards by measured duration and adds shards to keep each within 28
@@ -145,7 +145,7 @@ jobs:
       # Why: pnpm install rebuilds native modules, and those postinstall
       # scripts still need the Linux toolchain even though this shard reuses
       # the prebuilt Electron output.
-      # Why fonts-noto-cjk: ubuntu-latest carries no font with Korean coverage
+      # Why fonts-noto-cjk: ubuntu-24.04 carries no font with Korean coverage
       # (`fc-list :lang=ko` is empty), so a spec measuring CJK glyph metrics
       # measures a tofu box instead of Hangul.
       # Why xvfb: Electron on Linux needs an X display even when the app
@@ -171,7 +171,7 @@ jobs:
       # broken bundled gyp_main.py on Linux. Gate on runner.os matches
       # release.yml so the invariant "this workaround is Linux-only" is
       # consistent across all three workflows, even though this job
-      # currently pins runs-on: ubuntu-latest.
+      # currently pins runs-on: ubuntu-24.04.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'
         uses: ./.github/actions/use-external-node-gyp
@@ -250,7 +250,7 @@ jobs:
     needs: build
     # Why both: an empty matrix fails the run, so the split's '[]' must skip before it expands.
     if: inputs.test_files != '' && needs.build.outputs.changed_shards != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why shards and not a higher cap: one runner took 28-30 min for the panel branch's 16 specs
     # and each new spec added to it (ORCA-1120). The split keeps a short list on one runner.
     timeout-minutes: 30
@@ -373,7 +373,7 @@ jobs:
     name: ssh docker watcher isolation
     needs: build
     if: inputs.test_files == ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why 35: the terminal parking + retention specs below add two more
     # docker-rig tests capped at 240s each on top of the watcher isolation pair.
     timeout-minutes: 35
@@ -400,7 +400,7 @@ jobs:
           run_install: false
 
       # Why: same Linux-only node-gyp pin as build/e2e jobs so the workaround
-      # stays consistent across workflows even while this job is ubuntu-latest.
+      # stays consistent across workflows even while this job is ubuntu-24.04.
       - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
         if: runner.os == 'Linux'
         uses: ./.github/actions/use-external-node-gyp

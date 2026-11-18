@@ -167,7 +167,7 @@ jobs:
   ios-distribute:
     name: Distribute to external TestFlight testers
     needs: ios-build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Fastlane's processing wait fails after 20m; this outer bound leaves setup
     # margin without allowing App Store Connect polling to hang for hours.
     timeout-minutes: 30

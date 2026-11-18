@@ -27,7 +27,7 @@ jobs:
     # Why: the release jobs install only mobile/, whose postinstall bundles the WebView engines;
     # `verify` also installs the repo root, which hid a desktop import resolved from there.
     name: mobile release install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     defaults:
       run:
@@ -54,7 +54,7 @@ jobs:
     # Why: PR Checks' `verify` is the context main requires; a second check with
     # that name could stand in for it (ORCA-566).
     name: mobile verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     defaults:
       run:

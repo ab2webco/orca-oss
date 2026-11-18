@@ -23,7 +23,7 @@ permissions:
 jobs:
   static_analysis:
     name: static analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why pull-requests: the merge-queue run reads the live PR title and body.
     permissions:
       contents: read
@@ -144,7 +144,7 @@ jobs:
 
   root_directory_guard:
     name: root directory guard
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -160,7 +160,7 @@ jobs:
         run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -175,7 +175,7 @@ jobs:
   git_compatibility:
     name: Git compatibility
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why: looser than the other test jobs because this one builds Git 2.25.5
     # from source and pulls container images; healthy runs stay under 2 minutes.
     timeout-minutes: 20
@@ -229,7 +229,7 @@ jobs:
   shell_contracts:
     name: shell contracts
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why: these specs drive real shells and PTYs, so a wedged child hangs the
     # job; healthy runs stay under 3 minutes. Why 30 (ORCA-1179): every network call in
     # "Install zsh and fish" is bounded, and that step at its worst is under 25 minutes:
@@ -313,7 +313,7 @@ jobs:
   cli_subprocess:
     name: cli subprocess
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why its own job: the specs spawn the compiled CLI and self-skip when
     # out/cli/index.js is absent, so they need a build the sharded test job
     # would pay for 16 times. They also load the runtime in-process, hence the
@@ -346,7 +346,7 @@ jobs:
 
   test:
     name: tests node ${{ matrix.node }} ${{ matrix.shard }}/${{ matrix.shard_total }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why: a healthy shard finishes in under 5 minutes, but a wedged worker holds
     # the run for the 6h default — one shard hung 72 minutes and blocked
     # re-running any other shard (ORCA-119). Cap so a hang reports as a failure.
@@ -401,7 +401,7 @@ jobs:
   cross-version-wire:
     name: cross-version wire compatibility
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       # Why fetch-depth 0: the harness extracts the newest release tag to skew
@@ -430,7 +430,7 @@ jobs:
   managed_hook_node18:
     name: managed hooks on Node 18
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -454,7 +454,7 @@ jobs:
   claude_hooks_python_floor:
     name: Claude hooks on Python 3.9
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -487,7 +487,7 @@ jobs:
   package:
     name: package
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -731,7 +731,7 @@ jobs:
   # specs). The path list and its reasons live in the scope script.
   e2e-paths:
     name: detect e2e scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event.pull_request.draft != true
     # Why: detector only needs to read the checkout; do not inherit repo defaults.
     permissions:
@@ -795,7 +795,7 @@ jobs:
       - package_windows
       - e2e-paths
       - e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       # Why: main requires this check and auto-merge waits on it (ORCA-566), so
@@ -862,7 +862,7 @@ jobs:
     needs:
       - verify
       - e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Why actions:read: the workflow default is contents:read only, and the jobs
     # API this reads 403s without it.

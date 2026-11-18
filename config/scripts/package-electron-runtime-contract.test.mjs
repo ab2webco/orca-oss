@@ -267,7 +267,7 @@ describe('Electron runtime package contract', () => {
     )
 
     expect(releaseWorkflowText).not.toContain('blacksmith-')
-    expect(releaseWorkflow.jobs['build-mac']['runs-on']).toBe('ubuntu-latest')
+    expect(releaseWorkflow.jobs['build-mac']['runs-on']).toBe('ubuntu-24.04')
     expect(releaseWorkflow.jobs['build-mac'].permissions.actions).toBe('write')
     expect(macDispatchStep.run).toBe('node config/scripts/run-release-mac-build-workflow.mjs')
     expect(macDispatchStep.env.RELEASE_MAC_BUILD_WORKFLOW).toBe('release-mac-build.yml')

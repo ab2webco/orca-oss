@@ -138,7 +138,7 @@ describe('the lab release signal gate', () => {
     const action = './.github/actions/verify-packaged-plugin-seal'
     expect(seal.needs).toBe('resolve')
     expect(verdict.needs).toContain('gate_plugin_seal')
-    expect(seal.strategy.matrix.os).toEqual(['macos-latest', 'ubuntu-latest', 'windows-latest'])
+    expect(seal.strategy.matrix.os).toEqual(['macos-latest', 'ubuntu-24.04', 'windows-latest'])
     expect(seal.strategy.matrix.os).toEqual(prSeal.strategy.matrix.os)
     expect(seal.steps.at(-1).uses).toBe(action)
     expect(prSeal.steps.at(-1).uses).toBe(action)

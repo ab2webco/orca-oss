@@ -9,7 +9,7 @@ permissions:
 jobs:
   verify:
     name: wayland terminal input
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
