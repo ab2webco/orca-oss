@@ -1,5 +1,5 @@
 ---
-sourceHash: b900633d48efd4a3
+sourceHash: 22eefe2fb3595503
 ---
 # Documentación de usuario de Orca Lab
 
@@ -11,6 +11,7 @@ de issues.
 
 - [Instalación](install.md): builds de escritorio para macOS, Windows y Linux, la CLI y hosts sin interfaz gráfica.
 - [Proyectos y espacios de trabajo](projects.md): agrega un repositorio o una carpeta, un espacio por tarea, la barra lateral, las pestañas, las terminales y el navegador.
+- [Un agente hasta un PR mergeado](one-agent.md): lee el estado de un agente, abre el pull request, revisa checks y comentarios, y mergea, en GitHub o GitLab.
 - [Worktrees](model/worktrees.md): un worktree de git aislado por tarea, y cómo cambiar entre ellos.
 - [Apertura rápida](model/quick-open.md): busca archivos y salta a worktrees, chats y acciones.
 - [Barra lateral y pestañas nuevas](model/sidebar.md): hosts, agrupación y filtros, y el menú **+**.

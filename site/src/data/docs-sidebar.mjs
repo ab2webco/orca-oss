@@ -7,7 +7,8 @@ export const docsSidebar = [
     page('docs/get-started'),
     page('docs'),
     page('docs/install'),
-    page('docs/projects')
+    page('docs/projects'),
+    page('docs/one-agent')
   ]),
   group('Workspaces', 'Espacios de trabajo', [
     page('docs/model/worktrees'),
