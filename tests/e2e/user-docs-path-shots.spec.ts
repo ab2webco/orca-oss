@@ -13,6 +13,7 @@ import { expect, test } from './helpers/orca-app'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { demoMember } from './helpers/game-showcase-demo-party'
 import { seedRendererGameState } from './helpers/game-state-renderer-seed'
+import { DOCS_HOSTS } from './helpers/user-docs-hosts'
 import { openTeamPanelWithLead } from './helpers/team-panel-lead'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import { waitForSessionReady } from './helpers/store'
@@ -514,6 +515,37 @@ test.describe('Agent Teams: the Team panel and the Inbox', () => {
         const box = await panelBox()
         const end = (await asked.boundingBox())!
         return { x: box.x, y: box.y, width: box.width, height: end.y + end.height + 12 - box.y }
+      })
+
+      // Made-up hosts only: no capture may show a real machine, user or address.
+      await seedRendererGameState(electronApp, { state: { hostCapacity: DOCS_HOSTS } })
+      await electronApp.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().forEach((w) =>
+          w.webContents.send('runtime:gameAdvisorChanged')
+        )
+      )
+      await panel.getByRole('tab', { name: /^(Machines|Hosts)/ }).click()
+      const host = (name: string) => panel.locator(`[data-team-machine="${name}"]`)
+      const figure = (name: string) => panel.locator(`[data-team-machines-figure="${name}"]`)
+      await expect(host('nas-02')).toBeVisible({ timeout: 30_000 })
+      await expect.soft(host('local')).toContainText('This computer')
+      await expect
+        .soft(host('buildbox'), 'a busy host starts open')
+        .toHaveAttribute('data-state', 'open')
+      await expect.soft(host('atelier')).toContainText('Not registered')
+      await expect.soft(host('nas-02')).toContainText('Offline')
+      await expect.soft(figure('ready')).toContainText('3 of 5')
+      await expect.soft(figure('agents')).toContainText('3 of 15')
+      await expect.soft(figure('warned')).toContainText('buildbox')
+      // Why 1000: under the scene banner, five hosts run past an 800px window.
+      await setWindowSize(electronApp, page, { width: 1280, height: 1000 })
+      await page.mouse.move(0, 0)
+      await captureBothThemes(page, testInfo, 'machines', async () => {
+        const box = await panelBox()
+        const end = (await host('nas-02').boundingBox())!
+        // Why hard: a board taller than the window would be captured cut.
+        expect(end.y + end.height).toBeLessThan(1000)
+        return { x: box.x, y: box.y, width: box.width, height: end.y + end.height + 4 - box.y }
       })
     } finally {
       rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })

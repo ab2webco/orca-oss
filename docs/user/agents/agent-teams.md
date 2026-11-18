@@ -91,8 +91,27 @@ the ticket to done, removes the worktree and its branch, and frees the member wi
 
 ## 6. Machines
 
-**Machines** lists each host the team can use, with how much it has free and how many agents it
-runs. With one machine it says **Only this machine**; [SSH](../ssh.md) covers adding more.
+**Machines** (**Hosts** when the panel is narrow) lists **This computer** and each paired host the
+team can use. With no other host it says **Only this machine**; [Paired hosts and SSH](../ssh.md) covers
+adding one. With two or more, a strip on top sums up the fleet:
+
+- **Ready**: the hosts where this lead can start a member, out of all of them, and how many **can't
+  launch** or are **offline**.
+- **Agents**: the agents running out of the hosts' caps, and the **slots free**.
+- **Busy / low**: how many hosts are busy or short of memory or disk, and which ones.
+
+![The Machines tab with its summary strip, five hosts and a busy one opened](../../assets/agent-teams/machines.png)
+
+Each host's row has its status and three bars: **CPU**, **Memory** and **Disk**. The status reads
+**Free**, **2 of 4 agents**, **Busy**, **Low memory**, **Low disk** or **Offline**. A host where
+this lead's members cannot start says so (**Not registered**, **Refused**, **Not answering** or
+**Unknown**) with a line on what to do. Click a row to open its card: the load and cores, the memory
+and disk free in GB, the tickets running there and the slots free. A host with a warning opens by
+itself.
+
+A host is **Busy** at 90% CPU or a load as high as its cores, **Low memory** under 4 GB or 10% free,
+and **Low disk** under 10 GB or 10% free. The phone's Team drawer has the same board in its **Hosts**
+tab.
 
 ## 7. Levels
 

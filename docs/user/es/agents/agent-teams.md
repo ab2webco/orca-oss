@@ -1,5 +1,5 @@
 ---
-sourceHash: 04e83994cc227505
+sourceHash: a045ef32bd721506
 ---
 # Agent Teams
 
@@ -94,8 +94,27 @@ y libera al miembro con `orca game sweep --close`, que lo registra en el histori
 
 ## 6. Machines
 
-**Machines** lista cada host que el equipo puede usar, con cuánto tiene libre y cuántos agentes
-corre. Con una sola máquina dice **Only this machine**; [SSH](../ssh.md) explica cómo sumar más.
+**Machines** (**Hosts** cuando el panel es angosto) lista **This computer** y cada host emparejado
+que el equipo puede usar. Sin otro host dice **Only this machine**; [Hosts emparejados y SSH](../ssh.md)
+explica cómo sumar uno. Con dos o más, una franja arriba resume la flota:
+
+- **Ready**: los hosts donde este líder puede iniciar un miembro, sobre el total, y cuántos **can't
+  launch** o están **offline**.
+- **Agents**: los agentes que corren sobre el tope de los hosts, y los **slots free**.
+- **Busy / low**: cuántos hosts están ocupados o cortos de memoria o disco, y cuáles.
+
+![La pestaña Machines con su franja de resumen, cinco hosts y uno ocupado abierto](../../../assets/agent-teams/machines.png)
+
+La fila de cada host muestra su estado y tres barras: **CPU**, **Memory** y **Disk**. El estado dice
+**Free**, **2 of 4 agents**, **Busy**, **Low memory**, **Low disk** u **Offline**. Un host donde los
+miembros de este líder no pueden iniciar lo dice (**Not registered**, **Refused**, **Not answering**
+o **Unknown**) con una línea sobre qué hacer. Haz clic en una fila para abrir su tarjeta: la carga y
+los núcleos, la memoria y el disco libres en GB, los tickets que corren ahí y los lugares libres. Un
+host con un aviso se abre solo.
+
+Un host está **Busy** al 90% de CPU o con una carga igual a sus núcleos, **Low memory** con menos de
+4 GB o del 10% libre, y **Low disk** con menos de 10 GB o del 10% libre. El cajón Team del teléfono
+tiene el mismo tablero en su pestaña **Hosts**.
 
 ## 7. Niveles
 

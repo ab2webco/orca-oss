@@ -8,6 +8,8 @@ export type GameStateRendererSeed = {
   agents?: SeededAgent[]
   /** Fields set on the real agents, by paneKey. */
   fields?: Record<string, Record<string, unknown>>
+  /** Fields laid over game.state's result, such as hostCapacity. */
+  state?: Record<string, unknown>
 }
 
 /** A review in game.state's shape. */
@@ -28,7 +30,7 @@ export async function seedRendererGameState(
   app: ElectronApplication,
   seed: GameStateRendererSeed
 ): Promise<void> {
-  await app.evaluate(({ ipcMain }, { agents = [], fields = {} }) => {
+  await app.evaluate(({ ipcMain }, { agents = [], fields = {}, state = {} }) => {
     const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, RuntimeCall> })
       ._invokeHandlers
     const real = handlers.get('runtime:call')!
@@ -42,6 +44,7 @@ export async function seedRendererGameState(
           ...response.result.agents.map((one) => ({ ...one, ...fields[one.paneKey] })),
           ...agents
         ]
+        Object.assign(response.result, state)
       }
       return response
     })
