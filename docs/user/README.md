@@ -9,6 +9,7 @@ tracker.
 - [Install](install.md): desktop builds for macOS, Windows and Linux, the CLI, and headless hosts.
 - [Projects and workspaces](projects.md): add a repository or a folder, one workspace per task, the sidebar, tabs, terminals and the browser.
 - [One agent to a merged PR](one-agent.md): read an agent's state, open the pull request, review checks and comments, and merge, on GitHub or GitLab.
+- [Trackers and tasks](review/linear.md): connect GitHub, GitLab, Linear, Jira and Plane, the Tasks page, a workspace from a ticket, and a team's To Do.
 - [Worktrees](model/worktrees.md): one isolated git worktree per task, and how to switch between them.
 - [Quick open](model/quick-open.md): find files, and jump to worktrees, chats and actions.
 - [Sidebar and new tabs](model/sidebar.md): hosts, grouping and filters, and the **+** menu.
@@ -17,7 +18,6 @@ tracker.
 - [Usage tracking and accounts](agents/usage-tracking.md): rate-limit usage, switching accounts, and long-lived Claude tokens.
 - [Agent Teams](agents/agent-teams.md): a lead and its members, the Team panel, scenes and the Inbox.
 - [SSH](ssh.md): remote worktrees and terminals over SSH.
-- [Linear and Plane tasks](review/linear.md): link issues to worktrees.
 - [Annotate AI diffs](review/annotate-ai-diff.md): leave notes on a diff and send them to an agent.
 - [File explorer](editing/file-explorer.md): browse, edit and drag files.
 - [File viewers](editing/viewers.md): images, PDFs, Markdown and other file types.

@@ -595,3 +595,40 @@ test.describe('One agent: its state, the checks and the merge', () => {
     }
   })
 })
+
+test.describe('Trackers: connecting Plane', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Task providers offers Linear, Jira and Plane, and Connect Plane asks for three fields', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900x1000: the window the shipped capture was taken in.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    await page.evaluate(() => {
+      const state = window.__store!.getState()
+      state.openSettingsTarget({ pane: 'integrations', repoId: null })
+      state.openSettingsPage()
+    })
+    const heading = page.getByRole('heading', { name: 'Task providers' })
+    await expect(heading).toBeVisible({ timeout: 15_000 })
+    await expect.soft(page.getByText('Review providers').first()).toBeVisible()
+    // Why the nearest section: the outer Integrations section also contains this heading.
+    const section = heading.locator('xpath=ancestor::section[1]')
+    for (const name of ['Add Linear access', 'Connect Jira', 'Connect Plane']) {
+      await expect.soft(section.getByRole('button', { name }).first()).toBeVisible()
+    }
+
+    // The dialog only: its fields carry placeholders, nothing is typed or sent.
+    await section.getByRole('button', { name: 'Connect Plane' }).first().click()
+    const plane = page.getByRole('dialog', { name: 'Connect Plane workspace' })
+    await expect(plane).toBeVisible()
+    for (const label of ['Plane base URL', 'Workspace slug', 'Personal access token']) {
+      await expect.soft(plane.getByText(label, { exact: true }).first()).toBeVisible()
+    }
+    await captureBothThemes(page, testInfo, 'connect-plane', plane)
+    await page.keyboard.press('Escape')
+  })
+})

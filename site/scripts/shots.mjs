@@ -22,6 +22,7 @@ const DOCS = [
   'install',
   'projects',
   'one-agent',
+  'review/linear',
   'orchestrator/orca-game',
   'cli/overview',
   'extend/plugins',
