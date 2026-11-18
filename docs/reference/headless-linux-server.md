@@ -85,7 +85,7 @@ The command writes one ready block to stdout after the listener bind and
 pairing initialization complete:
 
 ```text
-Orca server ready
+Orca Lab server ready
 Bound endpoint: ws://0.0.0.0:6768
 Advertised endpoint: ws://100.64.1.20:6768
 Pairing URL: orca://pair?code=...
@@ -527,7 +527,7 @@ profile archive are complete. If you run the managed Xvfb unit, only
 sudo journalctl -u orca-serve.service -f
 ```
 
-A healthy start prints one `Orca server ready` block with the actual bound and
+A healthy start prints one `Orca Lab server ready` block with the actual bound and
 advertised endpoints. Verify those values rather than assuming the configured
 port, because a collision can select a fallback port.
 Confirm a client reconnects before you discard the backup. The timestamped

@@ -1,5 +1,5 @@
 ---
-sourceHash: 502715cf1804e4f6
+sourceHash: c0d9f9a6b24deffa
 ---
 # Servidor Linux sin interfaz gráfica
 
@@ -89,7 +89,7 @@ El comando escribe en stdout un bloque de arranque listo cuando terminan el bind
 listener y la inicialización del emparejamiento:
 
 ```text
-Orca server ready
+Orca Lab server ready
 Bound endpoint: ws://0.0.0.0:6768
 Advertised endpoint: ws://100.64.1.20:6768
 Pairing URL: orca://pair?code=...
@@ -542,7 +542,7 @@ completos. Si usas la unidad de Xvfb administrada, solo hay que reiniciar
 sudo journalctl -u orca-serve.service -f
 ```
 
-Un arranque correcto imprime un bloque `Orca server ready` con los endpoints
+Un arranque correcto imprime un bloque `Orca Lab server ready` con los endpoints
 realmente enlazado y anunciado. Verifica esos valores en lugar de dar por hecho el
 puerto configurado, porque una colisión puede seleccionar un puerto alternativo.
 Confirma que un cliente se reconecta antes de descartar el respaldo. Los paquetes

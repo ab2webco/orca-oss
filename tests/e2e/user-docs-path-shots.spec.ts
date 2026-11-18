@@ -769,3 +769,56 @@ test.describe('Scenes and settings: the Panel group', () => {
     await captureBothThemes(page, testInfo, 'panel-settings', group)
   })
 })
+
+test.describe('Hosts: pairing and SSH in Settings', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Remote Orca Lab Servers offers three ways in, and Add Target opens the Add SSH host dialog', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so each section fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    const open = (pane: 'servers' | 'ssh') =>
+      page.evaluate((target) => {
+        const state = window.__store!.getState()
+        state.openSettingsTarget({ pane: target, repoId: null, sectionId: target })
+        state.openSettingsPage()
+      }, pane)
+    // Why: past the window's height an element capture comes out blank (PR 6's first try).
+    const fits = async (name: string, section: ReturnType<typeof page.locator>) => {
+      const box = (await section.boundingBox())!
+      testInfo.annotations.push({
+        type: `${name}-css-px`,
+        description: `${box.width}x${box.height}`
+      })
+      expect.soft(box.width).toBeLessThanOrEqual(560)
+      expect(box.height).toBeLessThan(900)
+    }
+
+    await open('servers')
+    const servers = page.locator('section#servers')
+    await expect(servers).toBeVisible({ timeout: 15_000 })
+    for (const name of ['Connect to a host', 'Share this host']) {
+      await expect.soft(servers.getByText(name, { exact: true }).first()).toBeVisible()
+    }
+    await fits('remote-servers', servers)
+    await captureBothThemes(page, testInfo, 'remote-servers', servers)
+
+    await open('ssh')
+    const ssh = page.locator('section#ssh')
+    await expect(ssh).toBeVisible({ timeout: 15_000 })
+    await expect.soft(ssh.getByRole('button', { name: 'Import' })).toBeVisible()
+    await ssh.getByRole('button', { name: 'Add Target' }).click()
+    // Add Target opens a modal outside the section; the page names its fields, so no capture.
+    const form = page.getByRole('dialog', { name: 'Add SSH host' })
+    await expect(form).toBeVisible()
+    for (const label of ['Host or alias *', 'Username', 'Port', 'Identity File', 'Advanced']) {
+      await expect.soft(form.getByText(label, { exact: true }).first()).toBeVisible()
+    }
+    await page.keyboard.press('Escape')
+    await expect(form).toBeHidden()
+  })
+})

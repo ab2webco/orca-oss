@@ -1,5 +1,5 @@
 ---
-sourceHash: 310069239899f067
+sourceHash: 0e03242b317dcf0d
 ---
 # Documentación de usuario de Orca Lab
 
@@ -21,7 +21,7 @@ de issues.
 - [Seguimiento de uso y cuentas](agents/usage-tracking.md): uso de los límites de tasa, cambio de cuentas y tokens de Claude de larga duración.
 - [Agent Teams](agents/agent-teams.md): un líder y sus miembros, el panel Team, las escenas y el Inbox.
 - [Escenas, estilos y ajustes](agents/scenes-and-settings.md): las apariencias y escenas del panel, qué capa de ajustes gana, qué cambia al momento y un proyecto existente.
-- [SSH](ssh.md): worktrees y terminales remotos por SSH.
+- [Hosts emparejados y SSH](ssh.md): empareja otra máquina con Orca Lab o agrega un host SSH, trabaja ahí y lanza miembros en un host emparejado.
 - [Anotar diffs de IA](review/annotate-ai-diff.md): deja notas en un diff y envíalas a un agente.
 - [Explorador de archivos](editing/file-explorer.md): explora, edita y arrastra archivos.
 - [Visores de archivos](editing/viewers.md): imágenes, PDF, Markdown y otros tipos de archivo.
