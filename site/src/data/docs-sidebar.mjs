@@ -8,7 +8,8 @@ export const docsSidebar = [
     page('docs'),
     page('docs/install'),
     page('docs/projects'),
-    page('docs/one-agent')
+    page('docs/one-agent'),
+    page('docs/review/linear')
   ]),
   group('Workspaces', 'Espacios de trabajo', [
     page('docs/model/worktrees'),
@@ -21,7 +22,7 @@ export const docsSidebar = [
     page('docs/agents/agent-teams'),
     page('docs/orchestrator/orca-game')
   ]),
-  group('Review', 'Revisión', [page('docs/review/annotate-ai-diff'), page('docs/review/linear')]),
+  group('Review', 'Revisión', [page('docs/review/annotate-ai-diff')]),
   group('Editing', 'Edición', [page('docs/editing/file-explorer'), page('docs/editing/viewers')]),
   group('Browser', 'Navegador', [page('docs/browser/design-mode')]),
   group('Remote', 'Remoto', [page('docs/ssh'), page('docs/remote/headless-linux-server')]),

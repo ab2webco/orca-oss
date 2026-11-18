@@ -1,5 +1,5 @@
 ---
-sourceHash: 22eefe2fb3595503
+sourceHash: 3ccc0871df959e21
 ---
 # Documentación de usuario de Orca Lab
 
@@ -12,6 +12,7 @@ de issues.
 - [Instalación](install.md): builds de escritorio para macOS, Windows y Linux, la CLI y hosts sin interfaz gráfica.
 - [Proyectos y espacios de trabajo](projects.md): agrega un repositorio o una carpeta, un espacio por tarea, la barra lateral, las pestañas, las terminales y el navegador.
 - [Un agente hasta un PR mergeado](one-agent.md): lee el estado de un agente, abre el pull request, revisa checks y comentarios, y mergea, en GitHub o GitLab.
+- [Trackers y tareas](review/linear.md): conecta GitHub, GitLab, Linear, Jira y Plane, la página Tasks, un espacio de trabajo desde un ticket, y el To Do de un equipo.
 - [Worktrees](model/worktrees.md): un worktree de git aislado por tarea, y cómo cambiar entre ellos.
 - [Apertura rápida](model/quick-open.md): busca archivos y salta a worktrees, chats y acciones.
 - [Barra lateral y pestañas nuevas](model/sidebar.md): hosts, agrupación y filtros, y el menú **+**.
@@ -20,7 +21,6 @@ de issues.
 - [Seguimiento de uso y cuentas](agents/usage-tracking.md): uso de los límites de tasa, cambio de cuentas y tokens de Claude de larga duración.
 - [Agent Teams](agents/agent-teams.md): un líder y sus miembros, el panel Team, las escenas y el Inbox.
 - [SSH](ssh.md): worktrees y terminales remotos por SSH.
-- [Tareas de Linear y Plane](review/linear.md): vincula issues a worktrees.
 - [Anotar diffs de IA](review/annotate-ai-diff.md): deja notas en un diff y envíalas a un agente.
 - [Explorador de archivos](editing/file-explorer.md): explora, edita y arrastra archivos.
 - [Visores de archivos](editing/viewers.md): imágenes, PDF, Markdown y otros tipos de archivo.
