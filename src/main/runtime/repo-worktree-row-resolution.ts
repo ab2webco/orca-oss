@@ -123,9 +123,12 @@ export async function resolveRepoWorktreeRows(
   return gitWorktrees.map((gitWorktree) => {
     const worktreeId = `${repo.id}::${gitWorktree.path}`
     // Why: lineage validation needs a durable instance ID even when the runtime sees a workspace before renderer discovery-stamp.
+    // A first write also stamps activity: discovery skips worktrees that already have meta, so it would stay 0.
     const existingMeta = metaById[worktreeId]
     const meta =
-      existingMeta && existingMeta.instanceId ? existingMeta : store.setWorktreeMeta(worktreeId, {})
+      existingMeta && existingMeta.instanceId
+        ? existingMeta
+        : store.setWorktreeMeta(worktreeId, existingMeta ? {} : { lastActivityAt: Date.now() })
     const merged = {
       ...mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
       hostId: existingMeta?.hostId ?? meta?.hostId ?? getRepoExecutionHostId(repo)
