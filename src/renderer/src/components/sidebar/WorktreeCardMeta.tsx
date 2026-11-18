@@ -33,6 +33,10 @@ import { WorktreeCardCliDetailSection } from './WorktreeCardCliDetailSection'
 import { WorktreeCardIssueDetailSection } from './WorktreeCardIssueDetailSection'
 import { WorktreeCardPlaneWorkItemDetailSection } from './WorktreeCardPlaneWorkItemDetailSection'
 import { WorktreeCardHoverIdentityHeader } from './WorktreeCardHoverIdentityHeader'
+import { SIDEBAR_HOVER_CARD_OFFSET, sidebarHoverCardSide } from './sidebar-hover-card-side'
+
+/** The card's w-80, so the side is chosen before it is measured. */
+const DETAILS_CARD_WIDTH = 320
 
 export type {
   WorktreeCardIssueDisplay,
@@ -67,6 +71,7 @@ export function WorktreeCardDetailsHover({
   identityOrder = 'workspace-first',
   workspaceTitleRenameDisabled = false,
   automationHostId,
+  detailsBefore,
   detailsAfter,
   openDelay = 250,
   closeDelay = 120,
@@ -163,6 +168,19 @@ export function WorktreeCardDetailsHover({
   }, [copyLinkedWorkItemLink, review])
 
   const showIdentityHeader = Boolean(branchName || workspaceTitle)
+  const [side, setSide] = React.useState<'right' | 'bottom'>('right')
+  // Why on enter: the side must be known before the open delay ends and the card is placed.
+  const placeFrom = React.useCallback(
+    (trigger: Element): void =>
+      setSide(
+        sidebarHoverCardSide({
+          triggerRight: trigger.getBoundingClientRect().right,
+          viewportWidth: window.innerWidth,
+          cardWidth: DETAILS_CARD_WIDTH
+        })
+      ),
+    []
+  )
 
   if (
     !showIdentityHeader &&
@@ -176,6 +194,7 @@ export function WorktreeCardDetailsHover({
       automationProvenance,
       cliProvenance
     }) &&
+    !detailsBefore &&
     !detailsAfter
   ) {
     return children
@@ -188,17 +207,25 @@ export function WorktreeCardDetailsHover({
       openDelay={openDelay}
       closeDelay={closeDelay}
     >
-      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+      <HoverCardTrigger
+        asChild
+        onPointerEnter={(event) => placeFrom(event.currentTarget)}
+        onFocus={(event) => placeFrom(event.currentTarget)}
+      >
+        {children}
+      </HoverCardTrigger>
       <HoverCardContent
-        side="right"
+        side={side}
         align="start"
-        sideOffset={8}
-        className="w-80 max-h-[28rem] overflow-y-auto p-3 text-xs scrollbar-sleek"
+        sideOffset={SIDEBAR_HOVER_CARD_OFFSET}
+        collisionPadding={8}
+        className="w-80 max-w-[calc(100vw-1rem)] max-h-[28rem] overflow-y-auto p-3 text-xs scrollbar-sleek"
         {...{ [WORKTREE_NATIVE_CONTEXT_MENU_ATTR]: '' }}
         onClick={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
         <SelectedTextCopyMenu className="space-y-3">
+          {detailsBefore}
           {showIdentityHeader && (
             <WorktreeCardHoverIdentityHeader
               branchName={branchName}

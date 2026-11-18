@@ -16558,6 +16558,7 @@
       }
     },
     "activity": {
+      "state": "Estado",
       "prompt": "Pedido",
       "now": "Ahora",
       "question": "Pregunta",

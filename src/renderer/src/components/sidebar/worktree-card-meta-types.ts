@@ -60,6 +60,8 @@ export type WorktreeCardDetailsHoverProps = WorktreeCardMetaBadgesProps & {
   identityOrder?: 'workspace-first' | 'branch-first'
   workspaceTitleRenameDisabled?: boolean
   automationHostId?: ExecutionHostId
+  /** Leads the card, above the workspace identity (a one-agent worktree's V30 facts). */
+  detailsBefore?: React.ReactNode
   detailsAfter?: React.ReactNode
   openDelay?: number
   closeDelay?: number

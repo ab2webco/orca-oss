@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 const team = vi.hoisted(() => ({ value: { row: null as unknown, child: false } }))
-const hover = vi.hoisted(() => ({ details: false }))
+const hover = vi.hoisted(() => ({
+  details: false,
+  title: undefined as string | undefined,
+  branch: undefined as string | undefined
+}))
 const live = vi.hoisted(() => ({ agents: [] as unknown[] }))
 vi.mock('./worktree-agent-row-selectors', () => ({
   selectLiveAgentStatusEntriesForWorktree: () =>
@@ -21,16 +25,42 @@ vi.mock('./worktree-card-row-content', () => ({
   WorktreeCardTeamChildren: () => <div data-team-children="" />
 }))
 vi.mock('./worktree-card-presentation', () => ({
-  buildWorktreeCardPresentation: () => ({ titleOnlyCard: false, hasHoverDetails: hover.details })
+  buildWorktreeCardPresentation: () => ({
+    titleOnlyCard: false,
+    hasHoverDetails: hover.details,
+    hoverWorkspaceTitle: hover.title,
+    hoverBranchName: hover.branch
+  })
 }))
 vi.mock('./WorktreeContextMenu', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 vi.mock('./AutoRenameFailedDialog', () => ({ AutoRenameFailedDialog: () => null }))
 vi.mock('./WorktreeCardMeta', () => ({
-  WorktreeCardDetailsHover: ({ children }: { children: React.ReactNode }) => (
-    <div data-details-hover="">{children}</div>
+  WorktreeCardDetailsHover: ({
+    children,
+    detailsBefore,
+    workspaceTitle,
+    branchName
+  }: {
+    children: React.ReactNode
+    detailsBefore?: React.ReactNode
+    workspaceTitle?: string
+    branchName?: string
+  }) => (
+    <div data-details-hover="" data-workspace-title={workspaceTitle} data-branch={branchName}>
+      {detailsBefore ? <div data-details-before="">{detailsBefore}</div> : null}
+      {children}
+    </div>
   )
+}))
+type SoloOpen = Partial<Record<'pr' | 'ticket', (event: React.MouseEvent) => void>>
+const soloHover = vi.hoisted(() => ({ onOpen: undefined as SoloOpen | undefined }))
+vi.mock('./SidebarSoloHoverContent', () => ({
+  SidebarSoloHoverContent: ({ paneKey, onOpen }: { paneKey: string; onOpen?: SoloOpen }) => {
+    soloHover.onOpen = onOpen
+    return <div data-solo-facts={paneKey} />
+  }
 }))
 vi.mock('./WorktreeCardPorts', () => ({ WorktreeCardPortsDetails: () => null }))
 vi.mock('./WorktreeCardAgentHoverDetails', () => ({ WorktreeCardAgentHoverDetails: () => null }))
@@ -51,7 +81,10 @@ afterEach(async () => {
   })
   team.value = { row: null, child: false }
   hover.details = false
+  hover.title = undefined
+  hover.branch = undefined
   live.agents = []
+  soloHover.onOpen = undefined
 })
 
 const oneAgent = {
@@ -167,5 +200,75 @@ describe('WorktreeCardSurface', () => {
     const surface = await surfaceOf(cardOf({ isRuntimeDisconnected: true }))
 
     expect(surface.querySelector('[data-row-content]')!.hasAttribute('data-solo')).toBe(false)
+  })
+
+  // ORCA-1149 S7: V30's solo facts lead the card, and every classic hover action stays below them.
+  it("leads a solo row's details card with V30's agent facts, even with no other details", async () => {
+    live.agents = [oneAgent]
+    const surface = await surfaceOf(cardOf({}))
+
+    expect(
+      surface.querySelector('[data-details-hover] [data-details-before] [data-solo-facts]')
+    ).not.toBeNull()
+    expect(surface.querySelector('[data-solo-facts]')!.getAttribute('data-solo-facts')).toBe(
+      'tab-1:leaf-1'
+    )
+    expect(surface.querySelector('[data-details-hover] [data-row-content]')).not.toBeNull()
+  })
+
+  it("drops the workspace title that repeats the solo facts' title, keeping a branch that differs", async () => {
+    hover.title = 'master'
+    hover.branch = 'fabolivark/orca-1149'
+    live.agents = [oneAgent]
+    const card = (await surfaceOf(cardOf({}))).querySelector('[data-details-hover]')!
+
+    expect(card.hasAttribute('data-workspace-title')).toBe(false)
+    expect(card.getAttribute('data-branch')).toBe('fabolivark/orca-1149')
+  })
+
+  it('keeps the workspace title on a card that is not a solo row', async () => {
+    hover.details = true
+    hover.title = 'master'
+    const card = (await surfaceOf(cardOf({}))).querySelector('[data-details-hover]')!
+
+    expect(card.getAttribute('data-workspace-title')).toBe('master')
+  })
+
+  it('opens no solo card while the Activity view shows the same facts', async () => {
+    live.agents = [oneAgent]
+    const surface = await surfaceOf(cardOf({ activityViewOpen: true }))
+
+    expect(surface.querySelector('[data-details-hover]')).toBeNull()
+  })
+
+  it('adds no agent facts to a card that is not a solo row', async () => {
+    hover.details = true
+    const surface = await surfaceOf(cardOf({}))
+
+    expect(surface.querySelector('[data-solo-facts]')).toBeNull()
+  })
+
+  it('closes the card and opens the PR and the ticket in Orca from their lines', async () => {
+    live.agents = [oneAgent]
+    const closeHover = vi.fn()
+    const openReview = vi.fn()
+    const openPlane = vi.fn()
+    await surfaceOf(
+      cardOf({
+        worktree: { id: 'wt-lead', linkedPlaneWorkItem: { identifier: 'ORCA-1149' } },
+        planeWorkItem: { identifier: 'ORCA-1149' },
+        hoverReview: { provider: 'github', url: 'https://example.test/pr/1' },
+        detailsHoverControl: { closeHover },
+        handleOpenReviewInOrca: openReview,
+        handleOpenPlaneWorkItemInOrca: openPlane
+      } as unknown as Partial<WorktreeCardController>)
+    )
+    const event = {} as React.MouseEvent
+    soloHover.onOpen?.pr?.(event)
+    soloHover.onOpen?.ticket?.(event)
+
+    expect(openReview).toHaveBeenCalledWith(event)
+    expect(openPlane).toHaveBeenCalledWith(event)
+    expect(closeHover).toHaveBeenCalledTimes(2)
   })
 })

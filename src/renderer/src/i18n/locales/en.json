@@ -17538,6 +17538,7 @@
       }
     },
     "activity": {
+      "state": "State",
       "prompt": "Prompt",
       "now": "Now",
       "question": "Question",
