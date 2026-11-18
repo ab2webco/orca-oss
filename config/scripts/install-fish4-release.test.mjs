@@ -117,8 +117,16 @@ describe('install-fish4-release fallback', () => {
     expect(result.recorded).toBe('release')
   })
 
-  it('does nothing when apt already installed fish 4', () => {
-    const result = run({ installed: '4.0.2' })
+  // Why (ORCA-1280): Ubuntu 26.04's own fish 4.2.1 neither arms DECSET 2031 nor re-queries OSC 11.
+  it('installs the pinned release when apt left fish 4.2.1, older than the 4.3 floor', () => {
+    const result = run({ installed: '4.2.1' })
+    expect(result.status).toBe(0)
+    expect(result.shippedVersion).toBe('fish, version 4.9.3')
+    expect(result.recorded).toBe('release')
+  })
+
+  it('does nothing when apt already installed fish 4.3 or newer', () => {
+    const result = run({ installed: '4.3.0' })
     expect(result.status).toBe(0)
     expect(result.shippedVersion).toBeNull()
     expect(result.recorded).toBe('ppa')

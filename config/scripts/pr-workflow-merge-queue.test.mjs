@@ -30,6 +30,7 @@ const PER_PUSH_JOBS = [
   'root_directory_guard',
   'typecheck',
   'test',
+  'ubuntu_2604',
   'e2e-paths',
   'e2e',
   'verify',

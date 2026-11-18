@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   fishRequirementViolation,
+  fishVersionMeetsFloor,
   REQUIRE_FISH_ENV_VAR,
   resolveFishBinary,
   type FishBinaryLookup
@@ -30,6 +31,18 @@ describe('fishRequirementViolation', () => {
   it('reports no violation when fish is present, requirement set or not', () => {
     expect(fishRequirementViolation(FOUND, { [REQUIRE_FISH_ENV_VAR]: '1' })).toBeNull()
     expect(fishRequirementViolation(FOUND, {})).toBeNull()
+  })
+})
+
+// Why (ORCA-1280): Ubuntu 26.04's fish 4.2.1 neither arms DECSET 2031 nor re-queries OSC 11.
+describe('fishVersionMeetsFloor', () => {
+  it('holds fish 4.2.1 below a 4.3 floor and accepts 4.3 and later', () => {
+    expect(fishVersionMeetsFloor('fish, version 4.2.1', 4, 3)).toBe(false)
+    expect(fishVersionMeetsFloor('fish, version 4.3.0', 4, 3)).toBe(true)
+    expect(fishVersionMeetsFloor('fish, version 4.10.1', 4, 3)).toBe(true)
+    expect(fishVersionMeetsFloor('fish, version 5.0', 4, 3)).toBe(true)
+    expect(fishVersionMeetsFloor('fish, version 3.7.0', 4, 3)).toBe(false)
+    expect(fishVersionMeetsFloor('', 4, 3)).toBe(false)
   })
 })
 

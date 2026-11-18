@@ -10,6 +10,7 @@ import {
   getPowerShellOsc133Bootstrap,
   isPowerShellExecutableName
 } from '../powershell-osc133-bootstrap'
+import { BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION } from '../pty/bash-prompt-command-normalize'
 import { getPosixOmpShellWrapper } from '../pty/omp-shell-wrapper'
 import {
   getFishCodexShellLaunchPreflight,
@@ -192,20 +193,7 @@ __orca_osc133_epilogue() {
 }
 # Why: normalize an array PROMPT_COMMAND (bash 5.1+) to a string so prepend/append
 # below is uniform, and capture $? in precmd before the user's chain mutates it.
-__orca_normalize_prompt_command() {
-  local __orca_joined="" __orca_prompt_part
-  if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-    for __orca_prompt_part in "\${PROMPT_COMMAND[@]}"; do
-      [[ -n "$__orca_prompt_part" ]] || continue
-      if [[ -n "$__orca_joined" ]]; then
-        __orca_joined="$__orca_joined;$__orca_prompt_part"
-      else
-        __orca_joined="$__orca_prompt_part"
-      fi
-    done
-    PROMPT_COMMAND="$__orca_joined"
-  fi
-}
+${BASH_NORMALIZE_PROMPT_COMMAND_FUNCTION}
 __orca_normalize_prompt_command
 PROMPT_COMMAND="__orca_osc133_precmd\${PROMPT_COMMAND:+;\${PROMPT_COMMAND}};__orca_osc133_epilogue"
 __orca_debug_trap_spec="$(trap -p DEBUG)"

@@ -18,7 +18,22 @@ export type FishBinaryLookup =
   | { available: true; path: string; majorVersion: number }
   | { available: false; path: null; majorVersion: number; reason: string }
 
-export function resolveFishBinary(minMajorVersion = 1): FishBinaryLookup {
+/** Whether `fish --version` output reports at least major.minor. */
+export function fishVersionMeetsFloor(
+  versionOutput: string,
+  minMajorVersion: number,
+  minMinorVersion: number
+): boolean {
+  const match = /version (\d+)(?:\.(\d+))?/.exec(versionOutput)
+  if (!match) {
+    return false
+  }
+  const major = Number(match[1])
+  const minor = Number(match[2] ?? '0')
+  return major > minMajorVersion || (major === minMajorVersion && minor >= minMinorVersion)
+}
+
+export function resolveFishBinary(minMajorVersion = 1, minMinorVersion = 0): FishBinaryLookup {
   if (process.platform === 'win32') {
     return {
       available: false,
@@ -34,12 +49,13 @@ export function resolveFishBinary(minMajorVersion = 1): FishBinaryLookup {
       continue
     }
     const majorVersion = Number(/version (\d+)/.exec(probe.stdout ?? '')?.[1] ?? '0')
-    if (majorVersion < minMajorVersion) {
+    if (!fishVersionMeetsFloor(probe.stdout ?? '', minMajorVersion, minMinorVersion)) {
+      const floor = minMinorVersion > 0 ? `${minMajorVersion}.${minMinorVersion}` : minMajorVersion
       return {
         available: false,
         path: null,
         majorVersion,
-        reason: `fish ${minMajorVersion}+ required, found ${probe.stdout?.trim() || 'an unknown version'} at ${path}`
+        reason: `fish ${floor}+ required, found ${probe.stdout?.trim() || 'an unknown version'} at ${path}`
       }
     }
     return { available: true, path, majorVersion }
