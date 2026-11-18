@@ -21,7 +21,7 @@ jobs:
   update:
     # Why: this workflow commits to main, so forks should not create divergent badge commits.
     if: github.repository == 'stablyai/orca'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout main
         uses: actions/checkout@v6

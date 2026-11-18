@@ -59,7 +59,7 @@ jobs:
     # Why: gate to the fork so this workflow no-ops if the file ever reaches
     # upstream or another fork (mirrors release-cut.yml's canonical-repo guard).
     if: github.repository == 'ab2webco/orca-oss'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.head.outputs.sha }}
@@ -87,7 +87,7 @@ jobs:
     name: release gate static analysis
     needs: resolve
     if: inputs.dry_run != true && inputs.skip_gate != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout the commit under release
@@ -106,7 +106,7 @@ jobs:
     name: release gate tests ${{ matrix.shard }}/${{ matrix.shard_total }}
     needs: resolve
     if: inputs.dry_run != true && inputs.skip_gate != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why 15: mirrors pr.yml's shard cap so a wedged shard reports as a failure
     # instead of holding the release for the 6h default.
     timeout-minutes: 15
@@ -163,7 +163,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-24.04, windows-latest]
     steps:
       - name: Checkout the commit under release
         uses: actions/checkout@v6
@@ -179,7 +179,7 @@ jobs:
     # Why always(): a skipped or failed gate job must reach the verdict, not
     # cascade past it. The verdict itself is what refuses to publish.
     if: always() && needs.resolve.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Why actions:read: the workflow default is contents:write only, and the jobs
     # API this reads 403s without it.
@@ -256,7 +256,7 @@ jobs:
     # Why !cancelled(): the implicit success() is false over the gate jobs a dry
     # run or skip_gate skips; a refused verdict still fails gate and stops here.
     if: ${{ !cancelled() && needs.resolve.result == 'success' && needs.gate.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       version: ${{ steps.next.outputs.version }}
@@ -493,7 +493,7 @@ jobs:
   linux:
     needs: version
     if: ${{ !cancelled() && needs.version.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - name: Checkout build ref
@@ -591,7 +591,7 @@ jobs:
       && needs.resolve.result == 'success' && needs.gate.result == 'success'
       && needs.version.result == 'success' && needs.mac.result == 'success'
       && needs.linux.result == 'success' && needs.windows.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: lab-release
     env:

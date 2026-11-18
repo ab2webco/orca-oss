@@ -162,7 +162,7 @@ describe('PR test LoC summary', () => {
     const locJob = workflow.jobs.loc
     const serialized = JSON.stringify(workflow)
 
-    expect(locJob['runs-on']).toBe('ubuntu-latest')
+    expect(locJob['runs-on']).toBe('ubuntu-24.04')
     expect(locJob.steps).toHaveLength(1)
     expect(locJob.steps[0].run).toContain('gh api')
     expect(locJob.steps[0].run).toContain('pr-test-loc-table.mjs')
