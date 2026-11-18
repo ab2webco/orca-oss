@@ -847,7 +847,7 @@ import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capaci
 import { LOCAL_GAME_HOST } from '../../shared/orchestrator-game-host-load'
 import { GameHostLaunchReader, gameHostLaunchesOf } from './orchestrator-game-host-launch-reader'
 import { withOtherProjectMembers } from '../../shared/orchestrator-game-host-projects'
-import { listOpenFederatedGameMembers } from './orchestrator-game-federated-members'
+import { liveFederatedGameMembersOf } from './orchestrator-game-federated-members'
 import {
   gameRepoSummaryOf,
   localGameRepoSummaryOf,
@@ -33015,18 +33015,12 @@ export class OrcaRuntimeService {
     )
     const repos = await hostRepos
     // Why before capacity: each host's running count there must include other projects' members.
-    const shared =
-      visible.role === 'lead'
-        ? withOtherProjectMembers(
-            visible,
-            [
-              { host: LOCAL_GAME_HOST, worktrees: summaries },
-              ...(await this.gameRemoteSessions.read().catch(() => []))
-            ],
-            worktree?.id ?? null,
-            this.gameFederatedMembersOf(worktreesById)
-          )
-        : visible
+    const shared = await this.withOtherGameProjects(
+      visible,
+      summaries,
+      worktree?.id ?? null,
+      worktreesById
+    )
     return withGameHostCapacity(
       shared,
       await hostReadings,
@@ -33034,19 +33028,34 @@ export class OrcaRuntimeService {
     )
   }
 
-  /** Every Run's open members this Orca placed on paired hosts, labelled by their lead's repo (ORCA-1284). */
-  private gameFederatedMembersOf(
+  /** A lead's other projects on each host: theirs here, by worktree.ps, and those this Orca placed live elsewhere (ORCA-1284). */
+  private async withOtherGameProjects(
+    state: OrchestratorGameState,
+    summaries: readonly RuntimeWorktreePsSummary[],
+    leadWorktreeId: string | null,
     worktreesById: ReadonlyMap<string, ResolvedWorktree>
-  ): { host: string; repo: string; dispatchId: string }[] {
-    const rows = this._orchestrationDb ? listOpenFederatedGameMembers(this._orchestrationDb) : []
-    return rows.map(({ dispatchId, host, leadWorktreeId }) => {
-      const repoId = leadWorktreeId ? worktreesById.get(leadWorktreeId)?.repoId : undefined
-      return {
-        host,
-        dispatchId,
-        repo: (repoId && this.gameRepoNameOf(repoId)) || 'another project'
+  ): Promise<OrchestratorGameState> {
+    if (state.role !== 'lead') {
+      return state
+    }
+    const remote = await this.gameRemoteSessions.read().catch(() => [])
+    const open = this._orchestrationDb?.listOpenFederatedDispatches?.() ?? []
+    const launched = liveFederatedGameMembersOf(open, remote).map(
+      ({ dispatchId, host, leadWorktreeId: placedBy }) => {
+        const repoId = placedBy ? worktreesById.get(placedBy)?.repoId : undefined
+        return {
+          host,
+          dispatchId,
+          repo: (repoId && this.gameRepoNameOf(repoId)) || 'another project'
+        }
       }
-    })
+    )
+    return withOtherProjectMembers(
+      state,
+      [{ host: LOCAL_GAME_HOST, worktrees: summaries }, ...remote],
+      leadWorktreeId,
+      launched
+    )
   }
 
   // Why last: an agent the lead dropped stays out however it was listed, found or member (ORCA-943).
