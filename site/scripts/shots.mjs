@@ -32,7 +32,8 @@ const DOCS = [
   'agents/usage-tracking',
   'model/sidebar',
   'terminal',
-  'mobile'
+  'mobile',
+  'artifacts-and-automations'
 ]
 const PAGES = [
   { name: 'landing', path: '/' },

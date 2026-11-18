@@ -822,3 +822,57 @@ test.describe('Hosts: pairing and SSH in Settings', () => {
     await expect(form).toBeHidden()
   })
 })
+
+test.describe('Mobile and artifacts: pairing and publishing settings', () => {
+  test.use({ seedTestRepo: false })
+
+  test('Mobile offers Orca Relay or LAN, and Artifacts names its upload host', async ({
+    electronApp,
+    orcaPage: page
+  }, testInfo) => {
+    test.setTimeout(120_000)
+    await waitForSessionReady(page)
+    // Why 900: the pane is the window less the settings nav, so each capture fits the 560px column.
+    await setWindowSize(electronApp, page, { width: 900, height: 1000 })
+    const open = (pane: 'mobile' | 'artifacts') =>
+      page.evaluate((target) => {
+        const state = window.__store!.getState()
+        state.openSettingsTarget({ pane: target, repoId: null, sectionId: target })
+        state.openSettingsPage()
+      }, pane)
+    const fits = async (name: string, target: ReturnType<typeof page.locator>) => {
+      const box = (await target.boundingBox())!
+      testInfo.annotations.push({
+        type: `${name}-css-px`,
+        description: `${box.width}x${box.height}`
+      })
+      expect.soft(box.width).toBeLessThanOrEqual(560)
+      expect(box.height).toBeLessThan(900)
+    }
+
+    await open('mobile')
+    // Only the connection choice: the address picker below it names this machine's own IPs.
+    const modes = page.getByRole('radiogroup', { name: 'How the phone reaches this computer' })
+    await expect(modes).toBeVisible({ timeout: 15_000 })
+    for (const name of ['Orca Relay', 'LAN']) {
+      await expect.soft(modes.getByText(name, { exact: true }).first()).toBeVisible()
+    }
+    await expect(modes.getByText(/\b\d{1,3}(\.\d{1,3}){3}\b/)).toHaveCount(0)
+    // A QR code or a pairing code is a live credential: neither may sit in this capture.
+    await expect(modes.locator('canvas, img, [aria-label*="QR" i]')).toHaveCount(0)
+    await expect(modes.getByText(/pairing code|orca:\/\/pair|[A-Za-z0-9_-]{24,}/i)).toHaveCount(0)
+    await fits('pair-a-phone', modes)
+    await captureBothThemes(page, testInfo, 'pair-a-phone', modes)
+
+    await open('artifacts')
+    const artifacts = page.locator('section#artifacts')
+    await expect(artifacts).toBeVisible({ timeout: 15_000 })
+    await expect
+      .soft(artifacts.getByText('Allow publishing public artifact links').first())
+      .toBeVisible()
+    await expect.soft(artifacts.getByText(/share\.onorca\.dev/).first()).toBeVisible()
+    await expect(artifacts.getByText(/\b\d{1,3}(\.\d{1,3}){3}\b/)).toHaveCount(0)
+    await fits('artifacts-settings', artifacts)
+    await captureBothThemes(page, testInfo, 'artifacts-settings', artifacts)
+  })
+})

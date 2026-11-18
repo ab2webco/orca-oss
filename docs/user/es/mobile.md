@@ -1,23 +1,47 @@
 ---
-sourceHash: a108d5d529100f86
+sourceHash: b927bae753082436
 ---
 # Móvil
 
 La app de Orca Lab se empareja con tu escritorio y te pone los agentes en el bolsillo. Esta página
-describe la versión 0.0.62.
+describe la versión 0.0.64.
+
+<figure class="orca-diagram" aria-label="De instalar la app del teléfono a responder a tu equipo">
+<ol class="orca-chain">
+<li><strong>Instala</strong><span>TestFlight en iPhone, el APK en Android</span></li>
+<li><strong>Empareja</strong><span>escanea el QR del escritorio, o pega su código</span></li>
+<li><strong>Observa</strong><span>el equipo, las cuentas y las terminales de cada escritorio</span></li>
+<li><strong>Responde</strong><span>las preguntas de tu equipo desde el Inbox</span></li>
+</ol>
+</figure>
 
 ## Instalar
 
-Abre **Settings > Mobile** en el escritorio. Enlaza el build de
-[TestFlight](https://testflight.apple.com/join/xbePNDGj) para iPhone y el **Android APK** de los
-[releases `mobile-android-v*`](https://github.com/ab2webco/orca-oss/releases?q=mobile-android).
-La app todavía no está en la App Store ni en Google Play.
+Abre **Settings > Mobile** en el escritorio, u **Orca Lab Mobile** en la barra lateral. Enlazan el
+build de [TestFlight](https://testflight.apple.com/join/xbePNDGj) para iPhone y el
+**Android APK**, que descarga el último release `mobile-android-v*`. La app todavía no está en la
+App Store ni en Google Play.
 
 ## Emparejar
 
-En la misma página **Settings > Mobile**, escanea el código QR desde la app. A partir de ahí, el
-teléfono llega al escritorio directamente por tu red, o a través de un relay con cifrado de extremo a
-extremo cuando no puede hacerlo.
+En **Pair a phone**, elige cómo llega el teléfono a este equipo:
+
+- **Orca Relay**: el teléfono funciona con datos móviles o cualquier Wi-Fi. Necesita que inicies
+  sesión con una cuenta de Orca Lab, y **Also use a faster local path** deja que el teléfono vaya
+  directo cuando está cerca. El relay corre en los servidores de Orca upstream (`relay.onorca.dev`),
+  no en los de este build: lo que transporta va cifrado de extremo a extremo, pero los metadatos,
+  como el momento y el volumen, no.
+- **LAN**: el teléfono tiene que estar en la misma red que el equipo, o llegar a él por Tailscale.
+  No hace falta cuenta.
+
+Un build sin el relay, como un build de desarrollo, muestra **Orca Relay** como **Unavailable** y
+dice que uses LAN.
+
+Elige **Generate QR code** y luego, en la app, toca **Pair Desktop** y escanéalo, o pega el código
+de **Copy pairing code**. **Paired Devices** lista cada teléfono; revocar uno lo desconecta al
+momento.
+
+![Settings > Mobile: las opciones Orca Relay y LAN en Pair a phone, en un build sin el relay](../../assets/mobile/pair-a-phone.png)
 
 ## Inicio
 

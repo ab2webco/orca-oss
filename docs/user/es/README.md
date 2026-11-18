@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e03242b317dcf0d
+sourceHash: 8d760fca3a4da09c
 ---
 # Documentación de usuario de Orca Lab
 
@@ -27,6 +27,7 @@ de issues.
 - [Visores de archivos](editing/viewers.md): imágenes, PDF, Markdown y otros tipos de archivo.
 - [Navegador y Design Mode](browser/design-mode.md): previsualiza páginas y envía comentarios sobre elementos a un agente.
 - [CLI](cli/overview.md): automatiza Orca Lab desde una terminal con el comando `orca`.
+- [Artefactos y automatizaciones](artifacts-and-automations.md): comparte un archivo como enlace público, y ejecuta un agente según un horario.
 - [Móvil](mobile.md): instala y empareja la app del teléfono, mira el equipo y las cuentas de cada escritorio y responde al líder.
 - [Telemetría y privacidad](telemetry.md): qué datos envía Orca Lab y cómo desactivarlo.
 
