@@ -1,5 +1,5 @@
 ---
-sourceHash: b927bae753082436
+sourceHash: 4c3e01d9d0dbc4cd
 ---
 # Móvil
 
@@ -34,14 +34,9 @@ En **Pair a phone**, elige cómo llega el teléfono a este equipo:
 - **LAN**: el teléfono tiene que estar en la misma red que el equipo, o llegar a él por Tailscale.
   No hace falta cuenta.
 
-Un build sin el relay, como un build de desarrollo, muestra **Orca Relay** como **Unavailable** y
-dice que uses LAN.
-
 Elige **Generate QR code** y luego, en la app, toca **Pair Desktop** y escanéalo, o pega el código
 de **Copy pairing code**. **Paired Devices** lista cada teléfono; revocar uno lo desconecta al
 momento.
-
-![Settings > Mobile: las opciones Orca Relay y LAN en Pair a phone, en un build sin el relay](../../assets/mobile/pair-a-phone.png)
 
 ## Inicio
 

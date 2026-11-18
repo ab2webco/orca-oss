@@ -30,14 +30,9 @@ Under **Pair a phone**, choose how the phone reaches this computer:
 - **LAN**: the phone must be on the same network as the computer, or reach it through Tailscale.
   No account is needed.
 
-A build without the relay, such as a development build, shows **Orca Relay** as **Unavailable**
-and says to use LAN.
-
 Choose **Generate QR code**, then in the app tap **Pair Desktop** and scan it, or paste the code
 from **Copy pairing code**. **Paired Devices** lists each phone; revoking one disconnects it at
 once.
-
-![Settings > Mobile: the Orca Relay and LAN choices under Pair a phone, in a build without the relay](../assets/mobile/pair-a-phone.png)
 
 ## Home
 
