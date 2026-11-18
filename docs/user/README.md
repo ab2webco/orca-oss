@@ -18,7 +18,7 @@ tracker.
 - [Usage tracking and accounts](agents/usage-tracking.md): rate-limit usage, switching accounts, and long-lived Claude tokens.
 - [Agent Teams](agents/agent-teams.md): a lead and its members, the Team panel, scenes and the Inbox.
 - [Scenes, styles and settings](agents/scenes-and-settings.md): the panel's looks and scenes, which settings layer wins, what changes at once, and an existing project.
-- [SSH](ssh.md): remote worktrees and terminals over SSH.
+- [Paired hosts and SSH](ssh.md): pair another Orca Lab machine or add an SSH host, work there, and launch members on a paired host.
 - [Annotate AI diffs](review/annotate-ai-diff.md): leave notes on a diff and send them to an agent.
 - [File explorer](editing/file-explorer.md): browse, edit and drag files.
 - [File viewers](editing/viewers.md): images, PDFs, Markdown and other file types.
