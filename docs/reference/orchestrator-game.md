@@ -909,7 +909,7 @@ matches …` (ORCA-866).
   `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
   have it read events and inbox before answering "qué pasó".
 - `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
-[--all]` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
+[--all]`, `orca game owner-question <id>` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
   to the person as records, below.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
@@ -1335,6 +1335,14 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   writes an `escalation` from `owner` to the lead's terminal, a type the lead's watch passes, and
   the lead records it on the ticket. The same answer again is a no-op, a different one is refused,
   and a member can neither ask the person nor answer for them.
+- A member checks an answer its lead relays instead of asking the person again (ORCA-1281):
+  `game owner-question <id>` reads one question, the answer, when and where it was given (`via`:
+  `inbox`, `phone`, or `cli` for `game answer-owner`; the host stamps it from the transport), and only
+  for the member's own ticket. A member on a paired host reads it on its own host: before the lead's
+  host hands that member its mail, it sends the answers on the member's ticket with
+  `game.ownerQuestionsImport`, which the member's host accepts only from the attachment's home
+  fingerprint ([`orchestrator-game-member-owner-answer-check.ts`](../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
+  An older host lacks that call, so its member asks the person as before.
 - Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
   its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
   their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`

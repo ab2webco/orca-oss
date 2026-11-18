@@ -95,7 +95,8 @@ export const GAME_MEMBER_CI_NOTE =
 export const GAME_MEMBER_REPORT_RULES = [
   'Before your first commit, estimate the diff: when it will pass about 400 lines outside tests, send your lead a split plan (one PR per part, in order) before you commit.',
   'Send worker_done once, with `--dispatch-capability`. If Orca refuses it for anything but the envelope field errors it lists, send the same text to your lead with `orca orchestration send --to <lead handle> --type escalation --subject report`; never resend worker_done.',
-  'When CI is red and the cause is outside your change, still name the failing job, its run id and the cause, propose who fixes it, and tell your lead. Never go idle on a red PR.'
+  'When CI is red and the cause is outside your change, still name the failing job, its run id and the cause, propose who fixes it, and tell your lead. Never go idle on a red PR.',
+  "When your lead relays the person's answer, check its `oq_` id with `orca game owner-question <id>` before a hard-to-undo step (merge, deploy, release). Ask the person again only when that record is missing, not answered, or does not cover the step."
 ].join('\n')
 
 export const withGameMemberNotes = (spec: string): string =>

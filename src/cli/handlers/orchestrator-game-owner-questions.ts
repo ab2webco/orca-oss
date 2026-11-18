@@ -2,8 +2,16 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { getRepeatedStringFlag } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
-import { callGameBoard, gameBoardCaller, optionalText } from './orchestrator-game-board-call'
-import type { GameOwnerQuestion } from '../../shared/orchestrator-game-owner-questions'
+import {
+  callGameBoard,
+  gameBoardCaller,
+  gameCallerRole,
+  optionalText
+} from './orchestrator-game-board-call'
+import type {
+  GameOwnerAnswerVia,
+  GameOwnerQuestion
+} from '../../shared/orchestrator-game-owner-questions'
 
 type AskResult = { question: GameOwnerQuestion }
 // Why optional: a host from before ORCA-942 does not send `undelivered`.
@@ -24,6 +32,12 @@ function requiredText(flags: Map<string, string | boolean>, name: string): strin
   return value
 }
 
+const VIA_TEXT: Record<GameOwnerAnswerVia, string> = {
+  inbox: "in the person's Inbox",
+  phone: "on the person's phone",
+  cli: 'with `game answer-owner` in a terminal'
+}
+
 function formatQuestion(one: GameOwnerQuestion): string[] {
   const head = `${one.id}${one.ticket ? ` ${one.ticket}` : ''} asked ${one.askedAt}: ${one.question}`
   const options = one.options.map((option, index) => `${index + 1}) ${option}`).join('  ')
@@ -31,8 +45,19 @@ function formatQuestion(one: GameOwnerQuestion): string[] {
     head,
     ...(options ? [`  ${options}`] : []),
     ...(one.context ? [`  ${one.context}`] : []),
-    ...(one.answer ? [`  answered ${one.answer.at}: ${one.answer.text}`] : [])
+    ...(one.answer
+      ? [
+          `  answered ${one.answer.at}${one.answer.via ? ` ${VIA_TEXT[one.answer.via]}` : ''}: ${one.answer.text}`
+        ]
+      : [])
   ]
+}
+
+export function formatOwnerQuestion({ question }: { question: GameOwnerQuestion }): string {
+  return [
+    ...formatQuestion(question),
+    ...(question.answer ? [] : ['  not answered yet: do not act on a relayed answer to it'])
+  ].join('\n')
 }
 
 function heldSection(list: GameOwnerQuestion[], tail: [string, string]): string[] {
@@ -116,6 +141,16 @@ export const ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS: Record<string, CommandHa
       WHAT
     )
     printResult(response, json, formatOwnerQuestions)
+  },
+  'game owner-question': async ({ flags, client, json }) => {
+    const id = requiredText(flags, 'id')
+    const response = await callGameBoard<{ question: GameOwnerQuestion }>(
+      client,
+      'game.ownerQuestion',
+      { ...gameBoardCaller(), ...gameCallerRole(), id },
+      WHAT
+    )
+    printResult(response, json, formatOwnerQuestion)
   },
   'game answer-owner': async ({ flags, client, json }) => {
     const id = requiredText(flags, 'id')

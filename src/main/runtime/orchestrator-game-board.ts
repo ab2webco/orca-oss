@@ -39,6 +39,7 @@ import {
   openGameOwnerQuestions,
   parseGameOwnerQuestion,
   type GameOwnerAnswerResult,
+  type GameOwnerAnswerVia,
   type GameOwnerQuestion,
   type GameOwnerQuestionDraft,
   type GameOwnerReply
@@ -251,7 +252,7 @@ export class GameBoard {
 
   /** The lead hears the answer once, as an escalation its mail watch already passes. */
   async answerOwner(
-    args: GameBoardCaller & GameOwnerReply & { id: string }
+    args: GameBoardCaller & GameOwnerReply & { id: string; via?: GameOwnerAnswerVia }
   ): Promise<{ question: GameOwnerQuestion; delivered: boolean; repeated: boolean }> {
     const project = await this.deps.projectOf(args)
     if (project.isMember) {
@@ -262,7 +263,7 @@ export class GameBoard {
     const result = await this.deps.store.changeOwnerQuestions<GameOwnerAnswerResult<unknown>>(
       project.key,
       (list) => {
-        const outcome = answerGameOwnerQuestion(list, args.id, args, at)
+        const outcome = answerGameOwnerQuestion(list, args.id, args, at, args.via)
         if (outcome.kind !== 'answered') {
           return { list: null, result: outcome }
         }

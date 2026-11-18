@@ -168,7 +168,8 @@ describe('game board RPC', () => {
           terminalHandle: undefined,
           id: 'oq_1',
           option: 2,
-          text: undefined
+          text: undefined,
+          via: 'cli'
         }
       ]
     ])
@@ -278,5 +279,86 @@ describe('game board RPC: the person answers a member (ORCA-878)', () => {
     await expect(
       dispatcher.dispatch({ id: 'b', authToken: 'test', method: 'game.ownerQuestionsAll' })
     ).resolves.toMatchObject({ ok: true, result: { projects } })
+  })
+})
+
+describe('game board RPC: a member checks a relayed owner answer (ORCA-1281)', () => {
+  function runtimeWith() {
+    const calls: [string, unknown, unknown?][] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getGameBoard: () => ({
+        answerOwner: async (args: unknown) => {
+          calls.push(['answerOwner', args])
+          return { delivered: true }
+        }
+      }),
+      readGameOwnerQuestion: async (args: unknown) => {
+        calls.push(['readGameOwnerQuestion', args])
+        return { question: { id: 'oq_1' } }
+      },
+      keepGameOwnerAnswersFromLeadHost: async (args: unknown, fingerprint: unknown) => {
+        calls.push(['keep', args, fingerprint])
+        return { kept: 1 }
+      }
+    } as unknown as OrcaRuntimeService
+    return {
+      dispatcher: new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_BOARD_METHODS }),
+      calls
+    }
+  }
+
+  it('reads one question by id with the caller and its member role', async () => {
+    const { dispatcher, calls } = runtimeWith()
+    const response = await dispatcher.dispatch({
+      id: 'b',
+      authToken: 'test',
+      method: 'game.ownerQuestion',
+      params: { terminalHandle: 'h1', role: 'member', id: 'oq_1' }
+    })
+
+    expect(response).toMatchObject({ ok: true, result: { question: { id: 'oq_1' } } })
+    expect(calls).toEqual([
+      ['readGameOwnerQuestion', { terminalHandle: 'h1', role: 'member', id: 'oq_1' }]
+    ])
+  })
+
+  it('stamps where the person answered from the transport, never from the params', async () => {
+    const { dispatcher, calls } = runtimeWith()
+    const answer = (id: string) => ({
+      id,
+      authToken: 'test',
+      method: 'game.ownerAnswer',
+      params: { id: 'oq_1', option: 1, via: 'inbox' }
+    })
+    await dispatcher.dispatch(answer('desktop-ipc'))
+    await dispatcher.dispatch(answer('cli-1'))
+    await dispatcher.dispatchStreaming(answer('m1'), () => undefined, { clientKind: 'mobile' })
+
+    expect(calls.map(([, args]) => (args as { via: string }).via)).toEqual([
+      'inbox',
+      'cli',
+      'phone'
+    ])
+  })
+
+  it("hands an import the paired caller's fingerprint, and refuses one over the cap", async () => {
+    const { dispatcher, calls } = runtimeWith()
+    const params = { dispatchId: 'ctx_1', ticket: 'CIN-1', questions: [{ id: 'oq_1' }] }
+    await dispatcher.dispatch(
+      { id: 'b', authToken: 'test', method: 'game.ownerQuestionsImport', params },
+      { authenticatedCallerFingerprint: 'home-fp' }
+    )
+    const tooMany = { ...params, questions: Array.from({ length: 201 }, () => ({})) }
+    await expect(
+      dispatcher.dispatch({
+        id: 'c',
+        authToken: 'test',
+        method: 'game.ownerQuestionsImport',
+        params: tooMany
+      })
+    ).resolves.toMatchObject({ ok: false })
+
+    expect(calls).toEqual([['keep', params, 'home-fp']])
   })
 })

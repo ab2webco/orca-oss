@@ -10,6 +10,7 @@ import type {
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import { TERMINAL_FIT_RESTORE_DEADLINE_MS } from '../../shared/terminal-fit-restore-deadline'
 import { RpcDispatcher } from '../runtime/rpc/dispatcher'
+import { DESKTOP_IPC_REQUEST_ID } from '../runtime/rpc/desktop-ipc-request-id'
 
 function boundTerminalFitRestore(pending: Promise<boolean>): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -56,7 +57,7 @@ export function registerRuntimeHandlers(runtime: OrcaRuntimeService): void {
       args: { method: string; params?: unknown }
     ): Promise<RuntimeRpcResponse<unknown>> => {
       return (await new RpcDispatcher({ runtime }).dispatch({
-        id: 'desktop-ipc',
+        id: DESKTOP_IPC_REQUEST_ID,
         authToken: 'desktop-ipc',
         method: args.method,
         params: args.params

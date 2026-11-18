@@ -875,12 +875,20 @@ import type {
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
 import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import {
+  keepRemoteMemberOwnerAnswers,
+  readBoardOwnerAnswer,
+  readRemoteMemberOwnerAnswer,
+  shareOwnerAnswersWithRemoteMember,
+  type RemoteMemberOwnerAnswers
+} from './orchestrator-game-member-owner-answer-check'
 import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import { GameTeamXpLedger } from './orchestrator-game-team-xp-ledger'
 import {
   gameOwnerQuestionMobileNotification,
   gameOwnerQuestionNotificationId,
+  type GameOwnerQuestion,
   type GameOwnerQuestionProject
 } from '../../shared/orchestrator-game-owner-questions'
 import { GameInboxChangeSignal } from './orchestrator-game-inbox-change'
@@ -31662,6 +31670,69 @@ export class OrcaRuntimeService {
 
   getGameBoard(): GameBoard {
     return this.gameBoard
+  }
+
+  // Why: what each remote member's host last received from this lead's host (ORCA-1281).
+  private readonly sharedOwnerAnswers = new Map<string, string>()
+
+  /** Before a remote member's mail goes out, its host gets the person's answers on its ticket (ORCA-1281). */
+  shareGameOwnerAnswersWithRemoteMember(dispatchId: string): Promise<void> {
+    const deps = {
+      memberOf: async (id: string) => {
+        const db = this.getOrchestrationDb()
+        const federated = db.getFederatedDispatch(id)
+        const dispatch = db.getDispatchContextById(id)
+        const task = dispatch ? db.getTask(dispatch.task_id) : undefined
+        const lead = dispatch ? db.getRun(dispatch.run_id)?.coordinator_handle : null
+        const ticket = ticketInText(task?.task_title ?? task?.display_name)
+        if (!federated || !ticket || !lead) {
+          return null
+        }
+        const { key } = await this.gameBoardProjectOf({ terminalHandle: lead })
+        return { ticket, projectKey: key, environmentId: federated.environment_id }
+      },
+      questionsOf: (key: string) => this.gameHistory.ownerQuestions(key),
+      send: (environmentId: string, shared: RemoteMemberOwnerAnswers) =>
+        this.callOrchestrationWorkerServer(
+          environmentId,
+          'game.ownerQuestionsImport',
+          shared,
+          15_000
+        ),
+      sent: this.sharedOwnerAnswers
+    }
+    return shareOwnerAnswersWithRemoteMember(deps, dispatchId)
+  }
+
+  /** On a member's host: keeps what its lead's paired host shared; any other caller is refused. */
+  async keepGameOwnerAnswersFromLeadHost(
+    shared: RemoteMemberOwnerAnswers,
+    callerFingerprint: string | undefined
+  ): Promise<{ kept: number }> {
+    const attachment = this.getOrchestrationDb().getRemoteDispatchAttachment(shared.dispatchId)
+    if (!attachment || attachment.home_peer_fingerprint !== callerFingerprint) {
+      throw new Error(`Remote Dispatch ${shared.dispatchId} was not found for this lead's host.`)
+    }
+    return keepRemoteMemberOwnerAnswers(this.gameHistory, shared)
+  }
+
+  /** One owner answer by id: from the lead's board here, or what a remote member's lead host shared. */
+  async readGameOwnerQuestion(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    role?: 'member'
+    id: string
+  }): Promise<{ question: GameOwnerQuestion }> {
+    const paneKey = args.terminalHandle ? this.getTerminalPaneKey(args.terminalHandle) : null
+    const db = paneKey ? this.getOrchestrationDbIfAvailable() : null
+    const remote =
+      paneKey && db
+        ? (db.findActiveRemoteAttachmentForPane(paneKey) ??
+          db.findLatestSettledRemoteAttachmentForPane(paneKey))
+        : undefined
+    return remote
+      ? readRemoteMemberOwnerAnswer(this.gameHistory, remote.dispatch_id, args.id)
+      : readBoardOwnerAnswer(this.gameHistory, await this.gameBoardProjectOf(args), args)
   }
 
   getGameArcade(): GameArcadeLedger {

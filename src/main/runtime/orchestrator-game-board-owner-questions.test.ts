@@ -9,6 +9,7 @@ import {
   type GameLeadNote
 } from './orchestrator-game-board'
 import { GameHistoryStore } from './orchestrator-game-history-store'
+import { readBoardOwnerAnswer } from './orchestrator-game-member-owner-answer-check'
 import { GameStopSwitch } from './orchestrator-game-stop-switch'
 
 const dirs: string[] = []
@@ -37,8 +38,9 @@ function board(
   const told: { lead: GameBoardLead; note: GameLeadNote }[] = []
   const changed: string[] = []
   const events: string[] = []
+  const store = new GameHistoryStore(() => dir)
   const game = new GameBoard({
-    store: new GameHistoryStore(() => dir),
+    store,
     stops: new GameStopSwitch(() => join(dir, 'stop')),
     projectOf: async (caller) => project(caller),
     inboxSourceOf: () => ({ leadAddresses: [], members: [], mail: [] }),
@@ -55,7 +57,7 @@ function board(
     now: () => new Date(Date.UTC(2026, 9, 29, 10, 0, 0)),
     ...(later ? { later } : {})
   })
-  return { game, told, changed, events }
+  return { game, told, changed, events, store }
 }
 
 const ask = {
@@ -123,7 +125,8 @@ describe('GameBoard owner questions', () => {
           body: [
             'Answer: Wait for lab.112',
             'Question: Ship the arcade in lab.111?',
-            'Record this answer on CIN-1.'
+            'Record this answer on CIN-1.',
+            `When you relay it to a member, cite ${question.id}: the member checks it with \`orca game owner-question ${question.id}\`.`
           ].join('\n'),
           payload: { ownerQuestionId: question.id, ticket: 'CIN-1', answer: 'Wait for lab.112' }
         }
@@ -329,5 +332,51 @@ describe('GameBoard owner questions', () => {
     await game.answerOwner({ id: question.id, text: 'Yes' })
 
     expect(events).toEqual([`asked repo:r1 ${question.id}`, `answered repo:r1 ${question.id}`])
+  })
+
+  describe('a member checks a relayed answer by id (ORCA-1281)', () => {
+    it("reads its own ticket's question and the person's answer, with where it was given", async () => {
+      const { game, store } = board(() => LEAD)
+      const { question } = await game.askOwner(ask)
+      await game.answerOwner({
+        terminalHandle: 'term_lead',
+        id: question.id,
+        option: 1,
+        via: 'phone'
+      })
+
+      const read = await readBoardOwnerAnswer(store, MEMBER, { id: question.id })
+
+      expect(read.question).toMatchObject({
+        id: question.id,
+        ticket: 'CIN-1',
+        answer: { text: 'Yes', at: '2026-10-29T10:00:00.000Z', via: 'phone' }
+      })
+      expect(read.question.answer).not.toHaveProperty('undelivered')
+    })
+
+    it("refuses another ticket's question and an id with no record", async () => {
+      const { game, store } = board(() => LEAD)
+      const { question } = await game.askOwner({ ...ask, ticket: 'CIN-2' })
+
+      await expect(readBoardOwnerAnswer(store, MEMBER, { id: question.id })).rejects.toThrow(
+        `Question ${question.id} is not on your ticket CIN-1.`
+      )
+      await expect(readBoardOwnerAnswer(store, MEMBER, { id: 'oq_missing' })).rejects.toThrow(
+        'No question oq_missing is on record for CIN-1.'
+      )
+      await expect(readBoardOwnerAnswer(store, LEAD, { id: question.id })).resolves.toMatchObject({
+        question: { ticket: 'CIN-2' }
+      })
+    })
+
+    it('refuses a member whose lead is on another host instead of reading as its lead', async () => {
+      const { game, store } = board(() => LEAD)
+      const { question } = await game.askOwner(ask)
+
+      await expect(
+        readBoardOwnerAnswer(store, LEAD, { id: question.id, role: 'member' })
+      ).rejects.toThrow(/your lead's host does/)
+    })
   })
 })

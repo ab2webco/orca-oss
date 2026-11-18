@@ -55,6 +55,7 @@ ones. [Agent Teams](../agents/agent-teams.md) explains the lead and its members.
 - `orca game history`: the project's freed members: ticket, outcome, PR, character, agent, account and host. Filter with `--ticket`, `--character` or `--since`.
 - `orca game resume-members`: bring back the members a restart left paused, or free them with `--discard`.
 - `orca game owner-questions`: what the lead asked you that still waits for an answer. Answer with `orca game answer-owner`.
+- `orca game owner-question <id>`: one question and your answer, with when and where you gave it. A member runs it to check an answer its lead relays instead of asking you again.
 - `orca game metrics`: tickets done, lead time and freed members by outcome.
 - `orca game stop <ticket>|--all [--hold]`: stop members and record them in the history. `--all --hold` also sets a STOP that refuses new launches until `orca game resume`.
 - `orca game adopt-history --from-repo-id <id>`: fold the history, lessons and STOP a removed repo id left behind into this project.

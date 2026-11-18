@@ -1,5 +1,5 @@
 ---
-sourceHash: 2edf93b30f64d8a4
+sourceHash: a15e78b96db990d9
 ---
 
 # El juego orquestador de Agent Teams
@@ -957,7 +957,7 @@ matches …` (ORCA-866).
   `orca game inbox [--ticket] [--unread] [--mark-read]` — el tablero compartido, más abajo. Las reglas
   del líder le piden leer los eventos y el inbox antes de responder "qué pasó".
 - `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
-[--all]` y `orca game answer-owner <id> (--pick <n> | --answer <text>)` — las preguntas del líder a
+[--all]`, `orca game owner-question <id>` y `orca game answer-owner <id> (--pick <n> | --answer <text>)` — las preguntas del líder a
   la persona como registros, más abajo.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — trae de vuelta a los miembros
   que un reinicio dejó en pausa, más abajo.
@@ -1425,6 +1425,14 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   un tipo que el watch del líder deja pasar, y el líder la registra en el ticket. La misma respuesta
   otra vez no hace nada, una distinta se rechaza, y un miembro no puede ni preguntarle a la persona
   ni responder por ella.
+- Un miembro comprueba una respuesta que su líder le transmite en lugar de volver a preguntarle a la
+  persona (ORCA-1281): `game owner-question <id>` lee una pregunta, la respuesta, cuándo y desde dónde
+  se dio (`via`: `inbox`, `phone`, o `cli` para `game answer-owner`; el host la marca según el
+  transporte), y solo para el ticket del propio miembro. Un miembro en un host emparejado la lee en su
+  propio host: antes de entregarle su correo, el host del líder le envía las respuestas de su ticket
+  con `game.ownerQuestionsImport`, que el host del miembro solo acepta de la huella del home de la
+  asignación ([`orchestrator-game-member-owner-answer-check.ts`](../../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
+  Un host más antiguo no tiene esa llamada, así que su miembro le pregunta a la persona como antes.
 - Los miembros que un líder coloca en un host emparejado con `orchestration worker-start --on <env>`
   forman parte de su flota (ORCA-824): `game fleet`, `game state --json` y `game member <ticket>` los
   listan con su host (`HOST`, `remote.host`), y el estado, la rama y el PR que informa el

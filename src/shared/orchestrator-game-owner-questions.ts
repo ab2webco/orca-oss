@@ -1,7 +1,17 @@
 /** `orca game ask-owner`: what the lead asks the person, kept as records so none is lost in its chat. */
 
+export const GAME_OWNER_ANSWER_VIAS = ['inbox', 'phone', 'cli'] as const
+/** Where it was answered: the desktop Inbox, a paired phone, or `game answer-owner` in a terminal. */
+export type GameOwnerAnswerVia = (typeof GAME_OWNER_ANSWER_VIAS)[number]
+
 /** `undelivered`: no lead has received it yet; absent on answers older builds kept, which were told. */
-export type GameOwnerAnswer = { text: string; at: string; undelivered?: true }
+export type GameOwnerAnswer = {
+  text: string
+  at: string
+  undelivered?: true
+  /** Absent on answers from before ORCA-1281. */
+  via?: GameOwnerAnswerVia
+}
 
 export type GameOwnerQuestion = {
   id: string
@@ -52,9 +62,31 @@ function answerOf(value: unknown): GameOwnerAnswer | null | undefined {
   if (!isRecord(value) || typeof value.text !== 'string' || typeof value.at !== 'string') {
     return undefined
   }
-  return value.undelivered === true
-    ? { text: value.text, at: value.at, undelivered: true }
-    : { text: value.text, at: value.at }
+  const via = GAME_OWNER_ANSWER_VIAS.find((one) => one === value.via)
+  return {
+    text: value.text,
+    at: value.at,
+    ...(value.undelivered === true ? { undelivered: true as const } : {}),
+    ...(via ? { via } : {})
+  }
+}
+
+/** One question by id; a member (`ticket` set) reads only its own ticket's (ORCA-1281). */
+export function gameOwnerQuestionForTicket(
+  list: readonly unknown[],
+  id: string,
+  ticket: string | null
+): GameOwnerQuestion {
+  const question = list
+    .flatMap((one) => parseGameOwnerQuestion(one) ?? [])
+    .find((one) => one.id === id)
+  if (!question) {
+    throw new Error(`No question ${id} is on record for ${ticket ?? 'this project'}.`)
+  }
+  if (ticket !== null && question.ticket?.toUpperCase() !== ticket.toUpperCase()) {
+    throw new Error(`Question ${id} is not on your ticket ${ticket}.`)
+  }
+  return question
 }
 
 export function parseGameOwnerQuestion(raw: unknown): GameOwnerQuestion | null {
@@ -150,7 +182,8 @@ export function answerGameOwnerQuestion<T>(
   list: readonly T[],
   id: string,
   reply: GameOwnerReply,
-  at: string
+  at: string,
+  via?: GameOwnerAnswerVia
 ): GameOwnerAnswerResult<T> {
   const index = list.findIndex((one) => parseGameOwnerQuestion(one)?.id === id)
   const question = index === -1 ? null : parseGameOwnerQuestion(list[index])
@@ -165,7 +198,10 @@ export function answerGameOwnerQuestion<T>(
     return { kind: question.answer.text === text ? 'repeated' : 'conflict', question }
   }
   // Why undelivered until told: an answer no lead received must stay on record to reach the next one.
-  const answered: GameOwnerQuestion = { ...question, answer: { text, at, undelivered: true } }
+  const answered: GameOwnerQuestion = {
+    ...question,
+    answer: { text, at, undelivered: true, ...(via ? { via } : {}) }
+  }
   const next: (T | GameOwnerQuestion)[] = [...list]
   next[index] = answered
   return { kind: 'answered', list: next, question: answered }
@@ -188,10 +224,8 @@ export function deliverGameOwnerAnswers<T>(
       return one
     }
     changed = true
-    const delivered = {
-      ...question,
-      answer: { text: question.answer.text, at: question.answer.at }
-    }
+    const { text, at, via } = question.answer
+    const delivered = { ...question, answer: { text, at, ...(via ? { via } : {}) } }
     held.push(delivered)
     return delivered
   })
@@ -275,7 +309,8 @@ export function gameOwnerAnswerNote(question: GameOwnerQuestion): {
     body: [
       `Answer: ${answer}`,
       `Question: ${question.question}`,
-      question.ticket ? `Record this answer on ${question.ticket}.` : 'Record this answer.'
+      question.ticket ? `Record this answer on ${question.ticket}.` : 'Record this answer.',
+      `When you relay it to a member, cite ${question.id}: the member checks it with \`orca game owner-question ${question.id}\`.`
     ].join('\n'),
     payload: { ownerQuestionId: question.id, ticket: question.ticket, answer }
   }

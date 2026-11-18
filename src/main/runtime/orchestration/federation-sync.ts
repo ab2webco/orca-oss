@@ -182,6 +182,8 @@ async function syncFederatedDispatchPages(
       ? db.listPendingFederationRelay(dispatchId, 'to_worker')
       : []
   if (toWorker.length > 0) {
+    // Why first: a relayed owner answer must be checkable when the member reads it (ORCA-1281).
+    await runtime.shareGameOwnerAnswersWithRemoteMember(dispatchId)
     const delivered = (await runtime.callOrchestrationWorkerServer(
       federated.environment_id,
       'orchestration.federationImport',
