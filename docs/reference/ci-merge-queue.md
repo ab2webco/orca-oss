@@ -12,6 +12,7 @@ sat queued for 2 hours or more, and each merge from `main` into a branch restart
 | Job                                                  | PR push            | Merge queue                                             |
 | ---------------------------------------------------- | ------------------ | ------------------------------------------------------- |
 | static analysis, root directory guard, typecheck     | yes                | yes                                                     |
+| ubuntu-26.04 shells                                  | yes                | yes                                                     |
 | unit tests (`tests node 24 n/N`)                     | 8 shards           | 16 shards                                               |
 | detect e2e scope + `e2e (<mode>)`                    | changed specs only | scope from the queued diff (full suite or area's specs) |
 | Git compatibility, shell contracts, cli subprocess   | —                  | yes                                                     |
@@ -24,10 +25,25 @@ sat queued for 2 hours or more, and each merge from `main` into a branch restart
 carries no `paths` filter, so its `detect plugin seal scope` job applies the old path list, and the
 three seal runners start only when one of those paths changed.
 
-A push to an ordinary PR schedules at most 15 `pr.yml` jobs, plus `pr-test-loc`.
+A push to an ordinary PR schedules at most 16 `pr.yml` jobs, plus `pr-test-loc`.
 `config/scripts/pr-workflow-merge-queue.test.mjs` asserts the count stays under 20. The workflows
 that only run when their own paths change (`mobile.yml`, `computer-e2e.yml`,
 `skill-update-roundtrip.yml`) are not part of that count and still run on the push.
+
+## Runner images
+
+`ubuntu-latest` rolled to Ubuntu 26.04 on 2026-11-18, so every Linux job names `ubuntu-24.04`
+(ORCA-1280). Git compatibility (old Git does not build with 26.04's gcc), package (the glibc
+floor) and Claude hooks on Python 3.9 (no 26.04 build) stay there on purpose.
+`ubuntu-26.04 shells` is the one lane on 26.04. It runs the tests that read the image itself: the
+bash wrappers under 26.04's `/etc/profile`, `orca-cli-resolver` against its `/usr/bin` and `/bin`,
+and the live fish tests.
+
+The fish lanes need fish **4.3 or newer**. fish arms DECSET 2031 around its prompt and re-queries
+OSC 11 on handoff only since 4.3, so an older fish leaves the #9993 and #13892 tests nothing to
+guard. Ubuntu 26.04's own fish is 4.2.1 and 24.04's is 3.7. Both lanes install the pinned release
+from `config/scripts/install-fish4-release.sh` when apt leaves anything older, and
+`require-fish4.sh` fails the job below the floor.
 
 ## E2E on a push
 

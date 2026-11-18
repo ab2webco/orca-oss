@@ -226,6 +226,8 @@ describe('PR workflow parallelism', () => {
       'typecheck',
       'git_compatibility',
       'shell_contracts',
+      // Why: the one Linux lane on ubuntu-26.04 while the rest stay pinned to 24.04 (ORCA-1280).
+      'ubuntu_2604',
       'cli_subprocess',
       'test',
       'managed_hook_node18',
