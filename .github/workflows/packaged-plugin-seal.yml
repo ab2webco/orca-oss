@@ -21,7 +21,7 @@ concurrency:
 jobs:
   scope:
     name: detect plugin seal scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-24.04, windows-latest]
     steps:
       - uses: actions/checkout@v6
         with:

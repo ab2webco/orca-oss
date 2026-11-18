@@ -33,7 +33,7 @@ describe('e2e workflow CJK font coverage', () => {
     ])
   })
 
-  // Why this is a test and not a comment: ubuntu-latest resolves no Korean-capable
+  // Why this is a test and not a comment: ubuntu-24.04 resolves no Korean-capable
   // font, so a dropped package makes CJK glyph-metric specs measure a tofu box and
   // fail for a reason that has nothing to do with the code under test. e2e.yml
   // conflicts on every upstream sync, which is exactly where the line gets lost.

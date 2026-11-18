@@ -44,7 +44,7 @@ for (const f of files) {
 }
 
 const isWin = process.platform === 'win32'
-const sibling = isWin ? 'verify (ubuntu-latest)' : 'verify-windows (windows-2022)'
+const sibling = isWin ? 'verify (ubuntu-24.04)' : 'verify-windows (windows-2022)'
 const lines = [
   '### Platform test coverage',
   '',

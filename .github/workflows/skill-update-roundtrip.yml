@@ -22,12 +22,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-24.04, windows-latest]
         shape: [symlink, copy]
         autocrlf: ['false', 'true']
         skills-cli: ['1.5.17']
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             shape: symlink
             autocrlf: 'false'
             skills-cli: latest

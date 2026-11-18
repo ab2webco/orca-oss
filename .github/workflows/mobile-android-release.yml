@@ -21,7 +21,7 @@ on:
 
 jobs:
   android-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Why 60: real builds take 28-31 min (0.0.50, 0.0.51). Without this the job
     # inherits GitHub's 360-minute default, where a hung Gradle and a slow one
     # both just read `in_progress` -- iOS has been bounded at 90 all along

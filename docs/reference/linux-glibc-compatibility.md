@@ -9,8 +9,9 @@ exception — see below.)
 ## Why this needs attention
 
 A native module (`.node`) links against the glibc of the machine that compiled
-it. Our release CI compiles node-pty from source on GitHub's `ubuntu-latest`
-runner, whose glibc rises over time as the image is bumped. A binary compiled on
+it. Our release CI compiles node-pty from source on GitHub's `ubuntu-24.04`
+runner, pinned because `ubuntu-latest` now resolves to 26.04 and its glibc rises
+with every image bump. A binary compiled on
 a newer glibc can reference symbol versions that do not exist on an older target,
 and the dynamic loader then refuses to load it:
 
