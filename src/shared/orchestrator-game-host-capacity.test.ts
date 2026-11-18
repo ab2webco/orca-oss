@@ -4,7 +4,8 @@ import {
   gameHostBusyRefusalOf,
   gameHostCapacitiesOf,
   gameHostMachineOf,
-  withGameHostCapacity
+  withGameHostCapacity,
+  type GameHostMachine
 } from './orchestrator-game-host-capacity'
 import type { GameAgent, OrchestratorGameState } from './orchestrator-game-state'
 
@@ -289,7 +290,7 @@ describe('formatGameHostCapacity', () => {
 })
 
 describe('gameHostBusyRefusalOf (ORCA-1284)', () => {
-  const row = (host: string, machine: typeof local) =>
+  const row = (host: string, machine: GameHostMachine) =>
     ({ host, running: 0, status: 'ok', ...machine }) as const
 
   it('refuses on this lead’s machine at three quarters of its cores, keeping room for its leads', () => {

@@ -117,7 +117,11 @@ function clientOn(runtime: OrcaRuntimeService): { client: RuntimeClient; started
 
 const launchFromLeadB = (client: RuntimeClient, ticket: string) =>
   ORCHESTRATOR_GAME_LAUNCH_HANDLERS['game launch']({
-    flags: new Map([['ticket', ticket]]),
+    // Why: this reads the CI runner's real load, which can pass the lead machine's busy line (ORCA-1284).
+    flags: new Map([
+      ['ticket', ticket],
+      ['past-busy', 'e2e']
+    ]),
     client,
     cwd: userData.dir,
     json: true
