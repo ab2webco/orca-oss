@@ -560,10 +560,7 @@ jobs:
       # Why the container: node-pty built on the runner image links its glibc, which on 26.04 is
       # above the 2.31 floor the afterPack gate enforces (ORCA-1285).
       - name: Build native modules at the glibc floor
-        run: |
-          node config/scripts/install-electron-package-binary.mjs
-          node config/scripts/rebuild-native-at-glibc-floor.mjs
-          node config/scripts/ensure-native-runtime.mjs --runtime=electron
+        uses: ./.github/actions/build-native-at-glibc-floor
 
       - name: Build package inputs
         run: |

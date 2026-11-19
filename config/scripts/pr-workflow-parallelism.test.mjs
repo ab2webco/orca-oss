@@ -189,8 +189,8 @@ describe('PR workflow parallelism', () => {
     expect(
       workflow.jobs.package.steps.find(
         (step) => step.name === 'Build native modules at the glibc floor'
-      ).run
-    ).toContain('ensure-native-runtime.mjs --runtime=electron')
+      ).uses
+    ).toBe('./.github/actions/build-native-at-glibc-floor')
 
     expect(
       dependencyAction.runs.steps.find((step) => step.name === 'Use external node-gyp').if

@@ -493,7 +493,7 @@ jobs:
   linux:
     needs: version
     if: ${{ !cancelled() && needs.version.result == 'success' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:
       - name: Checkout build ref
@@ -520,12 +520,17 @@ jobs:
       - name: Build desktop bundles
         run: pnpm build:desktop
 
+      # Why: the same build as the merge queue's package job, so the floor it checks is what ships
+      # (ORCA-1285).
+      - name: Build native modules at the glibc floor
+        uses: ./.github/actions/build-native-at-glibc-floor
+
       - name: Package and publish Linux artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORCA_LAB_RELEASE_CANDIDATE: ${{ inputs.release_candidate && '1' || '' }}
+          ORCA_REUSE_PREPARED_NATIVE_RUNTIME: '1'
         run: |
-          node config/scripts/ensure-native-runtime.mjs --runtime=electron
           publish="always"
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             publish="never"
