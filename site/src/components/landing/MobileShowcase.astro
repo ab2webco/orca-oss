@@ -11,10 +11,10 @@ const copy = {
   en: {
     eyebrow: 'Mobile · iOS and Android',
     title: 'Your agents, in your pocket.',
-    lede: 'Pair once with a QR code. The phone then reaches your desktop directly, or through an end-to-end encrypted relay, and a lead’s question finds you wherever you are.',
+    lede: 'Pair once by QR code. Directly or through an end-to-end encrypted relay, a lead’s question finds you anywhere.',
     phones: [
-      ['mobile-inbox-ios.gif', 'Owner-question Inbox', 'Answer the lead’s decision with one tap; the answer goes back to the lead.'],
-      ['mobile-team-android.gif', 'Team drawer', 'Open questions, a card per member with ticket, state, PR and CI, merges per day and lead time.'],
+      ['mobile-inbox-ios.gif', 'Owner-question Inbox', 'Answer the lead’s decision with one tap.'],
+      ['mobile-team-android.gif', 'Team drawer', 'Open questions, each member’s ticket, state, PR and CI, merges per day, lead time.'],
       ['mobile-terminal-ios.gif', 'Live terminals', 'Watch any agent’s terminal stream and type into it.']
     ],
     ios: 'iOS via TestFlight',
@@ -24,10 +24,10 @@ const copy = {
   es: {
     eyebrow: 'Móvil · iOS y Android',
     title: 'Tus agentes, en tu bolsillo.',
-    lede: 'Empareja una vez con un código QR. Desde ahí el teléfono llega a tu escritorio directo, o por un relay cifrado de extremo a extremo, y la pregunta de un líder te encuentra donde estés.',
+    lede: 'Empareja una vez por QR. Directo o por un relay cifrado de extremo a extremo, la pregunta de un líder te encuentra donde estés.',
     phones: [
-      ['mobile-inbox-ios.gif', 'Inbox de preguntas', 'Responde la decisión del líder con un toque; la respuesta vuelve al líder.'],
-      ['mobile-team-android.gif', 'Cajón del equipo', 'Preguntas abiertas, una tarjeta por miembro con ticket, estado, PR y CI, merges por día y lead time.'],
+      ['mobile-inbox-ios.gif', 'Inbox de preguntas', 'Responde la decisión del líder con un toque.'],
+      ['mobile-team-android.gif', 'Cajón del equipo', 'Preguntas abiertas, ticket, estado, PR y CI de cada miembro, merges por día, lead time.'],
       ['mobile-terminal-ios.gif', 'Terminales en vivo', 'Mira la terminal de cualquier agente en tiempo real y escribe en ella.']
     ],
     ios: 'iOS por TestFlight',
@@ -46,9 +46,9 @@ const copy = {
       {
         copy.phones.map(([file, title, text]) => (
           <li>
+            <Recording lang={lang} file={file as 'mobile-inbox-ios.gif'} isPhone />
             <h3>{title}</h3>
             <p class="muted">{text}</p>
-            <Recording lang={lang} file={file as 'mobile-inbox-ios.gif'} isPhone />
           </li>
         ))
       }
@@ -74,10 +74,19 @@ const copy = {
     .phones {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+    /* Why subgrid: the Android recording is taller, and the titles still share one line. */
+    .phones li {
+      display: grid;
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      row-gap: 0;
+    }
   }
   h3 {
-    margin: 0;
-    font-size: 16px;
+    margin: var(--space-md) 0 0;
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: 1.2;
   }
   .phones p {
     margin: 6px 0 14px;
