@@ -38896,7 +38896,9 @@ describe('OrcaRuntimeService', () => {
         displayName: 'Review dispatch prompts and make worker labels distinct',
         lastAssistantMessage: 'on it',
         stateStartedAt: now - 100,
-        updatedAt: now
+        updatedAt: now,
+        // Why: another project's lead counts it toward this host's cap (ORCA-1284).
+        dispatched: true
       })
     ])
     expect(summary).toMatchObject({ hasHostSidebarActivity: true, status: 'working' })

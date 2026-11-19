@@ -67,7 +67,9 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
   'game fleet': async ({ client, json }) => {
     const response = await readCallerGameState(client)
     await postGameEvents(client, observedGameEventsOf(response.result.agents))
-    const { githubBudget, hostCapacity } = response.result
+    const { githubBudget, localHost } = response.result
+    // Why alone too: this machine's row is where other projects' share of its cap shows (ORCA-1284).
+    const hostCapacity = response.result.hostCapacity ?? (localHost?.others ? [localHost] : null)
     const fleet = {
       ...gameFleetReportOf(response.result),
       ...(githubBudget ? { githubBudget } : {}),

@@ -844,7 +844,10 @@ import {
   remoteWorktreeKeyOf
 } from './orchestrator-game-remote-found'
 import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
+import { LOCAL_GAME_HOST } from '../../shared/orchestrator-game-host-load'
 import { GameHostLaunchReader, gameHostLaunchesOf } from './orchestrator-game-host-launch-reader'
+import { withOtherProjectMembers } from '../../shared/orchestrator-game-host-projects'
+import { liveFederatedGameMembersOf } from './orchestrator-game-federated-members'
 import {
   gameRepoSummaryOf,
   localGameRepoSummaryOf,
@@ -20991,7 +20994,8 @@ export class OrcaRuntimeService {
         updatedAt: src.updatedAt,
         ...(src.restoredUnconfirmed ? { restoredUnconfirmed: true } : {}),
         ...(orchestration?.lastActivityAt ? { lastActivityAt: orchestration.lastActivityAt } : {}),
-        ...(orchestration?.orphaned ? { orphaned: true } : {})
+        ...(orchestration?.orphaned ? { orphaned: true } : {}),
+        ...(orchestration ? { dispatched: true as const } : {})
       }
       // Why: SSH/runtime projections can spell an equivalent path differently;
       // bucket by the canonical summary id so mobile keeps the agent activity.
@@ -33081,10 +33085,47 @@ export class OrcaRuntimeService {
       args.paneKey ? worktree?.repoId : undefined
     )
     const repos = await hostRepos
-    return withGameHostCapacity(
+    // Why before capacity: each host's running count there must include other projects' members.
+    const shared = await this.withOtherGameProjects(
       visible,
+      summaries,
+      worktree?.id ?? null,
+      worktreesById
+    )
+    return withGameHostCapacity(
+      shared,
       await hostReadings,
       repos ? gameHostLaunchesOf(repos, visible.lead?.memberRepos) : null
+    )
+  }
+
+  /** A lead's other projects on each host: theirs here, by worktree.ps, and those this Orca placed live elsewhere (ORCA-1284). */
+  private async withOtherGameProjects(
+    state: OrchestratorGameState,
+    summaries: readonly RuntimeWorktreePsSummary[],
+    leadWorktreeId: string | null,
+    worktreesById: ReadonlyMap<string, ResolvedWorktree>
+  ): Promise<OrchestratorGameState> {
+    if (state.role !== 'lead') {
+      return state
+    }
+    const remote = await this.gameRemoteSessions.read().catch(() => [])
+    const open = this._orchestrationDb?.listOpenFederatedDispatches?.() ?? []
+    const launched = liveFederatedGameMembersOf(open, remote).map(
+      ({ dispatchId, host, leadWorktreeId: placedBy }) => {
+        const repoId = placedBy ? worktreesById.get(placedBy)?.repoId : undefined
+        return {
+          host,
+          dispatchId,
+          repo: (repoId && this.gameRepoNameOf(repoId)) || 'another project'
+        }
+      }
+    )
+    return withOtherProjectMembers(
+      state,
+      [{ host: LOCAL_GAME_HOST, worktrees: summaries }, ...remote],
+      leadWorktreeId,
+      launched
     )
   }
 

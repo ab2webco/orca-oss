@@ -287,8 +287,8 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
       throw new RuntimeClientError('invalid_argument', `${ticket} is ${formatSetupQueue(queued)}.`)
     }
     gameLaunchChoiceOf(overrides, response.result.lead ?? DEFAULT_GAME_LEAD)
-    const { cap, running, hosts } = gameFleetReportOf(response.result)
-    const refusal = gameHostRefusalOf(hosts ?? [], { cap, running }, remote?.on ?? null, ticket)
+    const fleet = gameFleetReportOf(response.result)
+    const refusal = gameHostRefusalOf(fleet.hosts ?? [], fleet, remote?.on ?? null, ticket)
     if (refusal) {
       throw new RuntimeClientError('cap_reached', refusal)
     }

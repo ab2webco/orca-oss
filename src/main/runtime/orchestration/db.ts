@@ -5129,6 +5129,38 @@ export class OrchestrationDb {
       .get(dispatchId) as FederatedDispatchRow | undefined
   }
 
+  /**
+   * Every Run's federated dispatches not yet settled, stopped or released (ORCA-1284). Such rows are
+   * never closed when a member goes away, so only a live pane on the host proves one still runs.
+   */
+  listOpenFederatedDispatches(): {
+    dispatchId: string
+    environmentId: string
+    remoteWorktreeId: string | null
+    leadWorktreeId: string | null
+  }[] {
+    return this.db
+      .prepare(
+        `SELECT f.dispatch_id AS dispatchId, f.environment_id AS environmentId,
+                f.remote_worktree_id AS remoteWorktreeId,
+                CASE WHEN json_valid(w.start_options)
+                  THEN json_extract(w.start_options, '$.leadWorktreeId') END AS leadWorktreeId
+           FROM federated_dispatches f
+           JOIN dispatch_contexts d ON d.id = f.dispatch_id
+           LEFT JOIN worker_dispatches w ON w.dispatch_id = f.dispatch_id
+          WHERE d.status IN ('pending', 'dispatched')
+            AND COALESCE(w.stage, '') <> 'released'
+            AND COALESCE(w.state, '') NOT IN ('stopped', 'abandoned', 'failed')
+          ORDER BY d.created_at, d.rowid`
+      )
+      .all() as {
+      dispatchId: string
+      environmentId: string
+      remoteWorktreeId: string | null
+      leadWorktreeId: string | null
+    }[]
+  }
+
   /** The other unreleased dispatches on the same host worktree, newest first: with it, one member. */
   listUnreleasedWorktreeSiblings(
     dispatchId: string

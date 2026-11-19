@@ -200,6 +200,33 @@ describe('gameHostRefusalOf', () => {
     )
   })
 
+  it('refuses when two projects fill a host past its cap together, naming who holds it (ORCA-1284)', () => {
+    const shared = [
+      {
+        host: 'local',
+        cap: 5,
+        status: 'ok' as const,
+        running: 5,
+        free: 0,
+        others: [
+          { repo: 'cineco', running: 2 },
+          { repo: 'koombea', running: 1 }
+        ]
+      }
+    ]
+    expect(gameHostRefusalOf(shared, { cap: 5, running: 2 }, null, 'ORCA-1')).toBe(
+      'local at cap 5/5 (this project 2, cineco 2, koombea 1): close one on local before launching ORCA-1.'
+    )
+  })
+
+  it('alone, another project’s members on this machine count toward the lead’s cap (ORCA-1284)', () => {
+    const others = [{ host: 'local', repo: 'cineco', running: 3 }]
+    expect(gameHostRefusalOf([], { cap: 5, running: 2, others }, null, 'ORCA-1')).toBe(
+      'local at cap 5/5 (this project 2, cineco 3): close one on local before launching ORCA-1.'
+    )
+    expect(gameHostRefusalOf([], { cap: 6, running: 2, others }, null, 'ORCA-1')).toBeNull()
+  })
+
   it('leaves an unreachable or unknown host to the launch itself', () => {
     const down = gameHostLoadsOf(
       [
