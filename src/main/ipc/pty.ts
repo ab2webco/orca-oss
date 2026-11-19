@@ -278,6 +278,11 @@ import {
   SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV
 } from '../../shared/setup-agent-sequencing'
 import { dropAgentResumeArgvFromCommand } from '../../shared/agent-resume-argv-drop'
+import {
+  paneHoldingConversation,
+  withoutSequencedStartupCommand
+} from './pty-conversation-held-elsewhere'
+import { indexPersistedPaneKeyPtyIds } from '../agent-hooks/restored-subagent-liveness-sweep'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { getStartupTerminalColorQueryReplyColors } from './terminal-startup-color-query-replies'
 import {
@@ -4933,6 +4938,80 @@ export function registerPtyHandlers(
     }
   }
 
+  const probePtyLiveness = async (ptyId: string): Promise<boolean | null> => {
+    try {
+      // Why: no locally routed provider can authoritatively answer for a
+      // remote host's PTY, so remote-scoped ids stay unknown, never absent.
+      if (ptyId.startsWith('remote:')) {
+        return null
+      }
+      const connectionId = ptyOwnership.get(ptyId) ?? parseAppSshPtyId(ptyId)?.connectionId
+      // Why: during cold start the daemon swap is in flight; the pre-swap
+      // fallback would answer absent for every daemon-owned id.
+      const startupPromise = getLocalPtyProviderStartupPromise(connectionId)
+      if (startupPromise) {
+        await startupPromise
+      }
+      const provider = getProviderForPty(ptyId)
+      if (provider.probePtyLiveness) {
+        return await provider.probePtyLiveness(ptyId)
+      }
+      // Why: the in-process provider is its own sole owner (#12393), so its
+      // refusal is authoritative; every other probe-less provider is doubt.
+      if (provider instanceof LocalPtyProvider) {
+        return provider.hasPty(ptyId)
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Why (ORCA-1283): a cold restore resumes the pane's last conversation even when a live pane runs it.
+  const paneHoldingResume = async (args: {
+    launchAgent?: string
+    resumeProviderSession?: AgentProviderSessionMetadata
+    tabId?: string
+    leafId?: string
+    sessionId?: string
+  }): Promise<string | null> => {
+    if (!args.launchAgent || !args.resumeProviderSession) {
+      return null
+    }
+    let persisted: Map<string, string> | undefined
+    return paneHoldingConversation(
+      {
+        statuses: () => {
+          try {
+            return agentHookServer.getStatusSnapshot()
+          } catch {
+            return []
+          }
+        },
+        boundPtyIdOf: getPtyIdForPaneKey,
+        persistedPtyIdOf: (paneKey) =>
+          (persisted ??= indexPersistedPaneKeyPtyIds(
+            store?.getWorkspaceSession().terminalLayoutsByTabId ?? {}
+          )).get(paneKey),
+        // Why the listing: an SSH provider has no probe, and its listing names its live PTYs.
+        isPtyLive: async (ptyId) =>
+          (await probePtyLiveness(ptyId)) ??
+          ((await tryGetProviderForPty(ptyId)?.listProcesses())?.some((one) => one.id === ptyId)
+            ? true
+            : null)
+      },
+      {
+        agent: args.launchAgent,
+        providerSession: args.resumeProviderSession,
+        paneKey:
+          args.tabId && args.leafId && isTerminalLeafId(args.leafId)
+            ? makePaneKey(args.tabId, args.leafId)
+            : null,
+        ...(args.sessionId ? { ptyId: args.sessionId } : {})
+      }
+    ).catch(() => null)
+  }
+
   // Why: route through getProviderForPty() so CLI commands work for remote PTYs too; localProvider would silently fail for them.
   runtime?.setPtyController({
     claimStablePaneCreate: (args) => {
@@ -6184,34 +6263,7 @@ export function registerPtyHandlers(
         return false
       }
     },
-    probePtyLiveness: async (ptyId) => {
-      try {
-        // Why: no locally routed provider can authoritatively answer for a
-        // remote host's PTY, so remote-scoped ids stay unknown, never absent.
-        if (ptyId.startsWith('remote:')) {
-          return null
-        }
-        const connectionId = ptyOwnership.get(ptyId) ?? parseAppSshPtyId(ptyId)?.connectionId
-        // Why: during cold start the daemon swap is in flight; the pre-swap
-        // fallback would answer absent for every daemon-owned id.
-        const startupPromise = getLocalPtyProviderStartupPromise(connectionId)
-        if (startupPromise) {
-          await startupPromise
-        }
-        const provider = getProviderForPty(ptyId)
-        if (provider.probePtyLiveness) {
-          return await provider.probePtyLiveness(ptyId)
-        }
-        // Why: the in-process provider is its own sole owner (#12393), so its
-        // refusal is authoritative; every other probe-less provider is doubt.
-        if (provider instanceof LocalPtyProvider) {
-          return provider.hasPty(ptyId)
-        }
-        return null
-      } catch {
-        return null
-      }
-    },
+    probePtyLiveness,
     // Why: subscriber-driven ingestion for daemon sessions no renderer pane
     // ever attached. Local daemon sessions only — SSH panes have their own
     // lease machinery, and the in-process local provider streams without
@@ -6699,6 +6751,22 @@ export function registerPtyHandlers(
       const startupPromise = getLocalPtyStartupPromise(args.connectionId)
       if (startupPromise) {
         await startupPromise
+      }
+      // Why only for a resume: an extra tick reorders the pane-spawn reservation races below.
+      const resumeHeldBy =
+        args.launchAgent && args.resumeProviderSession ? await paneHoldingResume(args) : null
+      if (resumeHeldBy) {
+        // Why a plain shell: the live pane keeps the conversation, and this pane says so.
+        args = {
+          ...args,
+          command: undefined,
+          resumeProviderSession: undefined,
+          launchAgent: undefined,
+          launchConfig: undefined,
+          launchToken: undefined,
+          startupCommandDelivery: undefined,
+          ...(args.env ? { env: withoutSequencedStartupCommand(args.env) } : {})
+        }
       }
       let cwd = resolvePtySpawnStartupCwd(args.worktreeId, args.cwd)
       let prevalidatedCwd: string | undefined
@@ -8039,7 +8107,7 @@ export function registerPtyHandlers(
           ...(startupCwdFallback && !result.isReattach ? { startupCwdFallback } : {}),
           // Why: the pane asked to resume and got a fresh session instead; only the
           // renderer can say so, and a reattach never ran this launch command.
-          ...(codexResumeLaunch.notifyResumeUnavailable && !result.isReattach
+          ...((codexResumeLaunch.notifyResumeUnavailable || resumeHeldBy) && !result.isReattach
             ? { agentResumeUnavailable: true as const }
             : {})
         }
