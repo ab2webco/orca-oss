@@ -17,6 +17,9 @@ describe('Git binary compatibility PR gate', () => {
     expect(step?.run).toContain('ORCA_GIT_COMPAT_IMAGE="$image"')
     expect(step?.run).toContain('src/shared/git-binary-compatibility.test.ts')
     expect(step?.run).toContain('-j"$(nproc)"')
+    // Why: 2.25.5 does not parse as C23, gcc 15's default on ubuntu-26.04.
+    expect(workflow.jobs.git_compatibility['runs-on']).toBe('ubuntu-26.04')
+    expect(step?.run).toContain('CFLAGS="-g -O2 -Wall -std=gnu17"')
     expect(step?.run).toContain('pids+=("$!")')
     expect(step?.run).toContain('wait "$pid" || status=1')
   })

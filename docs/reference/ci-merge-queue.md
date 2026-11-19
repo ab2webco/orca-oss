@@ -39,11 +39,11 @@ that only run when their own paths change (`mobile.yml`, `computer-e2e.yml`,
   `/etc/profile`, `orca-cli-resolver` against its `/usr/bin` and `/bin`, and the live fish tests.
 - Claude hooks on Python 3.9 installs 3.9 with uv, because setup-python has no 3.9 build for 26.04
   (ORCA-1285).
+- Git compatibility builds Git 2.25.5 with `-std=gnu17`: 26.04's gcc defaults to C23, where 2.25.5
+  does not compile (ORCA-1285).
 
-Two stay on `ubuntu-24.04` until ORCA-1285 moves them:
-
-- Git compatibility: Git 2.25.5 does not build with 26.04's gcc.
-- package: node-pty built on 26.04 needs a glibc above the 2.31 floor.
+package stays on `ubuntu-24.04` until ORCA-1285 moves it: node-pty built on 26.04 needs a glibc
+above the 2.31 floor.
 
 The fish lanes need fish **4.3 or newer**. fish arms DECSET 2031 around its prompt and re-queries
 OSC 11 on handoff only since 4.3, so an older fish leaves the #9993 and #13892 tests nothing to
