@@ -1,7 +1,6 @@
 ---
-import { docsHref, type Lang, REPO_URL } from '../../data/product'
-import QuestBand from './QuestBand.astro'
-import Recording from './Recording.astro'
+import { docsHref, type Lang } from '../../data/product'
+import Clip from './Clip.astro'
 
 type Props = {
   lang: Lang
@@ -10,74 +9,95 @@ type Props = {
 const { lang } = Astro.props
 const copy = {
   en: {
-    title: 'Run a team of coding agents from your To Do.',
-    lede: 'Orca Lab is a desktop IDE where a lead agent takes your tickets, launches one member per ticket in its own worktree, on any machine you own, and asks you only what only you can decide. Free and open source, MIT.',
+    title: 'The IDE for coding agent teams',
+    lede: 'A lead agent hands each ticket to its own agent and worktree, on every machine you own, and asks you only what only you can decide.',
     download: 'Download',
-    start: 'Get started',
-    source: 'Source on GitHub',
-    platforms: 'macOS · Windows · Linux · iOS · Android'
+    guide: 'Read the guide',
+    fact: 'Free and MIT licensed, for macOS, Windows and Linux, with apps for iOS and Android.'
   },
   es: {
-    title: 'Lleva un equipo de agentes de código desde tu To Do.',
-    lede: 'Orca Lab es un IDE de escritorio donde un agente líder toma tus tickets, lanza un miembro por ticket en su propio worktree, en cualquier máquina que tengas, y solo te pregunta lo que solo tú puedes decidir. Libre y de código abierto, MIT.',
+    title: 'El IDE para equipos de agentes de código',
+    lede: 'Un agente líder da cada ticket a su propio agente y worktree, en cada máquina que tengas, y solo te pregunta lo que solo tú puedes decidir.',
     download: 'Descargar',
-    start: 'Primeros pasos',
-    source: 'Código en GitHub',
-    platforms: 'macOS · Windows · Linux · iOS · Android'
+    guide: 'Leer la guía',
+    fact: 'Libre y con licencia MIT, para macOS, Windows y Linux, con apps para iOS y Android.'
   }
 }[lang]
 ---
 
 <section class="hero" aria-labelledby="hero-title">
-  <QuestBand lang={lang} />
-  <div class="wrap copy">
-    <div>
-    <p class="prompt-line"><span class="p">$</span> orca game lead</p>
-    <h1 id="hero-title">{copy.title}</h1>
-    <p class="lede">{copy.lede}</p>
-    <ul class="links">
-      <li><a href="#get">{copy.download}</a></li>
-      <li><a href={docsHref(lang, 'get-started')}>{copy.start}</a></li>
-      <li><a href={REPO_URL}>{copy.source}</a></li>
-    </ul>
-    <p class="platforms muted">{copy.platforms}</p>
+  <div class="wrap grid">
+    <div class="copy">
+      <h1 id="hero-title">{copy.title}</h1>
+      <p class="lede">{copy.lede}</p>
+      <div class="actions">
+        <a class="btn" href="#get">{copy.download}</a>
+        <a class="btn quiet" href={docsHref(lang, 'get-started')}>{copy.guide}</a>
+      </div>
+      <p class="fact">{copy.fact}</p>
     </div>
-    <Recording lang={lang} file="game-band-panel.gif" isEager />
+    <Clip lang={lang} name="team-office-building" isEager />
   </div>
 </section>
 
 <style>
-  .copy {
+  .hero {
+    padding: var(--space-xl) 0 var(--space-lg);
+  }
+  .grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
+    gap: var(--space-xl);
     align-items: center;
-    padding-top: 40px;
-  }
-  @media (min-width: 1024px) {
-    .copy {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 48px;
-    }
-  }
-  .prompt-line {
-    margin: 0;
-    color: var(--muted);
-  }
-  .prompt-line .p {
-    color: var(--link);
   }
   h1 {
-    margin: 10px 0 0;
-    max-width: 24ch;
-    font-size: clamp(28px, 4vw, 44px);
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+    margin: 0;
+    max-width: 12ch;
+    font-size: var(--text-display);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: var(--tracking-display);
   }
-  .platforms {
-    margin: 16px 0 0;
-    font-size: 13px;
+  .lede {
+    margin: var(--space-lg) 0 0;
+    max-width: 34ch;
+    color: var(--fg-2);
+    font-size: var(--text-lead);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 var(--space-lg);
+    border: 1px solid var(--fg);
+    border-radius: 8px;
+    background: var(--fg);
+    color: var(--bg);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .btn.quiet {
+    border-color: var(--line);
+    background: transparent;
+    color: var(--fg);
+    font-weight: 400;
+  }
+  .btn.quiet:hover {
+    background: var(--surface);
+  }
+  .fact {
+    margin: var(--space-md) 0 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+  @media (min-width: 60rem) {
+    .grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
   }
 </style>

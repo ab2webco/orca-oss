@@ -11,9 +11,9 @@ import Hero from './Hero.astro'
 import Integrations from './Integrations.astro'
 import MobileShowcase from './MobileShowcase.astro'
 import MultiHost from './MultiHost.astro'
-import Orchestrator from './Orchestrator.astro'
 import SiteFooter from './SiteFooter.astro'
 import SiteHeader from './SiteHeader.astro'
+import TeamMerge from './TeamMerge.astro'
 
 type Props = {
   lang: Lang
@@ -37,7 +37,7 @@ const meta = {
 <LandingLayout lang={lang} title={meta.title} description={meta.description}>
   <SiteHeader slot="header" lang={lang} />
   <Hero lang={lang} />
-  <Orchestrator lang={lang} />
+  <TeamMerge lang={lang} />
   <MultiHost lang={lang} />
   <AgentWall lang={lang} />
   <Integrations lang={lang} />

@@ -1,0 +1,106 @@
+---
+import { type Lang, withBase } from '../../data/product'
+import { RECORDINGS } from '../../data/recordings.mjs'
+
+type Props = {
+  lang: Lang
+  /** One of CLIPS in recordings.mjs; its GIF entry gives the size and the text. */
+  name: string
+  /** Above the fold: fetch with the page. */
+  isEager?: boolean
+}
+
+const { lang, name, isEager = false } = Astro.props
+const recording = RECORDINGS[`${name}.gif` as keyof typeof RECORDINGS]
+if (!recording) {
+  throw new Error(`${name}.gif is not in recordings.mjs`)
+}
+const src = (ext: string): string => withBase(`media/clips/${name}.${ext}`)
+const words = { en: ['Pause', 'Play'], es: ['Pausa', 'Reproducir'] }[lang]
+---
+
+<figure class="clip" data-clip>
+  <video
+    muted
+    loop
+    playsinline
+    preload={isEager ? 'auto' : 'none'}
+    poster={src('png')}
+    width={recording.width}
+    height={recording.height}
+    aria-label={recording[lang]}
+  >
+    <source src={src('webm')} type="video/webm" />
+    <source src={src('mp4')} type="video/mp4" />
+  </video>
+  <button class="toggle" type="button" data-clip-toggle data-pause={words[0]} data-play={words[1]} hidden>
+    {words[0]}
+  </button>
+</figure>
+
+<script>
+  // Why no autoplay attribute: under reduced motion or without script the poster is the whole clip.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-clip]')) {
+    const video = figure.querySelector('video')
+    const toggle = figure.querySelector<HTMLButtonElement>('[data-clip-toggle]')
+    if (!video || !toggle) {
+      continue
+    }
+    let held = still
+    let seen = false
+    const sync = (): void => {
+      if (seen && !held) {
+        void video.play().catch(() => {})
+      } else {
+        video.pause()
+      }
+      toggle.textContent = (held ? toggle.dataset.play : toggle.dataset.pause) ?? ''
+    }
+    toggle.hidden = false
+    toggle.addEventListener('click', () => {
+      held = !held
+      sync()
+    })
+    // Why: a clip off screen, or in a hidden tab, stops; it resumes when it is seen again.
+    new IntersectionObserver(([entry]) => {
+      seen = entry?.isIntersecting ?? false
+      sync()
+    }).observe(figure)
+    sync()
+  }
+</script>
+
+<style>
+  .clip {
+    position: relative;
+    margin: 0;
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .clip video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-frame);
+    outline: 1px solid color-mix(in srgb, var(--fg) 9%, transparent);
+    outline-offset: -1px;
+  }
+  .toggle {
+    position: absolute;
+    right: var(--space-sm);
+    bottom: var(--space-sm);
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 var(--text-sm) / 1 var(--font-body);
+    cursor: pointer;
+  }
+  .toggle:hover {
+    background: var(--surface);
+  }
+</style>

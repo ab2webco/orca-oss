@@ -14,7 +14,7 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BASE, REPO_URL } from '../site.config.mjs'
-import { RECORDINGS } from '../src/data/recordings.mjs'
+import { CLIPS, RECORDINGS } from '../src/data/recordings.mjs'
 import { transformDoc } from './docs-transform.mjs'
 import {
   isTranslationPath,
@@ -153,6 +153,11 @@ function syncAssets() {
   // Copied rather than imported so Vite never reaches outside site/.
   for (const gif of Object.keys(RECORDINGS)) {
     copyInto(`docs/assets/readme/${gif}`, `public/media/readme/${gif}`)
+  }
+  for (const clip of CLIPS) {
+    for (const ext of ['mp4', 'webm', 'png']) {
+      copyInto(`docs/assets/media/${clip}.${ext}`, `public/media/clips/${clip}.${ext}`)
+    }
   }
 }
 
