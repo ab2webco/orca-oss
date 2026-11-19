@@ -10,22 +10,22 @@ const { lang } = Astro.props
 const copy = {
   en: {
     title: 'One ticket, one worktree, one agent',
-    lede: 'The lead never writes code. It starts members, reads their reports and lands their PRs, and the team earns XP only from signals it can check.',
+    lede: 'The lead never writes code: it starts members, reads reports, lands PRs. XP comes only from signals it can check.',
     steps: [
       ['Kai claims LUM-19', 'Its own worktree on feat/lum-19.'],
-      ['PR #44, CI running', 'Checks come from GitHub, not from the agent.'],
-      ['Green, in the merge queue', '#44 waits at the top of the PRs tab.'],
-      ['Merged, and the team levels up', 'Every award counts: claim, green CI, review, Done and merge.']
+      ['PR #44, CI running', 'Checks come from GitHub, not the agent.'],
+      ['Green, in the merge queue', '#44 tops the PRs tab.'],
+      ['Merged, and the team levels up', 'XP for the claim, green CI, review, Done and merge.']
     ]
   },
   es: {
     title: 'Un ticket, un worktree, un agente',
-    lede: 'El líder nunca escribe código. Lanza miembros, lee sus reportes y mergea sus PR, y el equipo gana XP solo con señales que puede comprobar.',
+    lede: 'El líder nunca escribe código: lanza miembros, lee reportes, mergea PR. El XP sale solo de señales que puede comprobar.',
     steps: [
       ['Kai toma LUM-19', 'Su propio worktree en feat/lum-19.'],
       ['PR #44, CI corriendo', 'Los checks vienen de GitHub, no del agente.'],
-      ['En verde, en la merge queue', '#44 espera primero en la pestaña de PR.'],
-      ['Mergeado, y el equipo sube de nivel', 'Cada premio cuenta: tomar el ticket, CI en verde, revisión, Done y merge.']
+      ['En verde, en la merge queue', '#44 encabeza la pestaña de PR.'],
+      ['Mergeado, y el equipo sube de nivel', 'XP por tomar el ticket, CI en verde, revisión, Done y merge.']
     ]
   }
 }[lang]

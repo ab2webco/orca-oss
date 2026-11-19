@@ -24,7 +24,6 @@ const recording = RECORDINGS[file]
     loading={isEager ? 'eager' : 'lazy'}
     decoding="async"
   />
-  <figcaption>{recording[lang]}</figcaption>
 </figure>
 
 <style>
@@ -39,12 +38,5 @@ const recording = RECORDINGS[file]
   }
   .recording.phone {
     max-width: 280px;
-  }
-  figcaption {
-    padding: 8px 12px;
-    border-top: 1px solid var(--line);
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--muted);
   }
 </style>

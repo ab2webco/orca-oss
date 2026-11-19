@@ -117,7 +117,7 @@ pre {
 }
 
 .section {
-  padding: 72px 0 0;
+  padding: var(--space-4xl) 0 0;
 }
 
 @media (max-width: 767px) {
@@ -145,8 +145,9 @@ pre {
 }
 
 .lede {
-  margin: 12px 0 0;
-  max-width: 72ch;
+  margin: var(--space-md) 0 0;
+  max-width: 48ch;
+  font-size: var(--text-lead);
   color: var(--muted);
   text-wrap: pretty;
 }
@@ -188,6 +189,15 @@ pre {
   position: relative;
   padding-left: 2ch;
   margin-top: 8px;
+}
+
+/* Points beside a recording read at the lead size, one short line each. */
+.split .dash {
+  font-size: var(--text-lead);
+}
+
+.split .dash li + li {
+  margin-top: var(--space-md);
 }
 
 .dash li::before {
