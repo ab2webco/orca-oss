@@ -26,7 +26,7 @@ for (const file of ['index.html', 'es/index.html']) {
     it('sets the clip beside the copy from 60rem, so the hero fits the first screen', () => {
       assert.ok(scope, 'no scoped hero section')
       const wide = new RegExp(
-        `@media \\(width>=60rem\\)\\{[^@]*\\.grid:where\\(\\.${scope}\\)\\{grid-template-columns:minmax\\(0,\\d+fr\\) minmax\\(0,\\d+fr\\)\\}`
+        `@media \\((?:width\\s*>=\\s*|min-width:\\s*)60rem\\)\\s*\\{[^@]*\\.grid:where\\(\\.${scope}\\)\\{grid-template-columns:minmax\\(0,\\d+fr\\) minmax\\(0,\\d+fr\\)\\}`
       )
       assert.match(css, wide)
     })

@@ -72,11 +72,14 @@ async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
     document.body.style.overflowX = ''
     return measured
   })
-  const heroEnd = await page.evaluate(() =>
-    Math.round(document.querySelector('.hero')?.getBoundingClientRect().bottom ?? 0)
-  )
+  const landing = name.startsWith('landing')
+  const heroEnd = landing
+    ? await page.evaluate(() =>
+        Math.round(document.querySelector('.hero')?.getBoundingClientRect().bottom ?? 0)
+      )
+    : 0
   // Why from 1440 only: below it the clip stacks under the copy and the hero is taller than a phone.
-  const heroFits = width < 1440 || heroEnd <= 900
+  const heroFits = !landing || width < 1440 || heroEnd <= 900
   const file = path.join(OUT, `${name}-${theme}-${width}.png`)
   await page.screenshot({ path: file, fullPage: true })
   await context.close()
