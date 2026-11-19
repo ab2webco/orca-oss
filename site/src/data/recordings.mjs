@@ -116,3 +116,12 @@ export const RECORDINGS = {
     es: 'La app de iOS mostrando en vivo una terminal de Claude Code, con teclas para escribir en ella.'
   }
 }
+
+// Motion clips from docs/assets/media (mp4, webm and the poster png); each reuses its GIF's size and text.
+export const CLIPS = [
+  'team-office-building',
+  'team-merge',
+  'team-style-office',
+  'team-style-figures',
+  'team-style-pixel'
+]
