@@ -1,4 +1,5 @@
 ---
+import '../styles/fonts.css'
 import '../styles/landing.css'
 import { type Lang, withBase } from '../data/product'
 import { scenePaletteCss } from '../data/scene-palette'
@@ -35,9 +36,11 @@ const ogImage = new URL(withBase('icon.png'), Astro.site)
     <style set:html={scenePaletteCss}></style>
     <script is:inline>
       // Same key and attribute as Starlight's theme picker, so the docs and the landing agree.
+      // Why ?theme= first: a shared link or a capture can ask for one theme without storing it.
       document.documentElement.classList.remove('no-js')
       try {
-        const stored = localStorage.getItem('starlight-theme')
+        const asked = new URLSearchParams(location.search).get('theme')
+        const stored = asked ?? localStorage.getItem('starlight-theme')
         const theme =
           stored === 'light' || stored === 'dark'
             ? stored
@@ -63,8 +66,9 @@ const ogImage = new URL(withBase('icon.png'), Astro.site)
         left: 16px;
         top: -60px;
         z-index: 100;
-        padding: 8px 14px;
-        background: var(--gold);
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: 8px;
+        background: var(--fg);
         color: var(--bg);
       }
       .skip:focus {

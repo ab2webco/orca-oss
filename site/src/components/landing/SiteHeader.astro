@@ -1,5 +1,6 @@
 ---
-import { docsHref, homeHref, type Lang, REPO_URL, withBase } from '../../data/product'
+import { docsHref, homeHref, type Lang, REPO_URL } from '../../data/product'
+import Mark from './Mark.astro'
 
 type Props = {
   lang: Lang
@@ -20,8 +21,8 @@ const copy = {
     otherLang: 'ES',
     otherLangLabel: 'Leer en español',
     theme: 'Toggle light and dark theme',
-    light: 'light',
-    dark: 'dark'
+    light: 'Light',
+    dark: 'Dark'
   },
   es: {
     nav: [
@@ -36,8 +37,8 @@ const copy = {
     otherLang: 'EN',
     otherLangLabel: 'Read in English',
     theme: 'Cambiar entre tema claro y oscuro',
-    light: 'claro',
-    dark: 'oscuro'
+    light: 'Claro',
+    dark: 'Oscuro'
   }
 }[lang]
 const other: Lang = lang === 'es' ? 'en' : 'es'
@@ -46,8 +47,8 @@ const other: Lang = lang === 'es' ? 'en' : 'es'
 <header class="site-header">
   <div class="wrap bar">
     <a class="brand" href={homeHref(lang)}>
-      <img src={withBase('icon.png')} alt="" width="22" height="22" />
-      <span>orca-lab</span>
+      <Mark />
+      <span>Orca Lab</span>
     </a>
     <nav class="nav" aria-label={lang === 'es' ? 'Secciones' : 'Sections'}>
       {copy.nav.map(([href, label]) => <a href={href}>{label}</a>)}
@@ -57,8 +58,15 @@ const other: Lang = lang === 'es' ? 'en' : 'es'
       <a href="#get">{copy.download}</a>
       <a href={REPO_URL}>GitHub</a>
       <a href={homeHref(other)} hreflang={other} aria-label={copy.otherLangLabel}>{copy.otherLang}</a>
-      <button type="button" data-theme-toggle aria-label={copy.theme}>
-        <span class="to-light">{copy.light}</span><span class="to-dark">{copy.dark}</span>
+      <button class="theme" type="button" data-theme-toggle aria-label={copy.theme}>
+        <svg class="to-light" viewBox="0 0 24 24" aria-hidden="true"
+          ><circle cx="12" cy="12" r="4"></circle><path
+            d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+          ></path></svg
+        ><span class="to-light">{copy.light}</span>
+        <svg class="to-dark" viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"></path></svg
+        ><span class="to-dark">{copy.dark}</span>
       </button>
     </div>
   </div>
@@ -84,41 +92,66 @@ const other: Lang = lang === 'es' ? 'en' : 'es'
     z-index: 50;
     background: var(--bg);
     border-bottom: 1px solid var(--line);
-    font-size: 13.5px;
+    font-size: var(--text-sm);
   }
   .bar {
     display: flex;
     align-items: center;
     gap: 8px 24px;
-    min-height: 48px;
+    min-height: 64px;
   }
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-xs);
     color: var(--fg);
-    font-weight: 700;
+    font-size: var(--text-body);
+    font-weight: 600;
     text-decoration: none;
     flex: none;
   }
   .nav,
   .actions {
     display: flex;
-    gap: 2ch;
+    align-items: center;
+    gap: var(--space-lg);
     white-space: nowrap;
+  }
+  .nav a,
+  .actions a {
+    color: var(--fg-2);
+    text-decoration: none;
+  }
+  .nav a:hover,
+  .actions a:hover {
+    color: var(--fg);
   }
   .actions {
     margin-left: auto;
   }
-  button {
+  .theme {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    min-height: 44px;
     padding: 0;
     border: 0;
     background: none;
-    color: var(--link);
+    color: var(--fg-2);
     font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
     cursor: pointer;
+  }
+  .theme:hover {
+    color: var(--fg);
+  }
+  .theme svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   :root[data-theme='light'] .to-light,
   :root:not([data-theme='light']) .to-dark {
