@@ -263,6 +263,31 @@ async function watch(browser, origin, job) {
       heights.set(run.step, run.height)
     }
     await frame(`Run map, advanced to ${run.step}`)
+    // Why record order: the region must turn polite before the picked caption shows, or it is not read.
+    await page.evaluate(() => {
+      window.__runOrder = []
+      const list = document.querySelector('[data-run] .captions')
+      new MutationObserver((records) => {
+        for (const r of records) {
+          if (r.attributeName === 'aria-live') {
+            window.__runOrder.push('live')
+          } else if (r.attributeName === 'hidden' && !r.target.hidden) {
+            window.__runOrder.push('reveal')
+          }
+        }
+      }).observe(list, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['hidden', 'aria-live']
+      })
+    })
+    await page.locator(`[data-run] [data-pick="${(run.step % 6) + 1}"]`).click()
+    const order = await page.evaluate(() => window.__runOrder)
+    check(
+      'a click on a running map turns its captions polite before the step shows',
+      order.includes('live') && order.indexOf('live') < order.indexOf('reveal'),
+      order.join()
+    )
     await page.locator('[data-run] [data-pick="3"]').click()
     await page.waitForTimeout(ADVANCE_MS + 500)
     run = await page.evaluate(runState)
