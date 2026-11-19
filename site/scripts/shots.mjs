@@ -2,15 +2,11 @@
 // Fails when any page scrolls horizontally; arguments keep only the pages whose name contains one.
 // Playwright comes from the repo root's node_modules (the desktop app's dev dependency), so site/
 // does not install it again.
-import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { BASE } from '../site.config.mjs'
+import { serveDist, SITE_DIR } from './dist-server.mjs'
 
-const SITE_DIR = fileURLToPath(new URL('../', import.meta.url))
-const DIST = path.join(SITE_DIR, 'dist')
 const OUT = path.join(SITE_DIR, '.shots')
 const require = createRequire(path.join(SITE_DIR, '..', 'package.json'))
 const { chromium } = require('@playwright/test')
@@ -48,44 +44,11 @@ const PAGES = [
   ])
 ]
 const EXTRA = [{ name: '404', path: '/404.html', width: 1440, theme: 'dark' }]
-const TYPES = {
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'text/javascript',
-  '.png': 'image/png',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-  '.xml': 'application/xml'
-}
-
-function serve() {
-  const server = createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    if (!url.pathname.startsWith(`${BASE}/`)) {
-      res.writeHead(404).end()
-      return
-    }
-    let file = path.join(DIST, decodeURIComponent(url.pathname.slice(BASE.length)))
-    if (existsSync(file) && statSync(file).isDirectory()) {
-      file = path.join(file, 'index.html')
-    }
-    if (!existsSync(file)) {
-      res.writeHead(404).end()
-      return
-    }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' })
-    createReadStream(file).pipe(res)
-  })
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)))
-}
-
 async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme })
   await context.addInitScript((t) => localStorage.setItem('starlight-theme', t), theme)
   const page = await context.newPage()
-  await page.goto(`${origin}${BASE}${pagePath}`, { waitUntil: 'networkidle' })
+  await page.goto(`${origin}${pagePath}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
   // Walk the page so scroll-triggered reveals and lazy images settle before the capture.
   // Why instant: the landing sets scroll-behavior: smooth, which would swallow each step.
@@ -114,13 +77,9 @@ async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
   return { file, ...overflow, ok: overflow.scrollWidth <= overflow.clientWidth }
 }
 
-if (!existsSync(path.join(DIST, 'index.html'))) {
-  process.stderr.write('dist/ is missing; run `pnpm build` first\n')
-  process.exit(1)
-}
+const server = await serveDist()
 mkdirSync(OUT, { recursive: true })
-const server = await serve()
-const origin = `http://127.0.0.1:${server.address().port}`
+const { origin } = server
 const browser = await chromium.launch()
 const only = process.argv.slice(2)
 const picked = PAGES.filter((p) => !only.length || only.some((part) => p.name.includes(part)))

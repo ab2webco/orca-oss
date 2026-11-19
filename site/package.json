@@ -10,6 +10,7 @@
     "test": "pnpm run build && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/*.test.mjs\"",
     "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/*.test.mjs\"",
     "shots": "node scripts/shots.mjs",
+    "motion": "node scripts/motion.mjs",
     "translations": "node scripts/translations.mjs"
   },
   "dependencies": {

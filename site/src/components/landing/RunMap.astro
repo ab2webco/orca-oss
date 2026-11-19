@@ -178,9 +178,10 @@ const pulses = [
     }
     for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
       button.addEventListener('click', () => {
-        show(Number(button.dataset.pick))
+        // Why hold first: the live region must be polite before the caption changes, or the step is not read.
         held = true
         sync()
+        show(Number(button.dataset.pick))
       })
     }
     toggle.addEventListener('click', () => {
