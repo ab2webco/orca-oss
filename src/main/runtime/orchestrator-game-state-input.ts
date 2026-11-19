@@ -76,6 +76,8 @@ export type OrchestratorGameStateInput = {
   callerRole?: 'member'
   /** The handle of the project's live lead when it is not the caller. */
   readLeadElsewhere?: () => Promise<string | null>
+  /** Every pane on the project's lead conversation, when more than one is (ORCA-1283). */
+  readDuplicateLead?: () => Promise<{ terminals: string[] } | null>
   terminalHandleOf?: (paneKey: string) => string | null
   /** The calling Team's terminals; when known, agents outside it are left out. */
   teamHandles?: ReadonlySet<string> | null

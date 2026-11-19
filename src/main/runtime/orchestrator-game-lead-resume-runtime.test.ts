@@ -26,6 +26,7 @@ afterEach(() => markClaudePtyExited('pty-lead'))
 type LeadDeps = {
   sessionOf: (handle: string) => Promise<GameLeadSession | null>
   resume: (session: GameLeadSession) => Promise<string>
+  panesOfConversation: (session: GameLeadSession) => Promise<string[]>
 }
 
 // Why the cast: the lead's wiring is private, and the real panes need live PTYs and hook events.
@@ -213,5 +214,41 @@ describe('a game lead reopened on claim', () => {
       'Claude exited instead of reopening the conversation on account lead@example.com: No conversation found with session ID: sess-lead'
     )
     expect(read.mock.invocationCallOrder[0]).toBeLessThan(close.mock.invocationCallOrder[0] ?? 0)
+  })
+})
+
+// ORCA-1283: a reopen beside a live pane on the same conversation ran two leads on it.
+describe("the panes that hold a lead's conversation", () => {
+  it('are the live panes whose Claude runs it, not one back at its shell or on another', async () => {
+    const runtime = runtimeWithAccounts()
+    const list = vi.spyOn(runtime, 'listTerminals').mockResolvedValue({
+      terminals: [
+        { handle: 'term_lead', liveness: 'running' },
+        { handle: 'term_copy', liveness: 'starting' },
+        { handle: 'term_exited', liveness: 'running' },
+        { handle: 'term_other', liveness: 'running' },
+        { handle: 'term_closed', liveness: 'exited' }
+      ]
+    } as never)
+    const sessions: Record<string, string> = {
+      term_lead: 'sess-lead',
+      term_copy: 'sess-lead',
+      term_exited: 'sess-lead',
+      term_other: 'sess-other',
+      term_closed: 'sess-lead'
+    }
+    vi.spyOn(runtime, 'getExactWorkerProviderSessionIdentity').mockImplementation(
+      (handle) => ({ providerSession: { key: 'session_id', id: sessions[handle] } }) as never
+    )
+    vi.spyOn(runtime, 'inspectTerminalProcess').mockImplementation(
+      async (handle) =>
+        ({ foregroundProcess: handle === 'term_exited' ? 'zsh' : 'claude' }) as never
+    )
+
+    await expect(leadDepsOf(runtime).panesOfConversation(STORED)).resolves.toEqual([
+      'term_lead',
+      'term_copy'
+    ])
+    expect(list).toHaveBeenCalledWith('id:wt-lead')
   })
 })

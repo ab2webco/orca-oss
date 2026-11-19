@@ -323,6 +323,30 @@ describe('buildOrchestratorGameState', () => {
     ).not.toHaveProperty('leadElsewhere')
   })
 
+  // ORCA-1283: two panes on one lead conversation both read its mail and queue merges.
+  it('names both panes to the lead when its conversation runs in two, and never to a member', async () => {
+    const base = {
+      settings: undefined,
+      worktree: null,
+      agents: [],
+      leaderPaneKey: 'tab:m',
+      readReview: none,
+      readPlane: none,
+      readLinear: none,
+      readDuplicateLead: async () => ({ terminals: ['term_a', 'term_b'] })
+    }
+
+    expect((await buildOrchestratorGameState(base)).duplicateLead).toEqual({
+      terminals: ['term_a', 'term_b']
+    })
+    expect(
+      await buildOrchestratorGameState({ ...base, callerParentPaneKey: 'tab:lead' })
+    ).not.toHaveProperty('duplicateLead')
+    expect(
+      await buildOrchestratorGameState({ ...base, readDuplicateLead: async () => null })
+    ).not.toHaveProperty('duplicateLead')
+  })
+
   it("sends Orca's lead buttons only to the lead, unless the project turns them off", async () => {
     const base = {
       settings: undefined,

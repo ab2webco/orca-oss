@@ -12,7 +12,8 @@ export const GAME_LEAD_ALERT_BUDGETS_MS = {
 
 export type GameLeadAlert = { key: string; line: string }
 
-export type GameLeadAlertInput = GameFleetInput & Pick<OrchestratorGameState, 'project'>
+export type GameLeadAlertInput = GameFleetInput &
+  Pick<OrchestratorGameState, 'project' | 'duplicateLead'>
 
 /** What one watch remembers between reads: no host keeps these clocks or the previous queue. */
 export type GameLeadAlertMemory = {
@@ -145,13 +146,31 @@ function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, n
   return alerts
 }
 
+// Why first: two leads on one conversation both read its mail and queue merges (ORCA-1283).
+function duplicateLeadAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
+  const terminals = state.duplicateLead?.terminals ?? []
+  if (terminals.length < 2) {
+    return []
+  }
+  return [
+    {
+      key: `duplicate-lead:${terminals.join(',')}`,
+      line: `lead conversation live in ${terminals.length} panes (${terminals.join(', ')}): keep one, close the others (orca terminal close --terminal <handle>).`
+    }
+  ]
+}
+
 /** Every alert that holds now; `memory` is updated in place for the next read. */
 export function gameLeadAlertsOf(
   state: GameLeadAlertInput,
   memory: GameLeadAlertMemory,
   now: number
 ): GameLeadAlert[] {
-  return [...memberAlertsOf(state, memory, now), ...queueAlertsOf(state, memory, now)]
+  return [
+    ...duplicateLeadAlertsOf(state),
+    ...memberAlertsOf(state, memory, now),
+    ...queueAlertsOf(state, memory, now)
+  ]
 }
 
 /** The alerts not printed yet; a cleared alert is forgotten so it prints again when it returns. */

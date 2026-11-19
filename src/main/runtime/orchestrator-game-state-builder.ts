@@ -77,7 +77,8 @@ export async function buildOrchestratorGameState(
     merges,
     metrics,
     arcade,
-    teamXp
+    teamXp,
+    duplicateLead
   ] = await Promise.all([
     input.worktree ? settle(input.readReview) : Promise.resolve(null),
     tracker ? settle(input.readPlane) : Promise.resolve(null),
@@ -93,7 +94,8 @@ export async function buildOrchestratorGameState(
     leadOnly(input.readMerges),
     leadOnly(readMetrics && (() => readMetrics(timezone))),
     leadOnly(input.readArcade),
-    leadOnly(input.readTeamXp)
+    leadOnly(input.readTeamXp),
+    leadOnly(input.readDuplicateLead)
   ])
   const scenes = orchestratorGameScenesOf(sceneSources ?? [])
   const config = {
@@ -235,6 +237,7 @@ export async function buildOrchestratorGameState(
     viewScopes: input.worktree?.repoId ? ['project', 'global'] : ['global'],
     ...(suggested ? { suggestedView: suggested } : {}),
     ...(leadElsewhere ? { leadElsewhere: { handle: leadElsewhere } } : {}),
+    ...(duplicateLead ? { duplicateLead } : {}),
     ...(leadAccount ? { leadAccount } : {}),
     review: gameReview,
     workItem,
