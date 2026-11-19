@@ -278,6 +278,13 @@ import {
   SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV
 } from '../../shared/setup-agent-sequencing'
 import { dropAgentResumeArgvFromCommand } from '../../shared/agent-resume-argv-drop'
+import {
+  ConversationRestores,
+  NOT_CLAIMED,
+  withoutSequencedStartupCommand,
+  type RestoreAdmission
+} from './pty-conversation-held-elsewhere'
+import { indexPersistedPaneKeyPtyIds } from '../agent-hooks/restored-subagent-liveness-sweep'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { getStartupTerminalColorQueryReplyColors } from './terminal-startup-color-query-replies'
 import {
@@ -312,6 +319,8 @@ function registeredPtyProviders(): RegisteredPtyProvider[] {
 }
 
 const SYNTHETIC_KILL_EXIT_DUPLICATE_WINDOW_MS = 30_000
+const CONVERSATION_FOREGROUND_READ_MS = 3_000
+type RuntimePtyControllerOf = NonNullable<Parameters<OrcaRuntimeService['setPtyController']>[0]>
 const CLAUDE_EXIT_LIVE_SETTLE_RETRY_MS = [250, 500, 1_000, 5_000, 30_000] as const
 // Why: kill switch — flip to disable producer flow control (pause/resume) without untangling the wiring.
 const PRODUCER_FLOW_CONTROL_ENABLED = true
@@ -4933,8 +4942,118 @@ export function registerPtyHandlers(
     }
   }
 
+  // Why (ORCA-1283): a cold restore resumed a conversation another pane still ran, or two restores both did.
+  const conversationRestores = new ConversationRestores({
+    statuses: () => {
+      try {
+        return agentHookServer.getStatusSnapshot()
+      } catch {
+        return []
+      }
+    },
+    boundPtyIdOf: getPtyIdForPaneKey,
+    persistedPtyIdOf: (paneKey) =>
+      indexPersistedPaneKeyPtyIds(store?.getWorkspaceSession().terminalLayoutsByTabId ?? {}).get(
+        paneKey
+      ),
+    foregroundOf: async (ptyId) => {
+      // Why: during cold start the daemon swap is in flight and the fallback knows no daemon PTY.
+      const startup = getLocalPtyProviderStartupPromise(
+        ptyOwnership.get(ptyId) ?? parseAppSshPtyId(ptyId)?.connectionId
+      )
+      if (startup) {
+        await startup
+      }
+      const provider = tryGetProviderForPty(ptyId)
+      if (!provider) {
+        return null
+      }
+      // Why bounded: a slow SSH relay must not stall the restore; unknown keeps the resume.
+      let timer: ReturnType<typeof setTimeout> | undefined
+      return Promise.race([
+        provider.getForegroundProcess(ptyId).catch(() => null),
+        new Promise<null>((done) => {
+          timer = setTimeout(() => done(null), CONVERSATION_FOREGROUND_READ_MS)
+        })
+      ]).finally(() => clearTimeout(timer))
+    }
+  })
+  // Why sync for a non-resume: an extra tick reorders the pane-spawn reservation races.
+  const resumeAdmission = (args: {
+    launchAgent?: string
+    resumeProviderSession?: AgentProviderSessionMetadata
+    connectionId?: string | null
+    tabId?: string
+    leafId?: string
+    sessionId?: string
+  }): Promise<RestoreAdmission> | null =>
+    args.launchAgent && args.resumeProviderSession
+      ? conversationRestores
+          .admit({
+            agent: args.launchAgent,
+            providerSession: args.resumeProviderSession,
+            connectionId: args.connectionId ?? null,
+            paneKey:
+              args.tabId && args.leafId && isTerminalLeafId(args.leafId)
+                ? makePaneKey(args.tabId, args.leafId)
+                : null,
+            ...(args.sessionId ? { ptyId: getAppPtyId(args.connectionId, args.sessionId) } : {})
+          })
+          .catch(() => NOT_CLAIMED)
+      : null
+
+  // Why a wrapper: a paired client and ensureAgentSession restore through this spawn, not pty:spawn.
+  const guardResumeSpawns = (controller: RuntimePtyControllerOf): RuntimePtyControllerOf => {
+    const spawn = controller.spawn
+    if (!spawn) {
+      return controller
+    }
+    return {
+      ...controller,
+      spawn: async (args) => {
+        const ensure = args.resumeProviderSession ? args.agentSessionEnsure : undefined
+        if (ensure) {
+          const startup = getLocalPtyStartupPromise(args.connectionId)
+          if (startup) {
+            await startup
+          }
+          await reconcileAgentSessionOwnerListings()
+        }
+        // Why: a request its live owner answers must reach that pane, not open a plain shell.
+        const admission =
+          args.adoptedStablePane || (ensure && agentSessionOwners.find(ensure.claim))
+            ? null
+            : resumeAdmission(args)
+        if (!admission) {
+          return spawn(args)
+        }
+        const { heldBy, settle } = await admission
+        let spawnedPtyId: string | null = null
+        try {
+          const spawned = await spawn(
+            heldBy
+              ? {
+                  ...args,
+                  command: undefined,
+                  resumeProviderSession: undefined,
+                  launchAgent: undefined,
+                  startupCommandDelivery: undefined,
+                  agentSessionEnsure: undefined,
+                  ...(args.env ? { env: withoutSequencedStartupCommand(args.env) } : {})
+                }
+              : args
+          )
+          spawnedPtyId = spawned.id
+          return spawned
+        } finally {
+          settle(spawnedPtyId)
+        }
+      }
+    }
+  }
+
   // Why: route through getProviderForPty() so CLI commands work for remote PTYs too; localProvider would silently fail for them.
-  runtime?.setPtyController({
+  const ptyController: RuntimePtyControllerOf = {
     claimStablePaneCreate: (args) => {
       const paneKey = makePaneKey(args.tabId, args.leafId)
       const ownerKey = makePaneSpawnReservationKey(args.worktreeId, args.connectionId, paneKey)
@@ -6526,7 +6645,8 @@ export function registerPtyHandlers(
         return false
       }
     }
-  })
+  }
+  runtime?.setPtyController(guardResumeSpawns(ptyController))
 
   // ─── IPC Handlers (thin dispatch layer) ─────────────────────────
 
@@ -6757,7 +6877,24 @@ export function registerPtyHandlers(
       let snapshotKittyFlagsCoverReconciledSeq = true
       let preparedProvisionalExecutionContext = false
       let releaseWorktreeSpawn: (() => void) | undefined
+      let resumeClaim: RestoreAdmission | null = null
+      let spawnedResumePtyId: string | null = null
       try {
+        const admission = resumeAdmission(args)
+        resumeClaim = admission ? await admission : null
+        if (resumeClaim?.heldBy) {
+          // Why a plain shell: the live pane keeps the conversation, and this pane says so.
+          args = {
+            ...args,
+            command: undefined,
+            resumeProviderSession: undefined,
+            launchAgent: undefined,
+            launchConfig: undefined,
+            launchToken: undefined,
+            startupCommandDelivery: undefined,
+            ...(args.env ? { env: withoutSequencedStartupCommand(args.env) } : {})
+          }
+        }
         if (!earlyStablePaneOwner) {
           await assertFolderWorkspacePtyPathUsable(args.worktreeId)
         }
@@ -8039,7 +8176,8 @@ export function registerPtyHandlers(
           ...(startupCwdFallback && !result.isReattach ? { startupCwdFallback } : {}),
           // Why: the pane asked to resume and got a fresh session instead; only the
           // renderer can say so, and a reattach never ran this launch command.
-          ...(codexResumeLaunch.notifyResumeUnavailable && !result.isReattach
+          ...((codexResumeLaunch.notifyResumeUnavailable || resumeClaim?.heldBy) &&
+          !result.isReattach
             ? { agentResumeUnavailable: true as const }
             : {})
         }
@@ -8063,6 +8201,7 @@ export function registerPtyHandlers(
                 : {})
           })
         }
+        spawnedResumePtyId = result.id
         return resolvePaneSpawnReservation(paneSpawnReservationKey, paneSpawnReservation, response)
       } catch (err) {
         if (pendingRegistrationPtyId) {
@@ -8081,6 +8220,7 @@ export function registerPtyHandlers(
         rejectPaneSpawnReservation(paneSpawnReservationKey, paneSpawnReservation, err)
         throw err
       } finally {
+        resumeClaim?.settle(spawnedResumePtyId)
         releaseWorktreeSpawn?.()
         finishTerminalInstall()
       }
