@@ -213,10 +213,11 @@ pre {
 .prompt {
   margin: 0;
   padding: 14px 16px;
-  overflow-x: auto;
   font-size: 13.5px;
   line-height: 1.7;
-  white-space: pre;
+  /* Why wrap: a sideways scroll inside the box reads as a clipped command on a phone. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .prompt .c {
