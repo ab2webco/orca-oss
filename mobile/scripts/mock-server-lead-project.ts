@@ -78,6 +78,12 @@ function projectWork(): GameProjectWork {
 }
 
 const GB = 1024 ** 3
+const READY = {
+  kind: 'ready',
+  repo: { id: 'r1', displayName: 'orca-oss', path: '/Users/dev/code/orca-oss', remoteKey: null }
+} as const
+
+// Why every kind: the Hosts tab draws a calm host, a busy one, a refused one, an older one and an offline one.
 const HOST_CAPACITY: GameHostCapacity[] = [
   {
     host: 'local',
@@ -87,7 +93,10 @@ const HOST_CAPACITY: GameHostCapacity[] = [
     cpuCoreCount: 10,
     totalMemory: 64 * GB,
     availableMemory: 21 * GB,
-    loadAverage1m: 6.2
+    loadAverage1m: 6.2,
+    cpuUsagePercent: 58,
+    workspaceDiskTotal: 1000 * GB,
+    workspaceDiskFree: 420 * GB
   },
   {
     host: 'mac-studio',
@@ -97,7 +106,50 @@ const HOST_CAPACITY: GameHostCapacity[] = [
     cpuCoreCount: 24,
     totalMemory: 128 * GB,
     availableMemory: 80 * GB,
-    loadAverage1m: 3.1
+    loadAverage1m: 3.1,
+    cpuUsagePercent: 14,
+    workspaceDiskTotal: 2000 * GB,
+    workspaceDiskFree: 1400 * GB,
+    launch: READY
+  },
+  {
+    host: 'render-node',
+    running: 2,
+    cap: 3,
+    status: 'ok',
+    cpuCoreCount: 8,
+    totalMemory: 16 * GB,
+    availableMemory: 1.2 * GB,
+    loadAverage1m: 9.4,
+    cpuUsagePercent: 96,
+    workspaceDiskTotal: 460 * GB,
+    workspaceDiskFree: 140 * GB,
+    launch: READY
+  },
+  {
+    host: 'atelier',
+    running: 0,
+    cap: 4,
+    status: 'ok',
+    cpuCoreCount: 8,
+    totalMemory: 32 * GB,
+    availableMemory: 20 * GB,
+    loadAverage1m: 0.4,
+    cpuUsagePercent: 7,
+    workspaceDiskTotal: 500 * GB,
+    workspaceDiskFree: 320 * GB,
+    launch: { kind: 'unregistered', project: 'orca-oss', reason: 'not on atelier' }
+  },
+  // An Orca older than ORCA-1252: no CPU use, disk or launch state.
+  {
+    host: 'veteran',
+    running: 0,
+    cap: 2,
+    status: 'ok',
+    cpuCoreCount: 4,
+    totalMemory: 8 * GB,
+    availableMemory: 5 * GB,
+    loadAverage1m: 0.6
   },
   { host: 'build-box-linux-02', running: 0, cap: 3, status: 'unreachable' }
 ]
