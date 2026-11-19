@@ -148,7 +148,7 @@ for (const [plugins, group] of [false, true].flatMap((one) =>
           ORCA_WORKTREE_ID: worktreeId,
           ORCA_PANE_KEY: leadPane.paneKey
         },
-        ['game', 'launch', 'E2E-1135', '--agent', 'codex', '--json']
+        ['game', 'launch', 'E2E-1135', '--agent', 'codex', '--past-busy', 'e2e', '--json']
       )
       writeFileSync(testInfo.outputPath('launch.txt'), `${launch.stdout}\n${launch.stderr}`)
       expect(launch.status, `${launch.stdout}\n${launch.stderr}`).toBe(0)

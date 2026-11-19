@@ -1,5 +1,5 @@
 ---
-sourceHash: a15e78b96db990d9
+sourceHash: 1d5212335fa04fe8
 ---
 
 # El juego orquestador de Agent Teams
@@ -731,6 +731,13 @@ launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea un
   relanzamiento no agrega PR) o se pase `--past-pr-cap "<por qué>"`, que lanza e imprime el motivo.
   `orca game wave` imprime `Warning:` en stderr y aun así inicia sus miembros. Un PR cuenta incluso
   después de que su miembro fue liberado, algo que el recuento de miembros vivos no puede ver.
+- El tope de un host cuenta cada miembro que Orca lanzó ahí, sea del líder del proyecto que sea: el
+  estado de un líder lista los demás como `otherProjectMembers`, `orca game fleet` muestra el reparto
+  de cada host (`5/5 running (this project 2, cineco 3)`) y un lanzamiento en el tope nombra los
+  proyectos que lo ocupan. `orca game launch` también se niega en un host ocupado (carga igual a sus
+  núcleos; en la máquina del propio líder, a tres cuartos de ellos, para dejar margen a sus líderes)
+  o con poca memoria, con la lectura, salvo que se pase `--past-busy "<por qué>"`. Un host más
+  antiguo no lista los miembros de otros proyectos.
 - `orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>]` — un miembro para
   un ticket; `--repo` lo inicia en otro repo del proyecto (el suyo o uno de `memberRepos`), y `--on` en un host emparejado (consulta
   la sección de la flota más abajo; `--repo` es entonces el repo del host y es obligatorio). `--prompt` reemplaza `launchPrompt` para ese

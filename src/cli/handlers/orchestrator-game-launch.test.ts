@@ -63,6 +63,35 @@ describe('orca game launch', () => {
     warn.mockRestore()
   })
 
+  // Why: ORCA-1284: Orca Lab froze with members launched onto an already loaded machine.
+  const busyHere = () =>
+    stateWith({
+      localHost: {
+        host: 'local',
+        running: 0,
+        status: 'ok',
+        cpuCoreCount: 8,
+        totalMemory: 32 * 1024 ** 3,
+        availableMemory: 12 * 1024 ** 3,
+        loadAverage1m: 27.3
+      }
+    })
+
+  it('refuses on a busy machine with its reading, and launches with --past-busy and why (ORCA-1284)', async () => {
+    const refused = fakeClient(busyHere())
+    await expect(launch(refused.client)).rejects.toThrow(
+      /^local is busy \(load 27\.3 on 8 cores, 12 of 32 GB free; .*--past-busy "<why>"\.$/
+    )
+    expect(refused.calls.map(([method]) => method)).toEqual(['game.state'])
+
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { client, calls } = fakeClient(busyHere())
+    await launch(client, 'cin-12', [['past-busy', 'e2e']])
+    expect(warn).toHaveBeenCalledWith('Launching on a busy host: e2e')
+    expect(calls.map(([method]) => method)).toContain('orchestration.workerStart')
+    warn.mockRestore()
+  })
+
   it('relaunches a ticket whose own PR is one of the open ones, since that adds no PR', async () => {
     const { client, calls } = fakeClient(
       atPrCap([{ id: '7', title: 'feat: Cartelera page (CIN-12)', url: 'https://x/pull/7' }])

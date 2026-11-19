@@ -54,7 +54,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own worktree, as this project's lead",
     usage:
-      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures>] [--skip-mcp-check] [--past-pr-cap <why>] [--json]',
+      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures>] [--skip-mcp-check] [--past-pr-cap <why>] [--past-busy <why>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'ticket',
@@ -62,6 +62,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'on',
       'prompt',
       'past-pr-cap',
+      'past-busy',
       ...GAME_LAUNCH_OVERRIDE_FLAGS
     ],
     positionalArgs: ['ticket'],
@@ -70,6 +71,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
       'The agent, model, cap and prompt come from orchestratorGame.orchestrator in orca.yaml or the project Settings.',
       'Refused when the project cap of running members is reached.',
       'Refused when the open PRs reach the cap, unless the ticket\'s own PR is one of them; --past-pr-cap "<why>" launches anyway and prints why.',
+      'Refused when the target host is busy (load at its cores; on the lead\'s machine at three quarters, to keep room for its leads) or low on memory; --past-busy "<why>" launches anyway and prints why.',
       "--repo starts the member in that repo's own new worktree instead of a child of the lead's.",
       "--on <host> starts the member on that paired host (a saved environment) in a new worktree of --repo, which is then the host's repo selector and required; it takes the same roster name and game as a local member. --account (or the project's accounts: auto) is resolved by the host against its own accounts and refused there when it has none usable; the result names the email it used.",
       "A relaunch reuses the ticket's idle worktree in that repo (its previous member's, else linked to the ticket, else named after it; an open PR breaks a tie); refused when an agent is live there or two still match.",

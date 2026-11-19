@@ -115,7 +115,7 @@ test("a failed member's lesson reaches the next member's brief", async ({
         ORCA_WORKTREE_ID: lead!.worktreeId,
         ORCA_PANE_KEY: leadPane.paneKey
       },
-      ['game', 'launch', 'E2E-687', '--agent', 'codex', '--json']
+      ['game', 'launch', 'E2E-687', '--agent', 'codex', '--past-busy', 'e2e', '--json']
     )
     expect(launch.status, `${launch.stdout}\n${launch.stderr}`).toBe(0)
     const launched = JSON.parse(launch.stdout) as { result: { runId: string; taskId: string } }

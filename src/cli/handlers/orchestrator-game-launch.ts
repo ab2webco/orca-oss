@@ -38,6 +38,7 @@ import { memberWorktreeParamsOf } from './orchestrator-game-launch-worktree'
 import { checkGameMemberRepoScope } from './orchestrator-game-launch-repo-scope'
 import { forgetOnRefusal } from './orchestrator-game-launch-refusal'
 import { recordGameStartOutcome } from './orchestrator-game-launch-outcome'
+import { launchBusyRefusalOf, refuseUnlessPast } from './orchestrator-game-launch-gates'
 import { readCallerGameState, recordGameMember } from './orchestrator-game-board-call'
 import { refuseWhileStopped } from './orchestrator-game-hold'
 import { gameLessonBriefFor, withGameLessons } from './orchestrator-game-lessons-call'
@@ -292,14 +293,15 @@ export const ORCHESTRATOR_GAME_LAUNCH_HANDLERS: Record<string, CommandHandler> =
     if (refusal) {
       throw new RuntimeClientError('cap_reached', refusal)
     }
-    const openPrRefusal = openPrCapRefusalOf(response.result, ticket)
-    if (openPrRefusal) {
-      const why = flags.get('past-pr-cap')
-      if (typeof why !== 'string' || why.trim() === '') {
-        throw new RuntimeClientError('cap_reached', openPrRefusal)
-      }
-      console.error(`Launching past the open-PR cap: ${why.trim()}`)
-    }
+    refuseUnlessPast(flags, openPrCapRefusalOf(response.result, ticket), {
+      flag: 'past-pr-cap',
+      label: 'Launching past the open-PR cap'
+    })
+    refuseUnlessPast(
+      flags,
+      launchBusyRefusalOf(response.result, fleet.hosts, remote?.on ?? null, ticket),
+      { flag: 'past-busy', label: 'Launching on a busy host' }
+    )
     const launched = await launchGameMember({
       client,
       state: response.result,
