@@ -17,7 +17,7 @@ for (const file of ['index.html', 'es/index.html']) {
 
     it('marks the map while it shows one caption at a time', () => {
       assert.ok(script, 'no run map script in the built page')
-      assert.match(script, /toggleAttribute\(`data-stepper`/)
+      assert.match(script, /toggleAttribute\([`'"]data-stepper[`'"]/)
     })
 
     it('stacks the stepper captions in one cell, so a step never changes the height', () => {
@@ -36,7 +36,10 @@ for (const file of ['index.html', 'es/index.html']) {
     })
 
     it('keeps the captions quiet for screen readers while the map advances by itself', () => {
-      assert.match(script, /setAttribute\(`aria-live`,\w+\?`off`:`polite`\)/)
+      assert.match(
+        script,
+        /setAttribute\([`'"]aria-live[`'"],\s*\w+\s*\?\s*[`'"]off[`'"]\s*:\s*[`'"]polite[`'"]\)/
+      )
     })
   })
 }
