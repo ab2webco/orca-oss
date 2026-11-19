@@ -31,6 +31,10 @@ h1#_top {
   font-weight: 400;
 }
 
+.sl-markdown-content code .nowrap {
+  white-space: nowrap;
+}
+
 :focus-visible {
   outline: 2px solid var(--sl-color-white);
   outline-offset: 2px;

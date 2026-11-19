@@ -107,4 +107,29 @@ describe('transformDoc', () => {
     const out = transformDoc(src, 'docs/user/get-started.md', opts)
     assert.ok(out.markdown.endsWith(src.slice('# T\n'.length)))
   })
+
+  it('keeps each flag and short word of an inline code span whole', () => {
+    const out = transformDoc(
+      '# T\n\nRun `--past-busy "<why>"` or `orca game fleet`.\n',
+      'docs/user/ssh.md',
+      opts
+    )
+    assert.match(
+      out.markdown,
+      /Run <code dir="auto"><span class="nowrap">&#45;&#45;past&#45;busy<\/span> <span class="nowrap">&#34;&#60;why&#62;&#34;<\/span><\/code> or `orca game fleet`\./
+    )
+  })
+
+  it('keeps a flag whole in a code span that runs onto the next line', () => {
+    const out = transformDoc(
+      '# T\n\nA (`orca game lead\n--fresh`) starts, and `x` then `--on <host>` runs.\n',
+      'docs/user/agents/agent-teams.md',
+      opts
+    )
+    assert.match(
+      out.markdown,
+      /A \(<code dir="auto"><span class="nowrap">orca<\/span> <span class="nowrap">game<\/span> <span class="nowrap">lead<\/span> <span class="nowrap">&#45;&#45;fresh<\/span><\/code>\) starts, and `x` then <code dir="auto">/
+    )
+    assert.doesNotMatch(out.markdown, /<code dir="auto">\) starts/)
+  })
 })

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c3e01d9d0dbc4cd
+sourceHash: bc33233db47ac4bb
 ---
 # Móvil
 
@@ -64,12 +64,18 @@ escritorio.
 ## Cajón del equipo e Inbox
 
 - **Cajón del equipo.** En la terminal de un líder, una barra en la parte inferior abre el cajón con
-  dos pestañas:
+  **Team** e **Inbox**, más **PRs** y **Hosts** cuando el escritorio los comparte:
   - **Team**: una tarjeta por miembro con su ticket, host, estado, uso de la cuenta y PR con CI. Toca
     una tarjeta para ver su título, su resumen y **Open terminal**. **Metrics** muestra los merges por
     día y el lead time mediano.
   - **Inbox**: las preguntas del líder para ti y los hilos. El cajón se abre aquí cuando hay una
     pregunta esperando, y **Answer in Inbox** en una tarjeta te lleva a ella.
+  - **PRs**: los pull requests abiertos del equipo, cada uno con lo que espera, y la merge queue.
+  - **Hosts**: el tablero [Machines](agents/agent-teams.md#6-machines) del escritorio. Una franja
+    arriba cuenta los hosts **Ready**, los **Agents** frente al tope de los hosts y los **Busy /
+    low**; cada host debajo muestra su estado y las barras **CPU**, **Memory** y **Disk**. Toca un
+    host para ver su tarjeta: carga y núcleos, memoria y disco libres, sus tickets y los lugares
+    libres.
 - **Inbox por escritorio.** La fila **Inbox** en la lista de worktrees de un escritorio abre todas las
   preguntas en espera de ese escritorio, con una sección por proyecto.
 - **Enrutado al tocar una notificación.** Un toque abre el host y la pantalla correctos; la pregunta

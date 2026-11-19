@@ -79,8 +79,10 @@ orca game launch LUM-21 --on studio --repo name:lumen-app
 `--on` takes the paired host's name and needs `--repo` to say which project. The member runs on
 that host with that host's own agent accounts, while the lead stays on this machine. Its card
 in the Team panel names the host, and **Machines** shows how many agents each host runs. Each host
-takes as many members as its memory and cores allow; when one is full, the lead is told to launch
-on another.
+takes as many members as its memory and cores allow, counting the members every project's lead
+started there. When one is full, the launch names the projects holding it and the lead is told to
+launch on another. A busy or low-memory host refuses the launch with its reading unless
+`--past-busy "<why>"` is given; [Machines](agents/agent-teams.md#6-machines) has the thresholds.
 
 Agents on a host sign in with that host's own logins: sign in there, or add accounts on it with
 `orca account add`.

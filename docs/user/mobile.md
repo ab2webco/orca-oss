@@ -57,12 +57,18 @@ Tap an **Account usage** card on Home, or the person icon on a desktop's worktre
 
 ## Team drawer and Inbox
 
-- **Team drawer.** On a lead's terminal, a bar at the bottom opens the drawer with two tabs:
+- **Team drawer.** On a lead's terminal, a bar at the bottom opens the drawer with **Team** and
+  **Inbox**, plus **PRs** and **Hosts** when the desktop shares them:
   - **Team**: a card per member with its ticket, host, state, account use and PR with CI. Tap a
     card for its title, summary and **Open terminal**. **Metrics** shows merges per day and the
     median lead time.
   - **Inbox**: the lead's questions for you, and the threads. The drawer opens here when a question
     waits, and **Answer in Inbox** on a card takes you to it.
+  - **PRs**: the team's open pull requests, each with what it waits for, and the merge queue.
+  - **Hosts**: the desktop's [Machines](agents/agent-teams.md#6-machines) board. A strip on top
+    counts the hosts **Ready**, the **Agents** against the hosts' caps and the **Busy / low** ones;
+    each host below shows its status and **CPU**, **Memory** and **Disk** bars. Tap a host for its
+    card: load and cores, memory and disk free, its tickets and the slots free.
 - **Inbox per desktop.** The **Inbox** row on a desktop's worktree list opens every waiting
   question on that desktop, one section per project.
 - **Notification tap routing.** A tap opens the right host and screen; a lead's question opens the
