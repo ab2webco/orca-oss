@@ -1,6 +1,36 @@
 // Recordings of Orca Lab the landing shows, from docs/assets/readme (ORCA-954/955 captures of a demo
 // project). sync-docs copies exactly these; ORCA-959 replaces each file with a motion clip in place.
 export const RECORDINGS = {
+  'team-office-building.gif': {
+    width: 1200,
+    height: 750,
+    en: 'The Team panel’s Office scene: a floor per machine, and the lead riding the elevator to the member who needs you.',
+    es: 'La escena Oficina del panel Equipo: un piso por máquina, y el líder subiendo en el ascensor hasta el miembro que te necesita.'
+  },
+  'team-merge.gif': {
+    width: 1200,
+    height: 750,
+    en: 'A member’s PR goes green and merges, and each award fills the team’s bar to the next level.',
+    es: 'El PR de un miembro pasa a verde y se mergea, y cada premio llena la barra del equipo hasta el siguiente nivel.'
+  },
+  'team-style-office.gif': {
+    width: 1200,
+    height: 750,
+    en: 'The Office style: a floor per machine.',
+    es: 'El estilo Oficina: un piso por máquina.'
+  },
+  'team-style-figures.gif': {
+    width: 1200,
+    height: 750,
+    en: 'The Figures style: the team as characters before a castle.',
+    es: 'El estilo Figuras: el equipo como personajes frente a un castillo.'
+  },
+  'team-style-pixel.gif': {
+    width: 1200,
+    height: 750,
+    en: 'The Pixel style: the team as pixel sprites.',
+    es: 'El estilo Pixel: el equipo como sprites de píxeles.'
+  },
   'lead-wave.gif': {
     width: 960,
     height: 600,
