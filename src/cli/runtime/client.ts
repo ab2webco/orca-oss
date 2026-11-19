@@ -10,6 +10,7 @@ import { launchOrcaApp } from './launch'
 import { getDefaultUserDataPath, readMetadata } from './metadata'
 import { getCliStatus, resolveDesktopWindowStatus } from './status'
 import { sendRequest } from './transport'
+import { withMainHangRecord } from './main-hang-record-hint'
 import { RuntimeClientError, RuntimeRpcFailureError, type RuntimeRpcSuccess } from './types'
 import { markEnvironmentUsed, resolveEnvironmentPairingOffer } from './environments'
 import {
@@ -124,7 +125,15 @@ export class RuntimeClient {
     try {
       response = await sendRequest<TResult>(metadata, method, params, effectiveTimeoutMs, envelope)
     } catch (error) {
-      throw attachMutationRecovery(error, orchestrationRequestId)
+      throw attachMutationRecovery(
+        withMainHangRecord(error, {
+          userDataPath: this.userDataPath,
+          pid: metadata.pid,
+          method,
+          timeoutMs: effectiveTimeoutMs
+        }),
+        orchestrationRequestId
+      )
     }
     if (response.ok === false) {
       throw new RuntimeRpcFailureError(response)
@@ -137,6 +146,13 @@ export class RuntimeClient {
     const metadata = readMetadata(this.userDataPath)
     const response = await sendRequest(metadata, method, params, this.requestTimeoutMs, undefined, {
       onStreamFrame: onFrame
+    }).catch((error: unknown) => {
+      throw withMainHangRecord(error, {
+        userDataPath: this.userDataPath,
+        pid: metadata.pid,
+        method,
+        timeoutMs: this.requestTimeoutMs
+      })
     })
     if (response.ok === false) {
       throw new RuntimeRpcFailureError(response)
