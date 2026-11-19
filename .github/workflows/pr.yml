@@ -175,7 +175,7 @@ jobs:
   git_compatibility:
     name: Git compatibility
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Why: looser than the other test jobs because this one builds Git 2.25.5
     # from source and pulls container images; healthy runs stay under 2 minutes.
     timeout-minutes: 20
@@ -199,7 +199,9 @@ jobs:
               | sha256sum --check
             mkdir -p "$source"
             tar -xzf "$archive" -C "$source" --strip-components=1
-            make -C "$source" -j"$(nproc)" \
+            # Why gnu17: 26.04's gcc defaults to C23, where thread_local is a keyword and 2.25.5's
+            # `struct thread_local` no longer parses (ORCA-1285).
+            make -C "$source" -j"$(nproc)" CFLAGS="-g -O2 -Wall -std=gnu17" \
               NO_GETTEXT=YesPlease NO_TCLTK=YesPlease NO_PYTHON=YesPlease git
             ORCA_GIT_COMPAT_BINARY="$source/git" ORCA_GIT_COMPAT_VERSION="2.25.5" \
               pnpm exec vitest run --config config/vitest.config.ts \
