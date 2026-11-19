@@ -122,6 +122,7 @@ describe('watchdog worker entry', () => {
       isHangWatchdogWorkerData({
         parentPid: 42,
         markerPath: '/tmp/marker',
+        userDataPath: '',
         timeoutMs: 100,
         checkIntervalMs: 25
       })
@@ -129,10 +130,29 @@ describe('watchdog worker entry', () => {
     for (const value of [
       null,
       {},
-      { parentPid: 0, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: 7, timeoutMs: 100, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 0, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: Infinity }
+      {
+        parentPid: 0,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 100,
+        checkIntervalMs: 25
+      },
+      { parentPid: 42, markerPath: 7, userDataPath: '', timeoutMs: 100, checkIntervalMs: 25 },
+      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: 25 },
+      {
+        parentPid: 42,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 0,
+        checkIntervalMs: 25
+      },
+      {
+        parentPid: 42,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 100,
+        checkIntervalMs: Infinity
+      }
     ]) {
       expect(isHangWatchdogWorkerData(value)).toBe(false)
     }
@@ -154,6 +174,7 @@ describe('watchdog worker entry', () => {
         {
           parentPid: process.pid,
           markerPath,
+          userDataPath: '',
           timeoutMs: 100,
           checkIntervalMs: 25
         },
