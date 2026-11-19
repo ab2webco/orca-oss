@@ -101,7 +101,9 @@ async function seedSidebar(page: Page): Promise<void> {
     ])
     add('certified-received', [
       ['main', 3 * day],
-      ['handover', 30 * min]
+      ['handover', 30 * min],
+      // Why: handover's one agent draws it as a solo row, which has no activity age to wait on.
+      ['notes', 50 * min]
     ])
     add('koombea-ai-workflows', [
       ['main', 2 * day],
@@ -365,9 +367,7 @@ test('active projects sort Needs you first, frozen inside a tier, with the reaso
     }))
   }, `${PREFIX}certified-received`)
   await expect(
-    orcaPage.locator(
-      `[data-worktree-id="${PREFIX}certified-received-handover"] [data-activity-age]`
-    )
+    orcaPage.locator(`[data-worktree-id="${PREFIX}certified-received-notes"] [data-activity-age]`)
   ).toHaveText('2 min')
   expect(await activeOrder(orcaPage)).toEqual(before)
 
