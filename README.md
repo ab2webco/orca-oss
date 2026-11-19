@@ -22,7 +22,7 @@
 <h3 align="center"><a href="https://github.com/ab2webco/orca-oss/releases/latest"><ins>Download Orca Lab</ins></a></h3>
 
 <p align="center">
-  <img src="docs/assets/readme/multi-host-fleet.gif" alt="The lead's Panel across this machine and two paired hosts: a new member lands on linux-box with its running/cap, cores, free memory and load; a remote member moves from reading to running commands, its CI turns green, and another remote PR merges, paying XP" width="960" />
+  <img src="docs/assets/readme/team-office-building.gif" alt="The Team panel's Office scene: one floor per machine (This computer, studio, render-01, ci-runner); Juno on studio hits a permission prompt and the lead Atlas rides the elevator up to that floor, while the lead's pane says who needs you" width="960" />
 </p>
 
 <p align="center">
@@ -161,10 +161,6 @@ It looks like a game, a **Team** panel in the right sidebar with a scene, levels
 
 The idea of running a Claude Code team as a game came from [Jucer Orozco](https://github.com/Jucerweb).
 
-<p align="center">
-  <img src="docs/assets/readme/team-office-building.gif" alt="The Team panel's Office scene: one floor per machine (This computer, studio, render-01, ci-runner); Juno on studio hits a permission prompt and the lead Atlas rides the elevator up to that floor, while the lead's pane says who needs you" width="960" />
-</p>
-
 **What keeps it serious**
 
 - **XP only from verified signals.** A member earns nothing for saying it is done. XP comes from CI turning green, the ticket reaching review or Done, and the PR merging. [The lead's XP →](docs/reference/orchestrator-game.md#the-leads-xp)
@@ -187,28 +183,22 @@ The idea of running a Claude Code team as a game came from [Jucer Orozco](https:
 - **Members you can follow.** Each member is one character for its whole run, on its card, its terminal and the history. `orca game history` lists the freed members with outcome, PR and character; their outcomes become short project lessons that new members get in their brief, and `orca game adopt-history` carries both over when a repo is added again.
 - **Recovery is built in.** `game resume-members` brings back members a restart paused; `game adopt` takes an agent the fleet found running into the team, `game drop` lets one go without stopping it; `game lead --fresh` rotates to a new lead when the old conversation is too long.
 
-Each verified signal pays the team on the spot: Kai's PR goes green, merges, and the team reaches Lv 8:
+A wave fills the free slots from the To Do, one member per ticket, and each verified signal pays the team on the spot: Kai's PR goes green, merges, and the team reaches Lv 8:
 
 <p align="center">
   <img src="docs/assets/readme/team-merge.gif" alt="Kai's card for LUM-19 in the Team panel: PR #44 starts CI, turns green for +20 XP, then merges for +220 XP and the team's bar fills to Level 8" width="960" />
 </p>
 
-A wave fills the free slots from the To Do, one member per ticket; green CI and a merge pay XP:
-
-<p align="center">
-  <img src="docs/assets/readme/lead-wave.gif" alt="The owner presses Wave in the band; the lead streams which tickets it launches, LUM-14 and LUM-15 join the Panel as members and start working, the To Do drops to 2, then LUM-12's CI turns green and its PR merges, paying XP and a level-up" width="960" />
-</p>
-
 A question only you can answer lands in Orca's Inbox, and your answer goes back to the lead:
 
 <p align="center">
-  <img src="docs/assets/readme/owner-inbox.gif" alt="Orca Lab desktop: the owner asks the live lead to check before the offline cache ships; the lead's two questions reach the Inbox, one is answered with Ship in 2.3, and the lead picks the answer up from its mail" width="960" />
+  <img src="docs/assets/readme/team-inbox.gif" alt="The Team panel's Inbox: the lead's question on LUM-25, Retry uploads on cellular?, with Yes and Wi-Fi only to answer and the PR it is about; Nova's card waits for your answer" width="960" />
 </p>
 
-The Panel also keeps your open PRs and the team's numbers:
+The PRs tab keeps the team's open PRs and the merge queue:
 
 <p align="center">
-  <img src="docs/assets/readme/panel-metrics.gif" alt="The owner opens the lead's Panel on My PRs with CI green, CI running and changes requested, then the Metrics widget with merges per day over 14 days, median lead time and each Claude account's session and weekly use" width="960" />
+  <img src="docs/assets/readme/team-prs.gif" alt="The Team panel's PRs tab: #44 first in the merge queue, then the team's open PRs with a failed check, one in review and two ready" width="960" />
 </p>
 
 Settings → Agents → Panel picks how the panel looks: **Game** (a scene with levels and XP), **Display** (a carousel of team metrics) or **Plain**. The scene comes in three styles that act out the real state of the work: **Pixel** (a garden), **Figures** (a castle tower per member, trophies for merges) and **Office** (whiteboards, and a building with one floor per machine). A project can change any of it in its own settings or in `orca.yaml`, a scene file can bring its own art, and Settings previews the chosen style. Settings → Appearance → Status colors sets one color per state for light and dark. The older pixel band inside the lead's pane is off by default; **Show the band** in Settings → Agents → Agent Teams game turns it on with its **Default view** (Off, Flat, Zen, 2D classic, 2D hd). [Agent Teams guide →](docs/user/agents/agent-teams.md) · [Orca Game reference →](docs/reference/orchestrator-game.md)
@@ -249,6 +239,10 @@ flowchart TB
 - **Survives restarts.** When a host restarts, `game resume-members` wakes the members it put to sleep, and the Panel card offers Resume and Reconnect.
 
 **Why it matters:** the laptop you stopped using can run two members tonight. A strong workstation can take the heavy tickets and shorten the queue. And your main machine stays responsive while the work runs somewhere else. [Fleet and hosts →](docs/reference/orchestrator-game.md#the-project-lead-orchestratorgameorchestrator)
+
+<p align="center">
+  <img src="docs/assets/readme/team-machines.gif" alt="The Team panel's Machines tab: four hosts ready, each with its members against its cap, CPU, memory, disk and load" width="960" />
+</p>
 
 ## Under the hood
 

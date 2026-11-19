@@ -602,27 +602,30 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
       await panel.screenshot({ path: testInfo.outputPath(`panel-steward-${theme}.png`) })
     }
 
-    // The PRs tab with Kai's merge queue entry, and the Machines tab.
+    // The Inbox with an open owner question, the PRs tab with Kai's merge queue entry, and the Machines
+    // tab: each recorded dark from the Team tab, then its stills in both themes.
     await stepDemo(electronApp, demoOf(2))
-    for (const tab of ['PRs', 'Machines'] as const) {
-      // Why a take here: the site's multi-host section shows the team moving from Team to Machines.
-      if (tab === 'Machines') {
-        await setTheme(orcaPage, 'dark')
-        await orcaPage.waitForTimeout(800)
-      }
-      const take =
-        tab === 'Machines' ? await showcaseClip(electronApp, testInfo, 'team-machines') : null
-      if (take) {
-        await panel.getByRole('tab', { name: 'Team' }).click()
-        await orcaPage.waitForTimeout(HOLD_MS)
-      }
+    await client.call('game.ownerAsk', {
+      worktreeId,
+      ticket: 'LUM-25',
+      question: 'Retry uploads on cellular?',
+      options: ['Yes', 'Wi-Fi only'],
+      context: `${PR_URL}/47`
+    })
+    for (const tab of ['Inbox', 'PRs', 'Machines'] as const) {
+      await setTheme(orcaPage, 'dark')
+      await panel.getByRole('tab', { name: 'Team' }).click()
+      await orcaPage.waitForTimeout(800)
+      const take = await showcaseClip(electronApp, testInfo, `team-${tab.toLowerCase()}`)
+      await orcaPage.waitForTimeout(HOLD_MS)
       await panel.getByRole('tab', { name: tab }).click()
-      if (take) {
-        await orcaPage.waitForTimeout(HOLD_MS * 2)
-        await take.stop()
-      }
+      await orcaPage.waitForTimeout(HOLD_MS * 2)
+      await take.stop()
       await expect(panel.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
       await expect(panel).not.toContainText('Could not read')
+      if (tab === 'Inbox') {
+        await expect(panel).toContainText('Retry uploads on cellular?')
+      }
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
         await orcaPage.waitForTimeout(800)

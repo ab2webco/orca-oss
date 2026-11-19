@@ -37,36 +37,6 @@ export const RECORDINGS = {
     en: 'The Pixel style: the team as pixel sprites.',
     es: 'El estilo Pixel: el equipo como sprites de píxeles.'
   },
-  'lead-wave.gif': {
-    width: 960,
-    height: 600,
-    en: 'The lead’s Panel in Orca Lab: the band, the lead card, a member on LUM-12 with its PR and CI, and the To Do.',
-    es: 'El Panel del líder en Orca Lab: la banda, la tarjeta del líder, un miembro en LUM-12 con su PR y CI, y el To Do.'
-  },
-  'game-band-panel.gif': {
-    width: 1280,
-    height: 800,
-    en: 'The Orca Game band above Claude Code’s prompt: three teammates, one of them waiting on you.',
-    es: 'La banda de Orca Game sobre el prompt de Claude Code: tres compañeros, uno esperándote.'
-  },
-  'panel-metrics.gif': {
-    width: 960,
-    height: 600,
-    en: 'The Panel with member cards and My PRs: CI green, CI running and changes requested.',
-    es: 'El Panel con tarjetas de miembros y Mis PR: CI en verde, CI corriendo y cambios pedidos.'
-  },
-  'owner-inbox.gif': {
-    width: 960,
-    height: 600,
-    en: 'The desktop Inbox with a lead’s question about LUM-17 and two options to answer it.',
-    es: 'El Inbox de escritorio con una pregunta del líder sobre LUM-17 y dos opciones para responder.'
-  },
-  'multi-host-fleet.gif': {
-    width: 960,
-    height: 600,
-    en: 'The Panel’s fleet: three paired hosts with running members, cores, free memory and load.',
-    es: 'La flota del Panel: tres hosts emparejados con miembros corriendo, núcleos, memoria libre y carga.'
-  },
   'plane-board.gif': {
     width: 1280,
     height: 764,

@@ -10,7 +10,7 @@ macOS only (the recorder encodes with VideoToolbox), with `ffmpeg` and Claude Co
 `PATH`:
 
 ```sh
-ORCA_SHOWCASE_CLIPS=1 npx playwright test tests/e2e/game-lead-wave-showcase.spec.ts \
+ORCA_SHOWCASE_CLIPS=1 npx playwright test tests/e2e/team-panel-showcase.spec.ts \
   --config tests/playwright.config.ts --project=electron-headless --workers=1 --output tmp/clips
 node config/scripts/export-showcase-media.mjs --from tmp/clips
 ```
@@ -20,7 +20,7 @@ start of every run, so a second run deletes the first run's clips.
 
 The export writes, per clip, `docs/assets/media/<name>.mp4`, `.webm` and a `.png` poster (the last
 second) for the site, and `docs/assets/readme/<name>.gif` (1200 px, 12 fps) for the README.
-`--only lead-wave,agent-grid` limits it to some clips.
+`--only team-merge,agent-grid` limits it to some clips.
 
 Without `ORCA_SHOWCASE_CLIPS=1` the specs run as ordinary regression tests and record nothing.
 
