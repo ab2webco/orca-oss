@@ -1,7 +1,7 @@
 ---
 import { commandHtml } from '../../data/command-html'
 import { docsHref, type Lang } from '../../data/product'
-import Recording from './Recording.astro'
+import Clip from './Clip.astro'
 
 type Props = {
   lang: Lang
@@ -12,7 +12,7 @@ const copy = {
   en: {
     eyebrow: 'Agentic, on every machine',
     title: 'The laptop you stopped using can run two members tonight.',
-    lede: 'Every Orca you pair becomes a host the lead can place members on. A strong workstation takes the heavy tickets, an old iMac adds its own accounts, and your main machine stays responsive.',
+    lede: 'Every Orca you pair becomes a host the lead can place members on. A strong workstation takes the heavy tickets, an old laptop adds its own accounts, and your main machine stays responsive.',
     comments: ['# pair a host: the desktop app, or orca serve on headless Linux', '# place a member on it', '# every host against its cap, cores, memory and load'],
     points: [
       ['Caps that add up', 'Each host’s cap comes from its own memory and cores; the lead’s cap is the sum. A launch past a host’s cap is refused and names a host with room.'],
@@ -25,7 +25,7 @@ const copy = {
   es: {
     eyebrow: 'Agéntico, en cada máquina',
     title: 'La laptop que dejaste de usar puede correr dos miembros esta noche.',
-    lede: 'Cada Orca que emparejas se vuelve un host donde el líder puede poner miembros. Una estación potente toma los tickets pesados, un iMac viejo suma sus propias cuentas y tu máquina principal sigue fluida.',
+    lede: 'Cada Orca que emparejas se vuelve un host donde el líder puede poner miembros. Una estación potente toma los tickets pesados, un portátil viejo suma sus propias cuentas y tu máquina principal sigue fluida.',
     comments: ['# empareja un host: la app de escritorio, u orca serve en Linux sin pantalla', '# pon un miembro ahí', '# cada host frente a su tope, núcleos, memoria y carga'],
     points: [
       ['Topes que se suman', 'El tope de cada host sale de su memoria y sus núcleos; el del líder es la suma. Un lanzamiento por encima del tope se rechaza y sugiere un host con espacio.'],
@@ -70,7 +70,7 @@ const block = commands
         </ul>
       </div>
       <div>
-        <Recording lang={lang} file="multi-host-fleet.gif" />
+        <Clip lang={lang} name="team-machines" />
         <pre class="prompt box" set:html={block} />
       </div>
     </div>

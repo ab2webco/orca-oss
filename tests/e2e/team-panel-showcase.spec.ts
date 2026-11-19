@@ -50,10 +50,18 @@ type Reading = {
   disk: [number, number]
 }
 // Why CPU and disk: the Machines board draws a gauge for each (ORCA-1252) and reads a missing one as unknown.
+// Why launch: a paired host without one reads as an older Orca that cannot say whether members start (ORCA-1207).
+const LUMEN_REPO = {
+  id: 'lumen-app',
+  displayName: 'lumen-app',
+  path: '~/code/lumen-app',
+  remoteKey: null
+}
 const machine = (host: string, running: number, cap: number, reading: Reading) => ({
   host,
   running,
   cap,
+  ...(host === 'local' ? {} : { launch: { kind: 'ready', repo: LUMEN_REPO } }),
   status: 'ok',
   cpuCoreCount: reading.cores,
   totalMemory: reading.memory[1] * GB,
@@ -400,7 +408,12 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
       const ptyId = await waitForActivePanePtyId(orcaPage)
       await sendToTerminal(orcaPage, ptyId, OWNER_PROMPT)
       await sendToTerminal(orcaPage, ptyId, '\r')
-      await expect.poll(() => api.prompts.length, { timeout: 20_000 }).toBe(1)
+      // Why the content, not a count: Claude Code may add its own side requests to the same API.
+      await expect
+        .poll(() => api.prompts.some((prompt) => prompt.includes(OWNER_PROMPT)), {
+          timeout: 20_000
+        })
+        .toBe(true)
       await expect
         .poll(async () => screenText(orcaPage), { timeout: 20_000 })
         .toContain('keep working')
@@ -592,7 +605,22 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
     // The PRs tab with Kai's merge queue entry, and the Machines tab.
     await stepDemo(electronApp, demoOf(2))
     for (const tab of ['PRs', 'Machines'] as const) {
+      // Why a take here: the site's multi-host section shows the team moving from Team to Machines.
+      if (tab === 'Machines') {
+        await setTheme(orcaPage, 'dark')
+        await orcaPage.waitForTimeout(800)
+      }
+      const take =
+        tab === 'Machines' ? await showcaseClip(electronApp, testInfo, 'team-machines') : null
+      if (take) {
+        await panel.getByRole('tab', { name: 'Team' }).click()
+        await orcaPage.waitForTimeout(HOLD_MS)
+      }
       await panel.getByRole('tab', { name: tab }).click()
+      if (take) {
+        await orcaPage.waitForTimeout(HOLD_MS * 2)
+        await take.stop()
+      }
       await expect(panel.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
       await expect(panel).not.toContainText('Could not read')
       for (const theme of ['dark', 'light'] as const) {
