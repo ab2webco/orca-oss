@@ -220,6 +220,10 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.nowrap {
+  white-space: nowrap;
+}
+
 .prompt .c {
   color: var(--muted);
 }
