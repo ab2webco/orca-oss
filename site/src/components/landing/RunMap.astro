@@ -1,4 +1,5 @@
 ---
+import { commandHtml } from '../../data/command-html'
 import type { Lang } from '../../data/product'
 
 type Props = {
@@ -118,7 +119,7 @@ const pulses = [
           <li data-step={i + 1}>
             <h3>{`${i + 1}. ${title}`}</h3>
             <p>{body}</p>
-            {command && <pre>{command}</pre>}
+            {command && <pre set:html={commandHtml(command)} />}
           </li>
         ))
       }

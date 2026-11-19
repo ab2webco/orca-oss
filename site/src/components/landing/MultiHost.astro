@@ -1,4 +1,5 @@
 ---
+import { commandHtml } from '../../data/command-html'
 import { docsHref, type Lang } from '../../data/product'
 import Recording from './Recording.astro'
 
@@ -37,6 +38,15 @@ const copy = {
 }[lang]
 
 const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
+const commands = [
+  'orca environment add --name build-box --pairing-code orca://pair?code=…',
+  'orca game launch ACME-219 --on build-box --repo name:acme-api',
+  'orca game fleet'
+]
+// Why a string: whitespace inside <pre> is the output, so the template's indentation must stay out.
+const block = commands
+  .map((line, i) => `<span class="c">${copy.comments[i]}</span>\n<span class="p">$ </span>${commandHtml(line)}`)
+  .join('\n')
 ---
 
 <section class="section" id="multi-host" aria-labelledby="multi-host-title">
@@ -61,12 +71,7 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
       </div>
       <div>
         <Recording lang={lang} file="multi-host-fleet.gif" />
-        <pre class="prompt box"><span class="c">{copy.comments[0]}</span>
-<span class="p">$ </span>orca environment add --name build-box --pairing-code orca://pair?code=…
-<span class="c">{copy.comments[1]}</span>
-<span class="p">$ </span>orca game launch ACME-219 --on build-box --repo name:acme-api
-<span class="c">{copy.comments[2]}</span>
-<span class="p">$ </span>orca game fleet</pre>
+        <pre class="prompt box" set:html={block} />
       </div>
     </div>
   </div>
