@@ -497,7 +497,7 @@ jobs:
   claude_hooks_python_floor:
     name: Claude hooks on Python 3.9
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
 
     steps:
@@ -508,12 +508,17 @@ jobs:
 
       - uses: ./.github/actions/install-node-dependencies
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
       # Why: macOS /usr/bin/python3 is 3.9; a hook that crashes there exits 1 and
       # Claude Code runs the command unchecked (ORCA-884).
+      # Why uv: setup-python has no 3.9 build for Ubuntu 26.04 (ORCA-1285); uv's comes from
+      # python-build-standalone, which does not depend on the runner image.
       - name: Setup Python 3.9
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.9'
+        run: |
+          uv python install 3.9
+          dirname "$(uv python find --managed-python 3.9)" >> "$GITHUB_PATH"
 
       - name: Load every hook and run the hook suites on Python 3.9
         run: |
