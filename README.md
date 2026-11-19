@@ -162,7 +162,7 @@ It looks like a game, a **Team** panel in the right sidebar with a scene, levels
 The idea of running a Claude Code team as a game came from [Jucer Orozco](https://github.com/Jucerweb).
 
 <p align="center">
-  <img src="docs/assets/readme/game-band-panel.gif" alt="The game band under a Claude Code lead: three members, one waiting on you; the Panel lists each member's ticket, branch, PR and CI; a merged PR and green CI award XP and a level-up" width="960" />
+  <img src="docs/assets/readme/team-office-building.gif" alt="The Team panel's Office scene: one floor per machine (This computer, studio, render-01, ci-runner); Juno on studio hits a permission prompt and the lead Atlas rides the elevator up to that floor, while the lead's pane says who needs you" width="960" />
 </p>
 
 **What keeps it serious**
@@ -187,6 +187,12 @@ The idea of running a Claude Code team as a game came from [Jucer Orozco](https:
 - **Members you can follow.** Each member is one character for its whole run, on its card, its terminal and the history. `orca game history` lists the freed members with outcome, PR and character; their outcomes become short project lessons that new members get in their brief, and `orca game adopt-history` carries both over when a repo is added again.
 - **Recovery is built in.** `game resume-members` brings back members a restart paused; `game adopt` takes an agent the fleet found running into the team, `game drop` lets one go without stopping it; `game lead --fresh` rotates to a new lead when the old conversation is too long.
 
+Each verified signal pays the team on the spot: Kai's PR goes green, merges, and the team reaches Lv 8:
+
+<p align="center">
+  <img src="docs/assets/readme/team-merge.gif" alt="Kai's card for LUM-19 in the Team panel: PR #44 starts CI, turns green for +20 XP, then merges for +220 XP and the team's bar fills to Level 8" width="960" />
+</p>
+
 A wave fills the free slots from the To Do, one member per ticket; green CI and a merge pay XP:
 
 <p align="center">
@@ -208,7 +214,9 @@ The Panel also keeps your open PRs and the team's numbers:
 Settings → Agents → Panel picks how the panel looks: **Game** (a scene with levels and XP), **Display** (a carousel of team metrics) or **Plain**. The scene comes in three styles that act out the real state of the work: **Pixel** (a garden), **Figures** (a castle tower per member, trophies for merges) and **Office** (whiteboards, and a building with one floor per machine). A project can change any of it in its own settings or in `orca.yaml`, a scene file can bring its own art, and Settings previews the chosen style. Settings → Appearance → Status colors sets one color per state for light and dark. The older pixel band inside the lead's pane is off by default; **Show the band** in Settings → Agents → Agent Teams game turns it on with its **Default view** (Off, Flat, Zen, 2D classic, 2D hd). [Agent Teams guide →](docs/user/agents/agent-teams.md) · [Orca Game reference →](docs/reference/orchestrator-game.md)
 
 <p align="center">
-  <img src="docs/assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: the five views, then Flat and Off turning the scene preview off" width="960" />
+  <img src="docs/assets/readme/team-style-office.gif" alt="Office: a floor per machine, the lead on the floor of the member who needs you" width="320" />
+  <img src="docs/assets/readme/team-style-figures.gif" alt="Figures: the team as characters before a castle, the waiting member flagged" width="320" />
+  <img src="docs/assets/readme/team-style-pixel.gif" alt="Pixel: the same team as pixel sprites on a night hillside" width="320" />
 </p>
 
 ## Run members on every machine you own
