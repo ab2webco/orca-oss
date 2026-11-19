@@ -22,7 +22,7 @@
 <h3 align="center"><a href="https://github.com/ab2webco/orca-oss/releases/latest"><ins>Descargar Orca Lab</ins></a></h3>
 
 <p align="center">
-  <img src="../assets/readme/multi-host-fleet.gif" alt="El Panel del líder en esta máquina y dos hosts vinculados: un miembro nuevo cae en linux-box con sus miembros en marcha y su tope, núcleos, memoria libre y carga; un miembro remoto pasa de leer a ejecutar comandos, su CI se pone en verde y otro PR remoto se mergea, lo que da XP" width="960" />
+  <img src="../assets/readme/team-office-building.gif" alt="La escena Office del panel Team: una planta por máquina (This computer, studio, render-01, ci-runner); Juno, en studio, se topa con un aviso de permiso y el líder Atlas sube en el ascensor hasta esa planta, mientras el pane del líder dice quién te necesita" width="960" />
 </p>
 
 <p align="center">
@@ -161,10 +161,6 @@ Parece un juego, un panel **Team** en la barra lateral derecha con una escena, n
 
 La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco](https://github.com/Jucerweb).
 
-<p align="center">
-  <img src="../assets/readme/game-band-panel.gif" alt="La banda del juego bajo un líder de Claude Code: tres miembros, uno esperándote; el Panel muestra el ticket, la rama, el PR y el CI de cada miembro; un PR mergeado y un CI en verde dan XP y una subida de nivel" width="960" />
-</p>
-
 **Lo que lo hace serio**
 
 - **XP solo por señales verificadas.** Un miembro no gana nada por decir que terminó. La XP sale del CI en verde, del ticket que llega a revisión o a Done y del PR mergeado. [La XP del líder →](../reference/orchestrator-game.md#the-leads-xp)
@@ -187,28 +183,30 @@ La idea de dirigir un equipo de Claude Code como un juego viene de [Jucer Orozco
 - **Miembros a los que puedes seguir.** Cada miembro es un personaje durante toda su ejecución, en su tarjeta, su terminal y el historial. `orca game history` lista los miembros liberados con su resultado, PR y personaje; sus resultados se vuelven lecciones breves del proyecto que los miembros nuevos reciben en su brief, y `orca game adopt-history` trae ambos cuando un repo se vuelve a agregar.
 - **La recuperación viene incluida.** `game resume-members` trae de vuelta a los miembros que un reinicio pausó; `game adopt` suma al equipo un agente que la flota encontró en marcha y `game drop` lo deja ir sin detenerlo; `game lead --fresh` rota a un líder nuevo cuando la conversación anterior es demasiado larga.
 
-Una ola llena los cupos libres desde el To Do, un miembro por ticket; el CI en verde y el merge dan XP:
+Una ola llena los cupos libres desde el To Do, un miembro por ticket, y cada señal verificada paga al equipo en el momento: el PR de Kai pasa a verde, se mergea y el equipo llega al nivel 8:
 
 <p align="center">
-  <img src="../assets/readme/lead-wave.gif" alt="El dueño pulsa Wave en la banda; el líder transmite qué tickets lanza, LUM-14 y LUM-15 entran al Panel como miembros y se ponen a trabajar, el To Do baja a 2, y luego el CI de LUM-12 se pone en verde y su PR se mergea, lo que da XP y una subida de nivel" width="960" />
+  <img src="../assets/readme/team-merge.gif" alt="La tarjeta de Kai para LUM-19 en el panel Team: el PR #44 arranca el CI, pasa a verde por +20 XP, luego se mergea por +220 XP y la barra del equipo llega al nivel 8" width="960" />
 </p>
 
 Una pregunta que solo tú puedes responder llega a la bandeja de Orca, y tu respuesta vuelve al líder:
 
 <p align="center">
-  <img src="../assets/readme/owner-inbox.gif" alt="Orca Lab de escritorio: el dueño le pide al líder que le consulte antes de publicar la caché offline; las dos preguntas del líder llegan a la bandeja, una se responde con Ship in 2.3 y el líder recoge la respuesta de su correo" width="960" />
+  <img src="../assets/readme/team-inbox.gif" alt="El Inbox del panel Team: la pregunta del líder sobre LUM-25, Retry uploads on cellular?, con Yes y Wi-Fi only para responder y el PR del que trata; la tarjeta de Nova espera tu respuesta" width="960" />
 </p>
 
-El Panel también muestra tus PR abiertos y los números del equipo:
+La pestaña PRs muestra los PR abiertos del equipo y la merge queue:
 
 <p align="center">
-  <img src="../assets/readme/panel-metrics.gif" alt="El dueño abre el Panel del líder en My PRs con CI en verde, CI en curso y cambios pedidos, y luego el widget Metrics con los merges por día de 14 días, el lead time mediano y el uso de sesión y semanal de cada cuenta de Claude" width="960" />
+  <img src="../assets/readme/team-prs.gif" alt="La pestaña PRs del panel Team: #44 primero en la merge queue, y luego los PR abiertos del equipo con un check fallido, uno en revisión y dos listos" width="960" />
 </p>
 
 Settings → Agents → Panel elige cómo se ve el panel: **Game** (una escena con niveles y XP), **Display** (un carrusel de métricas del equipo) o **Plain**. La escena viene en tres estilos que representan el estado real del trabajo: **Pixel** (un huerto), **Figures** (una torre de castillo por miembro, trofeos por los merges) y **Office** (pizarras, y un edificio con una planta por máquina). Un proyecto puede cambiar cualquiera de estos ajustes en su propia configuración o en `orca.yaml`, un archivo de escena puede traer su propio arte y Settings muestra una vista previa del estilo elegido. Settings → Appearance → Status colors define un color por estado para claro y oscuro. La banda pixel antigua dentro del pane del líder está apagada por defecto; **Show the band** en Settings → Agents → Agent Teams game la activa con su **Default view** (Off, Flat, Zen, 2D classic, 2D hd). [Guía de Agent Teams →](../user/agents/agent-teams.md) · [Referencia de Orca Game →](../reference/orchestrator-game.md)
 
 <p align="center">
-  <img src="../assets/readme/game-view-switcher.gif" alt="Settings → Agents → Default view: las cinco vistas, y luego Flat y Off apagando la vista previa de la escena" width="960" />
+  <img src="../assets/readme/team-style-office.gif" alt="Office: una planta por máquina, el líder en la planta del miembro que te necesita" width="320" />
+  <img src="../assets/readme/team-style-figures.gif" alt="Figures: el equipo como personajes frente a un castillo, con el miembro que espera señalado" width="320" />
+  <img src="../assets/readme/team-style-pixel.gif" alt="Pixel: el mismo equipo como sprites de píxeles en una colina de noche" width="320" />
 </p>
 
 ## Ejecuta miembros en todas tus máquinas
@@ -241,6 +239,10 @@ flowchart TB
 - **Sobrevive a los reinicios.** Cuando un host se reinicia, `game resume-members` despierta a los miembros que dejó dormidos, y la tarjeta del Panel ofrece Resume y Reconnect.
 
 **Por qué importa:** el portátil que ya no usas puede correr dos miembros esta noche. Una estación potente puede tomar los tickets pesados y acortar la cola. Y tu máquina principal sigue respondiendo mientras el trabajo corre en otro lado. [Flota y hosts →](../reference/orchestrator-game.md#the-project-lead-orchestratorgameorchestrator)
+
+<p align="center">
+  <img src="../assets/readme/team-machines.gif" alt="La pestaña Machines del panel Team: cuatro hosts listos, cada uno con sus miembros frente a su tope, CPU, memoria, disco y carga" width="960" />
+</p>
 
 ## Por dentro
 

@@ -4,7 +4,7 @@
 // docs/assets/media/, and a lightweight GIF for the README in docs/assets/readme/. Phone recordings
 // (`mobile-<scene>-<ios|android>.showcase.webm|mp4`, see docs/reference/showcase-media.md) export the same way.
 //
-//   node config/scripts/export-showcase-media.mjs [--only lead-wave,agent-grid] [--from <dir>]
+//   node config/scripts/export-showcase-media.mjs [--only team-merge,agent-grid] [--from <dir>]
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
