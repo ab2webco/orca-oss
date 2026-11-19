@@ -1,5 +1,5 @@
 ---
-sourceHash: a045ef32bd721506
+sourceHash: 88b48e9556087d8f
 ---
 # Agent Teams
 
@@ -45,7 +45,8 @@ segunda entrada **Claude Agent Teams**: **Go to lead** y **Add member…** mient
 - O abre **+ > Add member…**, elige una cuenta en **Member account** y un ticket del To Do
   ([Trackers y tareas](../review/linear.md#el-to-do-de-un-equipo) dice de dónde sale).
 - O ejecuta `orca game launch <ticket>` desde la terminal del líder. `--on <host>` inicia el miembro
-  en un host de Orca Lab emparejado.
+  en un host de Orca Lab emparejado. Un host lleno, ocupado o con poca memoria rechaza el
+  lanzamiento; [Machines](#6-machines) explica cuándo.
 
 ## 3. Lee el panel Team
 
@@ -115,6 +116,16 @@ host con un aviso se abre solo.
 Un host está **Busy** al 90% de CPU o con una carga igual a sus núcleos, **Low memory** con menos de
 4 GB o del 10% libre, y **Low disk** con menos de 10 GB o del 10% libre. El cajón Team del teléfono
 tiene el mismo tablero en su pestaña **Hosts**.
+
+Un lanzamiento lee los mismos hosts. El tope de un host cuenta todos los miembros que corren ahí,
+sea cual sea el líder del proyecto que los inició, así que dos líderes en una misma máquina no
+pueden llenarla cada uno. `orca game fleet` muestra el reparto, como
+`5/5 running (this project 2, cineco 3)`, y un lanzamiento en el tope nombra los proyectos que lo
+ocupan. `orca game launch` también rechaza un host ocupado (una carga igual a sus núcleos, o a tres
+cuartas partes de ellos en la máquina del propio líder, para dejar sitio a sus líderes) o con poca
+memoria, e imprime la lectura. `--past-busy "<por qué>"` lanza de todos modos e imprime el motivo. Un
+host con un Orca Lab más antiguo no informa de los miembros de otros proyectos, así que ahí no
+cuentan.
 
 ## 7. Niveles
 

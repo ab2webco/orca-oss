@@ -1,5 +1,5 @@
 ---
-sourceHash: e189955e1f680747
+sourceHash: 6c00f5df487efdb5
 ---
 # Barra lateral y pestañas nuevas
 
@@ -17,6 +17,23 @@ al final de la barra de pestañas abre terminales, agentes y, en un proyecto con
 - El líder y los miembros de un equipo se dibujan como filas de agente: un punto de estado, un icono
   de PR coloreado según su CI (o un icono de rama), el nombre y la antigüedad. El líder lleva una
   corona y su rama; sus miembros van debajo, y uno que te necesita muestra un signo de interrogación.
+
+## Un workspace con un solo agente
+
+Un workspace con exactamente un agente vivo se dibuja como una sola fila: su estado, un icono de PR o
+de rama, el nombre y la antigüedad, y después lo que el agente hace ahora: su pregunta mientras
+espera, la herramienta mientras trabaja, su última respuesta al terminar o su prompt cuando está
+inactivo. Una segunda línea suma el repo cuando las filas no se agrupan por proyecto, el host remoto
+cuando ninguna cabecera de host lo nombra, el número de subagentes, y los puertos, la cuenta y el
+modelo cuando **Card display** los muestra. Haz clic en la fila para ir al pane del agente. Dos o más
+agentes, ningún agente o un host desconectado conservan la tarjeta habitual con su lista de agentes.
+
+Pasa el puntero por la fila para ver su tarjeta de detalles. Empieza con los datos del agente, cada
+uno solo cuando lo tiene: **State**, **Prompt**, **Now**, **Question**, **Model**, **Account**,
+**Cache** (el tiempo que le queda a su caché de prompt), **PR** con su CI, **Ticket**, **Ports** y
+**Notes**. **PR** y **Ticket** se abren en Orca Lab, salvo un ticket de Jira. Después siguen los
+detalles y las acciones habituales del workspace. Cuando la tarjeta no cabe junto a la barra
+lateral, se abre debajo de la fila.
 
 ## Agrupar y filtrar
 

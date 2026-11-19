@@ -42,7 +42,8 @@ team** and **Start fresh lead…** after you close it. `/orca-game:lead fresh` (
 - Or open **+ > Add member…**, pick an account under **Member account** and a ticket from the To Do
   ([Trackers and tasks](../review/linear.md#the-to-do-for-a-team) says where it comes from).
 - Or run `orca game launch <ticket>` from the lead's terminal. `--on <host>` starts the member on a
-  paired Orca Lab host.
+  paired Orca Lab host. A full, busy or low-memory host refuses the launch; [Machines](#6-machines)
+  says when.
 
 ## 3. Read the Team panel
 
@@ -112,6 +113,14 @@ itself.
 A host is **Busy** at 90% CPU or a load as high as its cores, **Low memory** under 4 GB or 10% free,
 and **Low disk** under 10 GB or 10% free. The phone's Team drawer has the same board in its **Hosts**
 tab.
+
+A launch reads the same hosts. A host's cap counts every member running there, whichever project's
+lead started it, so two leads on one machine cannot each fill it. `orca game fleet` shows the split,
+such as `5/5 running (this project 2, cineco 3)`, and a launch at the cap names the projects holding
+it. `orca game launch` also refuses a host that is busy (a load as high as its cores, or three
+quarters of them on the lead's own machine, to keep room for its leads) or low on memory, and prints
+the reading. `--past-busy "<why>"` launches anyway and prints why. A host on an older Orca Lab does
+not report other projects' members, so they do not count there.
 
 ## 7. Levels
 

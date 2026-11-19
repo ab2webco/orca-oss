@@ -15,6 +15,21 @@ the tab bar opens terminals, agents and, for a project with a lead, its team.
   a branch icon), the name and the age. The lead carries a crown and its branch; its members sit
   under it, and one that needs you shows a question mark.
 
+## A workspace with one agent
+
+A workspace with exactly one live agent is drawn as a single row: its state, a PR or branch icon,
+the name and the age, then what the agent is doing now: its question while it waits, the tool while
+it works, its last reply when done, or its prompt when idle. A second line adds the repo when rows
+are not grouped by project, the remote host when no host header names it, the subagent count, and
+the ports, account and model when **Card display** shows them. Click the row to go to the agent's
+pane. Two or more agents, no agent or a disconnected host keep the usual card with its agent list.
+
+Hover the row for its details card. It opens with the agent's facts, each only when it has one:
+**State**, **Prompt**, **Now**, **Question**, **Model**, **Account**, **Cache** (the time left on
+its prompt cache), **PR** with its CI, **Ticket**, **Ports** and **Notes**. **PR** and **Ticket**
+open in Orca Lab, except a Jira ticket. The workspace's usual details and actions follow. When the
+card does not fit beside the sidebar, it opens under the row.
+
 ## Group and filter
 
 Open **Workspace options** (the sliders button at the top of the list).

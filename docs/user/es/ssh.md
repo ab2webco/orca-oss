@@ -1,5 +1,5 @@
 ---
-sourceHash: ebff1e306a3ad34d
+sourceHash: adc19f2a11fed59b
 ---
 # Hosts emparejados y SSH
 
@@ -84,8 +84,11 @@ orca game launch LUM-21 --on studio --repo name:lumen-app
 `--on` toma el nombre del host emparejado y necesita `--repo` para indicar el proyecto. El miembro
 corre en ese host con las cuentas de agente de ese host, mientras el líder sigue en esta máquina. Su
 tarjeta en el panel Team nombra el host, y **Machines** muestra cuántos agentes corre cada host.
-Cada host acepta tantos miembros como le permiten su memoria y sus núcleos; cuando uno está lleno,
-al líder se le indica lanzar en otro.
+Cada host acepta tantos miembros como le permiten su memoria y sus núcleos, contando los miembros
+que el líder de cada proyecto inició ahí. Cuando uno está lleno, el lanzamiento nombra los proyectos
+que lo ocupan y al líder se le indica lanzar en otro. Un host ocupado o con poca memoria rechaza el
+lanzamiento con su lectura, salvo que se pase `--past-busy "<por qué>"`;
+[Machines](agents/agent-teams.md#6-machines) tiene los umbrales.
 
 Los agentes en un host inician sesión con los logins de ese host: inicia sesión ahí, o agrega
 cuentas en él con `orca account add`.

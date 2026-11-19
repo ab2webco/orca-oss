@@ -72,7 +72,7 @@ The agent grid puts every live agent of every project on one screen, grouped by 
   <img src="docs/assets/readme/agent-grid.gif" alt="The agent grid of Orca Lab: four live Claude Code sessions in lumen-app stream their answers, grouped as Needs You, Working and Done, then filtered by bucket" width="960" />
 </p>
 
-- **A sidebar for every host.** Each host lists its projects and workspaces, with a team's lead and members as agent rows. Group by status, PR or project, and filter out what you do not need. [Sidebar →](docs/user/model/sidebar.md)
+- **A sidebar for every host.** Each host lists its projects and workspaces, with a team's lead and members as agent rows. Group by status, PR or project, and filter out what you do not need. A workspace with one agent is a single row with what that agent is doing now, and its hover card leads with the agent's state, model, account, cache timer, PR and ticket. [Sidebar →](docs/user/model/sidebar.md)
 - **One + menu for new tabs.** Terminals, the browser and every detected agent; in a project with a lead, **Go to lead**, **Add member…** from the To Do, or reopen the team. On a phone-width pane the tabs shrink to icons with a **+N** list. [New tabs →](docs/user/model/sidebar.md#the--menu)
 - **One worktree per agent.** Every task gets its own git worktree, so agents never edit the same checkout; folders work as workspaces too. [Worktrees →](docs/user/model/worktrees.md)
 - **Terminals that outlive the window.** Tabs and split panes run in a background daemon, so a restart reconnects them with their recent output. [Terminal →](docs/user/terminal.md)
@@ -133,7 +133,7 @@ The Orca Lab app (0.0.62) pairs with your desktop and puts your agents in your p
 - **Live terminals.** Watch any agent's terminal stream and type into it.
 - **Owner-question Inbox.** When a lead needs a decision only you can make, the question lands in the phone's Inbox with a notification. Answer it there, and the answer goes back to the lead.
 - **Notification tap routing.** A tap opens the right host and screen; a lead's question opens the lead's terminal with the Team drawer.
-- **Team drawer over the lead's terminal.** A **Team** tab with a card per member (ticket, host, state, account use, PR and CI) and the team's metrics, and an **Inbox** tab for the lead's questions.
+- **Team drawer over the lead's terminal.** A **Team** tab with a card per member (ticket, host, state, account use, PR and CI) and the team's metrics, an **Inbox** tab for the lead's questions, **PRs** with the merge queue, and **Hosts**: the Machines board, with a summary strip and each host's CPU, memory and disk.
 - **Plane board and plugin panels** from the phone, and a button that asks the desktop to install its pending update.
 
 ```mermaid
@@ -178,7 +178,7 @@ The idea of running a Claude Code team as a game came from [Jucer Orozco](https:
 - **Your rules, not just Orca's.** Orca's standing rules come first; a project appends its own in `orca.yaml` (`orchestrator.rules`): strict TDD, conventional commits, merging only through the merge queue, whatever your team enforces.
 - **Typed reports.** A member finishes with a `worker_done` envelope that states each claim it verified and how: live, unit tests only, or not at all. The runtime rejects a malformed report, and a success cannot rest on an unverified claim.
 - **Finish before starting.** The lead drives each member to a merge before it launches another ticket, then removes the merged worktree and branch, so half-done work does not pile up.
-- **Questions go somewhere real.** Members ask the lead, or stop on a decision gate; the lead answers what it can and records the answer on the ticket. What only you can decide (releases, spending, hard-to-reverse actions, product direction) becomes an owner question with options, kept in an Inbox on desktop and phone, never buried in chat.
+- **Questions go somewhere real.** Members ask the lead, or stop on a decision gate; the lead answers what it can and records the answer on the ticket. What only you can decide (releases, spending, hard-to-reverse actions, product direction) becomes an owner question with options, kept in an Inbox on desktop and phone, never buried in chat. When the lead relays your answer, the member checks it with `orca game owner-question <id>` instead of asking you again.
 - **The Team panel shows the truth.** One card per member with its ticket, branch, PR, CI, phase and account use; click it to open the member's terminal. **Inbox** holds the questions for you, **PRs** your open PRs and the merge queue, **Machines** each host's free memory and agents. A member reads its PR's CI and GitHub's merge state from `orca game state` (`review.ci`, `review.mergeState`), and only a `clean` PR can merge.
 - **Members you can follow.** Each member is one character for its whole run, on its card, its terminal and the history. `orca game history` lists the freed members with outcome, PR and character; their outcomes become short project lessons that new members get in their brief, and `orca game adopt-history` carries both over when a repo is added again.
 - **Recovery is built in.** `game resume-members` brings back members a restart paused; `game adopt` takes an agent the fleet found running into the team, `game drop` lets one go without stopping it; `game lead --fresh` rotates to a new lead when the old conversation is too long.
@@ -232,7 +232,8 @@ flowchart TB
 ```
 
 - **Pairing.** Any machine running Orca Lab, the desktop app or `orca serve` on a headless Linux box, prints a pairing link; `orca environment add` saves it on the lead's machine. A Tailscale address keeps it private. [Headless server →](docs/reference/headless-linux-server.md)
-- **Caps that add up.** Each host's member cap comes from its own memory and cores, and the lead's cap is the sum over every reachable host. A launch past a host's cap is refused and names a host with room.
+- **Caps that add up.** Each host's member cap comes from its own memory and cores, and the lead's cap is the sum over every reachable host. A host's cap counts the members every project's lead started there, so two leads cannot each fill one machine; `game fleet` shows the split per project. A launch past a host's cap is refused and names a host with room.
+- **No launch on a struggling host.** `game launch` refuses a host that is busy or low on memory and prints its reading; the lead's own machine refuses at three quarters of its cores, to keep room for its leads. `--past-busy "<why>"` launches anyway and prints why.
 - **Every host in plain sight.** `game fleet`, `game state` and the Panel show each host's members against its cap, cores, free memory and load, flagged `low memory` or `busy`.
 - **Each host uses its own accounts.** A remote member picks a Claude or Codex account from that host's roster, so adding a machine adds quota, not only CPU.
 - **One fleet, both ways.** Remote members appear in the lead's Panel with their ticket, PR and CI, report back with the same typed messages, and open their terminal from the Panel through the paired host.
