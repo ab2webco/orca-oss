@@ -1,0 +1,15 @@
+name: Build native modules at the glibc floor
+description: Builds Linux native modules in the manylinux_2_28 container and checks they load in Electron.
+
+# Why one action: the merge queue's package job must build native modules exactly like the Linux
+# release it stands in for (ORCA-1285). Callers keep ORCA_REUSE_PREPARED_NATIVE_RUNTIME=1 on
+# electron-builder, whose beforeBuild hook otherwise rebuilds on the runner image.
+runs:
+  using: composite
+  steps:
+    - name: Build native modules at the glibc floor
+      shell: bash
+      run: |
+        node config/scripts/install-electron-package-binary.mjs
+        node config/scripts/rebuild-native-at-glibc-floor.mjs
+        node config/scripts/ensure-native-runtime.mjs --runtime=electron

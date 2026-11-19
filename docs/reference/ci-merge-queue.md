@@ -41,9 +41,8 @@ that only run when their own paths change (`mobile.yml`, `computer-e2e.yml`,
   (ORCA-1285).
 - Git compatibility builds Git 2.25.5 with `-std=gnu17`: 26.04's gcc defaults to C23, where 2.25.5
   does not compile (ORCA-1285).
-
-package stays on `ubuntu-24.04` until ORCA-1285 moves it: node-pty built on 26.04 needs a glibc
-above the 2.31 floor.
+- package builds node-pty in a manylinux_2_28 container, because a build on 26.04 itself needs
+  glibc 2.42, above the 2.31 floor (ORCA-1285). See `linux-glibc-compatibility.md`.
 
 The fish lanes need fish **4.3 or newer**. fish arms DECSET 2031 around its prompt and re-queries
 OSC 11 on handoff only since 4.3, so an older fish leaves the #9993 and #13892 tests nothing to

@@ -9,9 +9,8 @@ exception — see below.)
 ## Why this needs attention
 
 A native module (`.node`) links against the glibc of the machine that compiled
-it. Our release CI compiles node-pty from source on GitHub's `ubuntu-24.04`
-runner, pinned because `ubuntu-latest` now resolves to 26.04 and its glibc rises
-with every image bump. A binary compiled on
+it. Compiled on GitHub's runner image, node-pty follows that image's glibc, which
+rises with every bump: on `ubuntu-26.04` it needs `GLIBC_2.42`. A binary compiled on
 a newer glibc can reference symbol versions that do not exist on an older target,
 and the dynamic loader then refuses to load it:
 
@@ -68,6 +67,16 @@ the version check passes) yet fails to load on 20.04, where those functions live
 only in libutil. A future runner bump, a new native dependency, or a dropped
 ldflag therefore fails the release build instead of shipping a Linux app that
 crashes on launch.
+
+**3. Build in an old-glibc container (the shipping build and its CI check).**
+[`config/scripts/rebuild-native-at-glibc-floor.mjs`](../../config/scripts/rebuild-native-at-glibc-floor.mjs)
+runs `rebuild-native-deps.mjs --force` inside a digest-pinned `manylinux_2_28` image
+(glibc 2.28, with a gcc-toolset that links new libstdc++ pieces statically), using the
+runner's own Node. The `build-native-at-glibc-floor` action wraps it, and both the Linux
+job in `lab-release.yml` (what ships) and the merge queue's `package` job use it on
+`ubuntu-26.04` with `ORCA_REUSE_PREPARED_NATIVE_RUNTIME=1`. Without that variable,
+electron-builder's `beforeBuild` rebuilds on the runner. `release-cut.yml` builds
+nothing from this fork, because its `cut` job only runs on `stablyai/orca` (ORCA-1285).
 
 > The gate is a static invariant, not an integration test. The load path was
 > verified by hand for this fix (real Ubuntu 20.04, x64 + arm64: `require`

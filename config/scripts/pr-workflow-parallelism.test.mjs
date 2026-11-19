@@ -184,7 +184,13 @@ describe('PR workflow parallelism', () => {
     }
     expect(installFor('shell_contracts').with['native-runtime']).toBe('node')
     expect(installFor('test').with['native-runtime']).toBe('node')
-    expect(installFor('package').with['native-runtime']).toBe('electron')
+    // Why: package builds its Electron runtime in the glibc-floor container (ORCA-1285).
+    expect(installFor('package').with).toBeUndefined()
+    expect(
+      workflow.jobs.package.steps.find(
+        (step) => step.name === 'Build native modules at the glibc floor'
+      ).uses
+    ).toBe('./.github/actions/build-native-at-glibc-floor')
 
     expect(
       dependencyAction.runs.steps.find((step) => step.name === 'Use external node-gyp').if
