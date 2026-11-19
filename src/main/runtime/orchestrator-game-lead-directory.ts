@@ -1,3 +1,5 @@
+import type { GameLeadListing } from './orchestrator-game-lead-types'
+
 /** A project's lead as `orca game lead` registered it on this Orca host. */
 export type GameLeadEntry = {
   projectKey: string
@@ -8,6 +10,16 @@ export type GameLeadEntry = {
   /** The lead's own worktree, when its CLI sent one; an older CLI does not. */
   worktreeId?: string
 }
+
+/** How `orca game leads` lists a live lead; `paneKey` is the pane it answers to now. */
+export const gameLeadListingOf = (one: GameLeadEntry, paneKey: string | null): GameLeadListing => ({
+  project: one.project,
+  label: one.label,
+  handle: one.handle,
+  since: one.at,
+  ...(paneKey ? { paneKey } : {}),
+  ...(one.worktreeId ? { worktreeId: one.worktreeId } : {})
+})
 
 /**
  * The leads on this host. Why registered, not derived: the host cannot tell a lead from any other

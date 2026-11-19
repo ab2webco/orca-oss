@@ -1,5 +1,15 @@
 import type { GameBoardCaller } from './orchestrator-game-board'
-import { GameLeadDirectory, type GameLeadEntry } from './orchestrator-game-lead-directory'
+import {
+  UNPLACED_PROJECT,
+  duplicateLeadOf,
+  panesOfLeadConversation,
+  storedLeadOf
+} from './orchestrator-game-lead-conversation'
+import {
+  GameLeadDirectory,
+  gameLeadListingOf,
+  type GameLeadEntry
+} from './orchestrator-game-lead-directory'
 import type { GameLeadRecord } from './orchestrator-game-lead-roster'
 import type {
   GameLeadListing,
@@ -16,8 +26,6 @@ export type {
   GameLeadSession
 } from './orchestrator-game-lead-types'
 
-// Why: an unplaced caller shares this key with every other, so one lead there is not one per project.
-const UNPLACED_PROJECT = 'no-project'
 // Why: after a restart the lead's pane reconnects after former lead tabs have resumed (ORCA-728).
 const RESTORE_GRACE_MS = 120_000
 const CLAIM_POLL_MS = 500
@@ -80,7 +88,7 @@ export class GameLeads {
         live || args.fresh ? null : await this.deps.sessions?.read(project.key).catch(() => null)
       if (stored && stored.sessionId !== mine?.sessionId) {
         const reopened = await this.resumeStored(stored, entryOf)
-        if (reopened.resumed) {
+        if (reopened.resumed || reopened.live) {
           return reopened
         }
         resumeError = reopened.resumeError
@@ -130,6 +138,15 @@ export class GameLeads {
     stored: GameLeadSession,
     entryOf: (handle: string) => GameLeadEntry
   ): Promise<GameLeadRegistration> {
+    const [holding] = await panesOfLeadConversation(this.deps, stored)
+    if (holding) {
+      // Why: resuming beside a live pane runs two leads on one conversation (ORCA-1283).
+      const entry = entryOf(holding)
+      this.directory.register(entry)
+      await this.remember(entry, this.deps.paneOf?.(holding) ?? null, stored)
+      await this.deps.focus?.(holding).catch(() => undefined)
+      return { registered: false, live: { handle: holding } }
+    }
     if (!this.deps.resume) {
       return { registered: false }
     }
@@ -143,6 +160,11 @@ export class GameLeads {
       const resumeError = error instanceof Error ? error.message : String(error)
       return { registered: false, resumeError }
     }
+  }
+
+  /** The panes that all run the project's lead conversation, when more than one does. */
+  duplicateOf(caller: GameBoardCaller): Promise<{ terminals: string[] } | null> {
+    return duplicateLeadOf(this.deps, caller)
   }
 
   private async leadOf(projectKey: string): Promise<{ handle: string } | null> {
@@ -196,18 +218,8 @@ export class GameLeads {
   }
 
   /** The account of the project's kept lead conversation, so a client can offer to reopen the team. */
-  async storedLeadOf(caller: GameBoardCaller): Promise<{ accountId: string | null } | null> {
-    const project = await this.deps.projectOf(caller)
-    if (project.key === UNPLACED_PROJECT) {
-      return null
-    }
-    const session = await this.deps.sessions?.read(project.key).catch(() => null)
-    if (!session) {
-      return null
-    }
-    // Why the reopen's account: a removed account falls back, and the menu must name the one used.
-    const reopenAccountOf = this.deps.reopenAccountOf
-    return { accountId: reopenAccountOf ? reopenAccountOf(session) : (session.accountId ?? null) }
+  storedLeadOf(caller: GameBoardCaller): Promise<{ accountId: string | null } | null> {
+    return storedLeadOf(this.deps, caller)
   }
 
   /** The project's live lead, for a caller that is no terminal: the person's Inbox. */
@@ -223,17 +235,7 @@ export class GameLeads {
     // Why: an idle lead never reports agent status, so a client finds its pane only from here (ORCA-1130).
     const leads = live
       .filter((_, index) => running[index])
-      .map((one) => {
-        const paneKey = this.deps.paneOf?.(one.handle) ?? null
-        return {
-          project: one.project,
-          label: one.label,
-          handle: one.handle,
-          since: one.at,
-          ...(paneKey ? { paneKey } : {}),
-          ...(one.worktreeId ? { worktreeId: one.worktreeId } : {})
-        }
-      })
+      .map((one) => gameLeadListingOf(one, this.deps.paneOf?.(one.handle) ?? null))
     const restoring = [...this.pending.values()]
       .filter((one) => this.restoringOf(one.projectKey, null) === one)
       .map((one) => ({ project: one.project, paneKey: one.paneKey }))

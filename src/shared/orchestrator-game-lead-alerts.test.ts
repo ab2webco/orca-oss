@@ -167,6 +167,20 @@ describe('gameLeadAlertsOf: the merge queue (ORCA-1214)', () => {
   })
 })
 
+describe('gameLeadAlertsOf: one lead conversation in two panes (ORCA-1283)', () => {
+  it('names every pane on it, first, and says nothing for one pane', () => {
+    const two = stateOf([member('CIN-1', { phase: 'needs-you' } as Partial<GameAgent>)], {
+      duplicateLead: { terminals: ['term_a', 'term_b'] }
+    })
+
+    expect(linesOf(two)[0]).toBe(
+      'lead conversation live in 2 panes (term_a, term_b): keep one, close the others (orca terminal close --terminal <handle>).'
+    )
+    expect(linesOf(stateOf([], { duplicateLead: { terminals: ['term_a'] } }))).toEqual([])
+    expect(linesOf(stateOf([]))).toEqual([])
+  })
+})
+
 describe('newGameLeadAlertsOf', () => {
   it('prints an alert once while it holds, and again when it comes back', () => {
     const printed = new Set<string>()

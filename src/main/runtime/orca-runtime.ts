@@ -4140,6 +4140,7 @@ export class OrcaRuntimeService {
         presentation: 'focused'
       }),
     reopenAccountOf: (session) => this.leadReopenAccountOf(session),
+    panesOfConversation: (session) => this.livePanesOfClaudeConversation(session),
     focus: async (handle) => {
       await this.focusTerminal(handle)
     },
@@ -32208,6 +32209,22 @@ export class OrcaRuntimeService {
     return handle
   }
 
+  // Why the worktree only: a reopen resumes there, and every pane's identity read costs a status scan.
+  private async livePanesOfClaudeConversation(session: GameLeadSession): Promise<string[]> {
+    const { terminals } = await this.listTerminals(`id:${session.worktreeId}`)
+    const holding = terminals.filter(
+      (terminal) =>
+        (terminal.liveness === 'running' || terminal.liveness === 'starting') &&
+        this.getExactWorkerProviderSessionIdentity(terminal.handle, 0)?.providerSession.id ===
+          session.sessionId
+    )
+    // Why: a pane back at its shell may still report the conversation it last ran.
+    const running = await Promise.all(
+      holding.map((terminal) => this.isGameLeadPaneRunning(terminal.handle))
+    )
+    return holding.filter((_, index) => running[index]).map((terminal) => terminal.handle)
+  }
+
   /**
    * The account a reopened lead runs on: its recorded one, else the vault its transcript lives
    * under, while that account exists. Null leaves it to the spawn, which takes what a new launch
@@ -32968,6 +32985,11 @@ export class OrcaRuntimeService {
         this.gameTeamXp.read({ worktreeId, terminalHandle: callerHandle ?? undefined }),
       readLeadElsewhere: () =>
         this.gameLeads.leadElsewhere({
+          worktreeId,
+          terminalHandle: callerHandle ?? undefined
+        }),
+      readDuplicateLead: () =>
+        this.gameLeads.duplicateOf({
           worktreeId,
           terminalHandle: callerHandle ?? undefined
         }),

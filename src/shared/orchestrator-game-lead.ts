@@ -4,6 +4,7 @@ import {
   renderGameWorkPrompt,
   unknownPlaceholderOf
 } from './orchestrator-game-actions'
+import type { GameOtherProjectsState } from './orchestrator-game-host-load'
 import { GAME_MCP_SERVER_NAME_MAX } from './orchestrator-game-member-mcp'
 import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
 import { memberRepoKeyOf } from './orchestrator-game-member-repo-scope'
@@ -41,6 +42,12 @@ export type OrchestratorGameLead = {
   mcpServers?: string[]
   /** Other repos members may launch into, as canonical git remotes; the lead's own is always allowed. */
   memberRepos?: string[]
+}
+
+/** What a lead's state says about panes other than its own. */
+export type GameLeadPeersState = GameOtherProjectsState & {
+  /** The panes all running the project's lead conversation, when more than one does (ORCA-1283). */
+  duplicateLead?: { terminals: string[] }
 }
 
 /** A list restricts `auto` to those accounts (emails or ids). */

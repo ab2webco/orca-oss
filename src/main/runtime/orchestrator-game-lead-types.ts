@@ -14,6 +14,8 @@ export type GameLeadsDeps = {
     clear: (projectKey: string) => Promise<void>
   }
   sessionOf?: (handle: string) => Promise<GameLeadSession | null>
+  /** The live panes whose Claude runs this conversation now, whatever opened them. */
+  panesOfConversation?: (session: GameLeadSession) => Promise<string[]>
   /** Reopens the conversation in a new pane and returns that pane's handle. */
   resume?: (session: GameLeadSession) => Promise<string>
   /** The managed account `resume` reopens a conversation on; the recorded one when absent. */
