@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getAgentStatusSnapshotMock } from './pty-ipc-mock-registry'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
+import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
 import {
+  clearProviderPtyState,
   registerPtyHandlers,
   registerSshPtyProvider,
   setLocalPtyProvider,
@@ -80,7 +82,13 @@ type Controller = { spawn: (args: Record<string, unknown>) => Promise<unknown> }
 
 // Why (ORCA-1283): a former tab's cold restore resumed the lead's conversation beside the live lead.
 describe('a cold restore of a conversation another live pane runs', () => {
-  const { handlers, mainWindow } = setupPtyIpcSuite()
+  const {
+    handlers,
+    mainWindow,
+    createAgentClaimProvider,
+    recoveredAgentClaim,
+    recoveredAgentSurface
+  } = setupPtyIpcSuite()
 
   /** `foregrounds` is what each live PTY runs in front; a PTY left out is gone. */
   function daemonWith(foregrounds: Record<string, string>, runtime?: Record<string, unknown>) {
@@ -276,8 +284,8 @@ describe('a cold restore of a conversation another live pane runs', () => {
       }
     )
 
-    await controller!
-      .spawn({
+    await expect(
+      controller!.spawn({
         cols: 80,
         rows: 24,
         cwd: '/tmp',
@@ -286,9 +294,99 @@ describe('a cold restore of a conversation another live pane runs', () => {
         resumeProviderSession: SESSION,
         claudeAccountId: null
       })
-      .catch(() => undefined)
-
-    expect(spawn).toHaveBeenCalled()
+    ).resolves.toMatchObject({ id: expect.any(String) })
     expect(spawn.mock.calls.at(-1)![0].command).toBeUndefined()
+  })
+
+  // Why: once Claude exits the pane can run anything; only Claude in front holds its conversation.
+  it('still resumes when the other pane now runs another program in front', async () => {
+    getAgentStatusSnapshotMock.mockReturnValue([statusOf('tab-lead:leaf-lead', 'sess-lead')])
+    const spawn = daemonWith({ 'pty-lead': 'vim' })
+
+    const spawned = await coldRestore()
+
+    expect(spawn.mock.calls.at(-1)![0].command).toContain('sess-lead')
+    expect(spawned.agentResumeUnavailable).toBeUndefined()
+  })
+
+  // Why: a failed first restore must not leave the conversation running nowhere.
+  it('resumes in a second pane right after the first restore failed', async () => {
+    getAgentStatusSnapshotMock.mockReturnValue([
+      statusOf('tab-a:leaf-a', 'sess-lead'),
+      statusOf('tab-b:leaf-b', 'sess-lead')
+    ])
+    const spawn = daemonWith({})
+    spawn.mockRejectedValueOnce(new Error('spawn failed'))
+
+    await expect(
+      coldRestore({ tabId: 'tab-a', leafId: 'leaf-a', sessionId: 'pty-a' })
+    ).rejects.toBeInstanceOf(Error)
+    const second = await coldRestore({ tabId: 'tab-b', leafId: 'leaf-b', sessionId: 'pty-b' })
+
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(spawn.mock.calls.at(-1)![0].command).toContain('sess-lead')
+    expect(second.agentResumeUnavailable).toBeUndefined()
+  })
+
+  // Why: ensureAgentSession routes a request to the pane that already owns its session.
+  it('leaves an ensure request to the live pane that owns its session', async () => {
+    const owner: AgentSessionOwnerBinding = {
+      claim: { ...recoveredAgentClaim, agent: 'claude' },
+      generation: 'generation-lead',
+      phase: 'live',
+      ptyId: 'pty-lead',
+      surface: { ...recoveredAgentSurface, tabId: 'tab-lead', leafId: 'leaf-lead' }
+    }
+    getAgentStatusSnapshotMock.mockReturnValue([statusOf('tab-lead:leaf-lead', 'sess-lead')])
+    const provider = createAgentClaimProvider({
+      sessions: [
+        {
+          id: 'pty-lead',
+          incarnationId: 'inc-lead',
+          cwd: '/tmp',
+          title: 'Claude',
+          agentSessionOwners: [owner]
+        }
+      ]
+    })
+    provider.getForegroundProcess.mockResolvedValue('claude')
+    setLocalPtyProvider(provider as never)
+    let controller: Controller | undefined
+    registerPtyHandlers(
+      mainWindow as never,
+      {
+        setPtyController: vi.fn((next: Controller) => {
+          controller = next
+        }),
+        createPreAllocatedTerminalHandle: vi.fn(() => 'term_restored'),
+        registerPreAllocatedHandleForPty: vi.fn(),
+        registerPty: vi.fn()
+      } as never,
+      undefined,
+      undefined,
+      undefined,
+      STORE as never
+    )
+
+    try {
+      await expect(
+        controller!.spawn({
+          cols: 80,
+          rows: 24,
+          cwd: '/tmp',
+          command: RESUME,
+          launchAgent: 'claude',
+          resumeProviderSession: SESSION,
+          claudeAccountId: null,
+          agentSessionEnsure: { claim: owner.claim, surface: recoveredAgentSurface }
+        })
+      ).resolves.toMatchObject({
+        id: 'pty-lead',
+        agentSessionEnsure: { disposition: 'adopted', owner }
+      })
+      expect(provider.spawn).not.toHaveBeenCalled()
+    } finally {
+      clearProviderPtyState('pty-lead')
+    }
   })
 })

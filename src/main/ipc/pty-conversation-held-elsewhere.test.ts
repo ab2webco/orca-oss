@@ -3,6 +3,7 @@ import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../shared/setup-agent-sequencing'
 import {
   ConversationRestores,
+  foregroundRunsAgent,
   paneHoldingConversation,
   withoutSequencedStartupCommand,
   type ConversationHolderDeps
@@ -26,11 +27,12 @@ const status = (
     stateStartedAt: 1
   }) as AgentStatusIpcPayload
 
+/** `foregrounds` is what each live PTY runs in front; a PTY left out is gone. */
 function deps(args: {
   statuses: AgentStatusIpcPayload[]
   bound?: Record<string, string>
   persisted?: Record<string, string>
-  live: Record<string, boolean | null>
+  foregrounds: Record<string, string | null>
   now?: () => number
 }): ConversationHolderDeps & { probed: string[] } {
   const probed: string[] = []
@@ -39,9 +41,9 @@ function deps(args: {
     statuses: () => args.statuses,
     boundPtyIdOf: (paneKey) => args.bound?.[paneKey],
     persistedPtyIdOf: (paneKey) => args.persisted?.[paneKey],
-    runsAgent: async (ptyId) => {
+    foregroundOf: async (ptyId) => {
       probed.push(ptyId)
-      return args.live[ptyId] ?? false
+      return args.foregrounds[ptyId] ?? null
     },
     ...(args.now ? { now: args.now } : {})
   }
@@ -60,7 +62,7 @@ describe('paneHoldingConversation', () => {
     const holder = deps({
       statuses: [status('tab-new:leaf'), status('tab-lead:leaf')],
       persisted: { 'tab-lead:leaf': 'pty-lead' },
-      live: { 'pty-lead': true }
+      foregrounds: { 'pty-lead': 'claude' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBe('tab-lead:leaf')
@@ -70,7 +72,7 @@ describe('paneHoldingConversation', () => {
     const holder = deps({
       statuses: [status('tab-new:leaf'), status('tab-alias:leaf')],
       persisted: { 'tab-new:leaf': 'pty-new', 'tab-alias:leaf': 'pty-new' },
-      live: { 'pty-new': true }
+      foregrounds: { 'pty-new': 'claude' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBeNull()
@@ -80,7 +82,7 @@ describe('paneHoldingConversation', () => {
     const holder = deps({
       statuses: [status('tab-a:leaf'), status('tab-b:leaf'), status('tab-c:leaf')],
       persisted: { 'tab-a:leaf': 'pty-a', 'tab-b:leaf': 'pty-b' },
-      live: { 'pty-a': null, 'pty-b': false }
+      foregrounds: { 'pty-a': null }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBeNull()
@@ -91,7 +93,7 @@ describe('paneHoldingConversation', () => {
       statuses: [status('tab-lead:leaf')],
       bound: { 'tab-lead:leaf': 'pty-now' },
       persisted: { 'tab-lead:leaf': 'pty-saved' },
-      live: { 'pty-now': true }
+      foregrounds: { 'pty-now': 'claude' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBe('tab-lead:leaf')
@@ -102,7 +104,7 @@ describe('paneHoldingConversation', () => {
     const holder = deps({
       statuses: [status('tab-a:leaf', 'sess-other'), status('tab-b:leaf', 'sess-lead', 'codex')],
       persisted: { 'tab-a:leaf': 'pty-a', 'tab-b:leaf': 'pty-b' },
-      live: { 'pty-a': true, 'pty-b': true }
+      foregrounds: { 'pty-a': 'claude', 'pty-b': 'codex' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBeNull()
@@ -115,7 +117,7 @@ describe('paneHoldingConversation: which pane holds it', () => {
     const holder = deps({
       statuses: [status('tab-lead:leaf')],
       persisted: { 'tab-lead:leaf': 'pty-lead' },
-      live: { 'pty-lead': false }
+      foregrounds: { 'pty-lead': 'zsh' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBeNull()
@@ -125,7 +127,7 @@ describe('paneHoldingConversation: which pane holds it', () => {
     const holder = deps({
       statuses: [status('tab-lead:leaf', 'sess-lead', 'claude', 'ssh-1')],
       persisted: { 'tab-lead:leaf': 'pty-lead' },
-      live: { 'pty-lead': true }
+      foregrounds: { 'pty-lead': 'claude' }
     })
 
     await expect(paneHoldingConversation(holder, ASK)).resolves.toBeNull()
@@ -135,36 +137,92 @@ describe('paneHoldingConversation: which pane holds it', () => {
   })
 })
 
+describe('foregroundRunsAgent', () => {
+  it('matches Claude by its name, the Agent Teams wrapper and its native binary', () => {
+    for (const foreground of ['claude', '2.1.328']) {
+      expect(foregroundRunsAgent('claude', foreground)).toBe(true)
+    }
+    expect(foregroundRunsAgent('codex', 'codex')).toBe(true)
+  })
+
+  // Why: after the agent exits the pane can run anything, and a WSL pane shows wsl.exe in front.
+  it('never matches another program, a shell, WSL, or an unknown foreground', () => {
+    for (const foreground of ['vim', 'npm', 'node', 'ssh', 'zsh', 'wsl.exe', null]) {
+      expect(foregroundRunsAgent('claude', foreground)).toBe(false)
+    }
+    expect(foregroundRunsAgent('codex', 'claude')).toBe(false)
+  })
+})
+
 describe('ConversationRestores', () => {
   const PANE_A = { ...ASK, paneKey: 'tab-a:leaf', ptyId: 'pty-a' }
   const PANE_B = { ...ASK, paneKey: 'tab-b:leaf', ptyId: 'pty-b' }
 
   it('lets the first of two restores resume and names it to the second', async () => {
-    const restores = new ConversationRestores(deps({ statuses: [], live: {} }))
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds: {} }))
 
-    await expect(Promise.all([restores.admit(PANE_A), restores.admit(PANE_B)])).resolves.toEqual([
-      null,
-      'tab-a:leaf'
-    ])
+    const [first, second] = await Promise.all([restores.admit(PANE_A), restores.admit(PANE_B)])
+
+    expect([first.heldBy, second.heldBy]).toEqual([null, 'tab-a:leaf'])
   })
 
   it('lets the same pane resume again, as a retry of its own restore', async () => {
-    const restores = new ConversationRestores(deps({ statuses: [], live: {} }))
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds: {} }))
     await restores.admit(PANE_A)
 
-    await expect(restores.admit(PANE_A)).resolves.toBeNull()
+    await expect(restores.admit(PANE_A)).resolves.toMatchObject({ heldBy: null })
   })
 
   it('frees the conversation once the claimed pane no longer runs the agent', async () => {
     let clock = 0
-    const live: Record<string, boolean | null> = { 'pty-a': true }
-    const restores = new ConversationRestores(deps({ statuses: [], live, now: () => clock }))
-    await restores.admit(PANE_A)
+    const foregrounds: Record<string, string | null> = { 'pty-a': 'claude' }
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds, now: () => clock }))
+    ;(await restores.admit(PANE_A)).settle('pty-a')
 
     clock = 60_000
-    await expect(restores.admit(PANE_B)).resolves.toBe('tab-a:leaf')
-    live['pty-a'] = false
-    await expect(restores.admit(PANE_B)).resolves.toBeNull()
+    await expect(restores.admit(PANE_B)).resolves.toMatchObject({ heldBy: 'tab-a:leaf' })
+    foregrounds['pty-a'] = 'vim'
+    await expect(restores.admit(PANE_B)).resolves.toMatchObject({ heldBy: null })
+  })
+
+  // Why (ORCA-1283 review): a failed first spawn must not leave the conversation running nowhere.
+  it('frees the conversation at once when the claimed spawn fails', async () => {
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds: {} }))
+    ;(await restores.admit(PANE_A)).settle(null)
+
+    await expect(restores.admit(PANE_B)).resolves.toMatchObject({ heldBy: null })
+  })
+
+  it('frees the conversation when the restored pane closes', async () => {
+    let clock = 0
+    const restores = new ConversationRestores(
+      deps({ statuses: [], foregrounds: {}, now: () => clock })
+    )
+    ;(await restores.admit(PANE_A)).settle('pty-a')
+
+    clock = 1_000
+    await expect(restores.admit(PANE_B)).resolves.toMatchObject({ heldBy: null })
+  })
+
+  it('claims nothing for a restore it cannot tell apart, so its retry is never blocked', async () => {
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds: {} }))
+    const anonymous = { ...ASK, paneKey: null, ptyId: undefined }
+    await restores.admit(anonymous)
+
+    await expect(restores.admit(anonymous)).resolves.toMatchObject({ heldBy: null })
+    await expect(restores.admit(PANE_B)).resolves.toMatchObject({ heldBy: null })
+  })
+
+  it('keeps no claim or queue once nothing holds the conversation', async () => {
+    const restores = new ConversationRestores(deps({ statuses: [], foregrounds: {} }))
+    ;(await restores.admit(PANE_A)).settle(null)
+    await new Promise((done) => setTimeout(done, 0))
+
+    const maps = restores as unknown as {
+      claims: Map<string, unknown>
+      queues: Map<string, unknown>
+    }
+    expect([maps.claims.size, maps.queues.size]).toEqual([0, 0])
   })
 })
 

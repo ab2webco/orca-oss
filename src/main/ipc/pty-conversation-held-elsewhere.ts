@@ -1,9 +1,11 @@
+import { recognizeAgentProcess } from '../../shared/agent-process-recognition'
 import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
 import {
   agentProviderSessionsEqual,
   type AgentProviderSessionMetadata
 } from '../../shared/agent-session-resume'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../shared/setup-agent-sequencing'
+import { leadPaneStateOf } from '../runtime/orchestrator-game-lead-sessions'
 
 export type ConversationHolderDeps = {
   statuses: () => readonly AgentStatusIpcPayload[]
@@ -11,8 +13,8 @@ export type ConversationHolderDeps = {
   boundPtyIdOf: (paneKey: string) => string | undefined
   /** The PTY a pane had when the session was saved; covers a surviving pane not reattached yet. */
   persistedPtyIdOf: (paneKey: string) => string | undefined
-  /** True while the PTY's foreground is the agent, false at its shell or gone, null when unknown. */
-  runsAgent: (ptyId: string) => Promise<boolean | null>
+  /** The PTY's foreground process name; null when it is gone or unreadable. */
+  foregroundOf: (ptyId: string) => Promise<string | null>
   now?: () => number
 }
 
@@ -24,10 +26,25 @@ export type ConversationResume = {
   ptyId?: string
 }
 
+/** Settle with the spawned PTY, or null when the spawn failed. */
+export type RestoreAdmission = { heldBy: string | null; settle: (ptyId: string | null) => void }
+
+export const NOT_CLAIMED: RestoreAdmission = { heldBy: null, settle: () => undefined }
+
 /**
- * Another pane whose agent runs this conversation in the foreground now. Why the foreground
- * (ORCA-1283): a status row outlives an agent that exited to its shell.
+ * Whether a foreground process is this agent. Why a positive match (ORCA-1283): an editor, a dev
+ * server, ssh or wsl.exe in front after the agent exited must not keep its conversation.
  */
+export function foregroundRunsAgent(agent: string, foreground: string | null): boolean {
+  if (!foreground) {
+    return false
+  }
+  return agent === 'claude'
+    ? leadPaneStateOf(foreground) === 'running'
+    : recognizeAgentProcess(foreground)?.agent === agent
+}
+
+/** Another pane whose agent runs this conversation in the foreground now. */
 export async function paneHoldingConversation(
   deps: ConversationHolderDeps,
   ask: ConversationResume
@@ -43,18 +60,30 @@ export async function paneHoldingConversation(
     )
   for (const one of holders) {
     const ptyId = deps.boundPtyIdOf(one.paneKey) ?? deps.persistedPtyIdOf(one.paneKey)
-    // Why only a proven agent: an unknown one must not cost the pane its resume.
-    if (ptyId && ptyId !== ask.ptyId && (await deps.runsAgent(ptyId).catch(() => null))) {
+    if (
+      ptyId &&
+      ptyId !== ask.ptyId &&
+      foregroundRunsAgent(ask.agent, await deps.foregroundOf(ptyId).catch(() => null))
+    ) {
       return one.paneKey
     }
   }
   return null
 }
 
-// Why: a claimed resume's agent is not in the foreground until its spawn and startup finish.
+// Why: a resumed agent reaches the foreground only after its spawn and startup.
 const CLAIM_STARTING_MS = 15_000
+// Why: every caller settles its claim; this only bounds one a crashed caller left behind.
+const CLAIM_PENDING_MAX_MS = 60_000
 
-type RestoreClaim = { owner: string; paneKey: string | null; ptyId?: string; at: number }
+type RestoreClaim = {
+  owner: string
+  paneKey: string | null
+  agent: string
+  ptyId?: string
+  at: number
+  spawned: boolean
+}
 
 /** One resume per conversation at a time: two panes restored together must not both resume it. */
 export class ConversationRestores {
@@ -63,8 +92,8 @@ export class ConversationRestores {
 
   constructor(private readonly deps: ConversationHolderDeps) {}
 
-  /** The pane already holding the conversation, else null after claiming it for this resume. */
-  admit(ask: ConversationResume): Promise<string | null> {
+  /** The pane already holding the conversation, else a claim on it that the caller settles. */
+  admit(ask: ConversationResume): Promise<RestoreAdmission> {
     const key = JSON.stringify([
       ask.agent,
       ask.connectionId,
@@ -75,33 +104,76 @@ export class ConversationRestores {
     const owner = ask.paneKey ?? ask.ptyId ?? null
     const next = (this.queues.get(key) ?? Promise.resolve())
       .catch(() => undefined)
-      .then(async () => {
-        const claim = this.claims.get(key)
-        if (claim && claim.owner !== owner && (await this.holds(claim))) {
-          return claim.paneKey ?? claim.owner
-        }
-        const heldBy = await paneHoldingConversation(this.deps, ask)
-        if (heldBy === null) {
-          const at = this.deps.now?.() ?? Date.now()
-          this.claims.set(key, {
-            owner: owner ?? `claim:${at}`,
-            paneKey: ask.paneKey,
-            ptyId: ask.ptyId,
-            at
-          })
-        }
-        return heldBy
-      })
+      .then(() => this.decide(key, owner, ask))
     this.queues.set(key, next)
+    const prune = (): void => {
+      if (this.queues.get(key) === next) {
+        this.queues.delete(key)
+      }
+    }
+    next.then(prune, prune)
     return next
   }
 
+  private async decide(
+    key: string,
+    owner: string | null,
+    ask: ConversationResume
+  ): Promise<RestoreAdmission> {
+    const claim = this.claims.get(key)
+    if (claim && claim.owner !== owner) {
+      if (await this.holds(claim)) {
+        return { heldBy: claim.paneKey ?? claim.owner, settle: () => undefined }
+      }
+      if (this.claims.get(key) === claim) {
+        this.claims.delete(key)
+      }
+    }
+    const heldBy = await paneHoldingConversation(this.deps, ask)
+    // Why no claim without an owner: nothing could tell its own retry from another pane.
+    if (heldBy !== null || owner === null) {
+      return heldBy === null ? NOT_CLAIMED : { heldBy, settle: () => undefined }
+    }
+    const mine: RestoreClaim = {
+      owner,
+      paneKey: ask.paneKey,
+      agent: ask.agent,
+      ...(ask.ptyId ? { ptyId: ask.ptyId } : {}),
+      at: this.now(),
+      spawned: false
+    }
+    this.claims.set(key, mine)
+    return {
+      heldBy: null,
+      settle: (ptyId) => {
+        if (this.claims.get(key) !== mine) {
+          return
+        }
+        if (ptyId === null) {
+          this.claims.delete(key)
+          return
+        }
+        Object.assign(mine, { ptyId, at: this.now(), spawned: true })
+      }
+    }
+  }
+
   private async holds(claim: RestoreClaim): Promise<boolean> {
-    if ((this.deps.now?.() ?? Date.now()) - claim.at < CLAIM_STARTING_MS) {
-      return true
+    const age = this.now() - claim.at
+    if (!claim.spawned) {
+      return age < CLAIM_PENDING_MAX_MS
     }
     const ptyId = (claim.paneKey && this.deps.boundPtyIdOf(claim.paneKey)) || claim.ptyId
-    return ptyId ? (await this.deps.runsAgent(ptyId).catch(() => null)) === true : false
+    const foreground = ptyId ? await this.deps.foregroundOf(ptyId).catch(() => null) : null
+    // Why the starting window: the spawned pane shows its shell until the agent takes over.
+    return (
+      foregroundRunsAgent(claim.agent, foreground) ||
+      (foreground !== null && age < CLAIM_STARTING_MS)
+    )
+  }
+
+  private now(): number {
+    return this.deps.now?.() ?? Date.now()
   }
 }
 
