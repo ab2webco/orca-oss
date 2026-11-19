@@ -135,6 +135,7 @@ const pulses = [
   for (const run of document.querySelectorAll<HTMLElement>('[data-run]')) {
     const controls = run.querySelector<HTMLElement>('[data-run-controls]')
     const toggle = run.querySelector<HTMLButtonElement>('[data-run-toggle]')
+    const list = run.querySelector<HTMLElement>('.captions')
     const captions = [...run.querySelectorAll<HTMLElement>('[data-step]')]
     const parts = [...run.querySelectorAll<SVGElement>('svg [data-s]')]
     if (!controls || !toggle) {
@@ -148,6 +149,7 @@ const pulses = [
       step = n
       const on = wide.matches
       run.toggleAttribute('data-active', on && !still)
+      run.toggleAttribute('data-stepper', on)
       run.classList.toggle('has-models', n >= 3)
       controls.hidden = !on
       for (const caption of captions) {
@@ -170,6 +172,8 @@ const pulses = [
         timer = undefined
       }
       run.classList.toggle('running', play)
+      // Why: a region that changes by itself every 4 s would talk over the reader; clicked steps still speak.
+      list?.setAttribute('aria-live', play ? 'off' : 'polite')
       toggle.textContent = (held ? toggle.dataset.play : toggle.dataset.pause) ?? ''
     }
     for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
@@ -317,6 +321,14 @@ const pulses = [
   }
   .captions li[hidden] {
     display: none;
+  }
+  /* One cell for every caption: the tallest sets the height, so a step never moves what follows. */
+  .run[data-stepper] .captions li {
+    grid-area: 1 / 1;
+  }
+  .run[data-stepper] .captions li[hidden] {
+    display: block;
+    visibility: hidden;
   }
   h3 {
     margin: 0;
