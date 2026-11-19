@@ -51,7 +51,7 @@ const copy = {
   }
   h1 {
     margin: 0;
-    max-width: 12ch;
+    max-width: 18ch;
     font-size: var(--text-display);
     font-weight: 600;
     line-height: 1.02;
@@ -95,9 +95,19 @@ const copy = {
     color: var(--muted);
     font-size: var(--text-sm);
   }
+  /* Why stacked at every width: beside the clip the title broke into four lines, and the clip shrank. */
   @media (min-width: 60rem) {
-    .grid {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    .copy {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      column-gap: var(--space-xl);
+      align-items: end;
+    }
+    h1 {
+      grid-column: 1 / -1;
+    }
+    .lede {
+      max-width: none;
     }
   }
 </style>

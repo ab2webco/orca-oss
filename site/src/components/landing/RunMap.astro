@@ -1,0 +1,371 @@
+---
+import type { Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+// The lead's real flow on main, with real CLI flags; every name, host and ticket is the demo team's.
+const { lang } = Astro.props
+const t = {
+  en: {
+    title: 'How the lead runs LUM-23',
+    lede: 'From the ticket to main, with the commands the lead runs.',
+    desc: 'The tracker feeds the lead, which plans LUM-23 and starts Orin on render-01, the host with a free slot, on Opus 5.5 high, beside Ivy on Sonnet 5.5 medium. Orin’s commands pass through Jev, and it reports worker_done to the lead. PR 49 goes through CI and the merge queue to main. A question reaches you in the Inbox, and your answer goes back to the lead.',
+    tracker: 'Your tracker',
+    lead: 'Lead',
+    places: 'plans and places',
+    phase: 'plan, implement',
+    local: 'This computer',
+    load: (n: string, cap: string, load: string) => `${n} of ${cap} members, load ${load}`,
+    free: 'free slot',
+    gate: 'allow, ask',
+    green: 'CI green',
+    queue: 'Merge queue',
+    first: 'first in line',
+    merged: 'merged',
+    inbox: 'desktop and phone',
+    you: 'You',
+    pause: ['Pause', 'Play'],
+    steps: [
+      ['The plan', 'The lead plans the ticket', 'It reads LUM-23 from your tracker and writes the model and effort for each phase.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
+      ['A host', 'It picks a host with room', 'Each machine reports its members, memory and load; render-01 has a free slot. With accounts: auto the member starts on the account with the most quota left.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
+      ['The models', 'Each member gets its model', 'The plan or the kind of work picks it, and the card shows it: Orin on Opus 5.5 at high, Ivy, launched with --kind captures, on Sonnet 5.5 at medium.', ''],
+      ['Jev, report', 'Jev gates, the member reports', 'With the Jev Advisor plugin every Bash command is allowed, refused or sent to you. Orin finishes with a typed report.', 'orca orchestration send --type worker_done'],
+      ['CI to main', 'CI, the merge queue, main', 'PR #49 goes green on GitHub, waits its turn in the merge queue and lands on main.', ''],
+      ['Your call', 'Your call, on any screen', 'What only you can decide reaches your Inbox on desktop and phone, and your answer goes back to the lead.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
+    ]
+  },
+  es: {
+    title: 'Cómo lleva el líder LUM-23',
+    lede: 'Del ticket a main, con los comandos que corre el líder.',
+    desc: 'El tracker alimenta al líder, que planifica LUM-23 y lanza a Orin en render-01, el host con un hueco libre, en Opus 5.5 high, junto a Ivy en Sonnet 5.5 medium. Los comandos de Orin pasan por Jev, y reporta worker_done al líder. El PR 49 pasa por CI y la merge queue hasta main. Una pregunta te llega al Inbox, y tu respuesta vuelve al líder.',
+    tracker: 'Tu tracker',
+    lead: 'Líder',
+    places: 'planifica y ubica',
+    phase: 'plan, implement',
+    local: 'Este equipo',
+    load: (n: string, cap: string, load: string) => `${n} de ${cap} miembros, carga ${load}`,
+    free: 'hueco libre',
+    gate: 'permite, pregunta',
+    green: 'CI en verde',
+    queue: 'Merge queue',
+    first: 'primero en la fila',
+    merged: 'mergeado',
+    inbox: 'escritorio y móvil',
+    you: 'Tú',
+    pause: ['Pausa', 'Reproducir'],
+    steps: [
+      ['El plan', 'El líder planifica el ticket', 'Lee LUM-23 de tu tracker y escribe el modelo y el esfuerzo de cada fase.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
+      ['Un host', 'Elige un host con espacio', 'Cada máquina reporta sus miembros, memoria y carga; render-01 tiene un hueco libre. Con accounts: auto el miembro arranca en la cuenta con más cuota.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
+      ['Los modelos', 'Cada miembro recibe su modelo', 'El plan o el tipo de trabajo lo elige, y la tarjeta lo muestra: Orin en Opus 5.5 high, Ivy, lanzada con --kind captures, en Sonnet 5.5 medium.', ''],
+      ['Jev, reporte', 'Jev filtra, el miembro reporta', 'Con el plugin Jev Advisor cada comando Bash se permite, se rechaza o te llega a ti. Orin termina con un reporte tipado.', 'orca orchestration send --type worker_done'],
+      ['CI a main', 'CI, la merge queue, main', 'El PR #49 pasa a verde en GitHub, espera su turno en la merge queue y llega a main.', ''],
+      ['Tu decisión', 'Tu decisión, en cualquier pantalla', 'Lo que solo tú puedes decidir llega a tu Inbox en escritorio y móvil, y tu respuesta vuelve al líder.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
+    ]
+  }
+}[lang]
+const pulses = [
+  ['1', 'M194 100 H250'],
+  ['2', 'M420 125 C 470 125, 450 375, 500 375'],
+  ['4', 'M960 374 V296 H465 V115 H420'],
+  ['5', 'M1020 410 C 1060 410, 1060 80, 1100 80'],
+  ['6', 'M420 140 H440 V480 H420']
+]
+---
+
+<section class="section" aria-labelledby="run-title">
+  <div class="wrap run" data-run>
+    <h2 class="h2" id="run-title">{t.title}</h2>
+    <p class="lede">{t.lede}</p>
+    <figure class="stage">
+      <svg viewBox="0 0 1312 540" role="img" aria-labelledby="run-svg-title run-svg-desc">
+        <title id="run-svg-title">{t.title}</title>
+        <desc id="run-svg-desc">{t.desc}</desc>
+        <path class="edge" data-s="1" d="M194 100 H250"></path>
+        <path class="edge" data-s="2" d="M420 125 C 470 125, 450 375, 500 375"></path>
+        <path class="edge" data-s="3" d="M420 85 C 460 85, 460 80, 500 80"></path>
+        <path class="edge" data-s="4" d="M860 410 H900"></path>
+        <path class="edge dot" data-s="4" d="M960 374 V296 H465 V115 H420"></path>
+        <path class="edge" data-s="5" d="M1020 410 C 1060 410, 1060 80, 1100 80"></path>
+        <path class="edge ok" data-s="5" d="M1195 120 V180 M1195 260 V320"></path>
+        <path class="edge dash" data-s="6" d="M420 140 H440 V480 H420 M250 480 H194 M194 455 H222 V132 H250"></path>
+        <g class="node soft" data-s="1"><rect x="24" y="60" width="170" height="80" rx="10"></rect><text x="42" y="94">{t.tracker}</text><text class="sub" x="42" y="118">LUM-23</text></g>
+        <g class="node" data-s="1 2 3 4 6"><rect x="250" y="60" width="170" height="90" rx="10"></rect><text x="268" y="94">{t.lead}</text><text class="sub" x="268" y="118">{t.places}</text></g>
+        <g class="node soft" data-s="1"><rect x="250" y="170" width="180" height="64" rx="10"></rect><text class="sub" x="266" y="196">{t.phase}</text><text x="266" y="220">Opus 5.5 · high</text></g>
+        <g class="node" data-s="2 3"><rect x="500" y="40" width="360" height="124" rx="10"></rect><text x="518" y="72">{t.local}</text><text class="sub" x="518" y="94">{t.load('2', '4', '2.4')}</text>
+          <g class="chip" data-s="3"><rect x="516" y="108" width="328" height="42" rx="8"></rect><text x="532" y="135">Ivy LUM-26</text><text class="model" x="828" y="135" text-anchor="end">Sonnet 5.5 · medium</text></g></g>
+        <g class="node" data-s="2"><rect x="500" y="186" width="360" height="94" rx="10"></rect><text x="518" y="218">studio</text><text class="sub" x="518" y="240">{t.load('2', '4', '3.1')}</text></g>
+        <g class="node" data-s="2 3 4"><rect x="500" y="310" width="360" height="134" rx="10"></rect><text x="518" y="342">render-01</text><text class="sub" x="518" y="364">{`${t.load('1', '3', '0.8')}, ${t.free}`}</text>
+          <g class="chip" data-s="3 4"><rect x="516" y="388" width="328" height="42" rx="8"></rect><text x="532" y="415">Orin LUM-23</text><text class="model" x="828" y="415" text-anchor="end">Opus 5.5 · high</text></g></g>
+        <g class="node" data-s="4"><rect x="900" y="374" width="120" height="72" rx="10"></rect><text x="918" y="404">Jev</text><text class="sub" x="918" y="426">{t.gate}</text></g>
+        <text class="label" data-s="4" x="950" y="288" text-anchor="end">worker_done</text>
+        <g class="node" data-s="5"><rect x="1100" y="40" width="190" height="80" rx="10"></rect><text x="1118" y="74">PR #49</text><text class="sub" x="1118" y="98">{t.green}</text></g>
+        <g class="node" data-s="5"><rect x="1100" y="180" width="190" height="80" rx="10"></rect><text x="1118" y="214">{t.queue}</text><text class="sub" x="1118" y="238">{t.first}</text></g>
+        <g class="node ok" data-s="5"><rect x="1100" y="320" width="190" height="80" rx="10"></rect><text x="1118" y="354">main</text><text class="sub" x="1118" y="378">{t.merged}</text></g>
+        <g class="node" data-s="6"><rect x="250" y="440" width="170" height="80" rx="10"></rect><text x="268" y="474">Inbox</text><text class="sub" x="268" y="498">{t.inbox}</text></g>
+        <g class="node soft" data-s="6"><rect x="24" y="440" width="170" height="80" rx="10"></rect><text x="42" y="474">{t.you}</text><text class="sub" x="42" y="498">Wi-Fi only</text></g>
+        {pulses.map(([s, d]) => <circle class="pulse" data-s={s} r="5" style={`offset-path: path('${d}')`}></circle>)}
+      </svg>
+    </figure>
+    <div class="controls" hidden data-run-controls>
+      {t.steps.map(([short], i) => <button type="button" data-pick={i + 1}><span>{i + 1}</span>{short}</button>)}
+      <button type="button" class="toggle" data-run-toggle data-pause={t.pause[0]} data-play={t.pause[1]}>{t.pause[0]}</button>
+    </div>
+    <ol class="captions" aria-live="polite">
+      {
+        t.steps.map(([, title, body, command], i) => (
+          <li data-step={i + 1}>
+            <h3>{`${i + 1}. ${title}`}</h3>
+            <p>{body}</p>
+            {command && <pre>{command}</pre>}
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<script>
+  // One step lit at a time while the map is on screen; a click holds a step. Under reduced motion,
+  // or on a phone where the diagram is hidden, every caption shows and the diagram stays fully lit.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const wide = matchMedia('(min-width: 60rem)')
+  for (const run of document.querySelectorAll<HTMLElement>('[data-run]')) {
+    const controls = run.querySelector<HTMLElement>('[data-run-controls]')
+    const toggle = run.querySelector<HTMLButtonElement>('[data-run-toggle]')
+    const captions = [...run.querySelectorAll<HTMLElement>('[data-step]')]
+    const parts = [...run.querySelectorAll<SVGElement>('svg [data-s]')]
+    if (!controls || !toggle) {
+      continue
+    }
+    let step = 1
+    let held = still
+    let seen = false
+    let timer: ReturnType<typeof setInterval> | undefined
+    const show = (n: number): void => {
+      step = n
+      const on = wide.matches
+      run.toggleAttribute('data-active', on && !still)
+      run.classList.toggle('has-models', n >= 3)
+      controls.hidden = !on
+      for (const caption of captions) {
+        caption.hidden = on && caption.dataset.step !== String(n)
+      }
+      for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
+        button.setAttribute('aria-current', button.dataset.pick === String(n) ? 'step' : 'false')
+      }
+      for (const part of parts) {
+        part.classList.toggle('lit', (part.dataset.s ?? '').split(' ').includes(String(n)))
+      }
+    }
+    const sync = (): void => {
+      const play = seen && !held && wide.matches
+      if (play && !timer) {
+        timer = setInterval(() => show((step % 6) + 1), 4000)
+      }
+      if (!play && timer) {
+        clearInterval(timer)
+        timer = undefined
+      }
+      run.classList.toggle('running', play)
+      toggle.textContent = (held ? toggle.dataset.play : toggle.dataset.pause) ?? ''
+    }
+    for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
+      button.addEventListener('click', () => {
+        show(Number(button.dataset.pick))
+        held = true
+        sync()
+      })
+    }
+    toggle.addEventListener('click', () => {
+      held = !held
+      sync()
+    })
+    wide.addEventListener('change', () => {
+      show(step)
+      sync()
+    })
+    new IntersectionObserver(([entry]) => {
+      seen = entry?.isIntersecting ?? false
+      sync()
+    }).observe(run)
+    show(1)
+  }
+</script>
+
+<style>
+  .stage {
+    display: none;
+    margin: var(--space-xl) 0 0;
+    padding: var(--space-md);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-frame);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .edge {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1.5;
+  }
+  .edge.dot {
+    stroke-dasharray: 2 5;
+  }
+  .edge.dash {
+    stroke-dasharray: 5 5;
+  }
+  .node rect {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1.5;
+  }
+  .node.soft rect,
+  .chip rect {
+    fill: var(--surface);
+  }
+  .node text {
+    fill: var(--fg-2);
+    font: 600 16px var(--font-body);
+  }
+  .node .sub,
+  .label {
+    fill: var(--muted);
+    font: 400 14px var(--font-body);
+  }
+  .chip .model {
+    fill: var(--fg);
+  }
+  .pulse {
+    fill: var(--fg);
+    opacity: 0;
+  }
+  /* Without an active step (reduced motion, no script) the whole map is lit. */
+  .run:not([data-active]) .edge,
+  .edge.lit {
+    stroke: var(--fg);
+    stroke-width: 2;
+  }
+  .run:not([data-active]) .edge.ok,
+  .edge.ok.lit,
+  .run:not([data-active]) .node.ok > rect,
+  .node.ok.lit > rect {
+    stroke: var(--success);
+  }
+  .run:not([data-active]) .node > rect,
+  .node.lit > rect {
+    stroke: var(--fg);
+    stroke-width: 2;
+  }
+  .run:not([data-active]) .node > text,
+  .node.lit > text,
+  .run:not([data-active]) .label,
+  .label.lit {
+    fill: var(--fg);
+  }
+  .run[data-active]:not(.has-models) .chip {
+    opacity: 0;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-lg);
+  }
+  .controls[hidden] {
+    display: none;
+  }
+  .controls button {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-2);
+    font: 400 var(--text-sm) / 1 var(--font-body);
+    cursor: pointer;
+  }
+  .controls button span {
+    color: var(--muted);
+  }
+  .controls [aria-current='step'] {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+  .controls .toggle {
+    margin-left: auto;
+  }
+  .captions {
+    display: grid;
+    gap: var(--space-md);
+    margin: var(--space-lg) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .captions li {
+    min-width: 0;
+    padding: var(--space-lg);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .captions li[hidden] {
+    display: none;
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .captions p {
+    margin: var(--space-xs) 0 0;
+    max-width: 70ch;
+    color: var(--fg-2);
+  }
+  pre {
+    margin: var(--space-md) 0 0;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: var(--text-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 60rem) {
+    .stage {
+      display: block;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .edge,
+    .node > rect,
+    .node > text,
+    .chip {
+      transition:
+        stroke 400ms ease-out,
+        fill 400ms ease-out,
+        opacity 400ms ease-out;
+    }
+    .pulse.lit {
+      opacity: 1;
+      animation: travel 1.6s linear infinite;
+    }
+    .run:not(.running) .pulse {
+      animation-play-state: paused;
+    }
+    @keyframes travel {
+      from {
+        offset-distance: 0%;
+      }
+      to {
+        offset-distance: 100%;
+      }
+    }
+  }
+</style>
