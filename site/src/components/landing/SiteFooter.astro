@@ -1,5 +1,6 @@
 ---
-import { docsHref, homeHref, type Lang, REPO_URL, withBase } from '../../data/product'
+import { docsHref, homeHref, type Lang, REPO_URL } from '../../data/product'
+import Mark from './Mark.astro'
 
 type Props = {
   lang: Lang
@@ -50,7 +51,7 @@ const copy = {
   <div class="wrap">
     <p class="tagline">
       <a class="brand" href={homeHref(lang)}>
-        <img src={withBase('icon.png')} alt="" width="20" height="20" loading="lazy" />Orca Lab
+        <Mark />Orca Lab
       </a>
       <span class="muted">{copy.tagline}</span>
     </p>
@@ -69,9 +70,9 @@ const copy = {
 
 <style>
   .site-footer {
-    padding: 32px 0 40px;
+    padding: var(--space-2xl) 0 var(--space-xl);
     border-top: 1px solid var(--line);
-    font-size: 13.5px;
+    font-size: var(--text-sm);
   }
   p,
   nav {
@@ -92,9 +93,11 @@ const copy = {
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-xs);
     color: var(--fg);
-    font-weight: 700;
+    font-size: var(--text-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
     text-decoration: none;
   }
   .legal {

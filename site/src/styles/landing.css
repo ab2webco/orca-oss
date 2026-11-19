@@ -1,18 +1,58 @@
 /*
- * Landing: terminal typography on the Orca Game scene palette. Colours are the --scene-* tokens
- * LandingLayout writes from src/data/scene-palette.ts; the mono stack is the app's (main.css).
+ * Landing: the editor's neutral theme and type, shared with the docs. Colours are the --scene-*
+ * tokens LandingLayout writes from src/data/scene-palette.ts (main.css); Geist is the app's face,
+ * mono only for commands and code.
  */
 :root {
+  --font-body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono:
     'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code', Menlo, Consolas, 'Liberation Mono',
     monospace;
   --bg: var(--scene-bg);
   --surface: var(--scene-surface);
+  --raised: var(--scene-raised);
   --line: var(--scene-line);
   --fg: var(--scene-fg);
+  --fg-2: var(--scene-fg-2);
   --muted: var(--scene-muted);
-  --link: var(--scene-link);
-  --gold: var(--scene-gold);
+  --success: var(--scene-success);
+  /* One accent, the ink; the older sections' names point at it until they are replaced. */
+  --link: var(--fg);
+  --gold: var(--fg);
+
+  --text-display: clamp(2.5rem, 1.2rem + 4.4vw, 5.25rem);
+  --text-section: clamp(2rem, 1.3rem + 2.4vw, 3.25rem);
+  --text-title: 1.5625rem;
+  --text-lead: clamp(1.125rem, 1rem + 0.4vw, 1.3125rem);
+  --text-body: 1rem;
+  --text-sm: 0.875rem;
+  --tracking-display: -0.04em;
+  --tracking-section: -0.035em;
+
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+  --space-4xl: 144px;
+  --container: 1440px;
+  --gutter: 16px;
+  --radius-frame: 12px;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --gutter: 40px;
+  }
+}
+
+@media (min-width: 80rem) {
+  :root {
+    --gutter: 64px;
+  }
 }
 
 *,
@@ -29,8 +69,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-mono);
-  font-size: 15px;
+  font-family: var(--font-body);
+  font-size: var(--text-body);
   line-height: 1.6;
   overflow-x: clip;
 }
@@ -51,9 +91,11 @@ canvas {
   display: block;
 }
 
-code {
-  font-family: inherit;
-  color: var(--gold);
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--fg-2);
 }
 
 :focus-visible {
@@ -84,25 +126,21 @@ code {
   }
 }
 
-/* The Panel's section heading: `▾ TEAM`, gold on the band's ink. */
+/* A section's small label: the body face, muted, never tracked capitals. */
 .heading {
   display: inline-block;
   margin: 0;
-  padding: 0 6px;
-  background: var(--gold);
-  color: var(--bg);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .h2 {
   margin: 16px 0 0;
-  font-size: clamp(22px, 3.2vw, 32px);
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: var(--text-section);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: var(--tracking-section);
   text-wrap: balance;
 }
 
@@ -215,16 +253,18 @@ code {
   }
 }
 
+/* Green only for success; the other states read by weight, not hue. */
 .state-working {
-  color: var(--scene-working);
+  color: var(--fg);
 }
 
 .state-waiting {
-  color: var(--scene-waiting);
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .state-done {
-  color: var(--scene-done);
+  color: var(--success);
 }
 
 .sr-only {

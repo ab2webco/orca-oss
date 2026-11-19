@@ -1,56 +1,6 @@
-// The landing's colours, read from the scenes Orca Game ships: night is Quest's handoff sky, day its
-// working sky, states are the band's rings. No new colour; tests/landing-palette.test.mjs checks contrast.
-import { LEAD_GOLD, STATE_RING } from '../../../resources/claude-plugins/orca-game/hooks/hd-party'
-import { SCENES } from '../../../resources/claude-plugins/orca-game/hooks/scenes/index'
+// The landing's and the docs' colours, read from the app's default theme (main.css), so neither can
+// drift from the editor. No new colour; tests/landing-palette.test.mjs checks contrast and origin.
 import appCss from '../../../src/renderer/src/assets/main.css?raw'
-
-const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`
-
-const quest = SCENES.quest?.looks
-const tamer = SCENES.tamer?.looks
-const jrpg = SCENES.jrpg?.looks
-if (!quest || !tamer || !jrpg) {
-  throw new Error('the Quest, Tamer and JRPG scenes are missing from the game')
-}
-
-const night = {
-  bg: quest.handoff.skyTop,
-  surface: quest.handoff.far,
-  line: quest.handoff.cloud,
-  fg: quest.working.snow,
-  muted: quest.handoff.snow,
-  link: quest.working.sun,
-  gold: LEAD_GOLD,
-  working: STATE_RING.working,
-  waiting: STATE_RING.waiting,
-  done: tamer.working.near
-}
-
-const day = {
-  bg: quest.working.cloud,
-  surface: quest.build.snow,
-  line: quest.working.skyBottom,
-  fg: quest.handoff.skyTop,
-  muted: quest.docs.skyTop,
-  link: quest.working.plant,
-  gold: quest.docs.ground,
-  working: jrpg.working.skyTop,
-  waiting: jrpg.verify.skyBottom,
-  done: quest.build.plant
-}
-
-export type PaletteRole = keyof typeof night
-
-const declarationsOf = (palette: Record<PaletteRole, number>): string =>
-  Object.entries(palette)
-    .map(([role, color]) => `--scene-${role}:${hex(color)};`)
-    .join('')
-
-/** CSS for both themes; the theme attribute matches Starlight's picker. */
-export const scenePaletteCss = [
-  `:root{${declarationsOf(night)}color-scheme:dark;}`,
-  `:root[data-theme='light']{${declarationsOf(day)}color-scheme:light;}`
-].join('')
 
 type AppTokens = Record<string, string>
 
@@ -101,6 +51,34 @@ const starlightOf = (t: AppTokens, surface: string | undefined, raised: string |
 
 const dark = appTokens('.dark')
 const light = appTokens(':root')
+
+// Why roles over raw tokens: the landing names what a colour does; green is for success only.
+const landingOf = (t: AppTokens, surface: string | undefined, raised: string | undefined) => {
+  const roles: Record<string, string | undefined> = {
+    bg: t.background,
+    surface,
+    raised,
+    line: raised,
+    fg: t.foreground,
+    'fg-2': t['secondary-foreground'],
+    muted: t['muted-foreground'],
+    success: t['status-success']
+  }
+  return Object.entries(roles)
+    .map(([role, value]) => {
+      if (!value || value.startsWith('var(')) {
+        throw new Error(`main.css token for --scene-${role} is missing or not a literal`)
+      }
+      return `--scene-${role}:${value};`
+    })
+    .join('')
+}
+
+/** The landing's palette for both themes; the theme attribute matches Starlight's picker. */
+export const scenePaletteCss = [
+  `:root{${landingOf(dark, dark.card, dark.secondary)}color-scheme:dark;}`,
+  `:root[data-theme='light']{${landingOf(light, light.secondary, light.border)}color-scheme:light;}`
+].join('')
 
 /** Starlight mapped onto the app's default theme: neutral greys, the foreground as the accent. */
 export const starlightPaletteCss = [

@@ -1,0 +1,21 @@
+---
+// The Orca Lab mark from the app's own logo, drawn in the text colour so it reads in both themes.
+import logo from '../../../../resources/logo.svg?raw'
+
+const paths = (logo.match(/<path\b[^>]*\/>/g) ?? [])
+  .join('')
+  .replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="currentColor"')
+if (!paths) {
+  throw new Error('resources/logo.svg has no paths')
+}
+---
+
+<svg class="mark" viewBox="0 0 318 231" aria-hidden="true" focusable="false" set:html={paths} />
+
+<style>
+  .mark {
+    flex: none;
+    height: 1.125em;
+    width: calc(1.125em * 318 / 231);
+  }
+</style>
