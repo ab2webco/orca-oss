@@ -202,7 +202,12 @@ test('agent grid groups live agents into buckets and filters them', async ({
       }
     }
     if (live) {
-      await expect.poll(() => api.prompts.length, { timeout: 20_000 }).toBe(4)
+      // Why the content, not a count: Claude Code may add its own side requests to the same API.
+      const missing = () =>
+        AGENTS.filter((agent) => !api.prompts.some((prompt) => prompt.includes(agent.prompt)))
+      await expect
+        .poll(() => missing().map((agent) => agent.title), { timeout: 20_000 })
+        .toEqual([])
     }
     await page.waitForTimeout(HOLD_MS * 2)
 
