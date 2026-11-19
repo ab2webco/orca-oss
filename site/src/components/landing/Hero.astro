@@ -27,8 +27,8 @@ const copy = {
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap grid">
+    <h1 id="hero-title">{copy.title}</h1>
     <div class="copy">
-      <h1 id="hero-title">{copy.title}</h1>
       <p class="lede">{copy.lede}</p>
       <div class="actions">
         <a class="btn" href="#get">{copy.download}</a>
@@ -46,19 +46,24 @@ const copy = {
   }
   .grid {
     display: grid;
-    gap: var(--space-xl);
+    gap: var(--space-lg) var(--space-xl);
     align-items: center;
+  }
+  /* Stacked, the clip stands --space-xl below the copy, as it did before the two columns. */
+  .copy {
+    padding-bottom: calc(var(--space-xl) - var(--space-lg));
   }
   h1 {
     margin: 0;
     max-width: 18ch;
+    text-wrap: balance;
     font-size: var(--text-display);
     font-weight: 600;
     line-height: 1.02;
     letter-spacing: var(--tracking-display);
   }
   .lede {
-    margin: var(--space-lg) 0 0;
+    margin: 0;
     max-width: 34ch;
     color: var(--fg-2);
     font-size: var(--text-lead);
@@ -95,18 +100,17 @@ const copy = {
     color: var(--muted);
     font-size: var(--text-sm);
   }
-  /* Why stacked at every width: beside the clip the title broke into four lines, and the clip shrank. */
+  /* Why the title spans both columns: beside the clip it broke into four lines. Why the clip sits
+     beside the copy: stacked under it, it ran past the 1440x900 and 1920x1080 first screens. */
   @media (min-width: 60rem) {
+    .grid {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+    }
     .copy {
-      display: grid;
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      column-gap: var(--space-xl);
-      align-items: end;
+      padding-bottom: 0;
     }
     h1 {
       grid-column: 1 / -1;
-    }
-    .lede {
       max-width: none;
     }
   }

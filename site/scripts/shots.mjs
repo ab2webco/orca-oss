@@ -1,5 +1,6 @@
 // Screenshots of the built site at 1440/768/390/320 in light and dark, into .shots/.
-// Fails when any page scrolls horizontally; arguments keep only the pages whose name contains one.
+// Fails when any page scrolls horizontally, or when the landing's hero runs past the 1440x900 first
+// screen; arguments keep only the pages whose name contains one.
 // Playwright comes from the repo root's node_modules (the desktop app's dev dependency), so site/
 // does not install it again.
 import { mkdirSync } from 'node:fs'
@@ -71,10 +72,23 @@ async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
     document.body.style.overflowX = ''
     return measured
   })
+  const landing = name.startsWith('landing')
+  const heroEnd = landing
+    ? await page.evaluate(() =>
+        Math.round(document.querySelector('.hero')?.getBoundingClientRect().bottom ?? 0)
+      )
+    : 0
+  // Why from 1440 only: below it the clip stacks under the copy and the hero is taller than a phone.
+  const heroFits = !landing || width < 1440 || heroEnd <= 900
   const file = path.join(OUT, `${name}-${theme}-${width}.png`)
   await page.screenshot({ path: file, fullPage: true })
   await context.close()
-  return { file, ...overflow, ok: overflow.scrollWidth <= overflow.clientWidth }
+  return {
+    file,
+    ...overflow,
+    heroEnd,
+    ok: overflow.scrollWidth <= overflow.clientWidth && heroFits
+  }
 }
 
 const server = await serveDist()
@@ -95,7 +109,7 @@ try {
     const result = await shoot(browser, origin, job)
     const rel = path.relative(SITE_DIR, result.file)
     process.stdout.write(
-      `${result.ok ? 'ok  ' : 'FAIL'} ${rel} scrollWidth=${result.scrollWidth} clientWidth=${result.clientWidth}\n`
+      `${result.ok ? 'ok  ' : 'FAIL'} ${rel} scrollWidth=${result.scrollWidth} clientWidth=${result.clientWidth}${result.heroEnd ? ` heroEnd=${result.heroEnd}` : ''}\n`
     )
     if (!result.ok) {
       failures.push(rel)
@@ -105,5 +119,7 @@ try {
   await browser.close()
   server.close()
 }
-process.stdout.write(`shots: ${jobs.length} captured, ${failures.length} with horizontal scroll\n`)
+process.stdout.write(
+  `shots: ${jobs.length} captured, ${failures.length} with horizontal scroll or a landing hero past the 1440x900 fold\n`
+)
 process.exit(failures.length ? 1 : 0)
