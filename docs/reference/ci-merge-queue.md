@@ -32,12 +32,18 @@ that only run when their own paths change (`mobile.yml`, `computer-e2e.yml`,
 
 ## Runner images
 
-`ubuntu-latest` rolled to Ubuntu 26.04 on 2026-11-18, so every Linux job names `ubuntu-24.04`
-(ORCA-1280). Git compatibility (old Git does not build with 26.04's gcc), package (the glibc
-floor) and Claude hooks on Python 3.9 (no 26.04 build) stay there on purpose.
-`ubuntu-26.04 shells` is the one lane on 26.04. It runs the tests that read the image itself: the
-bash wrappers under 26.04's `/etc/profile`, `orca-cli-resolver` against its `/usr/bin` and `/bin`,
-and the live fish tests.
+`ubuntu-latest` rolled to Ubuntu 26.04 on 2026-11-18, so every Linux job names its image
+(ORCA-1280). Most name `ubuntu-24.04`. These run on `ubuntu-26.04`:
+
+- `ubuntu-26.04 shells` runs the tests that read the image itself: the bash wrappers under 26.04's
+  `/etc/profile`, `orca-cli-resolver` against its `/usr/bin` and `/bin`, and the live fish tests.
+- Claude hooks on Python 3.9 installs 3.9 with uv, because setup-python has no 3.9 build for 26.04
+  (ORCA-1285).
+
+Two stay on `ubuntu-24.04` until ORCA-1285 moves them:
+
+- Git compatibility: Git 2.25.5 does not build with 26.04's gcc.
+- package: node-pty built on 26.04 needs a glibc above the 2.31 floor.
 
 The fish lanes need fish **4.3 or newer**. fish arms DECSET 2031 around its prompt and re-queries
 OSC 11 on handoff only since 4.3, so an older fish leaves the #9993 and #13892 tests nothing to
