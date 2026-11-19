@@ -1,5 +1,5 @@
 {
-  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them; user-docs-path-shots from the changed-spec report of merge group 44169926136; team-panel-machines-board from the changed-spec report of merge group 44180966065; sidebar-solo-rows from the changed-spec report of merge group 44351770337; sidebar-solo-hover from the changed-spec report of PR Checks run 44389352397",
+  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them; user-docs-path-shots from the changed-spec report of merge group 44169926136; team-panel-machines-board from the changed-spec report of merge group 44180966065; sidebar-solo-rows from the changed-spec report of merge group 44351770337; sidebar-solo-hover from the changed-spec report of PR Checks run 44389352397; team-panel-showcase from the changed-spec report of PR Checks run 44462209681",
   "seconds": {
     "tests/e2e/active-view-restart-restore.spec.ts": 20,
     "tests/e2e/activity-agent-pane-isolation.spec.ts": 114,
@@ -346,6 +346,7 @@
     "tests/e2e/team-panel-served-model.spec.ts": 138,
     "tests/e2e/team-panel-settings-toggles.spec.ts": 85,
     "tests/e2e/team-panel-shell.spec.ts": 38,
+    "tests/e2e/team-panel-showcase.spec.ts": 118,
     "tests/e2e/team-panel-steward-scene.spec.ts": 151,
     "tests/e2e/team-panel-steward.spec.ts": 200,
     "tests/e2e/team-panel-stop-while-running.spec.ts": 30,
