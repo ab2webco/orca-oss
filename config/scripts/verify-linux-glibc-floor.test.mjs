@@ -61,6 +61,7 @@ describe('verify-linux-glibc-floor parsing', () => {
 
   it('classifies version nodes across glibc and libstdc++ families', () => {
     expect(isVersionNodeAboveFloor('GLIBC_2.34')).toBe(true)
+    expect(isVersionNodeAboveFloor('GLIBC_2.42')).toBe(true) // node-pty built on ubuntu-26.04
     expect(isVersionNodeAboveFloor('GLIBC_2.31')).toBe(false)
     expect(isVersionNodeAboveFloor('GLIBC_ABI_DT_RELR')).toBe(true) // symbol-less marker (2.36+)
     // GLIBC_PRIVATE is not a stable ABI contract; a needed private symbol can be

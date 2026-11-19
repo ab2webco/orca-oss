@@ -537,7 +537,7 @@ jobs:
   package:
     name: package
     if: github.event_name == 'merge_group'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -556,8 +556,14 @@ jobs:
             electron-builder-linux-
 
       - uses: ./.github/actions/install-node-dependencies
-        with:
-          native-runtime: electron
+
+      # Why the container: node-pty built on the runner image links its glibc, which on 26.04 is
+      # above the 2.31 floor the afterPack gate enforces (ORCA-1285).
+      - name: Build native modules at the glibc floor
+        run: |
+          node config/scripts/install-electron-package-binary.mjs
+          node config/scripts/rebuild-native-at-glibc-floor.mjs
+          node config/scripts/ensure-native-runtime.mjs --runtime=electron
 
       - name: Build package inputs
         run: |
