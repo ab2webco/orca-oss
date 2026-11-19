@@ -118,7 +118,12 @@ test("the lead's question reaches the Inbox and the answer reaches the lead", as
         await orcaPage.waitForTimeout(70)
       }
       await sendToTerminal(orcaPage, ptyId, '\r')
-      await expect.poll(() => api.prompts.length, { timeout: 20_000 }).toBe(1)
+      // Why the content, not a count: Claude Code may add its own side requests to the same API.
+      await expect
+        .poll(() => api.prompts.some((prompt) => prompt.includes(OWNER_PROMPT)), {
+          timeout: 20_000
+        })
+        .toBe(true)
       await expect
         .poll(async () => screenText(orcaPage), { timeout: 20_000 })
         .toContain('keep working')
