@@ -1,6 +1,12 @@
 // Recordings of Orca Lab the landing shows, from docs/assets/readme (ORCA-954/955 captures of a demo
 // project). sync-docs copies exactly these; ORCA-959 replaces each file with a motion clip in place.
 export const RECORDINGS = {
+  'team-machines.gif': {
+    width: 1200,
+    height: 750,
+    en: 'The Team panel’s Machines tab: each paired host with its members against its cap, CPU, memory, disk and load.',
+    es: 'La pestaña Machines del panel Equipo: cada host emparejado con sus miembros frente a su tope, CPU, memoria, disco y carga.'
+  },
   'team-office-building.gif': {
     width: 1200,
     height: 750,
@@ -123,5 +129,6 @@ export const CLIPS = [
   'team-merge',
   'team-style-office',
   'team-style-figures',
-  'team-style-pixel'
+  'team-style-pixel',
+  'team-machines'
 ]

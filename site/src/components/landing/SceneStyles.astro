@@ -1,0 +1,137 @@
+---
+import type { Lang } from '../../data/product'
+import Clip from './Clip.astro'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const copy = {
+  en: {
+    title: 'Office, Figures or Pixel',
+    lede: 'Each scene acts out the real state of the work. Pick one in Settings, or per project in orca.yaml.',
+    label: 'Scene style',
+    styles: [
+      ['office', 'Office', 'A floor per machine. When a member needs you, the lead rides the elevator to its floor.'],
+      ['figures', 'Figures', 'The team before a castle, a tower per member and a trophy for each merge.'],
+      ['pixel', 'Pixel', 'The default: the team in a pixel garden.']
+    ]
+  },
+  es: {
+    title: 'Oficina, Figuras o Pixel',
+    lede: 'Cada escena actúa el estado real del trabajo. Elige una en Ajustes, o por proyecto en orca.yaml.',
+    label: 'Estilo de escena',
+    styles: [
+      ['office', 'Oficina', 'Un piso por máquina. Cuando un miembro te necesita, el líder sube en el ascensor a su piso.'],
+      ['figures', 'Figuras', 'El equipo frente a un castillo, una torre por miembro y un trofeo por cada merge.'],
+      ['pixel', 'Pixel', 'El predeterminado: el equipo en un jardín de píxeles.']
+    ]
+  }
+}[lang]
+---
+
+<section class="section" aria-labelledby="styles-title">
+  <div class="wrap">
+    <h2 class="h2" id="styles-title">{copy.title}</h2>
+    <p class="lede">{copy.lede}</p>
+    <div class="tabs" role="tablist" aria-label={copy.label} data-styles>
+      {
+        copy.styles.map(([id, name], i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`style-tab-${id}`}
+            aria-controls={`style-panel-${id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {name}
+          </button>
+        ))
+      }
+    </div>
+    {
+      copy.styles.map(([id, name, body], i) => (
+        <div
+          class="panel"
+          role="tabpanel"
+          id={`style-panel-${id}`}
+          aria-labelledby={`style-tab-${id}`}
+          hidden={i !== 0}
+        >
+          <Clip lang={lang} name={`team-style-${id}`} />
+          <p>
+            <strong>{name}.</strong> {body}
+          </p>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<script>
+  for (const list of document.querySelectorAll<HTMLElement>('[data-styles]')) {
+    const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    const select = (tab: HTMLButtonElement): void => {
+      for (const one of tabs) {
+        const on = one === tab
+        one.setAttribute('aria-selected', String(on))
+        one.tabIndex = on ? 0 : -1
+        const panel = document.getElementById(one.getAttribute('aria-controls') ?? '')
+        if (panel) {
+          panel.hidden = !on
+        }
+      }
+    }
+    for (const [i, tab] of tabs.entries()) {
+      tab.addEventListener('click', () => select(tab))
+      tab.addEventListener('keydown', (event) => {
+        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+        if (step) {
+          const next = tabs[(i + step + tabs.length) % tabs.length]
+          next?.focus()
+          if (next) {
+            select(next)
+          }
+        }
+      })
+    }
+  }
+</script>
+
+<style>
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: var(--space-xl) 0 var(--space-lg);
+  }
+  [role='tab'] {
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-2);
+    font: 400 var(--text-body) / 1 var(--font-body);
+    cursor: pointer;
+  }
+  [role='tab']:hover {
+    background: var(--surface);
+    color: var(--fg);
+  }
+  [role='tab'][aria-selected='true'] {
+    border-color: var(--fg);
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .panel p {
+    margin: var(--space-md) 0 0;
+    max-width: 60ch;
+    color: var(--fg-2);
+  }
+  .panel strong {
+    color: var(--fg);
+  }
+</style>
