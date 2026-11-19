@@ -100,13 +100,33 @@ function escapePlaceholderTags(text) {
   )
 }
 
-// Rewrites one prose line, leaving inline code spans as they are.
+// An inline code span with a flag, as HTML with each flag and short word kept whole: a wrapped
+// line must never split `--past-busy` after `--`. Punctuation goes out as entities so Markdown's
+// smart punctuation cannot turn `--` into a dash or `"` into a curly quote.
+function flagSpan(span) {
+  const inner = /^`([^`]+)`$/.exec(span)?.[1]
+  if (!inner || !/--\w/.test(inner)) {
+    return span
+  }
+  const words = inner
+    .replace(/\s*\n\s*/g, ' ')
+    .split(/( +)/)
+    .map((word) => {
+      const text = word.replace(/[^\w\s]/g, (ch) => `&#${ch.codePointAt(0)};`)
+      return word.trim() && (word.includes('--') || word.length <= 20)
+        ? `<span class="nowrap">${text}</span>`
+        : text
+    })
+  return `<code dir="auto">${words.join('')}</code>`
+}
+
+// Rewrites one prose line; inline code spans keep their text.
 function rewriteProse(line, sourcePath, opts, images) {
   return line
     .split(/(`+[^`]*`+)/)
     .map((part, index) => {
       if (index % 2 === 1) {
-        return part
+        return flagSpan(part)
       }
       const linked = part
         .replace(
@@ -134,6 +154,18 @@ export function transformDoc(source, sourcePath, opts) {
   let fence = null
   const body = []
   let titleTaken = false
+  // Why gather lines: a code span can run onto the next line, and a line-by-line split would pair
+  // its backtick with the next span's. A span never crosses a blank line.
+  let prose = []
+  const flush = () => {
+    if (prose.length) {
+      const text = prose.join('\n')
+      body.push(
+        themedShot(text, sourcePath, opts, images) ?? rewriteProse(text, sourcePath, opts, images)
+      )
+      prose = []
+    }
+  }
   for (const line of lines) {
     const fenceMatch = /^\s*(```+|~~~+)/.exec(line)
     if (fence) {
@@ -144,20 +176,28 @@ export function transformDoc(source, sourcePath, opts) {
       continue
     }
     if (fenceMatch) {
+      flush()
       fence = fenceMatch[1]
       body.push(line)
       continue
     }
     const h1 = /^#\s+(.+?)\s*$/.exec(line)
-    if (h1 && !titleTaken) {
+    if (h1 && !titleTaken && !prose.length) {
       title = h1[1]
       titleTaken = true
       continue
     }
-    body.push(
-      themedShot(line, sourcePath, opts, images) ?? rewriteProse(line, sourcePath, opts, images)
-    )
+    if (!line.trim()) {
+      flush()
+      body.push(line)
+      continue
+    }
+    prose.push(line)
+    if ((prose.join('\n').match(/`/g) ?? []).length % 2 === 0) {
+      flush()
+    }
   }
+  flush()
   const frontmatter = [
     '---',
     `title: ${quote(title)}`,
