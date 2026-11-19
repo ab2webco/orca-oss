@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -17,7 +17,8 @@ const INTERNAL_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_INTERNAL'
 const ASAR_ENV = 'ORCA_PACKAGED_WATCHDOG_SMOKE_ASAR'
 const TIMEOUT_MS = 100
 const CHECK_INTERVAL_MS = 20
-const POLL_TIMEOUT_MS = 5_000
+// Why 30 s: the worker records the stall (macOS samples for 3 s) before it reads the next heartbeat.
+const POLL_TIMEOUT_MS = 30_000
 // Why 30 s: hosted Linux cold starts measured 0.7-8.7 s after PR 602, and two were killed at 15 s.
 const SPAWN_BUDGET_MS = 30_000
 const SUCCESS_LINE = '[packaged-watchdog-smoke] app.asar worker detected and recovered a stall'
@@ -69,6 +70,19 @@ async function waitForMarker(markerPath, predicate, workerError) {
   throw new Error(`Timed out waiting for packaged watchdog marker at ${markerPath}`)
 }
 
+// Why: the record is what a person attaches after a hang; prove the packaged worker writes it.
+function assertHangRecord(userDataPath) {
+  const logsDir = join(userDataPath, 'logs')
+  const name = readdirSync(logsDir).find((entry) => entry.startsWith(`main-hang-${process.pid}-`))
+  const text = name ? readFileSync(join(logsDir, name), 'utf8') : ''
+  if (
+    !text.includes('== Threads of the main process ==') ||
+    !text.includes('Main thread answered again after')
+  ) {
+    throw new Error(`Packaged watchdog wrote no complete hang record in ${logsDir}`)
+  }
+}
+
 async function waitForExit(worker, workerError) {
   const exitCode = await Promise.race([
     new Promise((resolveExit) => worker.once('exit', resolveExit)),
@@ -106,6 +120,7 @@ async function runInternal() {
       workerData: {
         parentPid: process.pid,
         markerPath,
+        userDataPath: tempRoot,
         timeoutMs: TIMEOUT_MS,
         checkIntervalMs: CHECK_INTERVAL_MS
       }
@@ -119,6 +134,7 @@ async function runInternal() {
     worker.postMessage({ type: 'heartbeat' })
     await waitForMarker(markerPath, (marker) => marker?.selfRecovered === true, workerError)
     logPhase('recovered')
+    assertHangRecord(tempRoot)
     worker.postMessage({ type: 'shutdown' })
     await waitForExit(worker, workerError)
     logPhase('worker-exited')
