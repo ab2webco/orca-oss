@@ -8,7 +8,8 @@ export type HangWatchdogDetectionLoopConfig = {
 }
 
 export type HangWatchdogDetectionLoop = {
-  recordHeartbeat: () => void
+  /** sentAt: when main sent it; defaults to now. */
+  recordHeartbeat: (sentAt?: number) => void
   tick: () => void
 }
 
@@ -19,8 +20,8 @@ export function createHangWatchdogDetectionLoop(
   let lastTickAt = config.now()
   let detected = false
   return {
-    recordHeartbeat: () => {
-      const now = config.now()
+    recordHeartbeat: (sentAt) => {
+      const now = Math.min(sentAt ?? config.now(), config.now())
       if (detected) {
         detected = false
         config.onHangResolved(now - lastHeartbeatAt)

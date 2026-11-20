@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- main-process entry point; owns app lifecycle, service wiring, window creation, and hook/daemon startup with no cleaner split seam. */
 import { existsSync, statSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import os from 'node:os'
 import { getManagedClaudeProjectsPathsForSessionDiscovery } from './claude-accounts/managed-projects-session-discovery'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor, type Tray } from 'electron'
@@ -2364,7 +2364,9 @@ void app.whenReady().then(async () => {
     recordDurableCrashBreadcrumb('main_thread_hang_detected', {
       unresponsiveMs: hangDetection.unresponsiveMs,
       previousPid: hangDetection.parentPid,
-      selfRecovered: hangDetection.selfRecovered
+      selfRecovered: hangDetection.selfRecovered,
+      // Why: the file name only; a crash report must not carry the home path.
+      reportFile: hangDetection.reportPath ? basename(hangDetection.reportPath) : null
     })
   }
   // Why: install certificate decisions before any webview or headless window issues its first TLS request.

@@ -10,6 +10,8 @@ export type HangDetectionMarker = {
   parentPid: number
   unresponsiveMs: number
   selfRecovered: boolean
+  /** The `logs/main-hang-*.txt` record of where the main thread waited. */
+  reportPath?: string
 }
 
 export function hangDetectionMarkerPath(userDataPath: string): string {
@@ -46,7 +48,8 @@ export function consumeHangDetectionMarker(markerPath: string): HangDetectionMar
       parentPid: parsed.parentPid,
       unresponsiveMs: parsed.unresponsiveMs,
       // Why: a marker left by the detect leg and never rewritten means the stall never cleared.
-      selfRecovered: parsed.selfRecovered === true
+      selfRecovered: parsed.selfRecovered === true,
+      ...(typeof parsed.reportPath === 'string' ? { reportPath: parsed.reportPath } : {})
     }
   } catch {
     return null

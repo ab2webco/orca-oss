@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { consumeHangDetectionMarker } from './hang-detection-marker'
+import type * as MarkerModule from './hang-detection-marker'
+import type * as ReportModule from './main-thread-hang-report'
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(() => ({ unref: vi.fn() }))
@@ -10,6 +12,30 @@ const { spawnMock } = vi.hoisted(() => ({
 
 vi.mock('node:child_process', () => ({
   spawn: spawnMock
+}))
+
+// Why: snapshot the record each time the marker is written, to check what a marker reader finds.
+const { recordAtMarkerWrite } = vi.hoisted(() => ({ recordAtMarkerWrite: [] as string[] }))
+vi.mock('./hang-detection-marker', async (importOriginal) => {
+  const original = await importOriginal<typeof MarkerModule>()
+  return {
+    ...original,
+    writeHangDetectionMarker: (
+      path: string,
+      marker: Parameters<typeof original.writeHangDetectionMarker>[1]
+    ) => {
+      if (marker.reportPath) {
+        recordAtMarkerWrite.push(readFileSync(marker.reportPath, { encoding: 'utf8', flag: 'a+' }))
+      }
+      original.writeHangDetectionMarker(path, marker)
+    }
+  }
+})
+vi.mock('./main-thread-hang-report', async (importOriginal) => ({
+  ...(await importOriginal<typeof ReportModule>()),
+  writeMainThreadHangReport: (options: { reportPath: string }) => {
+    writeFileSync(options.reportPath, 'stalled\n')
+  }
 }))
 
 import {
@@ -122,6 +148,7 @@ describe('watchdog worker entry', () => {
       isHangWatchdogWorkerData({
         parentPid: 42,
         markerPath: '/tmp/marker',
+        userDataPath: '',
         timeoutMs: 100,
         checkIntervalMs: 25
       })
@@ -129,10 +156,29 @@ describe('watchdog worker entry', () => {
     for (const value of [
       null,
       {},
-      { parentPid: 0, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: 7, timeoutMs: 100, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 0, checkIntervalMs: 25 },
-      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: Infinity }
+      {
+        parentPid: 0,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 100,
+        checkIntervalMs: 25
+      },
+      { parentPid: 42, markerPath: 7, userDataPath: '', timeoutMs: 100, checkIntervalMs: 25 },
+      { parentPid: 42, markerPath: '/tmp/marker', timeoutMs: 100, checkIntervalMs: 25 },
+      {
+        parentPid: 42,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 0,
+        checkIntervalMs: 25
+      },
+      {
+        parentPid: 42,
+        markerPath: '/tmp/marker',
+        userDataPath: '',
+        timeoutMs: 100,
+        checkIntervalMs: Infinity
+      }
     ]) {
       expect(isHangWatchdogWorkerData(value)).toBe(false)
     }
@@ -154,6 +200,7 @@ describe('watchdog worker entry', () => {
         {
           parentPid: process.pid,
           markerPath,
+          userDataPath: '',
           timeoutMs: 100,
           checkIntervalMs: 25
         },
@@ -175,6 +222,40 @@ describe('watchdog worker entry', () => {
       expect(consumeHangDetectionMarker(markerPath)).toBeNull()
     } finally {
       rmSync(markerPath, { force: true })
+    }
+  })
+
+  it('closes the record before the marker says the stall cleared', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'hang-watchdog-order-'))
+    mkdirSync(join(userDataPath, 'logs'))
+    let onMessage: ((message: { type: 'heartbeat' | 'shutdown' }) => void) | undefined
+    const port = {
+      on: vi.fn(
+        (_event: 'message', listener: (message: { type: 'heartbeat' | 'shutdown' }) => void) => {
+          onMessage = listener
+        }
+      ),
+      close: vi.fn()
+    }
+    recordAtMarkerWrite.length = 0
+    try {
+      runWatchdog(
+        {
+          parentPid: process.pid,
+          markerPath: join(userDataPath, 'marker.json'),
+          userDataPath,
+          timeoutMs: 100,
+          checkIntervalMs: 25
+        },
+        port
+      )
+      vi.advanceTimersByTime(150)
+      onMessage?.({ type: 'heartbeat' })
+      onMessage?.({ type: 'shutdown' })
+      expect(recordAtMarkerWrite).toHaveLength(2)
+      expect(recordAtMarkerWrite[1]).toContain('Main thread answered again after')
+    } finally {
+      rmSync(userDataPath, { recursive: true, force: true })
     }
   })
 })

@@ -23,9 +23,6 @@ function positiveTiming(value: string | undefined, fallback: number): number {
 export function installMainThreadHangWatchdog(options: {
   userDataPath: string
 }): MainThreadHangWatchdogHandle | null {
-  if (process.platform !== 'darwin') {
-    return null
-  }
   // Why: dev main threads pause in debuggers routinely; watch packaged builds only unless forced.
   if (!app.isPackaged && process.env.ORCA_HANG_WATCHDOG_FORCE !== '1') {
     return null
@@ -34,6 +31,7 @@ export function installMainThreadHangWatchdog(options: {
   const workerData: HangWatchdogWorkerData = {
     parentPid: process.pid,
     markerPath: hangDetectionMarkerPath(options.userDataPath),
+    userDataPath: options.userDataPath,
     timeoutMs: positiveTiming(process.env.ORCA_HANG_WATCHDOG_TIMEOUT_MS, HANG_WATCHDOG_TIMEOUT_MS),
     checkIntervalMs: positiveTiming(
       process.env.ORCA_HANG_WATCHDOG_CHECK_INTERVAL_MS,
@@ -66,7 +64,7 @@ export function installMainThreadHangWatchdog(options: {
     }
   }
   const heartbeatTimer = setInterval(() => {
-    postMessage({ type: 'heartbeat' })
+    postMessage({ type: 'heartbeat', sentAt: Date.now() })
   }, HANG_WATCHDOG_HEARTBEAT_INTERVAL_MS)
   const stop = (): void => {
     if (stopped) {

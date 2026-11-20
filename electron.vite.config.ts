@@ -255,7 +255,11 @@ export const electronViteConfig: UserConfig = {
           // Why: account import mutates the user's macOS Keychain from the CLI.
           'claude-accounts/keychain': resolve('src/main/claude-accounts/keychain.ts'),
           // Why: `orca skills update` finds every agent home holding a skill from the CLI.
-          'skills/skill-repoint-agent-keys': resolve('src/main/skills/skill-repoint-agent-keys.ts')
+          'skills/skill-repoint-agent-keys': resolve('src/main/skills/skill-repoint-agent-keys.ts'),
+          // Why: a timed-out CLI call records where a stuck runtime's main process waits.
+          'hang-watchdog/main-thread-hang-report': resolve(
+            'src/main/hang-watchdog/main-thread-hang-report.ts'
+          )
         },
         // Why: Rolldown's SSR default is ESM, but Electron and sidecar launchers
         // consume these stable CommonJS paths.
