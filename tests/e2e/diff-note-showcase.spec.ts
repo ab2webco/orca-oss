@@ -6,7 +6,7 @@ import { setTheme } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { sizeWindow } from './helpers/game-showcase-demo-party'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
-import { glideAndClick, glideTo, movePointer, showPointer } from './helpers/showcase-pointer'
+import { glideAndClick, movePointer, showPointer } from './helpers/showcase-pointer'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 
@@ -147,7 +147,10 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
   const clip = await showcaseClip(electronApp, testInfo, 'diff-note')
   await orcaPage.waitForTimeout(1_500)
 
-  await glideTo(orcaPage, line)
+  // Why the indent: over a word Monaco opens a type hover, and Linux CI then never shows the add button.
+  const lineBox = (await line.boundingBox())!
+  await movePointer(orcaPage, lineBox.x + 6, lineBox.y + lineBox.height / 2)
+  await line.hover({ position: { x: 6, y: lineBox.height / 2 } })
   await orcaPage.waitForTimeout(600)
   const add = orcaPage.locator('.orca-diff-comment-add-btn').first()
   await expect(add).toBeVisible()
