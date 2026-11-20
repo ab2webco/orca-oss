@@ -91,3 +91,52 @@ describe('superseded cancelled runs in a GitHub rollup (ORCA-1269)', () => {
     expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
   })
 })
+
+describe('superseded cancelled runs in the review list checks (ORCA-1301)', () => {
+  const run = (
+    name: string,
+    workflowRunId: number,
+    conclusion: PRCheckDetail['conclusion'],
+    workflowName = 'PR Checks'
+  ): PRCheckDetail => ({
+    name,
+    status: 'completed',
+    conclusion,
+    url: null,
+    workflowRunId,
+    workflowName
+  })
+
+  it('reads green when a newer run of the workflow replaced a cancelled one', () => {
+    expect(
+      derivePRCheckStatus([
+        run('build', 100, 'cancelled'),
+        run('verify', 100, 'failure'),
+        run('build', 101, 'success'),
+        run('verify', 101, 'success')
+      ])
+    ).toBe('success')
+  })
+
+  it('still reads red when the newest run was cancelled, or another workflow failed', () => {
+    expect(
+      derivePRCheckStatus([run('build', 100, 'success'), run('build', 101, 'cancelled')])
+    ).toBe('failure')
+    expect(
+      derivePRCheckStatus([
+        run('build', 100, 'cancelled'),
+        run('build', 101, 'success'),
+        run('lint', 90, 'failure', 'Lint')
+      ])
+    ).toBe('failure')
+  })
+
+  it('keeps a row with no workflow name, as the REST path returns', () => {
+    expect(
+      derivePRCheckStatus([
+        { name: 'build', status: 'completed', conclusion: 'failure', url: null, workflowRunId: 1 },
+        run('build', 2, 'success')
+      ])
+    ).toBe('failure')
+  })
+})

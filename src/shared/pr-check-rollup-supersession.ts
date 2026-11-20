@@ -7,10 +7,13 @@ function runOf(raw: unknown): RollupRun | null {
     return null
   }
   const workflow: unknown = Reflect.get(raw, 'workflowName')
+  // Why: a gh rollup entry carries detailsUrl; a normalized PRCheckDetail carries workflowRunId.
+  const id: unknown = Reflect.get(raw, 'workflowRunId')
   const url: unknown = Reflect.get(raw, 'detailsUrl')
   const match = typeof url === 'string' ? ACTIONS_RUN_ID.exec(url) : null
-  return typeof workflow === 'string' && workflow !== '' && match
-    ? { workflow, runId: Number(match[1]) }
+  const runId = typeof id === 'number' ? id : match ? Number(match[1]) : null
+  return typeof workflow === 'string' && workflow !== '' && runId !== null
+    ? { workflow, runId }
     : null
 }
 
