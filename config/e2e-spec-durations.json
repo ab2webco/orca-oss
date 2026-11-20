@@ -1,5 +1,5 @@
 {
-  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them; user-docs-path-shots from the changed-spec report of merge group 44169926136; team-panel-machines-board from the changed-spec report of merge group 44180966065; sidebar-solo-rows from the changed-spec report of merge group 44351770337; sidebar-solo-hover from the changed-spec report of PR Checks run 44389352397; team-panel-showcase from the changed-spec report of PR Checks run 44462209681",
+  "source": "Merge group 44166014367 (PR Checks, #1302 on 54c76ac566): shards 1-11 from their JSON reports; shard 12, cancelled at its cap, from job log 134339643695, where user-docs-help-screens ran 2 of its 4 tests; older figures kept for specs that run did not reach; specs whose every test is @headful or @ondemand at 0, since the suite shards never run them; user-docs-path-shots from the changed-spec report of merge group 44169926136; team-panel-machines-board from the changed-spec report of merge group 44180966065; sidebar-solo-rows from the changed-spec report of merge group 44351770337; sidebar-solo-hover from the changed-spec report of PR Checks run 44389352397; team-panel-showcase from the changed-spec report of PR Checks run 44462209681; arcade-center-room from the changed-spec report of PR Checks run 44653553795",
   "seconds": {
     "tests/e2e/active-view-restart-restore.spec.ts": 20,
     "tests/e2e/activity-agent-pane-isolation.spec.ts": 114,
@@ -17,6 +17,7 @@
     "tests/e2e/agent-status-claude-monitor-idle.spec.ts": 24,
     "tests/e2e/ai-vault-session-delete.spec.ts": 32,
     "tests/e2e/app-menu-paste-ownership.spec.ts": 32,
+    "tests/e2e/arcade-center-room.spec.ts": 47,
     "tests/e2e/artificial-opencode-terminal-load.spec.ts": 198,
     "tests/e2e/automation-account-picker.spec.ts": 96,
     "tests/e2e/automation-hidden-terminal-first-mount.spec.ts": 14,
