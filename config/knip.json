@@ -23,6 +23,7 @@
     "src/renderer/src/web/main.tsx",
     "src/renderer/src/**/*.worker.ts",
     "src/cli/index.ts",
+    "src/cli/runtime/main-hang-capture-entry.ts",
     "src/relay/relay.ts",
     "src/relay/wsl-agent-hook-relay.ts",
     "config/scripts/**/*.{mjs,cjs,js,ts}",

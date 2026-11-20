@@ -1,5 +1,4 @@
 ---
-import { commandHtml } from '../../data/command-html'
 import { docsHref, type Lang } from '../../data/product'
 import Clip from './Clip.astro'
 
@@ -12,41 +11,30 @@ const copy = {
   en: {
     eyebrow: 'Agentic, on every machine',
     title: 'The laptop you stopped using can run two members tonight.',
-    lede: 'Every Orca you pair becomes a host the lead can place members on. A strong workstation takes the heavy tickets, an old laptop adds its own accounts, and your main machine stays responsive.',
-    comments: ['# pair a host: the desktop app, or orca serve on headless Linux', '# place a member on it', '# every host against its cap, cores, memory and load'],
+    lede: 'Pair any Orca as a host, and heavy tickets leave your main machine.',
     points: [
-      ['Caps that add up', 'Each host’s cap comes from its own memory and cores; the lead’s cap is the sum. A launch past a host’s cap is refused and names a host with room.'],
-      ['Each host brings its accounts', 'A remote member picks a Claude or Codex account from that host’s roster, so a machine adds quota, not only CPU.'],
-      ['One fleet, both ways', 'Remote members show up in the Team panel with ticket, PR and CI, report with the same typed messages, and open their terminal through the host.'],
-      ['Private by default', 'Pair over Tailscale or your LAN; after a restart `game resume-members` wakes what it put to sleep.']
+      ['Caps that add up', 'Memory and cores set each cap; a full host names another.'],
+      ['Each host brings its accounts', 'Its Claude and Codex accounts: more quota, not just CPU.'],
+      ['One fleet, both ways', 'Ticket, PR, CI, reports and terminal, like local ones.'],
+      ['Private by default', 'Tailscale or LAN; `game resume-members` wakes them after a restart.']
     ],
     more: 'Headless Linux server guide'
   },
   es: {
     eyebrow: 'Agéntico, en cada máquina',
     title: 'La laptop que dejaste de usar puede correr dos miembros esta noche.',
-    lede: 'Cada Orca que emparejas se vuelve un host donde el líder puede poner miembros. Una estación potente toma los tickets pesados, un portátil viejo suma sus propias cuentas y tu máquina principal sigue fluida.',
-    comments: ['# empareja un host: la app de escritorio, u orca serve en Linux sin pantalla', '# pon un miembro ahí', '# cada host frente a su tope, núcleos, memoria y carga'],
+    lede: 'Empareja cualquier Orca como host, y los tickets pesados dejan tu máquina principal.',
     points: [
-      ['Topes que se suman', 'El tope de cada host sale de su memoria y sus núcleos; el del líder es la suma. Un lanzamiento por encima del tope se rechaza y sugiere un host con espacio.'],
-      ['Cada host trae sus cuentas', 'Un miembro remoto elige una cuenta de Claude o Codex del host, así una máquina suma cuota, no solo CPU.'],
-      ['Una sola flota', 'Los miembros remotos aparecen en el panel Team con ticket, PR y CI, reportan con los mismos mensajes tipados y abren su terminal a través del host.'],
-      ['Privado por defecto', 'Empareja por Tailscale o tu red local; tras un reinicio, `game resume-members` despierta lo que puso a dormir.']
+      ['Topes que se suman', 'Memoria y núcleos fijan cada tope; un host lleno sugiere otro.'],
+      ['Cada host trae sus cuentas', 'Sus cuentas de Claude y Codex: más cuota, no solo CPU.'],
+      ['Una sola flota', 'Ticket, PR, CI, reportes y terminal, como los locales.'],
+      ['Privado por defecto', 'Tailscale o red local; `game resume-members` los despierta tras reiniciar.']
     ],
     more: 'Guía de servidor Linux sin pantalla'
   }
 }[lang]
 
 const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
-const commands = [
-  'orca environment add --name build-box --pairing-code orca://pair?code=…',
-  'orca game launch ACME-219 --on build-box --repo name:acme-api',
-  'orca game fleet'
-]
-// Why a string: whitespace inside <pre> is the output, so the template's indentation must stay out.
-const block = commands
-  .map((line, i) => `<span class="c">${copy.comments[i]}</span>\n<span class="p">$ </span>${commandHtml(line)}`)
-  .join('\n')
 ---
 
 <section class="section" id="multi-host" aria-labelledby="multi-host-title">
@@ -55,30 +43,20 @@ const block = commands
     <h2 class="h2" id="multi-host-title">{copy.title}</h2>
     <p class="lede">{copy.lede}</p>
     <div class="split flip">
-      <div>
-        <ul class="dash">
-          {
-            copy.points.map(([title, text]) => (
-              <li>
-                <b>{title}.</b> <span set:html={code(text)} />
-              </li>
-            ))
-          }
-        </ul>
-        <ul class="links">
-          <li><a href={docsHref(lang, 'remote/headless-linux-server')}>{copy.more}</a></li>
-        </ul>
-      </div>
-      <div>
-        <Clip lang={lang} name="team-machines" />
-        <pre class="prompt box" set:html={block} />
-      </div>
+      <ul class="dash">
+        {
+          copy.points.map(([title, text]) => (
+            <li>
+              <b>{title}.</b> <span set:html={code(text)} />
+            </li>
+          ))
+        }
+      </ul>
+      <Clip lang={lang} name="team-machines" />
     </div>
+    <ul class="links">
+      <li><a href={docsHref(lang, 'remote/headless-linux-server')}>{copy.more}</a></li>
+    </ul>
   </div>
 </section>
 
-<style>
-  .prompt {
-    margin-top: 16px;
-  }
-</style>

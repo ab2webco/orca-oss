@@ -29,12 +29,12 @@ const t = {
     you: 'You',
     pause: ['Pause', 'Play'],
     steps: [
-      ['The plan', 'The lead plans the ticket', 'It reads LUM-23 from your tracker and writes the model and effort for each phase.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
-      ['A host', 'It picks a host with room', 'Each machine reports its members, memory and load; render-01 has a free slot. With accounts: auto the member starts on the account with the most quota left.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
-      ['The models', 'Each member gets its model', 'The plan or the kind of work picks it, and the card shows it: Orin on Opus 5.5 at high, Ivy, launched with --kind captures, on Sonnet 5.5 at medium.', ''],
-      ['Jev, report', 'Jev gates, the member reports', 'With the Jev Advisor plugin every Bash command is allowed, refused or sent to you. Orin finishes with a typed report.', 'orca orchestration send --type worker_done'],
-      ['CI to main', 'CI, the merge queue, main', 'PR #49 goes green on GitHub, waits its turn in the merge queue and lands on main.', ''],
-      ['Your call', 'Your call, on any screen', 'What only you can decide reaches your Inbox on desktop and phone, and your answer goes back to the lead.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
+      ['The plan', 'The lead plans the ticket', 'It reads LUM-23 from your tracker and sets each phase’s model and effort.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
+      ['A host', 'It picks a host with room', 'Each machine reports its load; render-01 has a free slot. With accounts: auto, the member gets the account with the most quota.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
+      ['The models', 'Each member gets its model', 'The plan or the kind of work picks it: Orin on Opus 5.5 high, Ivy (--kind captures) on Sonnet 5.5 medium.', ''],
+      ['Jev, report', 'Jev gates, the member reports', 'The Jev Advisor plugin allows, refuses or asks you about each Bash command. Orin ends with a typed report.', 'orca orchestration send --type worker_done'],
+      ['CI to main', 'CI, the merge queue, main', 'PR #49 goes green on GitHub, waits in the merge queue and lands on main.', ''],
+      ['Your call', 'Your call, on any screen', 'Your decisions reach the Inbox on desktop and phone; the answer goes back to the lead.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
     ]
   },
   es: {
@@ -57,12 +57,12 @@ const t = {
     you: 'Tú',
     pause: ['Pausa', 'Reproducir'],
     steps: [
-      ['El plan', 'El líder planifica el ticket', 'Lee LUM-23 de tu tracker y escribe el modelo y el esfuerzo de cada fase.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
-      ['Un host', 'Elige un host con espacio', 'Cada máquina reporta sus miembros, memoria y carga; render-01 tiene un hueco libre. Con accounts: auto el miembro arranca en la cuenta con más cuota.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
-      ['Los modelos', 'Cada miembro recibe su modelo', 'El plan o el tipo de trabajo lo elige, y la tarjeta lo muestra: Orin en Opus 5.5 high, Ivy, lanzada con --kind captures, en Sonnet 5.5 medium.', ''],
-      ['Jev, reporte', 'Jev filtra, el miembro reporta', 'Con el plugin Jev Advisor cada comando Bash se permite, se rechaza o te llega a ti. Orin termina con un reporte tipado.', 'orca orchestration send --type worker_done'],
-      ['CI a main', 'CI, la merge queue, main', 'El PR #49 pasa a verde en GitHub, espera su turno en la merge queue y llega a main.', ''],
-      ['Tu decisión', 'Tu decisión, en cualquier pantalla', 'Lo que solo tú puedes decidir llega a tu Inbox en escritorio y móvil, y tu respuesta vuelve al líder.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
+      ['El plan', 'El líder planifica el ticket', 'Lee LUM-23 de tu tracker y fija el modelo y el esfuerzo de cada fase.', 'orca game plan LUM-23 --phase "implement:opus-5-5:high:new screen"'],
+      ['Un host', 'Elige un host con espacio', 'Cada máquina reporta su carga; render-01 tiene un hueco libre. Con accounts: auto, el miembro usa la cuenta con más cuota.', 'orca game launch LUM-23 --on render-01 --repo name:lumen-app'],
+      ['Los modelos', 'Cada miembro recibe su modelo', 'El plan o el tipo de trabajo lo elige: Orin en Opus 5.5 high, Ivy (--kind captures) en Sonnet 5.5 medium.', ''],
+      ['Jev, reporte', 'Jev filtra, el miembro reporta', 'El plugin Jev Advisor permite, rechaza o te consulta cada comando Bash. Orin termina con un reporte tipado.', 'orca orchestration send --type worker_done'],
+      ['CI a main', 'CI, la merge queue, main', 'El PR #49 pasa a verde en GitHub, espera en la merge queue y llega a main.', ''],
+      ['Tu decisión', 'Tu decisión, en cualquier pantalla', 'Tus decisiones llegan al Inbox en escritorio y móvil; la respuesta vuelve al líder.', 'orca game ask-owner --ticket LUM-23 --question "Retry uploads on cellular?" --option Yes --option "Wi-Fi only"']
     ]
   }
 }[lang]
@@ -79,6 +79,21 @@ const pulses = [
   <div class="wrap run" data-run>
     <h2 class="h2" id="run-title">{t.title}</h2>
     <p class="lede">{t.lede}</p>
+    <div class="controls" hidden data-run-controls>
+      {t.steps.map(([short], i) => <button type="button" data-pick={i + 1}><span>{i + 1}</span>{short}</button>)}
+      <button type="button" class="toggle" data-run-toggle data-pause={t.pause[0]} data-play={t.pause[1]}>{t.pause[0]}</button>
+    </div>
+    <ol class="captions" aria-live="polite">
+      {
+        t.steps.map(([, title, body, command], i) => (
+          <li data-step={i + 1}>
+            <h3>{`${i + 1}. ${title}`}</h3>
+            <p>{body}</p>
+            {command && <pre set:html={commandHtml(command)} />}
+          </li>
+        ))
+      }
+    </ol>
     <figure class="stage">
       <svg viewBox="0 0 1312 540" role="img" aria-labelledby="run-svg-title run-svg-desc">
         <title id="run-svg-title">{t.title}</title>
@@ -109,21 +124,6 @@ const pulses = [
         {pulses.map(([s, d]) => <circle class="pulse" data-s={s} r="5" style={`offset-path: path('${d}')`}></circle>)}
       </svg>
     </figure>
-    <div class="controls" hidden data-run-controls>
-      {t.steps.map(([short], i) => <button type="button" data-pick={i + 1}><span>{i + 1}</span>{short}</button>)}
-      <button type="button" class="toggle" data-run-toggle data-pause={t.pause[0]} data-play={t.pause[1]}>{t.pause[0]}</button>
-    </div>
-    <ol class="captions" aria-live="polite">
-      {
-        t.steps.map(([, title, body, command], i) => (
-          <li data-step={i + 1}>
-            <h3>{`${i + 1}. ${title}`}</h3>
-            <p>{body}</p>
-            {command && <pre set:html={commandHtml(command)} />}
-          </li>
-        ))
-      }
-    </ol>
   </div>
 </section>
 

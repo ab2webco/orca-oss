@@ -1,4 +1,4 @@
-import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -24,6 +24,30 @@ function getPackagedCliPath(appDir) {
     return join(appDir, 'resources', 'bin', 'orca.exe')
   }
   return join(appDir, 'resources', 'bin', 'orca-ide')
+}
+
+function getUnpackedOutDir(appDir) {
+  const resources =
+    process.platform === 'darwin' || appDir.endsWith('.app')
+      ? join(appDir, 'Contents', 'Resources')
+      : join(appDir, 'resources')
+  return join(resources, 'app.asar.unpacked', 'out')
+}
+
+// Why: a timed-out CLI call spawns this entry from app.asar.unpacked, outside asar's require hook,
+// so every module it loads from out/main must be unpacked too.
+async function assertHangCaptureEntryRecords(appDir, root) {
+  const entry = join(getUnpackedOutDir(appDir), 'cli', 'runtime', 'main-hang-capture-entry.js')
+  const reportPath = join(root, 'logs', 'main-hang-smoke.txt')
+  const options = {
+    reportPath,
+    parentPid: process.pid,
+    unresponsiveMs: 30_000,
+    detectedAt: Date.now(),
+    observer: 'the packaged CLI smoke'
+  }
+  await execFileAsync(process.execPath, [entry, JSON.stringify(options)], { timeout: 60_000 })
+  assert.match(await readFile(reportPath, 'utf8'), /== Threads of the main process ==/)
 }
 
 const appDir = resolve(readAppDirArg(process.argv.slice(2)))
@@ -68,7 +92,8 @@ try {
   )
   assert.equal(install.executed, false)
   assert.equal(update.executed, false)
-  console.log(`[packaged-cli-smoke] help and skills commands passed via ${cliPath}`)
+  await assertHangCaptureEntryRecords(copiedAppDir, tempRoot)
+  console.log(`[packaged-cli-smoke] help, skills and hang-capture commands passed via ${cliPath}`)
 } catch (error) {
   smokeFailure = error
 }

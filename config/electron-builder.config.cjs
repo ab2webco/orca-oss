@@ -182,6 +182,8 @@ module.exports = {
     'out/main/claude-accounts/keychain.js',
     // Why: `orca skills update` loads it from the CLI to find every agent home holding a skill.
     'out/main/skills/skill-repoint-agent-keys.js',
+    // Why: a timed-out CLI call spawns out/cli's capture entry, which loads it to record a stuck runtime.
+    'out/main/hang-watchdog/main-thread-hang-report.js',
     'out/main/codex/**',
     'out/main/copilot/**',
     'out/main/cursor/**',

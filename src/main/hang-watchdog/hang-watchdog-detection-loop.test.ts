@@ -54,6 +54,20 @@ describe('createHangWatchdogDetectionLoop', () => {
     expect(onHangDetected).toHaveBeenCalledWith(50_000)
   })
 
+  // Why: the worker is busy sampling for up to 20 s, so main's heartbeat waits in its queue.
+  it('measures recovery from when main sent the heartbeat, not when the worker read it', () => {
+    const { loop, onHangDetected, onHangResolved, advance } = loopWithClock()
+    loop.recordHeartbeat()
+    for (let i = 0; i < 12; i++) {
+      advance(CHECK_INTERVAL_MS)
+      loop.tick()
+    }
+    expect(onHangDetected).toHaveBeenCalledTimes(1)
+    advance(15_000)
+    loop.recordHeartbeat(62_000)
+    expect(onHangResolved).toHaveBeenCalledWith(62_000)
+  })
+
   it('does not fire at exactly the timeout boundary', () => {
     const { loop, onHangDetected, advance } = loopWithClock()
     loop.recordHeartbeat()
