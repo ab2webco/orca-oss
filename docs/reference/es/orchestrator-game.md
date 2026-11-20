@@ -1,5 +1,5 @@
 ---
-sourceHash: 114e9f03fcc28059
+sourceHash: a02470a83ca270d9
 ---
 
 # El juego orquestador de Agent Teams
@@ -761,8 +761,7 @@ escena y los encabezados de los mensajes del líder lo leen de ahí
 ([`orchestrator-game-lead-names.ts`](../../../src/main/runtime/orchestrator-game-lead-names.ts)).
 
 En el teléfono, Ajustes → Agent Teams → **Names** fija los nombres globales del líder y de los
-miembros de la computadora vinculada, dice de dónde sale cada uno y borra el que queda vacío. Un host
-sin `mobile.agent-teams-names.v1` rechaza la clave `agentTeamsNames`, así que el teléfono pide actualizar
+miembros. Un host sin `mobile.agent-teams-names.v1` rechaza esa clave, así que el teléfono pide actualizar
 ([`agent-teams-names-settings.ts`](../../../src/shared/agent-teams-names-settings.ts)).
 
 Los verbos del líder, ejecutados desde la terminal del líder

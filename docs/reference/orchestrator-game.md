@@ -731,8 +731,7 @@ headings all read it there
 ([`orchestrator-game-lead-names.ts`](../../src/main/runtime/orchestrator-game-lead-names.ts)).
 
 On the phone, Settings → Agent Teams → **Names** sets the paired computer's global lead and member
-names, says where each comes from, and clears one left empty. A host without
-`mobile.agent-teams-names.v1` rejects the `agentTeamsNames` key, so the phone asks for an update
+names. A host without `mobile.agent-teams-names.v1` rejects that key, so the phone asks for an update
 ([`agent-teams-names-settings.ts`](../../src/shared/agent-teams-names-settings.ts)).
 
 The lead's verbs, run from the lead's terminal

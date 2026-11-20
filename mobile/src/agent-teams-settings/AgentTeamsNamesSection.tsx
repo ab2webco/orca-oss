@@ -17,13 +17,16 @@ type Props = {
 /** Settings → Agent Teams → Names: where the names come from, and this computer's own (ORCA-1304). */
 export function AgentTeamsNamesSection({ state, hostName, onLeadName, onMemberNames }: Props) {
   const [open, setOpen] = useState<string | null>(null)
+  const heading = <Text style={styles.sectionHeading}>Names</Text>
   if (state.kind !== 'ready') {
+    const why = state.kind === 'failed' ? `Could not read the names: ${state.message}` : null
     return state.kind === 'loading' ? null : (
-      <Text style={styles.message}>
-        {state.kind === 'failed'
-          ? `Could not read the names: ${state.message}`
-          : `Update Orca on ${hostName || 'this computer'} to name the team here`}
-      </Text>
+      <>
+        {heading}
+        <Text style={styles.intro}>
+          {why ?? `Update Orca on ${hostName || 'this computer'} to name the team here`}
+        </Text>
+      </>
     )
   }
   const { names } = state
@@ -48,10 +51,9 @@ export function AgentTeamsNamesSection({ state, hostName, onLeadName, onMemberNa
     }
   ]
   const editing = fields.find((field) => field.label === open)
-  const close = () => setOpen(null)
   return (
     <>
-      <Text style={styles.sectionHeading}>Names</Text>
+      {heading}
       <Text style={styles.intro}>
         Each member takes the next free name from the scene. The lead is called Lead until you name
         it.
@@ -89,16 +91,15 @@ export function AgentTeamsNamesSection({ state, hostName, onLeadName, onMemberNa
         allowEmpty
         onSubmit={(value) => {
           editing?.submit(value)
-          close()
+          setOpen(null)
         }}
-        onCancel={close}
+        onCancel={() => setOpen(null)}
       />
     </>
   )
 }
 
 const styles = StyleSheet.create({
-  message: { paddingTop: spacing.xl, fontSize: typography.bodySize, color: colors.textSecondary },
   sectionHeading: {
     marginTop: spacing.xl,
     paddingBottom: spacing.xs,

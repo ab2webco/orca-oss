@@ -101,10 +101,10 @@ describe('AgentTeamsNamesSection', () => {
     expect(onMemberNames.mock.calls).toEqual([[['Bo', 'Cy']], [null]])
   })
 
-  it('asks for an update on an older host instead of drawing the section', () => {
+  it('asks for an update on an older host under the Names heading', () => {
     const { text } = render({ kind: 'unsupported' })
 
-    expect(text()).toBe('Update Orca on Mac to name the team here')
+    expect(text()).toBe('Names\nUpdate Orca on Mac to name the team here')
   })
 
   it('has no roster to show for a scene file, which only the desktop reads', () => {
