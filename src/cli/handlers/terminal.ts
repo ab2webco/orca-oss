@@ -37,7 +37,7 @@ import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import type { TuiAgent } from '../../shared/types'
 import { RuntimeClientError } from '../runtime-client'
 import { resolveAccountSelectorFlags } from '../account-selector'
-import { sendFollowingRemoteMember } from './remote-member-terminal-send'
+import { callFollowingRemoteMember, sendFollowingRemoteMember } from './remote-member-terminal-send'
 import { attachAgentTerminalToTask, resolveTaskAttachRequest } from './agent-terminal-task-attach'
 import { terminalWakeHandler } from './terminal-wake'
 import {
@@ -130,11 +130,15 @@ export const TERMINAL_HANDLERS: Record<string, CommandHandler> = {
     if (cursorFlag !== undefined && cursor === undefined) {
       throw new RuntimeClientError('invalid_argument', '--cursor must be a non-negative integer')
     }
-    const result = await client.call<{ terminal: RuntimeTerminalRead }>('terminal.read', {
-      terminal: await getTerminalHandle(flags, cwd, client),
-      ...(cursor !== undefined ? { cursor } : {}),
-      limit: getOptionalPositiveIntegerFlag(flags, 'limit')
-    })
+    const result = await callFollowingRemoteMember<{ terminal: RuntimeTerminalRead }>(
+      client,
+      'terminal.read',
+      {
+        terminal: await getTerminalHandle(flags, cwd, client),
+        ...(cursor !== undefined ? { cursor } : {}),
+        limit: getOptionalPositiveIntegerFlag(flags, 'limit')
+      }
+    )
     printResult(result, json, formatTerminalRead)
   },
   'terminal state': async ({ flags, client, cwd, json }) => {

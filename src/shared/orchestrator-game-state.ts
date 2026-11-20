@@ -18,6 +18,7 @@ import type { GameStop } from './orchestrator-game-stop-state'
 import type { GameInboxSummary } from './orchestrator-game-inbox'
 import type { GameGitHubBudget } from './orchestrator-game-github-budget'
 import type { GameMetricsSummary } from './orchestrator-game-metrics-summary'
+import type { GameRemoteHost } from './orchestrator-game-remote-host'
 import type { GameMemberAdvisor } from './orchestrator-game-member-advisor'
 import type { GameMemberSteward } from './orchestrator-game-member-steward'
 import type { SupportedUiLocale } from './ui-locale'
@@ -88,23 +89,6 @@ export type GameAgent = {
   remote?: GameRemoteHost
   /** A session no `game launch` started: listed and stopped by name, never acted on in bulk (ORCA-914). */
   found?: true
-}
-
-export type GameRemoteHost = {
-  host: string
-  /** The paired environment View opens the member's terminal through (ORCA-839). */
-  environmentId?: string
-  stateKnown: boolean
-  /** Launched by a lead that no longer leads it; read from the home Run DB (ORCA-793). */
-  earlierLead?: true
-  /** The home Run completed the member's task. */
-  ticketDone?: true
-  /** The host answered and the member's terminal is no longer there (ORCA-790). */
-  gone?: true
-  /** A host restart slept the member's pane; resume wakes it (ORCA-915). Absent from an older host. */
-  asleep?: true
-  /** Its start failed and no agent answers for it, so its name is free again (ORCA-1034). */
-  startFailed?: true
 }
 
 export type GameMemberAccount = { provider: 'claude' | 'codex'; id: string; email: string }

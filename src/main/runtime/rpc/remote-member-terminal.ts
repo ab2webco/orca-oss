@@ -10,7 +10,8 @@ export type RemoteMemberTerminalHost = { host: string; environmentId: string }
  */
 export function remoteMemberTerminalError(
   runtime: OrcaRuntimeService,
-  handle: string
+  handle: string,
+  verb: 'send' | 'read' = 'send'
 ): OrchestrationError | null {
   let federated
   try {
@@ -26,7 +27,7 @@ export function remoteMemberTerminalError(
   const data: RemoteMemberTerminalHost = { host, environmentId: federated.environment_id }
   return new OrchestrationError(
     'terminal_handle_stale',
-    `${handle} is not a terminal here: it runs on the paired host ${host}. Send to it with \`orca terminal send --environment ${host} --terminal ${handle}\`.`,
+    `${handle} is not a terminal here: it runs on the paired host ${host}. Use \`orca terminal ${verb} --environment ${host} --terminal ${handle}\`.`,
     data
   )
 }

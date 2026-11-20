@@ -19,6 +19,7 @@ vi.mock('./orchestrator-game-host-client', () => ({
 import { RuntimeClientError } from '../runtime-client'
 import { LEAD, fakeClient, member, run, stateWith } from './orchestrator-game-fleet-test-fixtures'
 import { sendFollowingRemoteMember } from './remote-member-terminal-send'
+import { TERMINAL_HANDLERS } from './terminal'
 
 const remoteMember = member({
   displayName: 'CIN-7',
@@ -100,6 +101,23 @@ describe("sends to a remote member's terminal (ORCA-976)", () => {
     expect(host.calls).toEqual([
       ['env_m1', 'terminal.send', { terminal: 'term_remote', text: 'continue' }]
     ])
+  })
+
+  // Why: the lead read three live members on m1 as terminal_handle_stale without --environment (ORCA-1301).
+  it('terminal read follows the host the home names for the handle', async () => {
+    const home = vi.fn(async () => {
+      throw staleNamingHost()
+    })
+
+    await TERMINAL_HANDLERS['terminal read']({
+      flags: new Map([['terminal', 'term_remote']]),
+      client: { call: home, isRemote: false } as never,
+      cwd: '/repo',
+      json: true
+    })
+
+    expect(home).toHaveBeenCalledTimes(1)
+    expect(host.calls).toEqual([['env_m1', 'terminal.read', { terminal: 'term_remote' }]])
   })
 
   it('keeps the error of an older home that names no host, and of a remote client', async () => {

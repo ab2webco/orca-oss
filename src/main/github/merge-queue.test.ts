@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeQueueOfResponse } from './merge-queue'
+import { mergeQueueDepartureOfResponse, mergeQueueOfResponse } from './merge-queue'
 
 const entry = (position: number, state: string, number: number | null = position) => ({
   position,
@@ -70,5 +70,27 @@ describe('mergeQueueOfResponse', () => {
     })
 
     expect(mergeQueueOfResponse(stdout)?.[0]?.since).toBeNull()
+  })
+})
+
+describe('mergeQueueDepartureOfResponse (ORCA-1273)', () => {
+  const departure = (pullRequest: unknown): string =>
+    JSON.stringify({ data: { repository: { pullRequest } } })
+
+  it("reads the PR's state and its last removal's reason and actor", () => {
+    const nodes = [
+      { reason: 'failed_checks', actor: { login: 'github-merge-queue' } },
+      { reason: 'merged', actor: { login: 'github-merge-queue' } }
+    ]
+    expect(
+      mergeQueueDepartureOfResponse(departure({ state: 'MERGED', timelineItems: { nodes } }))
+    ).toEqual({ state: 'merged', reason: 'merged', actor: 'github-merge-queue' })
+  })
+
+  it('keeps the state when no removal is on the timeline, and is null for no PR', () => {
+    expect(
+      mergeQueueDepartureOfResponse(departure({ state: 'OPEN', timelineItems: { nodes: [] } }))
+    ).toEqual({ state: 'open', reason: null, actor: null })
+    expect(mergeQueueDepartureOfResponse(departure(null))).toBeNull()
   })
 })
