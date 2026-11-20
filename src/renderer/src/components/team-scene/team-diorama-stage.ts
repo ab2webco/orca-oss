@@ -22,6 +22,15 @@ export type DioramaStage = {
   dispose: () => void
 }
 
+/** The canvas's WebGL renderer, or null where WebGL does not open (hardware acceleration off). */
+export function dioramaRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer | null {
+  try {
+    return new THREE.WebGLRenderer({ canvas, antialias: true })
+  } catch {
+    return null
+  }
+}
+
 /** One read of the team as a lit world with its cast, its lead's round and the moments playing. */
 export function dioramaStage(
   renderer: THREE.WebGLRenderer,
@@ -38,6 +47,8 @@ export function dioramaStage(
     pace: DioramaPace
     /** The camera, kept across reads: it follows the lead, frames everything, or stays put. */
     view: DioramaView
+    /** The tallest the stage may be; the phone keeps its band short. */
+    maxHeight?: number
   }
 ): DioramaStage {
   const { input, layout, views, cues } = args
@@ -82,7 +93,7 @@ export function dioramaStage(
     )
   )
 
-  const fit = dioramaFitCamera(world, args.width)
+  const fit = dioramaFitCamera(world, args.width, args.maxHeight)
   renderer.setSize(args.width, fit.height, true)
   // The sun's shadow box covers the whole world, or shadows stop a few metres from the middle.
   const center = fit.ground.getCenter(new THREE.Vector3())

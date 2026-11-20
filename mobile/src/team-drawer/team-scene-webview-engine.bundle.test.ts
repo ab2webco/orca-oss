@@ -6,7 +6,7 @@ import { TEAM_SCENE_ENGINE_JS } from './team-scene-webview-engine.generated'
 
 // Why: an old Android System WebView lacks these; the page must still draw on it.
 const STRIP_NEWER_BUILT_INS = `
-  delete Array.prototype.toSorted; delete Array.prototype.findLast;
+  delete Array.prototype.toSorted; delete Array.prototype.toReversed; delete Array.prototype.findLast;
   delete Array.prototype.findLastIndex; delete Array.prototype.at;
   delete Object.hasOwn; delete String.prototype.replaceAll;
 `
@@ -29,7 +29,7 @@ type Page = {
 }
 
 /** A WebView page with no canvas behind it: the 2D context records text and draws nothing. */
-function loadPage(strip: boolean): Page {
+function loadPage(strip: boolean, opts: { threeD?: { style: { display?: string } } } = {}): Page {
   const posted: Page['posted'] = []
   const drawn: string[] = []
   const thrown: string[] = []
@@ -87,7 +87,13 @@ function loadPage(strip: boolean): Page {
     Image: function Image() {},
     document: {
       getElementById: (id: string) =>
-        id === 'stage' ? stage : id === 'overlay' || id === 'names' ? element() : null,
+        id === 'stage'
+          ? stage
+          : id === 'overlay' || id === 'names'
+            ? element()
+            : id === 'stage3d' && opts.threeD
+              ? { ...opts.threeD, getContext: () => null }
+              : null,
       createElement
     }
   })
@@ -175,6 +181,7 @@ const SHIM_CASES = [
   `[1, 2, 3].findLastIndex((v, i, all) => all.length === 3 && i === 0)`,
   `[[1, 2, 3].at(-1), [1, 2, 3].at(5), [1, 2, 3].at(1.7), [1, 2, 3].at(-4)]`,
   `(() => { const a = [3, 1, 2]; return [a.toSorted(), a, a.toSorted((x, y) => y - x)] })()`,
+  `(() => { const a = [3, 1, 2]; return [a.toReversed(), a, [].toReversed()] })()`,
   `[Object.hasOwn({ a: 1 }, 'a'), Object.hasOwn(Object.create({ a: 1 }), 'a')]`,
   `(() => { const keys = []; for (const k in []) keys.push(k); for (const k in '') keys.push(k); return keys })()`
 ]
@@ -204,7 +211,7 @@ describe('the Team scene WebView bundle', () => {
     const native = createContext({})
     expect(answersIn(stripped.realm)).toEqual(answersIn(native))
     const builtIns = `[Array.prototype.at, Array.prototype.findLast, Array.prototype.findLastIndex,
-      Array.prototype.toSorted, String.prototype.replaceAll, Object.hasOwn]`
+      Array.prototype.toSorted, Array.prototype.toReversed, String.prototype.replaceAll, Object.hasOwn]`
     const kept = createContext({})
     runInContext(`var before = ${builtIns}`, kept)
     const page = loadPage(false)
@@ -234,6 +241,29 @@ describe('the Team scene WebView bundle', () => {
       ['closePath'],
       ['moveTo', 0, 0]
     ])
+  })
+
+  // ORCA-1296: a phone WebView with no WebGL keeps drawing Figures in 2D when the host asks for 3D.
+  it('keeps Figures in 2D where the 3D canvas gets no WebGL, and never breaks the page', async () => {
+    const stage3d = { style: { display: 'none' } }
+    const page = loadPage(true, { threeD: stage3d })
+    await page.send({
+      kind: 'stage',
+      stage: {
+        art: { kind: 'bundled', style: 'figures' },
+        images: {},
+        scenes: [],
+        timezone: 'America/Bogota',
+        nowMs: Date.UTC(2026, 10, 16, 3, 0),
+        colors: { attention: '#f00', done: '#a0f', working: '#0f0', risk: '#fa0' },
+        diorama: { quality: 'high', pace: 'normal' }
+      }
+    })
+    await page.send({ kind: 'input', input, leadLine: null, advisorName: 'Jev', machines: [] })
+    page.flush(10)
+    expect(stage3d.style.display).toBe('none')
+    expect(page.posted.filter((one) => one.kind === 'error')).toEqual([])
+    expect(page.thrown).toEqual([])
   })
 
   it('stops drawing after a paint throws, and says so once', async () => {

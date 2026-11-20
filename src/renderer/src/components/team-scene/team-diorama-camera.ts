@@ -13,7 +13,11 @@ export type DioramaFit = {
 }
 
 /** An isometric camera that frames the whole world at `width`, and the stage height that fits it. */
-export function dioramaFitCamera(world: THREE.Object3D, width: number): DioramaFit {
+export function dioramaFitCamera(
+  world: THREE.Object3D,
+  width: number,
+  maxHeight = 520
+): DioramaFit {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400)
   camera.position.copy(DIORAMA_VIEW).multiplyScalar(80)
   camera.lookAt(0, 0, 0)
@@ -38,7 +42,7 @@ export function dioramaFitCamera(world: THREE.Object3D, width: number): DioramaF
   const ys = corners.map((v) => v.y)
   const fw = Math.max(...xs) - Math.min(...xs) + 1.6
   const fh = Math.max(...ys) - Math.min(...ys) + 1.6
-  const height = Math.round(Math.max(240, Math.min(width * (fh / fw), 520)))
+  const height = Math.round(Math.max(240, Math.min(width * (fh / fw), maxHeight)))
   const aspect = width / height
   const half =
     fw / 2 / aspect > fh / 2
