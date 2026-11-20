@@ -402,8 +402,7 @@ describe('orca game launch', () => {
         terminalHandle: 'h1',
         ticket: 'CIN-12',
         locale: 'en',
-        // Elaine is the lead's own character while no Lead name is set (ORCA-1094).
-        taken: ['Arthur', 'Elaine']
+        taken: ['Arthur']
       })
     )
     expect(reserve.roster[0]).toEqual({ en: 'Arthur', es: 'Arturo' })

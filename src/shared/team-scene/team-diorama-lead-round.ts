@@ -13,6 +13,16 @@ import type { DioramaRoadNet } from './team-diorama-roads'
 /** How the lead gets about: walking like a person, 2.5 times faster, or sent by the court mage. */
 export type DioramaPace = 'normal' | 'fast' | 'direct'
 
+/** What a pace does to any scene's walkers: walk speed, how long a word lasts, and whether a trip is
+ * a jump. An unknown pace, from a newer client's setting, walks at normal. */
+export type DioramaPaceFactors = { speed: number; holdScale: number; jump: boolean }
+
+export const dioramaPaceOf = (pace: string | undefined): DioramaPaceFactors => ({
+  speed: pace === 'fast' ? 2.5 : 1,
+  holdScale: pace === 'fast' || pace === 'direct' ? 0.6 : 1,
+  jump: pace === 'direct'
+})
+
 export type DioramaLeadStep =
   | { kind: 'walk'; pts: DioramaPoint[]; cum: number[]; start: number; dur: number }
   | { kind: 'row'; column: number; pts: DioramaPoint[]; cum: number[]; start: number; dur: number }
@@ -66,8 +76,7 @@ export function dioramaLeadRoundOf(args: {
   stands?: ReadonlyMap<string, DioramaPoint>
 }): DioramaLeadRound {
   const { layout, roads, water, pace } = args
-  const speed = pace === 'fast' ? 2.5 : 1
-  const holdScale = pace === 'normal' ? 1 : 0.6
+  const { speed, holdScale, jump } = dioramaPaceOf(pace)
   const steps: DioramaLeadStep[] = []
   let t = 0
   const push = (step: DioramaLeadStep) => {
@@ -75,7 +84,7 @@ export function dioramaLeadRoundOf(args: {
     t += step.dur
   }
   const walk = (from: DioramaPoint, to: DioramaPoint): DioramaPoint => {
-    if (pace === 'direct') {
+    if (jump) {
       push({ kind: 'jump', from, to, start: t, dur: JUMP })
       return to
     }
@@ -137,7 +146,7 @@ export function dioramaLeadRoundOf(args: {
     if (!dock || !island.dock) {
       continue
     }
-    if (pace === 'direct') {
+    if (jump) {
       for (const stand of stands) {
         here = walk(here, talkSpotOf(stand))
         talk(here, stand)

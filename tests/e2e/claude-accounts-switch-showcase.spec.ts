@@ -4,6 +4,7 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { glideTo, showPointer } from './helpers/showcase-pointer'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 import { writeSettings } from './helpers/settings-write'
 
@@ -74,26 +75,103 @@ test('switches the active Claude account from the accounts pane', async ({
     state.openSettingsTarget({ pane: 'accounts', repoId: null, sectionId: 'accounts-claude' })
     state.openSettingsPage()
   })
+  // Why: invented accounts are never checked, so the store gets a verified sign-in and quota per account.
+  await orcaPage.evaluate((at) => {
+    const usage = (session: number, weekly: number) => ({
+      provider: 'claude' as const,
+      session: {
+        usedPercent: session,
+        windowMinutes: 300,
+        resetsAt: at + 2_400_000,
+        resetDescription: null
+      },
+      weekly: {
+        usedPercent: weekly,
+        windowMinutes: 10_080,
+        resetsAt: at + 259_200_000,
+        resetDescription: null
+      },
+      updatedAt: at,
+      error: null,
+      status: 'ok' as const
+    })
+    const usageById: Record<string, ReturnType<typeof usage>> = {
+      'demo-work': usage(82, 64),
+      'demo-team': usage(18, 31),
+      'demo-oss': usage(6, 12)
+    }
+    const store = window.__store!
+    const demo = window as unknown as { demoActive: string; demoSeed: () => void }
+    demo.demoActive = 'demo-work'
+    const seeded = new WeakSet<object>()
+    demo.demoSeed = () => {
+      const ids = Object.keys(usageById)
+      const next = {
+        ...store.getState().rateLimits,
+        claude: usageById[demo.demoActive]!,
+        inactiveClaudeAccounts: ids
+          .filter((id) => id !== demo.demoActive)
+          .map((id) => ({
+            accountId: id,
+            rateLimits: usageById[id]!,
+            updatedAt: at,
+            isFetching: false
+          })),
+        claudeAccountAuth: ids.map((id) => ({
+          accountId: id,
+          state: 'authenticated' as const,
+          checkedAt: at - 240_000,
+          failure: null,
+          undecided: null,
+          undecidedAt: null,
+          checking: false
+        }))
+      }
+      seeded.add(next)
+      store.setState({ rateLimits: next })
+    }
+    store.subscribe((state) => {
+      if (!seeded.has(state.rateLimits)) {
+        demo.demoSeed()
+      }
+    })
+    demo.demoSeed()
+  }, now)
 
   // Why: each beat holds long enough to read before the next action.
   const hold = () => orcaPage.waitForTimeout(HOLD_MS)
 
   const section = orcaPage.locator('#accounts-claude')
+  await expect(section.getByText('Sign-in verified 4m ago')).toHaveCount(3)
   await expect(section.getByRole('button', { name: /work@example\.com.*Active/ })).toBeVisible({
     timeout: 15_000
   })
   await section.evaluate((element) => element.scrollIntoView({ block: 'start' }))
+  await showPointer(orcaPage, WINDOW_WIDTH * 0.7, WINDOW_HEIGHT * 0.8)
   const clip = await showcaseClip(electronApp, testInfo, 'claude-accounts-switch')
   await hold()
 
-  await section.getByRole('button', { name: /team@example\.com/ }).click()
+  await glideTo(orcaPage, section.getByText('team@example.com', { exact: true }))
+  await orcaPage.evaluate(() => {
+    const demo = window as unknown as { demoActive: string; demoSeed: () => void }
+    demo.demoActive = 'demo-team'
+    demo.demoSeed()
+  })
+  await orcaPage.mouse.down()
+  await orcaPage.mouse.up()
   await expect(section.getByRole('button', { name: /team@example\.com.*Active/ })).toBeVisible()
   await expect(orcaPage.getByText('Claude account updated.')).toBeVisible()
   await hold()
 
-  await section.getByRole('button', { name: /oss@example\.com/ }).click()
+  await glideTo(orcaPage, section.getByText('oss@example.com', { exact: true }))
+  await orcaPage.evaluate(() => {
+    const demo = window as unknown as { demoActive: string; demoSeed: () => void }
+    demo.demoActive = 'demo-oss'
+    demo.demoSeed()
+  })
+  await orcaPage.mouse.down()
+  await orcaPage.mouse.up()
   await expect(section.getByRole('button', { name: /oss@example\.com.*Active/ })).toBeVisible()
-  await hold()
   await orcaPage.waitForTimeout(1_500)
   await clip.stop()
 })
