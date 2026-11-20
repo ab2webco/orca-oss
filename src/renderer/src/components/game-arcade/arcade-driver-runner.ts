@@ -7,7 +7,7 @@ import {
   type RunnerShape,
   type RunnerState
 } from '../../../../shared/orchestrator-game-arcade-runner-rules'
-import { arcadeBackdropOf, paintRunnerRun } from './arcade-runner-paint'
+import { arcadeBackdropOf, paintRunnerRun } from './arcade-canvas-paint'
 import type { ArcadeDriver } from './arcade-run-state'
 
 /** A sprite obstacle as the canvas draws it: its rows and their 24-bit colours. */

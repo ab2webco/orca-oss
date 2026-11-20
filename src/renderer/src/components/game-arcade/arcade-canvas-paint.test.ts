@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arcadeFitPxOf, arcadeLinesOf } from './arcade-canvas-paint'
+import { arcadeFitPxOf, arcadeLinesOf, ridgeStepsOf } from './arcade-canvas-paint'
 
 describe('arcadeLinesOf', () => {
   const chars = (line: string) => line.length
@@ -28,5 +28,19 @@ describe('arcadeFitPxOf', () => {
   it('shrinks the size in proportion so the widest line fits, down to the floor', () => {
     expect(arcadeFitPxOf(22, 160, 105, 12)).toBe(14)
     expect(arcadeFitPxOf(22, 400, 105, 12)).toBe(12)
+  })
+})
+
+describe('ridgeStepsOf', () => {
+  it('ends the ridge on the right edge when the width is not a multiple of the step', () => {
+    const steps = ridgeStepsOf(318)
+    expect(steps[0]).toBe(0)
+    expect(steps.at(-1)).toBe(318)
+  })
+
+  it('does not repeat the edge when the width lands on a step', () => {
+    const steps = ridgeStepsOf(320)
+    expect(steps.at(-1)).toBe(320)
+    expect(steps.filter((x) => x === 320)).toHaveLength(1)
   })
 })

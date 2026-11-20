@@ -79,8 +79,15 @@ const GAMES = {
 const SIZE = { width: 800, height: 600, scale: 1 }
 const WORDS = { score: '5 pts', hint: 'hint', held: 'held', over: 'Game over', overHint: 'back' }
 
-/** The colours one frame of `engine` draws mid-run and on its game-over screen, under `theme`. */
-function colorsOf(engine: keyof typeof GAMES): Set<string> {
+type Engine = keyof typeof GAMES
+/** The games whose scene paints with tokens; each split part of ORCA-1299 adds its own. */
+const TOKEN_ENGINES: Engine[] = []
+
+/**
+ * The colours one frame of `engine` draws mid-run and on its game-over screen, under `theme`;
+ * without `scene`, only the overlay text and card the four games share, as a themed game shows them.
+ */
+function colorsOf(engine: Engine, scene = true): Set<string> {
   const colors = new Set<string>()
   const g = recordingContext(colors)
   let run = { ...arcadeRunOf(GAMES[engine], 7), screen: 'running' as const }
@@ -90,6 +97,9 @@ function colorsOf(engine: keyof typeof GAMES): Set<string> {
       break
     }
     run = { ...stepped, screen: 'running' }
+  }
+  if (!scene) {
+    run = { ...run, play: { ...run.play, paint: () => {}, isThemed: true } }
   }
   const backdrop = {} as HTMLCanvasElement
   paintArcadeFrame(g, backdrop, run, WORDS, SIZE)
@@ -120,24 +130,33 @@ function rolesOf(
   return { roles, stray }
 }
 
+/** Every colour is a token of its theme, and the two themes paint the same roles in their own. */
+function expectThemed(paint: () => Set<string>): void {
+  theme = DARK
+  const dark = paint()
+  theme = LIGHT
+  const light = paint()
+  expect(rolesOf(dark, DARK).stray, 'colours no dark token explains').toEqual([])
+  expect(rolesOf(light, LIGHT).stray, 'colours no light token explains').toEqual([])
+  expect([...rolesOf(light, LIGHT).roles].sort()).toEqual([...rolesOf(dark, DARK).roles].sort())
+  expect([...dark].some((color) => light.has(color))).toBe(false)
+  expect(rolesOf(dark, DARK).roles).toContain('foreground')
+}
+
 describe('the arcade painters draw with the app tokens', () => {
   beforeEach(() => {
     theme = DARK
   })
 
-  for (const engine of Object.keys(GAMES) as (keyof typeof GAMES)[]) {
-    it(`${engine}: every colour is a token of the current theme, and switching theme repaints in its colours`, () => {
-      theme = DARK
-      const dark = colorsOf(engine)
-      theme = LIGHT
-      const light = colorsOf(engine)
+  it('the score, hint and game-over card take the theme in every game', () => {
+    for (const engine of Object.keys(GAMES) as Engine[]) {
+      expectThemed(() => colorsOf(engine, false))
+    }
+  })
 
-      expect(rolesOf(dark, DARK).stray, 'colours no dark token explains').toEqual([])
-      expect(rolesOf(light, LIGHT).stray, 'colours no light token explains').toEqual([])
-      // The same roles paint the scene in both themes, each in that theme's own colour.
-      expect([...rolesOf(light, LIGHT).roles].sort()).toEqual([...rolesOf(dark, DARK).roles].sort())
-      expect([...dark].some((color) => light.has(color))).toBe(false)
-      expect(rolesOf(dark, DARK).roles).toContain('foreground')
+  for (const engine of TOKEN_ENGINES) {
+    it(`${engine}: every colour is a token of the current theme, and switching theme repaints in its colours`, () => {
+      expectThemed(() => colorsOf(engine))
     })
   }
 })
