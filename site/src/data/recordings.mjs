@@ -75,15 +75,15 @@ export const RECORDINGS = {
   },
   'mobile-inbox-ios.gif': {
     width: 360,
-    height: 782,
-    en: 'The iOS app’s Inbox: the leads’ questions by project, each with its options and a field to answer.',
-    es: 'El Inbox de la app de iOS: las preguntas de los líderes por proyecto, cada una con sus opciones y un campo para responder.'
+    height: 783,
+    en: 'The iOS app’s Team sheet: the lead’s question arrives, is answered from the Inbox, and the member goes back to work.',
+    es: 'La hoja Equipo de la app de iOS: llega la pregunta del líder, se responde desde el Inbox y el miembro vuelve a trabajar.'
   },
-  'mobile-team-android.gif': {
+  'mobile-team-ios.gif': {
     width: 360,
-    height: 800,
-    en: 'The Android app’s Team drawer: questions waiting on your answer and a card per member with its PR and CI.',
-    es: 'El panel Equipo de la app de Android: preguntas que esperan tu respuesta y una tarjeta por miembro con su PR y CI.'
+    height: 783,
+    en: 'The iOS app’s Team sheet: the live scene, each member’s state in its colour, the merge queue and the hosts.',
+    es: 'La hoja Equipo de la app de iOS: la escena en vivo, el estado de cada miembro en su color, la cola de merge y los hosts.'
   },
   'mobile-terminal-ios.gif': {
     width: 360,

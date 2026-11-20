@@ -14,7 +14,7 @@ const copy = {
     lede: 'Pair once by QR code. Directly or through an end-to-end encrypted relay, a lead’s question finds you anywhere.',
     phones: [
       ['mobile-inbox-ios.gif', 'Owner-question Inbox', 'Answer the lead’s decision with one tap.'],
-      ['mobile-team-android.gif', 'Team drawer', 'Open questions, each member’s ticket, state, PR and CI, merges per day, lead time.'],
+      ['mobile-team-ios.gif', 'Team drawer', 'The live scene, each member’s state, PRs, the merge queue and hosts.'],
       ['mobile-terminal-ios.gif', 'Live terminals', 'Watch any agent’s terminal stream and type into it.']
     ],
     ios: 'iOS via TestFlight',
@@ -27,7 +27,7 @@ const copy = {
     lede: 'Empareja una vez por QR. Directo o por un relay cifrado de extremo a extremo, la pregunta de un líder te encuentra donde estés.',
     phones: [
       ['mobile-inbox-ios.gif', 'Inbox de preguntas', 'Responde la decisión del líder con un toque.'],
-      ['mobile-team-android.gif', 'Cajón del equipo', 'Preguntas abiertas, ticket, estado, PR y CI de cada miembro, merges por día, lead time.'],
+      ['mobile-team-ios.gif', 'Cajón del equipo', 'La escena en vivo, el estado de cada miembro, PRs, la cola de merge y los hosts.'],
       ['mobile-terminal-ios.gif', 'Terminales en vivo', 'Mira la terminal de cualquier agente en tiempo real y escribe en ella.']
     ],
     ios: 'iOS por TestFlight',
@@ -74,7 +74,7 @@ const copy = {
     .phones {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    /* Why subgrid: the Android recording is taller, and the titles still share one line. */
+    /* Why subgrid: recordings can differ in height, and the titles still share one line. */
     .phones li {
       display: grid;
       grid-row: span 3;
