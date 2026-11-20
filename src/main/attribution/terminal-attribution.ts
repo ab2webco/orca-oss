@@ -199,7 +199,7 @@ function writeExecutable(filePath: string, contents: string): void {
   chmodSync(filePath, 0o755)
 }
 
-function resolveWindowsExecutable(command: string, pathValue: string): string | null {
+export function resolveWindowsExecutable(command: string, pathValue: string): string | null {
   const pathExt = (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD')
     .split(';')
     .map((ext) => ext.toLowerCase())

@@ -64,6 +64,17 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['game', 'pr-cap-check'],
+    summary: "Exits 3 when this member's gh pr create would pass its project's open-PR cap",
+    usage: 'orca game pr-cap-check',
+    allowedFlags: [...GLOBAL_FLAGS],
+    notes: [
+      "Orca's gh wrapper runs it before every gh pr create in an Orca terminal. The lead and plain sessions always pass.",
+      "Exit 0 passes, 3 refuses, and any other code means not checked, so gh runs and the lead's watch alerts."
+    ],
+    examples: ['orca game pr-cap-check']
+  },
+  {
     path: ['game', 'arcade'],
     summary:
       "The lead's saved arcade plays: read, play or keep one, or pay the terminal's kept offers",

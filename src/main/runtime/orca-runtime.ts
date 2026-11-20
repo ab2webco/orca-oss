@@ -984,6 +984,8 @@ import {
 } from '../github/client'
 import { getMergeQueueDeparture, getMergeQueueEntries } from '../github/merge-queue'
 import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
+import type { GamePrCap } from '../../shared/orchestrator-game-pr-cap'
+import { readGamePrCap, type GamePrCapCaller } from './orchestrator-game-pr-cap-read'
 import { getPullRequestsMergeable } from '../github/pull-request-mergeable'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
@@ -33367,6 +33369,23 @@ export class OrcaRuntimeService {
   }
 
   /** A PR's state and last queue removal for the caller's project, read when its watch saw it leave. */
+  /** A member's open PRs against its lead's cap, which the gh wrapper checks before `gh pr create`. */
+  async readGamePrCap(caller: GamePrCapCaller): Promise<GamePrCap> {
+    return readGamePrCap(caller, {
+      parentPaneKeyOf: async (paneKey) =>
+        (await this.getWorktreePs()).worktrees
+          .flatMap((one) => one.agents)
+          .find((row) => row.paneKey === paneKey)?.parentPaneKey ?? null,
+      isRemoteMember: ({ terminalHandle, paneKey }) =>
+        this.getOrchestrationDb().hasLiveRemoteDispatchFor(terminalHandle ?? null, paneKey ?? null),
+      leadHandleOf: (leadPaneKey) => this.getTerminalHandleForPaneKey(leadPaneKey),
+      readLeadCap: async (terminalHandle, paneKey) => {
+        const lead = await this.getOrchestratorGameState({ terminalHandle, paneKey })
+        return { open: lead.project?.reviews?.total, cap: lead.lead?.cap }
+      }
+    })
+  }
+
   async readGameQueueDeparture(args: {
     worktreeId?: string
     terminalHandle?: string
