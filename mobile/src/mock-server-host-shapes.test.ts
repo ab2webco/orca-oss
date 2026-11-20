@@ -214,7 +214,8 @@ describe('mock host answers in the host shapes mobile reads', () => {
     )
   })
 
-  it("draws a plugin scene's Figures art in the Team sheet band", async () => {
+  // ORCA-1296: Figures is Orca's own art whatever the scene, on the phone as on the desktop.
+  it("draws Orca's Figures for a plugin scene in the Team sheet band", async () => {
     vi.stubEnv('MOCK_CUSTOM_SCENE', '1')
     vi.stubEnv('MOCK_PANEL_STYLE', 'figures')
     const state = await resultOf('game.state', { worktreeId: await activeWorktreeId() })
@@ -222,7 +223,7 @@ describe('mock host answers in the host shapes mobile reads', () => {
 
     expect(view?.scene).toMatchObject({
       kind: 'stage',
-      art: { kind: 'scene', style: 'figures', sceneId: 'mock/neon-heist' }
+      art: { kind: 'bundled', style: 'figures' }
     })
   })
 

@@ -2,11 +2,10 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
 
-const NOTE =
-  "This scene has no Figures art, so the Team panel draws the scene's own characters in Pixel."
+const NOTE = "Figures always draws Orca's own art; this scene changes Pixel only."
 
-// ORCA-1139 criterion 4, ORCA-1150: vigilante has no Figures art, so the panel draws it in Pixel.
-test('the Panel section says when the scene has no art for the chosen style', async ({
+// ORCA-1296: Figures and Office are Orca's own art whatever the scene; a themed scene says so.
+test('the Panel section says a themed scene leaves Figures as Orca draws it', async ({
   orcaPage
 }, testInfo) => {
   await waitForSessionReady(orcaPage)

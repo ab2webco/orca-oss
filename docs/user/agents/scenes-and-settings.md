@@ -27,9 +27,9 @@ the scene use them.
 ## Scenes
 
 A scene is a built-in one (**Quest**, **Night Watch**, **Crystal Saga**, **Beast Tamer**), one a
-plugin adds, or a scene file in the project. Pixel draws every scene. When a scene has no art for
-Figures or Office, a note in Settings says what the panel draws instead: Orca's own office, or the
-scene's characters in Pixel. The preview in Settings shows the chosen scene in the chosen style.
+plugin adds, or a scene file in the project. A scene themes Pixel; Figures and Office always draw
+Orca's own art, and a note in Settings says so when a scene other than Quest is chosen. The preview
+in Settings shows the chosen scene in the chosen style.
 
 ## Which setting wins
 
