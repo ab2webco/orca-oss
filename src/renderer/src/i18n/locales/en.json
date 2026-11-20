@@ -11789,8 +11789,7 @@
           "teamPanelLook": "Team panel: {{look}}"
         },
         "orchestrator-game-style-fallback-note": {
-          "text": "This scene has no {{style}} art, so the Team panel draws the scene's own characters in Pixel.",
-          "office": "This scene has no {{style}} art, so the Team panel draws Orca's own office."
+          "fixed": "{{style}} always draws Orca's own art; this scene changes Pixel only."
         },
         "ClaudeLongLivedTokenDialog": {
           "title": "Long-lived token",

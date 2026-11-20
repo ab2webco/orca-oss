@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d5212335fa04fe8
+sourceHash: 86ccd02504484b96
 ---
 
 # El juego orquestador de Agent Teams
@@ -1720,22 +1720,17 @@ orchestratorGame:
   opcional. Las imágenes viven en la carpeta de la escena, fuera del JSON de 64 KB, con un máximo de 2 MB
   cada una y de 8 MB y 16 megapíxeles por estilo; las rutas son relativas al archivo de la escena.
   `orca game scene validate` lee cada archivo e informa los problemas como
-  `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. El panel dibuja
-  un estilo con el arte propio de la escena cuando su bloque cubre ese estilo y las imágenes cargan
-  (`orchestratorGameSceneArtOf`). Quest se dibuja con su arte, que viene con Orca en
-  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Office conserva esa
-  oficina para cualquier escena sin arte propio de Office, porque una oficina se lee como tal en
-  cualquier tema. Cualquier otra escena sin arte de Figures se dibuja en Pixel, con sus propios
-  personajes, asesor, mascota y colores, así que una escena con tema nunca muestra los caballeros de
-  Quest. Settings dice cuál bajo el estilo. Por lo demás, un estilo pasa a Pixel solo cuando ni
-  siquiera el arte de Orca se puede decodificar. Un archivo de escena cuyo nombre es
-  `quest` es Quest, así que el arte incluido es el suyo. El panel lee las imágenes de un archivo de
-  escena bajo demanda con `game.sceneArt`, en el host dueño del worktree: en local, por SSH a través del
-  sistema de archivos remoto del worktree, y desde un host emparejado por el RPC del runtime, con el
-  caller del lead. El host sirve solo las imágenes de la escena que dibuja su worktree, contenidas en la
-  carpeta del archivo de escena, con un máximo de 2 MB cada una. Un host anterior al método, una escena
-  llevada a un miembro remoto, una escena de plugin y cualquier imagen que falle se dibujan en Pixel
-  con los personajes de la propia escena. El estado del juego lleva el bloque como campo opcional. La
+  `native.<style>…: <message>`; el juego descarta un bloque incorrecto con un aviso. Desde ORCA-1296
+  el panel de Equipo dibuja Figuras y Oficina con el arte propio de Orca sea cual sea la escena
+  (`orchestratorGameSceneArtOf`): una escena solo cambia Pixel, así que elegir Figuras u Oficina
+  siempre las muestra. Ese arte viene con Orca en
+  [`quest-art/native.json`](../../../src/renderer/src/assets/quest-art/native.json). Settings lo
+  indica bajo el estilo para cualquier escena que no sea Quest (un archivo de escena cuyo nombre es
+  `quest` es Quest). Un estilo pasa a Pixel solo cuando el arte de Orca no se puede decodificar. El
+  bloque se sigue validando, el estado del juego lo sigue llevando como campo opcional y el host sigue
+  sirviendo sus imágenes con `game.sceneArt` (solo las de la escena que dibuja su worktree, contenidas
+  en la carpeta del archivo de escena, con un máximo de 2 MB cada una), así que un Orca o una app del
+  teléfono anteriores a ORCA-1296 lo siguen dibujando. La
   [guía de escenas](../../../skill-guides/orca-game-scenes.md#native-optional) tiene el formato.
 
 **Settings.** El selector **Scene** del proyecto termina con **Custom file…**, que muestra la ruta

@@ -1,5 +1,5 @@
 ---
-sourceHash: 488804686db963e3
+sourceHash: 7e5dfcc70525c472
 ---
 # Escenas, estilos y ajustes
 
@@ -31,10 +31,9 @@ panel y la escena los usan.
 ## Escenas
 
 Una escena es una de las incluidas (**Quest**, **Night Watch**, **Crystal Saga**, **Beast Tamer**),
-una que agrega un plugin o un archivo de escena del proyecto. Pixel dibuja todas las escenas. Cuando
-una escena no tiene arte para Figures u Office, una nota en Settings dice qué dibuja el panel en su
-lugar: la oficina propia de Orca, o los personajes de la escena en Pixel. La vista previa en
-Settings muestra la escena elegida en el estilo elegido.
+una que agrega un plugin o un archivo de escena del proyecto. Una escena cambia Pixel; Figures y
+Office siempre usan el arte propio de Orca, y una nota en Settings lo dice cuando se elige una escena
+que no es Quest. La vista previa en Settings muestra la escena elegida en el estilo elegido.
 
 ## Qué ajuste gana
 
