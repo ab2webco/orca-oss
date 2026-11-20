@@ -80,40 +80,35 @@ describe('main-thread hang record', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  // TEMPORARY (ORCA-1303): 50 runs on Linux CI; reverted before merge.
-  it.each(Array.from({ length: 50 }, (_, run) => run))(
-    'records where a blocked main thread waits and when it answers again (run %i)',
-    (run) => {
-      const userDataPath = join(root, `user-data-${run}`)
-      const host = spawnSync(
-        process.execPath,
-        [join(root, 'host.cjs'), entryPath, userDataPath, join(root, 'waiter.cjs'), CHILD_TOKEN],
-        { encoding: 'utf8', timeout: 90_000 }
-      )
-      expect(host.status, host.stderr).toBe(0)
+  it('records where a blocked main thread waits and when it answers again', () => {
+    const userDataPath = join(root, 'user-data')
+    const host = spawnSync(
+      process.execPath,
+      [join(root, 'host.cjs'), entryPath, userDataPath, join(root, 'waiter.cjs'), CHILD_TOKEN],
+      { encoding: 'utf8', timeout: 90_000 }
+    )
+    expect(host.status, host.stderr).toBe(0)
 
-      const logsDir = join(userDataPath, 'logs')
-      const records = readdirSync(logsDir).filter((name) => name.endsWith('.txt'))
-      expect(records).toEqual([expect.stringMatching(new RegExp(`^main-hang-${host.pid}-`))])
-      const text = readFileSync(join(logsDir, records[0]), 'utf8')
-      expect(text).toContain(`Orca Lab main process ${host.pid} stopped answering`)
-      // The child the main thread is parked on names the wait.
-      expect(text).toContain(CHILD_TOKEN)
-      if (process.platform === 'darwin') {
-        // sample's main-thread stack reaches the spawnSync the thread is parked in.
-        expect(text).toContain('com.apple.main-thread')
-        expect(text).toContain('SyncProcessRunner')
-      } else if (process.platform === 'linux') {
-        expect(text).toMatch(new RegExp(`^${host.pid} \\S+ state=S `, 'm'))
-      }
-      expect(text).toMatch(/Main thread answered again after \d+ ms\.\n$/)
-      const marker = JSON.parse(readFileSync(join(userDataPath, 'main-thread-hang.json'), 'utf8'))
-      expect(marker).toMatchObject({
-        parentPid: host.pid,
-        selfRecovered: true,
-        reportPath: join(logsDir, records[0])
-      })
-    },
-    120_000
-  )
+    const logsDir = join(userDataPath, 'logs')
+    const records = readdirSync(logsDir).filter((name) => name.endsWith('.txt'))
+    expect(records).toEqual([expect.stringMatching(new RegExp(`^main-hang-${host.pid}-`))])
+    const text = readFileSync(join(logsDir, records[0]), 'utf8')
+    expect(text).toContain(`Orca Lab main process ${host.pid} stopped answering`)
+    // The child the main thread is parked on names the wait.
+    expect(text).toContain(CHILD_TOKEN)
+    if (process.platform === 'darwin') {
+      // sample's main-thread stack reaches the spawnSync the thread is parked in.
+      expect(text).toContain('com.apple.main-thread')
+      expect(text).toContain('SyncProcessRunner')
+    } else if (process.platform === 'linux') {
+      expect(text).toMatch(new RegExp(`^${host.pid} \\S+ state=S `, 'm'))
+    }
+    expect(text).toMatch(/Main thread answered again after \d+ ms\.\n$/)
+    const marker = JSON.parse(readFileSync(join(userDataPath, 'main-thread-hang.json'), 'utf8'))
+    expect(marker).toMatchObject({
+      parentPid: host.pid,
+      selfRecovered: true,
+      reportPath: join(logsDir, records[0])
+    })
+  }, 120_000)
 })
