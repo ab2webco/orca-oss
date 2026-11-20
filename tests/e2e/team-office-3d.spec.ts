@@ -77,10 +77,11 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
           await orcaPage.waitForTimeout(1500)
           const overflow = await panel.evaluate((n) => n.scrollWidth - n.clientWidth)
           expect(overflow, `panel overflows at ${name} ${theme}`).toBeLessThanOrEqual(0)
-          const stage = quality === 'high' && webgl === 'on' ? canvas : scene
+          // Why data-team-scene: Low resources draws no WebGL, so it carries no webgl attribute.
+          const stage = panel.locator('[data-team-scene]')
           const measured = await stage.evaluate((n) => n.clientWidth)
           await writeFile(testInfo.outputPath(`office-${name}-${quality}.json`), String(measured))
-          await scene.screenshot({
+          await stage.screenshot({
             path: testInfo.outputPath(`office-${name}-${quality}-${theme}.png`)
           })
         }
