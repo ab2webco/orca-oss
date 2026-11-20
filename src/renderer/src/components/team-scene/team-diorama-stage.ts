@@ -10,6 +10,7 @@ import { dioramaCast } from './team-diorama-cast'
 import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
+import { dioramaRises } from './team-diorama-rise'
 import { dioramaHomeProps } from './team-diorama-props'
 import { dioramaWorld } from './team-diorama-world-meshes'
 
@@ -54,8 +55,8 @@ export function dioramaStage(
 
   const ticks = dioramaHomeProps(kit, world)
   const lead = dioramaLeadActor(kit, world, { layout, views, input, lite })
-  const cast = dioramaCast(kit, world, { layout, views, input, lite })
-  ticks.push(lead.tick, ...cast.ticks)
+  const cast = dioramaCast(kit, world, { layout, views, input, cues, lite })
+  ticks.push(...dioramaRises(world, cues), lead.tick, ...cast.ticks)
   const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite) : null
   if (advisor) {
     ticks.push(advisor.tick)

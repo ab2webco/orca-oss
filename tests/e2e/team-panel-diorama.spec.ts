@@ -63,17 +63,22 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
       await orcaPage.waitForTimeout(3000)
       const after = await canvas.screenshot({ path: testInfo.outputPath('diorama-motion-b.png') })
       expect(Buffer.compare(before, after), 'the diorama stood still').not.toBe(0)
-      // Jev decides in Ada's pane: it lowers its spyglass and its bird flies to her.
+      // Jev decides in Ada's pane, a member joins here and a machine connects with one more.
       await seedOfficeTeam(electronApp, {
         jev,
         members: [
           { ...team[0]!, decisions: [{ id: 'd1', verdict: 'allow', gesture: 'approved' }] },
-          ...team.slice(1)
+          ...team.slice(1),
+          { name: 'Ho · ORCA-408 Build', state: 'working' },
+          { name: 'Io · ORCA-409 Build', state: 'working', host: 'm3' }
         ]
       })
       await expect(canvas).toHaveAttribute('data-diorama-cues', /bird:office:0/, {
         timeout: 30_000
       })
+      await expect(canvas).toHaveAttribute('data-diorama-cues', /arrive:office:6/)
+      await expect(canvas).toHaveAttribute('data-diorama-cues', /rise:m3/)
+      await expect(canvas).toHaveAttribute('data-diorama-islands', '4')
       for (const [n, wait] of [
         [1, 400],
         [2, 1200],

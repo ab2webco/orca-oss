@@ -47,7 +47,11 @@ function road(k: DioramaKit, pts: DioramaPoint[], parent: THREE.Object3D) {
   }
 }
 
-function dock(k: DioramaKit, from: DioramaPoint, to: DioramaPoint, parent: THREE.Object3D) {
+function dock(k: DioramaKit, from: DioramaPoint, to: DioramaPoint, into: THREE.Object3D) {
+  // Why a group: a newly connected island builds its dock up out of the water.
+  const parent = new THREE.Group()
+  parent.userData.dock = true
+  into.add(parent)
   const len = Math.hypot(to[0] - from[0], to[1] - from[1]) + 0.6
   const deck = k.mesh(
     k.box(1, 0.07, len),
@@ -168,12 +172,27 @@ export function dioramaWorld(
   const world = new THREE.Group()
   const sea = k.mesh(new THREE.PlaneGeometry(600, 600), k.mat(k.p.sea), 0, -0.95, 0, world, false)
   sea.rotation.x = -Math.PI / 2
+  // Why a group per island: a newly connected machine's island rises out of the sea as one piece.
+  const groups = new Map<string, THREE.Group>()
   for (const isl of layout.islands) {
-    island(k, isl, world)
+    const g = new THREE.Group()
+    g.userData.island = isl.key
+    world.add(g)
+    groups.set(isl.key, g)
+  }
+  const groupAt = ([x, z]: DioramaPoint): THREE.Object3D => {
+    const isl = layout.islands.find(
+      ({ rect: r }) => Math.abs(x - r.x) <= r.hw && Math.abs(z - r.z) <= r.hd
+    )
+    return (isl && groups.get(isl.key)) ?? world
+  }
+  for (const isl of layout.islands) {
+    const parent = groups.get(isl.key)!
+    island(k, isl, parent)
     for (const plot of isl.plots) {
       const view = plot.key ? views.get(plot.key) : undefined
       if (view) {
-        dioramaHouse(k, plot.x, plot.z, view, world)
+        dioramaHouse(k, plot.x, plot.z, view, parent)
       } else {
         k.mesh(
           k.box(2.7, 0.04, 2.7),
@@ -181,13 +200,13 @@ export function dioramaWorld(
           plot.x,
           0.02,
           plot.z,
-          world,
+          parent,
           false
         )
       }
     }
     if (isl.dock) {
-      dock(k, [isl.rect.x, isl.rect.z - isl.rect.hd + 0.25], isl.dock.end, world)
+      dock(k, [isl.rect.x, isl.rect.z - isl.rect.hd + 0.25], isl.dock.end, parent)
     }
     if (!isl.home) {
       dioramaTree(
@@ -196,13 +215,17 @@ export function dioramaWorld(
         isl.rect.z + 0.1,
         0.8,
         isl.column % 2 === 1,
-        world
+        parent
       )
     }
   }
   for (const r of layout.roads) {
     if (r.paved) {
-      road(k, r.pts, world)
+      road(
+        k,
+        r.pts,
+        r.pts.every((pt) => groupAt(pt) === groupAt(r.pts[0]!)) ? groupAt(r.pts[0]!) : world
+      )
     }
   }
   for (const d of Object.values(layout.homeDocks)) {

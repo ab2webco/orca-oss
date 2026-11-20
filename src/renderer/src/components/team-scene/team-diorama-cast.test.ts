@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { dioramaPlotViewOf } from '../../../../shared/team-scene/team-diorama-actions'
-import { teamDioramaLayoutOf } from '../../../../shared/team-scene/team-diorama-layout'
+import { dioramaCuesOf } from '../../../../shared/team-scene/team-diorama-cues'
+import {
+  DIORAMA_GATE,
+  teamDioramaLayoutOf
+} from '../../../../shared/team-scene/team-diorama-layout'
 import type {
   TeamSceneInput,
   TeamSceneMemberInput
@@ -20,7 +24,7 @@ const member = (key: string): TeamSceneMemberInput => ({
   mergedPr: null,
   site: { stage: 1, broken: false }
 })
-const castOf = () => {
+const castOf = (joinedAt: number | null) => {
   const input = {
     lead: { key: 'lead', name: 'lead' },
     advisor: null,
@@ -38,14 +42,36 @@ const castOf = () => {
     }
   ])
   const views = new Map([['a', dioramaPlotViewOf(member('a'))]])
-  return dioramaCast(kit(), new THREE.Group(), { layout, views, input, lite: true })
+  const cues = joinedAt === null ? [] : dioramaCuesOf([{ kind: 'join', key: 'a' }], joinedAt)
+  return dioramaCast(kit(), new THREE.Group(), { layout, views, input, cues, lite: true })
 }
 const play = (cast: ReturnType<typeof castOf>, t: number) => cast.ticks.forEach((tick) => tick(t))
 
 describe('the diorama cast', () => {
   it('stands a working member at its plot from the first frame', () => {
-    const cast = castOf()
+    const cast = castOf(null)
     play(cast, 5)
     expect(cast.figures.get('a')!.g.visible).toBe(true)
+  })
+
+  it('has a member that just joined appear at the gate and walk to its plot', () => {
+    const cast = castOf(10)
+    const f = cast.figures.get('a')!
+    const rest = f.g.position.clone()
+    play(cast, 10.1)
+    expect(f.g.visible).toBe(false)
+    play(cast, 10.6)
+    expect(f.g.visible).toBe(true)
+    expect(
+      Math.hypot(f.g.position.x - DIORAMA_GATE[0], f.g.position.z - DIORAMA_GATE[1])
+    ).toBeLessThan(0.6)
+    let last = f.g.position.clone()
+    for (let t = 10.6; t < 18; t += 1 / 30) {
+      play(cast, t)
+      // Smooth: never more than a step's worth between frames.
+      expect(f.g.position.distanceTo(last)).toBeLessThan(0.3)
+      last = f.g.position.clone()
+    }
+    expect(f.g.position.distanceTo(rest)).toBeLessThan(0.01)
   })
 })

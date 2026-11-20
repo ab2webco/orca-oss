@@ -1,3 +1,4 @@
+import type { DioramaIsland } from './team-diorama-layout'
 import type { TeamSceneEvent, TeamSceneVerdictTone } from './team-scene-types'
 
 // Why cues outlive a read: the diorama is rebuilt on every read of the team, so a moment that
@@ -7,11 +8,12 @@ import type { TeamSceneEvent, TeamSceneVerdictTone } from './team-scene-types'
  * What the diorama plays for a moment of the team:
  * `arrive` a dust puff at the keep's gate and a walk to the plot; `confetti` over a merged build;
  * `flash` a ring of light at a member; `bird` the advisor's messenger bird flying from its tower;
- * `talk` the advisor lowering its spyglass to speak.
+ * `talk` the advisor lowering its spyglass to speak; `rise` a newly connected machine's island
+ * coming up out of the sea and building its dock.
  */
 export type DioramaCue = {
-  kind: 'arrive' | 'confetti' | 'flash' | 'bird' | 'talk'
-  /** The member's pane key, `lead`, or `advisor`. */
+  kind: 'arrive' | 'confetti' | 'flash' | 'bird' | 'talk' | 'rise'
+  /** The member's pane key, `lead`, `advisor`, or an island's machine key for `rise`. */
   key: string
   tone: TeamSceneVerdictTone
   start: number
@@ -23,7 +25,8 @@ const LENGTH: Record<DioramaCue['kind'], number> = {
   confetti: 4.5,
   flash: 2.4,
   bird: 3.2,
-  talk: 4
+  talk: 4,
+  rise: 4.5
 }
 
 const cue = (
@@ -51,6 +54,36 @@ export function dioramaCuesOf(events: readonly TeamSceneEvent[], now: number): D
       out.push(cue('talk', 'advisor', e.tone, now), cue('bird', e.key, e.tone, now + 0.8))
     } else if (e.kind === 'advisorSpoke') {
       out.push(cue('talk', 'advisor', 'note', now))
+    }
+  }
+  return out
+}
+
+const RISEN = 2.8
+
+/**
+ * A machine connected since the last read: its island rises, and its members step out once it
+ * stands. The first read has nothing to compare, so opening the panel raises nothing.
+ */
+export function dioramaIslandCuesOf(
+  before: readonly string[] | null,
+  islands: readonly DioramaIsland[],
+  now: number
+): DioramaCue[] {
+  if (!before) {
+    return []
+  }
+  const known = new Set(before)
+  const out: DioramaCue[] = []
+  for (const island of islands) {
+    if (island.home || known.has(island.key)) {
+      continue
+    }
+    out.push(cue('rise', island.key, 'note', now))
+    for (const plot of island.plots) {
+      if (plot.key) {
+        out.push(cue('arrive', plot.key, 'note', now + RISEN))
+      }
     }
   }
   return out

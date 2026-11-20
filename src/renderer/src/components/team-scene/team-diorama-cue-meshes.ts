@@ -27,6 +27,40 @@ export const dioramaToneColor = (k: DioramaKit, tone: TeamSceneVerdictTone): str
     tone
   ]
 
+/** A dust puff on the ground at `at`, from `start` for 0.9 s: where someone appears. */
+export function dioramaPoof(
+  parent: THREE.Object3D,
+  at: [number, number],
+  start: number
+): DioramaTick {
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.32, 24), fading(0xffffff, 0.7))
+  ring.rotation.x = -Math.PI / 2
+  parent.add(ring)
+  const balls = [0, 1, 2, 3, 4, 5].map((n) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 1), fading(0xf2efe8, 0.85))
+    parent.add(m)
+    return [m, (n / 6) * Math.PI * 2] as const
+  })
+  return (t) => {
+    const k = (t - start) / 0.9
+    const on = k >= 0 && k < 1
+    ring.visible = on
+    for (const [m, a] of balls) {
+      m.visible = on
+      if (on) {
+        m.position.set(at[0] + Math.cos(a) * k * 0.9, 0.3 + k * 0.6, at[1] + Math.sin(a) * k * 0.9)
+        m.scale.setScalar(1 + k * 1.2)
+        ;(m.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - k)
+      }
+    }
+    if (on) {
+      ring.position.set(at[0], 0.05, at[1])
+      ring.scale.setScalar(1 + k * 4)
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - k)
+    }
+  }
+}
+
 function confetti(k: DioramaKit, parent: THREE.Object3D, at: THREE.Vector3, c: DioramaCue) {
   const colors = [k.status.done, '#ffffff', k.status.done, '#e9edf2']
   const bits = Array.from({ length: 26 }, (_, n) => {

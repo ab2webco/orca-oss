@@ -8,6 +8,7 @@ import {
 import {
   dioramaCuesLive,
   dioramaCuesOf,
+  dioramaIslandCuesOf,
   type DioramaCue
 } from '../../../../shared/team-scene/team-diorama-cues'
 import {
@@ -39,6 +40,7 @@ export function TeamSceneDiorama({
   const order = useRef<DioramaOrder | undefined>(undefined)
   const seen = useRef<TeamSceneInput | null>(null)
   const cues = useRef<DioramaCue[]>([])
+  const islandsSeen = useRef<string[] | null>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const status = useTeamSceneStatusColors()
   const [width, setWidth] = useState(0)
@@ -107,7 +109,13 @@ export function TeamSceneDiorama({
     const at = performance.now() / 1000
     const events = teamSceneEventsBetween(seen.current, input)
     seen.current = input
-    cues.current = reduced ? [] : dioramaCuesLive(cues.current, dioramaCuesOf(events, at), at)
+    // After the events: a new machine's members step out once its island stands, not before.
+    const added = [
+      ...dioramaCuesOf(events, at),
+      ...dioramaIslandCuesOf(islandsSeen.current, layout.islands, at)
+    ]
+    islandsSeen.current = layout.islands.map((island) => island.key)
+    cues.current = reduced ? [] : dioramaCuesLive(cues.current, added, at)
     const stage = dioramaStage(renderer, {
       width,
       dark: document.documentElement.classList.contains('dark'),
