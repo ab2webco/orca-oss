@@ -5,6 +5,8 @@ import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input
 import { TeamSceneBuilding, teamSceneHasFloors } from './TeamSceneBuilding'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
 import { TeamSceneDiorama } from './TeamSceneDiorama'
+import { TeamSceneOffice3d } from './TeamSceneOffice3d'
+import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { useTeamScenePainter } from './use-team-scene-painter'
@@ -56,6 +58,10 @@ export function TeamPanelScene({
   // Why a fallback: with hardware acceleration off there is no WebGL, and Figures still draws.
   const [noWebgl, setNoWebgl] = useState(false)
   const onNoWebgl = useCallback(() => setNoWebgl(true), [])
+  // Why quality, not a flag of its own: Illustrated draws the Office in 3D, Low resources keeps the 2D one.
+  const { quality } = useTeamSceneDioramaLook()
+  const office3d = drawn === 'office' && quality === 'high'
+  const webgl = (diorama && drawn === 'figures') || office3d
   return (
     <TeamScenePainterContext.Provider value={painter}>
       <TeamSceneLeadLineContext.Provider value={painter && leadUnplaced ? leadLine : null}>
@@ -63,13 +69,13 @@ export function TeamPanelScene({
           className="shrink-0 border-b border-border"
           data-team-scene={drawn}
           data-team-scene-art={art}
-          data-team-scene-webgl={
-            diorama && drawn === 'figures' ? (noWebgl ? 'off' : 'on') : undefined
-          }
+          data-team-scene-webgl={webgl ? (noWebgl ? 'off' : 'on') : undefined}
         >
           {/* Why Office and Pixel: a floor per machine; one machine keeps its single stage. */}
           {diorama && drawn === 'figures' && !noWebgl ? (
             <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} />
+          ) : office3d && !noWebgl ? (
+            <TeamSceneOffice3d model={model} onNoWebgl={onNoWebgl} />
           ) : painter && (drawn === 'office' || drawn === 'pixel') && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}

@@ -252,6 +252,17 @@ describe('TeamPanelScene', () => {
     expect(shownStyle()).toBe('figures')
   })
 
+  it('draws the 2D Office when the 3D Office gets no WebGL, as with hardware acceleration off', async () => {
+    await act(async () =>
+      root.render(<TeamPanelScene model={model({ id: 'quest', extensions: [] })} style="office" />)
+    )
+    expect(
+      host.querySelector('[data-team-scene-webgl]')?.getAttribute('data-team-scene-webgl')
+    ).toBe('off')
+    expect(host.querySelector('[data-team-scene-office3d]')).toBeNull()
+    expect(shownStyle()).toBe('office')
+  })
+
   it('holds the stage at its height while the art decodes, so the panel does not jump', async () => {
     let finish = (_art: TeamSceneImageArt): void => {}
     vi.mocked(loadTeamSceneArt).mockReturnValue(new Promise((resolve) => (finish = resolve)))
