@@ -18,6 +18,7 @@ import { openTeamSession } from './team-session-open'
 import { TeamReadNotice } from './team-panel-read-error'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { TeamArcadeSection, type TeamArcadeActions } from './TeamArcadeSection'
+import { useTeamLeadPrompt } from './use-team-lead-prompt'
 import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
 
 /** Why here: core names its advisor only in the files core-vendor-adapters.txt lists. */
@@ -39,6 +40,8 @@ function LeadCardRow({
   memberCount: number
 }): React.JSX.Element {
   const sceneLine = useContext(TeamSceneLeadLineContext)
+  const sendToLead = useTeamLeadPrompt()
+  const setupLabel = translate('teamPanel.lead.nameSetup', 'Name your lead')
   return (
     <article data-team-card="lead" className="border-b border-border">
       <button
@@ -53,7 +56,8 @@ function LeadCardRow({
         ) : null}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 whitespace-nowrap">
-            {showName ? (
+            {/* Why: an unnamed lead is "Lead", which the crown badge already says. */}
+            {showName && !lead.isNameDefault ? (
               <span data-team-name="" className="min-w-0 truncate text-[13px] font-medium">
                 {lead.name}
               </span>
@@ -96,6 +100,27 @@ function LeadCardRow({
           <MetaLine model={teamModelText(lead.model)} parts={[coordinatesText(memberCount)]} />
         </span>
       </button>
+      {lead.isNameDefault && sendToLead ? (
+        <div
+          data-team-lead-unnamed=""
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pb-2 text-xs text-muted-foreground"
+        >
+          <span className="min-w-0 flex-1 basis-32">
+            {translate(
+              'teamPanel.lead.unnamed',
+              'Your lead has no name yet. The setup asks for it.'
+            )}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-6 shrink-0 px-2 text-xs"
+            onClick={() => void sendToLead('setup', '/orca-game:setup', setupLabel)}
+          >
+            {setupLabel}
+          </Button>
+        </div>
+      ) : null}
     </article>
   )
 }

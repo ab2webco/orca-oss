@@ -16590,7 +16590,9 @@
       "waitingOnMany": "Esperando a {{count}} agentes",
       "asksOn": "Te espera · Pregunta sobre {{ticket}}",
       "asks": "Te espera",
-      "orchestrating": "Orquestando · {{action}}"
+      "orchestrating": "Orquestando · {{action}}",
+      "nameSetup": "Pon nombre al lead",
+      "unnamed": "Tu lead aún no tiene nombre. El setup te lo pregunta."
     },
     "advisor": {
       "label": "Advisor",

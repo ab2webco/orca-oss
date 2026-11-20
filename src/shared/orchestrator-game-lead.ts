@@ -58,6 +58,9 @@ export type OrchestratorGameLeadLayer = Partial<OrchestratorGameLead>
 /** Members one machine runs at once, at most; the lead's total is the sum over its hosts (ORCA-888). */
 export const GAME_HOST_CAP_MAX = 12
 /** The project's overall ceiling over every host; a bound on typos, not on capacity. */
+/** What an unnamed lead is called: the person names it in the setup, never the scene's roster. */
+export const GAME_LEAD_DEFAULT_NAME = 'Lead'
+
 export const GAME_LEAD_CAP_MAX = 100
 const GAME_LEAD_RULES_MAX = 4000
 const GAME_LEAD_LABEL_MAX = 32

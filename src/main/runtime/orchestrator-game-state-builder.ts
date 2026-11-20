@@ -20,8 +20,8 @@ import {
   gameLinksOf,
   projectGameLinksOf
 } from '../../shared/orchestrator-game-links'
+import { GAME_LEAD_DEFAULT_NAME } from '../../shared/orchestrator-game-lead'
 import { orchestratorGameScenesOf } from '../../shared/orchestrator-game-scene'
-import { leadCharacterOf, memberRosterOf } from '../../shared/orchestrator-game-member-names'
 import { desktopGameTimezoneOf } from '../../shared/orchestrator-game-render'
 import { shownOrchestratorGameTerminalOf } from '../../shared/orchestrator-game-view'
 import { orchestratorGameLocaleOf } from '../claude/orchestrator-game-launch'
@@ -195,17 +195,8 @@ export async function buildOrchestratorGameState(
       : null
   const sceneList = sceneFile?.scene ? [sceneFile.scene, ...scenes.scenes] : scenes.scenes
   const locale = orchestratorGameLocaleOf(input.settings?.uiLanguage, input.systemLocale ?? '')
-  // Why the Team card's order: a heading names the lead as its card does (ORCA-1140).
-  const character = (): string | null =>
-    leadCharacterOf(
-      memberRosterOf({ lead: placed.lead, config, extensions: { scenes: sceneList } }),
-      locale
-    )
-  // Why the parent pane: a member's state must name its lead as the lead's own does.
-  const leadPaneKey = input.callerParentPaneKey ?? input.leaderPaneKey
-  const leadName =
-    placed.lead.label ??
-    (input.leadNames ? input.leadNames.keep(leadPaneKey, character) : character())
+  // Why: a heading names the lead as its Team card does (ORCA-1140), and neither takes a roster name (ORCA-1304).
+  const leadName = placed.lead.label ?? GAME_LEAD_DEFAULT_NAME
   return {
     config,
     // Why: a hidden game's mode comes from the layer that hid it, not the one that chose the view.

@@ -3,11 +3,11 @@ import type { GamePausedMember } from './orchestrator-game-member-sessions'
 import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
   characterKeyOf,
-  leadCharacterOf,
   memberNameOf,
   memberRosterOf,
   type GameMemberName
 } from './orchestrator-game-member-names'
+import { GAME_LEAD_DEFAULT_NAME } from './orchestrator-game-lead'
 import { gameAdvisorDecisionsOf } from './orchestrator-game-member-advisor'
 import { teamAgentModelOf } from './team-panel-agent-model'
 import { teamStewardOf } from './team-panel-steward'
@@ -273,14 +273,8 @@ export function teamCardsOf(
     terminalHandle: leader.terminalHandle ?? null,
     worktreeId: state.worktree?.id ?? null,
     host: hostOf(leader),
-    // Why leadName first: the host keeps it for the session, so a scene or language change cannot rename the lead.
-    name:
-      state.leadName ??
-      state.lead?.label ??
-      leadCharacterOf(roster, locale) ??
-      leader.displayName ??
-      state.worktree?.displayName ??
-      leader.paneKey,
+    // Why leadName first: an older host may still send its own pick, which the card keeps showing.
+    name: state.leadName ?? state.lead?.label ?? GAME_LEAD_DEFAULT_NAME,
     agentType: leader.agentType,
     status: statusOf(leaderCondition, leader.state === 'waiting' || ownerAsk !== null, {
       review: null,
@@ -293,6 +287,7 @@ export function teamCardsOf(
     account: accountOf(leader, state),
     ...gameAdvisorDecisionsOf(leader.advisor),
     characterKey: null,
+    isNameDefault: !state.lead?.label,
     branch: state.worktree?.branch ?? null,
     ownerAsk
   }

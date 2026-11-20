@@ -52,8 +52,8 @@ describe('teamCardsOf', () => {
     )
     expect(cards?.lead).toMatchObject({
       paneKey: 'lead:leaf',
-      // Why not the pane's name: with no Lead name the lead is the roster's last character (ORCA-1094).
-      name: 'Elaine',
+      // Why not the pane's name: with no Lead name the lead is plain "Lead" (ORCA-1304).
+      name: 'Lead',
       branch: 'main',
       worktreeId: 'repo::/w/main',
       terminalHandle: 'term_1',
@@ -429,7 +429,7 @@ describe('teamCardsOf', () => {
     expect(cards?.members.map((one) => one.characterKey)).toEqual(['arthur', null])
   })
 
-  it('names the lead after the Lead name setting, else a roster character, never its worktree', () => {
+  it('names the lead after the Lead name setting, else the plain word, never a roster character or its worktree', () => {
     const named = teamCardsOf(
       state([{ ...lead, displayName: null }], {
         lead: { autostart: false, cap: 4, agent: 'claude', label: 'Alfred' }
@@ -437,14 +437,15 @@ describe('teamCardsOf', () => {
       new Set()
     )
     expect(named?.lead.name).toBe('Alfred')
-    // ORCA-1094 row 1: the quest roster's last character, the same in every launch of the project.
-    expect(teamCardsOf(state([{ ...lead, displayName: null }]), new Set())?.lead.name).toBe(
-      'Elaine'
-    )
+    expect(named?.lead.isNameDefault).toBe(false)
+    // ORCA-1304: the owner's call, an unnamed lead is "Lead" in every scene and language.
+    const unnamed = teamCardsOf(state([{ ...lead, displayName: null }]), new Set(), null, 'es')
+    expect(unnamed?.lead.name).toBe('Lead')
+    expect(unnamed?.lead.isNameDefault).toBe(true)
     const vigilante = state([lead], {
       config: { scene: 'vigilante' } as OrchestratorGameState['config']
     })
-    expect(teamCardsOf(vigilante, new Set())?.lead.name).toBe('Cipher')
+    expect(teamCardsOf(vigilante, new Set())?.lead.name).toBe('Lead')
   })
 
   // ORCA-1139 criterion 5: the host freezes the lead's name for the session; the card must not re-pick it.

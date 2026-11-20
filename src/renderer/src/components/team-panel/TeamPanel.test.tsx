@@ -76,7 +76,8 @@ const team: TeamPanelGameModel = {
 }
 vi.mock('./use-team-panel-model', () => ({
   useTeamPanelModel: () => ({ section: { kind: 'ready', value: team }, retry: null }),
-  refreshTeamPanelModel: vi.fn()
+  refreshTeamPanelModel: vi.fn(),
+  useTeamLeadHandle: () => null
 }))
 
 const { default: TeamPanel } = await import('./TeamPanel')
