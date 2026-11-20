@@ -11,6 +11,7 @@ import {
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { claudeVersionOk } from './helpers/orchestrator-game-band'
+import { glideAndClick, showPointer } from './helpers/showcase-pointer'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { writeShowcaseClaude } from './helpers/showcase-claude'
 import { startMessagesApi } from './helpers/showcase-messages-api'
@@ -136,13 +137,18 @@ test('agent grid groups live agents into buckets and filters them', async ({
   test.setTimeout(240_000)
   await waitForSessionReady(page)
   await resizeWindow(electronApp)
+  await writeSettings(page, { theme: 'dark' })
 
   const repo = createShowcaseRepo()
   const api = await startMessagesApi(
-    AGENTS.map((agent) => ({ match: new RegExp(agent.prompt.slice(0, 7)), text: agent.answer }))
+    AGENTS.map((agent) => ({
+      match: new RegExp(agent.prompt.slice(0, 7)),
+      text: agent.answer,
+      holdOpen: agent.state === 'working'
+    }))
   )
   const claude = live
-    ? await writeShowcaseClaude({ projectDir: repo, apiUrl: api.url, theme: 'light' })
+    ? await writeShowcaseClaude({ projectDir: repo, apiUrl: api.url, theme: 'dark' })
     : null
   try {
     await attachRepoAndOpenTerminal(page, repo)
@@ -190,43 +196,63 @@ test('agent grid groups live agents into buckets and filters them', async ({
     await expect(page.getByText('Workspace board moved to the bottom bar')).toHaveCount(0, {
       timeout: 15_000
     })
+    // Why the redraw: a pane printed before the grid wraps at its old width.
     await page.waitForTimeout(800)
-
-    const clip = await showcaseClip(electronApp, testInfo, 'agent-grid')
-    await page.waitForTimeout(1_000)
-    // Why staggered: the owner types into one agent after another, as they would.
-    for (const [index, agent] of AGENTS.entries()) {
-      if (live) {
-        await sendToTerminal(page, ptyIds[index]!, `${agent.prompt}\r`)
-        await page.waitForTimeout(500)
-      }
-    }
     if (live) {
+      // Why: a cell shows its pty's rows as printed, so each pty takes its cell's width.
+      await page.evaluate((ids) => {
+        const context = document.createElement('canvas').getContext('2d')!
+        for (const id of ids) {
+          const tail = document.querySelector<HTMLElement>(`[data-terminal-tail="${id}"]`)
+          if (!tail) {
+            throw new Error(`no grid tail for ${id}`)
+          }
+          context.font = getComputedStyle(tail).font
+          const cols = Math.floor(tail.clientWidth / context.measureText('M').width) - 2
+          window.api.pty.resize(id, cols, 40)
+        }
+      }, ptyIds)
+      await page.waitForTimeout(800)
+      for (const ptyId of ptyIds) {
+        await sendToTerminal(page, ptyId, '\x0c')
+      }
+      await page.waitForTimeout(800)
+      for (const [index, agent] of AGENTS.entries()) {
+        await sendToTerminal(page, ptyIds[index]!, `${agent.prompt}\r`)
+      }
       // Why the content, not a count: Claude Code may add its own side requests to the same API.
       const missing = () =>
         AGENTS.filter((agent) => !api.prompts.some((prompt) => prompt.includes(agent.prompt)))
       await expect
         .poll(() => missing().map((agent) => agent.title), { timeout: 20_000 })
         .toEqual([])
+      // Why the reseed: Claude's own hooks report each pane once its turn starts.
+      for (const [index, agent] of AGENTS.entries()) {
+        await seedAgentStatus(page, paneKeys[index]!, agent.state, agent.title, agent.prompt)
+      }
+      await page.waitForTimeout(1_500)
     }
+    await showPointer(page, 1100, 700)
+
+    const clip = await showcaseClip(electronApp, testInfo, 'agent-grid')
     await page.waitForTimeout(HOLD_MS * 2)
 
-    await bucketButton(page, /Working/).click()
+    await glideAndClick(page, bucketButton(page, /Working/))
     await expect.poll(() => gridCells(page).count()).toBe(2)
     await page.waitForTimeout(HOLD_MS)
 
-    await bucketButton(page, /Done/).click()
+    await glideAndClick(page, bucketButton(page, /Done/))
     await expect.poll(() => gridCells(page).count()).toBe(1)
     await page.waitForTimeout(HOLD_MS)
 
     // The filter is single-select, so the active bucket clears when pressed again.
-    await bucketButton(page, /Done/).click()
+    await glideAndClick(page, bucketButton(page, /Done/))
     await expect.poll(() => gridCells(page).count()).toBe(4)
     // Why no whitespace: the narrow panes wrap the answer, mid-word without Claude.
     await expect
       .poll(async () => (await tails()).join('').replace(/\s+/g, ''), { timeout: 20_000 })
-      .toContain('howmanyuploadsarewaiting')
-    await page.waitForTimeout(HOLD_MS * 2)
+      .toContain('Faileduploadsnow')
+    await page.waitForTimeout(1_500)
     await clip.stop()
   } finally {
     await api.close()
