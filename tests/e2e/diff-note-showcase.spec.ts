@@ -1,21 +1,84 @@
+import { execFileSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, test } from './helpers/orca-app'
 import { setTheme } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { sizeWindow } from './helpers/game-showcase-demo-party'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
+import { glideAndClick, movePointer, showPointer } from './helpers/showcase-pointer'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
 
 // The README and site review clip: a note for the agent on a line of its own diff.
+const BASE = [
+  "import { readCache, writeCache } from './feed-cache'",
+  "import type { Story } from './story'",
+  '',
+  'const FEED_TIMEOUT_MS = 8_000',
+  '',
+  'export async function fetchFeed(url: string): Promise<Response> {',
+  '  const response = await fetch(url)',
+  "  if (!response.ok) throw new Error('feed unavailable')",
+  '  return response',
+  '}',
+  '',
+  'export async function loadStories(url: string): Promise<Story[]> {',
+  '  try {',
+  '    const response = await fetchFeed(url)',
+  '    const stories = (await response.json()) as Story[]',
+  '    await writeCache(stories)',
+  '    return stories',
+  '  } catch (error) {',
+  '    const cached = await readCache()',
+  '    if (cached) return cached',
+  '    throw error',
+  '  }',
+  '}',
+  '',
+  'export function sortByDate(stories: Story[]): Story[] {',
+  '  return [...stories].sort((a, b) => b.publishedAt - a.publishedAt)',
+  '}',
+  ''
+].join('\n')
 const AGENT_CHANGE = [
+  "import { readCache, writeCache } from './feed-cache'",
+  "import type { Story } from './story'",
+  '',
+  'const FEED_TIMEOUT_MS = 8_000',
+  '',
   'export async function fetchFeed(url: string): Promise<Response> {',
   '  for (let attempt = 0; attempt < 5; attempt++) {',
-  '    const response = await fetch(url)',
+  '    const signal = AbortSignal.timeout(FEED_TIMEOUT_MS)',
+  '    const response = await fetch(url, { signal })',
   '    if (response.ok) return response',
+  '    if (response.status < 500) break',
   '  }',
   "  throw new Error('feed unavailable')",
+  '}',
+  '',
+  'export async function loadStories(url: string): Promise<Story[]> {',
+  '  try {',
+  '    const response = await fetchFeed(url)',
+  '    const stories = dedupe((await response.json()) as Story[])',
+  '    await writeCache(stories)',
+  '    return sortByDate(stories)',
+  '  } catch (error) {',
+  '    const cached = await readCache()',
+  '    if (cached) return sortByDate(cached)',
+  '    throw error',
+  '  }',
+  '}',
+  '',
+  'export function dedupe(stories: Story[]): Story[] {',
+  '  const seen = new Set<string>()',
+  '  return stories.filter((story) => !seen.has(story.id) && seen.add(story.id))',
+  '}',
+  '',
+  'export function sortByDate(stories: Story[]): Story[] {',
+  '  return [...stories].sort((a, b) => b.publishedAt - a.publishedAt)',
   '}',
   ''
 ].join('\n')
@@ -28,7 +91,22 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
 }, testInfo) => {
   test.setTimeout(120_000)
   await waitForSessionReady(orcaPage)
-  const worktreeId = await attachRepoAndOpenTerminal(orcaPage, createShowcaseRepo())
+  const repo = createShowcaseRepo()
+  // Why a longer base: a five-line diff leaves most of the editor empty in the clip.
+  writeFileSync(join(repo, 'src', 'feed', 'fetch-feed.ts'), BASE)
+  // Why the identity: CI runners have no git user configured.
+  execFileSync('git', [
+    '-C',
+    repo,
+    '-c',
+    'user.name=Lumen',
+    '-c',
+    'user.email=team@example.com',
+    'commit',
+    '-qam',
+    'Feed loading'
+  ])
+  const worktreeId = await attachRepoAndOpenTerminal(orcaPage, repo)
   await ensureTerminalVisible(orcaPage)
   await sizeWindow(electronApp, 1440, 900)
   await setTheme(orcaPage, 'dark')
@@ -65,14 +143,18 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
     .first()
   await expect(line).toBeVisible({ timeout: 15_000 })
   await orcaPage.waitForTimeout(800)
+  await showPointer(orcaPage, 1100, 760)
   const clip = await showcaseClip(electronApp, testInfo, 'diff-note')
   await orcaPage.waitForTimeout(1_500)
 
-  await line.hover()
+  // Why the indent: over a word Monaco opens a type hover, and Linux CI then never shows the add button.
+  const lineBox = (await line.boundingBox())!
+  await movePointer(orcaPage, lineBox.x + 6, lineBox.y + lineBox.height / 2)
+  await line.hover({ position: { x: 6, y: lineBox.height / 2 } })
   await orcaPage.waitForTimeout(600)
   const add = orcaPage.locator('.orca-diff-comment-add-btn').first()
   await expect(add).toBeVisible()
-  await add.click()
+  await glideAndClick(orcaPage, add)
   const input = orcaPage.getByPlaceholder('Add note for the AI')
   await expect(input).toBeVisible()
   await orcaPage.waitForTimeout(600)
@@ -80,9 +162,11 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
   await input.pressSequentially(NOTE, { delay: 45 })
   await orcaPage.waitForTimeout(800)
 
-  await orcaPage.getByRole('button', { name: 'Add note', exact: true }).click()
+  await glideAndClick(orcaPage, orcaPage.getByRole('button', { name: 'Add note', exact: true }))
   const card = orcaPage.locator('.orca-diff-comment-card').filter({ hasText: NOTE })
   await expect(card).toBeVisible({ timeout: 15_000 })
-  await orcaPage.waitForTimeout(2_500)
+  const cardBox = (await card.boundingBox())!
+  await movePointer(orcaPage, cardBox.x + cardBox.width + 120, cardBox.y + cardBox.height / 2)
+  await orcaPage.waitForTimeout(1_500)
   await clip.stop()
 })

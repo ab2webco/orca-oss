@@ -3,7 +3,8 @@ import type { AddressInfo } from 'node:net'
 
 // A local stand-in for the Messages API so a recorded lead streams a scripted answer
 // instead of an API error; nothing leaves the machine.
-export type ScriptedReply = { match: RegExp; text: string }
+// holdOpen leaves the turn streaming until close, so the agent still reads as working.
+export type ScriptedReply = { match: RegExp; text: string; holdOpen?: boolean }
 
 export type MessagesApi = {
   url: string
@@ -32,7 +33,12 @@ function lastUserText(body: unknown): string {
 const sse = (res: ServerResponse, event: string, data: unknown) =>
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 
-async function streamText(res: ServerResponse, model: string, text: string): Promise<void> {
+async function streamText(
+  res: ServerResponse,
+  model: string,
+  text: string,
+  holdOpen = false
+): Promise<void> {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   sse(res, 'message_start', {
     type: 'message_start',
@@ -60,6 +66,9 @@ async function streamText(res: ServerResponse, model: string, text: string): Pro
       delta: { type: 'text_delta', text: word }
     })
     await new Promise((resolve) => setTimeout(resolve, CHUNK_MS))
+  }
+  if (holdOpen) {
+    return
   }
   sse(res, 'content_block_stop', { type: 'content_block_stop', index: 0 })
   sse(res, 'message_delta', {
@@ -104,7 +113,7 @@ export async function startMessagesApi(replies: ScriptedReply[]): Promise<Messag
     const text = reply?.text ?? 'OK.'
     const model = body.model ?? 'claude-opus-5-5'
     if (body.stream) {
-      await streamText(res, model, text)
+      await streamText(res, model, text, reply?.holdOpen)
       return
     }
     res.writeHead(200, { 'content-type': 'application/json' }).end(
@@ -125,6 +134,10 @@ export async function startMessagesApi(replies: ScriptedReply[]): Promise<Messag
   return {
     url: `http://127.0.0.1:${port}`,
     prompts,
-    close: () => new Promise((resolve) => server.close(() => resolve()))
+    close: () =>
+      new Promise((resolve) => {
+        server.close(() => resolve())
+        server.closeAllConnections()
+      })
   }
 }

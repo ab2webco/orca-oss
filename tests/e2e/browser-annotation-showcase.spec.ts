@@ -6,6 +6,7 @@ import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import { sizeWindow } from './helpers/game-showcase-demo-party'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { glideAndClick, movePointer, showPointer } from './helpers/showcase-pointer'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 
 test.use({ seedTestRepo: false, orcaAppExtraArgs: CLIP_ARGS })
@@ -22,13 +23,19 @@ p{color:#9aa3b5;font-size:18px}
 .cta{display:inline-block;margin-top:24px;padding:12px 22px;border-radius:8px;background:#3b82f6;color:#fff;font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px;text-align:left}
 .card{border:1px solid #262a33;border-radius:10px;padding:16px;background:#151821}
+.card b{display:block;margin-bottom:6px}.card span{color:#9aa3b5;font-size:14px}
+.feed{margin-top:40px;text-align:left;border:1px solid #262a33;border-radius:10px;background:#151821}
+.feed h2{font-size:14px;color:#9aa3b5;margin:0;padding:14px 16px;border-bottom:1px solid #262a33;font-weight:600}
+.story{display:flex;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #1d2029}
+.story:last-child{border-bottom:0}.story span{color:#9aa3b5;font-size:14px}
 </style></head><body>
 <nav><strong>Lumen</strong><span>Features · Pricing · Docs</span></nav>
 <main>
 <h1 id="headline">Read your feed, even offline</h1>
 <p>Lumen keeps the last 200 stories on your phone, so the subway is no longer a dead zone.</p>
 <a class="cta" id="cta">Start free</a>
-<div class="cards"><div class="card">Offline cache</div><div class="card">Dark mode</div><div class="card">Share anywhere</div></div>
+<div class="cards"><div class="card"><b>Offline cache</b><span>The last 200 stories, read anywhere.</span></div><div class="card"><b>Dark mode</b><span>Easy on the eyes after sunset.</span></div><div class="card"><b>Share anywhere</b><span>One tap to send a story on.</span></div></div>
+<div class="feed"><h2>Today on Lumen</h2><div class="story">City council backs the new night bus lines<span>4 min</span></div><div class="story">Why the river cleanup is ahead of schedule<span>6 min</span></div><div class="story">The bakery that only opens when it rains<span>3 min</span></div><div class="story">Ten trails within an hour of downtown<span>8 min</span></div></div>
 </main></body></html>`
 const NOTE = 'Make the headline one line on desktop and use the brand blue for "offline".'
 
@@ -94,10 +101,11 @@ test('a reviewer annotates an element of the page for the agent', async ({
       await expect(tour).toHaveCount(0)
     }
     await orcaPage.waitForTimeout(800)
+    await showPointer(orcaPage, 1000, 700)
     const clip = await showcaseClip(electronApp, testInfo, 'design-mode')
     await orcaPage.waitForTimeout(1_500)
 
-    await orcaPage.getByRole('button', { name: 'Annotate page element' }).click()
+    await glideAndClick(orcaPage, orcaPage.getByRole('button', { name: 'Annotate page element' }))
     // Why the guest's own geometry: the headline's box inside the page, offset by the webview's box.
     const headline = await webview.evaluate(async (node) => {
       const guest = node as unknown as { executeJavaScript(code: string): Promise<unknown> }
@@ -114,6 +122,8 @@ test('a reviewer annotates an element of the page for the agent', async ({
     const box = await webview.boundingBox()
     expect(box).not.toBeNull()
     const target = { x: box!.x + rect.x + rect.width / 2, y: box!.y + rect.y + rect.height / 2 }
+    await movePointer(orcaPage, target.x, target.y)
+    // Why main's raw moves too: the picker highlights the element under a real hover before the click.
     await orcaPage.mouse.move(target.x - 40, target.y - 30)
     await orcaPage.mouse.move(target.x, target.y, { steps: 30 })
     await orcaPage.waitForTimeout(900)
@@ -125,12 +135,15 @@ test('a reviewer annotates an element of the page for the agent', async ({
     await orcaPage.waitForTimeout(800)
 
     // Why the regex: the button's name carries its shortcut hint ("Add ⌘↵" on a Mac).
-    await orcaPage.getByRole('button', { name: /^Add\b(?! Project| quick)/ }).click()
+    await glideAndClick(
+      orcaPage,
+      orcaPage.getByRole('button', { name: /^Add\b(?! Project| quick)/ })
+    )
     await expect(comment).toHaveCount(0)
     await expect(
       orcaPage.getByRole('button', { name: 'Annotate page element' }).locator('span')
     ).toHaveText('1')
-    await orcaPage.waitForTimeout(2_500)
+    await orcaPage.waitForTimeout(1_500)
     await clip.stop()
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()))

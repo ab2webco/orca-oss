@@ -33,6 +33,8 @@ Without `ORCA_SHOWCASE_CLIPS=1` the specs run as ordinary regression tests and r
 - `showcase-messages-api.ts` is a local Messages API: a lead or agent Claude Code streams the scripted
   answer for a matching prompt instead of an API error. Unmatched side requests get `OK.`, which is
   never on screen; add a reply for any prompt that reaches the transcript.
+- The recorder captures no OS cursor: `showcase-pointer.ts` draws an arrow, and a spec moves it
+  with `glideTo` / `glideAndClick` so every click is seen. Over a webview it is placed by hand.
 - `showcase-repo.ts` opens a `lumen-app` repo instead of the e2e fixture repo, so the sidebar, tabs and
   grid read `lumen-app` on `main`. While recording on macOS it lives at `/Users/Shared/code/lumen-app`,
   because the diff header prints the absolute path.

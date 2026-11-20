@@ -5,6 +5,7 @@ import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal } from './helpers/orca-restart'
 import { CLIP_ARGS, showcaseClip } from './helpers/showcase-clip'
+import { glideAndClick, showPointer } from './helpers/showcase-pointer'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 import { writeSettings } from './helpers/settings-write'
 
@@ -65,15 +66,16 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
     await orcaPage.getByRole('tab', { name: /^Installed/ }).click()
     const row = orcaPage.locator(`[data-plugin-key="${pluginKey}"]`)
     await expect(row).toContainText('Needs review')
+    await showPointer(orcaPage, 1000, 720)
     const clip = await showcaseClip(electronApp, testInfo, 'worklog-plugin')
     await hold()
 
-    await row.getByRole('button', { name: 'Review & enable' }).click()
+    await glideAndClick(orcaPage, row.getByRole('button', { name: 'Review & enable' }))
     const consent = orcaPage.getByRole('dialog', { name: 'Review access and content' })
     await expect(consent).toContainText('0 18 * * 1-5')
     await hold()
 
-    await consent.getByRole('button', { name: 'Enable plugin' }).click()
+    await glideAndClick(orcaPage, consent.getByRole('button', { name: 'Enable plugin' }))
     await expect(consent).toBeHidden()
     await expect(row).toContainText('Enabled')
 
@@ -95,14 +97,13 @@ test('installs, reviews, enables and opens the worklog plugin with entries', asy
       { key: pluginKey, author: DEMO_AUTHOR, entries: DEMO_ENTRIES }
     )
 
-    await orcaPage.getByRole('button', { name: 'Worklog', exact: true }).click()
+    await glideAndClick(orcaPage, orcaPage.getByRole('button', { name: 'Worklog', exact: true }))
     const panel = orcaPage.frameLocator('iframe[title="Worklog"]')
     await expect(panel.locator('#settings')).toContainText(DEMO_AUTHOR, { timeout: 20_000 })
     await expect(panel.locator('#status')).toHaveText('', { timeout: 20_000 })
     for (const text of DEMO_ENTRIES) {
       await expect(panel.locator('#entries')).toContainText(text)
     }
-    await hold()
     await orcaPage.waitForTimeout(1_500)
     await clip.stop()
   } finally {
