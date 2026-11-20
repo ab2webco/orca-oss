@@ -9,6 +9,7 @@ import {
 } from './orchestrator-game-lead-alerts'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
+import type { GameQueueDeparture } from './orchestrator-game-queue-departure'
 import type { GameAgent, GameReview } from './orchestrator-game-state'
 
 const NOW = Date.parse('2026-11-14T20:00:00Z')
@@ -200,5 +201,42 @@ describe('a remote member still starting (ORCA-1263)', () => {
     })
     const alerts = gameLeadAlertsOf(stateOf([starting]), emptyGameLeadAlertMemory(), NOW)
     expect(alerts).toEqual([])
+  })
+})
+
+describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () => {
+  const leftLine = (departure: GameQueueDeparture): string | undefined => {
+    const memory = emptyGameLeadAlertMemory()
+    // Why open: the member's cached review still says open after the queue merged it (#1304).
+    const agents = [member('CIN-2', { review: review(42, 'open') })]
+    linesOf(stateOf(agents, {}, [entry(42, 'checks')]), memory)
+    memory.departures.set('#42', departure)
+    return linesOf(stateOf(agents, {}, []), memory, NOW + MIN).find((one) => one.startsWith('#42'))
+  }
+
+  it('calls a PR the queue merged merged, even while its cached review says open', () => {
+    expect(leftLine({ state: 'merged', reason: 'merged', actor: 'github-merge-queue' })).toBe(
+      '#42 merged from the queue: close its ticket and clean up its member.'
+    )
+  })
+
+  it('calls a PR the queue removed for failed checks dropped, naming the reason', () => {
+    expect(leftLine({ state: 'open', reason: 'failed_checks', actor: 'github-merge-queue' })).toBe(
+      '#42 dropped from the merge queue (failed_checks): find why, then fix it or queue it again.'
+    )
+  })
+
+  it('calls a PR a person took out dequeued by that person', () => {
+    expect(leftLine({ state: 'open', reason: 'manual', actor: 'fabolivar' })).toBe(
+      '#42 dequeued by fabolivar: queue it again only when that is settled.'
+    )
+  })
+
+  it('reads the departure once: the next drop of the same PR is read again', () => {
+    const memory = emptyGameLeadAlertMemory()
+    linesOf(stateOf([], {}, [entry(42, 'checks')]), memory)
+    memory.departures.set('#42', { state: 'merged', reason: 'merged', actor: null })
+    linesOf(stateOf([], {}, []), memory, NOW + MIN)
+    expect(memory.departures.size).toBe(0)
   })
 })
