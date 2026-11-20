@@ -116,8 +116,13 @@ export function office3dLeadRoundOf(args: {
     }
     if (toFloor !== floor) {
       walk([here[0], OFFICE3D_AISLE_Z], [1.2, OFFICE3D_AISLE_Z], DOOR)
-      const booked = bookOffice3dCab(cab, floor, toFloor, t, speed)
-      hold('idle', booked.board - t, OFFICE3D_LIFT)
+      // Why booked for when it reaches the cab: the cab must not leave while it is still walking in.
+      const walkIn = Math.max(
+        0.2,
+        Math.hypot(DOOR[0] - OFFICE3D_LIFT[0], DOOR[1] - OFFICE3D_LIFT[1]) / (WALK * speed)
+      )
+      const booked = bookOffice3dCab(cab, floor, toFloor, t + walkIn, speed)
+      hold('idle', booked.board - walkIn - t, OFFICE3D_LIFT)
       walk(OFFICE3D_LIFT)
       hold('idle', booked.depart - t, null)
       push({ kind: 'ride', start: t, dur: booked.arrive - t })
