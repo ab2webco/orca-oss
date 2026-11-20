@@ -4,6 +4,7 @@ import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-typ
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { TeamSceneBuilding, teamSceneHasFloors } from './TeamSceneBuilding'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
+import { TeamSceneDiorama } from './TeamSceneDiorama'
 import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { useTeamScenePainter } from './use-team-scene-painter'
@@ -18,12 +19,20 @@ type Props = {
   style: GamePanelStyle
   /** The panel's last team, shown while a read confirms it. */
   unconfirmed?: boolean
+  /** Figures as the 3D diorama (ORCA-1296, behind `panel.diorama` until it draws everything). */
+  diorama?: boolean
   /** The panel below the scene; its card faces draw with the scene's painter. */
   children?: React.ReactNode
 }
 
 /** The live scene for a team in the Game look, drawn from the Team model only. */
-export function TeamPanelScene({ model, style, unconfirmed, children }: Props): React.JSX.Element {
+export function TeamPanelScene({
+  model,
+  style,
+  unconfirmed,
+  diorama,
+  children
+}: Props): React.JSX.Element {
   const timezone = model.metrics.kind === 'ready' ? model.metrics.value.timezone : 'local'
   const { drawn, art, painter, makePainter } = useTeamScenePainter({
     style,
@@ -53,7 +62,9 @@ export function TeamPanelScene({ model, style, unconfirmed, children }: Props): 
           data-team-scene-art={art}
         >
           {/* Why Office only: the building is desks on floors, and one machine stays as today. */}
-          {painter && drawn === 'office' && teamSceneHasFloors(model) ? (
+          {diorama && drawn === 'figures' ? (
+            <TeamSceneDiorama model={model} />
+          ) : painter && drawn === 'office' && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}
               unconfirmed={unconfirmed}

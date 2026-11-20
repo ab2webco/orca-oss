@@ -11,3 +11,12 @@ export function useTeamSceneStyle(): GamePanelStyle {
     [global, local, project]
   )
 }
+
+/** Whether Figures draws as the 3D diorama (ORCA-1296), after the same three layers. */
+export function useTeamSceneDiorama(): boolean {
+  const { global, project, local } = useTeamPanelSettingLayers()
+  return useMemo(
+    () => resolveOrchestratorGamePanel({ global, project, local }).diorama,
+    [global, local, project]
+  )
+}
