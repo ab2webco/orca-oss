@@ -55,7 +55,8 @@ function panelOf(): OrchestratorGamePanel | undefined {
       GAME_PANEL_TABS.map((tab) => [tab, true])
     ) as OrchestratorGamePanel['tabs'],
     advisor: true,
-    arcade: false
+    arcade: false,
+    diorama: false
   }
 }
 
