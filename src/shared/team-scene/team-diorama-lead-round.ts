@@ -1,0 +1,154 @@
+import {
+  DIORAMA_GATE,
+  type DioramaIsland,
+  type DioramaLayout,
+  type DioramaPoint
+} from './team-diorama-layout'
+import { polyLengths, type DioramaGrid } from './team-diorama-nav'
+import type { DioramaRoadNet } from './team-diorama-roads'
+
+// Why a plan, not a simulation: the lead's whole round is laid out once per read of the team, so
+// any moment of it is a pure lookup and reduced motion can show one still frame of it.
+
+/** How the lead gets about: walking like a person, 2.5 times faster, or sent by the court mage. */
+export type DioramaPace = 'normal' | 'fast' | 'direct'
+
+export type DioramaLeadStep =
+  | { kind: 'walk'; pts: DioramaPoint[]; cum: number[]; start: number; dur: number }
+  | { kind: 'row'; column: number; pts: DioramaPoint[]; cum: number[]; start: number; dur: number }
+  | { kind: 'jump'; from: DioramaPoint; to: DioramaPoint; start: number; dur: number }
+  | {
+      kind: 'hold'
+      at: DioramaPoint
+      face: DioramaPoint | null
+      pose: 'talk' | 'idle'
+      start: number
+      dur: number
+    }
+
+export type DioramaLeadRound = { steps: DioramaLeadStep[]; total: number }
+
+/** Where a member stands at its plot, and the road point the lead talks to it from. */
+export const dioramaStandOf = (plot: { x: number; z: number }): DioramaPoint => [
+  plot.x + 1.55,
+  plot.z + 1.2
+]
+
+const WALK = 1.8
+const ROW = 1.5
+const JUMP = 1.6
+const TALK = 3.5
+const HOME_PAUSE = 3
+
+/**
+ * The lead's round: the members who need the user first, then every island with a member worth a
+ * word, each in one boat trip, then home to the gate. Idle members and unreachable machines get no
+ * visit. Every walk keeps to the roads; only a row crosses water.
+ */
+export function dioramaLeadRoundOf(args: {
+  layout: DioramaLayout
+  roads: DioramaRoadNet
+  water: DioramaGrid
+  /** Member keys that need the user, in the order the Team model lists them. */
+  needs: readonly string[]
+  /** Member keys the lead stops by on its round: working, waiting or broken ones. */
+  visits: readonly string[]
+  pace: DioramaPace
+}): DioramaLeadRound {
+  const { layout, roads, water, pace } = args
+  const speed = pace === 'fast' ? 2.5 : 1
+  const holdScale = pace === 'normal' ? 1 : 0.6
+  const steps: DioramaLeadStep[] = []
+  let t = 0
+  const push = (step: DioramaLeadStep) => {
+    steps.push(step)
+    t += step.dur
+  }
+  const walk = (from: DioramaPoint, to: DioramaPoint): DioramaPoint => {
+    if (pace === 'direct') {
+      push({ kind: 'jump', from, to, start: t, dur: JUMP })
+      return to
+    }
+    const pts = roads.route(from, to)
+    const cum = polyLengths(pts)
+    push({ kind: 'walk', pts, cum, start: t, dur: cum.at(-1)! / (WALK * speed) + 0.5 / speed })
+    return pts.at(-1)!
+  }
+  const row = (column: number, from: DioramaPoint, to: DioramaPoint) => {
+    const pts = water.path(from, to)
+    const cum = polyLengths(pts)
+    push({
+      kind: 'row',
+      column,
+      pts,
+      cum,
+      start: t,
+      dur: cum.at(-1)! / (ROW * speed) + 1.2 / speed
+    })
+  }
+  const talk = (at: DioramaPoint, face: DioramaPoint) =>
+    push({ kind: 'hold', at, face, pose: 'talk', start: t, dur: TALK * holdScale })
+  const placeOf = (key: string): { island: DioramaIsland; stand: DioramaPoint } | null => {
+    for (const island of layout.islands) {
+      const plot = island.plots.find((p) => p.key === key)
+      if (plot) {
+        return { island, stand: dioramaStandOf(plot) }
+      }
+    }
+    return null
+  }
+  const talkSpotOf = (stand: DioramaPoint): DioramaPoint => roads.on([stand[0], stand[1] + 1.2])
+
+  // One trip per island: every member there in one boat ride, needs-you ones first.
+  const trips = new Map<DioramaIsland, DioramaPoint[]>()
+  for (const key of [...args.needs, ...args.visits.filter((k) => !args.needs.includes(k))]) {
+    const place = placeOf(key)
+    if (!place || !place.island.reachable) {
+      continue
+    }
+    trips.set(place.island, [...(trips.get(place.island) ?? []), place.stand])
+  }
+  const gate = roads.on(DIORAMA_GATE)
+  let here = gate
+  for (const [island, stands] of trips) {
+    if (island.home) {
+      for (const stand of stands) {
+        here = walk(here, talkSpotOf(stand))
+        talk(here, stand)
+      }
+      continue
+    }
+    const dock = layout.homeDocks[island.column]
+    if (!dock || !island.dock) {
+      continue
+    }
+    if (pace === 'direct') {
+      for (const stand of stands) {
+        here = walk(here, talkSpotOf(stand))
+        talk(here, stand)
+      }
+      continue
+    }
+    here = walk(here, dock.end)
+    row(island.column, dock.boat, island.dock.boat)
+    here = island.dock.end
+    for (const stand of stands) {
+      here = walk(here, talkSpotOf(stand))
+      talk(here, stand)
+    }
+    walk(here, island.dock.end)
+    row(island.column, island.dock.boat, dock.boat)
+    here = dock.end
+  }
+  if (here !== gate) {
+    here = walk(here, gate)
+  }
+  push({ kind: 'hold', at: here, face: null, pose: 'idle', start: t, dur: HOME_PAUSE })
+  return { steps, total: t }
+}
+
+/** The step the round is on at `t` seconds into it, looping. */
+export function dioramaLeadStepAt(round: DioramaLeadRound, t: number): DioramaLeadStep {
+  const tt = round.total > 0 ? ((t % round.total) + round.total) % round.total : 0
+  return round.steps.find((s) => tt >= s.start && tt < s.start + s.dur) ?? round.steps.at(-1)!
+}
