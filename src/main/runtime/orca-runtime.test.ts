@@ -1946,6 +1946,35 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it("merges a paired phone's names with its scene, so neither write drops the other (ORCA-1304)", async () => {
+    let settings = {
+      ...store.getSettings(),
+      orchestratorGame: { band: true, orchestrator: { agent: 'codex', label: 'Ada' } }
+    }
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getSettings: () => settings,
+      updateSettings: (updates: Partial<typeof settings>) => {
+        settings = { ...settings, ...updates }
+      }
+    } as never)
+
+    await runtime.updateClientSettings({
+      agentTeamsPanel: { scene: 'vigilante' },
+      agentTeamsNames: { leadName: null, memberNames: ['Bo'] }
+    })
+
+    expect(settings.orchestratorGame).toEqual({
+      band: true,
+      scene: 'vigilante',
+      orchestrator: { agent: 'codex', memberNames: ['Bo'] }
+    })
+    expect(runtime.getClientSettings().agentTeamsNames).toMatchObject({
+      leadName: null,
+      memberNames: ['Bo']
+    })
+  })
+
   it('broadcasts visibility default changes to paired clients', async () => {
     let settings = { ...store.getSettings(), worktreeVisibilityDefaults: { external: 'hide' } }
     const runtime = new OrcaRuntimeService({

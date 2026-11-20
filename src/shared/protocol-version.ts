@@ -219,6 +219,8 @@ export const MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY = 'mobile.team-level.v1' as co
 // Why: settings.update is strict, so an older host rejects agentTeamsPanel and statusColors (ORCA-1183).
 export const MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY =
   'mobile.agent-teams-settings.v1' as const
+// Why apart from the v1 settings: a host with only v1 rejects agentTeamsNames, so the phone hides Names (ORCA-1304).
+export const MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY = 'mobile.agent-teams-names.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
   'runtime.status.compat.v1',
@@ -292,6 +294,7 @@ export const RUNTIME_CAPABILITIES = [
   MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
   MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
+  MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY,
   MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY
 ] as const
 

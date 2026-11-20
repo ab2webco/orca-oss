@@ -3,6 +3,11 @@ import {
   agentTeamsSettingsPatchOf,
   type AgentTeamsSettingsUpdate
 } from '../../src/shared/agent-teams-client-settings'
+import {
+  agentTeamsNamesOf,
+  agentTeamsNamesPatchOf,
+  type AgentTeamsNamesUpdate
+} from '../../src/shared/agent-teams-names-settings'
 import type { GlobalSettings } from '../../src/shared/global-settings-types'
 import { settingsGetResultOf } from '../../src/shared/settings-get-result'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
@@ -21,7 +26,8 @@ const clientSettings = () => ({
   defaultTuiAgent: 'codex',
   disabledTuiAgents: [],
   agentCmdOverrides: {},
-  ...agentTeamsClientSettingsOf(source)
+  ...agentTeamsClientSettingsOf(source),
+  agentTeamsNames: agentTeamsNamesOf(source)
 })
 
 // Why the host's own builders: a hand-written shape hid #1238's flat settings read.
@@ -36,8 +42,13 @@ export function handleMockSettingsRequest(
   }
   if (request.method === 'settings.update') {
     console.log('[mock] settings.update', JSON.stringify(request.params))
-    const update = (request.params ?? {}) as AgentTeamsSettingsUpdate
+    const update = (request.params ?? {}) as AgentTeamsSettingsUpdate & {
+      agentTeamsNames?: AgentTeamsNamesUpdate
+    }
     source = { ...source, ...agentTeamsSettingsPatchOf(source, update) }
+    if (update.agentTeamsNames) {
+      source = { ...source, ...agentTeamsNamesPatchOf(source, update.agentTeamsNames) }
+    }
     respond(success(request.id, { settings: clientSettings() }))
     return true
   }
