@@ -177,6 +177,13 @@
         "sweep": "When finished members wait to be closed.",
         "wave": "When there is To Do and free slots."
       }
+    },
+    "gameNames": {
+      "title": "Names",
+      "description": "Each member takes the next free name from the scene's roster. The lead is called Lead until you name it. /orca-game:setup asks for both.",
+      "unnamedLead": "Lead, until you name it",
+      "leadPlaceholder": "Lead",
+      "fromScene": "from the scene"
     }
   },
   "menu": {
@@ -17549,7 +17556,8 @@
         "weekly": "Week",
         "claude": "Claude",
         "codex": "Codex"
-      }
+      },
+      "noTerminal": "This agent has no terminal to open yet."
     },
     "activity": {
       "state": "State",
@@ -17585,7 +17593,20 @@
       "waitingOnMany": "Waiting on {{count}} agents",
       "asksOn": "Waiting for you · Question on {{ticket}}",
       "asks": "Waiting for you",
-      "orchestrating": "Orchestrating · {{action}}"
+      "orchestrating": "Orchestrating · {{action}}",
+      "detail": {
+        "status": "Status",
+        "action": "Now",
+        "waitingOn": "Waiting on",
+        "agents_one": "{{count}} agent",
+        "agents_other": "{{count}} agents",
+        "question": "Question",
+        "questionOn": "Open, on {{ticket}}",
+        "questionOpen": "Open",
+        "host": "Host",
+        "model": "Model",
+        "effort": "Effort"
+      }
     },
     "advisor": {
       "label": "Advisor",
@@ -17766,6 +17787,11 @@
       "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})",
       "raised": "Up to {{to}}: {{reason}}",
       "lowered": "Down to {{to}}: {{reason}}"
+    },
+    "firstRun": {
+      "title": "Start a team",
+      "setup": "in a Claude session here names your lead and sets up the project's game.",
+      "lead": "starts the lead. Give it a ticket: it launches one member per ticket."
     }
   },
   "claudeDeadHooks": {
