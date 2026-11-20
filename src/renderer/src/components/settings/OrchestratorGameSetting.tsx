@@ -47,6 +47,8 @@ import {
   orchestratorGameSourceLabel as sourceLabel
 } from './orchestrator-game-setting-labels'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
+import { ProjectOrchestratorGameNamesSetting } from './OrchestratorGameNamesSetting'
+import { ORCHESTRATOR_GAME_SETTING_KEYWORDS as keywords } from './orchestrator-game-setting-keywords'
 import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
 import {
   OrchestratorGameOpenLinksRow,
@@ -86,8 +88,6 @@ const sectionHeader = (): React.JSX.Element => (
     )}
   />
 )
-
-const keywords = ['agent teams', 'game', 'quest', 'orchestrator', 'hud', 'rewards', 'zen', 'scene']
 
 const sceneTitle = (): string =>
   translate('auto.components.settings.OrchestratorGameSetting.scene', 'Scene')
@@ -381,6 +381,13 @@ export function ProjectOrchestratorGameSetting({
             </>
           ) : null}
         </TerminalBandGroup>
+        <ProjectOrchestratorGameNamesSetting
+          repoId={repoId}
+          settings={settings}
+          projectLayer={projectLayer}
+          scene={panelScene}
+          updateSettings={updateSettings}
+        />
         <ProjectOrchestratorGameLeadSetting
           repoId={repoId}
           settings={settings}

@@ -17,6 +17,7 @@ vi.mock('expo-router', async () => {
 })
 
 const { useTeamDrawer } = await import('./use-team-drawer')
+const { announceOwnerQuestion } = await import('../game-inbox/owner-question-arrivals')
 
 const question = {
   id: 'q1',
@@ -325,5 +326,59 @@ describe('useTeamDrawer', () => {
     expect(answers).toEqual([
       ['game.ownerAnswer', { worktreeId: 'repo::/main', id: 'q1', option: 1 }]
     ])
+  })
+
+  const reads = (sendRequest: ReturnType<typeof hostReplying>, method: string): number =>
+    sendRequest.mock.calls.filter(([called]) => called === method).length
+
+  it("re-reads the Team and its questions on a question banner for this repo, not another's", async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+    const state = reads(sendRequest, 'game.state')
+    const questions = reads(sendRequest, 'game.ownerQuestionsAll')
+
+    await act(async () => announceOwnerQuestion({ worktreeId: 'other::/main' }))
+    expect(reads(sendRequest, 'game.state')).toBe(state)
+
+    await act(async () => announceOwnerQuestion({ worktreeId: 'repo::/main' }))
+    expect(reads(sendRequest, 'game.state')).toBe(state + 1)
+    expect(reads(sendRequest, 'game.ownerQuestionsAll')).toBe(questions + 1)
+    expect(reads(sendRequest, 'game.inboxThreads')).toBe(2)
+  })
+
+  it('reads once for a burst of banners, and once more after it for the last', async () => {
+    const replying = hostReplying(leadState)
+    let release: () => void = () => {}
+    const sendRequest = vi.fn(async (method: string) => {
+      const reply = await replying(method)
+      if (method === 'game.state' && reads(sendRequest, 'game.state') > 1) {
+        await new Promise<void>((resolve) => (release = resolve))
+      }
+      return reply
+    })
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+
+    await act(async () => {
+      for (let i = 0; i < 3; i++) {
+        announceOwnerQuestion({ worktreeId: 'repo::/lead' })
+      }
+    })
+    expect(reads(sendRequest, 'game.state')).toBe(2)
+    await act(async () => release())
+    expect(reads(sendRequest, 'game.state')).toBe(3)
+    await act(async () => release())
+    expect(reads(sendRequest, 'game.state')).toBe(3)
+  })
+
+  it('re-reads the Team once an answer lands, so the member shows what the host says now', async () => {
+    const sendRequest = hostReplying(leadState)
+    const client = { sendRequest } as unknown as RpcClient
+    await render({ client, terminalHandle: 'term_1', paneKey: 'tab:leaf' })
+    const state = reads(sendRequest, 'game.state')
+
+    await act(async () => team?.answer('q1', { option: 1 }))
+    expect(reads(sendRequest, 'game.state')).toBe(state + 1)
   })
 })
