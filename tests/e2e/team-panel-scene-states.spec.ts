@@ -287,7 +287,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
     // its spot; with a member waiting it walks to that member on its rounds (ORCA-1150).
     const capture = async (round: Partial<Record<'lead' | 'member', string>>): Promise<void> => {
       for (const style of STYLES) {
-        await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
+        await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
         const scene = panel.locator(`[data-team-scene="${style}"]`)
         await expect(scene.getByRole('img', { name: 'Live team scene' })).toBeVisible({
           timeout: 30_000
@@ -456,7 +456,7 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
           .toBe(true)
         await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
         for (const style of STYLES) {
-          await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
+          await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
           // ORCA-1296: every style draws as picked, Figures and Office in Orca's art for any file.
           const drawn = style
           const scene = panel.locator(`[data-team-scene="${drawn}"]`)

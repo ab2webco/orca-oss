@@ -156,6 +156,11 @@ pre {
   color: var(--muted);
 }
 
+/* No head ends on a one-word stub. */
+.section h3 {
+  text-wrap: balance;
+}
+
 /* Terminal-style links: underlined, with the key hint the Panel puts before an action. */
 .links {
   display: flex;

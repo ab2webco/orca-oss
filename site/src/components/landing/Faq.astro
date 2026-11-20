@@ -37,9 +37,11 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
 ---
 
 <section class="section" id="faq" aria-labelledby="faq-title">
-  <div class="wrap">
-    <p class="heading">▾ {copy.eyebrow}</p>
-    <h2 class="h2" id="faq-title">{copy.title}</h2>
+  <div class="wrap rows">
+    <div>
+      <p class="heading">▾ {copy.eyebrow}</p>
+      <h2 class="h2" id="faq-title">{copy.title}</h2>
+    </div>
     <div class="list">
       {
         copy.items.map(([question, answer]) => (
@@ -58,11 +60,26 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
     margin-top: 20px;
     border-top: 1px solid var(--line);
   }
+  /* The head beside the questions, like a price list or an index. */
+  @media (min-width: 60rem) {
+    .rows {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: var(--space-xl);
+      align-items: start;
+    }
+    .rows .list {
+      margin-top: 0;
+    }
+    summary {
+      font-size: var(--text-lead);
+    }
+  }
   details {
     border-bottom: 1px solid var(--line);
   }
   summary {
-    padding: 12px 0;
+    padding: var(--space-md) 0;
     cursor: pointer;
     font-weight: 700;
     list-style: none;
@@ -76,6 +93,10 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
   }
   details[open] summary::before {
     content: '▾ ';
+  }
+  /* Why explicit: Chromium still lays out a closed answer, so it would count as text on screen. */
+  details:not([open]) p {
+    display: none;
   }
   details p {
     margin: 0 0 14px 2ch;
