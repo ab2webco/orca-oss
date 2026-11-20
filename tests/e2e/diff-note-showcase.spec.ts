@@ -94,7 +94,18 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
   const repo = createShowcaseRepo()
   // Why a longer base: a five-line diff leaves most of the editor empty in the clip.
   writeFileSync(join(repo, 'src', 'feed', 'fetch-feed.ts'), BASE)
-  execFileSync('git', ['-C', repo, 'commit', '-qam', 'Feed loading'])
+  // Why the identity: CI runners have no git user configured.
+  execFileSync('git', [
+    '-C',
+    repo,
+    '-c',
+    'user.name=Lumen',
+    '-c',
+    'user.email=team@example.com',
+    'commit',
+    '-qam',
+    'Feed loading'
+  ])
   const worktreeId = await attachRepoAndOpenTerminal(orcaPage, repo)
   await ensureTerminalVisible(orcaPage)
   await sizeWindow(electronApp, 1440, 900)
