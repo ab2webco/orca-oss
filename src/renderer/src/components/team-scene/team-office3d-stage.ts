@@ -6,7 +6,7 @@ import {
 } from '../../../../shared/team-scene/team-office3d-actions'
 import { office3dCabFloorAt } from '../../../../shared/team-scene/team-office3d-elevator'
 import {
-  OFFICE3D_LIFT,
+  OFFICE3D_DEPTH,
   OFFICE3D_PITCH,
   OFFICE3D_SEAT_Z,
   type Office3dLayout
@@ -25,7 +25,8 @@ import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { poseDioramaFigure } from './team-diorama-poses'
-import { office3dDev } from './team-office3d-dev'
+import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
+import { office3dLeadMark, office3dLiftShaft, office3dMark } from './team-office3d-lift'
 import { OFFICE3D_DAY, OFFICE3D_NIGHT, office3dFloor } from './team-office3d-floor'
 import { keepOffice3dLabelLegible, office3dLabelOf } from './team-office3d-labels'
 import { paintOffice3dBoard, paintOffice3dScreen } from './team-office3d-screens'
@@ -166,7 +167,8 @@ export function office3dStage(
       })
     }
     const chip = dioramaChip(office3dLabelOf(floor, args.words))
-    chip.position.set(0.4, floor.y + 3.1, 5.4)
+    // Why on the slab's front edge: over the row it covered the first desk and its member.
+    chip.position.set(0.4, floor.y - 0.8, OFFICE3D_DEPTH + 0.4)
     world.add(chip)
     chips.push(chip)
 
@@ -188,6 +190,11 @@ export function office3dStage(
           ghost(figure.g)
         }
         world.add(figure.g)
+        if (view.mark) {
+          const mark = office3dMark(view.mark, args.status)
+          mark.position.set(seat.x, floor.y + 2.3 * floor.scale, OFFICE3D_SEAT_Z)
+          world.add(mark)
+        }
       }
       let painted = -Infinity
       ticks.push((t) => {
@@ -221,14 +228,10 @@ export function office3dStage(
   const lead = office3dDev(dioramaLookOf(input.lead.characterKey ?? input.lead.key), 'lead')
   const leadScale = lead.g.scale.x
   world.add(lead.g)
-  const cab = kit.mesh(
-    kit.box(1.7, 0.12, 1.8),
-    kit.mat(X.metal),
-    OFFICE3D_LIFT[0],
-    0,
-    OFFICE3D_LIFT[1],
-    world
-  )
+  const { group: shaft, cab } = office3dLiftShaft(kit, X, layout.floors.length)
+  world.add(shaft)
+  const leadMark = office3dLeadMark(OFFICE3D_LEAD_COAT)
+  world.add(leadMark)
   ticks.push((t) => {
     const at = office3dWalkerAt(round, t)
     lead.g.position.set(at.at[0], 0, at.at[1])
@@ -245,7 +248,9 @@ export function office3dStage(
       poseDioramaFigure(lead, at.pose === 'give' ? 'talk' : at.pose, t)
     }
     const tt = round.total > 0 ? t % round.total : 0
-    cab.position.y = office3dCabFloorAt(round.cab, tt) * OFFICE3D_PITCH - 0.06
+    cab.position.y = office3dCabFloorAt(round.cab, tt) * OFFICE3D_PITCH
+    const p = lead.g.position
+    leadMark.position.set(p.x, p.y + 2.5 + Math.sin(t * 2.4) * 0.06, p.z)
   })
 
   const fit = dioramaFitCamera(world, args.width, args.maxHeight)
