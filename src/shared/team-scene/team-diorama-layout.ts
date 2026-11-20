@@ -42,7 +42,7 @@ export type DioramaLayout = {
   homeDocks: Record<number, DioramaDock>
   roads: DioramaRoad[]
   blocks: DioramaBlock[]
-  /** Members the home island has no plot for; the panel's list still shows them. */
+  /** Members no island has a plot for; the panel's list still shows them. */
   overflow: string[]
   order: DioramaOrder
 }
@@ -112,6 +112,20 @@ export function stableOrderOf(
     order.pop()
   }
   return order
+}
+
+/** The order cut to `slots` plots: who falls past moves into a free plot, else is returned. */
+function fitOrder(order: (string | null)[], slots: number): string[] {
+  const left: string[] = []
+  for (const key of order.splice(slots)) {
+    const hole = order.indexOf(null)
+    if (key !== null && hole === -1) {
+      left.push(key)
+    } else if (key !== null) {
+      order[hole] = key
+    }
+  }
+  return left
 }
 
 /** Plots an island holds: its cap, else its members, and the seats other sessions hold. */
@@ -211,10 +225,8 @@ export function teamDioramaLayoutOf(
   const overflow: string[] = []
   if (home) {
     const homeOrder = stableOrderOf(home.members, previous.plots[home.key] ?? [])
-    order.plots[home.key] = homeOrder.slice(0, DIORAMA_HOME_PLOTS.length)
-    overflow.push(
-      ...homeOrder.slice(DIORAMA_HOME_PLOTS.length).filter((k): k is string => k !== null)
-    )
+    overflow.push(...fitOrder(homeOrder, DIORAMA_HOME_PLOTS.length))
+    order.plots[home.key] = homeOrder
     islands.push({
       key: home.key,
       name: home.name,
@@ -263,7 +275,9 @@ export function teamDioramaLayoutOf(
       rect.x - (across - 1) * (PLOT_PITCH[0] / 2) + (j % 3) * PLOT_PITCH[0],
       rect.z - 0.3 - (rows - 1) * (PLOT_PITCH[1] / 2) + Math.floor(j / 3) * PLOT_PITCH[1]
     ])
-    order.plots[m.key] = stableOrderOf(m.members, previous.plots[m.key] ?? []).slice(0, slots)
+    const plotOrder = stableOrderOf(m.members, previous.plots[m.key] ?? [])
+    overflow.push(...fitOrder(plotOrder, slots))
+    order.plots[m.key] = plotOrder
     const top = rect.z - hd
     islands.push({
       key: m.key,

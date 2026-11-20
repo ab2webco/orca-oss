@@ -6,6 +6,7 @@ import {
   teamDioramaMachinesOf,
   type DioramaMachine
 } from './team-diorama-layout'
+import type { TeamMemberCard } from '../team-panel-model-types'
 import type { TeamSceneFloor } from './team-scene-floors'
 
 const machine = (key: string, over: Partial<DioramaMachine> = {}): DioramaMachine => ({
@@ -19,6 +20,30 @@ const machine = (key: string, over: Partial<DioramaMachine> = {}): DioramaMachin
   ...over
 })
 const HOME = machine('', { home: true, members: ['lead-pane', 'a'] })
+const card = (paneKey: string, host: TeamMemberCard['host']): TeamMemberCard => ({
+  paneKey,
+  terminalHandle: null,
+  worktreeId: null,
+  host,
+  name: paneKey,
+  agentType: 'claude',
+  status: 'working',
+  condition: 'working',
+  since: null,
+  liveAction: null,
+  model: null,
+  account: null,
+  characterKey: null,
+  ticket: null,
+  flowPhase: 'code',
+  summary: null,
+  pr: null,
+  needsYou: false,
+  limitResetsAt: null,
+  found: false
+})
+const plotKeysOf = (layout: ReturnType<typeof teamDioramaLayoutOf>, key: string) =>
+  layout.islands.find((i) => i.key === key)!.plots.map((p) => p.key)
 
 describe('the diorama layout', () => {
   it('sizes an island by its machine cap: one, two or three plots across', () => {
@@ -74,6 +99,28 @@ describe('the diorama layout', () => {
     expect(layout.overflow).toEqual(['7'])
   })
 
+  it("reports remote members past an island's six plots instead of dropping them", () => {
+    const members = ['1', '2', '3', '4', '5', '6', '7']
+    const layout = teamDioramaLayoutOf([HOME, machine('gpu', { members })])
+    expect(plotKeysOf(layout, 'gpu')).toEqual(['1', '2', '3', '4', '5', '6'])
+    expect(layout.overflow).toEqual(['7'])
+  })
+
+  it("moves a member into a free plot when its machine's cap shrinks under it", () => {
+    const first = teamDioramaLayoutOf([HOME, machine('gpu', { cap: 3, members: ['a', 'b', 'c'] })])
+    const left = teamDioramaLayoutOf(
+      [HOME, machine('gpu', { cap: 3, members: ['c'] })],
+      first.order
+    )
+    expect(left.order.plots['gpu']).toEqual([null, null, 'c'])
+    const shrunk = teamDioramaLayoutOf(
+      [HOME, machine('gpu', { cap: 2, members: ['c'] })],
+      left.order
+    )
+    expect(plotKeysOf(shrunk, 'gpu')).toEqual(['c', null])
+    expect(shrunk.overflow).toEqual([])
+  })
+
   it('gives each column of islands one home dock and each island its own', () => {
     const layout = teamDioramaLayoutOf([
       HOME,
@@ -89,17 +136,18 @@ describe('the diorama layout', () => {
   })
 
   it('reads a floor as a machine with its members, cap and other sessions', () => {
-    const floor = {
+    const host = { kind: 'remote', name: 'gpu', environmentId: null, reachable: false } as const
+    const floor: TeamSceneFloor = {
       key: 'gpu',
-      host: { kind: 'remote', name: 'gpu', environmentId: null, reachable: false },
-      members: [{ paneKey: 'p1' }],
+      host,
+      members: [card('p1', host)],
       cap: 3,
       running: 2,
       reachable: false,
       lead: false,
       taken: 1,
       free: 1
-    } as unknown as TeamSceneFloor
+    }
     expect(teamDioramaMachinesOf([floor])).toEqual([
       { key: 'gpu', name: 'gpu', home: false, reachable: false, members: ['p1'], cap: 3, taken: 1 }
     ])
