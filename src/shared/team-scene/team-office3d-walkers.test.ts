@@ -67,6 +67,12 @@ describe("the 3D Office lead's round", () => {
     ])
     expect(round.steps.filter((s) => s.kind === 'ride')).toHaveLength(3)
     expect(round.steps.at(-1)).toMatchObject({ kind: 'hold', pose: 'desk', floor: 0 })
+    expect(round.steps.every((s) => s.dur >= 0)).toBe(true)
+    for (const [i, s] of round.steps.entries()) {
+      if (s.kind === 'ride') {
+        expect(round.steps[i - 1]).toMatchObject({ kind: 'hold', at: [-1.15, 4.1] })
+      }
+    }
   })
 
   it('skips a floor whose machine is unreachable and never visits another floor to hand work out', () => {
