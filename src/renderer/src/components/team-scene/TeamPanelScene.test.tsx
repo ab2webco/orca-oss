@@ -273,7 +273,8 @@ describe('TeamPanelScene', () => {
     expect(shownStyle()).toBe('pixel')
   })
 
-  it("draws a scene file's own art, read from the lead's host", async () => {
+  // ORCA-1296: Figures and Office are Orca's art; a scene file's own block themes nothing there.
+  it("draws a scene file that carries its own art with Orca's Figures", async () => {
     await act(async () =>
       root.render(
         <TeamPanelScene
@@ -283,7 +284,7 @@ describe('TeamPanelScene', () => {
       )
     )
     expect(shownStyle()).toBe('figures')
-    expect(artOf()).toBe('scene')
+    expect(artOf()).toBe('bundled')
     expect(loadTeamSceneArt).toHaveBeenLastCalledWith(
       teamSceneQuestArtOf('figures'),
       expect.any(Function)
@@ -300,14 +301,14 @@ describe('TeamPanelScene', () => {
     expect(artOf()).toBe('bundled')
   })
 
-  it("draws a scene with no Figures art as its own characters in Pixel, never Quest's", async () => {
+  it("draws a scene with no Figures art in Orca's Figures, not in Pixel", async () => {
     await act(async () =>
       root.render(
         <TeamPanelScene model={model({ id: plain.id, extensions: [plain] })} style="figures" />
       )
     )
-    expect(shownStyle()).toBe('pixel')
-    expect(artOf()).toBe('pixel')
+    expect(shownStyle()).toBe('figures')
+    expect(artOf()).toBe('bundled')
   })
 
   it('draws Quest exported as a scene file with its bundled art', async () => {

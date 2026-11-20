@@ -120,3 +120,10 @@ tests/e2e/orchestrator-game-band-showcase.spec.ts # band and Panel under a lead 
 # ORCA-1296: the diorama is now Figures by default, so the case that pinned it off is renamed.
 src/shared/orchestrator-game-panel.test.ts # is on unless a layer turns it off
 src/renderer/src/components/team-scene/TeamPanelScene.test.tsx # Pixel draws the building too; the Office-only case is renamed
+
+# ORCA-1296 (#1353): the owner fixed Figures and Office to Orca's own art, so the panel no longer
+# reads or draws a scene file's own Figures or Office art (the native block still validates and
+# older builds keep drawing it). These cases covered that removed loading and fallback path.
+src/renderer/src/components/settings/orchestrator-game-style-fallback-note.test.ts # "no art, so Pixel" note
+src/renderer/src/components/team-scene/use-team-scene-painter.test.tsx # loading a scene's own art from the lead's host
+src/shared/orchestrator-game-scene-native.test.ts # a scene's own art, and Pixel for themed scenes

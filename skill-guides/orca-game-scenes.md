@@ -81,10 +81,10 @@ Run every step; skipping validation is the usual way scenes ship broken.
 6. **Decide whether to commit it.** A scene in `.orca/scenes/` is shared when committed. For a
    private scene (licensed characters, personal jokes) see [Private scenes](#private-scenes).
 
-7. **Optionally add native art.** The JSON above is the Pixel form, and it stays required: it is
-   what every scene falls back to. To also draw in the native panel's Figures or Office styles,
-   add a [`native` block](#native-optional) and its image files, validate again, and look at both
-   forms with the [captures](#looking-at-it-without-a-pane).
+7. **Native art is for older Orca builds only.** The JSON above is the Pixel form, and it is what
+   a scene changes in the Team panel: since ORCA-1296, Figures and Office always draw Orca's own
+   art. A [`native` block](#native-optional) still validates and reaches Orca builds and phone apps
+   older than that, so add one only for them.
 
 `orca game scene list` shows the built-in scene ids and every file in `.orca/scenes/` with
 its status, from any folder of the project.
@@ -440,8 +440,9 @@ scene still draws in its plain looks.
 
 ### `native` (optional)
 
-Image art for the native Team panel. The scene file still holds everything above: `native` adds to
-the Pixel form and never replaces it. Interactions belong to the engine and art to the scene, so
+Image art for the native Team panel of Orca builds older than ORCA-1296; current builds draw
+Figures and Office with Orca's own art whatever the scene. The scene file still holds everything
+above: `native` adds to the Pixel form and never replaces it. Interactions belong to the engine and art to the scene, so
 characters act out the same real state in every scene; a scene only draws them, names the actions
 and swaps the station prop.
 
@@ -514,11 +515,10 @@ game ignores the key.
 **Where the panel reads it.** The panel reads a scene file's images from the host that owns its
 worktree: this machine, an SSH host, or a paired host. A plugin scene's images are not read yet.
 
-**The default art is the floor.** A built-in scene other than Quest, a scene with no block, a style
-the block does not cover, a plugin scene, and art that does not load on this machine all draw the
-chosen style with Quest's art, which ships with Orca, and keep the scene's names and roster. The
-panel and Settings say the default art is in use. Pixel draws only when it is picked. A scene file
-named `quest.json` is Quest, so that art is its own.
+**Orca's art is what current builds draw.** Every scene draws Figures and Office with the art that
+ships with Orca, and keeps the scene's names and roster; Settings notes it for any scene but Quest.
+Pixel draws only when it is picked, or when Orca's own art fails to decode. A scene file named
+`quest.json` is Quest.
 
 Never use third-party characters in anything committed or published: see
 [Private scenes](#private-scenes) for art that must stay on your machine.

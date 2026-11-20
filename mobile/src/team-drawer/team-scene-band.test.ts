@@ -148,10 +148,11 @@ describe('the Team sheet scene band', () => {
     ).toEqual({ kind: 'bundled', style: 'office' })
   })
 
-  it('draws a themed scene in Figures as its Pixel stage, as the desktop does', () => {
+  // ORCA-1296: Figures is Orca's own art whatever the scene, on the desktop and here.
+  it("keeps Orca's Figures in a themed scene, as the desktop does", () => {
     expect(stageOf({ config: { scene: 'night-watch' } }).art).toEqual({
-      kind: 'pixel',
-      sceneId: 'night-watch'
+      kind: 'bundled',
+      style: 'figures'
     })
   })
 
@@ -188,11 +189,10 @@ const mario = {
 }
 
 describe("the scene band with a scene's own art", () => {
-  it('offers the scene file art on a host that serves it, with the stage it falls back to', () => {
+  it("draws Orca's Figures even where the host serves the scene file's own art", () => {
     const band = stageOf(mario, true)
-    expect(band.art).toMatchObject({ kind: 'scene', style: 'figures', sceneId: 'mario' })
-    expect(band.art.kind === 'scene' && band.art.native.roles.lead.sheets).toEqual(['mario.png'])
-    expect(band.fallback).toEqual({ kind: 'pixel', sceneId: 'mario' })
+    expect(band.art).toEqual({ kind: 'bundled', style: 'figures' })
+    expect(band.fallback).toEqual({ kind: 'bundled', style: 'figures' })
     expect(band.scenes.map((one) => one.id)).toEqual(['mario'])
   })
 
@@ -215,8 +215,8 @@ describe("the scene band with a scene's own art", () => {
     expect(stageOf(office).art).toEqual({ kind: 'bundled', style: 'office' })
   })
 
-  it("never asks a host without mobile.team-scene.v1 for the scene's own art", () => {
-    expect(stageOf(mario).art).toEqual({ kind: 'pixel', sceneId: 'mario' })
+  it("draws Orca's Figures on a host without mobile.team-scene.v1 too", () => {
+    expect(stageOf(mario).art).toEqual({ kind: 'bundled', style: 'figures' })
   })
 })
 

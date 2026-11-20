@@ -457,9 +457,8 @@ test('every Team scene style draws idle, working, waiting and done apart, as V28
         await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
         for (const style of STYLES) {
           await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
-          // Why Pixel for a themed file's Figures: it has no figures art, and that also proves it applied.
-          const quest = name === null || name === 'quest.json'
-          const drawn = style === 'figures' && !quest ? 'pixel' : style
+          // ORCA-1296: every style draws as picked, Figures and Office in Orca's art for any file.
+          const drawn = style
           const scene = panel.locator(`[data-team-scene="${drawn}"]`)
           for (const width of [1440, 390]) {
             await orcaPage.setViewportSize({ width, height: 900 })

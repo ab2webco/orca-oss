@@ -11,12 +11,6 @@ import {
   type OrchestratorGameSceneArtSource
 } from '../../../../shared/orchestrator-game-scene-native'
 import { loadTeamSceneArt } from './team-scene-art-load'
-import {
-  readTeamSceneArtUrl,
-  teamSceneArtHostKeyOf,
-  useTeamSceneArtHost,
-  type TeamSceneArtHost
-} from './team-scene-art-host'
 import { createImagePainter, type TeamSceneImageArt } from './team-scene-image-painter'
 import { OFFICE_BACK_SEAT } from './team-scene-office-back'
 import type { TeamScenePainter } from './team-scene-painter'
@@ -40,23 +34,12 @@ export type TeamScenePainterArgs = {
   timezone: string
 }
 
-const carriedOf = (scene: TeamScenePainterScene) =>
-  scene.extensions.find((one) => one.id === (scene.id ?? QUEST))?.definition
-
-/** The style drawn for this scene and where its art comes from; Pixel only when picked or broken. */
+/** The style drawn and where its art comes from: Orca's own for Figures and Office (ORCA-1296). */
 export function teamSceneArtOf(args: {
   style: GamePanelStyle
-  scene: TeamScenePainterScene
-  sceneArtFailed?: boolean
   bundledArtFailed?: boolean
 }): OrchestratorGameSceneArt {
-  return orchestratorGameSceneArtOf({
-    style: args.style,
-    sceneId: args.scene.id ?? QUEST,
-    scene: carriedOf(args.scene),
-    sceneArtFailed: args.sceneArtFailed,
-    bundledArtFailed: args.bundledArtFailed
-  })
+  return orchestratorGameSceneArtOf({ style: args.style, bundledArtFailed: args.bundledArtFailed })
 }
 
 /** The style really drawn, where its art came from, and its painter; null only while art decodes. */
@@ -68,62 +51,25 @@ export type TeamSceneStage = {
   makePainter: () => TeamScenePainter | null
 }
 
-type ArtRequest = { key: string; own: boolean; load: () => Promise<TeamSceneImageArt> }
+type ArtRequest = { key: string; load: () => Promise<TeamSceneImageArt> }
 
-function artRequestOf(args: {
-  art: OrchestratorGameSceneArtSource
-  style: 'figures' | 'office'
-  sceneKey: string
-  host: TeamSceneArtHost | null
-}): ArtRequest | null {
-  const { art, style, sceneKey, host } = args
-  if (art === 'bundled') {
-    return {
-      key: `bundled|${style}`,
-      own: false,
-      load: () => loadTeamSceneArt(teamSceneQuestArtOf(style), teamSceneQuestArtUrl)
-    }
-  }
-  const scene = JSON.parse(sceneKey) as TeamScenePainterScene
-  const native = carriedOf(scene)?.native?.[style]
-  if (art !== 'scene' || !native || !host) {
-    return null
-  }
-  const sceneId = scene.id ?? QUEST
-  return {
-    key: ownArtKeyOf(style, sceneKey, host),
-    own: true,
-    load: () => loadTeamSceneArt(native, (src) => readTeamSceneArtUrl(host, sceneId, src))
-  }
-}
-
-const ownArtKeyOf = (style: GamePanelStyle, sceneKey: string, host: TeamSceneArtHost | null) =>
-  `scene|${style}|${teamSceneArtHostKeyOf(host)}|${sceneKey}`
+const artRequestOf = (style: 'figures' | 'office'): ArtRequest => ({
+  key: `bundled|${style}`,
+  load: () => loadTeamSceneArt(teamSceneQuestArtOf(style), teamSceneQuestArtUrl)
+})
 
 /** The stage for the panel's style; while the painter is null, hold `TEAM_SCENE_ART_HEIGHT`. */
 export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage {
   const { style, scene, timezone } = args
   const colors = useTeamSceneStatusColors()
-  const host = useTeamSceneArtHost()
   // Why by text: each poll hands a new `extensions` array, and a new painter drops the stage's caches.
   const sceneKey = JSON.stringify(scene)
-  const [ownFailed, setOwnFailed] = useState<string | null>(null)
   const [bundledFailed, setBundledFailed] = useState<GamePanelStyle | null>(null)
   const [loaded, setLoaded] = useState<{ key: string; art: TeamSceneImageArt } | null>(null)
-  const art = teamSceneArtOf({
-    style,
-    scene,
-    // Why: without the lead's host there is nowhere to read the scene's own art from.
-    sceneArtFailed: host === null || ownFailed === ownArtKeyOf(style, sceneKey, host),
-    bundledArtFailed: bundledFailed === style
-  })
+  const art = teamSceneArtOf({ style, bundledArtFailed: bundledFailed === style })
   const artStyle = art.drawn === 'figures' || art.drawn === 'office' ? art.drawn : null
 
-  const request = useMemo(
-    () =>
-      artStyle === null ? null : artRequestOf({ art: art.art, style: artStyle, sceneKey, host }),
-    [art.art, artStyle, sceneKey, host]
-  )
+  const request = useMemo(() => (artStyle === null ? null : artRequestOf(artStyle)), [artStyle])
 
   useEffect(() => {
     if (request === null) {
@@ -137,12 +83,7 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
         }
       },
       () => {
-        if (!current) {
-          return
-        }
-        if (request.own) {
-          setOwnFailed(request.key)
-        } else if (artStyle !== null) {
+        if (current && artStyle !== null) {
           setBundledFailed(artStyle)
         }
       }
@@ -173,10 +114,9 @@ export function useTeamScenePainter(args: TeamScenePainterArgs): TeamSceneStage 
       return createPixelPainter({ ...pixelScene, colors })
     }
     const builds = artStyle === 'figures' ? 'castle' : 'office'
-    // Why only Orca's own desk: the back view knows where its art's side chair ends.
-    const back = artStyle === 'office' && request?.own === false ? OFFICE_BACK_SEAT : null
+    const back = artStyle === 'office' ? OFFICE_BACK_SEAT : null
     return image ? createImagePainter({ art: image, colors, builds, back }) : null
-  }, [artStyle, image, pixelScene, colors, request])
+  }, [artStyle, image, pixelScene, colors])
   const painter = useMemo(makePainter, [makePainter])
   return { drawn: art.drawn, art: art.art, painter, makePainter }
 }
