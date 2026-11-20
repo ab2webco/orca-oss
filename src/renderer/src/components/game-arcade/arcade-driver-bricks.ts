@@ -58,6 +58,5 @@ export const BRICKS_DRIVER: ArcadeDriver<OrchestratorGameArcadeBricks, BricksSta
   isOverOf: (state) => state.isOver,
   msOf: (state) => state.ms,
   paint: (g, game, state, view) => paintBricksRun(g, game, state, view),
-  backdropOf: bricksBackdropOf,
-  isThemed: true
+  backdropOf: bricksBackdropOf
 }

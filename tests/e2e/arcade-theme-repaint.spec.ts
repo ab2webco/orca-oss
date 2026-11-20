@@ -8,7 +8,7 @@ import { expect, test } from './helpers/orca-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { setTheme } from './helpers/settings-window'
 
-const ENGINES: OrchestratorGameArcadeEngine[] = ['runner', 'snake', 'bricks']
+const ENGINES: OrchestratorGameArcadeEngine[] = ['runner', 'snake', 'bricks', 'defense']
 
 /** Mean brightness of the top-left corner, where every game shows its background. */
 const cornerLightOf = (page: Page, engine: OrchestratorGameArcadeEngine): Promise<number> =>

@@ -154,7 +154,7 @@ const HOST_CAPACITY: GameHostCapacity[] = [
   { host: 'build-box-linux-02', running: 0, cap: 3, status: 'unreachable' }
 ]
 
-const ACTIONS: GameAction[] = [
+export const LEAD_ACTIONS: GameAction[] = [
   {
     id: 'lead:wave',
     label: 'Wave',
@@ -227,6 +227,6 @@ const stoppedTeam = (): Partial<OrchestratorGameState> =>
 export const leadProjectState = (): Partial<OrchestratorGameState> => ({
   project: projectWork(),
   hostCapacity: HOST_CAPACITY,
-  actions: ACTIONS,
+  actions: LEAD_ACTIONS,
   ...stoppedTeam()
 })
