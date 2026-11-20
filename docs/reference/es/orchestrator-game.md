@@ -1,5 +1,5 @@
 ---
-sourceHash: 968e252cc8457d6b
+sourceHash: 114e9f03fcc28059
 ---
 
 # El juego orquestador de Agent Teams
@@ -759,6 +759,11 @@ guarda el primero que le da al pane de un líder durante toda la sesión, así q
 idioma no le cambia el nombre. Lo lleva el `leadName` del estado del juego, y la tarjeta del Team, la
 escena y los encabezados de los mensajes del líder lo leen de ahí
 ([`orchestrator-game-lead-names.ts`](../../../src/main/runtime/orchestrator-game-lead-names.ts)).
+
+En el teléfono, Ajustes → Agent Teams → **Names** fija los nombres globales del líder y de los
+miembros de la computadora vinculada, dice de dónde sale cada uno y borra el que queda vacío. Un host
+sin `mobile.agent-teams-names.v1` rechaza la clave `agentTeamsNames`, así que el teléfono pide actualizar
+([`agent-teams-names-settings.ts`](../../../src/shared/agent-teams-names-settings.ts)).
 
 Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):
