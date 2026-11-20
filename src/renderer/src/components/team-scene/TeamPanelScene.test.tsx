@@ -328,7 +328,7 @@ describe('TeamPanelScene', () => {
     expect(host.querySelector('[data-scene-bubble="lead"]')?.textContent).toContain('Merge #923?')
   })
 
-  it('draws the building only in Office and only when the team spans more than one machine', async () => {
+  it('draws the building in Office only when the team spans more than one machine, never in Figures', async () => {
     const member = (paneKey: string, host: TeamLeadCard['host']) =>
       ({
         ...lead,
@@ -360,6 +360,28 @@ describe('TeamPanelScene', () => {
     await act(async () =>
       root.render(
         <TeamPanelScene model={spread([{ kind: 'local' }, { kind: 'local' }])} style="office" />
+      )
+    )
+    expect(building()).toBeNull()
+  })
+
+  // ORCA-1296: Pixel lays a team on several machines out a floor per machine, not stacked seats.
+  it('draws Pixel as a floor per machine too, and one machine as its single stage', async () => {
+    const member = (paneKey: string, h: TeamLeadCard['host']) =>
+      ({ ...model({ id: 'quest', extensions: [] }).lead, paneKey, host: h, name: paneKey }) as never
+    const spread = (hosts: TeamLeadCard['host'][]) => ({
+      ...model({ id: 'quest', extensions: [] }),
+      members: hosts.map((h, i) => member(`m${i}`, h))
+    })
+    const imac = { kind: 'remote' as const, name: 'imac', environmentId: 'e1', reachable: true }
+    const building = () => host.querySelector('[data-team-building]')
+    await act(async () =>
+      root.render(<TeamPanelScene model={spread([{ kind: 'local' }, imac])} style="pixel" />)
+    )
+    expect(building()).not.toBeNull()
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={spread([{ kind: 'local' }, { kind: 'local' }])} style="pixel" />
       )
     )
     expect(building()).toBeNull()

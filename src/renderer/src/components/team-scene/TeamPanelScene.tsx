@@ -67,10 +67,10 @@ export function TeamPanelScene({
             diorama && drawn === 'figures' ? (noWebgl ? 'off' : 'on') : undefined
           }
         >
-          {/* Why Office only: the building is desks on floors, and one machine stays as today. */}
+          {/* Why Office and Pixel: a floor per machine; one machine keeps its single stage. */}
           {diorama && drawn === 'figures' && !noWebgl ? (
             <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} />
-          ) : painter && drawn === 'office' && teamSceneHasFloors(model) ? (
+          ) : painter && (drawn === 'office' || drawn === 'pixel') && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}
               unconfirmed={unconfirmed}
