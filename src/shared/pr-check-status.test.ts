@@ -38,3 +38,56 @@ describe('provider-neutral check status', () => {
     expect(derivePRCheckStatusFromRollup([{ status: 'COMPLETED', conclusion }])).toBe('failure')
   })
 })
+
+describe('superseded cancelled runs in a GitHub rollup (ORCA-1269)', () => {
+  const run = (runId: number, workflowName: string, name: string, conclusion: string) => ({
+    __typename: 'CheckRun',
+    workflowName,
+    name,
+    status: 'COMPLETED',
+    conclusion,
+    detailsUrl: `https://github.com/o/r/actions/runs/${runId}/job/${runId}${name.length}`
+  })
+
+  it('does not count a cancelled run superseded by a newer run of its workflow as red', () => {
+    const rollup = [
+      run(200, 'PR Checks', 'verify', 'FAILURE'),
+      run(200, 'PR Checks', 'lint', 'CANCELLED'),
+      run(201, 'PR Checks', 'lint', 'SUCCESS')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('success')
+  })
+
+  it('does not count a failed aggregate job of a superseded cancelled run as red', () => {
+    const rollup = [
+      run(300, 'PR Checks', 'verify', 'FAILURE'),
+      run(300, 'PR Checks', 'build', 'CANCELLED'),
+      { ...run(301, 'PR Checks', 'build', ''), status: 'IN_PROGRESS', conclusion: null }
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('pending')
+  })
+
+  it('still reads red when the latest run of a workflow is itself cancelled', () => {
+    const rollup = [
+      run(400, 'PR Checks', 'lint', 'SUCCESS'),
+      run(401, 'PR Checks', 'lint', 'CANCELLED')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
+  })
+
+  it('still reads red for a failed run with no newer run of its workflow', () => {
+    const rollup = [
+      run(500, 'PR Checks', 'verify', 'FAILURE'),
+      run(500, 'PR Checks', 'build', 'CANCELLED')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
+  })
+
+  it('keeps a cancelled run of another workflow red', () => {
+    const rollup = [
+      run(600, 'CodeQL', 'analyze', 'CANCELLED'),
+      run(601, 'PR Checks', 'lint', 'SUCCESS')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
+  })
+})
