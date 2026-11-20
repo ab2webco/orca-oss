@@ -52,7 +52,7 @@ export function TeamOpenTerminalButton({
             className={cn(
               'size-5 text-muted-foreground hover:text-foreground',
               blocked &&
-                'cursor-default opacity-50 hover:bg-transparent hover:text-muted-foreground'
+                'cursor-default opacity-50 hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent'
             )}
             onClick={() => {
               if (!blocked) {

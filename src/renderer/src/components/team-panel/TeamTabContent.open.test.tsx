@@ -176,6 +176,10 @@ describe('a Team card click expands it; its terminal icon opens the session', ()
     const icon = terminalOf(container, 'member')
 
     expect(icon.getAttribute('aria-disabled')).toBe('true')
+    // Why dark too: ghost's dark:hover:bg-accent/50 outranks a bare hover:bg-transparent.
+    expect(icon.className.split(' ')).toEqual(
+      expect.arrayContaining(['hover:bg-transparent', 'dark:hover:bg-transparent'])
+    )
     await click(icon)
 
     expect(openTeamSession).not.toHaveBeenCalled()
