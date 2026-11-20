@@ -359,10 +359,11 @@ test('the Team tab shows the live lead and its members from the lead game state'
       })
     }
     const leadCard = panel.locator('[data-team-card="lead"]')
-    // ORCA-1094 row 1: with no Lead name the lead is the quest roster's last character, never the worktree.
-    const leadName = 'Elaine'
+    // ORCA-1304: with no Lead name the lead is "Lead", never a roster name or the worktree.
+    const rosterName = 'Elaine'
     await expect(panel.locator('[data-team-scene]')).toHaveCount(1)
-    await expect(leadCard).toContainText(leadName)
+    await expect(leadCard).toContainText('Lead')
+    await expect(leadCard).not.toContainText(rosterName)
     for (const look of ['display', 'plain'] as const) {
       await setLook(look)
       await expect(panel.locator('[data-team-scene]')).toHaveCount(0)
@@ -370,7 +371,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
       await expect(panel.locator('[aria-roledescription="carousel"]')).toHaveCount(
         look === 'display' ? 1 : 0
       )
-      await expect(leadCard).not.toContainText(leadName)
+      await expect(leadCard).not.toContainText(rosterName)
       // ORCA-1094 row 5: as V28 draws Plain and Display, members sit indented under the lead with
       // their status in a column of its own, left of the text, not inline under the ticket.
       const layout = await panel.evaluate((node) => {
