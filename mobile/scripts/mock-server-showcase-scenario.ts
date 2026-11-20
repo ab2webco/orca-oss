@@ -3,50 +3,56 @@ import type {
   RuntimeWorktreePsSummary
 } from '../../src/shared/runtime-types'
 import type { GameOwnerQuestionProject } from '../../src/shared/orchestrator-game-owner-questions'
-import {
-  statusGroupOfName,
-  type GameAgent,
-  type GameReview
-} from '../../src/shared/orchestrator-game-state'
 import type { MockRepo } from './mobile-lag-scenario'
 
-// MOCK_SCENARIO=showcase: invented demo data for the README recordings (ORCA-955).
+// MOCK_SCENARIO=showcase: invented demo data for the README and site recordings (ORCA-955, ORCA-1176).
 // Every name, ticket, host and URL here is made up; keep it that way.
 export const isShowcaseScenario = process.env.MOCK_SCENARIO === 'showcase'
 
 const ROOT = '/Users/demo/code'
-const PLANE = 'https://plane.example.com/acme'
-const GIT = 'https://git.example.com/acme'
+export const PLANE = 'https://plane.example.com/lumen'
+export const GIT = 'https://git.example.com/lumen'
 
 export const SHOWCASE_REPOS: MockRepo[] = [
-  { id: 'repo-web', displayName: 'acme-web', path: `${ROOT}/acme-web`, badgeColor: '#6366f1' },
-  { id: 'repo-api', displayName: 'acme-api', path: `${ROOT}/acme-api`, badgeColor: '#06b6d4' },
-  { id: 'repo-field', displayName: 'field-app', path: `${ROOT}/field-app`, badgeColor: '#f97316' }
+  { id: 'repo-app', displayName: 'lumen-app', path: `${ROOT}/lumen-app`, badgeColor: '#6366f1' },
+  { id: 'repo-api', displayName: 'lumen-api', path: `${ROOT}/lumen-api`, badgeColor: '#06b6d4' },
+  { id: 'repo-web', displayName: 'lumen-web', path: `${ROOT}/lumen-web`, badgeColor: '#f97316' }
 ].map((repo) => ({ ...repo, connectionId: null }))
 
 const worktreeIdOf = (repo: MockRepo, name: string | null): string =>
   name ? `${repo.id}::${repo.path}/worktrees/${name}` : `${repo.id}::${repo.path}`
 
-const [WEB, API, FIELD] = SHOWCASE_REPOS as [MockRepo, MockRepo, MockRepo]
-export const LEAD_WORKTREE_ID = worktreeIdOf(WEB, null)
-const CHECKOUT_WORKTREE_ID = worktreeIdOf(WEB, 'checkout-summary')
+const [APP, API, WEB] = SHOWCASE_REPOS as [MockRepo, MockRepo, MockRepo]
+export const LEAD_WORKTREE_ID = worktreeIdOf(APP, null)
+const FEED_WORKTREE_ID = worktreeIdOf(APP, 'offline-feed')
 const API_WORKTREE_ID = worktreeIdOf(API, null)
-const FIELD_WORKTREE_ID = worktreeIdOf(FIELD, null)
+const WEB_WORKTREE_ID = worktreeIdOf(WEB, null)
+
+/** The lead's own worktree as game.state names it. */
+export const SHOWCASE_LEAD_WORKTREE = {
+  id: LEAD_WORKTREE_ID,
+  path: APP.path,
+  branch: 'main',
+  displayName: APP.displayName
+}
+
+/** The site and desktop clips call this lead Atlas. */
+export const SHOWCASE_LEAD_LABEL = 'Atlas'
 
 /** One terminal per worktree so each subscribe knows whose output to stream. */
 const TERMINAL_HANDLES = new Map([
   [LEAD_WORKTREE_ID, 'term-lead'],
-  [CHECKOUT_WORKTREE_ID, 'term-checkout'],
+  [FEED_WORKTREE_ID, 'term-feed'],
   [API_WORKTREE_ID, 'term-api'],
-  [FIELD_WORKTREE_ID, 'term-field']
+  [WEB_WORKTREE_ID, 'term-web']
 ])
 
 export function showcaseTerminalHandle(worktreeId: string): string {
-  return TERMINAL_HANDLES.get(worktreeId) ?? 'term-checkout'
+  return TERMINAL_HANDLES.get(worktreeId) ?? 'term-feed'
 }
 
 export function showcaseTerminalTitle(handle: string): string {
-  return handle === 'term-lead' ? 'Lead — acme-web' : 'Claude — ACME-212'
+  return handle === 'term-lead' ? 'Atlas — lumen-app' : 'Claude — LUM-14'
 }
 
 function agentRow(
@@ -109,96 +115,40 @@ export function createShowcaseWorktrees(now = Date.now()): RuntimeWorktreePsSumm
     ...fields
   })
   return [
-    row(WEB, LEAD_WORKTREE_ID, {
-      displayName: 'acme-web',
+    row(APP, LEAD_WORKTREE_ID, {
+      displayName: 'lumen-app',
       isMainWorktree: true,
       isActive: true,
-      preview: 'Lead · 5 members · 2 questions for you',
-      agents: [agentRow('tab-lead:1', 'working', 'Lead · acme-web', 60_000, now)]
+      preview: 'Atlas · 5 members · 2 questions for you',
+      agents: [agentRow('tab-lead:1', 'working', 'Atlas · lumen-app', 60_000, now)]
     }),
-    row(WEB, CHECKOUT_WORKTREE_ID, {
-      displayName: 'checkout-summary',
-      branch: 'acme-212-checkout-summary',
+    row(APP, FEED_WORKTREE_ID, {
+      displayName: 'offline-feed',
+      branch: 'lum-14-offline-feed',
       sortOrder: now - 1_000,
-      linkedPR: { number: 412, state: 'open' },
-      preview: '● Bash pnpm test checkout',
-      agents: [agentRow('tab-co:1', 'working', 'ACME-212 Checkout summary', 180_000, now)]
+      linkedPR: { number: 42, state: 'open' },
+      preview: '● Bash pnpm test feed-cache',
+      agents: [agentRow('tab-feed:1', 'working', 'LUM-14 Offline cache for the feed', 180_000, now)]
     }),
     row(API, API_WORKTREE_ID, {
-      displayName: 'acme-api',
+      displayName: 'lumen-api',
       isMainWorktree: true,
       sortOrder: now - 2_000,
       status: 'active',
       preview: 'Waiting on you: rate limit',
-      agents: [agentRow('tab-api:1', 'waiting', 'ACME-208 Public API limits', 420_000, now)]
+      agents: [agentRow('tab-api:1', 'waiting', 'API-208 Public API limits', 420_000, now)]
     }),
-    row(FIELD, FIELD_WORKTREE_ID, {
-      displayName: 'field-app',
+    row(WEB, WEB_WORKTREE_ID, {
+      displayName: 'lumen-web',
       isMainWorktree: true,
       sortOrder: now - 3_000,
       status: 'done',
       linkedPR: { number: 77, state: 'merged' },
-      preview: 'FLD-41 merged',
-      agents: [agentRow('tab-field:1', 'done', 'FLD-41 Offline sync', 900_000, now)]
+      preview: 'WEB-41 merged',
+      agents: [agentRow('tab-web:1', 'done', 'WEB-41 Pricing page', 900_000, now)]
     })
   ]
 }
-
-const member = (
-  paneKey: string,
-  name: string,
-  state: GameAgent['state'],
-  ticket: [string, string, string],
-  extra: Partial<GameAgent> = {}
-): GameAgent => ({
-  paneKey,
-  displayName: name,
-  agentType: 'claude',
-  state,
-  toolName: null,
-  isLeader: false,
-  isMember: true,
-  launch: { model: 'opus', effort: null },
-  workItem: {
-    provider: 'plane',
-    identifier: ticket[0],
-    title: ticket[1],
-    url: `${PLANE}/${ticket[0]}`,
-    status: ticket[2],
-    statusGroup: statusGroupOfName(ticket[2])
-  },
-  ...extra
-})
-
-const review = (
-  number: number,
-  ci: GameReview['ci'],
-  state: GameReview['state'] = 'open'
-): GameReview => ({
-  provider: 'github',
-  number,
-  title: `PR ${number}`,
-  url: `${GIT}/acme-web/pull/${number}`,
-  state,
-  ci
-})
-
-export const SHOWCASE_MEMBERS = [
-  member('tab-9:a', 'Maya', 'working', ['ACME-212', 'Checkout summary card', 'In Progress'], {
-    review: review(412, 'pending')
-  }),
-  member('tab-9:b', 'Leo', 'working', ['ACME-214', 'Payment sandbox on CI', 'In Progress'], {
-    review: review(415, 'failure'),
-    remote: { host: 'build-box', stateKnown: true }
-  }),
-  member('tab-9:c', 'Iris', 'waiting', ['ACME-216', 'Webhook retry policy', 'In Progress']),
-  member('tab-9:d', 'Theo', 'idle', ['ACME-205', 'Dark mode for invoices', 'In Review'], {
-    review: review(409, 'success')
-  }),
-  member('tab-9:e', 'Sana', 'done', ['ACME-201', 'Faster product search', 'Done'], {
-    review: review(401, 'success', 'merged')
-  })
-]
 
 export const SHOWCASE_METRICS_MERGED = [
   { day: '2026-10-27', merged: 3 },
@@ -225,22 +175,22 @@ const question = (
 export function createShowcaseQuestionProjects(): GameOwnerQuestionProject[] {
   return [
     {
-      repoId: WEB.id,
-      repoName: WEB.displayName,
+      repoId: APP.id,
+      repoName: APP.displayName,
       worktreeId: LEAD_WORKTREE_ID,
       questions: [
         question(
-          'q-web-1',
-          'ACME-214',
-          'The payment sandbox is slow on CI. Raise the checkout spec timeout to 90 s?',
-          ['Raise to 90 s', 'Keep 60 s'],
-          `${GIT}/acme-web/pull/415`,
+          'q-app-1',
+          'LUM-23',
+          'Push opt-in: ask on first launch, or after the first saved post?',
+          ['First launch', 'After first post'],
+          `${PLANE}/LUM-23`,
           14
         ),
         question(
-          'q-web-2',
+          'q-app-2',
           null,
-          'Ship v2.4 to staging tonight, or wait for ACME-212?',
+          'Ship 3.2 to TestFlight tonight, or wait for LUM-14?',
           ['Tonight', 'Wait'],
           null,
           6
@@ -254,24 +204,24 @@ export function createShowcaseQuestionProjects(): GameOwnerQuestionProject[] {
       questions: [
         question(
           'q-api-1',
-          'ACME-208',
+          'API-208',
           'Public API rate limit for free accounts: 100 or 300 requests a minute?',
           ['100 / min', '300 / min'],
-          `${PLANE}/ACME-208`,
+          `${PLANE}/API-208`,
           31
         )
       ]
     },
     {
-      repoId: FIELD.id,
-      repoName: FIELD.displayName,
-      worktreeId: FIELD_WORKTREE_ID,
+      repoId: WEB.id,
+      repoName: WEB.displayName,
+      worktreeId: WEB_WORKTREE_ID,
       questions: [
         question(
-          'q-field-1',
-          'FLD-44',
-          'Offline edit conflict: keep the phone copy or the server copy?',
-          ['Phone wins', 'Server wins', 'Ask each time'],
+          'q-web-1',
+          'WEB-44',
+          'Pricing page on a slow connection: the video or a still?',
+          ['Still', 'Video', 'Ask each time'],
           null,
           52
         )
@@ -280,14 +230,14 @@ export function createShowcaseQuestionProjects(): GameOwnerQuestionProject[] {
   ]
 }
 
-/** The question the notification trigger adds to the lead's project. */
+/** The question the notification trigger adds to the lead's project: the site's step 6. */
 export function showcaseIncomingQuestion() {
   return question(
-    `q-web-${Date.now()}`,
-    'ACME-216',
-    'Webhook retries: give up after 3 attempts or 5?',
-    ['3 attempts', '5 attempts'],
-    `${PLANE}/ACME-216`,
+    `q-app-${Date.now()}`,
+    'LUM-25',
+    'Retry uploads on cellular?',
+    ['Yes', 'Wi-Fi only'],
+    `${PLANE}/LUM-25`,
     0
   )
 }
