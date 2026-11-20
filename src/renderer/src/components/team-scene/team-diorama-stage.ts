@@ -23,9 +23,12 @@ export type DioramaStage = {
 }
 
 /** The canvas's WebGL renderer, or null where WebGL does not open (hardware acceleration off). */
-export function dioramaRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer | null {
+export function dioramaRenderer(
+  canvas: HTMLCanvasElement,
+  alpha = false
+): THREE.WebGLRenderer | null {
   try {
-    return new THREE.WebGLRenderer({ canvas, antialias: true })
+    return new THREE.WebGLRenderer({ canvas, antialias: true, alpha })
   } catch {
     return null
   }

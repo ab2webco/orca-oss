@@ -15,7 +15,10 @@ import {
   office3dLeadRoundOf,
   office3dWalkerAt
 } from '../../../../shared/team-scene/team-office3d-walkers'
-import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
+import type {
+  TeamSceneInput,
+  TeamSceneMemberInput
+} from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { dioramaFitCamera } from './team-diorama-camera'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
@@ -35,6 +38,66 @@ export type Office3dStage = { height: number; draw: (t: number) => void; dispose
 const REPAINT = 0.4
 /** A seated figure's lift off the floor at the diorama's 1.6 scale, as the approved prototype. */
 const SIT_Y = 0.58 - 0.34 * 1.6
+
+/** A figure on a machine that cannot be reached: see-through, as its desk's haze. */
+function ghost(g: THREE.Object3D): void {
+  g.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (m.isMesh) {
+      m.material = (m.material as THREE.Material).clone()
+      Object.assign(m.material, { transparent: true, opacity: 0.35, depthWrite: false })
+    }
+  })
+}
+
+const tileOf = (m: TeamSceneMemberInput, reachable: boolean, c: TeamSceneStatusColors): string =>
+  !reachable || m.away
+    ? '#4b5563'
+    : m.activity === 'needsYou'
+      ? c.attention
+      : m.activity === 'done'
+        ? c.done
+        : m.activity === 'blocked' || m.hold
+          ? c.risk
+          : c.working
+
+/** The control room's video wall: one tile per member of its floor, in Orca's status colours. */
+function paintWall(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  floorMembers: readonly TeamSceneMemberInput[],
+  reachable: boolean,
+  c: TeamSceneStatusColors,
+  t: number
+): void {
+  g.fillStyle = '#0b1220'
+  g.fillRect(0, 0, w, h)
+  const cols = 8,
+    tw = 42,
+    th = 22,
+    gap = 6
+  for (const [k, m] of floorMembers.slice(0, 40).entries()) {
+    const fill = tileOf(m, reachable, c)
+    // Why a pulse on the asker's tile only: the wall says who needs the user at a glance.
+    g.globalAlpha = fill === c.attention ? 0.65 + 0.35 * Math.abs(Math.sin(t * 3)) : 1
+    g.fillStyle = fill
+    g.fillRect(14 + (k % cols) * (tw + gap), 20 + Math.floor(k / cols) * (th + gap), tw, th)
+  }
+  g.globalAlpha = 1
+  g.strokeStyle = '#7fb4ff'
+  g.lineWidth = 2
+  g.beginPath()
+  for (let q = 0; q <= 40; q++) {
+    const y = h - 16 - 16 * (0.5 + 0.5 * Math.sin(q * 0.55 + t * 0.8))
+    if (q) {
+      g.lineTo(14 + q * 9.3, y)
+    } else {
+      g.moveTo(14, y)
+    }
+  }
+  g.stroke()
+}
 
 /** One read of the team as the 3D Office: every machine's floor, its desks, its advisor, the lead. */
 export function office3dStage(
@@ -56,7 +119,8 @@ export function office3dStage(
   const scene = new THREE.Scene()
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.shadowMap.enabled = true
-  renderer.setClearColor(kit.p.sea)
+  // Why see-through: the building stands on the panel's own background, not the islands' sea.
+  renderer.setClearColor(0x000000, 0)
   const raw = (hex: number) => new THREE.Color().setHex(hex, THREE.LinearSRGBColorSpace)
   scene.add(
     new THREE.HemisphereLight(raw(kit.p.hemiSky), raw(kit.p.hemiGround), kit.p.hemi * Math.PI)
@@ -89,6 +153,17 @@ export function office3dStage(
       jev.g.rotation.y = Math.PI - 0.35
       world.add(jev.g)
       ticks.push((t) => poseOffice3dSeated(jev, 'type', t))
+      const floorMembers = floor.seats.flatMap((s) => (s.key && members.get(s.key)) || [])
+      let shown = -Infinity
+      ticks.push((t) => {
+        if (t - shown < REPAINT && t >= shown) {
+          return
+        }
+        shown = t
+        room.wall?.redraw((g, w, h) =>
+          paintWall(g, w, h, floorMembers, floor.reachable, args.status, t)
+        )
+      })
     }
     const chip = dioramaChip(office3dLabelOf(floor, args.words))
     chip.position.set(0.4, floor.y + 3.1, 5.4)
@@ -109,6 +184,9 @@ export function office3dStage(
         figure.g.position.set(seat.x, 0, OFFICE3D_SEAT_Z)
         figure.baseY = floor.y + SIT_Y * floor.scale
         figure.g.rotation.y = Math.PI
+        if (view.faded) {
+          ghost(figure.g)
+        }
         world.add(figure.g)
       }
       let painted = -Infinity

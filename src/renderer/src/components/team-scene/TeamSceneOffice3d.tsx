@@ -65,7 +65,7 @@ export function TeamSceneOffice3d({
       return
     }
     // Why one renderer per canvas: a new WebGL context per read runs into the browser's cap.
-    const renderer = (gl.current ??= dioramaRenderer(el))
+    const renderer = (gl.current ??= dioramaRenderer(el, true))
     if (!renderer) {
       onNoWebgl()
       return
