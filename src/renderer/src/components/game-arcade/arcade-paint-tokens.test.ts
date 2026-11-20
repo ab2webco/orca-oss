@@ -81,7 +81,7 @@ const WORDS = { score: '5 pts', hint: 'hint', held: 'held', over: 'Game over', o
 
 type Engine = keyof typeof GAMES
 /** The games whose scene paints with tokens; each split part of ORCA-1299 adds its own. */
-const TOKEN_ENGINES: Engine[] = ['runner']
+const TOKEN_ENGINES: Engine[] = ['runner', 'snake', 'bricks']
 
 /**
  * The colours one frame of `engine` draws mid-run and on its game-over screen, under `theme`;

@@ -43,5 +43,6 @@ export const SNAKE_DRIVER: ArcadeDriver<OrchestratorGameArcadeSnake, SnakeState>
   isOverOf: (state) => state.isOver,
   msOf: (state) => state.ms,
   paint: (g, game, state, view) => paintSnakeRun(g, game, state, view),
-  backdropOf: snakeBackdropOf
+  backdropOf: snakeBackdropOf,
+  isThemed: true
 }
