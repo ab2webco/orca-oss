@@ -683,6 +683,10 @@ resuelven una por una a través de las mismas capas ([`orchestrator-game-lead.ts
 los Settings del proyecto editan todas salvo los dos prompts, `rules` y `mcpServers`, que viven en
 `orca.yaml` (**Lead buttons** es `actions`).
 
+Sin un líder en marcha, el panel Team nativo se abre como **Your work** y lo encabeza **Start a team**:
+correr `/orca-game:setup` en una sesión de Claude ahí, después `/orca-game:lead`, y darle un ticket al
+líder ([`team-panel-first-run-hint.tsx`](../../../src/renderer/src/components/team-panel/team-panel-first-run-hint.tsx), ORCA-1304).
+
 ```yaml
 # orca.yaml
 orchestratorGame:

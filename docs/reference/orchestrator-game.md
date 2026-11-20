@@ -658,6 +658,10 @@ through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestr
 project Settings edits all but the two prompts, `rules` and `mcpServers`, which live in `orca.yaml`
 (**Lead buttons** is `actions`).
 
+With no lead running, the native Team panel opens as **Your work** and heads it with **Start a team**:
+run `/orca-game:setup` in a Claude session there, then `/orca-game:lead`, and give the lead a ticket
+([`team-panel-first-run-hint.tsx`](../../src/renderer/src/components/team-panel/team-panel-first-run-hint.tsx), ORCA-1304).
+
 ```yaml
 # orca.yaml
 orchestratorGame:

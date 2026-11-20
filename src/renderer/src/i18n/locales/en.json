@@ -17766,6 +17766,11 @@
       "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})",
       "raised": "Up to {{to}}: {{reason}}",
       "lowered": "Down to {{to}}: {{reason}}"
+    },
+    "firstRun": {
+      "title": "Start a team",
+      "setup": "in a Claude session here names your lead and sets up the project's game.",
+      "lead": "starts the lead. Give it a ticket: it launches one member per ticket."
     }
   },
   "claudeDeadHooks": {
