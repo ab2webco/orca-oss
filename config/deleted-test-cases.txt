@@ -116,6 +116,11 @@ tests/e2e/game-lead-wave-showcase.spec.ts # band Wave button (lead-wave clip)
 tests/e2e/game-panel-metrics-showcase.spec.ts # band Panel My PRs and Metrics (panel-metrics clip)
 tests/e2e/orca-game-arcade-pane.spec.ts # arcade opened in a Claude pane
 tests/e2e/orchestrator-game-band-showcase.spec.ts # band and Panel under a lead (game-band-panel clip)
+
+# ORCA-1296: the diorama is now Figures by default, so the case that pinned it off is renamed.
+src/shared/orchestrator-game-panel.test.ts # is on unless a layer turns it off
+src/renderer/src/components/team-scene/TeamPanelScene.test.tsx # Pixel draws the building too; the Office-only case is renamed
+
 # ORCA-1296 (#1353): the owner fixed Figures and Office to Orca's own art, so the panel no longer
 # reads or draws a scene file's own Figures or Office art (the native block still validates and
 # older builds keep drawing it). These cases covered that removed loading and fallback path.

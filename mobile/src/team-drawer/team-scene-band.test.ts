@@ -138,6 +138,32 @@ describe('the Team sheet scene band', () => {
     expect(stageOf().input.stopped).toBeUndefined()
   })
 
+  // ORCA-1296: the phone draws Figures as the diorama only when the host's panel does.
+  it("asks for the diorama with the host's quality and pace, and keeps 2D for an older host", () => {
+    const diorama = { ...panel('game', 'figures'), diorama: true, quality: 'low', pace: 'direct' }
+    expect(stageOf({ panel: diorama }).diorama).toEqual({ quality: 'low', pace: 'direct' })
+    expect(stageOf({ panel: { ...diorama, quality: 'ultra', pace: undefined } }).diorama).toEqual({
+      quality: 'high',
+      pace: 'normal'
+    })
+    expect(stageOf().diorama).toBeUndefined()
+    expect(stageOf({ panel: { ...diorama, style: 'office' } }).diorama).toBeUndefined()
+  })
+
+  it('names an island per machine its members run on, this one first', () => {
+    const machines = stageOf({
+      agents: [
+        leader,
+        member('tab-1:leaf'),
+        member('tab-2:leaf', 'working', { remote: { host: 'm2', stateKnown: true } })
+      ]
+    }).machines
+    expect(machines.map((one) => [one.home, one.members])).toEqual([
+      [true, ['tab-1:leaf']],
+      [false, ['tab-2:leaf']]
+    ])
+  })
+
   it('reads an older host with no panel as the readable band', () => {
     expect(sceneOf({ panel: undefined })?.kind).toBe('readable')
   })

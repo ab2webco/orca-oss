@@ -243,7 +243,7 @@ test('Team cards carry names, live detail and V28 status marks', async ({
         () => window.__store!.getState().settings?.orchestratorGame
       )
       await writeSettings(orcaPage, {
-        orchestratorGame: { ...game, panel: { ...game?.panel, style } }
+        orchestratorGame: { ...game, panel: { ...game?.panel, style, diorama: false } }
       })
     }
     // V28 draws each card's face as the scene draws that character, in every style.

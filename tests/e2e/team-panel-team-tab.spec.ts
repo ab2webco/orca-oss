@@ -420,14 +420,17 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await panel.getByRole('button', { name: COPY.en.answer }).first().click()
     await expect(panel.getByRole('tab', { name: /Inbox/ })).toHaveAttribute('aria-selected', 'true')
 
-    // One click on a member opens its own terminal in the center and opens its card; Team stays open.
+    // A click on a member only opens its card (ORCA-1300); its terminal icon opens the terminal.
     await panel.getByRole('tab', { name: COPY.en.team }).click()
     const asker = cards.filter({ hasText: 'ORCA-14' })
+    const activeTab = (): Promise<string | null> =>
+      orcaPage.evaluate(() => window.__store!.getState().activeTabId)
+    const tabBefore = await activeTab()
     await asker.locator('button[aria-expanded]').click()
     await expect(asker.locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'true')
-    await expect
-      .poll(() => orcaPage.evaluate(() => window.__store!.getState().activeTabId))
-      .toBe(members[1].paneKey.split(':')[0])
+    expect(await activeTab()).toBe(tabBefore)
+    await asker.getByRole('button', { name: COPY.en.open }).click()
+    await expect.poll(activeTab).toBe(members[1].paneKey.split(':')[0])
     await captureEvery(
       orcaPage,
       testInfo.outputPath.bind(testInfo),
@@ -435,8 +438,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
       async (language) => {
         const detail = asker.locator('[data-team-card-detail]')
         await expect(detail).toBeVisible()
-        // Why gone: the card itself opens the terminal, so the button would only repeat it.
-        await expect(asker.getByRole('button', { name: COPY[language].open })).toHaveCount(0)
+        await expect(asker.getByRole('button', { name: COPY[language].open })).toHaveCount(1)
         await expect(detail.getByRole('button', { name: COPY[language].answer })).toBeVisible()
         // Each fact once: the header shows model, phase, time and host, so the grid does not.
         await expect(detail.locator('[data-team-detail]')).toHaveCount(

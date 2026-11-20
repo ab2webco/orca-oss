@@ -35,7 +35,7 @@ const HTML = `<!DOCTYPE html>
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: ${colors.bgBase}; }
   #wrap { position: relative; }
-  #stage { display: block; width: 100%; }
+  #stage, #stage3d { display: block; width: 100%; }
   #overlay { position: absolute; inset: 0; pointer-events: none; }
   /* Why a border, not padding: overflow clips at the padding box, so padding showed a cut line. */
   .bubble { position: absolute; box-sizing: border-box; padding: 0 8px; border-radius: 8px;
@@ -49,7 +49,7 @@ const HTML = `<!DOCTYPE html>
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
-<body><div id="wrap"><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div><div id="names"></div></div>
+<body><div id="wrap"><canvas id="stage3d" style="display:none"></canvas><canvas id="stage" height="${TEAM_SCENE_BAND_HEIGHT}" style="height:${TEAM_SCENE_BAND_HEIGHT}px"></canvas><div id="overlay"></div><div id="names"></div></div>
 <script>${TEAM_SCENE_ENGINE_JS}</script>
 </body>
 </html>`
@@ -115,7 +115,14 @@ function StageBand({
   const ownFailed = band.art.kind === 'scene' && ownArt?.kind === 'failed'
   const art = failed || ownFailed ? band.fallback : band.art
   const waitsForArt = art.kind === 'scene' && ownArt?.kind !== 'ready'
-  const stageKey = JSON.stringify([art, band.scenes, band.timezone, tones, ownArt?.kind])
+  const stageKey = JSON.stringify([
+    art,
+    band.scenes,
+    band.timezone,
+    tones,
+    ownArt?.kind,
+    band.diorama
+  ])
   const stage = useMemo<TeamSceneEngineStage>(
     () => ({
       art,
@@ -123,12 +130,13 @@ function StageBand({
       scenes: band.scenes,
       timezone: band.timezone,
       nowMs: Date.now(),
-      colors: sceneColorsOf(tones)
+      colors: sceneColorsOf(tones),
+      ...(band.diorama ? { diorama: band.diorama } : {})
     }),
     // Why by text: every 20 s poll hands a new band, and a new stage re-decodes megabytes of art.
     [stageKey]
   )
-  const inputKey = JSON.stringify([band.input, leadLine, advisorName])
+  const inputKey = JSON.stringify([band.input, leadLine, advisorName, band.machines])
   const run = useAppInForeground() && shown
   const reduced = useReducedMotionEnabled()
   // Why before the stage: a page that loads with the app in the background must not start frames.
@@ -145,7 +153,13 @@ function StageBand({
   useEffect(() => {
     if (loaded > 0 && !waitsForArt) {
       ref.current?.injectJavaScript(
-        scriptOf({ kind: 'input', input: band.input, leadLine, advisorName })
+        scriptOf({
+          kind: 'input',
+          input: band.input,
+          leadLine,
+          advisorName,
+          machines: band.machines
+        })
       )
     }
   }, [loaded, waitsForArt, stage, inputKey])

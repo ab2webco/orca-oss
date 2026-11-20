@@ -5606,6 +5606,17 @@
         }
       },
       "settings": {
+        "GamePanelDioramaRows": {
+          "quality": "Calidad de la escena",
+          "qualityDescription": "Ilustrado dibuja figuras con contorno y sombras. Bajos recursos las dibuja planas y sin sombras, para equipos más lentos.",
+          "qualityHigh": "Ilustrado",
+          "qualityLow": "Bajos recursos",
+          "pace": "Ritmo del lead",
+          "paceDescription": "Cómo recorre el lead la base: caminando, más rápido o enviado por el mago de la corte.",
+          "paceNormal": "Normal",
+          "paceFast": "Rápido",
+          "paceDirect": "Directo"
+        },
         "GamePanelOverrideNote": {
           "local": "{{project}} usa {{value}} en este equipo.",
           "open": "Abrir proyecto",
@@ -15716,6 +15727,10 @@
         }
       },
       "team-scene": {
+        "TeamSceneDiorama": {
+          "followLead": "Seguir al lead",
+          "showAll": "Ver todo"
+        },
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
           "leadAsks": "Esperándote\n{{question}}",
@@ -16554,7 +16569,8 @@
         "weekly": "Semana",
         "claude": "Claude",
         "codex": "Codex"
-      }
+      },
+      "noTerminal": "Este agente todavía no tiene una terminal que abrir."
     },
     "activity": {
       "state": "Estado",
@@ -16592,7 +16608,20 @@
       "asks": "Te espera",
       "orchestrating": "Orquestando · {{action}}",
       "nameSetup": "Pon nombre al lead",
-      "unnamed": "Tu lead aún no tiene nombre. El setup te lo pregunta."
+      "unnamed": "Tu lead aún no tiene nombre. El setup te lo pregunta.",
+      "detail": {
+        "status": "Estado",
+        "action": "Ahora",
+        "waitingOn": "Esperando a",
+        "agents_one": "{{count}} agente",
+        "agents_other": "{{count}} agentes",
+        "question": "Pregunta",
+        "questionOn": "Abierta, sobre {{ticket}}",
+        "questionOpen": "Abierta",
+        "host": "Host",
+        "model": "Modelo",
+        "effort": "Esfuerzo"
+      }
     },
     "advisor": {
       "label": "Advisor",

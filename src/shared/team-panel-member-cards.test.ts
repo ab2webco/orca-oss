@@ -155,6 +155,18 @@ describe('teamCardsOf', () => {
     expect(card?.branch).toBe('fabolivark/netsa-121-sso')
   })
 
+  it("names the lead's branch without its refs/heads/ prefix", () => {
+    const cards = cardsOf([], {
+      worktree: {
+        id: 'repo::/w/main',
+        path: '/w/main',
+        branch: 'refs/heads/main',
+        displayName: 'main'
+      }
+    } as Partial<OrchestratorGameState>)
+    expect(cards?.lead.branch).toBe('main')
+  })
+
   it('works on the lead branch when it has no worktree of its own', () => {
     const [card] = cardsOf([agent()])?.members ?? []
     expect(card?.branch).toBe('main')

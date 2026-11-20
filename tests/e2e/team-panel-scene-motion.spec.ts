@@ -225,7 +225,7 @@ test('every Team scene style moves while its team works, with no one entering or
 
     for (const style of STYLES) {
       await writeSettings(orcaPage, {
-        orchestratorGame: { panel: { style } }
+        orchestratorGame: { panel: { style, diorama: false } }
       })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000

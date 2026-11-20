@@ -436,7 +436,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     // failed to load in this build falls to Pixel and stops here (ORCA-1052).
     await writeSettings(orcaPage, { uiLanguage: 'en' })
     for (const style of ART_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -564,7 +564,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     }
     for (const style of ADVISOR_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -591,7 +591,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
       toolInput: { cmd: LONG_COMMAND }
     })
     for (const style of ADVISOR_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style } } })
+      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         // Why 30 s: game.state names the new tool at the panel's next 20 s read.
@@ -731,8 +731,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     // A member opened from the Team tab gets its native header while the scene keeps drawing.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     const asker = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-14' })
-    // One click on the card opens the member's terminal and its card together.
-    await asker.locator('button[aria-expanded]').click()
+    await asker.getByRole('button', { name: 'Open terminal' }).click()
     const askerTab = members[1].paneKey.split(':')[0]
     const header = orcaPage.locator(
       `[data-terminal-overlay-tab-id="${askerTab}"] [data-team-member-header]`
