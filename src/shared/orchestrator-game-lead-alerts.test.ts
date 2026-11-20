@@ -266,3 +266,24 @@ describe('gameLeadAlertsOf: lead mail a remote member never received (ORCA-1301)
     )
   })
 })
+
+describe('gameLeadAlertsOf: open PRs past the cap (ORCA-1301)', () => {
+  const withOpen = (total: number) =>
+    stateOf([], {
+      lead: { ...DEFAULT_GAME_LEAD, cap: 1 },
+      project: { reviews: { total, url: null, items: [] }, todo: null }
+    })
+
+  it('alerts once a member opens PRs past a cap of 1, and again as the count grows', () => {
+    expect(linesOf(withOpen(2))).toEqual([
+      "2 open PRs, past the project's cap of 1: a member opened PRs past it. Find who (gh pr list --author @me) and stop it before it opens more."
+    ])
+    const keys = (total: number) =>
+      gameLeadAlertsOf(withOpen(total), emptyGameLeadAlertMemory(), NOW).map((one) => one.key)
+    expect(keys(3)).not.toEqual(keys(2))
+  })
+
+  it('stays quiet at the cap, which launches already respect', () => {
+    expect(linesOf(withOpen(1))).toEqual([])
+  })
+})

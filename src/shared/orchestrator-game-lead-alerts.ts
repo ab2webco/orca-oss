@@ -170,6 +170,20 @@ function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, n
   return alerts
 }
 
+// Why past, not at: launches stop at the cap, so only a member's own `gh pr create` passes it (ORCA-1301).
+function prCapAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
+  const open = state.project?.reviews?.total
+  const { cap } = gameFleetReportOf(state)
+  return open !== undefined && open > cap
+    ? [
+        {
+          key: `pr-cap:${open}`,
+          line: `${open} open PRs, past the project's cap of ${cap}: a member opened PRs past it. Find who (gh pr list --author @me) and stop it before it opens more.`
+        }
+      ]
+    : []
+}
+
 // Why: a send to a remote member returned ok while its host never took it (ORCA-1301).
 function undeliveredMailAlertsOf(state: GameLeadAlertInput, now: number): GameLeadAlert[] {
   return state.agents.flatMap((agent) => {
@@ -219,6 +233,7 @@ export function gameLeadAlertsOf(
     ...duplicateLeadAlertsOf(state),
     ...memberAlertsOf(state, memory, now),
     ...undeliveredMailAlertsOf(state, now),
+    ...prCapAlertsOf(state),
     ...queueAlertsOf(state, memory, now)
   ]
 }
