@@ -87,7 +87,7 @@ export const RECORDINGS = {
   },
   'mobile-terminal-ios.gif': {
     width: 360,
-    height: 782,
+    height: 783,
     en: 'The iOS app streaming a Claude Code terminal, with keys to type into it.',
     es: 'La app de iOS mostrando en vivo una terminal de Claude Code, con teclas para escribir en ella.'
   }
