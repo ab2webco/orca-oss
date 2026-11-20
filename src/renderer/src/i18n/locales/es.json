@@ -16555,7 +16555,8 @@
         "weekly": "Semana",
         "claude": "Claude",
         "codex": "Codex"
-      }
+      },
+      "noTerminal": "Este agente todavía no tiene una terminal que abrir."
     },
     "activity": {
       "state": "Estado",
@@ -16591,7 +16592,20 @@
       "waitingOnMany": "Esperando a {{count}} agentes",
       "asksOn": "Te espera · Pregunta sobre {{ticket}}",
       "asks": "Te espera",
-      "orchestrating": "Orquestando · {{action}}"
+      "orchestrating": "Orquestando · {{action}}",
+      "detail": {
+        "status": "Estado",
+        "action": "Ahora",
+        "waitingOn": "Esperando a",
+        "agents_one": "{{count}} agente",
+        "agents_other": "{{count}} agentes",
+        "question": "Pregunta",
+        "questionOn": "Abierta, sobre {{ticket}}",
+        "questionOpen": "Abierta",
+        "host": "Host",
+        "model": "Modelo",
+        "effort": "Esfuerzo"
+      }
     },
     "advisor": {
       "label": "Advisor",

@@ -731,8 +731,7 @@ test('the Team panel draws the live scene beside a member opened under its heade
     // A member opened from the Team tab gets its native header while the scene keeps drawing.
     await orcaPage.setViewportSize({ width: 1440, height: 900 })
     const asker = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-14' })
-    // One click on the card opens the member's terminal and its card together.
-    await asker.locator('button[aria-expanded]').click()
+    await asker.getByRole('button', { name: 'Open terminal' }).click()
     const askerTab = members[1].paneKey.split(':')[0]
     const header = orcaPage.locator(
       `[data-terminal-overlay-tab-id="${askerTab}"] [data-team-member-header]`
