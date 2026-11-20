@@ -723,16 +723,20 @@ released, and a launch that fails gives it back at once: a refused start, a host
 start failed, or a saved or remote record left `failed` holds no name. A numbered name (`Merlin 2`)
 appears only once the whole roster is busy; a member gets its ticket alone when the scene has no
 names ([`orchestrator-game-member-names.ts`](../../src/shared/orchestrator-game-member-names.ts)).
-The project Settings' **Member names** takes plain names separated by commas. A member on a paired
+The project Settings' **Names** section says where the names come from and lists the roster in use:
+the scene's (the built-in scenes' and a scene file's; a plugin scene's reads as "the scene's names"),
+or `memberNames` with the layer that sets it. Its **Member names** takes plain names separated by
+commas, and its **Lead name** sets `label`; `/orca-game:setup` asks for both. A member on a paired
 host (`game launch --on`) takes its name from the same pool: the lead's Orca picks it and keeps it
 in the home task title. The home Run DB records no project, so the names of its unreleased remote
 members hold only while another name is free: they give way before a launch numbers a name.
 
-With no `label`, the lead is the roster's last name, which members reach last. Orca keeps the first
-one it gives a lead's pane for the session, so changing the scene or the language does not rename
-the lead. The game state's `leadName` carries it, and the Team card, the scene and the lead's message
-headings all read it there
-([`orchestrator-game-lead-names.ts`](../../src/main/runtime/orchestrator-game-lead-names.ts)).
+With no `label`, the lead is called `Lead`, in every scene and language: it never takes a roster
+name (ORCA-1304). The game state's `leadName` carries it, and the Team card, the scene and the lead's
+message headings all read it there
+([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts)). The Team card of an
+unnamed lead shows only its crown badge and a **Name your lead** button, which sends
+`/orca-game:setup` to the lead.
 
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):

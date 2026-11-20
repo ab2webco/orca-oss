@@ -50,10 +50,17 @@ Offer only what applies, in this order, and skip what they decline:
    its `label`, `icon` or `prompt` (no placeholders); the command stays.
 4. **Activity links** (`activity`): an MCP tool whose ids should become chips (test runs, builds).
    Ask for one real id and its page URL, and derive `match` and `url` from them.
-5. **The lead** (`orchestrator`): name, autostart, members at once (`cap`), agent and model, what a
+5. **Names** (`orchestrator.label`, `orchestrator.memberNames`): ask whenever `lead.label` is
+   unset, even if the person came for something else; otherwise offer to change them.
+   - The lead's name. With none given, write nothing: the lead is called Lead. Never offer or
+     pick a name from the scene's roster for the lead.
+   - Whether members keep the scene's names, which members take in order (list the active scene's
+     roster from [reference.md](reference.md) or its scene file), or a list of their own
+     (1 to 24, each up to 32 characters, none shaped like a ticket id such as `K-9`).
+6. **The lead** (`orchestrator`): autostart, members at once (`cap`), agent and model, what a
    member is told (`launchPrompt`), and the project rules from step 1 the lead must follow
    (`rules`). The lead never does ticket work itself.
-6. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art, `hd` 9 to 14-row scene or `hd-compact` 7-row hd scene)
+7. **Look**: scene, HUD, rewards, `render` (`classic` 5-row pixel art, `hd` 9 to 14-row scene or `hd-compact` 7-row hd scene)
    and, for hd's day and night, `timezone` (`local` or the team's IANA zone, e.g. `America/Bogota`).
 
 ## 3. Write and check
