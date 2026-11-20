@@ -258,6 +258,9 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
+    quality: high # high | low: Figures' diorama illustrated, or flat without shadows
+    pace: normal # normal | fast | direct: how the diorama's lead gets about
+    diorama: true # false keeps Figures in 2D
   steward: # the Orca steward in each member pane
     highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
 ```
@@ -284,6 +287,48 @@ Soft is not a style to pick, because nothing draws it: a `style: soft` saved ear
 It is edited in the project's game section and, as the default for every project, in Settings,
 Agents, Panel; the panel's gear opens the first with a team and the second without one. An Orca
 older than `panel` reports it as an unknown setting and ignores it.
+
+### Figures: the diorama
+
+Since ORCA-1296 Figures draws the team as a 3D base of islands
+([`TeamSceneDiorama.tsx`](../../src/renderer/src/components/team-scene/TeamSceneDiorama.tsx), on
+three.js 0.170.0). Everything it shows comes from the same `TeamSceneInput`, floors and events the
+other styles read, never from a timer:
+
+- **Islands.** One per machine from `teamSceneFloorsOf`, home first. A remote island has a plot per
+  member it can run (its cap, 1 to 6) and dims while the host is unreachable. A member keeps its
+  plot between reads, and a new machine or member takes a free slot, so nothing already drawn
+  moves ([`team-diorama-layout.ts`](../../src/shared/team-scene/team-diorama-layout.ts)).
+- **Plots.** `dioramaActionOf` maps a member to build, inspect (CI running), wait (PR open), signal
+  (needs you), repair (red CI, the roof on fire), cheer (merged), rest (limited, at the camp
+  fire), start, idle (fishing, farming or chopping) or gone. The house rises from foundation to
+  roof with its site stage ([`team-diorama-actions.ts`](../../src/shared/team-scene/team-diorama-actions.ts)).
+- **The lead's round.** Needs-you first, then every island with a member worth a word. It walks
+  only on roads (A* on a road graph) and crosses water only by rowboat from a dock
+  ([`team-diorama-lead-round.ts`](../../src/shared/team-scene/team-diorama-lead-round.ts)).
+  `pace: fast` is 2.5 times faster; `pace: direct` jumps from stop to stop, sent by the court mage
+  beside the keep.
+- **Moments.** `teamSceneEventsBetween` becomes timed cues that outlive the read that started them
+  ([`team-diorama-cues.ts`](../../src/shared/team-scene/team-diorama-cues.ts)):
+  - a join puffs dust at the keep's gate and walks the member to its plot;
+  - a merge throws confetti;
+  - green CI, a finish, a hand-off or a steward move lights a ring at the member;
+  - a Jev decision lowers the advisor's spyglass on its tower and sends its bird to the pane;
+  - a machine absent from the last read raises its island out of the sea, then its dock.
+
+  The first read replays nothing. Under reduced motion no cue plays.
+- **Camera.** It follows the lead by default. **Show all** frames the world, a drag pans, and a
+  pinch, or Ctrl or ⌘ with the wheel, zooms. A plain wheel scrolls the panel.
+- **Quality.** `quality: low` draws flat figures without outlines or shadows, at one pixel per
+  pixel. Settings previews the chosen quality.
+
+Without WebGL (hardware acceleration off) the panel falls back to the 2D Figures, as it does with
+`diorama: false`. Linux E2E runs with the GPU off, so CI checks that fallback; the 3D path is
+checked locally on macOS. The canvas exposes `data-diorama-islands`, `-advisor`, `-cues` and
+`-camera`, and the stage `data-team-scene-webgl`, for specs.
+
+Pixel, which a scene file themes, draws a team on more than one machine as Office's building: a
+floor per machine, each with its host's name.
 
 `steward.highRiskPaths` adds path parts to the Orca steward's built-in high-risk list
 (`migrations/`, `.github/workflows/`, `auth/`, `security/`, `crypto/`, `billing/`, `payments/`,
