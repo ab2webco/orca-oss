@@ -1,0 +1,67 @@
+// Why booked, not simulated: every trip is laid out when the round is planned, so the cab's place at
+// any moment is a lookup and a frozen frame (reduced motion) still shows it at a floor.
+
+/** One trip of the cab, in floor indexes; it eases from `from` to `to` between `start` and `end`. */
+export type Office3dCabRide = { from: number; to: number; start: number; end: number }
+
+/** The one glass cab every floor shares, and when it is next free. */
+export type Office3dCab = { rides: Office3dCabRide[]; freeAt: number; home: number }
+
+/** How long the doors stay open while someone steps in, and after they step out. */
+const BOARD = 1
+const ALIGHT = 1.1
+
+export const office3dCab = (home = 0): Office3dCab => ({ rides: [], freeAt: -Infinity, home })
+
+/** A ride's length: a short start, then per floor; faster paces ride faster too. */
+export const office3dRideDur = (from: number, to: number, speed = 1): number =>
+  (0.8 + Math.abs(from - to) * 1.15) / speed
+
+const ease = (x: number): number => {
+  const k = Math.min(1, Math.max(0, x))
+  return k * k * (3 - 2 * k)
+}
+
+/** Where the cab is at `t`, as a floor index that may sit between floors while it rides. */
+export function office3dCabFloorAt(cab: Office3dCab, t: number): number {
+  let at = cab.home
+  for (const r of cab.rides) {
+    if (t < r.start) {
+      break
+    }
+    if (t <= r.end) {
+      return r.from + (r.to - r.from) * ease((t - r.start) / (r.end - r.start))
+    }
+    at = r.to
+  }
+  return at
+}
+
+/**
+ * Books the cab from floor `from` to `to`, no earlier than `earliest`: it first comes to `from` if
+ * it is elsewhere, waits while the rider boards, then rides. Riders queue; a second booking starts
+ * once the first has stepped out.
+ */
+export function bookOffice3dCab(
+  cab: Office3dCab,
+  from: number,
+  to: number,
+  earliest: number,
+  speed = 1
+): { board: number; depart: number; arrive: number } {
+  let t = Math.max(earliest, cab.freeAt)
+  const at = Math.round(office3dCabFloorAt(cab, t))
+  if (at !== from) {
+    const dur = office3dRideDur(at, from, speed)
+    cab.rides.push({ from: at, to: from, start: t, end: t + dur })
+    t += dur
+  }
+  const board = t
+  const depart = t + BOARD / speed
+  const arrive = from === to ? depart : depart + office3dRideDur(from, to, speed)
+  if (from !== to) {
+    cab.rides.push({ from, to, start: depart, end: arrive })
+  }
+  cab.freeAt = arrive + ALIGHT / speed
+  return { board, depart, arrive }
+}
