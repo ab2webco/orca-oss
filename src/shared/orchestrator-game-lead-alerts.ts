@@ -1,4 +1,8 @@
-import { gameFleetReportOf, type GameFleetInput } from './orchestrator-game-fleet-verbs'
+import {
+  gameFleetReportOf,
+  ticketOfMember,
+  type GameFleetInput
+} from './orchestrator-game-fleet-verbs'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
 import { queueDepartureLineOf, type GameQueueDeparture } from './orchestrator-game-queue-departure'
 import type { OrchestratorGameState } from './orchestrator-game-state'
@@ -8,7 +12,8 @@ import type { OrchestratorGameState } from './orchestrator-game-state'
 export const GAME_LEAD_ALERT_BUDGETS_MS = {
   queueEntry: 180 * 60_000,
   queueRun: 60 * 60_000,
-  queuedLaunch: 20 * 60_000
+  queuedLaunch: 20 * 60_000,
+  undeliveredMail: 10 * 60_000
 } as const
 
 export type GameLeadAlert = { key: string; line: string }
@@ -165,6 +170,31 @@ function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, n
   return alerts
 }
 
+// Why: a send to a remote member returned ok while its host never took it (ORCA-1301).
+function undeliveredMailAlertsOf(state: GameLeadAlertInput, now: number): GameLeadAlert[] {
+  return state.agents.flatMap((agent) => {
+    const remote = agent.remote
+    const since = remote?.undeliveredSince ? Date.parse(remote.undeliveredSince) : Number.NaN
+    if (
+      !remote ||
+      agent.state === 'done' ||
+      !(now - since >= GAME_LEAD_ALERT_BUDGETS_MS.undeliveredMail)
+    ) {
+      return []
+    }
+    const who = ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey
+    const pane = agent.terminalHandle
+      ? `orca terminal send --environment ${remote.host} --terminal ${agent.terminalHandle}`
+      : `orca game member ${who}`
+    return [
+      {
+        key: `undelivered:${who}:${remote.undeliveredSince}`,
+        line: `${who} has not received lead mail for ${minutesOf(now - since)}+ min: ${remote.host} has not taken it, so the member has not seen it. Check the host, or reach the pane: ${pane}`
+      }
+    ]
+  })
+}
+
 // Why first: two leads on one conversation both read its mail and queue merges (ORCA-1283).
 function duplicateLeadAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
   const terminals = state.duplicateLead?.terminals ?? []
@@ -188,6 +218,7 @@ export function gameLeadAlertsOf(
   return [
     ...duplicateLeadAlertsOf(state),
     ...memberAlertsOf(state, memory, now),
+    ...undeliveredMailAlertsOf(state, now),
     ...queueAlertsOf(state, memory, now)
   ]
 }

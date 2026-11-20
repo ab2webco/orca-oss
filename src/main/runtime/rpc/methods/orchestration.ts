@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: RPC method definitions co-locate param schemas with handlers; splitting by method would scatter the shared enums and Zod transforms without reducing complexity. */
 import { z } from 'zod'
+import { waitForRelayDelivery } from '../../orchestration/federation-relay-delivery'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, OptionalBoolean, requiredString } from '../schemas'
 import {
@@ -685,13 +686,19 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             })
           })
           runtime.ensureOrchestrationFederationRelay(routing.run?.id)
+          // Why: a queued send read as ok while the member never saw it (ORCA-1301).
+          const deliveredAt = await waitForRelayDelivery(() =>
+            db.getFederationRelayAckedAt(dispatchId, 'to_worker', relay.message_id)
+          )
           return {
             relay: {
               messageId: relay.message_id,
               sequence: relay.sequence,
               dispatchId: relay.dispatch_id,
               destination: 'worker',
-              accepted: true
+              accepted: true,
+              delivered: deliveredAt !== null,
+              deliveredAt
             },
             ...(followUp ? { reopenedDispatchId: dispatchId } : {})
           }

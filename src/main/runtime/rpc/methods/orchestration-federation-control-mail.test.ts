@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RELAY_DELIVERY_WAIT_MS } from '../../orchestration/federation-relay-delivery'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
 import { OrcaRuntimeService } from '../../orca-runtime'
@@ -359,6 +360,49 @@ describe('orchestration federation control mail', () => {
       ).resolves.toMatchObject({
         ok: true,
         result: { count: 1, messages: [{ subject: 'Follow up' }] }
+      })
+    })
+
+    // Why: Arthur's lead got ok for sends he had not seen; the send must say so (ORCA-1301).
+    it('reports a send its host never takes as not delivered', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+      try {
+        vi.spyOn(homeRuntime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {})
+        const pending = homeDispatcher.dispatch({
+          id: 'send-undelivered',
+          authToken: 'coordinator-token',
+          orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+          orchestrationRequestId: 'send-undelivered-request',
+          method: 'orchestration.send',
+          params: { from: 'term_coord', to: 'term_worker', subject: 'Stop', type: 'status' }
+        })
+        await vi.advanceTimersByTimeAsync(RELAY_DELIVERY_WAIT_MS + 1_000)
+
+        await expect(pending).resolves.toMatchObject({
+          ok: true,
+          result: { relay: { dispatchId, delivered: false, deliveredAt: null } }
+        })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('reports a send its host took as delivered, with when', async () => {
+      vi.spyOn(homeRuntime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {
+        void homeRuntime.syncOrchestrationFederation()
+      })
+      const sent = await homeDispatcher.dispatch({
+        id: 'send-delivered',
+        authToken: 'coordinator-token',
+        orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+        orchestrationRequestId: 'send-delivered-request',
+        method: 'orchestration.send',
+        params: { from: 'term_coord', to: 'term_worker', subject: 'Stop', type: 'status' }
+      })
+
+      expect(sent).toMatchObject({
+        ok: true,
+        result: { relay: { dispatchId, delivered: true, deliveredAt: expect.any(String) } }
       })
     })
 

@@ -12,6 +12,7 @@ import {
 } from '../../shared/orchestrator-game-member-launch'
 import type { RuntimeTerminalLiveness } from '../../shared/runtime-types'
 import { chosenLaunchSelectionOf, type OrchestrationDb } from './orchestration/db'
+import { repoOf } from './orchestrator-game-dispatch-start-repo'
 
 /** A member the lead's Run placed on a paired host with `worker-start --on`, as the home database records it. */
 export type RemoteGameMemberSource = {
@@ -27,6 +28,7 @@ export type RemoteGameMemberSource = {
   finished: boolean
   startFailed?: boolean
   starting?: boolean // Its worker start has not finished (ORCA-1263).
+  undeliveredSince?: string | null // Oldest lead mail its host has not taken (ORCA-1301).
   /** The home Run completed the member's task. */
   ticketDone: boolean
   /** Launched by a lead that no longer leads it (ORCA-793). */
@@ -58,16 +60,6 @@ type RemoteMemberReads = {
   ) => Promise<Parameters<typeof gameReviewOf>[0] | null>
 }
 
-function repoOf(startOptions: string | null): string | null {
-  try {
-    const parsed: unknown = startOptions ? JSON.parse(startOptions) : null
-    const repo = typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'repo') : null
-    return typeof repo === 'string' && repo.length > 0 ? repo : null
-  } catch {
-    return null
-  }
-}
-
 const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               f.environment_name AS hostName, f.environment_id AS environmentId,
               f.remote_terminal_handle AS remoteTerminalHandle,
@@ -77,6 +69,9 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               d.status NOT IN ('pending', 'dispatched') AS finished,
               COALESCE(w.state, '') = 'failed' AS startFailed,
               COALESCE(w.state, '') = 'starting' AS starting,
+              (SELECT strftime('%Y-%m-%dT%H:%M:%SZ', MIN(i.created_at)) FROM federation_relay_items i
+                WHERE i.dispatch_id = f.dispatch_id AND i.direction = 'to_worker'
+                  AND i.acked_at IS NULL) AS undeliveredSince,
               COALESCE(t.status, '') = 'completed' AS ticketDone,
               w.start_options AS startOptions`
 
@@ -305,6 +300,7 @@ export async function remoteGameMembersOf(
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
           ...(gone ? { gone: true as const } : {}),
           ...(starting ? { starting: true as const } : {}),
+          ...(source.undeliveredSince ? { undeliveredSince: source.undeliveredSince } : {}),
           ...(show?.asleep ? { asleep: true as const } : {}),
           ...(source.startFailed && !agent ? { startFailed: true as const } : {})
         },

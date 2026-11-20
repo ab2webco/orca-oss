@@ -240,3 +240,29 @@ describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () =
     expect(memory.departures.size).toBe(0)
   })
 })
+
+describe('gameLeadAlertsOf: lead mail a remote member never received (ORCA-1301)', () => {
+  const onM1 = (minutesAgo: number, overrides: Partial<GameAgent> = {}) =>
+    member('ORCA-9', {
+      remote: {
+        host: 'm1',
+        environmentId: 'env_m1',
+        stateKnown: true,
+        undeliveredSince: new Date(NOW - minutesAgo * MIN).toISOString()
+      },
+      ...overrides
+    })
+
+  it('alerts once mail has waited past its budget, naming the host and how to reach the pane', () => {
+    expect(linesOf(stateOf([onM1(11)]))).toEqual([
+      'ORCA-9 has not received lead mail for 11+ min: m1 has not taken it, so the member has not seen it. Check the host, or reach the pane: orca terminal send --environment m1 --terminal term_ORCA-9'
+    ])
+  })
+
+  it('stays quiet inside the budget and for a finished member', () => {
+    expect(linesOf(stateOf([onM1(5)]))).toEqual([])
+    expect(linesOf(stateOf([onM1(30, { state: 'done' })]))).not.toContainEqual(
+      expect.stringContaining('lead mail')
+    )
+  })
+})
