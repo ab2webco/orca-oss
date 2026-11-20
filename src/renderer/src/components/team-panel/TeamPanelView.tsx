@@ -32,7 +32,7 @@ import type { TeamPanelLook } from './use-team-panel-look'
 import { TeamXpRow } from './TeamXpRow'
 import { TeamPanelScene } from '../team-scene/TeamPanelScene'
 import { TeamDisplayCarousel } from './TeamDisplayCarousel'
-import { useTeamSceneStyle } from '../team-scene/use-team-scene-style'
+import { useTeamSceneDiorama, useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
 /** With a team the gear opens the project; without one, the global Panel settings. */
 export function teamPanelSettingsRepoId(model: TeamPanelModel | null): string | null {
@@ -183,6 +183,7 @@ export function TeamPanelView({
   const { section, retry } = source
   const readStatus = useMemo(() => teamReadStatusOf(source), [source])
   const sceneStyle = useTeamSceneStyle()
+  const diorama = useTeamSceneDiorama()
   const model = section.kind === 'ready' ? section.value : null
   // Why a scope, not an effect: the filter belongs to the list in view, so another tab visit or
   // a team view reads as unfiltered at once, with no frame of the stale filter.
@@ -229,7 +230,12 @@ export function TeamPanelView({
         data-team-panel-state={model?.kind ?? section.kind}
       >
         {model?.kind === 'team' && look === 'game' ? (
-          <TeamPanelScene model={model} style={sceneStyle} unconfirmed={source.updating === true}>
+          <TeamPanelScene
+            model={model}
+            style={sceneStyle}
+            diorama={diorama}
+            unconfirmed={source.updating === true}
+          >
             {body}
           </TeamPanelScene>
         ) : (

@@ -11,23 +11,25 @@ const copy = {
   en: {
     eyebrow: 'The orca CLI',
     title: 'Everything you click, your agents can script.',
-    lede: 'Worktrees, terminals, accounts, tickets, the game, the browser and multi-agent orchestration: task graphs with dependencies, decision gates and blocking questions between agents.',
+    lede: 'Worktrees, terminals, accounts, tickets, the game, the browser, and task graphs with dependencies, decision gates and blocking questions between agents.',
     panes: [
       ['orchestration', ['# a task that waits on another', 'orca orchestration task-create --spec "Move billing to v2" --deps \'["task_api"]\'', '# stop on a decision only a human makes', 'orca orchestration gate-create --task task_billing --question "Drop v1 now?"']],
       ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "Ship in 2.3?" --option Yes --option Hold', 'orca game metrics']],
       ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
     ],
+    panesLabel: 'orca commands',
     more: 'CLI guide'
   },
   es: {
     eyebrow: 'La CLI orca',
-    title: 'Todo lo que tú haces con clics, tus agentes lo pueden scriptear.',
-    lede: 'Worktrees, terminales, cuentas, tickets, el juego, el navegador y la orquestación entre agentes: grafos de tareas con dependencias, puertas de decisión y preguntas bloqueantes entre agentes.',
+    title: 'Todo lo que haces con clics, tus agentes pueden scriptearlo.',
+    lede: 'Worktrees, terminales, cuentas, tickets, el juego, el navegador y grafos de tareas entre agentes, con dependencias, puertas de decisión y preguntas bloqueantes.',
     panes: [
-      ['orchestration', ['# una tarea que espera a otra', 'orca orchestration task-create --spec "Mover billing a v2" --deps \'["task_api"]\'', '# detenerse en una decisión que toma una persona', 'orca orchestration gate-create --task task_billing --question "¿Quitar v1 ya?"']],
+      ['orchestration', ['# una tarea que espera a otra', 'orca orchestration task-create --spec "Mover billing a v2" --deps \'["task_api"]\'', '# parar ante una decisión de una persona', 'orca orchestration gate-create --task task_billing --question "¿Quitar v1 ya?"']],
       ['game', ['orca game wave', 'orca game ask-owner --ticket ACME-206 --question "¿Publicar en 2.3?" --option Sí --option Esperar', 'orca game metrics']],
       ['browser · accounts', ['orca goto --url https://app.example.com', 'orca snapshot', 'orca click --element e12', 'orca account switch --to ops@example.com']]
     ],
+    panesLabel: 'Comandos de orca',
     more: 'Guía de la CLI'
   }
 }[lang]
@@ -50,10 +52,26 @@ const terminalOf = (lines: string[]) =>
     <p class="heading">▾ {copy.eyebrow}</p>
     <h2 class="h2" id="cli-title">{copy.title}</h2>
     <p class="lede">{copy.lede}</p>
+    <div class="tabs" role="tablist" aria-label={copy.panesLabel} hidden data-cli>
+      {
+        copy.panes.map(([name], i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`cli-tab-${i}`}
+            aria-controls={`cli-panel-${i}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {name}
+          </button>
+        ))
+      }
+    </div>
     <div class="panes">
       {
-        copy.panes.map(([name, lines]) => (
-          <figure class="box">
+        copy.panes.map(([name, lines], i) => (
+          <figure class="box" id={`cli-panel-${i}`} role="tabpanel" aria-labelledby={`cli-tab-${i}`}>
             <figcaption>{name}</figcaption>
             <pre class="prompt" set:html={terminalOf(lines as string[])} />
           </figure>
@@ -66,12 +84,34 @@ const terminalOf = (lines: string[]) =>
   </div>
 </section>
 
+<script>
+  import { wireTabList } from './tab-list'
+
+  // Without script every pane shows under its caption; with it, one pane per tab.
+  for (const list of document.querySelectorAll<HTMLElement>('[data-cli]')) {
+    list.hidden = false
+    for (const caption of document.querySelectorAll<HTMLElement>('#cli figcaption')) {
+      caption.hidden = true
+    }
+    wireTabList([...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')])
+  }
+</script>
+
 <style>
   .panes {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     margin-top: 28px;
+  }
+  .tabs + .panes {
+    margin-top: 0;
+  }
+  @media (min-width: 60rem) {
+    .prompt {
+      padding: var(--space-lg);
+      font-size: var(--text-lead);
+    }
   }
   figure {
     margin: 0;

@@ -130,9 +130,6 @@ function nativeStackSection(pid: number, reportPath: string, deps: HangReportDep
       rmSync(samplePath, { force: true })
     }
   }
-  if (deps.platform === 'linux') {
-    return linuxThreadSection(pid, deps)
-  }
   return '(not captured on this platform; the child processes above are what it was running)'
 }
 
@@ -171,6 +168,8 @@ export function writeMainThreadHangReport(
 ): void {
   const { reportPath, parentPid } = options
   mkdirSync(dirname(reportPath), { recursive: true })
+  // Why: ps's exit SIGCHLD wakes a main thread parked in spawnSync, so read /proc before spawning it.
+  const linuxThreads = deps.platform === 'linux' ? linuxThreadSection(parentPid, deps) : null
   // Why: write what is cheap first, so a capture that hangs or kills the worker still leaves a record.
   const header = [
     `Orca Lab main process ${parentPid} stopped answering ${options.observer ?? 'its main-thread heartbeat'}.`,
@@ -183,7 +182,7 @@ export function writeMainThreadHangReport(
     '== Threads of the main process =='
   ]
   writeFileSync(reportPath, `${header.join('\n')}\n`)
-  appendFileSync(reportPath, `${nativeStackSection(parentPid, reportPath, deps)}\n`)
+  appendFileSync(reportPath, `${linuxThreads ?? nativeStackSection(parentPid, reportPath, deps)}\n`)
   try {
     pruneOldRecords(reportPath, Date.now())
   } catch {

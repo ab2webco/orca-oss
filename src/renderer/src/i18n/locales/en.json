@@ -5957,6 +5957,17 @@
         }
       },
       "settings": {
+        "GamePanelDioramaRows": {
+          "quality": "Scene quality",
+          "qualityDescription": "Illustrated draws outlined figures with shadows. Low resources draws flat ones without shadows, for slower machines.",
+          "qualityHigh": "Illustrated",
+          "qualityLow": "Low resources",
+          "pace": "Lead's pace",
+          "paceDescription": "How the lead gets round the base: walking, faster, or sent by the court mage.",
+          "paceNormal": "Normal",
+          "paceFast": "Fast",
+          "paceDirect": "Direct"
+        },
         "GamePanelOverrideNote": {
           "local": "{{project}} uses {{value}} on this machine.",
           "open": "Open project",
@@ -16640,6 +16651,10 @@
         }
       },
       "team-scene": {
+        "TeamSceneDiorama": {
+          "followLead": "Follow the lead",
+          "showAll": "Show all"
+        },
         "team-scene-copy": {
           "label": "Live team scene",
           "leadAsks": "Waiting for you\n{{question}}",

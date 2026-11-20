@@ -20,6 +20,7 @@ const target = 'chrome74'
 
 const ENTRY = `
   import { createTeamSceneEngine } from './src/team-drawer/team-scene-engine'
+  import { createTeamSceneDioramaEngine } from './src/team-drawer/team-scene-diorama-engine'
   import { installTeamSceneShims } from './src/team-drawer/team-scene-webview-shims'
 
   installTeamSceneShims()
@@ -45,8 +46,40 @@ const ENTRY = `
     decode,
     post
   })
+  // Figures as the diorama takes the stage where the host asks for it and WebGL opens; every other
+  // stage, and a page with no 3D canvas, stays with the 2D engine.
+  const canvas3d = document.getElementById('stage3d')
+  const diorama = canvas3d && createTeamSceneDioramaEngine({
+    canvas: canvas3d,
+    width: () => canvas.clientWidth || window.innerWidth,
+    dark: () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+    scheduler: { request: (cb) => window.requestAnimationFrame(cb), cancel: (id) => window.cancelAnimationFrame(id) },
+    post
+  })
+  let threeD = false, lastInput = null, lastMotion = null
+  const show = (on) => {
+    threeD = on
+    canvas3d.style.display = on ? 'block' : 'none'
+    for (const id of ['stage', 'overlay', 'names']) document.getElementById(id).style.display = on ? 'none' : ''
+  }
+  const route = async (message) => {
+    if (!diorama) return engine.receive(message)
+    if (message.kind === 'stage') {
+      show(diorama.take(message.stage))
+      if (threeD) {
+        await engine.receive({ kind: 'motion', run: false, reduced: true })
+        return lastInput && diorama.input(lastInput.input, lastInput.machines)
+      }
+      for (const one of [message, lastMotion, lastInput]) if (one) await engine.receive(one)
+      return
+    }
+    if (message.kind === 'input') lastInput = message
+    if (message.kind === 'motion') { lastMotion = message; diorama.motion(message.run, message.reduced) }
+    if (!threeD) return engine.receive(message)
+    if (message.kind === 'input') diorama.input(message.input, message.machines)
+  }
   window.__teamScene = (message) => {
-    engine.receive(message).catch((error) => post({ kind: 'error', message: String(error) }))
+    route(message).catch((error) => post({ kind: 'error', message: String(error) }))
   }
   window.addEventListener('error', (event) => post({ kind: 'error', message: String(event.message) }))
   post({ kind: 'loaded' })

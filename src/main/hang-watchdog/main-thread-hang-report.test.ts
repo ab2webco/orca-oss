@@ -109,6 +109,28 @@ describe('writeMainThreadHangReport', () => {
     expect(text).toContain('640 ? state=? wchan=? syscall=?')
   })
 
+  it('on Linux reads thread states before its ps child can wake the parked main thread', () => {
+    // ps's exit SIGCHLD wakes every libuv loop with a child, spawnSync's included (ORCA-1303).
+    let psExited = false
+    const reportPath = write({
+      platform: 'linux',
+      run: () => {
+        psExited = true
+        return PS_LISTING
+      },
+      readText: (path) => {
+        if (path.endsWith('/stat')) {
+          return `633 (MainThread) ${psExited ? 'R' : 'S'} 1 633`
+        }
+        return path.endsWith('/comm') ? 'MainThread' : 'ep_poll'
+      },
+      listDir: () => ['633']
+    })
+    const text = readFileSync(reportPath, 'utf8')
+    expect(text).toMatch(/^633 MainThread state=S /m)
+    expect(text).toContain('git -C /repo status')
+  })
+
   it('keeps the header when a capture fails', () => {
     const reportPath = write({
       platform: 'win32',
