@@ -136,6 +136,7 @@ function graphQLCheckRun(
     url: string | null
     checkSuiteId: number | null
     workflowRunId: number | null
+    workflowName: string
   }> = {}
 ): Record<string, unknown> {
   const checkSuiteId = overrides.checkSuiteId ?? 1000
@@ -150,7 +151,13 @@ function graphQLCheckRun(
     url: overrides.url ?? 'https://github.com/acme/widgets/runs/88',
     checkSuite: {
       databaseId: checkSuiteId,
-      workflowRun: workflowRunId === null ? null : { databaseId: workflowRunId }
+      workflowRun:
+        workflowRunId === null
+          ? null
+          : {
+              databaseId: workflowRunId,
+              ...(overrides.workflowName ? { workflow: { name: overrides.workflowName } } : {})
+            }
     }
   }
 }
@@ -258,6 +265,24 @@ describe('getPRChecks', () => {
         checkRunId: 88,
         workflowRunId: 1
       }
+    ])
+  })
+
+  it("carries each check run's workflow name so the review list can drop a superseded run (ORCA-1301)", async () => {
+    getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+    ghExecFileAsyncMock.mockResolvedValueOnce(
+      graphQLChecksResponse({
+        contexts: [graphQLCheckRun({ workflowRunId: 7, workflowName: 'PR Checks' })]
+      })
+    )
+
+    const checks = await getPRChecks('/repo-root', 42, 'head-oid')
+
+    const args = ghExecFileAsyncMock.mock.calls[0]![0] as string[]
+    const queryArg = args.find((arg) => arg.startsWith('query='))
+    expect(queryArg).toMatch(/workflowRun\s*\{\s*databaseId\s*workflow\s*\{\s*name/)
+    expect(checks).toEqual([
+      expect.objectContaining({ workflowRunId: 7, workflowName: 'PR Checks' })
     ])
   })
 

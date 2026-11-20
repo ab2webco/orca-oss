@@ -5,7 +5,7 @@ import type { CheckStatus } from './github/pull-request-types'
 
 /** Derives the review status from the normalized check contract. */
 export function derivePRCheckStatus(checks: readonly PRCheckDetail[]): CheckStatus {
-  const { state } = summarizeProviderChecks(checks)
+  const { state } = summarizeProviderChecks(withoutSupersededCancelledRuns(checks))
   // Why: CheckStatus has no 'none'; an empty rollup carries the same "nothing to report" meaning.
   return state === 'none' ? 'neutral' : state
 }

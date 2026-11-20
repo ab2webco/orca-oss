@@ -17,6 +17,8 @@ export type PRCheckDetail = {
   url: string | null
   checkRunId?: number
   workflowRunId?: number
+  /** The Actions workflow the run belongs to; GraphQL path only (ORCA-1301). */
+  workflowName?: string
   // Why: the GitLab job trace API is addressed by numeric job id only, so the
   // Checks panel cannot load a job log without carrying it on the row.
   gitlabJobId?: number

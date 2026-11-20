@@ -3637,6 +3637,9 @@ query($owner: String!, $repo: String!, $pr: Int!) {
                       databaseId
                       workflowRun {
                         databaseId
+                        workflow {
+                          name
+                        }
                       }
                     }
                   }
@@ -3702,7 +3705,7 @@ type GraphQLCheckRunContext = {
   url?: string | null
   checkSuite?: {
     databaseId?: number | null
-    workflowRun?: { databaseId?: number | null } | null
+    workflowRun?: { databaseId?: number | null; workflow?: { name?: string | null } | null } | null
   } | null
 }
 
@@ -3769,13 +3772,15 @@ function mapGraphQLCheckRunContext(context: GraphQLCheckRunContext): PRCheckDeta
   const checkRunId = nullableNumber(context.databaseId)
   const workflowRunId =
     nullableNumber(context.checkSuite?.workflowRun?.databaseId) ?? parseActionsRunId(url)
+  const workflowName = nullableString(context.checkSuite?.workflowRun?.workflow?.name)
   return {
     name,
     status: mapCheckRunRESTStatus(context.status ?? ''),
     conclusion: mapCheckRunRESTConclusion(context.status ?? '', context.conclusion ?? null),
     url,
     ...(checkRunId !== null ? { checkRunId } : {}),
-    ...(typeof workflowRunId === 'number' ? { workflowRunId } : {})
+    ...(typeof workflowRunId === 'number' ? { workflowRunId } : {}),
+    ...(workflowName ? { workflowName } : {})
   }
 }
 
