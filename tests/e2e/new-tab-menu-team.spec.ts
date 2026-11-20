@@ -72,7 +72,9 @@ async function expectActiveTabReadable(page: Page): Promise<void> {
     await tab.hover()
   }
   const close = await closeButton.boundingBox()
-  expect(strip && icon && close, 'the active tab has no box').toBeTruthy()
+  expect(strip, 'the tab strip has no box').not.toBeNull()
+  expect(icon, "the active tab's icon has no box").not.toBeNull()
+  expect(close, "the active tab's close has no box").not.toBeNull()
   expect(icon!.x, "the tab's icon is cut off").toBeGreaterThanOrEqual(strip!.x)
   expect(close!.x + close!.width, "the tab's close is cut off").toBeLessThanOrEqual(
     strip!.x + strip!.width
