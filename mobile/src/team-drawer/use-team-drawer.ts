@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router'
 import type { RpcClient } from '../transport/rpc-client'
 import type { OwnerQuestionReply } from '../game-inbox/game-owner-questions-rpc'
 import { useGameOwnerQuestions } from '../game-inbox/use-game-owner-questions'
+import { onOwnerQuestion } from '../game-inbox/owner-question-arrivals'
 import {
   leadOwnerQuestionsOf,
   teamLeadViewOf,
@@ -11,6 +12,7 @@ import {
   type TeamInbox
 } from './team-drawer-model'
 import { gameCharacterLevelOf } from '../../../src/shared/orchestrator-game-characters'
+import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
 import { readLeadGameState, readLeadInboxThreads, readLeadXp } from './team-drawer-rpc'
 import { useTeamSceneArt } from './use-team-scene-art'
 import { useHostTeamTones } from './use-host-team-tones'
@@ -53,17 +55,19 @@ export function useTeamDrawer(args: {
   const [xpRead, setXpRead] = useState<{ key: string; xp: number | null } | null>(null)
   const xp = xpRead?.key === terminalKey ? xpRead.xp : null
   const generationRef = useRef(0)
+  // Why: the sheet re-reads on a question banner or an answer, not only on its 20 s tick (ORCA-1306).
+  const refreshNowRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!candidate || !client || !terminalHandle || !paneKey) {
       return
     }
     const generation = ++generationRef.current
-    const refresh = (): void => {
+    const refresh = async (): Promise<void> => {
       if (AppState.currentState !== 'active') {
         return
       }
-      void readLeadGameState(client, { worktreeId, terminalHandle, paneKey })
+      await readLeadGameState(client, { worktreeId, terminalHandle, paneKey })
         .then(async (result) => {
           if (generationRef.current !== generation) {
             return
@@ -96,14 +100,41 @@ export function useTeamDrawer(args: {
         // Why keep the last state: a failed read says nothing about the team.
         .catch(() => {})
     }
-    refresh()
+    // Why coalesced: a burst of question banners costs one read, and one more after it for the last.
+    let reading = false
+    let again = false
+    const refreshNow = (): void => {
+      if (reading) {
+        again = true
+        return
+      }
+      reading = true
+      void Promise.all([refresh(), reloadQuestions().catch(() => {})]).then(() => {
+        reading = false
+        if (again && generationRef.current === generation) {
+          again = false
+          refreshNow()
+        }
+      })
+    }
+    refreshNowRef.current = refreshNow
+    void refresh()
     const interval = setInterval(() => {
-      refresh()
+      void refresh()
       void reloadQuestions()
     }, TEAM_REFRESH_MS)
+    // Why by repo: the board answers through the repo's own worktree, not always the lead's pane.
+    const repoId = getRepoIdFromWorktreeId(worktreeId)
+    const stopArrivals = onOwnerQuestion((arrival) => {
+      if (arrival.worktreeId === null || getRepoIdFromWorktreeId(arrival.worktreeId) === repoId) {
+        refreshNow()
+      }
+    })
     return () => {
       generationRef.current++
       clearInterval(interval)
+      stopArrivals()
+      refreshNowRef.current = null
     }
   }, [
     candidate,
@@ -163,6 +194,7 @@ export function useTeamDrawer(args: {
         throw new Error('This host has no worktree to answer through.')
       }
       await inboxAnswer(own.worktreeId, id, reply)
+      refreshNowRef.current?.()
     },
     [inboxAnswer, own.worktreeId]
   )
