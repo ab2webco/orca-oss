@@ -17,6 +17,8 @@ export type OrchestratorGamePanel = {
   advisor: boolean
   /** Saved arcade credits; drawn only in the Game look. */
   arcade: boolean
+  /** Figures as the 3D diorama (ORCA-1296); off until it draws everything Figures draws today. */
+  diorama: boolean
 }
 
 export type OrchestratorGamePanelLayer = Partial<Omit<OrchestratorGamePanel, 'tabs'>> & {
@@ -99,7 +101,7 @@ export function parseGamePanel(raw: unknown): {
       if (tabs.value) {
         value.tabs = tabs.value
       }
-    } else if (key === 'advisor' || key === 'arcade') {
+    } else if (key === 'advisor' || key === 'arcade' || key === 'diorama') {
       if (typeof entry === 'boolean') {
         value[key] = entry
       } else {
@@ -130,7 +132,8 @@ export function resolveGamePanel(
     ...gamePanelLookOfLegacy(legacy),
     tabs: { prs: true, queue: true, machines: true },
     advisor: true,
-    arcade: true
+    arcade: true,
+    diorama: false
   }
   for (const layer of layers) {
     // Why re-parsed: a Settings layer is hand-editable JSON that never went through the parser.

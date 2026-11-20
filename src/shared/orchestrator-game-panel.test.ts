@@ -28,7 +28,8 @@ describe('parseGamePanel', () => {
         style: 'office',
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
-        arcade: true
+        arcade: true,
+        diorama: false
       })
     ).toEqual({
       value: {
@@ -36,7 +37,8 @@ describe('parseGamePanel', () => {
         style: 'office',
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
-        arcade: true
+        arcade: true,
+        diorama: false
       },
       warnings: []
     })
@@ -104,7 +106,8 @@ describe('resolveGamePanel', () => {
       style: 'pixel',
       tabs: { prs: true, queue: true, machines: true },
       advisor: true,
-      arcade: true
+      arcade: true,
+      diorama: false
     })
   })
 
@@ -123,7 +126,8 @@ describe('resolveGamePanel', () => {
       style: 'figures',
       tabs: { prs: false, queue: true, machines: true },
       advisor: true,
-      arcade: false
+      arcade: false,
+      diorama: false
     })
   })
 
@@ -238,7 +242,8 @@ describe('orchestratorGame.panel across versions and writers', () => {
       style: 'office',
       tabs: { prs: true, queue: false, machines: true },
       advisor: true,
-      arcade: true
+      arcade: true,
+      diorama: false
     })
   })
 
@@ -267,5 +272,16 @@ describe("a project's panel row and the global look", () => {
         local: ownerLocal
       }).look
     ).toBe('display')
+  })
+})
+
+describe('orchestratorGame.panel.diorama', () => {
+  it('is off unless a layer turns it on, and warns on a value that is not a boolean', () => {
+    const legacy = { mode: 'on' as const, render: 'classic' as const }
+    expect(resolveGamePanel([], legacy).diorama).toBe(false)
+    expect(resolveGamePanel([{ diorama: true }], legacy).diorama).toBe(true)
+    expect(parseGamePanel({ diorama: 'yes' }).warnings).toEqual([
+      'orchestratorGame.panel.diorama must be true or false'
+    ])
   })
 })

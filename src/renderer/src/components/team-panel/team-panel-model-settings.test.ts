@@ -79,6 +79,7 @@ const panel = (overrides: Partial<PanelSettings> = {}): PanelSettings => ({
   tabs: { prs: true, queue: true, machines: true },
   advisor: true,
   arcade: true,
+  diorama: false,
   pluginsOn: true,
   ...overrides
 })
