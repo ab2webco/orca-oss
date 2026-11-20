@@ -23,6 +23,7 @@ import { arcadeCanvasLabel, arcadeWordsOf } from './arcade-words'
 import { whoIsWaitingOnUser } from './arcade-hold'
 import { keepArcadeRun, keptArcadeRunOf } from './arcade-kept-runs'
 import { arcadeNeedsRightPanelClosed } from './arcade-center-room'
+import { arcadeTokens } from './arcade-theme-tokens'
 
 const builtInOf = (text: string): OrchestratorGameArcade => {
   const parsed = parseOrchestratorGameArcade(text)
@@ -72,7 +73,12 @@ export function ArcadeTab({
   const runRef = useRef<ArcadeRun>(firstRun)
   const heldRef = useRef(isHeld)
   const heldByRef = useRef(heldBy ?? '')
-  const paintRef = useRef<{ size: ArcadePaintSize; backdrop: HTMLCanvasElement } | null>(null)
+  /** The backdrop baked for this size, and the theme its colours came from. */
+  const paintRef = useRef<{
+    size: ArcadePaintSize
+    backdrop: HTMLCanvasElement
+    theme: string
+  } | null>(null)
   const frameRef = useRef<number | null>(null)
   /** Set on becoming active; the first measured width then decides whether to make room. */
   const roomCheckRef = useRef(false)
@@ -93,6 +99,11 @@ export function ArcadeTab({
     const painted = paintRef.current
     const g = canvas?.getContext('2d')
     if (canvas && painted && g) {
+      const theme = arcadeTokens().key
+      if (painted.theme !== theme) {
+        painted.backdrop = runRef.current.play.backdropOf(painted.size)
+        painted.theme = theme
+      }
       paintArcadeFrame(
         g,
         painted.backdrop,
@@ -187,12 +198,26 @@ export function ArcadeTab({
       runRef.current = fitArcadeRun(runRef.current, size)
       canvas.width = Math.round(width * size.scale)
       canvas.height = Math.round(height * size.scale)
-      paintRef.current = { size, backdrop: runRef.current.play.backdropOf(size) }
+      paintRef.current = {
+        size,
+        backdrop: runRef.current.play.backdropOf(size),
+        theme: arcadeTokens().key
+      }
       paint()
     })
     observer.observe(box)
     return () => observer.disconnect()
   }, [paint, makeRoom])
+
+  // Why: a run that waits for a key paints no frames, so a theme switch would otherwise not show.
+  useEffect(() => {
+    const observer = new MutationObserver(paint)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    })
+    return () => observer.disconnect()
+  }, [paint])
 
   useEffect(() => {
     if (!isActive) {
