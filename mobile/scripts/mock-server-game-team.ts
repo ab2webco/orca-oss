@@ -13,6 +13,7 @@ import {
   type GameWorkItem
 } from '../../src/shared/orchestrator-game-state'
 import { leadProjectState } from './mock-server-lead-project'
+import { showcaseProjectState } from './mock-server-showcase-project'
 import { LEAD_PANE_KEY } from './mock-server-lead-sessions'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
 import {
@@ -235,7 +236,7 @@ function leadState(worktreeId: unknown): Partial<OrchestratorGameState> {
     ],
     openOwnerQuestions: openQuestionCount(),
     // Why not the showcase: its recorded clips keep their own Team sheet.
-    ...(isShowcaseScenario ? {} : leadProjectState()),
+    ...(isShowcaseScenario ? showcaseProjectState() : leadProjectState()),
     ...teamSceneState(),
     metrics: {
       claudeAccounts: [
