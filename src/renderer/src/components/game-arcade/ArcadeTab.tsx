@@ -22,6 +22,7 @@ import {
 import { arcadeCanvasLabel, arcadeWordsOf } from './arcade-words'
 import { whoIsWaitingOnUser } from './arcade-hold'
 import { keepArcadeRun, keptArcadeRunOf } from './arcade-kept-runs'
+import { arcadeNeedsRightPanelClosed } from './arcade-center-room'
 
 const builtInOf = (text: string): OrchestratorGameArcade => {
   const parsed = parseOrchestratorGameArcade(text)
@@ -73,6 +74,19 @@ export function ArcadeTab({
   const heldByRef = useRef(heldBy ?? '')
   const paintRef = useRef<{ size: ArcadePaintSize; backdrop: HTMLCanvasElement } | null>(null)
   const frameRef = useRef<number | null>(null)
+  /** Set on becoming active; the first measured width then decides whether to make room. */
+  const roomCheckRef = useRef(false)
+
+  const makeRoom = useCallback((width: number) => {
+    if (!roomCheckRef.current || width === 0) {
+      return
+    }
+    roomCheckRef.current = false
+    const state = useAppStore.getState()
+    if (arcadeNeedsRightPanelClosed(width, state.rightSidebarOpen)) {
+      state.setRightSidebarOpen(false)
+    }
+  }, [])
 
   const paint = useCallback(() => {
     const canvas = canvasRef.current
@@ -168,6 +182,7 @@ export function ArcadeTab({
       if (width === 0 || height === 0) {
         return
       }
+      makeRoom(width)
       const size = { width, height, scale: window.devicePixelRatio || 1 }
       runRef.current = fitArcadeRun(runRef.current, size)
       canvas.width = Math.round(width * size.scale)
@@ -177,13 +192,15 @@ export function ArcadeTab({
     })
     observer.observe(box)
     return () => observer.disconnect()
-  }, [paint])
+  }, [paint, makeRoom])
 
   useEffect(() => {
     if (!isActive) {
       stopLoop()
       return
     }
+    roomCheckRef.current = true
+    makeRoom(boxRef.current?.clientWidth ?? 0)
     boxRef.current?.focus()
     startLoop()
     const onVisible = (): void => {
@@ -196,7 +213,7 @@ export function ArcadeTab({
       document.removeEventListener('visibilitychange', onVisible)
       stopLoop()
     }
-  }, [isActive, startLoop, stopLoop])
+  }, [isActive, makeRoom, startLoop, stopLoop])
 
   useEffect(() => {
     heldRef.current = isHeld
