@@ -631,6 +631,7 @@ orchestratorGame:
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: default # optional: auto (unset: the freest managed account, see below), default (Orca's own selection), or a list of allowed account emails or ids
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
+    replyAlertMinutes: 10 # optional: minutes a member's question, escalation or gate waits unanswered before game watch --lead alerts (10 by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
     mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs

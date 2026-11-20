@@ -239,3 +239,17 @@ describe('renderGameLaunchPrompt', () => {
     )
   })
 })
+
+describe('parseGameLead: replyAlertMinutes (ORCA-1301)', () => {
+  it('takes whole minutes from 1 to 1440 and warns on anything else', () => {
+    expect(parseGameLead({ replyAlertMinutes: 30 })).toEqual({
+      value: { replyAlertMinutes: 30 },
+      warnings: []
+    })
+    for (const bad of [0, 1441, 2.5, '10']) {
+      expect(parseGameLead({ replyAlertMinutes: bad }).warnings).toEqual([
+        'orchestratorGame.orchestrator.replyAlertMinutes must be a whole number of minutes from 1 to 1440'
+      ])
+    }
+  })
+})

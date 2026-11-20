@@ -217,3 +217,23 @@ describe('gameInboxesOf', () => {
     expect(lead?.newest).toBe(3)
   })
 })
+
+// Why: an escalation waited on the lead for hours with nothing to remind it (ORCA-1154, folded into ORCA-1301).
+describe('gameInboxesOf: escalations and gates waiting on the lead', () => {
+  it('lists an unanswered escalation and decision gate as waiting, and drops each once a reply threads it', () => {
+    sequence = 0
+    const escalation = mail('term_lead', 'term_1', { type: 'escalation', subject: 'Blocked' })
+    const gate = mail('run:run_1', 'term_2', { type: 'decision_gate', subject: 'Which way?' })
+    const status = mail('term_lead', 'term_2', { type: 'status' })
+
+    const [before] = gameInboxesOf(source([escalation, gate, status]), {})
+    expect(before?.waiting.map((one) => [one.id, one.from, one.subject])).toEqual([
+      ['msg_1', 'CIN-1', 'Blocked'],
+      ['msg_2', 'CIN-2', 'Which way?']
+    ])
+
+    const reply = mail('term_1', 'term_lead', { thread_id: escalation.id })
+    const [after] = gameInboxesOf(source([escalation, gate, status, reply]), {})
+    expect(after?.waiting.map((one) => one.id)).toEqual(['msg_2'])
+  })
+})

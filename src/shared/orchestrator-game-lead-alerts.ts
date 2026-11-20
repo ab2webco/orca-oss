@@ -5,6 +5,7 @@ import {
 } from './orchestrator-game-fleet-verbs'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
 import { queueDepartureLineOf, type GameQueueDeparture } from './orchestrator-game-queue-departure'
+import { GAME_LEAD_REPLY_ALERT_MINUTES, leadWaitAlertsOf } from './orchestrator-game-lead-wait'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** What `orca game watch --lead` prints: one line per condition the lead must act on (ORCA-1214). */
@@ -234,6 +235,11 @@ export function gameLeadAlertsOf(
     ...memberAlertsOf(state, memory, now),
     ...undeliveredMailAlertsOf(state, now),
     ...prCapAlertsOf(state),
+    ...leadWaitAlertsOf(
+      state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? [],
+      state.lead?.replyAlertMinutes ?? GAME_LEAD_REPLY_ALERT_MINUTES,
+      now
+    ),
     ...queueAlertsOf(state, memory, now)
   ]
 }

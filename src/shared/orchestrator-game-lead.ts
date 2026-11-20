@@ -17,6 +17,8 @@ export type OrchestratorGameLead = {
   askBeforeResume?: boolean
   /** Members running at once; in a layer, the ceiling over the sum of every host's cap. */
   cap: number
+  /** Minutes a member's question, escalation or gate waits unanswered before the watch alerts; 10 unset. */
+  replyAlertMinutes?: number
   /** The agent a member runs, as `orca orchestration worker-start --agent` names it. */
   agent: string
   model?: string
@@ -174,6 +176,10 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
     typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= GAME_LEAD_CAP_MAX
       ? { cap: value }
       : `${at('cap')} must be a whole number from 1 to ${GAME_LEAD_CAP_MAX}`,
+  replyAlertMinutes: (value) =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 1440
+      ? { replyAlertMinutes: value }
+      : `${at('replyAlertMinutes')} must be a whole number of minutes from 1 to 1440`,
   agent: idKey('agent', AGENT_ID, 'must be an agent id like claude or codex'),
   model: idKey('model', MODEL_ID, 'must be a provider model id like opus'),
   effort: idKey('effort', EFFORT, 'must be an effort level like high'),

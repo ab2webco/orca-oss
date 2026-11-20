@@ -287,3 +287,56 @@ describe('gameLeadAlertsOf: open PRs past the cap (ORCA-1301)', () => {
     expect(linesOf(withOpen(1))).toEqual([])
   })
 })
+
+describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into ORCA-1301)', () => {
+  const sqliteAt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+  const waitingFor = (minutes: number, replyAlertMinutes?: number) =>
+    stateOf([], {
+      lead: { ...DEFAULT_GAME_LEAD, cap: 6, ...(replyAlertMinutes ? { replyAlertMinutes } : {}) },
+      inboxes: [
+        {
+          key: 'lead',
+          unread: 0,
+          last: null,
+          waiting: [
+            {
+              id: 'relay_887',
+              from: 'ORCA-1299',
+              subject: 'Which look?',
+              at: sqliteAt(NOW - minutes * MIN)
+            }
+          ]
+        }
+      ]
+    })
+
+  it('alerts once a question has waited past 10 min, with its age and the reply to give', () => {
+    expect(linesOf(waitingFor(9))).toEqual([])
+    expect(linesOf(waitingFor(12))).toEqual([
+      'ORCA-1299 waiting on you 12m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+  })
+
+  it('prints again on a doubling backoff until the reply, and forgets it once answered', () => {
+    const printed = new Set<string>()
+    const newLines = (state: GameLeadAlertInput) =>
+      newGameLeadAlertsOf(gameLeadAlertsOf(state, emptyGameLeadAlertMemory(), NOW), printed).map(
+        (one) => one.line
+      )
+    expect(newLines(waitingFor(12))).toHaveLength(1)
+    expect(newLines(waitingFor(15))).toEqual([])
+    expect(newLines(waitingFor(21))).toEqual([
+      'ORCA-1299 waiting on you 21m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+    expect(newLines(waitingFor(202))).toEqual([
+      'ORCA-1299 waiting on you 3h22m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+    expect(newLines(stateOf([]))).toEqual([])
+    expect(printed.size).toBe(0)
+  })
+
+  it("waits the project's replyAlertMinutes when orca.yaml sets one", () => {
+    expect(linesOf(waitingFor(12, 30))).toEqual([])
+    expect(linesOf(waitingFor(31, 30))).toHaveLength(1)
+  })
+})

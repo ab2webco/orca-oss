@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   gameFleetReportOf,
@@ -248,7 +248,8 @@ describe('gameFleetReportOf', () => {
     )
   })
 
-  it('shows a member whose question the lead has not answered as waiting on you, with the reply to give (ORCA-746 T6)', () => {
+  it('shows a member whose question the lead has not answered as waiting on you, how long, and the reply to give (ORCA-746 T6, ORCA-1154)', () => {
+    vi.useFakeTimers({ now: Date.parse('2026-10-23T13:22:30Z'), toFake: ['Date'] })
     const [row] = gameFleetReportOf({
       lead: DEFAULT_GAME_LEAD,
       agents: [member({ state: 'working', workItem: ticket('CIN-1', 'in_progress') })],
@@ -267,8 +268,9 @@ describe('gameFleetReportOf', () => {
     expect(row).toMatchObject({
       ticket: 'CIN-1',
       phase: 'working',
-      next: 'waiting on you: orchestration reply --id msg_9'
+      next: 'waiting on you 3h22m: orchestration reply --id msg_9'
     })
+    vi.useRealTimers()
   })
 
   it('keeps an orphaned member as still working, says what to do with it, and carries its last activity (ORCA-658)', () => {
