@@ -192,3 +192,13 @@ describe('newGameLeadAlertsOf', () => {
     expect(newGameLeadAlertsOf([red], printed)).toEqual([red])
   })
 })
+
+describe('a remote member still starting (ORCA-1263)', () => {
+  it('raises no gone or idle alert while its launch has not finished', () => {
+    const starting = member('ORCA-9', {
+      remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true, starting: true }
+    })
+    const alerts = gameLeadAlertsOf(stateOf([starting]), emptyGameLeadAlertMemory(), NOW)
+    expect(alerts).toEqual([])
+  })
+})

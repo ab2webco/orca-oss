@@ -197,10 +197,10 @@ import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   liveRemoteMemberTitlesOf,
-  remoteAsleepShowOf,
   remoteGameMembersOf,
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
+import { remoteAsleepShowOf } from './orchestrator-game-remote-asleep-show'
 import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 import { GameHostAnswerGate } from './orchestrator-game-host-answer-gate'
 
