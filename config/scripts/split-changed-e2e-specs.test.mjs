@@ -95,9 +95,10 @@ const RUN_936 = {
 const SHARD_SETUP_SECONDS = 120
 const filesOf = (shard) => JSON.parse(shard.files)
 // #1191's 131 changed specs: 6 shards by size put 30 measured minutes on one, and two hit the cap (ORCA-1155).
+// Why the filter: a spec deleted since #1191 never reaches the split again and has no measured figure.
 const PR_1191 = JSON.parse(
   readFileSync('config/scripts/fixtures/split-changed-e2e-specs/pr-1191-changed-specs.json', 'utf8')
-).files
+).files.filter((file) => existsSync(file))
 const MEASURED = JSON.parse(readFileSync('config/e2e-spec-durations.json', 'utf8')).seconds
 
 describe('splitChangedSpecs', () => {
