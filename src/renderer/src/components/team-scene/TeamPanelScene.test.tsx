@@ -238,6 +238,20 @@ describe('TeamPanelScene', () => {
     expect(shownStyle()).toBe('office')
   })
 
+  it('draws Figures in 2D when the diorama gets no WebGL, as with hardware acceleration off', async () => {
+    await act(async () =>
+      root.render(
+        <TeamPanelScene model={model({ id: 'quest', extensions: [] })} style="figures" diorama />
+      )
+    )
+    expect(
+      host.querySelector('[data-team-scene-webgl]')?.getAttribute('data-team-scene-webgl')
+    ).toBe('off')
+    expect(host.querySelector('[data-team-scene-diorama]')).toBeNull()
+    expect(canvasHeight()).toBe('176px')
+    expect(shownStyle()).toBe('figures')
+  })
+
   it('holds the stage at its height while the art decodes, so the panel does not jump', async () => {
     let finish = (_art: TeamSceneImageArt): void => {}
     vi.mocked(loadTeamSceneArt).mockReturnValue(new Promise((resolve) => (finish = resolve)))

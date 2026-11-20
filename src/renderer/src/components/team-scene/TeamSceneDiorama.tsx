@@ -27,22 +27,33 @@ const FRAME_MS = 1000 / 30
 type Placed = { figure: DioramaFigure; pose: DioramaPose }
 
 /** Figures as the 3D diorama (ORCA-1296): one island per machine, each member at its own plot. */
-export function TeamSceneDiorama({ model }: { model: TeamPanelGameModel }): React.JSX.Element {
+export function TeamSceneDiorama({
+  model,
+  onNoWebgl
+}: {
+  model: TeamPanelGameModel
+  /** Without WebGL (hardware acceleration off) the panel draws the 2D Figures instead. */
+  onNoWebgl: () => void
+}): React.JSX.Element {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const order = useRef<DioramaOrder | undefined>(undefined)
   const status = useTeamSceneStatusColors()
   const [width, setWidth] = useState(0)
   const input = useMemo(() => teamSceneInputOf(model), [model])
-  const layout = useMemo(() => {
-    const next = teamDioramaLayoutOf(
-      teamDioramaMachinesOf(teamSceneFloorsOf(model)),
-      order.current,
-      width > 0 && width < 300
-    )
-    order.current = next.order
-    return next
-  }, [model, width])
+  // Why the last order: a new machine or member takes a free slot and moves nobody already drawn.
+  const layout = useMemo(
+    () =>
+      teamDioramaLayoutOf(
+        teamDioramaMachinesOf(teamSceneFloorsOf(model)),
+        order.current,
+        width > 0 && width < 300
+      ),
+    [model, width]
+  )
+  useEffect(() => {
+    order.current = layout.order
+  }, [layout])
   const views = useMemo(() => {
     const out = new Map<string, DioramaPlotView>()
     let idle = 0
@@ -69,14 +80,18 @@ export function TeamSceneDiorama({ model }: { model: TeamPanelGameModel }): Reac
 
   useEffect(() => {
     const el = canvas.current
-    if (!el || width === 0) {
+    if (!el) {
       return
     }
     let renderer: THREE.WebGLRenderer
     try {
       renderer = new THREE.WebGLRenderer({ canvas: el, antialias: true })
     } catch {
-      // Why quiet: without WebGL the panel keeps its cards; the stage stays empty.
+      onNoWebgl()
+      return
+    }
+    if (width === 0) {
+      renderer.dispose()
       return
     }
     const dark = document.documentElement.classList.contains('dark')
@@ -198,7 +213,7 @@ export function TeamSceneDiorama({ model }: { model: TeamPanelGameModel }): Reac
       kit.dispose(world)
       renderer.dispose()
     }
-  }, [layout, views, input, status, width])
+  }, [layout, views, input, status, width, onNoWebgl])
 
   return (
     <div ref={wrap} className="w-full" data-team-scene-diorama="">

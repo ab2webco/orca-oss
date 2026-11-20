@@ -1,3 +1,4 @@
+import type { Locator } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
 import { writeSettings } from './helpers/settings-write'
@@ -15,6 +16,23 @@ const team: SeededMember[] = [
 
 test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
+/** Whether the diorama got WebGL: 'on' once it drew its islands, 'off' once it fell back to 2D. */
+async function dioramaWebgl(panel: Locator): Promise<'on' | 'off'> {
+  const state = async () => {
+    const scene = panel.locator('[data-team-scene-webgl]')
+    if ((await scene.getAttribute('data-team-scene-webgl')) === 'off') {
+      return 'off'
+    }
+    const islands = await panel
+      .locator('[data-team-scene-diorama] canvas')
+      .getAttribute('data-diorama-islands')
+      .catch(() => null)
+    return islands ? 'on' : 'pending'
+  }
+  await expect.poll(state, { timeout: 30_000 }).not.toBe('pending')
+  return (await state()) as 'on' | 'off'
+}
+
 test('Figures draws the team as the diorama, an island per machine, at every width', async ({
   electronApp,
   orcaPage
@@ -27,9 +45,16 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
       orchestratorGame: { scene: 'quest', panel: { look: 'game', style: 'figures', diorama: true } }
     })
     const canvas = panel.locator('[data-team-scene-diorama] canvas')
-    await expect(canvas).toBeVisible({ timeout: 30_000 })
-    // Home plus the two paired machines the members run on.
-    await expect(canvas).toHaveAttribute('data-diorama-islands', '3', { timeout: 30_000 })
+    const webgl = await dioramaWebgl(panel)
+    testInfo.annotations.push({ type: 'webgl', description: webgl })
+    if (webgl === 'off') {
+      // Linux E2E runs with the GPU off, as a user with hardware acceleration off: Figures in 2D.
+      await expect(panel.getByRole('img', { name: 'Live team scene' })).toBeVisible()
+      await expect(canvas).toHaveCount(0)
+    } else {
+      // Home plus the two paired machines the members run on.
+      await expect(canvas).toHaveAttribute('data-diorama-islands', '3')
+    }
     for (const width of WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
       await orcaPage.evaluate((wide) => {

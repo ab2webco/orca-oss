@@ -53,6 +53,9 @@ export function TeamPanelScene({
   // Why: like the advisor's, a lead's line with no room for its bubble shows in its card (ORCA-1139).
   const [leadUnplaced, setLeadUnplaced] = useState(false)
   const onUnplaced = useCallback((keys: string[]) => setLeadUnplaced(keys.includes('lead')), [])
+  // Why a fallback: with hardware acceleration off there is no WebGL, and Figures still draws.
+  const [noWebgl, setNoWebgl] = useState(false)
+  const onNoWebgl = useCallback(() => setNoWebgl(true), [])
   return (
     <TeamScenePainterContext.Provider value={painter}>
       <TeamSceneLeadLineContext.Provider value={painter && leadUnplaced ? leadLine : null}>
@@ -60,10 +63,13 @@ export function TeamPanelScene({
           className="shrink-0 border-b border-border"
           data-team-scene={drawn}
           data-team-scene-art={art}
+          data-team-scene-webgl={
+            diorama && drawn === 'figures' ? (noWebgl ? 'off' : 'on') : undefined
+          }
         >
           {/* Why Office only: the building is desks on floors, and one machine stays as today. */}
-          {diorama && drawn === 'figures' ? (
-            <TeamSceneDiorama model={model} />
+          {diorama && drawn === 'figures' && !noWebgl ? (
+            <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} />
           ) : painter && drawn === 'office' && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}
