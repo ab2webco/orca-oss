@@ -160,7 +160,8 @@ test('a member whose name carries its ticket shows the ticket once on the card, 
     expect(await countOf(row, 'E2E-801'), 'sidebar row').toBe(1)
     await capture(orcaPage, testInfo.outputPath.bind(testInfo), 'ticket-once-panel')
 
-    await cards.filter({ hasText: 'E2E-801' }).locator('button[aria-expanded]').click()
+    // Why the icon: since #1374 the card button only expands the card (ORCA-1308).
+    await cards.filter({ hasText: 'E2E-801' }).locator('[data-team-open-terminal]').click()
     const header = orcaPage.locator(
       `[data-terminal-overlay-tab-id="${terminal.tabId}"] [data-team-member-header]`
     )
