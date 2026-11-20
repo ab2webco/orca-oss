@@ -1258,12 +1258,19 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'terminal.read',
     params: TerminalRead,
-    handler: async (params, { runtime }) => ({
-      terminal: await runtime.readTerminal(params.terminal, {
-        cursor: params.cursor,
-        limit: params.limit
-      })
-    })
+    handler: async (params, { runtime }) => {
+      try {
+        return {
+          terminal: await runtime.readTerminal(params.terminal, {
+            cursor: params.cursor,
+            limit: params.limit
+          })
+        }
+      } catch (error) {
+        // Why: a remote member's handle is no pane here; name its host, not a bare stale (ORCA-1301).
+        throw remoteMemberTerminalError(runtime, params.terminal, 'read') ?? error
+      }
+    }
   }),
   defineMethod({
     name: 'terminal.inspectProcess',

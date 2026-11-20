@@ -417,6 +417,32 @@ describe('orchestration federation control mail', () => {
       expect(unknown.ok).toBe(false)
       expect(unknown.error.data).toBeUndefined()
     })
+
+    // Why: a lead's read of a live member on m1 said only terminal_handle_stale (ORCA-1301).
+    it('answers terminal.read with the host the handle runs on', async () => {
+      const terminals = new RpcDispatcher({ runtime: homeRuntime, methods: TERMINAL_METHODS })
+      const read = (terminal: string) =>
+        terminals.dispatch({
+          id: `read-${terminal}`,
+          authToken: 'coordinator-token',
+          method: 'terminal.read',
+          params: { terminal }
+        })
+
+      await expect(read('term_worker')).resolves.toMatchObject({
+        ok: false,
+        error: {
+          code: 'terminal_handle_stale',
+          message: expect.stringContaining(
+            'terminal read --environment worker --terminal term_worker'
+          ),
+          data: { host: 'worker', environmentId: 'environment_worker' }
+        }
+      })
+      const unknown = (await read('term_nobody')) as { ok: false; error: { data?: unknown } }
+      expect(unknown.ok).toBe(false)
+      expect(unknown.error.data).toBeUndefined()
+    })
   })
 
   function checkRequest(id: string, wait = false, timeoutMs = 5_000, types?: string): RpcRequest {

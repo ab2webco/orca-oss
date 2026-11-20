@@ -20,15 +20,16 @@ export function remoteMemberHostOf(error: unknown): { host: string; environmentI
     : null
 }
 
-/** Sends on `environmentId`'s host, naming that host in any failure so it is never mistaken for home's. */
-export async function sendOnHost(
+/** Calls `method` on `environmentId`'s host, naming that host in any failure so it is never mistaken for home's. */
+export async function callOnHost<TResult>(
   host: { host: string; environmentId: string },
+  method: string,
   params: Record<string, unknown>,
   openHost: (environment: string) => Promise<SendClient> = openHostRuntimeClient
-): Promise<TerminalSendResponse> {
+): Promise<RuntimeRpcSuccess<TResult>> {
   try {
     const there = await openHost(host.environmentId)
-    return await there.call<{ send: RuntimeTerminalSend }>('terminal.send', params)
+    return await there.call<TResult>(method, params)
   } catch (error) {
     const code = error instanceof RuntimeClientError ? error.code : 'remote_runtime_unavailable'
     const message = error instanceof Error ? error.message : String(error)
@@ -36,23 +37,37 @@ export async function sendOnHost(
   }
 }
 
-/**
- * `terminal.send` that follows a remote member's handle to the paired host its home names, so a lead
- * need not know which host a member runs on (ORCA-976). An older home names no host: its error stands.
- */
-export async function sendFollowingRemoteMember(
-  client: SendClient & { isRemote: boolean },
+export const sendOnHost = (
+  host: { host: string; environmentId: string },
   params: Record<string, unknown>,
   openHost?: (environment: string) => Promise<SendClient>
-): Promise<TerminalSendResponse> {
+): Promise<TerminalSendResponse> => callOnHost(host, 'terminal.send', params, openHost)
+
+/**
+ * A terminal call that follows a remote member's handle to the paired host its home names, so a lead
+ * need not know which host a member runs on (ORCA-976, ORCA-1301). An older home names no host: its error stands.
+ */
+export async function callFollowingRemoteMember<TResult>(
+  client: SendClient & { isRemote: boolean },
+  method: string,
+  params: Record<string, unknown>,
+  openHost?: (environment: string) => Promise<SendClient>
+): Promise<RuntimeRpcSuccess<TResult>> {
   try {
-    return await client.call<{ send: RuntimeTerminalSend }>('terminal.send', params)
+    return await client.call<TResult>(method, params)
   } catch (error) {
     // Why a remote client keeps the error: its environment ids are the host's, not this CLI's.
     const host = client.isRemote ? null : remoteMemberHostOf(error)
     if (!host) {
       throw error
     }
-    return await sendOnHost(host, params, openHost)
+    return await callOnHost<TResult>(host, method, params, openHost)
   }
 }
+
+export const sendFollowingRemoteMember = (
+  client: SendClient & { isRemote: boolean },
+  params: Record<string, unknown>,
+  openHost?: (environment: string) => Promise<SendClient>
+): Promise<TerminalSendResponse> =>
+  callFollowingRemoteMember(client, 'terminal.send', params, openHost)
