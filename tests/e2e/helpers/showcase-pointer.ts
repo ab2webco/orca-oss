@@ -36,7 +36,6 @@ export async function showPointer(page: Page, x: number, y: number): Promise<voi
 // Why the arrow is placed by hand: over a webview the host page never sees the mouse move.
 export async function movePointer(page: Page, x: number, y: number, ms = GLIDE_MS): Promise<void> {
   if (!RECORDING_CLIPS) {
-    await page.mouse.move(x, y)
     return
   }
   const from = last.get(page) ?? { x, y }
