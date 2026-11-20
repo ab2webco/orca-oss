@@ -1,3 +1,4 @@
+import { waitingOnYouNextOf } from './orchestrator-game-lead-wait'
 import {
   memberTicketStatusOf,
   phaseNextOf,
@@ -148,7 +149,7 @@ function nextWithQuestionOf(
   question: GameWaitingMessage | undefined
 ): string {
   if (question && phase !== 'finished') {
-    return `waiting on you: orchestration reply --id ${question.id}`
+    return waitingOnYouNextOf(question)
   }
   return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : phaseNextOf(agent, phase)
 }

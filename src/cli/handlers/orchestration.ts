@@ -114,9 +114,24 @@ type OrchestrationSendResult =
         dispatchId: string
         destination?: 'run_home' | 'worker'
         accepted: true
+        /** Whether the member's host took it within the send's wait; absent from an older home (ORCA-1301). */
+        delivered?: boolean
+        deliveredAt?: string | null
       }
       lifecycle?: LifecycleSendResult
     }
+
+type WorkerRelay = Extract<OrchestrationSendResult, { relay: unknown }>['relay']
+
+function workerRelayLineOf(relay: WorkerRelay): string {
+  if (relay.delivered === true) {
+    return `Delivered ${relay.messageId} to worker Dispatch ${relay.dispatchId}'s host at ${relay.deliveredAt}`
+  }
+  if (relay.delivered === false) {
+    return `Queued ${relay.messageId} for worker Dispatch ${relay.dispatchId}, NOT delivered: its host has not taken it. orca game state shows when it does; until then the member has not seen it.`
+  }
+  return `Queued ${relay.messageId} for worker Dispatch ${relay.dispatchId}`
+}
 
 function resolveCompatibilityCliCommand(): 'orca' | 'orca-ide' | 'orca-dev' {
   const configured = process.env.ORCA_CLI_COMMAND
@@ -687,7 +702,7 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       }
       if ('relay' in r) {
         if (r.relay.destination === 'worker') {
-          return `Queued ${r.relay.messageId} for worker Dispatch ${r.relay.dispatchId}`
+          return workerRelayLineOf(r.relay)
         }
         return `Queued ${r.relay.messageId} for Run home (Dispatch ${r.relay.dispatchId})`
       }

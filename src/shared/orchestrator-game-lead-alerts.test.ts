@@ -240,3 +240,103 @@ describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () =
     expect(memory.departures.size).toBe(0)
   })
 })
+
+describe('gameLeadAlertsOf: lead mail a remote member never received (ORCA-1301)', () => {
+  const onM1 = (minutesAgo: number, overrides: Partial<GameAgent> = {}) =>
+    member('ORCA-9', {
+      remote: {
+        host: 'm1',
+        environmentId: 'env_m1',
+        stateKnown: true,
+        undeliveredSince: new Date(NOW - minutesAgo * MIN).toISOString()
+      },
+      ...overrides
+    })
+
+  it('alerts once mail has waited past its budget, naming the host and how to reach the pane', () => {
+    expect(linesOf(stateOf([onM1(11)]))).toEqual([
+      'ORCA-9 has not received lead mail for 11+ min: m1 has not taken it, so the member has not seen it. Check the host, or reach the pane: orca terminal send --environment m1 --terminal term_ORCA-9'
+    ])
+  })
+
+  it('stays quiet inside the budget and for a finished member', () => {
+    expect(linesOf(stateOf([onM1(5)]))).toEqual([])
+    expect(linesOf(stateOf([onM1(30, { state: 'done' })]))).not.toContainEqual(
+      expect.stringContaining('lead mail')
+    )
+  })
+})
+
+describe('gameLeadAlertsOf: open PRs past the cap (ORCA-1301)', () => {
+  const withOpen = (total: number) =>
+    stateOf([], {
+      lead: { ...DEFAULT_GAME_LEAD, cap: 1 },
+      project: { reviews: { provider: 'github', total, url: null, items: [] }, todo: null }
+    })
+
+  it('alerts once a member opens PRs past a cap of 1, and again as the count grows', () => {
+    expect(linesOf(withOpen(2))).toEqual([
+      "2 open PRs, past the project's cap of 1: a member opened PRs past it. Find who (gh pr list --author @me) and stop it before it opens more."
+    ])
+    const keys = (total: number) =>
+      gameLeadAlertsOf(withOpen(total), emptyGameLeadAlertMemory(), NOW).map((one) => one.key)
+    expect(keys(3)).not.toEqual(keys(2))
+  })
+
+  it('stays quiet at the cap, which launches already respect', () => {
+    expect(linesOf(withOpen(1))).toEqual([])
+  })
+})
+
+describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into ORCA-1301)', () => {
+  const sqliteAt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+  const waitingFor = (minutes: number, replyAlertMinutes?: number) =>
+    stateOf([], {
+      lead: { ...DEFAULT_GAME_LEAD, cap: 6, ...(replyAlertMinutes ? { replyAlertMinutes } : {}) },
+      inboxes: [
+        {
+          key: 'lead',
+          unread: 0,
+          last: null,
+          waiting: [
+            {
+              id: 'relay_887',
+              from: 'ORCA-1299',
+              subject: 'Which look?',
+              at: sqliteAt(NOW - minutes * MIN)
+            }
+          ]
+        }
+      ]
+    })
+
+  it('alerts once a question has waited past 10 min, with its age and the reply to give', () => {
+    expect(linesOf(waitingFor(9))).toEqual([])
+    expect(linesOf(waitingFor(12))).toEqual([
+      'ORCA-1299 waiting on you 12m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+  })
+
+  it('prints again on a doubling backoff until the reply, and forgets it once answered', () => {
+    const printed = new Set<string>()
+    const newLines = (state: GameLeadAlertInput) =>
+      newGameLeadAlertsOf(gameLeadAlertsOf(state, emptyGameLeadAlertMemory(), NOW), printed).map(
+        (one) => one.line
+      )
+    expect(newLines(waitingFor(12))).toHaveLength(1)
+    expect(newLines(waitingFor(15))).toEqual([])
+    expect(newLines(waitingFor(21))).toEqual([
+      'ORCA-1299 waiting on you 21m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+    expect(newLines(waitingFor(202))).toEqual([
+      'ORCA-1299 waiting on you 3h22m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+    ])
+    expect(newLines(stateOf([]))).toEqual([])
+    expect(printed.size).toBe(0)
+  })
+
+  it("waits the project's replyAlertMinutes when orca.yaml sets one", () => {
+    expect(linesOf(waitingFor(12, 30))).toEqual([])
+    expect(linesOf(waitingFor(31, 30))).toHaveLength(1)
+  })
+})

@@ -76,6 +76,8 @@ export type GameInboxSummary = {
   waiting: GameWaitingMessage[]
 }
 
+const WAITS_ON_LEAD: ReadonlySet<string> = new Set(['escalation', 'decision_gate'])
+
 // Why 50: a lead's turn reads it whole; older mail stays in `orca orchestration inbox`.
 export const GAME_INBOX_MESSAGES_MAX = 50
 
@@ -193,12 +195,19 @@ export function gameInboxesOf(
     ...source.members.map((member) => ({ key: member.ticket, addresses: member.addresses }))
   ]
   const pending = source.pendingQuestions ?? []
+  // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
+  const replied = new Set(allOldestFirst.flatMap((row) => (row.thread_id ? [row.thread_id] : [])))
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
     const rows = withoutRepeatedDone(oldestFirst.filter((row) => to.has(row.to_handle)))
-    const waiting = pending
+    const unanswered =
+      key === 'lead'
+        ? rows.filter((row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id))
+        : []
+    const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]
       .filter((row) => to.has(row.to_handle))
+      .sort((a, b) => a.sequence - b.sequence)
       .map(
         (row): GameWaitingMessage => ({
           id: row.id,

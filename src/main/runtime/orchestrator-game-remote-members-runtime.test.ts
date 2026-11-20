@@ -235,6 +235,32 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     expect(member?.state).toBe('working')
   })
 
+  // Why: a lead's stop orders sat unread on the home while every send said ok (ORCA-1301).
+  it('carries when the oldest lead mail its host has not taken was sent, and drops it once taken', async () => {
+    const { runtime, dispatchId } = leadWithRemoteMember()
+    const db = runtime.getOrchestrationDb()
+    db.markWorkerDispatchReady(dispatchId)
+    const relay = db.enqueueFederationRelay({
+      dispatchId,
+      direction: 'to_worker',
+      kind: 'control_message',
+      payload: '{}'
+    })
+    vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({ terminal: null })
+    const pending = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+    expect(pending.agents.find((agent) => agent.isMember)?.remote?.undeliveredSince).toMatch(
+      /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/
+    )
+
+    db.acknowledgeFederationRelay({
+      dispatchId,
+      direction: 'to_worker',
+      throughSequence: relay.sequence
+    })
+    const taken = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+    expect(taken.agents.find((agent) => agent.isMember)?.remote?.undeliveredSince).toBeUndefined()
+  })
+
   it('lists a member an earlier lead left running on the host, flagged with its ticket done (ORCA-793)', async () => {
     const { runtime } = leadWithRemoteMember()
     const earlierPane = 'tab-0:33333333-3333-4333-8333-333333333333'

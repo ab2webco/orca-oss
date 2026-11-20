@@ -11,6 +11,8 @@ export type GameRemoteHost = {
   /** The host answered and the member's terminal is no longer there (ORCA-790). */
   gone?: true
   starting?: true // Its launch has not finished, so the host shows no terminal yet (ORCA-1263).
+  /** When the oldest lead mail its host has not taken was sent; absent when none waits (ORCA-1301). */
+  undeliveredSince?: string
   /** A host restart slept the member's pane; resume wakes it (ORCA-915). Absent from an older host. */
   asleep?: true
   /** Its start failed and no agent answers for it, so its name is free again (ORCA-1034). */

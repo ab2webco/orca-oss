@@ -1,6 +1,11 @@
-import { gameFleetReportOf, type GameFleetInput } from './orchestrator-game-fleet-verbs'
+import {
+  gameFleetReportOf,
+  ticketOfMember,
+  type GameFleetInput
+} from './orchestrator-game-fleet-verbs'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
 import { queueDepartureLineOf, type GameQueueDeparture } from './orchestrator-game-queue-departure'
+import { GAME_LEAD_REPLY_ALERT_MINUTES, leadWaitAlertsOf } from './orchestrator-game-lead-wait'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** What `orca game watch --lead` prints: one line per condition the lead must act on (ORCA-1214). */
@@ -8,7 +13,8 @@ import type { OrchestratorGameState } from './orchestrator-game-state'
 export const GAME_LEAD_ALERT_BUDGETS_MS = {
   queueEntry: 180 * 60_000,
   queueRun: 60 * 60_000,
-  queuedLaunch: 20 * 60_000
+  queuedLaunch: 20 * 60_000,
+  undeliveredMail: 10 * 60_000
 } as const
 
 export type GameLeadAlert = { key: string; line: string }
@@ -165,6 +171,45 @@ function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, n
   return alerts
 }
 
+// Why past, not at: launches stop at the cap, so only a member's own `gh pr create` passes it (ORCA-1301).
+function prCapAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
+  const open = state.project?.reviews?.total
+  const { cap } = gameFleetReportOf(state)
+  return open !== undefined && open > cap
+    ? [
+        {
+          key: `pr-cap:${open}`,
+          line: `${open} open PRs, past the project's cap of ${cap}: a member opened PRs past it. Find who (gh pr list --author @me) and stop it before it opens more.`
+        }
+      ]
+    : []
+}
+
+// Why: a send to a remote member returned ok while its host never took it (ORCA-1301).
+function undeliveredMailAlertsOf(state: GameLeadAlertInput, now: number): GameLeadAlert[] {
+  return state.agents.flatMap((agent) => {
+    const remote = agent.remote
+    const since = remote?.undeliveredSince ? Date.parse(remote.undeliveredSince) : Number.NaN
+    if (
+      !remote ||
+      agent.state === 'done' ||
+      !(now - since >= GAME_LEAD_ALERT_BUDGETS_MS.undeliveredMail)
+    ) {
+      return []
+    }
+    const who = ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey
+    const pane = agent.terminalHandle
+      ? `orca terminal send --environment ${remote.host} --terminal ${agent.terminalHandle}`
+      : `orca game member ${who}`
+    return [
+      {
+        key: `undelivered:${who}:${remote.undeliveredSince}`,
+        line: `${who} has not received lead mail for ${minutesOf(now - since)}+ min: ${remote.host} has not taken it, so the member has not seen it. Check the host, or reach the pane: ${pane}`
+      }
+    ]
+  })
+}
+
 // Why first: two leads on one conversation both read its mail and queue merges (ORCA-1283).
 function duplicateLeadAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
   const terminals = state.duplicateLead?.terminals ?? []
@@ -188,6 +233,13 @@ export function gameLeadAlertsOf(
   return [
     ...duplicateLeadAlertsOf(state),
     ...memberAlertsOf(state, memory, now),
+    ...undeliveredMailAlertsOf(state, now),
+    ...prCapAlertsOf(state),
+    ...leadWaitAlertsOf(
+      state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? [],
+      state.lead?.replyAlertMinutes ?? GAME_LEAD_REPLY_ALERT_MINUTES,
+      now
+    ),
     ...queueAlertsOf(state, memory, now)
   ]
 }

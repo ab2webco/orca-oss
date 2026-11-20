@@ -6308,6 +6308,21 @@ export class OrchestrationDb {
       .run(params.messageId, params.runId, params.dispatchId, `dispatch:${params.dispatchId}`)
   }
 
+  /** When the peer took a relayed message: null while it has not, undefined for no such item. */
+  getFederationRelayAckedAt(
+    dispatchId: string,
+    direction: FederationRelayDirection,
+    messageId: string
+  ): string | null | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT acked_at FROM federation_relay_items
+         WHERE dispatch_id = ? AND direction = ? AND message_id = ?`
+      )
+      .get(dispatchId, direction, messageId) as { acked_at: string | null } | undefined
+    return row?.acked_at
+  }
+
   private getFederationRelayItem(
     dispatchId: string,
     direction: FederationRelayDirection,
