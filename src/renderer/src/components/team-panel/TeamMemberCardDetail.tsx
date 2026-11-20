@@ -55,10 +55,10 @@ function HelpersList({ paneKey }: { paneKey: string }): React.JSX.Element | null
 }
 
 /** `wraps`: a sentence that must read whole at 320, where a path or tool may be cut. */
-type Fact = { key: string; label: string; value: ReactNode; wraps?: true }
+export type TeamFact = { key: string; label: string; value: ReactNode; wraps?: true }
 
 /** A branch cut in the middle: the owner prefix gives way first, the ticket part stays whole. */
-function BranchText({ branch }: { branch: string }): React.JSX.Element {
+export function BranchText({ branch }: { branch: string }): React.JSX.Element {
   const { head, tail } = teamBranchParts(branch)
   return (
     <code title={branch} className="flex min-w-0 font-mono text-[11.5px]">
@@ -69,13 +69,13 @@ function BranchText({ branch }: { branch: string }): React.JSX.Element {
 }
 
 // Why only these: the header above already shows model, phase, time in state and host (owner).
-function factsOf(card: TeamMemberCard): Fact[] {
+function factsOf(card: TeamMemberCard): TeamFact[] {
   const tool =
     card.liveAction && card.liveAction.kind !== 'question'
       ? teamLiveText(card.liveAction, card.condition)
       : null
   const credit = teamModelCreditText(card.model)
-  const facts: (Fact | null)[] = [
+  const facts: (TeamFact | null)[] = [
     card.branch
       ? {
           key: 'branch',
@@ -103,7 +103,26 @@ function factsOf(card: TeamMemberCard): Fact[] {
         }
       : null
   ]
-  return facts.filter((fact): fact is Fact => fact !== null)
+  return facts.filter((fact): fact is TeamFact => fact !== null)
+}
+
+/** Label and value pairs; needs an `@container` ancestor to stack when narrow. */
+export function TeamFactsGrid({ facts }: { facts: TeamFact[] }): React.JSX.Element {
+  return (
+    // Why stacked when narrow: beside a full label the value column is narrower than one word.
+    <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 @max-[16rem]:grid-cols-1 @max-[16rem]:gap-y-0">
+      {facts.map((fact, index) => (
+        <div key={fact.key} data-team-detail={fact.key} className="contents">
+          <dt className={cn('text-muted-foreground', index > 0 && '@max-[16rem]:mt-1.5')}>
+            {fact.label}
+          </dt>
+          <dd className={`min-w-0 text-foreground ${fact.wraps ? 'break-words' : 'truncate'}`}>
+            {fact.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
 }
 
 function UsageBar({
@@ -234,19 +253,7 @@ export function TeamMemberCardDetail({
           {title}
         </p>
       ) : null}
-      {/* Why stacked when narrow: beside a full label the value column is narrower than one word. */}
-      <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 @max-[16rem]:grid-cols-1 @max-[16rem]:gap-y-0">
-        {factsOf(card).map((fact, index) => (
-          <div key={fact.key} data-team-detail={fact.key} className="contents">
-            <dt className={cn('text-muted-foreground', index > 0 && '@max-[16rem]:mt-1.5')}>
-              {fact.label}
-            </dt>
-            <dd className={`min-w-0 text-foreground ${fact.wraps ? 'break-words' : 'truncate'}`}>
-              {fact.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <TeamFactsGrid facts={factsOf(card)} />
       {hostWorktreeMissing ? (
         <p data-team-card-host-hint="" className="break-words text-muted-foreground">
           {translate(
