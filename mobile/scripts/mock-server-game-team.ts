@@ -13,20 +13,24 @@ import {
   type GameWorkItem
 } from '../../src/shared/orchestrator-game-state'
 import { leadProjectState } from './mock-server-lead-project'
+import { showcaseProjectState } from './mock-server-showcase-project'
 import { LEAD_PANE_KEY } from './mock-server-lead-sessions'
 import type { RpcRequest, RpcRespond, RpcResponse } from './mock-server-rpc-handlers'
 import {
-  createShowcaseQuestionProjects,
   isShowcaseScenario,
   LEAD_WORKTREE_ID,
-  SHOWCASE_MEMBERS,
-  SHOWCASE_METRICS_MERGED,
-  showcaseIncomingQuestion
+  SHOWCASE_LEAD_LABEL,
+  SHOWCASE_LEAD_WORKTREE,
+  SHOWCASE_METRICS_MERGED
 } from './mock-server-showcase-scenario'
 import { createShowcaseInboxThreads } from './mock-server-showcase-inbox'
-import { showcaseAnswerChunks } from './mock-server-showcase-terminal'
+import {
+  answerShowcaseQuestion,
+  showcaseLeadQuestionCount,
+  showcaseAgentsNow,
+  showcaseQuestionProjects
+} from './mock-server-showcase-team'
 import { teamSceneState } from './mock-server-team-scene'
-import { queueTerminalOutput } from './mock-server-terminal-stream'
 
 // Every terminal is the lead of a project with five members, so the Team drawer (ORCA-952) has data.
 const member = (
@@ -135,12 +139,11 @@ const DEFAULT_QUESTIONS: GameOwnerQuestion[] = [
 ]
 
 // Showcase projects are fixed; the default one follows whichever worktree is active.
-let showcaseProjects = isShowcaseScenario ? createShowcaseQuestionProjects() : []
 let defaultQuestions = DEFAULT_QUESTIONS
 
 function questionProjects(activeWorktreeId: string): GameOwnerQuestionProject[] {
   if (isShowcaseScenario) {
-    return showcaseProjects.filter((project) => project.questions.length > 0)
+    return showcaseQuestionProjects()
   }
   const repoId = getRepoIdFromWorktreeId(activeWorktreeId)
   return defaultQuestions.length
@@ -149,9 +152,7 @@ function questionProjects(activeWorktreeId: string): GameOwnerQuestionProject[] 
 }
 
 function openQuestionCount(): number {
-  return isShowcaseScenario
-    ? (showcaseProjects.find((one) => one.worktreeId === LEAD_WORKTREE_ID)?.questions.length ?? 0)
-    : defaultQuestions.length
+  return isShowcaseScenario ? showcaseLeadQuestionCount() : defaultQuestions.length
 }
 
 // The lead's own row: the host sends no account, launch or isMember on it (leadAccount has the account).
@@ -198,30 +199,44 @@ function leadState(worktreeId: unknown): Partial<OrchestratorGameState> {
   }
   return {
     role: 'lead',
-    lead: { autostart: false, cap: process.env.MOCK_DOCK ? 9 : 5, agent: 'claude', label: 'Lead' },
-    agents: isShowcaseScenario ? SHOWCASE_MEMBERS : leadAgents(),
-    worktree: {
-      id: String(worktreeId),
-      path: '/Users/dev/code/orca-oss',
-      branch: 'main',
-      displayName: 'orca-oss'
+    lead: {
+      autostart: false,
+      cap: process.env.MOCK_DOCK ? 9 : 5,
+      agent: 'claude',
+      label: isShowcaseScenario ? SHOWCASE_LEAD_LABEL : 'Lead'
     },
+    agents: isShowcaseScenario ? showcaseAgentsNow() : leadAgents(),
+    worktree: isShowcaseScenario
+      ? SHOWCASE_LEAD_WORKTREE
+      : {
+          id: String(worktreeId),
+          path: '/Users/dev/code/orca-oss',
+          branch: 'main',
+          displayName: 'orca-oss'
+        },
     ...(isShowcaseScenario ? {} : { leadAccount: CLAUDE_TEAM }),
     // Why: MOCK_GAME_LOCALE=es checks the cards follow the host's language.
     locale: process.env.MOCK_GAME_LOCALE
       ? normalizeSupportedUiLocale(process.env.MOCK_GAME_LOCALE)
       : undefined,
     inboxes: [
-      {
-        key: 'ORCA-949',
-        unread: 0,
-        last: { at: '', from: 'ORCA-949', subject: 'Fleet pane redesign pushed, CI running' },
-        waiting: []
-      }
+      isShowcaseScenario
+        ? {
+            key: 'LUM-14',
+            unread: 0,
+            last: { at: '', from: 'LUM-14', subject: 'Offline cache pushed, CI running' },
+            waiting: []
+          }
+        : {
+            key: 'ORCA-949',
+            unread: 0,
+            last: { at: '', from: 'ORCA-949', subject: 'Fleet pane redesign pushed, CI running' },
+            waiting: []
+          }
     ],
     openOwnerQuestions: openQuestionCount(),
     // Why not the showcase: its recorded clips keep their own Team sheet.
-    ...(isShowcaseScenario ? {} : leadProjectState()),
+    ...(isShowcaseScenario ? showcaseProjectState() : leadProjectState()),
     ...teamSceneState(),
     metrics: {
       claudeAccounts: [
@@ -243,47 +258,6 @@ function leadState(worktreeId: unknown): Partial<OrchestratorGameState> {
         : { medianMs: 5.5 * 3_600_000, measured: 19 }
     }
   }
-}
-
-function answerShowcaseQuestion(id: string, params: Record<string, unknown>): void {
-  for (const project of showcaseProjects) {
-    const found = project.questions.find((one) => one.id === id)
-    if (!found) {
-      continue
-    }
-    // The option is 1-based, as the host's owner board reads it.
-    const answer =
-      typeof params.option === 'number'
-        ? found.options[params.option - 1]
-        : String(params.text ?? '')
-    if (project.worktreeId === LEAD_WORKTREE_ID && answer) {
-      // Why by ticket: the lead relays the answer to whoever owns it, not a fixed member.
-      const owner = SHOWCASE_MEMBERS.find((one) => one.workItem?.identifier === found.ticket)
-      queueTerminalOutput(
-        'term-lead',
-        showcaseAnswerChunks(found.ticket, answer, owner?.displayName ?? null)
-      )
-    }
-  }
-  showcaseProjects = showcaseProjects.map((project) => ({
-    ...project,
-    questions: project.questions.filter((one) => one.id !== id)
-  }))
-}
-
-/** Adds a fresh question to the showcase lead's project; null outside the showcase. */
-export function addShowcaseOwnerQuestion(): {
-  question: GameOwnerQuestion
-  worktreeId: string
-  repoName: string
-} | null {
-  const project = showcaseProjects.find((one) => one.worktreeId === LEAD_WORKTREE_ID)
-  if (!isShowcaseScenario || !project) {
-    return null
-  }
-  const question = showcaseIncomingQuestion()
-  project.questions = [question, ...project.questions]
-  return { question, worktreeId: LEAD_WORKTREE_ID, repoName: project.repoName }
 }
 
 export function handleMockGameTeamRequest(

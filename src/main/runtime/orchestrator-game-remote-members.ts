@@ -26,6 +26,7 @@ export type RemoteGameMemberSource = {
   createdAt: string
   finished: boolean
   startFailed?: boolean
+  starting?: boolean // Its worker start has not finished (ORCA-1263).
   /** The home Run completed the member's task. */
   ticketDone: boolean
   /** Launched by a lead that no longer leads it (ORCA-793). */
@@ -75,6 +76,7 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               d.created_at AS createdAt,
               d.status NOT IN ('pending', 'dispatched') AS finished,
               COALESCE(w.state, '') = 'failed' AS startFailed,
+              COALESCE(w.state, '') = 'starting' AS starting,
               COALESCE(t.status, '') = 'completed' AS ticketDone,
               w.start_options AS startOptions`
 
@@ -96,10 +98,11 @@ const EARLIER_LEAD_LIMIT = 20
 
 type SourceRow = Omit<
   RemoteGameMemberSource,
-  'finished' | 'startFailed' | 'ticketDone' | 'earlierLead' | 'launch'
+  'finished' | 'startFailed' | 'starting' | 'ticketDone' | 'earlierLead' | 'launch'
 > & {
   finished: number
   startFailed: number
+  starting: number
   ticketDone: number
   startOptions: string | null
 }
@@ -113,6 +116,7 @@ const sourceOf = (
     ...row,
     finished: row.finished === 1,
     startFailed: row.startFailed === 1,
+    starting: row.starting === 1,
     ticketDone: row.ticketDone === 1,
     earlierLead,
     launch: chosen ? gameMemberLaunchOf({ ...chosen, source: 'launch' }) : null,
@@ -245,20 +249,6 @@ function oneSourcePerWorktree(
   })
 }
 
-/** What a host's federationShow says of a member a restart slept (ORCA-915); null for anything else. */
-export function remoteAsleepShowOf(value: unknown): RemoteGameMemberShow | null {
-  const asleep = value as { terminal?: unknown; branch?: unknown; title?: unknown } | null
-  if (typeof asleep?.terminal !== 'string' || typeof asleep.branch !== 'string') {
-    return null
-  }
-  return {
-    branch: asleep.branch,
-    title: typeof asleep.title === 'string' ? asleep.title : null,
-    liveness: 'sleeping',
-    asleep: true
-  }
-}
-
 /** Fleet rows for remote members; a host that does not answer still lists its member, state unknown. */
 export async function remoteGameMembersOf(
   sources: readonly RemoteGameMemberSource[],
@@ -271,7 +261,10 @@ export async function remoteGameMembersOf(
         () => ({ answered: false, show: null })
       )
       const { show } = answer
-      const gone = answer.answered && (show === null || show.liveness === 'gone')
+      // Why: the host shows no terminal until the launch's handshake ends, so a start is not a close (ORCA-1263).
+      const closed = answer.answered && (show === null || show.liveness === 'gone')
+      const starting = closed && source.starting === true
+      const gone = closed && !starting
       // Why: an earlier lead's member is only worth listing while its terminal still runs.
       if (source.earlierLead && (show === null || gone)) {
         return null
@@ -285,11 +278,13 @@ export async function remoteGameMembersOf(
       const agent = gone ? null : (show?.agent ?? null)
       const state: GameAgent['state'] = agent
         ? gameAgentStateOf(agent.state)
-        : source.finished
-          ? 'done'
-          : titleState
-            ? TITLE_STATES[titleState]
-            : 'idle'
+        : starting
+          ? 'working'
+          : source.finished
+            ? 'done'
+            : titleState
+              ? TITLE_STATES[titleState]
+              : 'idle'
       const lastActivityAt = latestActivityOf(source.lastActivityAt, agent?.updatedAt)
       // Why the home's launch last: the host's hooks may have seen the member move off it.
       const launch = agent?.launch ?? source.launch
@@ -309,6 +304,7 @@ export async function remoteGameMembersOf(
           ...(source.earlierLead ? { earlierLead: true as const } : {}),
           ...(source.ticketDone ? { ticketDone: true as const } : {}),
           ...(gone ? { gone: true as const } : {}),
+          ...(starting ? { starting: true as const } : {}),
           ...(show?.asleep ? { asleep: true as const } : {}),
           ...(source.startFailed && !agent ? { startFailed: true as const } : {})
         },

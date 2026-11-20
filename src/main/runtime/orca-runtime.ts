@@ -197,10 +197,10 @@ import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
   liveRemoteMemberTitlesOf,
-  remoteAsleepShowOf,
   remoteGameMembersOf,
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
+import { remoteAsleepShowOf } from './orchestrator-game-remote-asleep-show'
 import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 import { GameHostAnswerGate } from './orchestrator-game-host-answer-gate'
 
@@ -745,6 +745,12 @@ import {
   type AgentTeamsClientSettings,
   type AgentTeamsSettingsUpdate
 } from '../../shared/agent-teams-client-settings'
+import {
+  agentTeamsNamesOf,
+  agentTeamsNamesPatchOf,
+  type AgentTeamsNamesSettings,
+  type AgentTeamsNamesUpdate
+} from '../../shared/agent-teams-names-settings'
 import type { GameSceneArtImage } from '../worktree-game-scene-file'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import type { GamePanelTab } from '../../shared/orchestrator-game-panel'
@@ -976,7 +982,8 @@ import {
   type MainWorkItem,
   type GitHubPRBranchLookupOptions
 } from '../github/client'
-import { getMergeQueueEntries } from '../github/merge-queue'
+import { getMergeQueueDeparture, getMergeQueueEntries } from '../github/merge-queue'
+import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
 import { getPullRequestsMergeable } from '../github/pull-request-mergeable'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
@@ -4538,13 +4545,14 @@ export class OrcaRuntimeService {
     | 'artifactSharingEnabled'
     | 'worktreeVisibilityDefaults'
   > &
-    AgentTeamsClientSettings {
+    AgentTeamsClientSettings & { agentTeamsNames: AgentTeamsNamesSettings } {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
     return {
       ...agentTeamsClientSettingsOf(settings),
+      agentTeamsNames: agentTeamsNamesOf(settings),
       worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
       defaultTuiAgent: settings.defaultTuiAgent ?? null,
       disabledTuiAgents: settings.disabledTuiAgents ?? [],
@@ -4617,7 +4625,7 @@ export class OrcaRuntimeService {
       | 'minimaxUsageModels'
       | 'prBotAuthorOverrides'
     > &
-      AgentTeamsSettingsUpdate
+      AgentTeamsSettingsUpdate & { agentTeamsNames?: AgentTeamsNamesUpdate }
   ): Promise<
     Pick<
       GlobalSettings,
@@ -4647,14 +4655,13 @@ export class OrcaRuntimeService {
     }
     const beforeSettings = this.store.getSettings()
     const before = beforeSettings.agentStatusHooksEnabled !== false
-    const { agentTeamsPanel, statusColors, ...rest } = updates
-    this.store.updateSettings(
-      {
-        ...rest,
-        ...agentTeamsSettingsPatchOf(beforeSettings, { agentTeamsPanel, statusColors })
-      },
-      { notifyListeners: true }
-    )
+    const { agentTeamsPanel, statusColors, agentTeamsNames, ...rest } = updates
+    const panelPatch = agentTeamsSettingsPatchOf(beforeSettings, { agentTeamsPanel, statusColors })
+    // Why on top of the panel patch: both write orchestratorGame, and neither may drop the other.
+    const namesPatch = agentTeamsNames
+      ? agentTeamsNamesPatchOf({ ...beforeSettings, ...panelPatch }, agentTeamsNames)
+      : {}
+    this.store.updateSettings({ ...rest, ...panelPatch, ...namesPatch }, { notifyListeners: true })
     const settings = this.store.getSettings()
     if (updates.worktreeVisibilityDefaults !== undefined) {
       this.notifyReposChanged()
@@ -33357,6 +33364,30 @@ export class OrcaRuntimeService {
       ...(unlisted.length > 0 ? { unlistedMembers: unlisted } : {}),
       ...(view.error ? { pausedMembersError: view.error } : {})
     }
+  }
+
+  /** A PR's state and last queue removal for the caller's project, read when its watch saw it leave. */
+  async readGameQueueDeparture(args: {
+    worktreeId?: string
+    terminalHandle?: string
+    number: number
+  }): Promise<GameQueueDeparture | null> {
+    const worktreeId =
+      args.worktreeId ??
+      (args.terminalHandle
+        ? (await this.showTerminal(args.terminalHandle).catch(() => null))?.worktreeId
+        : undefined)
+    const worktree = worktreeId ? (await this.getResolvedWorktreeMap()).get(worktreeId) : undefined
+    if (!worktree?.repoId || this.store?.getRepo(worktree.repoId)?.kind === 'folder') {
+      return null
+    }
+    const repo = await this.resolveRepoSelector(`id:${worktree.repoId}`)
+    return getMergeQueueDeparture(
+      repo.path,
+      args.number,
+      repo.connectionId ?? null,
+      ...this.getLocalGitExecutionOptionArgs(repo)
+    )
   }
 
   private gameProjectWorkPortFor(repoId: string): GameProjectWorkPort {

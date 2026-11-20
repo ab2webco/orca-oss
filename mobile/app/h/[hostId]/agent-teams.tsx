@@ -4,7 +4,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams } from 'expo-router'
 import { AccountsHeader } from '../../../src/accounts/AccountsHeader'
 import { styles } from '../../../src/accounts/mobile-accounts-screen-styles'
+import { AgentTeamsNamesSection } from '../../../src/agent-teams-settings/AgentTeamsNamesSection'
 import { AgentTeamsSettingsBody } from '../../../src/agent-teams-settings/AgentTeamsSettingsBody'
+import { useAgentTeamsNames } from '../../../src/agent-teams-settings/use-agent-teams-names'
 import { useAgentTeamsSettings } from '../../../src/agent-teams-settings/use-agent-teams-settings'
 import { spacing } from '../../../src/theme/mobile-theme'
 import { useHostClient } from '../../../src/transport/client-context'
@@ -17,6 +19,7 @@ export default function AgentTeamsSettingsScreen() {
   const { client, state: connState } = useHostClient(hostId)
   const [hostName, setHostName] = useState('')
   const settings = useAgentTeamsSettings({ client, connected: connState === 'connected' })
+  const names = useAgentTeamsNames({ client, connected: connState === 'connected' })
 
   useEffect(() => {
     let stale = false
@@ -49,6 +52,15 @@ export default function AgentTeamsSettingsScreen() {
           onToneColor={settings.setToneColor}
           onResetColors={settings.resetColors}
         />
+        {/* Why after a ready body: an older host already reads "Update Orca" once above. */}
+        {settings.state.kind === 'ready' ? (
+          <AgentTeamsNamesSection
+            state={names.state}
+            hostName={hostName}
+            onLeadName={names.setLeadName}
+            onMemberNames={names.setMemberNames}
+          />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   )

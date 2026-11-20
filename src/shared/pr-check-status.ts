@@ -1,4 +1,5 @@
 import { summarizeProviderChecks } from './provider-check-summary'
+import { withoutSupersededCancelledRuns } from './pr-check-rollup-supersession'
 import type { PRCheckDetail } from './github/check-types'
 import type { CheckStatus } from './github/pull-request-types'
 
@@ -47,7 +48,7 @@ export function derivePRCheckStatusFromRollup(rollup: unknown): CheckStatus {
     return 'neutral'
   }
   return derivePRCheckStatus(
-    rollup.map((raw, index) =>
+    withoutSupersededCancelledRuns(rollup as unknown[]).map((raw, index) =>
       normalizeRollupCheck(raw && typeof raw === 'object' ? (raw as RawCheckRollup) : {}, index)
     )
   )

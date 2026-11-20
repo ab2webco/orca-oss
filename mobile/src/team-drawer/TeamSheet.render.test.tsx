@@ -384,10 +384,20 @@ describe('TeamSheet', () => {
     act(() => button('Team').click())
     const scroller = (): Element | null | undefined =>
       document.body.querySelector('[role="tablist"]')?.parentElement?.parentElement
-    const teamScroller = scroller()
+    scroller()!.scrollTop = 300
     act(() => button('Answer in Inbox').click())
-    expect(teamScroller?.isConnected).toBe(false)
-    expect(scroller()).not.toBeNull()
+    expect(button('Inbox').getAttribute('aria-selected')).toBe('true')
+    expect(scroller()!.scrollTop).toBe(0)
+  })
+
+  it('keeps the stage mounted across tab switches, so it never reloads blank (ORCA-1307)', () => {
+    show(teamWith({}, leader, gamePanel('figures')))
+    const stage = container.querySelector('[data-testid="team-scene-webview"]')
+    expect(stage).not.toBeNull()
+    for (const tab of ['Team', 'Inbox', 'PRs', 'Hosts', 'Team']) {
+      act(() => button(tab).click())
+      expect(container.querySelector('[data-testid="team-scene-webview"]')).toBe(stage)
+    }
   })
 
   it("words the sheet and its cards in the host's language", () => {

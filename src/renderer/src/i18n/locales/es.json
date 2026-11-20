@@ -150,6 +150,13 @@
         "sweep": "Cuando hay miembros terminados por cerrar.",
         "wave": "Cuando hay tareas por hacer y cupos libres."
       }
+    },
+    "gameNames": {
+      "title": "Nombres",
+      "description": "Cada member toma el siguiente nombre libre del roster de la escena. El lead se llama Lead hasta que le pongas nombre. /orca-game:setup pregunta los dos.",
+      "unnamedLead": "Lead, hasta que le pongas nombre",
+      "leadPlaceholder": "Lead",
+      "fromScene": "de la escena"
     }
   },
   "menu": {
@@ -16802,6 +16809,11 @@
       "notServed": "eligió {{model}}, no se sirve: otro plugin puede saltarse sus hooks ({{steward}})",
       "raised": "Sube a {{to}}: {{reason}}",
       "lowered": "Baja a {{to}}: {{reason}}"
+    },
+    "firstRun": {
+      "title": "Arma un equipo",
+      "setup": "en una sesión de Claude aquí le pone nombre a tu lead y configura el juego del proyecto.",
+      "lead": "inicia el lead. Dale un ticket: lanza un member por ticket."
     }
   },
   "claudeDeadHooks": {

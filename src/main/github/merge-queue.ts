@@ -1,4 +1,5 @@
 import type { GameQueueEntry } from '../../shared/orchestrator-game-project-work'
+import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
 import { ghExecFileAsync, type LocalGitExecOptions } from './gh-utils'
 import { githubHostExecOptions, resolveGitHubRepoExecution } from './github-api-repository'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from './rate-limit'
@@ -69,12 +70,13 @@ export function mergeQueueOfResponse(stdout: string): GameQueueEntry[] | null {
     .sort((a, b) => a.position - b.position)
 }
 
-/** The repo's merge queue, oldest first; null with no queue, no GitHub repo or no budget. */
-export async function getMergeQueueEntries(
+// Why one budget note per read: each call is one GraphQL request against the repo's own budget.
+async function queueGraphQL(
   repoPath: string,
-  connectionId?: string | null,
-  localGitOptions: LocalGitExecOptions = {}
-): Promise<GameQueueEntry[] | null> {
+  args: string[],
+  connectionId: string | null | undefined,
+  localGitOptions: LocalGitExecOptions
+): Promise<string | null> {
   const { ownerRepo, ghOptions } = await resolveGitHubRepoExecution(
     repoPath,
     null,
@@ -85,18 +87,77 @@ export async function getMergeQueueEntries(
     return null
   }
   noteRepositoryRateLimitSpend(ownerRepo, 'graphql', 1, ghOptions)
-  const { stdout } = await ghExecFileAsync(
-    [
-      'api',
-      'graphql',
-      '-f',
-      `query=${MERGE_QUEUE_QUERY}`,
-      '-f',
-      `owner=${ownerRepo.owner}`,
-      '-f',
-      `repo=${ownerRepo.repo}`
-    ],
-    { ...ghOptions, ...githubHostExecOptions(ownerRepo) }
-  )
-  return mergeQueueOfResponse(stdout)
+  const owner = ['-f', `owner=${ownerRepo.owner}`, '-f', `repo=${ownerRepo.repo}`]
+  const { stdout } = await ghExecFileAsync(['api', 'graphql', ...args, ...owner], {
+    ...ghOptions,
+    ...githubHostExecOptions(ownerRepo)
+  })
+  return stdout
+}
+
+/** The repo's merge queue, oldest first; null with no queue, no GitHub repo or no budget. */
+export async function getMergeQueueEntries(
+  repoPath: string,
+  connectionId?: string | null,
+  localGitOptions: LocalGitExecOptions = {}
+): Promise<GameQueueEntry[] | null> {
+  const args = ['-f', `query=${MERGE_QUEUE_QUERY}`]
+  const stdout = await queueGraphQL(repoPath, args, connectionId, localGitOptions)
+  return stdout === null ? null : mergeQueueOfResponse(stdout)
+}
+
+const DEPARTURE_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      state
+      timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
+        nodes { ... on RemovedFromMergeQueueEvent { reason actor { login } } }
+      }
+    }
+  }
+}`
+
+const DEPARTURE_STATES: Record<string, GameQueueDeparture['state']> = {
+  OPEN: 'open',
+  MERGED: 'merged',
+  CLOSED: 'closed'
+}
+
+/** Null when GitHub names no such PR. */
+export function mergeQueueDepartureOfResponse(stdout: string): GameQueueDeparture | null {
+  const parsed = JSON.parse(stdout) as {
+    data?: {
+      repository?: {
+        pullRequest?: {
+          state?: unknown
+          timelineItems?: {
+            nodes?: ({ reason?: unknown; actor?: { login?: unknown } | null } | null)[]
+          } | null
+        } | null
+      } | null
+    }
+  }
+  const pr = parsed.data?.repository?.pullRequest
+  const state = typeof pr?.state === 'string' ? DEPARTURE_STATES[pr.state] : undefined
+  if (!state) {
+    return null
+  }
+  const removal = pr?.timelineItems?.nodes?.at(-1)
+  return {
+    state,
+    reason: typeof removal?.reason === 'string' ? removal.reason : null,
+    actor: typeof removal?.actor?.login === 'string' ? removal.actor.login : null
+  }
+}
+
+/** A PR's state and its last queue removal, read fresh when the lead's watch sees it leave (ORCA-1273). */
+export async function getMergeQueueDeparture(
+  repoPath: string,
+  number: number,
+  connectionId?: string | null,
+  localGitOptions: LocalGitExecOptions = {}
+): Promise<GameQueueDeparture | null> {
+  const args = ['-f', `query=${DEPARTURE_QUERY}`, '-F', `pr=${number}`]
+  const stdout = await queueGraphQL(repoPath, args, connectionId, localGitOptions)
+  return stdout === null ? null : mergeQueueDepartureOfResponse(stdout)
 }

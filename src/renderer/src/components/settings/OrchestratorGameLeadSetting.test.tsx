@@ -82,7 +82,7 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
 
   it('shows each effective lead value with the layer it comes from', () => {
     const view = render(
-      { orchestratorGameProjects: { repo1: { orchestrator: { label: 'Boss' } } } },
+      { orchestratorGameProjects: { repo1: { orchestrator: { agent: 'codex' } } } },
       { orchestrator: { autostart: true, cap: 6 } }
     )
 
@@ -90,8 +90,10 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     expect(text).toContain('Lead')
     expect(text).toContain('On · from orca.yaml')
     expect(text).toContain('6 · from orca.yaml')
-    expect(text).toContain('Boss · this machine')
-    expect(text).toContain('claude · default')
+    expect(text).toContain('codex · this machine')
+    // ORCA-1304: the names live in their own Names section.
+    expect(view.container.querySelector('input[aria-label="Lead name"]')).toBeNull()
+    expect(view.container.querySelector('input[aria-label="Member names"]')).toBeNull()
     expect(text).toContain('orchestratorGame.orchestrator')
     expect(field(view.container, 'Member cap').placeholder).toBe('6')
     view.unmount()
@@ -197,43 +199,6 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
       { orchestratorGameProjects: { repo1: { orchestrator: { agent: 'codex', model: 'opus' } } } },
       { orchestratorGameProjects: { repo1: { orchestrator: { agent: 'codex', cap: 8 } } } },
       { orchestratorGameProjects: {} }
-    ])
-    view.unmount()
-  })
-
-  it("saves member names typed with commas over the scene's, and inherits when cleared", () => {
-    const updates: Partial<GlobalSettings>[] = []
-    const view = render(
-      { orchestratorGameProjects: { repo1: { orchestrator: { memberNames: ['Ann'] } } } },
-      { orchestrator: { memberNames: ['Mario', { en: 'Peach', es: 'Melocotón' }] } },
-      updates
-    )
-
-    const names = field(view.container, 'Member names')
-    expect(names.value).toBe('Ann')
-    expect(names.placeholder).toBe('Mario, Peach')
-    commit(names, ' Mario,  Luigi , ')
-    commit(field(view.container, 'Member names'), '')
-    expect(updates).toEqual([
-      {
-        orchestratorGameProjects: { repo1: { orchestrator: { memberNames: ['Mario', 'Luigi'] } } }
-      },
-      { orchestratorGameProjects: {} }
-    ])
-    view.unmount()
-  })
-
-  it("says members take the scene's names when no layer sets them, and refuses a ticket-like name", () => {
-    const updates: Partial<GlobalSettings>[] = []
-    const view = render({}, undefined, updates)
-
-    expect(view.container.textContent).toContain("The scene's names")
-    commit(field(view.container, 'Member names'), 'Mario, K-9')
-    expect(updates).toEqual([])
-    expect(
-      Array.from(view.container.querySelectorAll('[role="alert"]')).map((one) => one.textContent)
-    ).toEqual([
-      'Use 1 to 24 names separated by commas, each up to 32 characters and none like a ticket id.'
     ])
     view.unmount()
   })

@@ -498,8 +498,10 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
     [repoId]: { orchestrator: { autostart: false, model: 'opus', accounts: 'default' } }
   })
 
-  await expect(lead.getByText('Mario, Luigi · from orca.yaml')).toBeVisible()
-  const names = lead.getByRole('textbox', { name: 'Member names' })
+  // Why: member names live in their own Names section since #1378 (ORCA-1313).
+  const namesSection = orcaPage.locator('[data-slot="game-names-settings"]')
+  await expect(namesSection.getByText('Mario, Luigi · from orca.yaml')).toBeVisible()
+  const names = namesSection.getByRole('textbox', { name: 'Member names' })
   await names.fill('Arthur, Merlin, Morgana')
   await names.press('Enter')
   await expect
@@ -514,7 +516,7 @@ test("the project lead shows orca.yaml's values, overrides them on this machine 
         }
       }
     })
-  await expect(lead.getByText('Arthur, Merlin, Morgana · this machine')).toBeVisible()
+  await expect(namesSection.getByText('Arthur, Merlin, Morgana · this machine')).toBeVisible()
 
   const askFirst = lead.getByRole('radiogroup', { name: 'Ask before resuming' })
   await askFirst.getByRole('radio', { name: 'On' }).click()

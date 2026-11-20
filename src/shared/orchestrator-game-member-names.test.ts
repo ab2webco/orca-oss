@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ORCHESTRATOR_GAME_BUILT_IN_ROSTERS,
@@ -125,5 +127,19 @@ describe('characterKeyOf', () => {
 
   it('keys a name the roster no longer lists by the name itself', () => {
     expect(characterKeyOf(ROSTER, 'Percival')).toBe('percival')
+  })
+})
+
+// ORCA-1304: /orca-game:setup lists these to the person, so its reference must name each roster as Orca ships it.
+describe("the setup reference's built-in rosters", () => {
+  it('lists every built-in scene with its roster in order', () => {
+    const reference = readFileSync(
+      join(process.cwd(), 'resources/claude-plugins/orca-game/skills/setup/reference.md'),
+      'utf8'
+    ).replace(/\s+/g, ' ')
+    for (const [scene, roster] of Object.entries(ORCHESTRATOR_GAME_BUILT_IN_ROSTERS)) {
+      const names = roster.map((name) => (typeof name === 'string' ? name : name.en)).join(', ')
+      expect(reference).toContain(`${scene} ${names}`)
+    }
   })
 })

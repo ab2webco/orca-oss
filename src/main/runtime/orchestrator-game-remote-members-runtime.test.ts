@@ -198,7 +198,8 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
 
   // Why: the host answers with no terminal once the member's closed; that is not an offline host (ORCA-854).
   it('marks the member gone, not its host silent, when the host answers without its terminal', async () => {
-    const { runtime } = leadWithRemoteMember()
+    const { runtime, dispatchId } = leadWithRemoteMember()
+    runtime.getOrchestrationDb().markWorkerDispatchReady(dispatchId)
     const show = vi.spyOn(runtime, 'callOrchestrationWorkerServer')
     show.mockResolvedValueOnce({ terminal: null, observation: { status: 'missing' } })
     const closed = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
@@ -215,6 +216,23 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
         gone: true
       })
     }
+  })
+
+  // Why: the host has no terminal for it until the launch's handshake ends; that is not gone (ORCA-1263).
+  it('reads a member still starting on its host as starting, not gone', async () => {
+    const { runtime } = leadWithRemoteMember()
+    const show = vi.spyOn(runtime, 'callOrchestrationWorkerServer')
+    show.mockResolvedValueOnce({ terminal: null, observation: { status: 'unattached' } })
+    const state = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+
+    const member = state.agents.find((agent) => agent.isMember)
+    expect(member?.remote).toEqual({
+      host: 'imac',
+      environmentId: 'env_imac',
+      stateKnown: true,
+      starting: true
+    })
+    expect(member?.state).toBe('working')
   })
 
   it('lists a member an earlier lead left running on the host, flagged with its ticket done (ORCA-793)', async () => {

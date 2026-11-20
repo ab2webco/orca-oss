@@ -3,8 +3,12 @@ import type { RuntimeClient } from '../runtime-client'
 import {
   emptyGameLeadAlertMemory,
   gameLeadAlertsOf,
-  newGameLeadAlertsOf
+  newGameLeadAlertsOf,
+  queueLeftOf,
+  type GameLeadAlertMemory
 } from '../../shared/orchestrator-game-lead-alerts'
+import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
+import type { OrchestratorGameState } from '../../shared/orchestrator-game-state'
 import { readCallerGameState } from './orchestrator-game-board-call'
 
 type GameFleetWait = { version: number; changed: boolean }
@@ -37,6 +41,28 @@ async function watchFleet(client: RuntimeClient, onTick: FleetTick | null): Prom
   }
 }
 
+// Why a fresh read: the cached PR state can still say open after the queue merged it (ORCA-1273).
+async function readQueueDepartures(
+  client: RuntimeClient,
+  state: OrchestratorGameState,
+  memory: GameLeadAlertMemory
+): Promise<void> {
+  for (const left of queueLeftOf(state, memory)) {
+    const departure = await client
+      .call<GameQueueDeparture | null>('game.queueDeparture', {
+        worktreeId: process.env.ORCA_WORKTREE_ID,
+        terminalHandle: process.env.ORCA_TERMINAL_HANDLE,
+        number: Number(left.id.replace('#', ''))
+      })
+      .then(({ result }) => result)
+      // Why: an older host has no such method, so the line stays the cautious one.
+      .catch(() => null)
+    if (departure) {
+      memory.departures.set(left.id, departure)
+    }
+  }
+}
+
 /** The lead's watch: one line per new condition to act on, from the same cached state the band reads. */
 function leadTick(client: RuntimeClient): FleetTick {
   const memory = emptyGameLeadAlertMemory()
@@ -53,6 +79,7 @@ function leadTick(client: RuntimeClient): FleetTick {
     if (state === null) {
       return
     }
+    await readQueueDepartures(client, state.result, memory)
     for (const alert of newGameLeadAlertsOf(gameLeadAlertsOf(state.result, memory, now), printed)) {
       console.log(`alert ${alert.line}`)
     }

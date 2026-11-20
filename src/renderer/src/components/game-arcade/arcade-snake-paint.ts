@@ -6,22 +6,20 @@ import type {
 import type { OrchestratorGameArcadeSnake } from '../../../../shared/orchestrator-game-arcade-file'
 import {
   arcadeBoardOf,
-  arcadeHexOf,
-  paintArcadeField,
   type ArcadeBoard,
-  type ArcadeBoardSize
+  type ArcadeBoardSize,
+  type ArcadeGrid
 } from './arcade-board'
+import { arcadeTokens, type ArcadeTokens } from './arcade-theme-tokens'
 
-// Draws the snake in its own garden: a soil bed framed in timber on a lawn, a vine of rounded
-// cells with leaves at the joints, and a glowing berry. The vine and berry take the file's colours.
+// Draws the snake in its own grow bed: a lit tray on a dotted lab floor, the vine as one glowing
+// stem through its cells, and a pulsing berry. Every colour is an app token, read at draw time.
 
 type Size = ArcadeBoardSize
-type SnakeBoard = ArcadeBoard
 
-const BED = { fill: '#5b4331', edge: '#9a7448', check: 'rgb(0 0 0 / 0.12)' }
-
-/** The lawn around the bed: deep green with mown stripes and a scatter of clover. */
+/** The lab floor around the bed: a dot matrix under two soft lamps. */
 export function snakeBackdropOf(size: ArcadeBoardSize & { scale: number }): HTMLCanvasElement {
+  const t = arcadeTokens()
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(size.width * size.scale)
   canvas.height = Math.round(size.height * size.scale)
@@ -30,22 +28,24 @@ export function snakeBackdropOf(size: ArcadeBoardSize & { scale: number }): HTML
     return canvas
   }
   g.scale(size.scale, size.scale)
-  const lawn = g.createLinearGradient(0, 0, 0, size.height)
-  lawn.addColorStop(0, '#2d5a32')
-  lawn.addColorStop(1, '#1b3a22')
-  g.fillStyle = lawn
-  g.fillRect(0, 0, size.width, size.height)
-  g.fillStyle = 'rgb(255 255 255 / 0.035)'
-  for (let x = 0; x < size.width; x += 48) {
-    g.fillRect(x, 0, 24, size.height)
+  const { width: w, height: h } = size
+  g.fillStyle = t.css('background')
+  g.fillRect(0, 0, w, h)
+  for (const [x, y, role] of [
+    [0.15, 0.2, 'success'],
+    [0.85, 0.85, 'cyan']
+  ] as const) {
+    const lamp = g.createRadialGradient(w * x, h * y, 2, w * x, h * y, Math.max(w, h) * 0.6)
+    lamp.addColorStop(0, t.css(role, t.isDark ? 0.16 : 0.1))
+    lamp.addColorStop(1, t.css(role, 0))
+    g.fillStyle = lamp
+    g.fillRect(0, 0, w, h)
   }
-  g.fillStyle = 'rgb(190 230 150 / 0.25)'
-  for (let i = 0; i < 90; i += 1) {
-    const x = ((i * 97) % 101) / 101
-    const y = ((i * 61) % 89) / 89
-    g.beginPath()
-    g.arc(x * size.width, y * size.height, 2 + (i % 3), 0, Math.PI * 2)
-    g.fill()
+  g.fillStyle = t.css('mutedForeground', t.isDark ? 0.22 : 0.28)
+  for (let y = 8; y < h; y += 16) {
+    for (let x = 8; x < w; x += 16) {
+      g.fillRect(x, y, 1.2, 1.2)
+    }
   }
   return canvas
 }
@@ -74,78 +74,119 @@ export function snakeTapTurnOf(
   return dy > 0 ? 'down' : 'up'
 }
 
+function paintBed(
+  g: CanvasRenderingContext2D,
+  t: ArcadeTokens,
+  board: ArcadeBoard,
+  grid: ArcadeGrid
+): void {
+  const w = board.cell * grid.columns
+  const h = board.cell * grid.rows
+  g.fillStyle = t.css('muted', 0.72)
+  g.strokeStyle = t.css('success', 0.65)
+  g.lineWidth = 1.5
+  g.shadowColor = t.css('success', 0.5)
+  g.shadowBlur = 10
+  g.beginPath()
+  g.roundRect(board.left - 4, board.top - 4, w + 8, h + 8, 10)
+  g.fill()
+  g.shadowBlur = 0
+  g.stroke()
+  g.strokeStyle = t.css('mutedForeground', t.isDark ? 0.1 : 0.14)
+  g.lineWidth = 1
+  g.beginPath()
+  for (let x = 1; x < grid.columns; x += 1) {
+    g.moveTo(board.left + x * board.cell + 0.5, board.top)
+    g.lineTo(board.left + x * board.cell + 0.5, board.top + h)
+  }
+  for (let y = 1; y < grid.rows; y += 1) {
+    g.moveTo(board.left, board.top + y * board.cell + 0.5)
+    g.lineTo(board.left + w, board.top + y * board.cell + 0.5)
+  }
+  g.stroke()
+}
+
 function paintBerry(
   g: CanvasRenderingContext2D,
-  board: SnakeBoard,
+  t: ArcadeTokens,
+  board: ArcadeBoard,
   food: SnakeCell,
-  color: number,
-  t: number
-) {
+  time: number
+): void {
   const x = board.left + (food.x + 0.5) * board.cell
   const y = board.top + (food.y + 0.5) * board.cell
-  const r = board.cell * (0.34 + Math.sin(t * 5) * 0.03)
-  const glow = g.createRadialGradient(x, y, 1, x, y, board.cell)
-  glow.addColorStop(0, 'rgb(255 190 150 / 0.5)')
-  glow.addColorStop(1, 'rgb(255 190 150 / 0)')
-  g.fillStyle = glow
-  g.fillRect(x - board.cell, y - board.cell, board.cell * 2, board.cell * 2)
-  g.fillStyle = arcadeHexOf(color)
+  const r = board.cell * 0.32
+  const wave = (time * 1.2) % 1
+  g.strokeStyle = t.css('attention', 0.6 * (1 - wave))
+  g.lineWidth = 1.5
   g.beginPath()
-  g.arc(x, y + r * 0.1, r, 0, Math.PI * 2)
+  g.arc(x, y, r + wave * board.cell * 0.6, 0, Math.PI * 2)
+  g.stroke()
+  g.fillStyle = t.css('attention')
+  g.shadowColor = t.css('attention', 0.9)
+  g.shadowBlur = board.cell * 0.6
+  g.beginPath()
+  g.arc(x, y, r, 0, Math.PI * 2)
   g.fill()
-  g.fillStyle = 'rgb(255 255 255 / 0.55)'
+  g.shadowBlur = 0
+  g.fillStyle = t.css('background', 0.45)
   g.beginPath()
-  g.arc(x - r * 0.35, y - r * 0.25, r * 0.25, 0, Math.PI * 2)
-  g.fill()
-  g.fillStyle = '#4f7d36'
-  g.beginPath()
-  g.ellipse(x + r * 0.3, y - r * 0.95, r * 0.45, r * 0.2, -0.5, 0, Math.PI * 2)
+  g.arc(x - r * 0.3, y - r * 0.3, r * 0.28, 0, Math.PI * 2)
   g.fill()
 }
 
 const EYES: Record<SnakeDirection, [number, number][]> = {
   right: [
-    [0.68, 0.32],
-    [0.68, 0.68]
+    [0.2, -0.2],
+    [0.2, 0.2]
   ],
   left: [
-    [0.32, 0.32],
-    [0.32, 0.68]
+    [-0.2, -0.2],
+    [-0.2, 0.2]
   ],
   up: [
-    [0.32, 0.32],
-    [0.68, 0.32]
+    [-0.2, -0.2],
+    [0.2, -0.2]
   ],
   down: [
-    [0.32, 0.68],
-    [0.68, 0.68]
+    [-0.2, 0.2],
+    [0.2, 0.2]
   ]
 }
 
 function paintVine(
   g: CanvasRenderingContext2D,
-  board: SnakeBoard,
-  game: OrchestratorGameArcadeSnake,
+  t: ArcadeTokens,
+  board: ArcadeBoard,
   state: SnakeState
-) {
+): void {
   const { body, heading } = state
   const { cell } = board
-  const inset = Math.max(1, cell * 0.08)
-  for (let i = body.length - 1; i >= 0; i -= 1) {
-    const one = body[i]
-    if (!one) {
+  const centre = (one: SnakeCell): [number, number] => [
+    board.left + (one.x + 0.5) * cell,
+    board.top + (one.y + 0.5) * cell
+  ]
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+  // Why one segment at a time: the stem fades toward its tail.
+  for (let i = body.length - 1; i > 0; i -= 1) {
+    const from = body[i]
+    const to = body[i - 1]
+    if (!from || !to) {
       continue
     }
-    const x = board.left + one.x * cell
-    const y = board.top + one.y * cell
-    g.fillStyle = arcadeHexOf(i === 0 ? game.colors.head : game.colors.body)
+    const [x1, y1] = centre(from)
+    const [x2, y2] = centre(to)
+    g.strokeStyle = t.css('success', 0.4 + 0.6 * (1 - i / body.length))
+    g.lineWidth = cell * 0.56
     g.beginPath()
-    g.roundRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2, cell * 0.32)
-    g.fill()
-    if (i > 0 && i % 2 === 0) {
-      g.fillStyle = 'rgb(255 255 255 / 0.18)'
+    g.moveTo(x1, y1)
+    g.lineTo(x2, y2)
+    g.stroke()
+    if (i % 2 === 0) {
+      g.fillStyle = t.css('cyan', 0.85)
       g.beginPath()
-      g.ellipse(x + cell * 0.5, y + cell * 0.5, cell * 0.22, cell * 0.1, 0.7, 0, Math.PI * 2)
+      g.arc(x1, y1, cell * 0.11, 0, Math.PI * 2)
       g.fill()
     }
   }
@@ -153,16 +194,18 @@ function paintVine(
   if (!head) {
     return
   }
-  g.fillStyle = '#1d1a22'
+  const [hx, hy] = centre(head)
+  g.fillStyle = t.css('success')
+  g.shadowColor = t.css('success', 0.9)
+  g.shadowBlur = cell * 0.7
+  g.beginPath()
+  g.arc(hx, hy, cell * 0.42, 0, Math.PI * 2)
+  g.fill()
+  g.shadowBlur = 0
+  g.fillStyle = t.css('background')
   for (const [ex, ey] of EYES[heading]) {
     g.beginPath()
-    g.arc(
-      board.left + (head.x + ex) * cell,
-      board.top + (head.y + ey) * cell,
-      Math.max(1, cell * 0.09),
-      0,
-      Math.PI * 2
-    )
+    g.arc(hx + ex * cell, hy + ey * cell, Math.max(1, cell * 0.08), 0, Math.PI * 2)
     g.fill()
   }
 }
@@ -173,10 +216,11 @@ export function paintSnakeRun(
   state: SnakeState,
   size: Size
 ): void {
+  const t = arcadeTokens()
   const board = arcadeBoardOf(size, game.grid)
-  paintArcadeField(g, board, game.grid, BED)
+  paintBed(g, t, board, game.grid)
   if (state.food) {
-    paintBerry(g, board, state.food, game.colors.food, state.ms / 1000)
+    paintBerry(g, t, board, state.food, state.ms / 1000)
   }
-  paintVine(g, board, game, state)
+  paintVine(g, t, board, state)
 }
