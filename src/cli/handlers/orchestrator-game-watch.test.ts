@@ -151,3 +151,93 @@ describe('orca game watch', () => {
     })
   })
 })
+
+describe('orca game watch --lead: an entry that leaves the merge queue (ORCA-1273)', () => {
+  let output: string[] = []
+
+  beforeEach(() => {
+    output = []
+    vi.spyOn(console, 'log').mockImplementation((line: string) => {
+      output.push(line)
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const queued = {
+    id: '#42',
+    title: 'PR 42',
+    url: 'https://github.com/o/r/pull/42',
+    position: 1,
+    state: 'checks',
+    since: null
+  }
+  // Why open: the member's cached review still said open when the queue merged it (#1304).
+  const stateWith = (entries: unknown[]) => ({
+    agents: [
+      {
+        paneKey: 'p',
+        displayName: 'CIN-2 work',
+        agentType: 'claude',
+        state: 'working',
+        toolName: null,
+        isLeader: false,
+        isMember: true,
+        review: {
+          provider: 'github',
+          number: 42,
+          title: 'x',
+          url: queued.url,
+          state: 'open',
+          ci: 'success'
+        }
+      }
+    ],
+    lead: { cap: 4 },
+    project: { reviews: null, todo: null, queue: { provider: 'github', entries } }
+  })
+
+  it("asks the host why the PR left and words the alert from GitHub's answer", async () => {
+    const states = [stateWith([queued]), stateWith([])]
+    const waits = [
+      { version: 1, changed: false },
+      { version: 2, changed: true }
+    ]
+    const asked: unknown[] = []
+    const client = {
+      call: async (method: string, params: unknown) => {
+        if (method === 'game.state') {
+          return { ok: true, result: states.shift() }
+        }
+        if (method === 'game.queueDeparture') {
+          asked.push(params)
+          return {
+            ok: true,
+            result: { state: 'merged', reason: 'merged', actor: 'github-merge-queue' }
+          }
+        }
+        const reply = waits.shift()
+        if (!reply) {
+          throw GONE
+        }
+        return { ok: true, result: reply }
+      }
+    } as unknown as RuntimeClient
+
+    await expect(
+      ORCHESTRATOR_GAME_WATCH_HANDLERS['game watch']({
+        flags: new Map([['lead', true]]),
+        client,
+        cwd: '/repo',
+        json: false
+      })
+    ).rejects.toBe(GONE)
+
+    expect(asked).toEqual([expect.objectContaining({ number: 42 })])
+    expect(output).toContain(
+      'alert #42 merged from the queue: close its ticket and clean up its member.'
+    )
+  })
+})

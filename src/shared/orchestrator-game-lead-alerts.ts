@@ -1,5 +1,6 @@
 import { gameFleetReportOf, type GameFleetInput } from './orchestrator-game-fleet-verbs'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
+import { queueDepartureLineOf, type GameQueueDeparture } from './orchestrator-game-queue-departure'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
 /** What `orca game watch --lead` prints: one line per condition the lead must act on (ORCA-1214). */
@@ -23,12 +24,15 @@ export type GameLeadAlertMemory = {
   checksSince: Map<string, number>
   /** When this watch first saw each launch waiting on setup, by ticket. */
   queuedSince: Map<string, number>
+  /** GitHub's own word on each entry that just left, read by the watch before wording it (ORCA-1273). */
+  departures: Map<string, GameQueueDeparture>
 }
 
 export const emptyGameLeadAlertMemory = (): GameLeadAlertMemory => ({
   queue: null,
   checksSince: new Map(),
-  queuedSince: new Map()
+  queuedSince: new Map(),
+  departures: new Map()
 })
 
 const minutesOf = (ms: number): number => Math.floor(ms / 60_000)
@@ -89,8 +93,23 @@ function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, 
   return alerts
 }
 
-// Why the members' PRs first: the project's open list keeps only its first few items.
-function leftQueueLineOf(entry: GameQueueEntry, state: GameLeadAlertInput): string {
+/** Entries the last read listed that this read does not; none while the queue is unread. */
+export function queueLeftOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory) {
+  const entries = state.project?.queue?.entries
+  const ids = new Set(entries?.map((one) => one.id))
+  return entries ? (memory.queue?.filter((one) => !ids.has(one.id)) ?? []) : []
+}
+
+// Why the members' PRs next: the project's open list keeps only its first few items.
+function leftQueueLineOf(
+  entry: GameQueueEntry,
+  state: GameLeadAlertInput,
+  memory: GameLeadAlertMemory
+): string {
+  const departure = memory.departures.get(entry.id)
+  if (departure) {
+    return queueDepartureLineOf(entry.id, departure)
+  }
   const member = state.agents.find((agent) => agent.review?.url === entry.url)?.review
   const open = state.project?.reviews?.items.some((item) => item.url === entry.url)
   if (member?.state === 'merged') {
@@ -108,11 +127,11 @@ function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, n
     return []
   }
   const alerts: GameLeadAlert[] = []
-  const ids = new Set(entries.map((one) => one.id))
-  for (const gone of memory.queue?.filter((one) => !ids.has(one.id)) ?? []) {
+  for (const gone of queueLeftOf(state, memory)) {
     // Why the time in the key: the next drop of the same PR is news again.
-    alerts.push({ key: `left:${gone.id}:${now}`, line: leftQueueLineOf(gone, state) })
+    alerts.push({ key: `left:${gone.id}:${now}`, line: leftQueueLineOf(gone, state, memory) })
   }
+  memory.departures.clear()
   for (const id of memory.checksSince.keys()) {
     if (!entries.some((one) => one.id === id && one.state === 'checks')) {
       memory.checksSince.delete(id)
