@@ -1,4 +1,5 @@
 import type { RpcClient } from '../transport/rpc-client'
+import { announceOwnerQuestion } from '../game-inbox/owner-question-arrivals'
 // Re-exported so the existing importers (and their vi.mock paths) keep working.
 export {
   ensureNotificationPermissions,
@@ -260,6 +261,10 @@ export function subscribeToDesktopNotifications(client: RpcClient, hostId: strin
     }
     if (event.type !== 'notification' && event.type !== 'dismiss') {
       return
+    }
+    if (event.type === 'notification' && event.source === 'game-owner-question') {
+      // Why now: an open Team sheet lists the question with its banner, not at its 20 s read (ORCA-1306).
+      announceOwnerQuestion({ worktreeId: event.worktreeId ?? null })
     }
     // Why the await (#8591): deliverLive advances the watermark. A live event landing
     // while the persisted read is still in flight would push it past the buffered seqs

@@ -5,7 +5,7 @@
 import { createServer } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../src/shared/pairing'
-import { addShowcaseOwnerQuestion } from './mock-server-game-team'
+import { addShowcaseOwnerQuestion } from './mock-server-showcase-team'
 import { broadcastMockNotification } from './mock-server-notifications'
 import { deriveSharedKey, e2eeDecrypt, e2eeEncrypt, type E2EEState } from './mock-server-encryption'
 import { loadOrCreateMockServerKeyPair } from './mock-server-key-pair'

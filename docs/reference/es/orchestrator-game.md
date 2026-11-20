@@ -1,5 +1,5 @@
 ---
-sourceHash: b4735279c71a40a9
+sourceHash: f7da6c0896e37dfa
 ---
 
 # El juego orquestador de Agent Teams
@@ -752,17 +752,22 @@ inmediato: un inicio rechazado, un host que informa que el inicio falló, o un r
 que quedó en `failed` no retiene ningún nombre. Un nombre numerado (`Merlin 2`) aparece solo cuando todo
 el roster está ocupado; un miembro recibe solo su ticket cuando la escena no tiene nombres
 ([`orchestrator-game-member-names.ts`](../../../src/shared/orchestrator-game-member-names.ts)).
-**Member names**, en los Settings del proyecto, toma nombres simples separados por comas. Un miembro
+La sección **Names** de los Settings del proyecto dice de dónde salen los nombres y muestra el roster
+en uso: el de la escena (el de las escenas integradas y el de un archivo de escena; el de una escena de
+plugin se lee como "the scene's names"), o `memberNames` con la capa que lo fija. Su **Member names**
+toma nombres simples separados por comas, y su **Lead name** fija `label`; `/orca-game:setup` pregunta
+los dos. Un miembro
 en un host emparejado (`game launch --on`) toma su nombre del mismo conjunto: el Orca del líder lo
 elige y lo guarda en el título de la tarea en casa. La Run DB de casa no registra el proyecto, así que
 los nombres de sus miembros remotos no liberados solo retienen mientras quede otro nombre libre: ceden
 antes de que un lanzamiento numere un nombre.
 
-Sin `label`, el líder es el último nombre del roster, el que los miembros alcanzan al final. Orca
-guarda el primero que le da al pane de un líder durante toda la sesión, así que cambiar la escena o el
-idioma no le cambia el nombre. Lo lleva el `leadName` del estado del juego, y la tarjeta del Team, la
-escena y los encabezados de los mensajes del líder lo leen de ahí
-([`orchestrator-game-lead-names.ts`](../../../src/main/runtime/orchestrator-game-lead-names.ts)).
+Sin `label`, el líder se llama `Lead`, en toda escena e idioma: nunca toma un nombre del roster
+(ORCA-1304). Lo lleva el `leadName` del estado del juego, y la tarjeta del Team, la escena y los
+encabezados de los mensajes del líder lo leen de ahí
+([`orchestrator-game-lead.ts`](../../../src/shared/orchestrator-game-lead.ts)). La tarjeta del Team de
+un líder sin nombre muestra solo su insignia con la corona y un botón **Name your lead**, que le envía
+`/orca-game:setup` al líder.
 
 En el teléfono, Ajustes → Agent Teams → **Names** fija los nombres globales del líder y de los
 miembros. Un host sin `mobile.agent-teams-names.v1` rechaza esa clave, así que el teléfono pide actualizar

@@ -12,7 +12,6 @@ import {
 } from '../../../../shared/orchestrator-game-lead'
 import { withOrchestratorGameProjectLead } from '../../../../shared/orchestrator-game-settings-updates'
 import { Input } from '../ui/input'
-import { OrchestratorGameMemberNamesRow } from './OrchestratorGameMemberNamesRow'
 import {
   SettingsRow,
   SettingsSegmentedControl,
@@ -30,6 +29,16 @@ type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameP
 type LeadTextKey = 'cap' | 'label' | 'agent' | 'model' | 'effort'
 type LeadField = { key: LeadTextKey; label: string; invalid: string }
 
+/** The lead's name, which the Names section shows beside the members' (ORCA-1304). */
+export const leadNameField = (): LeadField => ({
+  key: 'label',
+  label: translate('auto.components.settings.OrchestratorGameLeadSetting.label', 'Lead name'),
+  invalid: translate(
+    'auto.components.settings.OrchestratorGameLeadSetting.labelInvalid',
+    'Use 1 to 32 characters.'
+  )
+})
+
 const fields = (): LeadField[] => [
   {
     key: 'cap',
@@ -38,14 +47,6 @@ const fields = (): LeadField[] => [
       'auto.components.settings.OrchestratorGameLeadSetting.capInvalid',
       'Enter a whole number from 1 to {{value0}}.',
       { value0: GAME_LEAD_CAP_MAX }
-    )
-  },
-  {
-    key: 'label',
-    label: translate('auto.components.settings.OrchestratorGameLeadSetting.label', 'Lead name'),
-    invalid: translate(
-      'auto.components.settings.OrchestratorGameLeadSetting.labelInvalid',
-      'Use 1 to 32 characters.'
     )
   },
   {
@@ -81,7 +82,7 @@ const notSet = (): string =>
 const rawOf = (key: LeadTextKey, text: string): string | number =>
   key === 'cap' && /^\d+$/.test(text) ? Number(text) : text
 
-function LeadTextRow({
+export function LeadTextRow({
   field,
   stored,
   description,
@@ -328,13 +329,6 @@ export function ProjectOrchestratorGameLeadSetting({
           />
         )
       })}
-      <OrchestratorGameMemberNamesRow
-        key={`memberNames:${JSON.stringify(stored?.memberNames ?? null)}`}
-        stored={stored?.memberNames}
-        inherited={inherited.memberNames}
-        sourceLabel={orchestratorGameSourceLabel(gameLeadSourceOf(layers, 'memberNames'))}
-        onCommit={(next) => set('memberNames', next)}
-      />
       <p className="text-xs text-muted-foreground">
         {translate(
           'auto.components.settings.OrchestratorGameLeadSetting.yamlOnly',
