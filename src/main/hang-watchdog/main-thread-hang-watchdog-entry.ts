@@ -79,14 +79,8 @@ export function runWatchdog(
       }
     },
     // Why: rewriting the marker keeps one observation per stall rather than two rows to reconcile.
+    // Why the record first: a reader that sees selfRecovered must find the closing line too.
     onHangResolved: (unresponsiveMs) => {
-      recordHangObservation({
-        parentPid: config.parentPid,
-        markerPath: config.markerPath,
-        unresponsiveMs,
-        selfRecovered: true,
-        reportPath
-      })
       if (reportPath) {
         try {
           appendMainThreadHangResolution(reportPath, unresponsiveMs)
@@ -94,6 +88,13 @@ export function runWatchdog(
           // Record missing or unwritable; the marker still says the stall cleared.
         }
       }
+      recordHangObservation({
+        parentPid: config.parentPid,
+        markerPath: config.markerPath,
+        unresponsiveMs,
+        selfRecovered: true,
+        reportPath
+      })
     }
   })
 
@@ -103,7 +104,7 @@ export function runWatchdog(
   )
   port.on('message', (message: MainToHangWatchdogWorkerMessage) => {
     if (message.type === 'heartbeat') {
-      loop.recordHeartbeat()
+      loop.recordHeartbeat(message.sentAt)
     } else if (message.type === 'shutdown') {
       if (checkTimer) {
         clearInterval(checkTimer)

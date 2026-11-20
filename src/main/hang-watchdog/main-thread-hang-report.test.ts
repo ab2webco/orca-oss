@@ -144,6 +144,23 @@ describe('writeMainThreadHangReport', () => {
     ])
   })
 
+  it('removes a sample scratch file a force quit left behind, but not one still being written', () => {
+    const deps: HangReportDeps = {
+      platform: 'win32',
+      run: () => '',
+      readText: () => '',
+      listDir: () => []
+    }
+    const orphan = write(deps, 'main-hang-633-1.txt.sample')
+    utimesSync(orphan, 0, 0)
+    write(deps, 'main-hang-633-2.txt.sample')
+    write(deps, 'main-hang-633-3.txt')
+    expect(readdirSync(join(dir, 'logs')).sort()).toEqual([
+      'main-hang-633-2.txt.sample',
+      'main-hang-633-3.txt'
+    ])
+  })
+
   it('appends when the main thread answers again', () => {
     const reportPath = write({
       platform: 'win32',

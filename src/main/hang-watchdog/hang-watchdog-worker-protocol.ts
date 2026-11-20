@@ -13,4 +13,6 @@ export type HangWatchdogWorkerData = {
   checkIntervalMs: number
 }
 
-export type MainToHangWatchdogWorkerMessage = { type: 'heartbeat' } | { type: 'shutdown' }
+export type MainToHangWatchdogWorkerMessage =
+  /** sentAt: main's clock, so a heartbeat queued behind a capture does not stretch the stall. */
+  { type: 'heartbeat'; sentAt?: number } | { type: 'shutdown' }

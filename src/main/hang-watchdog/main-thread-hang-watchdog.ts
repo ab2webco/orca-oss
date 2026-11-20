@@ -64,7 +64,7 @@ export function installMainThreadHangWatchdog(options: {
     }
   }
   const heartbeatTimer = setInterval(() => {
-    postMessage({ type: 'heartbeat' })
+    postMessage({ type: 'heartbeat', sentAt: Date.now() })
   }, HANG_WATCHDOG_HEARTBEAT_INTERVAL_MS)
   const stop = (): void => {
     if (stopped) {

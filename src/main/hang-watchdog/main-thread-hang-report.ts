@@ -136,9 +136,17 @@ function nativeStackSection(pid: number, reportPath: string, deps: HangReportDep
   return '(not captured on this platform; the child processes above are what it was running)'
 }
 
-function pruneOldRecords(reportPath: string): void {
+function pruneOldRecords(reportPath: string, now: number): void {
   const dir = dirname(reportPath)
-  const records = readdirSync(dir)
+  const names = readdirSync(dir)
+  // Why: a force quit mid-sample leaves its scratch file; one older than a capture is orphaned.
+  for (const name of names.filter((n) => n.startsWith('main-hang-') && n.endsWith('.sample'))) {
+    const path = join(dir, name)
+    if (now - statSync(path).mtimeMs > CAPTURE_TIMEOUT_MS) {
+      rmSync(path, { force: true })
+    }
+  }
+  const records = names
     .filter((name) => name.startsWith('main-hang-') && name.endsWith('.txt'))
     .map((name) => ({ path: join(dir, name), mtimeMs: statSync(join(dir, name)).mtimeMs }))
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
@@ -177,7 +185,7 @@ export function writeMainThreadHangReport(
   writeFileSync(reportPath, `${header.join('\n')}\n`)
   appendFileSync(reportPath, `${nativeStackSection(parentPid, reportPath, deps)}\n`)
   try {
-    pruneOldRecords(reportPath)
+    pruneOldRecords(reportPath, Date.now())
   } catch {
     // Why: retention is housekeeping; failing it must not lose the record just written.
   }
