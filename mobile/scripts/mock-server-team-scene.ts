@@ -56,7 +56,9 @@ function panelOf(): OrchestratorGamePanel | undefined {
     ) as OrchestratorGamePanel['tabs'],
     advisor: true,
     arcade: false,
-    diorama: false
+    diorama: false,
+    quality: 'high',
+    pace: 'normal'
   }
 }
 

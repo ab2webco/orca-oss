@@ -29,7 +29,9 @@ describe('parseGamePanel', () => {
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
         arcade: true,
-        diorama: false
+        diorama: false,
+        quality: 'low',
+        pace: 'direct'
       })
     ).toEqual({
       value: {
@@ -38,7 +40,9 @@ describe('parseGamePanel', () => {
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
         arcade: true,
-        diorama: false
+        diorama: false,
+        quality: 'low',
+        pace: 'direct'
       },
       warnings: []
     })
@@ -50,6 +54,8 @@ describe('parseGamePanel', () => {
       style: 'hd',
       tabs: { prs: 'no', inbox: false },
       advisor: 1,
+      quality: 'ultra',
+      pace: 'warp',
       colour: 'red'
     })
 
@@ -60,6 +66,8 @@ describe('parseGamePanel', () => {
       'orchestratorGame.panel.tabs.prs must be true or false',
       'orchestratorGame.panel.tabs.inbox is not a tab that can be hidden',
       'orchestratorGame.panel.advisor must be true or false',
+      'orchestratorGame.panel.quality must be high or low',
+      'orchestratorGame.panel.pace must be normal, fast or direct',
       'orchestratorGame.panel.colour is not a known setting'
     ])
   })
@@ -107,7 +115,9 @@ describe('resolveGamePanel', () => {
       tabs: { prs: true, queue: true, machines: true },
       advisor: true,
       arcade: true,
-      diorama: false
+      diorama: false,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 
@@ -127,7 +137,9 @@ describe('resolveGamePanel', () => {
       tabs: { prs: false, queue: true, machines: true },
       advisor: true,
       arcade: false,
-      diorama: false
+      diorama: false,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 
@@ -243,7 +255,9 @@ describe('orchestratorGame.panel across versions and writers', () => {
       tabs: { prs: true, queue: false, machines: true },
       advisor: true,
       arcade: true,
-      diorama: false
+      diorama: false,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 

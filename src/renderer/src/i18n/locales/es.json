@@ -5606,6 +5606,17 @@
         }
       },
       "settings": {
+        "GamePanelDioramaRows": {
+          "quality": "Calidad de la escena",
+          "qualityDescription": "Ilustrado dibuja figuras con contorno y sombras. Bajos recursos las dibuja planas y sin sombras, para equipos más lentos.",
+          "qualityHigh": "Ilustrado",
+          "qualityLow": "Bajos recursos",
+          "pace": "Ritmo del lead",
+          "paceDescription": "Cómo recorre el lead la base: caminando, más rápido o enviado por el mago de la corte.",
+          "paceNormal": "Normal",
+          "paceFast": "Rápido",
+          "paceDirect": "Directo"
+        },
         "GamePanelOverrideNote": {
           "local": "{{project}} usa {{value}} en este equipo.",
           "open": "Abrir proyecto",

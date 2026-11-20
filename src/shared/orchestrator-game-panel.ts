@@ -3,10 +3,16 @@ import type { OrchestratorGameConfig } from './orchestrator-game-config'
 export const GAME_PANEL_LOOKS = ['game', 'display', 'plain'] as const
 export const GAME_PANEL_STYLES = ['figures', 'office', 'pixel'] as const
 export const GAME_PANEL_TABS = ['prs', 'queue', 'machines'] as const
+/** The diorama's drawing: illustrated (outlined, shadowed) or low resources (flat, no shadows). */
+export const GAME_PANEL_QUALITIES = ['high', 'low'] as const
+/** How the diorama's lead gets about: walking, 2.5 times faster, or sent by the court mage. */
+export const GAME_PANEL_PACES = ['normal', 'fast', 'direct'] as const
 
 export type GamePanelLook = (typeof GAME_PANEL_LOOKS)[number]
 export type GamePanelStyle = (typeof GAME_PANEL_STYLES)[number]
 export type GamePanelTab = (typeof GAME_PANEL_TABS)[number]
+export type GamePanelQuality = (typeof GAME_PANEL_QUALITIES)[number]
+export type GamePanelPace = (typeof GAME_PANEL_PACES)[number]
 
 /** The native panel's own keys; `mode` and `render` keep driving the terminal beside them. */
 export type OrchestratorGamePanel = {
@@ -19,6 +25,8 @@ export type OrchestratorGamePanel = {
   arcade: boolean
   /** Figures as the 3D diorama (ORCA-1296); off until it draws everything Figures draws today. */
   diorama: boolean
+  quality: GamePanelQuality
+  pace: GamePanelPace
 }
 
 export type OrchestratorGamePanelLayer = Partial<Omit<OrchestratorGamePanel, 'tabs'>> & {
@@ -27,7 +35,12 @@ export type OrchestratorGamePanelLayer = Partial<Omit<OrchestratorGamePanel, 'ta
 
 export type GamePanelField = Exclude<keyof OrchestratorGamePanel, 'tabs'> | GamePanelTab
 
-export type GamePanelValue = boolean | GamePanelLook | GamePanelStyle
+export type GamePanelValue =
+  | boolean
+  | GamePanelLook
+  | GamePanelStyle
+  | GamePanelQuality
+  | GamePanelPace
 
 const at = (key: string): string => `orchestratorGame.panel.${key}`
 
@@ -42,6 +55,8 @@ const oneOf =
 const isLook = oneOf(GAME_PANEL_LOOKS)
 const isStyle = oneOf(GAME_PANEL_STYLES)
 const isTab = oneOf(GAME_PANEL_TABS)
+const isQuality = oneOf(GAME_PANEL_QUALITIES)
+const isPace = oneOf(GAME_PANEL_PACES)
 
 const orList = (list: readonly string[]): string =>
   `${list.slice(0, -1).join(', ')} or ${list.at(-1)}`
@@ -95,6 +110,13 @@ export function parseGamePanel(raw: unknown): {
       } else {
         warnings.push(`${at(key)} must be ${orList(GAME_PANEL_STYLES)}`)
       }
+    } else if (key === 'quality' || key === 'pace') {
+      const list = key === 'quality' ? GAME_PANEL_QUALITIES : GAME_PANEL_PACES
+      if (key === 'quality' ? isQuality(entry) : isPace(entry)) {
+        Object.assign(value, { [key]: entry })
+      } else {
+        warnings.push(`${at(key)} must be ${orList(list)}`)
+      }
     } else if (key === 'tabs') {
       const tabs = parseTabs(entry)
       warnings.push(...tabs.warnings)
@@ -133,7 +155,9 @@ export function resolveGamePanel(
     tabs: { prs: true, queue: true, machines: true },
     advisor: true,
     arcade: true,
-    diorama: false
+    diorama: false,
+    quality: 'high',
+    pace: 'normal'
   }
   for (const layer of layers) {
     // Why re-parsed: a Settings layer is hand-editable JSON that never went through the parser.

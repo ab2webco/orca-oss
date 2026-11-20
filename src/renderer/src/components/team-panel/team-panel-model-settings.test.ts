@@ -80,6 +80,8 @@ const panel = (overrides: Partial<PanelSettings> = {}): PanelSettings => ({
   advisor: true,
   arcade: true,
   diorama: false,
+  quality: 'high',
+  pace: 'normal',
   pluginsOn: true,
   ...overrides
 })

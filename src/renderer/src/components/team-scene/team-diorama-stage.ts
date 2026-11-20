@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
 import type { DioramaCue } from '../../../../shared/team-scene/team-diorama-cues'
 import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
+import type { DioramaPace } from '../../../../shared/team-scene/team-diorama-lead-round'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { dioramaAdvisor, DIORAMA_TOWER } from './team-diorama-advisor'
@@ -31,20 +32,23 @@ export function dioramaStage(
     layout: DioramaLayout
     views: ReadonlyMap<string, DioramaPlotView>
     cues: readonly DioramaCue[]
+    /** Low resources: flat figures, no shadows, one pixel per pixel. */
+    lite: boolean
+    pace: DioramaPace
   }
 ): DioramaStage {
   const { input, layout, views, cues } = args
-  const lite = false
+  const { lite } = args
   const kit = dioramaKit(args.dark ? NIGHT : DAY, args.status)
   const scene = new THREE.Scene()
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-  renderer.shadowMap.enabled = true
+  renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, 2))
+  renderer.shadowMap.enabled = !lite
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.setClearColor(kit.p.sea)
   // Why π: three r155+ lights are physical; the approved prototype's (r128) were π brighter.
   scene.add(new THREE.HemisphereLight(kit.p.hemiSky, kit.p.hemiGround, kit.p.hemi * Math.PI))
   const sun = new THREE.DirectionalLight(kit.p.sun, kit.p.sunI * Math.PI)
-  sun.castShadow = true
+  sun.castShadow = !lite
   sun.shadow.mapSize.set(2048, 2048)
   // Why a bias: without it thin decks and planks shade themselves in stripes that shimmer.
   sun.shadow.bias = -0.0006
@@ -54,7 +58,7 @@ export function dioramaStage(
   scene.add(world)
 
   const ticks = dioramaHomeProps(kit, world)
-  const lead = dioramaLeadActor(kit, world, { layout, views, input, lite })
+  const lead = dioramaLeadActor(kit, world, { layout, views, input, lite, pace: args.pace })
   const cast = dioramaCast(kit, world, { layout, views, input, cues, lite })
   ticks.push(...dioramaRises(world, cues), lead.tick, ...cast.ticks)
   const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite) : null

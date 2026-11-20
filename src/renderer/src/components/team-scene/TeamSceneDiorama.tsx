@@ -23,6 +23,7 @@ import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-ty
 import { dioramaStage } from './team-diorama-stage'
 import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
+import { useTeamSceneDioramaLook } from './use-team-scene-style'
 
 const FRAME_MS = 1000 / 30
 
@@ -43,6 +44,7 @@ export function TeamSceneDiorama({
   const islandsSeen = useRef<string[] | null>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const status = useTeamSceneStatusColors()
+  const look = useTeamSceneDioramaLook()
   const [width, setWidth] = useState(0)
   const input = useMemo(() => teamSceneInputOf(model), [model])
   // Why the last order: a new machine or member takes a free slot and moves nobody already drawn.
@@ -123,7 +125,9 @@ export function TeamSceneDiorama({
       input,
       layout,
       views,
-      cues: cues.current
+      cues: cues.current,
+      lite: look.quality === 'low',
+      pace: look.pace
     })
     const draw = stage.draw
     let raf = 0,
@@ -154,7 +158,7 @@ export function TeamSceneDiorama({
       watch.disconnect()
       stage.dispose()
     }
-  }, [layout, views, input, status, width, onNoWebgl])
+  }, [layout, views, input, status, width, onNoWebgl, look])
 
   return (
     <div ref={wrap} className="w-full" data-team-scene-diorama="">
