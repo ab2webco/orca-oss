@@ -292,29 +292,19 @@ describe('useTeamDrawer', () => {
     })
   }
 
-  it("reads only the images the scene band draws, on a host that serves the scene's art", async () => {
+  // ORCA-1296: Figures and Office are Orca's own art, so the phone never reads a scene's images.
+  it("asks a host that serves the scene's art for none of it", async () => {
     const sendRequest = serving(null)
     const client = { sendRequest } as unknown as RpcClient
     await render({ client, terminalHandle: 'term_1', paneKey: 'lead', sceneArtSupported: true })
-
-    const asked = sendRequest.mock.calls
-      .filter(([method]) => method === 'game.sceneArt')
-      .map(([, params]) => (params as { src: string }).src)
-      .toSorted()
-    expect(asked).toEqual(['bush.png', 'mario.png', 'sky.png', 'toad.png'])
-    expect(sendRequest).toHaveBeenCalledWith('game.sceneArt', {
-      worktreeId: 'repo::/lead',
-      terminalHandle: 'term_1',
-      sceneId: 'mario',
-      src: 'sky.png'
-    })
-    expect(team?.sceneArt?.kind).toBe('ready')
+    expect(sendRequest).not.toHaveBeenCalledWith('game.sceneArt', expect.anything())
+    expect(team?.sceneArt).toBeNull()
   })
 
-  it("draws the fallback when any of the scene's images fails, as the desktop draws Pixel", async () => {
+  it('keeps no failed scene art when one of its images would fail, since none is read', async () => {
     const client = { sendRequest: serving('toad.png') } as unknown as RpcClient
     await render({ client, terminalHandle: 'term_1', paneKey: 'lead', sceneArtSupported: true })
-    expect(team?.sceneArt).toEqual({ kind: 'failed' })
+    expect(team?.sceneArt).toBeNull()
   })
 
   it("never asks an older host for the scene's art", async () => {
