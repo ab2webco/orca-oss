@@ -96,6 +96,12 @@ button.chip:disabled { opacity: 0.45; cursor: default; }
 }
 .litenote strong { font-size: 15px; }
 .litenote span { color: var(--muted); }
+/* ?bare: the scene alone, edge to edge, as a phone's Team sheet draws it */
+body.bare { padding: 0; margin: 0; }
+body.bare .wrap > :not(.stage) { display: none; }
+body.bare .wrap { max-width: none; }
+html:has(body.bare) { overflow: hidden; }
+body.bare .stage { border: 0; border-radius: 0; }
 h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
 </style>
 
@@ -206,6 +212,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   const num = (k, d) => (qs.has(k) ? Number(qs.get(k)) : d)
   let tod = qs.get('theme') ? (qs.get('theme') === 'dark' ? 'night' : 'day') : pageTheme === 'dark' || (pageTheme !== 'light' && sysDark) ? 'night' : 'day'
   document.documentElement.setAttribute('data-theme', tod === 'night' ? 'dark' : 'light')
+  if (qs.has('bare')) document.body.classList.add('bare')
   let viewW = num('w', 0), figs = qs.get('q') === 'lite' ? 'lite' : 'toon', playing = !reduce
   let camMode = qs.get('cam') === 'lead' ? 'lead' : 'all', focusFloor = null
   let machines = num('machines', 3), perFloor = num('members', 4)

@@ -26,7 +26,7 @@ Jev is installed as a plugin on each machine, so it is not one shared Jev. Every
 own Jev, who decides only for that floor's members; no Jev rides the lift. On the lead's floor the control room is
 the balcony over the lead's office; on every other floor it is a room at floor level beside the desks. Each room's
 wall shows only that machine's members. An offline machine's Jev is drawn faded like its members.
-Captures re-taken: `office-1440-*` and `office-390-*`, plus `moments/jev-per-floor-1440-{light,dark}.png`.
+Captures: see below, plus `moments/jev-per-floor-1440-{light,dark}.png`.
 
 ## What it shows, against today's 2D Office
 
@@ -50,9 +50,14 @@ Captures re-taken: `office-1440-*` and `office-390-*`, plus `moments/jev-per-flo
 | Arrivals / departures | New member rides the elevator and walks to a free desk; a leaving one walks back and vanishes |
 | Hover label and click target | Hover shows name + state + host; click says which terminal it would open |
 
-## Captures (Illustrated only)
+## Captures (Illustrated only, at the scene's container widths)
 
-- `office-{1440,768,390,320}-{light,dark}.png`: the whole page at each width and theme.
+The scene's size is set by its container, so captures are of the scene alone, not the page:
+
+- `office-panel-{219,320,350}-{light,dark}.png`: the side panel at 219, 320 and 350 px.
+- `office-large-{light,dark}.png`: the large view.
+- `office-phone-sheet-390-{light,dark}.png`: the phone's Team sheet at 390 px, edge to edge (`?bare`), as
+  `mobile/src/team-drawer` draws the scene.
 - `moments/`: the sample flow step by step (arrive, work, needs you, hand-in, merge) in both themes, the elevator
   ride, hover label, 5 machines × 8 members, one member at 390, Panel 219 in both themes, close-ups of the devs and of
   the lead's office with the control room in both themes, and the Low resources note.
