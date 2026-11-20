@@ -152,7 +152,14 @@ function FloorStage({
     }),
     [model, floor, legs, unconfirmed]
   )
-  const cropTop = zoomed ? 0 : cropOf(level)
+  // Why capped for a shorter stage: Pixel's art is lower than Office's, and the Office crop left a
+  // dark band under its ground.
+  const short = painter && painter.height < TEAM_SCENE_ART_HEIGHT ? painter.height : null
+  const cropTop = zoomed
+    ? 0
+    : short === null
+      ? cropOf(level)
+      : Math.min(cropOf(level), Math.max(0, short - STRIP.height))
   const plateRef = useRef<HTMLSpanElement>(null)
   const [plate, setPlate] = useState<TeamSceneRect | null>(null)
   // Why measured: the plate is as wide as its host's name, and no bubble may cover it.

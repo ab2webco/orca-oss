@@ -28,7 +28,10 @@ describe('parseGamePanel', () => {
         style: 'office',
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
-        arcade: true
+        arcade: true,
+        diorama: false,
+        quality: 'low',
+        pace: 'direct'
       })
     ).toEqual({
       value: {
@@ -36,7 +39,10 @@ describe('parseGamePanel', () => {
         style: 'office',
         tabs: { prs: false, queue: true, machines: false },
         advisor: false,
-        arcade: true
+        arcade: true,
+        diorama: false,
+        quality: 'low',
+        pace: 'direct'
       },
       warnings: []
     })
@@ -48,6 +54,8 @@ describe('parseGamePanel', () => {
       style: 'hd',
       tabs: { prs: 'no', inbox: false },
       advisor: 1,
+      quality: 'ultra',
+      pace: 'warp',
       colour: 'red'
     })
 
@@ -58,6 +66,8 @@ describe('parseGamePanel', () => {
       'orchestratorGame.panel.tabs.prs must be true or false',
       'orchestratorGame.panel.tabs.inbox is not a tab that can be hidden',
       'orchestratorGame.panel.advisor must be true or false',
+      'orchestratorGame.panel.quality must be high or low',
+      'orchestratorGame.panel.pace must be normal, fast or direct',
       'orchestratorGame.panel.colour is not a known setting'
     ])
   })
@@ -104,7 +114,10 @@ describe('resolveGamePanel', () => {
       style: 'pixel',
       tabs: { prs: true, queue: true, machines: true },
       advisor: true,
-      arcade: true
+      arcade: true,
+      diorama: true,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 
@@ -123,7 +136,10 @@ describe('resolveGamePanel', () => {
       style: 'figures',
       tabs: { prs: false, queue: true, machines: true },
       advisor: true,
-      arcade: false
+      arcade: false,
+      diorama: true,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 
@@ -238,7 +254,10 @@ describe('orchestratorGame.panel across versions and writers', () => {
       style: 'office',
       tabs: { prs: true, queue: false, machines: true },
       advisor: true,
-      arcade: true
+      arcade: true,
+      diorama: true,
+      quality: 'high',
+      pace: 'normal'
     })
   })
 
@@ -267,5 +286,16 @@ describe("a project's panel row and the global look", () => {
         local: ownerLocal
       }).look
     ).toBe('display')
+  })
+})
+
+describe('orchestratorGame.panel.diorama', () => {
+  it('is on unless a layer turns it off, and warns on a value that is not a boolean', () => {
+    const legacy = { mode: 'on' as const, render: 'classic' as const }
+    expect(resolveGamePanel([], legacy).diorama).toBe(true)
+    expect(resolveGamePanel([{ diorama: false }], legacy).diorama).toBe(false)
+    expect(parseGamePanel({ diorama: 'yes' }).warnings).toEqual([
+      'orchestratorGame.panel.diorama must be true or false'
+    ])
   })
 })

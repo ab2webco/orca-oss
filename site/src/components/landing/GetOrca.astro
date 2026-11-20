@@ -16,14 +16,14 @@ const copy = {
   en: {
     eyebrow: 'Get Orca Lab',
     title: 'Start your first team in five minutes.',
-    lede: 'Install the desktop app, register the orca command, open a repo, and let the lead take the first wave from your To Do.',
+    lede: 'Install the app, register the orca command, open a repo, and the lead takes the first wave from your To Do.',
     all: 'All releases',
     install: 'Install guide',
     phone: 'Phone',
-    ios: 'iOS · TestFlight',
-    iosNote: 'Builds ship through TestFlight.',
-    android: 'Android · APK',
-    androidNote: 'From the mobile-android releases.',
+    ios: 'TestFlight',
+    iosNote: 'iOS',
+    android: 'APK',
+    androidNote: 'Android',
     server: 'Headless',
     serverNote: '`orca serve` on Linux, paired as a host.',
     serverLink: 'Server guide'
@@ -31,14 +31,14 @@ const copy = {
   es: {
     eyebrow: 'Consigue Orca Lab',
     title: 'Arma tu primer equipo en cinco minutos.',
-    lede: 'Instala la app de escritorio, registra el comando orca, abre un repo y deja que el líder tome la primera ola de tu To Do.',
+    lede: 'Instala la app, registra el comando orca, abre un repo y el líder toma la primera ola de tu To Do.',
     all: 'Todas las releases',
     install: 'Guía de instalación',
     phone: 'Teléfono',
-    ios: 'iOS · TestFlight',
-    iosNote: 'Las builds se distribuyen por TestFlight.',
-    android: 'Android · APK',
-    androidNote: 'Desde las releases mobile-android.',
+    ios: 'TestFlight',
+    iosNote: 'iOS',
+    android: 'APK',
+    androidNote: 'Android',
     server: 'Sin pantalla',
     serverNote: '`orca serve` en Linux, emparejado como host.',
     serverLink: 'Guía de servidor'
@@ -96,17 +96,16 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
 
 <style>
   .get {
-    padding-bottom: 72px;
+    padding-bottom: var(--space-4xl);
   }
   .downloads {
     width: 100%;
     margin-top: 24px;
     border-collapse: collapse;
-    font-size: 14px;
   }
   .downloads th,
   .downloads td {
-    padding: 10px 16px;
+    padding: var(--space-md) var(--space-lg);
     text-align: left;
     vertical-align: top;
     border-bottom: 1px dashed var(--line);
@@ -117,9 +116,19 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
   .downloads th {
     white-space: nowrap;
   }
+  @media (min-width: 60rem) {
+    .downloads {
+      font-size: var(--text-lead);
+    }
+  }
   .downloads a {
     font-weight: 700;
     overflow-wrap: anywhere;
+  }
+  @media (min-width: 48rem) {
+    .downloads a {
+      white-space: nowrap;
+    }
   }
   @media (max-width: 640px) {
     .downloads,

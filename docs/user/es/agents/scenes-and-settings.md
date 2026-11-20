@@ -1,5 +1,5 @@
 ---
-sourceHash: 7e5dfcc70525c472
+sourceHash: bed93b04ea804705
 ---
 # Escenas, estilos y ajustes
 
@@ -15,14 +15,34 @@ XP), **Display** (un carrusel de métricas del equipo) y **Plain**. En la aparie
 escena viene en tres estilos, todos representando el estado real del trabajo, nunca un temporizador:
 
 - **Pixel**: un huerto; el cantero de cada miembro crece con su fase, y el trabajo mergeado llena
-  cajas de cosecha.
-- **Figures**: una torre de castillo por miembro que sube de los cimientos a terminada; las torres
-  mergeadas pasan a ser trofeos en las colinas.
+  cajas de cosecha. Con miembros en más de una máquina se convierte en un piso por máquina, como
+  Office.
+- **Figures**: una base 3D de islas, una por máquina, del tamaño de cuántos miembros puede correr.
+  Cada miembro construye una casa en su parcela, que sube de los cimientos al techo a medida que
+  avanza su trabajo; un CI en rojo le prende fuego al techo, y un merge lanza confeti e iza su
+  bandera. El líder camina por los caminos hasta el miembro que te necesita y rema en bote hasta las
+  otras islas. Los miembros libres pescan, siembran o cortan leña, y los limitados se sientan junto
+  al fuego. Jev vigila desde su torre con un catalejo y manda una paloma mensajera cuando decide. Un
+  miembro nuevo sale del castillo; la isla de una máquina recién conectada sube del mar.
 - **Office**: pizarras cuyas notas avanzan hacia terminado, con placas por cada merge. Con miembros
   en más de una máquina se convierte en un edificio con un piso por máquina, primero el del líder,
   y **All** muestra todos los pisos.
 
 ![Settings > Agents > Panel con la escena, la apariencia, el estilo, su vista previa y los interruptores de pestañas](../../../assets/scenes-and-settings/panel-settings.png)
+
+En Figures la cámara sigue al líder. **Show all** encuadra todas las islas, arrastrar mueve la vista
+por la base, y pellizcar (o Ctrl o ⌘ con la rueda) acerca o aleja; **Follow the lead** vuelve. Dos
+filas en **Settings > Agents > Panel** lo ajustan:
+
+- **Scene quality**: **Illustrated** (figuras con contorno y sombras) o **Low resources** (figuras
+  planas, sin sombras), para equipos más lentos.
+- **Lead's pace**: **Normal** (camina como una persona), **Fast** (2,5 veces más rápido) o
+  **Direct** (el mago de la corte, junto al castillo, lo envía de círculo en círculo con magia).
+
+Figures necesita WebGL. Con la aceleración por hardware apagada, Figures se dibuja en 2D: una torre
+de castillo por miembro que sube de los cimientos a terminada, y las torres mergeadas pasan a ser
+trofeos en las colinas. `orchestratorGame.panel.diorama: false` deja Figures en 2D en cualquier
+equipo.
 
 Un CI en rojo muestra la build rota. **Settings > Appearance > Status colors** define un color por
 estado (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), para claro y oscuro; el
@@ -50,9 +70,10 @@ posterior.
 </figure>
 
 - **Settings > Agents**: **Agent Teams game** (el juego en los paneles y la **Terminal band**) y
-  **Panel** (escena, apariencia, estilo y los interruptores **PRs**, **Queue** y **Machines**), para
-  todos los proyectos.
-- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`),
+  **Panel** (escena, apariencia, estilo, **Scene quality** y **Lead's pace** para Figures, y los
+  interruptores **PRs**, **Queue** y **Machines**), para todos los proyectos.
+- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
+  `pace`, `diorama`),
   `orchestratorGame.scene` y `orchestratorGame.sceneFile`, más las
   `orchestratorGame.orchestrator.rules` del líder.
 - La página del proyecto en **Settings**, sección **Agent Teams game**: las mismas filas para este
