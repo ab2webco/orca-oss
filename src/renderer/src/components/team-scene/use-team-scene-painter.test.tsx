@@ -12,11 +12,6 @@ import { createPixelPainter } from './team-scene-pixel-painter'
 import type { TeamScenePainter } from './team-scene-painter'
 import { teamSceneQuestArtOf } from './team-scene-quest-art'
 import {
-  readTeamSceneArtUrl,
-  useTeamSceneArtHostStore,
-  type TeamSceneArtHost
-} from './team-scene-art-host'
-import {
   teamSceneArtOf,
   useTeamScenePainter,
   type TeamSceneStage,
@@ -24,10 +19,6 @@ import {
 } from './use-team-scene-painter'
 
 vi.mock('./team-scene-art-load', () => ({ loadTeamSceneArt: vi.fn() }))
-vi.mock('./team-scene-art-host', async (actual) => ({
-  ...(await actual<Record<string, unknown>>()),
-  readTeamSceneArtUrl: vi.fn()
-}))
 vi.mock('./team-scene-image-painter', () => ({ createImagePainter: vi.fn() }))
 vi.mock('./team-scene-pixel-painter', () => ({ createPixelPainter: vi.fn() }))
 vi.mock('./team-scene-pixel-scene', () => ({ teamScenePixelSceneOf: vi.fn(() => ({})) }))
@@ -47,55 +38,15 @@ const blockScene = (id: string): OrchestratorGameSceneExtension =>
 
 const QUEST = { id: 'quest', extensions: [] }
 
-const HOST: TeamSceneArtHost = {
-  target: { kind: 'local' },
-  caller: { worktreeId: 'wt1', terminalHandle: 'h1' }
-}
-
 describe('teamSceneArtOf', () => {
-  it('draws Quest in its bundled art', () => {
-    expect(teamSceneArtOf({ style: 'figures', scene: QUEST })).toEqual({
-      drawn: 'figures',
-      art: 'bundled'
-    })
-    expect(teamSceneArtOf({ style: 'office', scene: QUEST }).drawn).toBe('office')
+  it("draws Figures and Office in Orca's art and Pixel when Pixel is asked for", () => {
+    expect(teamSceneArtOf({ style: 'figures' })).toEqual({ drawn: 'figures', art: 'bundled' })
+    expect(teamSceneArtOf({ style: 'office' })).toEqual({ drawn: 'office', art: 'bundled' })
+    expect(teamSceneArtOf({ style: 'pixel' }).drawn).toBe('pixel')
   })
 
-  it('reads a host that named no scene as Quest, as Pixel does', () => {
-    expect(teamSceneArtOf({ style: 'office', scene: { id: null, extensions: [] } })).toEqual({
-      drawn: 'office',
-      art: 'bundled'
-    })
-  })
-
-  it('draws Pixel when Pixel is asked for', () => {
-    expect(teamSceneArtOf({ style: 'pixel', scene: QUEST }).drawn).toBe('pixel')
-  })
-
-  it("draws a scene's own art when its block covers the style", () => {
-    const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
-    expect(teamSceneArtOf({ style: 'figures', scene })).toMatchObject({
-      drawn: 'figures',
-      art: 'scene'
-    })
-  })
-
-  it("draws a scene with no art in the chosen style with its own characters in Pixel, never Quest's", () => {
-    expect(teamSceneArtOf({ style: 'figures', scene: { id: 'other', extensions: [] } })).toEqual({
-      drawn: 'pixel',
-      art: 'pixel'
-    })
-  })
-
-  it('draws Pixel when the own art did not load, and Quest in Pixel when even its art failed', () => {
-    const scene = { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] }
-    expect(teamSceneArtOf({ style: 'figures', scene, sceneArtFailed: true })).toEqual({
-      drawn: 'pixel',
-      art: 'pixel'
-    })
-    expect(teamSceneArtOf({ style: 'figures', scene: QUEST, bundledArtFailed: true }).drawn).toBe(
-      'pixel'
-    )
+  it("falls to Pixel only when Orca's own art failed", () => {
+    expect(teamSceneArtOf({ style: 'figures', bundledArtFailed: true }).drawn).toBe('pixel')
   })
 })
 
@@ -120,8 +71,6 @@ describe('useTeamScenePainter', () => {
   beforeEach(() => {
     seen = []
     stages = []
-    useTeamSceneArtHostStore.setState({ host: HOST })
-    vi.mocked(readTeamSceneArtUrl).mockImplementation(async (_host, _id, src) => `data:${src}`)
     root = createRoot(document.createElement('div'))
     vi.mocked(createPixelPainter).mockReturnValue(PIXEL)
     vi.mocked(createImagePainter).mockReturnValue(IMAGE)
@@ -152,59 +101,27 @@ describe('useTeamScenePainter', () => {
     expect(stages.at(-1)?.drawn).toBe('pixel')
   })
 
-  it("loads a scene's own art from the lead's host and draws it", async () => {
-    const id = 'file:mine.json'
-    await render('figures', { id, extensions: [blockScene(id)] })
-    const [style, urlOf] = vi.mocked(loadTeamSceneArt).mock.calls[0]!
-    expect(style).toEqual(teamSceneQuestArtOf('figures'))
-    await expect(urlOf('art/sky.png')).resolves.toBe('data:art/sky.png')
-    expect(readTeamSceneArtUrl).toHaveBeenCalledWith(HOST, id, 'art/sky.png')
-    expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'figures', art: 'scene' })
+  // ORCA-1296: a themed scene, with or without art of its own, draws Orca's Figures and Office.
+  it.each(['figures', 'office'] as const)("draws %s in Orca's art for any scene", async (style) => {
+    for (const scene of [
+      { id: 'file:mine.json', extensions: [blockScene('file:mine.json')] },
+      { id: 'file:.orca/scenes/koombea.json', extensions: [] },
+      { id: 'vigilante', extensions: [] }
+    ]) {
+      await render(style, scene)
+      expect(seen.at(-1)).toBe(IMAGE)
+      expect(stages.at(-1)).toMatchObject({ drawn: style, art: 'bundled' })
+    }
+    for (const [loaded] of vi.mocked(loadTeamSceneArt).mock.calls) {
+      expect(loaded).toEqual(teamSceneQuestArtOf(style))
+    }
   })
 
-  it("draws the scene's own characters in Pixel when its own art fails, as an older host does", async () => {
-    const id = 'file:mine.json'
-    vi.mocked(loadTeamSceneArt).mockRejectedValueOnce(new Error('method_not_found'))
-    await render('figures', { id, extensions: [blockScene(id)] })
-    expect(seen.at(-1)).toBe(PIXEL)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
-  })
-
-  it("draws Pixel at once when no host is known to read the own figures from, and Orca's office", async () => {
-    useTeamSceneArtHostStore.setState({ host: null })
-    const id = 'file:mine.json'
-    await render('figures', { id, extensions: [blockScene(id)] })
-    expect(readTeamSceneArtUrl).not.toHaveBeenCalled()
-    expect(stages.at(-1)).toMatchObject({ drawn: 'pixel', art: 'pixel' })
-    await render('office', { id, extensions: [blockScene(id)] })
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
-  })
-
-  it("draws a scene's figures as its own characters, never Quest's, and Orca's office", async () => {
-    const scene = { id: 'file:.orca/scenes/koombea.json', extensions: [] }
-    await render('figures', scene)
-    expect(seen.at(-1)).toBe(PIXEL)
-    expect(loadTeamSceneArt).not.toHaveBeenCalled()
-    await render('office', scene)
-    expect(seen.at(-1)).toBe(IMAGE)
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'bundled' })
-  })
-
-  it("seats members from behind only at Orca's own Office desk", async () => {
+  it('seats members from behind at the Office desk, not in Figures', async () => {
     const backOf = () => vi.mocked(createImagePainter).mock.calls.at(-1)![0].back
     await render('office', QUEST)
     expect(backOf()).toEqual(OFFICE_BACK_SEAT)
     await render('figures', QUEST)
-    expect(backOf()).toBeNull()
-    const id = 'file:mine.json'
-    const own = {
-      id,
-      pluginId: 'plugin',
-      definition: { native: { office: teamSceneQuestArtOf('office') } }
-    } as unknown as OrchestratorGameSceneExtension
-    await render('office', { id, extensions: [own] })
-    expect(stages.at(-1)).toMatchObject({ drawn: 'office', art: 'scene' })
     expect(backOf()).toBeNull()
   })
 

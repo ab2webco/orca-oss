@@ -122,7 +122,7 @@ describe('buildOrchestratorGameState scene file', () => {
       ).toBe('figures')
     })
 
-    it('stays on a scene carried to a remote member, whose art may not be on that host', async () => {
+    it("draws Figures with Orca's art for a scene carried to a remote member (ORCA-1296)", async () => {
       const state = await build(checkout({}), {
         carried: { id: ID, text: WITH_ART }
       })
@@ -136,10 +136,10 @@ describe('buildOrchestratorGameState scene file', () => {
           scene: definition,
           sceneArtFailed: true
         })
-      ).toEqual({ drawn: 'pixel', art: 'pixel' })
+      ).toEqual({ drawn: 'figures', art: 'bundled' })
     })
 
-    it('draws a file with a broken block with its own characters in Pixel, and says why', async () => {
+    it("says why a broken block was dropped, and still draws Figures with Orca's art", async () => {
       const state = await build(
         checkout({
           '.orca/scenes/space.json': JSON.stringify(
@@ -156,7 +156,7 @@ describe('buildOrchestratorGameState scene file', () => {
           sceneId: state.config.scene,
           scene: state.extensions?.scenes[0]?.definition
         })
-      ).toEqual({ drawn: 'pixel', art: 'pixel' })
+      ).toEqual({ drawn: 'figures', art: 'bundled' })
     })
   })
 

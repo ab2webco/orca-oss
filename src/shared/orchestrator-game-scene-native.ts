@@ -305,29 +305,21 @@ export const isQuestScene = (sceneId: string): boolean => {
 }
 
 /**
- * The art a style draws with: the scene's own when its block covers the style and loaded; Quest's
- * art Orca ships for Quest; else Pixel, which draws the scene's own characters and colours, so a
- * themed scene never shows Quest's knights.
+ * The art a style draws with. Figures and Office always draw Orca's own art, whatever the scene: a
+ * scene themes Pixel only (ORCA-1296). Pixel draws only when picked or when Orca's art fails.
  */
 export function orchestratorGameSceneArtOf(args: {
   style: OrchestratorGameSceneStyle
-  sceneId: string
-  /** The scene game state carries; absent when a file did not read or the scene is built in. */
+  /** @deprecated Ignored since ORCA-1296: no scene changes Figures or Office. */
+  sceneId?: string
+  /** @deprecated Ignored since ORCA-1296: a scene's `native` block no longer draws in the panel. */
   scene?: { native?: OrchestratorGameSceneNative }
-  /** The scene's own images did not load here, such as an older host or a carried scene. */
+  /** @deprecated Ignored since ORCA-1296, with `scene`. */
   sceneArtFailed?: boolean
   bundledArtFailed?: boolean
 }): OrchestratorGameSceneArt {
-  const { style, sceneId, scene, sceneArtFailed, bundledArtFailed } = args
-  if (style !== 'figures' && style !== 'office') {
-    return { drawn: 'pixel', art: 'pixel' }
-  }
-  if (scene?.native?.[style] && !sceneArtFailed) {
-    return { drawn: style, art: 'scene' }
-  }
-  // Why Office keeps Orca's art in any theme: an office reads as one, and picking it must show it;
-  // Quest's figures are knights, so a themed scene's figures draw in Pixel as its own characters.
-  return (style === 'office' || isQuestScene(sceneId)) && !bundledArtFailed
+  const { style, bundledArtFailed } = args
+  return (style === 'figures' || style === 'office') && !bundledArtFailed
     ? { drawn: style, art: 'bundled' }
     : { drawn: 'pixel', art: 'pixel' }
 }
