@@ -41,6 +41,11 @@ import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestr
 import { withOrchestratorGameField } from '../../../../shared/orchestrator-game-settings-updates'
 import { gamePanelValueOf, ownGamePanelValueOf } from './game-panel-overrides'
 import { GamePanelOverrideNote, useGamePanelOverrideProjects } from './GamePanelOverrideNote'
+import {
+  dioramaRowsShown,
+  GamePanelDioramaRows,
+  ProjectGamePanelDioramaRows
+} from './GamePanelDioramaRows'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -227,7 +232,22 @@ export function GamePanelSetting({
             }
           />
         ))}
-      {panel.look === 'game' ? <GamePanelStylePreview style={panel.style} scene={scene} /> : null}
+      {panel.look === 'game' ? (
+        <GamePanelStylePreview
+          style={panel.style}
+          scene={scene}
+          diorama={panel.diorama}
+          lite={panel.quality === 'low'}
+        />
+      ) : null}
+      {dioramaRowsShown(panel) ? (
+        <GamePanelDioramaRows
+          settings={settings}
+          panel={panel}
+          projects={projects}
+          updateSettings={updateSettings}
+        />
+      ) : null}
       {GAME_PANEL_TABS.map((tab) => (
         <SettingsSwitchRow
           key={tab}
@@ -360,7 +380,15 @@ export function ProjectGamePanelRows({
         return field === 'style' ? (
           <Fragment key={field}>
             {row}
-            <GamePanelStylePreview style={panel.style} scene={shownScene} />
+            <GamePanelStylePreview
+              style={panel.style}
+              scene={shownScene}
+              diorama={panel.diorama}
+              lite={panel.quality === 'low'}
+            />
+            {dioramaRowsShown(panel) ? (
+              <ProjectGamePanelDioramaRows layers={layers} panel={panel} set={set} />
+            ) : null}
           </Fragment>
         ) : (
           row

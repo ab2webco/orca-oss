@@ -1,5 +1,5 @@
 ---
-sourceHash: 86ccd02504484b96
+sourceHash: 968e252cc8457d6b
 ---
 
 # El juego orquestador de Agent Teams
@@ -272,6 +272,9 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
+    quality: high # high | low: Figures' diorama illustrated, or flat without shadows
+    pace: normal # normal | fast | direct: how the diorama's lead gets about
+    diorama: true # false keeps Figures in 2D
   steward: # the Orca steward in each member pane
     highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
 ```
@@ -299,6 +302,52 @@ Soft no es un estilo que se pueda elegir, porque nada lo dibuja: un `style: soft
 Se edita en la sección del juego del proyecto y, como valor por defecto para todos los proyectos, en
 Settings, Agents, Panel; el engranaje del panel abre la primera con equipo y la segunda sin él. Un Orca
 anterior a `panel` lo informa como ajuste desconocido y lo ignora.
+
+### Figures: el diorama
+
+Desde ORCA-1296 Figures dibuja el equipo como una base 3D de islas
+([`TeamSceneDiorama.tsx`](../../../src/renderer/src/components/team-scene/TeamSceneDiorama.tsx), con
+three.js 0.170.0). Todo lo que muestra sale del mismo `TeamSceneInput`, pisos y eventos que leen los
+otros estilos, nunca de un temporizador:
+
+- **Islas.** Una por máquina, de `teamSceneFloorsOf`, primero la de casa. Una isla remota tiene una
+  parcela por cada miembro que puede correr (su tope, de 1 a 6) y se atenúa mientras el host no
+  responde. Un miembro conserva su parcela entre lecturas, y una máquina o un miembro nuevo toma un
+  lugar libre, así que nada de lo ya dibujado se mueve
+  ([`team-diorama-layout.ts`](../../../src/shared/team-scene/team-diorama-layout.ts)).
+- **Parcelas.** `dioramaActionOf` lleva un miembro a build, inspect (CI en curso), wait (PR abierto),
+  signal (te necesita), repair (CI en rojo, el techo en llamas), cheer (mergeado), rest (limitado,
+  junto al fuego del campamento), start, idle (pesca, siembra o corta leña) o gone. La casa sube de
+  los cimientos al techo con la etapa de su obra
+  ([`team-diorama-actions.ts`](../../../src/shared/team-scene/team-diorama-actions.ts)).
+- **La ronda del líder.** Primero quien te necesita, luego cada isla con un miembro al que valga la
+  pena hablarle. Camina solo por los caminos (A* sobre un grafo de caminos) y cruza el agua solo en
+  bote de remos desde un muelle
+  ([`team-diorama-lead-round.ts`](../../../src/shared/team-scene/team-diorama-lead-round.ts)).
+  `pace: fast` va 2,5 veces más rápido; `pace: direct` salta de parada en parada, enviado por el mago
+  de la corte junto al castillo.
+- **Momentos.** `teamSceneEventsBetween` se convierte en señales con tiempo que sobreviven a la
+  lectura que las empezó
+  ([`team-diorama-cues.ts`](../../../src/shared/team-scene/team-diorama-cues.ts)):
+  - una llegada levanta polvo en la puerta del castillo y lleva al miembro caminando a su parcela;
+  - un merge lanza confeti;
+  - un CI en verde, un final, una entrega o un cambio del steward enciende un anillo en el miembro;
+  - una decisión de Jev le hace bajar el catalejo en su torre y mandar su paloma al pane;
+  - una máquina que no estaba en la lectura anterior sube su isla del mar, y luego su muelle.
+
+  La primera lectura no repite nada. Con movimiento reducido no se reproduce ninguna señal.
+- **Cámara.** Sigue al líder por defecto. **Show all** encuadra el mundo, arrastrar desplaza, y
+  pellizcar, o Ctrl o ⌘ con la rueda, acerca. La rueda sola desplaza el panel.
+- **Calidad.** `quality: low` dibuja figuras planas sin contorno ni sombras, a un píxel por píxel.
+  Settings muestra la vista previa de la calidad elegida.
+
+Sin WebGL (aceleración por hardware apagada) el panel vuelve a Figures en 2D, igual que con
+`diorama: false`. El E2E de Linux corre con la GPU apagada, así que CI comprueba ese respaldo; el
+camino 3D se comprueba en local en macOS. El canvas expone `data-diorama-islands`, `-advisor`,
+`-cues` y `-camera`, y el escenario `data-team-scene-webgl`, para los specs.
+
+Pixel, que tematiza un archivo de escena, dibuja un equipo en más de una máquina como el edificio de
+Office: un piso por máquina, cada uno con el nombre de su host.
 
 `steward.highRiskPaths` agrega partes de ruta a la lista de alto riesgo integrada del Orca steward
 (`migrations/`, `.github/workflows/`, `auth/`, `security/`, `crypto/`, `billing/`, `payments/`,

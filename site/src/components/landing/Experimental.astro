@@ -44,14 +44,61 @@ const copy = {
     <p class="heading">▾ {copy.eyebrow}</p>
     <h2 class="h2" id="experimental-title">{copy.title}</h2>
     <p class="lede">{copy.lede}</p>
-    <ul class="dash">
+    <ul class="lab">
       {
         copy.items.map(([title, text]) => (
           <li>
-            <b>{title}.</b> <span>{text}</span>
+            <details>
+              <summary>{title}</summary>
+              <p>{text}</p>
+            </details>
           </li>
         ))
       }
     </ul>
   </div>
 </section>
+
+<style>
+  .lab {
+    display: grid;
+    gap: 0 var(--space-xl);
+    margin: var(--space-xl) 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+  @media (min-width: 48rem) {
+    .lab {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .lab li {
+    border-bottom: 1px solid var(--line);
+  }
+  summary {
+    padding: var(--space-sm) 0;
+    cursor: pointer;
+    font-size: var(--text-lead);
+    font-weight: 600;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::before {
+    content: '▸ ';
+    color: var(--muted);
+  }
+  details[open] summary::before {
+    content: '▾ ';
+  }
+  /* Why explicit: Chromium still lays out a closed panel, so it would count as text on screen. */
+  details:not([open]) p {
+    display: none;
+  }
+  details p {
+    margin: 0 0 var(--space-md) 2ch;
+    color: var(--muted);
+  }
+</style>
