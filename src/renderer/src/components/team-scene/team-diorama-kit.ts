@@ -118,7 +118,14 @@ export function dioramaKit(p: DioramaPalette, status: TeamSceneStatusColors) {
   }
   const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
   const dispose = (root: THREE.Object3D) => {
-    root.traverse((o) => (o as THREE.Mesh).geometry?.dispose())
+    // Why each mesh's own material too: figures and cues make their own, outside this kit's map.
+    root.traverse((o) => {
+      const m = o as THREE.Mesh
+      m.geometry?.dispose()
+      for (const one of [m.material ?? []].flat()) {
+        one.dispose()
+      }
+    })
     for (const m of mats.values()) {
       m.dispose()
     }

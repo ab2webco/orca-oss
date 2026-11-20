@@ -1,0 +1,83 @@
+import * as THREE from 'three'
+import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
+import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
+import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
+import type { TeamSceneStatusColors } from './team-scene-painter-marks'
+import { dioramaFitCamera } from './team-diorama-camera'
+import { dioramaCast } from './team-diorama-cast'
+import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
+import { dioramaLeadActor } from './team-diorama-lead-actor'
+import { dioramaHomeProps } from './team-diorama-props'
+import { dioramaWorld } from './team-diorama-world-meshes'
+
+export type DioramaStage = {
+  height: number
+  draw: (t: number) => void
+  dispose: () => void
+}
+
+/** One read of the team as a lit world with its cast and its lead's round. */
+export function dioramaStage(
+  renderer: THREE.WebGLRenderer,
+  args: {
+    width: number
+    dark: boolean
+    status: TeamSceneStatusColors
+    input: TeamSceneInput
+    layout: DioramaLayout
+    views: ReadonlyMap<string, DioramaPlotView>
+  }
+): DioramaStage {
+  const { input, layout, views } = args
+  const lite = false
+  const kit = dioramaKit(args.dark ? NIGHT : DAY, args.status)
+  const scene = new THREE.Scene()
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.setClearColor(kit.p.sea)
+  // Why π: three r155+ lights are physical; the approved prototype's (r128) were π brighter.
+  scene.add(new THREE.HemisphereLight(kit.p.hemiSky, kit.p.hemiGround, kit.p.hemi * Math.PI))
+  const sun = new THREE.DirectionalLight(kit.p.sun, kit.p.sunI * Math.PI)
+  sun.castShadow = true
+  sun.shadow.mapSize.set(2048, 2048)
+  // Why a bias: without it thin decks and planks shade themselves in stripes that shimmer.
+  sun.shadow.bias = -0.0006
+  sun.shadow.normalBias = 0.02
+  scene.add(sun, sun.target)
+  const world = dioramaWorld(kit, layout, views)
+  scene.add(world)
+
+  const ticks = dioramaHomeProps(kit, world)
+  const lead = dioramaLeadActor(kit, world, { layout, views, input, lite })
+  const cast = dioramaCast(kit, world, { layout, views, input, lite })
+  ticks.push(lead.tick, ...cast.ticks)
+
+  const fit = dioramaFitCamera(world, args.width)
+  renderer.setSize(args.width, fit.height, true)
+  // The sun's shadow box covers the whole world, or shadows stop a few metres from the middle.
+  const center = fit.ground.getCenter(new THREE.Vector3())
+  const reach = fit.ground.getSize(new THREE.Vector3()).length() / 2 + 2
+  sun.target.position.copy(center)
+  sun.position.copy(center).add(new THREE.Vector3(-14, 26, 10))
+  Object.assign(sun.shadow.camera, {
+    left: -reach,
+    right: reach,
+    top: reach,
+    bottom: -reach,
+    near: 0.5,
+    far: 40 + reach * 2
+  })
+  sun.shadow.camera.updateProjectionMatrix()
+
+  return {
+    height: fit.height,
+    draw: (t) => {
+      for (const tick of ticks) {
+        tick(t)
+      }
+      renderer.render(scene, fit.camera)
+    },
+    dispose: () => kit.dispose(world)
+  }
+}
