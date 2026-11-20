@@ -12,78 +12,117 @@ const copy = {
     eyebrow: 'The desktop',
     title: 'Everything an agent needs, nothing that slows you down.',
     features: [
-      ['agent-grid.gif', 'Every agent, one screen', 'The agent grid groups every live agent of every project by what it needs from you. Each cell is the agent’s own terminal.'],
-      ['diff-note.gif', 'Notes on the diff, straight to the agent', 'Leave a note in the gutter of an AI diff and send it to the agent’s terminal.'],
-      ['design-mode.gif', 'Design mode in the built-in browser', 'Pick an element on the page an agent changed and send a change request with its selector, styles and HTML.'],
-      ['worklog-plugin.gif', 'Plugins you review first', 'A plugin is a folder with a manifest: a sandboxed panel and a worker under Node’s permission model. Nothing runs until you consent.']
+      ['agent-grid.gif', 'Every agent, one screen', 'Every live agent of every project, grouped by what it needs from you. Each cell is its own terminal.'],
+      ['diff-note.gif', 'Notes on the diff, straight to the agent', 'A note in the gutter of an AI diff goes to the agent’s terminal.'],
+      ['design-mode.gif', 'Design mode in the built-in browser', 'Pick an element an agent changed and send its selector, styles and HTML.'],
+      ['worklog-plugin.gif', 'Plugins you review first', 'A sandboxed panel and a worker under Node’s permission model. Nothing runs until you consent.']
     ],
     basics: [
-      ['One worktree per agent', 'Agents never share a checkout. Folders work as workspaces too, and SSH worktrees run on remote machines.'],
+      ['One worktree per agent', 'No shared checkouts. Folders and SSH worktrees on remote machines work too.'],
       ['Jump anywhere', 'Chats, terminals, worktrees, settings and actions in one list.'],
-      ['Terminals that outlive the window', 'Tabs and splits run in a background daemon; a restart reconnects them with their recent output.']
+      ['Terminals that outlive the window', 'A background daemon keeps them; a restart brings back their output.']
     ],
     moreTitle: 'And the rest of the toolbox',
+    toolsLabel: 'Toolbox',
     docs: 'Browse the docs'
   },
   es: {
     eyebrow: 'El escritorio',
     title: 'Todo lo que un agente necesita, nada que te frene.',
     features: [
-      ['agent-grid.gif', 'Todos los agentes, una pantalla', 'La cuadrícula de agentes agrupa cada agente vivo de cada proyecto según lo que necesita de ti. Cada celda es la terminal del propio agente.'],
-      ['diff-note.gif', 'Notas en el diff, directo al agente', 'Deja una nota en el margen de un diff hecho por IA y envíala a la terminal del agente.'],
-      ['design-mode.gif', 'Design mode en el navegador integrado', 'Elige un elemento de la página que cambió un agente y envía un pedido de cambio con su selector, estilos y HTML.'],
-      ['worklog-plugin.gif', 'Plugins que revisas antes', 'Un plugin es una carpeta con un manifiesto: un panel aislado y un worker bajo el modelo de permisos de Node. Nada corre hasta que das tu consentimiento.']
+      ['agent-grid.gif', 'Todos los agentes, una pantalla', 'Cada agente vivo de cada proyecto, agrupado según lo que necesita de ti. Cada celda es su propia terminal.'],
+      ['diff-note.gif', 'Notas en el diff, directo al agente', 'Una nota en el margen de un diff hecho por IA llega a la terminal del agente.'],
+      ['design-mode.gif', 'Design mode en el navegador integrado', 'Elige un elemento que cambió un agente y envía su selector, estilos y HTML.'],
+      ['worklog-plugin.gif', 'Plugins que revisas antes', 'Un panel aislado y un worker bajo el modelo de permisos de Node. Nada corre sin tu consentimiento.']
     ],
     basics: [
-      ['Un worktree por agente', 'Los agentes nunca comparten un checkout. Las carpetas también sirven como espacio de trabajo, y los worktrees por SSH corren en máquinas remotas.'],
+      ['Un worktree por agente', 'Sin checkouts compartidos. También sirven carpetas y worktrees por SSH en máquinas remotas.'],
       ['Salta a donde sea', 'Chats, terminales, worktrees, ajustes y acciones en una sola lista.'],
-      ['Terminales que sobreviven a la ventana', 'Pestañas y divisiones corren en un daemon en segundo plano; al reiniciar se reconectan con su salida reciente.']
+      ['Terminales que sobreviven a la ventana', 'Un daemon en segundo plano las mantiene; al reiniciar vuelve su salida.']
     ],
     moreTitle: 'Y el resto de la caja de herramientas',
+    toolsLabel: 'Caja de herramientas',
     docs: 'Ver la documentación'
   }
 }[lang]
 
-const tools: Record<Lang, [string, string][]> = {
+type Tool = [string, string]
+const tools: Record<Lang, { id: string; name: string; items: Tool[] }[]> = {
   en: [
-    ['Voice dictation', 'Talk to an agent with speech models that run on your machine.'],
-    ['Session history', 'Find and resume past agent sessions, local or over SSH.'],
-    ['iOS & Android emulators', 'An emulator pane next to the code, drivable from the CLI.'],
-    ['Floating workspace', 'Pop a terminal or workspace out and keep it on top.'],
-    ['Port scanner', 'See what each workspace is listening on.'],
-    ['Workspace cleanup', 'Find stale worktrees by size, age and unpushed work.'],
-    ['Sparse checkout presets', 'Check out only the folders a task needs.'],
-    ['Quick commands', 'Saved commands one shortcut away in any terminal.'],
-    ['Ghostty & Warp themes', 'Import the terminal theme you already use.'],
-    ['AI commit messages', 'Generate a commit message from the staged diff.'],
-    ['Fork sync', 'Fast-forward your fork from upstream, safely.'],
-    ['Automations', 'Scheduled prompts or commands on the account you choose.'],
-    ['Orca Sonar', 'An index of the repo for agents instead of grep.'],
-    ['Skills', 'Install, update and share agent skills.'],
-    ['Artifacts', 'Share HTML or Markdown as a link from the CLI.'],
-    ['Browser automation', '`orca goto`, `orca snapshot`, `orca click` drive the built-in browser.'],
-    ['Crash reports', 'The process that died, memory and GPU state, reviewed before sending.'],
-    ['Low-memory warning', 'Lists agent terminals first and says what opened it.']
+    {
+      id: 'agents',
+      name: 'Agents',
+      items: [
+        ['Voice dictation', 'Speech models that run on your machine.'],
+        ['Session history', 'Resume past sessions, local or over SSH.'],
+        ['Automations', 'Scheduled prompts or commands, on any account.'],
+        ['Orca Sonar', 'A repo index for agents, not grep.'],
+        ['Skills', 'Install, update and share agent skills.'],
+        ['Browser automation', '`orca goto`, `snapshot`, `click` drive the browser.']
+      ]
+    },
+    {
+      id: 'workspaces',
+      name: 'Terminals and workspaces',
+      items: [
+        ['iOS & Android emulators', 'A pane beside the code, driven from the CLI.'],
+        ['Floating workspace', 'A terminal or workspace kept on top.'],
+        ['Port scanner', 'What each workspace listens on.'],
+        ['Workspace cleanup', 'Stale worktrees by size, age and unpushed work.'],
+        ['Quick commands', 'Saved commands, one shortcut away.'],
+        ['Ghostty & Warp themes', 'Import the terminal theme you use.']
+      ]
+    },
+    {
+      id: 'git',
+      name: 'Git, sharing and upkeep',
+      items: [
+        ['Sparse checkout presets', 'Only the folders a task needs.'],
+        ['AI commit messages', 'Written from the staged diff.'],
+        ['Fork sync', 'Fast-forward from upstream, safely.'],
+        ['Artifacts', 'HTML or Markdown as a link, from the CLI.'],
+        ['Crash reports', 'What died, memory and GPU, reviewed before sending.'],
+        ['Low-memory warning', 'Agent terminals first, and what opened it.']
+      ]
+    }
   ],
   es: [
-    ['Dictado por voz', 'Háblale a un agente con modelos de voz que corren en tu máquina.'],
-    ['Historial de sesiones', 'Encuentra y retoma sesiones de agentes, locales o por SSH.'],
-    ['Emuladores iOS y Android', 'Un panel de emulador junto al código, controlable desde la CLI.'],
-    ['Espacio flotante', 'Saca una terminal o un espacio de trabajo y déjalo encima.'],
-    ['Escáner de puertos', 'Ve en qué puertos escucha cada espacio de trabajo.'],
-    ['Limpieza de espacios', 'Encuentra worktrees viejos por tamaño, antigüedad y trabajo sin subir.'],
-    ['Presets de sparse checkout', 'Baja solo las carpetas que necesita una tarea.'],
-    ['Comandos rápidos', 'Comandos guardados a un atajo en cualquier terminal.'],
-    ['Temas de Ghostty y Warp', 'Importa el tema de terminal que ya usas.'],
-    ['Mensajes de commit con IA', 'Genera el mensaje de commit desde el diff preparado.'],
-    ['Sincronizar forks', 'Avanza tu fork desde upstream, de forma segura.'],
-    ['Automatizaciones', 'Prompts o comandos programados en la cuenta que elijas.'],
-    ['Orca Sonar', 'Un índice del repo para los agentes en lugar de grep.'],
-    ['Skills', 'Instala, actualiza y comparte skills de agentes.'],
-    ['Artifacts', 'Comparte HTML o Markdown como enlace desde la CLI.'],
-    ['Automatización del navegador', '`orca goto`, `orca snapshot`, `orca click` manejan el navegador integrado.'],
-    ['Reportes de fallos', 'El proceso que cayó, memoria y estado de GPU, revisados antes de enviar.'],
-    ['Aviso de poca memoria', 'Lista primero las terminales de agentes y dice qué lo abrió.']
+    {
+      id: 'agents',
+      name: 'Agentes',
+      items: [
+        ['Dictado por voz', 'Modelos de voz que corren en tu máquina.'],
+        ['Historial de sesiones', 'Retoma sesiones, locales o por SSH.'],
+        ['Automatizaciones', 'Prompts o comandos programados, en cualquier cuenta.'],
+        ['Orca Sonar', 'Un índice del repo para agentes, no grep.'],
+        ['Skills', 'Instala, actualiza y comparte skills de agentes.'],
+        ['Automatización del navegador', '`orca goto`, `snapshot`, `click` manejan el navegador.']
+      ]
+    },
+    {
+      id: 'workspaces',
+      name: 'Terminales y espacios',
+      items: [
+        ['Emuladores iOS y Android', 'Un panel junto al código, desde la CLI.'],
+        ['Espacio flotante', 'Una terminal o un espacio siempre encima.'],
+        ['Escáner de puertos', 'En qué puertos escucha cada espacio.'],
+        ['Limpieza de espacios', 'Worktrees viejos por tamaño, antigüedad y trabajo sin subir.'],
+        ['Comandos rápidos', 'Comandos guardados, a un atajo.'],
+        ['Temas de Ghostty y Warp', 'Importa el tema de terminal que usas.']
+      ]
+    },
+    {
+      id: 'git',
+      name: 'Git, compartir y mantenimiento',
+      items: [
+        ['Presets de sparse checkout', 'Solo las carpetas que necesita una tarea.'],
+        ['Mensajes de commit con IA', 'Escritos desde el diff preparado.'],
+        ['Sincronizar forks', 'Avanza desde upstream, de forma segura.'],
+        ['Artifacts', 'HTML o Markdown como enlace, desde la CLI.'],
+        ['Reportes de fallos', 'Qué cayó, memoria y GPU, revisados antes de enviar.'],
+        ['Aviso de poca memoria', 'Terminales de agentes primero, y qué lo abrió.']
+      ]
+    }
   ]
 }
 
@@ -94,7 +133,20 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
   <div class="wrap">
     <p class="heading">▾ {copy.eyebrow}</p>
     <h2 class="h2" id="desktop-title">{copy.title}</h2>
-    <ul class="dash">
+    <div class="features">
+      {
+        copy.features.slice(0, 1).map(([file, title, text]) => (
+          <article class="split">
+            <div>
+              <h3>{title}</h3>
+              <p class="muted">{text}</p>
+            </div>
+            <Recording lang={lang} file={file as 'agent-grid.gif'} />
+          </article>
+        ))
+      }
+    </div>
+    <ul class="dash basics">
       {
         copy.basics.map(([title, text]) => (
           <li>
@@ -105,58 +157,113 @@ const code = (text: string) => text.replace(/`([^`]+)`/g, '<code>$1</code>')
     </ul>
     <div class="features">
       {
-        copy.features.map(([file, title, text]) => (
-          <article>
-            <h3>{title}</h3>
-            <p class="muted">{text}</p>
+        copy.features.slice(1, 2).map(([file, title, text]) => (
+          <article class="split">
+            <div>
+              <h3>{title}</h3>
+              <p class="muted">{text}</p>
+            </div>
             <Recording lang={lang} file={file as 'agent-grid.gif'} />
           </article>
         ))
       }
     </div>
-    <h3 class="more-title">{copy.moreTitle}</h3>
-    <dl class="tools">
+    <h3 class="more-title" id="tools-title">{copy.moreTitle}</h3>
+    <div class="tabs" role="tablist" aria-label={copy.toolsLabel} hidden data-tools>
       {
-        tools[lang].map(([title, text]) => (
-          <div>
-            <dt>{title}</dt>
-            <dd set:html={code(text)} />
-          </div>
+        tools[lang].map(({ id, name }, i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`tools-tab-${id}`}
+            aria-controls={`tools-panel-${id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {name}
+          </button>
         ))
       }
-    </dl>
+    </div>
+    {
+      tools[lang].map(({ id, name, items }) => (
+        <div class="group" id={`tools-panel-${id}`} role="tabpanel" aria-labelledby={`tools-tab-${id}`} data-tools-panel>
+          <h4 class="group-title">{name}</h4>
+          <dl class="tools">
+            {items.map(([title, text]) => (
+              <div>
+                <dt>{title}</dt>
+                <dd set:html={code(text)} />
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))
+    }
+    <div class="features">
+      {
+        copy.features.slice(2).map(([file, title, text]) => (
+          <article class="split">
+            <div>
+              <h3>{title}</h3>
+              <p class="muted">{text}</p>
+            </div>
+            <Recording lang={lang} file={file as 'agent-grid.gif'} />
+          </article>
+        ))
+      }
+    </div>
     <ul class="links">
       <li><a href={docsHref(lang, '')}>{copy.docs}</a></li>
     </ul>
   </div>
 </section>
 
+<script>
+  import { wireTabList } from './tab-list'
+
+  // Without script every group shows under its own title; with it, one group per tab.
+  for (const list of document.querySelectorAll<HTMLElement>('[data-tools]')) {
+    list.hidden = false
+    for (const title of document.querySelectorAll<HTMLElement>('[data-tools-panel] .group-title')) {
+      title.hidden = true
+    }
+    wireTabList([...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')])
+  }
+</script>
+
 <style>
   .features {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 40px 32px;
-    margin-top: 32px;
+    margin-top: var(--space-xl);
   }
-  @media (min-width: 900px) {
-    .features {
-      grid-template-columns: 1fr 1fr;
-    }
+  .features .split {
+    margin-top: var(--space-2xl);
+    align-items: center;
   }
-  .features article {
-    display: flex;
-    flex-direction: column;
+  .features h3 {
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .features p {
+    margin: var(--space-xs) 0 0;
+    font-size: var(--text-lead);
   }
   h3 {
     margin: 0;
     font-size: 16px;
   }
-  .features p {
-    margin: 6px 0 14px;
-    flex: 1;
-  }
   .more-title {
-    margin-top: 48px;
+    margin-top: var(--space-4xl);
+  }
+  .basics {
+    margin-top: var(--space-3xl);
+    font-size: var(--text-lead);
+  }
+  .group-title {
+    margin: var(--space-lg) 0 0;
+    font-size: var(--text-body);
+    color: var(--muted);
   }
   .tools {
     display: grid;
