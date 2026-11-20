@@ -69,4 +69,11 @@ describe("the lead's name the game state hands the mod", () => {
   it('is the Lead name when one is set', async () => {
     expect((await stateWith({ label: 'Boss' })).leadName).toBe('Boss')
   })
+
+  // Why the parent pane: a member's state must name its lead as the lead's own does.
+  it("gives a member's state its lead's name, set or not", async () => {
+    const member = { leaderPaneKey: 'tab-2:0', callerParentPaneKey: LEADER.paneKey }
+    expect((await stateWith({ ...member, scene: 'vigilante' })).leadName).toBe('Lead')
+    expect((await stateWith({ ...member, label: 'Boss' })).leadName).toBe('Boss')
+  })
 })
