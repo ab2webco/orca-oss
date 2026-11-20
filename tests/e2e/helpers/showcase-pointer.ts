@@ -45,6 +45,6 @@ export async function glideTo(page: Page, target: Locator, steps = 30): Promise<
 
 export async function glideAndClick(page: Page, target: Locator, steps = 30): Promise<void> {
   await glideTo(page, target, steps)
-  await page.mouse.down()
-  await page.mouse.up()
+  // Why click(): a raw down/up at the box centre missed the Annotate toggle on Linux CI.
+  await target.click()
 }
