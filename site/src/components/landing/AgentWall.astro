@@ -11,22 +11,22 @@ const copy = {
   en: {
     eyebrow: 'Bring your own agent',
     title: `${agents.length} coding agents. Your subscriptions. One screen.`,
-    lede: 'Orca Lab launches and tracks the agent CLIs you already pay for. Run Claude Code next to Codex next to Gemini, each in its own worktree, and see at a glance which one needs you.',
+    lede: 'The CLIs you already pay for, each in its own worktree. See which one needs you.',
     points: [
-      ['Switch accounts mid-session', 'Several Claude and Codex accounts; switch a running terminal and the conversation resumes.'],
-      ['Usage next to every agent', 'Rate-limit usage and quota resets, per account, before you hit the wall.'],
-      ['Resume any past session', 'Browse earlier agent sessions, local or over SSH, and pick one back up.']
+      ['Switch accounts mid-session', 'Several Claude and Codex accounts; the conversation resumes.'],
+      ['Usage next to every agent', 'Rate limits and quota resets per account, before the wall.'],
+      ['Resume any past session', 'Local or over SSH.']
     ],
     more: 'Supported agents'
   },
   es: {
     eyebrow: 'Trae tu propio agente',
     title: `${agents.length} agentes de código. Tus suscripciones. Una pantalla.`,
-    lede: 'Orca Lab lanza y sigue las CLIs de agentes que ya pagas. Corre Claude Code junto a Codex y Gemini, cada uno en su worktree, y ve de un vistazo cuál te necesita.',
+    lede: 'Las CLIs que ya pagas, cada una en su worktree. Ve cuál te necesita.',
     points: [
-      ['Cambia de cuenta sin cortar la sesión', 'Varias cuentas de Claude y Codex; cambia una terminal en marcha y la conversación continúa.'],
-      ['Uso junto a cada agente', 'Uso de rate limit y reinicios de cuota por cuenta, antes de chocar con el límite.'],
-      ['Retoma cualquier sesión', 'Explora sesiones anteriores de los agentes, locales o por SSH, y continúa una.']
+      ['Cambia de cuenta sin cortar la sesión', 'Varias cuentas de Claude y Codex; la conversación sigue.'],
+      ['Uso junto a cada agente', 'Rate limit y reinicios de cuota por cuenta, antes del límite.'],
+      ['Retoma cualquier sesión', 'Local o por SSH.']
     ],
     more: 'Agentes soportados'
   }
@@ -38,9 +38,6 @@ const copy = {
     <p class="heading">▾ {copy.eyebrow}</p>
     <h2 class="h2" id="agents-title">{copy.title}</h2>
     <p class="lede">{copy.lede}</p>
-    <ul class="agents box" aria-label={copy.eyebrow}>
-      {agents.map((name) => <li>{name}</li>)}
-    </ul>
     <div class="split">
       <div>
         <ul class="dash">
@@ -58,18 +55,26 @@ const copy = {
       </div>
       <Recording lang={lang} file="claude-accounts-switch.gif" />
     </div>
+    <ul class="agents box" aria-label={copy.eyebrow}>
+      {agents.map((name) => <li>{name}</li>)}
+    </ul>
   </div>
 </section>
 
 <style>
   .agents {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-    gap: 2px 24px;
-    margin: 24px 0 0;
-    padding: 14px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-xs) var(--space-lg);
+    margin: var(--space-xl) 0 0;
+    padding: var(--space-lg);
     list-style: none;
-    font-size: 14px;
+  }
+  @media (min-width: 60rem) {
+    .agents {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      font-size: var(--text-lead);
+    }
   }
   .agents li::before {
     content: '● ';
