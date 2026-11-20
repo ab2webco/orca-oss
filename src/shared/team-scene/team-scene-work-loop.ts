@@ -129,9 +129,13 @@ export function seatedPlayOf(
   const row = [...world.bodies.values()]
     .filter((one) => one.role === 'member' && one.home.depth === body.home.depth)
     .sort((p, q) => p.home.x - q.home.x)
-  const seat = Math.max(0, row.indexOf(body))
+  return seatedPlayAt(Math.max(0, row.indexOf(body)), world.t)
+}
+
+/** The play at `seat` (left to right in its row) at time `t`; shared with the 3D Office. */
+export function seatedPlayAt(seat: number, t: number): TeamScenePlay {
   // Why staggered: each seat switches a fifth of a turn after its left neighbour, so two
   // neighbours sit one or two plays apart and the row never changes all at once.
-  const turn = Math.floor((world.t + ((seat % 5) * PLAY_SECONDS) / 5) / PLAY_SECONDS)
-  return PLAYS[(seat + turn) % PLAYS.length]
+  const turn = Math.floor((t + ((seat % 5) * PLAY_SECONDS) / 5) / PLAY_SECONDS)
+  return PLAYS[(seat + turn) % PLAYS.length]!
 }

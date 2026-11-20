@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated from 'react-native-reanimated'
@@ -101,8 +101,10 @@ export function TeamSheet({
   const tab: TeamTab = picked ?? (questions.length > 0 ? 'inbox' : 'team')
   const { scrollY } = drag
   const sceneBand = useTeamSceneBandShown(scrollY)
-  // Why: a keyed tab remounts its ScrollView at the top without a scroll event to say so.
-  useEffect(() => {
+  const scrollRef = useRef<Animated.ScrollView>(null)
+  // Why scroll, not a key: a keyed ScrollView remounted the stage's WebView on every switch (ORCA-1307).
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false })
     scrollY.value = 0
   }, [tab, scrollY])
   useEffect(() => {
@@ -160,9 +162,8 @@ export function TeamSheet({
             <GestureDetector gesture={drag.contentPan}>
               <View style={styles.body} collapsable={false}>
                 <GestureDetector gesture={drag.scrollGesture}>
-                  {/* Why keyed: a tab switch (Answer in Inbox) must not keep the other tab's scroll and hide the tabs. */}
                   <Animated.ScrollView
-                    key={tab}
+                    ref={scrollRef}
                     bounces={false}
                     onScroll={drag.scrollHandler}
                     scrollEventThrottle={16}
