@@ -54,6 +54,11 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
     } else {
       // Home plus the two paired machines the members run on.
       await expect(canvas).toHaveAttribute('data-diorama-islands', '3')
+      // The lead walks its round: the stage is not the same picture three seconds later.
+      const before = await canvas.screenshot({ path: testInfo.outputPath('diorama-motion-a.png') })
+      await orcaPage.waitForTimeout(3000)
+      const after = await canvas.screenshot({ path: testInfo.outputPath('diorama-motion-b.png') })
+      expect(Buffer.compare(before, after), 'the diorama stood still').not.toBe(0)
     }
     for (const width of WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)

@@ -6,12 +6,19 @@ import {
   type DioramaPlotView
 } from '../../../../shared/team-scene/team-diorama-actions'
 import {
-  DIORAMA_GATE,
   teamDioramaLayoutOf,
   teamDioramaMachinesOf,
   type DioramaOrder
 } from '../../../../shared/team-scene/team-diorama-layout'
-import { dioramaStandOf } from '../../../../shared/team-scene/team-diorama-lead-round'
+import {
+  dioramaBoatAt,
+  dioramaLeadAt,
+  dioramaLeadRoundOf,
+  dioramaStandOf
+} from '../../../../shared/team-scene/team-diorama-lead-round'
+import { dioramaWaterGrid } from '../../../../shared/team-scene/team-diorama-nav'
+import { dioramaRoadNet } from '../../../../shared/team-scene/team-diorama-roads'
+import { dioramaBoat } from './team-diorama-boats'
 import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
@@ -111,10 +118,48 @@ export function TeamSceneDiorama({
     scene.add(world)
 
     const placed: Placed[] = []
+    // The lead's round: needs-you first, then each island by boat; only roads and water.
     const lead = dioramaFigure(kit, 0, { lead: true, lite: false })
-    lead.g.position.set(DIORAMA_GATE[0], 0, DIORAMA_GATE[1])
     world.add(lead.g)
-    placed.push({ figure: lead, pose: 'idle' })
+    const leadScale = lead.g.scale.x
+    const visitable = new Set(['build', 'inspect', 'wait', 'repair', 'cheer'])
+    const round = dioramaLeadRoundOf({
+      layout,
+      roads: dioramaRoadNet(layout),
+      water: dioramaWaterGrid(layout),
+      needs: input.members.filter((m) => views.get(m.key)?.action === 'signal').map((m) => m.key),
+      visits: input.members
+        .filter((m) => visitable.has(views.get(m.key)?.action ?? ''))
+        .map((m) => m.key),
+      pace: 'normal'
+    })
+    const boats = Object.entries(layout.homeDocks).map(([column, dock]) => ({
+      column: Number(column),
+      home: dock.boat,
+      boat: dioramaBoat(kit, world)
+    }))
+    let yaw = 0
+    let lastT: number | null = null
+    const moveLead = (t: number) => {
+      for (const b of boats) {
+        const at = dioramaBoatAt(round, b.column, b.home, t)
+        b.boat.place(at.at, at.heading, t, at.moving)
+      }
+      const at = dioramaLeadAt(round, t)
+      lead.g.position.x = at.at[0]
+      lead.g.position.z = at.at[1]
+      lead.baseY = at.pose === 'sit' ? -0.6 : 0
+      lead.g.scale.setScalar(leadScale * at.blink)
+      // Why eased: a snapped turn reads as a jump; it turns toward its heading over a few frames.
+      if (at.heading && Math.hypot(at.heading[0], at.heading[1]) > 1e-6) {
+        const goal = Math.atan2(at.heading[0], at.heading[1])
+        const dt = lastT === null ? 1 : Math.min(0.1, Math.max(0, t - lastT))
+        yaw += (((goal - yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 7)
+        lead.g.rotation.y = yaw
+      }
+      lastT = t
+      poseDioramaFigure(lead, at.pose === 'talk' ? 'idle' : at.pose, t)
+    }
     for (const island of layout.islands) {
       for (const plot of island.plots) {
         const view = plot.key ? views.get(plot.key) : undefined
@@ -181,6 +226,7 @@ export function TeamSceneDiorama({
     camera.updateProjectionMatrix()
 
     const draw = (t: number) => {
+      moveLead(t)
       for (const p of placed) {
         poseDioramaFigure(p.figure, p.pose, t)
       }

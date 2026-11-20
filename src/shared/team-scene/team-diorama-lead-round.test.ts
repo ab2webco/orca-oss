@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DIORAMA_GATE, teamDioramaLayoutOf, type DioramaMachine } from './team-diorama-layout'
 import {
+  dioramaBoatAt,
+  dioramaLeadAt,
   dioramaLeadRoundOf,
   dioramaLeadStepAt,
   dioramaStandOf,
@@ -81,5 +83,37 @@ describe("the lead's round", () => {
   it('loops: a moment past the end is the same step as its remainder', () => {
     const round = roundOf()
     expect(dioramaLeadStepAt(round, round.total + 1)).toBe(dioramaLeadStepAt(round, 1))
+  })
+})
+
+describe('the lead and the boats at a moment', () => {
+  it('seats the lead in its boat while rowing, and moors the boat where the trip left it', () => {
+    const round = roundOf()
+    const row = round.steps.find((s) => s.kind === 'row')!
+    const mid = row.start + row.dur / 2
+    const lead = dioramaLeadAt(round, mid)
+    expect(lead.pose).toBe('sit')
+    const home = layout.homeDocks[lead.column!]!.boat
+    const boat = dioramaBoatAt(round, lead.column!, home, mid)
+    expect(boat.moving).toBe(true)
+    expect(boat.at).toEqual(lead.at)
+    // Just after the outbound row, the boat waits at the island while the lead talks.
+    const moored = dioramaBoatAt(round, lead.column!, home, row.start + row.dur + 0.5)
+    expect(moored.moving).toBe(false)
+    expect(Math.hypot(moored.at[0] - home[0], moored.at[1] - home[1])).toBeGreaterThan(1)
+    // A whole loop later every boat is home again.
+    const back = dioramaBoatAt(round, lead.column!, home, round.total - 0.01).at
+    expect(Math.hypot(back[0] - home[0], back[1] - home[1])).toBeLessThan(0.3)
+  })
+
+  it('blinks the lead out and in on a direct jump, and walks it otherwise', () => {
+    const direct = roundOf('direct')
+    const jump = direct.steps.find((s) => s.kind === 'jump')!
+    expect(dioramaLeadAt(direct, jump.start + jump.dur / 2).blink).toBeLessThan(0.1)
+    const walk = roundOf().steps.find((s) => s.kind === 'walk')!
+    expect(dioramaLeadAt(roundOf(), walk.start + walk.dur / 2)).toMatchObject({
+      pose: 'walk',
+      blink: 1
+    })
   })
 })

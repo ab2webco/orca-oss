@@ -4,7 +4,7 @@ import {
   type DioramaLayout,
   type DioramaPoint
 } from './team-diorama-layout'
-import { polyLengths, type DioramaGrid } from './team-diorama-nav'
+import { polyAt, polyLengths, type DioramaGrid } from './team-diorama-nav'
 import type { DioramaRoadNet } from './team-diorama-roads'
 
 // Why a plan, not a simulation: the lead's whole round is laid out once per read of the team, so
@@ -151,4 +151,82 @@ export function dioramaLeadRoundOf(args: {
 export function dioramaLeadStepAt(round: DioramaLeadRound, t: number): DioramaLeadStep {
   const tt = round.total > 0 ? ((t % round.total) + round.total) % round.total : 0
   return round.steps.find((s) => tt >= s.start && tt < s.start + s.dur) ?? round.steps.at(-1)!
+}
+
+const easeInOut = (x: number): number => {
+  const k = Math.min(1, Math.max(0, x))
+  return k * k * (3 - 2 * k)
+}
+
+/** Where the lead is at `t`, its heading and pose; `blink` shrinks it while the mage sends it. */
+export function dioramaLeadAt(
+  round: DioramaLeadRound,
+  t: number
+): {
+  at: DioramaPoint
+  heading: DioramaPoint | null
+  pose: 'walk' | 'sit' | 'talk' | 'idle'
+  blink: number
+  column: number | null
+} {
+  const s = dioramaLeadStepAt(round, t)
+  const k = s.dur > 0 ? ((((t % round.total) + round.total) % round.total) - s.start) / s.dur : 1
+  if (s.kind === 'walk' || s.kind === 'row') {
+    const p = polyAt(s.pts, s.cum, easeInOut(k) * s.cum.at(-1)!)
+    return {
+      at: p.at,
+      heading: p.heading,
+      pose: s.kind === 'row' ? 'sit' : 'walk',
+      blink: 1,
+      column: s.kind === 'row' ? s.column : null
+    }
+  }
+  if (s.kind === 'jump') {
+    return {
+      at: k < 0.5 ? s.from : s.to,
+      heading: null,
+      pose: 'idle',
+      blink: Math.max(0.02, Math.abs(1 - 2 * k)),
+      column: null
+    }
+  }
+  return {
+    at: s.at,
+    heading: s.face ? [s.face[0] - s.at[0], s.face[1] - s.at[1]] : null,
+    pose: s.pose,
+    blink: 1,
+    column: null
+  }
+}
+
+/** Where a column's boat is at `t`: moored where its last trip in the round left it. */
+export function dioramaBoatAt(
+  round: DioramaLeadRound,
+  column: number,
+  home: DioramaPoint,
+  t: number
+): { at: DioramaPoint; heading: DioramaPoint | null; moving: boolean } {
+  const tt = round.total > 0 ? ((t % round.total) + round.total) % round.total : 0
+  let out: { at: DioramaPoint; heading: DioramaPoint | null; moving: boolean } = {
+    at: home,
+    heading: null,
+    moving: false
+  }
+  for (const s of round.steps) {
+    if (s.kind !== 'row' || s.column !== column || s.start > tt) {
+      continue
+    }
+    if (tt < s.start + s.dur) {
+      const p = polyAt(s.pts, s.cum, easeInOut((tt - s.start) / s.dur) * s.cum.at(-1)!)
+      return { at: p.at, heading: p.heading, moving: true }
+    }
+    const n = s.pts.length
+    out = {
+      at: s.pts[n - 1]!,
+      heading:
+        n > 1 ? [s.pts[n - 1]![0] - s.pts[n - 2]![0], s.pts[n - 1]![1] - s.pts[n - 2]![1]] : null,
+      moving: false
+    }
+  }
+  return out
 }
