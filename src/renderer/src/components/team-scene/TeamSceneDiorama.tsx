@@ -6,12 +6,19 @@ import {
   type DioramaPlotView
 } from '../../../../shared/team-scene/team-diorama-actions'
 import {
+  dioramaCuesLive,
+  dioramaCuesOf,
+  type DioramaCue
+} from '../../../../shared/team-scene/team-diorama-cues'
+import {
   teamDioramaLayoutOf,
   teamDioramaMachinesOf,
   type DioramaOrder
 } from '../../../../shared/team-scene/team-diorama-layout'
+import { teamSceneEventsBetween } from '../../../../shared/team-scene/team-scene-events'
 import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
+import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { dioramaStage } from './team-diorama-stage'
 import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
@@ -30,6 +37,8 @@ export function TeamSceneDiorama({
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const order = useRef<DioramaOrder | undefined>(undefined)
+  const seen = useRef<TeamSceneInput | null>(null)
+  const cues = useRef<DioramaCue[]>([])
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const status = useTeamSceneStatusColors()
   const [width, setWidth] = useState(0)
@@ -94,13 +103,19 @@ export function TeamSceneDiorama({
       return
     }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Why the moments live in a ref: each read rebuilds the stage, and a moment keeps playing.
+    const at = performance.now() / 1000
+    const events = teamSceneEventsBetween(seen.current, input)
+    seen.current = input
+    cues.current = reduced ? [] : dioramaCuesLive(cues.current, dioramaCuesOf(events, at), at)
     const stage = dioramaStage(renderer, {
       width,
       dark: document.documentElement.classList.contains('dark'),
       status,
       input,
       layout,
-      views
+      views,
+      cues: cues.current
     })
     const draw = stage.draw
     let raf = 0,
@@ -118,11 +133,14 @@ export function TeamSceneDiorama({
       visible = entry?.isIntersecting ?? true
     })
     watch.observe(el)
-    draw(1.3)
+    // Why the clock under motion: a moment that just started must show in the very first frame.
+    draw(reduced ? 1.3 : at)
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
     el.dataset.dioramaIslands = String(layout.islands.length)
+    el.dataset.dioramaAdvisor = input.advisor ? 'tower' : 'none'
+    el.dataset.dioramaCues = cues.current.map((c) => `${c.kind}:${c.key}`).join(' ')
     return () => {
       cancelAnimationFrame(raf)
       watch.disconnect()

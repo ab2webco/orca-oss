@@ -1,10 +1,13 @@
 import * as THREE from 'three'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
+import type { DioramaCue } from '../../../../shared/team-scene/team-diorama-cues'
 import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
+import { dioramaAdvisor, DIORAMA_TOWER } from './team-diorama-advisor'
 import { dioramaFitCamera } from './team-diorama-camera'
 import { dioramaCast } from './team-diorama-cast'
+import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
 import { dioramaHomeProps } from './team-diorama-props'
@@ -16,7 +19,7 @@ export type DioramaStage = {
   dispose: () => void
 }
 
-/** One read of the team as a lit world with its cast and its lead's round. */
+/** One read of the team as a lit world with its cast, its lead's round and the moments playing. */
 export function dioramaStage(
   renderer: THREE.WebGLRenderer,
   args: {
@@ -26,9 +29,10 @@ export function dioramaStage(
     input: TeamSceneInput
     layout: DioramaLayout
     views: ReadonlyMap<string, DioramaPlotView>
+    cues: readonly DioramaCue[]
   }
 ): DioramaStage {
-  const { input, layout, views } = args
+  const { input, layout, views, cues } = args
   const lite = false
   const kit = dioramaKit(args.dark ? NIGHT : DAY, args.status)
   const scene = new THREE.Scene()
@@ -52,6 +56,23 @@ export function dioramaStage(
   const lead = dioramaLeadActor(kit, world, { layout, views, input, lite })
   const cast = dioramaCast(kit, world, { layout, views, input, lite })
   ticks.push(lead.tick, ...cast.ticks)
+  const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite) : null
+  if (advisor) {
+    ticks.push(advisor.tick)
+  }
+  const anchorOf = (key: string) => {
+    const f = key === 'lead' ? lead.figure : cast.figures.get(key)
+    return f ? f.g.position.clone() : null
+  }
+  ticks.push(
+    ...dioramaCueEffects(
+      kit,
+      world,
+      cues,
+      anchorOf,
+      advisor ? DIORAMA_TOWER.clone().setY(3.2) : null
+    )
+  )
 
   const fit = dioramaFitCamera(world, args.width)
   renderer.setSize(args.width, fit.height, true)

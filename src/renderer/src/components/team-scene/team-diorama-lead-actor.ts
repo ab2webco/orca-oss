@@ -66,7 +66,7 @@ export function dioramaLeadActor(
       lead.g.rotation.y = yaw
     }
     lastT = t
-    poseDioramaFigure(lead, at.pose === 'talk' ? 'idle' : at.pose, t)
+    poseDioramaFigure(lead, at.pose === 'talk' ? 'talk' : at.pose, t)
   }
   return { figure: lead, tick }
 }

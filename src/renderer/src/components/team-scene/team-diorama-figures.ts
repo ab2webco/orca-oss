@@ -4,7 +4,16 @@ import type { DioramaKit } from './team-diorama-kit'
 // Why chibi with an ink outline: the owner chose 3D figures that read like the illustrated ones,
 // turning toward where they walk, with no swords (ORCA-1296). Low resources draws a few flat parts.
 
-export type DioramaRole = 'lead' | 'wizard' | 'builder' | 'scout' | 'knight' | 'scholar' | 'smith'
+export type DioramaRole =
+  | 'lead'
+  | 'advisor'
+  | 'mage'
+  | 'wizard'
+  | 'builder'
+  | 'scout'
+  | 'knight'
+  | 'scholar'
+  | 'smith'
 export type DioramaFigure = {
   g: THREE.Group
   legs: THREE.Group[]
@@ -21,6 +30,8 @@ const SKIN = [0xf2c9a0, 0xd9a274, 0xa86b45, 0xf5d5b5, 0xc28455, 0xe8b88e]
 const HAIR = [0x4a3324, 0x8a5a2b, 0x2a221c, 0xd9a35a, 0x6b4428, 0x1f1a16]
 const TUNIC: Record<DioramaRole, number> = {
   lead: 0x3b5bb5,
+  advisor: 0x2f7f86,
+  mage: 0x26357e,
   wizard: 0x6d4aa0,
   builder: 0xa0513a,
   scout: 0x3f7a4a,
@@ -58,9 +69,9 @@ const gradient = (() => {
 export function dioramaFigure(
   k: DioramaKit,
   look: number,
-  opts: { lead?: boolean; lite: boolean }
+  opts: { lead?: boolean; role?: 'advisor' | 'mage'; lite: boolean }
 ): DioramaFigure {
-  const role: DioramaRole = opts.lead ? 'lead' : COSTUMES[look % COSTUMES.length]!
+  const role: DioramaRole = opts.lead ? 'lead' : (opts.role ?? COSTUMES[look % COSTUMES.length]!)
   const skin = SKIN[look % SKIN.length]!
   const hair = HAIR[Math.floor(look / 6) % HAIR.length]!
   const mats = new Map<number, THREE.Material>()
@@ -113,7 +124,7 @@ export function dioramaFigure(
     0,
     g
   )
-  if (role === 'wizard' || role === 'scholar') {
+  if (role === 'wizard' || role === 'scholar' || role === 'mage' || role === 'advisor') {
     part(new THREE.CylinderGeometry(0.22, 0.34, 0.5, 12), TUNIC[role], 0, 0.32, 0, g)
   }
   const arms: THREE.Group[] = []
@@ -145,8 +156,10 @@ export function dioramaFigure(
     eye.position.set(ex, 0, 0.275)
     head.add(eye)
   }
-  if (role === 'wizard') {
-    part(new THREE.ConeGeometry(0.27, 0.62, 12), 0x6d4aa0, 0, 0.48, -0.03, head).rotation.x = -0.18
+  if (role === 'wizard' || role === 'mage') {
+    const tall = role === 'mage' ? 0.78 : 0.62
+    part(new THREE.ConeGeometry(0.27, tall, 12), TUNIC[role], 0, 0.48, -0.03, head).rotation.x =
+      -0.18
   } else if (role === 'knight') {
     part(
       new THREE.SphereGeometry(0.33, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
@@ -173,6 +186,28 @@ export function dioramaFigure(
       -0.03,
       head
     ).rotation.x = -0.35
+  }
+  if (role === 'advisor') {
+    // Jev watches through round glasses and a spyglass, never with a weapon (owner, ORCA-1296).
+    for (const ex of [-0.1, 0.1]) {
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.065, 0.013, 6, 16),
+        new THREE.MeshBasicMaterial({ color: 0x2a2420 })
+      )
+      rim.position.set(ex, 0, 0.285)
+      head.add(rim)
+    }
+    const glass = new THREE.Group()
+    glass.position.set(0, -0.4, 0.04)
+    arms[1]!.add(glass)
+    part(
+      new THREE.CylinderGeometry(0.035, 0.055, 0.46, 10),
+      0xb08d57,
+      0,
+      0,
+      0.16,
+      glass
+    ).rotation.x = Math.PI / 2
   }
   if (role === 'builder' || role === 'smith') {
     const tool = new THREE.Group()

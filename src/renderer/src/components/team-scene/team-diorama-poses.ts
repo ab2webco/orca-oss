@@ -15,6 +15,7 @@ export type DioramaPose =
   | 'chop'
   | 'fish'
   | 'water'
+  | 'spy'
 
 /** The loop a member plays at its plot for its action. */
 export const POSE_OF_ACTION: Record<DioramaAction, DioramaPose> = {
@@ -72,6 +73,14 @@ export function poseDioramaFigure(f: DioramaFigure, pose: DioramaPose, t: number
     lR!.rotation.x = -s * 0.4
     aR!.rotation.x = -1.15
     lift = Math.abs(Math.cos(t * 6)) * 0.02
+  } else if (pose === 'spy') {
+    aR!.rotation.x = -2.05
+    aR!.rotation.z = 0.42
+    aL!.rotation.x = -1.7
+    aL!.rotation.z = -0.38
+  } else if (pose === 'talk') {
+    aR!.rotation.x = -0.75 + Math.sin(t * 3) * 0.2
+    aL!.rotation.z = -0.12
   } else if (pose === 'sit') {
     lL!.rotation.x = lR!.rotation.x = -1.45
     aL!.rotation.x = aR!.rotation.x = -0.6
