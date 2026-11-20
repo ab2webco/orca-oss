@@ -271,7 +271,7 @@ describe('gameLeadAlertsOf: open PRs past the cap (ORCA-1301)', () => {
   const withOpen = (total: number) =>
     stateOf([], {
       lead: { ...DEFAULT_GAME_LEAD, cap: 1 },
-      project: { reviews: { total, url: null, items: [] }, todo: null }
+      project: { reviews: { provider: 'github', total, url: null, items: [] }, todo: null }
     })
 
   it('alerts once a member opens PRs past a cap of 1, and again as the count grows', () => {
