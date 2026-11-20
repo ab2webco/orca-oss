@@ -34,6 +34,9 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
   if (remote && agent.found) {
     return `found on ${remote.host}: orca game adopt ${ticket ?? agent.displayName ?? agent.paneKey} so lead mail reaches it`
   }
+  if (remote?.starting) {
+    return `starting on ${remote.host}`
+  }
   // Why: a finished member's closed terminal is how it ends; its phase says what is next (ORCA-854).
   if (remote?.gone && agent.state !== 'done') {
     const name = ticket ?? agent.paneKey
