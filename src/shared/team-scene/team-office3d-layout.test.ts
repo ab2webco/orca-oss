@@ -5,7 +5,7 @@ import {
   OFFICE3D_BALCONY_Y,
   OFFICE3D_PITCH,
   office3dFloorWidth,
-  office3dHasJev,
+  office3dHasAdvisor,
   teamOffice3dLayoutOf
 } from './team-office3d-layout'
 
@@ -97,15 +97,15 @@ describe('the 3D Office building', () => {
 
 describe('one Jev per machine, only where its plugin has spoken', () => {
   it("draws the lead floor's Jev from the team's Jev row", () => {
-    expect(office3dHasJev(floor(), true)).toBe(true)
-    expect(office3dHasJev(floor(), false)).toBe(false)
+    expect(office3dHasAdvisor(floor(), true)).toBe(true)
+    expect(office3dHasAdvisor(floor(), false)).toBe(false)
   })
 
   it("draws another floor's Jev from a decision in one of its panes, never the lead's line", () => {
-    expect(office3dHasJev(remoteFloor('m2'), true)).toBe(false)
-    expect(office3dHasJev(remoteFloor('m2', { members: [card('a'), decided('b')] }), false)).toBe(
-      true
-    )
+    expect(office3dHasAdvisor(remoteFloor('m2'), true)).toBe(false)
+    expect(
+      office3dHasAdvisor(remoteFloor('m2', { members: [card('a'), decided('b')] }), false)
+    ).toBe(true)
   })
 
   it('gives a floor without its Jev no control room, and the lead floor a balcony', () => {

@@ -71,7 +71,7 @@ export type Office3dLayout = {
  * Jev made in one of that floor's panes. Why not a host flag: the model has none, and a plugin
  * that has not yet decided looks the same as no plugin.
  */
-export function office3dHasJev(floor: TeamSceneFloor, leadAdvisor: boolean): boolean {
+export function office3dHasAdvisor(floor: TeamSceneFloor, leadAdvisor: boolean): boolean {
   if (floor.lead && leadAdvisor) {
     return true
   }
@@ -133,7 +133,7 @@ export function teamOffice3dLayoutOf(
     const y = i * OFFICE3D_PITCH
     const placed = seatsOf(floor, args.previous?.[floor.key] ?? [])
     order[floor.key] = placed.order
-    const jev = office3dHasJev(floor, args.leadAdvisor)
+    const advisor = office3dHasAdvisor(floor, args.leadAdvisor)
     return {
       key: floor.key,
       name: floor.host.kind === 'remote' ? floor.host.name : '',
@@ -147,7 +147,7 @@ export function teamOffice3dLayoutOf(
       office: floor.lead
         ? { x: placed.width, desk: [placed.width + OFFICE3D_WING_WIDTH / 2, 1.65] }
         : null,
-      controlRoom: jev ? controlRoomOf(floor, y, placed.width) : null
+      controlRoom: advisor ? controlRoomOf(floor, y, placed.width) : null
     }
   })
   return { floors: built, order }
