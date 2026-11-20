@@ -57,7 +57,8 @@ orchestratorGame:
 
   orchestrator: # the lead
     autostart: true # a plain session here starts as the lead
-    label: Lead # the lead's name, at most 32 characters
+    label: Ada # the lead's name, at most 32 characters; unset, the lead is called Lead
+    memberNames: [Ann, Bo, { en: Cid, es: Cide }] # 1 to 24, replaces the scene's roster; unset, the scene's
     cap: 4 # members running at once, 1 to 12; unset, Orca sizes it to the machine
     agent: claude
     model: claude-opus-5-5 # optional
@@ -72,6 +73,12 @@ orchestratorGame:
     accounts: auto # auto (also when unset): each member on its agent's freest managed account | default: Orca's own selection
 ```
 
+- The built-in scenes' rosters, which members take in order without `memberNames`:
+  quest Arthur, Merlin, Lancelot, Guinevere, Gawain, Morgana, Percival, Tristan, Isolde, Galahad,
+  Bedivere, Elaine; vigilante Nightjar, Raven, Lynx, Vesper, Specter, Onyx, Talon, Nova, Shade,
+  Ember, Falcon, Cipher; jrpg Aerin, Kael, Lyra, Riven, Sora, Thane, Mira, Elara, Bryn, Corin,
+  Faye, Zephyr; tamer Pip, Mochi, Bramble, Sprout, Pebble, Fern, Clover, Thistle, Puddle, Nibbles,
+  Juniper, Biscuit. A scene file's roster is its `roster`.
 - URLs must be `http(s)` with a literal host: no placeholder before the path.
 - A placeholder in a prompt or link with no value in a worktree drops that link, or leaves the
   value empty in a prompt.

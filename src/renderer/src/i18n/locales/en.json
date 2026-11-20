@@ -177,6 +177,13 @@
         "sweep": "When finished members wait to be closed.",
         "wave": "When there is To Do and free slots."
       }
+    },
+    "gameNames": {
+      "title": "Names",
+      "description": "Each member takes the next free name from the scene's roster. The lead is called Lead until you name it. /orca-game:setup asks for both.",
+      "unnamedLead": "Lead, until you name it",
+      "leadPlaceholder": "Lead",
+      "fromScene": "from the scene"
     }
   },
   "menu": {
