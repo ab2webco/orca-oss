@@ -143,6 +143,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       <button class="chip" id="e-arrive">Llega un miembro</button>
       <button class="chip" id="e-leave">Se va un miembro</button>
       <button class="chip" id="e-jev">Jev decide</button>
+      <button class="chip" id="e-jev-in">Jev entra a su sala</button>
       <button class="chip" id="e-steward">Steward cambia un modelo</button>
       <button class="chip" id="e-stop" aria-pressed="false">STOP de lanzamientos</button>
       <button class="chip" id="e-reset">Reiniciar</button>
@@ -904,10 +905,11 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     const [aL, aR] = u.arms
     const s = (f, p = 0) => Math.sin(t * f + p)
     if (kind === 'type' || kind === 'game') {
-      const f = kind === 'game' ? 22 : 13, amp = kind === 'game' ? 0.06 : 0.12
-      aL.rotation.x = -1.2 + s(f) * amp; aR.rotation.x = -1.2 + s(f, 2.2) * amp
-      aL.rotation.z = 0.2; aR.rotation.z = -0.2
-      u.head.rotation.x = 0.06
+      // Why low, near-still forearms: arms swinging in turn read as steering a wheel, not typing.
+      const tap = kind === 'game' ? 0.05 : 0.03, f = kind === 'game' ? 22 : 17
+      aL.rotation.x = -1.0 + Math.max(0, s(f)) * tap; aR.rotation.x = -1.0 + Math.max(0, s(f, 1.3)) * tap
+      aL.rotation.z = 0.08; aR.rotation.z = -0.08
+      u.body.rotation.x = 0.06; u.head.rotation.x = 0.14 + s(0.7) * 0.03
     } else if (kind === 'raise') {
       aL.rotation.z = -2.6 + s(5) * 0.22; aL.rotation.x = -0.2
       aR.rotation.x = -1.1
@@ -1547,7 +1549,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     const sign = new T.Mesh(new T.PlaneGeometry(1.1, 0.28), new T.MeshBasicMaterial({ map: sg.tex, transparent: true, side: T.DoubleSide }))
     sign.rotation.y = Math.PI / 2; sign.position.set(0.06, 3.05, 4.05); g.add(sign)
     // a bookshelf along the back wall
-    const shelf = new T.Group(); shelf.position.set(cx - 0.2, 0, 0.3); g.add(shelf)
+    const shelf = new T.Group(); shelf.position.set(cx - 0.5, 0, 0.3); g.add(shelf)
     mesh(box(2.6, 2.2, 0.05), M(shade(XX.deskSide, -0.14)), 0, 1.1, -0.18, shelf)
     for (const sx of [-1.27, 1.27]) mesh(box(0.07, 2.2, 0.42), M(XX.deskSide), sx, 1.1, 0, shelf)
     for (const y of [0.03, 2.17]) mesh(box(2.6, 0.07, 0.42), M(XX.deskSide), 0, y, 0, shelf)
@@ -1589,21 +1591,28 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       mesh(box(0.6, 0.6, 0.1), M(0x3c4a66), 0, 0.8, -0.27, c)
       for (const [lx, lz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) mesh(box(0.05, 0.44, 0.05), M(XX.metal), lx, 0.22, lz, c)
     }
-    plant(g, XX, AW - 0.45, 0.6, 1.2)
+    plant(g, XX, AW - 0.45, 5.0, 1.2)
     if (night) { const lp = new T.PointLight(0xffd9a0, 0.8, 7, 1.6); lp.position.set(cx, 3.2, 2.4); g.add(lp) }
     const seat = [fl.W + cx, dz - 0.95]
     // out of the chair, round the desk's right side, through the glass door, and back the same way
-    const route = [[fl.W + cx + 1.35, dz - 0.95], [fl.W + cx + 1.35, 4.4], [fl.W - 0.35, 4.4]]
+    const route = [[fl.W + cx - 1.35, dz - 0.95], [fl.W + cx - 1.35, 4.05], [fl.W - 0.35, 4.05]]
     return { g, seat, route, scr, drawn: 0 }
   }
   // The control room: a wing off the lead's floor, one level up, glass to the office, a video wall of every member.
   const CR_W = AW
+  // Why the back corner, through a hatch: in front of the office the stair hid the lead's desk.
+  const STAIR = { x: AW - 0.6, z: 0.85, r: 0.5, hx: AW - 1.15, hz: 1.6 }
   function controlRoom(fl) {
     const { XX } = fl, g = new T.Group(); g.position.set(fl.W, LV, 0); world.add(g)
     // Why half deep: a balcony over the back of the office leaves its front open, so the lead's desk shows.
     const cx = CR_W / 2, WH = Math.min(H + 0.3, PITCH - 0.86 - LV), night = tod === 'night', CRD = 3.1
-    mesh(box(CR_W, 0.14, CRD), M(night ? 0x222833 : 0x3e4858), cx, -0.07, CRD / 2, g).castShadow = false
-    mesh(box(CR_W, 0.3, CRD), M(XX.slab), cx, -0.29, CRD / 2, g).castShadow = false
+    const floorM = M(night ? 0x222833 : 0x3e4858)
+    for (const [x0, x1, z0, z1] of [[0, STAIR.hx, 0, CRD], [STAIR.hx, CR_W, STAIR.hz, CRD]]) {
+      mesh(box(x1 - x0, 0.14, z1 - z0), floorM, (x0 + x1) / 2, -0.07, (z0 + z1) / 2, g).castShadow = false
+      mesh(box(x1 - x0, 0.3, z1 - z0), M(XX.slab), (x0 + x1) / 2, -0.29, (z0 + z1) / 2, g).castShadow = false
+    }
+    // a rail round the hatch, open on the side the stair comes out of
+    mesh(box(0.05, 0.9, STAIR.hz), M(XX.frame), STAIR.hx, 0.45, STAIR.hz / 2, g)
     mesh(box(CR_W + 0.3, WH, 0.3), M(night ? 0x262c37 : 0x39414e), cx + 0.15, WH / 2, -0.15, g)
     mesh(box(CR_W + 0.34, 0.12, 0.34), M(XX.trim), cx + 0.15, WH + 0.06, -0.15, g)
     const glassM = new T.MeshStandardMaterial({ color: lin(0xbfe0f0), transparent: true, opacity: 0.2, roughness: 0.1, depthWrite: false })
@@ -1611,9 +1620,10 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     mesh(box(0.1, 0.1, CRD), M(XX.frame), 0.02, WH - 0.15, CRD / 2, g)
     for (const z of [0.05, CRD - 0.05]) mesh(box(0.1, WH - 0.1, 0.1), M(XX.frame), 0.02, (WH - 0.1) / 2, z, g)
     // a glass rail along the balcony's edge
-    const rail = new T.Mesh(box(CR_W, 0.9, 0.04), glassM); rail.position.set(cx, 0.45, CRD); g.add(rail)
-    mesh(box(CR_W, 0.06, 0.08), M(XX.frame), cx, 0.92, CRD, g)
-    for (const x of [0.05, cx, CR_W - 0.05]) mesh(box(0.06, 0.92, 0.06), M(XX.frame), x, 0.46, CRD, g)
+    const RL = CR_W
+    const rail = new T.Mesh(box(RL, 0.9, 0.04), glassM); rail.position.set(RL / 2, 0.45, CRD); g.add(rail)
+    mesh(box(RL, 0.06, 0.08), M(XX.frame), RL / 2, 0.92, CRD, g)
+    for (const x of [0.05, RL / 2, RL]) mesh(box(0.06, 0.92, 0.06), M(XX.frame), x, 0.46, CRD, g)
     // the video wall and its sign
     mesh(box(3.5, 1.85, 0.06), M(0x15181e), cx, 2.3, 0.01, g)
     const vw = canvasTex(400, 200)
@@ -1623,27 +1633,42 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     sg.g.shadowColor = '#5ee0e0'; sg.g.shadowBlur = 12; sg.g.fillStyle = '#c9fbfb'; sg.g.fillText('JEV · CONTROL', 128, 26)
     const sign = new T.Mesh(new T.PlaneGeometry(1.9, 0.36), new T.MeshBasicMaterial({ map: sg.tex, transparent: true })); sign.position.set(cx, 3.5, 0.05); g.add(sign)
     // the console: one long desk and three monitors turned toward the chair
-    mesh(box(3.1, 0.08, 0.85), M(0x2f3540), cx, 0.98, 1.0, g)
-    for (const dx of [-1.48, 1.48]) mesh(box(0.08, 0.94, 0.8), M(0x232831), cx + dx, 0.47, 1.0, g)
-    mesh(box(3.0, 0.5, 0.05), M(0x232831), cx, 0.68, 0.6, g)
+    const kx = STAIR.hx / 2 + 0.05
+    mesh(box(STAIR.hx - 0.3, 0.08, 0.85), M(0x2f3540), kx, 0.98, 1.0, g)
+    for (const dx of [-1, 1]) mesh(box(0.08, 0.94, 0.8), M(0x232831), kx + dx * (STAIR.hx / 2 - 0.2), 0.47, 1.0, g)
+    mesh(box(STAIR.hx - 0.4, 0.5, 0.05), M(0x232831), kx, 0.68, 0.6, g)
     const screens = []
-    ;[[-0.95, 0.38, 'checks'], [0, 0, 'tests'], [0.95, -0.38, 'plan']].forEach(([dx, ry, spec]) => {
-      const m = new T.Group(); m.position.set(cx + dx, 1.42, 0.82 + Math.abs(dx) * 0.18); m.rotation.y = ry; g.add(m)
+    ;[[-0.8, 0.38, 'checks'], [0, 0, 'tests'], [0.8, -0.38, 'plan']].forEach(([dx, ry, spec]) => {
+      const m = new T.Group(); m.position.set(kx + dx, 1.42, 0.82 + Math.abs(dx) * 0.18); m.rotation.y = ry; g.add(m)
       mesh(box(0.86, 0.54, 0.06), M(XX.monitor), 0, 0, 0, m)
       mesh(box(0.06, 0.3, 0.06), M(XX.metal), 0, -0.4, -0.02, m)
       const c = canvasTex(96, 60)
       const s = new T.Mesh(new T.PlaneGeometry(0.78, 0.47), new T.MeshBasicMaterial({ map: c.tex })); s.position.z = 0.035; m.add(s)
       screens.push({ c, spec })
     })
-    mesh(new T.CylinderGeometry(0.12, 0.1, 0.16, 10), M(XX.mug), cx + 1.3, 1.1, 1.2, g)
+    mesh(new T.CylinderGeometry(0.12, 0.1, 0.16, 10), M(XX.mug), kx + 1.0, 1.1, 1.2, g)
     // the chair, seen from behind like the office's
-    const chairAt = [fl.W + cx, 2.0]
-    const ch = new T.Group(); ch.position.set(cx, 0, 2.08); g.add(ch)
+    const chairAt = [fl.W + kx, 2.0]
+    const ch = new T.Group(); ch.position.set(kx, 0, 2.08); g.add(ch)
     mesh(new T.CylinderGeometry(0.42, 0.4, 0.12, 14), M(0x1f2430), 0, 0.52, 0, ch)
     mesh(box(0.8, 0.82, 0.12), M(0x1f2430), 0, 1.04, 0.42, ch)
     mesh(new T.CylinderGeometry(0.05, 0.05, 0.4, 8), M(XX.metal), 0, 0.26, 0, ch)
     if (night) { const pl = new T.PointLight(0x5ee0e0, 0.9, 7, 1.6); pl.position.set(cx, 2.6, 1.6); g.add(pl); glow(g, cx, 2.3, 0.4, 0x5ee0e0, 3.2, 0.35) }
-    return { g, chairAt, vw, screens, drawn: 0 }
+    // the spiral stair, from the office floor up to the balcony, and Jev's way in
+    const st = new T.Group(); st.position.set(fl.W + STAIR.x, 0, STAIR.z); world.add(st)
+    mesh(new T.CylinderGeometry(0.06, 0.06, LV + 1.0, 8), M(XX.metal), 0, (LV + 1.0) / 2, 0, st)
+    const N = 18
+    for (let k = 0; k < N; k++) {
+      const a = -Math.PI / 2 + (k / (N - 1)) * Math.PI * 2.5, y = ((k + 1) / N) * LV
+      const step = mesh(box(STAIR.r, 0.06, 0.26), M(night ? 0x4a5160 : 0x8a919c), Math.sin(a) * STAIR.r / 2, y, Math.cos(a) * STAIR.r / 2, st)
+      step.rotation.y = a - Math.PI / 2
+      mesh(new T.CylinderGeometry(0.02, 0.02, 0.9, 6), M(XX.frame), Math.sin(a) * STAIR.r, y + 0.45, Math.cos(a) * STAIR.r, st)
+    }
+    const at = (lx, lz, y) => [fl.W + lx, y, lz]
+    const path = [at(-0.35, 4.05, 0), at(0.55, 4.05, 0), at(0.55, 1.15, 0), at(STAIR.x - STAIR.r * 0.7, 1.15, 0)]
+    for (let k = 1; k <= 12; k++) { const a = -Math.PI / 2 + (k / 12) * Math.PI * 2.5; path.push(at(STAIR.x + Math.sin(a) * STAIR.r * 0.7, STAIR.z + Math.cos(a) * STAIR.r * 0.7, (k / 12) * LV)) }
+    path.push(at(STAIR.x, 1.95, LV), at(kx + 0.3, 2.5, LV), [chairAt[0], LV, chairAt[1]])
+    return { g, chairAt, vw, screens, drawn: 0, path }
   }
   // The wall: one tile per member on every floor, in Orca's status colours.
   const statusCss = (m, online) => {
@@ -1735,7 +1760,21 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       jevSeat.line.center.set(0.5, 0); world.add(jevSeat.line)
       const jh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); jh.position.y = 0.8; u.g.add(jh)
       jh.userData.who = { name: 'Jev', role: 'advisor' }; hits.push(jh)
+      // Jev walks in: through the lead's office door, up the spiral stair, to the console
+      const legs = cr.path.slice(1).map((b, k) => { const a = cr.path[k]; return { a, b, len: Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) } })
+      const walkDur = legs.reduce((n, l) => n + l.len, 0) / 1.5
+      jevSeat.enterAt = reduce ? -Infinity : t
       animators.push((tt) => {
+        const k = (tt - jevSeat.enterAt) / walkDur
+        if (k >= 0 && k < 1) {
+          let d = k * walkDur * 1.5, leg = legs[0]
+          for (const l of legs) { leg = l; if (d <= l.len) break; d -= l.len }
+          const f = Math.min(1, d / (leg.len || 1)), p = leg.a.map((v, q) => v + (leg.b[q] - v) * f)
+          resetPose(u); face(u, [leg.b[0] - leg.a[0], leg.b[2] - leg.a[2]], tt); pose(u, 'walk', tt)
+          u.g.position.set(p[0], p[1] + (u.g.position.y - (u.baseY || 0)), p[2])
+          jevSeat.line.visible = false
+          return
+        }
         const speaking = tt < jevSeat.sayUntil
         u.yaw = Math.PI - 0.35; u.g.rotation.y = u.yaw
         seatedPose(u, speaking ? 'give' : 'type', tt)
@@ -2029,6 +2068,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     leave(t, s[s.length - 1]); sync()
   })
   $('e-jev').addEventListener('click', () => { playing = true; jevDecides() })
+  $('e-jev-in').addEventListener('click', () => { playing = true; if (jevSeat) jevSeat.enterAt = t })
   $('e-steward').addEventListener('click', () => { playing = true; stewardVisits() })
   $('e-stop').addEventListener('click', () => { model.stopped = !model.stopped; stopSigns.forEach((s) => { s.visible = model.stopped }); sync() })
   $('e-reset').addEventListener('click', () => { flow = null; model = makeModel(); build(); sync() })
