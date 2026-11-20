@@ -63,6 +63,8 @@ async function expectPlusReachable(page: Page): Promise<void> {
 
 // Why (ORCA-717): at 320 the strip shrank to a 22 px sliver that showed only the tab's ×.
 async function expectActiveTabReadable(page: Page): Promise<void> {
+  // Why: under 120 px a hover swaps the icon for the close, so a retry left hovering reads no icon.
+  await page.mouse.move(0, 0)
   const tab = page.locator('[data-testid="sortable-tab"][data-active="true"]').first()
   const strip = await page.locator('.terminal-tab-strip').first().boundingBox()
   const icon = await tab.locator('svg').first().boundingBox()
