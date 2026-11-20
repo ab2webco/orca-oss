@@ -73,6 +73,16 @@ describe('the diorama rows in the panel settings', () => {
     }
   })
 
+  it('preview Figures in 2D when the diorama gets no WebGL, as the panel draws it', () => {
+    const view = render(
+      <GamePanelSetting settings={{ orchestratorGame: diorama }} updateSettings={() => {}} />
+    )
+    const preview = view.container.querySelector('[data-slot="game-panel-style-preview"]')
+    expect(preview?.getAttribute('data-style')).toBe('figures')
+    expect(preview?.querySelector('[data-diorama-preview]')).toBeNull()
+    view.unmount()
+  })
+
   it("store this machine's pace for one project, and inherit it again", () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(

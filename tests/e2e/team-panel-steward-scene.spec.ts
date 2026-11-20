@@ -74,7 +74,9 @@ test('the Orca steward visits the member whose model it moved, in every style an
       await expect(bubble).toBeHidden({ timeout: 15_000 })
     }
     const show = async (scene: string, style: GamePanelStyle, width: number): Promise<void> => {
-      await writeSettings(orcaPage, { orchestratorGame: { scene, panel: { look: 'game', style } } })
+      await writeSettings(orcaPage, {
+        orchestratorGame: { scene, panel: { look: 'game', style, diorama: false } }
+      })
       await setWindowWidth(electronApp, orcaPage, width)
       await orcaPage.evaluate((wide) => {
         const state = window.__store!.getState()

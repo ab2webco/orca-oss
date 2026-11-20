@@ -23,7 +23,7 @@ export type OrchestratorGamePanel = {
   advisor: boolean
   /** Saved arcade credits; drawn only in the Game look. */
   arcade: boolean
-  /** Figures as the 3D diorama (ORCA-1296); off until it draws everything Figures draws today. */
+  /** Figures as the 3D diorama (ORCA-1296); off draws Figures in 2D, as it does without WebGL. */
   diorama: boolean
   quality: GamePanelQuality
   pace: GamePanelPace
@@ -155,7 +155,7 @@ export function resolveGamePanel(
     tabs: { prs: true, queue: true, machines: true },
     advisor: true,
     arcade: true,
-    diorama: false,
+    diorama: true,
     quality: 'high',
     pace: 'normal'
   }

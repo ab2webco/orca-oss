@@ -232,7 +232,14 @@ export function GamePanelSetting({
             }
           />
         ))}
-      {panel.look === 'game' ? <GamePanelStylePreview style={panel.style} scene={scene} /> : null}
+      {panel.look === 'game' ? (
+        <GamePanelStylePreview
+          style={panel.style}
+          scene={scene}
+          diorama={panel.diorama}
+          lite={panel.quality === 'low'}
+        />
+      ) : null}
       {dioramaRowsShown(panel) ? (
         <GamePanelDioramaRows
           settings={settings}
@@ -373,7 +380,12 @@ export function ProjectGamePanelRows({
         return field === 'style' ? (
           <Fragment key={field}>
             {row}
-            <GamePanelStylePreview style={panel.style} scene={shownScene} />
+            <GamePanelStylePreview
+              style={panel.style}
+              scene={shownScene}
+              diorama={panel.diorama}
+              lite={panel.quality === 'low'}
+            />
             {dioramaRowsShown(panel) ? (
               <ProjectGamePanelDioramaRows layers={layers} panel={panel} set={set} />
             ) : null}
