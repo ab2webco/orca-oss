@@ -181,7 +181,8 @@ async function watch(browser, origin, job) {
       return {
         tab: list?.querySelector('[aria-selected="true"]')?.id ?? '',
         focused: document.activeElement?.id ?? '',
-        panels: [...document.querySelectorAll('[role="tabpanel"]')]
+        // Why the prefix: the toolbox and the CLI have tab panels of their own.
+        panels: [...document.querySelectorAll('[role="tabpanel"][id^="style-panel-"]')]
           .filter((p) => !p.hidden)
           .map((p) => p.id),
         inOrder: [...(list?.querySelectorAll('[role="tab"]') ?? [])].filter((t) => t.tabIndex === 0)

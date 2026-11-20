@@ -44,30 +44,42 @@ const groups = [
     <p class="heading">▾ {copy.eyebrow}</p>
     <h2 class="h2" id="integrations-title">{copy.title}</h2>
     <p class="lede">{copy.lede}</p>
-    <div class="split">
-      <div>
-        {
-          groups.map((group) => (
-            <div class="group">
-              <h3>{group.title}</h3>
-              <p class="muted">{group.note}</p>
-              <p class="names">{group.items.join(' · ')}</p>
-            </div>
-          ))
-        }
+    <div class="stage">
+      <Recording lang={lang} file="plane-board.gif" />
+    </div>
+    <div class="groups">
+      {
+        groups.map((group) => (
+          <div class="group">
+            <h3>{group.title}</h3>
+            <p class="muted">{group.note}</p>
+            <p class="names">{group.items.join(' · ')}</p>
+          </div>
+        ))
+      }
+      <div class="group">
         <p class="muted" set:html={code(copy.cli)} />
         <ul class="links">
           <li><a href={docsHref(lang, 'review/linear')}>{copy.more}</a></li>
         </ul>
       </div>
-      <Recording lang={lang} file="plane-board.gif" />
     </div>
   </div>
 </section>
 
 <style>
-  .group + .group {
-    margin-top: 24px;
+  .stage {
+    margin-top: var(--space-xl);
+  }
+  .groups {
+    display: grid;
+    gap: var(--space-lg) var(--space-xl);
+    margin-top: var(--space-xl);
+  }
+  @media (min-width: 60rem) {
+    .groups {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
   h3 {
     margin: 0;

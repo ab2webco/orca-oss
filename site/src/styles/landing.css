@@ -268,6 +268,40 @@ pre {
   }
 }
 
+/* A tablist of bordered buttons; the selected one takes the ink. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: var(--space-xl) 0 var(--space-lg);
+}
+
+.tabs[hidden] {
+  display: none;
+}
+
+[role='tab'] {
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-2);
+  font: 400 var(--text-body) / 1 var(--font-body);
+  cursor: pointer;
+}
+
+[role='tab']:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+[role='tab'][aria-selected='true'] {
+  border-color: var(--fg);
+  color: var(--fg);
+  font-weight: 600;
+}
+
 /* Green only for success; the other states read by weight, not hue. */
 .state-working {
   color: var(--fg);

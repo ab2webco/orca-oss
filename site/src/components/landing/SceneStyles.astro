@@ -71,61 +71,14 @@ const copy = {
 </section>
 
 <script>
+  import { wireTabList } from './tab-list'
+
   for (const list of document.querySelectorAll<HTMLElement>('[data-styles]')) {
-    const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
-    const select = (tab: HTMLButtonElement): void => {
-      for (const one of tabs) {
-        const on = one === tab
-        one.setAttribute('aria-selected', String(on))
-        one.tabIndex = on ? 0 : -1
-        const panel = document.getElementById(one.getAttribute('aria-controls') ?? '')
-        if (panel) {
-          panel.hidden = !on
-        }
-      }
-    }
-    for (const [i, tab] of tabs.entries()) {
-      tab.addEventListener('click', () => select(tab))
-      tab.addEventListener('keydown', (event) => {
-        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-        if (step) {
-          const next = tabs[(i + step + tabs.length) % tabs.length]
-          next?.focus()
-          if (next) {
-            select(next)
-          }
-        }
-      })
-    }
+    wireTabList([...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')])
   }
 </script>
 
 <style>
-  .tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin: var(--space-xl) 0 var(--space-lg);
-  }
-  [role='tab'] {
-    min-height: 44px;
-    padding: 0 var(--space-md);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: transparent;
-    color: var(--fg-2);
-    font: 400 var(--text-body) / 1 var(--font-body);
-    cursor: pointer;
-  }
-  [role='tab']:hover {
-    background: var(--surface);
-    color: var(--fg);
-  }
-  [role='tab'][aria-selected='true'] {
-    border-color: var(--fg);
-    color: var(--fg);
-    font-weight: 600;
-  }
   .panel p {
     margin: var(--space-md) 0 0;
     max-width: 60ch;
