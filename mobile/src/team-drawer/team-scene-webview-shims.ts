@@ -30,6 +30,11 @@ function findLast<T>(this: readonly T[], test: Test<T>, self?: unknown): T | und
   return undefined
 }
 
+function toReversed<T>(this: readonly T[]): T[] {
+  // oxlint-disable-next-line no-array-reverse -- a copy, standing in for toReversed.
+  return Array.from(this).reverse()
+}
+
 function toSorted<T>(this: readonly T[], compare?: (a: T, b: T) => number): T[] {
   if (compare !== undefined && typeof compare !== 'function') {
     throw new TypeError('The comparison function must be either a function or undefined')
@@ -111,6 +116,7 @@ export function installTeamSceneShims(): void {
   define(Array.prototype, 'findLast', findLast)
   define(Array.prototype, 'findLastIndex', findLastIndex)
   define(Array.prototype, 'toSorted', toSorted)
+  define(Array.prototype, 'toReversed', toReversed)
   define(String.prototype, 'replaceAll', replaceAll)
   define(Object, 'hasOwn', hasOwn)
   define(globalThis.CanvasRenderingContext2D?.prototype, 'roundRect', roundRect)
