@@ -1,5 +1,5 @@
 ---
-sourceHash: 968e252cc8457d6b
+sourceHash: 3cfd3ec2f70f5e8d
 ---
 
 # El juego orquestador de Agent Teams
