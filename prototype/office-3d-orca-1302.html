@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Oficina 3D ORCA-1302</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -88,6 +90,12 @@ button.chip:disabled { opacity: 0.45; cursor: default; }
 .editor .name { min-width: 52px; font-weight: 500; }
 .editor select { font: 13px/1.2 var(--sans); color: var(--fg); background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; max-width: 100%; }
 .editor .check, .editor .sel { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.litenote {
+  position: absolute; inset: 0; margin: auto; height: fit-content; max-width: min(420px, calc(100% - 32px)); display: grid; gap: 6px;
+  padding: 16px 18px; border-radius: 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); font: 13px/1.45 var(--sans);
+}
+.litenote strong { font-size: 15px; }
+.litenote span { color: var(--muted); }
 h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
 </style>
 
@@ -95,7 +103,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   <header>
     <div class="eyebrow">ORCA-1302 · dirección visual propuesta, sin código de producto</div>
     <h1>La oficina del equipo, en 3D</h1>
-    <p class="lede">Cada máquina es una planta del edificio y cada miembro trabaja en su escritorio según su estado real. El lead atiende primero a quien te necesita, sube en el ascensor a otras plantas y Jev vigila desde la ventana. Es el mismo mundo del diorama: mismos muñecos, materiales y luz.</p>
+    <p class="lede">Cada máquina es una planta del edificio y cada miembro trabaja en su escritorio según su estado real. El equipo son devs en suéter. El lead, con abrigo violeta, trabaja en su oficina de gerencia y sale a atender primero a quien te necesita, aunque esté en otra planta. Jev vigila a todos desde la sala de control. Es el mismo mundo del diorama: mismo kit toon, materiales y luz.</p>
   </header>
 
   <div class="controls" role="group" aria-label="Controles">
@@ -105,7 +113,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     </div>
     <div class="group"><span>Calidad</span>
       <button class="chip" data-figs="toon" aria-pressed="true">Ilustrada</button>
-      <button class="chip" data-figs="lite" aria-pressed="false">Bajos recursos</button>
+      <button class="chip" data-figs="lite" aria-pressed="false">Bajos recursos · Office actual</button>
     </div>
     <div class="group"><span>Máquinas</span>
       <button class="chip" data-hosts="1">1</button>
@@ -148,6 +156,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     <canvas id="c" role="img" aria-label="La oficina del equipo en 3D: una planta por máquina"></canvas>
     <div class="tip" id="tip" hidden></div>
     <div class="toast" id="toast" role="status" hidden></div>
+    <div class="litenote" id="lite-note" hidden><strong>Bajos recursos mantiene la Office de hoy</strong><span>Con esta calidad el panel sigue dibujando la oficina 2D actual, sin cambios. La oficina 3D es la calidad Ilustrada.</span></div>
   </div>
 
   <p class="desc" id="desc"></p>
@@ -575,6 +584,113 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     return { g, legs, arms, body, head, tool, bodyY: 0.56 }
   }
 
+  // ---------- office developers: the diorama's toon kit, dressed for an office ----------
+  // Same skeleton as makeUnit (legs at 0.34, shoulders at 0.74, head at 1.08), so every pose still fits.
+  const SWEATERS = [0xd9a441, 0x3f7a5a, 0x8e3b46, 0x2f4a7a, 0x2f8a8a, 0xc0643b, 0x8f7cc0, 0xe8dcc4, 0x4a4f58, 0xe07a6a, 0x6b8f3a, 0xb4527a]
+  const PANTS = [0x3d5a80, 0x2a2d34, 0xb9a27c, 0x5b6b4a, 0x4d4a6b]
+  const DEV_SKIN = [0xf2c9a0, 0xd9a274, 0xa86b45, 0xf5d5b5, 0xc28455, 0x7a4b2e, 0xe8b88e]
+  const DEV_HAIR = [0x2a221c, 0x4a3324, 0x8a5a2b, 0xd9a35a, 0x1f1a16, 0xb5523b, 0x6b4428, 0xcfcac2]
+  const HAIRDOS = ['crop', 'bun', 'curly', 'long', 'part', 'pony', 'buzz', 'beanie']
+  const KNITS = ['stripe', 'plain', 'cardigan', 'turtle', 'band2', 'collar']
+  const LEAD_COAT = 0x6c4cf0, LEAD_LAPEL = 0x8d74ff
+  const shade = (hex, l) => new T.Color(hex).offsetHSL(0, 0, l).getHex()
+  const pickBy = (arr, h, shift) => arr[(h >>> shift) % arr.length]
+
+  function makeDev(i, P, opts = {}) {
+    const g = new T.Group()
+    const lite = figs === 'lite', S = lite ? 6 : 14
+    const role = opts.lead ? 'lead' : opts.role || 'dev'
+    const h = Math.imul(i + 7, 2654435761) >>> 0
+    const sweater = role === 'advisor' ? 0x2f8a8a : role === 'steward' ? 0x5f8f4a : SWEATERS[i % SWEATERS.length]
+    const trim = shade(sweater, sweater === 0xe8dcc4 ? -0.28 : 0.16)
+    const skin = pickBy(DEV_SKIN, h, 3), hair = role === 'lead' ? 0x2a221c : pickBy(DEV_HAIR, h, 7)
+    const knit = role === 'lead' ? 'turtle' : role === 'advisor' ? 'cardigan' : pickBy(KNITS, h, 11)
+    const hairdo = role === 'lead' ? 'part' : role === 'advisor' ? 'crop' : HAIRDOS[(i * 5 + (h >>> 15)) % HAIRDOS.length]
+    const glasses = role === 'advisor' || (role === 'dev' && ((h >>> 19) & 3) === 0)
+    const beard = role === 'dev' && ((h >>> 22) % 5) === 0 && hairdo !== 'long' && hairdo !== 'bun' && hairdo !== 'pony'
+    const pants = role === 'lead' ? 0x2a2d34 : pickBy(PANTS, h, 25)
+    const sole = role === 'lead' ? LEAD_LAPEL : trim
+    const shoe = role === "lead" ? 0x1d1f26 : [0xf4f3ee, 0x2a2d34, 0x6e4a2c, 0x3d4a5c][(h >>> 27) % 4]
+
+    const legs = []
+    for (const sx of [-0.1, 0.1]) {
+      const leg = new T.Group(); leg.position.set(sx, 0.34, 0); g.add(leg)
+      tpart(box(0.13, 0.28, 0.15), pants, 0, -0.14, 0, leg)
+      tpart(box(0.15, 0.08, 0.23), shoe, 0, -0.29, 0.03, leg)
+      tpart(box(0.155, 0.03, 0.235), sole, 0, -0.335, 0.03, leg, { outline: false })
+      legs.push(leg)
+    }
+    const top = role === 'lead' ? 0x1d1f26 : sweater
+    const body = tpart(new T.CylinderGeometry(0.2, 0.24, 0.44, S), top, 0, 0.56, 0, g)
+    // the knit: a ribbed hem, then a stripe, a cardigan front, a roll neck or a shirt collar
+    tpart(new T.CylinderGeometry(0.245, 0.25, 0.07, S), role === 'lead' ? top : trim, 0, -0.2, 0, body, { outline: false })
+    if (knit === 'stripe') tpart(new T.CylinderGeometry(0.218, 0.222, 0.08, S), trim, 0, 0.04, 0, body, { outline: false })
+    if (knit === 'band2') for (const y of [-0.02, 0.1]) tpart(new T.CylinderGeometry(0.212 + y * 0.03, 0.216, 0.045, S), trim, 0, y, 0, body, { outline: false })
+    if (knit === 'cardigan') {
+      tpart(box(0.11, 0.4, 0.04), 0xf2efe8, 0, 0.0, 0.215, body, { outline: false }).rotation.x = -0.08
+      for (const y of [-0.1, 0.0, 0.1]) tpart(new T.SphereGeometry(0.018, 6, 5), trim, 0.07, y, 0.235, body, { outline: false })
+    }
+    if (knit === 'turtle') tpart(new T.CylinderGeometry(0.12, 0.14, 0.12, S), role === 'lead' ? top : trim, 0, 0.27, 0, body)
+    else if (knit === 'collar') for (const sx of [-1, 1]) { const c = tpart(box(0.1, 0.035, 0.08), 0xf6f4ee, sx * 0.07, 0.23, 0.13, body, { outline: false }); c.rotation.set(0.3, 0, sx * -0.5) }
+    else tpart(new T.CylinderGeometry(0.135, 0.15, 0.05, S), trim, 0, 0.23, 0, body, { outline: false })
+
+    const arms = []
+    for (const sx of [-0.27, 0.27]) {
+      const arm = new T.Group(); arm.position.set(sx, 0.74, 0); g.add(arm)
+      tpart(box(0.11, 0.3, 0.12), role === 'lead' ? LEAD_COAT : sweater, 0, -0.15, 0, arm)
+      tpart(box(0.12, 0.06, 0.13), role === 'lead' ? LEAD_LAPEL : trim, 0, -0.31, 0, arm, { outline: false })
+      tpart(new T.SphereGeometry(0.065, S, Math.max(5, S - 4)), skin, 0, -0.37, 0, arm)
+      arms.push(arm)
+    }
+    // the lead: a long violet coat with wide lapels over a black roll neck, and a headset to talk to everyone
+    if (role === 'lead') {
+      const coat = tpart(new T.CylinderGeometry(0.235, 0.29, 0.5, S, 1, true), LEAD_COAT, 0, 0.55, -0.01, g)
+      coat.material = coat.material.clone(); coat.material.side = T.DoubleSide
+      for (const sx of [-1, 1]) { const l = tpart(box(0.09, 0.34, 0.03), LEAD_LAPEL, sx * 0.1, 0.66, 0.2, g, { outline: false }); l.rotation.set(-0.12, 0, sx * 0.32) }
+      g.scale.setScalar(1.12)
+    }
+
+    const head = new T.Group(); head.position.set(0, 1.08, 0); g.add(head)
+    tpart(new T.SphereGeometry(0.3, S + 4, S), skin, 0, 0, 0, head)
+    for (const ex of [-0.1, 0.1]) {
+      const e = new T.Mesh(new T.SphereGeometry(0.045, 10, 8), B(0x1b1815)); e.scale.set(0.8, 1.25, 0.6); e.position.set(ex, 0.0, 0.275); head.add(e)
+      if (!lite) { const sh = new T.Mesh(new T.SphereGeometry(0.014, 6, 5), B(0xffffff)); sh.position.set(ex + 0.012, 0.025, 0.3); head.add(sh) }
+    }
+    if (!lite) {
+      const cheekM = B(0xf09a8a, { transparent: true, opacity: 0.5 })
+      for (const ex of [-0.17, 0.17]) { const c = new T.Mesh(new T.CircleGeometry(0.045, 10), cheekM); c.position.set(ex, -0.08, 0.262); c.rotation.y = ex * 1.6; head.add(c) }
+    }
+    const cap = (phi = 0.5, r = 0.315) => { const m = tpart(new T.SphereGeometry(r, S + 4, Math.max(6, S - 4), 0, Math.PI * 2, 0, Math.PI * phi), hair, 0, 0.02, -0.02, head); m.rotation.x = -0.3; return m }
+    if (hairdo === 'crop') { cap(0.5); tpart(box(0.34, 0.07, 0.1), hair, 0.04, 0.2, 0.22, head).rotation.z = -0.15 }
+    else if (hairdo === 'part') { cap(0.52); const sw = tpart(new T.SphereGeometry(0.15, S, 8), hair, -0.12, 0.2, 0.15, head); sw.scale.set(1.3, 0.55, 0.9) }
+    else if (hairdo === 'bun') { cap(0.52); tpart(new T.SphereGeometry(0.12, S, 8), hair, 0, 0.3, -0.16, head) }
+    else if (hairdo === 'long') { cap(0.56); tpart(box(0.5, 0.48, 0.13), hair, 0, -0.12, -0.2, head) }
+    else if (hairdo === 'pony') { cap(0.52); const t = tpart(new T.CylinderGeometry(0.07, 0.04, 0.34, S), hair, 0, -0.06, -0.33, head); t.rotation.x = 0.35 }
+    else if (hairdo === 'buzz') cap(0.44, 0.308)
+    else if (hairdo === 'curly') { for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; tpart(new T.SphereGeometry(0.12, S, 8), hair, Math.cos(a) * 0.2, 0.17 + Math.sin(k * 1.7) * 0.03, Math.sin(a) * 0.2 - 0.04, head) } tpart(new T.SphereGeometry(0.15, S, 8), hair, 0, 0.27, -0.02, head) }
+    else if (hairdo === 'beanie') {
+      tpart(new T.SphereGeometry(0.32, S + 4, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), sweater, 0, 0.05, 0, head).rotation.x = -0.12
+      tpart(new T.CylinderGeometry(0.325, 0.325, 0.08, S + 4), trim, 0, 0.08, 0.01, head, { outline: false })
+      tpart(new T.SphereGeometry(0.07, S, 6), trim, 0, 0.38, -0.04, head)
+    }
+    if (beard) { const bd = tpart(new T.SphereGeometry(0.17, S, 8), hair, 0, -0.18, 0.12, head); bd.scale.set(1.15, 0.8, 0.7) }
+    if (glasses && !lite) {
+      const rim = B(0x1f2228)
+      for (const ex of [-0.1, 0.1]) { const gl = new T.Mesh(new T.TorusGeometry(0.068, 0.014, 6, 16), rim); gl.position.set(ex, 0.0, 0.29); head.add(gl) }
+      const br = new T.Mesh(box(0.06, 0.016, 0.016), rim); br.position.set(0, 0.01, 0.3); head.add(br)
+    }
+    if (role === 'lead' || role === 'advisor') {
+      // a headset: a band over the head and a mic boom toward the mouth
+      const band = new T.Mesh(new T.TorusGeometry(0.33, 0.022, 6, 20, Math.PI), lite ? LM(0x26262e) : TM(0x26262e)); band.position.y = 0.05; head.add(band)
+      tpart(new T.CylinderGeometry(0.08, 0.08, 0.07, 10), 0x26262e, -0.33, 0.02, 0, head).rotation.z = Math.PI / 2
+      const boom = tpart(box(0.025, 0.025, 0.26), 0x26262e, -0.27, -0.1, 0.14, head, { outline: false }); boom.rotation.y = -0.5
+      tpart(new T.SphereGeometry(0.035, 8, 6), role === 'lead' ? LEAD_LAPEL : 0x9ad8d8, -0.2, -0.12, 0.25, head, { outline: false })
+    }
+    let tool = null
+    if (role === 'steward') { tool = new T.Group(); arms[0].add(tool); tool.position.set(0, -0.4, 0.1); tpart(box(0.24, 0.32, 0.03), 0x2a2f3a, 0, 0, 0.04, tool); tpart(box(0.2, 0.27, 0.01), 0x7fb4ff, 0, 0, 0.06, tool, { outline: false }) }
+    return { g, legs, arms, body, head, tool, bodyY: 0.56 }
+  }
+
   // ---------- office palette: the diorama's material kit, indoors ----------
   const XD = {
     floorTop: 0xd2bd96, floorSeam: 0xbfa880, rug: 0x5d7690, rug2: 0x4c6680, slab: 0xc9c0ae, slabDark: 0x9a917f,
@@ -762,7 +878,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   // ---------- figures: the diorama's units at 1.6x, so they read in a narrow panel ----------
   const SIT_SCALE = 1.6
   function actor(i, opts = {}) {
-    const u = (figs === 'lite' ? makeUnitLite : makeUnit)(i, P, opts)
+    const u = makeDev(i, P, opts)
     u.k = SIT_SCALE * (opts.lead ? 1.12 : 1)
     u.g.scale.setScalar(u.k)
     world.add(u.g)
@@ -861,7 +977,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     mesh(box(W - 1.6, 0.031, 1.7), M(XX.rug2), W / 2 + 0.2, 0.016, AISLE_Z, g).castShadow = false
     // back wall: plaster over a darker dado, with the boards above each desk
     // double-height loft: the wall rises to the slab above, with a high window band
-    HW = fi === model.floors.length - 1 ? H + 1.6 : PITCH - 0.86
+    HW = fi === model.floors.length - 1 && fi !== 0 ? H + 1.6 : PITCH - 0.86
     mesh(box(W + 0.3, H + 0.3, 0.3), M(XX.wall), W / 2 - 0.15, (H + 0.3) / 2, -0.15, g)
     mesh(box(W + 0.3, 0.4, 0.3), M(XX.wall), W / 2 - 0.15, HW - 0.2, -0.15, g)
     {
@@ -879,10 +995,6 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     leftWall(g, PP, XX, fi)
     // right end: a plant, and the lead's corner with its rug
     plant(g, XX, W - 0.55, 0.55, 1.15)
-    if (fi === 0) {
-      const leadRug = mesh(new T.CylinderGeometry(1.0, 1.0, 0.03, 28), M(PP.banner), W - 1.55, 0.02, AISLE_Z, g); leadRug.castShadow = false
-      mesh(new T.CylinderGeometry(0.86, 0.86, 0.035, 28), M(XX.rug), W - 1.55, 0.022, AISLE_Z, g).castShadow = false
-    }
     fl.home = [W - 1.55, AISLE_Z]
     // seats: our members, then other sessions' desks (a coat on the chair), then the cap's free ones
     const taken = Math.min(fm.taken, cap - fm.members.length)
@@ -956,6 +1068,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       const l = mesh(new T.ConeGeometry(0.09, 0.8, 5), M(q % 2 ? XX.leaf : XX.leaf2), Math.cos(a) * 0.1, 0.72, Math.sin(a) * 0.1, p)
       l.rotation.z = Math.cos(a) * 0.5; l.rotation.x = -Math.sin(a) * 0.5
     }
+    return p
   }
   function plaque(g, x, y) {
     const p = new T.Group(); p.position.set(x, y, 0.02); g.add(p)
@@ -1016,7 +1129,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     mesh(box(0.66, 0.58, 0.1), M(XX.coat), 0, 1.02, 0.5, coat)
     mesh(box(0.3, 0.08, 0.16), M(XX.coat), 0, 1.36, 0.44, coat)
     // a hover target over the desk and its sitter, and a ring that marks it
-    const hit = new T.Mesh(box(2.0, 2.6, 2.6), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 1.3, -0.5); sg.add(hit)
+    const hit = new T.Mesh(box(1.6, 2.3, 1.5), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 1.15, -0.45); sg.add(hit)
     const ring = new T.Mesh(new T.RingGeometry(0.62, 0.74, 32), B(PP.info, { transparent: true, opacity: 0.9, side: T.DoubleSide, depthWrite: false }))
     ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0.3); ring.visible = false; sg.add(ring)
     const seat = { fl, j, kind, m, x, sg, chair, coat, mon, screen, scr, brd, board, ring, hit, u: null, emote: null, props: {}, mode: m ? 'seated' : 'empty', boardKey: '', shake: 0 }
@@ -1254,8 +1367,10 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     else if (kind === 'give') { pose(u, 'idle', t); u.arms[0].rotation.x = -1.4; u.arms[1].rotation.x = -1.4 }
     else if (kind === 'wave') pose(u, 'wave', t)
     else if (kind === 'point') { pose(u, 'idle', t); u.arms[1].rotation.x = -1.6 }
+    else if (kind === 'desk') { u.yaw = 0; u.g.rotation.y = 0; seatedPose(u, 'type', t) }
     else pose(u, 'idle', t)
     u.g.position.y = y + (u.g.position.y - (u.baseY || 0))
+    if (kind === 'desk') u.g.position.y = y + 0.62 - 0.34 * u.k
   }
 
   // ---------- the lead: answers whoever needs it first, then hands work round its own floor ----------
@@ -1270,6 +1385,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       .sort((a, b) => (flow && flow.seat === b) - (flow && flow.seat === a) || (a.m.attendedAt || 0) - (b.m.attendedAt || 0) || (a.fl.i !== w.fl) - (b.fl.i !== w.fl))
     const target = due[0]
     if (target) {
+      outOfOffice(P_)
       P_.ride(target.fl.i)
       P_.walk([[P_.at[0], AISLE_Z], [standBehind(target)[0], AISLE_Z], standBehind(target)])
       P_.call(() => { bubble.visible = true })
@@ -1281,18 +1397,24 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       const busy = floors[w.fl] ? floors[w.fl].seats.filter((s) => s.m && s.mode === 'seated' && stateOf(s.m).act === 'work' && s.fl.online) : []
       const home = floors[0].home
       if (w.fl !== 0) { P_.walk([P_.at[0], AISLE_Z]); P_.ride(0) }
-      else if (busy.length && Math.random() < 0.7 && !reduce) {
+      else if (busy.length && Math.random() < 0.55 && !reduce) {
         const s = busy[Math.floor(Math.random() * busy.length)]
+        outOfOffice(P_)
         P_.walk([[P_.at[0], AISLE_Z], [standBehind(s)[0], AISLE_Z], standBehind(s)])
         P_.hold(1.1, 'give', [0, -1])
         P_.walk([standBehind(s)[0], AISLE_Z])
       }
-      if (w.fl === 0 || P_.fl === 0) { P_.walk([[home[0], AISLE_Z], home]); P_.hold(2.2, 'idle', [-0.6, -1]) }
+      if (P_.fl === 0) {
+        if (!atDesk(P_)) P_.walk([[P_.at[0], AISLE_Z], ...floors[0].office.route.slice().reverse(), home])
+        P_.hold(reduce ? 3 : 4.5, 'desk', [0, 1])
+      }
     }
     P_.call((tt) => leadNext(tt))
     run(w, P_)
   }
   let bubble = null
+  const atDesk = (P_) => P_.fl === 0 && floors[0].office && Math.hypot(P_.at[0] - floors[0].home[0], P_.at[1] - floors[0].home[1]) < 0.3
+  const outOfOffice = (P_) => { if (atDesk(P_)) P_.walk(floors[0].office.route) }
 
   // ---------- events: someone arrives, someone leaves, Jev decides, the steward moves a model ----------
   function freeSeat(prefer = 0) {
@@ -1392,7 +1514,171 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   }
 
   // ---------- the scene ----------
-  let OFFX = null, sun = null, jevSeat = null, steward = null
+  let OFFX = null, sun = null, jevSeat = null, steward = null, leadMark = null
+  function leadMarkTex() {
+    const { g, tex } = canvasTex(128, 128)
+    g.lineJoin = 'round'; g.lineWidth = 14; g.strokeStyle = '#ffffff'; g.fillStyle = '#6c4cf0'
+    g.beginPath(); g.moveTo(14, 26); g.lineTo(64, 70); g.lineTo(114, 26); g.lineTo(114, 62); g.lineTo(64, 112); g.lineTo(14, 62); g.closePath()
+    g.stroke(); g.fill()
+    return tex
+  }
+  // The lead's office: the wing's ground level, glass to the open plan, a desk that faces the room.
+  const AW = 3.9, LV = 4.6
+  function managerOffice(fl) {
+    const { XX } = fl, g = new T.Group(); g.position.set(fl.W, 0, 0); world.add(g)
+    const cx = AW / 2, night = tod === 'night'
+    mesh(box(AW, 0.14, D + 0.3), M(XX.floorTop), cx, -0.07, D / 2 - 0.15, g).castShadow = false
+    mesh(box(AW, 0.55, D + 0.3), M(XX.slab), cx, -0.41, D / 2 - 0.15, g).castShadow = false
+    mesh(box(AW - 0.05, 0.18, D + 0.05), M(XX.slabDark), cx, -0.77, D / 2 - 0.15, g).castShadow = false
+    const rug = mesh(box(3.0, 0.03, 3.4), M(night ? 0x5a3346 : 0x8a4f63), cx + 0.1, 0.015, 2.8, g); rug.castShadow = false
+    mesh(box(2.8, 0.031, 3.2), M(night ? 0x6b4055 : 0xa65f77), cx + 0.1, 0.016, 2.8, g).castShadow = false
+    mesh(box(AW + 0.3, LV, 0.3), M(XX.wall), cx + 0.15, LV / 2, -0.15, g)
+    mesh(box(AW + 0.3, 0.07, 0.07), M(XX.trim), cx + 0.15, 1.02, 0.04, g)
+    const glassM = new T.MeshStandardMaterial({ color: lin(0xbfe0f0), transparent: true, opacity: 0.2, roughness: 0.1, depthWrite: false })
+    for (const [z0, z1] of [[0, 3.4], [4.7, D]]) {
+      const p = new T.Mesh(box(0.05, LV - 0.3, z1 - z0), glassM); p.position.set(0.02, (LV - 0.3) / 2, (z0 + z1) / 2); g.add(p)
+    }
+    for (const z of [0.05, 3.4, 4.7, D - 0.05]) mesh(box(0.1, LV - 0.2, 0.1), M(XX.frame), 0.02, (LV - 0.2) / 2, z, g)
+    mesh(box(0.1, 0.1, D), M(XX.frame), 0.02, LV - 0.25, D / 2, g)
+    // the door's sign
+    const sg = canvasTex(256, 64)
+    sg.g.fillStyle = '#6c4cf0'; sg.g.beginPath(); (sg.g.roundRect ? sg.g.roundRect(4, 4, 248, 56, 14) : sg.g.rect(4, 4, 248, 56)); sg.g.fill()
+    sg.g.fillStyle = '#ffffff'; sg.g.font = '700 30px Geist, sans-serif'; sg.g.textAlign = 'center'; sg.g.textBaseline = 'middle'; sg.g.fillText('GERENCIA', 128, 34)
+    const sign = new T.Mesh(new T.PlaneGeometry(1.1, 0.28), new T.MeshBasicMaterial({ map: sg.tex, transparent: true, side: T.DoubleSide }))
+    sign.rotation.y = Math.PI / 2; sign.position.set(0.06, 3.05, 4.05); g.add(sign)
+    // a bookshelf along the back wall
+    const shelf = new T.Group(); shelf.position.set(cx - 0.2, 0, 0.3); g.add(shelf)
+    mesh(box(2.6, 2.2, 0.05), M(shade(XX.deskSide, -0.14)), 0, 1.1, -0.18, shelf)
+    for (const sx of [-1.27, 1.27]) mesh(box(0.07, 2.2, 0.42), M(XX.deskSide), sx, 1.1, 0, shelf)
+    for (const y of [0.03, 2.17]) mesh(box(2.6, 0.07, 0.42), M(XX.deskSide), 0, y, 0, shelf)
+    const books = [0x8e3b46, 0x2f4a7a, 0xd9a441, 0x3f7a5a, 0xe8dcc4, 0x6c4cf0, 0xc0643b]
+    for (let r = 0; r < 3; r++) {
+      mesh(box(2.46, 0.05, 0.36), M(XX.deskSide), 0, 0.32 + r * 0.66, 0.04, shelf)
+      let x = -1.12
+      for (let b = 0; x < (r === 1 ? 0.2 : 1.0); b++) {
+        const w = 0.09 + ((r * 7 + b * 3) % 4) * 0.025, h = 0.36 + ((r + b * 5) % 4) * 0.05
+        mesh(box(w, h, 0.26), M(books[(r * 3 + b) % books.length]), x + w / 2, 0.35 + r * 0.66 + h / 2, 0.06, shelf)
+        x += w + 0.015
+      }
+    }
+    // two framed stars of merged work and a plant on the shelf's open bay
+    plant(shelf, XX, 0.72, 0.1, 0.5).position.y = 0.98
+    // the desk faces the room; the lead sits behind it, looking out
+    const dz = 2.6
+    mesh(box(2.1, 0.09, 0.95), M(0x7a4f32), cx, 0.98, dz, g)
+    mesh(box(2.0, 0.88, 0.08), M(0x6a4329), cx, 0.5, dz + 0.42, g)
+    for (const dx of [-0.98, 0.98]) mesh(box(0.1, 0.94, 0.9), M(0x6a4329), cx + dx, 0.47, dz, g)
+    const plate = canvasTex(192, 48)
+    plate.g.fillStyle = '#1d1f26'; plate.g.fillRect(0, 0, 192, 48); plate.g.fillStyle = '#c9b8ff'; plate.g.font = '700 28px Geist, sans-serif'; plate.g.textAlign = 'center'; plate.g.textBaseline = 'middle'; plate.g.fillText('LEAD', 96, 26)
+    const pl = new T.Mesh(new T.PlaneGeometry(0.72, 0.18), new T.MeshBasicMaterial({ map: plate.tex })); pl.position.set(cx, 0.72, dz + 0.465); g.add(pl)
+    const mon = new T.Group(); mon.position.set(cx - 0.35, 1.38, dz - 0.15); mon.rotation.y = Math.PI + 0.2; g.add(mon)
+    mesh(box(0.9, 0.56, 0.06), M(XX.monitor), 0, 0, 0, mon)
+    mesh(box(0.06, 0.32, 0.06), M(XX.metal), 0, -0.38, -0.02, mon)
+    const scr = canvasTex(96, 60)
+    const s = new T.Mesh(new T.PlaneGeometry(0.82, 0.48), new T.MeshBasicMaterial({ map: scr.tex })); s.position.z = 0.035; mon.add(s)
+    mesh(new T.CylinderGeometry(0.08, 0.07, 0.15, 10), M(XX.mug), cx + 0.7, 1.1, dz + 0.1, g)
+    mesh(box(0.42, 0.05, 0.3), M(XX.paper), cx + 0.35, 1.05, dz + 0.15, g).rotation.y = -0.2
+    // the lead's chair, a high back, and two guest chairs facing the desk
+    const ch = new T.Group(); ch.position.set(cx, 0, dz - 0.95); g.add(ch)
+    mesh(new T.CylinderGeometry(0.44, 0.42, 0.14, 14), M(0x2a1e1a), 0, 0.54, 0, ch)
+    mesh(box(0.9, 1.25, 0.16), M(0x2a1e1a), 0, 1.25, -0.44, ch)
+    mesh(new T.CylinderGeometry(0.05, 0.05, 0.42, 8), M(XX.metal), 0, 0.27, 0, ch)
+    for (const gx of [-0.65, 0.65]) {
+      const c = new T.Group(); c.position.set(cx + gx, 0, dz + 1.25); c.rotation.y = Math.PI + gx * 0.4; g.add(c)
+      mesh(box(0.6, 0.12, 0.6), M(0x3c4a66), 0, 0.48, 0, c)
+      mesh(box(0.6, 0.6, 0.1), M(0x3c4a66), 0, 0.8, -0.27, c)
+      for (const [lx, lz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) mesh(box(0.05, 0.44, 0.05), M(XX.metal), lx, 0.22, lz, c)
+    }
+    plant(g, XX, AW - 0.45, 0.6, 1.2)
+    if (night) { const lp = new T.PointLight(0xffd9a0, 0.8, 7, 1.6); lp.position.set(cx, 3.2, 2.4); g.add(lp) }
+    const seat = [fl.W + cx, dz - 0.95]
+    // out of the chair, round the desk's right side, through the glass door, and back the same way
+    const route = [[fl.W + cx + 1.35, dz - 0.95], [fl.W + cx + 1.35, 4.4], [fl.W - 0.35, 4.4]]
+    return { g, seat, route, scr, drawn: 0 }
+  }
+  // The control room: a wing off the lead's floor, one level up, glass to the office, a video wall of every member.
+  const CR_W = AW
+  function controlRoom(fl) {
+    const { XX } = fl, g = new T.Group(); g.position.set(fl.W, LV, 0); world.add(g)
+    // Why half deep: a balcony over the back of the office leaves its front open, so the lead's desk shows.
+    const cx = CR_W / 2, WH = Math.min(H + 0.3, PITCH - 0.86 - LV), night = tod === 'night', CRD = 3.1
+    mesh(box(CR_W, 0.14, CRD), M(night ? 0x222833 : 0x3e4858), cx, -0.07, CRD / 2, g).castShadow = false
+    mesh(box(CR_W, 0.3, CRD), M(XX.slab), cx, -0.29, CRD / 2, g).castShadow = false
+    mesh(box(CR_W + 0.3, WH, 0.3), M(night ? 0x262c37 : 0x39414e), cx + 0.15, WH / 2, -0.15, g)
+    mesh(box(CR_W + 0.34, 0.12, 0.34), M(XX.trim), cx + 0.15, WH + 0.06, -0.15, g)
+    const glassM = new T.MeshStandardMaterial({ color: lin(0xbfe0f0), transparent: true, opacity: 0.2, roughness: 0.1, depthWrite: false })
+    const p = new T.Mesh(box(0.05, WH - 0.2, CRD), glassM); p.position.set(0.02, (WH - 0.2) / 2, CRD / 2); g.add(p)
+    mesh(box(0.1, 0.1, CRD), M(XX.frame), 0.02, WH - 0.15, CRD / 2, g)
+    for (const z of [0.05, CRD - 0.05]) mesh(box(0.1, WH - 0.1, 0.1), M(XX.frame), 0.02, (WH - 0.1) / 2, z, g)
+    // a glass rail along the balcony's edge
+    const rail = new T.Mesh(box(CR_W, 0.9, 0.04), glassM); rail.position.set(cx, 0.45, CRD); g.add(rail)
+    mesh(box(CR_W, 0.06, 0.08), M(XX.frame), cx, 0.92, CRD, g)
+    for (const x of [0.05, cx, CR_W - 0.05]) mesh(box(0.06, 0.92, 0.06), M(XX.frame), x, 0.46, CRD, g)
+    // the video wall and its sign
+    mesh(box(3.5, 1.85, 0.06), M(0x15181e), cx, 2.3, 0.01, g)
+    const vw = canvasTex(400, 200)
+    const wall = new T.Mesh(new T.PlaneGeometry(3.36, 1.68), new T.MeshBasicMaterial({ map: vw.tex })); wall.position.set(cx, 2.3, 0.05); g.add(wall)
+    const sg = canvasTex(256, 48)
+    sg.g.font = '700 30px Geist, sans-serif'; sg.g.textAlign = 'center'; sg.g.textBaseline = 'middle'
+    sg.g.shadowColor = '#5ee0e0'; sg.g.shadowBlur = 12; sg.g.fillStyle = '#c9fbfb'; sg.g.fillText('JEV · CONTROL', 128, 26)
+    const sign = new T.Mesh(new T.PlaneGeometry(1.9, 0.36), new T.MeshBasicMaterial({ map: sg.tex, transparent: true })); sign.position.set(cx, 3.5, 0.05); g.add(sign)
+    // the console: one long desk and three monitors turned toward the chair
+    mesh(box(3.1, 0.08, 0.85), M(0x2f3540), cx, 0.98, 1.0, g)
+    for (const dx of [-1.48, 1.48]) mesh(box(0.08, 0.94, 0.8), M(0x232831), cx + dx, 0.47, 1.0, g)
+    mesh(box(3.0, 0.5, 0.05), M(0x232831), cx, 0.68, 0.6, g)
+    const screens = []
+    ;[[-0.95, 0.38, 'checks'], [0, 0, 'tests'], [0.95, -0.38, 'plan']].forEach(([dx, ry, spec]) => {
+      const m = new T.Group(); m.position.set(cx + dx, 1.42, 0.82 + Math.abs(dx) * 0.18); m.rotation.y = ry; g.add(m)
+      mesh(box(0.86, 0.54, 0.06), M(XX.monitor), 0, 0, 0, m)
+      mesh(box(0.06, 0.3, 0.06), M(XX.metal), 0, -0.4, -0.02, m)
+      const c = canvasTex(96, 60)
+      const s = new T.Mesh(new T.PlaneGeometry(0.78, 0.47), new T.MeshBasicMaterial({ map: c.tex })); s.position.z = 0.035; m.add(s)
+      screens.push({ c, spec })
+    })
+    mesh(new T.CylinderGeometry(0.12, 0.1, 0.16, 10), M(XX.mug), cx + 1.3, 1.1, 1.2, g)
+    // the chair, seen from behind like the office's
+    const chairAt = [fl.W + cx, 2.0]
+    const ch = new T.Group(); ch.position.set(cx, 0, 2.08); g.add(ch)
+    mesh(new T.CylinderGeometry(0.42, 0.4, 0.12, 14), M(0x1f2430), 0, 0.52, 0, ch)
+    mesh(box(0.8, 0.82, 0.12), M(0x1f2430), 0, 1.04, 0.42, ch)
+    mesh(new T.CylinderGeometry(0.05, 0.05, 0.4, 8), M(XX.metal), 0, 0.26, 0, ch)
+    if (night) { const pl = new T.PointLight(0x5ee0e0, 0.9, 7, 1.6); pl.position.set(cx, 2.6, 1.6); g.add(pl); glow(g, cx, 2.3, 0.4, 0x5ee0e0, 3.2, 0.35) }
+    return { g, chairAt, vw, screens, drawn: 0 }
+  }
+  // The wall: one tile per member on every floor, in Orca's status colours.
+  const statusCss = (m, online) => {
+    if (!online) return '#3a4150'
+    const st = stateOf(m)
+    if (st.act === 'ask' || st.broken || st.act === 'blocked' || st.hold === 'loggedOut') return css(P.attention)
+    if (st.hold === 'limited') return css(P.warning)
+    if (st.act === 'work') return css(P.info)
+    if (st.act === 'done' || st.act === 'cheer') return css(P.success)
+    return '#5b6472'
+  }
+  function drawWall(cr, t) {
+    const g = cr.vw.g, W_ = 400, H_ = 200
+    g.fillStyle = '#0b1220'; g.fillRect(0, 0, W_, H_)
+    g.fillStyle = '#a8b4c8'; g.font = '600 15px Geist, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'
+    g.fillText('EQUIPO', 14, 16)
+    const all = model.floors.flatMap((f) => f.members.map((m) => [m, f.online]))
+    const asking = all.filter(([m, on]) => on && stateOf(m).act === 'ask').length
+    g.textAlign = 'right'; g.fillStyle = asking ? css(P.attention) : '#4ade80'; g.fillText(asking ? asking + ' te necesitan' : 'todo en orden', W_ - 14, 16); g.textAlign = 'left'
+    const cols = 8, tw = 42, th = 22, gap = 6, x0 = 14, y0 = 32
+    all.slice(0, 40).forEach(([m, on], k) => {
+      const x = x0 + (k % cols) * (tw + gap), y = y0 + Math.floor(k / cols) * (th + gap)
+      const col = statusCss(m, on)
+      g.globalAlpha = col === css(P.attention) ? 0.65 + 0.35 * Math.abs(Math.sin(t * 3)) : 1
+      g.fillStyle = col; g.fillRect(x, y, tw, th); g.globalAlpha = 1
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = '600 11px Geist, sans-serif'; g.fillText(m.name.slice(0, 5), x + 4, y + th / 2 + 1)
+    })
+    // a load line along the bottom
+    g.strokeStyle = '#7fb4ff'; g.lineWidth = 2; g.beginPath()
+    for (let q = 0; q <= 40; q++) { const x = 14 + q * 9.3, y = 184 - 16 * (0.5 + 0.5 * Math.sin(q * 0.55 + t * 0.8)) * (0.6 + 0.4 * Math.sin(q * 0.17)); q ? g.lineTo(x, y) : g.moveTo(x, y) }
+    g.stroke()
+    cr.vw.tex.needsUpdate = true
+    cr.screens.forEach((s) => { drawScreen(s.c.g, 96, 60, s.spec, t); s.c.tex.needsUpdate = true })
+  }
+
   const desat = (pal) => {
     const o = Object.assign({}, pal)
     for (const [k, v] of Object.entries(pal)) if (typeof v === 'number' && !['sunI', 'hemi', 'fogOpacity'].includes(k)) {
@@ -1423,34 +1709,40 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     buildShaft(floors.length)
     cab.rides = []; cab.freeAt = -Infinity; cab.home = 0
 
-    // the lead, on its own floor, in its corner
+    // the lead works from its office in the wing, and walks out to the floors
+    const office = managerOffice(floors[0])
+    floors[0].office = office; floors[0].home = office.seat
+    animators.push((tt) => { if (tt - office.drawn > 0.3) { office.drawn = tt; drawScreen(office.scr.g, 96, 60, 'plan', tt); office.scr.tex.needsUpdate = true } })
     lead = walker(actor(0, { lead: true }))
     lead.fl = 0; lead.at = floors[0].home.slice()
     const lh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); lh.position.y = 0.8; lead.u.g.add(lh)
     lh.userData.who = { name: 'El lead', role: 'lead' }; hits.push(lh)
     bubble = chip('…', P); bubble.center.set(0.5, 0); bubble.visible = false; world.add(bubble)
+    // a violet marker over the lead's head, kept readable at any panel width
+    leadMark = new T.Sprite(new T.SpriteMaterial({ map: leadMarkTex(), depthTest: false, transparent: true })); leadMark.center.set(0.5, 0); leadMark.renderOrder = 12; world.add(leadMark)
     leadNext(t)
-    animators.push((tt) => { bubble.position.set(lead.u.g.position.x, lead.u.g.position.y + 3.25, lead.u.g.position.z) })
+    animators.push((tt) => {
+      const p = lead.u.g.position
+      leadMark.position.set(p.x, p.y + 2.75 + Math.sin(tt * 2.4) * 0.06, p.z)
+      bubble.position.set(p.x, p.y + 2.85 + leadMark.scale.y, p.z)
+    })
 
-    // Jev: the advisor watches from the window corner with a clipboard, and speaks when it decides
+    // Jev: the advisor sits in a control room over the lead's office, watching every desk on its wall
     if (model.advisor) {
+      const cr = controlRoom(floors[0])
       const u = actor(1, { role: 'advisor' })
-      if (u.tool) u.tool.visible = false
-      mesh(box(0.16, 0.2, 0.03), M(0x8a5a3a), 0, -0.4, 0.12, u.arms[0]); mesh(box(0.13, 0.15, 0.035), M(0xf6f3ea), 0, -0.41, 0.12, u.arms[0])
-      jevSeat = { u, at: [floors[0].W - 0.5, D - 0.55], line: chip('Jev · vigila', P), sayUntil: 0 }
+      jevSeat = { u, cr, at: cr.chairAt, line: chip('Jev · vigila', P), sayUntil: 0 }
       jevSeat.line.center.set(0.5, 0); world.add(jevSeat.line)
       const jh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); jh.position.y = 0.8; u.g.add(jh)
       jh.userData.who = { name: 'Jev', role: 'advisor' }; hits.push(jh)
       animators.push((tt) => {
-        resetPose(u)
         const speaking = tt < jevSeat.sayUntil
-        u.g.position.set(jevSeat.at[0], 0, jevSeat.at[1])
-        face(u, speaking ? jevSeat.look : [-1, Math.sin(tt * 0.35) * 0.6 - 0.5], tt)
-        pose(u, 'idle', tt)
-        u.arms[0].rotation.x = -1.1
-        if (speaking) u.arms[1].rotation.x = -1.5 + Math.sin(tt * 4) * 0.2
+        u.yaw = Math.PI - 0.35; u.g.rotation.y = u.yaw
+        seatedPose(u, speaking ? 'give' : 'type', tt)
+        u.g.position.set(jevSeat.at[0], LV + 0.58 - 0.34 * SIT_SCALE, jevSeat.at[1])
         jevSeat.line.visible = speaking
-        jevSeat.line.position.set(jevSeat.at[0], 3.2, jevSeat.at[1])
+        jevSeat.line.position.set(jevSeat.at[0], LV + 3.3, jevSeat.at[1])
+        if (!cr.drawn || tt - cr.drawn > 0.4) { cr.drawn = tt; drawWall(cr, tt) }
       })
     } else jevSeat = null
     steward = null
@@ -1528,14 +1820,14 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     const c = chip(`Jev · ${verb} ${s.m.name}`, P); jevSeat.line.material = c.material; jevSeat.line.scale.copy(c.scale)
     jevSeat.sayUntil = t + 4.2
     jevSeat.look = [s.x - jevSeat.at[0], SIT_Z - jevSeat.at[1]]
-    verdictFlight(new T.Vector3(jevSeat.at[0], 2.4, jevSeat.at[1]), s, hex)
+    verdictFlight(new T.Vector3(jevSeat.at[0], LV + 2.4, jevSeat.at[1]), s, hex)
   }
   function stewardVisits() {
     const seats = allSeats().filter((s) => s.m && s.mode === 'seated' && s.fl.online && stateOf(s.m).act === 'work')
     if (!seats.length) return say('Nadie trabajando a quien cambiarle el modelo.')
     if (steward) return
     const s = seats[Math.floor(rnd() * seats.length)]
-    const u = actor(3, { role: 'mage' })
+    const u = actor(3, { role: 'steward' })
     const w = walker(u)
     const raise = rnd() < 0.6
     const line = chip(`Steward · ${raise ? 'sube' : 'baja'} a ${s.m.name} a ${raise ? 'Opus · alto' : 'Sonnet · medio'}`, P); line.center.set(0.5, 0); line.visible = false; world.add(line)
@@ -1596,6 +1888,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   function handIn(seat) {
     const w = lead
     const P_ = planner(w, t, w.fl, w.at)
+    outOfOffice(P_)
     P_.ride(seat.fl.i)
     P_.walk([[P_.at[0], AISLE_Z], [standBehind(seat)[0], AISLE_Z], standBehind(seat)])
     P_.call((tt) => { seat.giving = tt + 1.3; paperFlight(seat) })
@@ -1627,7 +1920,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     return hit ? { seat: hit.object.userData.seat || null, who: hit.object.userData.who || null, x: e.clientX - r.left, y: e.clientY - r.top } : null
   }
   function describe(h) {
-    if (h.who) return [h.who.name, h.who.role === 'lead' ? 'Hace la ronda y atiende a quien te necesita' : 'Advisor: decide permisos y avisa']
+    if (h.who) return [h.who.name, h.who.role === 'lead' ? 'Trabaja desde su oficina de gerencia y sale a atender a quien te necesita' : 'Advisor · sala de control: decide permisos y avisa']
     const s = h.seat
     if (s.kind === 'taken') return ['Escritorio de otra sesión', `${s.fl.m.host.label} · por eso la máquina está llena`]
     if (s.kind === 'free') return ['Escritorio libre', `${s.fl.m.host.label} · cabe otro miembro`]
@@ -1667,6 +1960,8 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     pressed('[data-members]', (b) => Number(b.dataset.members) === perFloor)
     pressed('[data-figs]', (b) => b.dataset.figs === figs)
     pressed('[data-cam]', (b) => b.dataset.cam === camMode)
+    $('lite-note').hidden = figs !== 'lite'
+    canvas.style.visibility = figs === 'lite' ? 'hidden' : ''
     $('play').textContent = playing ? 'Pausar' : 'Reproducir'
     $('play').setAttribute('aria-pressed', String(playing))
     $('e-stop').setAttribute('aria-pressed', String(model.stopped))
@@ -1787,6 +2082,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     camera.position.copy(target).add(VIEW_DIR.clone().multiplyScalar(80))
     camera.lookAt(target)
     camera.updateProjectionMatrix()
+    if (leadMark) { const ppu = canvas.clientWidth * camera.zoom / (camera.right - camera.left); const s = Math.max(0.62, 20 / ppu); leadMark.scale.set(s, s, 1) }
     renderer.render(scene, camera)
     requestAnimationFrame(frame)
   }
@@ -1800,6 +2096,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     setState: (fi, j, s) => { model.floors[fi].members[j].state = s; refreshEditor() },
     advance: (secs) => { const until = t + secs; while (t < until) { t += 1 / 30; animators.slice().forEach((f) => f(t)); tickFlow(t) } },
     pause: () => { playing = false; sync() },
+    focus: (x, y, z, zoom) => { camMode = "free"; camGoal.target.set(x, y, z); camGoal.zoom = zoom; target.copy(camGoal.target); camera.zoom = zoom; sync() },
     hoverAt: (x, y) => { const r = canvas.getBoundingClientRect(); hover = pick({ clientX: r.left + x, clientY: r.top + y }); showTip(hover); return hover && describe(hover) },
     project: (v) => { const p = v.clone().project(camera); return [(p.x + 1) / 2 * canvas.clientWidth, (1 - p.y) / 2 * canvas.clientHeight] },
     seatScreen: (fi, j) => { const s = floors[fi].seats[j]; return window.__office.project(seatWorld(s).add(new T.Vector3(0, 1.4 * s.fl.k, -0.6))) },
