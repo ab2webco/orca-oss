@@ -11,14 +11,32 @@ The panel has three looks with the same data and actions: **Game** (a scene, lev
 three styles, all acting out the real state of the work, never a timer:
 
 - **Pixel**: a garden; each member's bed grows with its phase, and merged work fills harvest
-  crates.
-- **Figures**: a castle tower per member that rises from foundation to finished; merged towers
-  become trophies on the hills.
+  crates. With members on more than one machine it becomes a floor per machine, like Office.
+- **Figures**: a 3D base of islands, one per machine, sized by how many members it can run. Each
+  member builds a house at its own plot that rises from foundation to roof as its work moves; a red
+  CI sets the roof on fire, and a merge throws confetti and flies its flag. The lead walks the
+  roads to the member who needs you, and rows a boat to the other islands. Free members fish, farm
+  or chop wood, and limited ones sit by the fire. Jev watches from its lookout tower and sends a
+  messenger bird when it decides. A new member walks out of the keep; a newly connected machine's
+  island rises out of the sea.
 - **Office**: whiteboards whose notes move toward done, with plaques for merges. With members on
   more than one machine it becomes a building with one floor per machine, the lead's first, and
   **All** shows every floor.
 
 ![Settings > Agents > Panel with the scene, look, style, the style preview and the tab switches](../../assets/scenes-and-settings/panel-settings.png)
+
+In Figures the camera follows the lead. **Show all** frames every island, a drag moves around the
+base, and a pinch (or Ctrl or ⌘ with the scroll wheel) zooms; **Follow the lead** goes back. Two
+rows in **Settings > Agents > Panel** tune it:
+
+- **Scene quality**: **Illustrated** (outlined figures with shadows) or **Low resources** (flat
+  figures, no shadows), for slower machines.
+- **Lead's pace**: **Normal** (it walks like a person), **Fast** (2.5 times faster) or **Direct**
+  (the court mage by the keep sends it from circle to circle by magic).
+
+Figures needs WebGL. With hardware acceleration off, Figures draws in 2D instead: a castle tower
+per member that rises from foundation to finished, and merged towers become trophies on the hills.
+`orchestratorGame.panel.diorama: false` keeps the 2D Figures on any machine.
 
 Red CI shows the build broken. **Settings > Appearance > Status colors** sets one color per state
 (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), for light and dark; the panel and
@@ -45,9 +63,10 @@ The same settings exist in three places, and each field resolves on its own: the
 </figure>
 
 - **Settings > Agents**: **Agent Teams game** (the game in panes, and the **Terminal band**) and
-  **Panel** (scene, look, style, and the **PRs**, **Queue** and **Machines** switches), for every
-  project.
-- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`),
+  **Panel** (scene, look, style, **Scene quality** and **Lead's pace** for Figures, and the **PRs**,
+  **Queue** and **Machines** switches), for every project.
+- `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
+  `pace`, `diorama`),
   `orchestratorGame.scene` and `orchestratorGame.sceneFile`, plus the lead's
   `orchestratorGame.orchestrator.rules`.
 - The project's page in **Settings**, section **Agent Teams game**: the same rows for this project

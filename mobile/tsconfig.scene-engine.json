@@ -4,6 +4,7 @@
   "files": [
     "../src/renderer/src/env.d.ts",
     "src/team-drawer/team-scene-engine.ts",
+    "src/team-drawer/team-scene-diorama-engine.ts",
     "src/team-drawer/team-scene-webview-shims.ts"
   ],
   "compilerOptions": { "composite": false, "noEmit": true }

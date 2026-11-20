@@ -4,6 +4,7 @@ import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-typ
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { TeamSceneBuilding, teamSceneHasFloors } from './TeamSceneBuilding'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
+import { TeamSceneDiorama } from './TeamSceneDiorama'
 import { teamSceneLeadLineOf } from './team-scene-copy'
 import { TEAM_SCENE_ART_HEIGHT } from './team-scene-image-painter'
 import { useTeamScenePainter } from './use-team-scene-painter'
@@ -18,12 +19,20 @@ type Props = {
   style: GamePanelStyle
   /** The panel's last team, shown while a read confirms it. */
   unconfirmed?: boolean
+  /** Figures as the 3D diorama (ORCA-1296, behind `panel.diorama` until it draws everything). */
+  diorama?: boolean
   /** The panel below the scene; its card faces draw with the scene's painter. */
   children?: React.ReactNode
 }
 
 /** The live scene for a team in the Game look, drawn from the Team model only. */
-export function TeamPanelScene({ model, style, unconfirmed, children }: Props): React.JSX.Element {
+export function TeamPanelScene({
+  model,
+  style,
+  unconfirmed,
+  diorama,
+  children
+}: Props): React.JSX.Element {
   const timezone = model.metrics.kind === 'ready' ? model.metrics.value.timezone : 'local'
   const { drawn, art, painter, makePainter } = useTeamScenePainter({
     style,
@@ -44,6 +53,9 @@ export function TeamPanelScene({ model, style, unconfirmed, children }: Props): 
   // Why: like the advisor's, a lead's line with no room for its bubble shows in its card (ORCA-1139).
   const [leadUnplaced, setLeadUnplaced] = useState(false)
   const onUnplaced = useCallback((keys: string[]) => setLeadUnplaced(keys.includes('lead')), [])
+  // Why a fallback: with hardware acceleration off there is no WebGL, and Figures still draws.
+  const [noWebgl, setNoWebgl] = useState(false)
+  const onNoWebgl = useCallback(() => setNoWebgl(true), [])
   return (
     <TeamScenePainterContext.Provider value={painter}>
       <TeamSceneLeadLineContext.Provider value={painter && leadUnplaced ? leadLine : null}>
@@ -51,9 +63,14 @@ export function TeamPanelScene({ model, style, unconfirmed, children }: Props): 
           className="shrink-0 border-b border-border"
           data-team-scene={drawn}
           data-team-scene-art={art}
+          data-team-scene-webgl={
+            diorama && drawn === 'figures' ? (noWebgl ? 'off' : 'on') : undefined
+          }
         >
-          {/* Why Office only: the building is desks on floors, and one machine stays as today. */}
-          {painter && drawn === 'office' && teamSceneHasFloors(model) ? (
+          {/* Why Office and Pixel: a floor per machine; one machine keeps its single stage. */}
+          {diorama && drawn === 'figures' && !noWebgl ? (
+            <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} />
+          ) : painter && (drawn === 'office' || drawn === 'pixel') && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}
               unconfirmed={unconfirmed}

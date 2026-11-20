@@ -1,4 +1,11 @@
-import { GAME_PANEL_STYLES, type GamePanelStyle } from '../../../src/shared/orchestrator-game-panel'
+import {
+  GAME_PANEL_PACES,
+  GAME_PANEL_QUALITIES,
+  GAME_PANEL_STYLES,
+  type GamePanelPace,
+  type GamePanelQuality,
+  type GamePanelStyle
+} from '../../../src/shared/orchestrator-game-panel'
 import type { OrchestratorGameSceneExtension } from '../../../src/shared/orchestrator-game-scene'
 import {
   orchestratorGameSceneArtOf,
@@ -10,6 +17,11 @@ import type {
   TeamLeadCard,
   TeamMemberCard
 } from '../../../src/shared/team-panel-model-types'
+import {
+  teamDioramaMachinesOf,
+  type DioramaMachine
+} from '../../../src/shared/team-scene/team-diorama-layout'
+import { teamSceneFloorsOf } from '../../../src/shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../src/shared/team-scene/team-scene-input'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 
@@ -37,6 +49,10 @@ export type TeamSceneBand =
       timezone: string
       /** What the desktop's scene director reads: who is on stage and what each one does. */
       input: TeamSceneInput
+      /** Figures as the 3D diorama, as the host's panel draws it; absent draws Figures in 2D. */
+      diorama?: { quality: GamePanelQuality; pace: GamePanelPace }
+      /** The team's machines, an island each in the diorama. */
+      machines: DioramaMachine[]
     }
 
 const QUEST = 'quest'
@@ -82,10 +98,22 @@ export function teamSceneBandOf(
     sceneId,
     native
   )
+  // Why only when the host says so: a host older than the diorama draws Figures in 2D itself.
+  const diorama =
+    style === 'figures' && panel.diorama === true
+      ? {
+          quality: GAME_PANEL_QUALITIES.find((one) => one === panel.quality) ?? 'high',
+          pace: GAME_PANEL_PACES.find((one) => one === panel.pace) ?? 'normal'
+        }
+      : undefined
   return {
     kind: 'stage',
     art,
     fallback,
+    ...(diorama ? { diorama } : {}),
+    machines: teamDioramaMachinesOf(
+      teamSceneFloorsOf({ lead: cards.lead, members: cards.members, machines: null })
+    ),
     scenes,
     timezone: typeof config.timezone === 'string' ? config.timezone : 'local',
     input: teamSceneInputOf({

@@ -42,7 +42,8 @@ function customScenes() {
   return scenes
 }
 
-// MOCK_PANEL_STYLE=pixel|office|figures (and MOCK_PANEL_LOOK) set the project's panel.
+// MOCK_PANEL_STYLE=pixel|office|figures (and MOCK_PANEL_LOOK) set the project's panel;
+// MOCK_DIORAMA=1 draws Figures as the diorama, MOCK_QUALITY=low its low-resource look.
 function panelOf(): OrchestratorGamePanel | undefined {
   const style = process.env.MOCK_PANEL_STYLE as OrchestratorGamePanel['style'] | undefined
   if (!style) {
@@ -55,7 +56,10 @@ function panelOf(): OrchestratorGamePanel | undefined {
       GAME_PANEL_TABS.map((tab) => [tab, true])
     ) as OrchestratorGamePanel['tabs'],
     advisor: true,
-    arcade: false
+    arcade: false,
+    diorama: process.env.MOCK_DIORAMA === '1',
+    quality: process.env.MOCK_QUALITY === 'low' ? 'low' : 'high',
+    pace: 'normal'
   }
 }
 
