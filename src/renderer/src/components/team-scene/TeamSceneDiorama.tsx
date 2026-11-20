@@ -16,7 +16,13 @@ import {
   dioramaLeadRoundOf,
   dioramaStandOf
 } from '../../../../shared/team-scene/team-diorama-lead-round'
-import { dioramaWaterGrid } from '../../../../shared/team-scene/team-diorama-nav'
+import { dioramaActivitySpotsOf } from '../../../../shared/team-scene/team-diorama-activities'
+import {
+  dioramaWaterGrid,
+  polyAt,
+  polyLengths
+} from '../../../../shared/team-scene/team-diorama-nav'
+import { dioramaActivity, dioramaHomeProps, type DioramaTick } from './team-diorama-props'
 import { dioramaRoadNet } from '../../../../shared/team-scene/team-diorama-roads'
 import { dioramaBoat } from './team-diorama-boats'
 import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floors'
@@ -160,6 +166,9 @@ export function TeamSceneDiorama({
       lastT = t
       poseDioramaFigure(lead, at.pose === 'talk' ? 'idle' : at.pose, t)
     }
+    const ticks: DioramaTick[] = dioramaHomeProps(kit, world)
+    const spots = new Map(dioramaActivitySpotsOf(layout, views).map((spot) => [spot.key, spot]))
+    const SPOT_POSE = { fish: 'fish', chop: 'chop', rest: 'sit', farm: 'water' } as const
     for (const island of layout.islands) {
       for (const plot of island.plots) {
         const view = plot.key ? views.get(plot.key) : undefined
@@ -170,6 +179,29 @@ export function TeamSceneDiorama({
         const f = dioramaFigure(kit, dioramaLookOf(member.characterKey ?? member.key), {
           lite: false
         })
+        const spot = spots.get(member.key)
+        if (spot) {
+          // A free or resting member leaves its plot for its spot; the plot keeps its build.
+          f.g.position.set(spot.at[0], 0, spot.at[1])
+          f.g.rotation.y = Math.atan2(spot.face[0] - spot.at[0], spot.face[1] - spot.at[1])
+          world.add(f.g)
+          const tick = dioramaActivity(kit, spot, f, world)
+          if (tick) {
+            ticks.push(tick)
+          }
+          if (spot.loop) {
+            const loop = [...spot.loop, spot.loop[0]!]
+            const cum = polyLengths(loop)
+            const phase = (spot.phase ?? 0) * cum.at(-1)!
+            ticks.push((t) => {
+              const at = polyAt(loop, cum, (t * 0.45 + phase) % cum.at(-1)!)
+              f.g.position.set(at.at[0], f.g.position.y, at.at[1])
+              f.g.rotation.y = Math.atan2(at.heading[0], at.heading[1])
+            })
+          }
+          placed.push({ figure: f, pose: SPOT_POSE[spot.kind] })
+          continue
+        }
         const [x, z] = dioramaStandOf(plot)
         f.g.position.set(x, 0, z)
         f.g.rotation.y =
@@ -227,6 +259,9 @@ export function TeamSceneDiorama({
 
     const draw = (t: number) => {
       moveLead(t)
+      for (const tick of ticks) {
+        tick(t)
+      }
       for (const p of placed) {
         poseDioramaFigure(p.figure, p.pose, t)
       }
