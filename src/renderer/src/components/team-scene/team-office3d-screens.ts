@@ -1,0 +1,98 @@
+import * as THREE from 'three'
+import type { Office3dScreen } from '../../../../shared/team-scene/team-office3d-actions'
+import type { TeamSceneSite } from '../../../../shared/team-scene/team-scene-sites'
+import { drawDeskScreen } from './team-scene-desk-screens'
+import { drawOfficeBoard } from './team-scene-office-builds'
+import { drawOfficeHoldScreen } from './team-scene-office-hold'
+import { OFFICE_SCREEN_OFF } from './team-scene-office-painter'
+import { drawOfficeVirus } from './team-scene-office-virus'
+import type { TeamSceneStatusColors } from './team-scene-painter-marks'
+
+// Why the 2D Office's own drawings: a monitor, hold screen, red-CI bug and task board read the
+// same in both Offices, so Low resources and Illustrated never disagree about a member (ORCA-1302).
+
+const ON = '#0f1826'
+const CODE = ['#7fb4ff', '#a8b4c8']
+
+/** A canvas a mesh shows; `redraw` repaints it and flags the texture. */
+export type Office3dCanvas = { tex: THREE.CanvasTexture; redraw: (paint: Paint) => void }
+type Paint = (g: CanvasRenderingContext2D, w: number, h: number) => void
+
+/** Null without a 2D canvas (tests, a blocked context): the mesh is simply left out. */
+export function office3dCanvas(w: number, h: number): Office3dCanvas | null {
+  const c = typeof document === 'undefined' ? null : document.createElement('canvas')
+  const g = c?.getContext('2d')
+  if (!c || !g) {
+    return null
+  }
+  c.width = w
+  c.height = h
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return {
+    tex,
+    redraw: (paint) => {
+      g.clearRect(0, 0, w, h)
+      paint(g, w, h)
+      tex.needsUpdate = true
+    }
+  }
+}
+
+function code(g: CanvasRenderingContext2D, w: number, h: number, t: number): void {
+  const [ux, uy] = [w / 28, h / 18]
+  for (let i = 0; i < 6; i++) {
+    const n = (Math.floor(t * 3) + i * 3) % 7
+    g.fillStyle = CODE[i % 2]!
+    g.fillRect((2.5 + (n % 3) * 1.5) * ux, (2 + i * 2.5) * uy, (6 + ((n * 11) % 15)) * ux, 1.3 * uy)
+  }
+}
+
+/** A resting member's screen saver: a dim card drifting slowly, so the desk reads as idle. */
+function idle(g: CanvasRenderingContext2D, w: number, h: number, t: number): void {
+  const [ux, uy] = [w / 28, h / 18]
+  const x = 4 + ((Math.sin(t * 0.5) + 1) / 2) * 16
+  const y = 3 + ((Math.cos(t * 0.37) + 1) / 2) * 9
+  g.fillStyle = '#2b3650'
+  g.fillRect(x * ux, y * uy, 6 * ux, 4 * uy)
+}
+
+/** Paints a desk's monitor: its desk, a hold's screen, code, idle or off, with the bug on top. */
+export function paintOffice3dScreen(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  screen: Office3dScreen,
+  virus: boolean,
+  t: number,
+  colors: TeamSceneStatusColors
+): void {
+  const rect = { x: 0, y: 0, width: w, height: h }
+  g.fillStyle = screen.kind === 'off' ? OFFICE_SCREEN_OFF : ON
+  g.fillRect(0, 0, w, h)
+  if (screen.kind === 'desk') {
+    drawDeskScreen(g, rect, screen.desk, t)
+  } else if (screen.kind === 'hold') {
+    drawOfficeHoldScreen(g, rect, screen.hold, t, colors)
+  } else if (screen.kind === 'code') {
+    code(g, w, h, t)
+  } else if (screen.kind === 'idle') {
+    idle(g, w, h, t)
+  }
+  if (virus) {
+    drawOfficeVirus(g, rect, t)
+  }
+}
+
+/** Paints the task board over a desk; null paints another session's or a free desk's blank one. */
+export function paintOffice3dBoard(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  site: TeamSceneSite | null,
+  t: number,
+  attention: string
+): void {
+  const s = w / 38
+  drawOfficeBoard(g, w / 2, h - s, s, site ?? { stage: 0, broken: false }, t, attention)
+}
