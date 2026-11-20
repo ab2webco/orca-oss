@@ -20,6 +20,14 @@ the prototype.
   renderer unchanged. The prototype's toggle says so and draws nothing.
 - **Accents fixed:** the file now declares UTF-8.
 
+## Owner's answer: one Jev per machine (2026-11-20)
+
+Jev is installed as a plugin on each machine, so it is not one shared Jev. Every floor has its own control room and its
+own Jev, who decides only for that floor's members; no Jev rides the lift. On the lead's floor the control room is
+the balcony over the lead's office; on every other floor it is a room at floor level beside the desks. Each room's
+wall shows only that machine's members. An offline machine's Jev is drawn faded like its members.
+Captures re-taken: `office-1440-*` and `office-390-*`, plus `moments/jev-per-floor-1440-{light,dark}.png`.
+
 ## What it shows, against today's 2D Office
 
 | 2D Office today | 3D prototype (Illustrated) |
@@ -37,7 +45,7 @@ the prototype.
 | Holds: limited, asleep, loggedOut, unreachable, queued, starting | Hourglass, standby + zz, lock, static + faded, clock with empty chair, boot bar |
 | Emotes: alert, prompt, check, star, heart, blocked | Same marks in Orca's status colours |
 | Lead rounds, attends who needs you, rides to other floors | Lead works in its office, walks out to whoever needs you first, rides the elevator, hands work round |
-| Jev decisions, verdict flights | Jev at the control-room console; speaks and sends a plane in the verdict's colour |
+| Jev decisions, verdict flights | Each floor's Jev at its own console; speaks and sends a plane in the verdict's colour to its own floor |
 | Steward model change | Steward (a dev with a tablet) appears beside the member and says the pick |
 | Arrivals / departures | New member rides the elevator and walks to a free desk; a leaving one walks back and vanishes |
 | Hover label and click target | Hover shows name + state + host; click says which terminal it would open |

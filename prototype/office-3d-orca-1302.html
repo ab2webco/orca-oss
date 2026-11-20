@@ -103,7 +103,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   <header>
     <div class="eyebrow">ORCA-1302 · dirección visual propuesta, sin código de producto</div>
     <h1>La oficina del equipo, en 3D</h1>
-    <p class="lede">Cada máquina es una planta del edificio y cada miembro trabaja en su escritorio según su estado real. El equipo son devs en suéter. El lead, con abrigo violeta, trabaja en su oficina de gerencia y sale a atender primero a quien te necesita, aunque esté en otra planta. Jev vigila a todos desde la sala de control. Es el mismo mundo del diorama: mismo kit toon, materiales y luz.</p>
+    <p class="lede">Cada máquina es una planta del edificio y cada miembro trabaja en su escritorio según su estado real. El equipo son devs en suéter. El lead, con abrigo violeta, trabaja en su oficina de gerencia y sale a atender primero a quien te necesita, aunque esté en otra planta. Cada máquina tiene su propio Jev en su sala de control, que decide solo por su planta. Es el mismo mundo del diorama: mismo kit toon, materiales y luz.</p>
   </header>
 
   <div class="controls" role="group" aria-label="Controles">
@@ -143,7 +143,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       <button class="chip" id="e-arrive">Llega un miembro</button>
       <button class="chip" id="e-leave">Se va un miembro</button>
       <button class="chip" id="e-jev">Jev decide</button>
-      <button class="chip" id="e-jev-in">Jev entra a su sala</button>
+      <button class="chip" id="e-jev-in">Los Jev entran a su sala</button>
       <button class="chip" id="e-steward">Steward cambia un modelo</button>
       <button class="chip" id="e-stop" aria-pressed="false">STOP de lanzamientos</button>
       <button class="chip" id="e-reset">Reiniciar</button>
@@ -1516,7 +1516,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   }
 
   // ---------- the scene ----------
-  let OFFX = null, sun = null, jevSeat = null, steward = null, leadMark = null
+  let OFFX = null, sun = null, jevs = [], steward = null, leadMark = null
   function leadMarkTex() {
     const { g, tex } = canvasTex(128, 128)
     g.lineJoin = 'round'; g.lineWidth = 14; g.strokeStyle = '#ffffff'; g.fillStyle = '#6c4cf0'
@@ -1602,28 +1602,36 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
   const CR_W = AW
   // Why the back corner, through a hatch: in front of the office the stair hid the lead's desk.
   const STAIR = { x: AW - 0.6, z: 0.85, r: 0.5, hx: AW - 1.15, hz: 1.6 }
-  function controlRoom(fl) {
-    const { XX } = fl, g = new T.Group(); g.position.set(fl.W, LV, 0); world.add(g)
-    // Why half deep: a balcony over the back of the office leaves its front open, so the lead's desk shows.
-    const cx = CR_W / 2, WH = Math.min(H + 0.3, PITCH - 0.86 - LV), night = tod === 'night', CRD = 3.1
+  // Each machine's Jev has its own control room: Jev is a plugin hook per session, not one shared instance.
+  // On the lead's floor it is a balcony over the lead's office; on any other floor, a room at floor level.
+  function controlRoom(fl, ground) {
+    const { XX } = fl, BY = ground ? fl.y : LV, g = new T.Group(); g.position.set(fl.W, BY, 0); world.add(g)
+    // Why half deep on the lead's floor: a balcony over the back of the office leaves the lead's desk in view.
+    const cx = CR_W / 2, WH = ground ? H + 0.3 : Math.min(H + 0.3, PITCH - 0.86 - LV), night = tod === 'night', CRD = ground ? D : 3.1
     const floorM = M(night ? 0x222833 : 0x3e4858)
-    for (const [x0, x1, z0, z1] of [[0, STAIR.hx, 0, CRD], [STAIR.hx, CR_W, STAIR.hz, CRD]]) {
+    const slabs = ground ? [[0, CR_W, 0, CRD]] : [[0, STAIR.hx, 0, CRD], [STAIR.hx, CR_W, STAIR.hz, CRD]]
+    for (const [x0, x1, z0, z1] of slabs) {
       mesh(box(x1 - x0, 0.14, z1 - z0), floorM, (x0 + x1) / 2, -0.07, (z0 + z1) / 2, g).castShadow = false
-      mesh(box(x1 - x0, 0.3, z1 - z0), M(XX.slab), (x0 + x1) / 2, -0.29, (z0 + z1) / 2, g).castShadow = false
+      mesh(box(x1 - x0, ground ? 0.55 : 0.3, z1 - z0), M(XX.slab), (x0 + x1) / 2, ground ? -0.41 : -0.29, (z0 + z1) / 2, g).castShadow = false
     }
     // a rail round the hatch, open on the side the stair comes out of
-    mesh(box(0.05, 0.9, STAIR.hz), M(XX.frame), STAIR.hx, 0.45, STAIR.hz / 2, g)
+    if (!ground) mesh(box(0.05, 0.9, STAIR.hz), M(XX.frame), STAIR.hx, 0.45, STAIR.hz / 2, g)
     mesh(box(CR_W + 0.3, WH, 0.3), M(night ? 0x262c37 : 0x39414e), cx + 0.15, WH / 2, -0.15, g)
     mesh(box(CR_W + 0.34, 0.12, 0.34), M(XX.trim), cx + 0.15, WH + 0.06, -0.15, g)
     const glassM = new T.MeshStandardMaterial({ color: lin(0xbfe0f0), transparent: true, opacity: 0.2, roughness: 0.1, depthWrite: false })
-    const p = new T.Mesh(box(0.05, WH - 0.2, CRD), glassM); p.position.set(0.02, (WH - 0.2) / 2, CRD / 2); g.add(p)
+    // glass to the office; at floor level it has a door, where Jev walks in
+    for (const [z0, z1] of ground ? [[0, 3.4], [4.7, CRD]] : [[0, CRD]]) {
+      const p = new T.Mesh(box(0.05, WH - 0.2, z1 - z0), glassM); p.position.set(0.02, (WH - 0.2) / 2, (z0 + z1) / 2); g.add(p)
+    }
     mesh(box(0.1, 0.1, CRD), M(XX.frame), 0.02, WH - 0.15, CRD / 2, g)
-    for (const z of [0.05, CRD - 0.05]) mesh(box(0.1, WH - 0.1, 0.1), M(XX.frame), 0.02, (WH - 0.1) / 2, z, g)
+    for (const z of ground ? [0.05, 3.4, 4.7, CRD - 0.05] : [0.05, CRD - 0.05]) mesh(box(0.1, WH - 0.1, 0.1), M(XX.frame), 0.02, (WH - 0.1) / 2, z, g)
     // a glass rail along the balcony's edge
-    const RL = CR_W
+    const RL = ground ? 0 : CR_W
+    if (RL) {
     const rail = new T.Mesh(box(RL, 0.9, 0.04), glassM); rail.position.set(RL / 2, 0.45, CRD); g.add(rail)
     mesh(box(RL, 0.06, 0.08), M(XX.frame), RL / 2, 0.92, CRD, g)
     for (const x of [0.05, RL / 2, RL]) mesh(box(0.06, 0.92, 0.06), M(XX.frame), x, 0.46, CRD, g)
+    }
     // the video wall and its sign
     mesh(box(3.5, 1.85, 0.06), M(0x15181e), cx, 2.3, 0.01, g)
     const vw = canvasTex(400, 200)
@@ -1633,10 +1641,10 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     sg.g.shadowColor = '#5ee0e0'; sg.g.shadowBlur = 12; sg.g.fillStyle = '#c9fbfb'; sg.g.fillText('JEV · CONTROL', 128, 26)
     const sign = new T.Mesh(new T.PlaneGeometry(1.9, 0.36), new T.MeshBasicMaterial({ map: sg.tex, transparent: true })); sign.position.set(cx, 3.5, 0.05); g.add(sign)
     // the console: one long desk and three monitors turned toward the chair
-    const kx = STAIR.hx / 2 + 0.05
-    mesh(box(STAIR.hx - 0.3, 0.08, 0.85), M(0x2f3540), kx, 0.98, 1.0, g)
-    for (const dx of [-1, 1]) mesh(box(0.08, 0.94, 0.8), M(0x232831), kx + dx * (STAIR.hx / 2 - 0.2), 0.47, 1.0, g)
-    mesh(box(STAIR.hx - 0.4, 0.5, 0.05), M(0x232831), kx, 0.68, 0.6, g)
+    const cw = ground ? CR_W - 0.3 : STAIR.hx, kx = ground ? cx : STAIR.hx / 2 + 0.05
+    mesh(box(cw - 0.3, 0.08, 0.85), M(0x2f3540), kx, 0.98, 1.0, g)
+    for (const dx of [-1, 1]) mesh(box(0.08, 0.94, 0.8), M(0x232831), kx + dx * (cw / 2 - 0.2), 0.47, 1.0, g)
+    mesh(box(cw - 0.4, 0.5, 0.05), M(0x232831), kx, 0.68, 0.6, g)
     const screens = []
     ;[[-0.8, 0.38, 'checks'], [0, 0, 'tests'], [0.8, -0.38, 'plan']].forEach(([dx, ry, spec]) => {
       const m = new T.Group(); m.position.set(kx + dx, 1.42, 0.82 + Math.abs(dx) * 0.18); m.rotation.y = ry; g.add(m)
@@ -1654,6 +1662,8 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     mesh(box(0.8, 0.82, 0.12), M(0x1f2430), 0, 1.04, 0.42, ch)
     mesh(new T.CylinderGeometry(0.05, 0.05, 0.4, 8), M(XX.metal), 0, 0.26, 0, ch)
     if (night) { const pl = new T.PointLight(0x5ee0e0, 0.9, 7, 1.6); pl.position.set(cx, 2.6, 1.6); g.add(pl); glow(g, cx, 2.3, 0.4, 0x5ee0e0, 3.2, 0.35) }
+    const at = (lx, lz, y) => [fl.W + lx, y, lz]
+    if (ground) return { g, fm: fl.m, y: BY, chairAt, vw, screens, drawn: 0, path: [at(-1.2, 4.05, BY), at(-0.35, 4.05, BY), at(kx + 0.3, 2.9, BY), [chairAt[0], BY, chairAt[1]]] }
     // the spiral stair, from the office floor up to the balcony, and Jev's way in
     const st = new T.Group(); st.position.set(fl.W + STAIR.x, 0, STAIR.z); world.add(st)
     mesh(new T.CylinderGeometry(0.06, 0.06, LV + 1.0, 8), M(XX.metal), 0, (LV + 1.0) / 2, 0, st)
@@ -1664,11 +1674,10 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       step.rotation.y = a - Math.PI / 2
       mesh(new T.CylinderGeometry(0.02, 0.02, 0.9, 6), M(XX.frame), Math.sin(a) * STAIR.r, y + 0.45, Math.cos(a) * STAIR.r, st)
     }
-    const at = (lx, lz, y) => [fl.W + lx, y, lz]
     const path = [at(-0.35, 4.05, 0), at(0.55, 4.05, 0), at(0.55, 1.15, 0), at(STAIR.x - STAIR.r * 0.7, 1.15, 0)]
     for (let k = 1; k <= 12; k++) { const a = -Math.PI / 2 + (k / 12) * Math.PI * 2.5; path.push(at(STAIR.x + Math.sin(a) * STAIR.r * 0.7, STAIR.z + Math.cos(a) * STAIR.r * 0.7, (k / 12) * LV)) }
     path.push(at(STAIR.x, 1.95, LV), at(kx + 0.3, 2.5, LV), [chairAt[0], LV, chairAt[1]])
-    return { g, chairAt, vw, screens, drawn: 0, path }
+    return { g, fm: fl.m, y: BY, chairAt, vw, screens, drawn: 0, path }
   }
   // The wall: one tile per member on every floor, in Orca's status colours.
   const statusCss = (m, online) => {
@@ -1684,8 +1693,8 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     const g = cr.vw.g, W_ = 400, H_ = 200
     g.fillStyle = '#0b1220'; g.fillRect(0, 0, W_, H_)
     g.fillStyle = '#a8b4c8'; g.font = '600 15px Geist, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'
-    g.fillText('EQUIPO', 14, 16)
-    const all = model.floors.flatMap((f) => f.members.map((m) => [m, f.online]))
+    g.fillText(cr.fm.host.name.toUpperCase(), 14, 16)
+    const all = cr.fm.members.map((m) => [m, cr.fm.online])
     const asking = all.filter(([m, on]) => on && stateOf(m).act === 'ask').length
     g.textAlign = 'right'; g.fillStyle = asking ? css(P.attention) : '#4ade80'; g.fillText(asking ? asking + ' te necesitan' : 'todo en orden', W_ - 14, 16); g.textAlign = 'left'
     const cols = 8, tw = 42, th = 22, gap = 6, x0 = 14, y0 = 32
@@ -1752,14 +1761,16 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
       bubble.position.set(p.x, p.y + 2.85 + leadMark.scale.y, p.z)
     })
 
-    // Jev: the advisor sits in a control room over the lead's office, watching every desk on its wall
-    if (model.advisor) {
-      const cr = controlRoom(floors[0])
-      const u = actor(1, { role: 'advisor' })
-      jevSeat = { u, cr, at: cr.chairAt, line: chip('Jev · vigila', P), sayUntil: 0 }
+    // One Jev per machine, each in its own control room, watching and deciding only for its own floor
+    jevs = []
+    if (model.advisor) floors.forEach((fl) => {
+      const cr = controlRoom(fl, fl.i !== 0)
+      const u = actor(1 + fl.i * 7, { role: 'advisor' })
+      const jevSeat = { u, cr, fl, at: cr.chairAt, line: chip('Jev · vigila', P), sayUntil: 0 }
+      jevs.push(jevSeat)
       jevSeat.line.center.set(0.5, 0); world.add(jevSeat.line)
       const jh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); jh.position.y = 0.8; u.g.add(jh)
-      jh.userData.who = { name: 'Jev', role: 'advisor' }; hits.push(jh)
+      jh.userData.who = { name: 'Jev · ' + fl.m.host.name, role: 'advisor' }; hits.push(jh)
       // Jev walks in: through the lead's office door, up the spiral stair, to the console
       const legs = cr.path.slice(1).map((b, k) => { const a = cr.path[k]; return { a, b, len: Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) } })
       const walkDur = legs.reduce((n, l) => n + l.len, 0) / 1.5
@@ -1778,12 +1789,13 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
         const speaking = tt < jevSeat.sayUntil
         u.yaw = Math.PI - 0.35; u.g.rotation.y = u.yaw
         seatedPose(u, speaking ? 'give' : 'type', tt)
-        u.g.position.set(jevSeat.at[0], LV + 0.58 - 0.34 * SIT_SCALE, jevSeat.at[1])
+        setGhost(u, !fl.online)
+        u.g.position.set(jevSeat.at[0], cr.y + 0.58 - 0.34 * SIT_SCALE, jevSeat.at[1])
         jevSeat.line.visible = speaking
-        jevSeat.line.position.set(jevSeat.at[0], LV + 3.3, jevSeat.at[1])
+        jevSeat.line.position.set(jevSeat.at[0], cr.y + 3.3, jevSeat.at[1])
         if (!cr.drawn || tt - cr.drawn > 0.4) { cr.drawn = tt; drawWall(cr, tt) }
       })
-    } else jevSeat = null
+    })
     steward = null
 
     animators.push((tt) => walkers.forEach((w) => tickWalker(w, tt)))
@@ -1849,17 +1861,19 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
 
   // ---------- Jev and the steward ----------
   function jevDecides() {
-    if (!jevSeat) return say('Jev está apagado en este proyecto.')
-    const seats = floors[0].seats.filter((s) => s.m && s.mode === 'seated')
-    if (!seats.length) return say('No hay nadie en la planta del lead.')
+    if (!jevs.length) return say('Jev está apagado en este proyecto.')
+    // a member on any machine that is online; its own floor's Jev decides, nobody rides the lift
+    const seats = allSeats().filter((s) => s.m && s.mode === 'seated' && s.fl.online)
+    if (!seats.length) return say('No hay nadie en una máquina en línea.')
     const s = seats[Math.floor(rnd() * seats.length)]
+    const jevSeat = jevs.find((j) => j.fl === s.fl)
     const tones = [['aprueba «Edit» de', P.success], ['pregunta por', P.warning], ['frena un «rm» de', P.attention]]
     const [verb, hex] = tones[Math.floor(rnd() * 3)]
     jevSeat.line.material.map.dispose()
     const c = chip(`Jev · ${verb} ${s.m.name}`, P); jevSeat.line.material = c.material; jevSeat.line.scale.copy(c.scale)
     jevSeat.sayUntil = t + 4.2
     jevSeat.look = [s.x - jevSeat.at[0], SIT_Z - jevSeat.at[1]]
-    verdictFlight(new T.Vector3(jevSeat.at[0], LV + 2.4, jevSeat.at[1]), s, hex)
+    verdictFlight(new T.Vector3(jevSeat.at[0], jevSeat.cr.y + 2.4, jevSeat.at[1]), s, hex)
   }
   function stewardVisits() {
     const seats = allSeats().filter((s) => s.m && s.mode === 'seated' && s.fl.online && stateOf(s.m).act === 'work')
@@ -1959,7 +1973,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     return hit ? { seat: hit.object.userData.seat || null, who: hit.object.userData.who || null, x: e.clientX - r.left, y: e.clientY - r.top } : null
   }
   function describe(h) {
-    if (h.who) return [h.who.name, h.who.role === 'lead' ? 'Trabaja desde su oficina de gerencia y sale a atender a quien te necesita' : 'Advisor · sala de control: decide permisos y avisa']
+    if (h.who) return [h.who.name, h.who.role === 'lead' ? 'Trabaja desde su oficina de gerencia y sale a atender a quien te necesita' : 'Advisor de esta máquina: decide los permisos de su planta']
     const s = h.seat
     if (s.kind === 'taken') return ['Escritorio de otra sesión', `${s.fl.m.host.label} · por eso la máquina está llena`]
     if (s.kind === 'free') return ['Escritorio libre', `${s.fl.m.host.label} · cabe otro miembro`]
@@ -2068,7 +2082,7 @@ h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
     leave(t, s[s.length - 1]); sync()
   })
   $('e-jev').addEventListener('click', () => { playing = true; jevDecides() })
-  $('e-jev-in').addEventListener('click', () => { playing = true; if (jevSeat) jevSeat.enterAt = t })
+  $('e-jev-in').addEventListener('click', () => { playing = true; jevs.forEach((j) => { j.enterAt = t }) })
   $('e-steward').addEventListener('click', () => { playing = true; stewardVisits() })
   $('e-stop').addEventListener('click', () => { model.stopped = !model.stopped; stopSigns.forEach((s) => { s.visible = model.stopped }); sync() })
   $('e-reset').addEventListener('click', () => { flow = null; model = makeModel(); build(); sync() })
