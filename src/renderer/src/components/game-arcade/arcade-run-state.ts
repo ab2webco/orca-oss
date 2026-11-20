@@ -43,8 +43,6 @@ export type ArcadeDriver<G, S> = {
   ) => void
   /** The still scene behind the play, baked once per size: each game has its own. */
   backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
-  /** Whether the scene paints with the theme's tokens, so the score and card above it do too. */
-  isThemed?: boolean
 }
 
 /** A game and its state, closed over so the tab never needs to know which game it plays. */
@@ -58,7 +56,6 @@ export type ArcadePlay = {
   playsStartPress: boolean
   paint: (g: CanvasRenderingContext2D, view: ArcadeView, isMoving: boolean) => void
   backdropOf: (size: ArcadePaintSize) => HTMLCanvasElement
-  isThemed: boolean
   /** A not-yet-started play, laid out again for a view; absent once it has moved. */
   fitTo?: (view: ArcadeView) => ArcadePlay
 }
@@ -76,8 +73,7 @@ export function arcadePlayOf<G, S>(driver: ArcadeDriver<G, S>, game: G, state: S
     isStartKey: driver.isStartKey,
     playsStartPress: driver.playsStartPress,
     paint: (g, view, isMoving) => driver.paint(g, game, state, { ...view, isMoving }),
-    backdropOf: driver.backdropOf,
-    isThemed: driver.isThemed === true
+    backdropOf: driver.backdropOf
   }
 }
 

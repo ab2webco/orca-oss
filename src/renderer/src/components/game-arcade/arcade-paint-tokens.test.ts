@@ -80,12 +80,12 @@ const SIZE = { width: 800, height: 600, scale: 1 }
 const WORDS = { score: '5 pts', hint: 'hint', held: 'held', over: 'Game over', overHint: 'back' }
 
 type Engine = keyof typeof GAMES
-/** The games whose scene paints with tokens; each split part of ORCA-1299 adds its own. */
-const TOKEN_ENGINES: Engine[] = ['runner', 'snake', 'bricks']
+/** The games whose scene paints with tokens: all four since ORCA-1299. */
+const TOKEN_ENGINES: Engine[] = ['runner', 'snake', 'bricks', 'defense']
 
 /**
  * The colours one frame of `engine` draws mid-run and on its game-over screen, under `theme`;
- * without `scene`, only the overlay text and card the four games share, as a themed game shows them.
+ * without `scene`, only the overlay text and card the four games share.
  */
 function colorsOf(engine: Engine, scene = true): Set<string> {
   const colors = new Set<string>()
@@ -99,7 +99,7 @@ function colorsOf(engine: Engine, scene = true): Set<string> {
     run = { ...stepped, screen: 'running' }
   }
   if (!scene) {
-    run = { ...run, play: { ...run.play, paint: () => {}, isThemed: true } }
+    run = { ...run, play: { ...run.play, paint: () => {} } }
   }
   const backdrop = {} as HTMLCanvasElement
   paintArcadeFrame(g, backdrop, run, WORDS, SIZE)

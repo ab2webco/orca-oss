@@ -1,10 +1,9 @@
-import type { ArcadeRun } from './arcade-run-state'
+import type { ArcadeRun, ArcadeScreen } from './arcade-run-state'
 import type { ArcadeWords } from './arcade-words'
-import { arcadeTokens, type ArcadeTokens } from './arcade-theme-tokens'
+import { arcadeTokens } from './arcade-theme-tokens'
 
 // Draws one frame of the arcade tab: the game's baked backdrop, its run, then the score, the hint
-// and the game-over or paused card, with the caller's translated words; in the theme's colours once
-// the game's scene paints with them.
+// and the game-over or paused card in the theme's colours, with the caller's translated words.
 
 export type ArcadePaintSize = { width: number; height: number; scale: number }
 
@@ -58,49 +57,34 @@ function fittedLinesOf(
 const HINT: TextLook = { px: 12, floor: 9, fontOf: (px) => `${px}px "Geist Mono", monospace` }
 const TITLE: TextLook = { px: 22, floor: 12, fontOf: (px) => `600 ${px}px Geist, sans-serif` }
 
-type OverlayInk = { text: string; hint: string; scrim: string }
-
-// Why white on a scene that is not themed yet: its art stays dark in both themes.
-const SCENE_INK: OverlayInk = {
-  text: '#fff',
-  hint: 'rgb(255 255 255 / 0.8)',
-  scrim: 'rgb(8 8 12 / 0.62)'
-}
-
-const themedInkOf = (t: ArcadeTokens): OverlayInk => ({
-  text: t.css('foreground'),
-  hint: t.css('mutedForeground'),
-  scrim: t.css('background', 0.78)
-})
-
 function paintText(
   g: CanvasRenderingContext2D,
-  run: Pick<ArcadeRun, 'screen' | 'play'>,
+  run: { screen: ArcadeScreen },
   words: ArcadeWords,
   w: number,
   h: number
 ): void {
-  const ink = run.play.isThemed ? themedInkOf(arcadeTokens()) : SCENE_INK
+  const t = arcadeTokens()
   const room = w - 32
-  g.fillStyle = ink.text
+  g.fillStyle = t.css('foreground')
   g.font = '600 15px "Geist Mono", monospace'
   g.fillText(words.score, 16, 26, room)
-  g.fillStyle = ink.hint
+  g.fillStyle = t.css('mutedForeground')
   const hint = fittedLinesOf(g, run.screen === 'held' ? words.held : words.hint, room, HINT)
   hint.lines.forEach((line, i) => g.fillText(line, 16, 44 + i * hint.px * 1.35, room))
   if (run.screen !== 'over' && run.screen !== 'held') {
     return
   }
-  g.fillStyle = ink.scrim
+  g.fillStyle = t.css('background', 0.78)
   g.fillRect(0, 0, w, h)
   g.textAlign = 'center'
-  g.fillStyle = ink.text
+  g.fillStyle = t.css('foreground')
   const title = fittedLinesOf(g, run.screen === 'over' ? words.over : words.held, room, TITLE)
   const step = title.px * 1.2
   const top = h / 2 - 6 - ((title.lines.length - 1) * step) / 2
   title.lines.forEach((line, i) => g.fillText(line, w / 2, top + i * step, room))
   g.font = '14px Geist, sans-serif'
-  g.fillStyle = ink.hint
+  g.fillStyle = t.css('mutedForeground')
   if (run.screen === 'over') {
     g.fillText(words.overHint, w / 2, top + (title.lines.length - 1) * step + 24, room)
   }
