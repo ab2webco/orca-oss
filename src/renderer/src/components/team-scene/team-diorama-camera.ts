@@ -7,6 +7,9 @@ export type DioramaFit = {
   height: number
   /** The world's ground extent, for the sun's shadow box. */
   ground: THREE.Box3
+  /** Where the camera looks to frame the whole world, and the width it frames. */
+  center: THREE.Vector3
+  span: number
 }
 
 /** An isometric camera that frames the whole world at `width`, and the stage height that fits it. */
@@ -51,5 +54,5 @@ export function dioramaFitCamera(world: THREE.Object3D, width: number): DioramaF
   camera.position.copy(target).add(DIORAMA_VIEW.clone().multiplyScalar(80))
   camera.lookAt(target)
   camera.updateProjectionMatrix()
-  return { camera, height, ground: box }
+  return { camera, height, ground: box, center: target, span: half.w * 2 }
 }

@@ -15728,6 +15728,10 @@
         }
       },
       "team-scene": {
+        "TeamSceneDiorama": {
+          "followLead": "Seguir al lead",
+          "showAll": "Ver todo"
+        },
         "team-scene-copy": {
           "label": "Escena en vivo del equipo",
           "leadAsks": "Esperándote\n{{question}}",

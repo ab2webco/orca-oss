@@ -13,6 +13,7 @@ import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-ty
 import { dioramaBoat } from './team-diorama-boats'
 import { dioramaFigure, type DioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
+import { dioramaMage } from './team-diorama-mage'
 import { poseDioramaFigure } from './team-diorama-poses'
 
 const VISITABLE = new Set(['build', 'inspect', 'wait', 'repair', 'cheer'])
@@ -48,9 +49,11 @@ export function dioramaLeadActor(
     home: dock.boat,
     boat: dioramaBoat(k, world)
   }))
+  const mage = args.pace === 'direct' ? dioramaMage(k, world, round, args.lite) : null
   let yaw = 0
   let lastT: number | null = null
   const tick = (t: number) => {
+    mage?.(t)
     for (const b of boats) {
       const at = dioramaBoatAt(round, b.column, b.home, t)
       b.boat.place(at.at, at.heading, t, at.moving)

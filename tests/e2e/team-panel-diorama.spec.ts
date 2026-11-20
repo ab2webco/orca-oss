@@ -63,6 +63,49 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
       await orcaPage.waitForTimeout(3000)
       const after = await canvas.screenshot({ path: testInfo.outputPath('diorama-motion-b.png') })
       expect(Buffer.compare(before, after), 'the diorama stood still').not.toBe(0)
+      // The camera follows the lead; Show all frames the world, a drag frees it, Follow returns.
+      await expect(canvas).toHaveAttribute('data-diorama-camera', 'lead')
+      await panel.getByRole('button', { name: 'Show all' }).click()
+      await expect(canvas).toHaveAttribute('data-diorama-camera', 'all')
+      await orcaPage.waitForTimeout(2500)
+      await canvas.screenshot({ path: testInfo.outputPath('diorama-camera-all.png') })
+      const box = (await canvas.boundingBox())!
+      await orcaPage.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await orcaPage.mouse.down()
+      await orcaPage.mouse.move(box.x + box.width / 2 - 80, box.y + box.height / 2 + 30, {
+        steps: 6
+      })
+      await orcaPage.mouse.up()
+      await expect(canvas).toHaveAttribute('data-diorama-camera', 'free')
+      await panel.getByRole('button', { name: 'Follow the lead' }).click()
+      await expect(canvas).toHaveAttribute('data-diorama-camera', 'lead')
+      await orcaPage.waitForTimeout(2500)
+      await canvas.screenshot({ path: testInfo.outputPath('diorama-camera-lead.png') })
+      // Direct pace brings the court mage; Low resources draws flat figures without shadows.
+      for (const [name, look] of [
+        ['mage', { pace: 'direct' }],
+        ['low', { quality: 'low', pace: 'normal' }]
+      ] as const) {
+        await writeSettings(orcaPage, {
+          pluginSystemEnabled: true,
+          orchestratorGame: {
+            scene: 'quest',
+            panel: { look: 'game', style: 'figures', diorama: true, ...look }
+          }
+        })
+        await panel.getByRole('button', { name: 'Show all' }).click()
+        await orcaPage.waitForTimeout(2500)
+        await expect(canvas).toHaveAttribute('data-diorama-islands', /\d/)
+        await canvas.screenshot({ path: testInfo.outputPath(`diorama-${name}.png`) })
+      }
+      await writeSettings(orcaPage, {
+        pluginSystemEnabled: true,
+        orchestratorGame: {
+          scene: 'quest',
+          panel: { look: 'game', style: 'figures', diorama: true }
+        }
+      })
+      await panel.getByRole('button', { name: 'Follow the lead' }).click()
       // Jev decides in Ada's pane, a member joins here and a machine connects with one more.
       await seedOfficeTeam(electronApp, {
         jev,

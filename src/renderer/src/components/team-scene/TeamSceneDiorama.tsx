@@ -24,6 +24,9 @@ import { dioramaStage } from './team-diorama-stage'
 import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
+import { useDioramaCameraInput } from './use-diorama-camera-input'
+import { Button } from '@/components/ui/button'
+import { translate } from '@/i18n/i18n'
 
 const FRAME_MS = 1000 / 30
 
@@ -43,6 +46,8 @@ export function TeamSceneDiorama({
   const cues = useRef<DioramaCue[]>([])
   const islandsSeen = useRef<string[] | null>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
+  const redraw = useRef<(() => void) | null>(null)
+  const camera = useDioramaCameraInput(canvas, redraw)
   const status = useTeamSceneStatusColors()
   const look = useTeamSceneDioramaLook()
   const [width, setWidth] = useState(0)
@@ -127,7 +132,8 @@ export function TeamSceneDiorama({
       views,
       cues: cues.current,
       lite: look.quality === 'low',
-      pace: look.pace
+      pace: look.pace,
+      view: camera.view.current
     })
     const draw = stage.draw
     let raf = 0,
@@ -147,6 +153,13 @@ export function TeamSceneDiorama({
     watch.observe(el)
     // Why the clock under motion: a moment that just started must show in the very first frame.
     draw(reduced ? 1.3 : at)
+    // Under reduced motion nothing animates, so a camera move paints its own still frame.
+    redraw.current = reduced
+      ? () => {
+          camera.view.current.target = null
+          draw(1.3)
+        }
+      : null
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
@@ -158,11 +171,38 @@ export function TeamSceneDiorama({
       watch.disconnect()
       stage.dispose()
     }
-  }, [layout, views, input, status, width, onNoWebgl, look])
+  }, [layout, views, input, status, width, onNoWebgl, look, camera.view])
 
+  const modes = [
+    [
+      'lead',
+      translate('auto.components.team-scene.TeamSceneDiorama.followLead', 'Follow the lead')
+    ],
+    ['all', translate('auto.components.team-scene.TeamSceneDiorama.showAll', 'Show all')]
+  ] as const
   return (
-    <div ref={wrap} className="w-full" data-team-scene-diorama="">
-      <canvas ref={canvas} role="img" aria-label={teamSceneLabel()} className="block w-full" />
+    <div ref={wrap} className="relative w-full" data-team-scene-diorama="">
+      <canvas
+        ref={canvas}
+        role="img"
+        aria-label={teamSceneLabel()}
+        className="block w-full"
+        data-diorama-camera={camera.mode}
+      />
+      <div className="absolute top-2 right-2 flex gap-1">
+        {modes.map(([mode, label]) => (
+          <Button
+            key={mode}
+            variant="outline"
+            size="xs"
+            aria-pressed={camera.mode === mode}
+            className="aria-pressed:bg-accent"
+            onClick={() => camera.setMode(mode)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }

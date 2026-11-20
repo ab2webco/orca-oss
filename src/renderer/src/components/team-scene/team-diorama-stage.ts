@@ -13,6 +13,7 @@ import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
 import { dioramaRises } from './team-diorama-rise'
 import { dioramaHomeProps } from './team-diorama-props'
+import { dioramaAim, type DioramaView } from './team-diorama-view'
 import { dioramaWorld } from './team-diorama-world-meshes'
 
 export type DioramaStage = {
@@ -35,6 +36,8 @@ export function dioramaStage(
     /** Low resources: flat figures, no shadows, one pixel per pixel. */
     lite: boolean
     pace: DioramaPace
+    /** The camera, kept across reads: it follows the lead, frames everything, or stays put. */
+    view: DioramaView
   }
 ): DioramaStage {
   const { input, layout, views, cues } = args
@@ -102,6 +105,7 @@ export function dioramaStage(
       for (const tick of ticks) {
         tick(t)
       }
+      dioramaAim(args.view, fit, lead.figure.g.position, args.width, t)
       renderer.render(scene, fit.camera)
     },
     dispose: () => kit.dispose(world)

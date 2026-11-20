@@ -16652,6 +16652,10 @@
         }
       },
       "team-scene": {
+        "TeamSceneDiorama": {
+          "followLead": "Follow the lead",
+          "showAll": "Show all"
+        },
         "team-scene-copy": {
           "label": "Live team scene",
           "leadAsks": "Waiting for you\n{{question}}",

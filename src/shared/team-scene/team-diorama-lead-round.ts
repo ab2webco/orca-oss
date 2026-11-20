@@ -230,3 +230,16 @@ export function dioramaBoatAt(
   }
   return out
 }
+
+/** The jump the court mage is sending the lead on at `t`, and how far along it is; else null. */
+export function dioramaLeadJumpAt(
+  round: DioramaLeadRound,
+  t: number
+): { from: DioramaPoint; to: DioramaPoint; k: number } | null {
+  const s = dioramaLeadStepAt(round, t)
+  if (s.kind !== 'jump' || s.dur <= 0) {
+    return null
+  }
+  const tt = ((t % round.total) + round.total) % round.total
+  return { from: s.from, to: s.to, k: Math.min(1, Math.max(0, (tt - s.start) / s.dur)) }
+}

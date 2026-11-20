@@ -3,6 +3,7 @@ import { DIORAMA_GATE, teamDioramaLayoutOf, type DioramaMachine } from './team-d
 import {
   dioramaBoatAt,
   dioramaLeadAt,
+  dioramaLeadJumpAt,
   dioramaLeadRoundOf,
   dioramaLeadStepAt,
   dioramaStandOf,
@@ -115,5 +116,18 @@ describe('the lead and the boats at a moment', () => {
       pose: 'walk',
       blink: 1
     })
+  })
+})
+
+describe("the court mage's jumps", () => {
+  it('names each jump of the Direct round with its progress, and none on foot', () => {
+    const direct = roundOf('direct')
+    const jump = direct.steps.find((s) => s.kind === 'jump')!
+    const mid = dioramaLeadJumpAt(direct, jump.start + jump.dur / 2)
+    expect(mid?.k).toBeCloseTo(0.5, 5)
+    expect(mid?.from).toEqual(jump.kind === 'jump' ? jump.from : null)
+    const walk = roundOf('normal')
+    const step = walk.steps.find((s) => s.kind === 'walk')!
+    expect(dioramaLeadJumpAt(walk, step.start + step.dur / 2)).toBeNull()
   })
 })
