@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { DAY, dioramaKit } from './team-diorama-kit'
-import { dioramaFigure, dioramaLookOf } from './team-diorama-figures'
+import { DIORAMA_UNIT_SCALE, dioramaFigure, dioramaLookOf } from './team-diorama-figures'
 import { POSE_OF_ACTION, poseDioramaFigure } from './team-diorama-poses'
 
 const kit = () =>
@@ -21,6 +21,30 @@ describe('the diorama figures', () => {
   it('outlines the illustrated figure in ink, and draws the low-resource one without outlines', () => {
     expect(inkOutlines(dioramaFigure(kit(), 3, { lite: false }).g)).toBeGreaterThan(8)
     expect(inkOutlines(dioramaFigure(kit(), 3, { lite: true }).g)).toBe(0)
+  })
+
+  it('draws each quality with its own prototype model, 1.6 times the prototype size', () => {
+    const materials = (g: THREE.Object3D) => {
+      const kinds = new Set<string>()
+      g.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined
+        if (m && m.side !== THREE.BackSide) {
+          kinds.add(m.type)
+        }
+      })
+      return kinds
+    }
+    const toon = dioramaFigure(kit(), 0, { lite: false })
+    const lite = dioramaFigure(kit(), 0, { lite: true })
+    expect(materials(toon.g)).toContain('MeshToonMaterial')
+    expect(materials(lite.g)).toContain('MeshLambertMaterial')
+    expect(materials(lite.g)).not.toContain('MeshToonMaterial')
+    // The low-poly unit is the prototype's own: far fewer parts than the illustrated one.
+    expect(lite.g.children.length).toBeLessThan(toon.g.children.length)
+    expect(toon.g.scale.x).toBe(DIORAMA_UNIT_SCALE)
+    expect(dioramaFigure(kit(), 0, { lead: true, lite: true }).g.scale.x).toBeCloseTo(
+      DIORAMA_UNIT_SCALE * 1.12
+    )
   })
 
   it('keeps a member look by its character, so it never changes between reads', () => {

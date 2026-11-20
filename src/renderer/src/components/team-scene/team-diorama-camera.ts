@@ -16,33 +16,38 @@ export type DioramaFit = {
 export function dioramaFitCamera(
   world: THREE.Object3D,
   width: number,
-  maxHeight = 520
+  maxHeight = 760
 ): DioramaFit {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400)
   camera.position.copy(DIORAMA_VIEW).multiplyScalar(80)
   camera.lookAt(0, 0, 0)
   camera.updateMatrixWorld()
   const box = new THREE.Box3()
+  const corners: THREE.Vector3[] = []
   world.updateMatrixWorld(true)
+  // Why each part's own box, solid ones only: the prototype's computeFit, so the frame hugs the
+  // islands instead of the box around them, and fog, wakes and the sea never widen it.
   world.traverse((o) => {
     const m = o as THREE.Mesh
-    // Why not planes: the sea is a 600-wide plane and would fit the camera to the horizon.
-    if (m.geometry && m.geometry.type !== 'PlaneGeometry') {
-      box.expandByObject(m)
+    const mat = m.material as THREE.Material | undefined
+    if (!m.isMesh || !mat || mat.transparent || m.geometry.type === 'PlaneGeometry') {
+      return
+    }
+    const part = new THREE.Box3().setFromObject(m)
+    box.union(part)
+    for (const x of [part.min.x, part.max.x]) {
+      for (const y of [part.min.y, part.max.y]) {
+        for (const z of [part.min.z, part.max.z]) {
+          corners.push(new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse))
+        }
+      }
     }
   })
-  const corners = [box.min.x, box.max.x].flatMap((x) =>
-    [box.min.y, box.max.y].flatMap((y) =>
-      [box.min.z, box.max.z].map((z) =>
-        new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse)
-      )
-    )
-  )
   const xs = corners.map((v) => v.x)
   const ys = corners.map((v) => v.y)
   const fw = Math.max(...xs) - Math.min(...xs) + 1.6
   const fh = Math.max(...ys) - Math.min(...ys) + 1.6
-  const height = Math.round(Math.max(240, Math.min(width * (fh / fw), maxHeight)))
+  const height = Math.round(Math.max(220, Math.min(width * (fh / fw), maxHeight)))
   const aspect = width / height
   const half =
     fw / 2 / aspect > fh / 2

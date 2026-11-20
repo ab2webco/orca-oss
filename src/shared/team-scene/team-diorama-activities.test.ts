@@ -64,6 +64,24 @@ describe('where free and resting members go', () => {
     expect(spots[0]!.at[1]).toBeGreaterThan(island.rect.z + island.rect.hd)
   })
 
+  it('sends free and resting members past the home plots to their spots, though they have no plot', () => {
+    const members = ['1', '2', '3', '4', '5', '6', 'r', 'f']
+    const layout = teamDioramaLayoutOf([machine('', { home: true, members, cap: null })])
+    expect(layout.overflow).toEqual(['r', 'f'])
+    const views = new Map([
+      ...['1', '2', '3', '4', '5', '6'].map(
+        (key) => [key, dioramaPlotViewOf(member(key, { activity: 'working' }))] as const
+      ),
+      ['r', dioramaPlotViewOf(member('r', { activity: 'blocked', hold: 'limited' }))] as const,
+      ['f', dioramaPlotViewOf(member('f'), 0)] as const
+    ])
+    const spots = dioramaActivitySpotsOf(layout, views)
+    expect(spots.map((s) => [s.key, s.kind])).toEqual([
+      ['r', 'rest'],
+      ['f', 'fish']
+    ])
+  })
+
   it('leaves working members at their plots', () => {
     const layout = teamDioramaLayoutOf([machine('', { home: true, members: ['w'], cap: null })])
     const views = new Map([['w', dioramaPlotViewOf(member('w', { activity: 'working' }))]])

@@ -12,9 +12,9 @@ import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
 import { dioramaRises } from './team-diorama-rise'
-import { dioramaHomeProps } from './team-diorama-props'
+import { dioramaHomeProps } from './team-diorama-camp'
 import { dioramaAim, type DioramaView } from './team-diorama-view'
-import { dioramaWorld } from './team-diorama-world-meshes'
+import { dioramaWorld, type DioramaWords } from './team-diorama-world-meshes'
 
 export type DioramaStage = {
   height: number
@@ -49,6 +49,8 @@ export function dioramaStage(
     view: DioramaView
     /** The tallest the stage may be; the phone keeps its band short. */
     maxHeight?: number
+    /** The island chips' words; a client without them names only remote machines. */
+    words?: DioramaWords
   }
 ): DioramaStage {
   const { input, layout, views, cues } = args
@@ -68,14 +70,15 @@ export function dioramaStage(
   sun.shadow.bias = -0.0006
   sun.shadow.normalBias = 0.02
   scene.add(sun, sun.target)
-  const world = dioramaWorld(kit, layout, views)
+  const built = dioramaWorld(kit, layout, views, args.words)
+  const world = built.world
   scene.add(world)
 
-  const ticks = dioramaHomeProps(kit, world)
+  const ticks = [...built.ticks, ...dioramaHomeProps(kit, world, lite)]
   const lead = dioramaLeadActor(kit, world, { layout, views, input, lite, pace: args.pace })
-  const cast = dioramaCast(kit, world, { layout, views, input, cues, lite })
+  const cast = dioramaCast(kit, world, { layout, views, input, cues, lite, stands: built.stands })
   ticks.push(...dioramaRises(world, cues), lead.tick, ...cast.ticks)
-  const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite) : null
+  const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite, input.advisor.line) : null
   if (advisor) {
     ticks.push(advisor.tick)
   }
@@ -89,7 +92,7 @@ export function dioramaStage(
       world,
       cues,
       anchorOf,
-      advisor ? DIORAMA_TOWER.clone().setY(3.2) : null
+      advisor ? DIORAMA_TOWER.clone().setY(DIORAMA_TOWER.y + 1.3) : null
     )
   )
 

@@ -14,6 +14,7 @@ export type DioramaPose =
   | 'talk'
   | 'chop'
   | 'fish'
+  | 'reel'
   | 'water'
   | 'spy'
 
@@ -40,6 +41,8 @@ export function poseDioramaFigure(f: DioramaFigure, pose: DioramaPose, t: number
   }
   f.body.rotation.set(0, 0, 0)
   f.body.position.y = f.bodyY
+  f.body.scale.y = 1
+  f.head.rotation.x = 0
   f.g.rotation.z = 0
   let lift = 0
   if (pose === 'walk') {
@@ -63,15 +66,19 @@ export function poseDioramaFigure(f: DioramaFigure, pose: DioramaPose, t: number
   } else if (pose === 'chop') {
     const w = (Math.sin(t * 2.2) + 1) / 2
     aR!.rotation.x = aL!.rotation.x = -2.7 + w * 2
+    aL!.rotation.z = -0.15
+    aR!.rotation.z = 0.15
     f.body.rotation.x = 0.12 * w
-  } else if (pose === 'fish') {
-    aR!.rotation.x = -0.9 + Math.sin(t * 1.2) * 0.05
-    aL!.rotation.x = -0.8
+  } else if (pose === 'fish' || pose === 'reel') {
+    aR!.rotation.x = pose === 'reel' ? -2.3 : -0.9 + Math.sin(t * 1.2) * 0.05
+    aL!.rotation.x = pose === 'reel' ? -2 : -0.8
+    aL!.rotation.z = -0.25
   } else if (pose === 'water') {
     const s = Math.sin(t * 6)
     lL!.rotation.x = s * 0.4
     lR!.rotation.x = -s * 0.4
     aR!.rotation.x = -1.15
+    aL!.rotation.x = -s * 0.3
     lift = Math.abs(Math.cos(t * 6)) * 0.02
   } else if (pose === 'spy') {
     aR!.rotation.x = -2.05
@@ -84,11 +91,13 @@ export function poseDioramaFigure(f: DioramaFigure, pose: DioramaPose, t: number
   } else if (pose === 'sit') {
     lL!.rotation.x = lR!.rotation.x = -1.45
     aL!.rotation.x = aR!.rotation.x = -0.6
+    f.head.rotation.x = 0.12 + Math.sin(t * 0.9) * 0.05
     lift = -0.3
   } else {
     f.body.scale.y = 1 + Math.sin(t * 2.2) * 0.015
     aL!.rotation.z = -0.06
     aR!.rotation.z = 0.06
   }
-  f.g.position.y = f.baseY + lift
+  // Why scaled: a seated or bobbing figure keeps its proportions at the size it is drawn.
+  f.g.position.y = f.baseY + lift * f.g.scale.y
 }

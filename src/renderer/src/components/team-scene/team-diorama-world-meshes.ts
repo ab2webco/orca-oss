@@ -1,176 +1,89 @@
 import * as THREE from 'three'
-import type {
-  DioramaIsland,
-  DioramaLayout,
-  DioramaPoint
-} from '../../../../shared/team-scene/team-diorama-layout'
-import { DIORAMA_KEEP } from '../../../../shared/team-scene/team-diorama-layout'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
-import type { DioramaKit } from './team-diorama-kit'
+import {
+  DIORAMA_KEEP,
+  DIORAMA_LANE_Z,
+  type DioramaIsland,
+  type DioramaLayout,
+  type DioramaPoint
+} from '../../../../shared/team-scene/team-diorama-layout'
+import { dioramaKeep, type DioramaTick } from './team-diorama-buildings'
+import { dioramaChip } from './team-diorama-fx'
+import { dioramaOffKit, type DioramaKit } from './team-diorama-kit'
+import { dioramaPlot, type DioramaPlotStand } from './team-diorama-plots'
+import { dioramaIsland, dioramaRoad, dioramaTravelDock, dioramaTree } from './team-diorama-scenery'
 
-// Why every surface has its own height: two faces at one height flicker (z-fighting), as the
-// prototype's dock decks did on the grass (ORCA-1296). Grass tops sit at y 0, roads at 0.03,
-// plots at 0.04 and decks at 0.075.
+// Why every surface has its own height: two faces at one height flicker (z-fighting). Grass tops
+// sit at y 0, roads at 0.03, plots at 0.04, and dock planks just under the grass at -0.04, as the
+// approved prototype lays them (ORCA-1296).
 
-function island(k: DioramaKit, isl: DioramaIsland, parent: THREE.Object3D) {
-  const { x, z, hw, hd } = isl.rect
-  const dim = !isl.reachable
-  const tone = (hex: number) =>
-    dim ? new THREE.Color(hex).lerp(new THREE.Color(0x8a8a8a), 0.75).getHex() : hex
-  k.mesh(k.box(hw * 2, 0.22, hd * 2), k.mat(tone(k.p.grass)), x, -0.11, z, parent, false)
-  k.mesh(
-    k.box(hw * 2 - 0.05, 0.7, hd * 2 - 0.05),
-    k.mat(tone(k.p.dirt)),
-    x,
-    -0.55,
-    z,
-    parent,
-    false
-  )
-  k.mesh(k.box(hw * 2 + 0.9, 0.3, hd * 2 + 0.9), k.mat(tone(k.p.sand)), x, -0.78, z, parent, false)
+/** The words the island chips use; without them only remote machines are named. */
+export type DioramaWords = { thisMachine: string; offline: string }
+
+export type DioramaWorld = {
+  world: THREE.Group
+  /** Each member's place on its plot, as its state draws it. */
+  stands: Map<string, { at: DioramaPoint; stand: DioramaPlotStand }>
+  ticks: DioramaTick[]
 }
 
-function road(k: DioramaKit, pts: DioramaPoint[], parent: THREE.Object3D) {
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [ax, az] = pts[i]!,
-      [bx, bz] = pts[i + 1]!
-    const seg = k.mesh(
-      k.box(0.75, 0.03, Math.hypot(bx - ax, bz - az) + 0.75),
-      k.mat(k.p.path),
-      (ax + bx) / 2,
-      0.015,
-      (az + bz) / 2,
-      parent,
-      false
+/** An unreachable machine's island drifts under a slow fog. */
+function fog(k: DioramaKit, isl: DioramaIsland, parent: THREE.Object3D): DioramaTick {
+  const { x, z, hw } = isl.rect
+  const puffs = Array.from({ length: 6 + isl.plots.length * 3 }, () => {
+    const m = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.9 + k.rnd() * 0.9, 1),
+      k.mat(k.p.fog, { opacity: k.p.fogOpacity, unique: true })
     )
-    seg.rotation.y = Math.atan2(bx - ax, bz - az)
-  }
+    m.userData.o = [
+      (k.rnd() - 0.5) * (hw * 2 - 1),
+      0.6 + k.rnd() * 1.6,
+      k.rnd() * 6 - 3,
+      k.rnd() * 6
+    ]
+    parent.add(m)
+    return m
+  })
+  return (t) =>
+    puffs.forEach((m) => {
+      const [ox, oy, oz, ph] = m.userData.o as number[]
+      m.position.set(
+        x + ox! + Math.sin(t * 0.25 + ph!) * 0.8,
+        oy!,
+        z + oz! + Math.cos(t * 0.2 + ph!) * 0.6
+      )
+    })
 }
 
-function dock(k: DioramaKit, from: DioramaPoint, to: DioramaPoint, into: THREE.Object3D) {
-  // Why a group: a newly connected island builds its dock up out of the water.
-  const parent = new THREE.Group()
-  parent.userData.dock = true
-  into.add(parent)
-  const len = Math.hypot(to[0] - from[0], to[1] - from[1]) + 0.6
-  const deck = k.mesh(
-    k.box(1, 0.07, len),
-    k.mat(k.p.wood),
-    (from[0] + to[0]) / 2,
-    0.075,
-    (from[1] + to[1]) / 2,
-    parent,
-    false
-  )
-  deck.rotation.y = Math.atan2(to[0] - from[0], to[1] - from[1])
-  for (const side of [-0.48, 0.48]) {
-    k.mesh(k.box(0.1, 1.1, 0.1), k.mat(k.p.woodDark), to[0] + side, -0.45, to[1], parent)
+function chipOf(isl: DioramaIsland, words: DioramaWords | undefined): string | null {
+  if (isl.home) {
+    return words ? words.thisMachine : null
   }
+  if (!isl.reachable) {
+    return words ? `${isl.name} · ${words.offline}` : isl.name
+  }
+  return `${isl.name} · ${isl.plots.filter((p) => p.key).length}/${isl.plots.length}`
 }
 
-export function dioramaTree(
-  k: DioramaKit,
-  x: number,
-  z: number,
-  s: number,
-  pine: boolean,
-  parent: THREE.Object3D
-) {
-  const g = new THREE.Group()
-  g.position.set(x, 0, z)
-  g.scale.setScalar(s)
-  parent.add(g)
-  k.mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.6, 6), k.mat(k.p.trunk), 0, 0.3, 0, g)
-  if (pine) {
-    k.mesh(new THREE.ConeGeometry(0.6, 1, 7), k.mat(k.p.leaf2), 0, 0.95, 0, g)
-    k.mesh(new THREE.ConeGeometry(0.42, 0.8, 7), k.mat(k.p.leaf), 0, 1.4, 0, g)
-  } else {
-    k.mesh(new THREE.IcosahedronGeometry(0.6, 0), k.mat(k.p.leaf), 0, 1.05, 0, g)
-    k.mesh(new THREE.IcosahedronGeometry(0.4, 0), k.mat(k.p.leaf3), 0.22, 1.35, 0.12, g)
-  }
-}
-
-/** A member's build at its plot, by the stage its real work reached. */
-export function dioramaHouse(
-  k: DioramaKit,
-  x: number,
-  z: number,
-  view: Pick<DioramaPlotView, 'stage' | 'scaffold' | 'flag'>,
-  parent: THREE.Object3D
-) {
-  const g = new THREE.Group()
-  g.position.set(x, 0, z)
-  parent.add(g)
-  const S = 1.8
-  k.mesh(k.box(2.7, 0.04, 2.7), k.mat(k.p.pad), 0, 0.02, 0, g, false)
-  if (view.stage >= 1) {
-    k.mesh(k.box(S + 0.2, 0.22, S + 0.2), k.mat(k.p.stone2), 0, 0.15, 0, g)
-  }
-  if (view.stage === 2) {
-    for (const [px, pz] of [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1]
-    ]) {
-      k.mesh(k.box(0.12, 1.3, 0.12), k.mat(k.p.wood), (px! * S) / 2, 0.88, (pz! * S) / 2, g)
-    }
-    k.mesh(k.box(S, 0.5, 0.1), k.mat(k.p.wood), 0, 0.5, S / 2, g)
-  }
-  if (view.stage >= 3) {
-    k.mesh(k.box(S, 1.25, S), k.mat(k.p.plaster), 0, 0.86, 0, g)
-    const win = k.p.lit ? k.mat(k.p.window, { emissive: 0xffc870, ei: 1.1 }) : k.mat(k.p.window)
-    k.mesh(k.box(0.34, 0.36, 0.05), win, 0.45, 0.95, S / 2 + 0.01, g)
-    k.mesh(k.box(0.42, 0.72, 0.05), k.mat(k.p.woodDark), -0.4, 0.6, S / 2 + 0.01, g)
-  }
-  if (view.stage >= 4) {
-    const roof = k.mesh(new THREE.ConeGeometry(1.55, 1.05, 4), k.mat(k.p.roof), 0, 2.02, 0, g)
-    roof.rotation.y = Math.PI / 4
-  }
-  if (view.scaffold) {
-    const color = view.scaffold === 'lit' ? k.status.working : k.p.woodDark
-    const m =
-      view.scaffold === 'lit'
-        ? k.mat(color, { emissive: color, ei: k.p.lit ? 1.2 : 0.5 })
-        : k.mat(color)
-    for (const [px, pz] of [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1]
-    ]) {
-      k.mesh(k.box(0.07, 2.3, 0.07), m, px! * 1.2, 1.15, pz! * 1.2, g)
-    }
-  }
-  if (view.flag) {
-    const color = view.flag === 'merged' ? k.status.done : k.p.banner
-    k.mesh(new THREE.CylinderGeometry(0.035, 0.04, 2.2, 6), k.mat(k.p.woodDark), 1.35, 1.1, 1.25, g)
-    const cloth = k.mesh(new THREE.PlaneGeometry(0.8, 0.48), k.mat(color), 1.75, 1.95, 1.25, g)
-    ;(cloth.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide
-    g.userData.flag = cloth
-  }
-  return g
-}
-
-function keep(k: DioramaKit, parent: THREE.Object3D) {
-  const g = new THREE.Group()
-  g.position.set(DIORAMA_KEEP[0], 0, DIORAMA_KEEP[1])
-  parent.add(g)
-  k.mesh(k.box(3.4, 0.3, 3.4), k.mat(k.p.stone2), 0, 0.15, 0, g)
-  k.mesh(k.box(3, 1.9, 3), k.mat(k.p.stone), 0, 1.25, 0, g)
-  k.mesh(new THREE.CylinderGeometry(0.85, 0.95, 3.2, 10), k.mat(k.p.stone), -0.5, 3.1, -0.5, g)
-  k.mesh(new THREE.ConeGeometry(1.15, 1.5, 10), k.mat(k.p.roof), -0.5, 5.45, -0.5, g)
-  k.mesh(k.box(0.75, 1.15, 0.08), k.mat(0x2a2420), 0.55, 0.88, 1.51, g)
-}
-
-/** The static world: sea, islands, roads, docks, the keep, plots and their builds, and props. */
+/** The static world: sea, islands, roads, docks, the keep, every plot by its member's state. */
 export function dioramaWorld(
   k: DioramaKit,
   layout: DioramaLayout,
-  views: ReadonlyMap<string, DioramaPlotView>
-): THREE.Group {
+  views: ReadonlyMap<string, DioramaPlotView>,
+  words?: DioramaWords
+): DioramaWorld {
   const world = new THREE.Group()
-  const sea = k.mesh(new THREE.PlaneGeometry(600, 600), k.mat(k.p.sea), 0, -0.95, 0, world, false)
+  const ticks: DioramaTick[] = []
+  const stands: DioramaWorld['stands'] = new Map()
+  const sea = k.mesh(
+    new THREE.PlaneGeometry(600, 600),
+    k.mat(k.p.sea, { rough: 0.35, metal: 0.05 }),
+    0,
+    -0.95,
+    0,
+    world,
+    false
+  )
   sea.rotation.x = -Math.PI / 2
   // Why a group per island: a newly connected machine's island rises out of the sea as one piece.
   const groups = new Map<string, THREE.Group>()
@@ -186,31 +99,44 @@ export function dioramaWorld(
     )
     return (isl && groups.get(isl.key)) ?? world
   }
+  let off: DioramaKit | null = null
   for (const isl of layout.islands) {
     const parent = groups.get(isl.key)!
-    island(k, isl, parent)
+    const kk = isl.reachable ? k : (off ??= dioramaOffKit(k))
+    dioramaIsland(kk, isl.rect, parent)
     for (const plot of isl.plots) {
-      const view = plot.key ? views.get(plot.key) : undefined
-      if (view) {
-        dioramaHouse(k, plot.x, plot.z, view, parent)
-      } else {
-        k.mesh(
-          k.box(2.7, 0.04, 2.7),
-          k.mat(k.p.pad, plot.taken ? { opacity: 0.5 } : {}),
-          plot.x,
-          0.02,
-          plot.z,
+      const stand = dioramaPlot(
+        kk,
+        plot,
+        plot.key ? views.get(plot.key) : undefined,
+        parent,
+        isl.reachable,
+        ticks
+      )
+      if (plot.key && stand) {
+        stands.set(plot.key, { at: [plot.x + stand.dx, plot.z + stand.dz], stand })
+      }
+      if (isl.home) {
+        // Each home plot's own path out to the street or the lane.
+        const toZ = plot.z < 0 ? 0.5 : DIORAMA_LANE_Z
+        dioramaRoad(
+          k,
+          [
+            [plot.x - 0.4, plot.z + 1.3],
+            [plot.x - 0.4, toZ]
+          ],
           parent,
-          false
+          0.55
         )
       }
     }
     if (isl.dock) {
-      dock(k, [isl.rect.x, isl.rect.z - isl.rect.hd + 0.25], isl.dock.end, parent)
+      const top = isl.rect.z - isl.rect.hd
+      dioramaTravelDock(kk, parent, isl.rect.x, top + 0.25, 1.7, -1)
     }
     if (!isl.home) {
       dioramaTree(
-        k,
+        kk,
         isl.rect.x - isl.rect.hw + 0.55,
         isl.rect.z + 0.1,
         0.8,
@@ -218,28 +144,25 @@ export function dioramaWorld(
         parent
       )
     }
+    if (!isl.reachable) {
+      ticks.push(fog(k, isl, parent))
+    }
+    const text = chipOf(isl, words)
+    if (text) {
+      const chip = dioramaChip(text)
+      chip.position.set(isl.rect.x - isl.rect.hw - 0.35, 0.4, isl.rect.z + isl.rect.hd + 0.35)
+      parent.add(chip)
+    }
   }
   for (const r of layout.roads) {
     if (r.paved) {
-      road(
-        k,
-        r.pts,
-        r.pts.every((pt) => groupAt(pt) === groupAt(r.pts[0]!)) ? groupAt(r.pts[0]!) : world
-      )
+      const one = r.pts.every((pt) => groupAt(pt) === groupAt(r.pts[0]!))
+      dioramaRoad(k, r.pts, one ? groupAt(r.pts[0]!) : world)
     }
   }
   for (const d of Object.values(layout.homeDocks)) {
-    dock(k, [d.end[0], 8.3], d.end, world)
+    dioramaTravelDock(k, world, d.end[0], 8.3, 1.8, 1)
   }
-  keep(k, world)
-  for (const [x, z, pine] of [
-    [-8.6, -5.6, true],
-    [-7.4, -5.9, false],
-    [9, -5.7, false],
-    [-12.3, -5.8, true],
-    [-12.4, -0.8, false]
-  ] as const) {
-    dioramaTree(k, x, z, 1, pine, world)
-  }
-  return world
+  ticks.push(dioramaKeep(k, world, DIORAMA_KEEP[0], DIORAMA_KEEP[1]))
+  return { world, stands, ticks }
 }

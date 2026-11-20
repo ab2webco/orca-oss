@@ -20,6 +20,7 @@ import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { useDioramaCameraInput } from './use-diorama-camera-input'
 import { Button } from '@/components/ui/button'
+import { localHostDisplayLabel } from '@/lib/local-host-display-label'
 import { translate } from '@/i18n/i18n'
 
 const FRAME_MS = 1000 / 30
@@ -102,7 +103,11 @@ export function TeamSceneDiorama({
       cues,
       lite: look.quality === 'low',
       pace: look.pace,
-      view: camera.view.current
+      view: camera.view.current,
+      words: {
+        thisMachine: localHostDisplayLabel(),
+        offline: translate('teamPanel.machines.offline', 'Offline')
+      }
     })
     const draw = stage.draw
     let raf = 0,

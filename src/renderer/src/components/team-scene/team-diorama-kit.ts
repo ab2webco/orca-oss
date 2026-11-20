@@ -6,11 +6,13 @@ import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 export type DioramaPalette = typeof DAY
 export const DAY = {
   sea: 0x4f9fc0,
+  seaDeep: 0x3f8aa8,
   sand: 0xe2cf9f,
   grass: 0x78a656,
   grassDark: 0x5f8c44,
   grassLight: 0x8db866,
   dirt: 0x9a7350,
+  dirtDark: 0x7a5a3d,
   path: 0xdcc597,
   pad: 0xc49a6c,
   stone: 0xe6e0d3,
@@ -42,11 +44,13 @@ export const DAY = {
 export const NIGHT: DioramaPalette = {
   ...DAY,
   sea: 0x14324a,
+  seaDeep: 0x0f2638,
   sand: 0x6d6450,
   grass: 0x35553a,
   grassDark: 0x2a4630,
   grassLight: 0x41653f,
   dirt: 0x4a3a2c,
+  dirtDark: 0x3a2d22,
   path: 0x6f6550,
   pad: 0x5d4a37,
   stone: 0x9c9a96,
@@ -75,31 +79,67 @@ export const NIGHT: DioramaPalette = {
   fogOpacity: 0.72
 }
 
-/** Shared geometry and materials for one world; dispose it with the world. */
+type MatOptions = {
+  emissive?: number | string
+  ei?: number
+  opacity?: number
+  rough?: number
+  metal?: number
+  /** Its own material, for one that animates its colour or opacity. */
+  unique?: boolean
+}
+
+// Why a drawn texture: the prototype's soft additive glow for lit things; a test DOM may lack 2D.
+let glowTexture: THREE.Texture | null | undefined
+function glowMap(): THREE.Texture | null {
+  if (glowTexture !== undefined) {
+    return glowTexture
+  }
+  const c = typeof document === 'undefined' ? null : document.createElement('canvas')
+  const g = c?.getContext('2d') ?? null
+  if (!c || !g) {
+    return (glowTexture = null)
+  }
+  c.width = c.height = 64
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  r.addColorStop(0, 'rgba(255,255,255,1)')
+  r.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+  r.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = r
+  g.fillRect(0, 0, 64, 64)
+  return (glowTexture = new THREE.CanvasTexture(c))
+}
+
+/** Shared geometry and materials for one world, as the approved prototype builds them. */
 export function dioramaKit(p: DioramaPalette, status: TeamSceneStatusColors) {
   const mats = new Map<string, THREE.Material>()
-  const mat = (
-    hex: number | string,
-    o: { emissive?: number | string; ei?: number; opacity?: number } = {}
-  ) => {
-    const key = `${hex}|${o.emissive ?? ''}|${o.ei ?? ''}|${o.opacity ?? ''}`
-    let m = mats.get(key)
-    if (!m) {
-      const s = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.88, flatShading: true })
-      if (o.emissive !== undefined) {
-        s.emissive = new THREE.Color(o.emissive)
-        s.emissiveIntensity = o.ei ?? 1
-      }
-      if (o.opacity !== undefined) {
-        s.transparent = true
-        s.opacity = o.opacity
-        s.depthWrite = false
-      }
-      m = s
-      mats.set(key, m)
+  const mat = (hex: number | string, o: MatOptions = {}): THREE.MeshStandardMaterial => {
+    const key = `${hex}|${o.emissive ?? ''}|${o.ei ?? ''}|${o.opacity ?? ''}|${o.rough ?? ''}|${o.metal ?? ''}`
+    const known = o.unique ? undefined : mats.get(key)
+    if (known) {
+      return known as THREE.MeshStandardMaterial
     }
-    return m
+    const s = new THREE.MeshStandardMaterial({
+      color: hex,
+      roughness: o.rough ?? 0.88,
+      metalness: o.metal ?? 0,
+      flatShading: true
+    })
+    if (o.emissive !== undefined) {
+      s.emissive = new THREE.Color(o.emissive)
+      s.emissiveIntensity = o.ei ?? 1
+    }
+    if (o.opacity !== undefined) {
+      s.transparent = true
+      s.opacity = o.opacity
+      s.depthWrite = false
+    }
+    mats.set(o.unique ? `${key}|${mats.size}` : key, s)
+    return s
   }
+  /** Unlit, as the prototype's flames, lamps, wakes and sparks. */
+  const basic = (hex: number | string, o: THREE.MeshBasicMaterialParameters = {}) =>
+    new THREE.MeshBasicMaterial({ color: hex, ...o })
   const mesh = (
     geo: THREE.BufferGeometry,
     m: THREE.Material,
@@ -117,6 +157,35 @@ export function dioramaKit(p: DioramaPalette, status: TeamSceneStatusColors) {
     return out
   }
   const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
+  const glow = (
+    parent: THREE.Object3D,
+    x: number,
+    y: number,
+    z: number,
+    hex: number | string,
+    size: number,
+    strength = 1
+  ) => {
+    const s = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowMap(),
+        color: new THREE.Color(hex),
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+        opacity: strength
+      })
+    )
+    s.position.set(x, y, z)
+    s.scale.set(size, size, 1)
+    parent.add(s)
+    return s
+  }
+  const windowMat = () =>
+    p.lit ? mat(p.window, { emissive: 0xffc870, ei: 1.1 }) : mat(p.window, { rough: 0.4 })
+  // Why seeded: the same team draws the same tufts, rocks and flames on every read.
+  let seed = 11
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   const dispose = (root: THREE.Object3D) => {
     // Why each mesh's own material too: figures and cues make their own, outside this kit's map.
     root.traverse((o) => {
@@ -130,6 +199,30 @@ export function dioramaKit(p: DioramaPalette, status: TeamSceneStatusColors) {
       m.dispose()
     }
   }
-  return { p, status, mat, mesh, box, dispose }
+  return { p, status, mat, basic, mesh, box, glow, windowMat, rnd, dispose }
 }
 export type DioramaKit = ReturnType<typeof dioramaKit>
+
+const greyed = (hex: number | string): number => {
+  const hsl = { h: 0, s: 0, l: 0 }
+  new THREE.Color(hex).getHSL(hsl)
+  return new THREE.Color().setHSL(hsl.h, hsl.s * 0.12, hsl.l * 0.82 + 0.06).getHex()
+}
+
+/** The prototype's OFF palette: an unreachable machine's island and builds, nearly grey. */
+export function dioramaOffKit(k: DioramaKit): DioramaKit {
+  const p = Object.fromEntries(
+    Object.entries(k.p).map(([key, v]) =>
+      typeof v === 'number' && key !== 'sunI' && key !== 'hemi' && key !== 'fogOpacity'
+        ? [key, greyed(v)]
+        : [key, v]
+    )
+  ) as DioramaPalette
+  const status = Object.fromEntries(
+    Object.entries(k.status).map(([key, v]) => [
+      key,
+      `#${new THREE.Color(greyed(v)).getHexString()}`
+    ])
+  ) as TeamSceneStatusColors
+  return dioramaKit({ ...p, lit: false }, status)
+}

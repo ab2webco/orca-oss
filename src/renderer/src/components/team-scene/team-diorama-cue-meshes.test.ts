@@ -57,7 +57,7 @@ describe('the diorama cue effects', () => {
 describe('the advisor on its tower', () => {
   it('scans with its spyglass, and lowers it to speak when it decides', () => {
     const cues = dioramaCuesOf([{ kind: 'advisorSpoke', line: 'ok' }], 10)
-    const advisor = dioramaAdvisor(kit(), new THREE.Group(), cues, true)
+    const advisor = dioramaAdvisor(kit(), new THREE.Group(), cues, true, null)
     advisor.tick(5)
     const spying = advisor.figure.arms[1]!.rotation.x
     expect(spying).toBeLessThan(-1.8)

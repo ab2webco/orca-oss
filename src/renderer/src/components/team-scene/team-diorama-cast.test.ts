@@ -43,7 +43,14 @@ const castOf = (joinedAt: number | null) => {
   ])
   const views = new Map([['a', dioramaPlotViewOf(member('a'))]])
   const cues = joinedAt === null ? [] : dioramaCuesOf([{ kind: 'join', key: 'a' }], joinedAt)
-  return dioramaCast(kit(), new THREE.Group(), { layout, views, input, cues, lite: true })
+  return dioramaCast(kit(), new THREE.Group(), {
+    layout,
+    views,
+    input,
+    cues,
+    lite: true,
+    stands: new Map()
+  })
 }
 const play = (cast: ReturnType<typeof castOf>, t: number) => cast.ticks.forEach((tick) => tick(t))
 

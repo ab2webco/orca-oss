@@ -21,7 +21,7 @@ const machine = (key: string, home: boolean) => ({
 describe('a newly connected machine in the diorama', () => {
   it('raises its island out of the sea, then builds its dock up from the water', () => {
     const layout = teamDioramaLayoutOf([machine('', true), machine('m2', false)])
-    const world = dioramaWorld(kit(), layout, new Map())
+    const { world } = dioramaWorld(kit(), layout, new Map())
     const cues = dioramaIslandCuesOf([''], layout.islands, 10)
     const [rise] = dioramaRises(world, cues)
     const island = world.children.find((o) => o.userData.island === 'm2')!
@@ -44,7 +44,7 @@ describe('a newly connected machine in the diorama', () => {
 
   it('carries the island roads with it, so no road floats over the water while it rises', () => {
     const layout = teamDioramaLayoutOf([machine('', true), machine('m2', false)])
-    const world = dioramaWorld(kit(), layout, new Map())
+    const { world } = dioramaWorld(kit(), layout, new Map())
     const island = world.children.find((o) => o.userData.island === 'm2')!
     const roads = island.children.filter(
       (o) => Math.abs(o.position.y - 0.015) < 1e-6 && (o as THREE.Mesh).isMesh

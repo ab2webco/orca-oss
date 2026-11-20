@@ -6,7 +6,9 @@ import {
 } from '../../../../shared/team-scene/team-diorama-layout'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
-import { dioramaHouse, dioramaWorld } from './team-diorama-world-meshes'
+import { dioramaHouse } from './team-diorama-buildings'
+import { dioramaPlot } from './team-diorama-plots'
+import { dioramaWorld } from './team-diorama-world-meshes'
 
 const STATUS = { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' }
 const view = (over: Partial<DioramaPlotView> = {}): DioramaPlotView => ({
@@ -42,13 +44,13 @@ describe('the diorama world meshes', () => {
   it('builds each stage of a member build, a roof only once it is finished', () => {
     const k = dioramaKit(DAY, STATUS)
     const root = new THREE.Group()
-    expect(kindsOf(dioramaHouse(k, 0, 0, view({ stage: 1 }), root))).not.toContain('ConeGeometry')
-    expect(kindsOf(dioramaHouse(k, 0, 0, view({ stage: 4 }), root))).toContain('ConeGeometry')
+    expect(kindsOf(dioramaHouse(k, 0, 0, 1, root))).not.toContain('ConeGeometry')
+    expect(kindsOf(dioramaHouse(k, 0, 0, 3, root))).not.toContain('ConeGeometry')
+    expect(kindsOf(dioramaHouse(k, 0, 0, 4, root))).toContain('ConeGeometry')
   })
 
   it('lights a CI scaffold in the working status colour, and flags a merge in the done one', () => {
     const k = dioramaKit(DAY, STATUS)
-    const root = new THREE.Group()
     const colors = (g: THREE.Object3D) => {
       const out: string[] = []
       g.traverse((o) => {
@@ -59,21 +61,24 @@ describe('the diorama world meshes', () => {
       })
       return out
     }
-    expect(colors(dioramaHouse(k, 0, 0, view({ stage: 3, scaffold: 'lit' }), root))).toContain(
+    const plotted = (v: DioramaPlotView) => {
+      const g = new THREE.Group()
+      dioramaPlot(k, { x: 0, z: 0, key: 'a', taken: false }, v, g, true, [])
+      return colors(g)
+    }
+    expect(plotted(view({ action: 'inspect', stage: 3, scaffold: 'lit' }))).toContain(
       STATUS.working
     )
-    expect(colors(dioramaHouse(k, 0, 0, view({ stage: 4, flag: 'merged' }), root))).toContain(
-      STATUS.done
-    )
+    expect(plotted(view({ action: 'cheer', stage: 4, flag: 'merged' }))).toContain(STATUS.done)
   })
 
-  it('keeps every deck and road above the grass so no two faces flicker at one height', () => {
+  it('gives roads and plots their own heights, and lays dock planks as the approved file does', () => {
     const k = dioramaKit(NIGHT, STATUS)
     const layout = teamDioramaLayoutOf([
       machine('', { home: true, members: ['a'], cap: null }),
       machine('m2', { members: ['x'] })
     ])
-    const world = dioramaWorld(
+    const { world } = dioramaWorld(
       k,
       layout,
       new Map([
@@ -82,22 +87,24 @@ describe('the diorama world meshes', () => {
       ])
     )
     const tops = new Set<string>()
+    const planks = new Set<string>()
     world.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (mesh.geometry?.type !== 'BoxGeometry') {
         return
       }
       const { height, width, depth } = (mesh.geometry as THREE.BoxGeometry).parameters
-      if (height > 0.1 || width < 0.7 || depth < 0.7) {
-        return
-      }
       const top = +(mesh.getWorldPosition(new THREE.Vector3()).y + height / 2).toFixed(3)
-      if (top >= 0) {
+      if (mesh.parent?.userData.dock && height < 0.1) {
+        planks.add(String(top))
+      } else if (height <= 0.1 && width >= 0.7 && depth >= 0.7 && top > 0 && top < 0.5) {
         tops.add(String(top))
       }
     })
-    // Roads, plots and decks each have their own height, all above the grass top at 0.
-    expect([...tops].sort()).toEqual(['0.03', '0.04', '0.11'])
+    // Roads and plots each have their own height above the grass top at 0.
+    expect([...tops].sort()).toEqual(['0.03', '0.04'])
+    // The approved prototype lays every dock plank at y -0.04, its top level with the grass.
+    expect([...planks]).toEqual(['0'])
     k.dispose(world)
   })
 
@@ -107,7 +114,7 @@ describe('the diorama world meshes', () => {
       machine('', { home: true }),
       machine('off', { reachable: false })
     ])
-    const world = dioramaWorld(k, layout, new Map())
+    const { world } = dioramaWorld(k, layout, new Map())
     const grass = new Set<string>()
     world.traverse((o) => {
       const m = o as THREE.Mesh
