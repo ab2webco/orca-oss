@@ -18,6 +18,7 @@ import {
   teamReadStatusOf
 } from './team-panel-read-error'
 import { TeamSessionCount } from './team-panel-session-count'
+import { TeamFirstRunHint } from './team-panel-first-run-hint'
 import type { TeamPanelResolvedTab } from './team-panel-tab-definition'
 import { pickTeamPanelTab, resolveTeamPanelTabs } from './team-panel-tab-registry'
 import { TabStripEdgeCues, useTabStripCue } from './team-panel-tab-strip-cue'
@@ -206,6 +207,7 @@ export function TeamPanelView({
     <>
       <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
       {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
+      {model?.kind === 'solo' ? <TeamFirstRunHint /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
       {section.kind === 'ready' ? (
         <TeamReadStatusContext.Provider value={readStatus}>
