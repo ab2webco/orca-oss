@@ -146,13 +146,13 @@ export function office3dStage(
     const room = office3dControlRoom(kit, X, floor, dark)
     if (room && floor.controlRoom) {
       world.add(room.group)
-      const jev = office3dDev(dioramaLookOf(`advisor:${floor.key}`), 'advisor')
+      const advisor = office3dDev(dioramaLookOf(`advisor:${floor.key}`), 'advisor')
       const [cx, cz] = floor.controlRoom.chair
-      jev.g.position.set(cx, 0, cz)
-      jev.baseY = floor.controlRoom.y + SIT_Y
-      jev.g.rotation.y = Math.PI - 0.35
-      world.add(jev.g)
-      ticks.push((t) => poseOffice3dSeated(jev, 'type', t))
+      advisor.g.position.set(cx, 0, cz)
+      advisor.baseY = floor.controlRoom.y + SIT_Y
+      advisor.g.rotation.y = Math.PI - 0.35
+      world.add(advisor.g)
+      ticks.push((t) => poseOffice3dSeated(advisor, 'type', t))
       const floorMembers = floor.seats.flatMap((s) => (s.key && members.get(s.key)) || [])
       let shown = -Infinity
       ticks.push((t) => {
