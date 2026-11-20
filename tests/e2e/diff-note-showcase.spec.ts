@@ -154,7 +154,7 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
   await orcaPage.waitForTimeout(600)
   const add = orcaPage.locator('.orca-diff-comment-add-btn').first()
   await expect(add).toBeVisible()
-  await glideAndClick(orcaPage, add, 15)
+  await glideAndClick(orcaPage, add)
   const input = orcaPage.getByPlaceholder('Add note for the AI')
   await expect(input).toBeVisible()
   await orcaPage.waitForTimeout(600)
@@ -166,7 +166,7 @@ test('a reviewer adds a note for the agent on a line of its diff', async ({
   const card = orcaPage.locator('.orca-diff-comment-card').filter({ hasText: NOTE })
   await expect(card).toBeVisible({ timeout: 15_000 })
   const cardBox = (await card.boundingBox())!
-  await movePointer(orcaPage, cardBox.x + cardBox.width + 120, cardBox.y + cardBox.height / 2, 20)
+  await movePointer(orcaPage, cardBox.x + cardBox.width + 120, cardBox.y + cardBox.height / 2)
   await orcaPage.waitForTimeout(1_500)
   await clip.stop()
 })

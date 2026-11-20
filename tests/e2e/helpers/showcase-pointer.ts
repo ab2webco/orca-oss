@@ -1,10 +1,22 @@
 import type { Locator, Page } from '@stablyai/playwright-test'
+import { RECORDING_CLIPS } from './showcase-clip'
 
+// Decoration for the recording only: outside ORCA_SHOWCASE_CLIPS=1 these act as plain locator calls.
 type PointerWindow = { showcasePointerAt: (x: number, y: number) => void }
 const last = new WeakMap<Page, { x: number; y: number }>()
+const GLIDE_MS = 500
+
+const placeArrow = (page: Page, x: number, y: number) =>
+  page.evaluate(
+    ([ax, ay]) => (window as unknown as PointerWindow).showcasePointerAt(ax, ay),
+    [x, y]
+  )
 
 // Why: the frame recorder captures no OS cursor, so a DOM arrow stands in for it in the clip.
 export async function showPointer(page: Page, x: number, y: number): Promise<void> {
+  if (!RECORDING_CLIPS) {
+    return
+  }
   await page.evaluate(() => {
     const pointer = document.createElement('div')
     pointer.style.cssText =
@@ -16,35 +28,46 @@ export async function showPointer(page: Page, x: number, y: number): Promise<voi
       pointer.style.transform = `translate(${px}px, ${py}px)`
     }
   })
-  await movePointer(page, x, y, 1)
+  last.set(page, { x, y })
+  await page.mouse.move(x, y)
+  await placeArrow(page, x, y)
 }
 
 // Why the arrow is placed by hand: over a webview the host page never sees the mouse move.
-export async function movePointer(page: Page, x: number, y: number, steps = 30): Promise<void> {
+export async function movePointer(page: Page, x: number, y: number, ms = GLIDE_MS): Promise<void> {
+  if (!RECORDING_CLIPS) {
+    await page.mouse.move(x, y)
+    return
+  }
   const from = last.get(page) ?? { x, y }
-  for (let step = 1; step <= steps; step++) {
-    const px = from.x + ((x - from.x) * step) / steps
-    const py = from.y + ((y - from.y) * step) / steps
+  const start = Date.now()
+  // Why time, not steps: a slow host still ends the glide on budget.
+  for (let progress = 0; progress < 1; ) {
+    progress = Math.min(1, (Date.now() - start) / ms)
+    const px = from.x + (x - from.x) * progress
+    const py = from.y + (y - from.y) * progress
     await page.mouse.move(px, py)
-    await page.evaluate(
-      ([ax, ay]) => (window as unknown as PointerWindow).showcasePointerAt(ax, ay),
-      [px, py]
-    )
+    await placeArrow(page, px, py)
   }
   last.set(page, { x, y })
 }
 
-export async function glideTo(page: Page, target: Locator, steps = 30): Promise<void> {
+export async function glideTo(page: Page, target: Locator, ms = GLIDE_MS): Promise<void> {
+  if (!RECORDING_CLIPS) {
+    await target.hover()
+    return
+  }
   await target.scrollIntoViewIfNeeded()
   const box = await target.boundingBox()
   if (!box) {
     throw new Error('glide target has no box')
   }
-  await movePointer(page, box.x + box.width / 2, box.y + box.height / 2, steps)
+  await movePointer(page, box.x + box.width / 2, box.y + box.height / 2, ms)
 }
 
-export async function glideAndClick(page: Page, target: Locator, steps = 30): Promise<void> {
-  await glideTo(page, target, steps)
-  // Why click(): a raw down/up at the box centre missed the Annotate toggle on Linux CI.
+export async function glideAndClick(page: Page, target: Locator, ms = GLIDE_MS): Promise<void> {
+  if (RECORDING_CLIPS) {
+    await glideTo(page, target, ms)
+  }
   await target.click()
 }

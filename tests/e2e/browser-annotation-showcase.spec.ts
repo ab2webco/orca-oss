@@ -123,6 +123,9 @@ test('a reviewer annotates an element of the page for the agent', async ({
     expect(box).not.toBeNull()
     const target = { x: box!.x + rect.x + rect.width / 2, y: box!.y + rect.y + rect.height / 2 }
     await movePointer(orcaPage, target.x, target.y)
+    // Why main's raw moves too: the picker highlights the element under a real hover before the click.
+    await orcaPage.mouse.move(target.x - 40, target.y - 30)
+    await orcaPage.mouse.move(target.x, target.y, { steps: 30 })
     await orcaPage.waitForTimeout(900)
 
     await orcaPage.mouse.click(target.x, target.y)
@@ -134,8 +137,7 @@ test('a reviewer annotates an element of the page for the agent', async ({
     // Why the regex: the button's name carries its shortcut hint ("Add ⌘↵" on a Mac).
     await glideAndClick(
       orcaPage,
-      orcaPage.getByRole('button', { name: /^Add\b(?! Project| quick)/ }),
-      20
+      orcaPage.getByRole('button', { name: /^Add\b(?! Project| quick)/ })
     )
     await expect(comment).toHaveCount(0)
     await expect(
