@@ -28,14 +28,14 @@ export const RECORDINGS = {
   'team-style-figures.gif': {
     width: 1200,
     height: 750,
-    en: 'The Figures style: the team as characters before a castle.',
-    es: 'El estilo Figuras: el equipo como personajes frente a un castillo.'
+    en: 'The Figures style: an island per machine, each member building its house.',
+    es: 'El estilo Figuras: una isla por máquina, cada miembro construyendo su casa.'
   },
   'team-style-pixel.gif': {
     width: 1200,
     height: 750,
-    en: 'The Pixel style: the team as pixel sprites.',
-    es: 'El estilo Pixel: el equipo como sprites de píxeles.'
+    en: 'The Pixel style: the team as pixel sprites, a floor per machine.',
+    es: 'El estilo Pixel: el equipo como sprites de píxeles, un piso por máquina.'
   },
   'plane-board.gif': {
     width: 1280,
