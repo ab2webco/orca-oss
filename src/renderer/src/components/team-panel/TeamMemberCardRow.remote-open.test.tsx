@@ -87,17 +87,22 @@ async function expandRemoteCard(): Promise<HTMLElement> {
   return card
 }
 
+const terminalIcon = (card: HTMLElement): HTMLButtonElement =>
+  card.querySelector('[data-team-open-terminal]') as HTMLButtonElement
+
 // Why (ORCA-851): opening a remote card raised an error toast when this window lacked the host's repo.
-describe("opening a remote member's card", () => {
-  it('shows the hint in the card, and opens nothing, when this window lacks the host worktree', async () => {
+describe("a remote member's card", () => {
+  it('shows the hint, and its terminal icon opens nothing, when this window lacks the host worktree', async () => {
     const card = await expandRemoteCard()
 
     expect(card.querySelector('[data-team-card-detail]')).not.toBeNull()
     expect(card.textContent).toContain(HINT)
+    expect(terminalIcon(card).getAttribute('aria-disabled')).toBe('true')
+    await act(async () => terminalIcon(card).click())
     expect(openTeamSession).not.toHaveBeenCalled()
   })
 
-  it('opens its session, with no hint, once this window holds that worktree', async () => {
+  it('opens its session from the terminal icon, with no hint, once this window holds that worktree', async () => {
     useAppStore.setState({
       getKnownWorktreeById: ((id: string) =>
         id === 'wt-host-21' ? { id } : undefined) as unknown as typeof knownWorktree
@@ -105,6 +110,10 @@ describe("opening a remote member's card", () => {
     const card = await expandRemoteCard()
 
     expect(card.textContent).not.toContain(HINT)
+    // Why: expanding alone must not reveal the remote terminal (ORCA-1300).
+    expect(openTeamSession).not.toHaveBeenCalled()
+    expect(terminalIcon(card).getAttribute('aria-disabled')).toBeNull()
+    await act(async () => terminalIcon(card).click())
     expect(openTeamSession).toHaveBeenCalledWith(
       expect.objectContaining({ worktreeId: 'wt-host-21' }),
       'ORCA-21'
