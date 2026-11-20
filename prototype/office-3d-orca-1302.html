@@ -1,0 +1,1809 @@
+<title>Oficina 3D ORCA-1302</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one big stage that carries the page; controls stay quiet around it. */
+:root {
+  --bg: #f4f5f6; --surface: #ffffff; --fg: #0b0d10; --muted: #5f6670; --line: #dfe2e6;
+  --chip: #eceef1; --chip-on: #0b0d10; --chip-on-fg: #f7f8f9; --stage-edge: #cfd5db;
+  --attention: #e40014; --warning: #b45309; --info: #0369a1; --success: #15803d; --idle: #737373;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0b0d; --surface: #15171a; --fg: #f3f4f6; --muted: #9aa1ab; --line: #262a30;
+    --chip: #1c1f24; --chip-on: #f3f4f6; --chip-on-fg: #0a0b0d; --stage-edge: #2a2f36;
+    --attention: #ff6568; --warning: #f5b342; --info: #4fc3f7; --success: #34d399; --idle: #a1a1a1;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0b0d; --surface: #15171a; --fg: #f3f4f6; --muted: #9aa1ab; --line: #262a30;
+  --chip: #1c1f24; --chip-on: #f3f4f6; --chip-on-fg: #0a0b0d; --stage-edge: #2a2f36;
+  --attention: #ff6568; --warning: #f5b342; --info: #4fc3f7; --success: #34d399; --idle: #a1a1a1;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  letter-spacing: 0.01em;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font: 500 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group > span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+button.chip {
+  font: 500 13px/1 var(--sans); padding: 8px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--chip); color: var(--fg); cursor: pointer;
+}
+button.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-fg); border-color: var(--chip-on); }
+button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.stage {
+  border: 1px solid var(--stage-edge); border-radius: 16px; overflow: hidden; background: #6cb7d4;
+  display: grid; justify-items: center; min-width: 0; position: relative;
+}
+.stage canvas { display: block; max-width: 100%; }
+.panelframe { border-left: 1px solid rgba(0,0,0,.25); border-right: 1px solid rgba(0,0,0,.25); }
+.meta { font: 12px/1.4 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.states { display: flex; flex-wrap: wrap; gap: 6px; }
+.state {
+  display: inline-flex; gap: 8px; align-items: center; font: 500 13px/1.2 var(--sans);
+  padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.state[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.desc { margin: 0; min-height: 1.5em; color: var(--fg); font-weight: 500; }
+.note { font-size: 12px; color: var(--muted); margin: 0; max-width: 74ch; }
+.err { padding: 24px; color: #fff; font: 13px/1.5 var(--mono); }
+@media (max-width: 600px) { .wrap { display: flex; flex-direction: column; } .stage { order: -1; } header { order: -2; } .lede { display: none; } }
+.stage { background: #cfe2ec; }
+.tip {
+  position: absolute; z-index: 2; pointer-events: none; display: grid; gap: 1px; max-width: 240px;
+  padding: 7px 10px; border-radius: 10px; background: rgba(12,14,18,0.86); color: #f7f8f9;
+  font: 12px/1.35 var(--sans); box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+.tip strong { font-weight: 600; font-size: 13px; }
+.tip span { color: #c9ced6; }
+.toast {
+  position: absolute; z-index: 2; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  padding: 8px 12px; border-radius: 999px; background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+  font: 500 12px/1.3 var(--sans); box-shadow: 0 4px 14px rgba(0,0,0,0.18); text-align: center;
+}
+[hidden] { display: none !important; }
+button.chip:disabled { opacity: 0.45; cursor: default; }
+.editor { display: grid; gap: 8px; }
+.editor details { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 6px 12px; }
+.editor summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.editor .row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); }
+.editor .row:first-of-type { border-top: 0; }
+.editor .name { min-width: 52px; font-weight: 500; }
+.editor select { font: 13px/1.2 var(--sans); color: var(--fg); background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; max-width: 100%; }
+.editor .check, .editor .sel { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+h2 { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ORCA-1302 · dirección visual propuesta, sin código de producto</div>
+    <h1>La oficina del equipo, en 3D</h1>
+    <p class="lede">Cada máquina es una planta del edificio y cada miembro trabaja en su escritorio según su estado real. El lead atiende primero a quien te necesita, sube en el ascensor a otras plantas y Jev vigila desde la ventana. Es el mismo mundo del diorama: mismos muñecos, materiales y luz.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Controles">
+    <div class="group"><span>Tema</span>
+      <button class="chip" data-tod="day" aria-pressed="true">Claro</button>
+      <button class="chip" data-tod="night" aria-pressed="false">Oscuro</button>
+    </div>
+    <div class="group"><span>Calidad</span>
+      <button class="chip" data-figs="toon" aria-pressed="true">Ilustrada</button>
+      <button class="chip" data-figs="lite" aria-pressed="false">Bajos recursos</button>
+    </div>
+    <div class="group"><span>Máquinas</span>
+      <button class="chip" data-hosts="1">1</button>
+      <button class="chip" data-hosts="2">2</button>
+      <button class="chip" data-hosts="3">3</button>
+      <button class="chip" data-hosts="5">5</button>
+    </div>
+    <div class="group"><span>Miembros por máquina</span>
+      <button class="chip" data-members="1">1</button>
+      <button class="chip" data-members="3">3</button>
+      <button class="chip" data-members="4">4</button>
+      <button class="chip" data-members="5">5</button>
+      <button class="chip" data-members="8">8</button>
+    </div>
+    <div class="group"><span>Vista</span>
+      <button class="chip" data-w="0">Grande</button>
+      <button class="chip" data-w="350">Panel 350</button>
+      <button class="chip" data-w="320">Panel 320</button>
+      <button class="chip" data-w="219">Panel 219</button>
+    </div>
+    <div class="group"><span>Cámara</span>
+      <button class="chip" data-cam="all">Ver todo</button>
+      <button class="chip" data-cam="lead">Seguir al lead</button>
+    </div>
+    <div class="group"><span>Eventos</span>
+      <button class="chip" id="e-flow">▶ Flujo de ejemplo</button>
+      <button class="chip" id="e-arrive">Llega un miembro</button>
+      <button class="chip" id="e-leave">Se va un miembro</button>
+      <button class="chip" id="e-jev">Jev decide</button>
+      <button class="chip" id="e-steward">Steward cambia un modelo</button>
+      <button class="chip" id="e-stop" aria-pressed="false">STOP de lanzamientos</button>
+      <button class="chip" id="e-reset">Reiniciar</button>
+    </div>
+    <div class="group"><span>Movimiento</span>
+      <button class="chip" id="play" aria-pressed="true">Pausar</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="c" role="img" aria-label="La oficina del equipo en 3D: una planta por máquina"></canvas>
+    <div class="tip" id="tip" hidden></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </div>
+
+  <p class="desc" id="desc"></p>
+  <div class="meta" id="meta"></div>
+  <h2>Estado de cada miembro</h2>
+  <div class="editor" id="editor"></div>
+  <p class="note">Prototipo de la dirección visual con datos de ejemplo. En el producto, la escena lee el modelo del equipo que ya dibuja la Office 2D: plantas por máquina, escritorios de otras sesiones, el tablero de cada miembro, las pantallas por fase, el STOP y las estrellas de lo mergeado. Sin WebGL, el panel sigue dibujando la Office 2D de hoy. Las marcas de estado usan siempre los colores de estado de Orca.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id)
+  if (!window.THREE) {
+    $('stage').innerHTML = '<div class="err">No se pudo cargar three.js desde la CDN. Recarga la página.</div>'
+    return
+  }
+  const T = THREE
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const pageTheme = document.documentElement.getAttribute('data-theme')
+  const DAY = {
+    sea: 0x4f9fc0, seaDeep: 0x3f8aa8, sand: 0xe2cf9f, grass: 0x78a656, grassDark: 0x5f8c44, grassLight: 0x8db866,
+    dirt: 0x9a7350, dirtDark: 0x7a5a3d, path: 0xdcc597, pad: 0xc49a6c,
+    stone: 0xe6e0d3, stone2: 0xc9c0ae, stoneDark: 0x9a917f, plaster: 0xf1e8d8, timber: 0x6e4a2c,
+    roof: 0x4f5e75, roof2: 0x3e4a5c, wood: 0xb07c4c, woodDark: 0x6e4a2c,
+    leaf: 0x4f9050, leaf2: 0x3d7a43, leaf3: 0x6aae58, trunk: 0x6b4a2f, rock: 0xa7a59f,
+    window: 0x3c4654, windowOn: false, canvas: 0xefe7d6, ink: 0x15171a,
+    hemiSky: 0xd6e8f5, hemiGround: 0x7a6c4c, hemi: 0.5, sun: 0xfff0d6, sunI: 1.45,
+    attention: 0xe40014, warning: 0xb45309, info: 0x0369a1, success: 0x15803d, banner: 0xf7f5ef,
+    fogPuff: 0xffffff, fogOpacity: 0.62
+  }
+  const NIGHT = Object.assign({}, DAY, {
+    sea: 0x14324a, seaDeep: 0x0f2638, sand: 0x6d6450, grass: 0x35553a, grassDark: 0x2a4630, grassLight: 0x41653f,
+    dirt: 0x4a3a2c, dirtDark: 0x3a2d22, path: 0x6f6550, pad: 0x5d4a37,
+    stone: 0x9c9a96, stone2: 0x83807a, stoneDark: 0x5f5c57, plaster: 0xa49c8e, timber: 0x3e2a19,
+    roof: 0x2f3949, roof2: 0x262e3b, wood: 0x6e5034, woodDark: 0x3e2a19,
+    leaf: 0x2c4c34, leaf2: 0x223e2b, leaf3: 0x36593b, trunk: 0x3e2a19, rock: 0x6f6e6a,
+    window: 0xffd98c, windowOn: true, canvas: 0xb8ad97,
+    hemiSky: 0x3a5a8c, hemiGround: 0x101820, hemi: 0.55, sun: 0xa9c1ff, sunI: 0.62,
+    attention: 0xff6568, warning: 0xf5b342, info: 0x4fc3f7, success: 0x34d399, banner: 0xf1f0ea,
+    fogPuff: 0x3b4352, fogOpacity: 0.72
+  })
+
+  // ---------- state ----------
+  const qs = new URLSearchParams(location.search)
+  const num = (k, d) => (qs.has(k) ? Number(qs.get(k)) : d)
+  let tod = qs.get('theme') ? (qs.get('theme') === 'dark' ? 'night' : 'day') : pageTheme === 'dark' || (pageTheme !== 'light' && sysDark) ? 'night' : 'day'
+  document.documentElement.setAttribute('data-theme', tod === 'night' ? 'dark' : 'light')
+  let viewW = num('w', 0), figs = qs.get('q') === 'lite' ? 'lite' : 'toon', playing = !reduce
+  let camMode = qs.get('cam') === 'lead' ? 'lead' : 'all', focusFloor = null
+  let machines = num('machines', 3), perFloor = num('members', 4)
+  let P = DAY, X = null, OFF = null
+
+  // ---------- the team model: the demo data lives only here ----------
+  const HOSTS = [
+    { name: 'm1', label: 'm1 · esta máquina', local: true },
+    { name: 'm2', label: 'm2' },
+    { name: 'gpu-box', label: 'gpu-box' },
+    { name: 'build-01', label: 'build-01' },
+    { name: 'laptop', label: 'laptop' }
+  ]
+  const NAMES = ['Ada', 'Bruno', 'Carla', 'Dante', 'Elena', 'Félix', 'Gina', 'Hugo', 'Irene', 'Jaime', 'Karla', 'Luis', 'Marta', 'Nico', 'Olga', 'Pablo', 'Rosa', 'Saúl', 'Tania', 'Ulises', 'Vera', 'Xavi', 'Yara', 'Zoe']
+  const DEMO = [
+    ['ask', 'code', 'red', 'rest-music', 'tests', 'done', 'blocked', 'plan'],
+    ['queue', 'limited', 'prompt', 'rest-sketch', 'checks', 'review-ok', 'asleep', 'code'],
+    ['code', 'tests', 'rest-plane', 'review-chg', 'merged', 'plan', 'code', 'checks'],
+    ['rest-plane', 'code', 'merged', 'review-wait', 'loggedOut', 'tests', 'plan', 'code'],
+    ['rest-game', 'plan', 'code', 'starting', 'unreachable', 'checks', 'code', 'tests']
+  ]
+  // act: what the sitter does; screen: what the monitor shows; stage: how far its board has got.
+  const STATES = {
+    code: { label: 'Trabaja · código', act: 'work', screen: 'code', stage: 1 },
+    plan: { label: 'Trabaja · plan', act: 'work', screen: 'plan', stage: 0 },
+    tests: { label: 'Trabaja · pruebas', act: 'work', screen: 'tests', stage: 2 },
+    checks: { label: 'Trabaja · CI corriendo', act: 'work', screen: 'checks', stage: 3 },
+    'review-ok': { label: 'Review aprobada', act: 'work', screen: 'review-ok', stage: 3 },
+    'review-chg': { label: 'Review pide cambios', act: 'work', screen: 'review-chg', stage: 3 },
+    'review-wait': { label: 'Review pendiente', act: 'work', screen: 'review-wait', stage: 3 },
+    queue: { label: 'En la cola de merge', act: 'work', screen: 'queue', stage: 3 },
+    red: { label: 'CI en rojo', act: 'work', screen: 'code', stage: 3, broken: true },
+    'rest-music': { label: 'Libre · escucha música', act: 'rest', play: 'music', screen: 'idle', stage: 0 },
+    'rest-sketch': { label: 'Libre · dibuja', act: 'rest', play: 'sketch', screen: 'idle', stage: 0 },
+    'rest-plane': { label: 'Libre · avioncito', act: 'rest', play: 'plane', screen: 'idle', stage: 0 },
+    'rest-game': { label: 'Libre · juega', act: 'rest', play: 'game', screen: 'game', stage: 0 },
+    ask: { label: 'Necesita tu atención', act: 'ask', emote: 'alert', screen: 'code', stage: 2 },
+    prompt: { label: 'Espera un prompt en su panel', act: 'ask', emote: 'prompt', screen: 'code', stage: 2 },
+    done: { label: 'Terminó', act: 'done', emote: 'check', screen: 'review-ok', stage: 4 },
+    merged: { label: 'Mergeado · celebra', act: 'cheer', emote: 'star', screen: 'review-ok', stage: 4 },
+    blocked: { label: 'Bloqueado', act: 'blocked', emote: 'blocked', screen: 'code', stage: 2 },
+    limited: { label: 'Límite alcanzado', act: 'hold', hold: 'limited', stage: 1 },
+    asleep: { label: 'Dormido', act: 'hold', hold: 'asleep', stage: 1 },
+    loggedOut: { label: 'Sesión cerrada', act: 'hold', hold: 'loggedOut', stage: 0 },
+    unreachable: { label: 'Sin conexión', act: 'hold', hold: 'unreachable', stage: 1 },
+    queued: { label: 'Esperando turno de lanzamiento', act: 'hold', hold: 'queued', stage: 0 },
+    starting: { label: 'Arrancando', act: 'hold', hold: 'starting', stage: 0 },
+    away: { label: 'Sin sesión (silla vacía)', act: 'away', stage: 0 }
+  }
+  let memberSeq = 0
+  const mkMember = (state, i) => ({ id: ++memberSeq, name: NAMES[(memberSeq - 1) % NAMES.length], state, stage: null, look: i })
+  function makeModel() {
+    memberSeq = 0
+    return {
+      stopped: false, advisor: true, trophies: 2,
+      floors: HOSTS.slice(0, machines).map((h, f) => ({
+        host: h, online: !(f === 2 && machines >= 3),
+        taken: f === 1 ? 1 : 0,
+        members: Array.from({ length: perFloor }, (_, j) => mkMember(DEMO[f][j % 8], f * 8 + j))
+      }))
+    }
+  }
+  let model = makeModel()
+  const stateOf = (m) => STATES[m.state]
+  const stageOf = (m) => (m.stage === null || m.stage === undefined ? stateOf(m).stage : m.stage)
+  const capOf = (fm) => Math.max(5, Math.min(8, fm.members.length + fm.taken))
+  // ---------- renderer ----------
+  const canvas = $('c')
+  let renderer
+  try {
+    renderer = new T.WebGLRenderer({ canvas, antialias: true })
+  } catch (e) {
+    $('stage').innerHTML = '<div class="err">Este navegador no pudo iniciar WebGL.</div>'
+    return
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  renderer.outputEncoding = T.sRGBEncoding
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = T.PCFSoftShadowMap
+  const scene = new T.Scene()
+  const camera = new T.OrthographicCamera(-10, 10, 10, -10, 0.1, 400)
+  const VIEW_DIR = new T.Vector3(1, 0.88, 1).normalize()
+  const target = new T.Vector3()
+  const camGoal = { target: new T.Vector3(), zoom: 1 }
+  let fit = { cx: 0, cy: 0, w: 20, h: 20 }
+
+  // ---------- helpers ----------
+  const lin = (hex) => new T.Color(hex).convertSRGBToLinear()
+  const matCache = new Map()
+  function M(hex, o = {}) {
+    const key = hex + JSON.stringify(o)
+    if (!o.unique && matCache.has(key)) return matCache.get(key)
+    const m = new T.MeshStandardMaterial({ color: lin(hex), roughness: o.rough ?? 0.88, metalness: o.metal ?? 0, flatShading: true,
+      transparent: !!o.opacity, opacity: o.opacity ?? 1, depthWrite: o.opacity ? false : true })
+    if (o.emissive !== undefined) { m.emissive = lin(o.emissive); m.emissiveIntensity = o.ei ?? 1 }
+    if (!o.unique) matCache.set(key, m)
+    return m
+  }
+  const B = (hex, o) => new T.MeshBasicMaterial(Object.assign({ color: lin(hex) }, o || {}))
+  function mesh(geo, mat, x = 0, y = 0, z = 0, parent) {
+    const m = new T.Mesh(geo, mat)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    m.receiveShadow = true
+    if (parent) parent.add(m)
+    return m
+  }
+  const box = (w, h, d) => new T.BoxGeometry(w, h, d)
+  let seed = 7
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+
+  const animators = []
+  const anchors = {}
+  let world = new T.Group()
+  scene.add(world)
+
+  // A soft additive glow for lit things at night.
+  const glowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64
+    const g = c.getContext('2d'); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,0.45)'); r.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = r; g.fillRect(0, 0, 64, 64)
+    const t = new T.CanvasTexture(c); return t
+  })()
+  function glow(parent, x, y, z, hex, size, strength = 1) {
+    const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: new T.Color(hex), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: strength }))
+    s.position.set(x, y, z); s.scale.set(size, size, 1); parent.add(s); return s
+  }
+
+  function chip(text, P) {
+    const c = document.createElement('canvas')
+    const g = c.getContext('2d')
+    const font = '600 30px Geist, ui-sans-serif, system-ui, sans-serif'
+    g.font = font
+    const w = Math.ceil(g.measureText(text).width) + 32
+    c.width = w; c.height = 48
+    g.font = font
+    g.fillStyle = 'rgba(12,14,18,0.78)'
+    g.beginPath(); (g.roundRect ? g.roundRect(0, 0, w, 48, 12) : g.rect(0, 0, w, 48)); g.fill()
+    g.fillStyle = '#f7f8f9'; g.textBaseline = 'middle'; g.fillText(text, 16, 25)
+    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding
+    const s = new T.Sprite(new T.SpriteMaterial({ map: tex, depthTest: false, transparent: true }))
+    const h = 0.62
+    s.scale.set(h * w / 48, h, 1)
+    s.center.set(0, 0)
+    s.renderOrder = 10
+    return s
+  }
+
+  function signalSprite(P) {
+    const c = document.createElement('canvas'); c.width = 112; c.height = 140
+    const g = c.getContext('2d')
+    const col = '#' + new T.Color(P.attention).getHexString()
+    g.fillStyle = '#ffffff'
+    g.beginPath(); (g.roundRect ? g.roundRect(4, 4, 104, 132, 30) : g.rect(4, 4, 104, 132)); g.fill()
+    g.fillStyle = col
+    g.beginPath(); (g.roundRect ? g.roundRect(12, 12, 88, 116, 24) : g.rect(12, 12, 88, 116)); g.fill()
+    g.fillStyle = '#ffffff'
+    g.beginPath(); (g.roundRect ? g.roundRect(46, 28, 20, 56, 8) : g.rect(46, 28, 20, 56)); g.fill()
+    g.beginPath(); g.arc(56, 104, 11, 0, Math.PI * 2); g.fill()
+    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding
+    const s = new T.Sprite(new T.SpriteMaterial({ map: tex, depthTest: false, transparent: true }))
+    s.scale.set(0.62, 0.78, 1); s.renderOrder = 11
+    return s
+  }
+  // ---------- characters ----------
+  // ---------- characters: chibi toon figures with an ink outline, turned in 3D ----------
+  const gradMap = (() => {
+    const tx = new T.DataTexture(new Uint8Array([110, 185, 255]), 3, 1, T.LuminanceFormat)
+    tx.minFilter = tx.magFilter = T.NearestFilter; tx.generateMipmaps = false; tx.needsUpdate = true
+    return tx
+  })()
+  const toonCache = new Map()
+  function TM(hex, o = {}) {
+    const key = hex + (o.emissive || '')
+    if (toonCache.has(key)) return toonCache.get(key)
+    const m = new T.MeshToonMaterial({ color: lin(hex), gradientMap: gradMap })
+    if (o.emissive) { m.emissive = lin(o.emissive); m.emissiveIntensity = 0.6 }
+    toonCache.set(key, m); return m
+  }
+  const INK = new T.MeshBasicMaterial({ color: lin(0x1b1815), side: T.BackSide })
+  // A toon part plus an inverted hull a constant ~0.028 units thick: the drawn outline.
+  function tpart(geo, hex, x, y, z, parent, o = {}) {
+    if (figs === 'lite') return lpart(geo, hex, x, y, z, parent)
+    const m = new T.Mesh(geo, TM(hex, o)); m.position.set(x, y, z); m.castShadow = true; parent.add(m)
+    if (o.outline !== false) {
+      geo.computeBoundingSphere()
+      const r = Math.max(0.05, geo.boundingSphere.radius)
+      const ol = new T.Mesh(geo, INK); ol.scale.setScalar(1 + 0.028 / r); m.add(ol)
+    }
+    return m
+  }
+  const COSTUMES = ['wizard', 'builder', 'scout', 'knight', 'scholar', 'smith']
+  const SKIN = [0xf2c9a0, 0xd9a274, 0xa86b45, 0xf5d5b5, 0xc28455, 0xe8b88e]
+  const HAIR = [0x4a3324, 0x8a5a2b, 0x2a221c, 0xd9a35a, 0x6b4428, 0x1f1a16]
+
+  function makeUnit(i, P, opts = {}) {
+    const g = new T.Group()
+    const role = opts.lead ? 'lead' : opts.role || COSTUMES[i % COSTUMES.length]
+    const skin = SKIN[i % SKIN.length], hair = HAIR[i % HAIR.length]
+    const C = {
+      lead: { tunic: 0x3b5bb5, pants: 0x2c2f3a, robe: false },
+      wizard: { tunic: 0x6d4aa0, pants: 0x3a2f4f, robe: 0x6d4aa0 },
+      builder: { tunic: 0xa0513a, pants: 0x4a3a2e, robe: false },
+      scout: { tunic: 0x3f7a4a, pants: 0x4a3a2e, robe: false },
+      knight: { tunic: 0x9aa3ad, pants: 0x5a6170, robe: false },
+      scholar: { tunic: 0x2f6f7a, pants: 0x34403f, robe: 0x2f6f7a },
+      smith: { tunic: 0xb07a3a, pants: 0x3e3530, robe: false },
+      advisor: { tunic: 0x2f7f86, pants: 0x34403f, robe: 0x2f7f86 },
+      mage: { tunic: 0x26357e, pants: 0x1d2552, robe: 0x26357e }
+    }[role]
+    const legs = []
+    for (const sx of [-0.1, 0.1]) {
+      const leg = new T.Group(); leg.position.set(sx, 0.34, 0); g.add(leg)
+      tpart(box(0.13, 0.28, 0.15), C.pants, 0, -0.14, 0, leg)
+      tpart(box(0.15, 0.09, 0.21), 0x2a221c, 0, -0.3, 0.03, leg)
+      legs.push(leg)
+    }
+    const body = tpart(new T.CylinderGeometry(0.19, 0.25, 0.44, 12), C.tunic, 0, 0.56, 0, g)
+    if (C.robe) tpart(new T.CylinderGeometry(0.22, 0.34, 0.5, 12), C.robe, 0, 0.32, 0, g)
+    if (role === 'smith') tpart(box(0.36, 0.42, 0.06), 0x5a3a26, 0, 0.5, 0.21, g)
+    if (role !== 'knight') tpart(new T.CylinderGeometry(0.255, 0.255, 0.06, 12), 0x4a3322, 0, 0.42, 0, g, { outline: false })
+    const arms = []
+    for (const sx of [-0.27, 0.27]) {
+      const arm = new T.Group(); arm.position.set(sx, 0.74, 0); g.add(arm)
+      tpart(box(0.11, 0.34, 0.12), C.tunic, 0, -0.16, 0, arm)
+      tpart(new T.SphereGeometry(0.07, 10, 8), skin, 0, -0.36, 0, arm)
+      arms.push(arm)
+    }
+    const head = new T.Group(); head.position.set(0, 1.08, 0); g.add(head)
+    tpart(new T.SphereGeometry(0.3, 18, 14), skin, 0, 0, 0, head)
+    for (const ex of [-0.1, 0.1]) {
+      const e = new T.Mesh(new T.SphereGeometry(0.045, 10, 8), B(0x1b1815)); e.scale.set(0.8, 1.25, 0.6); e.position.set(ex, 0.0, 0.275); head.add(e)
+      const sh = new T.Mesh(new T.SphereGeometry(0.014, 6, 5), B(0xffffff)); sh.position.set(ex + 0.012, 0.025, 0.3); head.add(sh)
+    }
+    const cheekM = B(0xf09a8a, { transparent: true, opacity: 0.55 })
+    for (const ex of [-0.17, 0.17]) { const c = new T.Mesh(new T.CircleGeometry(0.045, 10), cheekM); c.position.set(ex, -0.08, 0.262); c.rotation.y = ex * 1.6; head.add(c) }
+    const hat = () => {
+      if (role === 'wizard' || role === 'mage') {
+        tpart(new T.CylinderGeometry(0.44, 0.44, 0.04, 20), role === 'mage' ? 0x1a2558 : 0x4f3480, 0, 0.17, 0, head)
+        const tip = tpart(new T.ConeGeometry(0.27, role === 'mage' ? 0.78 : 0.62, 16), role === 'mage' ? 0x26357e : 0x6d4aa0, 0, role === 'mage' ? 0.56 : 0.48, -0.03, head); tip.rotation.x = -0.18
+        tpart(new T.CylinderGeometry(0.275, 0.275, 0.07, 16), 0xe9c46a, 0, 0.22, 0, head, { outline: false })
+        const beard = tpart(new T.SphereGeometry(0.17, 12, 10), 0xeeeeee, 0, -0.24, 0.13, head); beard.scale.set(1, 1.2, 0.7)
+      } else if (role === 'knight') {
+        const helm = tpart(new T.SphereGeometry(0.33, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), 0xb7c0c9, 0, 0.02, 0, head)
+        helm.rotation.x = -0.3
+        tpart(box(0.06, 0.2, 0.32), 0x3a5da8, 0, 0.36, -0.05, head)
+      } else if (role === 'scout') {
+        const hood = tpart(new T.SphereGeometry(0.335, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), 0x2f6a3c, 0, 0.02, -0.03, head)
+        hood.rotation.x = -0.45
+        const tipC = tpart(new T.ConeGeometry(0.12, 0.3, 10), 0x2f6a3c, 0, 0.12, -0.33, head); tipC.rotation.x = -1.9
+      } else if (role === 'builder') {
+        tpart(new T.SphereGeometry(0.315, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 0.02, -0.02, head).rotation.x = -0.3
+        tpart(new T.CylinderGeometry(0.315, 0.315, 0.09, 18), 0xc0392b, 0, 0.1, 0, head)
+      } else if (role === 'lead') {
+        tpart(new T.SphereGeometry(0.315, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 0.02, -0.02, head).rotation.x = -0.3
+        tpart(new T.CylinderGeometry(0.21, 0.23, 0.13, 10, 1, true), 0xe9c46a, 0, 0.33, 0, head)
+        for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; tpart(new T.ConeGeometry(0.045, 0.12, 6), 0xe9c46a, Math.sin(a) * 0.21, 0.44, Math.cos(a) * 0.21, head, { outline: false }) }
+      } else {
+        tpart(new T.SphereGeometry(0.315, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 0.02, -0.03, head).rotation.x = -0.35
+        if (role === 'smith') { const bd = tpart(new T.SphereGeometry(0.16, 12, 10), hair, 0, -0.22, 0.12, head); bd.scale.set(1.1, 0.9, 0.7) }
+      }
+    }
+    hat()
+    if (role === 'advisor') for (const ex of [-0.1, 0.1]) { const gl = new T.Mesh(new T.TorusGeometry(0.065, 0.013, 6, 16), B(0x2a2420)); gl.position.set(ex, 0.0, 0.285); head.add(gl) }
+    let tool = null
+    const hand = arms[1]
+    if (opts.lead) {
+      const cape = tpart(box(0.52, 0.72, 0.05), 0x9b2d3a, 0, 0.5, -0.24, g); cape.rotation.x = 0.14
+      tpart(new T.CylinderGeometry(0.03, 0.03, 1.7, 8), P.woodDark, -0.06, -0.05, 0.08, arms[0])
+      const ban = new T.Mesh(new T.PlaneGeometry(0.42, 0.3), TM(0xf7f5ef)); ban.material = TM(0xf7f5ef); ban.position.set(-0.29, 0.62, 0.08); arms[0].add(ban)
+      ban.material.side = T.DoubleSide
+    } else if (role === 'wizard' || role === 'mage') {
+      tpart(new T.CylinderGeometry(0.03, 0.03, 1.2, 8), P.woodDark, 0, -0.2, 0.05, hand)
+      tpart(new T.SphereGeometry(0.08, 12, 10), 0xdff3ff, 0, 0.42, 0.05, hand, { emissive: 0x9fd8ff })
+    } else if (role === 'builder' || role === 'smith' || opts.hammer) {
+      tool = new T.Group(); hand.add(tool); tool.position.set(0, -0.38, 0.05)
+      tpart(box(0.05, 0.05, 0.36), P.woodDark, 0, 0, 0.16, tool)
+      tpart(box(0.16, 0.12, 0.12), 0x8c8f94, 0, 0, 0.34, tool)
+    } else if (role === 'knight') {
+      tpart(box(0.14, 0.18, 0.14), 0x3a3a3a, 0, -0.5, 0.05, arms[0])
+      tpart(box(0.09, 0.1, 0.09), 0xffd98c, 0, -0.5, 0.05, arms[0], { outline: false, emissive: 0xffc870 })
+    } else if (role === 'scholar') {
+      tpart(box(0.22, 0.28, 0.07), 0x7a3b2e, 0, -0.38, 0.12, arms[0])
+    } else if (role === 'scout') {
+      tpart(box(0.16, 0.2, 0.1), 0x6e4a2c, -0.22, 0.42, 0.12, g)
+    }
+    if (role === 'advisor') { tool = new T.Group(); arms[1].add(tool); tool.position.set(0, -0.4, 0.04); const sg = tpart(new T.CylinderGeometry(0.035, 0.055, 0.46, 10), 0xb08d57, 0, 0, 0.16, tool); sg.rotation.x = Math.PI / 2 }
+    if (opts.lead) g.scale.setScalar(1.12)
+    return { g, legs, arms, body, head, tool, bodyY: 0.56 }
+  }
+
+  function pose(u, kind, t) {
+    const [lL, lR] = u.legs, [aL, aR] = u.arms
+    lL.rotation.set(0, 0, 0); lR.rotation.set(0, 0, 0); aL.rotation.set(0, 0, 0); aR.rotation.set(0, 0, 0)
+    u.body.rotation.set(0, 0, 0)
+    u.body.position.y = u.bodyY
+    let lift = 0
+    if (kind === 'walk' || kind === 'carry') {
+      const s = Math.sin(t * 6)
+      lL.rotation.x = s * 0.45; lR.rotation.x = -s * 0.45
+      if (kind === 'walk') { aL.rotation.x = -s * 0.35; aR.rotation.x = s * 0.35 } else { aL.rotation.x = aR.rotation.x = -1.2 }
+      lift = Math.abs(Math.cos(t * 6)) * 0.02
+    } else if (kind === 'hammer') {
+      // A calm, eased swing: no snap at the bottom.
+      aR.rotation.x = -1.35 - Math.sin(t * 2.6) * 0.85
+      aL.rotation.x = -0.35
+      u.body.rotation.y = Math.sin(t * 2.6) * 0.05
+    } else if (kind === 'wave') {
+      aL.rotation.z = -0.35
+      aR.rotation.z = 2.55 + Math.sin(t * 3.2) * 0.28
+    } else if (kind === 'cheer') {
+      // Arms up with a slow sway; no jumping.
+      aL.rotation.z = -2.55 - Math.sin(t * 1.8) * 0.18
+      aR.rotation.z = 2.55 - Math.sin(t * 1.8) * 0.18
+      u.g.rotation.z = Math.sin(t * 1.8) * 0.04
+    } else if (kind === 'spy') {
+      aR.rotation.x = -2.05; aR.rotation.z = 0.35; aL.rotation.x = -1.3; aL.rotation.z = -0.25
+    } else if (kind === 'fish' || kind === 'reel') {
+      aR.rotation.x = kind === 'reel' ? -2.3 : -0.9 + Math.sin(t * 1.2) * 0.05
+      aL.rotation.x = kind === 'reel' ? -2.0 : -0.8
+      aL.rotation.z = -0.25
+    } else if (kind === 'water') {
+      const s = Math.sin(t * 6)
+      lL.rotation.x = s * 0.4; lR.rotation.x = -s * 0.4
+      aR.rotation.x = -1.15; aL.rotation.x = -s * 0.3
+      lift = Math.abs(Math.cos(t * 6)) * 0.02
+    } else if (kind === 'chop') {
+      const w = (Math.sin(t * 2.2) + 1) / 2
+      aR.rotation.x = aL.rotation.x = -2.7 + w * 2.0
+      aL.rotation.z = -0.15; aR.rotation.z = 0.15
+      u.body.rotation.x = 0.12 * w
+    } else if (kind === 'sit') {
+      lL.rotation.x = lR.rotation.x = -1.45
+      lift = -0.3
+      aL.rotation.x = aR.rotation.x = -0.6
+      u.head.rotation.x = 0.12 + Math.sin(t * 0.9) * 0.05
+    } else {
+      u.body.scale.y = 1 + Math.sin(t * 2.2) * 0.015
+      aL.rotation.z = -0.06; aR.rotation.z = 0.06
+    }
+    u.g.position.y = (u.baseY || 0) + lift
+  }
+  const clamp01 = (x) => Math.max(0, Math.min(1, x))
+  const ease3 = (x) => { const k = clamp01(x); return k * k * (3 - 2 * k) }
+
+  // ---------- low-resource figures: a handful of flat-shaded parts, no outline ----------
+  const liteCache = new Map()
+  const LM = (hex) => { if (!liteCache.has(hex)) liteCache.set(hex, new T.MeshLambertMaterial({ color: lin(hex), flatShading: true })); return liteCache.get(hex) }
+  function lpart(geo, hex, x, y, z, parent) { const m = new T.Mesh(geo, LM(hex)); m.position.set(x, y, z); parent.add(m); return m }
+  function makeUnitLite(i, P, opts = {}) {
+    const g = new T.Group()
+    const role = opts.lead ? 'lead' : opts.role || COSTUMES[i % COSTUMES.length]
+    const tunic = { lead: 0x3b5bb5, wizard: 0x6d4aa0, builder: 0xa0513a, scout: 0x3f7a4a, knight: 0x9aa3ad, scholar: 0x2f6f7a, smith: 0xb07a3a, advisor: 0x2f7f86, mage: 0x26357e }[role]
+    const skin = SKIN[i % SKIN.length], hair = HAIR[i % HAIR.length]
+    const legs = [], arms = []
+    for (const sx of [-0.1, 0.1]) { const leg = new T.Group(); leg.position.set(sx, 0.34, 0); g.add(leg); lpart(box(0.13, 0.34, 0.15), 0x3d3a36, 0, -0.17, 0, leg); legs.push(leg) }
+    const body = lpart(new T.CylinderGeometry(0.19, 0.25, 0.44, 6), tunic, 0, 0.56, 0, g)
+    for (const sx of [-0.27, 0.27]) { const arm = new T.Group(); arm.position.set(sx, 0.74, 0); g.add(arm); lpart(box(0.11, 0.38, 0.12), tunic, 0, -0.18, 0, arm); arms.push(arm) }
+    const head = new T.Group(); head.position.set(0, 1.08, 0); g.add(head)
+    lpart(new T.IcosahedronGeometry(0.29, 0), skin, 0, 0, 0, head)
+    for (const ex of [-0.1, 0.1]) lpart(box(0.05, 0.07, 0.03), 0x1b1815, ex, 0, 0.26, head)
+    if (role === 'wizard' || role === 'mage') lpart(new T.ConeGeometry(0.3, 0.6, 6), tunic, 0, 0.42, 0, head)
+    else if (role === 'knight') lpart(new T.IcosahedronGeometry(0.31, 0), 0xb7c0c9, 0, 0.08, -0.04, head)
+    else if (role === 'lead') lpart(new T.CylinderGeometry(0.21, 0.23, 0.13, 6), 0xe9c46a, 0, 0.33, 0, head)
+    else lpart(new T.IcosahedronGeometry(0.3, 0), role === 'scout' ? 0x2f6a3c : hair, 0, 0.07, -0.06, head)
+    let tool = null
+    if (opts.lead) {
+      lpart(box(0.5, 0.7, 0.05), 0x9b2d3a, 0, 0.5, -0.24, g)
+      lpart(new T.CylinderGeometry(0.03, 0.03, 1.7, 5), P.woodDark, -0.06, -0.05, 0.08, arms[0])
+      const ban = lpart(new T.PlaneGeometry(0.42, 0.3), 0xf7f5ef, -0.29, 0.62, 0.08, arms[0]); ban.material = LM(0xf7f5ef).clone(); ban.material.side = T.DoubleSide
+      g.scale.setScalar(1.12)
+    } else if (role === 'builder' || role === 'smith' || opts.hammer) {
+      tool = new T.Group(); arms[1].add(tool); tool.position.set(0, -0.38, 0.05)
+      lpart(box(0.05, 0.05, 0.36), P.woodDark, 0, 0, 0.16, tool); lpart(box(0.16, 0.12, 0.12), 0x8c8f94, 0, 0, 0.34, tool)
+    }
+    return { g, legs, arms, body, head, tool, bodyY: 0.56 }
+  }
+
+  // ---------- office palette: the diorama's material kit, indoors ----------
+  const XD = {
+    floorTop: 0xd2bd96, floorSeam: 0xbfa880, rug: 0x5d7690, rug2: 0x4c6680, slab: 0xc9c0ae, slabDark: 0x9a917f,
+    wall: 0xf1e8d8, wallLow: 0xe3d6bf, trim: 0x6e4a2c, frame: 0x3e4a5c,
+    deskTop: 0xd9b98a, deskSide: 0xb07c4c, metal: 0x3b4250, chair: 0x3c4a66, chairEdge: 0x2b3448, monitor: 0x1b1f27,
+    pot: 0xd9d4c8, leaf: 0x4f9050, leaf2: 0x3d7a43, coat: 0x8a5a3a, mug: 0xe9edf2, paper: 0xf6f3ea,
+    shaft: 0x5f6b7d, cab: 0xe6e0d3, lamp: 0xffe2a8, sky: 0xbfdcec
+  }
+  const XN = Object.assign({}, XD, {
+    floorTop: 0x7d6c55, floorSeam: 0x6d5e4a, rug: 0x2f4256, rug2: 0x283a4c, slab: 0x83807a, slabDark: 0x5f5c57,
+    wall: 0xa49c8e, wallLow: 0x948a7a, trim: 0x3e2a19, frame: 0x262e3b,
+    deskTop: 0x8f7552, deskSide: 0x6e5034, chair: 0x2a3348, chairEdge: 0x1d2433,
+    pot: 0x9c968a, leaf: 0x2c4c34, leaf2: 0x223e2b, coat: 0x5a3a26, mug: 0xb8bcc2, paper: 0xc8c3b8,
+    shaft: 0x3a4250, cab: 0x9c9a96, sky: 0x101830
+  })
+  const SCREEN = { ink: '#7fb4ff', text: '#a8b4c8', done: '#4ade80', wait: '#ffd24a', dim: '#2b3650', card: '#1c2a3a', track: '#3b4a66', bg: '#0f1826', off: '#06080c' }
+  const css = (hex) => '#' + new T.Color(hex).getHexString()
+
+  function canvasTex(w, h) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h
+    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4
+    return { c, g: c.getContext('2d'), tex }
+  }
+
+  // The city through the side window: dusk at night as today's Office draws it, a clear day in light.
+  function skyTex(night, off) {
+    const { g, tex } = canvasTex(1024, 256)
+    const sky = g.createLinearGradient(0, 0, 0, 256)
+    if (off) { sky.addColorStop(0, '#3a3d44'); sky.addColorStop(1, '#5a5d63') }
+    else if (night) { sky.addColorStop(0, '#141a3d'); sky.addColorStop(0.55, '#3a2f5e'); sky.addColorStop(1, '#b86a78') }
+    else { sky.addColorStop(0, '#79b9e4'); sky.addColorStop(1, '#dcefF8') }
+    g.fillStyle = sky; g.fillRect(0, 0, 1024, 256)
+    if (!night && !off) {
+      g.fillStyle = 'rgba(255,255,255,0.85)'
+      for (const [x, y, r] of [[140, 60, 26], [180, 52, 34], [222, 64, 24], [640, 40, 22], [676, 34, 30], [712, 44, 20]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill() }
+    }
+    let s = 5
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647)
+    for (const [layer, top, col, lit] of [[0, 120, off ? '#4a4d54' : night ? '#2d3158' : '#a9c3d6', 0.25], [1, 150, off ? '#3a3c42' : night ? '#1e2244' : '#7f9cb3', 0.55]]) {
+      for (let x = -10; x < 1030;) {
+        const w = 30 + r() * 44, h = top * 0.45 + r() * (60 + layer * 30)
+        g.fillStyle = col; g.fillRect(x, 256 - h, w, h)
+        if (!off) {
+          g.fillStyle = night ? 'rgba(255,222,160,0.85)' : 'rgba(255,255,255,0.45)'
+          for (let yy = 256 - h + 8; yy < 250; yy += 11) for (let xx = x + 5; xx < x + w - 6; xx += 9) if (r() < (night ? lit : 0.35)) g.fillRect(xx, yy, 4, 5)
+        }
+        x += w + 2 + r() * 8
+      }
+    }
+    return tex
+  }
+
+  // A monitor: what the member is doing, in the screen palette today's Office uses.
+  const eased = (p) => p * p * (3 - 2 * p)
+  function drawScreen(g, w, h, spec, t) {
+    const ux = w / 28, uy = h / 18
+    const at = (col, u, v, ww, hh) => { g.fillStyle = col; g.fillRect(u * ux, v * uy, ww * ux, hh * uy) }
+    g.fillStyle = spec === 'off' ? SCREEN.off : spec === 'standby' || spec === 'limited' || spec === 'loggedOut' || spec === 'queued' || spec === 'starting' || spec === 'unreachable' ? '#05060a' : SCREEN.bg
+    g.fillRect(0, 0, w, h)
+    const typing = () => { const p = (t * 0.6) % 1; at(SCREEN.ink, 4, 14, 14 * eased(p), 1.4); if (Math.floor(t * 2) % 2 === 0) at(SCREEN.text, 4.4 + 14 * eased(p), 13.6, 1, 2.2) }
+    const stroke = (col, pts, lw) => { g.strokeStyle = col; g.lineWidth = lw * uy; g.lineCap = g.lineJoin = 'round'; g.beginPath(); pts.forEach(([u, v], i) => (i ? g.lineTo(u * ux, v * uy) : g.moveTo(u * ux, v * uy))); g.stroke() }
+    const glyph = (txt, col, size) => { g.fillStyle = col; g.font = `700 ${size * uy}px Geist, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 0.5 * uy) }
+    if (spec === 'code' || spec === 'red') {
+      for (let i = 0; i < 6; i++) { const n = (Math.floor(t * 3) + i * 3) % 7; at(i % 2 ? SCREEN.ink : SCREEN.text, 2.5 + (n % 3) * 1.5, 2 + i * 2.5, 6 + ((n * 11) % 15), 1.3) }
+    } else if (spec === 'plan') {
+      const ticked = Math.floor((t * 0.7) % 5)
+      for (let i = 0; i < 4; i++) { at(i < ticked ? SCREEN.done : SCREEN.ink, 2.5, 2.2 + i * 3.8, 2.4, 2.4); at(SCREEN.text, 6.5, 2.7 + i * 3.8, 10 + ((i * 7) % 9), 1.4) }
+    } else if (spec === 'tests') {
+      const passed = Math.floor((t * 3) % 19)
+      for (let i = 0; i < 18; i++) at(i < passed ? SCREEN.done : SCREEN.dim, 3 + (i % 6) * 4, 3.5 + Math.floor(i / 6) * 4.5, 2, 2)
+    } else if (spec === 'checks') {
+      at(SCREEN.track, 2.5, 3, 23, 5); at(SCREEN.wait, 2.5, 3, 23 * eased((t * 0.35) % 1), 5); at(SCREEN.text, 3, 10.5, 12, 1.4); typing()
+    } else if (spec === 'review-ok') {
+      at(SCREEN.card, 2, 2, 24, 14); stroke(SCREEN.done, [[8, 7], [12.5, 11.5], [20.5, 3.5]], 2.4); typing()
+    } else if (spec === 'review-wait') {
+      at(SCREEN.card, 2, 2, 24, 14); g.strokeStyle = SCREEN.text; g.lineWidth = 1.6 * uy; g.strokeRect(9 * ux, 3 * uy, 10 * ux, 8 * uy); typing()
+    } else if (spec === 'review-chg') {
+      at(SCREEN.card, 2, 2, 24, 14)
+      const ticked = Math.floor((t * 0.7) % 4)
+      for (let i = 0; i < 3; i++) { at(i < ticked ? SCREEN.done : SCREEN.wait, 4, 3.5 + i * 3.6, 2.4, 2.4); at(SCREEN.text, 8, 4 + i * 3.6, 10 + ((i * 5) % 6), 1.4) }
+    } else if (spec === 'queue') {
+      at(SCREEN.wait, 6, 3, 16, 12); at(SCREEN.text, 6 + 14 * ((t * 0.5) % 1), 3, 2, 1); at(SCREEN.card, 7, 4, 14, 10); glyph('#2', SCREEN.wait, 7)
+    } else if (spec === 'idle') {
+      const x = 4 + ((Math.sin(t * 0.5) + 1) / 2) * 16, y = 3 + ((Math.cos(t * 0.37) + 1) / 2) * 9
+      at(SCREEN.dim, x, y, 6, 4); at(SCREEN.track, x + 1, y + 1, 4, 1)
+    } else if (spec === 'game') {
+      at(SCREEN.dim, 0, 14.5, 28, 3.5)
+      const jump = Math.abs(Math.sin(t * 3.2)) * 6
+      at(SCREEN.wait, 6, 11 - jump, 3, 3.5)
+      const ox = 28 - ((t * 9) % 34)
+      at(SCREEN.done, ox, 11, 2.5, 3.5)
+    } else if (spec === 'limited') {
+      const s = 4.4, cx = 14, cy = 9
+      g.fillStyle = css(P.warning); g.beginPath()
+      g.moveTo((cx - s * 0.7) * ux, (cy - s) * uy); g.lineTo((cx + s * 0.7) * ux, (cy - s) * uy); g.lineTo(cx * ux, cy * uy)
+      g.lineTo((cx + s * 0.7) * ux, (cy + s) * uy); g.lineTo((cx - s * 0.7) * ux, (cy + s) * uy); g.lineTo(cx * ux, cy * uy); g.closePath(); g.fill()
+    } else if (spec === 'loggedOut') {
+      g.strokeStyle = css(P.attention); g.lineWidth = 1.3 * uy; g.beginPath(); g.arc(14 * ux, 7.6 * uy, 2.4 * uy, Math.PI, 0); g.stroke()
+      at(css(P.attention), 10.6, 7.6, 6.8, 5.6)
+    } else if (spec === 'unreachable') {
+      let seed = Math.floor(t * 6) * 977
+      for (let r = 0; r < 9; r++) for (let c = 0; c < 14; c++) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; at(seed % 3 === 0 ? '#8a93a3' : SCREEN.dim, c * 2, r * 2, 2, 2) }
+    } else if (spec === 'queued') {
+      g.strokeStyle = '#8a93a3'; g.lineWidth = 1.2 * uy; g.beginPath(); g.arc(14 * ux, 9 * uy, 4.6 * uy, 0, 7)
+      g.moveTo(14 * ux, 9 * uy); g.lineTo(14 * ux, 6 * uy); g.moveTo(14 * ux, 9 * uy); g.lineTo(16.4 * ux, 9 * uy); g.stroke()
+    } else if (spec === 'starting') {
+      at(SCREEN.dim, 5.6, 8, 16.8, 2); at('#7fb4ff', 5.6, 8, 16.8 * ((t * 0.5) % 1), 2)
+    } else if (spec === 'standby') {
+      at(SCREEN.dim, 24, 15, 1.6, 1.2)
+    }
+  }
+  // A red CI: a bug hops across the failing screen, over a red glow, until CI is green.
+  function drawVirus(g, w, h, t) {
+    g.fillStyle = 'rgba(229,72,77,0.3)'; g.fillRect(0, 0, w, h)
+    const inRound = t % 4
+    const arc = (p) => 4 * p * (1 - p)
+    const hop = inRound >= 3.2 ? arc((inRound - 3.2) / 0.8) * 0.9 : arc((t * 1.6) % 1) * 0.28
+    const bx = w * (0.5 + Math.sin(t * 1.3) * 0.22), by = h * 0.66 - hop * h, r = h * 0.2
+    g.strokeStyle = '#1b1418'; g.lineWidth = Math.max(1, r * 0.26); g.lineCap = 'round'
+    for (const side of [-1, 1]) for (const k of [-0.45, 0.05, 0.5]) {
+      const kick = Math.sin(t * 18 + k * 4) * r * 0.35
+      g.beginPath(); g.moveTo(bx, by + k * r); g.lineTo(bx + side * r * 1.55, by + k * r + r * 0.45 + kick); g.stroke()
+    }
+    g.beginPath(); g.ellipse(bx, by, r * 1.1, r, 0, 0, 7); g.fillStyle = '#7ee04b'; g.fill(); g.stroke()
+    for (const side of [-1, 1]) {
+      g.beginPath(); g.arc(bx + side * r * 0.42, by - r * 0.25, r * 0.3, 0, 7); g.fillStyle = '#fdfdfb'; g.fill()
+      g.beginPath(); g.arc(bx + side * r * 0.42, by - r * 0.18, r * 0.14, 0, 7); g.fillStyle = '#1b1418'; g.fill()
+    }
+  }
+
+  // The task board over each desk: to do, doing, done, filled as far as the member really is.
+  const NOTES = { 0: [0, 0, 0], 1: [3, 0, 0], 2: [1, 1, 1], 3: [0, 1, 2], 4: [0, 0, 3] }
+  function drawBoard(g, w, h, stage, broken, blink) {
+    g.clearRect(0, 0, w, h)
+    g.fillStyle = '#59606b'; g.fillRect(0, 0, w, h)
+    g.fillStyle = '#eef1f4'; g.fillRect(4, 4, w - 8, h - 8)
+    g.fillStyle = '#c3c9d1'; g.fillRect(w / 3, 8, 2, h - 16); g.fillRect((2 * w) / 3, 8, 2, h - 16)
+    NOTES[stage].forEach((count, col) => {
+      for (let i = 0; i < count; i++) { g.fillStyle = '#ffd86b'; g.fillRect(col * (w / 3) + 10, 12 + i * 22, w / 3 - 20, 16) }
+    })
+    if (broken && blink) { g.fillStyle = css(P.attention); g.fillRect(w / 3 + 10, h - 30, w / 3 - 20, 16) }
+    if (stage === 4) star(g, w - 22, 22, 13)
+  }
+  function star(g, x, y, r, col = '#ffc23a') {
+    g.fillStyle = col; g.beginPath()
+    for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.45 : r, a = (i * Math.PI) / 5 - Math.PI / 2; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) }
+    g.closePath(); g.fill()
+  }
+
+  // Marks over a member's head, always in Orca's status colours.
+  const emoteCache = new Map()
+  function emoteSprite(kind) {
+    const key = kind + tod
+    if (!emoteCache.has(key)) {
+      if (kind === 'alert') { emoteCache.set(key, signalSprite(P).material); }
+      else {
+        const { c, g, tex } = canvasTex(128, 128)
+        const disc = (col) => { g.fillStyle = '#ffffff'; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(64, 64, 50, 0, 7); g.fill() }
+        g.lineCap = g.lineJoin = 'round'
+        if (kind === 'check') { disc(css(P.success)); g.strokeStyle = '#fff'; g.lineWidth = 13; g.beginPath(); g.moveTo(38, 66); g.lineTo(56, 84); g.lineTo(90, 46); g.stroke() }
+        else if (kind === 'star') { disc('#e0a21a'); star(g, 64, 67, 36, '#fff6d6') }
+        else if (kind === 'blocked') { disc(css(P.attention)); g.fillStyle = '#fff'; g.fillRect(34, 56, 60, 16) }
+        else if (kind === 'heart') {
+          g.fillStyle = '#ffffff'; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill()
+          g.fillStyle = '#e5484d'; g.beginPath(); g.moveTo(64, 96); g.bezierCurveTo(14, 64, 34, 22, 64, 46); g.bezierCurveTo(94, 22, 114, 64, 64, 96); g.fill()
+        } else if (kind === 'prompt') {
+          g.fillStyle = '#ffffff'; g.beginPath(); (g.roundRect ? g.roundRect(6, 14, 116, 84, 22) : g.rect(6, 14, 116, 84)); g.fill()
+          g.beginPath(); g.moveTo(34, 92); g.lineTo(26, 120); g.lineTo(58, 94); g.fill()
+          g.fillStyle = css(P.attention); g.beginPath(); (g.roundRect ? g.roundRect(14, 22, 100, 68, 16) : g.rect(14, 22, 100, 68)); g.fill()
+          g.strokeStyle = '#fff'; g.lineWidth = 10; g.beginPath(); g.moveTo(34, 40); g.lineTo(52, 56); g.lineTo(34, 72); g.stroke(); g.fillStyle = '#fff'; g.fillRect(60, 66, 30, 9)
+        } else if (kind === 'zz') {
+          g.strokeStyle = tod === 'night' ? '#d6dce6' : '#5f6670'; g.lineWidth = 9
+          for (const [x, y, s] of [[30, 70, 30], [70, 30, 24]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x + s, y + s); g.stroke() }
+        } else if (kind === 'note') {
+          g.fillStyle = '#f6d365'; g.beginPath(); g.arc(46, 92, 20, 0, 7); g.fill(); g.fillRect(58, 20, 10, 72); g.fillRect(58, 20, 36, 10)
+        }
+        void c
+        emoteCache.set(key, new T.SpriteMaterial({ map: tex, depthTest: false, transparent: true }))
+      }
+    }
+    const s = new T.Sprite(emoteCache.get(key)); s.renderOrder = 11; s.scale.set(0.7, kind === 'alert' ? 0.88 : 0.7, 1)
+    return s
+  }
+
+  // ---------- figures: the diorama's units at 1.6x, so they read in a narrow panel ----------
+  const SIT_SCALE = 1.6
+  function actor(i, opts = {}) {
+    const u = (figs === 'lite' ? makeUnitLite : makeUnit)(i, P, opts)
+    u.k = SIT_SCALE * (opts.lead ? 1.12 : 1)
+    u.g.scale.setScalar(u.k)
+    world.add(u.g)
+    return u
+  }
+  function resetPose(u) { u.g.rotation.z = 0; u.body.scale.y = 1; u.head.rotation.set(0, 0, 0) }
+  // A walker turns smoothly toward where it goes; the diorama's own walk cycle drives the legs.
+  function face(u, dir, t) {
+    if (dir && (dir[0] || dir[1])) {
+      const goal = Math.atan2(dir[0], dir[1])
+      if (u.yaw === undefined) u.yaw = goal
+      const dt = Math.min(0.1, Math.max(0, t - (u.lastT ?? t)))
+      const diff = ((goal - u.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      u.yaw += diff * Math.min(1, dt * 8)
+    }
+    u.lastT = t
+    u.g.rotation.y = u.yaw || 0
+  }
+  // Seated poses at a desk; the sitter faces its monitor, its back to the camera.
+  function seatedPose(u, kind, t) {
+    resetPose(u)
+    pose(u, 'sit', t)
+    const [aL, aR] = u.arms
+    const s = (f, p = 0) => Math.sin(t * f + p)
+    if (kind === 'type' || kind === 'game') {
+      const f = kind === 'game' ? 22 : 13, amp = kind === 'game' ? 0.06 : 0.12
+      aL.rotation.x = -1.2 + s(f) * amp; aR.rotation.x = -1.2 + s(f, 2.2) * amp
+      aL.rotation.z = 0.2; aR.rotation.z = -0.2
+      u.head.rotation.x = 0.06
+    } else if (kind === 'raise') {
+      aL.rotation.z = -2.6 + s(5) * 0.22; aL.rotation.x = -0.2
+      aR.rotation.x = -1.1
+      u.head.rotation.x = -0.12
+    } else if (kind === 'cheer') {
+      aL.rotation.z = -2.55 - s(4) * 0.2; aR.rotation.z = 2.55 - s(4) * 0.2
+      u.g.rotation.z = s(4) * 0.05
+    } else if (kind === 'done') {
+      aL.rotation.x = aR.rotation.x = -0.2; aL.rotation.z = -0.12; aR.rotation.z = 0.12
+      u.body.rotation.x = -0.1; u.head.rotation.x = -0.14
+    } else if (kind === 'slump') {
+      aL.rotation.x = aR.rotation.x = -1.35; aL.rotation.z = 0.35; aR.rotation.z = -0.35
+      u.body.rotation.x = 0.32; u.head.rotation.x = 0.6
+    } else if (kind === 'music') {
+      aL.rotation.x = aR.rotation.x = -0.7; u.head.rotation.z = s(3.2) * 0.14; u.body.rotation.z = s(3.2, 0.4) * 0.04
+    } else if (kind === 'sketch') {
+      aL.rotation.x = -1.5; aL.rotation.z = 0.15
+      aR.rotation.x = -1.25 + s(9) * 0.08; aR.rotation.z = -0.45 + s(6) * 0.06
+      u.head.rotation.x = 0.3
+    } else if (kind === 'plane') {
+      const p = t % 5
+      if (p < 3) { aL.rotation.x = aR.rotation.x = -1.7 + s(7) * 0.08; aL.rotation.z = 0.3; aR.rotation.z = -0.3; u.head.rotation.x = 0.25 }
+      else { aL.rotation.x = -2.7 + (p - 3) * 0.8; aR.rotation.x = -0.6 }
+    } else if (kind === 'give') {
+      aL.rotation.x = -1.45; aR.rotation.x = -0.6
+    } else {
+      aL.rotation.x = aR.rotation.x = -0.65
+    }
+  }
+  // An unreachable member is drawn faded: its materials swap for see-through copies.
+  const ghostMats = new Map()
+  function setGhost(u, on) {
+    if (u.ghost === on) return
+    u.ghost = on
+    u.g.traverse((o) => {
+      if (!o.isMesh) return
+      if (on) {
+        o.userData.solid = o.material
+        if (!ghostMats.has(o.material)) { const m = o.material.clone(); m.transparent = true; m.opacity = 0.38; m.depthWrite = false; ghostMats.set(o.material, m) }
+        o.material = ghostMats.get(o.material)
+      } else if (o.userData.solid) o.material = o.userData.solid
+    })
+  }
+
+  // ---------- the building: one floor per machine, stacked over a glass elevator ----------
+  // Why 9 apart: a floor's slab must clear the boards of the floor under it at this camera angle.
+  const H = 3.5, D = 5.6, PITCH = 9.0, SIT_Z = 1.85, DOOR_Z = 4.1, AISLE_Z = 4.0
+  let HW = H
+  const CAB_X = -1.15
+  let floors = [], cab = null, hits = [], walkers = [], lead = null, jev = null, flow = null
+  const floorW = (cap) => Math.max(11.7, Math.min(14.4, 2.2 * cap + 0.7))
+
+  function buildFloor(fi, fm) {
+    const online = fm.online
+    const PP = online ? P : OFF, XX = online ? X : OFFX
+    const cap = capOf(fm), W = floorW(cap)
+    const pitch = (W - 0.65) / cap, k = Math.min(1, pitch / 2.2)
+    const y0 = fi * PITCH
+    const g = new T.Group(); g.position.set(0, y0, 0); world.add(g)
+    const fl = { i: fi, m: fm, g, y: y0, W, cap, pitch, k, seats: [], online, PP, XX }
+    // the slab: a wooden floor on a chunky concrete tray, like the diorama's islands
+    const top = mesh(box(W + 0.3, 0.14, D + 0.3), M(XX.floorTop), W / 2 - 0.15, -0.07, D / 2 - 0.15, g); top.castShadow = false
+    mesh(box(W + 0.3, 0.55, D + 0.3), M(XX.slab), W / 2 - 0.15, -0.41, D / 2 - 0.15, g).castShadow = false
+    mesh(box(W + 0.05, 0.18, D + 0.05), M(XX.slabDark), W / 2 - 0.15, -0.77, D / 2 - 0.15, g).castShadow = false
+    for (let x = 1.1; x < W; x += 1.1) { const s = mesh(box(0.03, 0.01, D), M(XX.floorSeam), x, 0.005, D / 2, g); s.castShadow = false }
+    const rug = mesh(box(W - 1.4, 0.03, 1.9), M(XX.rug), W / 2 + 0.2, 0.015, AISLE_Z, g); rug.castShadow = false
+    mesh(box(W - 1.6, 0.031, 1.7), M(XX.rug2), W / 2 + 0.2, 0.016, AISLE_Z, g).castShadow = false
+    // back wall: plaster over a darker dado, with the boards above each desk
+    // double-height loft: the wall rises to the slab above, with a high window band
+    HW = fi === model.floors.length - 1 ? H + 1.6 : PITCH - 0.86
+    mesh(box(W + 0.3, H + 0.3, 0.3), M(XX.wall), W / 2 - 0.15, (H + 0.3) / 2, -0.15, g)
+    mesh(box(W + 0.3, 0.4, 0.3), M(XX.wall), W / 2 - 0.15, HW - 0.2, -0.15, g)
+    {
+      const bandH = HW - 0.4 - (H + 0.3), tex = skyTex(tod === 'night', !online); tex.wrapS = T.RepeatWrapping; tex.repeat.set(W / 8, 1); tex.offset.x = fi * 0.21
+      const band = new T.Mesh(new T.PlaneGeometry(W + 0.3, bandH), new T.MeshBasicMaterial({ map: tex })); band.position.set(W / 2 - 0.15, H + 0.3 + bandH / 2, -0.24); g.add(band)
+      const n = Math.round(W / 1.6)
+      for (let q = 0; q <= n; q++) mesh(box(0.1, bandH, 0.14), M(XX.frame), -0.3 + ((W + 0.3) * q) / n, H + 0.3 + bandH / 2, -0.1, g)
+      mesh(box(W + 0.3, 0.08, 0.36), M(XX.trim), W / 2 - 0.15, H + 0.34, -0.12, g)
+    }
+    if (fi < model.floors.length - 1) pendants(g, XX, W, online)
+    mesh(box(W + 0.3, 1.0, 0.04), M(XX.wallLow), W / 2 - 0.15, 0.5, 0.02, g).castShadow = false
+    mesh(box(W + 0.3, 0.07, 0.07), M(XX.trim), W / 2 - 0.15, 1.02, 0.04, g)
+    mesh(box(W + 0.34, 0.12, 0.34), M(XX.trim), W / 2 - 0.15, HW + 0.06, -0.15, g)
+    // side wall: the window over the city, and the elevator door
+    leftWall(g, PP, XX, fi)
+    // right end: a plant, and the lead's corner with its rug
+    plant(g, XX, W - 0.55, 0.55, 1.15)
+    if (fi === 0) {
+      const leadRug = mesh(new T.CylinderGeometry(1.0, 1.0, 0.03, 28), M(PP.banner), W - 1.55, 0.02, AISLE_Z, g); leadRug.castShadow = false
+      mesh(new T.CylinderGeometry(0.86, 0.86, 0.035, 28), M(XX.rug), W - 1.55, 0.022, AISLE_Z, g).castShadow = false
+    }
+    fl.home = [W - 1.55, AISLE_Z]
+    // seats: our members, then other sessions' desks (a coat on the chair), then the cap's free ones
+    const taken = Math.min(fm.taken, cap - fm.members.length)
+    for (let j = 0; j < cap; j++) {
+      const kind = j < fm.members.length ? 'member' : j < fm.members.length + taken ? 'taken' : 'free'
+      fl.seats.push(makeSeat(fl, j, kind, kind === 'member' ? fm.members[j] : null))
+    }
+    // the floor's name, as the Machines tab names the host
+    const used = fm.members.length
+    const lbl = chip(fm.host.label + (online ? ` · ${used}/${cap}` : ' · sin conexión'), PP)
+    lbl.center.set(0, 0.5); lbl.position.set(1.7, y0 - 0.42, D + 0.2); world.add(lbl)
+    fl.label = lbl
+    // night: a warm light per floor; offline: the floor sits under a cold haze
+    if (tod === 'night' && figs !== 'lite' && online) { const pl = new T.PointLight(0xffd9a0, 0.9, 13, 1.6); pl.position.set(W / 2, 2.9, 2.6); g.add(pl) }
+    if (!online) {
+      const puffs = []
+      for (let q = 0; q < 9; q++) {
+        const m = new T.Mesh(new T.IcosahedronGeometry(0.6 + rnd() * 0.5, 1), M(P.fogPuff, { opacity: P.fogOpacity * 0.45, unique: true }))
+        m.userData.o = [rnd() * W, 0.8 + rnd() * 1.6, rnd() * D, rnd() * 6]; g.add(m); puffs.push(m)
+      }
+      animators.push((t) => puffs.forEach((m) => { const [ox, oy, oz, ph] = m.userData.o; m.position.set(ox + Math.sin(t * 0.25 + ph) * 0.6, oy, oz + Math.cos(t * 0.2 + ph) * 0.5) }))
+    }
+    // plaques of merged work and the launch STOP live on the lead's floor
+    if (fi === 0) {
+      for (let q = 0; q < model.trophies; q++) plaque(g, 0.55 + q * 0.62, H - 0.05)
+      fl.trophyAt = (q) => plaque(g, 0.55 + q * 0.62, H - 0.05)
+      stopSign(g, PP, W - 0.45, AISLE_Z + 1.25)
+    }
+    return fl
+  }
+
+  function leftWall(g, PP, XX, fi) {
+    const segs = [[0, DOOR_Z - 0.85], [DOOR_Z + 0.85, D]]
+    const sky = skyTex(tod === 'night', PP === OFF)
+    for (const [z0, z1] of segs) {
+      const L = z1 - z0, zc = (z0 + z1) / 2
+      mesh(box(0.3, 0.8, L), M(XX.wall), -0.15, 0.4, zc, g)
+      mesh(box(0.3, 0.5, L), M(XX.wall), -0.15, HW - 0.25, zc, g)
+      mesh(box(0.36, 0.06, L), M(XX.trim), -0.12, 0.83, zc, g)
+      const n = Math.max(1, Math.round(L / 1.5))
+      for (let q = 0; q <= n; q++) mesh(box(0.14, HW - 1.3, 0.1), M(XX.frame), -0.1, 0.8 + (HW - 1.3) / 2, z0 + (L * q) / n, g)
+      const tex = sky.clone(); tex.needsUpdate = true; tex.repeat.set(L / ((HW - 1.3) * 3.2), 1); tex.offset.set((z0 / 8 + fi * 0.37) % 1, 0); tex.wrapS = T.RepeatWrapping
+      const pane = new T.Mesh(new T.PlaneGeometry(L, HW - 1.3), new T.MeshBasicMaterial({ map: tex }))
+      pane.rotation.y = Math.PI / 2; pane.position.set(-0.24, 0.8 + (HW - 1.3) / 2, zc); g.add(pane)
+    }
+    // the elevator door: two leaves that slide into the wall
+    mesh(box(0.3, HW - 2.8, 1.7), M(XX.wall), -0.15, 2.8 + (HW - 2.8) / 2, DOOR_Z, g)
+    mesh(box(0.36, 0.1, 1.84), M(XX.frame), -0.12, 2.83, DOOR_Z, g)
+    for (const dz of [-0.88, 0.88]) mesh(box(0.36, 2.8, 0.1), M(XX.frame), -0.12, 1.4, DOOR_Z + dz, g)
+    const leaves = [-1, 1].map((side) => mesh(box(0.08, 2.75, 0.84), M(0xb9c2cc, { metal: 0.3, rough: 0.4 }), -0.08, 1.38, DOOR_Z + side * 0.42, g))
+    const lamp = mesh(box(0.06, 0.18, 0.5), B(0x2b3650), 0.02, 3.05, DOOR_Z, g)
+    floorsDoor.push({ fi, leaves, lamp, open: 0 })
+  }
+  const floorsDoor = []
+
+  // lamps hung from the slab above, lit at night
+  function pendants(g, XX, W, online) {
+    for (let q = 0; q < 3; q++) {
+      const x = W * (0.2 + q * 0.3), z = SIT_Z + 0.4, y = 3.6
+      mesh(box(0.025, HW - y, 0.025), M(0x2a2f3a), x, y + (HW - y) / 2, z, g).castShadow = false
+      const shade = mesh(new T.ConeGeometry(0.42, 0.34, 14, 1, true), M(XX.metal), x, y, z, g); shade.material.side = T.DoubleSide
+      mesh(new T.SphereGeometry(0.12, 10, 8), tod === 'night' && online ? B(0xffe2a8) : M(0xe9edf2), x, y - 0.14, z, g).castShadow = false
+      if (tod === 'night' && online) glow(g, x, y - 0.3, z, 0xffd08a, 2.2, 0.55)
+    }
+  }
+  function plant(g, XX, x, z, s = 1) {
+    const p = new T.Group(); p.position.set(x, 0, z); p.scale.setScalar(s); g.add(p)
+    mesh(new T.CylinderGeometry(0.26, 0.2, 0.42, 10), M(XX.pot), 0, 0.21, 0, p)
+    for (let q = 0; q < 7; q++) {
+      const a = (q / 7) * Math.PI * 2
+      const l = mesh(new T.ConeGeometry(0.09, 0.8, 5), M(q % 2 ? XX.leaf : XX.leaf2), Math.cos(a) * 0.1, 0.72, Math.sin(a) * 0.1, p)
+      l.rotation.z = Math.cos(a) * 0.5; l.rotation.x = -Math.sin(a) * 0.5
+    }
+  }
+  function plaque(g, x, y) {
+    const p = new T.Group(); p.position.set(x, y, 0.02); g.add(p)
+    mesh(box(0.46, 0.46, 0.05), M(0x59606b), 0, 0, 0, p)
+    mesh(box(0.38, 0.38, 0.06), M(0xeef1f4), 0, 0, 0.005, p)
+    const sh = new T.Shape(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.07 : 0.16, a = (i * Math.PI) / 5 + Math.PI / 2; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r) }
+    const st = new T.Mesh(new T.ShapeGeometry(sh), B(0xffc23a)); st.position.z = 0.04; p.add(st)
+    return p
+  }
+  function stopSign(g, PP, x, z) {
+    const s = new T.Group(); s.position.set(x, 0, z); s.visible = model.stopped; g.add(s)
+    mesh(new T.CylinderGeometry(0.04, 0.05, 1.9, 6), M(0x59606b), 0, 0.95, 0, s)
+    const { g: c, tex } = canvasTex(128, 128)
+    c.fillStyle = '#ffffff'; c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; c.lineTo(64 + Math.cos(a) * 62, 64 + Math.sin(a) * 62) } c.fill()
+    c.fillStyle = css(PP.warning); c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; c.lineTo(64 + Math.cos(a) * 54, 64 + Math.sin(a) * 54) } c.fill()
+    c.fillStyle = '#1b1418'; c.font = '800 34px Geist, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('STOP', 64, 66)
+    const face = new T.Mesh(new T.PlaneGeometry(0.8, 0.8), new T.MeshBasicMaterial({ map: tex, transparent: true, side: T.DoubleSide }))
+    face.position.set(0, 2.0, 0); face.rotation.y = Math.PI / 4; s.add(face)
+    stopSigns.push(s)
+  }
+  const stopSigns = []
+
+  // ---------- a desk ----------
+  function makeSeat(fl, j, kind, m) {
+    const { g: fg, XX, PP, k } = fl
+    const x = 0.3 + fl.pitch * (j + 0.5)
+    const sg = new T.Group(); sg.position.set(x, 0, SIT_Z); sg.scale.setScalar(k); fg.add(sg)
+    // desk: a wooden top on two side panels, a keyboard, and a mug or a little plant
+    mesh(box(2.0, 0.08, 1.1), M(XX.deskTop), 0, 0.98, -0.95, sg)
+    for (const dx of [-0.92, 0.92]) mesh(box(0.08, 0.94, 1.02), M(XX.deskSide), dx, 0.47, -0.95, sg)
+    mesh(box(1.76, 0.5, 0.05), M(XX.deskSide), 0, 0.68, -1.4, sg)
+    mesh(box(0.62, 0.04, 0.2), M(0x2a2f3a), 0, 1.04, -0.68, sg)
+    mesh(box(0.12, 0.04, 0.16), M(0x2a2f3a), 0.48, 1.04, -0.66, sg)
+    const deco = j % 3
+    if (deco === 0) { mesh(new T.CylinderGeometry(0.08, 0.07, 0.16, 10), M(XX.mug), -0.72, 1.1, -0.7, sg) }
+    else if (deco === 1) { const pg = new T.Group(); pg.position.set(-0.72, 1.02, -1.15); sg.add(pg); plant(pg, XX, 0, 0, 0.42) }
+    else { mesh(box(0.34, 0.06, 0.26), M(XX.paper), -0.7, 1.05, -0.8, sg).rotation.y = 0.2 }
+    // monitor: a live screen the member's work draws on
+    mesh(box(0.08, 0.32, 0.08), M(XX.metal), 0, 1.18, -1.22, sg)
+    mesh(box(0.36, 0.03, 0.22), M(XX.metal), 0, 1.03, -1.22, sg)
+    const mon = new T.Group(); mon.position.set(0, 1.62, -1.2); mon.rotation.x = -0.06; sg.add(mon)
+    mesh(box(1.22, 0.78, 0.07), M(XX.monitor), 0, 0, 0, mon)
+    const scr = canvasTex(112, 72)
+    const screen = new T.Mesh(new T.PlaneGeometry(1.12, 0.68), new T.MeshBasicMaterial({ map: scr.tex }))
+    screen.position.z = 0.04; mon.add(screen)
+    // the board on the wall above the monitor
+    const brd = canvasTex(144, 96)
+    const board = new T.Mesh(new T.PlaneGeometry(1.3, 0.8), new T.MeshBasicMaterial({ map: brd.tex }))
+    board.position.set(0, 2.5, -SIT_Z / k + 0.03); sg.add(board)
+    // chair, seen from behind
+    const chair = new T.Group(); chair.position.set(0, 0, 0.08); sg.add(chair)
+    mesh(new T.CylinderGeometry(0.4, 0.38, 0.12, 14), M(XX.chair), 0, 0.52, 0, chair)
+    const back = mesh(box(0.74, 0.74, 0.12), M(XX.chair), 0, 1.0, 0.42, chair); back.rotation.x = -0.08
+    mesh(box(0.78, 0.06, 0.15), M(XX.chairEdge), 0, 1.38, 0.43, chair)
+    mesh(new T.CylinderGeometry(0.05, 0.05, 0.4, 8), M(XX.metal), 0, 0.26, 0, chair)
+    for (let q = 0; q < 5; q++) { const leg = mesh(box(0.06, 0.05, 0.42), M(XX.metal), 0, 0.06, 0, chair); leg.rotation.y = (q / 5) * Math.PI * 2; leg.geometry.translate(0, 0, 0.0); leg.position.set(Math.sin(leg.rotation.y) * 0.2, 0.06, Math.cos(leg.rotation.y) * 0.2) }
+    const coat = new T.Group(); coat.visible = kind === 'taken'; chair.add(coat)
+    mesh(box(0.66, 0.58, 0.1), M(XX.coat), 0, 1.02, 0.5, coat)
+    mesh(box(0.3, 0.08, 0.16), M(XX.coat), 0, 1.36, 0.44, coat)
+    // a hover target over the desk and its sitter, and a ring that marks it
+    const hit = new T.Mesh(box(2.0, 2.6, 2.6), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 1.3, -0.5); sg.add(hit)
+    const ring = new T.Mesh(new T.RingGeometry(0.62, 0.74, 32), B(PP.info, { transparent: true, opacity: 0.9, side: T.DoubleSide, depthWrite: false }))
+    ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 0.3); ring.visible = false; sg.add(ring)
+    const seat = { fl, j, kind, m, x, sg, chair, coat, mon, screen, scr, brd, board, ring, hit, u: null, emote: null, props: {}, mode: m ? 'seated' : 'empty', boardKey: '', shake: 0 }
+    hit.userData.seat = seat; hits.push(hit)
+    if (m) ensureFigure(seat)
+    animators.push((t) => tickSeat(seat, t))
+    return seat
+  }
+  const seatWorld = (seat) => new T.Vector3(seat.x, seat.fl.y, SIT_Z)
+
+  function ensureFigure(seat) {
+    if (seat.u) return seat.u
+    const u = actor(seat.m.look)
+    seat.u = u
+    const em = emoteSprite('alert'); em.visible = false; world.add(em); seat.emote = em
+    // what a resting member holds: headphones, a sketch pad, a paper plane, a game pad
+    const pr = seat.props
+    pr.phones = new T.Group(); u.head.add(pr.phones)
+    const band = new T.Mesh(new T.TorusGeometry(0.33, 0.04, 6, 18, Math.PI), M(0x26262e)); band.position.y = 0.04; pr.phones.add(band)
+    for (const sx of [-0.33, 0.33]) mesh(new T.CylinderGeometry(0.1, 0.1, 0.08, 10), M(0x26262e), sx, 0, 0, pr.phones).rotation.z = Math.PI / 2
+    pr.pad = new T.Group(); pr.pad.position.set(0, -0.38, 0.1); u.arms[0].add(pr.pad)
+    mesh(box(0.3, 0.02, 0.38), M(0xf4f1e8), 0, 0, 0.12, pr.pad)
+    pr.gamepad = mesh(box(0.34, 0.06, 0.16), M(0x2a2a33), 0, 0.98, 0.42, u.g)
+    pr.plane = new T.Mesh(new T.ConeGeometry(0.09, 0.32, 3), M(0xfdfdfb)); pr.plane.rotation.x = Math.PI / 2; pr.plane.scale.set(1.6, 1, 0.4); world.add(pr.plane)
+    pr.note = emoteSprite('note'); pr.note.scale.set(0.34, 0.34, 1); world.add(pr.note)
+    pr.zz = emoteSprite('zz'); pr.zz.scale.set(0.5, 0.5, 1); world.add(pr.zz)
+    pr.phones.visible = pr.pad.visible = pr.gamepad.visible = pr.plane.visible = pr.note.visible = pr.zz.visible = false
+    return u
+  }
+  function dropFigure(seat) {
+    if (!seat.u) return
+    for (const o of [seat.u.g, seat.emote, seat.props.plane, seat.props.note, seat.props.zz]) world.remove(o)
+    seat.u = null; seat.emote = null; seat.props = {}
+  }
+
+  // What a seat looks like this frame, read from its member's state; nothing here is stored twice.
+  function tickSeat(seat, t) {
+    const { m, fl } = seat
+    const st = m ? stateOf(m) : null
+    const offline = !fl.online
+    const seated = m && seat.mode === 'seated'
+    const hold = !st ? null : offline ? 'unreachable' : st.hold
+    const away = st && (st.act === 'away' || hold === 'queued')
+    // screen
+    let spec = 'off'
+    if (seat.kind === 'taken') spec = 'standby'
+    else if (m && seat.mode !== 'empty' && seated && !away) spec = hold ? (hold === 'asleep' ? 'standby' : hold) : st.screen || 'code'
+    else if (m && hold === 'queued') spec = 'queued'
+    const broken = st && st.broken && !offline && seated
+    const due = figs === 'lite' ? 0.25 : 0.1
+    if (!seat.lastDraw || t - seat.lastDraw > due || seat.spec !== spec) {
+      seat.lastDraw = t; seat.spec = spec
+      drawScreen(seat.scr.g, 112, 72, spec, t)
+      if (broken) drawVirus(seat.scr.g, 112, 72, t)
+      seat.scr.tex.needsUpdate = true
+    }
+    // board: only redrawn when it changes
+    const stage = m ? stageOf(m) : 0
+    const blink = broken ? Math.floor(t * 3) % 2 === 0 : false
+    const bkey = `${seat.kind}|${m ? stage : -1}|${broken}|${blink}`
+    if (bkey !== seat.boardKey) {
+      seat.boardKey = bkey
+      if (m) drawBoard(seat.brd.g, 144, 96, stage, broken, blink)
+      else { seat.brd.g.fillStyle = '#59606b'; seat.brd.g.fillRect(0, 0, 144, 96); seat.brd.g.fillStyle = '#eef1f4'; seat.brd.g.fillRect(4, 4, 136, 88) }
+      seat.brd.tex.needsUpdate = true
+    }
+    // a failing desk shakes; a jitter, never a slide
+    seat.sg.position.x = seat.x + (broken ? Math.sin(t * 38) * 0.025 : 0)
+    seat.chair.position.z = m && seat.mode === 'seated' && !away ? 0.08 : seat.kind === 'free' ? -0.12 : 0.3
+    seat.ring.visible = !!(hover && hover.seat === seat)
+    const u = seat.u
+    if (!u) return
+    if (seat.mode !== 'seated') return
+    u.g.visible = !away
+    const pr = seat.props
+    for (const k of ['note', 'zz']) pr[k].visible = false
+    pr.phones.visible = pr.pad.visible = pr.gamepad.visible = pr.plane.visible = false
+    setGhost(u, hold === 'unreachable')
+    const w = seatWorld(seat), k = fl.k
+    u.g.scale.setScalar(u.k * k)
+    u.g.position.set(seat.sg.position.x, 0, w.z)
+    u.yaw = Math.PI; u.g.rotation.y = Math.PI
+    let kind = 'idle'
+    if (hold === 'limited' || hold === 'asleep' || (st && st.act === 'blocked')) kind = 'slump'
+    else if (hold) kind = hold === 'starting' ? 'idle' : 'idle'
+    else if (st.act === 'work') kind = 'type'
+    else if (st.act === 'ask') kind = st.emote === 'prompt' ? 'idle' : 'raise'
+    else if (st.act === 'done') kind = seat.giving && t < seat.giving ? 'give' : 'done'
+    else if (st.act === 'cheer') kind = 'cheer'
+    else if (st.act === 'rest') kind = st.play
+    seatedPose(u, kind, t + seat.j * 0.37)
+    u.g.position.y = fl.y + k * (0.58 - 0.34 * SIT_SCALE)
+    u.g.position.x = seat.sg.position.x
+    // props
+    if (!hold && st.act === 'rest') {
+      if (st.play === 'music') { pr.phones.visible = true; const p = (t * 0.6) % 1; pr.note.visible = true; pr.note.position.set(w.x + 0.5 * k + p * 0.4, fl.y + (2.4 + p * 0.9) * k, w.z + 0.2); pr.note.material.opacity = 1 - p }
+      if (st.play === 'sketch') pr.pad.visible = true
+      if (st.play === 'game') pr.gamepad.visible = true
+      if (st.play === 'plane') {
+        const p = t % 5
+        pr.plane.visible = true
+        if (p < 3) { pr.plane.position.set(w.x, fl.y + 1.55 * k, w.z - 0.45 * k); pr.plane.rotation.set(Math.PI / 2, 0, 0) }
+        else { const f = (p - 3) / 2; pr.plane.position.set(w.x + f * 3.2, fl.y + (1.9 + Math.sin(f * Math.PI) * 1.3) * k, w.z + 0.4 + f * 1.8); pr.plane.rotation.set(Math.PI / 2 - 0.3, 0, -Math.PI * 0.75) }
+      }
+    }
+    if (hold === 'asleep') { const p = (t * 0.4) % 1; pr.zz.visible = true; pr.zz.position.set(w.x + 0.4 * k, fl.y + (2.3 + p * 0.8) * k, w.z); pr.zz.material.opacity = 1 - p }
+    // the mark over its head: needs you, a prompt, finished, a star, blocked, or the lead's thanks
+    let em = hold === 'loggedOut' ? 'blocked' : st.emote || null
+    if (seat.heartUntil && t < seat.heartUntil) em = 'heart'
+    if (offline || hold === 'unreachable') em = null
+    seat.emote.visible = !!em
+    if (em) {
+      if (seat.emoteKind !== em) { seat.emote.material = emoteSprite(em).material; seat.emoteKind = em; seat.emote.scale.set(0.7, em === 'alert' ? 0.88 : 0.7, 1) }
+      const bob = em === 'alert' ? Math.sin(t * 2.6) * 0.06 : Math.sin(t * 1.6) * 0.04
+      seat.emote.position.set(w.x - 0.95 * k, fl.y + (2.55 + bob) * k, w.z - 0.2)
+    }
+  }
+
+  // ---------- the elevator: one glass cab every floor shares ----------
+  function buildShaft(n) {
+    const top = (n - 1) * PITCH + H + 1.9
+    const g = new T.Group(); world.add(g)
+    const z0 = DOOR_Z - 1.0, z1 = DOOR_Z + 1.0, x0 = -2.25, x1 = -0.3
+    for (const [px, pz] of [[x0, z0], [x0, z1], [x1, z0], [x1, z1]]) mesh(box(0.12, top + 0.9, 0.12), M(X.shaft), px, (top + 0.9) / 2 - 0.9, pz, g)
+    mesh(box(x1 - x0 + 0.3, 0.3, z1 - z0 + 0.3), M(X.shaft), (x0 + x1) / 2, top + 0.15, DOOR_Z, g)
+    mesh(box(x1 - x0 + 0.3, 0.5, z1 - z0 + 0.3), M(P.slabDark || X.slabDark), (x0 + x1) / 2, -0.65, DOOR_Z, g)
+    const glass = new T.MeshStandardMaterial({ color: lin(0xbfe0f0), transparent: true, opacity: 0.16, roughness: 0.1, depthWrite: false })
+    for (const [w, d, px, pz] of [[0.04, z1 - z0, x0, DOOR_Z], [x1 - x0, 0.04, (x0 + x1) / 2, z1]]) {
+      const pane = new T.Mesh(box(w, top + 0.9, d), glass); pane.position.set(px, (top + 0.9) / 2 - 0.9, pz); g.add(pane)
+    }
+    for (let f = 0; f < n; f++) mesh(box(0.06, 0.06, z1 - z0), M(X.shaft), x0, f * PITCH - 0.3, DOOR_Z, g)
+    // the cab: a floor, a back wall, a lit ceiling
+    const c = new T.Group(); world.add(c)
+    mesh(box(1.7, 0.12, 1.8), M(X.cab), CAB_X, 0.0, DOOR_Z, c).position.y = -0.06
+    mesh(box(0.08, 2.9, 1.8), M(X.cab), x0 + 0.12, 1.45, DOOR_Z, c)
+    mesh(box(1.7, 0.1, 1.8), M(X.cab), CAB_X, 2.95, DOOR_Z, c)
+    mesh(box(1.2, 0.03, 1.2), B(X.lamp), CAB_X, 2.89, DOOR_Z, c)
+    const rail = mesh(box(0.05, 0.05, 1.5), M(0x9aa3ad, { metal: 0.4 }), x0 + 0.25, 1.0, DOOR_Z, c)
+    void rail
+    // a counterweight cable, for the eye
+    const cable = mesh(box(0.03, 1, 0.03), M(0x2a2f3a), CAB_X, 0, DOOR_Z, g)
+    cab = { g: c, cable, top, rides: [], freeAt: -Infinity, home: 0 }
+    animators.push((t) => {
+      const y = cabY(t)
+      c.position.y = y
+      cable.scale.y = Math.max(0.01, top - (y + 3))
+      cable.position.y = y + 3 + (top - (y + 3)) / 2
+    })
+  }
+  // Where the cab is at time t: easing between floors on each booked ride, still in between.
+  function cabY(t) {
+    let y = cab.home * PITCH
+    for (const r of cab.rides) {
+      if (t < r.t0) break
+      if (t <= r.t1) return (r.from + (r.to - r.from) * ease3((t - r.t0) / (r.t1 - r.t0))) * PITCH
+      y = r.to * PITCH
+    }
+    return y
+  }
+  const cabFloorAt = (t) => Math.round(cabY(t) / PITCH)
+  const rideDur = (a, b) => 0.8 + Math.abs(a - b) * 1.15
+  // Books the cab: it comes to `from` if it is elsewhere, waits to board, then rides to `to`.
+  function bookCab(from, to, earliest) {
+    let t = Math.max(earliest, cab.freeAt)
+    const at = cabFloorAt(t)
+    if (at !== from) { const d = rideDur(at, from); cab.rides.push({ from: at, to: from, t0: t, t1: t + d }); t += d }
+    const board = t, depart = t + 1.0, arrive = depart + (from === to ? 0 : rideDur(from, to))
+    if (from !== to) cab.rides.push({ from, to, t0: depart, t1: arrive })
+    cab.freeAt = arrive + 1.1
+    return { board, depart, arrive }
+  }
+
+  // ---------- walkers: the lead, Jev, the steward, and members coming or going ----------
+  // A walker plays a list of steps on a timeline: walk, hold, ride, or call back.
+  function walker(u) { const w = { u, steps: [], fired: new Set(), fl: 0, at: [0, 0], visible: true }; walkers.push(w); return w }
+  function planner(w, t0, fl, at) {
+    const steps = []
+    let tt = t0, cur = at, curFl = fl
+    const P_ = {
+      get t() { return tt }, get at() { return cur }, get fl() { return curFl },
+      walk(to, speed = 1.9) {
+        const pts = [cur, ...(Array.isArray(to[0]) ? to : [to])]
+        let len = 0; for (let q = 1; q < pts.length; q++) len += Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1])
+        const dur = Math.max(0.2, len / speed)
+        steps.push({ k: 'walk', fl: curFl, pts, len, t0: tt, t1: tt + dur }); tt += dur; cur = pts[pts.length - 1]; return P_
+      },
+      hold(dur, kind = 'idle', look = null, until) {
+        const t1 = until !== undefined ? Math.max(tt + 0.05, until) : tt + dur
+        steps.push({ k: 'hold', fl: curFl, at: cur, kind, look, t0: tt, t1 }); tt = t1; return P_
+      },
+      call(f) { steps.push({ k: 'call', f, t0: tt, t1: tt }); return P_ },
+      // walk to the door, wait for the cab, step in, ride, step out
+      ride(to) {
+        if (to === curFl) return P_
+        P_.walk([[1.2, AISLE_Z], [0.9, DOOR_Z]])
+        const bk = bookCab(curFl, to, tt)
+        P_.hold(0, 'idle', [-1, 0], bk.board)
+        P_.walk([CAB_X, DOOR_Z], 2.2)
+        P_.hold(0, 'idle', [1, 0], bk.depart)
+        steps.push({ k: 'ride', at: cur, t0: tt, t1: bk.arrive }); tt = bk.arrive; curFl = to
+        P_.walk([[0.9, DOOR_Z]], 2.2)
+        return P_
+      },
+      steps
+    }
+    return P_
+  }
+  function run(w, plan) { w.steps = plan.steps; w.fired = new Set() }
+  function tickWalker(w, t) {
+    const u = w.u
+    if (!w.steps.length) return
+    for (const s of w.steps) if (s.k === 'call' && t >= s.t0 && !w.fired.has(s)) { w.fired.add(s); s.f(t) }
+    const s = w.steps.find((x) => x.k !== 'call' && t < x.t1) || [...w.steps].reverse().find((x) => x.k !== 'call')
+    if (!s) return
+    resetPose(u)
+    let x, z, y, dir = null, kind = 'idle'
+    if (s.k === 'walk') {
+      const d = clamp01((t - s.t0) / (s.t1 - s.t0)) * s.len
+      let acc = 0, q = 1
+      while (q < s.pts.length - 1 && acc + Math.hypot(s.pts[q][0] - s.pts[q - 1][0], s.pts[q][1] - s.pts[q - 1][1]) < d) { acc += Math.hypot(s.pts[q][0] - s.pts[q - 1][0], s.pts[q][1] - s.pts[q - 1][1]); q++ }
+      const a = s.pts[q - 1], b = s.pts[q], seg = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, f = clamp01((d - acc) / seg)
+      x = a[0] + (b[0] - a[0]) * f; z = a[1] + (b[1] - a[1]) * f; y = s.fl * PITCH
+      dir = [b[0] - a[0], b[1] - a[1]]; kind = t < s.t1 ? 'walk' : 'idle'; w.fl = s.fl
+    } else if (s.k === 'ride') {
+      ;[x, z] = s.at; y = cabY(t); kind = 'idle'; dir = [1, 0]; w.fl = Math.round(y / PITCH)
+    } else {
+      ;[x, z] = s.at; y = s.fl * PITCH; w.fl = s.fl; kind = s.kind
+      if (s.look) dir = [s.look[0] - (s.look.length > 2 ? 0 : 0), s.look[1]]
+    }
+    w.at = [x, z]
+    u.g.position.set(x, y, z)
+    face(u, dir, t)
+    if (kind === 'walk') pose(u, 'walk', t)
+    else if (kind === 'talk') { pose(u, 'idle', t); u.arms[1].rotation.x = -0.5 + Math.sin(t * 4) * 0.25 }
+    else if (kind === 'give') { pose(u, 'idle', t); u.arms[0].rotation.x = -1.4; u.arms[1].rotation.x = -1.4 }
+    else if (kind === 'wave') pose(u, 'wave', t)
+    else if (kind === 'point') { pose(u, 'idle', t); u.arms[1].rotation.x = -1.6 }
+    else pose(u, 'idle', t)
+    u.g.position.y = y + (u.g.position.y - (u.baseY || 0))
+  }
+
+  // ---------- the lead: answers whoever needs it first, then hands work round its own floor ----------
+  function allSeats() { return floors.flatMap((f) => f.seats) }
+  const asking = () => allSeats().filter((s) => s.m && s.mode === 'seated' && s.fl.online && stateOf(s.m).act === 'ask')
+  const standBehind = (seat) => [seat.x + 0.15, SIT_Z + 1.25]
+  function leadNext(t) {
+    const w = lead
+    const P_ = planner(w, t, w.fl, w.at)
+    // whoever has waited longest first, this floor before another, the sample flow's member before all
+    const due = asking().filter((s) => !s.m.attendedAt || t - s.m.attendedAt > 22 || (flow && flow.seat === s && s.m.attendedAt < flow.at))
+      .sort((a, b) => (flow && flow.seat === b) - (flow && flow.seat === a) || (a.m.attendedAt || 0) - (b.m.attendedAt || 0) || (a.fl.i !== w.fl) - (b.fl.i !== w.fl))
+    const target = due[0]
+    if (target) {
+      P_.ride(target.fl.i)
+      P_.walk([[P_.at[0], AISLE_Z], [standBehind(target)[0], AISLE_Z], standBehind(target)])
+      P_.call(() => { bubble.visible = true })
+      P_.hold(3.4, 'talk', [0, -1])
+      P_.call((tt) => { bubble.visible = false; target.m.attendedAt = tt; target.heartUntil = tt + 2.2 })
+      P_.walk([standBehind(target)[0], AISLE_Z])
+    } else {
+      // rounds: walk work to a busy member on its own floor, as today's Office does
+      const busy = floors[w.fl] ? floors[w.fl].seats.filter((s) => s.m && s.mode === 'seated' && stateOf(s.m).act === 'work' && s.fl.online) : []
+      const home = floors[0].home
+      if (w.fl !== 0) { P_.walk([P_.at[0], AISLE_Z]); P_.ride(0) }
+      else if (busy.length && Math.random() < 0.7 && !reduce) {
+        const s = busy[Math.floor(Math.random() * busy.length)]
+        P_.walk([[P_.at[0], AISLE_Z], [standBehind(s)[0], AISLE_Z], standBehind(s)])
+        P_.hold(1.1, 'give', [0, -1])
+        P_.walk([standBehind(s)[0], AISLE_Z])
+      }
+      if (w.fl === 0 || P_.fl === 0) { P_.walk([[home[0], AISLE_Z], home]); P_.hold(2.2, 'idle', [-0.6, -1]) }
+    }
+    P_.call((tt) => leadNext(tt))
+    run(w, P_)
+  }
+  let bubble = null
+
+  // ---------- events: someone arrives, someone leaves, Jev decides, the steward moves a model ----------
+  function freeSeat(prefer = 0) {
+    const order = [floors[prefer], ...floors.filter((f) => f.i !== prefer)].filter((f) => f && f.online)
+    for (const f of order) { const s = f.seats.find((x) => x.kind === 'free'); if (s) return s }
+    return null
+  }
+  function arrive(t, prefer = 0, state = 'starting', onSeated) {
+    const seat = freeSeat(prefer)
+    if (!seat) { say('No queda ningún escritorio libre en una máquina en línea.'); return null }
+    const m = mkMember(state, 40 + memberSeq)
+    seat.fl.m.members.push(m)
+    Object.assign(seat, { kind: 'member', m, mode: 'arriving' })
+    const u = ensureFigure(seat)
+    const w = walker(u)
+    w.fl = 0; w.at = [CAB_X, DOOR_Z]
+    const bk = bookCab(0, seat.fl.i, t)
+    const P_ = planner(w, bk.board, 0, [CAB_X, DOOR_Z])
+    u.g.visible = false
+    P_.call(() => { u.g.visible = true; puff(CAB_X, 0, DOOR_Z, 0.9) })
+    P_.hold(0, 'idle', [1, 0], bk.depart)
+    if (seat.fl.i !== 0) P_.steps.push({ k: 'ride', at: [CAB_X, DOOR_Z], t0: P_.t, t1: bk.arrive })
+    const P2 = planner(w, Math.max(P_.t, bk.arrive), seat.fl.i, [CAB_X, DOOR_Z])
+    P2.walk([[0.9, DOOR_Z], [1.3, AISLE_Z], [seat.x, AISLE_Z], [seat.x, SIT_Z + 0.9]])
+    P2.call((tt) => { walkers.splice(walkers.indexOf(w), 1); seat.mode = 'seated'; refreshEditor(); onSeated && onSeated(tt) })
+    w.steps = P_.steps.concat(P2.steps)
+    w.fired = new Set()
+    refreshEditor()
+    return seat
+  }
+  function leave(t, seat) {
+    if (!seat || !seat.u) return
+    seat.mode = 'leaving'
+    const w = walker(seat.u)
+    setGhost(seat.u, false)
+    seat.u.g.scale.setScalar(seat.u.k)
+    seat.emote.visible = false
+    const P_ = planner(w, t, seat.fl.i, [seat.x, SIT_Z + 0.4])
+    P_.walk([[seat.x, SIT_Z + 0.9], [seat.x, AISLE_Z], [1.3, AISLE_Z]])
+    P_.ride(0)
+    P_.walk([CAB_X, DOOR_Z], 2.2)
+    P_.call((tt) => {
+      puff(CAB_X, 0, DOOR_Z, 0.9)
+      walkers.splice(walkers.indexOf(w), 1)
+      const fm = seat.fl.m; fm.members.splice(fm.members.indexOf(seat.m), 1)
+      dropFigure(seat); Object.assign(seat, { kind: 'free', m: null, mode: 'empty' }); refreshEditor()
+      void tt
+    })
+    run(w, P_)
+  }
+  // A dust puff where someone appears or goes.
+  function puff(x, y, z, size = 1) {
+    const at = t
+    const ring = new T.Mesh(new T.RingGeometry(0.2, 0.32, 24), B(0xffffff, { transparent: true, opacity: 0.7, side: T.DoubleSide }))
+    ring.rotation.x = -Math.PI / 2; world.add(ring)
+    const balls = []
+    for (let q = 0; q < 6; q++) { const m = new T.Mesh(new T.IcosahedronGeometry(0.2, 1), M(0xf2efe8, { opacity: 0.85, unique: true })); world.add(m); balls.push([m, (q / 6) * Math.PI * 2]) }
+    const f = (tt) => {
+      const k = (tt - at) / 0.9
+      if (k > 1) { world.remove(ring); balls.forEach(([m]) => world.remove(m)); animators.splice(animators.indexOf(f), 1); return }
+      ring.position.set(x, y + 0.05, z); ring.scale.setScalar(size * (1 + k * 4)); ring.material.opacity = 0.7 * (1 - k)
+      balls.forEach(([m, a]) => { m.position.set(x + Math.cos(a) * k * 0.9 * size, y + 0.3 + k * 0.6, z + Math.sin(a) * k * 0.9 * size); m.scale.setScalar(1 + k * 1.2); m.material.opacity = 0.85 * (1 - k) })
+    }
+    animators.push(f)
+  }
+  // Confetti over a desk whose PR merged.
+  function confetti(x, y, z) {
+    const at = t, bits = []
+    const cols = [P.success, 0xffffff, 0xffc23a, 0xe9edf2]
+    for (let q = 0; q < 28; q++) { const m = new T.Mesh(new T.PlaneGeometry(0.1, 0.16), B(cols[q % 4], { side: T.DoubleSide })); world.add(m); bits.push([m, rnd() * Math.PI * 2, 0.4 + rnd() * 1.1, rnd()]) }
+    const f = (tt) => {
+      const ph = (tt - at) / 2.6
+      if (ph > 1) { bits.forEach(([m]) => world.remove(m)); animators.splice(animators.indexOf(f), 1); return }
+      bits.forEach(([m, a, r, o]) => { const b = 1 - Math.pow(1 - Math.min(1, ph * 3), 3); m.position.set(x + Math.cos(a) * r * b, y + 2.6 + b * 1.2 - ph * ph * (3.2 + o), z + Math.sin(a) * r * b); m.rotation.set(tt * 1.6 + a, tt * 1.1 + o * 9, 0) })
+    }
+    animators.push(f)
+  }
+  // A paper plane from Jev to a desk, in the verdict's colour.
+  function verdictFlight(from, seat, hex) {
+    const at = t
+    const m = new T.Mesh(new T.ConeGeometry(0.12, 0.42, 3), B(hex)); m.scale.set(1.6, 1, 0.4); world.add(m)
+    const to = seatWorld(seat).add(new T.Vector3(0, 2.2 * seat.fl.k, -0.3))
+    const f = (tt) => {
+      const k = (tt - at) / 2.2
+      if (k > 1) { world.remove(m); animators.splice(animators.indexOf(f), 1); flash(seat, hex); return }
+      const p = from.clone().lerp(to, ease3(k)); p.y += Math.sin(k * Math.PI) * 1.8
+      m.position.copy(p); m.lookAt(to.x, p.y, to.z); m.rotateX(Math.PI / 2)
+    }
+    animators.push(f)
+  }
+  function flash(seat, hex) {
+    const at = t
+    const r = new T.Mesh(new T.RingGeometry(0.5, 0.7, 32), B(hex, { transparent: true, opacity: 0.9, side: T.DoubleSide, depthWrite: false }))
+    r.rotation.x = -Math.PI / 2; const p = seatWorld(seat); r.position.set(p.x, p.y + 0.05, p.z - 0.3); world.add(r)
+    const f = (tt) => { const k = (tt - at) / 1.4; if (k > 1) { world.remove(r); animators.splice(animators.indexOf(f), 1); return } r.scale.setScalar(1 + k * 1.6); r.material.opacity = 0.9 * (1 - k) }
+    animators.push(f)
+  }
+
+  // ---------- the scene ----------
+  let OFFX = null, sun = null, jevSeat = null, steward = null
+  const desat = (pal) => {
+    const o = Object.assign({}, pal)
+    for (const [k, v] of Object.entries(pal)) if (typeof v === 'number' && !['sunI', 'hemi', 'fogOpacity'].includes(k)) {
+      const hsl = {}; new T.Color(v).getHSL(hsl); o[k] = new T.Color().setHSL(hsl.h, hsl.s * 0.12, hsl.l * 0.82 + 0.06).getHex()
+    }
+    o.windowOn = false
+    return o
+  }
+  function build() {
+    scene.remove(world)
+    world.traverse((o) => { if (o.geometry) o.geometry.dispose() })
+    world = new T.Group(); scene.add(world)
+    animators.length = 0; hits = []; walkers = []; floors = []; floorsDoor.length = 0; stopSigns.length = 0
+    seed = 11
+    P = tod === 'night' ? NIGHT : DAY
+    X = tod === 'night' ? XN : XD
+    OFF = desat(P); OFFX = desat(X)
+    const bg = tod === 'night' ? 0x151c2b : 0xd3e4ee
+    renderer.setClearColor(new T.Color(bg))
+    $('stage').style.background = css(bg)
+    world.add(new T.HemisphereLight(P.hemiSky, P.hemiGround, P.hemi + 0.15))
+    sun = new T.DirectionalLight(P.sun, P.sunI)
+    renderer.setPixelRatio(figs === 'lite' ? 1 : Math.min(window.devicePixelRatio || 1, 2))
+    sun.castShadow = figs !== 'lite'; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02
+    world.add(sun); world.add(sun.target)
+
+    floors = model.floors.map((fm, i) => buildFloor(i, fm))
+    buildShaft(floors.length)
+    cab.rides = []; cab.freeAt = -Infinity; cab.home = 0
+
+    // the lead, on its own floor, in its corner
+    lead = walker(actor(0, { lead: true }))
+    lead.fl = 0; lead.at = floors[0].home.slice()
+    const lh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); lh.position.y = 0.8; lead.u.g.add(lh)
+    lh.userData.who = { name: 'El lead', role: 'lead' }; hits.push(lh)
+    bubble = chip('…', P); bubble.center.set(0.5, 0); bubble.visible = false; world.add(bubble)
+    leadNext(t)
+    animators.push((tt) => { bubble.position.set(lead.u.g.position.x, lead.u.g.position.y + 3.25, lead.u.g.position.z) })
+
+    // Jev: the advisor watches from the window corner with a clipboard, and speaks when it decides
+    if (model.advisor) {
+      const u = actor(1, { role: 'advisor' })
+      if (u.tool) u.tool.visible = false
+      mesh(box(0.16, 0.2, 0.03), M(0x8a5a3a), 0, -0.4, 0.12, u.arms[0]); mesh(box(0.13, 0.15, 0.035), M(0xf6f3ea), 0, -0.41, 0.12, u.arms[0])
+      jevSeat = { u, at: [floors[0].W - 0.5, D - 0.55], line: chip('Jev · vigila', P), sayUntil: 0 }
+      jevSeat.line.center.set(0.5, 0); world.add(jevSeat.line)
+      const jh = new T.Mesh(box(0.9, 1.8, 0.9), new T.MeshBasicMaterial({ visible: false })); jh.position.y = 0.8; u.g.add(jh)
+      jh.userData.who = { name: 'Jev', role: 'advisor' }; hits.push(jh)
+      animators.push((tt) => {
+        resetPose(u)
+        const speaking = tt < jevSeat.sayUntil
+        u.g.position.set(jevSeat.at[0], 0, jevSeat.at[1])
+        face(u, speaking ? jevSeat.look : [-1, Math.sin(tt * 0.35) * 0.6 - 0.5], tt)
+        pose(u, 'idle', tt)
+        u.arms[0].rotation.x = -1.1
+        if (speaking) u.arms[1].rotation.x = -1.5 + Math.sin(tt * 4) * 0.2
+        jevSeat.line.visible = speaking
+        jevSeat.line.position.set(jevSeat.at[0], 3.2, jevSeat.at[1])
+      })
+    } else jevSeat = null
+    steward = null
+
+    animators.push((tt) => walkers.forEach((w) => tickWalker(w, tt)))
+    // doors open while someone is at them and the cab is on that floor
+    animators.push((tt) => floorsDoor.forEach((d) => {
+      const here = Math.abs(cabY(tt) - d.fi * PITCH) < 0.05
+      const near = here && walkers.some((w) => w.fl === d.fi && Math.hypot(w.at[0] - 0.4, w.at[1] - DOOR_Z) < 1.9)
+      d.open += ((near ? 1 : 0) - d.open) * 0.15
+      d.leaves.forEach((l, q) => { l.position.z = DOOR_Z + (q ? 1 : -1) * (0.42 + d.open * 0.8) })
+      d.lamp.material.color.copy(lin(here ? P.info : 0x2b3650))
+    }))
+    stopSigns.forEach((s) => { s.visible = model.stopped })
+    if (flow) flow.rebuilt = true
+
+    // sun and shadow fit the building; the camera fits whatever is on stage
+    const bb = new T.Box3()
+    world.updateMatrixWorld(true)
+    const parts = []
+    world.traverse((o) => { if (o.isMesh && o.visible && !(o.material && o.material.transparent) && o.material && o.material.visible !== false) { const b = new T.Box3().setFromObject(o); parts.push(b); bb.union(b) } })
+    const ctr = bb.getCenter(new T.Vector3())
+    sun.target.position.copy(ctr); sun.position.copy(ctr).add(new T.Vector3(-12, 30, 14))
+    const span = bb.getSize(new T.Vector3()).length() / 2 + 2
+    const sc = sun.shadow.camera
+    sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 1; sc.far = 160; sc.updateProjectionMatrix()
+    computeFit(parts)
+    refreshEditor()
+  }
+
+  // ---------- camera fit, as the diorama does it ----------
+  function computeFit(parts) {
+    camera.position.copy(VIEW_DIR).multiplyScalar(80); camera.lookAt(0, 0, 0); camera.updateMatrixWorld()
+    const inv = camera.matrixWorldInverse
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    const v = new T.Vector3()
+    for (const bb of parts) for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+      v.set(x, y, z).applyMatrix4(inv)
+      minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y)
+    }
+    const pad = 0.6
+    fit = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 + 1.2 }
+    const right = new T.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+    const up = new T.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+    fit.target = right.multiplyScalar(fit.cx).add(up.multiplyScalar(fit.cy + 0.3))
+    camGoal.target.copy(fit.target); camGoal.zoom = 1
+    target.copy(fit.target); camera.zoom = 1
+    resize()
+  }
+  function resize() {
+    const stageW = $('stage').clientWidth
+    const w = viewW ? Math.min(viewW, stageW) : stageW
+    let h = Math.round(w * (fit.h / fit.w))
+    h = Math.max(220, Math.min(h, viewW ? 1100 : Math.max(560, Math.round(window.innerHeight * 0.78))))
+    renderer.setSize(w, h, true)
+    canvas.classList.toggle('panelframe', !!viewW)
+    const aspect = w / h
+    let hw = fit.w / 2, hh = fit.h / 2
+    if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect
+    camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh
+    camera.updateProjectionMatrix()
+    const n = model.floors.reduce((a, f) => a + f.members.length, 0)
+    $('meta').textContent = `${floors.length} ${floors.length === 1 ? 'máquina' : 'máquinas'} · ${n} miembros · ${viewW ? 'panel ' + w + ' px' : 'vista ' + w + ' px'} · escena ${w}×${h} px · ${tod === 'night' ? 'oscuro' : 'claro'} · ${figs === 'lite' ? 'bajos recursos' : 'ilustrada'}${playing ? '' : ' · en pausa'}`
+  }
+
+  // ---------- Jev and the steward ----------
+  function jevDecides() {
+    if (!jevSeat) return say('Jev está apagado en este proyecto.')
+    const seats = floors[0].seats.filter((s) => s.m && s.mode === 'seated')
+    if (!seats.length) return say('No hay nadie en la planta del lead.')
+    const s = seats[Math.floor(rnd() * seats.length)]
+    const tones = [['aprueba «Edit» de', P.success], ['pregunta por', P.warning], ['frena un «rm» de', P.attention]]
+    const [verb, hex] = tones[Math.floor(rnd() * 3)]
+    jevSeat.line.material.map.dispose()
+    const c = chip(`Jev · ${verb} ${s.m.name}`, P); jevSeat.line.material = c.material; jevSeat.line.scale.copy(c.scale)
+    jevSeat.sayUntil = t + 4.2
+    jevSeat.look = [s.x - jevSeat.at[0], SIT_Z - jevSeat.at[1]]
+    verdictFlight(new T.Vector3(jevSeat.at[0], 2.4, jevSeat.at[1]), s, hex)
+  }
+  function stewardVisits() {
+    const seats = allSeats().filter((s) => s.m && s.mode === 'seated' && s.fl.online && stateOf(s.m).act === 'work')
+    if (!seats.length) return say('Nadie trabajando a quien cambiarle el modelo.')
+    if (steward) return
+    const s = seats[Math.floor(rnd() * seats.length)]
+    const u = actor(3, { role: 'mage' })
+    const w = walker(u)
+    const raise = rnd() < 0.6
+    const line = chip(`Steward · ${raise ? 'sube' : 'baja'} a ${s.m.name} a ${raise ? 'Opus · alto' : 'Sonnet · medio'}`, P); line.center.set(0.5, 0); line.visible = false; world.add(line)
+    steward = { u, w, line }
+    const at = [s.x + 0.95 * s.fl.k, SIT_Z + 1.1]
+    const P_ = planner(w, t, s.fl.i, at)
+    P_.call(() => { puff(at[0], s.fl.y, at[1]); line.visible = true })
+    P_.hold(3.6, 'talk', [-1, -1])
+    P_.call(() => { line.visible = false; puff(at[0], s.fl.y, at[1]); world.remove(u.g); world.remove(line); walkers.splice(walkers.indexOf(w), 1); steward = null })
+    run(w, P_)
+    animators.push(() => line.visible && line.position.set(u.g.position.x, u.g.position.y + 3.0, u.g.position.z))
+  }
+
+  // ---------- the sample flow: a member arrives, works, needs you, then finishes ----------
+  function startFlow() {
+    if (!floors[0].online) { model.floors[0].online = true }
+    const f0 = model.floors[0]
+    if (!floors[0].seats.some((s) => s.kind === 'free')) { f0.members.length = Math.max(0, Math.min(f0.members.length, capOf(f0) - f0.taken - 1)); build() }
+    flow = { step: -1, at: t, seat: null }
+    const seat = arrive(t, 0, 'starting', (tt) => { flow.step = 1; flow.at = tt })
+    if (!seat) { flow = null; return }
+    flow.seat = seat
+    flow.step = 0
+    camMode = 'all'; sync()
+  }
+  const FLOW = [
+    ['1/7 · Llega un miembro: sube en el ascensor y se sienta en un escritorio libre.', null],
+    ['2/7 · Arranca su sesión: la pantalla se despierta.', 3.2, (m) => { m.state = 'starting' }],
+    ['3/7 · Trabaja: planea, escribe código y corre pruebas; su tablero se llena.', 9, (m, k) => { m.state = ['plan', 'code', 'tests'][Math.min(2, Math.floor(k / 3))] }],
+    ['4/7 · Necesita tu atención: levanta la mano y el lead va a verlo.', 'attended', (m) => { m.state = 'ask' }],
+    ['5/7 · Vuelve al trabajo: CI corriendo.', 4.5, (m) => { m.state = 'checks' }],
+    ['6/7 · Terminó: entrega el trabajo al lead.', 'handed', (m) => { m.state = 'done' }],
+    ['7/7 · Mergeado: celebra y su estrella sube a la pared.', 5, (m) => { m.state = 'merged' }],
+    ['Listo. Pulsa «Flujo de ejemplo» para verlo otra vez.', Infinity, (m) => { m.state = 'rest-music' }]
+  ]
+  function tickFlow(tt) {
+    if (!flow || flow.step < 1) { if (flow) $('desc').textContent = FLOW[0][0]; return }
+    const seat = flow.seat
+    if (!seat || !seat.m) { flow = null; return }
+    const [label, until, enter] = FLOW[flow.step]
+    const k = tt - flow.at
+    if (!flow.entered) {
+      flow.entered = true
+      // the lead drops its rounds for whoever needs it now, unless it is already in the cab
+      if (flow.step === 3) { const now = lead.steps.find((x) => x.k !== 'call' && tt < x.t1); if (!now || now.k !== 'ride') { seat.m.state = 'ask'; leadNext(tt) } }
+      if (flow.step === 5) { seat.giving = 0; handIn(seat) }
+      if (flow.step === 6) { model.trophies++; floors[0].trophyAt(model.trophies - 1); const p = seatWorld(seat); confetti(p.x, p.y, p.z - 0.5) }
+      refreshEditor()
+    }
+    enter(seat.m, k)
+    $('desc').textContent = label
+    const done = until === 'attended' ? seat.m.attendedAt && seat.m.attendedAt > flow.at && tt > seat.m.attendedAt + 0.8
+      : until === 'handed' ? flow.handed && tt > flow.handed + 1.2 : k > until
+    if (done && flow.step < FLOW.length - 1) { flow.step++; flow.at = tt; flow.entered = false; refreshEditor() }
+    else if (flow.step === FLOW.length - 1) { flow.seat.m.stage = null; flow = null; refreshEditor() }
+  }
+  // The finished member hands its report to the lead, who comes for it.
+  function handIn(seat) {
+    const w = lead
+    const P_ = planner(w, t, w.fl, w.at)
+    P_.ride(seat.fl.i)
+    P_.walk([[P_.at[0], AISLE_Z], [standBehind(seat)[0], AISLE_Z], standBehind(seat)])
+    P_.call((tt) => { seat.giving = tt + 1.3; paperFlight(seat) })
+    P_.hold(1.6, 'give', [0, -1])
+    P_.call((tt) => { if (flow) flow.handed = tt; seat.heartUntil = tt + 2 })
+    P_.walk([standBehind(seat)[0], AISLE_Z])
+    P_.call((tt) => leadNext(tt))
+    run(w, P_)
+  }
+  function paperFlight(seat) {
+    const at = t, m = mesh(box(0.34, 0.03, 0.44), M(X.paper), 0, 0, 0, world)
+    const a = seatWorld(seat).add(new T.Vector3(0, 1.4 * seat.fl.k, 0.1)), b = new T.Vector3(...[standBehind(seat)[0], seat.fl.y + 1.4, standBehind(seat)[1]])
+    const f = (tt) => { const k = (tt - at) / 0.9; if (k > 1) { world.remove(m); animators.splice(animators.indexOf(f), 1); return } m.position.copy(a.clone().lerp(b, ease3(k))); m.position.y += Math.sin(k * Math.PI) * 0.5; m.rotation.y = k * 3 }
+    animators.push(f)
+  }
+
+  // ---------- hover and click: the panel's own label and target ----------
+  let hover = null
+  const ray = new T.Raycaster(), ndc = new T.Vector2()
+  const tip = $('tip')
+  function pick(e) {
+    const r = canvas.getBoundingClientRect()
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
+    ray.setFromCamera(ndc, camera)
+    const hit = ray.intersectObjects(hits, false).find((h) => {
+      const s = h.object.userData.seat
+      return !s || s.kind !== 'free' || true
+    })
+    return hit ? { seat: hit.object.userData.seat || null, who: hit.object.userData.who || null, x: e.clientX - r.left, y: e.clientY - r.top } : null
+  }
+  function describe(h) {
+    if (h.who) return [h.who.name, h.who.role === 'lead' ? 'Hace la ronda y atiende a quien te necesita' : 'Advisor: decide permisos y avisa']
+    const s = h.seat
+    if (s.kind === 'taken') return ['Escritorio de otra sesión', `${s.fl.m.host.label} · por eso la máquina está llena`]
+    if (s.kind === 'free') return ['Escritorio libre', `${s.fl.m.host.label} · cabe otro miembro`]
+    const st = stateOf(s.m)
+    return [s.m.name, `${s.fl.online ? st.label : 'Sin conexión'} · ${s.fl.m.host.name}`]
+  }
+  function showTip(h) {
+    if (!h) { tip.hidden = true; canvas.style.cursor = 'grab'; return }
+    const [a, b] = describe(h)
+    tip.innerHTML = ''
+    const strong = document.createElement('strong'); strong.textContent = a
+    const span = document.createElement('span'); span.textContent = b
+    tip.append(strong, span)
+    tip.hidden = false
+    const sw = $('stage').clientWidth
+    const cr = canvas.getBoundingClientRect(), sr = $('stage').getBoundingClientRect()
+    const x = h.x + (cr.left - sr.left), y = h.y + (cr.top - sr.top)
+    tip.style.left = Math.max(8, Math.min(sw - tip.offsetWidth - 8, x + 14)) + 'px'
+    tip.style.top = Math.max(8, y - tip.offsetHeight - 12) + 'px'
+    canvas.style.cursor = h.seat && h.seat.kind !== 'member' ? 'default' : 'pointer'
+  }
+  function clickOn(h) {
+    if (!h) return
+    if (h.who) return say(h.who.role === 'lead' ? 'En el panel, esto abre la terminal del lead.' : 'En el panel, esto abre el historial de Jev.')
+    const s = h.seat
+    if (s.kind === 'member') say(`En el panel, esto abre la terminal de ${s.m.name} (${s.fl.m.host.name}).`)
+  }
+  let toastTimer = 0
+  function say(text) { const el = $('toast'); el.textContent = text; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true }, 2600) }
+
+  // ---------- controls ----------
+  function sync() {
+    const pressed = (sel, f) => document.querySelectorAll(sel).forEach((b) => b.setAttribute('aria-pressed', String(f(b))))
+    pressed('[data-tod]', (b) => b.dataset.tod === tod)
+    pressed('[data-w]', (b) => Number(b.dataset.w) === viewW)
+    pressed('[data-hosts]', (b) => Number(b.dataset.hosts) === machines)
+    pressed('[data-members]', (b) => Number(b.dataset.members) === perFloor)
+    pressed('[data-figs]', (b) => b.dataset.figs === figs)
+    pressed('[data-cam]', (b) => b.dataset.cam === camMode)
+    $('play').textContent = playing ? 'Pausar' : 'Reproducir'
+    $('play').setAttribute('aria-pressed', String(playing))
+    $('e-stop').setAttribute('aria-pressed', String(model.stopped))
+    $('e-jev').disabled = !model.advisor
+    if (!flow) $('desc').textContent = camMode === 'lead' ? 'La cámara sigue al lead. Arrastra para moverte; rueda o pellizco para acercar.' : camMode === 'free' ? 'Cámara libre. «Ver todo» o «Seguir al lead» para volver.' : 'Pasa el cursor por un escritorio para ver quién es; un clic abriría su terminal.'
+    resize()
+  }
+  function refreshEditor() {
+    const root = $('editor')
+    if (!root) return
+    const open = new Set([...root.querySelectorAll('details[open]')].map((d) => d.dataset.f))
+    root.innerHTML = ''
+    model.floors.forEach((fm, fi) => {
+      const d = document.createElement('details'); d.dataset.f = String(fi); if (open.has(String(fi)) || (!open.size && fi === 0 && window.innerWidth > 600)) d.open = true
+      const sum = document.createElement('summary')
+      sum.textContent = `${fm.host.label} · ${fm.members.length} ${fm.members.length === 1 ? 'miembro' : 'miembros'}${fm.online ? '' : ' · sin conexión'}`
+      d.append(sum)
+      const opts = document.createElement('div'); opts.className = 'row'
+      const on = document.createElement('label'); on.className = 'check'
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = fm.online
+      cb.addEventListener('change', () => { fm.online = cb.checked; build(); sync() })
+      on.append(cb, document.createTextNode(' En línea'))
+      const tk = document.createElement('label'); tk.className = 'sel'; tk.append('Escritorios de otras sesiones ')
+      const ts = document.createElement('select')
+      for (let q = 0; q <= 2; q++) { const o = document.createElement('option'); o.value = String(q); o.textContent = String(q); ts.append(o) }
+      ts.value = String(fm.taken)
+      ts.addEventListener('change', () => { fm.taken = Number(ts.value); build(); sync() })
+      tk.append(ts)
+      opts.append(on, tk); d.append(opts)
+      fm.members.forEach((m) => {
+        const row = document.createElement('div'); row.className = 'row member'
+        const name = document.createElement('span'); name.className = 'name'; name.textContent = m.name
+        const s = document.createElement('select'); s.setAttribute('aria-label', 'Estado de ' + m.name)
+        for (const [key, st] of Object.entries(STATES)) { const o = document.createElement('option'); o.value = key; o.textContent = st.label; s.append(o) }
+        s.value = m.state
+        s.addEventListener('change', () => { m.state = s.value; m.stage = null; m.attendedAt = 0; if (flow && flow.seat && flow.seat.m === m) flow = null; refreshEditor() })
+        const g = document.createElement('select'); g.setAttribute('aria-label', 'Tablero de ' + m.name)
+        ;['0 · cimientos', '1 · por hacer', '2 · en curso', '3 · casi', '4 · hecho'].forEach((txt, q) => { const o = document.createElement('option'); o.value = String(q); o.textContent = 'Tablero ' + txt; g.append(o) })
+        g.value = String(stageOf(m))
+        g.addEventListener('change', () => { m.stage = Number(g.value) })
+        const dot = document.createElement('span'); dot.className = 'dot'
+        const act = fm.online ? stateOf(m).act : 'hold'
+        dot.style.background = tone(act === 'ask' || stateOf(m).broken || m.state === 'blocked' || m.state === 'loggedOut' ? '--attention' : act === 'work' ? '--info' : act === 'done' || act === 'cheer' ? '--success' : m.state === 'limited' ? '--warning' : '--idle')
+        row.append(dot, name, s, g); d.append(row)
+      })
+      root.append(d)
+    })
+  }
+  const tone = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
+
+  document.querySelectorAll('[data-tod]').forEach((b) => b.addEventListener('click', () => {
+    tod = b.dataset.tod; document.documentElement.setAttribute('data-theme', tod === 'night' ? 'dark' : 'light'); emoteCache.clear(); build(); sync()
+  }))
+  document.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => { viewW = Number(b.dataset.w); sync() }))
+  document.querySelectorAll('[data-hosts]').forEach((b) => b.addEventListener('click', () => { machines = Number(b.dataset.hosts); flow = null; model = makeModel(); build(); sync() }))
+  document.querySelectorAll('[data-members]').forEach((b) => b.addEventListener('click', () => { perFloor = Number(b.dataset.members); flow = null; model = makeModel(); build(); sync() }))
+  document.querySelectorAll('[data-figs]').forEach((b) => b.addEventListener('click', () => { figs = b.dataset.figs; build(); sync() }))
+  document.querySelectorAll('[data-cam]').forEach((b) => b.addEventListener('click', () => { camMode = b.dataset.cam; sync() }))
+  $('e-flow').addEventListener('click', () => { playing = true; startFlow(); sync() })
+  $('e-arrive').addEventListener('click', () => { playing = true; arrive(t, 0, 'code'); sync() })
+  $('e-leave').addEventListener('click', () => {
+    playing = true
+    const s = allSeats().filter((x) => x.m && x.mode === 'seated' && x.fl.online && (!flow || x !== flow.seat))
+    if (!s.length) return say('No hay nadie que pueda irse.')
+    leave(t, s[s.length - 1]); sync()
+  })
+  $('e-jev').addEventListener('click', () => { playing = true; jevDecides() })
+  $('e-steward').addEventListener('click', () => { playing = true; stewardVisits() })
+  $('e-stop').addEventListener('click', () => { model.stopped = !model.stopped; stopSigns.forEach((s) => { s.visible = model.stopped }); sync() })
+  $('e-reset').addEventListener('click', () => { flow = null; model = makeModel(); build(); sync() })
+  $('play').addEventListener('click', () => { playing = !playing; sync() })
+  window.addEventListener('resize', () => resize())
+
+  // drag to pan, wheel or pinch to zoom; a still press is a click
+  const clampZ = (z) => Math.max(0.7, Math.min(5, z))
+  function enterFree() { if (camMode === 'free') return; camMode = 'free'; camGoal.target.copy(target); camGoal.zoom = camera.zoom; sync() }
+  const ptrs = new Map(); let pinch0 = null, down = null
+  canvas.style.touchAction = 'none'; canvas.style.cursor = 'grab'
+  canvas.addEventListener('pointerdown', (e) => { canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); down = { x: e.clientX, y: e.clientY, moved: false } })
+  canvas.addEventListener('pointermove', (e) => {
+    if (!ptrs.has(e.pointerId)) { if (e.pointerType === 'mouse') { hover = pick(e); showTip(hover) } return }
+    const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY])
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) down.moved = true
+    if (ptrs.size === 1 && down && down.moved) {
+      const dx = e.clientX - prev[0], dy = e.clientY - prev[1]
+      enterFree(); hover = null; showTip(null); canvas.style.cursor = 'grabbing'
+      const upp = (camera.right - camera.left) / camera.zoom / canvas.clientWidth
+      camera.updateMatrixWorld()
+      const r = new T.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), u = new T.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+      camGoal.target.add(r.multiplyScalar(-dx * upp)).add(u.multiplyScalar(dy * upp)); target.copy(camGoal.target)
+    } else if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1])
+      if (pinch0) { enterFree(); camGoal.zoom = clampZ(camGoal.zoom * d / pinch0) }
+      pinch0 = d
+    }
+  })
+  const endPtr = (e) => {
+    if (down && !down.moved && ptrs.size === 1) { const h = pick(e); if (e.pointerType !== 'mouse') { hover = h; showTip(h) } clickOn(h) }
+    ptrs.delete(e.pointerId); pinch0 = null; down = null; canvas.style.cursor = 'grab'
+  }
+  canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', (e) => { ptrs.delete(e.pointerId); down = null })
+  canvas.addEventListener('pointerleave', () => { if (!ptrs.size) { hover = null; showTip(null) } })
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); enterFree(); camGoal.zoom = clampZ(camGoal.zoom * Math.exp(-e.deltaY * 0.0015)) }, { passive: false })
+
+  // ---------- loop ----------
+  let t = 1.3, prev = performance.now()
+  function frame(now) {
+    if (figs === 'lite' && now - prev < 31) { requestAnimationFrame(frame); return }
+    const dt = Math.min(0.05, (now - prev) / 1000); prev = now
+    if (playing) t += dt
+    if (playing || !frame.drawn) { animators.slice().forEach((f) => f(t)); tickFlow(t) }
+    frame.drawn = !playing
+    if (camMode === 'lead' && lead) { camGoal.target.copy(lead.u.g.position).add(new T.Vector3(0, 1.4, 0)); camGoal.zoom = Math.max(1.5, Math.min(3, fit.w / 12)) }
+    else if (camMode === 'all' && fit.target) { camGoal.target.copy(fit.target); camGoal.zoom = 1 }
+    const follow = 1 - Math.pow(camMode === 'lead' ? 0.05 : 0.002, dt)
+    target.lerp(camGoal.target, follow)
+    camera.zoom += (camGoal.zoom - camera.zoom) * follow
+    camera.position.copy(target).add(VIEW_DIR.clone().multiplyScalar(80))
+    camera.lookAt(target)
+    camera.updateProjectionMatrix()
+    renderer.render(scene, camera)
+    requestAnimationFrame(frame)
+  }
+  build(); sync()
+  animators.forEach((f) => f(t))
+  if (qs.has('t')) { const until = Number(qs.get('t')); while (t < until) { t += 1 / 30; animators.slice().forEach((f) => f(t)); tickFlow(t) } }
+  if (qs.get('flow') !== null) { startFlow(); const until = t + Number(qs.get('flow')); while (t < until) { t += 1 / 30; animators.slice().forEach((f) => f(t)); tickFlow(t) } }
+  requestAnimationFrame(frame)
+  window.__office = {
+    get t() { return t }, model: () => model, floors: () => floors, lead: () => lead, flow: () => flow,
+    setState: (fi, j, s) => { model.floors[fi].members[j].state = s; refreshEditor() },
+    advance: (secs) => { const until = t + secs; while (t < until) { t += 1 / 30; animators.slice().forEach((f) => f(t)); tickFlow(t) } },
+    pause: () => { playing = false; sync() },
+    hoverAt: (x, y) => { const r = canvas.getBoundingClientRect(); hover = pick({ clientX: r.left + x, clientY: r.top + y }); showTip(hover); return hover && describe(hover) },
+    project: (v) => { const p = v.clone().project(camera); return [(p.x + 1) / 2 * canvas.clientWidth, (1 - p.y) / 2 * canvas.clientHeight] },
+    seatScreen: (fi, j) => { const s = floors[fi].seats[j]; return window.__office.project(seatWorld(s).add(new T.Vector3(0, 1.4 * s.fl.k, -0.6))) },
+    info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries })
+  }
+})()
+</script>
