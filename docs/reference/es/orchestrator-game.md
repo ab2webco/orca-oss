@@ -1,5 +1,5 @@
 ---
-sourceHash: c6311f41b6c6513f
+sourceHash: 27e65565857586af
 ---
 
 # El juego orquestador de Agent Teams
@@ -769,6 +769,10 @@ encabezados de los mensajes del líder lo leen de ahí
 ([`orchestrator-game-lead.ts`](../../../src/shared/orchestrator-game-lead.ts)). La tarjeta del Team de
 un líder sin nombre muestra solo su insignia con la corona y un botón **Name your lead**, que le envía
 `/orca-game:setup` al líder.
+
+En el teléfono, Ajustes → Agent Teams → **Names** fija los nombres globales del líder y de los
+miembros. Un host sin `mobile.agent-teams-names.v1` rechaza esa clave, así que el teléfono pide actualizar
+([`agent-teams-names-settings.ts`](../../../src/shared/agent-teams-names-settings.ts)).
 
 Los verbos del líder, ejecutados desde la terminal del líder
 ([`orchestrator-game-fleet-verbs.ts`](../../../src/shared/orchestrator-game-fleet-verbs.ts)):

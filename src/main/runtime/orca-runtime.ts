@@ -746,6 +746,12 @@ import {
   type AgentTeamsClientSettings,
   type AgentTeamsSettingsUpdate
 } from '../../shared/agent-teams-client-settings'
+import {
+  agentTeamsNamesOf,
+  agentTeamsNamesPatchOf,
+  type AgentTeamsNamesSettings,
+  type AgentTeamsNamesUpdate
+} from '../../shared/agent-teams-names-settings'
 import type { GameSceneArtImage } from '../worktree-game-scene-file'
 import { createGameSuggestedView } from './orchestrator-game-suggested-view'
 import type { GamePanelTab } from '../../shared/orchestrator-game-panel'
@@ -4541,13 +4547,14 @@ export class OrcaRuntimeService {
     | 'artifactSharingEnabled'
     | 'worktreeVisibilityDefaults'
   > &
-    AgentTeamsClientSettings {
+    AgentTeamsClientSettings & { agentTeamsNames: AgentTeamsNamesSettings } {
     if (!this.store?.getSettings) {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
     return {
       ...agentTeamsClientSettingsOf(settings),
+      agentTeamsNames: agentTeamsNamesOf(settings),
       worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
       defaultTuiAgent: settings.defaultTuiAgent ?? null,
       disabledTuiAgents: settings.disabledTuiAgents ?? [],
@@ -4620,7 +4627,7 @@ export class OrcaRuntimeService {
       | 'minimaxUsageModels'
       | 'prBotAuthorOverrides'
     > &
-      AgentTeamsSettingsUpdate
+      AgentTeamsSettingsUpdate & { agentTeamsNames?: AgentTeamsNamesUpdate }
   ): Promise<
     Pick<
       GlobalSettings,
@@ -4650,14 +4657,13 @@ export class OrcaRuntimeService {
     }
     const beforeSettings = this.store.getSettings()
     const before = beforeSettings.agentStatusHooksEnabled !== false
-    const { agentTeamsPanel, statusColors, ...rest } = updates
-    this.store.updateSettings(
-      {
-        ...rest,
-        ...agentTeamsSettingsPatchOf(beforeSettings, { agentTeamsPanel, statusColors })
-      },
-      { notifyListeners: true }
-    )
+    const { agentTeamsPanel, statusColors, agentTeamsNames, ...rest } = updates
+    const panelPatch = agentTeamsSettingsPatchOf(beforeSettings, { agentTeamsPanel, statusColors })
+    // Why on top of the panel patch: both write orchestratorGame, and neither may drop the other.
+    const namesPatch = agentTeamsNames
+      ? agentTeamsNamesPatchOf({ ...beforeSettings, ...panelPatch }, agentTeamsNames)
+      : {}
+    this.store.updateSettings({ ...rest, ...panelPatch, ...namesPatch }, { notifyListeners: true })
     const settings = this.store.getSettings()
     if (updates.worktreeVisibilityDefaults !== undefined) {
       this.notifyReposChanged()

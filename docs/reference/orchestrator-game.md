@@ -739,6 +739,10 @@ message headings all read it there
 unnamed lead shows only its crown badge and a **Name your lead** button, which sends
 `/orca-game:setup` to the lead.
 
+On the phone, Settings → Agent Teams → **Names** sets the paired computer's global lead and member
+names. A host without `mobile.agent-teams-names.v1` rejects that key, so the phone asks for an update
+([`agent-teams-names-settings.ts`](../../src/shared/agent-teams-names-settings.ts)).
+
 The lead's verbs, run from the lead's terminal
 ([`orchestrator-game-fleet-verbs.ts`](../../src/shared/orchestrator-game-fleet-verbs.ts)):
 

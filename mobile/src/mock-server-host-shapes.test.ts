@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY,
   MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
   MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
   MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
@@ -8,6 +9,7 @@ import {
 } from '../../src/shared/protocol-version'
 import { teamMachineGaugesOf, teamMachineWarningsOf } from '../../src/shared/team-machine-board'
 import { claudeTokenAccountStatusOf } from './accounts/claude-token-account'
+import { namesFromSettingsGet } from './agent-teams-settings/agent-teams-names-model'
 import { agentTeamsSettingsOf } from './agent-teams-settings/agent-teams-settings-model'
 import { AccountsSnapshotSchema } from './components/accounts-snapshot'
 import { startFreshLeadFromPhone } from './new-tab-team/fresh-lead-start'
@@ -61,7 +63,8 @@ describe('mock host answers in the host shapes mobile reads', () => {
         MOBILE_TEAM_CONTROL_RUNTIME_CAPABILITY,
         MOBILE_TEAM_SCENE_RUNTIME_CAPABILITY,
         MOBILE_TEAM_LEVEL_RUNTIME_CAPABILITY,
-        MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY
+        MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
+        MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY
       ])
     )
   })
@@ -83,6 +86,17 @@ describe('mock host answers in the host shapes mobile reads', () => {
       style: 'office',
       dark: { attention: '#ff00aa' }
     })
+  })
+
+  it('serves the names and keeps a phone write to them (ORCA-1304)', async () => {
+    expect(namesFromSettingsGet(await resultOf('settings.get'))).toMatchObject({
+      leadName: null,
+      memberNames: null
+    })
+
+    await resultOf('settings.update', { agentTeamsNames: { leadName: 'Ada' } })
+
+    expect(namesFromSettingsGet(await resultOf('settings.get'))).toMatchObject({ leadName: 'Ada' })
   })
 
   it('accepts terminal.send the way the host does, so the phone does not refuse its own prompt', async () => {

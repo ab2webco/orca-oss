@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ALL_RPC_METHODS } from './rpc/methods'
 import {
+  MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY,
   MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COLUMNS_RUNTIME_CAPABILITY,
   MOBILE_PLANE_BOARD_COMMENT_READS_RUNTIME_CAPABILITY,
@@ -227,6 +228,11 @@ describe('mobile RPC allowlist', () => {
   it('advertises the Agent Teams settings fields as their own capability', () => {
     // Why: settings.update is strict, so an older host rejects the new keys; the phone sends them only under this.
     expect(RUNTIME_CAPABILITIES).toContain(MOBILE_AGENT_TEAMS_SETTINGS_RUNTIME_CAPABILITY)
+  })
+
+  it('advertises the Agent Teams names as their own capability (ORCA-1304)', () => {
+    // Why apart from v1: a host with only the v1 settings rejects agentTeamsNames.
+    expect(RUNTIME_CAPABILITIES).toContain(MOBILE_AGENT_TEAMS_NAMES_RUNTIME_CAPABILITY)
   })
 
   it('opens one Plane work item to the phone as its own advertised capability', () => {
