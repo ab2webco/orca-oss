@@ -18,6 +18,7 @@ import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { TeamMemberCardDetail } from './TeamMemberCardDetail'
+import { TeamOpenTerminalButton } from './TeamOpenTerminalButton'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 import { teamHostWorktreeMissing } from './team-session-host-worktree'
@@ -111,14 +112,6 @@ export function TeamMemberCardRow({
   const hostWorktreeMissing = useAppStore((state) =>
     teamHostWorktreeMissing(card, state.getKnownWorktreeById)
   )
-  // Why only on opening: a second click folds the card and leaves the center as it is.
-  // Why not without the host's worktree: the reveal can only fail, so the card says why instead.
-  const toggle = (): void => {
-    if (!expanded && !hostWorktreeMissing && (card.terminalHandle || card.worktreeId)) {
-      void openTeamSession(card, shownName)
-    }
-    onToggle()
-  }
   return (
     <article
       data-team-card="member"
@@ -128,6 +121,7 @@ export function TeamMemberCardRow({
       onPointerLeave={() => useTeamSceneHover.getState().key === card.paneKey && setHover(null)}
       // Why one surface: V30's .card.sel and .more read as one card, not loose text under a row.
       className={cn(
+        'relative',
         expanded &&
           'mx-2 my-1 overflow-hidden rounded-lg border border-sidebar-border bg-sidebar-accent'
       )}
@@ -135,9 +129,10 @@ export function TeamMemberCardRow({
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={toggle}
+        onClick={onToggle}
         className={cn(
-          'flex w-full min-w-0 items-start gap-2.5 py-2 pr-3 text-left hover:bg-sidebar-accent',
+          // Why pr-9: room for the terminal icon, a sibling drawn over the row's top-right corner.
+          'flex w-full min-w-0 items-start gap-2.5 py-2 pr-9 text-left hover:bg-sidebar-accent',
           // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
           showName ? 'pl-3' : 'pl-5',
           (expanded || lit) && 'bg-sidebar-accent'
@@ -204,6 +199,9 @@ export function TeamMemberCardRow({
           <HelpersMark paneKey={card.paneKey} />
         </span>
       </button>
+      <span className="absolute right-2 top-2">
+        <TeamOpenTerminalButton session={card} name={shownName} />
+      </span>
       {answer && !expanded ? <div className="px-3 pb-2">{answer}</div> : null}
       {expanded ? (
         <TeamMemberCardDetail
