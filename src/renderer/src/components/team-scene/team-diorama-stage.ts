@@ -62,8 +62,12 @@ export function dioramaStage(
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.setClearColor(kit.p.sea)
   // Why π: three r155+ lights are physical; the approved prototype's (r128) were π brighter.
-  scene.add(new THREE.HemisphereLight(kit.p.hemiSky, kit.p.hemiGround, kit.p.hemi * Math.PI))
-  const sun = new THREE.DirectionalLight(kit.p.sun, kit.p.sunI * Math.PI)
+  // Why raw: r128 took a light's hex as linear, unconverted; r170 converts it, which shades sides darker.
+  const raw = (hex: number) => new THREE.Color().setHex(hex, THREE.LinearSRGBColorSpace)
+  scene.add(
+    new THREE.HemisphereLight(raw(kit.p.hemiSky), raw(kit.p.hemiGround), kit.p.hemi * Math.PI)
+  )
+  const sun = new THREE.DirectionalLight(raw(kit.p.sun), kit.p.sunI * Math.PI)
   sun.castShadow = !lite
   sun.shadow.mapSize.set(2048, 2048)
   // Why a bias: without it thin decks and planks shade themselves in stripes that shimmer.
