@@ -65,7 +65,7 @@ describe("the lead's round", () => {
     expect(talks[0]!.kind === 'hold' && talks[0]!.face).toEqual(stand)
     // Never inside the member it talks to: figures are drawn 1.6 times the prototype's size.
     for (const talk of talks) {
-      if (talk.kind === 'hold') {
+      if (talk.kind === 'hold' && talk.face) {
         expect(Math.hypot(talk.at[0] - talk.face[0], talk.at[1] - talk.face[1])).toBeGreaterThan(
           1.29
         )

@@ -10,7 +10,7 @@ import {
 import { dioramaWaterGrid } from '../../../../shared/team-scene/team-diorama-nav'
 import { dioramaRoadNet } from '../../../../shared/team-scene/team-diorama-roads'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
-import { dioramaBoat } from './team-diorama-boats'
+import { DIORAMA_BOAT_SEAT, dioramaBoat } from './team-diorama-boats'
 import { dioramaFigure, type DioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
 import { dioramaMage } from './team-diorama-mage'
@@ -64,7 +64,7 @@ export function dioramaLeadActor(
     const at = dioramaLeadAt(round, t)
     lead.g.position.x = at.at[0]
     lead.g.position.z = at.at[1]
-    lead.baseY = at.pose === 'sit' ? -0.6 : 0
+    lead.baseY = at.pose === 'sit' ? DIORAMA_BOAT_SEAT : 0
     lead.g.scale.setScalar(leadScale * at.blink)
     // Why eased: a snapped turn reads as a jump; it turns toward its heading over a few frames.
     if (at.heading && Math.hypot(at.heading[0], at.heading[1]) > 1e-6) {
