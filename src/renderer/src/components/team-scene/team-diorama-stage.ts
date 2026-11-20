@@ -79,7 +79,8 @@ export function dioramaStage(
   scene.add(world)
 
   const ticks = [...built.ticks, ...dioramaHomeProps(kit, world, lite)]
-  const lead = dioramaLeadActor(kit, world, { layout, views, input, lite, pace: args.pace })
+  const stands = new Map([...built.stands].map(([key, s]) => [key, s.at] as const))
+  const lead = dioramaLeadActor(kit, world, { layout, views, input, lite, pace: args.pace, stands })
   const cast = dioramaCast(kit, world, { layout, views, input, cues, lite, stands: built.stands })
   ticks.push(...dioramaRises(world, cues), lead.tick, ...cast.ticks)
   const advisor = input.advisor ? dioramaAdvisor(kit, world, cues, lite, input.advisor.line) : null

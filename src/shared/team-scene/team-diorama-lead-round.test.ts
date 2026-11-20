@@ -48,6 +48,31 @@ describe("the lead's round", () => {
     expect(talk.kind === 'hold' && talk.face).toEqual(dioramaStandOf(b))
   })
 
+  it('talks to each member where its state stands it, from a step away on the road', () => {
+    const b = layout.islands[0]!.plots.find((p) => p.key === 'b')!
+    // A needs-you member stands at its signal, a little off the default stand.
+    const stand: [number, number] = [b.x + 1.6, b.z + 1.25]
+    const round = dioramaLeadRoundOf({
+      layout,
+      roads,
+      water,
+      needs: ['b'],
+      visits: ['a', 'x', 'y'],
+      pace: 'normal',
+      stands: new Map([['b', stand]])
+    })
+    const talks = round.steps.filter((s) => s.kind === 'hold' && s.pose === 'talk')
+    expect(talks[0]!.kind === 'hold' && talks[0]!.face).toEqual(stand)
+    // Never inside the member it talks to: figures are drawn 1.6 times the prototype's size.
+    for (const talk of talks) {
+      if (talk.kind === 'hold') {
+        expect(Math.hypot(talk.at[0] - talk.face[0], talk.at[1] - talk.face[1])).toBeGreaterThan(
+          1.29
+        )
+      }
+    }
+  })
+
   it('walks only on the roads, rows only on open water, and ends idle at the gate', () => {
     const { steps } = roundOf()
     for (const step of steps) {

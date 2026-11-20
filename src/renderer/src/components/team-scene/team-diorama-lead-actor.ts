@@ -1,6 +1,6 @@
 import type * as THREE from 'three'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
-import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
+import type { DioramaLayout, DioramaPoint } from '../../../../shared/team-scene/team-diorama-layout'
 import {
   type DioramaPace,
   dioramaBoatAt,
@@ -28,6 +28,8 @@ export function dioramaLeadActor(
     input: TeamSceneInput
     lite: boolean
     pace: DioramaPace
+    /** Where each member stands on its plot, so the lead talks to it there. */
+    stands?: ReadonlyMap<string, DioramaPoint>
   }
 ): { figure: DioramaFigure; tick: (t: number) => void } {
   const { layout, views, input } = args
@@ -42,7 +44,8 @@ export function dioramaLeadActor(
     visits: input.members
       .filter((m) => VISITABLE.has(views.get(m.key)?.action ?? ''))
       .map((m) => m.key),
-    pace: args.pace
+    pace: args.pace,
+    stands: args.stands
   })
   const boats = Object.entries(layout.homeDocks).map(([column, dock]) => ({
     column: Number(column),

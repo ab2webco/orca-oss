@@ -38,6 +38,14 @@ const WALK = 1.8
 const ROW = 1.5
 const JUMP = 1.6
 const TALK = 3.5
+const TALK_APART = 1.3
+const TALK_FROM: DioramaPoint[] = [
+  [0, 1.2],
+  [0, 2],
+  [1.4, 0],
+  [-1.4, 0],
+  [0, -1.4]
+]
 const HOME_PAUSE = 3
 
 /**
@@ -54,6 +62,8 @@ export function dioramaLeadRoundOf(args: {
   /** Member keys the lead stops by on its round: working, waiting or broken ones. */
   visits: readonly string[]
   pace: DioramaPace
+  /** Where each member stands as its state draws it; a plot's default stand otherwise. */
+  stands?: ReadonlyMap<string, DioramaPoint>
 }): DioramaLeadRound {
   const { layout, roads, water, pace } = args
   const speed = pace === 'fast' ? 2.5 : 1
@@ -92,12 +102,17 @@ export function dioramaLeadRoundOf(args: {
     for (const island of layout.islands) {
       const plot = island.plots.find((p) => p.key === key)
       if (plot) {
-        return { island, stand: dioramaStandOf(plot) }
+        return { island, stand: args.stands?.get(key) ?? dioramaStandOf(plot) }
       }
     }
     return null
   }
-  const talkSpotOf = (stand: DioramaPoint): DioramaPoint => roads.on([stand[0], stand[1] + 1.2])
+  // Why apart: the lead talks from the road a step away, never inside the member it talks to.
+  const talkSpotOf = (stand: DioramaPoint): DioramaPoint => {
+    const spots = TALK_FROM.map(([dx, dz]) => roads.on([stand[0] + dx, stand[1] + dz]))
+    const apart = spots.find((p) => Math.hypot(p[0] - stand[0], p[1] - stand[1]) >= TALK_APART)
+    return apart ?? spots[0]!
+  }
 
   // One trip per island: every member there in one boat ride, needs-you ones first.
   const trips = new Map<DioramaIsland, DioramaPoint[]>()
