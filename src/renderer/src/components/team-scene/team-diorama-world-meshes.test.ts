@@ -4,9 +4,14 @@ import {
   teamDioramaLayoutOf,
   type DioramaMachine
 } from '../../../../shared/team-scene/team-diorama-layout'
-import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
+import {
+  dioramaPlotViewOf,
+  type DioramaPlotView
+} from '../../../../shared/team-scene/team-diorama-actions'
+import type { TeamSceneMemberInput } from '../../../../shared/team-scene/team-scene-types'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaHouse } from './team-diorama-buildings'
+import { dioramaCast } from './team-diorama-cast'
 import { dioramaPlot } from './team-diorama-plots'
 import { dioramaWorld } from './team-diorama-world-meshes'
 
@@ -19,6 +24,15 @@ const view = (over: Partial<DioramaPlotView> = {}): DioramaPlotView => ({
   flag: null,
   play: null,
   ...over
+})
+const idle = (key: string): TeamSceneMemberInput => ({
+  key,
+  name: key,
+  characterKey: null,
+  activity: 'resting',
+  reportId: null,
+  mergedPr: null,
+  site: { stage: 0, broken: false }
 })
 const machine = (key: string, over: Partial<DioramaMachine> = {}): DioramaMachine => ({
   key,
@@ -72,40 +86,59 @@ describe('the diorama world meshes', () => {
     expect(plotted(view({ action: 'cheer', stage: 4, flag: 'merged' }))).toContain(STATUS.done)
   })
 
-  it('gives roads and plots their own heights, and lays dock planks as the approved file does', () => {
-    const k = dioramaKit(NIGHT, STATUS)
+  it('never lays two ground surfaces of different colours at one height, so none flickers', () => {
+    // A free member fishes off its own dock, so the fisher's planks are checked too.
     const layout = teamDioramaLayoutOf([
-      machine('', { home: true, members: ['a'], cap: null }),
+      machine('', { home: true, members: ['a', 'f', 'g'], cap: null }),
       machine('m2', { members: ['x'] })
     ])
-    const { world } = dioramaWorld(
-      k,
-      layout,
-      new Map([
-        ['a', view()],
-        ['x', view({ stage: 4 })]
-      ])
-    )
-    const tops = new Set<string>()
-    const planks = new Set<string>()
-    world.traverse((o) => {
-      const mesh = o as THREE.Mesh
-      if (mesh.geometry?.type !== 'BoxGeometry') {
-        return
+    const views = new Map([
+      ['a', view()],
+      ['f', dioramaPlotViewOf(idle('f'), 0)],
+      ['g', dioramaPlotViewOf(idle('g'), 1)],
+      ['x', view({ stage: 4 })]
+    ])
+    for (const [palette, lite] of [
+      [DAY, false],
+      [NIGHT, true]
+    ] as const) {
+      const k = dioramaKit(palette, STATUS)
+      const built = dioramaWorld(k, layout, views)
+      const input = { lead: idle('lead'), advisor: null, members: [idle('f'), idle('g')] }
+      dioramaCast(k, built.world, { layout, views, input, cues: [], lite, stands: built.stands })
+      built.world.updateMatrixWorld(true)
+      // Every flat face at ground level: grass tops, roads, plots, the field and every plank.
+      const faces: { box: THREE.Box3; color: string; name: string }[] = []
+      built.world.traverse((o) => {
+        const m = o as THREE.Mesh
+        // Scene surfaces only: a figure's ink outline is a back-face hull, not a ground face.
+        const mat = m.material as THREE.Material | undefined
+        if (m.geometry?.type !== 'BoxGeometry' || mat?.type !== 'MeshStandardMaterial') {
+          return
+        }
+        const box = new THREE.Box3().setFromObject(m)
+        if (box.max.y > -0.001 && box.max.y < 0.2) {
+          const color = (m.material as THREE.MeshStandardMaterial).color?.getHexString() ?? ''
+          faces.push({ box, color, name: m.parent?.userData.dock ? 'dock plank' : color })
+        }
+      })
+      const clashes: string[] = []
+      for (let i = 0; i < faces.length; i++) {
+        for (let j = i + 1; j < faces.length; j++) {
+          const [a, b] = [faces[i]!, faces[j]!]
+          const overlapX = Math.min(a.box.max.x, b.box.max.x) - Math.max(a.box.min.x, b.box.min.x)
+          const overlapZ = Math.min(a.box.max.z, b.box.max.z) - Math.max(a.box.min.z, b.box.min.z)
+          const gap = Math.abs(a.box.max.y - b.box.max.y)
+          if (a.color !== b.color && overlapX > 0.01 && overlapZ > 0.01 && gap < 0.015) {
+            clashes.push(
+              `${a.name} ${a.box.max.y.toFixed(3)} / ${b.name} ${b.box.max.y.toFixed(3)}`
+            )
+          }
+        }
       }
-      const { height, width, depth } = (mesh.geometry as THREE.BoxGeometry).parameters
-      const top = +(mesh.getWorldPosition(new THREE.Vector3()).y + height / 2).toFixed(3)
-      if (mesh.parent?.userData.dock && height < 0.1) {
-        planks.add(String(top))
-      } else if (height <= 0.1 && width >= 0.7 && depth >= 0.7 && top > 0 && top < 0.5) {
-        tops.add(String(top))
-      }
-    })
-    // Roads and plots each have their own height above the grass top at 0.
-    expect([...tops].sort()).toEqual(['0.03', '0.04'])
-    // The approved prototype lays every dock plank at y -0.04, its top level with the grass.
-    expect([...planks]).toEqual(['0'])
-    k.dispose(world)
+      expect([...new Set(clashes)]).toEqual([])
+      k.dispose(built.world)
+    }
   })
 
   it('greys an island whose machine does not answer', () => {

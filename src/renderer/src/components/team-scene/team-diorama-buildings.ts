@@ -31,7 +31,7 @@ export function dioramaHouse(
   const at = (geo: THREE.BufferGeometry, m: THREE.Material, px: number, py: number, pz: number) =>
     k.mesh(geo, m, px, py, pz, g)
   if (!opts.noPad) {
-    k.mesh(box(2.7, 0.04, 2.7), mat(p.pad), 0, 0.02, 0, g, false)
+    k.mesh(box(2.7, 0.05, 2.7), mat(p.pad), 0, 0.025, 0, g, false)
   }
   if (stage >= 1) {
     at(box(S + 0.2, 0.22, S + 0.2), mat(p.stone2), 0, 0.13, 0)

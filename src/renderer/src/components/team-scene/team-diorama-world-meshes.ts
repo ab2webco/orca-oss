@@ -13,9 +13,9 @@ import { dioramaOffKit, type DioramaKit } from './team-diorama-kit'
 import { dioramaPlot, type DioramaPlotStand } from './team-diorama-plots'
 import { dioramaIsland, dioramaRoad, dioramaTravelDock, dioramaTree } from './team-diorama-scenery'
 
-// Why every surface has its own height: two faces at one height flicker (z-fighting). Grass tops
-// sit at y 0, roads at 0.03, plots at 0.04, and dock planks just under the grass at -0.04, as the
-// approved prototype lays them (ORCA-1296).
+// Why every ground surface has its own height, at least 0.02 apart: two faces at one height
+// flicker (z-fighting) as the camera moves. Grass tops sit at y 0, roads at 0.03, plots at 0.05,
+// the field at 0.06 and dock planks at 0.09 (owner, ORCA-1296).
 
 /** The words the island chips use; without them only remote machines are named. */
 export type DioramaWords = { thisMachine: string; offline: string }

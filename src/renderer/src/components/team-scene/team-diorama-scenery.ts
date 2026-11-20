@@ -6,6 +6,12 @@ import type { DioramaKit } from './team-diorama-kit'
 // Why a port: islands, trees, rocks, roads, docks, the sailboat and the gulls are the approved
 // prototype's (island, tree, rock, pathSeg, travelDock, sailboat, gulls; ORCA-1296).
 
+/**
+ * Planks sit well above the grass (their top at 0.09), so a dock that starts on land never
+ * flickers against it, as the approved file's planks at -0.04 did where they met the grass.
+ */
+export const DIORAMA_PLANK_Y = 0.05
+
 /** An island: grass on dirt on a sand rim, with tufts in two greens. */
 export function dioramaIsland(k: DioramaKit, rect: DioramaRect, parent: THREE.Object3D) {
   const { x, z, hw, hd } = rect
@@ -98,11 +104,11 @@ export function dioramaTravelDock(
   let n = 0
   for (let s = 0.12; s < len; s += 0.3) {
     const tone = n++ % 2 ? k.p.wood : 0xc89463
-    k.mesh(k.box(1, 0.08, 0.27), k.mat(tone), x, -0.04, z + dirZ * s, g, false)
+    k.mesh(k.box(1, 0.08, 0.27), k.mat(tone), x, DIORAMA_PLANK_Y, z + dirZ * s, g, false)
   }
   for (const s of [0.5, len - 0.2]) {
     for (const side of [-0.48, 0.48]) {
-      k.mesh(k.box(0.1, 1.1, 0.1), k.mat(k.p.woodDark), x + side, -0.45, z + dirZ * s, g)
+      k.mesh(k.box(0.1, 1.1, 0.1), k.mat(k.p.woodDark), x + side, -0.37, z + dirZ * s, g)
     }
   }
   return g
@@ -119,10 +125,10 @@ export function dioramaDock(
   const g = new THREE.Group()
   g.position.set(x, 0, z)
   parent.add(g)
-  k.mesh(k.box(1, 0.08, len), k.mat(k.p.wood), 0, -0.04, len / 2, g)
+  k.mesh(k.box(1, 0.08, len), k.mat(k.p.wood), 0, DIORAMA_PLANK_Y, len / 2, g)
   for (let s = 0.4; s < len; s += 0.9) {
     for (const side of [-0.46, 0.46]) {
-      k.mesh(k.box(0.1, 1, 0.1), k.mat(k.p.woodDark), side, -0.5, s, g)
+      k.mesh(k.box(0.1, 1, 0.1), k.mat(k.p.woodDark), side, -0.52, s, g)
     }
   }
   return g

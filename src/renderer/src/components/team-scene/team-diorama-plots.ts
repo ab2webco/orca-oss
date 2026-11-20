@@ -42,7 +42,7 @@ const STAGE: Partial<Record<DioramaAction, number>> = {
 /** A free plot: cleared, with a sign, waiting for the next member. A seat held elsewhere is dim. */
 function freePlot(k: DioramaKit, plot: DioramaPlot, parent: THREE.Object3D) {
   const pad = k.mat(k.p.pad, plot.taken ? { opacity: 0.5 } : {})
-  k.mesh(k.box(2.7, 0.04, 2.7), pad, plot.x, 0.02, plot.z, parent, false)
+  k.mesh(k.box(2.7, 0.05, 2.7), pad, plot.x, 0.025, plot.z, parent, false)
   if (!plot.taken) {
     k.mesh(k.box(0.07, 0.6, 0.07), k.mat(k.p.woodDark), plot.x + 0.9, 0.3, plot.z + 0.9, parent)
     k.mesh(k.box(0.5, 0.3, 0.05), k.mat(k.p.canvas), plot.x + 0.9, 0.62, plot.z + 0.92, parent)
@@ -51,7 +51,7 @@ function freePlot(k: DioramaKit, plot: DioramaPlot, parent: THREE.Object3D) {
 
 /** A member starting: its plot staked out with rope, before it walks in. */
 function stakedPlot(k: DioramaKit, x: number, z: number, parent: THREE.Object3D) {
-  k.mesh(k.box(2.7, 0.04, 2.7), k.mat(k.p.pad), x, 0.02, z, parent, false)
+  k.mesh(k.box(2.7, 0.05, 2.7), k.mat(k.p.pad), x, 0.025, z, parent, false)
   const C = [
     [-1.15, -1.15],
     [1.15, -1.15],
