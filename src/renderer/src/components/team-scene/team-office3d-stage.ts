@@ -167,7 +167,8 @@ export function office3dStage(
       })
     }
     const chip = dioramaChip(office3dLabelOf(floor, args.words))
-    // Why on the slab's front edge: over the row it covered the first desk and its member.
+    // Why hung from the slab's front edge: above it, a chip kept legible at 219 px covered the row.
+    chip.center.set(0, 1)
     chip.position.set(0.4, floor.y - 0.8, OFFICE3D_DEPTH + 0.4)
     world.add(chip)
     chips.push(chip)
