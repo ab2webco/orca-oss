@@ -1,12 +1,14 @@
 // Screenshots of the built site at 1440/768/390/320 in light and dark, into .shots/.
-// Fails when any page scrolls horizontally, or when the landing's hero runs past the 1440x900 first
-// screen; arguments keep only the pages whose name contains one.
+// Fails when any page scrolls horizontally, when the landing's hero runs past the 1440x900 first
+// screen, or when a landing screen at 1440 holds more than 95 words; arguments keep only the pages
+// whose name contains one.
 // Playwright comes from the repo root's node_modules (the desktop app's dev dependency), so site/
 // does not install it again.
 import { mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { serveDist, SITE_DIR } from './dist-server.mjs'
+import { densestScreen, SCREEN_WORD_BUDGET } from './screen-word-budget.mjs'
 
 const OUT = path.join(SITE_DIR, '.shots')
 const require = createRequire(path.join(SITE_DIR, '..', 'package.json'))
@@ -80,6 +82,8 @@ async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
     : 0
   // Why from 1440 only: below it the clip stacks under the copy and the hero is taller than a phone.
   const heroFits = !landing || width < 1440 || heroEnd <= 900
+  const densest = landing && width === 1440 ? await page.evaluate(densestScreen) : null
+  const wordsFit = !densest || densest.words <= SCREEN_WORD_BUDGET
   const file = path.join(OUT, `${name}-${theme}-${width}.png`)
   await page.screenshot({ path: file, fullPage: true })
   await context.close()
@@ -87,7 +91,8 @@ async function shoot(browser, origin, { name, path: pagePath, width, theme }) {
     file,
     ...overflow,
     heroEnd,
-    ok: overflow.scrollWidth <= overflow.clientWidth && heroFits
+    densest,
+    ok: overflow.scrollWidth <= overflow.clientWidth && heroFits && wordsFit
   }
 }
 
@@ -109,7 +114,7 @@ try {
     const result = await shoot(browser, origin, job)
     const rel = path.relative(SITE_DIR, result.file)
     process.stdout.write(
-      `${result.ok ? 'ok  ' : 'FAIL'} ${rel} scrollWidth=${result.scrollWidth} clientWidth=${result.clientWidth}${result.heroEnd ? ` heroEnd=${result.heroEnd}` : ''}\n`
+      `${result.ok ? 'ok  ' : 'FAIL'} ${rel} scrollWidth=${result.scrollWidth} clientWidth=${result.clientWidth}${result.heroEnd ? ` heroEnd=${result.heroEnd}` : ''}${result.densest ? ` screenWords=${result.densest.words}@${result.densest.at}` : ''}\n`
     )
     if (!result.ok) {
       failures.push(rel)
@@ -120,6 +125,6 @@ try {
   server.close()
 }
 process.stdout.write(
-  `shots: ${jobs.length} captured, ${failures.length} with horizontal scroll or a landing hero past the 1440x900 fold\n`
+  `shots: ${jobs.length} captured, ${failures.length} with horizontal scroll, a landing hero past the 1440x900 fold, or a 1440 landing screen over ${SCREEN_WORD_BUDGET} words\n`
 )
 process.exit(failures.length ? 1 : 0)
