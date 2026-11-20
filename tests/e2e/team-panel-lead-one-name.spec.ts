@@ -9,7 +9,7 @@ import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-s
 // Why: the panel reads game.state every 20 s (TEAM_REFRESH_MS).
 const REFRESH_WAIT_MS = 21_000
 
-// ORCA-1139 criterion 5: with no Lead name, the lead was Elaine, then Cipher, then Vigía nocturno.
+// ORCA-1139 criterion 5, ORCA-1304: an unnamed lead stays "Lead" across scene and language.
 test('the lead keeps the name it first had when the scene and the language change', async ({
   electronApp,
   orcaPage
@@ -71,8 +71,8 @@ test('the lead keeps the name it first had when the scene and the language chang
   })
   const panel = orcaPage.getByTestId('team-panel')
   const leadCard = panel.locator('[data-team-card="lead"]')
-  await expect(leadCard).toContainText('Elaine', { timeout: 90_000 })
-  expect((await stateOf()).leadName).toBe('Elaine')
+  await expect(leadCard).toContainText('Lead', { timeout: 90_000 })
+  expect((await stateOf()).leadName).toBe('Lead')
 
   const steps = [
     { label: 'vigilante-en', scene: 'vigilante', uiLanguage: 'en' },
@@ -84,10 +84,13 @@ test('the lead keeps the name it first had when the scene and the language chang
       orchestratorGame: { scene: step.scene }
     })
     await expect.poll(async () => (await stateOf()).config?.scene).toBe(step.scene)
-    expect((await stateOf()).leadName, `${step.label}: game.state renamed the lead`).toBe('Elaine')
+    expect((await stateOf()).leadName, `${step.label}: game.state renamed the lead`).toBe('Lead')
     await orcaPage.waitForTimeout(REFRESH_WAIT_MS)
-    await expect(leadCard, `${step.label}: the card renamed the lead`).toContainText('Elaine')
-    await expect(leadCard).not.toContainText(/Cipher|Vigía/)
+    await expect(
+      leadCard.locator('[data-team-lead-unnamed]'),
+      `${step.label}: the card renamed the lead`
+    ).toBeVisible()
+    await expect(leadCard).not.toContainText(/Elaine|Cipher|Vigía/)
   }
 
   for (const width of [1440, 768, 390, 320]) {

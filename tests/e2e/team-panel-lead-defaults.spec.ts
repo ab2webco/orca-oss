@@ -21,10 +21,10 @@ async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
     .toBe(theme)
 }
 
-// ORCA-1094 rows 1, 2 and 6: with no Lead name the lead is a character, a member's tab reads
+// ORCA-1094 rows 2 and 6, ORCA-1304: with no Lead name the lead is "Lead", a member's tab reads
 // `name · ticket · host`, and the header levels the team from its characters' real XP plus the
 // rewards the mod reported (ORCA-1264).
-test('the lead is a character, the member tab names who runs, and XP comes from the characters', async ({
+test('an unnamed lead is Lead, the member tab names who runs, and XP comes from the characters', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -113,9 +113,29 @@ test('the lead is a character, the member tab names who runs, and XP comes from 
     })
     const panel = orcaPage.getByTestId('team-panel')
     const leadCard = panel.locator('[data-team-card="lead"]')
-    // Row 1: no Lead name, so the quest roster's last character, never the worktree's name.
-    await expect(leadCard).toContainText('Elaine', { timeout: 90_000 })
-    await expect(leadCard).not.toContainText(/^(main|master)/)
+    // ORCA-1304: no Lead name, so plain "Lead" and the setup that names it; never a roster
+    // character or the worktree's name.
+    const unnamed = leadCard.locator('[data-team-lead-unnamed]')
+    await expect(unnamed.getByRole('button', { name: 'Name your lead' })).toBeVisible({
+      timeout: 90_000
+    })
+    // Why no name: "Lead" is what the crown badge already says.
+    await expect(leadCard.locator('[data-team-name]')).toHaveCount(0)
+    await expect(leadCard).not.toContainText(/Elaine|^(main|master)/)
+    // Why the side panel's widths: the card's room is the panel's, not the window's (219 clamps to 220).
+    const sidebarWidth = await orcaPage.evaluate(() => window.__store!.getState().rightSidebarWidth)
+    for (const sidebar of [220, 320, 350, 640]) {
+      await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), sidebar)
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await expect(unnamed).toBeVisible()
+        await leadCard.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`unnamed-lead-${sidebar}-${theme}.png`)
+        })
+      }
+    }
+    await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), sidebarWidth)
 
     // Row 2: a merged task pays its character 100 XP, the real path `orca game free` takes.
     const xp = panel.locator('[data-team-xp]')

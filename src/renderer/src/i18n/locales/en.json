@@ -17594,6 +17594,8 @@
       "asksOn": "Waiting for you · Question on {{ticket}}",
       "asks": "Waiting for you",
       "orchestrating": "Orchestrating · {{action}}",
+      "nameSetup": "Name your lead",
+      "unnamed": "Your lead has no name yet. The setup asks for it.",
       "detail": {
         "status": "Status",
         "action": "Now",

@@ -154,6 +154,8 @@ export type TeamMemberAsk = { kind: 'inbox' } | { kind: 'permission'; tool: stri
 /** The lead's live step reads as `verb · step` while working, or what it waits on. */
 export type TeamLeadCard = TeamAgentFacts & {
   characterKey: string | null
+  /** No Lead name is configured, so the card shows "Lead" and offers the setup; absent reads as named (ORCA-1304). */
+  isNameDefault?: boolean
   branch: string | null
   /** The oldest question the lead asked the user that is still open; the text stays in Inbox. */
   ownerAsk: { ticket: string | null } | null
