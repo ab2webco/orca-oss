@@ -293,7 +293,7 @@ export function teamCardsOf(
     account: accountOf(leader, state),
     ...gameAdvisorDecisionsOf(leader.advisor),
     characterKey: null,
-    branch: state.worktree?.branch ?? null,
+    branch: state.worktree?.branch?.replace(/^refs\/heads\//, '') ?? null,
     ownerAsk
   }
   const live = state.agents.filter((one) => one.isMember && !one.isLeader)
