@@ -61,6 +61,5 @@ export const RUNNER_DRIVER: ArcadeDriver<OrchestratorGameArcadeRunner, RunnerPla
   isOverOf: (state) => state.course.isOver,
   msOf: (state) => state.course.ms,
   paint: (g, _game, state, view) => paintRunnerRun(g, state.runner, state.course, view),
-  backdropOf: arcadeBackdropOf,
-  isThemed: true
+  backdropOf: arcadeBackdropOf
 }

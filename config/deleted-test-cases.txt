@@ -127,3 +127,7 @@ src/renderer/src/components/team-scene/TeamPanelScene.test.tsx # Pixel draws the
 src/renderer/src/components/settings/orchestrator-game-style-fallback-note.test.ts # "no art, so Pixel" note
 src/renderer/src/components/team-scene/use-team-scene-painter.test.tsx # loading a scene's own art from the lead's host
 src/shared/orchestrator-game-scene-native.test.ts # a scene's own art, and Pixel for themed scenes
+
+# ORCA-1311: both only recorded orphan clips (game-view-switcher, owner-inbox) that no page uses.
+tests/e2e/settings-orchestrator-game-view-showcase.spec.ts # covered by settings-orchestrator-game-view.spec.ts
+tests/e2e/game-inbox-showcase.spec.ts # covered by game-inbox.spec.ts and game-inbox-threads.spec.ts; only the local live-lead check is gone
