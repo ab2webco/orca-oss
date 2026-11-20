@@ -187,6 +187,14 @@ describe('TeamPanelView', () => {
     expect(panelText(container)).toContain('No agents running')
   })
 
+  // ORCA-1304: with no lead running, the panel says how to start a team; a team never shows it.
+  it('tells a project with no team how to start one, and a team never', async () => {
+    const solo_ = await render({ section: { kind: 'ready', value: solo }, retry: null })
+    expect(solo_.container.querySelector('[data-team-first-run]')).not.toBeNull()
+    const team_ = await render({ section: { kind: 'ready', value: game }, retry: null })
+    expect(team_.container.querySelector('[data-team-first-run]')).toBeNull()
+  })
+
   it('counts the sessions above the tabs on every tab, hidden with a single session', async () => {
     const twoSessions: TeamPanelSoloModel = {
       ...solo,
