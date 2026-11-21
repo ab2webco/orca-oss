@@ -255,3 +255,18 @@ describe("the 3D Office lead's path", () => {
     }
   }
 })
+
+describe('the shared cab', () => {
+  it('boards riders for one floor together, in order, up to its capacity', () => {
+    const cab = office3dCab(0)
+    const a = bookOffice3dCab(cab, 2, 0, 0, 1, 3)
+    const b = bookOffice3dCab(cab, 2, 0, 0.2, 1, 3)
+    const c = bookOffice3dCab(cab, 2, 0, 0.4, 1, 3)
+    const d = bookOffice3dCab(cab, 2, 0, 0.6, 1, 3)
+    expect([a.seat, b.seat, c.seat]).toEqual([0, 1, 2])
+    expect(b.depart).toBe(a.depart)
+    expect(c.arrive).toBe(a.arrive)
+    // The fourth waits for the next trip.
+    expect(d.depart).toBeGreaterThan(a.arrive)
+  })
+})

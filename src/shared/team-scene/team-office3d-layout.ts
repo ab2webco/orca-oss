@@ -153,7 +153,8 @@ export function office3dLobbyOf(width: number): Office3dLobby {
   ]
   const tv = width * 0.62
   const pp = width - 2.2
-  const talk = width * 0.45
+  // Why up front by the aisle: further back, the walk to them crossed a cafeteria chair.
+  const talk = width * 0.5
   return {
     counter: { x: 2.2, z: 0.45, w: 2.6, d: 0.6 },
     tables,
@@ -174,8 +175,8 @@ export function office3dLobbyOf(width: number): Office3dLobby {
       face: [pp, 2.6] as Office3dPoint
     })),
     talk: [0, 0.8].map((dx) => ({
-      at: [talk + dx, 1.2] as Office3dPoint,
-      face: [talk + 0.4, 1.2] as Office3dPoint
+      at: [talk + dx, 3.2] as Office3dPoint,
+      face: [talk + 0.4, 3.2] as Office3dPoint
     })),
     door: [width - 0.8, OFFICE3D_DEPTH - 0.3]
   }
