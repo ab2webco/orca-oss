@@ -158,15 +158,25 @@ describe('inherited project rows show the applied value (ORCA-1112 D3)', () => {
     view.unmount()
   })
 
-  it('keeps the HUD honest: Off after an On that stored the band stores hud:false', () => {
+  it('in Flat, Off after an On that stored the band clears both, leaving no hidden band:true', () => {
     const view = renderProject({ mode: 'flat' }, { hud: true, band: true })
     const hud = rowOf(view.container, 'hud')
 
     expect(checkedIn(hud)).toBe('On')
     press(radio(hud, 'Off'))
-    expect(view.updates).toEqual([
-      { orchestratorGameProjects: { repo1: { hud: false, band: true } } }
-    ])
+    expect(view.updates).toEqual([{ orchestratorGameProjects: {} }])
+    view.unmount()
+  })
+
+  it('in Flat, the HUD Reset gives back the real default Off and clears the band it wrote', () => {
+    const view = renderProject({ mode: 'flat' }, { hud: true, band: true })
+    const reset = rowOf(view.container, 'hud').querySelector<HTMLButtonElement>(
+      '[data-slot="game-row-source"] button'
+    )!
+
+    expect(reset.textContent).toBe('Reset to Off (default)')
+    press(reset)
+    expect(view.updates).toEqual([{ orchestratorGameProjects: {} }])
     view.unmount()
   })
 

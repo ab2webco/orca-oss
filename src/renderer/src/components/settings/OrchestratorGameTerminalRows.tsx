@@ -182,14 +182,17 @@ export function ProjectTerminalGroups({
     options: { value: string; label: string }[]
     appliedOf?: (resolved: OrchestratorGameConfig) => string
     sourceKeyOf?: (resolved: OrchestratorGameConfig) => keyof OrchestratorGameConfig
+    /** Keys this row also writes for this machine, cleared with it on Reset. */
+    alsoKeys?: (keyof OrchestratorGameConfig)[]
     onPick: (next: string | undefined) => void
   }) => {
     const appliedOf = args.appliedOf ?? ((resolved) => String(resolved[args.key]))
     const sourceKeyOf = args.sourceKeyOf ?? (() => args.key)
     // Why without this machine's value only: the inherited row is what Reset gives back.
+    const keys = [args.key, ...(args.alsoKeys ?? [])]
     const below = resolveOrchestratorGameConfig({
       ...layers,
-      local: withOrchestratorGameField(local, args.key, undefined)
+      local: keys.reduce((one, key) => withOrchestratorGameField(one, key, undefined), local)
     })
     const inherited = appliedOf(below.config)
     return (
@@ -203,7 +206,7 @@ export function ProjectTerminalGroups({
           label: args.options.find((one) => one.value === inherited)?.label ?? inherited,
           source: orchestratorGameSourceLabel(below.sources[sourceKeyOf(below.config)])
         }}
-        isOverridden={local?.[args.key] !== undefined}
+        isOverridden={keys.some((key) => local?.[key] !== undefined)}
         onPick={args.onPick}
       />
     )
@@ -215,14 +218,18 @@ export function ProjectTerminalGroups({
       options: onOff,
       onPick: (next) => set(key, next === undefined ? undefined : next === 'true')
     })
+  // Why: with the band row hidden, the band:true the HUD row wrote is the HUD row's to clear.
+  const hudOwnsBand = !shown.has('band')
   const setHud = (next: boolean | undefined): void => {
     const projects = settings.orchestratorGameProjects
     const withOwn = withOrchestratorGameProjectField(projects, repoId, 'hud', next)
     updateSettings({
       orchestratorGameProjects:
-        next === true && !config.band
-          ? withOrchestratorGameProjectField(withOwn, repoId, 'band', true)
-          : withOwn
+        next === undefined && hudOwnsBand
+          ? withOrchestratorGameProjectField(withOwn, repoId, 'band', undefined)
+          : next === true && !config.band
+            ? withOrchestratorGameProjectField(withOwn, repoId, 'band', true)
+            : withOwn
     })
   }
   const linkLabels = orchestratorGameOpenLinksLabels()
@@ -247,6 +254,7 @@ export function ProjectTerminalGroups({
         options: onOff,
         appliedOf: (resolved) => String(resolved.band && resolved.hud),
         sourceKeyOf: (resolved) => (resolved.band ? 'hud' : 'band'),
+        alsoKeys: hudOwnsBand ? ['band'] : [],
         onPick: (next) => setHud(next === undefined ? undefined : next === 'true')
       }),
     rewards: toggle('rewards'),
