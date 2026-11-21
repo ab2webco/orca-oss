@@ -69,3 +69,19 @@ export function dioramaFitCamera(
   camera.updateProjectionMatrix()
   return { camera, height, full, ground: box, center: target, span: half.w * 2 }
 }
+
+/**
+ * `fit` on a canvas `height` px tall, taller than it fits: the frame keeps its vertical extent and
+ * narrows, so the world draws bigger and its sides are reached by panning or following.
+ */
+export function dioramaGrowFit(fit: DioramaFit, height: number): DioramaFit {
+  const k = height / fit.height
+  if (!(k > 1)) {
+    return fit
+  }
+  fit.camera.left /= k
+  fit.camera.right /= k
+  fit.camera.updateProjectionMatrix()
+  // Why the span too: following the lead zooms by it, and would double the growth.
+  return { ...fit, height: Math.round(height), span: fit.span / k }
+}
