@@ -3,7 +3,6 @@ export type GamePrCap = {
   member: boolean
   open?: number
   cap?: number
-  /** Why the host could not read the cap, e.g. a member whose lead runs on another host. */
   unknown?: string
 }
 

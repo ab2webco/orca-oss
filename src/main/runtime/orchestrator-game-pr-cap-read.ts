@@ -3,9 +3,7 @@ import type { GamePrCap } from '../../shared/orchestrator-game-pr-cap'
 export type GamePrCapCaller = { paneKey?: string; terminalHandle?: string; role?: string }
 
 export type GamePrCapPorts = {
-  /** The lead pane that launched this pane, or null for a lead or a plain session. */
   parentPaneKeyOf: (paneKey: string) => Promise<string | null>
-  /** True when a home on another host dispatched this pane (a federated member). */
   isRemoteMember: (caller: GamePrCapCaller) => boolean
   leadHandleOf: (leadPaneKey: string) => string | null
   readLeadCap: (leadHandle: string, leadPaneKey: string) => Promise<{ open?: number; cap?: number }>
