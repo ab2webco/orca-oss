@@ -52,7 +52,14 @@ describe('teamFlowPhaseOf', () => {
       'replace',
       'edit_file',
       'search_replace',
-      'Create'
+      'Create',
+      'write_to_file',
+      'replace_file_content',
+      'multi_replace_file_content',
+      'create',
+      'edit',
+      'write',
+      'patch'
     ]) {
       expect(teamFlowPhaseOf(working(edit, 'src/a.ts')), edit).toBe('code')
       expect(teamFlowPhaseOf(working(edit, 'src/a.test.ts')), edit).toBe('tests')
@@ -64,7 +71,11 @@ describe('teamFlowPhaseOf', () => {
       'run_command',
       'run_terminal_cmd',
       'run_terminal_command',
-      'Execute'
+      'Execute',
+      'bash',
+      'powershell',
+      'terminal',
+      'execute_code'
     ]) {
       expect(teamFlowPhaseOf(working(shell, 'pnpm test')), shell).toBe('tests')
       expect(teamFlowPhaseOf(working(shell, 'git status')), shell).toBeNull()

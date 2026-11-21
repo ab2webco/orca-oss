@@ -19,7 +19,14 @@ const EDIT_TOOLS = new Set([
   'write_file',
   'edit_file',
   'replace',
-  'search_replace'
+  'search_replace',
+  'write_to_file',
+  'replace_file_content',
+  'multi_replace_file_content',
+  'create',
+  'edit',
+  'write',
+  'patch'
 ])
 const SHELL_TOOLS = new Set([
   'Bash',
@@ -29,7 +36,11 @@ const SHELL_TOOLS = new Set([
   'run_shell_command',
   'run_command',
   'run_terminal_cmd',
-  'run_terminal_command'
+  'run_terminal_command',
+  'bash',
+  'powershell',
+  'terminal',
+  'execute_code'
 ])
 const PLAN_TOOLS = new Set(['EnterPlanMode', 'ExitPlanMode', 'TodoWrite'])
 const TEST_COMMAND =
