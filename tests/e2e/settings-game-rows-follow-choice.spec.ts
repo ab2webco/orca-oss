@@ -211,6 +211,24 @@ test('a project row shows the applied value, and Reset by keyboard only while ov
   await expect(section.locator('[data-slot="game-row-source"] button')).toHaveCount(0)
 })
 
+/**
+ * The pane's own gap between two ordinary sections, and the gaps above, between and below the two
+ * game sections. Why measured: display: contents on their wrapper once dropped two of the three.
+ */
+const sectionGapsOf = (panel: Locator) =>
+  panel.evaluate((node) => {
+    const teams = node.parentElement!.querySelector(':scope > section:not([id])')!
+    const wrapper = node.parentElement!
+    const before = wrapper.previousElementSibling!
+    const box = (el: Element) => el.getBoundingClientRect()
+    return {
+      pane: box(before).top - box(before.previousElementSibling!).bottom,
+      abovePanel: box(node).top - box(before).bottom,
+      panelToTeams: box(teams).top - box(node).bottom,
+      belowTeams: box(wrapper.nextElementSibling!).top - box(teams).bottom
+    }
+  })
+
 const PANEL_ROWS = ['look', 'style', 'stylePreview', 'scene', 'prs', 'machines', 'timezone']
 const RUNNING_ROWS = ['show', 'view', 'hud', 'rewards', 'openLinks', 'tracker']
 const BAND_ROWS = ['band', 'bandPreview', 'render']
@@ -256,6 +274,11 @@ test('the Agents page draws each choice with only its rows: Off, Flat, Pixel, Fi
   for (const choice of CHOICES) {
     await writeSettings(orcaPage, { orchestratorGame: choice.layer } as Settings)
     await expect.poll(() => shownRows(orcaPage), choice.name).toEqual([...choice.rows])
+    const gaps = await sectionGapsOf(panel)
+    expect(gaps.pane, choice.name).toBeGreaterThan(0)
+    for (const gap of ['abovePanel', 'panelToTeams', 'belowTeams'] as const) {
+      expect(gaps[gap], `${choice.name} ${gap}`).toBeCloseTo(gaps.pane, 0)
+    }
     if (!CAPTURE_EVIDENCE) {
       continue
     }
