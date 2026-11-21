@@ -11640,7 +11640,7 @@
           "tracker": "Work item tracking",
           "trackerDescription": "Follow the linked Plane, Jira, Linear, GitHub or GitLab item in the flow.",
           "scene": "Scene",
-          "sceneDescription": "The art the game draws. Installed plugins can add scenes.",
+          "sceneDescription": "The art Pixel draws, and member names unless Names sets them.",
           "sceneQuest": "Quest (built-in)",
           "sceneVigilante": "Night Watch (built-in)",
           "sceneJrpg": "Crystal Saga (built-in)",

@@ -155,7 +155,7 @@ export function GamePanelSetting({
         label={sceneTitle()}
         description={translate(
           'auto.components.settings.OrchestratorGameSetting.sceneDescription',
-          'The art the game draws. Installed plugins can add scenes.'
+          'The art Pixel draws, and member names unless Names sets them.'
         )}
         control={
           <OrchestratorGameSceneSelect
