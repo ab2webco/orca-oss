@@ -234,8 +234,16 @@ export function ProjectOrchestratorGameViewRows({
     local: withView(local, null, config)
   })
   const inheritedView = orchestratorGameViewOf(belowView.config)
-  const pickView = (next: OrchestratorGameViewId | null): void =>
-    writeLocal(withView(local, next === inheritedView ? null : next, config))
+  const pickView = (next: OrchestratorGameViewId | null): void => {
+    const cleared = withView(local, next === inheritedView ? null : next, config)
+    // Why: the inherited pixel view draws nothing while the band below it is off.
+    const needsBand =
+      next !== null &&
+      next === inheritedView &&
+      isOrchestratorGamePixelView(next) &&
+      !belowView.config.band
+    writeLocal(needsBand ? withOrchestratorGameField(cleared, 'band', true) : cleared)
+  }
   return (
     <>
       {only === 'view' ? null : (

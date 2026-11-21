@@ -147,6 +147,22 @@ describe('Show the game and the default view, per project', () => {
     view.unmount()
   })
 
+  it('picking the inherited pixel view clears the override and turns the band on to draw it', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameViewRows
+        repoId="repo1"
+        settings={{ orchestratorGameProjects: { repo1: { mode: 'flat' } } }}
+        projectLayer={{ mode: 'zen' }}
+        updateSettings={(update) => updates.push(update)}
+      />
+    )
+
+    choose(view.container, 'zen')
+    expect(updates).toEqual([{ orchestratorGameProjects: { repo1: { band: true } } }])
+    view.unmount()
+  })
+
   it('resets the view by dropping both keys that store it', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
