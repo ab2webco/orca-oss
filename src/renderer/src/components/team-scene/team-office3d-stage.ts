@@ -34,6 +34,12 @@ import { paintOffice3dBoard, paintOffice3dScreen, paintOffice3dWall } from './te
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 import { office3dLeadActor } from './team-office3d-lead-actor'
 import { office3dLobby } from './team-office3d-lobby'
+import {
+  office3dLeavers,
+  office3dMover,
+  office3dRally,
+  office3dRoomCounter
+} from './team-office3d-cast'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 
 export type Office3dStage = { height: number; draw: (t: number) => void; dispose: () => void }
@@ -95,6 +101,8 @@ export function office3dStage(
   const chips: THREE.Sprite[] = []
   const views = new Map<string, Office3dSeatView>()
   const doors: THREE.Mesh[][] = []
+  const drawn = new Set<string>()
+  const here = office3dRoomCounter(args.traffic)
   const calls: ((on: boolean) => void)[] = []
   for (const [i, floor] of layout.floors.entries()) {
     const built = office3dFloor(kit, floor, i === layout.floors.length - 1, dark)
@@ -157,10 +165,28 @@ export function office3dStage(
           ghost(figure.g)
         }
         world.add(figure.g)
+        let mark: THREE.Sprite | null = null
         if (view.mark) {
-          const mark = office3dMark(view.mark, args.status)
+          mark = office3dMark(view.mark, args.status)
           mark.position.set(seat.x, floor.y + 2.3 * floor.scale, OFFICE3D_SEAT_Z)
           world.add(mark)
+        }
+        const key = m.key
+        // With the building's traffic it goes where its state sends it; without, it sits.
+        if (args.traffic?.members.has(key)) {
+          drawn.add(key)
+          const deskPose = view
+          ticks.push(
+            office3dMover({
+              figure,
+              member: () => args.traffic?.members.get(key),
+              desk: (t) => office3dPlayOf(deskPose, j, t) ?? deskPose.pose,
+              deskScale: floor.scale,
+              here,
+              mark
+            })
+          )
+          figure = null
         }
       }
       let painted = -Infinity
@@ -183,6 +209,10 @@ export function office3dStage(
     }
   }
 
+  if (args.traffic) {
+    ticks.push(...office3dLeavers(world, args.traffic, drawn, here))
+    ticks.push(office3dRally(kit, world, layout, here))
+  }
   // The lead and the one cab it rides; askers first, then a word with whoever is typing.
   const { figure: lead, tick: leadTick } = office3dLeadActor(kit, X, world, {
     layout,

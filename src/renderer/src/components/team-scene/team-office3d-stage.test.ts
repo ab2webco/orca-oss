@@ -427,4 +427,64 @@ describe('the 3D Office stage', () => {
       Math.max(...rights) + 0.5
     )
   })
+
+  // ORCA-1317: members go where their state sends them, and pairs play together.
+  describe('members on the move', () => {
+    const team = (resting: string[]) =>
+      ['a', 'b', 'c', 'd', 'e', 'f'].map((k) =>
+        member(k, resting.includes(k) ? 'resting' : 'working')
+      )
+    const floors = () => [floor('', ['a', 'b']), floor('m2', ['c', 'd', 'e', 'f'])]
+    const drawAt = (resting: string[], t: number) => {
+      const r = renderer()
+      const layout = teamOffice3dLayoutOf(floors(), { leadAdvisor: false })
+      const traffic = office3dTraffic()
+      office3dTrafficRead(traffic, layout, input(team([])), 0, 'normal')
+      office3dTrafficRead(traffic, layout, input(team(resting)), 1, 'normal')
+      const stage = office3dStage(r.fake, {
+        width: 350,
+        dark: false,
+        status,
+        input: input(team(resting)),
+        layout,
+        pace: 'normal',
+        words: { thisMachine: 'This Mac', offline: 'Offline' },
+        traffic
+      })
+      stage.draw(t)
+      return r.scenes.at(-1)!
+    }
+    const ballOf = (scene: THREE.Scene) => {
+      let ball: THREE.Object3D | null = null
+      scene.traverse((o) => {
+        const g = (o as THREE.Mesh).geometry as THREE.SphereGeometry | undefined
+        if (g?.type === 'SphereGeometry' && g.parameters.radius === 0.06) {
+          ball = o
+        }
+      })
+      return ball as THREE.Object3D | null
+    }
+
+    it('draws a member with nothing to do in the lobby, not at its desk', () => {
+      const scene = drawAt(['c'], 400)
+      const inLobby: THREE.Object3D[] = []
+      scene.traverse((o) => {
+        if (
+          o.type === 'Group' &&
+          Math.abs(o.scale.x - 1.6) < 1e-3 &&
+          o.visible &&
+          o.position.y < OFFICE3D_PITCH / 2
+        ) {
+          inLobby.push(o)
+        }
+      })
+      expect(inLobby).toHaveLength(1)
+    })
+
+    it('flies the table-tennis ball only while two hold the paddles', () => {
+      // Two at the console first, then the paddles: four free members fill both.
+      expect(ballOf(drawAt(['c', 'd', 'e', 'f'], 400))?.visible).toBe(true)
+      expect(ballOf(drawAt(['c', 'd', 'e'], 400))?.visible).toBe(false)
+    })
+  })
 })
