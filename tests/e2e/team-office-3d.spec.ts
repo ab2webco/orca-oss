@@ -85,6 +85,22 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       await expect(canvas).toHaveAttribute('data-office3d-camera', 'lead')
       await orcaPage.waitForTimeout(2500)
       await canvas.screenshot({ path: testInfo.outputPath('camera-follow.png') })
+      // The owner: it opens at the 2D Office's height, three floors' strips, and grows by dragging.
+      const tall = async () => Math.round((await canvas.boundingBox())!.height)
+      expect(await tall()).toBe(336)
+      const edge = panel.locator('[data-team-scene-office3d] [data-team-building-resize]')
+      const grip = (await edge.boundingBox())!
+      await orcaPage.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+      await orcaPage.mouse.down()
+      await orcaPage.mouse.move(grip.x + grip.width / 2, grip.y + 120, { steps: 6 })
+      await orcaPage.mouse.up()
+      await expect.poll(tall).toBeGreaterThan(400)
+      const kept = await orcaPage.evaluate(() => localStorage.getItem('orca.teamOffice3d.height'))
+      expect(Number(kept)).toBe(await tall())
+      await orcaPage.waitForTimeout(1500)
+      await canvas.screenshot({ path: testInfo.outputPath('dragged.png') })
+      await edge.dblclick()
+      await expect.poll(tall).toBe(336)
     }
     // Why a wide window first: the sidebar is clamped to the room the window leaves it.
     await setWindowWidth(electronApp, orcaPage, 1440)

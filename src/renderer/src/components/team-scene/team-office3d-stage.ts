@@ -42,7 +42,13 @@ import {
 } from './team-office3d-cast'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 
-export type Office3dStage = { height: number; draw: (t: number) => void; dispose: () => void }
+export type Office3dStage = {
+  height: number
+  /** The height that shows the building at full size at this width. */
+  full: number
+  draw: (t: number) => void
+  dispose: () => void
+}
 
 /** How often a desk's monitor and board repaint; a canvas upload per frame per desk is waste. */
 const REPAINT = 0.4
@@ -69,6 +75,8 @@ export function office3dStage(
     layout: Office3dLayout
     pace: string
     maxHeight?: number
+    /** The stage's exact height: the whole building is fitted into it. */
+    height?: number
     /** The panel's camera, kept across reads: it follows the lead, frames it all, or stays put. */
     view?: DioramaView
     /** The building's traffic, kept across reads: the lead's trips come only from its events. */
@@ -224,7 +232,7 @@ export function office3dStage(
   })
   ticks.push(leadTick)
 
-  const fit = dioramaFitCamera(world, args.width, args.maxHeight)
+  const fit = dioramaFitCamera(world, args.width, args.height ?? args.maxHeight, args.height)
   renderer.setSize(args.width, fit.height, true)
   // Why after the fit: a chip's size depends on how many px a world unit takes at this width.
   const pxPerUnit = args.width / (fit.camera.right - fit.camera.left)
@@ -270,6 +278,7 @@ export function office3dStage(
 
   return {
     height: fit.height,
+    full: fit.full,
     draw: (t) => {
       for (const tick of ticks) {
         tick(t)

@@ -17,8 +17,13 @@ import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { localHostDisplayLabel } from '@/lib/local-host-display-label'
 import { translate } from '@/i18n/i18n'
+import { TeamBuildingResizeHandle } from './TeamBuildingResizeHandle'
+import { OFFICE3D_HEIGHT_KEY, office3dDefaultHeight } from './team-office3d-height'
+import { teamBuildingHeightOf, useTeamBuildingHeight } from './use-team-building-height'
 
 const FRAME_MS = 1000 / 30
+// The arrow keys' step: one 2D floor strip.
+const OFFICE3D_STEP = 112
 
 /** The Office as the 3D building (ORCA-1302); Low resources keeps the 2D Office, so no lite mode. */
 export function TeamSceneOffice3d({
@@ -52,6 +57,13 @@ export function TeamSceneOffice3d({
   useEffect(() => {
     order.current = layout.order
   }, [layout])
+  const machines = layout.floors.filter((f) => !f.lobby).length
+  const [wanted, setWanted] = useTeamBuildingHeight(OFFICE3D_HEIGHT_KEY)
+  // Why the stage's full height as the top: past it the building only grows empty margins.
+  const [full, setFull] = useState(0)
+  const bounds = { min: office3dDefaultHeight(machines), max: 0 }
+  bounds.max = Math.max(bounds.min, full)
+  const height = teamBuildingHeightOf(wanted, bounds)
   // Why a ref: each read rebuilds the stage, and a trip under way must carry on, not restart.
   const traffic = useRef(office3dTraffic())
 
@@ -88,6 +100,7 @@ export function TeamSceneOffice3d({
     office3dTrafficRead(traffic.current, layout, input, performance.now() / 1000, look.pace)
     const stage = office3dStage(renderer, {
       width,
+      height,
       dark: document.documentElement.classList.contains('dark'),
       status,
       input,
@@ -101,6 +114,7 @@ export function TeamSceneOffice3d({
         lobby: translate('auto.components.team-scene.TeamSceneOffice3d.lobby', 'Lobby')
       }
     })
+    setFull(stage.full)
     let raf = 0,
       last = 0,
       visible = true
@@ -139,7 +153,7 @@ export function TeamSceneOffice3d({
       watch.disconnect()
       stage.dispose()
     }
-  }, [layout, input, status, width, onNoWebgl, look, camera.view])
+  }, [layout, input, status, width, height, onNoWebgl, look, camera.view])
 
   return (
     <div ref={wrap} className="relative w-full" data-team-scene-office3d="">
@@ -151,6 +165,13 @@ export function TeamSceneOffice3d({
         data-office3d-camera={camera.mode}
       />
       <DioramaCameraButtons mode={camera.mode} setMode={camera.setMode} />
+      <TeamBuildingResizeHandle
+        height={height}
+        min={bounds.min}
+        max={bounds.max}
+        step={OFFICE3D_STEP}
+        onResize={setWanted}
+      />
     </div>
   )
 }

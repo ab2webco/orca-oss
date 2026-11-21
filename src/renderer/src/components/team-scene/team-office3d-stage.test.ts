@@ -125,6 +125,20 @@ describe('the 3D Office stage', () => {
     stage.dispose()
   })
 
+  it('fits the whole building into an asked height under 220, and says its full height', () => {
+    const r = renderer()
+    const members = [member('a', 'working')]
+    const layout = teamOffice3dLayoutOf([floor('', ['a'])], { leadAdvisor: false })
+    const args = { dark: false, status, input: input(members), layout, pace: 'normal' }
+    const words = { thisMachine: 'This Mac', offline: 'Offline' }
+    const open = office3dStage(r.fake, { ...args, words, width: 280 })
+    const small = office3dStage(r.fake, { ...args, words, width: 280, height: 176 })
+    expect(small.height).toBe(176)
+    expect(r.setSize).toHaveBeenLastCalledWith(280, 176, true)
+    expect(small.full).toBe(open.height)
+    expect(open.full).toBeGreaterThan(176)
+  })
+
   it('sends the lead up the lift to a member on another floor whose CI went red', () => {
     const { stage, scenes } = stageOf(
       [member('a', 'working'), member('c', 'working')],
