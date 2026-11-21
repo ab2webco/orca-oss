@@ -18,8 +18,8 @@ import { ownGamePanelValueOf } from './game-panel-overrides'
 import { GamePanelOverrideNote, type GamePanelOverrideProject } from './GamePanelOverrideNote'
 import { translate } from '@/i18n/i18n'
 
-// Why rows of their own: quality and pace change only the Figures diorama (ORCA-1296), so they
-// show only while it draws.
+// Why rows of their own: quality and pace change only the 3D scenes, the Figures diorama (ORCA-1296)
+// and the Office building (ORCA-1302), so they show only while one of them draws.
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
@@ -38,14 +38,14 @@ const copy = (): Record<Field, [string, string]> => ({
     translate('auto.components.settings.GamePanelDioramaRows.quality', 'Scene quality'),
     translate(
       'auto.components.settings.GamePanelDioramaRows.qualityDescription',
-      'Illustrated draws outlined figures with shadows. Low resources draws flat ones without shadows, for slower machines.'
+      'Illustrated draws the scene in 3D: outlined figures with shadows, and the Office as a building. Low resources draws flat figures without shadows and the Office in 2D, for slower machines.'
     )
   ],
   pace: [
     translate('auto.components.settings.GamePanelDioramaRows.pace', "Lead's pace"),
     translate(
       'auto.components.settings.GamePanelDioramaRows.paceDescription',
-      'How the lead gets round the base: walking, faster, or sent by the court mage.'
+      'How the lead gets round the scene: walking, faster, or straight there.'
     )
   ]
 })

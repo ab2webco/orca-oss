@@ -75,7 +75,7 @@ test('the Orca steward visits the member whose model it moved, in every style an
     }
     const show = async (scene: string, style: GamePanelStyle, width: number): Promise<void> => {
       await writeSettings(orcaPage, {
-        orchestratorGame: { scene, panel: { look: 'game', style, diorama: false } }
+        orchestratorGame: { scene, panel: { look: 'game', style, diorama: false, quality: 'low' } }
       })
       await setWindowWidth(electronApp, orcaPage, width)
       await orcaPage.evaluate((wide) => {

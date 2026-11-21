@@ -6,7 +6,7 @@ import type { DioramaPace } from '../../../../shared/team-scene/team-diorama-lea
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { dioramaAdvisor, DIORAMA_TOWER } from './team-diorama-advisor'
-import { dioramaFitCamera } from './team-diorama-camera'
+import { dioramaFitCamera, dioramaGrowFit } from './team-diorama-camera'
 import { dioramaCast } from './team-diorama-cast'
 import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
@@ -18,6 +18,8 @@ import { dioramaWorld, type DioramaWords } from './team-diorama-world-meshes'
 
 export type DioramaStage = {
   height: number
+  /** The height that fits the whole world at this width: the stage's default. */
+  fitted: number
   draw: (t: number) => void
   dispose: () => void
 }
@@ -52,6 +54,8 @@ export function dioramaStage(
     view: DioramaView
     /** The tallest the stage may be; the phone keeps its band short. */
     maxHeight?: number
+    /** A taller stage the person dragged to; the world draws bigger in it. */
+    height?: number
     /** The island chips' words; a client without them names only remote machines. */
     words?: DioramaWords
   }
@@ -104,7 +108,8 @@ export function dioramaStage(
     )
   )
 
-  const fit = dioramaFitCamera(world, args.width, args.maxHeight)
+  const fitted = dioramaFitCamera(world, args.width, args.maxHeight)
+  const fit = dioramaGrowFit(fitted, args.height ?? 0)
   renderer.setSize(args.width, fit.height, true)
   // The sun's shadow box covers the whole world, or shadows stop a few metres from the middle.
   const center = fit.ground.getCenter(new THREE.Vector3())
@@ -123,6 +128,7 @@ export function dioramaStage(
 
   return {
     height: fit.height,
+    fitted: fitted.height,
     draw: (t) => {
       for (const tick of ticks) {
         tick(t)

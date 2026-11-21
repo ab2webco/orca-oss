@@ -1,3 +1,4 @@
+import type { TeamSceneMemberInput } from '../../../../shared/team-scene/team-scene-types'
 import * as THREE from 'three'
 import type { Office3dScreen } from '../../../../shared/team-scene/team-office3d-actions'
 import type { TeamSceneSite } from '../../../../shared/team-scene/team-scene-sites'
@@ -95,4 +96,53 @@ export function paintOffice3dBoard(
 ): void {
   const s = w / 38
   drawOfficeBoard(g, w / 2, h - s, s, site ?? { stage: 0, broken: false }, t, attention)
+}
+
+const tileOf = (m: TeamSceneMemberInput, reachable: boolean, c: TeamSceneStatusColors): string =>
+  !reachable || m.away
+    ? '#4b5563'
+    : m.activity === 'needsYou'
+      ? c.attention
+      : m.activity === 'done'
+        ? c.done
+        : m.activity === 'blocked' || m.hold
+          ? c.risk
+          : c.working
+
+/** The control room's video wall: one tile per member of its floor, in Orca's status colours. */
+export function paintOffice3dWall(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  floorMembers: readonly TeamSceneMemberInput[],
+  reachable: boolean,
+  c: TeamSceneStatusColors,
+  t: number
+): void {
+  g.fillStyle = '#0b1220'
+  g.fillRect(0, 0, w, h)
+  const cols = 8,
+    tw = 42,
+    th = 22,
+    gap = 6
+  for (const [k, m] of floorMembers.slice(0, 40).entries()) {
+    const fill = tileOf(m, reachable, c)
+    // Why a pulse on the asker's tile only: the wall says who needs the user at a glance.
+    g.globalAlpha = fill === c.attention ? 0.65 + 0.35 * Math.abs(Math.sin(t * 3)) : 1
+    g.fillStyle = fill
+    g.fillRect(14 + (k % cols) * (tw + gap), 20 + Math.floor(k / cols) * (th + gap), tw, th)
+  }
+  g.globalAlpha = 1
+  g.strokeStyle = '#7fb4ff'
+  g.lineWidth = 2
+  g.beginPath()
+  for (let q = 0; q <= 40; q++) {
+    const y = h - 16 - 16 * (0.5 + 0.5 * Math.sin(q * 0.55 + t * 0.8))
+    if (q) {
+      g.lineTo(14 + q * 9.3, y)
+    } else {
+      g.moveTo(14, y)
+    }
+  }
+  g.stroke()
 }

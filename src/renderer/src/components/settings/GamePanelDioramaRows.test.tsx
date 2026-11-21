@@ -68,7 +68,23 @@ describe('the diorama rows in the panel settings', () => {
     view.unmount()
   })
 
-  it('hide outside the diorama: Pixel, Office, or Figures in 2D', () => {
+  it('offer the same quality and pace rows for the Office, which Illustrated draws in 3D', () => {
+    const view = render(
+      <GamePanelSetting
+        settings={{ orchestratorGame: { panel: { style: 'office' } } }}
+        updateSettings={() => {}}
+      />
+    )
+    expect(segments(view.container, 'Scene quality')).toEqual(['Illustrated', 'Low resources'])
+    expect(segments(view.container, "Lead's pace")).toEqual(['Normal', 'Fast', 'Direct'])
+    const preview = view.container.querySelector('[data-slot="game-panel-style-preview"]')
+    // Why 2D here: happy-dom has no WebGL, so the preview falls back as the panel does.
+    expect(preview?.getAttribute('data-style')).toBe('office')
+    expect(preview?.querySelector('[data-office3d-preview]')).toBeNull()
+    view.unmount()
+  })
+
+  it('hide outside the 3D scenes: Pixel, or Figures in 2D', () => {
     for (const panel of [
       { style: 'pixel' as const, diorama: true },
       { style: 'figures' as const, diorama: false }

@@ -8,8 +8,11 @@ import {
 } from './team-office3d-elevator'
 import {
   OFFICE3D_AISLE_Z,
+  OFFICE3D_CALL,
+  OFFICE3D_CALL_PANEL,
   OFFICE3D_DOOR_Z,
   OFFICE3D_LIFT,
+  OFFICE3D_SEAT_Z,
   OFFICE3D_WING_WIDTH,
   office3dStandBehind,
   type Office3dLayout,
@@ -19,7 +22,18 @@ import {
 // Why a plan, as the diorama's round: laid out once per read of the team, so any moment is a lookup.
 // Each floor's advisor never walks: it sits in its own control room, so only the lead rides the lift.
 
-export type Office3dWalkPose = 'walk' | 'talk' | 'give' | 'idle' | 'desk'
+/** `call`: pressing the lift's call button, which lights while it does. */
+/** `sit` and `stand`: a member in a room or the lead's office; `gone`: out of the building. */
+export type Office3dWalkPose =
+  | 'walk'
+  | 'talk'
+  | 'give'
+  | 'idle'
+  | 'desk'
+  | 'call'
+  | 'sit'
+  | 'stand'
+  | 'gone'
 
 /** `floor` is an index into the layout's floors; a ride's height comes from the cab. */
 export type Office3dStep =
@@ -33,7 +47,8 @@ export type Office3dStep =
       start: number
       dur: number
     }
-  | { kind: 'ride'; start: number; dur: number }
+  /** `at` is the rider's own spot in the cab; riders stand side by side, never in one another. */
+  | { kind: 'ride'; start: number; dur: number; at?: Office3dPoint }
   | {
       kind: 'jump'
       from: { floor: number; at: Office3dPoint }
@@ -44,27 +59,41 @@ export type Office3dStep =
 
 export type Office3dRound = { steps: Office3dStep[]; total: number; cab: Office3dCab }
 
-const WALK = 1.9
+/** Walking speed, the call press, and a Direct jump: one pace for every figure in the building. */
+export const OFFICE3D_WALK = 1.9
+const WALK = OFFICE3D_WALK
 const TALK = 3.4
+export const OFFICE3D_PRESS = 0.6
+const PRESS = OFFICE3D_PRESS
 const GIVE = 1.1
-const JUMP = 1.6
+export const OFFICE3D_JUMP = 1.6
+const JUMP = OFFICE3D_JUMP
 const HOME_PAUSE = 4.5
-const DOOR: Office3dPoint = [0.9, OFFICE3D_DOOR_Z]
+/** Just outside each floor's lift door, where riders step out. */
+export const OFFICE3D_EXIT: Office3dPoint = [0.9, OFFICE3D_DOOR_Z]
+const DOOR = OFFICE3D_EXIT
 
 /** The lead's desk in its office, and the way out of the office to the aisle. */
 const homeOf = (office: { x: number }): Office3dPoint => [office.x + OFFICE3D_WING_WIDTH / 2, 1.65]
 const officeDoorOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, OFFICE3D_AISLE_Z]
+// Why round the desk's left side: a straight line from the chair to the door went through the desk.
+const besideDeskOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, 1.65]
 
 /**
- * The lead's round: members that need the user first, in the Team model's order and one lift trip
- * per floor; then a word with each busy member on its own floor; then back to its desk. An
- * unreachable floor gets no visit. Direct swaps every walk and ride for a jump.
+ * One trip of the lead from its desk, starting at `start`: a talk with each member in `needs` (one
+ * lift trip per floor, in order), then a folder handed to each in `visits`, then back to its desk.
+ * Only events fill these (ORCA-1317): with none it just sits. An unreachable floor gets no visit,
+ * and Direct swaps every walk and ride for a jump. `cab` is the building's one lift, shared.
  */
 export function office3dLeadRoundOf(args: {
   layout: Office3dLayout
   needs: readonly string[]
   visits: readonly string[]
   pace: string | undefined
+  start?: number
+  cab?: Office3dCab
+  /** Its place in the call-panel line it shares with the members; alone it presses at once. */
+  queued?: (floor: number, t: number) => number
 }): Office3dRound {
   const { speed, holdScale, jump } = dioramaPaceOf(args.pace)
   const floors = args.layout.floors
@@ -74,9 +103,9 @@ export function office3dLeadRoundOf(args: {
   )
   const office = floors[leadFloor]?.office ?? { x: floors[leadFloor]?.width ?? 0 }
   const home = homeOf(office)
-  const cab = office3dCab(leadFloor)
+  const cab = args.cab ?? office3dCab(leadFloor)
   const steps: Office3dStep[] = []
-  let t = 0
+  let t = args.start ?? 0
   let floor = leadFloor
   let here = home
   const push = (step: Office3dStep) => {
@@ -112,17 +141,23 @@ export function office3dLeadRoundOf(args: {
       return
     }
     if (floor === leadFloor && here === home) {
-      walk(officeDoorOf(office))
+      walk(besideDeskOf(office), officeDoorOf(office))
     }
     if (toFloor !== floor) {
-      walk([here[0], OFFICE3D_AISLE_Z], [1.2, OFFICE3D_AISLE_Z], DOOR)
+      // Its place in the line: the first presses the panel, the next wait behind, never in one.
+      const place = args.queued?.(floor, t) ?? 0
+      const spot: Office3dPoint = [OFFICE3D_CALL[0] + 1.2 * place, OFFICE3D_CALL[1]]
+      walk([here[0], OFFICE3D_AISLE_Z], [1.2 + 1.2 * place, OFFICE3D_AISLE_Z], spot)
       // Why booked for when it reaches the cab: the cab must not leave while it is still walking in.
       const walkIn = Math.max(
         0.2,
-        Math.hypot(DOOR[0] - OFFICE3D_LIFT[0], DOOR[1] - OFFICE3D_LIFT[1]) / (WALK * speed)
+        Math.hypot(spot[0] - OFFICE3D_LIFT[0], spot[1] - OFFICE3D_LIFT[1]) / (WALK * speed)
       )
+      // It presses the call button first; the cab answers only once it has.
+      hold(place === 0 ? 'call' : 'idle', PRESS / speed, OFFICE3D_CALL_PANEL)
       const booked = bookOffice3dCab(cab, floor, toFloor, t + walkIn, speed)
-      hold('idle', booked.board - walkIn - t, OFFICE3D_LIFT)
+      // It presses the call button and waits at the panel until the cab is here.
+      hold('idle', booked.board - walkIn - t, OFFICE3D_CALL_PANEL)
       walk(OFFICE3D_LIFT)
       hold('idle', booked.depart - t, null)
       push({ kind: 'ride', start: t, dur: booked.arrive - t })
@@ -152,14 +187,14 @@ export function office3dLeadRoundOf(args: {
   for (const [toFloor, stands] of trips) {
     for (const stand of stands) {
       goTo(toFloor, stand)
-      hold('talk', TALK * holdScale, [stand[0], 0])
+      hold('talk', TALK * holdScale, [stand[0] + 0.9, OFFICE3D_SEAT_Z])
     }
   }
   for (const key of args.visits) {
     const place = placeOf(key)
-    if (place?.floor === leadFloor && !args.needs.includes(key)) {
-      goTo(leadFloor, place.stand)
-      hold('give', GIVE * holdScale, [place.stand[0], 0])
+    if (place && !args.needs.includes(key)) {
+      goTo(place.floor, place.stand)
+      hold('give', GIVE * holdScale, [place.stand[0] + 0.9, OFFICE3D_SEAT_Z])
     }
   }
   if (floor !== leadFloor || here !== home) {
@@ -175,7 +210,7 @@ export function office3dLeadRoundOf(args: {
       here = home
     } else {
       goTo(leadFloor, officeDoorOf(office))
-      walk(home)
+      walk(besideDeskOf(office), home)
     }
   }
   hold('desk', HOME_PAUSE * holdScale, null)
@@ -198,7 +233,12 @@ export function office3dWalkerAt(
   pose: Office3dWalkPose
   blink: number
 } {
-  const tt = round.total > 0 ? ((t % round.total) + round.total) % round.total : 0
+  // Why a non-finite total plays once: the traffic's plans run on the clock and never loop.
+  const tt = !Number.isFinite(round.total)
+    ? t
+    : round.total > 0
+      ? ((t % round.total) + round.total) % round.total
+      : 0
   const s = round.steps.find((x) => tt >= x.start && tt < x.start + x.dur) ?? round.steps.at(-1)
   if (!s) {
     return { floor: round.cab.home, at: [0, 0], heading: null, pose: 'idle', blink: 1 }
@@ -211,7 +251,7 @@ export function office3dWalkerAt(
   if (s.kind === 'ride') {
     return {
       floor: office3dCabFloorAt(round.cab, tt),
-      at: OFFICE3D_LIFT,
+      at: s.at ?? OFFICE3D_LIFT,
       heading: [1, 0],
       pose: 'idle',
       blink: 1
