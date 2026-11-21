@@ -32,7 +32,7 @@ describe('agentTeamsSettingsPatchOf', () => {
 
   it('sets the scene and style without dropping the rest of the global layer', () => {
     const current = {
-      orchestratorGame: { band: true, scene: 'quest', panel: { tabs: { queue: false } } }
+      orchestratorGame: { band: true, scene: 'quest', panel: { tabs: { machines: false } } }
     }
 
     expect(
@@ -41,7 +41,7 @@ describe('agentTeamsSettingsPatchOf', () => {
       orchestratorGame: {
         band: true,
         scene: 'jrpg',
-        panel: { tabs: { queue: false }, style: 'office' }
+        panel: { tabs: { machines: false }, style: 'office' }
       }
     })
   })

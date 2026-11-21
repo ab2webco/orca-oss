@@ -51,6 +51,11 @@ import { useEnabledPluginSettingsPanels } from '@/components/plugins/plugin-surf
 import { resolvePluginPanelIcon } from '@/components/right-sidebar/plugin-panel-icon'
 import { getGeneralPaneSearchEntries } from '@/components/settings/general-search'
 import { getAgentsPaneSearchEntries } from '@/components/settings/agents-search'
+import {
+  gameRowFactsOf,
+  projectGameRowFactsOf
+} from '@/components/settings/orchestrator-game-row-visibility'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { getAccountsPaneSearchEntries } from '@/components/settings/accounts-search'
 import { getIntegrationsPaneSearchEntries } from '@/components/settings/integrations-search'
 import { getGitPaneSearchEntries } from '@/components/settings/git-search'
@@ -140,7 +145,8 @@ export function buildSettingsNavigationMetadata({
   isLinearConnected = false,
   isPlaneConnected = false,
   pluginSettingsPanels = [],
-  repos
+  repos,
+  gameSettings
 }: {
   isMac: boolean
   isWindows: boolean
@@ -155,6 +161,8 @@ export function buildSettingsNavigationMetadata({
   /** `surface: 'settings'` panels of enabled plugins, one Settings page each. */
   pluginSettingsPanels?: readonly ActivePluginPanel[]
   repos: readonly Repo[]
+  /** Hides the game rows a page hides from search; orca.yaml is read only by the open page. */
+  gameSettings?: Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>>
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
   const terminalPaneSearchEntries = getTerminalPaneSearchEntries({
@@ -186,7 +194,10 @@ export function buildSettingsNavigationMetadata({
       icon: Bot,
       searchEntries: getAgentsPaneSearchEntries({
         includeAgentAwake: !isWebClient,
-        includeAgentRuntime: isLocalWindowsHost
+        includeAgentRuntime: isLocalWindowsHost,
+        gameFacts:
+          gameSettings &&
+          gameRowFactsOf({ page: 'global', layers: { global: gameSettings.orchestratorGame } })
       }),
       group: 'capabilities'
     },
@@ -726,7 +737,8 @@ export function buildSettingsNavigationMetadata({
         description: `${getRepoKindLabel(project)} • ${hostSummary}`,
         icon: SlidersHorizontal,
         searchEntries: getRepositoryPaneSearchEntries(representativeRepo, {
-          windowsRuntimeSupported: isWindowsTerminalHost
+          windowsRuntimeSupported: isWindowsTerminalHost,
+          gameFacts: projectGameRowFactsOf(gameSettings, representativeRepoId)
         }),
         group: 'repositories'
       }
@@ -802,7 +814,11 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isLinearConnected,
         isPlaneConnected,
         pluginSettingsPanels,
-        repos
+        repos,
+        gameSettings: {
+          orchestratorGame: settings?.orchestratorGame,
+          orchestratorGameProjects: settings?.orchestratorGameProjects
+        }
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
     [
@@ -817,6 +833,8 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
       isPlaneConnected,
       pluginSettingsPanels,
       repos,
+      settings?.orchestratorGame,
+      settings?.orchestratorGameProjects,
       activeLocale
     ]
   )

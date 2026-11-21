@@ -12,17 +12,13 @@ import {
 } from '../../../../shared/orchestrator-game-lead'
 import { withOrchestratorGameProjectLead } from '../../../../shared/orchestrator-game-settings-updates'
 import { Input } from '../ui/input'
+import { SettingsRow, SettingsSubsectionHeader } from './SettingsFormControls'
 import {
-  SettingsRow,
-  SettingsSegmentedControl,
-  SettingsSubsectionHeader
-} from './SettingsFormControls'
-import {
-  orchestratorGameInheritLabel,
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
 import { translate } from '@/i18n/i18n'
+import { InheritableSegmentedRow } from './InheritableSettingRow'
 import { useGameHostProfile } from './use-game-host-profile'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
@@ -168,7 +164,8 @@ export function ProjectOrchestratorGameLeadSetting({
   // Why the host's snapshot: Orca's machine sets the cap no layer sets, as game.state does.
   const host = useGameHostProfile()
   const lead = resolveOrchestratorGameLead(layers, host)
-  const inherited = resolveOrchestratorGameLead({ ...layers, local: undefined }, host)
+  const below = { ...layers, local: undefined }
+  const inherited = resolveOrchestratorGameLead(below, host)
   const set = <K extends keyof OrchestratorGameLead>(
     key: K,
     value: OrchestratorGameLead[K] | undefined
@@ -187,7 +184,7 @@ export function ProjectOrchestratorGameLeadSetting({
   const switches: {
     key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame'
     label: string
-    isOn: boolean
+    isOn: (one: OrchestratorGameLead) => boolean
   }[] = [
     {
       key: 'autostart',
@@ -195,7 +192,7 @@ export function ProjectOrchestratorGameLeadSetting({
         'auto.components.settings.OrchestratorGameLeadSetting.autostart',
         'Start as lead'
       ),
-      isOn: lead.autostart
+      isOn: (one) => one.autostart === true
     },
     {
       key: 'actions',
@@ -204,7 +201,7 @@ export function ProjectOrchestratorGameLeadSetting({
         'Lead buttons'
       ),
       // Why: unset means on; Orca's buttons show unless a layer turns them off.
-      isOn: lead.actions !== false
+      isOn: (one) => one.actions !== false
     },
     {
       key: 'askBeforeResume',
@@ -212,7 +209,7 @@ export function ProjectOrchestratorGameLeadSetting({
         'auto.components.settings.OrchestratorGameLeadSetting.askBeforeResume',
         'Ask before resuming'
       ),
-      isOn: lead.askBeforeResume === true
+      isOn: (one) => one.askBeforeResume === true
     },
     {
       key: 'memberGame',
@@ -221,7 +218,7 @@ export function ProjectOrchestratorGameLeadSetting({
         'Game in member panes'
       ),
       // Why: unset means on; a launched member loads the game unless a layer turns it off.
-      isOn: lead.memberGame !== false
+      isOn: (one) => one.memberGame !== false
     }
   ]
   const accountsText = {
@@ -246,6 +243,14 @@ export function ProjectOrchestratorGameLeadSetting({
       'Most free'
     )
   }
+  const accountsChoiceOf = (one: OrchestratorGameLead): string =>
+    Array.isArray(one.accounts) || one.accounts !== 'default' ? 'auto' : 'default'
+  const accountsTextOf = (one: OrchestratorGameLead): string =>
+    Array.isArray(one.accounts)
+      ? one.accounts.join(', ')
+      : one.accounts === 'default'
+        ? accountsText.default
+        : accountsText.auto
   const textOf = (key: LeadTextKey): string => {
     const value = lead[key]
     if (value !== undefined) {
@@ -269,51 +274,41 @@ export function ProjectOrchestratorGameLeadSetting({
         )}
       />
       {switches.map((row) => (
-        <SettingsRow
+        <InheritableSegmentedRow
           key={row.key}
           label={row.label}
-          description={effective(row.key, row.isOn ? onOff.on : onOff.off)}
-          control={
-            <SettingsSegmentedControl
-              value={stored?.[row.key] === undefined ? 'inherit' : String(stored[row.key])}
-              ariaLabel={row.label}
-              size="sm"
-              options={[
-                { value: 'inherit', label: orchestratorGameInheritLabel() },
-                { value: 'true', label: onOff.on },
-                { value: 'false', label: onOff.off }
-              ]}
-              onChange={(next) => set(row.key, next === 'inherit' ? undefined : next === 'true')}
-            />
-          }
+          options={[
+            { value: 'true', label: onOff.on },
+            { value: 'false', label: onOff.off }
+          ]}
+          applied={String(row.isOn(lead))}
+          source={orchestratorGameSourceLabel(gameLeadSourceOf(layers, row.key))}
+          inherited={{
+            value: String(row.isOn(inherited)),
+            label: row.isOn(inherited) ? onOff.on : onOff.off,
+            source: orchestratorGameSourceLabel(gameLeadSourceOf(below, row.key))
+          }}
+          isOverridden={stored?.[row.key] !== undefined}
+          onPick={(next) => set(row.key, next === undefined ? undefined : next === 'true')}
         />
       ))}
-      <SettingsRow
+      <InheritableSegmentedRow
         label={accountsText.label}
-        description={effective(
-          'accounts',
-          Array.isArray(lead.accounts)
-            ? lead.accounts.join(', ')
-            : lead.accounts === 'default'
-              ? accountsText.default
-              : accountsText.auto
-        )}
-        control={
-          <SettingsSegmentedControl
-            // Why: an allow-list comes from orca.yaml; Settings can only override it with default or auto.
-            value={Array.isArray(stored?.accounts) ? 'auto' : (stored?.accounts ?? 'inherit')}
-            ariaLabel={accountsText.label}
-            size="sm"
-            options={[
-              { value: 'inherit', label: orchestratorGameInheritLabel() },
-              { value: 'default', label: accountsText.defaultOption },
-              { value: 'auto', label: accountsText.autoOption }
-            ]}
-            onChange={(next) =>
-              set('accounts', next === 'default' || next === 'auto' ? next : undefined)
-            }
-          />
-        }
+        options={[
+          { value: 'default', label: accountsText.defaultOption },
+          { value: 'auto', label: accountsText.autoOption }
+        ]}
+        // Why: an allow-list comes from orca.yaml; Settings can only override it with default or auto.
+        applied={accountsChoiceOf(lead)}
+        source={orchestratorGameSourceLabel(gameLeadSourceOf(layers, 'accounts'))}
+        appliedLabel={accountsTextOf(lead)}
+        inherited={{
+          value: accountsChoiceOf(inherited),
+          label: accountsTextOf(inherited),
+          source: orchestratorGameSourceLabel(gameLeadSourceOf(below, 'accounts'))
+        }}
+        isOverridden={stored?.accounts !== undefined}
+        onPick={(next) => set('accounts', next === 'default' || next === 'auto' ? next : undefined)}
       />
       {fields().map((field) => {
         const value = stored?.[field.key]

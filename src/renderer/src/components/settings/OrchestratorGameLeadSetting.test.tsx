@@ -99,7 +99,7 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     view.unmount()
   })
 
-  it('starts as lead on this machine, and inherits again', () => {
+  it('starts as lead on this machine, and resets to the inherited value', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({ orchestratorGameProjects: { repo1: { hud: false } } }, undefined, updates)
     click(view.container, '[aria-label="Start as lead"] button', 'On')
@@ -110,7 +110,7 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
       undefined,
       updates
     )
-    click(overridden.container, '[aria-label="Start as lead"] button', 'Inherit')
+    click(overridden.container, '[data-slot="game-row-source"] button', 'Reset to Off (default)')
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { hud: false, orchestrator: { autostart: true } } } },
       { orchestratorGameProjects: {} }

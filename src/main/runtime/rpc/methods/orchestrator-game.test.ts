@@ -385,6 +385,25 @@ describe('game.hidePanelTab RPC', () => {
     await expect(hide({ tab: 'team' })).resolves.toMatchObject({ ok: false })
     expect(calls).toEqual([{ tab: 'prs', worktreeId: 'w1', terminalHandle: undefined }])
   })
+
+  it("answers an older client's queue unchanged, writing nothing (ORCA-1112)", async () => {
+    const calls: unknown[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      hideOrchestratorGamePanelTab: async (args: unknown) => calls.push(args)
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await expect(
+      dispatcher.dispatch({
+        id: 'q',
+        authToken: 'test',
+        method: 'game.hidePanelTab',
+        params: { tab: 'queue' }
+      })
+    ).resolves.toMatchObject({ ok: true, result: { tab: 'queue', changed: false } })
+    expect(calls).toEqual([])
+  })
 })
 
 describe('game.setView RPC', () => {

@@ -1911,7 +1911,7 @@ describe('OrcaRuntimeService', () => {
   it("merges a paired phone's Agent Teams scene, style and colours into Settings", async () => {
     let settings = {
       ...store.getSettings(),
-      orchestratorGame: { band: true, panel: { tabs: { queue: false } } },
+      orchestratorGame: { band: true, panel: { tabs: { machines: false } } },
       statusColors: { light: { info: '#111111' } }
     }
     const updateSettings = vi.fn((updates: Partial<typeof settings>) => {
@@ -1934,7 +1934,7 @@ describe('OrcaRuntimeService', () => {
         orchestratorGame: {
           band: true,
           scene: 'jrpg',
-          panel: { tabs: { queue: false }, style: 'figures' }
+          panel: { tabs: { machines: false }, style: 'figures' }
         },
         statusColors: { light: { info: '#111111' }, dark: { success: '#3ddc97' } }
       },

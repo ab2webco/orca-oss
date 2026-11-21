@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { OrchestratorGameConfig } from '../../../../shared/orchestrator-game-config'
+import type {
+  OrchestratorGameConfig,
+  OrchestratorGameMode
+} from '../../../../shared/orchestrator-game-config'
 import { normalizeSupportedUiLocale } from '../../../../shared/ui-locale'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
@@ -49,16 +52,6 @@ function paint(canvas: HTMLCanvasElement, frame: ScenePreviewFrame): void {
 }
 
 const notes = {
-  off: (): string =>
-    translate(
-      'auto.components.settings.OrchestratorGameSetting.previewOff',
-      'The game is off, so Agent Teams panes start as plain Claude.'
-    ),
-  flat: (): string =>
-    translate(
-      'auto.components.settings.OrchestratorGameSetting.previewFlat',
-      'Flat draws the game as text, with no scene or characters.'
-    ),
   zen: (): string =>
     translate(
       'auto.components.settings.OrchestratorGameSetting.previewZen',
@@ -89,12 +82,21 @@ function fileSceneOf(read: SceneFileState | null | undefined): SceneDefinition |
   return read.status === 'ok' ? read.definition : QUEST_SCENE
 }
 
+/** The modes that draw a scene; Off and Flat never reach the preview. */
+export type ScenePreviewMode = Exclude<OrchestratorGameMode, 'off' | 'flat'>
+
+// Why no Off or Flat: the band preview row shows only in a pixel view (orchestrator-game-row-visibility).
+export const scenePreviewModeOf = (mode: OrchestratorGameMode): ScenePreviewMode =>
+  mode === 'zen' ? 'zen' : 'on'
+
 /** The scene an Agent Teams pane draws on its spinner, painted by the mod's own code. */
 export function OrchestratorGameScenePreview({
   config: { scene, mode, render, timezone },
   fileScene
 }: {
-  config: Pick<OrchestratorGameConfig, 'scene' | 'mode' | 'render' | 'timezone'>
+  config: Pick<OrchestratorGameConfig, 'scene' | 'render' | 'timezone'> & {
+    mode: ScenePreviewMode
+  }
   /** The read of a project's scene file, when `scene` is a `file:` id. */
   fileScene?: SceneFileState | null
 }): React.JSX.Element {
@@ -108,13 +110,7 @@ export function OrchestratorGameScenePreview({
       },
     [plugins, scene]
   )
-  const definition =
-    // Why flat too: a flat pane never draws the scene, so the preview must not either.
-    mode === 'off' || mode === 'flat'
-      ? null
-      : option.kind === 'file'
-        ? fileSceneOf(fileScene)
-        : previewSceneOf(option)
+  const definition = option.kind === 'file' ? fileSceneOf(fileScene) : previewSceneOf(option)
   const isFileFallback = option.kind === 'file' && definition !== null && fileScene?.status !== 'ok'
   const isReduced = usePrefersReducedMotion()
   const isAnimated = definition !== null && !isReduced
@@ -146,19 +142,15 @@ export function OrchestratorGameScenePreview({
   }, [frame])
 
   const note =
-    mode === 'off'
-      ? notes.off()
-      : mode === 'flat'
-        ? notes.flat()
-        : option.kind === 'plugin'
-          ? notes.plugin()
-          : isFileFallback
-            ? notes.file()
-            : option.kind === 'missing'
-              ? notes.missing()
-              : mode === 'zen'
-                ? notes.zen()
-                : null
+    option.kind === 'plugin'
+      ? notes.plugin()
+      : isFileFallback
+        ? notes.file()
+        : option.kind === 'missing'
+          ? notes.missing()
+          : mode === 'zen'
+            ? notes.zen()
+            : null
 
   return (
     <figure

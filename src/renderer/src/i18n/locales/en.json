@@ -11630,7 +11630,6 @@
         "OrchestratorGameSetting": {
           "title": "Agent Teams game",
           "description": "Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.",
-          "mode": "Game mode",
           "on": "On",
           "zen": "Zen",
           "off": "Off",
@@ -11648,7 +11647,6 @@
           "sceneTamer": "Beast Tamer (built-in)",
           "sceneMissing": "{{value0}} (not installed)",
           "sceneProjectFile": "{{value0}} (custom)",
-          "inherit": "Inherit",
           "projectDescription": "Override the game for this project on this machine. The project's orca.yaml sets its default.",
           "sourceDefault": "default",
           "sourceGlobal": "global setting",
@@ -11657,7 +11655,6 @@
           "scope": "Applies only to Claude Agent Teams panes. Plain Claude, Codex and other agents never load it.",
           "previewLabel": "Scene preview",
           "previewImage": "Preview of {{value0}}",
-          "previewOff": "The game is off, so Agent Teams panes start as plain Claude.",
           "previewZen": "Zen draws the same scene and also hides short working notes.",
           "previewPlugin": "This plugin's art is only drawn inside an Agent Teams pane.",
           "previewMissing": "Not installed, so the game draws Quest.",
@@ -11680,7 +11677,6 @@
           "previewFileFallback": "Until the scene file is valid, the game draws Quest.",
           "sceneFileNotText": "not a text file",
           "flat": "Flat",
-          "previewFlat": "Flat draws the game as text, with no scene or characters.",
           "terminalBand": "Terminal band",
           "band": "Show the band",
           "bandDescription": "The pixel scene and HUD in Agent Teams panes.",
@@ -11725,7 +11721,7 @@
           "label": "Render",
           "description": "Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.",
           "timezone": "Time zone",
-          "timezoneDescription": "When HD turns to night. Empty or local follows this machine's clock.",
+          "timezoneDescription": "When the scenes turn to night and the day's numbers start. Empty or local follows this machine's clock.",
           "timezoneInvalid": "Use local or an IANA time zone such as America/Bogota."
         },
         "orcaGameScenes": {
@@ -11794,9 +11790,7 @@
           "machines": "Machines",
           "machinesDescription": "Tab with the hosts and their memory.",
           "prs": "PRs",
-          "prsDescription": "Tab with your open PRs.",
-          "queue": "Queue",
-          "queueDescription": "The merge queue at the top of PRs.",
+          "prsDescription": "Tab with your open PRs. The merge queue shows at the top when there is one.",
           "show": "Show {{label}}",
           "style": "Scene style",
           "styleDescription": "They all act out the same real state.",
@@ -11852,6 +11846,13 @@
           "hours24": "24 h",
           "days3": "3 d",
           "days7": "7 d"
+        },
+        "OrchestratorGameTerminalBand": {
+          "terminalPanes": "Terminal panes",
+          "terminalPanesDescription": "How Agent Teams terminal panes start and draw the game on this machine."
+        },
+        "InheritableSettingRow": {
+          "resetTo": "Reset to {{value}} ({{source}})"
         }
       },
       "right": {

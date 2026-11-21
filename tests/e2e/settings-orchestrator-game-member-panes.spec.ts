@@ -44,9 +44,13 @@ test("the project lead's Game in member panes switch saves this machine's choice
   const lead = orcaPage.locator('[data-slot="game-lead-settings"]')
   const memberGame = lead.getByRole('radiogroup', { name: 'Game in member panes' })
   await expect(memberGame).toBeVisible({ timeout: 15_000 })
-  // Unset: the row inherits, and a launched member loads the game unless a layer turns it off.
-  await expect(memberGame.getByRole('radio').first()).toBeChecked()
-  await expect(memberGame.getByRole('radio', { name: 'On' })).not.toBeChecked()
+  // Unset: the row shows the On it inherits, with no Reset since this machine sets nothing (D3).
+  // Why two levels up: the radiogroup sits in the row's control slot, beside its description.
+  const memberRow = memberGame.locator('xpath=../..')
+  const reset = memberRow.locator('[data-slot="game-row-source"] button')
+  await expect(memberGame.getByRole('radio', { name: 'On' })).toBeChecked()
+  await expect(memberGame.getByRole('radio', { name: 'Inherit' })).toHaveCount(0)
+  await expect(reset).toHaveCount(0)
 
   const shoot = async (state: 'default' | 'on' | 'off') => {
     for (const theme of THEMES) {
@@ -76,12 +80,13 @@ test("the project lead's Game in member panes switch saves this machine's choice
     .poll(() => savedProjects(orcaPage))
     .toEqual({ [repoId as string]: { orchestrator: { memberGame: false } } })
   await expect(memberGame.getByRole('radio', { name: 'Off' })).toBeChecked()
+  await expect(reset).toHaveText('Reset to On (default)')
   await shoot('off')
 
+  // Why cleared: picking the inherited value drops the override instead of storing a copy.
   await memberGame.getByRole('radio', { name: 'On' }).click()
-  await expect
-    .poll(() => savedProjects(orcaPage))
-    .toEqual({ [repoId as string]: { orchestrator: { memberGame: true } } })
+  await expect.poll(() => savedProjects(orcaPage)).toEqual({})
   await expect(memberGame.getByRole('radio', { name: 'On' })).toBeChecked()
+  await expect(reset).toHaveCount(0)
   await shoot('on')
 })

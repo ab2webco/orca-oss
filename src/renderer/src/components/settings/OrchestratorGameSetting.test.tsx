@@ -173,7 +173,7 @@ describe('game settings section', () => {
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
         settings={{ orchestratorGame: { scene: 'tamer', band: true } }}
-        projectLayer={{ scene: 'jrpg', mode: 'off' }}
+        projectLayer={{ scene: 'jrpg', mode: 'zen' }}
         updateSettings={() => undefined}
       />
     )
@@ -181,7 +181,7 @@ describe('game settings section', () => {
     expect(view.container.textContent).toContain('Applies only to Claude Agent Teams panes')
     const preview = view.container.querySelector<HTMLElement>('[data-slot="game-scene-preview"]')
     expect(preview?.dataset.scene).toBe('jrpg')
-    expect(preview?.dataset.mode).toBe('off')
+    expect(preview?.dataset.mode).toBe('zen')
     view.unmount()
   })
 })
@@ -196,16 +196,20 @@ describe('ProjectOrchestratorGameSetting', () => {
           orchestratorGame: { band: true },
           orchestratorGameProjects: { repo1: { hud: false } }
         }}
-        projectLayer={{ mode: 'off' }}
+        projectLayer={{ mode: 'flat' }}
         updateSettings={(update) => updates.push(update)}
       />
     )
 
-    expect(view.container.textContent).toContain('Off · from orca.yaml')
+    expect(view.container.textContent).toContain('Flat · from orca.yaml')
     expect(view.container.textContent).toContain('Off · this machine')
 
     choose(viewSelect(view.container), 'zen')
-    click(view.container, '[aria-label="Teammate HUD"] button', 'Inherit')
+    click(
+      view.container,
+      '[data-game-row="hud"] [data-slot="game-row-source"] button',
+      'Reset to On (default)'
+    )
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { hud: false, mode: 'zen' } } },
       { orchestratorGameProjects: {} }
@@ -276,7 +280,7 @@ describe('game scene picker', () => {
     view.unmount()
   })
 
-  it('shows the orca.yaml scene as-is and overrides or inherits it for this machine', () => {
+  it('selects the orca.yaml scene as-is and overrides it for this machine', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
@@ -289,7 +293,7 @@ describe('game scene picker', () => {
 
     expect(view.container.textContent).toContain('acme.gone/orbit · from orca.yaml')
     const select = sceneSelect(view.container)
-    expect(select.value).toBe('inherit')
+    expect(select.value).toBe('acme.gone/orbit')
     choose(select, 'acme.space/orbit')
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { scene: 'acme.space/orbit' } } }
@@ -365,11 +369,18 @@ const timezoneField = (container: HTMLElement): HTMLInputElement => {
 describe('render and time zone', () => {
   it('writes the render and a valid time zone globally, refusing a zone that does not exist', () => {
     const updates: Partial<GlobalSettings>[] = []
+    // Why both sections: the zone moved to the Panel group, which reads it too (ORCA-1112).
     const view = render(
-      <OrchestratorGameSetting
-        settings={{ orchestratorGame: { band: true } }}
-        updateSettings={(update) => updates.push(update)}
-      />
+      <>
+        <GamePanelSetting
+          settings={{ orchestratorGame: { band: true } }}
+          updateSettings={(update) => updates.push(update)}
+        />
+        <OrchestratorGameSetting
+          settings={{ orchestratorGame: { band: true } }}
+          updateSettings={(update) => updates.push(update)}
+        />
+      </>
     )
     click(view.container, '[aria-label="Render"] button', 'HD')
     typeAndLeave(timezoneField(view.container), 'Mars/Olympus')
@@ -400,7 +411,7 @@ describe('render and time zone', () => {
   it('goes back to the local clock when the global zone is cleared', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
-      <OrchestratorGameSetting
+      <GamePanelSetting
         settings={{ orchestratorGame: { timezone: 'Asia/Tokyo', band: true } }}
         updateSettings={(update) => updates.push(update)}
       />
@@ -481,9 +492,7 @@ describe('the terminal band group', () => {
     container.querySelector<HTMLElement>('[role="group"][aria-label="Terminal band"]')
   const drawnRows = (band: HTMLElement | null) => [
     band?.querySelector('[data-slot="game-scene-preview"]') ?? null,
-    ...['Render', 'Time zone', 'Teammate HUD'].map(
-      (label) => band?.querySelector(`[aria-label="${label}"]`) ?? null
-    )
+    ...['Render'].map((label) => band?.querySelector(`[aria-label="${label}"]`) ?? null)
   ]
 
   it('holds what Agent Teams panes draw under its own heading, apart from the panel, globally and per project', () => {
@@ -498,6 +507,10 @@ describe('the terminal band group', () => {
       )
       expect(hasSceneSelect(band)).toBe(false)
       expect(drawnRows(band).every(Boolean)).toBe(true)
+      // ORCA-1112: the panel and the terminal panes read these too, so they sit outside the band.
+      expect(band?.querySelector('[aria-label="Time zone"]')).toBeNull()
+      expect(band?.querySelector('[aria-label="Teammate HUD"]')).toBeNull()
+      expect(view.container.querySelector('[aria-label="Teammate HUD"]')).toBeTruthy()
       expect(band?.querySelector('[aria-label="Scene style"]')).toBeNull()
       expect(band?.querySelector('[data-slot="game-panel-style-preview"]')).toBeNull()
       view.unmount()
@@ -541,7 +554,7 @@ describe('the terminal band group', () => {
   })
 })
 
-describe('the scene leads the Panel group', () => {
+describe('the scene follows the look and style in the Panel group (ORCA-1112)', () => {
   const before = (first: Element | null, second: Element | null): boolean =>
     Boolean(
       first && second && first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -549,7 +562,7 @@ describe('the scene leads the Panel group', () => {
   const preview = (container: HTMLElement) =>
     container.querySelector<HTMLElement>('[data-slot="game-panel-style-preview"]')
 
-  it('sits above the look and style globally and draws the panel preview of the chosen scene', () => {
+  it('sits below the look and style globally and draws the panel preview of the chosen scene', () => {
     const view = render(
       <GamePanelSetting
         settings={{ orchestratorGame: { scene: 'tamer' } }}
@@ -558,13 +571,13 @@ describe('the scene leads the Panel group', () => {
     )
 
     const scene = sceneSelect(view.container)
-    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
-    expect(before(scene, view.container.querySelector('[aria-label="Scene style"]'))).toBe(true)
+    expect(before(view.container.querySelector('[aria-label="Panel look"]'), scene)).toBe(true)
+    expect(before(view.container.querySelector('[aria-label="Scene style"]'), scene)).toBe(true)
     expect(preview(view.container)?.dataset.scene).toBe('tamer')
     view.unmount()
   })
 
-  it('sits above the look and style per project, outside the terminal band', () => {
+  it('sits below the look per project, outside the terminal band', () => {
     const view = render(
       <ProjectOrchestratorGameSetting
         repo={{ id: 'repo1', path: '/repo', connectionId: null }}
@@ -575,7 +588,7 @@ describe('the scene leads the Panel group', () => {
     )
 
     const scene = sceneSelect(view.container)
-    expect(before(scene, view.container.querySelector('[aria-label="Panel look"]'))).toBe(true)
+    expect(before(view.container.querySelector('[aria-label="Panel look"]'), scene)).toBe(true)
     expect(
       view.container.querySelector('[role="group"][aria-label="Terminal band"]')?.contains(scene)
     ).toBe(false)

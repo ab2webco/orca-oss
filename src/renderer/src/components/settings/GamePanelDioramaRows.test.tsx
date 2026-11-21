@@ -33,6 +33,14 @@ function press(container: HTMLElement, group: string, label: string): void {
   act(() => target?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 }
 
+function clickButton(container: HTMLElement, label: string): void {
+  const target = Array.from(container.querySelectorAll<HTMLElement>('button')).find(
+    (entry) => entry.textContent?.trim() === label
+  )
+  expect(target, label).toBeTruthy()
+  act(() => target?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+}
+
 const segments = (container: HTMLElement, group: string): string[] =>
   Array.from(container.querySelectorAll(`[aria-label="${group}"] [role="radio"]`)).map(
     (entry) => entry.textContent?.trim() ?? ''
@@ -83,7 +91,7 @@ describe('the diorama rows in the panel settings', () => {
     view.unmount()
   })
 
-  it("store this machine's pace for one project, and inherit it again", () => {
+  it("store this machine's pace for one project, and reset it to the inherited one", () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectGamePanelRows
@@ -98,7 +106,8 @@ describe('the diorama rows in the panel settings', () => {
       />
     )
     expect(view.container.textContent).toContain('Fast · this machine')
-    press(view.container, "Lead's pace", 'Inherit')
+    expect(segments(view.container, "Lead's pace")).not.toContain('Inherit')
+    clickButton(view.container, 'Reset to Normal (default)')
     press(view.container, 'Scene quality', 'Low resources')
     expect(updates).toEqual([
       { orchestratorGameProjects: {} },
