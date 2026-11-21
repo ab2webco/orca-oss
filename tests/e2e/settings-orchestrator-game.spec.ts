@@ -94,9 +94,11 @@ test('global and per-project Agent Teams game settings persist and render at eve
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
     .toEqual({ mode: 'zen', rewards: false, band: true, show: false })
-  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeDisabled()
-  await expect(globalSection).toHaveText('Zen · medium')
+  // Why gone, not disabled: with the game hidden only its gate is in use (ORCA-1112).
+  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toHaveCount(0)
+  await expect(globalSection).toHaveCount(0)
   await show.click()
+  await expect(globalSection).toHaveText('Zen · medium')
   await expect
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGame)
     .toEqual({ mode: 'zen', rewards: false, band: true, show: true })
@@ -133,8 +135,15 @@ test('global and per-project Agent Teams game settings persist and render at eve
     .poll(async () => (await savedGameSettings(orcaPage)).orchestratorGameProjects)
     .toEqual({ [repoId as string]: { mode: 'on', render: 'hd', show: false } })
   await expect(orcaPage.getByText('Off · this machine').first()).toBeVisible()
+  await expect(projectView).toHaveCount(0)
 
-  await shootAll(electronApp, orcaPage, testInfo, 'project', projectView)
+  await shootAll(
+    electronApp,
+    orcaPage,
+    testInfo,
+    'project',
+    orcaPage.getByRole('radiogroup', { name: 'Show the game' })
+  )
 })
 
 const SPACE_PACK = {
@@ -286,9 +295,8 @@ test('the game section says it is for Claude Agent Teams only and previews the p
   await setWindowWidth(electronApp, orcaPage, 1440)
   await orcaPage.getByRole('switch', { name: 'Show the game' }).first().click()
   await expect(nightWatch).toBeHidden()
-  await expect(
-    orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')
-  ).toBeVisible()
+  // Why gone: with the game hidden nothing draws, so the band group and its preview leave the page.
+  await expect(orcaPage.locator('[data-game-group="band"]')).toHaveCount(0)
   await heading.evaluate((element) => element.scrollIntoView({ block: 'start' }))
   await orcaPage.screenshot({ path: testInfo.outputPath('preview-off-1440.png') })
 })
