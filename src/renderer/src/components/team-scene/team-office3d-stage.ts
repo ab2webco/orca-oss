@@ -15,7 +15,7 @@ import type {
 } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { dioramaFitCamera } from './team-diorama-camera'
-import { dioramaAim, type DioramaView } from './team-diorama-view'
+import { dioramaAim, dioramaLeadZoom, type DioramaView } from './team-diorama-view'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
@@ -254,6 +254,31 @@ export function office3dStage(
   })
   sun.shadow.camera.updateProjectionMatrix()
 
+  // Why clamped: centred on a lead at the bottom floor, half the frame showed nothing under it.
+  const right = new THREE.Vector3().setFromMatrixColumn(fit.camera.matrixWorld, 0)
+  const up = new THREE.Vector3().setFromMatrixColumn(fit.camera.matrixWorld, 1)
+  const { min, max } = fit.ground
+  const corners = [min.x, max.x].flatMap((x) =>
+    [min.y, max.y].flatMap((y) => [min.z, max.z].map((z) => new THREE.Vector3(x, y, z)))
+  )
+  const span = (axis: THREE.Vector3) => {
+    const d = corners.map((c) => c.dot(axis))
+    return [Math.min(...d), Math.max(...d)] as const
+  }
+  const [rights, ups] = [span(right), span(up)]
+  const clampAxis = (v: number, [lo, hi]: readonly [number, number], half: number) =>
+    hi - lo <= 2 * half ? (lo + hi) / 2 : Math.min(hi - half, Math.max(lo + half, v))
+  const keepInside = (p: THREE.Vector3, zoom: number): THREE.Vector3 => {
+    const r = p.dot(right)
+    const u = p.dot(up)
+    const r2 = clampAxis(r, rights, fit.camera.right / zoom)
+    const u2 = clampAxis(u, ups, fit.camera.top / zoom)
+    return p
+      .clone()
+      .addScaledVector(right, r2 - r)
+      .addScaledVector(up, u2 - u)
+  }
+
   return {
     height: fit.height,
     draw: (t) => {
@@ -261,7 +286,11 @@ export function office3dStage(
         tick(t)
       }
       if (args.view) {
-        dioramaAim(args.view, fit, lead.g.position, args.width, t)
+        const aim =
+          args.view.mode === 'lead'
+            ? keepInside(lead.g.position, dioramaLeadZoom(fit.span))
+            : lead.g.position
+        dioramaAim(args.view, fit, aim, args.width, t)
       }
       renderer.render(scene, fit.camera)
     },

@@ -349,4 +349,48 @@ describe('the 3D Office stage', () => {
     expect(lit, 'the call panel never lit').toBeGreaterThan(0)
     expect(darkOnArrival).toBeGreaterThan(0)
   })
+
+  it('keeps the followed view inside the building, never past its bottom or sides', () => {
+    const view = dioramaView()
+    const { stage, cameras, scenes } = stageOf(
+      [member('a', 'working'), member('c', 'needsYou')],
+      [floor('', ['a']), floor('m2', ['c']), floor('gpu', [])],
+      false,
+      view
+    )
+    for (let t = 0; t < 40; t += 1 / 30) {
+      stage.draw(t)
+    }
+    const cam = cameras.at(-1)!
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0)
+    const up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1)
+    const box = new THREE.Box3()
+    // The building: solid meshes only, as the camera fit counts them.
+    scenes.at(-1)!.traverse((o) => {
+      const m = o as THREE.Mesh
+      const mat = m.material as THREE.Material | undefined
+      if (m.isMesh && mat && !mat.transparent && m.geometry.type !== 'PlaneGeometry') {
+        box.union(new THREE.Box3().setFromObject(m))
+      }
+    })
+    const corners = [box.min, box.max].flatMap((a) =>
+      [box.min.y, box.max.y].flatMap((y) =>
+        [box.min.z, box.max.z].map((z) => new THREE.Vector3(a.x, y, z))
+      )
+    )
+    const ups = corners.map((c) => c.dot(up))
+    const rights = corners.map((c) => c.dot(right))
+    const t = view.target!
+    const halfH = cam.top / cam.zoom
+    const halfW = cam.right / cam.zoom
+    expect(t.dot(up) - halfH, 'frame runs past the bottom').toBeGreaterThanOrEqual(
+      Math.min(...ups) - 0.5
+    )
+    expect(t.dot(right) - halfW, 'frame runs past the left').toBeGreaterThanOrEqual(
+      Math.min(...rights) - 0.5
+    )
+    expect(t.dot(right) + halfW, 'frame runs past the right').toBeLessThanOrEqual(
+      Math.max(...rights) + 0.5
+    )
+  })
 })
