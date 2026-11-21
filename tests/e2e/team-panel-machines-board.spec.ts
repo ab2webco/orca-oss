@@ -307,8 +307,16 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
   }
 })
 
-/** Where a strip tile draws its number over its label, lets text leave the tile, or splits "N of M". */
-function stripFaults(strip: HTMLElement): string[] {
+/**
+ * Sizes the strip's container for each panel width from `from` to `to` and lists where a tile draws
+ * its number over its label, lets text leave the tile, or splits "N of M".
+ * Why in one evaluate: a sidebar resize and a round trip per width ran past the CI test budget.
+ */
+function sweepStrip(strip: HTMLElement, [from, to]: [number, number]): string[] {
+  const container = strip.parentElement!
+  const panel = strip.closest<HTMLElement>('[data-testid="team-panel"]')!
+  // Why an offset: the container sits inside the panel's padding and scrollbar.
+  const inset = panel.getBoundingClientRect().width - container.getBoundingClientRect().width
   const textBox = (node: Element): DOMRect => {
     const range = document.createRange()
     range.selectNodeContents(node)
@@ -320,24 +328,31 @@ function stripFaults(strip: HTMLElement): string[] {
     a.top < b.bottom - 0.5 &&
     b.top < a.bottom - 0.5
   const faults: string[] = []
-  for (const tile of strip.querySelectorAll<HTMLElement>('[data-team-machines-figure]')) {
-    const box = tile.getBoundingClientRect()
-    const name = `${tile.dataset.teamMachinesFigure} (${getComputedStyle(tile).display}, ${Math.round(box.width)}px)`
-    const label = tile.querySelector('[data-team-machines-label]')!
-    const value = tile.querySelector('[data-team-machines-value]')!
-    if (meets(textBox(label), textBox(value))) {
-      faults.push(`${name}: number over its label`)
-    }
-    for (const part of [label, value, ...tile.querySelectorAll('[data-team-machines-lines]')]) {
-      const text = textBox(part)
-      if (text.left < box.left - 0.5 || text.right > box.right + 0.5) {
-        faults.push(`${name}: "${part.textContent}" leaves the tile`)
+  try {
+    for (let width = from; width <= to; width++) {
+      container.style.width = `${width - inset}px`
+      for (const tile of strip.querySelectorAll<HTMLElement>('[data-team-machines-figure]')) {
+        const box = tile.getBoundingClientRect()
+        const name = `${width}: ${tile.dataset.teamMachinesFigure} (${getComputedStyle(tile).display}, ${Math.round(box.width)}px)`
+        const label = tile.querySelector('[data-team-machines-label]')!
+        const value = tile.querySelector('[data-team-machines-value]')!
+        if (meets(textBox(label), textBox(value))) {
+          faults.push(`${name}: number over its label`)
+        }
+        for (const part of [label, value, ...tile.querySelectorAll('[data-team-machines-lines]')]) {
+          const text = textBox(part)
+          if (text.left < box.left - 0.5 || text.right > box.right + 0.5) {
+            faults.push(`${name}: "${part.textContent}" leaves the tile`)
+          }
+        }
+        const total = value.querySelector('small')
+        if (total && total.getClientRects().length > 1) {
+          faults.push(`${name}: "${total.textContent}" split over lines`)
+        }
       }
     }
-    const total = value.querySelector('small')
-    if (total && total.getClientRects().length > 1) {
-      faults.push(`${name}: "${total.textContent}" split over lines`)
-    }
+  } finally {
+    container.style.width = ''
   }
   return faults
 }
@@ -346,7 +361,7 @@ test('the summary strip keeps each number clear of its label at every sidebar wi
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(600_000)
+  test.setTimeout(CAPTURE_EVIDENCE ? 600_000 : 180_000)
   const agent = createStdinLoggingAgent()
   try {
     const panel = await openTeamPanel(electronApp, orcaPage, agent.command)
@@ -363,12 +378,12 @@ test('the summary strip keeps each number clear of its label at every sidebar wi
       await rereadPanel(orcaPage)
       await panel.getByRole('tab', { name: COPY[language].tab }).click({ timeout: 30_000 })
       await expect(strip).toBeVisible({ timeout: 30_000 })
-      const faults: string[] = []
-      for (let width = 219; width <= 600; width++) {
-        await setWidth(width)
-        const panelWidth = Math.round((await panel.boundingBox())!.width)
-        faults.push(...(await strip.evaluate(stripFaults)).map((one) => `${panelWidth}: ${one}`))
-      }
+      const started = Date.now()
+      const faults = await strip.evaluate(sweepStrip, [219, 600] as [number, number])
+      testInfo.annotations.push({
+        type: 'sweep',
+        description: `${language}: 382 widths in ${Date.now() - started} ms`
+      })
       expect.soft(faults, `strip faults in ${language}`).toEqual([])
       if (CAPTURE_EVIDENCE) {
         await orcaPage.mouse.move(0, 0)
