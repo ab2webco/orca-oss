@@ -26,10 +26,6 @@ export const getGamePanelSearchEntries = createLocalizedCatalog(() => [
         fallback: 'PRs'
       },
       {
-        key: 'auto.components.settings.OrchestratorGamePanelSetting.queue',
-        fallback: 'Queue'
-      },
-      {
         key: 'auto.components.settings.OrchestratorGamePanelSetting.machines',
         fallback: 'Machines'
       },

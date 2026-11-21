@@ -17,7 +17,7 @@ export const ORCHESTRATOR_GAME_VIEW_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'hide-tab'],
     summary: "Hide a native panel tab for the calling pane's project on this machine",
-    usage: 'orca game hide-tab <prs|queue|machines> [--json]',
+    usage: 'orca game hide-tab <prs|machines> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'tab'],
     positionalArgs: ['tab'],
     notes: [

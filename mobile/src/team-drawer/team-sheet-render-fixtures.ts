@@ -267,7 +267,7 @@ export const gamePanel = (style: string, look = 'game') => ({
   panel: {
     look,
     style,
-    tabs: { prs: true, queue: true, machines: true },
+    tabs: { prs: true, machines: true },
     advisor: true,
     arcade: true
   }

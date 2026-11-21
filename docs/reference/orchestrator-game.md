@@ -255,7 +255,7 @@ orchestratorGame:
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
     style: pixel # figures | office | pixel, for the game look
-    tabs: { prs: true, queue: false, machines: true }
+    tabs: { prs: true, machines: true } # the merge queue shows at the top of PRs; a stored queue is ignored
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
     quality: high # high | low: Figures' diorama illustrated, or flat without shadows

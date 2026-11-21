@@ -88,14 +88,7 @@ const copy = () => ({
     translate('auto.components.settings.OrchestratorGamePanelSetting.prs', 'PRs'),
     translate(
       'auto.components.settings.OrchestratorGamePanelSetting.prsDescription',
-      'Tab with your open PRs.'
-    )
-  ],
-  queue: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.queue', 'Queue'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.queueDescription',
-      'The merge queue at the top of PRs.'
+      'Tab with your open PRs. The merge queue shows at the top when there is one.'
     )
   ],
   machines: [

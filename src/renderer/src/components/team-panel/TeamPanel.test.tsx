@@ -122,9 +122,9 @@ describe('TeamPanel settings', () => {
     expect(container.querySelector('[data-team-card="advisor"]')).not.toBeNull()
   })
 
-  it('hides the PRs, Queue and Machines tabs turned off, and the selected one falls back', async () => {
-    useTeamPanelTabStore.setState({ selected: 'queue' })
-    const container = await render({ tabs: { prs: false, queue: false, machines: false } })
+  it('hides the PRs and Machines tabs turned off, and the selected one falls back', async () => {
+    useTeamPanelTabStore.setState({ selected: 'machines' })
+    const container = await render({ tabs: { prs: false, machines: false } })
 
     expect(tabs(container)).toEqual(['Team', 'Inbox'])
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Team')

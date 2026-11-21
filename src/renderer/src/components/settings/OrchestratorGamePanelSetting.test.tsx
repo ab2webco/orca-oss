@@ -91,7 +91,7 @@ describe('GamePanelSetting', () => {
     view.unmount()
   })
 
-  it('is the global Panel section the gear targets, with look, style and the three tabs', () => {
+  it('is the global Panel section the gear targets, with look, style, PRs and Machines, no Queue', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <GamePanelSetting
@@ -109,11 +109,12 @@ describe('GamePanelSetting', () => {
     expect(view.container.textContent).not.toContain('Advisor')
     expect(view.container.textContent).not.toContain('Arcade')
     press(view.container, 'Scene style', 'Figures')
-    toggle(view.container, 'Show Queue')
+    expect(view.container.querySelector('[aria-label="Show Queue"]')).toBeNull()
+    toggle(view.container, 'Show Machines')
     expect(updates).toEqual([
       { orchestratorGame: { scene: 'quest', panel: { style: 'figures' } } },
       {
-        orchestratorGame: { scene: 'quest', panel: { tabs: { queue: false } } }
+        orchestratorGame: { scene: 'quest', panel: { tabs: { machines: false } } }
       }
     ])
     view.unmount()
