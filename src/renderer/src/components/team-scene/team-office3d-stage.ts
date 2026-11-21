@@ -30,7 +30,12 @@ import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { poseDioramaFigure } from './team-diorama-poses'
 import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
 import { office3dLeadMark, office3dLiftShaft, office3dMark } from './team-office3d-lift'
-import { OFFICE3D_DAY, OFFICE3D_NIGHT, office3dFloor } from './team-office3d-floor'
+import {
+  OFFICE3D_CHAIR_BACK,
+  OFFICE3D_DAY,
+  OFFICE3D_NIGHT,
+  office3dFloor
+} from './team-office3d-floor'
 import { keepOffice3dLabelLegible, office3dLabelOf } from './team-office3d-labels'
 import { paintOffice3dBoard, paintOffice3dScreen } from './team-office3d-screens'
 import { poseOffice3dSeated } from './team-office3d-seated-poses'
@@ -40,8 +45,9 @@ export type Office3dStage = { height: number; draw: (t: number) => void; dispose
 
 /** How often a desk's monitor and board repaint; a canvas upload per frame per desk is waste. */
 const REPAINT = 0.4
-/** A seated figure's lift off the floor at the diorama's 1.6 scale, as the approved prototype. */
-const SIT_Y = 0.58 - 0.34 * 1.6
+/** Where a seated figure stands so its hips rest on a chair's cushion (top 0.58): the diorama's
+ * sit lowers the body 0.3 and the legs hang from 0.34, at the 1.6 scale. */
+const SIT_Y = 0.58 - (0.34 - 0.3) * 1.6
 
 /** A figure on a machine that cannot be reached: see-through, as its desk's haze. */
 function ghost(g: THREE.Object3D): void {
@@ -159,6 +165,7 @@ export function office3dStage(
       advisor.g.position.set(cx, 0, cz)
       advisor.baseY = floor.controlRoom.y + SIT_Y
       advisor.g.rotation.y = Math.PI - 0.35
+      advisor.g.userData.seated = 'advisor'
       world.add(advisor.g)
       ticks.push((t) => poseOffice3dSeated(advisor, 'type', t))
       const floorMembers = floor.seats.flatMap((s) => (s.key && members.get(s.key)) || [])
@@ -191,9 +198,11 @@ export function office3dStage(
       if (m && view && !view.empty) {
         figure = office3dDev(dioramaLookOf(m.characterKey ?? m.key), 'dev')
         figure.g.scale.multiplyScalar(floor.scale)
-        figure.g.position.set(seat.x, 0, OFFICE3D_SEAT_Z)
+        // Why the chair's own centre: the desk sets its chair 0.08 behind the seat line, scaled.
+        figure.g.position.set(seat.x, 0, OFFICE3D_SEAT_Z + OFFICE3D_CHAIR_BACK * floor.scale)
         figure.baseY = floor.y + SIT_Y * floor.scale
         figure.g.rotation.y = Math.PI
+        figure.g.userData.seated = 'member'
         if (view.faded) {
           ghost(figure.g)
         }
@@ -249,6 +258,7 @@ export function office3dStage(
     if (at.heading && Math.hypot(at.heading[0], at.heading[1]) > 1e-6) {
       lead.g.rotation.y = Math.atan2(at.heading[0], at.heading[1])
     }
+    lead.g.userData.seated = at.pose === 'desk' ? 'lead' : undefined
     if (at.pose === 'desk') {
       lead.g.rotation.y = 0
       poseOffice3dSeated(lead, 'type', t)

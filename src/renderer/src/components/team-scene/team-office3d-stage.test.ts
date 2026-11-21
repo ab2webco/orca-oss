@@ -247,4 +247,67 @@ describe('the 3D Office stage', () => {
     }
     expect(passed, 'the lead never passed the lift door').toBeGreaterThan(0)
   })
+
+  // The owner: every agent sits on its own chair, centred, facing its monitor (ORCA-1302).
+  it('seats every member, the lead and each advisor on a chair, facing their screen', () => {
+    const view = {
+      members: [member('a', 'working'), member('b', 'resting'), member('c', 'needsYou')]
+    }
+    const floors = [floor('', ['a', 'b'], true), floor('m2', ['c'], true)]
+    const { stage, scenes } = stageOf(view.members, floors, true)
+    // The lead sits at its desk once its round ends.
+    stage.draw(0)
+    const scene = scenes.at(-1)!
+    const cushions: THREE.Vector3[] = []
+    const sitters: THREE.Object3D[] = []
+    scene.traverse((o) => {
+      const m = o as THREE.Mesh
+      const g = m.geometry as THREE.CylinderGeometry | undefined
+      if (m.isMesh && g?.type === 'CylinderGeometry' && g.parameters.radiusTop === 0.4) {
+        cushions.push(m.getWorldPosition(new THREE.Vector3()))
+      }
+      if (o.userData.seated) {
+        sitters.push(o)
+      }
+    })
+    const seated = sitters
+    // a, b, c at desks, an advisor on each floor; the lead walks at t=0 so it is checked below.
+    expect(seated.length).toBeGreaterThanOrEqual(5)
+    for (const f of seated) {
+      const p = f.position
+      const chair = cushions.find(
+        (c) => Math.hypot(c.x - p.x, c.z - p.z) < 0.05 && Math.abs(c.y - p.y) < 2
+      )
+      expect(
+        chair,
+        `${f.userData.seated} sits off its chair at ${p.x.toFixed(2)},${p.z.toFixed(2)}`
+      ).toBeTruthy()
+      const hip = f.children
+        .find((c) => c.type === 'Group' && Math.abs(c.position.y - 0.34) < 1e-6)!
+        .getWorldPosition(new THREE.Vector3())
+      // Hips on the cushion's top (its centre + 0.06), never sunk into it or the floor.
+      expect(
+        Math.abs(hip.y - (chair!.y + 0.06)),
+        `${f.userData.seated} sits at the wrong height`
+      ).toBeLessThan(0.08)
+    }
+    for (const f of seated.filter((f) => f.userData.seated === 'member')) {
+      expect(f.rotation.y).toBeCloseTo(Math.PI)
+    }
+    // The lead, whenever its round sits it at its desk.
+    let atDesk = 0
+    for (let t = 0; t < 80; t += 0.5) {
+      stage.draw(t)
+      const lead = leadOf(scenes.at(-1)!)!
+      if (lead.userData.seated === 'lead') {
+        atDesk += 1
+        const p = lead.position
+        expect(
+          cushions.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < 0.05),
+          `lead off its chair at ${t}`
+        ).toBe(true)
+      }
+    }
+    expect(atDesk, 'the lead never sat at its desk').toBeGreaterThan(0)
+  })
 })
