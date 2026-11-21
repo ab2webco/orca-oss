@@ -44,7 +44,9 @@ export const GAME_ROWS = [
   {
     id: 'diorama',
     group: 'panel',
-    shows: (f: GameRowFacts) => isGameLook(f) && f.style === 'figures' && f.diorama
+    // Why the Office too: Scene quality also switches it between 3D and 2D (ORCA-1302).
+    shows: (f: GameRowFacts) =>
+      isGameLook(f) && ((f.style === 'figures' && f.diorama) || f.style === 'office')
   },
   // Why the band too: ORCA_GAME_SCENE is what a drawing band paints.
   { id: 'scene', group: 'panel', shows: (f: GameRowFacts) => isGameLook(f) || bandDraws(f) },

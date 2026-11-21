@@ -56,10 +56,6 @@ const choicesOf = (field: Field) =>
     label: valueLabels()[value]!
   }))
 
-/** Whether the rows apply: the Game look drawing Figures as the diorama. */
-export const dioramaRowsShown = (panel: OrchestratorGamePanel): boolean =>
-  panel.look === 'game' && panel.style === 'figures' && panel.diorama
-
 /** The global rows, each with the projects that override it. */
 export function GamePanelDioramaRows(p: {
   settings: GameSettings

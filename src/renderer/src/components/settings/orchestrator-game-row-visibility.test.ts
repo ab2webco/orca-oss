@@ -71,10 +71,13 @@ describe('the game row table', () => {
     expect(shown({ look: 'plain', view: 'flat' })).not.toContain('timezone')
   })
 
-  it('shows the diorama rows only for Figures drawn as the diorama', () => {
+  it('shows the diorama rows for Figures drawn as the diorama and for the Office', () => {
     expect(shown({ style: 'figures' })).toContain('diorama')
     expect(shown({ style: 'figures', diorama: false })).not.toContain('diorama')
-    expect(shown({ style: 'office' })).not.toContain('diorama')
+    expect(shown({ style: 'office' })).toContain('diorama')
+    expect(shown({ style: 'office', diorama: false })).toContain('diorama')
+    expect(shown({ style: 'pixel' })).not.toContain('diorama')
+    expect(shown({ look: 'plain', style: 'office' })).not.toContain('diorama')
   })
 
   it('shows the terminal band group only for a pixel view', () => {

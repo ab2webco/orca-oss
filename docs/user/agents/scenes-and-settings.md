@@ -30,7 +30,8 @@ base, and a pinch (or Ctrl or ⌘ with the scroll wheel) zooms; **Follow the lea
 rows in **Settings > Agents > Panel** tune it:
 
 - **Scene quality**: **Illustrated** (outlined figures with shadows) or **Low resources** (flat
-  figures, no shadows), for slower machines.
+  figures, no shadows), for slower machines. Scene quality also switches the Office between 3D
+  (**Illustrated**) and 2D (**Low resources**), and the row shows for the Office too.
 - **Lead's pace**: **Normal** (it walks like a person), **Fast** (2.5 times faster) or **Direct**
   (the court mage by the keep sends it from circle to circle by magic).
 

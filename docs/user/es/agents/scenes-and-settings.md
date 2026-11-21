@@ -1,5 +1,5 @@
 ---
-sourceHash: b893b433bbb8803e
+sourceHash: 6c54ff7509969c5c
 ---
 # Escenas, estilos y ajustes
 
@@ -35,7 +35,8 @@ por la base, y pellizcar (o Ctrl o ⌘ con la rueda) acerca o aleja; **Follow th
 filas en **Settings > Agents > Panel** lo ajustan:
 
 - **Scene quality**: **Illustrated** (figuras con contorno y sombras) o **Low resources** (figuras
-  planas, sin sombras), para equipos más lentos.
+  planas, sin sombras), para equipos más lentos. Scene quality también cambia la Office entre 3D
+  (**Illustrated**) y 2D (**Low resources**), y la fila también aparece con la Office.
 - **Lead's pace**: **Normal** (camina como una persona), **Fast** (2,5 veces más rápido) o
   **Direct** (el mago de la corte, junto al castillo, lo envía de círculo en círculo con magia).
 
