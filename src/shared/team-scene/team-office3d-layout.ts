@@ -18,6 +18,9 @@ export const OFFICE3D_AISLE_Z = 4
 export const OFFICE3D_DOOR_Z = 4.1
 /** The glass lift beside every floor's door; one car for the whole building. */
 export const OFFICE3D_LIFT: Office3dPoint = [-1.15, OFFICE3D_DOOR_Z]
+/** The lift's call panel on the side wall by the door, and where a rider stands to press it. */
+export const OFFICE3D_CALL_PANEL: Office3dPoint = [0, 3]
+export const OFFICE3D_CALL: Office3dPoint = [0.55, 3.35]
 /** The wing beside the desks: the lead's office, and a control room where its Jev runs. */
 export const OFFICE3D_WING_WIDTH = 3.9
 /** How high the lead floor's control room sits: a balcony over the lead's office. */

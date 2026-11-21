@@ -4,19 +4,11 @@ import {
   office3dSeatViewOf,
   type Office3dSeatView
 } from '../../../../shared/team-scene/team-office3d-actions'
-import { office3dCabFloorAt } from '../../../../shared/team-scene/team-office3d-elevator'
 import {
   OFFICE3D_DEPTH,
-  OFFICE3D_DOOR_Z,
-  OFFICE3D_LIFT,
-  OFFICE3D_PITCH,
   OFFICE3D_SEAT_Z,
   type Office3dLayout
 } from '../../../../shared/team-scene/team-office3d-layout'
-import {
-  office3dLeadRoundOf,
-  office3dWalkerAt
-} from '../../../../shared/team-scene/team-office3d-walkers'
 import type {
   TeamSceneInput,
   TeamSceneMemberInput
@@ -27,9 +19,8 @@ import { dioramaAim, type DioramaView } from './team-diorama-view'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
-import { poseDioramaFigure } from './team-diorama-poses'
-import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
-import { office3dLeadMark, office3dLiftShaft, office3dMark } from './team-office3d-lift'
+import { office3dDev } from './team-office3d-dev'
+import { office3dCallPanel, office3dMark } from './team-office3d-lift'
 import {
   OFFICE3D_CHAIR_BACK,
   OFFICE3D_DAY,
@@ -38,16 +29,14 @@ import {
 } from './team-office3d-floor'
 import { keepOffice3dLabelLegible, office3dLabelOf } from './team-office3d-labels'
 import { paintOffice3dBoard, paintOffice3dScreen } from './team-office3d-screens'
-import { poseOffice3dSeated } from './team-office3d-seated-poses'
+import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
+import { office3dLeadActor } from './team-office3d-lead-actor'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 
 export type Office3dStage = { height: number; draw: (t: number) => void; dispose: () => void }
 
 /** How often a desk's monitor and board repaint; a canvas upload per frame per desk is waste. */
 const REPAINT = 0.4
-/** Where a seated figure stands so its hips rest on a chair's cushion (top 0.58): the diorama's
- * sit lowers the body 0.3 and the legs hang from 0.34, at the 1.6 scale. */
-const SIT_Y = 0.58 - (0.34 - 0.3) * 1.6
 
 /** A figure on a machine that cannot be reached: see-through, as its desk's haze. */
 function ghost(g: THREE.Object3D): void {
@@ -150,9 +139,11 @@ export function office3dStage(
   const chips: THREE.Sprite[] = []
   const views = new Map<string, Office3dSeatView>()
   const doors: THREE.Mesh[][] = []
+  const calls: ((on: boolean) => void)[] = []
   for (const [i, floor] of layout.floors.entries()) {
     const built = office3dFloor(kit, floor, i === layout.floors.length - 1, dark)
     doors.push(built.doors)
+    calls.push(office3dCallPanel(kit, X, built.group, i).light)
     world.add(built.group)
     if (floor.office) {
       world.add(office3dLeadOffice(kit, X, floor))
@@ -163,7 +154,7 @@ export function office3dStage(
       const advisor = office3dDev(dioramaLookOf(`advisor:${floor.key}`), 'advisor')
       const [cx, cz] = floor.controlRoom.chair
       advisor.g.position.set(cx, 0, cz)
-      advisor.baseY = floor.controlRoom.y + SIT_Y
+      advisor.baseY = floor.controlRoom.y + OFFICE3D_SIT_Y
       advisor.g.rotation.y = Math.PI - 0.35
       advisor.g.userData.seated = 'advisor'
       world.add(advisor.g)
@@ -200,7 +191,7 @@ export function office3dStage(
         figure.g.scale.multiplyScalar(floor.scale)
         // Why the chair's own centre: the desk sets its chair 0.08 behind the seat line, scaled.
         figure.g.position.set(seat.x, 0, OFFICE3D_SEAT_Z + OFFICE3D_CHAIR_BACK * floor.scale)
-        figure.baseY = floor.y + SIT_Y * floor.scale
+        figure.baseY = floor.y + OFFICE3D_SIT_Y * floor.scale
         figure.g.rotation.y = Math.PI
         figure.g.userData.seated = 'member'
         if (view.faded) {
@@ -234,52 +225,15 @@ export function office3dStage(
   }
 
   // The lead and the one cab it rides; askers first, then a word with whoever is typing.
-  const keys = (pose: Office3dSeatView['pose']) =>
-    input.members.filter((m) => views.get(m.key)?.pose === pose).map((m) => m.key)
-  const round = office3dLeadRoundOf({
+  const { figure: lead, tick: leadTick } = office3dLeadActor(kit, X, world, {
     layout,
-    needs: keys('raise'),
-    visits: keys('type'),
-    pace: args.pace
+    input,
+    views,
+    pace: args.pace,
+    doors,
+    calls
   })
-  const lead = office3dDev(dioramaLookOf(input.lead.characterKey ?? input.lead.key), 'lead')
-  const leadScale = lead.g.scale.x
-  world.add(lead.g)
-  const { group: shaft, cab } = office3dLiftShaft(kit, X, layout.floors.length)
-  world.add(shaft)
-  const leadMark = office3dLeadMark(OFFICE3D_LEAD_COAT)
-  world.add(leadMark)
-  ticks.push((t) => {
-    const at = office3dWalkerAt(round, t)
-    lead.g.position.set(at.at[0], 0, at.at[1])
-    // Why baseY: the diorama's poses set the figure's height from it on every frame.
-    lead.baseY = at.floor * OFFICE3D_PITCH + (at.pose === 'desk' ? SIT_Y : 0)
-    lead.g.scale.setScalar(leadScale * at.blink)
-    if (at.heading && Math.hypot(at.heading[0], at.heading[1]) > 1e-6) {
-      lead.g.rotation.y = Math.atan2(at.heading[0], at.heading[1])
-    }
-    lead.g.userData.seated = at.pose === 'desk' ? 'lead' : undefined
-    if (at.pose === 'desk') {
-      lead.g.rotation.y = 0
-      poseOffice3dSeated(lead, 'type', t)
-    } else {
-      poseDioramaFigure(lead, at.pose === 'give' ? 'talk' : at.pose, t)
-    }
-    const tt = round.total > 0 ? t % round.total : 0
-    const cabAt = office3dCabFloorAt(round.cab, tt)
-    cab.position.y = cabAt * OFFICE3D_PITCH
-    // The leaves slide open while the cab waits on a floor and the lead is at its door.
-    const near = Math.hypot(at.at[0] - OFFICE3D_LIFT[0] / 2, at.at[1] - OFFICE3D_DOOR_Z)
-    for (const [fi, leaves] of doors.entries()) {
-      const here = Math.abs(cabAt - fi) < 0.05 && Math.abs(at.floor - fi) < 0.05
-      const open = here ? Math.min(1, Math.max(0, (1.9 - near) / 0.6)) : 0
-      for (const [side, leaf] of leaves.entries()) {
-        leaf.position.z = OFFICE3D_DOOR_Z + (side ? 1 : -1) * (0.42 + open * 0.8)
-      }
-    }
-    const p = lead.g.position
-    leadMark.position.set(p.x, p.y + 2.5 + Math.sin(t * 2.4) * 0.06, p.z)
-  })
+  ticks.push(leadTick)
 
   const fit = dioramaFitCamera(world, args.width, args.maxHeight)
   renderer.setSize(args.width, fit.height, true)

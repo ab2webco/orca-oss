@@ -310,4 +310,34 @@ describe('the 3D Office stage', () => {
     }
     expect(atDesk, 'the lead never sat at its desk').toBeGreaterThan(0)
   })
+
+  it('lights the call panel while the lead waits for the cab, and darkens it when the cab arrives', () => {
+    const { stage, scenes } = stageOf(
+      [member('a', 'working'), member('c', 'needsYou')],
+      [floor('', ['a']), floor('m2', ['c'])]
+    )
+    let lit = 0
+    let darkOnArrival = 0
+    for (let t = 0; t < 60; t += 0.1) {
+      stage.draw(t)
+      const scene = scenes.at(-1)!
+      const buttons: THREE.Mesh[] = []
+      scene.traverse((o) => {
+        if (o.userData.callButton !== undefined) {
+          buttons.push(o as THREE.Mesh)
+        }
+      })
+      expect(buttons).toHaveLength(2)
+      const on = buttons.filter((b) => b.userData.lit).length
+      lit += on
+      const lead = leadOf(scene)!.getWorldPosition(new THREE.Vector3())
+      // In the cab: no floor's call is pending any more.
+      if (lead.x < -0.6) {
+        darkOnArrival += 1
+        expect(on, `a call stayed lit with the lead in the cab at ${t.toFixed(1)}`).toBe(0)
+      }
+    }
+    expect(lit, 'the call panel never lit').toBeGreaterThan(0)
+    expect(darkOnArrival).toBeGreaterThan(0)
+  })
 })

@@ -3,6 +3,8 @@ import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
 import { dioramaPaceOf } from './team-diorama-lead-round'
 import { bookOffice3dCab, office3dCab, office3dCabFloorAt } from './team-office3d-elevator'
 import {
+  OFFICE3D_CALL,
+  OFFICE3D_CALL_PANEL,
   OFFICE3D_DEPTH,
   OFFICE3D_DOOR_Z,
   OFFICE3D_SEAT_Z,
@@ -186,6 +188,29 @@ const solidsOf = (floor: Office3dFloor): Rect[] => {
 }
 const inside = (p: Office3dPoint, s: Rect) =>
   p[0] > s.x0 - BODY && p[0] < s.x1 + BODY && p[1] > s.z0 - BODY && p[1] < s.z1 + BODY
+
+describe('the 3D Office lift call', () => {
+  it('stops at the call panel, facing it, until the cab boards, before every ride', () => {
+    const round = office3dLeadRoundOf({
+      layout: building(),
+      needs: ['d', 'c'],
+      visits: [],
+      pace: 'normal'
+    })
+    for (const [i, s] of round.steps.entries()) {
+      if (s.kind !== 'ride') {
+        continue
+      }
+      // Panel wait, the walk into the cab, the doors' wait inside it, then the ride.
+      expect(round.steps[i - 3]).toMatchObject({
+        kind: 'hold',
+        at: OFFICE3D_CALL,
+        face: OFFICE3D_CALL_PANEL
+      })
+      expect(round.steps[i - 2]).toMatchObject({ kind: 'walk' })
+    }
+  })
+})
 
 describe("the 3D Office lead's path", () => {
   const layouts = {

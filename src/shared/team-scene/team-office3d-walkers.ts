@@ -8,6 +8,8 @@ import {
 } from './team-office3d-elevator'
 import {
   OFFICE3D_AISLE_Z,
+  OFFICE3D_CALL,
+  OFFICE3D_CALL_PANEL,
   OFFICE3D_DOOR_Z,
   OFFICE3D_LIFT,
   OFFICE3D_WING_WIDTH,
@@ -19,7 +21,8 @@ import {
 // Why a plan, as the diorama's round: laid out once per read of the team, so any moment is a lookup.
 // Each floor's advisor never walks: it sits in its own control room, so only the lead rides the lift.
 
-export type Office3dWalkPose = 'walk' | 'talk' | 'give' | 'idle' | 'desk'
+/** `call`: pressing the lift's call button, which lights while it does. */
+export type Office3dWalkPose = 'walk' | 'talk' | 'give' | 'idle' | 'desk' | 'call'
 
 /** `floor` is an index into the layout's floors; a ride's height comes from the cab. */
 export type Office3dStep =
@@ -46,6 +49,7 @@ export type Office3dRound = { steps: Office3dStep[]; total: number; cab: Office3
 
 const WALK = 1.9
 const TALK = 3.4
+const PRESS = 0.6
 const GIVE = 1.1
 const JUMP = 1.6
 const HOME_PAUSE = 4.5
@@ -117,14 +121,18 @@ export function office3dLeadRoundOf(args: {
       walk(besideDeskOf(office), officeDoorOf(office))
     }
     if (toFloor !== floor) {
-      walk([here[0], OFFICE3D_AISLE_Z], [1.2, OFFICE3D_AISLE_Z], DOOR)
+      walk([here[0], OFFICE3D_AISLE_Z], [1.2, OFFICE3D_AISLE_Z], OFFICE3D_CALL)
       // Why booked for when it reaches the cab: the cab must not leave while it is still walking in.
       const walkIn = Math.max(
         0.2,
-        Math.hypot(DOOR[0] - OFFICE3D_LIFT[0], DOOR[1] - OFFICE3D_LIFT[1]) / (WALK * speed)
+        Math.hypot(OFFICE3D_CALL[0] - OFFICE3D_LIFT[0], OFFICE3D_CALL[1] - OFFICE3D_LIFT[1]) /
+          (WALK * speed)
       )
+      // It presses the call button first; the cab answers only once it has.
+      hold('call', PRESS / speed, OFFICE3D_CALL_PANEL)
       const booked = bookOffice3dCab(cab, floor, toFloor, t + walkIn, speed)
-      hold('idle', booked.board - walkIn - t, OFFICE3D_LIFT)
+      // It presses the call button and waits at the panel until the cab is here.
+      hold('idle', booked.board - walkIn - t, OFFICE3D_CALL_PANEL)
       walk(OFFICE3D_LIFT)
       hold('idle', booked.depart - t, null)
       push({ kind: 'ride', start: t, dur: booked.arrive - t })

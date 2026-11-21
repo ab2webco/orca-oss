@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { TeamSceneEmote } from '../../../../shared/team-scene/team-scene-types'
 import {
+  OFFICE3D_CALL_PANEL,
   OFFICE3D_DOOR_Z,
   OFFICE3D_HEIGHT,
   OFFICE3D_LIFT,
@@ -118,4 +119,28 @@ export function office3dLeadMark(coat: number): THREE.Sprite {
   )
   s.scale.set(0.8, 0.8, 1)
   return s
+}
+
+/** The call panel on a floor's side wall by the lift door; `light` turns its button on or off. */
+export function office3dCallPanel(
+  k: DioramaKit,
+  X: Office3dPalette,
+  parent: THREE.Object3D,
+  floor: number
+): { button: THREE.Mesh; light: (on: boolean) => void } {
+  const [px, pz] = OFFICE3D_CALL_PANEL
+  k.mesh(k.box(0.06, 0.7, 0.42), k.mat(X.frame), px + 0.03, 1.35, pz, parent)
+  const off = new THREE.Color(0x3a3f4a)
+  const on = new THREE.Color(0xffb020)
+  const material = new THREE.MeshBasicMaterial({ color: off })
+  const button = k.mesh(k.box(0.05, 0.2, 0.2), material, px + 0.08, 1.45, pz, parent, false)
+  button.userData.callButton = floor
+  button.userData.lit = false
+  return {
+    button,
+    light: (lit) => {
+      button.userData.lit = lit
+      material.color.copy(lit ? on : off)
+    }
+  }
 }
