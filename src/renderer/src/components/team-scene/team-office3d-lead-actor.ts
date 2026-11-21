@@ -1,5 +1,4 @@
 import type * as THREE from 'three'
-import type { Office3dSeatView } from '../../../../shared/team-scene/team-office3d-actions'
 import { office3dCabFloorAt } from '../../../../shared/team-scene/team-office3d-elevator'
 import {
   OFFICE3D_CALL,
@@ -10,6 +9,7 @@ import {
 } from '../../../../shared/team-scene/team-office3d-layout'
 import {
   office3dLeadRoundOf,
+  type Office3dRound,
   office3dWalkerAt
 } from '../../../../shared/team-scene/team-office3d-walkers'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
@@ -32,21 +32,20 @@ export function office3dLeadActor(
   args: {
     layout: Office3dLayout
     input: TeamSceneInput
-    views: ReadonlyMap<string, Office3dSeatView>
+    /** The lead's trips from the building's traffic; absent, it sits at its desk. */
+    plan: Office3dRound | null
     pace: string
     doors: readonly THREE.Mesh[][]
     calls: readonly ((on: boolean) => void)[]
   }
 ): { figure: DioramaFigure; tick: (t: number) => void } {
-  // The lead and the one cab it rides; askers first, then a word with whoever is typing.
-  const keys = (pose: Office3dSeatView['pose']) =>
-    args.input.members.filter((m) => args.views.get(m.key)?.pose === pose).map((m) => m.key)
-  const round = office3dLeadRoundOf({
-    layout: args.layout,
-    needs: keys('raise'),
-    visits: keys('type'),
-    pace: args.pace
-  })
+  // Why only from the traffic: the lead moves for events, and with none it sits (ORCA-1317).
+  const round = args.plan ?? {
+    ...office3dLeadRoundOf({ layout: args.layout, needs: [], visits: [], pace: args.pace }),
+    total: Infinity
+  }
+  // Needing the person is the one signal that asks them for something: a raised hand.
+  const asks = args.input.lead.activity === 'needsYou'
   const lead = office3dDev(
     dioramaLookOf(args.input.lead.characterKey ?? args.input.lead.key),
     'lead'
@@ -69,7 +68,7 @@ export function office3dLeadActor(
     lead.g.userData.seated = at.pose === 'desk' ? 'lead' : undefined
     if (at.pose === 'desk') {
       lead.g.rotation.y = 0
-      poseOffice3dSeated(lead, 'type', t)
+      poseOffice3dSeated(lead, asks ? 'raise' : 'type', t)
     } else {
       poseDioramaFigure(
         lead,
@@ -80,8 +79,7 @@ export function office3dLeadActor(
         lead.arms[1]!.rotation.x = -1.3
       }
     }
-    const tt = round.total > 0 ? t % round.total : 0
-    const cabAt = office3dCabFloorAt(round.cab, tt)
+    const cabAt = office3dCabFloorAt(round.cab, t)
     cab.position.y = cabAt * OFFICE3D_PITCH
     // The leaves slide open while the cab waits on a floor and the lead is at its door.
     const near = Math.hypot(at.at[0] - OFFICE3D_LIFT[0] / 2, at.at[1] - OFFICE3D_DOOR_Z)

@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { teamOffice3dLayoutOf } from '../../../../shared/team-scene/team-office3d-layout'
+import {
+  office3dTraffic,
+  office3dTrafficRead
+} from '../../../../shared/team-scene/team-office3d-traffic'
 import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { dioramaRenderer } from './team-diorama-stage'
@@ -48,6 +52,8 @@ export function TeamSceneOffice3d({
   useEffect(() => {
     order.current = layout.order
   }, [layout])
+  // Why a ref: each read rebuilds the stage, and a trip under way must carry on, not restart.
+  const traffic = useRef(office3dTraffic())
 
   useEffect(() => {
     const el = wrap.current
@@ -79,6 +85,7 @@ export function TeamSceneOffice3d({
       return
     }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    office3dTrafficRead(traffic.current, layout, input, performance.now() / 1000, look.pace)
     const stage = office3dStage(renderer, {
       width,
       dark: document.documentElement.classList.contains('dark'),
@@ -87,6 +94,7 @@ export function TeamSceneOffice3d({
       layout,
       pace: look.pace,
       view: camera.view.current,
+      traffic: traffic.current,
       words: {
         thisMachine: localHostDisplayLabel(),
         offline: translate('teamPanel.machines.offline', 'Offline')

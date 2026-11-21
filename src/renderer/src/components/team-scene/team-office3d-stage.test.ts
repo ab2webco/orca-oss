@@ -13,6 +13,11 @@ import type {
   TeamSceneMemberInput
 } from '../../../../shared/team-scene/team-scene-types'
 import { dioramaPan, dioramaView, dioramaZoomBy, type DioramaView } from './team-diorama-view'
+import {
+  office3dTraffic,
+  office3dTrafficRead,
+  type Office3dTraffic
+} from '../../../../shared/team-scene/team-office3d-traffic'
 import { office3dStage } from './team-office3d-stage'
 
 const status = { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' }
@@ -68,18 +73,31 @@ const stageOf = (
   members: TeamSceneMemberInput[],
   floors: TeamSceneFloor[],
   leadAdvisor = false,
-  view?: DioramaView
+  view?: DioramaView,
+  /** A member whose CI turns red between two reads: the event that sends the lead out. */
+  redCi?: string
 ) => {
   const r = renderer()
+  const layout = teamOffice3dLayoutOf(floors, { leadAdvisor })
+  let traffic: Office3dTraffic | undefined
+  if (redCi) {
+    traffic = office3dTraffic()
+    office3dTrafficRead(traffic, layout, input(members), 0, 'normal')
+    const red = members.map((m) =>
+      m.key === redCi ? { ...m, activity: 'done' as const, ci: 'failure' as const } : m
+    )
+    office3dTrafficRead(traffic, layout, input(red), 0, 'normal')
+  }
   const stage = office3dStage(r.fake, {
     width: 350,
     dark: false,
     status,
     input: input(members),
-    layout: teamOffice3dLayoutOf(floors, { leadAdvisor }),
+    layout,
     pace: 'normal',
     words: { thisMachine: 'This Mac', offline: 'Offline' },
-    ...(view ? { view } : {})
+    ...(view ? { view } : {}),
+    ...(traffic ? { traffic } : {})
   })
   return { stage, ...r }
 }
@@ -107,10 +125,13 @@ describe('the 3D Office stage', () => {
     stage.dispose()
   })
 
-  it('sends the lead up the lift to a member that needs the user on another floor', () => {
+  it('sends the lead up the lift to a member on another floor whose CI went red', () => {
     const { stage, scenes } = stageOf(
-      [member('a', 'working'), member('c', 'needsYou')],
-      [floor('', ['a']), floor('m2', ['c'])]
+      [member('a', 'working'), member('c', 'working')],
+      [floor('', ['a']), floor('m2', ['c'])],
+      false,
+      undefined,
+      'c'
     )
     const heights = new Set<number>()
     for (let t = 0; t < 60; t += 0.5) {
@@ -174,18 +195,22 @@ describe('the 3D Office stage', () => {
   it('follows the lead with the camera, up the lift and onto its floor', () => {
     const view = dioramaView()
     const { stage, scenes } = stageOf(
-      [member('a', 'working'), member('c', 'needsYou')],
+      [member('a', 'working'), member('c', 'working')],
       [floor('', ['a']), floor('m2', ['c'])],
       false,
-      view
+      view,
+      'c'
     )
     let aimedUp = false
+    let leadUp = false
     for (let t = 0; t < 60; t += 0.25) {
       stage.draw(t)
       const lead = leadOf(scenes.at(-1)!)!.getWorldPosition(new THREE.Vector3())
       expect(view.target!.distanceTo(lead), `camera lost the lead at ${t}`).toBeLessThan(12)
       aimedUp ||= view.target!.y > OFFICE3D_PITCH / 2
+      leadUp ||= lead.y > OFFICE3D_PITCH / 2
     }
+    expect(leadUp, 'the lead never rode up').toBe(true)
     expect(aimedUp, 'the camera never rode up with the lead').toBe(true)
   })
 
@@ -218,8 +243,11 @@ describe('the 3D Office stage', () => {
 
   it('slides the lift doors open while the lead walks through them, and shut after', () => {
     const { stage, scenes } = stageOf(
-      [member('a', 'working'), member('c', 'needsYou')],
-      [floor('', ['a']), floor('m2', ['c'])]
+      [member('a', 'working'), member('c', 'working')],
+      [floor('', ['a']), floor('m2', ['c'])],
+      false,
+      undefined,
+      'c'
     )
     // The leaves are the two thin boxes at the door plane, on the floor the lead stands on.
     const leavesAt = (scene: THREE.Scene, y: number) => {
@@ -322,8 +350,11 @@ describe('the 3D Office stage', () => {
 
   it('lights the call panel while the lead waits for the cab, and darkens it when the cab arrives', () => {
     const { stage, scenes } = stageOf(
-      [member('a', 'working'), member('c', 'needsYou')],
-      [floor('', ['a']), floor('m2', ['c'])]
+      [member('a', 'working'), member('c', 'working')],
+      [floor('', ['a']), floor('m2', ['c'])],
+      false,
+      undefined,
+      'c'
     )
     let lit = 0
     let darkOnArrival = 0

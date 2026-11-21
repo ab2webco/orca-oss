@@ -14,6 +14,7 @@ import type {
   TeamSceneMemberInput
 } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
+import type { Office3dTraffic } from '../../../../shared/team-scene/team-office3d-traffic'
 import { dioramaFitCamera } from './team-diorama-camera'
 import { dioramaAim, dioramaLeadZoom, type DioramaView } from './team-diorama-view'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
@@ -111,6 +112,8 @@ export function office3dStage(
     maxHeight?: number
     /** The panel's camera, kept across reads: it follows the lead, frames it all, or stays put. */
     view?: DioramaView
+    /** The building's traffic, kept across reads: the lead's trips come only from its events. */
+    traffic?: Office3dTraffic
     words: { thisMachine: string; offline: string }
   }
 ): Office3dStage {
@@ -228,7 +231,7 @@ export function office3dStage(
   const { figure: lead, tick: leadTick } = office3dLeadActor(kit, X, world, {
     layout,
     input,
-    views,
+    plan: args.traffic?.lead ?? null,
     pace: args.pace,
     doors,
     calls

@@ -85,7 +85,7 @@ describe("the 3D Office lead's round", () => {
     }
   })
 
-  it('skips a floor whose machine is unreachable and never visits another floor to hand work out', () => {
+  it('skips a floor whose machine is unreachable, and hands a folder on any floor', () => {
     const l = layout(
       floor('', ['a']),
       floor('m2', ['c'], { reachable: false }),
@@ -97,8 +97,12 @@ describe("the 3D Office lead's round", () => {
       visits: ['d', 'a'],
       pace: 'normal'
     })
-    expect(talksOf(round)).toEqual([[0, 'give']])
-    expect(round.steps.some((s) => s.kind === 'ride')).toBe(false)
+    expect(talksOf(round)).toEqual([
+      [2, 'give'],
+      [0, 'give']
+    ])
+    // Never on m2, the unreachable floor (index 1).
+    expect(round.steps.some((s) => 'floor' in s && s.floor === 1)).toBe(false)
   })
 
   it('walks 2.5 times faster at Fast, and Direct jumps with no walk or ride', () => {

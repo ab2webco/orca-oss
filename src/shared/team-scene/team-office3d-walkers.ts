@@ -63,15 +63,18 @@ const officeDoorOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, 
 const besideDeskOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, 1.65]
 
 /**
- * The lead's round: members that need the user first, in the Team model's order and one lift trip
- * per floor; then a word with each busy member on its own floor; then back to its desk. An
- * unreachable floor gets no visit. Direct swaps every walk and ride for a jump.
+ * One trip of the lead from its desk, starting at `start`: a talk with each member in `needs` (one
+ * lift trip per floor, in order), then a folder handed to each in `visits`, then back to its desk.
+ * Only events fill these (ORCA-1317): with none it just sits. An unreachable floor gets no visit,
+ * and Direct swaps every walk and ride for a jump. `cab` is the building's one lift, shared.
  */
 export function office3dLeadRoundOf(args: {
   layout: Office3dLayout
   needs: readonly string[]
   visits: readonly string[]
   pace: string | undefined
+  start?: number
+  cab?: Office3dCab
 }): Office3dRound {
   const { speed, holdScale, jump } = dioramaPaceOf(args.pace)
   const floors = args.layout.floors
@@ -81,9 +84,9 @@ export function office3dLeadRoundOf(args: {
   )
   const office = floors[leadFloor]?.office ?? { x: floors[leadFloor]?.width ?? 0 }
   const home = homeOf(office)
-  const cab = office3dCab(leadFloor)
+  const cab = args.cab ?? office3dCab(leadFloor)
   const steps: Office3dStep[] = []
-  let t = 0
+  let t = args.start ?? 0
   let floor = leadFloor
   let here = home
   const push = (step: Office3dStep) => {
@@ -168,8 +171,8 @@ export function office3dLeadRoundOf(args: {
   }
   for (const key of args.visits) {
     const place = placeOf(key)
-    if (place?.floor === leadFloor && !args.needs.includes(key)) {
-      goTo(leadFloor, place.stand)
+    if (place && !args.needs.includes(key)) {
+      goTo(place.floor, place.stand)
       hold('give', GIVE * holdScale, [place.stand[0] + 0.9, OFFICE3D_SEAT_Z])
     }
   }
@@ -209,7 +212,12 @@ export function office3dWalkerAt(
   pose: Office3dWalkPose
   blink: number
 } {
-  const tt = round.total > 0 ? ((t % round.total) + round.total) % round.total : 0
+  // Why a non-finite total plays once: the traffic's plans run on the clock and never loop.
+  const tt = !Number.isFinite(round.total)
+    ? t
+    : round.total > 0
+      ? ((t % round.total) + round.total) % round.total
+      : 0
   const s = round.steps.find((x) => tt >= x.start && tt < x.start + x.dur) ?? round.steps.at(-1)
   if (!s) {
     return { floor: round.cab.home, at: [0, 0], heading: null, pose: 'idle', blink: 1 }
