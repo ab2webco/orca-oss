@@ -1,9 +1,7 @@
 import type * as THREE from 'three'
 import { office3dCabFloorAt } from '../../../../shared/team-scene/team-office3d-elevator'
 import {
-  OFFICE3D_CALL,
   OFFICE3D_DOOR_Z,
-  OFFICE3D_LIFT,
   OFFICE3D_PITCH,
   type Office3dLayout
 } from '../../../../shared/team-scene/team-office3d-layout'
@@ -12,6 +10,7 @@ import {
   type Office3dRound,
   office3dWalkerAt
 } from '../../../../shared/team-scene/team-office3d-walkers'
+import type { Office3dMember } from '../../../../shared/team-scene/team-office3d-members'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
@@ -20,6 +19,7 @@ import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
 import type { Office3dPalette } from './team-office3d-floor'
 import { office3dAcrossFloors } from './team-office3d-floor-passes'
 import { office3dLeadMark, office3dLiftShaft } from './team-office3d-lift'
+import { office3dLiftAt } from './team-office3d-lift-doors'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 
 /** Where open lift door leaves rest: inside the side wall, which ends at the doorway. */
@@ -38,6 +38,8 @@ export function office3dLeadActor(
     pace: string
     doors: readonly THREE.Mesh[][]
     calls: readonly ((on: boolean) => void)[]
+    /** The members on their trips: the doors and call panels answer them too. */
+    members?: ReadonlyMap<string, Office3dMember>
   }
 ): { figure: DioramaFigure; tick: (t: number) => void } {
   // Why only from the traffic: the lead moves for events, and with none it sits (ORCA-1317).
@@ -83,19 +85,13 @@ export function office3dLeadActor(
     }
     const cabAt = office3dCabFloorAt(round.cab, t)
     cab.position.y = cabAt * OFFICE3D_PITCH
-    // The leaves slide open while the cab waits on a floor and the lead is at its door.
-    const near = Math.hypot(at.at[0] - OFFICE3D_LIFT[0] / 2, at.at[1] - OFFICE3D_DOOR_Z)
-    // The call lights while the lead waits at a floor's panel for a cab that is not there yet.
-    const atCall = Math.hypot(at.at[0] - OFFICE3D_CALL[0], at.at[1] - OFFICE3D_CALL[1]) < 0.15
+    const others = [...(args.members?.values() ?? [])].map((m) => office3dWalkerAt(m.plan, t))
+    const lift = office3dLiftAt([at, ...others], round.cab, t, args.layout.floors.length)
     for (const [fi, light] of args.calls.entries()) {
-      const onFloor = Math.abs(at.floor - fi) < 0.05
-      light(onFloor && (at.pose === 'call' || (atCall && Math.abs(cabAt - fi) > 0.05)))
+      light(lift.lit[fi] ?? false)
     }
     for (const [fi, leaves] of args.doors.entries()) {
-      // Why not while pressing: the doors answer the call, so they open only after it.
-      const here =
-        at.pose !== 'call' && Math.abs(cabAt - fi) < 0.05 && Math.abs(at.floor - fi) < 0.05
-      const open = here ? Math.min(1, Math.max(0, (1.9 - near) / 0.6)) : 0
+      const open = lift.open[fi] ?? 0
       for (const [side, leaf] of leaves.entries()) {
         // Why both into the wall: a leaf sliding toward the front stood outside the building.
         const shut = OFFICE3D_DOOR_Z + (side ? 0.42 : -0.42)

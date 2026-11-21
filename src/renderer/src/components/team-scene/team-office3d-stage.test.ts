@@ -524,6 +524,44 @@ describe('the 3D Office stage', () => {
       return ball as THREE.Object3D | null
     }
 
+    it('opens the doors and lights the panel for a member riding alone, the lead at its desk', () => {
+      const r = renderer()
+      const layout = teamOffice3dLayoutOf(floors(), { leadAdvisor: false })
+      const traffic = office3dTraffic()
+      office3dTrafficRead(traffic, layout, input(team([])), 0, 'normal')
+      office3dTrafficRead(traffic, layout, input(team(['c'])), 1, 'normal')
+      const stage = office3dStage(r.fake, {
+        width: 350,
+        dark: false,
+        status,
+        input: input(team(['c'])),
+        layout,
+        pace: 'normal',
+        words: { thisMachine: 'This Mac', offline: 'Offline' },
+        traffic
+      })
+      const litOn = new Set<number>()
+      const openOn = new Set<number>()
+      for (let t = 1; t < 40; t += 0.1) {
+        stage.draw(t)
+        expect(leadOf(r.scenes.at(-1)!)!.userData.seated, 'the lead left its desk').toBe('lead')
+        r.scenes.at(-1)!.traverse((o) => {
+          if (o.userData.callButton !== undefined && o.userData.lit) {
+            litOn.add(o.userData.callButton as number)
+          }
+          const m = o as THREE.Mesh
+          const p = m.getWorldPosition(new THREE.Vector3())
+          // A leaf is open once it slid out of its shut place into the wall.
+          if (m.isMesh && Math.abs(p.x + 0.08) < 1e-6 && Math.abs(p.z - OFFICE3D_DOOR_Z) > 0.6) {
+            openOn.add(Math.round(p.y / OFFICE3D_PITCH))
+          }
+        })
+      }
+      // c calls from m2's floor (2) and leaves the cab in the lobby (0).
+      expect([...litOn]).toEqual([2])
+      expect([...openOn].sort()).toEqual([0, 2])
+    })
+
     it('draws a member with nothing to do in the lobby, not at its desk', () => {
       const scene = drawAt(['c'], 400)
       const inLobby: THREE.Object3D[] = []

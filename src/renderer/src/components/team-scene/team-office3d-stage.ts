@@ -229,7 +229,8 @@ export function office3dStage(
     plan: args.traffic?.lead ?? null,
     pace: args.pace,
     doors,
-    calls
+    calls,
+    members: args.traffic?.members
   })
   ticks.push(leadTick)
 
