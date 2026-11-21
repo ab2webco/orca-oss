@@ -165,28 +165,33 @@ const SPACE_PACK = {
   gameScenes: ['acme.space/orbit']
 }
 
-test('the scene picker lists plugin scenes, keeps an uninstalled id and renders at every width', async ({
-  electronApp,
-  orcaPage
-}, testInfo) => {
-  await waitForSessionReady(orcaPage)
+/** The global Scene picker with Space Pack served by plugins:list, as a real install would. */
+async function openScenePicker(app: ElectronApplication, page: Page) {
+  await waitForSessionReady(page)
   // Why: a real install needs the plugin system and consent; the picker only reads plugins:list.
-  await electronApp.evaluate(({ ipcMain, BrowserWindow }, plugin) => {
+  await app.evaluate(({ ipcMain, BrowserWindow }, plugin) => {
     ipcMain.removeHandler('plugins:list')
     ipcMain.handle('plugins:list', async () => [plugin])
     BrowserWindow.getAllWindows()[0]?.webContents.send('plugins:changed', {})
   }, SPACE_PACK)
-
-  await orcaPage.evaluate(() => {
+  await page.evaluate(() => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')
     state.openSettingsTarget({ pane: 'agents', repoId: null })
     state.openSettingsPage()
   })
-  const scene = orcaPage.getByRole('combobox', { name: 'Scene' }).first()
+  const scene = page.getByRole('combobox', { name: 'Scene' }).first()
   await expect(scene).toBeVisible({ timeout: 15_000 })
-  await expect(scene).toHaveText('Quest (built-in)')
+  return scene
+}
 
+// Why three tests: one body with every sweep sat at 118 of its 120 s in CI (ORCA-1112).
+test('the scene picker lists plugin scenes and picks one, at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  const scene = await openScenePicker(electronApp, orcaPage)
+  await expect(scene).toHaveText('Quest (built-in)')
   await scene.click()
   await orcaPage.getByRole('option', { name: 'orbit · Space Pack' }).click()
   await expect
@@ -194,7 +199,13 @@ test('the scene picker lists plugin scenes, keeps an uninstalled id and renders 
     .toEqual({ scene: 'acme.space/orbit' })
   await expect(scene).toHaveText('orbit · Space Pack')
   await shootAll(electronApp, orcaPage, testInfo, 'scene-picked', scene)
+})
 
+test('the scene picker list renders open at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  const scene = await openScenePicker(electronApp, orcaPage)
   for (const theme of THEMES) {
     await setTheme(orcaPage, theme)
     for (const width of WIDTHS) {
@@ -202,6 +213,7 @@ test('the scene picker lists plugin scenes, keeps an uninstalled id and renders 
       await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       await scene.click()
       await expect(orcaPage.getByRole('listbox')).toBeVisible()
+      await expect(orcaPage.getByRole('option', { name: 'orbit · Space Pack' })).toBeVisible()
       // Why: Radix fades the list in; a mid-animation capture reads as a washed-out control.
       await orcaPage.waitForFunction(() =>
         (
@@ -215,11 +227,14 @@ test('the scene picker lists plugin scenes, keeps an uninstalled id and renders 
       await expect(orcaPage.getByRole('listbox')).toBeHidden()
     }
   }
+})
 
-  await setWindowWidth(electronApp, orcaPage, 1440)
-  await writeSettings(orcaPage, {
-    orchestratorGame: { scene: 'acme.gone/orbit' }
-  })
+test('the scene picker keeps an uninstalled id and renders it at every width', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  const scene = await openScenePicker(electronApp, orcaPage)
+  await writeSettings(orcaPage, { orchestratorGame: { scene: 'acme.gone/orbit' } })
   await expect(scene).toHaveText('acme.gone/orbit (not installed)')
   await shootAll(electronApp, orcaPage, testInfo, 'scene-missing', scene)
 })
