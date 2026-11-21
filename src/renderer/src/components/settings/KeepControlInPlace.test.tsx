@@ -81,4 +81,14 @@ describe('KeepControlInPlace (ORCA-1112 d)', () => {
     expect(view.scrollBy).not.toHaveBeenCalled()
     view.unmount()
   })
+
+  it('watches the page only after a press, not while its previews animate', async () => {
+    const observe = vi.spyOn(MutationObserver.prototype, 'observe')
+    const view = await mount()
+
+    expect(observe).not.toHaveBeenCalled()
+    view.button.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    expect(observe).toHaveBeenCalledTimes(1)
+    view.unmount()
+  })
 })

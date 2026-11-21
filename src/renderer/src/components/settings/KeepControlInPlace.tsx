@@ -30,20 +30,12 @@ export function KeepControlInPlace({
     if (!root) {
       return
     }
-    let anchor: { node: Element; top: number; until: number } | null = null
-    const arm = (event: Event): void => {
-      const node = event.target instanceof Element ? event.target : null
-      anchor = node
-        ? { node, top: node.getBoundingClientRect().top, until: Date.now() + ANCHOR_MS }
-        : null
-    }
-    const disarm = (): void => {
-      anchor = null
-    }
+    let anchor: { node: Element; top: number } | null = null
+    let timer: ReturnType<typeof setTimeout> | undefined
     // Why a MutationObserver: it runs after React's commit and before paint, so no frame jumps.
     const observer = new MutationObserver(() => {
-      if (!anchor || !anchor.node.isConnected || Date.now() > anchor.until) {
-        anchor = null
+      if (!anchor || !anchor.node.isConnected) {
+        disarm()
         return
       }
       const delta = anchor.node.getBoundingClientRect().top - anchor.top
@@ -51,13 +43,27 @@ export function KeepControlInPlace({
         scrollerOf(root)?.scrollBy({ top: delta })
       }
     })
-    observer.observe(root, { childList: true, subtree: true })
+    const disarm = (): void => {
+      anchor = null
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+    // Why observe only while armed: the page's animated previews mutate it every frame.
+    const arm = (event: Event): void => {
+      disarm()
+      if (!(event.target instanceof Element)) {
+        return
+      }
+      anchor = { node: event.target, top: event.target.getBoundingClientRect().top }
+      observer.observe(root, { childList: true, subtree: true })
+      timer = setTimeout(disarm, ANCHOR_MS)
+    }
     root.addEventListener('pointerdown', arm, true)
     root.addEventListener('keydown', arm, true)
     root.addEventListener('wheel', disarm, { passive: true })
     root.addEventListener('touchmove', disarm, { passive: true })
     return () => {
-      observer.disconnect()
+      disarm()
       root.removeEventListener('pointerdown', arm, true)
       root.removeEventListener('keydown', arm, true)
       root.removeEventListener('wheel', disarm)
