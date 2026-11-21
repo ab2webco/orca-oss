@@ -12,6 +12,9 @@ import {
 import { office3dMemberAt } from './team-office3d-members'
 import { office3dWaitOf } from './team-office3d-places'
 import { office3dTraffic, office3dTrafficRead } from './team-office3d-traffic'
+import type { Office3dStep } from './team-office3d-walkers'
+
+type Office3dStepLike = Office3dStep
 import type { TeamSceneFloor } from './team-scene-floors'
 import type { TeamSceneInput, TeamSceneMemberInput } from './team-scene-types'
 
@@ -255,6 +258,56 @@ describe('3D Office members never walk through anything', () => {
         }
         const hit = solidsOf(layout, Math.round(at.floor)).find((s) => inside(at.at, s))
         expect(hit, `${key} in ${hit?.name} at ${t.toFixed(1)}`).toBeUndefined()
+      }
+    }
+  })
+})
+
+describe('the call-panel line', () => {
+  it('never puts two people, the lead included, on one spot at once', () => {
+    const traffic = office3dTraffic()
+    const l = teamOffice3dLayoutOf(
+      [floor('', ['a', 'b', 'c', 'g', 'h']), floor('m2', ['d', 'e'])],
+      {
+        leadAdvisor: false
+      }
+    )
+    const keys = ['a', 'b', 'c', 'g', 'h', 'd', 'e']
+    office3dTrafficRead(traffic, l, input(keys.map((k) => m(k))), 0, 'normal')
+    const idle = { activity: 'resting' as const }
+    office3dTrafficRead(
+      traffic,
+      l,
+      input([
+        m('a'),
+        m('b', idle),
+        m('c', idle),
+        m('g', { activity: 'blocked', hold: 'limited' }),
+        m('h', idle),
+        m('d', { activity: 'needsYou' }),
+        m('e', { activity: 'done', ci: 'failure' })
+      ]),
+      1,
+      'normal'
+    )
+    type Wait = { who: string; x: number; floor: number; from: number; to: number }
+    const waits: Wait[] = []
+    const add = (who: string, steps: { kind: string }[]) => {
+      for (const s of steps as Extract<Office3dStepLike, { kind: 'hold' }>[]) {
+        if (s.kind === 'hold' && s.face && (s.pose === 'call' || s.pose === 'idle') && s.dur > 0) {
+          waits.push({ who, x: s.at[0], floor: s.floor, from: s.start, to: s.start + s.dur })
+        }
+      }
+    }
+    for (const [key, member] of traffic.members) {
+      add(key, member.plan.steps)
+    }
+    add('lead', traffic.lead!.steps)
+    for (const a of waits) {
+      for (const b of waits) {
+        if (a.who < b.who && a.floor === b.floor && a.from < b.to && b.from < a.to) {
+          expect(Math.abs(a.x - b.x), `${a.who} and ${b.who} share a spot`).toBeGreaterThan(1)
+        }
       }
     }
   })

@@ -6,7 +6,13 @@ import {
   type Office3dPlace,
   type Office3dWait
 } from './team-office3d-places'
-import { office3dLaneOf, office3dPlanner, office3dPolyLengthTo } from './team-office3d-planner'
+import {
+  office3dLaneOf,
+  office3dPlanner,
+  office3dPolyLengthTo,
+  office3dQueued,
+  type Office3dQueue
+} from './team-office3d-planner'
 import {
   office3dSeatPose,
   office3dSlotId,
@@ -135,16 +141,13 @@ export function office3dMembersRead(args: {
   now: number
   pace: string | undefined
   first: boolean
+  /** The call-panel lines, shared with the lead. */
+  queue: Office3dQueue
 }): void {
   const { members, layout, cab, now, pace } = args
   const slots = office3dSlotsOf(layout)
   const taken = new Set<string>()
-  const queue = new Map<number, number[]>()
-  const queued = (floor: number, t: number) => {
-    const waits = (queue.get(floor) ?? []).filter((until) => until > t)
-    queue.set(floor, [...waits, t + 6])
-    return Math.min(waits.length, 3)
-  }
+  const queued = office3dQueued(args.queue)
   // Who already holds a room seat keeps it while it stays in that room: nobody swaps chairs.
   const want = new Map<string, Office3dSlot | null>()
   const pick = (pool: Office3dSlot[], m: Office3dMember | undefined) => {

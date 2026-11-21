@@ -2,6 +2,7 @@ import { office3dCab, type Office3dCab } from './team-office3d-elevator'
 import type { Office3dLayout } from './team-office3d-layout'
 import { office3dLeadRoundOf, type Office3dRound } from './team-office3d-walkers'
 import { office3dMembersRead, type Office3dMember } from './team-office3d-members'
+import { office3dQueued, type Office3dQueue } from './team-office3d-planner'
 import type { TeamSceneInput } from './team-scene-types'
 
 // Why kept across reads: the stage is rebuilt on every read of the team, and a trip already under
@@ -14,13 +15,16 @@ export type Office3dTraffic = {
   lead: Office3dRound | null
   /** Each member's place, seat and trip; one that left stays until it is out of the door. */
   members: Map<string, Office3dMember>
+  /** The call-panel lines the lead and the members share. */
+  queue: Office3dQueue
 }
 
 export const office3dTraffic = (): Office3dTraffic => ({
   cab: null,
   last: null,
   lead: null,
-  members: new Map()
+  members: new Map(),
+  queue: new Map()
 })
 
 /**
@@ -71,7 +75,8 @@ export function office3dTrafficRead(
     cab: traffic.cab,
     now,
     pace,
-    first: prev === null
+    first: prev === null,
+    queue: traffic.queue
   })
   const seated = () =>
     office3dLeadRoundOf({ layout, needs: [], visits: [], pace, start: now, cab: traffic.cab! })
@@ -94,7 +99,8 @@ export function office3dTrafficRead(
     visits: brief,
     pace,
     start,
-    cab: traffic.cab
+    cab: traffic.cab,
+    queued: office3dQueued(traffic.queue)
   })
   // Why cut at the trip's start: it sits until the event, then gets up, never both at once.
   const kept = traffic.lead.steps

@@ -17,6 +17,22 @@ import {
 } from './team-office3d-walkers'
 
 const CAB_CAPACITY = 3
+
+/** The building's call-panel lines, per floor: when each one waiting there will have boarded. */
+export type Office3dQueue = Map<number, number[]>
+
+/**
+ * A place in the line at `floor`'s call panel for someone arriving at `t`: 0 presses the panel,
+ * the next stand behind it. Members and the lead share one line, so nobody stands in another.
+ */
+export const office3dQueued =
+  (queue: Office3dQueue) =>
+  (floor: number, t: number): number => {
+    // Why held 12 s and up to 6 places: a shorter hold or a cap let two stand on one spot.
+    const waits = (queue.get(floor) ?? []).filter((until) => until > t)
+    queue.set(floor, [...waits, t + 12])
+    return Math.min(waits.length, 5)
+  }
 // Why two lanes: members walking opposite ways pass each other instead of through each other.
 export const office3dLaneOf = (fromX: number, toX: number): number => (toX >= fromX ? 3.8 : 4.4)
 
@@ -111,7 +127,7 @@ export function office3dPlanner(
     },
     ride: (toFloor: number, cab: Office3dCab, queued: number) => {
       // In line at the call panel: the first presses, the next wait behind it, in order.
-      const spot: Office3dPoint = [OFFICE3D_CALL[0] + 0.8 * queued, OFFICE3D_CALL[1]]
+      const spot: Office3dPoint = [OFFICE3D_CALL[0] + 1.2 * queued, OFFICE3D_CALL[1]]
       walk(
         [here[0], office3dLaneOf(here[0], spot[0])],
         [spot[0], office3dLaneOf(here[0], spot[0])],
