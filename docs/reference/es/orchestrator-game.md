@@ -1,5 +1,5 @@
 ---
-sourceHash: 27e65565857586af
+sourceHash: f83833cc97dc52fa
 ---
 
 # El juego orquestador de Agent Teams
@@ -161,13 +161,17 @@ Cada campo se resuelve por separado; una capa posterior gana
 2. Settings globales → Agents → **Agent Teams game** (`orchestratorGame`).
 3. El `orca.yaml` versionado del proyecto, que pertenece a quien sea dueño del repo, un dev o una empresa.
 4. Settings → el proyecto → **Agent Teams game**, solo en esta máquina
-   (`orchestratorGameProjects[repoId]`). Cada fila puede decir **Inherit**.
+   (`orchestratorGameProjects[repoId]`). Cada fila selecciona el valor que aplica y nombra la capa
+   que lo define; **Reset to …** aparece solo mientras esta máquina sobrescribe la fila, y elegir el
+   valor heredado borra la sobrescritura.
 
 Ambas páginas de Settings muestran una fila del juego solo mientras la elección actual la usa
 (ORCA-1112). Una tabla,
 [`orchestrator-game-row-visibility.ts`](../../../src/renderer/src/components/settings/orchestrator-game-row-visibility.ts),
 da la condición de cada fila según su lector y gobierna la página y la búsqueda de Settings; una fila
-oculta conserva su valor guardado y un grupo sin filas visibles no dibuja encabezado. En el orden de V30:
+oculta conserva su valor guardado, un grupo sin filas visibles no dibuja encabezado y una elección que
+oculta o muestra filas por encima del control pulsado deja ese control en su sitio
+([`KeepControlInPlace.tsx`](../../../src/renderer/src/components/settings/KeepControlInPlace.tsx)). En el orden de V30:
 - **Panel**: aspecto, estilo, vista previa, filas del diorama, escena, PRs, Machines, Advisor, Arcade,
   zona horaria.
 - En la página del proyecto, **Actions**, **Names** y **Lead**.
@@ -278,7 +282,7 @@ orchestratorGame:
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
     style: pixel # figures | office | pixel, for the game look
-    tabs: { prs: true, machines: true } # la cola de merge aparece arriba en PRs; un queue guardado se ignora
+    tabs: { prs: true, machines: true } # the merge queue shows at the top of PRs; a stored queue is ignored
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
     quality: high # high | low: Figures' diorama illustrated, or flat without shadows

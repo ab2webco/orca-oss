@@ -150,12 +150,16 @@ Each field resolves on its own; a later layer wins
 2. Global Settings → Agents → **Agent Teams game** (`orchestratorGame`).
 3. The project's committed `orca.yaml` — owned by whoever owns the repo, a dev or a company.
 4. Settings → the project → **Agent Teams game**, this machine only
-   (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
+   (`orchestratorGameProjects[repoId]`). Each row selects the value it applies and names the layer
+   that sets it; **Reset to …** shows only while this machine overrides the row, and picking the
+   inherited value clears the override.
 
 Both Settings pages show a game row only while the current choice uses it (ORCA-1112). One table,
 [`orchestrator-game-row-visibility.ts`](../../src/renderer/src/components/settings/orchestrator-game-row-visibility.ts),
 names each row's condition from its reader and drives both the page and Settings search; a hidden
-row keeps its stored value, and a group with no row shown draws no heading. In V30's order:
+row keeps its stored value, a group with no row shown draws no heading, and a choice that hides or
+shows rows above the pressed control keeps that control in place
+([`KeepControlInPlace.tsx`](../../src/renderer/src/components/settings/KeepControlInPlace.tsx)). In V30's order:
 - **Panel**: look, style, preview, diorama rows, scene, PRs, Machines, Advisor, Arcade, time zone.
 - On the project page, **Actions**, **Names** and **Lead**.
 - **Terminal panes**, under the **Agent Teams game** heading on the global page: **Show the game**,
