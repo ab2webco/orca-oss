@@ -21,6 +21,7 @@ import type {
 } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import { dioramaFitCamera } from './team-diorama-camera'
+import { dioramaAim, type DioramaView } from './team-diorama-view'
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
@@ -111,6 +112,8 @@ export function office3dStage(
     layout: Office3dLayout
     pace: string
     maxHeight?: number
+    /** The panel's camera, kept across reads: it follows the lead, frames it all, or stays put. */
+    view?: DioramaView
     words: { thisMachine: string; offline: string }
   }
 ): Office3dStage {
@@ -278,6 +281,9 @@ export function office3dStage(
     draw: (t) => {
       for (const tick of ticks) {
         tick(t)
+      }
+      if (args.view) {
+        dioramaAim(args.view, fit, lead.g.position, args.width, t)
       }
       renderer.render(scene, fit.camera)
     },

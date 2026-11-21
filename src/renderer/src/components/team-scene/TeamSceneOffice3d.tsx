@@ -6,6 +6,8 @@ import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floo
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { dioramaRenderer } from './team-diorama-stage'
 import { office3dStage } from './team-office3d-stage'
+import { DioramaCameraButtons } from './DioramaCameraButtons'
+import { useDioramaCameraInput } from './use-diorama-camera-input'
 import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
@@ -27,6 +29,9 @@ export function TeamSceneOffice3d({
   const canvas = useRef<HTMLCanvasElement>(null)
   const order = useRef<Record<string, (string | null)[]> | undefined>(undefined)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
+  // Why the diorama's own camera: the owner asked the Office to pan, zoom and follow like Figures.
+  const redraw = useRef<(() => void) | null>(null)
+  const camera = useDioramaCameraInput(canvas, redraw)
   const status = useTeamSceneStatusColors()
   const look = useTeamSceneDioramaLook()
   const [width, setWidth] = useState(0)
@@ -81,6 +86,7 @@ export function TeamSceneOffice3d({
       input,
       layout,
       pace: look.pace,
+      view: camera.view.current,
       words: {
         thisMachine: localHostDisplayLabel(),
         offline: translate('teamPanel.machines.offline', 'Offline')
@@ -102,6 +108,13 @@ export function TeamSceneOffice3d({
     })
     watch.observe(el)
     stage.draw(reduced ? 1.3 : performance.now() / 1000)
+    // Under reduced motion nothing animates, so a camera move paints its own still frame.
+    redraw.current = reduced
+      ? () => {
+          camera.view.current.target = null
+          stage.draw(1.3)
+        }
+      : null
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
@@ -112,11 +125,18 @@ export function TeamSceneOffice3d({
       watch.disconnect()
       stage.dispose()
     }
-  }, [layout, input, status, width, onNoWebgl, look])
+  }, [layout, input, status, width, onNoWebgl, look, camera.view])
 
   return (
     <div ref={wrap} className="relative w-full" data-team-scene-office3d="">
-      <canvas ref={canvas} role="img" aria-label={teamSceneLabel()} className="block w-full" />
+      <canvas
+        ref={canvas}
+        role="img"
+        aria-label={teamSceneLabel()}
+        className="block w-full"
+        data-office3d-camera={camera.mode}
+      />
+      <DioramaCameraButtons mode={camera.mode} setMode={camera.setMode} />
     </div>
   )
 }

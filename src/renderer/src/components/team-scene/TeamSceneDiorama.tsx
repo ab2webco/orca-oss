@@ -19,7 +19,7 @@ import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { useDioramaCameraInput } from './use-diorama-camera-input'
-import { Button } from '@/components/ui/button'
+import { DioramaCameraButtons } from './DioramaCameraButtons'
 import { localHostDisplayLabel } from '@/lib/local-host-display-label'
 import { translate } from '@/i18n/i18n'
 
@@ -147,13 +147,6 @@ export function TeamSceneDiorama({
     }
   }, [layout, views, input, status, width, onNoWebgl, look, camera.view])
 
-  const modes = [
-    [
-      'lead',
-      translate('auto.components.team-scene.TeamSceneDiorama.followLead', 'Follow the lead')
-    ],
-    ['all', translate('auto.components.team-scene.TeamSceneDiorama.showAll', 'Show all')]
-  ] as const
   return (
     <div ref={wrap} className="relative w-full" data-team-scene-diorama="">
       <canvas
@@ -163,20 +156,7 @@ export function TeamSceneDiorama({
         className="block w-full"
         data-diorama-camera={camera.mode}
       />
-      <div className="absolute top-2 right-2 flex gap-1">
-        {modes.map(([mode, label]) => (
-          <Button
-            key={mode}
-            variant="outline"
-            size="xs"
-            aria-pressed={camera.mode === mode}
-            className="aria-pressed:bg-accent"
-            onClick={() => camera.setMode(mode)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <DioramaCameraButtons mode={camera.mode} setMode={camera.setMode} />
     </div>
   )
 }

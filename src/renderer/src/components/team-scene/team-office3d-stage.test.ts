@@ -11,6 +11,7 @@ import type {
   TeamSceneInput,
   TeamSceneMemberInput
 } from '../../../../shared/team-scene/team-scene-types'
+import { dioramaPan, dioramaView, dioramaZoomBy, type DioramaView } from './team-diorama-view'
 import { office3dStage } from './team-office3d-stage'
 
 const status = { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' }
@@ -49,19 +50,24 @@ const input = (members: TeamSceneMemberInput[]): TeamSceneInput => ({
 })
 const renderer = () => {
   const scenes: THREE.Scene[] = []
+  const cameras: THREE.OrthographicCamera[] = []
   const fake = {
     shadowMap: { enabled: false },
     setPixelRatio: vi.fn(),
     setClearColor: vi.fn(),
     setSize: vi.fn(),
-    render: (scene: THREE.Scene) => scenes.push(scene)
+    render: (scene: THREE.Scene, camera: THREE.OrthographicCamera) => {
+      scenes.push(scene)
+      cameras.push(camera)
+    }
   }
-  return { fake: fake as unknown as THREE.WebGLRenderer, scenes, setSize: fake.setSize }
+  return { fake: fake as unknown as THREE.WebGLRenderer, scenes, cameras, setSize: fake.setSize }
 }
 const stageOf = (
   members: TeamSceneMemberInput[],
   floors: TeamSceneFloor[],
-  leadAdvisor = false
+  leadAdvisor = false,
+  view?: DioramaView
 ) => {
   const r = renderer()
   const stage = office3dStage(r.fake, {
@@ -71,7 +77,8 @@ const stageOf = (
     input: input(members),
     layout: teamOffice3dLayoutOf(floors, { leadAdvisor }),
     pace: 'normal',
-    words: { thisMachine: 'This Mac', offline: 'Offline' }
+    words: { thisMachine: 'This Mac', offline: 'Offline' },
+    ...(view ? { view } : {})
   })
   return { stage, ...r }
 }
@@ -160,5 +167,51 @@ describe('the 3D Office stage', () => {
       expect(chip.position.z).toBeGreaterThan(OFFICE3D_DEPTH)
     }
     expect(leftmost).toBeLessThan(-2)
+  })
+
+  // The owner: the Office must pan, zoom and follow the lead like Figures (ORCA-1302).
+  it('follows the lead with the camera, up the lift and onto its floor', () => {
+    const view = dioramaView()
+    const { stage, scenes } = stageOf(
+      [member('a', 'working'), member('c', 'needsYou')],
+      [floor('', ['a']), floor('m2', ['c'])],
+      false,
+      view
+    )
+    let aimedUp = false
+    for (let t = 0; t < 60; t += 0.25) {
+      stage.draw(t)
+      const lead = leadOf(scenes.at(-1)!)!.getWorldPosition(new THREE.Vector3())
+      expect(view.target!.distanceTo(lead), `camera lost the lead at ${t}`).toBeLessThan(12)
+      aimedUp ||= view.target!.y > OFFICE3D_PITCH / 2
+    }
+    expect(aimedUp, 'the camera never rode up with the lead').toBe(true)
+  })
+
+  it('frames the whole building on Show all, and stays where the viewer moved it', () => {
+    const view = dioramaView()
+    const { stage, cameras } = stageOf(
+      [member('a', 'working')],
+      [floor('', ['a']), floor('m2', [])],
+      false,
+      view
+    )
+    stage.draw(0)
+    const following = cameras.at(-1)!.zoom
+    expect(following).toBeGreaterThan(1)
+    view.mode = 'all'
+    for (let t = 0.1; t < 8; t += 0.1) {
+      stage.draw(t)
+    }
+    expect(cameras.at(-1)!.zoom).toBeCloseTo(1, 1)
+    dioramaPan(view, 120, 0)
+    dioramaZoomBy(view, 2)
+    expect(view.mode).toBe('free')
+    const goal = view.goal.clone()
+    for (let t = 8; t < 16; t += 0.1) {
+      stage.draw(t)
+    }
+    expect(view.target!.distanceTo(goal)).toBeLessThan(0.5)
+    expect(cameras.at(-1)!.zoom).toBeGreaterThan(1.5)
   })
 })
