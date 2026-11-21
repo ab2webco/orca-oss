@@ -43,6 +43,7 @@ import { getRepositoryGameSectionId } from './repository-settings-targets'
 import { gameRowFactsOf, shownGameRows } from './orchestrator-game-row-visibility'
 import { GlobalTerminalGroups, ProjectTerminalGroups } from './OrchestratorGameTerminalRows'
 import { TerminalPanesHeading } from './OrchestratorGameTerminalBand'
+import { KeepControlInPlace } from './KeepControlInPlace'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 const title = (): string =>
@@ -265,7 +266,7 @@ export function ProjectOrchestratorGameSetting({
       description={description}
       keywords={getAgentTeamsGameSearchEntry(facts).keywords}
     >
-      <div className="space-y-1">
+      <KeepControlInPlace className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
         <ProjectGamePanelRows
@@ -309,7 +310,7 @@ export function ProjectOrchestratorGameSetting({
           terminalHeading={<TerminalPanesHeading />}
           updateSettings={updateSettings}
         />
-      </div>
+      </KeepControlInPlace>
     </SearchableSetting>
   )
 }

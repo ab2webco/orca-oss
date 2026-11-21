@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
 import { OrchestratorGameSetting } from './OrchestratorGameSetting'
 import { GamePanelSetting } from './OrchestratorGamePanelSetting'
+import { KeepControlInPlace } from './KeepControlInPlace'
 import { AgentCacheTimerSection } from './AgentCacheTimerSection'
 import { PreservedAgentSessionsSection } from './resume-vault/PreservedAgentSessionsSection'
 import { AgentRuntimeSetting } from './AgentRuntimeSetting'
@@ -911,9 +912,10 @@ export function AgentsPane({
       ) : null}
 
       {/* Why Panel first: V30 opens the game settings with the Team panel's rows (ORCA-1112). */}
-      <GamePanelSetting settings={settings} updateSettings={updateSettings} />
-
-      <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
+      <KeepControlInPlace className="contents">
+        <GamePanelSetting settings={settings} updateSettings={updateSettings} />
+        <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
+      </KeepControlInPlace>
 
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
 

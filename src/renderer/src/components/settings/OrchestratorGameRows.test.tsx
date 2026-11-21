@@ -15,6 +15,7 @@ import {
   getGamePanelSearchEntries
 } from './orchestrator-game-panel-search'
 import { getAgentsPaneSearchEntries } from './agents-search'
+import { matchesSettingsSearch } from './settings-search'
 
 // Why never settles: the panel preview's art loads from assets happy-dom cannot decode.
 vi.mock('../team-scene/team-scene-art-load', () => ({
@@ -225,6 +226,11 @@ describe('Settings search follows the shown rows (ORCA-1112)', () => {
       getAgentsPaneSearchEntries({ gameFacts: facts }).flatMap((entry) => entry.keywords ?? [])
     expect(terms(flat)).not.toContain('Render')
     expect(terms(drawing)).toContain('Render')
+    // Why the real matcher: the sidebar lists a pane by score, so no other Agents entry may match.
+    const matches = (facts: typeof flat) =>
+      matchesSettingsSearch('render', getAgentsPaneSearchEntries({ gameFacts: facts }))
+    expect(matches(flat)).toBe(false)
+    expect(matches(drawing)).toBe(true)
   })
 
   it('draws nothing for a band term searched while the view is Flat', () => {
