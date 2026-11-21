@@ -62,6 +62,7 @@ const renderer = () => {
     setPixelRatio: vi.fn(),
     setClearColor: vi.fn(),
     setSize: vi.fn(),
+    clear: vi.fn(),
     render: (scene: THREE.Scene, camera: THREE.OrthographicCamera) => {
       scenes.push(scene)
       cameras.push(camera)
@@ -121,8 +122,34 @@ describe('the 3D Office stage', () => {
     expect(setSize).toHaveBeenCalledWith(350, stage.height, true)
     expect(stage.height).toBeGreaterThan(0)
     stage.draw(1)
-    expect(scenes).toHaveLength(1)
+    // One pass for the lobby, one for this machine's floor, one for the lift shaft.
+    expect(scenes).toHaveLength(3)
     stage.dispose()
+  })
+
+  it('draws each floor in its own pass, so nothing upstairs shadows the floor below', () => {
+    const { stage, fake } = stageOf(
+      [member('a', 'working'), member('b', 'resting')],
+      [floor('', ['a', 'b']), floor('m2', [])]
+    )
+    const passes: Set<number>[] = []
+    const draw = fake.render.bind(fake)
+    fake.render = (scene: THREE.Scene, camera: THREE.Camera) => {
+      const world = scene.children.find((o) => o.type === 'Group')!
+      const floors = new Set<number>()
+      for (const part of world.children) {
+        // Only what casts or receives the sun's shadow; the shaft is drawn apart.
+        if (part.visible && !part.userData.office3dAcross) {
+          floors.add(Math.floor((part.position.y + 2) / OFFICE3D_PITCH))
+        }
+      }
+      passes.push(floors)
+      draw(scene, camera)
+    }
+    stage.draw(1)
+    // The lobby, this machine's floor with its members, m2's floor, and the shaft on its own.
+    expect(passes.filter((p) => p.size > 0).map((p) => [...p])).toEqual([[0], [1], [2]])
+    expect(passes).toHaveLength(4)
   })
 
   it('fits the whole building into an asked height under 220, and says its full height', () => {

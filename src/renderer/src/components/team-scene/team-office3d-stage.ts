@@ -41,6 +41,7 @@ import {
   office3dRoomCounter
 } from './team-office3d-cast'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
+import { office3dRenderByFloor } from './team-office3d-floor-passes'
 
 export type Office3dStage = {
   height: number
@@ -292,7 +293,7 @@ export function office3dStage(
         keepOffice3dLabelLegible(chip, pxPerUnit * fit.camera.zoom)
       }
       keepOffice3dChipsInFrame(chips, fit.camera)
-      renderer.render(scene, fit.camera)
+      office3dRenderByFloor(renderer, scene, world, fit.camera, layout.floors.length)
     },
     dispose: () => kit.dispose(world)
   }

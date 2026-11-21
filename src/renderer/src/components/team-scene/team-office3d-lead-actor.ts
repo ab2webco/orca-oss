@@ -18,6 +18,7 @@ import type { DioramaKit } from './team-diorama-kit'
 import { poseDioramaFigure } from './team-diorama-poses'
 import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
 import type { Office3dPalette } from './team-office3d-floor'
+import { office3dAcrossFloors } from './team-office3d-floor-passes'
 import { office3dLeadMark, office3dLiftShaft } from './team-office3d-lift'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 
@@ -53,6 +54,7 @@ export function office3dLeadActor(
   const leadScale = lead.g.scale.x
   world.add(lead.g)
   const { group: shaft, cab } = office3dLiftShaft(kit, X, args.layout.floors.length)
+  office3dAcrossFloors(shaft)
   world.add(shaft)
   const leadMark = office3dLeadMark(OFFICE3D_LEAD_COAT)
   world.add(leadMark)
