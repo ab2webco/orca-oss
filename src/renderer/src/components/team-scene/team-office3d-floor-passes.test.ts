@@ -23,6 +23,10 @@ describe('the pass each part of the 3D Office is drawn in', () => {
     office3dAcrossFloors(shaft)
     expect(office3dPassOf(shaft, 3)).toBe(3)
     expect(office3dPassOf(at(OFFICE3D_LIFT[0], OFFICE3D_PITCH * 1.5, OFFICE3D_LIFT[1]), 3)).toBe(3)
+    // Its side-by-side spot in the cab, too.
+    expect(
+      office3dPassOf(at(OFFICE3D_LIFT[0] + 0.45, OFFICE3D_PITCH * 1.5, OFFICE3D_LIFT[1]), 3)
+    ).toBe(3)
     // Waiting at the call panel beside the doors, it is still on its floor.
     expect(office3dPassOf(at(0.55, OFFICE3D_PITCH, 3.35), 3)).toBe(1)
   })

@@ -141,9 +141,10 @@ export function office3dPlanner(
       const booked = bookOffice3dCab(cab, level, toFloor, t + walkIn, speed, CAB_CAPACITY)
       hold('idle', booked.board - walkIn - t, OFFICE3D_CALL_PANEL)
       // Riders stand side by side in the cab, never in one another.
-      walk([OFFICE3D_LIFT[0] + (booked.seat - 1) * 0.45, OFFICE3D_LIFT[1]])
+      const inCab: Office3dPoint = [OFFICE3D_LIFT[0] + (booked.seat - 1) * 0.45, OFFICE3D_LIFT[1]]
+      walk(inCab)
       hold('idle', booked.depart - t, null)
-      push({ kind: 'ride', start: t, dur: booked.arrive - t })
+      push({ kind: 'ride', start: t, dur: booked.arrive - t, at: inCab })
       level = toFloor
       walk(OFFICE3D_EXIT)
     }

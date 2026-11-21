@@ -96,3 +96,39 @@ describe("the 3D Office lead's events", () => {
     expect(seatedAt(traffic, 0, 60).every(Boolean)).toBe(true)
   })
 })
+
+// Review ORCA-1319, finding 3: two riders drew as one figure for the whole ride.
+describe('riders in the cab', () => {
+  it('keep their side-by-side spots for the whole ride, never closer than 0.4', () => {
+    const shared = teamOffice3dLayoutOf([floor('', ['a']), floor('m2', ['c', 'd'])], {
+      leadAdvisor: false
+    })
+    const busy = [member('a'), member('c'), member('d')]
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, shared, input(busy), 0, 'normal')
+    const free = [
+      member('a'),
+      member('c', { activity: 'resting' }),
+      member('d', { activity: 'resting' })
+    ]
+    office3dTrafficRead(traffic, shared, input(free), 1, 'normal')
+    const riding = (key: string, t: number) => {
+      const plan = traffic.members.get(key)!.plan
+      return plan.steps.some((s) => s.kind === 'ride' && t >= s.start && t < s.start + s.dur)
+    }
+    let together = 0
+    for (let t = 1; t < 60; t += 0.05) {
+      if (!riding('c', t) || !riding('d', t)) {
+        continue
+      }
+      together += 1
+      const c = office3dWalkerAt(traffic.members.get('c')!.plan, t).at
+      const d = office3dWalkerAt(traffic.members.get('d')!.plan, t).at
+      expect(
+        Math.hypot(c[0] - d[0], c[1] - d[1]),
+        `riders met at ${t.toFixed(2)}`
+      ).toBeGreaterThanOrEqual(0.4)
+    }
+    expect(together, 'c and d never shared a ride').toBeGreaterThan(0)
+  })
+})

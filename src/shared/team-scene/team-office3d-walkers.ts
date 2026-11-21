@@ -47,7 +47,8 @@ export type Office3dStep =
       start: number
       dur: number
     }
-  | { kind: 'ride'; start: number; dur: number }
+  /** `at` is the rider's own spot in the cab; riders stand side by side, never in one another. */
+  | { kind: 'ride'; start: number; dur: number; at?: Office3dPoint }
   | {
       kind: 'jump'
       from: { floor: number; at: Office3dPoint }
@@ -250,7 +251,7 @@ export function office3dWalkerAt(
   if (s.kind === 'ride') {
     return {
       floor: office3dCabFloorAt(round.cab, tt),
-      at: OFFICE3D_LIFT,
+      at: s.at ?? OFFICE3D_LIFT,
       heading: [1, 0],
       pose: 'idle',
       blink: 1

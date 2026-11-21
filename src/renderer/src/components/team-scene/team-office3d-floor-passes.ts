@@ -15,7 +15,9 @@ export function office3dAcrossFloors(o: THREE.Object3D): void {
 /** The pass `o` is drawn in: its floor from its height, or the shaft's while it rides the cab. */
 export function office3dPassOf(o: THREE.Object3D, floors: number): number {
   // A rider stands on the cab's floor, so its shadow falls there, never on a floor it passes.
-  const riding = Math.hypot(o.position.x - OFFICE3D_LIFT[0], o.position.z - OFFICE3D_LIFT[1]) < 0.3
+  const riding =
+    Math.abs(o.position.x - OFFICE3D_LIFT[0]) < 0.75 &&
+    Math.abs(o.position.z - OFFICE3D_LIFT[1]) < 0.3
   if (o.userData.office3dAcross || riding) {
     return floors
   }
