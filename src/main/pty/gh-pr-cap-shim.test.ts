@@ -123,6 +123,14 @@ describe('applyGhPrCapShimEnv (ORCA-1301)', () => {
     expect(cmd.Path).toBe('C:\\nowhere')
   })
 
+  it("installs the .cmd only in a game member's pane, never in another cmd or PowerShell pane", () => {
+    const plain: Record<string, string> = { Path: 'C:\\Windows' }
+    expect(
+      applyGhPrCapShimEnv(plain, { userDataPath: 'C:\\u', platform: 'win32', ensure: () => dirs })
+    ).toBe(false)
+    expect(plain.Path).toBe('C:\\Windows')
+  })
+
   it('the .cmd asks Orca only for pr create and hands every call to the next gh', () => {
     const lines = WIN32_GH_PR_CAP_WRAPPER.split('\n')
     expect(lines.filter((line) => line.includes('pr-cap-check'))).toEqual([

@@ -115,6 +115,10 @@ export function applyGhPrCapShimEnv(
     return false
   }
   const nativeWindows = platform === 'win32' && options.shellFamily !== 'posix'
+  // Why members only: cmd re-parses %* on every call, so the .cmd never sits in front of other users' gh.
+  if (nativeWindows && baseEnv.ORCA_GAME_ROLE !== 'member') {
+    return false
+  }
   const dir = nativeWindows ? dirs.win32Dir : dirs.posixDir
   const delimiter = platform === 'win32' ? ';' : ':'
   const pathKey = resolvePathEnvKey(baseEnv, platform)
@@ -132,5 +136,9 @@ export function applyGhPrCapShimEnv(
     baseEnv.ORCA_PR_CAP_NEXT_GH = next
   }
   baseEnv[pathKey] = [dir, ...rest].join(delimiter)
+  // Why: Orca's shell-ready rc puts this dir back first after the user's startup files reorder PATH.
+  if (!nativeWindows) {
+    baseEnv.ORCA_GH_PR_CAP_SHIM_DIR = dir
+  }
   return true
 }
