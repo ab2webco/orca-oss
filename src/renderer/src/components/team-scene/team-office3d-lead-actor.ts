@@ -21,6 +21,9 @@ import type { Office3dPalette } from './team-office3d-floor'
 import { office3dLeadMark, office3dLiftShaft } from './team-office3d-lift'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 
+/** Where open lift door leaves rest: inside the side wall, which ends at the doorway. */
+const POCKET_Z = 2.8
+
 /** The lead on its round, the cab it rides, and each floor's lift doors and call panel. */
 export function office3dLeadActor(
   kit: DioramaKit,
@@ -94,7 +97,9 @@ export function office3dLeadActor(
         at.pose !== 'call' && Math.abs(cabAt - fi) < 0.05 && Math.abs(at.floor - fi) < 0.05
       const open = here ? Math.min(1, Math.max(0, (1.9 - near) / 0.6)) : 0
       for (const [side, leaf] of leaves.entries()) {
-        leaf.position.z = OFFICE3D_DOOR_Z + (side ? 1 : -1) * (0.42 + open * 0.8)
+        // Why both into the wall: a leaf sliding toward the front stood outside the building.
+        const shut = OFFICE3D_DOOR_Z + (side ? 0.42 : -0.42)
+        leaf.position.z = shut - open * (shut - POCKET_Z)
       }
     }
     const p = lead.g.position

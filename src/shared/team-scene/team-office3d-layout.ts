@@ -157,7 +157,9 @@ export function teamOffice3dLayoutOf(
 }
 
 /** Where a seat's sitter stands for the lead to talk to it: just behind the chair, in the aisle. */
+// Why on the chair's left: the camera sits to the right and in front, so a lead behind or right
+// of the chair was drawn over its sitter.
 export const office3dStandBehind = (seat: Office3dSeat): Office3dPoint => [
-  seat.x + 0.15,
+  seat.x - 0.9,
   OFFICE3D_SEAT_Z + 1.25
 ]

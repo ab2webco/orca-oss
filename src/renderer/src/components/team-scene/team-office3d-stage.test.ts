@@ -242,7 +242,16 @@ describe('the 3D Office stage', () => {
       if (lead.x > -0.3 && lead.x < 0.15 && Math.abs(lead.y - y) < 0.5) {
         passed += 1
         const gap = leavesAt(scene, y).map((l) => Math.abs(l.position.z - OFFICE3D_DOOR_Z))
-        expect(Math.min(...gap), `doors shut on the lead at ${t.toFixed(1)}`).toBeGreaterThan(0.9)
+        // Open means both leaves are out of the opening (z 3.26..4.94) and inside the wall,
+        // never slid out past the building's front.
+        for (const leaf of leavesAt(scene, y)) {
+          expect(
+            leaf.position.z + 0.42,
+            `a leaf still in the doorway at ${t.toFixed(1)}`
+          ).toBeLessThan(3.3)
+          expect(leaf.position.z - 0.42).toBeGreaterThan(0)
+        }
+        void gap
       }
     }
     expect(passed, 'the lead never passed the lift door').toBeGreaterThan(0)

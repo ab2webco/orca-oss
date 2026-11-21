@@ -12,6 +12,7 @@ import {
   OFFICE3D_CALL_PANEL,
   OFFICE3D_DOOR_Z,
   OFFICE3D_LIFT,
+  OFFICE3D_SEAT_Z,
   OFFICE3D_WING_WIDTH,
   office3dStandBehind,
   type Office3dLayout,
@@ -162,14 +163,14 @@ export function office3dLeadRoundOf(args: {
   for (const [toFloor, stands] of trips) {
     for (const stand of stands) {
       goTo(toFloor, stand)
-      hold('talk', TALK * holdScale, [stand[0], 0])
+      hold('talk', TALK * holdScale, [stand[0] + 0.9, OFFICE3D_SEAT_Z])
     }
   }
   for (const key of args.visits) {
     const place = placeOf(key)
     if (place?.floor === leadFloor && !args.needs.includes(key)) {
       goTo(leadFloor, place.stand)
-      hold('give', GIVE * holdScale, [place.stand[0], 0])
+      hold('give', GIVE * holdScale, [place.stand[0] + 0.9, OFFICE3D_SEAT_Z])
     }
   }
   if (floor !== leadFloor || here !== home) {

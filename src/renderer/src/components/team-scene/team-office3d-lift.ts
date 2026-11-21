@@ -52,6 +52,8 @@ export function office3dLiftShaft(
   const [cx, cz] = OFFICE3D_LIFT
   mesh(box(1.7, 0.12, 1.8), mat(X.metal), cx, -0.06, cz, cab)
   mesh(box(0.08, 2.9, 1.8), mat(X.metal), x0 + 0.12, 1.45, cz, cab)
+  // Its far side: without it the open doorway looked through the cab at the sky.
+  mesh(box(1.7, 2.9, 0.08), mat(X.metal), cx, 1.45, cz - 0.9, cab)
   mesh(box(1.7, 0.1, 1.8), mat(X.metal), cx, 2.95, cz, cab)
   mesh(box(1.2, 0.03, 1.2), k.basic(0xfff1c9), cx, 2.89, cz, cab, false)
   group.add(cab)
@@ -129,11 +131,11 @@ export function office3dCallPanel(
   floor: number
 ): { button: THREE.Mesh; light: (on: boolean) => void } {
   const [px, pz] = OFFICE3D_CALL_PANEL
-  k.mesh(k.box(0.06, 0.7, 0.42), k.mat(X.frame), px + 0.03, 1.35, pz, parent)
+  k.mesh(k.box(0.06, 0.9, 0.55), k.mat(X.frame), px + 0.03, 1.35, pz, parent)
   const off = new THREE.Color(0x3a3f4a)
   const on = new THREE.Color(0xffb020)
   const material = new THREE.MeshBasicMaterial({ color: off })
-  const button = k.mesh(k.box(0.05, 0.2, 0.2), material, px + 0.08, 1.45, pz, parent, false)
+  const button = k.mesh(k.box(0.05, 0.3, 0.3), material, px + 0.08, 1.45, pz, parent, false)
   button.userData.callButton = floor
   button.userData.lit = false
   return {
