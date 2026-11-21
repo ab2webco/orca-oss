@@ -1,4 +1,4 @@
-import type { ElectronApplication, Page, TestInfo } from '@stablyai/playwright-test'
+import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect } from './helpers/orca-app'
@@ -185,7 +185,38 @@ async function openScenePicker(app: ElectronApplication, page: Page) {
   return scene
 }
 
-// Why three tests: one body with every sweep sat at 118 of its 120 s in CI (ORCA-1112).
+/** Opens `scene`'s list in `theme` at every width and captures `<name>-<theme>-<width>.png`. */
+async function shootOpenList(
+  app: ElectronApplication,
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  theme: (typeof THEMES)[number],
+  scene: Locator,
+  option: Locator
+): Promise<void> {
+  await setTheme(page, theme)
+  for (const width of WIDTHS) {
+    await setWindowWidth(app, page, width)
+    await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+    await scene.click()
+    await expect(page.getByRole('listbox')).toBeVisible()
+    await expect(option).toBeVisible()
+    // Why: Radix fades the list in; a mid-animation capture reads as a washed-out control.
+    await page.waitForFunction(() =>
+      (
+        document
+          .querySelector('[role="listbox"]')
+          ?.parentElement?.getAnimations({ subtree: true }) ?? []
+      ).every((animation) => animation.playState !== 'running')
+    )
+    await page.screenshot({ path: testInfo.outputPath(`${name}-${theme}-${width}.png`) })
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('listbox')).toBeHidden()
+  }
+}
+
+// Why separate tests: one body with every sweep sat at 118 of its 120 s in CI (ORCA-1112).
 test('the scene picker lists plugin scenes and picks one, at every width', async ({
   electronApp,
   orcaPage
@@ -201,33 +232,16 @@ test('the scene picker lists plugin scenes and picks one, at every width', async
   await shootAll(electronApp, orcaPage, testInfo, 'scene-picked', scene)
 })
 
-test('the scene picker list renders open at every width', async ({
-  electronApp,
-  orcaPage
-}, testInfo) => {
-  const scene = await openScenePicker(electronApp, orcaPage)
-  for (const theme of THEMES) {
-    await setTheme(orcaPage, theme)
-    for (const width of WIDTHS) {
-      await setWindowWidth(electronApp, orcaPage, width)
-      await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
-      await scene.click()
-      await expect(orcaPage.getByRole('listbox')).toBeVisible()
-      await expect(orcaPage.getByRole('option', { name: 'orbit · Space Pack' })).toBeVisible()
-      // Why: Radix fades the list in; a mid-animation capture reads as a washed-out control.
-      await orcaPage.waitForFunction(() =>
-        (
-          document
-            .querySelector('[role="listbox"]')
-            ?.parentElement?.getAnimations({ subtree: true }) ?? []
-        ).every((animation) => animation.playState !== 'running')
-      )
-      await orcaPage.screenshot({ path: testInfo.outputPath(`scene-open-${theme}-${width}.png`) })
-      await orcaPage.keyboard.press('Escape')
-      await expect(orcaPage.getByRole('listbox')).toBeHidden()
-    }
-  }
-})
+for (const theme of THEMES) {
+  test(`the scene picker list renders open at every width, ${theme}`, async ({
+    electronApp,
+    orcaPage
+  }, testInfo) => {
+    const scene = await openScenePicker(electronApp, orcaPage)
+    const option = orcaPage.getByRole('option', { name: 'orbit · Space Pack' })
+    await shootOpenList(electronApp, orcaPage, testInfo, 'scene-open', theme, scene, option)
+  })
+}
 
 test('the scene picker keeps an uninstalled id and renders it at every width', async ({
   electronApp,
@@ -402,13 +416,11 @@ test("a project's scene file previews when valid, says why when not, and renders
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-invalid', path)
 })
 
-test("the project's scene files are listed in the Scene picker and picking one selects it", async ({
-  electronApp,
-  orcaPage
-}, testInfo) => {
-  await waitForSessionReady(orcaPage)
-  await showBand(orcaPage)
-  const repo = await orcaPage.evaluate(() => {
+/** The project page's Scene picker with one scene file, deep-space.json, in the repo. */
+async function openProjectScenePicker(page: Page) {
+  await waitForSessionReady(page)
+  await showBand(page)
+  const repo = await page.evaluate(() => {
     const first = window.__store!.getState().repos[0]
     return first ? { id: first.id, path: first.path } : null
   })
@@ -419,15 +431,23 @@ test("the project's scene files are listed in the Scene picker and picking one s
     join(repoPath, '.orca', 'scenes', 'deep-space.json'),
     JSON.stringify(sceneFile({ looks: byScenePhase({ ...sceneLook, skyTop: '#ff00ff' }) }), null, 2)
   )
-
-  await orcaPage.evaluate((id) => {
+  await page.evaluate((id) => {
     const state = window.__store!.getState()
     state.setSettingsSearchQuery('')
     state.openSettingsTarget({ pane: 'repo', repoId: id })
     state.openSettingsPage()
   }, repoId)
-  const scene = orcaPage.getByRole('combobox', { name: 'Scene' }).first()
+  const scene = page.getByRole('combobox', { name: 'Scene' }).first()
   await expect(scene).toBeVisible({ timeout: 15_000 })
+  return { scene, repoId }
+}
+
+// Why apart from the open lists: with them this test sat at 104 of its 120 s in CI (ORCA-1112).
+test("the project's scene files are listed in the Scene picker and picking one selects it", async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  const { scene, repoId } = await openProjectScenePicker(orcaPage)
   await scene.click()
   await orcaPage.getByRole('option', { name: 'deep-space (custom)' }).click()
   await expect
@@ -436,29 +456,18 @@ test("the project's scene files are listed in the Scene picker and picking one s
   await expect(scene).toHaveText('deep-space (custom)')
   await expect(orcaPage.getByRole('img', { name: 'Preview of deep-space (custom)' })).toBeVisible()
   await shootAll(electronApp, orcaPage, testInfo, 'scene-file-listed', scene)
-
-  for (const theme of THEMES) {
-    await setTheme(orcaPage, theme)
-    for (const width of WIDTHS) {
-      await setWindowWidth(electronApp, orcaPage, width)
-      await scene.evaluate((element) => element.scrollIntoView({ block: 'center' }))
-      await scene.click()
-      await expect(orcaPage.getByRole('listbox')).toBeVisible()
-      await orcaPage.waitForFunction(() =>
-        (
-          document
-            .querySelector('[role="listbox"]')
-            ?.parentElement?.getAnimations({ subtree: true }) ?? []
-        ).every((animation) => animation.playState !== 'running')
-      )
-      await orcaPage.screenshot({
-        path: testInfo.outputPath(`scene-files-open-${theme}-${width}.png`)
-      })
-      await orcaPage.keyboard.press('Escape')
-      await expect(orcaPage.getByRole('listbox')).toBeHidden()
-    }
-  }
 })
+
+for (const theme of THEMES) {
+  test(`the project's scene files list renders open at every width, ${theme}`, async ({
+    electronApp,
+    orcaPage
+  }, testInfo) => {
+    const { scene } = await openProjectScenePicker(orcaPage)
+    const option = orcaPage.getByRole('option', { name: 'deep-space (custom)' })
+    await shootOpenList(electronApp, orcaPage, testInfo, 'scene-files-open', theme, scene, option)
+  })
+}
 
 test("the project lead shows orca.yaml's values, overrides them on this machine and renders at every width", async ({
   electronApp,
