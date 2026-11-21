@@ -349,9 +349,7 @@ today's 2D Office, unchanged.
 - **Labels.** A floor's label never draws under 20 px tall, so it stays legible in a 219 px panel.
 
 The canvas exposes `data-office3d-floors` and `data-office3d-advisors`, and the stage
-`data-team-scene-webgl`. `game.state`'s `panel.office3d: true` tells a paired phone that this host
-draws its Office in 3D; the phone then draws it one floor at a time with a chip per machine, and an
-older host, which never sends it, keeps the phone's 2D Office.
+`data-team-scene-webgl`. The phone's Team sheet still draws the 2D Office.
 
 Pixel, which a scene file themes, draws a team on more than one machine as Office's building: a
 floor per machine, each with its host's name.

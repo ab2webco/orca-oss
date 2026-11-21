@@ -45,9 +45,6 @@ per member that rises from foundation to finished, and merged towers become trop
 `orchestratorGame.panel.diorama: false` keeps the 2D Figures on any machine. The 3D Office needs
 WebGL too; without it the Office draws in 2D, as with **Low resources**.
 
-On the phone, the Team sheet draws the 3D Office when the paired host does, one floor at a time,
-with a chip per machine under the band; it opens on the floor where someone needs you.
-
 Red CI shows the build broken. **Settings > Appearance > Status colors** sets one color per state
 (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), for light and dark; the panel and
 the scene use them.

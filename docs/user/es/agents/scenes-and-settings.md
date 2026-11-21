@@ -50,9 +50,6 @@ trofeos en las colinas. `orchestratorGame.panel.diorama: false` deja Figures en 
 equipo. La Office 3D también necesita WebGL; sin él la Office se dibuja en 2D, como con **Low
 resources**.
 
-En el teléfono, la hoja Team dibuja la Office 3D cuando el host emparejado lo hace, un piso a la
-vez, con un chip por máquina bajo la banda; abre en el piso donde alguien te necesita.
-
 Un CI en rojo muestra la build rota. **Settings > Appearance > Status colors** define un color por
 estado (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), para claro y oscuro; el
 panel y la escena los usan.

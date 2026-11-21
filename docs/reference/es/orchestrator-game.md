@@ -366,10 +366,8 @@ dibujan la Office 2D de hoy, sin cambios.
 - **Etiquetas.** La etiqueta de un piso nunca mide menos de 20 px de alto, legible en un panel de
   219 px.
 
-El canvas expone `data-office3d-floors` y `data-office3d-advisors`. `panel.office3d: true` en
-`game.state` le dice a un teléfono emparejado que este host dibuja su Office en 3D; el teléfono la
-dibuja entonces un piso a la vez, con un chip por máquina, y un host anterior, que nunca lo envía,
-deja la Office 2D en el teléfono.
+El canvas expone `data-office3d-floors` y `data-office3d-advisors`. La hoja Team del teléfono
+sigue dibujando la Office 2D.
 
 Pixel, que tematiza un archivo de escena, dibuja un equipo en más de una máquina como el edificio de
 Office: un piso por máquina, cada uno con el nombre de su host.
