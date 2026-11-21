@@ -28,7 +28,7 @@ export function InheritedSourceLine({
 }): React.JSX.Element {
   return (
     <span data-slot="game-row-source" className="block">
-      {lineOf(`${applied} · ${source}`)}
+      <span>{lineOf(`${applied} · ${source}`)}</span>
       {isOverridden ? (
         <button
           type="button"
