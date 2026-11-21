@@ -142,6 +142,8 @@ const LEAD_STATUS =
   'Kai has #44 in CI for LUM-19, Pico is coding LUM-14 here, and Orin and Nova ' +
   'keep working on render-01 and ci-runner.'
 const HOLD_MS = 2_500
+/** Long enough for the 3D Office's lead to leave its office, ride the lift and talk to Juno. */
+const OFFICE3D_RIDE_MS = 16_000
 // Why past 3.8 s: the level row plays each gain that long (use-team-xp-motion.ts), so both stills see it settled.
 const XP_MOTION_MS = 4_200
 const pick = (model: string, effort: string) => ({ model, effort })
@@ -482,58 +484,95 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
     const building = panel.locator('[data-team-building]')
     const floors = building.locator('[data-team-floor]')
     const cards = panel.locator('[data-team-card="member"]')
-    await expect(building).toBeVisible({ timeout: 90_000 })
-    await expect(floors).toHaveCount(HOSTS.length)
+    // Why both paths: Illustrated draws the Office in 3D where WebGL opens (the macOS recording);
+    // Linux CI runs with the GPU off, so it draws today's 2D building there.
+    const office3d = panel.locator('[data-team-scene-office3d] canvas')
+    await expect(panel.locator('[data-team-scene-webgl]')).toHaveAttribute(
+      'data-team-scene-webgl',
+      /on|off/,
+      { timeout: 90_000 }
+    )
+    const threeD =
+      (await panel.locator('[data-team-scene-webgl]').getAttribute('data-team-scene-webgl')) ===
+      'on'
     await expect(cards).toHaveCount(MEMBERS.length)
     await expect(panel).toContainText('Atlas')
     await expect(panel).toContainText('XP')
     await expect(panel).not.toContainText(/orca-e2e|ORCA-\d/)
-    // Every floor in view, This computer's included: the bottom floor sits inside the building's box.
-    const [lowest, box] = await Promise.all([
-      floors.last().boundingBox(),
-      building.locator('[data-team-floors-scroll]').boundingBox()
-    ])
-    expect(lowest!.y + lowest!.height, 'the lowest floor is cut').toBeLessThanOrEqual(
-      box!.y + box!.height + 1
-    )
     // Why: the sidebar's one-time 'Workspace board moved' tip would sit in every frame for 12 s.
     await expect(orcaPage.getByText('Workspace board moved to the bottom bar')).toBeHidden({
       timeout: 20_000
     })
+    if (threeD) {
+      await expect(office3d).toHaveAttribute('data-office3d-floors', String(HOSTS.length), {
+        timeout: 30_000
+      })
+      const ride = await showcaseClip(electronApp, testInfo, 'team-office-building')
+      await orcaPage.waitForTimeout(1_500)
+      await stepDemo(electronApp, demoOf(2))
+      await emitCodexHookStatus(endpoint, {
+        paneKey: pane.paneKey,
+        worktreeId,
+        state: 'working',
+        tool: 'PushNotification'
+      })
+      // The lead leaves its office, takes the glass lift and talks to Juno on its floor.
+      await orcaPage.waitForTimeout(OFFICE3D_RIDE_MS)
+      await ride.stop()
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.waitForTimeout(800)
+        await orcaPage.screenshot({ path: testInfo.outputPath(`window-office-${theme}.png`) })
+        await office3d.screenshot({ path: testInfo.outputPath(`building-${theme}.png`) })
+      }
+    } else {
+      await expect(building).toBeVisible({ timeout: 90_000 })
+      await expect(floors).toHaveCount(HOSTS.length)
+      // Every floor in view, This computer's included: the bottom floor sits inside the building's box.
+      const [lowest, box] = await Promise.all([
+        floors.last().boundingBox(),
+        building.locator('[data-team-floors-scroll]').boundingBox()
+      ])
+      expect(lowest!.y + lowest!.height, 'the lowest floor is cut').toBeLessThanOrEqual(
+        box!.y + box!.height + 1
+      )
 
-    await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
-      'data-team-elevator-car',
-      ''
-    )
-    const ride = await showcaseClip(electronApp, testInfo, 'team-office-building')
-    await orcaPage.waitForTimeout(1_500)
-    await stepDemo(electronApp, demoOf(2))
-    // The lead's step as the owner sees it: it notifies you, its line riding with it to Juno's floor.
-    await emitCodexHookStatus(endpoint, {
-      paneKey: pane.paneKey,
-      worktreeId,
-      state: 'working',
-      tool: 'PushNotification'
-    })
-    // The lead walks to the shaft, boards and rides to Juno's floor; the car moves only once it boards.
-    await expect
-      .poll(() => building.getAttribute('data-team-ride'), { timeout: 60_000 })
-      .toMatch(/^there\|/)
-    await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
-      'data-team-elevator-car',
-      'studio'
-    )
-    await orcaPage.waitForTimeout(HOLD_MS)
-    await ride.stop()
-    for (const theme of ['dark', 'light'] as const) {
-      await setTheme(orcaPage, theme)
-      await orcaPage.waitForTimeout(800)
-      await orcaPage.screenshot({ path: testInfo.outputPath(`window-office-${theme}.png`) })
-      await building.screenshot({ path: testInfo.outputPath(`building-${theme}.png`) })
+      await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
+        'data-team-elevator-car',
+        ''
+      )
+      const ride = await showcaseClip(electronApp, testInfo, 'team-office-building')
+      await orcaPage.waitForTimeout(1_500)
+      await stepDemo(electronApp, demoOf(2))
+      // The lead's step as the owner sees it: it notifies you, its line riding with it to Juno's floor.
+      await emitCodexHookStatus(endpoint, {
+        paneKey: pane.paneKey,
+        worktreeId,
+        state: 'working',
+        tool: 'PushNotification'
+      })
+      // The lead walks to the shaft, boards and rides to Juno's floor; the car moves only once it boards.
+      await expect
+        .poll(() => building.getAttribute('data-team-ride'), { timeout: 60_000 })
+        .toMatch(/^there\|/)
+      await expect(building.locator('[data-team-elevator-car]')).toHaveAttribute(
+        'data-team-elevator-car',
+        'studio'
+      )
+      await orcaPage.waitForTimeout(HOLD_MS)
+      await ride.stop()
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.waitForTimeout(800)
+        await orcaPage.screenshot({ path: testInfo.outputPath(`window-office-${theme}.png`) })
+        await building.screenshot({ path: testInfo.outputPath(`building-${theme}.png`) })
+      }
     }
     // A phone-width window: the panel is a drawer and the building keeps every floor.
     await setWindowWidth(electronApp, orcaPage, 390)
-    await expect(floors).toHaveCount(HOSTS.length)
+    if (!threeD) {
+      await expect(floors).toHaveCount(HOSTS.length)
+    }
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(orcaPage, theme)
       await orcaPage.waitForTimeout(1_500)
@@ -545,7 +584,12 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
     await setTheme(orcaPage, 'dark')
     for (const style of STYLES) {
       await setStyle(orcaPage, style)
-      const scene = style === 'office' ? building : panel.locator(`[data-team-scene="${style}"]`)
+      const scene =
+        style !== 'office'
+          ? panel.locator(`[data-team-scene="${style}"]`)
+          : threeD
+            ? office3d
+            : building
       await expect(scene).toBeVisible({ timeout: 30_000 })
       await orcaPage.waitForTimeout(1_500)
       const clip = await showcaseClip(electronApp, testInfo, `team-style-${style}`)
