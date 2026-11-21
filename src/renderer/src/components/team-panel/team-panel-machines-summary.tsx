@@ -47,18 +47,21 @@ function Figure({
   meter: React.ReactNode
   lines: string[]
 }): React.JSX.Element {
+  // Why one grid whose columns change, not a swap to flex: a tile left in two columns inside the
+  // three-up strip drew each number over its label (ORCA-1316).
   return (
     <div
       data-team-machines-figure={name}
-      className="grid min-w-0 grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-1.5 border-t border-border px-3 py-2.5 first:border-t-0 @[300px]:flex @[300px]:flex-col @[300px]:border-l @[300px]:border-t-0 @[300px]:py-0 @[300px]:first:border-l-0"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-1.5 border-t border-border px-3 py-2.5 first:border-t-0 @[340px]:grid-cols-1 @[340px]:content-start @[340px]:border-l @[340px]:border-t-0 @[340px]:py-0 @[340px]:first:border-l-0"
     >
-      <span className={cn(gaugeLabelClass, 'break-words')}>
+      <span data-team-machines-label className={gaugeLabelClass}>
         <Icon className="size-3.5 flex-none" />
-        {label}
+        <span className="min-w-0 break-words">{label}</span>
       </span>
       <span
+        data-team-machines-value
         className={cn(
-          'text-right text-lg font-semibold leading-tight tabular-nums @[300px]:text-left',
+          'whitespace-nowrap text-right text-lg font-semibold leading-tight tabular-nums @[340px]:text-left',
           {
             'text-status-warning': warn
           }
@@ -70,9 +73,10 @@ function Figure({
           <small className="ml-1 text-[11px] font-medium text-muted-foreground">{total}</small>
         ) : null}
       </span>
-      <span className="col-span-2 w-full">{meter}</span>
+      <span className="col-span-full w-full">{meter}</span>
       <small
-        className={cn('col-span-2 min-w-0 text-[11px] tabular-nums', {
+        data-team-machines-lines
+        className={cn('col-span-full min-w-0 text-[11px] tabular-nums', {
           'text-status-warning': warn,
           'text-muted-foreground': !warn
         })}
@@ -93,7 +97,7 @@ export function TeamMachinesSummary({ machines }: { machines: TeamMachine[] }): 
   return (
     <div
       data-team-machines-summary
-      className="mx-3 mb-2 mt-1 grid grid-cols-1 rounded-xl border border-border bg-muted/50 @[300px]:grid-cols-3 @[300px]:py-3"
+      className="mx-3 mb-2 mt-1 grid grid-cols-1 rounded-xl border border-border bg-muted/50 @[340px]:grid-cols-3 @[340px]:py-3"
     >
       <Figure
         name="ready"
