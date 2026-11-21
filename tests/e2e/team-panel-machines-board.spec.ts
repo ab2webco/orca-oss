@@ -372,14 +372,17 @@ test('the summary strip keeps each number clear of its label at every sidebar wi
       expect.soft(faults, `strip faults in ${language}`).toEqual([])
       if (CAPTURE_EVIDENCE) {
         await orcaPage.mouse.move(0, 0)
-        for (const width of [defaultWidth, 219, 260, 317, 320, 350, 600]) {
+        for (const [width, name] of [
+          [defaultWidth, `default-${defaultWidth}`],
+          ...[219, 260, 317, 320, 340, 350, 600].map((one) => [one, String(one)] as const)
+        ] as const) {
           await setWidth(width)
           for (const theme of THEMES) {
             await setTheme(orcaPage, theme)
             await settleLayout(orcaPage)
             await panel.screenshot({
               animations: 'disabled',
-              path: testInfo.outputPath(`strip-${language}-${width}-${theme}.png`)
+              path: testInfo.outputPath(`strip-${language}-${name}-${theme}.png`)
             })
           }
         }
