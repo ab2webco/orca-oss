@@ -19,7 +19,7 @@ three styles, all acting out the real state of the work, never a timer:
   or chop wood, and limited ones sit by the fire. Jev watches from its lookout tower and sends a
   messenger bird when it decides. A new member walks out of the keep; a newly connected machine's
   island rises out of the sea.
-- **Office**: a 3D building with one floor per machine, the lead's at the bottom. Members sit at
+- **Office**: a 3D building with one floor per machine over a Lobby, the lead's first. Members sit at
   their desks in sweaters, each monitor showing what its member is doing, a mark over the head of
   whoever needs you, and a board over each desk whose note moves toward done. The lead, in a violet
   coat, works from its own office and rides the glass lift to the member who needs you. Each
@@ -30,8 +30,13 @@ three styles, all acting out the real state of the work, never a timer:
 ![Settings > Agents > Panel with the scene, look, style, the style preview and the tab switches](../../assets/scenes-and-settings/panel-settings.png)
 
 In Figures the camera follows the lead. **Show all** frames every island, a drag moves around the
-base, and a pinch (or Ctrl or ⌘ with the scroll wheel) zooms; **Follow the lead** goes back. Two
-rows in **Settings > Agents > Panel** tune it, and the Office too:
+base, and the scroll wheel or a pinch zooms; **Follow the lead** goes back. At the zoom limit the
+wheel scrolls the panel again. The 3D Office's camera works the same way. Drag the bottom edge of
+either scene to make it taller (Figures up to twice its height, the Office up to the whole
+building); a double click puts it back. Members in the Office go where their work is: to their
+desks while they work, to the lead's office when they have a question for you, to the cafeteria or
+the games room while CI runs, and to the games room when they are done. Two rows in
+**Settings > Agents > Panel** tune it, and the Office too:
 
 - **Scene quality**: **Illustrated** (outlined figures with shadows, and the Office as the 3D
   building) or **Low resources** (flat figures without shadows, and the Office in 2D), for slower

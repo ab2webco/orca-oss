@@ -1,5 +1,5 @@
 ---
-sourceHash: d6d756565b00b589
+sourceHash: 13111f6a26a8c142
 ---
 
 # El juego orquestador de Agent Teams
@@ -337,7 +337,10 @@ otros estilos, nunca de un temporizador:
 
   La primera lectura no repite nada. Con movimiento reducido no se reproduce ninguna señal.
 - **Cámara.** Sigue al líder por defecto. **Show all** encuadra el mundo, arrastrar desplaza, y
-  pellizcar, o Ctrl o ⌘ con la rueda, acerca. La rueda sola desplaza el panel.
+  la rueda sola, pellizcar, o Ctrl o ⌘ con la rueda, acerca o aleja. En el límite del zoom un
+  gesto nuevo de rueda desplaza el panel; la inercia de un trackpad sigue con la escena. La escena
+  abre a la altura que encuadra las islas, y arrastrar su borde inferior la agranda hasta el doble,
+  guardada en `orca.teamFigures.height`; un doble clic la devuelve.
 - **Calidad.** `quality: low` dibuja figuras planas sin contorno ni sombras, a un píxel por píxel.
   Settings muestra la vista previa de la calidad elegida.
 
@@ -359,6 +362,33 @@ dibujan la Office 2D de hoy, sin cambios.
   de Jev del equipo en el piso del líder, o una decisión en uno de los panes del piso.
 - **Escritorios.** Postura, monitor, marca y pizarra salen solo del estado real, como en la Office
   2D ([`team-office3d-actions.ts`](../../../src/shared/team-scene/team-office3d-actions.ts)).
+- **A dónde van los miembros.** Solo un evento real mueve a alguien: un miembro camina cuando su
+  lugar cambia entre dos lecturas del equipo
+  ([`team-office3d-places.ts`](../../../src/shared/team-scene/team-office3d-places.ts)), por
+  precedencia:
+
+  | Evento | A dónde va el miembro |
+  | --- | --- |
+  | Lanzado | Entra por la puerta de la calle, cruza el Lobby y sube en ascensor a su escritorio |
+  | Trabajando | Su escritorio, de inmediato, en ascensor si hace falta |
+  | Una pregunta del Inbox o una compuerta de decisión | La oficina del líder, en una silla de visitas |
+  | Un permiso pendiente en su pane | Se queda en su escritorio |
+  | Sin cuota (limited o asleep) | La cafetería |
+  | CI en rojo, o bloqueado | Su escritorio; con CI en rojo el líder sube a hablar con él |
+  | CI corriendo | La cafetería, la sala de juegos o su escritorio, elegido una vez por espera |
+  | CI en verde, en review o en la cola de merge | Su escritorio |
+  | Mergeado, o sin nada que hacer | La sala de juegos |
+  | Sesión cerrada, o en cola para lanzar | Sale por la puerta de la calle |
+
+- **El Lobby.** La planta baja, bajo el piso del líder, rotulada Lobby en todos los idiomas; los
+  miembros entran y salen por ella. El panel de llamada de un piso se enciende mientras alguien lo
+  pulsa o espera en su fila a una cabina que está en otro piso, y las puertas se abren solo mientras
+  la cabina está detenida en ese piso.
+- **Cámara y altura.** Como en Figures: sigue al líder por defecto, **Show all** encuadra el
+  edificio, arrastrar desplaza la vista, y la rueda o pellizcar acerca o aleja. Abre a la altura de
+  la Office 2D, 176 px con una máquina y 112 px por piso con más, hasta tres; arrastrar su borde
+  inferior la agranda hasta encuadrar el edificio entero, guardada en `orca.teamOffice3d.height`, y
+  un doble clic la devuelve.
 - **La ronda del líder.** Primero quien pregunta, un viaje de ascensor por piso, luego una palabra
   con los miembros ocupados de su propio piso, y de vuelta a su escritorio
   ([`team-office3d-walkers.ts`](../../../src/shared/team-scene/team-office3d-walkers.ts)). `pace` es
@@ -366,7 +396,7 @@ dibujan la Office 2D de hoy, sin cambios.
 - **Etiquetas.** La etiqueta de un piso nunca mide menos de 20 px de alto, legible en un panel de
   219 px.
 
-El canvas expone `data-office3d-floors` y `data-office3d-advisors`. La hoja Team del teléfono
+El canvas expone `data-office3d-floors`, `-advisors`, `-places` y `-camera`. La hoja Team del teléfono
 sigue dibujando la Office 2D.
 
 Pixel, que tematiza un archivo de escena, dibuja un equipo en más de una máquina como el edificio de

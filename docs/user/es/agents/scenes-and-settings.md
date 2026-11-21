@@ -1,5 +1,5 @@
 ---
-sourceHash: a98c7a8c2dfbe83f
+sourceHash: 722d0f8e8844c0a8
 ---
 # Escenas, estilos y ajustes
 
@@ -24,7 +24,7 @@ escena viene en tres estilos, todos representando el estado real del trabajo, nu
   otras islas. Los miembros libres pescan, siembran o cortan leña, y los limitados se sientan junto
   al fuego. Jev vigila desde su torre con un catalejo y manda una paloma mensajera cuando decide. Un
   miembro nuevo sale del castillo; la isla de una máquina recién conectada sube del mar.
-- **Office**: un edificio 3D con un piso por máquina, abajo el del líder. Los miembros trabajan
+- **Office**: un edificio 3D con un piso por máquina sobre un Lobby, primero el del líder. Los miembros trabajan
   en sus escritorios con suéter, cada monitor muestra lo que hace su miembro, una marca sobre la
   cabeza de quien te necesita y una pizarra sobre cada escritorio cuya nota avanza hacia terminado.
   El líder, con abrigo violeta, trabaja desde su propia oficina y sube en el ascensor de vidrio
@@ -35,8 +35,13 @@ escena viene en tres estilos, todos representando el estado real del trabajo, nu
 ![Settings > Agents > Panel con la escena, la apariencia, el estilo, su vista previa y los interruptores de pestañas](../../../assets/scenes-and-settings/panel-settings.png)
 
 En Figures la cámara sigue al líder. **Show all** encuadra todas las islas, arrastrar mueve la vista
-por la base, y pellizcar (o Ctrl o ⌘ con la rueda) acerca o aleja; **Follow the lead** vuelve. Dos
-filas en **Settings > Agents > Panel** lo ajustan, y también la Office:
+por la base, y la rueda o pellizcar acerca o aleja; **Follow the lead** vuelve. En el límite del
+zoom la rueda vuelve a desplazar el panel. La cámara de la Office 3D funciona igual. Arrastra el
+borde inferior de cualquiera de las dos escenas para hacerla más alta (Figures hasta el doble de su
+altura, la Office hasta el edificio entero); un doble clic la devuelve. Los miembros de la Office van
+a donde está su trabajo: a su escritorio mientras trabajan, a la oficina del líder cuando tienen una
+pregunta para ti, a la cafetería o la sala de juegos mientras corre CI, y a la sala de juegos cuando
+terminan. Dos filas en **Settings > Agents > Panel** lo ajustan, y también la Office:
 
 - **Scene quality**: **Illustrated** (figuras con contorno y sombras, y la Office como el edificio
   3D) o **Low resources** (figuras planas sin sombras, y la Office en 2D), para equipos más lentos.
