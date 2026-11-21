@@ -238,3 +238,62 @@ describe('Settings search follows the shown rows (ORCA-1112)', () => {
     shown.unmount()
   })
 })
+
+describe('the HUD row in Flat shows what the pane draws (ORCA-1112 D2)', () => {
+  const hudSwitch = (root: HTMLElement) =>
+    root.querySelector<HTMLElement>('[role="switch"][aria-label="Teammate HUD"]')!
+  const press = (target: Element) =>
+    act(() => {
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+  it('reads off while the band is off, and turning it on stores the band and the HUD', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { mode: 'flat' } }}
+        updateSettings={(next) => updates.push(next)}
+      />
+    )
+
+    expect(hudSwitch(view.container).getAttribute('aria-checked')).toBe('false')
+    press(hudSwitch(view.container))
+    expect(updates).toEqual([{ orchestratorGame: { mode: 'flat', band: true, hud: true } }])
+    view.unmount()
+  })
+
+  it('turning it off stores only the HUD', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <OrchestratorGameSetting
+        settings={{ orchestratorGame: { mode: 'flat', band: true } }}
+        updateSettings={(next) => updates.push(next)}
+      />
+    )
+
+    expect(hudSwitch(view.container).getAttribute('aria-checked')).toBe('true')
+    press(hudSwitch(view.container))
+    expect(updates).toEqual([{ orchestratorGame: { mode: 'flat', band: true, hud: false } }])
+    view.unmount()
+  })
+
+  it('on a project, says Off while the band is off and stores both when turned on', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render(
+      <ProjectOrchestratorGameSetting
+        repo={{ id: 'repo1', path: '/repo', connectionId: null }}
+        settings={{}}
+        projectLayer={{ mode: 'flat' }}
+        updateSettings={(next) => updates.push(next)}
+      />
+    )
+    const row = view.container.querySelector('[data-game-row="hud"]')!
+
+    expect(row.textContent).toContain('Off')
+    expect(row.textContent).not.toContain('On · default')
+    const on = Array.from(row.querySelectorAll('button')).find((b) => b.textContent === 'On')!
+    press(on)
+    expect(updates).toEqual([{ orchestratorGameProjects: { repo1: { hud: true, band: true } } }])
+    view.unmount()
+  })
+})

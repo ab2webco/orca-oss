@@ -38,6 +38,16 @@ import { GameRowGroupView, type GameRowDrawers } from './GameRowList'
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
 
+/** The HUD a pane draws needs the band too, so turning it on stores both (ORCA-1112 D2). */
+function withHud(
+  layer: OrchestratorGameLayer | undefined,
+  on: boolean,
+  band: boolean
+): OrchestratorGameLayer {
+  const next = withOrchestratorGameField(layer, 'hud', on)
+  return on && !band ? withOrchestratorGameField(next, 'band', true) : next
+}
+
 const switchOf = (key: ToggleKey) => orchestratorGameSwitches().find((one) => one.key === key)!
 
 function Groups({
@@ -91,12 +101,20 @@ export function GlobalTerminalGroups({
       />
     )
   }
+  const hud = config.band && config.hud
   const draw: GameRowDrawers = {
     show: () => <OrchestratorGameShowRow settings={settings} updateSettings={updateSettings} />,
     view: () => (
       <OrchestratorGameDefaultViewRow settings={settings} updateSettings={updateSettings} />
     ),
-    hud: toggle('hud'),
+    hud: () => (
+      <SettingsSwitchRow
+        label={switchOf('hud').label}
+        description={switchOf('hud').description}
+        checked={hud}
+        onChange={() => updateSettings({ orchestratorGame: withHud(layer, !hud, config.band) })}
+      />
+    ),
     rewards: toggle('rewards'),
     openLinks: () => (
       <OrchestratorGameOpenLinksRow
@@ -184,6 +202,18 @@ export function ProjectTerminalGroups({
       />
     )
   }
+  // Why band && hud: with the band off a pane draws no HUD (shownOrchestratorGameTerminalOf).
+  const hud = config.band && config.hud
+  const setHud = (next: boolean | undefined): void => {
+    const projects = settings.orchestratorGameProjects
+    const withOwn = withOrchestratorGameProjectField(projects, repoId, 'hud', next)
+    updateSettings({
+      orchestratorGameProjects:
+        next === true && !config.band
+          ? withOrchestratorGameProjectField(withOwn, repoId, 'band', true)
+          : withOwn
+    })
+  }
   const viewRow = (only: 'show' | 'view') => () => (
     <ProjectOrchestratorGameViewRows
       repoId={repoId}
@@ -196,7 +226,25 @@ export function ProjectTerminalGroups({
   const draw: GameRowDrawers = {
     show: viewRow('show'),
     view: viewRow('view'),
-    hud: toggle('hud'),
+    hud: () => (
+      <SettingsRow
+        label={switchOf('hud').label}
+        description={effective(config.band ? 'hud' : 'band', hud ? labels.on : labels.off)}
+        control={
+          <SettingsSegmentedControl
+            value={local?.hud === undefined ? 'inherit' : String(local.hud)}
+            ariaLabel={switchOf('hud').label}
+            size="sm"
+            options={[
+              { value: 'inherit', label: inherit },
+              { value: 'true', label: labels.on },
+              { value: 'false', label: labels.off }
+            ]}
+            onChange={(next) => setHud(next === 'inherit' ? undefined : next === 'true')}
+          />
+        }
+      />
+    ),
     rewards: toggle('rewards'),
     openLinks: () => (
       <OrchestratorGameOpenLinksRow
