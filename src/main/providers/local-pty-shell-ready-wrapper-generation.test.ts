@@ -253,6 +253,20 @@ describePosix('local PTY shell-ready launch config', () => {
     expect(zlogin).toContain('== "user:__orca_prompt_mark"')
   })
 
+  it("puts Orca's gh PR-cap wrapper back first after user startup files reorder PATH (ORCA-1301)", async () => {
+    const { getShellReadyLaunchConfig } = await importFreshLocalPtyShellReady()
+
+    getShellReadyLaunchConfig('/bin/zsh')
+
+    const restore = 'export PATH="${ORCA_GH_PR_CAP_SHIM_DIR}:$PATH"'
+    for (const file of ['.zshrc', '.zlogin']) {
+      expect(readFileSync(join(userDataPath, 'shell-ready', 'zsh', file), 'utf8')).toContain(
+        restore
+      )
+    }
+    expect(getBashShellReadyRcfileContent()).toContain(restore)
+  })
+
   it('writes wrappers without restoring Pi/OMP homes after user startup files', async () => {
     const { getShellReadyLaunchConfig } = await importFreshLocalPtyShellReady()
 

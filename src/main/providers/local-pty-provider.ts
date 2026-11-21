@@ -825,7 +825,8 @@ export class LocalPtyProvider implements IPtyProvider {
         finalEnv.ORCA_MIMOCODE_HOME ||
         finalEnv.ORCA_OMP_STATUS_EXTENSION ||
         finalEnv.ORCA_CODEX_HOME ||
-        finalEnv.ORCA_AGENT_TEAMS_SHIM_DIR
+        finalEnv.ORCA_AGENT_TEAMS_SHIM_DIR ||
+        finalEnv.ORCA_GH_PR_CAP_SHIM_DIR
       const isCodexStartupCommand = startupAgentRecognition?.agent === 'codex'
       let shellLaunch: ReturnType<typeof getShellReadyLaunchConfig> | null = null
       if (args.command && isCodexStartupCommand) {
