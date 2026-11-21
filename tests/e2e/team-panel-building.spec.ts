@@ -178,7 +178,11 @@ test('the Team panel draws a team on five machines as a building in Office', asy
       const state = window.__store!.getState()
       const game = state.settings?.orchestratorGame
       void state.updateSettings({
-        orchestratorGame: { ...game, panel: { ...game?.panel, look: 'game', style: 'office' } }
+        // Why Low resources: this spec drives the 2D Office's floors; Illustrated draws it in 3D.
+        orchestratorGame: {
+          ...game,
+          panel: { ...game?.panel, look: 'game', style: 'office', quality: 'low' }
+        }
       })
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')

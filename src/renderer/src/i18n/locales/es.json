@@ -5615,11 +5615,11 @@
       "settings": {
         "GamePanelDioramaRows": {
           "quality": "Calidad de la escena",
-          "qualityDescription": "Ilustrado dibuja figuras con contorno y sombras. Bajos recursos las dibuja planas y sin sombras, para equipos más lentos.",
+          "qualityDescription": "Ilustrado dibuja la escena en 3D: figuras con contorno y sombras, y la Oficina como un edificio. Bajos recursos dibuja figuras planas sin sombras y la Oficina en 2D, para equipos más lentos.",
           "qualityHigh": "Ilustrado",
           "qualityLow": "Bajos recursos",
           "pace": "Ritmo del lead",
-          "paceDescription": "Cómo recorre el lead la base: caminando, más rápido o enviado por el mago de la corte.",
+          "paceDescription": "Cómo recorre el lead la escena: caminando, más rápido o directo al lugar.",
           "paceNormal": "Normal",
           "paceFast": "Rápido",
           "paceDirect": "Directo"
@@ -15734,6 +15734,9 @@
         }
       },
       "team-scene": {
+        "TeamSceneOffice3d": {
+          "lobby": "Vestíbulo"
+        },
         "TeamSceneDiorama": {
           "followLead": "Seguir al lead",
           "showAll": "Ver todo"

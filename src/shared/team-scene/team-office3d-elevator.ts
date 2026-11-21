@@ -2,7 +2,14 @@
 // any moment is a lookup and a frozen frame (reduced motion) still shows it at a floor.
 
 /** One trip of the cab, in floor indexes; it eases from `from` to `to` between `start` and `end`. */
-export type Office3dCabRide = { from: number; to: number; start: number; end: number }
+export type Office3dCabRide = {
+  from: number
+  to: number
+  start: number
+  end: number
+  /** Who rides it, up to the cab's capacity; the cab coming for a caller carries nobody. */
+  riders?: number
+}
 
 /** The one glass cab every floor shares, and when it is next free. */
 export type Office3dCab = { rides: Office3dCabRide[]; freeAt: number; home: number }
@@ -47,21 +54,36 @@ export function bookOffice3dCab(
   from: number,
   to: number,
   earliest: number,
-  speed = 1
-): { board: number; depart: number; arrive: number } {
+  speed = 1,
+  capacity = 1
+): { board: number; depart: number; arrive: number; seat: number } {
+  // Why join a booked ride: riders queued at one door for one floor board together, in order.
+  const shared = cab.rides.find(
+    (r) => r.from === from && r.to === to && r.start >= earliest && (r.riders ?? 0) < capacity
+  )
+  if (shared) {
+    const seat = shared.riders ?? 0
+    shared.riders = seat + 1
+    return {
+      board: Math.max(earliest, shared.start - BOARD / speed),
+      depart: shared.start,
+      arrive: shared.end,
+      seat
+    }
+  }
   let t = Math.max(earliest, cab.freeAt)
   const at = Math.round(office3dCabFloorAt(cab, t))
   if (at !== from) {
     const dur = office3dRideDur(at, from, speed)
-    cab.rides.push({ from: at, to: from, start: t, end: t + dur })
+    cab.rides.push({ from: at, to: from, start: t, end: t + dur, riders: 0 })
     t += dur
   }
   const board = t
   const depart = t + BOARD / speed
   const arrive = from === to ? depart : depart + office3dRideDur(from, to, speed)
   if (from !== to) {
-    cab.rides.push({ from, to, start: depart, end: arrive })
+    cab.rides.push({ from, to, start: depart, end: arrive, riders: 1 })
   }
   cab.freeAt = arrive + ALIGHT / speed
-  return { board, depart, arrive }
+  return { board, depart, arrive, seat: 0 }
 }
