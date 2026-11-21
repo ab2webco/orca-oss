@@ -236,7 +236,10 @@ describe("the 3D Office lead's path", () => {
               continue
             }
             const hit = solidsOf(fl).find((s) => inside(at.at, s))
-            expect(hit, `${hit?.name} at t=${t.toFixed(2)} ${at.at}`).toBeUndefined()
+            expect(
+              hit,
+              `${hit?.name} at t=${t.toFixed(2)} ${at.at.map((v) => v.toFixed(2)).join(',')}`
+            ).toBeUndefined()
             // Through the lift door only with the cab on this floor, so its leaves are open.
             if (at.at[0] < 0.2 && at.at[0] > -0.5) {
               expect(Math.round(office3dCabFloorAt(round.cab, t))).toBe(Math.round(at.floor))
