@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { OrchestratorGameConfig } from '../../../../shared/orchestrator-game-config'
 import {
   isOrchestratorGameTimezone,
   type OrchestratorGameRender
@@ -61,49 +60,6 @@ export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'in
         />
       }
     />
-  )
-}
-
-type LookKey = 'render' | 'timezone'
-type LookLayer = Partial<Pick<OrchestratorGameConfig, LookKey>>
-
-/** Render and time zone for one layer; `effective` (project rows) adds Inherit and the resolved values. */
-export function OrchestratorGameLookRows({
-  layer,
-  effective,
-  disabled,
-  onChange
-}: {
-  layer: LookLayer | undefined
-  effective?: { render: string; timezone: string }
-  disabled?: boolean
-  onChange: <K extends LookKey>(key: K, value: OrchestratorGameConfig[K] | undefined) => void
-}): React.JSX.Element {
-  const stored = layer?.timezone ?? ''
-  return (
-    <>
-      {effective === undefined ? (
-        <OrchestratorGameRenderRow
-          value={layer?.render ?? 'classic'}
-          disabled={disabled}
-          onChange={(next) => onChange('render', next)}
-        />
-      ) : (
-        <OrchestratorGameRenderRow
-          value={layer?.render ?? 'inherit'}
-          effective={effective.render}
-          disabled={disabled}
-          onChange={(next) => onChange('render', next === 'inherit' ? undefined : next)}
-        />
-      )}
-      <OrchestratorGameTimezoneRow
-        key={stored}
-        stored={stored}
-        effective={effective?.timezone}
-        disabled={disabled}
-        onCommit={(value) => onChange('timezone', value)}
-      />
-    </>
   )
 }
 

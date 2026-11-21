@@ -910,9 +910,10 @@ export function AgentsPane({
         <AgentAwakeSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
 
-      <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
-
+      {/* Why Panel first: V30 opens the game settings with the Team panel's rows (ORCA-1112). */}
       <GamePanelSetting settings={settings} updateSettings={updateSettings} />
+
+      <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
 
       <AgentCacheTimerSection settings={settings} updateSettings={updateSettings} />
 

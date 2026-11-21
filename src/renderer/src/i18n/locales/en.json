@@ -11849,6 +11849,10 @@
           "hours24": "24 h",
           "days3": "3 d",
           "days7": "7 d"
+        },
+        "OrchestratorGameTerminalBand": {
+          "terminalPanes": "Terminal panes",
+          "terminalPanesDescription": "How Agent Teams terminal panes start and draw the game on this machine."
         }
       },
       "right": {

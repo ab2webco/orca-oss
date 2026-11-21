@@ -136,47 +136,77 @@ function ViewSelect({
   )
 }
 
-/** Show the game and the default view for every project. */
-export function OrchestratorGameViewRows({
-  settings,
-  updateSettings
-}: {
+type GlobalRowProps = {
   settings: Partial<GameSettings>
   updateSettings: (updates: Partial<GlobalSettings>) => void
-}): React.JSX.Element {
+}
+
+/** Show the game for every project. */
+export function OrchestratorGameShowRow({
+  settings,
+  updateSettings
+}: GlobalRowProps): React.JSX.Element {
   const layer = settings.orchestratorGame
   const { config } = resolveOrchestratorGameConfig({ global: layer })
   return (
+    <SettingsSwitchRow
+      label={showTitle()}
+      description={translate(
+        'auto.components.settings.OrchestratorGameViewSetting.showDescription',
+        'Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.'
+      )}
+      checked={config.show}
+      onChange={() =>
+        updateSettings({
+          orchestratorGame: withOrchestratorGameField(layer, 'show', !config.show)
+        })
+      }
+    />
+  )
+}
+
+/** The default view for every project. */
+export function OrchestratorGameDefaultViewRow({
+  settings,
+  updateSettings
+}: GlobalRowProps): React.JSX.Element {
+  const layer = settings.orchestratorGame
+  const { config } = resolveOrchestratorGameConfig({ global: layer })
+  return (
+    <SettingsRow
+      label={viewTitle()}
+      description={translate(
+        'auto.components.settings.OrchestratorGameViewSetting.viewDescription',
+        'How Agent Teams terminal panes draw the game, with what it costs. The Team panel follows it until you pick a Panel look. Each project can change it, and one pane with /orca-game:view.'
+      )}
+      control={
+        <ViewSelect
+          value={orchestratorGameViewOf(config)}
+          withInherit={false}
+          onChange={(view) => updateSettings({ orchestratorGame: withView(layer, view, config) })}
+        />
+      }
+    />
+  )
+}
+
+/** Show the game and the default view for every project. */
+export function OrchestratorGameViewRows(props: GlobalRowProps): React.JSX.Element {
+  return (
     <>
-      <SettingsSwitchRow
-        label={showTitle()}
-        description={translate(
-          'auto.components.settings.OrchestratorGameViewSetting.showDescription',
-          'Off starts Agent Teams panes as plain Claude and keeps the default view for when it is back on.'
-        )}
-        checked={config.show}
-        onChange={() =>
-          updateSettings({
-            orchestratorGame: withOrchestratorGameField(layer, 'show', !config.show)
-          })
-        }
-      />
-      <SettingsRow
-        label={viewTitle()}
-        description={translate(
-          'auto.components.settings.OrchestratorGameViewSetting.viewDescription',
-          'How Agent Teams terminal panes draw the game, with what it costs. The Team panel follows it until you pick a Panel look. Each project can change it, and one pane with /orca-game:view.'
-        )}
-        control={
-          <ViewSelect
-            value={orchestratorGameViewOf(config)}
-            withInherit={false}
-            onChange={(view) => updateSettings({ orchestratorGame: withView(layer, view, config) })}
-          />
-        }
-      />
+      <OrchestratorGameShowRow {...props} />
+      <OrchestratorGameDefaultViewRow {...props} />
     </>
   )
+}
+
+type ProjectRowProps = {
+  repoId: string
+  settings: Partial<GameSettings>
+  projectLayer: OrchestratorGameLayer | undefined
+  updateSettings: (updates: Partial<GlobalSettings>) => void
+  /** Draw only one of the two rows; both when omitted. */
+  only?: 'show' | 'view'
 }
 
 /** Show the game and the default view for one project on this machine, with their layers. */
@@ -184,13 +214,9 @@ export function ProjectOrchestratorGameViewRows({
   repoId,
   settings,
   projectLayer,
-  updateSettings
-}: {
-  repoId: string
-  settings: Partial<GameSettings>
-  projectLayer: OrchestratorGameLayer | undefined
-  updateSettings: (updates: Partial<GlobalSettings>) => void
-}): React.JSX.Element {
+  updateSettings,
+  only
+}: ProjectRowProps): React.JSX.Element {
   const local = settings.orchestratorGameProjects?.[repoId]
   const { config, sources } = resolveOrchestratorGameConfig({
     global: settings.orchestratorGame,
@@ -210,43 +236,47 @@ export function ProjectOrchestratorGameViewRows({
   }
   return (
     <>
-      <SettingsRow
-        label={showTitle()}
-        description={`${config.show ? onOff.on : onOff.off} · ${orchestratorGameSourceLabel(sources.show)}`}
-        control={
-          <SettingsSegmentedControl
-            value={local?.show === undefined ? INHERIT : String(local.show)}
-            ariaLabel={showTitle()}
-            size="sm"
-            options={[
-              { value: INHERIT, label: orchestratorGameInheritLabel() },
-              { value: 'true', label: onOff.on },
-              { value: 'false', label: onOff.off }
-            ]}
-            onChange={(next) =>
-              updateSettings({
-                orchestratorGameProjects: withOrchestratorGameProjectField(
-                  settings.orchestratorGameProjects,
-                  repoId,
-                  'show',
-                  next === INHERIT ? undefined : next === 'true'
-                )
-              })
-            }
-          />
-        }
-      />
-      <SettingsRow
-        label={viewTitle()}
-        description={`${viewLabels()[view]} · ${orchestratorGameSourceLabel(viewSourceOf(config, sources))}`}
-        control={
-          <ViewSelect
-            value={local?.mode === undefined ? INHERIT : view}
-            withInherit
-            onChange={(next) => writeLocal(withView(local, next, config))}
-          />
-        }
-      />
+      {only === 'view' ? null : (
+        <SettingsRow
+          label={showTitle()}
+          description={`${config.show ? onOff.on : onOff.off} · ${orchestratorGameSourceLabel(sources.show)}`}
+          control={
+            <SettingsSegmentedControl
+              value={local?.show === undefined ? INHERIT : String(local.show)}
+              ariaLabel={showTitle()}
+              size="sm"
+              options={[
+                { value: INHERIT, label: orchestratorGameInheritLabel() },
+                { value: 'true', label: onOff.on },
+                { value: 'false', label: onOff.off }
+              ]}
+              onChange={(next) =>
+                updateSettings({
+                  orchestratorGameProjects: withOrchestratorGameProjectField(
+                    settings.orchestratorGameProjects,
+                    repoId,
+                    'show',
+                    next === INHERIT ? undefined : next === 'true'
+                  )
+                })
+              }
+            />
+          }
+        />
+      )}
+      {only === 'show' ? null : (
+        <SettingsRow
+          label={viewTitle()}
+          description={`${viewLabels()[view]} · ${orchestratorGameSourceLabel(viewSourceOf(config, sources))}`}
+          control={
+            <ViewSelect
+              value={local?.mode === undefined ? INHERIT : view}
+              withInherit
+              onChange={(next) => writeLocal(withView(local, next, config))}
+            />
+          }
+        />
+      )}
     </>
   )
 }

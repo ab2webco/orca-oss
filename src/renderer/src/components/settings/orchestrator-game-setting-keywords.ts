@@ -1,13 +1,9 @@
-/** What finds the Agent Teams section in the Settings search. */
+/** The Agent Teams section's own words; each row's come from the row table (ORCA-1112). */
 export const ORCHESTRATOR_GAME_SETTING_KEYWORDS = [
   'agent teams',
   'game',
   'quest',
   'orchestrator',
-  'hud',
-  'rewards',
-  'zen',
-  'scene',
   // Why: the owner looked for where the characters' names are set (ORCA-1304).
   'names',
   'lead name',

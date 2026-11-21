@@ -20,7 +20,11 @@ import {
   getClaudeStatusLineTitle
 } from './claude-statusline-items-copy'
 import { getAgentCacheTimerSearchEntries } from './agent-cache-timer-search'
-import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import {
+  getAgentTeamsGameSearchEntry,
+  getGamePanelSearchEntries
+} from './orchestrator-game-panel-search'
+import { shownGameRows, type GameRowFacts } from './orchestrator-game-row-visibility'
 import { getOrcaGameScenesSkillSearchEntries } from './orca-game-scenes-skill-search'
 import { translate } from '@/i18n/i18n'
 import { searchKeywords, translateSearchKeyword, uniqueKeywords } from './settings-search-keywords'
@@ -69,6 +73,8 @@ function expandAgentSearchText(value: string): string[] {
 type AgentsPaneSearchOptions = {
   includeAgentAwake?: boolean
   includeAgentRuntime?: boolean
+  /** The global game rows in use; without it every game row is searchable. */
+  gameFacts?: GameRowFacts
 }
 
 const AGENT_AWAKE_SEARCH_ENTRY_ID = 'agent-awake'
@@ -152,19 +158,25 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.agents.search.checks', 'checks')
     ]
   },
-  ...getOrcaGameScenesSkillSearchEntries(),
-  ...getGamePanelSearchEntries(),
   ...getAgentCacheTimerSearchEntries()
 ])
 
 export function getAgentsPaneSearchEntries({
   includeAgentAwake = true,
-  includeAgentRuntime = true
+  includeAgentRuntime = true,
+  gameFacts
 }: AgentsPaneSearchOptions = {}) {
   const entries = getAllAgentsPaneSearchEntries()
-  return entries.filter(
-    (entry) =>
-      (!('id' in entry) || entry.id !== AGENT_RUNTIME_SEARCH_ENTRY_ID || includeAgentRuntime) &&
-      (!('id' in entry) || entry.id !== AGENT_AWAKE_SEARCH_ENTRY_ID || includeAgentAwake)
-  )
+  // Why not cached with the rest: a game row the page hides must not be found (ORCA-1112).
+  const sceneShown = gameFacts === undefined || shownGameRows(gameFacts).has('scene')
+  return [
+    ...entries.filter(
+      (entry) =>
+        (!('id' in entry) || entry.id !== AGENT_RUNTIME_SEARCH_ENTRY_ID || includeAgentRuntime) &&
+        (!('id' in entry) || entry.id !== AGENT_AWAKE_SEARCH_ENTRY_ID || includeAgentAwake)
+    ),
+    ...(sceneShown ? getOrcaGameScenesSkillSearchEntries() : []),
+    ...getGamePanelSearchEntries(gameFacts),
+    getAgentTeamsGameSearchEntry(gameFacts)
+  ]
 }

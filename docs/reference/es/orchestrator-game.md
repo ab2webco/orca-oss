@@ -163,9 +163,19 @@ Cada campo se resuelve por separado; una capa posterior gana
 4. Settings → el proyecto → **Agent Teams game**, solo en esta máquina
    (`orchestratorGameProjects[repoId]`). Cada fila puede decir **Inherit**.
 
-Ambas páginas de Settings agrupan los controles del juego (**Show the game**, **Default view** con el costo de cada vista, recompensas, seguimiento
-del work item, dónde se abren los enlaces y el grupo **Terminal band** con el interruptor de la banda, render, zona horaria y HUD de compañeros; la escena encabeza el grupo Panel) bajo un encabezado **Agent Teams game** que indica que solo se aplican a los panes de Claude
-Agent Teams. Bajo el selector de escena, una vista previa pinta la escena efectiva con el propio
+Ambas páginas de Settings muestran una fila del juego solo mientras la elección actual la usa
+(ORCA-1112). Una tabla,
+[`orchestrator-game-row-visibility.ts`](../../../src/renderer/src/components/settings/orchestrator-game-row-visibility.ts),
+da la condición de cada fila según su lector y gobierna la página y la búsqueda de Settings; una fila
+oculta conserva su valor guardado y un grupo sin filas visibles no dibuja encabezado. En el orden de V30:
+- **Panel**: aspecto, estilo, vista previa, filas del diorama, escena, PRs, Machines, Advisor, Arcade,
+  zona horaria.
+- En la página del proyecto, **Actions**, **Names** y **Lead**.
+- **Terminal panes**, bajo el encabezado **Agent Teams game** en la página global: **Show the game**,
+  **Default view** con el costo de cada vista, HUD de compañeros, recompensas, dónde se abren los
+  enlaces, seguimiento del work item. Solo se aplican a los panes de Claude Agent Teams.
+- **Terminal band**, solo con una vista de píxeles (Zen, 2D classic, 2D hd): el interruptor de la
+  banda y, con la banda encendida, su vista previa y el render. Bajo el selector de escena, una vista previa pinta la escena efectiva con el propio
 código de dibujo del mod
 ([`OrchestratorGameScenePreview.tsx`](../../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
 importa `hooks/scene.ts`, `scenery.ts`, `scenes/` y, para `render: hd`, `scene-hd.ts`), así que no
@@ -203,11 +213,10 @@ pane recibe `mode` y `hud` tal como están. Guardar una vista que dibuja (`zen`,
 si no, la elección no cambiaría nada en pantalla. `mode` nunca se reescribe, así que el aspecto del
 Panel, que lo sigue, no cambia.
 
-En Settings, la escena (integrada o un archivo del proyecto) encabeza el grupo **Panel**, sobre el
-aspecto y el estilo, y la vista previa del panel la dibuja en el estilo elegido, porque el panel del
-equipo es donde se ve por defecto. El grupo **Terminal band** tiene el interruptor de la banda; la
-vista previa de 5 filas, el render, la zona horaria y el HUD de compañeros solo aparecen con la banda
-encendida.
+En Settings, la escena (integrada o un archivo del proyecto) va en el grupo **Panel** bajo el aspecto
+y el estilo, visible con el aspecto Game o una banda que dibuja, y la vista previa del panel la dibuja
+en el estilo elegido. La zona horaria también va ahí: la leen el día y la noche de la escena del
+panel, las métricas del día de Display y una banda HD.
 
 Versiones mezcladas: todo mod desde flat (ORCA-689) lee `ORCA_GAME_MODE=flat` y `ORCA_GAME_HUD`; un
 mod anterior lee `flat` como desconocido y sigue dibujando, como antes. Un host emparejado anterior a

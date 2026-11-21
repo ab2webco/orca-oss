@@ -5,11 +5,9 @@ import {
   ORCHESTRATOR_GAME_BUILT_IN_SCENES,
   resolveOrchestratorGameConfig,
   type OrchestratorGameBuiltInScene,
-  type OrchestratorGameConfig,
   type OrchestratorGameLayer
 } from '../../../../shared/orchestrator-game-config'
 import {
-  withOrchestratorGameField,
   withOrchestratorGameProjectField,
   withOrchestratorGameProjectScene
 } from '../../../../shared/orchestrator-game-settings-updates'
@@ -20,7 +18,6 @@ import {
   INHERIT_SCENE,
   OrchestratorGameSceneSelect
 } from './OrchestratorGameSceneSelect'
-import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
 import {
   OrchestratorGameSceneFileField,
   OrchestratorGameSceneFileStatus
@@ -34,46 +31,24 @@ import {
   orchestratorGameSceneFileId,
   orchestratorGameSceneFileOfId
 } from '../../../../shared/orchestrator-game-scene-file'
-import {
-  SettingsRow,
-  SettingsSegmentedControl,
-  SettingsSubsectionHeader,
-  SettingsSwitchRow
-} from './SettingsFormControls'
+import { SettingsRow, SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import {
   orchestratorGameInheritLabel,
-  orchestratorGameModeLabels as modeLabels,
   orchestratorGameSourceLabel as sourceLabel
 } from './orchestrator-game-setting-labels'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
 import { ProjectOrchestratorGameNamesSetting } from './OrchestratorGameNamesSetting'
-import { ORCHESTRATOR_GAME_SETTING_KEYWORDS as keywords } from './orchestrator-game-setting-keywords'
 import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
-import {
-  OrchestratorGameOpenLinksRow,
-  orchestratorGameOpenLinksLabels
-} from './OrchestratorGameOpenLinksSetting'
-import {
-  OrchestratorGameLookRows,
-  orchestratorGameRenderLabels
-} from './OrchestratorGameRenderSetting'
+import { OrchestratorGameTimezoneRow } from './OrchestratorGameRenderSetting'
 import { OrchestratorGameScenesSkillCard } from './OrchestratorGameScenesSkillCard'
-import {
-  OrchestratorGameViewRows,
-  ProjectOrchestratorGameViewRows
-} from './OrchestratorGameViewSetting'
-import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
 import { ProjectGamePanelRows } from './OrchestratorGamePanelSetting'
-import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import { getAgentTeamsGameSearchEntry } from './orchestrator-game-panel-search'
 import { useAdvisorPluginPresence } from './use-advisor-plugin-presence'
 import { getRepositoryGameSectionId } from './repository-settings-targets'
-import {
-  switchPlaceOf,
-  orchestratorGameSwitches,
-  type ToggleKey
-} from './orchestrator-game-switches'
-import { TerminalBandGroup } from './OrchestratorGameTerminalBand'
+import { gameRowFactsOf, shownGameRows } from './orchestrator-game-row-visibility'
+import { GlobalTerminalGroups, ProjectTerminalGroups } from './OrchestratorGameTerminalRows'
+import { TerminalPanesHeading } from './OrchestratorGameTerminalBand'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 const title = (): string =>
@@ -99,35 +74,9 @@ export function OrchestratorGameSetting({
   settings: GameSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
-  const layer = settings.orchestratorGame
-  const resolved = resolveOrchestratorGameConfig({ global: layer }).config
-  // Why the shown mode: with Show the game off the rest of the section is disabled and the preview is off.
-  const config = { ...resolved, mode: shownOrchestratorGameModeOf(resolved) }
-  const set = <K extends keyof OrchestratorGameConfig>(
-    key: K,
-    value: OrchestratorGameConfig[K]
-  ): void => updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
-  const description = translate(
-    'auto.components.settings.OrchestratorGameSetting.description',
-    'Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.'
-  )
-  const switchRow = (
-    toggle: ReturnType<typeof orchestratorGameSwitches>[number]
-  ): React.JSX.Element => (
-    <SettingsSwitchRow
-      key={toggle.key}
-      label={toggle.label}
-      description={toggle.description}
-      checked={config[toggle.key]}
-      disabled={config.mode === 'off'}
-      onChange={() => set(toggle.key, !config[toggle.key])}
-    />
-  )
-  const switchesAt = (place: ReturnType<typeof switchPlaceOf>): React.JSX.Element[] =>
-    orchestratorGameSwitches()
-      .filter((toggle) => switchPlaceOf(toggle.key) === place)
-      .map(switchRow)
-
+  const facts = gameRowFactsOf({ page: 'global', layers: { global: settings.orchestratorGame } })
+  const shown = shownGameRows(facts)
+  const { description, keywords } = getAgentTeamsGameSearchEntry(facts)
   return (
     <section>
       <SearchableSetting
@@ -137,36 +86,12 @@ export function OrchestratorGameSetting({
         className="space-y-1"
       >
         {sectionHeader()}
-        <OrchestratorGameViewRows settings={settings} updateSettings={updateSettings} />
-        {switchesAt('game')}
-        <OrchestratorGameOpenLinksRow
-          value={config.openLinks}
-          disabled={config.mode === 'off'}
-          onChange={(next) => set('openLinks', next)}
-        />
-        <TerminalBandGroup>
-          {switchesAt('band')}
-          {config.band ? (
-            <>
-              <OrchestratorGameScenePreview config={config} />
-              <OrchestratorGameLookRows
-                layer={layer}
-                disabled={config.mode === 'off'}
-                onChange={(key, value) =>
-                  updateSettings({ orchestratorGame: withOrchestratorGameField(layer, key, value) })
-                }
-              />
-              {switchesAt('drawn')}
-            </>
-          ) : null}
-        </TerminalBandGroup>
+        <GlobalTerminalGroups settings={settings} shown={shown} updateSettings={updateSettings} />
       </SearchableSetting>
-      <OrchestratorGameScenesSkillCard />
+      {shown.has('scene') ? <OrchestratorGameScenesSkillCard /> : null}
     </section>
   )
 }
-
-type FieldValue = 'true' | 'false'
 
 const EMPTY_WORKTREES: never[] = []
 
@@ -187,11 +112,10 @@ export function ProjectOrchestratorGameSetting({
   const repoId = repo.id
   const advisorPlugin = useAdvisorPluginPresence(repo)
   const local = settings.orchestratorGameProjects?.[repoId]
-  const { config, sources, sceneFile } = resolveOrchestratorGameConfig({
-    global: settings.orchestratorGame,
-    project: projectLayer,
-    local
-  })
+  const layers = { global: settings.orchestratorGame, project: projectLayer, local }
+  const { config, sources, sceneFile } = resolveOrchestratorGameConfig(layers)
+  const facts = gameRowFactsOf({ page: 'project', layers, advisorPlugin })
+  const shown = shownGameRows(facts)
   const connectionId = repo.connectionId ?? undefined
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
   const worktrees = useAppStore((state) => state.worktreesByRepo[repoId] ?? EMPTY_WORKTREES)
@@ -199,10 +123,11 @@ export function ProjectOrchestratorGameSetting({
     connectionId ? state.sshConnectionStates.get(connectionId)?.status : undefined
   )
   const target = repositoryTargetWorktreeOf(activeWorktreeId, repo, worktrees)
+  const isReachable = !connectionId || sshStatus === 'connected'
   const file = useOrchestratorGameSceneFile({
     rootPath: target.path,
     connectionId,
-    isReachable: !connectionId || sshStatus === 'connected',
+    isReachable,
     path: sceneFile
   })
   // Why the file's definition: the panel draws a custom scene's own cast, as the band does.
@@ -216,7 +141,7 @@ export function ProjectOrchestratorGameSetting({
   const projectFiles = useOrchestratorGameProjectSceneFiles({
     rootPath: target.path,
     connectionId,
-    isReachable: !connectionId || sshStatus === 'connected'
+    isReachable
   })
   const [isCustomPicked, setIsCustomPicked] = useState(false)
   const isCustom = local?.sceneFile !== undefined || isCustomPicked
@@ -235,66 +160,63 @@ export function ProjectOrchestratorGameSetting({
       )
     })
   }
-  const set = <K extends keyof OrchestratorGameConfig>(
-    key: K,
-    value: OrchestratorGameConfig[K] | undefined
-  ): void =>
-    updateSettings({
-      orchestratorGameProjects: withOrchestratorGameProjectField(
-        settings.orchestratorGameProjects,
-        repoId,
-        key,
-        value
-      )
-    })
-  const labels = modeLabels()
-  const inherit = orchestratorGameInheritLabel()
-  const onOff = (value: boolean): string => (value ? labels.on : labels.off)
-  const effective = (key: keyof OrchestratorGameConfig, text: string): string =>
+  const effective = (key: 'scene' | 'timezone', text: string): string =>
     `${text} · ${sourceLabel(sources[key])}`
   const description = translate(
     'auto.components.settings.OrchestratorGameSetting.projectDescription',
     "Override the game for this project on this machine. The project's orca.yaml sets its default."
   )
-  const rows: {
-    key: ToggleKey
-    label: string
-    text: string
-    value: FieldValue | 'inherit'
-    options: { value: FieldValue | 'inherit'; label: string }[]
-  }[] = orchestratorGameSwitches().map((toggle) => ({
-    key: toggle.key,
-    label: toggle.label,
-    text: onOff(config[toggle.key]),
-    value:
-      local?.[toggle.key] === undefined
-        ? ('inherit' as const)
-        : (String(local[toggle.key]) as 'true' | 'false'),
-    options: [
-      { value: 'inherit' as const, label: inherit },
-      { value: 'true' as const, label: labels.on },
-      { value: 'false' as const, label: labels.off }
-    ]
-  }))
-  const toggleRow = (row: (typeof rows)[number]): React.JSX.Element => (
-    <SettingsRow
-      key={row.key}
-      label={row.label}
-      description={effective(row.key, row.text)}
-      control={
-        <SettingsSegmentedControl
-          value={row.value}
-          ariaLabel={row.label}
-          size="sm"
-          options={row.options}
-          onChange={(next) => {
-            if (next === 'inherit') {
-              set(row.key, undefined)
-            } else {
-              set(row.key, next === 'true')
-            }
-          }}
+  const sceneRows = (): React.JSX.Element => (
+    <>
+      <SettingsRow
+        label={sceneTitle()}
+        description={effective('scene', sceneFile ?? config.scene)}
+        control={
+          <OrchestratorGameSceneSelect
+            value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
+            ariaLabel={sceneTitle()}
+            inheritLabel={orchestratorGameInheritLabel()}
+            projectFiles={projectFiles}
+            onChange={(scene) => {
+              const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
+              setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
+            }}
+            onCustomFile={() => setIsCustomPicked(true)}
+          />
+        }
+      />
+      {isCustom ? (
+        <OrchestratorGameSceneFileField
+          key={local?.sceneFile ?? ''}
+          path={local?.sceneFile}
+          rootPath={target.path}
+          worktreeId={target.id}
+          connectionId={connectionId}
+          baseScene={builtInOf(config.scene)}
+          read={local?.sceneFile === undefined ? null : file.state}
+          onPath={(path) => setScene({ sceneFile: path })}
+          onFileWritten={file.reload}
         />
+      ) : (
+        <OrchestratorGameSceneFileStatus read={file.state} />
+      )}
+    </>
+  )
+  const stored = local?.timezone ?? ''
+  const timezoneRow = (): React.JSX.Element => (
+    <OrchestratorGameTimezoneRow
+      key={stored}
+      stored={stored}
+      effective={effective('timezone', config.timezone)}
+      onCommit={(value) =>
+        updateSettings({
+          orchestratorGameProjects: withOrchestratorGameProjectField(
+            settings.orchestratorGameProjects,
+            repoId,
+            'timezone',
+            value
+          )
+        })
       }
     />
   )
@@ -304,83 +226,30 @@ export function ProjectOrchestratorGameSetting({
       id={getRepositoryGameSectionId(repoId)}
       title={title()}
       description={description}
-      keywords={[...keywords, ...getGamePanelSearchEntries()[0].keywords]}
+      keywords={getAgentTeamsGameSearchEntry(facts).keywords}
     >
       <div className="space-y-1">
         {sectionHeader()}
         <p className="text-xs text-muted-foreground">{description}</p>
-        <SettingsRow
-          label={sceneTitle()}
-          description={effective('scene', sceneFile ?? config.scene)}
-          control={
-            <OrchestratorGameSceneSelect
-              value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
-              ariaLabel={sceneTitle()}
-              inheritLabel={inherit}
-              projectFiles={projectFiles}
-              onChange={(scene) => {
-                const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
-                setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
-              }}
-              onCustomFile={() => setIsCustomPicked(true)}
-            />
-          }
-        />
-        {isCustom ? (
-          <OrchestratorGameSceneFileField
-            key={local?.sceneFile ?? ''}
-            path={local?.sceneFile}
-            rootPath={target.path}
-            worktreeId={target.id}
-            connectionId={connectionId}
-            baseScene={builtInOf(config.scene)}
-            read={local?.sceneFile === undefined ? null : file.state}
-            onPath={(path) => setScene({ sceneFile: path })}
-            onFileWritten={file.reload}
-          />
-        ) : (
-          <OrchestratorGameSceneFileStatus read={file.state} />
-        )}
         <ProjectGamePanelRows
           repoId={repoId}
           scene={panelScene}
           settings={settings}
           projectLayer={projectLayer}
           advisorPlugin={advisorPlugin}
+          drawers={{ scene: sceneRows, timezone: timezoneRow }}
           updateSettings={updateSettings}
         />
-        <ProjectOrchestratorGameViewRows
+        <ProjectOrchestratorGameActionsSetting
+          key={repoId}
           repoId={repoId}
+          rootPath={target.path}
+          connectionId={connectionId}
+          isReachable={isReachable}
           settings={settings}
           projectLayer={projectLayer}
           updateSettings={updateSettings}
         />
-        {rows.filter((row) => switchPlaceOf(row.key) === 'game').map(toggleRow)}
-        <OrchestratorGameOpenLinksRow
-          value={local?.openLinks ?? 'inherit'}
-          effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
-          onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
-        />
-        <TerminalBandGroup>
-          {rows.filter((row) => switchPlaceOf(row.key) === 'band').map(toggleRow)}
-          {config.band ? (
-            <>
-              <OrchestratorGameScenePreview
-                config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
-                fileScene={file.state}
-              />
-              <OrchestratorGameLookRows
-                layer={local}
-                effective={{
-                  render: effective('render', orchestratorGameRenderLabels()[config.render]),
-                  timezone: effective('timezone', config.timezone)
-                }}
-                onChange={set}
-              />
-              {rows.filter((row) => switchPlaceOf(row.key) === 'drawn').map(toggleRow)}
-            </>
-          ) : null}
-        </TerminalBandGroup>
         <ProjectOrchestratorGameNamesSetting
           repoId={repoId}
           settings={settings}
@@ -394,14 +263,13 @@ export function ProjectOrchestratorGameSetting({
           projectLayer={projectLayer}
           updateSettings={updateSettings}
         />
-        <ProjectOrchestratorGameActionsSetting
-          key={repoId}
+        <ProjectTerminalGroups
           repoId={repoId}
-          rootPath={target.path}
-          connectionId={connectionId}
-          isReachable={!connectionId || sshStatus === 'connected'}
           settings={settings}
           projectLayer={projectLayer}
+          shown={shown}
+          fileScene={file.state}
+          terminalHeading={<TerminalPanesHeading />}
           updateSettings={updateSettings}
         />
       </div>
