@@ -9,7 +9,11 @@ import { useAppStore } from '../../store'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
 import { OrchestratorGameSetting, ProjectOrchestratorGameSetting } from './OrchestratorGameSetting'
 import { GamePanelSetting } from './OrchestratorGamePanelSetting'
-import { GAME_ROWS, gameRowFactsOf } from './orchestrator-game-row-visibility'
+import {
+  GAME_ROWS,
+  gameRowFactsOf,
+  projectGameRowFactsOf
+} from './orchestrator-game-row-visibility'
 import {
   getAgentTeamsGameSearchEntry,
   getGamePanelSearchEntries
@@ -210,6 +214,16 @@ describe('Settings search follows the shown rows (ORCA-1112)', () => {
     expect(getAgentTeamsGameSearchEntry(drawing).keywords).toEqual(
       expect.arrayContaining(['Render', 'Show the band'])
     )
+  })
+
+  it('offers quest only while the Scene row shows, and Advisor only with its plugin', () => {
+    const plainFlat = { panel: { look: 'plain' as const }, mode: 'flat' as const }
+    const terms = (project: OrchestratorGameLayer, advisor?: 'installed' | 'missing') =>
+      getAgentTeamsGameSearchEntry(projectGameRowFactsOf({}, 'repo1', project, advisor)!).keywords
+    expect(terms(plainFlat)).not.toContain('quest')
+    expect(terms({ panel: { look: 'game' } })).toContain('quest')
+    expect(terms({}, 'missing')).not.toContain('Advisor')
+    expect(terms({}, 'installed')).toContain('Advisor')
   })
 
   it('offers a Game-look term only in the Game look', () => {

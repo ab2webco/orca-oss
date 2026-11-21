@@ -17,7 +17,7 @@ const ROW_KEYWORDS: Record<GameRowId, (string | SearchKeywordSpec)[]> = {
     spec('GamePanelDioramaRows.pace', "Lead's pace"),
     'diorama'
   ],
-  scene: [spec('OrchestratorGameSetting.scene', 'Scene'), 'scene file', 'custom scene'],
+  scene: [spec('OrchestratorGameSetting.scene', 'Scene'), 'scene file', 'custom scene', 'quest'],
   prs: [spec('OrchestratorGamePanelSetting.prs', 'PRs'), 'merge queue'],
   machines: [spec('OrchestratorGamePanelSetting.machines', 'Machines')],
   advisor: [spec('OrchestratorGamePanelSetting.advisor', 'Advisor')],

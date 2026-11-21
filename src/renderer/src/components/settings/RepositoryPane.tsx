@@ -21,7 +21,7 @@ import { useAppStore } from '../../store'
 import { getRepositoryIconSectionId } from './repository-settings-targets'
 import { RepositoryIconPicker } from './RepositoryIconPicker'
 import { gameSearchEntryTitles } from './orchestrator-game-panel-search'
-import { projectGameRowFactsOf } from './orchestrator-game-row-visibility'
+import { useProjectGameRowFacts } from './use-project-game-row-facts'
 import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
@@ -119,6 +119,7 @@ export function RepositoryPane({
   )
   const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null)
   const [copiedTemplate, setCopiedTemplate] = useState(false)
+  const gameFacts = useProjectGameRowFacts(repo, settings, yamlHooks?.orchestratorGame)
   const copiedTemplateResetTimerRef = useRef<number | null>(null)
   // Why: clipboard IPC can resolve after settings navigation; avoid starting
   // a reset timer that will outlive this pane.
@@ -179,10 +180,7 @@ export function RepositoryPane({
     }, 1500)
   }
 
-  const allEntries = getRepositoryPaneSearchEntries(repo, {
-    isLocalWindowsProject,
-    gameFacts: projectGameRowFactsOf(settings, repo.id, yamlHooks?.orchestratorGame)
-  })
+  const allEntries = getRepositoryPaneSearchEntries(repo, { isLocalWindowsProject, gameFacts })
   const identityEntryTitles = new Set([
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
     translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),

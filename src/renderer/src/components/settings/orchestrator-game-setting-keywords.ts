@@ -2,7 +2,6 @@
 export const ORCHESTRATOR_GAME_SETTING_KEYWORDS = [
   'agent teams',
   'game',
-  'quest',
   'orchestrator',
   // Why: the owner looked for where the characters' names are set (ORCA-1304).
   'names',

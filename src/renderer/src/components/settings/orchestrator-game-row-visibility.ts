@@ -123,7 +123,8 @@ type GameSettings = Partial<Pick<GlobalSettings, 'orchestratorGame' | 'orchestra
 export function projectGameRowFactsOf(
   settings: GameSettings | null | undefined,
   repoId: string,
-  project?: OrchestratorGameLayer
+  project?: OrchestratorGameLayer,
+  advisorPlugin?: AdvisorPluginPresence
 ): GameRowFacts | undefined {
   if (!settings) {
     return undefined
@@ -133,5 +134,5 @@ export function projectGameRowFactsOf(
     project,
     local: settings.orchestratorGameProjects?.[repoId]
   }
-  return gameRowFactsOf({ page: 'project', layers })
+  return gameRowFactsOf({ page: 'project', layers, advisorPlugin })
 }
