@@ -1,4 +1,4 @@
-import type { ElectronApplication, Page } from '@stablyai/playwright-test'
+import type { ElectronApplication, Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endpoint'
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
@@ -19,7 +19,12 @@ const CAPTURE_HEIGHT = 2200
 
 const COPY = {
   en: { tab: 'Machines', team: 'Team', busy: 'Busy', unknown: 'Unknown' },
-  es: { tab: 'Máquinas', team: 'Equipo', busy: 'Ocupada', unknown: 'Desconocida' }
+  es: {
+    tab: 'Máquinas',
+    team: 'Equipo',
+    busy: 'Ocupada',
+    unknown: 'Desconocida'
+  }
 } as const
 
 const reading = (
@@ -44,9 +49,26 @@ const READY = { launch: { kind: 'ready' } }
 
 // Made-up hosts only: no capture may carry a real machine, user or address.
 const HOSTS = [
-  { host: 'local', running: 2, cap: 4, ...reading(12, 32, 18, 3.1, 38, [512, 210]) },
-  { host: 'studio', running: 1, cap: 4, ...READY, ...reading(10, 64, 51, 1.2, 12, [1000, 640]) },
-  { host: 'buildbox', running: 2, cap: 3, ...READY, ...reading(8, 16, 1.2, 9.4, 96, [460, 140]) },
+  {
+    host: 'local',
+    running: 2,
+    cap: 4,
+    ...reading(12, 32, 18, 3.1, 38, [512, 210])
+  },
+  {
+    host: 'studio',
+    running: 1,
+    cap: 4,
+    ...READY,
+    ...reading(10, 64, 51, 1.2, 12, [1000, 640])
+  },
+  {
+    host: 'buildbox',
+    running: 2,
+    cap: 3,
+    ...READY,
+    ...reading(8, 16, 1.2, 9.4, 96, [460, 140])
+  },
   {
     host: 'atelier',
     running: 0,
@@ -65,7 +87,13 @@ const HOSTS = [
     availableMemory: 5 * GB,
     loadAverage1m: 0.6
   },
-  { host: 'nas-02', running: 0, cap: 2, status: 'unreachable', launch: { kind: 'unanswered' } }
+  {
+    host: 'nas-02',
+    running: 0,
+    cap: 2,
+    status: 'unreachable',
+    launch: { kind: 'unanswered' }
+  }
 ]
 
 type RigGlobal = typeof globalThis & { __machinesBoard?: unknown[] }
@@ -106,6 +134,57 @@ const settleLayout = (page: Page): Promise<void> =>
       )
   )
 
+/** A registered lead with the made-up hosts, and the Team panel open in the right sidebar. */
+async function openTeamPanel(
+  electronApp: ElectronApplication,
+  orcaPage: Page,
+  agentCommand: string
+): Promise<Locator> {
+  await waitForSessionReady(orcaPage)
+  const worktreeId = await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActivePanePtyId(orcaPage)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  const lead = (
+    await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
+      paneKey: pane.paneKey
+    })
+  ).result.terminal.handle
+  await client.call('terminal.send', {
+    terminal: lead,
+    text: agentCommand,
+    enter: true
+  })
+  await seedHosts(electronApp)
+  await expect
+    .poll(async () => {
+      const registered = await client.call<{ registered: boolean }>('game.leadRegister', {
+        terminalHandle: lead,
+        project: 'e2e',
+        label: 'Alfred'
+      })
+      return registered.result.registered
+    })
+    .toBe(true)
+  await emitCodexHookStatus(await readHookEndpoint(electronApp), {
+    paneKey: pane.paneKey,
+    worktreeId,
+    state: 'working',
+    prompt: 'Lead the team'
+  })
+  await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
+    timeout: 15_000
+  })
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setRightSidebarOpen(true)
+    state.setRightSidebarTab('team')
+  })
+  return orcaPage.getByTestId('team-panel')
+}
+
 test('the Machines board draws each host collapsed with its CPU, memory and disk, opens a busy one, and keeps a choice (ORCA-1252)', async ({
   electronApp,
   orcaPage
@@ -113,45 +192,7 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
   test.setTimeout(CAPTURE_EVIDENCE ? 1_200_000 : 600_000)
   const agent = createStdinLoggingAgent()
   try {
-    await waitForSessionReady(orcaPage)
-    const worktreeId = await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActivePanePtyId(orcaPage)
-    const pane = await waitForActivePaneHookDescriptor(orcaPage)
-    const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
-    const client = new RuntimeClient(userDataDir, 30_000, null, null)
-    const lead = (
-      await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
-        paneKey: pane.paneKey
-      })
-    ).result.terminal.handle
-    await client.call('terminal.send', { terminal: lead, text: agent.command, enter: true })
-    await seedHosts(electronApp)
-    await expect
-      .poll(async () => {
-        const registered = await client.call<{ registered: boolean }>('game.leadRegister', {
-          terminalHandle: lead,
-          project: 'e2e',
-          label: 'Alfred'
-        })
-        return registered.result.registered
-      })
-      .toBe(true)
-    await emitCodexHookStatus(await readHookEndpoint(electronApp), {
-      paneKey: pane.paneKey,
-      worktreeId,
-      state: 'working',
-      prompt: 'Lead the team'
-    })
-    await expect(orcaPage.getByText('Workspace board moved to the bottom bar').first()).toBeHidden({
-      timeout: 15_000
-    })
-    await orcaPage.evaluate(() => {
-      const state = window.__store!.getState()
-      state.setRightSidebarOpen(true)
-      state.setRightSidebarTab('team')
-    })
-    const panel = orcaPage.getByTestId('team-panel')
+    const panel = await openTeamPanel(electronApp, orcaPage, agent.command)
     const row = (name: string) => panel.locator(`[data-team-machine="${name}"]`)
 
     for (const language of LANGUAGES) {
@@ -261,6 +302,90 @@ test('the Machines board draws each host collapsed with its CPU, memory and disk
         path: testInfo.outputPath('machines-es-1440-dark-studio-open.png')
       })
     }
+  } finally {
+    agent.dispose()
+  }
+})
+
+/** Where a strip tile draws its number over its label, lets text leave the tile, or splits "N of M". */
+function stripFaults(strip: HTMLElement): string[] {
+  const textBox = (node: Element): DOMRect => {
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    return range.getBoundingClientRect()
+  }
+  const meets = (a: DOMRect, b: DOMRect): boolean =>
+    a.left < b.right - 0.5 &&
+    b.left < a.right - 0.5 &&
+    a.top < b.bottom - 0.5 &&
+    b.top < a.bottom - 0.5
+  const faults: string[] = []
+  for (const tile of strip.querySelectorAll<HTMLElement>('[data-team-machines-figure]')) {
+    const box = tile.getBoundingClientRect()
+    const name = `${tile.dataset.teamMachinesFigure} (${getComputedStyle(tile).display}, ${Math.round(box.width)}px)`
+    const label = tile.querySelector('[data-team-machines-label]')!
+    const value = tile.querySelector('[data-team-machines-value]')!
+    if (meets(textBox(label), textBox(value))) {
+      faults.push(`${name}: number over its label`)
+    }
+    for (const part of [label, value, ...tile.querySelectorAll('[data-team-machines-lines]')]) {
+      const text = textBox(part)
+      if (text.left < box.left - 0.5 || text.right > box.right + 0.5) {
+        faults.push(`${name}: "${part.textContent}" leaves the tile`)
+      }
+    }
+    const total = value.querySelector('small')
+    if (total && total.getClientRects().length > 1) {
+      faults.push(`${name}: "${total.textContent}" split over lines`)
+    }
+  }
+  return faults
+}
+
+test('the summary strip keeps each number clear of its label at every sidebar width (ORCA-1316)', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(600_000)
+  const agent = createStdinLoggingAgent()
+  try {
+    const panel = await openTeamPanel(electronApp, orcaPage, agent.command)
+    const strip = panel.locator('[data-team-machines-summary]')
+    // Why a wide window: the sidebar is clamped to the room the window leaves it.
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    const defaultWidth = await orcaPage.evaluate(() => window.__store!.getState().rightSidebarWidth)
+    const setWidth = async (width: number): Promise<void> => {
+      await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
+      await settleLayout(orcaPage)
+    }
+    for (const language of LANGUAGES) {
+      await writeSettings(orcaPage, { uiLanguage: language })
+      await rereadPanel(orcaPage)
+      await panel.getByRole('tab', { name: COPY[language].tab }).click({ timeout: 30_000 })
+      await expect(strip).toBeVisible({ timeout: 30_000 })
+      const faults: string[] = []
+      for (let width = 219; width <= 600; width++) {
+        await setWidth(width)
+        const panelWidth = Math.round((await panel.boundingBox())!.width)
+        faults.push(...(await strip.evaluate(stripFaults)).map((one) => `${panelWidth}: ${one}`))
+      }
+      expect.soft(faults, `strip faults in ${language}`).toEqual([])
+      if (CAPTURE_EVIDENCE) {
+        await orcaPage.mouse.move(0, 0)
+        for (const width of [defaultWidth, 219, 260, 317, 320, 350, 600]) {
+          await setWidth(width)
+          for (const theme of THEMES) {
+            await setTheme(orcaPage, theme)
+            await settleLayout(orcaPage)
+            await panel.screenshot({
+              animations: 'disabled',
+              path: testInfo.outputPath(`strip-${language}-${width}-${theme}.png`)
+            })
+          }
+        }
+      }
+    }
+    await setWidth(defaultWidth)
   } finally {
     agent.dispose()
   }
