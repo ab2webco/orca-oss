@@ -210,3 +210,71 @@ test('a project row shows the applied value, and Reset by keyboard only while ov
     .toBeUndefined()
   await expect(section.locator('[data-slot="game-row-source"] button')).toHaveCount(0)
 })
+
+const PANEL_ROWS = ['look', 'style', 'stylePreview', 'scene', 'prs', 'machines', 'timezone']
+const RUNNING_ROWS = ['show', 'view', 'hud', 'rewards', 'openLinks', 'tracker']
+const BAND_ROWS = ['band', 'bandPreview', 'render']
+
+// Why these five: the views that drop rows (Off, Flat) and each scene style a pixel view draws.
+const CHOICES = [
+  { name: 'off', layer: { mode: 'off' }, rows: [...PANEL_ROWS, 'show', 'view'] },
+  { name: 'flat', layer: { mode: 'flat' }, rows: ['look', 'prs', 'machines', ...RUNNING_ROWS] },
+  {
+    name: 'pixel',
+    layer: { mode: 'on', band: true, panel: { look: 'game', style: 'pixel' } },
+    rows: [...PANEL_ROWS, ...RUNNING_ROWS, ...BAND_ROWS]
+  },
+  {
+    name: 'figures',
+    layer: { mode: 'on', band: true, panel: { look: 'game', style: 'figures', diorama: true } },
+    rows: [
+      ...PANEL_ROWS.slice(0, 3),
+      'diorama',
+      ...PANEL_ROWS.slice(3),
+      ...RUNNING_ROWS,
+      ...BAND_ROWS
+    ]
+  },
+  {
+    name: 'office',
+    layer: { mode: 'on', band: true, panel: { look: 'game', style: 'office' } },
+    rows: [...PANEL_ROWS, ...RUNNING_ROWS, ...BAND_ROWS]
+  }
+] as const
+
+test('the Agents page draws each choice with only its rows: Off, Flat, Pixel, Figures, Office', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(CAPTURE_EVIDENCE ? 900_000 : 120_000)
+  await waitForSessionReady(orcaPage)
+  await orcaPage.evaluate(() => window.api.ui.set({ starNagCompleted: true }))
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  const panel = await openTarget(orcaPage, null)
+  const teams = orcaPage.getByRole('heading', { name: 'Agent Teams game' }).first()
+
+  for (const choice of CHOICES) {
+    await writeSettings(orcaPage, { orchestratorGame: choice.layer } as Settings)
+    await expect.poll(() => shownRows(orcaPage), choice.name).toEqual([...choice.rows])
+    if (!CAPTURE_EVIDENCE) {
+      continue
+    }
+    for (const width of WIDTHS) {
+      await setWindowWidth(electronApp, orcaPage, width)
+      for (const theme of ['dark', 'light'] as const) {
+        await writeSettings(orcaPage, { theme })
+        for (const [part, top] of [
+          ['panel', panel],
+          ['teams', teams]
+        ] as const) {
+          await top.evaluate((node) => node.scrollIntoView({ block: 'start' }))
+          await orcaPage.screenshot({
+            path: testInfo.outputPath(`agents-${choice.name}-${width}-${theme}-${part}.png`),
+            animations: 'disabled'
+          })
+        }
+      }
+    }
+    await setWindowWidth(electronApp, orcaPage, 1440)
+  }
+})
