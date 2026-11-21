@@ -912,7 +912,7 @@ export function AgentsPane({
       ) : null}
 
       {/* Why Panel first: V30 opens the game settings with the Team panel's rows (ORCA-1112). */}
-      <KeepControlInPlace className="contents">
+      <KeepControlInPlace className="space-y-8">
         <GamePanelSetting settings={settings} updateSettings={updateSettings} />
         <OrchestratorGameSetting settings={settings} updateSettings={updateSettings} />
       </KeepControlInPlace>
