@@ -6,11 +6,12 @@ import {
   type DioramaCameraMode,
   type DioramaView
 } from './team-diorama-view'
+import { dioramaWheel, type DioramaWheelGesture } from './team-diorama-wheel'
 
 /**
- * The diorama's camera and what moves it: a drag pans, a pinch (or Ctrl or ⌘ with the wheel, as a
- * trackpad pinch arrives) zooms, and either hands the camera to the viewer. A plain wheel still
- * scrolls the panel. `redraw` paints a frame when nothing else is animating, as under reduced motion.
+ * The diorama's camera and what moves it: a drag pans, a pinch or the wheel zooms, and either hands
+ * the camera to the viewer. At the zoom's limits the wheel scrolls the panel again (owner, ORCA-1317).
+ * `redraw` paints a frame when nothing else is animating, as under reduced motion.
  */
 export function useDioramaCameraInput(
   canvas: RefObject<HTMLCanvasElement | null>,
@@ -73,13 +74,12 @@ export function useDioramaCameraInput(
         el.style.cursor = 'grab'
       }
     }
+    const gesture: DioramaWheelGesture = { zoomingUntil: 0 }
     const wheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) {
-        return
+      if (dioramaWheel(view.current, e, e.timeStamp, gesture)) {
+        e.preventDefault()
+        moved()
       }
-      e.preventDefault()
-      dioramaZoomBy(view.current, Math.exp(-e.deltaY * 0.0015))
-      moved()
     }
     el.style.cursor = 'grab'
     el.style.touchAction = 'none'

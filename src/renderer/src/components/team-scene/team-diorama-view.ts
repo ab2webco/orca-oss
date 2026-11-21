@@ -27,9 +27,9 @@ export const dioramaView = (): DioramaView => ({
   lastT: null
 })
 
-const MIN_ZOOM = 0.8
-const MAX_ZOOM = 5
-const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
+/** How far the viewer can zoom out and in. */
+export const DIORAMA_ZOOM = { min: 0.8, max: 5 }
+const clampZoom = (z: number) => Math.max(DIORAMA_ZOOM.min, Math.min(DIORAMA_ZOOM.max, z))
 
 // The screen's right and up in the world, fixed by the isometric view.
 const basis = (() => {

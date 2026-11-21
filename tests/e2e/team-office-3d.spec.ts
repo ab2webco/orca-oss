@@ -74,13 +74,18 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       await orcaPage.mouse.up()
       await expect(canvas).toHaveAttribute('data-office3d-camera', 'free')
       const panned = await canvas.screenshot({ path: testInfo.outputPath('camera-pan.png') })
-      // Why Ctrl: a pinch arrives as Ctrl with the wheel; a plain wheel scrolls the panel.
-      await orcaPage.keyboard.down('Control')
+      // The owner: a plain wheel or trackpad scroll over the scene zooms it.
       await orcaPage.mouse.wheel(0, -400)
-      await orcaPage.keyboard.up('Control')
       await orcaPage.waitForTimeout(1500)
       const zoomed = await canvas.screenshot({ path: testInfo.outputPath('camera-zoom.png') })
-      expect(Buffer.compare(panned, zoomed), 'the zoom changed nothing').not.toBe(0)
+      expect(Buffer.compare(panned, zoomed), 'the wheel did not zoom').not.toBe(0)
+      // A pinch arrives as Ctrl with the wheel, and still zooms.
+      await orcaPage.keyboard.down('Control')
+      await orcaPage.mouse.wheel(0, 300)
+      await orcaPage.keyboard.up('Control')
+      await orcaPage.waitForTimeout(1500)
+      const pinched = await canvas.screenshot({ path: testInfo.outputPath('camera-pinch.png') })
+      expect(Buffer.compare(zoomed, pinched), 'the pinch did not zoom').not.toBe(0)
       await panel.getByRole('button', { name: 'Follow the lead' }).click()
       await expect(canvas).toHaveAttribute('data-office3d-camera', 'lead')
       await orcaPage.waitForTimeout(2500)
