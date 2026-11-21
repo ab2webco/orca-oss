@@ -15735,7 +15735,7 @@
       },
       "team-scene": {
         "TeamSceneOffice3d": {
-          "lobby": "Vestíbulo"
+          "lobby": "Lobby"
         },
         "TeamSceneDiorama": {
           "followLead": "Seguir al lead",
