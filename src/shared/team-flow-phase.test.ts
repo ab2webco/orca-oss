@@ -44,6 +44,44 @@ describe('teamFlowPhaseOf', () => {
     expect(teamFlowPhaseOf(working('Edit'))).toBe('code')
   })
 
+  // ORCA-1317: the 3D Office shows what each member does, whatever agent it runs.
+  it("reads code and tests from every agent's own tool names, as the hook listener reports them", () => {
+    for (const edit of [
+      'apply_patch',
+      'write_file',
+      'replace',
+      'edit_file',
+      'search_replace',
+      'Create',
+      'write_to_file',
+      'replace_file_content',
+      'multi_replace_file_content',
+      'create',
+      'edit',
+      'write',
+      'patch'
+    ]) {
+      expect(teamFlowPhaseOf(working(edit, 'src/a.ts')), edit).toBe('code')
+      expect(teamFlowPhaseOf(working(edit, 'src/a.test.ts')), edit).toBe('tests')
+    }
+    for (const shell of [
+      'exec_command',
+      'shell_command',
+      'run_shell_command',
+      'run_command',
+      'run_terminal_cmd',
+      'run_terminal_command',
+      'Execute',
+      'bash',
+      'powershell',
+      'terminal',
+      'execute_code'
+    ]) {
+      expect(teamFlowPhaseOf(working(shell, 'pnpm test')), shell).toBe('tests')
+      expect(teamFlowPhaseOf(working(shell, 'git status')), shell).toBeNull()
+    }
+  })
+
   it('reads planning only from the planning tools', () => {
     expect(teamFlowPhaseOf(working('EnterPlanMode'))).toBe('plan')
     expect(teamFlowPhaseOf(working('TodoWrite'))).toBe('plan')

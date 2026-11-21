@@ -5,6 +5,8 @@ export const DIORAMA_VIEW = new THREE.Vector3(1, 0.88, 1).normalize()
 export type DioramaFit = {
   camera: THREE.OrthographicCamera
   height: number
+  /** The height that shows the whole world at this width, whatever height was asked for. */
+  full: number
   /** The world's ground extent, for the sun's shadow box. */
   ground: THREE.Box3
   /** Where the camera looks to frame the whole world, and the width it frames. */
@@ -16,7 +18,8 @@ export type DioramaFit = {
 export function dioramaFitCamera(
   world: THREE.Object3D,
   width: number,
-  maxHeight = 760
+  maxHeight = 760,
+  minHeight = 220
 ): DioramaFit {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400)
   camera.position.copy(DIORAMA_VIEW).multiplyScalar(80)
@@ -47,7 +50,8 @@ export function dioramaFitCamera(
   const ys = corners.map((v) => v.y)
   const fw = Math.max(...xs) - Math.min(...xs) + 1.6
   const fh = Math.max(...ys) - Math.min(...ys) + 1.6
-  const height = Math.round(Math.max(220, Math.min(width * (fh / fw), maxHeight)))
+  const full = Math.round(Math.max(220, Math.min(width * (fh / fw), 760)))
+  const height = Math.round(Math.max(minHeight, Math.min(width * (fh / fw), maxHeight)))
   const aspect = width / height
   const half =
     fw / 2 / aspect > fh / 2
@@ -63,5 +67,21 @@ export function dioramaFitCamera(
   camera.position.copy(target).add(DIORAMA_VIEW.clone().multiplyScalar(80))
   camera.lookAt(target)
   camera.updateProjectionMatrix()
-  return { camera, height, ground: box, center: target, span: half.w * 2 }
+  return { camera, height, full, ground: box, center: target, span: half.w * 2 }
+}
+
+/**
+ * `fit` on a canvas `height` px tall, taller than it fits: the frame keeps its vertical extent and
+ * narrows, so the world draws bigger and its sides are reached by panning or following.
+ */
+export function dioramaGrowFit(fit: DioramaFit, height: number): DioramaFit {
+  const k = height / fit.height
+  if (!(k > 1)) {
+    return fit
+  }
+  fit.camera.left /= k
+  fit.camera.right /= k
+  fit.camera.updateProjectionMatrix()
+  // Why the span too: following the lead zooms by it, and would double the growth.
+  return { ...fit, height: Math.round(height), span: fit.span / k }
 }

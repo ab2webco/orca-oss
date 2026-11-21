@@ -144,7 +144,11 @@ async function setLook(
       const state = window.__store!.getState()
       const game = state.settings?.orchestratorGame
       void state.updateSettings({
-        orchestratorGame: { ...game, panel: { ...game?.panel, look: nextLook, style: nextStyle } }
+        // Why Low resources: the 2D Office's cards and floors are what this spec reads.
+        orchestratorGame: {
+          ...game,
+          panel: { ...game?.panel, look: nextLook, style: nextStyle, quality: 'low' }
+        }
       })
     },
     { look, style }

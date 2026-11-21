@@ -540,6 +540,17 @@ test.describe('Agent Teams: the Team panel and the Inbox', () => {
       // Why 1000: under the scene banner, five hosts run past an 800px window.
       await setWindowSize(electronApp, page, { width: 1280, height: 1000 })
       await page.mouse.move(0, 0)
+      // Why wider: the strip goes three-up at a 340px container, and Linux's classic scrollbar
+      // takes its width out of a 349px panel, so it stacked there and ran past the window.
+      const width = await page.evaluate(() => window.__store!.getState().rightSidebarWidth)
+      await page.evaluate(() => window.__store!.getState().setRightSidebarWidth(370))
+      const top = async (name: string) => (await figure(name).boundingBox())!.y
+      await expect
+        .poll(async () => (await top('agents')) === (await top('ready')), {
+          message: 'the strip is three-up, the same frame on every platform'
+        })
+        .toBe(true)
+      expect(await top('warned')).toBe(await top('ready'))
       await captureBothThemes(page, testInfo, 'machines', async () => {
         const box = await panelBox()
         const end = (await host('nas-02').boundingBox())!
@@ -547,6 +558,7 @@ test.describe('Agent Teams: the Team panel and the Inbox', () => {
         expect(end.y + end.height).toBeLessThan(1000)
         return { x: box.x, y: box.y, width: box.width, height: end.y + end.height + 4 - box.y }
       })
+      await page.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
     } finally {
       rmSync(repo === DOCS_REPO ? dirname(DOCS_REPO) : repo, { recursive: true, force: true })
     }

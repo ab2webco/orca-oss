@@ -3,6 +3,8 @@ import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
 import type { TeamSceneFloor } from './team-scene-floors'
 import {
   OFFICE3D_BALCONY_Y,
+  OFFICE3D_LOBBY,
+  OFFICE3D_WING_WIDTH,
   OFFICE3D_PITCH,
   office3dFloorWidth,
   office3dHasAdvisor,
@@ -36,19 +38,25 @@ const remoteFloor = (name: string, over: Partial<TeamSceneFloor> = {}) =>
   floor({ key: name, host: remote(name), lead: false, ...over })
 
 describe('the 3D Office building', () => {
-  it('stacks the lead floor first, then each machine a pitch apart', () => {
+  it('stacks the shared lobby at the bottom, then the lead floor, then each machine a pitch apart', () => {
     const { floors } = teamOffice3dLayoutOf([floor(), remoteFloor('m2'), remoteFloor('gpu')], {
       leadAdvisor: false
     })
-    expect(floors.map((f) => [f.key, f.name, f.y, f.lead])).toEqual([
-      ['', '', 0, true],
-      ['m2', 'm2', OFFICE3D_PITCH, false],
-      ['gpu', 'gpu', 2 * OFFICE3D_PITCH, false]
+    expect(floors.map((f) => [f.key, f.name, f.y, f.lead, f.lobby ?? false])).toEqual([
+      [OFFICE3D_LOBBY, '', 0, false, true],
+      ['', '', OFFICE3D_PITCH, true, false],
+      ['m2', 'm2', 2 * OFFICE3D_PITCH, false, false],
+      ['gpu', 'gpu', 3 * OFFICE3D_PITCH, false, false]
     ])
+    // The building's own footprint, its wing included, with no desks: taller, not wider.
+    expect(floors[0]!.width).toBe(floors[1]!.width + OFFICE3D_WING_WIDTH)
+    expect(floors[0]!.seats).toEqual([])
   })
 
   it("seats members first, then other sessions' desks, then the cap's free ones", () => {
-    const [f] = teamOffice3dLayoutOf([floor({ taken: 2, free: 1 })], { leadAdvisor: false }).floors
+    const [, f] = teamOffice3dLayoutOf([floor({ taken: 2, free: 1 })], {
+      leadAdvisor: false
+    }).floors
     expect(f!.seats.map((s) => [s.kind, s.key])).toEqual([
       ['member', 'a'],
       ['member', 'b'],
@@ -60,13 +68,13 @@ describe('the 3D Office building', () => {
   })
 
   it('always draws at least five desks, and a crowded row shrinks each desk to keep its gaps', () => {
-    const [small] = teamOffice3dLayoutOf([floor({ members: [card('a')], free: 0 })], {
+    const [, small] = teamOffice3dLayoutOf([floor({ members: [card('a')], free: 0 })], {
       leadAdvisor: false
     }).floors
     expect(small!.seats).toHaveLength(5)
     expect(small!.scale).toBe(1)
     const crowd = Array.from({ length: 9 }, (_, i) => card(`m${i}`))
-    const [big] = teamOffice3dLayoutOf([floor({ members: crowd, free: 0 })], {
+    const [, big] = teamOffice3dLayoutOf([floor({ members: crowd, free: 0 })], {
       leadAdvisor: false
     }).floors
     expect(big!.seats).toHaveLength(9)
@@ -85,13 +93,14 @@ describe('the 3D Office building', () => {
       leadAdvisor: false,
       previous: first.order
     })
-    expect(after.floors[0]!.seats.slice(0, 3).map((s) => s.key)).toEqual(['a', 'd', 'c'])
+    expect(after.floors[1]!.seats.slice(0, 3).map((s) => s.key)).toEqual(['a', 'd', 'c'])
   })
 
   it("puts the lead's office on the lead's floor only", () => {
     const { floors } = teamOffice3dLayoutOf([floor(), remoteFloor('m2')], { leadAdvisor: false })
-    expect(floors[0]!.office?.x).toBe(floors[0]!.width)
-    expect(floors[1]!.office).toBeNull()
+    expect(floors[1]!.office?.x).toBe(floors[1]!.width)
+    expect(floors[0]!.office).toBeNull()
+    expect(floors[2]!.office).toBeNull()
   })
 })
 
@@ -113,8 +122,12 @@ describe('one Jev per machine, only where its plugin has spoken', () => {
       [floor(), remoteFloor('m2', { members: [decided('x')] }), remoteFloor('gpu')],
       { leadAdvisor: true }
     )
-    expect(floors[0]!.controlRoom).toMatchObject({ balcony: true, y: OFFICE3D_BALCONY_Y })
-    expect(floors[1]!.controlRoom).toMatchObject({ balcony: false, y: OFFICE3D_PITCH })
-    expect(floors[2]!.controlRoom).toBeNull()
+    expect(floors[0]!.controlRoom).toBeNull()
+    expect(floors[1]!.controlRoom).toMatchObject({
+      balcony: true,
+      y: OFFICE3D_PITCH + OFFICE3D_BALCONY_Y
+    })
+    expect(floors[2]!.controlRoom).toMatchObject({ balcony: false, y: 2 * OFFICE3D_PITCH })
+    expect(floors[3]!.controlRoom).toBeNull()
   })
 })

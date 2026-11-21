@@ -7,6 +7,7 @@ import { TEAM_SCENE_ART_HEIGHT } from '../team-scene/team-scene-image-painter'
 import { useTeamScenePainter } from '../team-scene/use-team-scene-painter'
 import { translate } from '@/i18n/i18n'
 import { GamePanelDioramaPreview } from './GamePanelDioramaPreview'
+import { GamePanelOffice3dPreview } from './GamePanelOffice3dPreview'
 
 /** The Team panel's stage in the chosen style, drawn by the panel's own painter. */
 export function GamePanelStylePreview({
@@ -18,7 +19,7 @@ export function GamePanelStylePreview({
   style: GamePanelStyle
   /** Figures as the 3D diorama; without WebGL the preview draws Figures in 2D, as the panel does. */
   diorama?: boolean
-  /** The diorama's Low resources quality. */
+  /** Low resources: the diorama flat, and the Office in 2D as before. */
   lite?: boolean
   /** The chosen scene; a custom file carries its definition so the panel draws its own cast. */
   scene: { id: string; extensions: OrchestratorGameSceneExtension[] }
@@ -37,6 +38,7 @@ export function GamePanelStylePreview({
   const [noWebgl, setNoWebgl] = useState(false)
   const onNoWebgl = useCallback(() => setNoWebgl(true), [])
   const threeD = diorama && drawn === 'figures' && !noWebgl
+  const office3d = drawn === 'office' && !lite && !noWebgl
   return (
     <div
       data-slot="game-panel-style-preview"
@@ -46,6 +48,8 @@ export function GamePanelStylePreview({
     >
       {threeD ? (
         <GamePanelDioramaPreview lite={lite} onNoWebgl={onNoWebgl} />
+      ) : office3d ? (
+        <GamePanelOffice3dPreview onNoWebgl={onNoWebgl} />
       ) : painter ? (
         <TeamSceneCanvas input={input} painter={painter} leadLine={null} />
       ) : (

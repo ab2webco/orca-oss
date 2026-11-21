@@ -19,11 +19,17 @@ import { teamSceneLabel } from './team-scene-copy'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { useDioramaCameraInput } from './use-diorama-camera-input'
-import { Button } from '@/components/ui/button'
+import { DioramaCameraButtons } from './DioramaCameraButtons'
+import { TeamBuildingResizeHandle } from './TeamBuildingResizeHandle'
+import { teamBuildingHeightOf, useTeamBuildingHeight } from './use-team-building-height'
 import { localHostDisplayLabel } from '@/lib/local-host-display-label'
 import { translate } from '@/i18n/i18n'
 
 const FRAME_MS = 1000 / 30
+const FIGURES_HEIGHT_KEY = 'orca.teamFigures.height'
+// The tallest it grows, from the height that fits the islands; past it a member fills the panel.
+const FIGURES_GROWTH = 2
+const FIGURES_STEP = 56
 
 /** Figures as the 3D diorama (ORCA-1296): one island per machine, each member at its own plot. */
 export function TeamSceneDiorama({
@@ -59,6 +65,11 @@ export function TeamSceneDiorama({
     order.current = layout.order
   }, [layout])
   const views = useMemo(() => dioramaViewsOf(input), [input])
+  // Why its own key: the owner enlarges Figures as the Office, and each keeps its own height.
+  const [wanted, setWanted] = useTeamBuildingHeight(FIGURES_HEIGHT_KEY)
+  const [fitted, setFitted] = useState(0)
+  const bounds = { min: fitted, max: fitted * FIGURES_GROWTH }
+  const height = fitted > 0 ? teamBuildingHeightOf(wanted, bounds) : 0
 
   useEffect(() => {
     const el = wrap.current
@@ -104,12 +115,14 @@ export function TeamSceneDiorama({
       lite: look.quality === 'low',
       pace: look.pace,
       view: camera.view.current,
+      height,
       words: {
         thisMachine: localHostDisplayLabel(),
         offline: translate('teamPanel.machines.offline', 'Offline')
       }
     })
     const draw = stage.draw
+    setFitted(stage.fitted)
     let raf = 0,
       last = 0,
       visible = true
@@ -145,15 +158,8 @@ export function TeamSceneDiorama({
       watch.disconnect()
       stage.dispose()
     }
-  }, [layout, views, input, status, width, onNoWebgl, look, camera.view])
+  }, [layout, views, input, status, width, height, onNoWebgl, look, camera.view])
 
-  const modes = [
-    [
-      'lead',
-      translate('auto.components.team-scene.TeamSceneDiorama.followLead', 'Follow the lead')
-    ],
-    ['all', translate('auto.components.team-scene.TeamSceneDiorama.showAll', 'Show all')]
-  ] as const
   return (
     <div ref={wrap} className="relative w-full" data-team-scene-diorama="">
       <canvas
@@ -163,20 +169,16 @@ export function TeamSceneDiorama({
         className="block w-full"
         data-diorama-camera={camera.mode}
       />
-      <div className="absolute top-2 right-2 flex gap-1">
-        {modes.map(([mode, label]) => (
-          <Button
-            key={mode}
-            variant="outline"
-            size="xs"
-            aria-pressed={camera.mode === mode}
-            className="aria-pressed:bg-accent"
-            onClick={() => camera.setMode(mode)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <DioramaCameraButtons mode={camera.mode} setMode={camera.setMode} />
+      {fitted > 0 ? (
+        <TeamBuildingResizeHandle
+          height={height}
+          min={bounds.min}
+          max={bounds.max}
+          step={FIGURES_STEP}
+          onResize={setWanted}
+        />
+      ) : null}
     </div>
   )
 }

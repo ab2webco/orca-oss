@@ -31,5 +31,9 @@ export const CROSS_LOCALE_KEY_OVERRIDES = {
   },
   'auto.components.settings.PluginSettingsRow.networkBlocked': {
     es: 'El acceso a la red está bloqueado porque este plugin no declara net:fetch.'
+  },
+  // Why English: owners read 'Vestíbulo' as 'vestuario'; Spanish speakers say 'lobby'.
+  'auto.components.team-scene.TeamSceneOffice3d.lobby': {
+    es: 'Lobby'
   }
 }

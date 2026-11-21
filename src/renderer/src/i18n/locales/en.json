@@ -5966,11 +5966,11 @@
       "settings": {
         "GamePanelDioramaRows": {
           "quality": "Scene quality",
-          "qualityDescription": "Illustrated draws outlined figures with shadows. Low resources draws flat ones without shadows, for slower machines.",
+          "qualityDescription": "Illustrated draws the scene in 3D: outlined figures with shadows, and the Office as a building. Low resources draws flat figures without shadows and the Office in 2D, for slower machines.",
           "qualityHigh": "Illustrated",
           "qualityLow": "Low resources",
           "pace": "Lead's pace",
-          "paceDescription": "How the lead gets round the base: walking, faster, or sent by the court mage.",
+          "paceDescription": "How the lead gets round the scene: walking, faster, or straight there.",
           "paceNormal": "Normal",
           "paceFast": "Fast",
           "paceDirect": "Direct"
@@ -16658,6 +16658,9 @@
         }
       },
       "team-scene": {
+        "TeamSceneOffice3d": {
+          "lobby": "Lobby"
+        },
         "TeamSceneDiorama": {
           "followLead": "Follow the lead",
           "showAll": "Show all"
