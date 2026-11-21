@@ -62,21 +62,22 @@ describe('the 3D Office lift', () => {
 })
 
 describe("the 3D Office lead's round", () => {
-  it('answers askers first, one trip per floor, then a word with busy members on its own floor', () => {
+  it('talks first, one lift trip per floor, then hands its folders, then sits at its desk', () => {
     const round = office3dLeadRoundOf({
       layout: building(),
       needs: ['d', 'c', 'a'],
       visits: ['b', 'a'],
       pace: 'normal'
     })
+    // Floor 0 is the lobby: the lead's floor is 1.
     expect(talksOf(round)).toEqual([
+      [3, 'talk'],
       [2, 'talk'],
       [1, 'talk'],
-      [0, 'talk'],
-      [0, 'give']
+      [1, 'give']
     ])
     expect(round.steps.filter((s) => s.kind === 'ride')).toHaveLength(3)
-    expect(round.steps.at(-1)).toMatchObject({ kind: 'hold', pose: 'desk', floor: 0 })
+    expect(round.steps.at(-1)).toMatchObject({ kind: 'hold', pose: 'desk', floor: 1 })
     expect(round.steps.every((s) => s.dur >= 0)).toBe(true)
     for (const [i, s] of round.steps.entries()) {
       if (s.kind === 'ride') {
@@ -98,11 +99,11 @@ describe("the 3D Office lead's round", () => {
       pace: 'normal'
     })
     expect(talksOf(round)).toEqual([
-      [2, 'give'],
-      [0, 'give']
+      [3, 'give'],
+      [1, 'give']
     ])
-    // Never on m2, the unreachable floor (index 1).
-    expect(round.steps.some((s) => 'floor' in s && s.floor === 1)).toBe(false)
+    // Never on m2, the unreachable floor (index 2).
+    expect(round.steps.some((s) => 'floor' in s && s.floor === 2)).toBe(false)
   })
 
   it('walks 2.5 times faster at Fast, and Direct jumps with no walk or ride', () => {
@@ -133,9 +134,9 @@ describe("the 3D Office lead's round", () => {
     })
     const ride = round.steps.find((s) => s.kind === 'ride')!
     const mid = office3dWalkerAt(round, ride.start + ride.dur / 2)
-    expect(mid.floor).toBeGreaterThan(0)
-    expect(mid.floor).toBeLessThan(1)
-    expect(office3dWalkerAt(round, round.total - 0.01)).toMatchObject({ floor: 0, pose: 'desk' })
+    expect(mid.floor).toBeGreaterThan(1)
+    expect(mid.floor).toBeLessThan(2)
+    expect(office3dWalkerAt(round, round.total - 0.01)).toMatchObject({ floor: 1, pose: 'desk' })
   })
 })
 
@@ -145,7 +146,7 @@ describe('the 3D Office commute', () => {
     const come = office3dCommuteOf({ layout: l, key: 'c', arriving: true, pace: 'normal' })!
     const go = office3dCommuteOf({ layout: l, key: 'c', arriving: false, pace: 'normal' })!
     const start = office3dWalkerAt(come, 0)
-    expect(start.floor).toBe(1)
+    expect(start.floor).toBe(2)
     expect(office3dWalkerAt(go, go.total - 0.001).at[0]).toBeCloseTo(start.at[0])
     expect(office3dCommuteOf({ layout: l, key: 'zz', arriving: true, pace: 'normal' })).toBeNull()
     expect(

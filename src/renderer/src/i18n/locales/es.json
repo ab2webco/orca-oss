@@ -15734,6 +15734,9 @@
         }
       },
       "team-scene": {
+        "TeamSceneOffice3d": {
+          "lobby": "Vestíbulo"
+        },
         "TeamSceneDiorama": {
           "followLead": "Seguir al lead",
           "showAll": "Ver todo"

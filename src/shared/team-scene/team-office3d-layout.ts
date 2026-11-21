@@ -43,8 +43,11 @@ export type Office3dSeat = {
 export type Office3dControlRoom = { x: number; y: number; balcony: boolean; chair: Office3dPoint }
 
 export type Office3dFloor = {
-  /** The floor's key from `teamSceneFloorsOf`: '' for this machine, else the host's name. */
+  /** The floor's key from `teamSceneFloorsOf`: '' for this machine, else the host's name;
+   * OFFICE3D_LOBBY for the shared ground floor. */
   key: string
+  /** The ground floor everyone shares: the cafeteria and the games room, no desks (ORCA-1317). */
+  lobby?: true
   name: string
   lead: boolean
   reachable: boolean
@@ -123,9 +126,64 @@ function controlRoomOf(floor: TeamSceneFloor, y: number, width: number): Office3
   return { x: width, y: balcony ? y + OFFICE3D_BALCONY_Y : y, balcony, chair: [chairX, 2] }
 }
 
+/** The lobby's key; no host is named so. */
+export const OFFICE3D_LOBBY = '@lobby'
+
+/** A place a figure sits or stands in the lobby, and what it faces. */
+export type Office3dSpot = { at: Office3dPoint; face: Office3dPoint }
+
+/** The lobby's furniture, by floor width, so the meshes, the seats and the tests share it. */
+export type Office3dLobby = {
+  counter: { x: number; z: number; w: number; d: number }
+  tables: Office3dPoint[]
+  cafe: Office3dSpot[]
+  tv: Office3dPoint
+  couch: { x: number; z: number; w: number; d: number }
+  console: Office3dSpot[]
+  pingpong: { x: number; z: number; w: number; d: number }
+  paddles: Office3dSpot[]
+  talk: Office3dSpot[]
+  door: Office3dPoint
+}
+
+export function office3dLobbyOf(width: number): Office3dLobby {
+  const tables: Office3dPoint[] = [
+    [2, 2.4],
+    [4.2, 2.4]
+  ]
+  const tv = width * 0.62
+  const pp = width - 2.2
+  const talk = width * 0.45
+  return {
+    counter: { x: 2.2, z: 0.45, w: 2.6, d: 0.6 },
+    tables,
+    // Two chairs a table, facing each other across it.
+    cafe: tables.flatMap(([x, z]) => [
+      { at: [x - 0.75, z] as Office3dPoint, face: [x, z] as Office3dPoint },
+      { at: [x + 0.75, z] as Office3dPoint, face: [x, z] as Office3dPoint }
+    ]),
+    tv: [tv, 0.15],
+    couch: { x: tv, z: 2.05, w: 1.8, d: 0.7 },
+    console: [-0.45, 0.45].map((dx) => ({
+      at: [tv + dx, 1.9] as Office3dPoint,
+      face: [tv + dx, 0] as Office3dPoint
+    })),
+    pingpong: { x: pp, z: 2.6, w: 2.2, d: 1.2 },
+    paddles: [-1.5, 1.5].map((dx) => ({
+      at: [pp + dx, 2.6] as Office3dPoint,
+      face: [pp, 2.6] as Office3dPoint
+    })),
+    talk: [0, 0.8].map((dx) => ({
+      at: [talk + dx, 1.2] as Office3dPoint,
+      face: [talk + 0.4, 1.2] as Office3dPoint
+    })),
+    door: [width - 0.8, OFFICE3D_DEPTH - 0.3]
+  }
+}
+
 /**
- * The building: the lead's floor first at the bottom, then each machine, as `teamSceneFloorsOf`
- * orders them. `previous` keeps every member on the desk it had.
+ * The building: the shared lobby at the bottom, then the lead's floor, then each machine, as
+ * `teamSceneFloorsOf` orders them. `previous` keeps every member on the desk it had.
  */
 export function teamOffice3dLayoutOf(
   floors: readonly TeamSceneFloor[],
@@ -133,7 +191,8 @@ export function teamOffice3dLayoutOf(
 ): Office3dLayout {
   const order: Record<string, (string | null)[]> = {}
   const built = floors.map((floor, i): Office3dFloor => {
-    const y = i * OFFICE3D_PITCH
+    // Why one up: the lobby is the ground floor, so a floor's index is its lift level.
+    const y = (i + 1) * OFFICE3D_PITCH
     const placed = seatsOf(floor, args.previous?.[floor.key] ?? [])
     order[floor.key] = placed.order
     const advisor = office3dHasAdvisor(floor, args.leadAdvisor)
@@ -153,7 +212,22 @@ export function teamOffice3dLayoutOf(
       controlRoom: advisor ? controlRoomOf(floor, y, placed.width) : null
     }
   })
-  return { floors: built, order }
+  const width = Math.max(MIN_WIDTH, ...built.map((f) => f.width))
+  const lobby: Office3dFloor = {
+    key: OFFICE3D_LOBBY,
+    lobby: true,
+    name: '',
+    lead: false,
+    reachable: true,
+    y: 0,
+    width,
+    scale: 1,
+    seats: [],
+    used: 0,
+    office: null,
+    controlRoom: null
+  }
+  return { floors: [lobby, ...built], order }
 }
 
 /** Where a seat's sitter stands for the lead to talk to it: just behind the chair, in the aisle. */

@@ -9,10 +9,7 @@ import {
   OFFICE3D_SEAT_Z,
   type Office3dLayout
 } from '../../../../shared/team-scene/team-office3d-layout'
-import type {
-  TeamSceneInput,
-  TeamSceneMemberInput
-} from '../../../../shared/team-scene/team-scene-types'
+import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import type { Office3dTraffic } from '../../../../shared/team-scene/team-office3d-traffic'
 import { dioramaFitCamera } from './team-diorama-camera'
@@ -29,9 +26,10 @@ import {
   office3dFloor
 } from './team-office3d-floor'
 import { keepOffice3dLabelLegible, office3dLabelOf } from './team-office3d-labels'
-import { paintOffice3dBoard, paintOffice3dScreen } from './team-office3d-screens'
+import { paintOffice3dBoard, paintOffice3dScreen, paintOffice3dWall } from './team-office3d-screens'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 import { office3dLeadActor } from './team-office3d-lead-actor'
+import { office3dLobby } from './team-office3d-lobby'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 
 export type Office3dStage = { height: number; draw: (t: number) => void; dispose: () => void }
@@ -50,55 +48,6 @@ function ghost(g: THREE.Object3D): void {
   })
 }
 
-const tileOf = (m: TeamSceneMemberInput, reachable: boolean, c: TeamSceneStatusColors): string =>
-  !reachable || m.away
-    ? '#4b5563'
-    : m.activity === 'needsYou'
-      ? c.attention
-      : m.activity === 'done'
-        ? c.done
-        : m.activity === 'blocked' || m.hold
-          ? c.risk
-          : c.working
-
-/** The control room's video wall: one tile per member of its floor, in Orca's status colours. */
-function paintWall(
-  g: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  floorMembers: readonly TeamSceneMemberInput[],
-  reachable: boolean,
-  c: TeamSceneStatusColors,
-  t: number
-): void {
-  g.fillStyle = '#0b1220'
-  g.fillRect(0, 0, w, h)
-  const cols = 8,
-    tw = 42,
-    th = 22,
-    gap = 6
-  for (const [k, m] of floorMembers.slice(0, 40).entries()) {
-    const fill = tileOf(m, reachable, c)
-    // Why a pulse on the asker's tile only: the wall says who needs the user at a glance.
-    g.globalAlpha = fill === c.attention ? 0.65 + 0.35 * Math.abs(Math.sin(t * 3)) : 1
-    g.fillStyle = fill
-    g.fillRect(14 + (k % cols) * (tw + gap), 20 + Math.floor(k / cols) * (th + gap), tw, th)
-  }
-  g.globalAlpha = 1
-  g.strokeStyle = '#7fb4ff'
-  g.lineWidth = 2
-  g.beginPath()
-  for (let q = 0; q <= 40; q++) {
-    const y = h - 16 - 16 * (0.5 + 0.5 * Math.sin(q * 0.55 + t * 0.8))
-    if (q) {
-      g.lineTo(14 + q * 9.3, y)
-    } else {
-      g.moveTo(14, y)
-    }
-  }
-  g.stroke()
-}
-
 /** One read of the team as the 3D Office: every machine's floor, its desks, its advisor, the lead. */
 export function office3dStage(
   renderer: THREE.WebGLRenderer,
@@ -114,7 +63,7 @@ export function office3dStage(
     view?: DioramaView
     /** The building's traffic, kept across reads: the lead's trips come only from its events. */
     traffic?: Office3dTraffic
-    words: { thisMachine: string; offline: string }
+    words: { thisMachine: string; offline: string; lobby?: string }
   }
 ): Office3dStage {
   const { input, layout, dark } = args
@@ -148,6 +97,9 @@ export function office3dStage(
     doors.push(built.doors)
     calls.push(office3dCallPanel(kit, X, built.group, i).light)
     world.add(built.group)
+    if (floor.lobby) {
+      world.add(office3dLobby(kit, X, floor, dark))
+    }
     if (floor.office) {
       world.add(office3dLeadOffice(kit, X, floor))
     }
@@ -170,7 +122,7 @@ export function office3dStage(
         }
         shown = t
         room.wall?.redraw((g, w, h) =>
-          paintWall(g, w, h, floorMembers, floor.reachable, args.status, t)
+          paintOffice3dWall(g, w, h, floorMembers, floor.reachable, args.status, t)
         )
       })
     }

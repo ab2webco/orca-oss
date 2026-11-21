@@ -138,7 +138,8 @@ describe('the 3D Office stage', () => {
       stage.draw(t)
       heights.add(Math.round(leadOf(scenes.at(-1)!)!.position.y / OFFICE3D_PITCH))
     }
-    expect([...heights].sort()).toEqual([0, 1])
+    // Floor 0 is the lobby: the lead's floor is 1, the asker's 2.
+    expect([...heights].sort()).toEqual([1, 2])
   })
 
   it('keeps the lead on its own floor when nobody elsewhere needs the user', () => {
@@ -148,7 +149,7 @@ describe('the 3D Office stage', () => {
     )
     for (let t = 0; t < 60; t += 0.5) {
       stage.draw(t)
-      expect(leadOf(scenes.at(-1)!)!.position.y).toBeLessThan(OFFICE3D_PITCH / 2)
+      expect(leadOf(scenes.at(-1)!)!.position.y).toBeLessThan(OFFICE3D_PITCH * 1.5)
     }
   })
 
@@ -184,7 +185,8 @@ describe('the 3D Office stage', () => {
         leftmost = Math.min(leftmost, o.getWorldPosition(new THREE.Vector3()).x)
       }
     })
-    expect(sprites).toHaveLength(2)
+    // Its two floors and the lobby.
+    expect(sprites).toHaveLength(3)
     for (const chip of sprites) {
       expect(chip.position.z).toBeGreaterThan(OFFICE3D_DEPTH)
     }
@@ -367,7 +369,8 @@ describe('the 3D Office stage', () => {
           buttons.push(o as THREE.Mesh)
         }
       })
-      expect(buttons).toHaveLength(2)
+      // A panel on every floor, the lobby's too.
+      expect(buttons).toHaveLength(3)
       const on = buttons.filter((b) => b.userData.lit).length
       lit += on
       const lead = leadOf(scene)!.getWorldPosition(new THREE.Vector3())

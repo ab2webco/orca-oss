@@ -12,9 +12,13 @@ const MAX_NAME = 14
 
 /** The floor's chip text: its machine and desks used, or that it cannot be reached. */
 export function office3dLabelOf(
-  floor: Pick<Office3dFloor, 'lead' | 'name' | 'reachable' | 'used' | 'seats'>,
-  words: { thisMachine: string; offline: string }
+  floor: Pick<Office3dFloor, 'lead' | 'name' | 'reachable' | 'used' | 'seats' | 'lobby'>,
+  words: { thisMachine: string; offline: string; lobby?: string }
 ): string {
+  // The shared ground floor has no machine and no desks to count.
+  if (floor.lobby) {
+    return words.lobby ?? 'Lobby'
+  }
   const raw = floor.lead && !floor.name ? words.thisMachine : floor.name
   // Why cut the name, never the count: the count is what says whether the machine is full.
   const name = raw.length > MAX_NAME ? `${raw.slice(0, MAX_NAME - 1)}…` : raw

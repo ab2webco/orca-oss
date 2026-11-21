@@ -97,7 +97,8 @@ export function TeamSceneOffice3d({
       traffic: traffic.current,
       words: {
         thisMachine: localHostDisplayLabel(),
-        offline: translate('teamPanel.machines.offline', 'Offline')
+        offline: translate('teamPanel.machines.offline', 'Offline'),
+        lobby: translate('auto.components.team-scene.TeamSceneOffice3d.lobby', 'Lobby')
       }
     })
     let raf = 0,
@@ -126,7 +127,8 @@ export function TeamSceneOffice3d({
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
-    el.dataset.office3dFloors = String(layout.floors.length)
+    // The machines' floors: the shared lobby is not one.
+    el.dataset.office3dFloors = String(layout.floors.filter((f) => !f.lobby).length)
     el.dataset.office3dAdvisors = String(layout.floors.filter((f) => f.controlRoom).length)
     return () => {
       cancelAnimationFrame(raf)
