@@ -234,11 +234,8 @@ export function office3dStage(
 
   const fit = dioramaFitCamera(world, args.width, args.height ?? args.maxHeight, args.height)
   renderer.setSize(args.width, fit.height, true)
-  // Why after the fit: a chip's size depends on how many px a world unit takes at this width.
+  // A chip's size depends on how many px a world unit takes at this width, sized in each draw.
   const pxPerUnit = args.width / (fit.camera.right - fit.camera.left)
-  for (const chip of chips) {
-    keepOffice3dLabelLegible(chip, pxPerUnit)
-  }
   const reach = fit.ground.getSize(new THREE.Vector3()).length() / 2 + 2
   sun.target.position.copy(fit.center)
   sun.position.copy(fit.center).add(new THREE.Vector3(-14, 26, 10))
@@ -289,6 +286,10 @@ export function office3dStage(
             ? keepInside(lead.g.position, dioramaLeadZoom(fit.span))
             : lead.g.position
         dioramaAim(args.view, fit, aim, args.width, t)
+      }
+      // Why each frame: a chip sized for the whole building grew with the follow zoom over the lead.
+      for (const chip of chips) {
+        keepOffice3dLabelLegible(chip, pxPerUnit * fit.camera.zoom)
       }
       keepOffice3dChipsInFrame(chips, fit.camera)
       renderer.render(scene, fit.camera)

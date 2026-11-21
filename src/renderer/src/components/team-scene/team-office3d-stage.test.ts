@@ -137,6 +137,24 @@ describe('the 3D Office stage', () => {
     expect(r.setSize).toHaveBeenLastCalledWith(280, 176, true)
     expect(small.full).toBe(open.height)
     expect(open.full).toBeGreaterThan(176)
+    // Following the lead in that small stage, a floor's chip keeps its size on screen.
+    const view = dioramaView()
+    const near = office3dStage(r.fake, { ...args, words, width: 280, height: 176, view })
+    for (let t = 0; t < 6; t += 0.2) {
+      near.draw(t)
+    }
+    const camera = r.cameras.at(-1)!
+    expect(camera.zoom).toBeGreaterThan(1.5)
+    const pxPerUnit = (280 / (camera.right - camera.left)) * camera.zoom
+    const chips: THREE.Sprite[] = []
+    r.scenes
+      .at(-1)!
+      .traverse((o) => o instanceof THREE.Sprite && o.userData.aspect && chips.push(o))
+    expect(chips.length).toBeGreaterThan(0)
+    for (const chip of chips) {
+      expect(chip.scale.y * pxPerUnit).toBeGreaterThanOrEqual(20 - 1e-6)
+      expect(chip.scale.y * pxPerUnit).toBeLessThan(30)
+    }
   })
 
   it('sends the lead up the lift to a member on another floor whose CI went red', () => {
