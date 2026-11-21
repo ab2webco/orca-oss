@@ -111,7 +111,7 @@ export function office3dPlanner(
     },
     ride: (toFloor: number, cab: Office3dCab, queued: number) => {
       // In line at the call panel: the first presses, the next wait behind it, in order.
-      const spot: Office3dPoint = [OFFICE3D_CALL[0] + 0.6 * queued, OFFICE3D_CALL[1]]
+      const spot: Office3dPoint = [OFFICE3D_CALL[0] + 0.8 * queued, OFFICE3D_CALL[1]]
       walk(
         [here[0], office3dLaneOf(here[0], spot[0])],
         [spot[0], office3dLaneOf(here[0], spot[0])],

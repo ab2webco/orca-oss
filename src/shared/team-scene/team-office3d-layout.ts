@@ -151,10 +151,12 @@ export function office3dLobbyOf(width: number): Office3dLobby {
     [2, 2.4],
     [4.2, 2.4]
   ]
-  const tv = width * 0.62
-  const pp = width - 2.2
+  // Why these spots: at the narrowest lobby the couch, the table and the talkers each keep a
+  // body's width apart, so two rooms' figures never stand in one another.
+  const tv = width * 0.58
+  const pp = width - 1.9
   // Why up front by the aisle: further back, the walk to them crossed a cafeteria chair.
-  const talk = width * 0.5
+  const talk = width * 0.44
   return {
     counter: { x: 2.2, z: 0.45, w: 2.6, d: 0.6 },
     tables,
@@ -213,7 +215,12 @@ export function teamOffice3dLayoutOf(
       controlRoom: advisor ? controlRoomOf(floor, y, placed.width) : null
     }
   })
-  const width = Math.max(MIN_WIDTH, ...built.map((f) => f.width))
+  // Why under the wing too: the lead's office and the control rooms stand over the lobby's right
+  // end, so the full footprint is the building's own width, and the rooms get their space.
+  const width = Math.max(
+    MIN_WIDTH,
+    ...built.map((f) => f.width + (f.office || f.controlRoom ? OFFICE3D_WING_WIDTH : 0))
+  )
   const lobby: Office3dFloor = {
     key: OFFICE3D_LOBBY,
     lobby: true,

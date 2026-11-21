@@ -16,6 +16,8 @@ import {
 import { office3dWalkerAt, type Office3dRound, type Office3dStep } from './team-office3d-walkers'
 import type { TeamSceneMemberInput } from './team-scene-types'
 
+const STAGGER = 0.8
+
 // Why waypoints, not a grid: each floor is a corridor, so a member leaves its seat by the way it
 // came in, walks a lane of the aisle, and takes the lift with the others (ORCA-1317).
 
@@ -205,6 +207,7 @@ export function office3dMembersRead(args: {
       members.set(input.key, created)
     }
   }
+  let leavingNow = 0
   for (const [key, m] of members) {
     const target = want.has(key) ? want.get(key)! : null
     if (!want.has(key)) {
@@ -219,7 +222,9 @@ export function office3dMembersRead(args: {
     }
     if (office3dSlotId(target) !== office3dSlotId(m.slot)) {
       m.leaving = false
-      tripTo(m, target, layout, cab, now, pace, queued)
+      // Why one after another: a team let go in one read stood up as one; back to work never waits.
+      const delay = target && target.kind !== 'desk' ? STAGGER * leavingNow++ : 0
+      tripTo(m, target, layout, cab, now + delay, pace, queued)
     }
   }
 }

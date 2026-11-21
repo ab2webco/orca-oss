@@ -4,6 +4,7 @@ import type { TeamSceneFloor } from './team-scene-floors'
 import {
   OFFICE3D_BALCONY_Y,
   OFFICE3D_LOBBY,
+  OFFICE3D_WING_WIDTH,
   OFFICE3D_PITCH,
   office3dFloorWidth,
   office3dHasAdvisor,
@@ -47,8 +48,8 @@ describe('the 3D Office building', () => {
       ['m2', 'm2', 2 * OFFICE3D_PITCH, false, false],
       ['gpu', 'gpu', 3 * OFFICE3D_PITCH, false, false]
     ])
-    // As wide as the widest floor, with no desks: the building grows taller, not wider.
-    expect(floors[0]!.width).toBe(Math.max(...floors.slice(1).map((f) => f.width)))
+    // The building's own footprint, its wing included, with no desks: taller, not wider.
+    expect(floors[0]!.width).toBe(floors[1]!.width + OFFICE3D_WING_WIDTH)
     expect(floors[0]!.seats).toEqual([])
   })
 
