@@ -8,7 +8,6 @@ import {
   withOrchestratorGameField,
   withOrchestratorGameProjectField
 } from '../../../../shared/orchestrator-game-settings-updates'
-import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
 import type { SceneFileState } from './use-orchestrator-game-scene-file'
 import { SettingsSwitchRow } from './SettingsFormControls'
 import {
@@ -26,7 +25,7 @@ import {
   orchestratorGameRenderLabels,
   renderLabel
 } from './OrchestratorGameRenderSetting'
-import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
+import { OrchestratorGameScenePreview, scenePreviewModeOf } from './OrchestratorGameScenePreview'
 import {
   OrchestratorGameDefaultViewRow,
   OrchestratorGameShowRow,
@@ -127,9 +126,7 @@ export function GlobalTerminalGroups({
     tracker: toggle('tracker'),
     band: toggle('band'),
     bandPreview: () => (
-      <OrchestratorGameScenePreview
-        config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
-      />
+      <OrchestratorGameScenePreview config={{ ...config, mode: scenePreviewModeOf(config.mode) }} />
     ),
     render: () => (
       <OrchestratorGameRenderRow
@@ -267,7 +264,7 @@ export function ProjectTerminalGroups({
     band: toggle('band'),
     bandPreview: () => (
       <OrchestratorGameScenePreview
-        config={{ ...config, mode: shownOrchestratorGameModeOf(config) }}
+        config={{ ...config, mode: scenePreviewModeOf(config.mode) }}
         fileScene={fileScene}
       />
     ),
