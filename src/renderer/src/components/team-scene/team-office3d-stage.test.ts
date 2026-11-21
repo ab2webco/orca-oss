@@ -1,7 +1,8 @@
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
+  OFFICE3D_DEPTH,
   OFFICE3D_PITCH,
   teamOffice3dLayoutOf
 } from '../../../../shared/team-scene/team-office3d-layout'
@@ -139,5 +140,25 @@ describe('the 3D Office stage', () => {
     expect(count([floor('', ['a']), floor('m2', ['c'])], false)).toBe(0)
     expect(count([floor('', ['a']), floor('m2', ['c'])], true)).toBe(1)
     expect(count([floor('', ['a']), floor('m2', ['c'], true)], true)).toBe(2)
+  })
+
+  it('puts every floor label on its slab front, clear of the desks, and the shaft inside the frame', () => {
+    const { stage, scenes } = stageOf([member('a', 'working')], [floor('', ['a']), floor('m2', [])])
+    stage.draw(1)
+    const sprites: THREE.Sprite[] = []
+    let leftmost = Infinity
+    scenes[0]!.traverse((o) => {
+      if ((o as THREE.Sprite).isSprite && o.position.z > OFFICE3D_DEPTH) {
+        sprites.push(o as THREE.Sprite)
+      }
+      if ((o as THREE.Mesh).isMesh) {
+        leftmost = Math.min(leftmost, o.getWorldPosition(new THREE.Vector3()).x)
+      }
+    })
+    expect(sprites).toHaveLength(2)
+    for (const chip of sprites) {
+      expect(chip.position.z).toBeGreaterThan(OFFICE3D_DEPTH)
+    }
+    expect(leftmost).toBeLessThan(-2)
   })
 })
