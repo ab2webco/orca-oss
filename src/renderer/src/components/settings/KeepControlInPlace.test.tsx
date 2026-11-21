@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import React, { act, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { KeepControlInPlace } from './KeepControlInPlace'
@@ -16,6 +17,16 @@ function Page(): React.JSX.Element {
       <button type="button" onClick={() => setIsAboveShown((one) => !one)}>
         toggle
       </button>
+      {/* Why: a menu's trigger stays on the page while its options render in a portal. */}
+      <button type="button" aria-expanded="true" data-trigger>
+        menu
+      </button>
+      {createPortal(
+        <div role="option" aria-selected="false" onClick={() => setIsAboveShown((one) => !one)}>
+          pick
+        </div>,
+        document.body
+      )}
     </KeepControlInPlace>
   )
 }
@@ -57,6 +68,17 @@ describe('KeepControlInPlace (ORCA-1112 d)', () => {
 
     view.button.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await act(async () => view.button.click())
+    await settle()
+    expect(view.scrollBy).toHaveBeenCalledWith({ top: -ROW })
+    view.unmount()
+  })
+
+  it('holds the menu trigger when an option in its portal is picked', async () => {
+    const view = await mount()
+    const option = document.body.querySelector<HTMLElement>('[role="option"]')!
+
+    option.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await act(async () => option.click())
     await settle()
     expect(view.scrollBy).toHaveBeenCalledWith({ top: -ROW })
     view.unmount()

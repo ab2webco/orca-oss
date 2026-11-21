@@ -143,9 +143,16 @@ test('the global game rows follow the choices, search and the pressed control', 
   testInfo.annotations.push({ type: 'moved', description: `off ${offMoved}, on ${onMoved}` })
 
   const view = orcaPage.getByRole('combobox', { name: 'Default view' })
+  await view.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+  const viewBefore = (await view.boundingBox())!.y
   await view.click()
+  // Why past 1 s: the press that opened the menu has let go, so only the pick can hold it.
+  await orcaPage.waitForTimeout(1_200)
   await orcaPage.getByRole('option', { name: 'Flat · light' }).click()
   await expect(orcaPage.locator('[data-game-group="band"]')).toHaveCount(0)
+  expect(await shownRows(orcaPage)).not.toContain('scene')
+  const viewMoved = (await view.boundingBox())!.y - viewBefore
+  expect(Math.abs(viewMoved), 'Default view moved under the pick').toBeLessThanOrEqual(1)
   await expect(orcaPage.locator('[aria-label="Render"]')).toHaveCount(0)
   await capture(electronApp, orcaPage, section, 'global-flat', testInfo)
 

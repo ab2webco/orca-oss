@@ -48,24 +48,32 @@ export function KeepControlInPlace({
       clearTimeout(timer)
       observer.disconnect()
     }
+    // Why the open trigger: a menu's options live in a portal outside the page, and unmount on pick.
+    const anchorOf = (target: EventTarget | null): Element | null => {
+      if (!(target instanceof Element)) {
+        return null
+      }
+      return root.contains(target) ? target : root.querySelector('[aria-expanded="true"]')
+    }
     // Why observe only while armed: the page's animated previews mutate it every frame.
     const arm = (event: Event): void => {
       disarm()
-      if (!(event.target instanceof Element)) {
+      const node = anchorOf(event.target)
+      if (!node) {
         return
       }
-      anchor = { node: event.target, top: event.target.getBoundingClientRect().top }
+      anchor = { node, top: node.getBoundingClientRect().top }
       observer.observe(root, { childList: true, subtree: true })
       timer = setTimeout(disarm, ANCHOR_MS)
     }
-    root.addEventListener('pointerdown', arm, true)
-    root.addEventListener('keydown', arm, true)
+    document.addEventListener('pointerdown', arm, true)
+    document.addEventListener('keydown', arm, true)
     root.addEventListener('wheel', disarm, { passive: true })
     root.addEventListener('touchmove', disarm, { passive: true })
     return () => {
       disarm()
-      root.removeEventListener('pointerdown', arm, true)
-      root.removeEventListener('keydown', arm, true)
+      document.removeEventListener('pointerdown', arm, true)
+      document.removeEventListener('keydown', arm, true)
       root.removeEventListener('wheel', disarm)
       root.removeEventListener('touchmove', disarm)
     }
