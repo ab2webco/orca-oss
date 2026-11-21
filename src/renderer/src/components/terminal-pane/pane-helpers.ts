@@ -16,6 +16,9 @@ export function focusActivePane(manager: PaneManager): void {
   }
   const panes = manager.getPanes()
   const activePane = manager.getActivePane() ?? panes[0]
+  if (isFocusHeldByOtherFloatingWorkspace(activeElement, activePane?.container ?? null)) {
+    return
+  }
   activePane?.terminal.focus()
 }
 
@@ -49,6 +52,21 @@ const OPEN_POPUP_LAYER_SELECTOR =
 
 function isInOpenPopupLayer(element: Element | null): boolean {
   return element instanceof HTMLElement && element.closest(OPEN_POPUP_LAYER_SELECTOR) !== null
+}
+
+const FLOATING_WORKSPACE_PANEL_SELECTOR = '[data-floating-terminal-panel]'
+
+// Why: a main-workspace pane's deferred fit/focus used to pull focus out of the floating
+// terminal, so the next keys and tab chords went to the main workspace (ORCA-1279).
+function isFocusHeldByOtherFloatingWorkspace(
+  activeElement: Element | null,
+  paneContainer: HTMLElement | null
+): boolean {
+  return (
+    activeElement instanceof HTMLElement &&
+    activeElement.closest(FLOATING_WORKSPACE_PANEL_SELECTOR) !== null &&
+    paneContainer?.closest(FLOATING_WORKSPACE_PANEL_SELECTOR) == null
+  )
 }
 
 function shouldPreserveEditableFocus(element: Element | null): boolean {
