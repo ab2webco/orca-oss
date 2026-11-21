@@ -11019,7 +11019,6 @@
         "OrchestratorGameSetting": {
           "title": "Juego de Agent Teams",
           "description": "Escenas en pixel art, un HUD del equipo y recompensas dentro de Claude Agent Teams. Cada proyecto puede cambiarlo en su orca.yaml.",
-          "mode": "Modo del juego",
           "on": "Activado",
           "zen": "Zen",
           "flat": "Plano",

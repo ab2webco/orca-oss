@@ -11630,7 +11630,6 @@
         "OrchestratorGameSetting": {
           "title": "Agent Teams game",
           "description": "Pixel-art scenes, a teammate HUD and rewards inside Claude Agent Teams. Each project can change this in its orca.yaml.",
-          "mode": "Game mode",
           "on": "On",
           "zen": "Zen",
           "off": "Off",
