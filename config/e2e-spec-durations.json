@@ -243,6 +243,7 @@
     "tests/e2e/settings-agents-in-process-row.spec.ts": 64,
     "tests/e2e/settings-diorama-quality-pace.spec.ts": 20,
     "tests/e2e/settings-display-name-ime.spec.ts": 20,
+    "tests/e2e/settings-game-rows-follow-choice.spec.ts": 190,
     "tests/e2e/settings-game-style-fallback-note.spec.ts": 48,
     "tests/e2e/settings-language-picker.spec.ts": 99,
     "tests/e2e/settings-narrow-width-overflow.spec.ts": 211,
