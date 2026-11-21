@@ -1,3 +1,4 @@
+import { POSIX_GH_PR_CAP_WRAPPER } from '../pty/gh-pr-cap-shim'
 import type { RemoteHostPlatform } from './ssh-remote-platform'
 import { isWindowsRemoteHost, joinRemotePath } from './ssh-remote-platform'
 import { powerShellCommand, powerShellLiteral, powerShellNativeArg } from './ssh-remote-powershell'
@@ -220,6 +221,7 @@ export function createRemoteCliInstallPlan(env: RemoteCliInstallEnv): RemoteCliI
   }
 
   const launcherPath = joinRemotePath(env.hostPlatform, env.binDir, 'orca')
+  const ghPath = joinRemotePath(env.hostPlatform, env.binDir, 'gh')
   return {
     launcherPath,
     files: [
@@ -239,9 +241,11 @@ export function createRemoteCliInstallPlan(env: RemoteCliInstallEnv): RemoteCliI
           'exec "$ORCA_RELAY_NODE_PATH" "$ORCA_RELAY_DIR/relay.js" --sock-path "$ORCA_RELAY_SOCKET_PATH" --credential-file "$ORCA_RELAY_CREDENTIAL_FILE" --orca-cli "$@"',
           ''
         ].join('\n')
-      }
+      },
+      // Why beside orca: an SSH member's gh pr create asks its home for the open-PR cap (ORCA-1301).
+      { path: ghPath, contents: POSIX_GH_PR_CAP_WRAPPER }
     ],
     // Surface chmod failures: a non-executable launcher must fail install loudly, not silently.
-    postWriteCommands: [`chmod +x ${quoteSh(launcherPath)}`]
+    postWriteCommands: [`chmod +x ${quoteSh(launcherPath)} ${quoteSh(ghPath)}`]
   }
 }

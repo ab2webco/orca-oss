@@ -221,6 +221,30 @@ describe('getRelayShellLaunchConfig', () => {
     }
   )
 
+  itWithBash(
+    'puts the remote CLI dir back first after a user rc pushes another dir ahead (ORCA-1301)',
+    () => {
+      writeFileSync(join(homeDir, '.bashrc'), 'export PATH="/opt/elsewhere/bin:$PATH"\n')
+      const config = getRelayShellLaunchConfig('/bin/bash', { HOME: homeDir })
+      const result = spawnSync(
+        'bash',
+        ['--noprofile', '--rcfile', config.args[1] as string, '-i'],
+        {
+          input: 'echo "FIRST=${PATH%%:*}"\nexit 0\n',
+          encoding: 'utf8',
+          env: {
+            HOME: homeDir,
+            TERM: 'xterm',
+            PATH: '/home/me/.orca-relay/bin:/usr/bin:/bin',
+            ORCA_REMOTE_CLI_BIN_DIR: '/home/me/.orca-relay/bin'
+          },
+          timeout: 5000
+        }
+      )
+      expect(result.stdout).toContain('FIRST=/home/me/.orca-relay/bin')
+    }
+  )
+
   itWithBash('runs the relay bash wrapper without fake C/D markers before the first prompt', () => {
     const config = getRelayShellLaunchConfig('/bin/bash', { HOME: homeDir })
     const output = runInteractiveBashRcfile(config.args[1] as string, homeDir)

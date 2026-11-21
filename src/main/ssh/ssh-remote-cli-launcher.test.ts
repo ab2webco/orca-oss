@@ -235,7 +235,24 @@ describe('SSH remote Orca Lab CLI launcher', () => {
       expect.objectContaining({
         path: '/home/me/.orca-relay/bin/orca',
         contents: expect.stringContaining('--orca-cli "$@"')
-      })
+      }),
+      expect.objectContaining({ path: '/home/me/.orca-relay/bin/gh' })
+    ])
+  })
+
+  it("ships the gh PR-cap wrapper beside orca, so an SSH member's gh pr create asks its home (ORCA-1301)", () => {
+    const plan = createRemoteCliInstallPlan({
+      binDir: '/home/me/.orca-relay/bin',
+      relayDir: '/home/me/.orca-remote/relay-v1',
+      nodePath: '/usr/bin/node',
+      sockPath: '/home/me/.orca-remote/relay-v1/relay.sock',
+      hostPlatform: getRemoteHostPlatform('linux-x64')
+    })
+
+    const gh = plan.files.find((file) => file.path === '/home/me/.orca-relay/bin/gh')
+    expect(gh?.contents).toContain('orca game pr-cap-check')
+    expect(plan.postWriteCommands).toEqual([
+      "chmod +x '/home/me/.orca-relay/bin/orca' '/home/me/.orca-relay/bin/gh'"
     ])
   })
 })
