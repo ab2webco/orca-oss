@@ -1,5 +1,5 @@
 ---
-sourceHash: bed93b04ea804705
+sourceHash: a98c7a8c2dfbe83f
 ---
 # Escenas, estilos y ajustes
 
@@ -24,25 +24,31 @@ escena viene en tres estilos, todos representando el estado real del trabajo, nu
   otras islas. Los miembros libres pescan, siembran o cortan leña, y los limitados se sientan junto
   al fuego. Jev vigila desde su torre con un catalejo y manda una paloma mensajera cuando decide. Un
   miembro nuevo sale del castillo; la isla de una máquina recién conectada sube del mar.
-- **Office**: pizarras cuyas notas avanzan hacia terminado, con placas por cada merge. Con miembros
-  en más de una máquina se convierte en un edificio con un piso por máquina, primero el del líder,
-  y **All** muestra todos los pisos.
+- **Office**: un edificio 3D con un piso por máquina, abajo el del líder. Los miembros trabajan
+  en sus escritorios con suéter, cada monitor muestra lo que hace su miembro, una marca sobre la
+  cabeza de quien te necesita y una pizarra sobre cada escritorio cuya nota avanza hacia terminado.
+  El líder, con abrigo violeta, trabaja desde su propia oficina y sube en el ascensor de vidrio
+  hasta el miembro que te necesita. El Jev de cada máquina se sienta en un cuarto de control en su
+  propio piso, dibujado solo donde Jev está instalado y ya habló. Con **Low resources** la Office se
+  dibuja como antes: pisos en 2D con pizarras y placas, y **All** muestra todos los pisos.
 
 ![Settings > Agents > Panel con la escena, la apariencia, el estilo, su vista previa y los interruptores de pestañas](../../../assets/scenes-and-settings/panel-settings.png)
 
 En Figures la cámara sigue al líder. **Show all** encuadra todas las islas, arrastrar mueve la vista
 por la base, y pellizcar (o Ctrl o ⌘ con la rueda) acerca o aleja; **Follow the lead** vuelve. Dos
-filas en **Settings > Agents > Panel** lo ajustan:
+filas en **Settings > Agents > Panel** lo ajustan, y también la Office:
 
-- **Scene quality**: **Illustrated** (figuras con contorno y sombras) o **Low resources** (figuras
-  planas, sin sombras), para equipos más lentos.
+- **Scene quality**: **Illustrated** (figuras con contorno y sombras, y la Office como el edificio
+  3D) o **Low resources** (figuras planas sin sombras, y la Office en 2D), para equipos más lentos.
 - **Lead's pace**: **Normal** (camina como una persona), **Fast** (2,5 veces más rápido) o
-  **Direct** (el mago de la corte, junto al castillo, lo envía de círculo en círculo con magia).
+  **Direct** (en Figures el mago de la corte lo envía con magia; en la Office sale del ascensor
+  donde lo necesitan).
 
 Figures necesita WebGL. Con la aceleración por hardware apagada, Figures se dibuja en 2D: una torre
 de castillo por miembro que sube de los cimientos a terminada, y las torres mergeadas pasan a ser
 trofeos en las colinas. `orchestratorGame.panel.diorama: false` deja Figures en 2D en cualquier
-equipo.
+equipo. La Office 3D también necesita WebGL; sin él la Office se dibuja en 2D, como con **Low
+resources**.
 
 Un CI en rojo muestra la build rota. **Settings > Appearance > Status colors** define un color por
 estado (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), para claro y oscuro; el
@@ -70,7 +76,7 @@ posterior.
 </figure>
 
 - **Settings > Agents**: **Agent Teams game** (el juego en los paneles y la **Terminal band**) y
-  **Panel** (escena, apariencia, estilo, **Scene quality** y **Lead's pace** para Figures, y los
+  **Panel** (escena, apariencia, estilo, **Scene quality** y **Lead's pace** para Figures y Office, y los
   interruptores **PRs**, **Queue** y **Machines**), para todos los proyectos.
 - `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
   `pace`, `diorama`),

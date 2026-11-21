@@ -258,8 +258,8 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
-    quality: high # high | low: Figures' diorama illustrated, or flat without shadows
-    pace: normal # normal | fast | direct: how the diorama's lead gets about
+    quality: high # high | low: the 3D scenes illustrated (and the Office in 3D), or flat and the Office in 2D
+    pace: normal # normal | fast | direct: how the lead gets about in the diorama and the 3D Office
     diorama: true # false keeps Figures in 2D
   steward: # the Orca steward in each member pane
     highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
@@ -326,6 +326,30 @@ Without WebGL (hardware acceleration off) the panel falls back to the 2D Figures
 `diorama: false`. Linux E2E runs with the GPU off, so CI checks that fallback; the 3D path is
 checked locally on macOS. The canvas exposes `data-diorama-islands`, `-advisor`, `-cues` and
 `-camera`, and the stage `data-team-scene-webgl`, for specs.
+
+### Office: the 3D building
+
+Since ORCA-1302 Office with `quality: high` (Illustrated, the default) draws the team as a 3D
+building on the diorama's toon kit; `quality: low` (Low resources) and a renderer without WebGL draw
+today's 2D Office, unchanged.
+
+- **Floors.** One per machine, the lead's at the bottom, a desk per member, per other session and
+  per free slot under the cap
+  ([`team-office3d-layout.ts`](../../src/shared/team-scene/team-office3d-layout.ts)). A floor's
+  control room and its advisor are drawn only where that machine's Jev has spoken: the team's Jev
+  row on the lead's floor, else a decision in one of the floor's panes. A floor without one runs its
+  desks to the wall.
+- **Desks.** Pose, monitor, mark and board come from real state only, as in the 2D Office
+  ([`team-office3d-actions.ts`](../../src/shared/team-scene/team-office3d-actions.ts)); monitors and
+  boards reuse the 2D Office's drawings.
+- **The lead's round.** Askers first, one lift trip per floor, then a word with busy members on its
+  own floor, then back to its desk
+  ([`team-office3d-walkers.ts`](../../src/shared/team-scene/team-office3d-walkers.ts)). `pace` is the
+  diorama's (`dioramaPaceOf`): Fast is 2.5 times faster, Direct swaps walks and rides for a blink.
+- **Labels.** A floor's label never draws under 20 px tall, so it stays legible in a 219 px panel.
+
+The canvas exposes `data-office3d-floors` and `data-office3d-advisors`, and the stage
+`data-team-scene-webgl`. The phone's Team sheet still draws the 2D Office.
 
 Pixel, which a scene file themes, draws a team on more than one machine as Office's building: a
 floor per machine, each with its host's name.

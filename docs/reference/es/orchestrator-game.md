@@ -1,5 +1,5 @@
 ---
-sourceHash: 27e65565857586af
+sourceHash: d6d756565b00b589
 ---
 
 # El juego orquestador de Agent Teams
@@ -272,8 +272,8 @@ orchestratorGame:
     tabs: { prs: true, queue: false, machines: true }
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
-    quality: high # high | low: Figures' diorama illustrated, or flat without shadows
-    pace: normal # normal | fast | direct: how the diorama's lead gets about
+    quality: high # high | low: the 3D scenes illustrated (and the Office in 3D), or flat and the Office in 2D
+    pace: normal # normal | fast | direct: how the lead gets about in the diorama and the 3D Office
     diorama: true # false keeps Figures in 2D
   steward: # the Orca steward in each member pane
     highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
@@ -345,6 +345,29 @@ Sin WebGL (aceleración por hardware apagada) el panel vuelve a Figures en 2D, i
 `diorama: false`. El E2E de Linux corre con la GPU apagada, así que CI comprueba ese respaldo; el
 camino 3D se comprueba en local en macOS. El canvas expone `data-diorama-islands`, `-advisor`,
 `-cues` y `-camera`, y el escenario `data-team-scene-webgl`, para los specs.
+
+### Office: el edificio 3D
+
+Desde ORCA-1302 Office con `quality: high` (Illustrated, el valor por defecto) dibuja al equipo como
+un edificio 3D con el kit toon del diorama; `quality: low` (Low resources) y un renderer sin WebGL
+dibujan la Office 2D de hoy, sin cambios.
+
+- **Pisos.** Uno por máquina, abajo el del líder, un escritorio por miembro, por otra sesión y por
+  cada lugar libre bajo el tope
+  ([`team-office3d-layout.ts`](../../../src/shared/team-scene/team-office3d-layout.ts)). El cuarto
+  de control de un piso y su advisor se dibujan solo donde el Jev de esa máquina ya habló: la fila
+  de Jev del equipo en el piso del líder, o una decisión en uno de los panes del piso.
+- **Escritorios.** Postura, monitor, marca y pizarra salen solo del estado real, como en la Office
+  2D ([`team-office3d-actions.ts`](../../../src/shared/team-scene/team-office3d-actions.ts)).
+- **La ronda del líder.** Primero quien pregunta, un viaje de ascensor por piso, luego una palabra
+  con los miembros ocupados de su propio piso, y de vuelta a su escritorio
+  ([`team-office3d-walkers.ts`](../../../src/shared/team-scene/team-office3d-walkers.ts)). `pace` es
+  el del diorama (`dioramaPaceOf`).
+- **Etiquetas.** La etiqueta de un piso nunca mide menos de 20 px de alto, legible en un panel de
+  219 px.
+
+El canvas expone `data-office3d-floors` y `data-office3d-advisors`. La hoja Team del teléfono
+sigue dibujando la Office 2D.
 
 Pixel, que tematiza un archivo de escena, dibuja un equipo en más de una máquina como el edificio de
 Office: un piso por máquina, cada uno con el nombre de su host.
