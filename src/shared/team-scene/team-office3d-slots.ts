@@ -103,7 +103,7 @@ export function office3dSlotsOf(layout: Office3dLayout): {
       }) as Office3dSlot
   const cafe = L.cafe.map(straight('cafe'))
   const tvX = L.tv[0]
-  // Between the TV and the couch, then back onto the couch: over its back would be through it.
+  // From the couch's right end, between it and the TV, then back onto it: over its back would be through it.
   const consoles = L.console.map(
     (s, i): Office3dSlot => ({
       kind: 'console',
@@ -111,8 +111,8 @@ export function office3dSlotsOf(layout: Office3dLayout): {
       floor: 0,
       at: s.at,
       face: s.face,
-      entry: tvX - 2,
-      path: [[tvX - 2, 1.25], [s.at[0], 1.25], s.at]
+      entry: tvX + 2,
+      path: [[tvX + 2, 1.25], [s.at[0], 1.25], s.at]
     })
   )
   const games = [...consoles, ...L.paddles.map(straight('paddle')), ...L.talk.map(straight('talk'))]

@@ -153,10 +153,10 @@ export function office3dLobbyOf(width: number): Office3dLobby {
   ]
   // Why these spots: at the narrowest lobby the couch, the table and the talkers each keep a
   // body's width apart, so two rooms' figures never stand in one another.
-  const tv = width * 0.58
+  const tv = width * 0.52
   const pp = width - 1.9
   // Why up front by the aisle: further back, the walk to them crossed a cafeteria chair.
-  const talk = width * 0.44
+  const talk = width / 3
   return {
     counter: { x: 2.2, z: 0.45, w: 2.6, d: 0.6 },
     tables,
@@ -177,9 +177,9 @@ export function office3dLobbyOf(width: number): Office3dLobby {
       at: [pp + dx, 2.6] as Office3dPoint,
       face: [pp, 2.6] as Office3dPoint
     })),
-    talk: [0, 0.8].map((dx) => ({
+    talk: [0, 1.1].map((dx) => ({
       at: [talk + dx, 3.2] as Office3dPoint,
-      face: [talk + 0.4, 3.2] as Office3dPoint
+      face: [talk + 0.55, 3.2] as Office3dPoint
     })),
     door: [width - 0.8, OFFICE3D_DEPTH - 0.3]
   }
