@@ -151,28 +151,40 @@ export function office3dMembersRead(args: {
   // Who already holds a room seat keeps it while it stays in that room: nobody swaps chairs.
   const want = new Map<string, Office3dSlot | null>()
   const pick = (pool: Office3dSlot[], m: Office3dMember | undefined) => {
-    const free = pool.filter((s) => !taken.has(office3dSlotId(s)))
-    const own = free.find((s) => office3dSlotId(s) === office3dSlotId(m?.slot ?? null)) ?? free[0]
-    if (own) {
-      taken.add(office3dSlotId(own))
+    const kept = pool.find((s) => m?.slot && office3dSlotId(s) === office3dSlotId(m.slot))
+    if (kept) {
+      return kept
     }
-    return own ?? null
+    const free = pool.find((s) => !taken.has(office3dSlotId(s)))
+    if (free) {
+      taken.add(office3dSlotId(free))
+    }
+    return free ?? null
   }
-  for (const input of args.input) {
+  const poolOf = (place: Office3dPlace) =>
+    place === 'office'
+      ? slots.guest
+      : place === 'cafe'
+        ? slots.cafe
+        : place === 'games'
+          ? slots.games
+          : null
+  const placed = args.input.map((input) => {
     const m = members.get(input.key)
     const { waitSince, wait } = waitOf(m, input, now)
-    const place = office3dPlaceOf(input, wait)
+    return { input, m, waitSince, wait, place: office3dPlaceOf(input, wait) }
+  })
+  // Why first: whoever stays in its room keeps its seat, so a newcomer never takes it (ORCA-1319).
+  for (const { m, place } of placed) {
+    const own = office3dSlotId(m?.slot ?? null)
+    if (m?.slot && poolOf(place)?.some((s) => office3dSlotId(s) === own)) {
+      taken.add(own)
+    }
+  }
+  for (const { input, m, waitSince, wait, place } of placed) {
     const desk = slots.desks.get(input.key) ?? null
-    const slot =
-      place === 'gone'
-        ? null
-        : place === 'office'
-          ? pick(slots.guest, m)
-          : place === 'cafe'
-            ? pick(slots.cafe, m)
-            : place === 'games'
-              ? pick(slots.games, m)
-              : null
+    const pool = poolOf(place)
+    const slot = pool ? pick(pool, m) : null
     want.set(input.key, slot ?? (place === 'gone' ? null : desk))
     if (m) {
       Object.assign(m, { place, waitSince, wait })

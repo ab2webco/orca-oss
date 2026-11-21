@@ -11,6 +11,7 @@ import {
 } from './team-office3d-layout'
 import { office3dMemberAt } from './team-office3d-members'
 import { office3dWaitOf } from './team-office3d-places'
+import { office3dSlotId } from './team-office3d-slots'
 import { office3dTraffic, office3dTrafficRead } from './team-office3d-traffic'
 import type { Office3dStep } from './team-office3d-walkers'
 
@@ -310,5 +311,24 @@ describe('the call-panel line', () => {
         }
       }
     }
+  })
+})
+
+// Review ORCA-1319, finding 4: a seated member got up when someone earlier in the order joined.
+describe('a seat already taken', () => {
+  it('stays with its occupant when someone else joins the room', () => {
+    const out = { activity: 'blocked' as const, hold: 'limited' as const }
+    const traffic = play([
+      [10, team({ e: out })],
+      [100, team({ c: out, e: out })]
+    ])
+    const seat = traffic.members.get('e')!.slot
+    expect(seat?.kind).toBe('cafe')
+    // e's own state did not change, so it never stands up.
+    for (let t = 60; t < 140; t += 0.5) {
+      expect(where(traffic, 'e', t).pose, `e moved at ${t}`).toBe('sit')
+    }
+    expect(office3dSlotId(traffic.members.get('e')!.slot)).toBe(office3dSlotId(seat))
+    expect(office3dSlotId(traffic.members.get('c')!.slot)).not.toBe(office3dSlotId(seat))
   })
 })
