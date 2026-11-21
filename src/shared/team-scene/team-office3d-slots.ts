@@ -111,8 +111,8 @@ export function office3dSlotsOf(layout: Office3dLayout): {
       floor: 0,
       at: s.at,
       face: s.face,
-      entry: tvX - 1.6,
-      path: [[tvX - 1.6, 1.25], [s.at[0], 1.25], s.at]
+      entry: tvX - 2,
+      path: [[tvX - 2, 1.25], [s.at[0], 1.25], s.at]
     })
   )
   const games = [...consoles, ...L.paddles.map(straight('paddle')), ...L.talk.map(straight('talk'))]
