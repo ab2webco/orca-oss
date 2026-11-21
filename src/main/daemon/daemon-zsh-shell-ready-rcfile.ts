@@ -17,6 +17,14 @@ __orca_restore_agent_teams_path() {
   export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
 [[ ! -o login ]] && __orca_restore_agent_teams_path
+__orca_restore_gh_pr_cap_path() {
+  [[ -n "\${ORCA_GH_PR_CAP_SHIM_DIR:-}" ]] || return 0
+  case "$PATH" in
+    "\${ORCA_GH_PR_CAP_SHIM_DIR}"|"\${ORCA_GH_PR_CAP_SHIM_DIR}:"*) return 0 ;;
+  esac
+  export PATH="\${ORCA_GH_PR_CAP_SHIM_DIR}:$PATH"
+}
+[[ ! -o login ]] && __orca_restore_gh_pr_cap_path
 if [[ ! -o login ]]; then
   # Why: ~/.zshrc can export the user's default OpenCode config after spawn.
   [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"

@@ -821,7 +821,8 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
         env.ORCA_MIMOCODE_HOME ||
         env.ORCA_OMP_STATUS_EXTENSION ||
         env.ORCA_CODEX_HOME ||
-        env.ORCA_AGENT_TEAMS_SHIM_DIR
+        env.ORCA_AGENT_TEAMS_SHIM_DIR ||
+        env.ORCA_GH_PR_CAP_SHIM_DIR
           ? getAttributionShellLaunchConfig(shellPath)
           : null
     }

@@ -20,6 +20,13 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-fleet.js')).ORCHESTRATOR_GAME_FLEET_HANDLERS
   },
   {
+    name: 'orchestrator-game-pr-cap-check',
+    keys: ['game pr-cap-check'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-pr-cap-check.js'))
+        .ORCHESTRATOR_GAME_PR_CAP_HANDLERS
+  },
+  {
     name: 'orchestrator-game-watch',
     keys: ['game watch'],
     load: async () =>
