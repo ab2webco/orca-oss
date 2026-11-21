@@ -13,11 +13,8 @@ import {
 } from '../../../../shared/orchestrator-game-settings-updates'
 import { useAppStore } from '../../store'
 import { SearchableSetting } from './SearchableSetting'
-import {
-  CUSTOM_SCENE_FILE,
-  INHERIT_SCENE,
-  OrchestratorGameSceneSelect
-} from './OrchestratorGameSceneSelect'
+import { CUSTOM_SCENE_FILE, OrchestratorGameSceneSelect } from './OrchestratorGameSceneSelect'
+import { InheritedSourceLine } from './InheritableSettingRow'
 import {
   OrchestratorGameSceneFileField,
   OrchestratorGameSceneFileStatus
@@ -33,10 +30,7 @@ import {
 } from '../../../../shared/orchestrator-game-scene-file'
 import { SettingsRow, SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
-import {
-  orchestratorGameInheritLabel,
-  orchestratorGameSourceLabel as sourceLabel
-} from './orchestrator-game-setting-labels'
+import { orchestratorGameSourceLabel as sourceLabel } from './orchestrator-game-setting-labels'
 import { ProjectOrchestratorGameLeadSetting } from './OrchestratorGameLeadSetting'
 import { ProjectOrchestratorGameNamesSetting } from './OrchestratorGameNamesSetting'
 import { ProjectOrchestratorGameActionsSetting } from './OrchestratorGameActionsSetting'
@@ -160,8 +154,15 @@ export function ProjectOrchestratorGameSetting({
       )
     })
   }
-  const effective = (key: 'scene' | 'timezone', text: string): string =>
-    `${text} · ${sourceLabel(sources[key])}`
+  // Why without this machine's scene only: the inherited choice is what Reset gives back.
+  const below = resolveOrchestratorGameConfig({
+    ...layers,
+    local: withOrchestratorGameProjectScene(settings.orchestratorGameProjects, repoId, null)[repoId]
+  })
+  const sceneIdOf = (file: string | null, scene: string): string =>
+    file === null ? scene : orchestratorGameSceneFileId(file)
+  const inheritedScene = sceneIdOf(below.sceneFile, below.config.scene)
+  const isSceneOverridden = local?.scene !== undefined || local?.sceneFile !== undefined
   const description = translate(
     'auto.components.settings.OrchestratorGameSetting.projectDescription',
     "Override the game for this project on this machine. The project's orca.yaml sets its default."
@@ -170,16 +171,35 @@ export function ProjectOrchestratorGameSetting({
     <>
       <SettingsRow
         label={sceneTitle()}
-        description={effective('scene', sceneFile ?? config.scene)}
+        description={
+          <InheritedSourceLine
+            applied={sceneFile ?? config.scene}
+            source={sourceLabel(sources.scene)}
+            inherited={{
+              value: inheritedScene,
+              label: below.sceneFile ?? below.config.scene,
+              source: sourceLabel(below.sources.scene)
+            }}
+            isOverridden={isSceneOverridden || isCustomPicked}
+            onReset={() => setScene(null)}
+          />
+        }
         control={
           <OrchestratorGameSceneSelect
-            value={listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : (local?.scene ?? INHERIT_SCENE))}
+            value={
+              listedFile ?? (isCustom ? CUSTOM_SCENE_FILE : sceneIdOf(sceneFile, config.scene))
+            }
             ariaLabel={sceneTitle()}
-            inheritLabel={orchestratorGameInheritLabel()}
             projectFiles={projectFiles}
             onChange={(scene) => {
               const path = scene === null ? null : orchestratorGameSceneFileOfId(scene)
-              setScene(scene === null ? null : path === null ? { scene } : { sceneFile: path })
+              setScene(
+                scene === null || scene === inheritedScene
+                  ? null
+                  : path === null
+                    ? { scene }
+                    : { sceneFile: path }
+              )
             }}
             onCustomFile={() => setIsCustomPicked(true)}
           />
@@ -203,11 +223,28 @@ export function ProjectOrchestratorGameSetting({
     </>
   )
   const stored = local?.timezone ?? ''
+  const belowZone = resolveOrchestratorGameConfig({
+    ...layers,
+    local: withOrchestratorGameProjectField(
+      settings.orchestratorGameProjects,
+      repoId,
+      'timezone',
+      undefined
+    )[repoId]
+  })
   const timezoneRow = (): React.JSX.Element => (
     <OrchestratorGameTimezoneRow
       key={stored}
       stored={stored}
-      effective={effective('timezone', config.timezone)}
+      project={{
+        applied: config.timezone,
+        source: sourceLabel(sources.timezone),
+        inherited: {
+          value: belowZone.config.timezone,
+          label: belowZone.config.timezone,
+          source: sourceLabel(belowZone.sources.timezone)
+        }
+      }}
       onCommit={(value) =>
         updateSettings({
           orchestratorGameProjects: withOrchestratorGameProjectField(

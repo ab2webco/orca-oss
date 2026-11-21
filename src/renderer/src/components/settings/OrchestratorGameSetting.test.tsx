@@ -205,7 +205,11 @@ describe('ProjectOrchestratorGameSetting', () => {
     expect(view.container.textContent).toContain('Off · this machine')
 
     choose(viewSelect(view.container), 'zen')
-    click(view.container, '[aria-label="Teammate HUD"] button', 'Inherit')
+    click(
+      view.container,
+      '[data-game-row="hud"] [data-slot="game-row-source"] button',
+      'Reset to On (default)'
+    )
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { hud: false, mode: 'zen' } } },
       { orchestratorGameProjects: {} }
@@ -276,7 +280,7 @@ describe('game scene picker', () => {
     view.unmount()
   })
 
-  it('shows the orca.yaml scene as-is and overrides or inherits it for this machine', () => {
+  it('selects the orca.yaml scene as-is and overrides it for this machine', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameSetting
@@ -289,7 +293,7 @@ describe('game scene picker', () => {
 
     expect(view.container.textContent).toContain('acme.gone/orbit · from orca.yaml')
     const select = sceneSelect(view.container)
-    expect(select.value).toBe('inherit')
+    expect(select.value).toBe('acme.gone/orbit')
     choose(select, 'acme.space/orbit')
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { scene: 'acme.space/orbit' } } }

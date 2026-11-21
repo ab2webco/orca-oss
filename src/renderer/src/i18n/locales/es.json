@@ -11037,7 +11037,6 @@
           "sceneTamer": "Beast Tamer (integrada)",
           "sceneMissing": "{{value0}} (no instalada)",
           "sceneProjectFile": "{{value0}} (propia)",
-          "inherit": "Heredar",
           "projectDescription": "Cambia el juego para este proyecto en este equipo. El orca.yaml del proyecto define su valor por defecto.",
           "sourceDefault": "por defecto",
           "sourceGlobal": "ajuste global",
@@ -11118,7 +11117,7 @@
           "label": "Render",
           "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 14 filas con luz, clima y día y noche; HD compacto la dibuja en 7 filas.",
           "timezone": "Zona horaria",
-          "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
+          "timezoneDescription": "Cuándo anochece en las escenas y empiezan los números del día. Vacía o local sigue el reloj de este equipo.",
           "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."
         },
         "orcaGameScenes": {
@@ -11242,6 +11241,9 @@
         "OrchestratorGameTerminalBand": {
           "terminalPanes": "Paneles de terminal",
           "terminalPanesDescription": "Cómo arrancan y dibujan el juego los paneles de terminal de Agent Teams en esta máquina."
+        },
+        "InheritableSettingRow": {
+          "resetTo": "Volver a {{value}} ({{source}})"
         }
       },
       "right": {

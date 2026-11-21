@@ -152,13 +152,14 @@ describe('ProjectGamePanelRows', () => {
     return { ...view, updates }
   }
 
-  it("stores this machine's choice for the repo and inherits it again", () => {
+  it("stores this machine's choice for the repo, and picking the inherited value clears it", () => {
     const view = projectRows({
       orchestratorGameProjects: { r1: { panel: { advisor: false } } }
     })
 
     press(view.container, 'Panel look', 'Display')
-    press(view.container, 'Advisor', 'Inherit')
+    expect(selected(view.container, 'Advisor')).toBe('Off')
+    press(view.container, 'Advisor', 'On')
     expect(view.updates).toEqual([
       {
         orchestratorGameProjects: {
@@ -170,15 +171,11 @@ describe('ProjectGamePanelRows', () => {
     view.unmount()
   })
 
-  it('offers only the scene styles something draws, plus Inherit', () => {
+  it('offers only the scene styles something draws, with the applied one selected', () => {
     const view = projectRows({})
 
-    expect(segments(view.container, 'Scene style')).toEqual([
-      'Inherit',
-      'Figures',
-      'Office',
-      'Pixel'
-    ])
+    expect(selected(view.container, 'Scene style')).toBe('Pixel')
+    expect(segments(view.container, 'Scene style')).toEqual(['Figures', 'Office', 'Pixel'])
     view.unmount()
   })
 

@@ -11647,7 +11647,6 @@
           "sceneTamer": "Beast Tamer (built-in)",
           "sceneMissing": "{{value0}} (not installed)",
           "sceneProjectFile": "{{value0}} (custom)",
-          "inherit": "Inherit",
           "projectDescription": "Override the game for this project on this machine. The project's orca.yaml sets its default.",
           "sourceDefault": "default",
           "sourceGlobal": "global setting",
@@ -11724,7 +11723,7 @@
           "label": "Render",
           "description": "Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.",
           "timezone": "Time zone",
-          "timezoneDescription": "When HD turns to night. Empty or local follows this machine's clock.",
+          "timezoneDescription": "When the scenes turn to night and the day's numbers start. Empty or local follows this machine's clock.",
           "timezoneInvalid": "Use local or an IANA time zone such as America/Bogota."
         },
         "orcaGameScenes": {
@@ -11853,6 +11852,9 @@
         "OrchestratorGameTerminalBand": {
           "terminalPanes": "Terminal panes",
           "terminalPanesDescription": "How Agent Teams terminal panes start and draw the game on this machine."
+        },
+        "InheritableSettingRow": {
+          "resetTo": "Reset to {{value}} ({{source}})"
         }
       },
       "right": {

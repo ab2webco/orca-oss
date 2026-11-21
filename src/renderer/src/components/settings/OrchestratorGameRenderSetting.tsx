@@ -5,7 +5,7 @@ import {
 } from '../../../../shared/orchestrator-game-render'
 import { Input } from '../ui/input'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
-import { orchestratorGameInheritLabel } from './orchestrator-game-setting-labels'
+import { InheritedSourceLine, type InheritedChoice } from './InheritableSettingRow'
 import { translate } from '@/i18n/i18n'
 
 export const orchestratorGameRenderLabels = (): Record<OrchestratorGameRender, string> => ({
@@ -17,45 +17,35 @@ export const orchestratorGameRenderLabels = (): Record<OrchestratorGameRender, s
   )
 })
 
-/** Classic, hd or hd-compact; a project row also offers Inherit and says what it resolves to. */
-export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'inherit'>({
+export const renderLabel = (): string =>
+  translate('auto.components.settings.OrchestratorGameRenderSetting.label', 'Render')
+
+/** Classic, hd or hd-compact for every project; a project row is an InheritableSegmentedRow. */
+export function OrchestratorGameRenderRow({
   value,
-  effective,
-  disabled,
   onChange
 }: {
-  value: V
-  /** The project's resolved render and its source; set only on a project row. */
-  effective?: string
-  disabled?: boolean
-  onChange: (next: V) => void
+  value: OrchestratorGameRender
+  onChange: (next: OrchestratorGameRender) => void
 }): React.JSX.Element {
-  const label = translate('auto.components.settings.OrchestratorGameRenderSetting.label', 'Render')
+  const label = renderLabel()
   const labels = orchestratorGameRenderLabels()
-  const options = [
-    ...(effective === undefined
-      ? []
-      : [{ value: 'inherit' as V, label: orchestratorGameInheritLabel() }]),
-    { value: 'classic' as V, label: labels.classic },
-    { value: 'hd' as V, label: labels.hd },
-    { value: 'hd-compact' as V, label: labels['hd-compact'] }
-  ]
   return (
     <SettingsRow
       label={label}
-      description={
-        effective ??
-        translate(
-          'auto.components.settings.OrchestratorGameRenderSetting.description',
-          'Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.'
-        )
-      }
+      description={translate(
+        'auto.components.settings.OrchestratorGameRenderSetting.description',
+        'Classic is the 5-row pixel art. HD draws a 9 to 14-row scene with light, weather and day and night; HD compact draws it in 7 rows.'
+      )}
       control={
         <SettingsSegmentedControl
           value={value}
           ariaLabel={label}
           size="sm"
-          options={options.map((one) => ({ ...one, disabled }))}
+          options={(['classic', 'hd', 'hd-compact'] as const).map((one) => ({
+            value: one,
+            label: labels[one]
+          }))}
           onChange={onChange}
         />
       }
@@ -63,17 +53,24 @@ export function OrchestratorGameRenderRow<V extends OrchestratorGameRender | 'in
   )
 }
 
-/** The zone hd's day and night follow; clearing it goes back to the layer below. */
+/** The project row's applied zone, its layer and what clearing it gives back. */
+export type TimezoneRowSource = {
+  applied: string
+  source: string
+  inherited: InheritedChoice
+}
+
+/** The zone the scenes' day and night follow; clearing it goes back to the layer below. */
 export function OrchestratorGameTimezoneRow({
   stored,
-  effective,
+  project,
   disabled,
   onCommit
 }: {
   /** The value this layer stores; '' when it stores none. */
   stored: string
-  /** The project's resolved zone and its source; set only on a project row. */
-  effective?: string
+  /** Set only on a project row. */
+  project?: TimezoneRowSource
   disabled?: boolean
   onCommit: (value: string | undefined) => void
 }): React.JSX.Element {
@@ -105,11 +102,25 @@ export function OrchestratorGameTimezoneRow({
       label={label}
       description={
         <>
-          {effective ??
-            translate(
+          <span className="block">
+            {translate(
               'auto.components.settings.OrchestratorGameRenderSetting.timezoneDescription',
-              "When HD turns to night. Empty or local follows this machine's clock."
+              "When the scenes turn to night and the day's numbers start. Empty or local follows this machine's clock."
             )}
+          </span>
+          {project ? (
+            <InheritedSourceLine
+              applied={project.applied}
+              source={project.source}
+              inherited={project.inherited}
+              isOverridden={stored !== ''}
+              onReset={() => {
+                setDraft('')
+                setIsInvalid(false)
+                onCommit(undefined)
+              }}
+            />
+          ) : null}
           {isInvalid ? (
             <span role="alert" className="block text-destructive">
               {translate(
@@ -126,7 +137,7 @@ export function OrchestratorGameTimezoneRow({
           aria-invalid={isInvalid}
           value={draft}
           disabled={disabled}
-          placeholder={effective === undefined ? 'local' : orchestratorGameInheritLabel()}
+          placeholder={project?.inherited.value ?? 'local'}
           spellCheck={false}
           className="h-8 w-40 text-xs md:text-xs"
           onChange={(event) => setDraft(event.currentTarget.value)}

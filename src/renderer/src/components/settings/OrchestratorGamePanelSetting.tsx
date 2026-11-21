@@ -23,10 +23,10 @@ import {
   SettingsSwitchRow
 } from './SettingsFormControls'
 import {
-  orchestratorGameInheritLabel,
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
+import { InheritableSegmentedRow } from './InheritableSettingRow'
 import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
@@ -234,19 +234,7 @@ export function ProjectGamePanelRows({
   const shownScene = scene ?? ownScene
   const shown = shownGameRows(gameRowFactsOf({ page: 'project', layers, advisorPlugin }))
   const text = copy()
-  const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
-  const named = (field: GamePanelField, value: PanelValue): string => {
-    const line = `${valueNameOf(value)} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
-    // Why named: the band preview below also draws pixels, and only this row sets the Team panel.
-    return field === 'look'
-      ? translate(
-          'auto.components.settings.OrchestratorGamePanelSetting.teamPanelLook',
-          'Team panel: {{look}}',
-          { look: line }
-        )
-      : line
-  }
   const set = (field: GamePanelField, value: boolean | string | undefined): void => {
     const nextLayer = withGamePanelField(local, field, value as PanelValue | undefined)
     const projects = { ...settings.orchestratorGameProjects, [repoId]: nextLayer }
@@ -257,34 +245,43 @@ export function ProjectGamePanelRows({
   }
   const row = (field: 'look' | 'style' | Toggle) => () => {
     const isToggle = field !== 'look' && field !== 'style'
-    const own = ownOf(local, field)
     const options = isToggle
       ? [
-          { value: 'inherit', label: inherit },
           { value: 'true', label: onOff.on },
           { value: 'false', label: onOff.off }
         ]
-      : [{ value: 'inherit', label: inherit }, ...choicesOf(field)]
+      : choicesOf(field)
+    // Why without this machine's value only: the inherited row is what Reset gives back.
+    const below = { ...layers, local: withGamePanelField(local, field, undefined) }
+    const inheritedValue = String(valueOf(resolveOrchestratorGamePanel(below), field))
+    const label = (value: string) => options.find((one) => one.value === value)?.label ?? value
     return (
-      <SettingsRow
+      <InheritableSegmentedRow
         label={text[field][0]}
-        description={
-          <>
-            {text[field][1]}
-            <span className="block">{named(field, valueOf(panel, field))}</span>
-            <StyleNote field={field} style={panel.style} sceneId={sceneId} />
-          </>
+        text={text[field][1]}
+        note={<StyleNote field={field} style={panel.style} sceneId={sceneId} />}
+        options={options}
+        applied={String(valueOf(panel, field))}
+        source={orchestratorGameSourceLabel(sourceOf(layers, field))}
+        inherited={{
+          value: inheritedValue,
+          label: label(inheritedValue),
+          source: orchestratorGameSourceLabel(sourceOf(below, field))
+        }}
+        isOverridden={ownOf(local, field) !== undefined}
+        // Why named: the band preview below also draws pixels, and only this row sets the Team panel.
+        lineOf={
+          field === 'look'
+            ? (look) =>
+                translate(
+                  'auto.components.settings.OrchestratorGamePanelSetting.teamPanelLook',
+                  'Team panel: {{look}}',
+                  { look }
+                )
+            : undefined
         }
-        control={
-          <SettingsSegmentedControl
-            value={own === undefined ? 'inherit' : String(own)}
-            ariaLabel={text[field][0]}
-            size="sm"
-            options={options}
-            onChange={(next) =>
-              set(field, next === 'inherit' ? undefined : isToggle ? next === 'true' : next)
-            }
-          />
+        onPick={(next) =>
+          set(field, next === undefined ? undefined : isToggle ? next === 'true' : next)
         }
       />
     )

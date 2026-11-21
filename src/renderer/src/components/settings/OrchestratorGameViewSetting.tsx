@@ -18,17 +18,15 @@ import {
   type OrchestratorGameViewId
 } from '../../../../shared/orchestrator-game-view'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './SettingsFormControls'
+import { SettingsRow, SettingsSwitchRow } from './SettingsFormControls'
 import {
-  orchestratorGameInheritLabel,
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
 import { translate } from '@/i18n/i18n'
+import { InheritableSegmentedRow, InheritedSourceLine } from './InheritableSettingRow'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
-
-const INHERIT = 'inherit'
 
 const viewLabels = (): Record<OrchestratorGameViewId, string> => ({
   off: translate('auto.components.settings.OrchestratorGameViewSetting.off', 'Off'),
@@ -102,30 +100,26 @@ function withView(
 
 function ViewSelect({
   value,
-  withInherit,
   onChange
 }: {
-  value: OrchestratorGameViewId | typeof INHERIT
-  withInherit: boolean
-  onChange: (view: OrchestratorGameViewId | null) => void
+  value: OrchestratorGameViewId
+  onChange: (view: OrchestratorGameViewId) => void
 }): React.JSX.Element {
   const options = orchestratorGameViewOptions()
   return (
     <Select
       value={value}
-      onValueChange={(next) =>
-        onChange(
-          next === INHERIT ? null : (options.find((one) => one.value === next)?.value ?? null)
-        )
-      }
+      onValueChange={(next) => {
+        const view = options.find((one) => one.value === next)?.value
+        if (view !== undefined) {
+          onChange(view)
+        }
+      }}
     >
       <SelectTrigger aria-label={viewTitle()} className="w-48 max-w-full" size="sm">
         <SelectValue />
       </SelectTrigger>
       <SelectContent position="popper" side="bottom" sideOffset={4}>
-        {withInherit ? (
-          <SelectItem value={INHERIT}>{orchestratorGameInheritLabel()}</SelectItem>
-        ) : null}
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
@@ -182,7 +176,6 @@ export function OrchestratorGameDefaultViewRow({
       control={
         <ViewSelect
           value={orchestratorGameViewOf(config)}
-          withInherit={false}
           onChange={(view) => updateSettings({ orchestratorGame: withView(layer, view, config) })}
         />
       }
@@ -218,11 +211,8 @@ export function ProjectOrchestratorGameViewRows({
   only
 }: ProjectRowProps): React.JSX.Element {
   const local = settings.orchestratorGameProjects?.[repoId]
-  const { config, sources } = resolveOrchestratorGameConfig({
-    global: settings.orchestratorGame,
-    project: projectLayer,
-    local
-  })
+  const layers = { global: settings.orchestratorGame, project: projectLayer, local }
+  const { config, sources } = resolveOrchestratorGameConfig(layers)
   const onOff = orchestratorGameModeLabels()
   const view = orchestratorGameViewOf(config)
   const writeLocal = (next: OrchestratorGameLayer): void => {
@@ -234,47 +224,66 @@ export function ProjectOrchestratorGameViewRows({
     }
     updateSettings({ orchestratorGameProjects: projects })
   }
+  const belowShow = resolveOrchestratorGameConfig({
+    ...layers,
+    local: withOrchestratorGameField(local, 'show', undefined)
+  })
+  // Why both keys: a view is stored as mode and render, and Reset drops both.
+  const belowView = resolveOrchestratorGameConfig({
+    ...layers,
+    local: withView(local, null, config)
+  })
+  const inheritedView = orchestratorGameViewOf(belowView.config)
+  const pickView = (next: OrchestratorGameViewId | null): void =>
+    writeLocal(withView(local, next === inheritedView ? null : next, config))
   return (
     <>
       {only === 'view' ? null : (
-        <SettingsRow
+        <InheritableSegmentedRow
           label={showTitle()}
-          description={`${config.show ? onOff.on : onOff.off} · ${orchestratorGameSourceLabel(sources.show)}`}
-          control={
-            <SettingsSegmentedControl
-              value={local?.show === undefined ? INHERIT : String(local.show)}
-              ariaLabel={showTitle()}
-              size="sm"
-              options={[
-                { value: INHERIT, label: orchestratorGameInheritLabel() },
-                { value: 'true', label: onOff.on },
-                { value: 'false', label: onOff.off }
-              ]}
-              onChange={(next) =>
-                updateSettings({
-                  orchestratorGameProjects: withOrchestratorGameProjectField(
-                    settings.orchestratorGameProjects,
-                    repoId,
-                    'show',
-                    next === INHERIT ? undefined : next === 'true'
-                  )
-                })
-              }
-            />
+          options={[
+            { value: 'true', label: onOff.on },
+            { value: 'false', label: onOff.off }
+          ]}
+          applied={String(config.show)}
+          source={orchestratorGameSourceLabel(sources.show)}
+          inherited={{
+            value: String(belowShow.config.show),
+            label: belowShow.config.show ? onOff.on : onOff.off,
+            source: orchestratorGameSourceLabel(belowShow.sources.show)
+          }}
+          isOverridden={local?.show !== undefined}
+          onPick={(next) =>
+            updateSettings({
+              orchestratorGameProjects: withOrchestratorGameProjectField(
+                settings.orchestratorGameProjects,
+                repoId,
+                'show',
+                next === undefined ? undefined : next === 'true'
+              )
+            })
           }
         />
       )}
       {only === 'show' ? null : (
         <SettingsRow
           label={viewTitle()}
-          description={`${viewLabels()[view]} · ${orchestratorGameSourceLabel(viewSourceOf(config, sources))}`}
-          control={
-            <ViewSelect
-              value={local?.mode === undefined ? INHERIT : view}
-              withInherit
-              onChange={(next) => writeLocal(withView(local, next, config))}
+          description={
+            <InheritedSourceLine
+              applied={viewLabels()[view]}
+              source={orchestratorGameSourceLabel(viewSourceOf(config, sources))}
+              inherited={{
+                value: inheritedView,
+                label: viewLabels()[inheritedView],
+                source: orchestratorGameSourceLabel(
+                  viewSourceOf(belowView.config, belowView.sources)
+                )
+              }}
+              isOverridden={local?.mode !== undefined || local?.render !== undefined}
+              onReset={() => pickView(null)}
             />
           }
+          control={<ViewSelect value={view} onChange={pickView} />}
         />
       )}
     </>

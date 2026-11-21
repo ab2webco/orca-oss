@@ -11,9 +11,6 @@ export const orchestratorGameModeLabels = (): Record<OrchestratorGameMode, strin
   off: translate('auto.components.settings.OrchestratorGameSetting.off', 'Off')
 })
 
-export const orchestratorGameInheritLabel = (): string =>
-  translate('auto.components.settings.OrchestratorGameSetting.inherit', 'Inherit')
-
 export const orchestratorGameSourceLabel = (source: OrchestratorGameSource): string =>
   ({
     default: translate('auto.components.settings.OrchestratorGameSetting.sourceDefault', 'default'),

@@ -119,7 +119,7 @@ describe('Show the game and the default view, globally', () => {
 })
 
 describe('Show the game and the default view, per project', () => {
-  it('shows each effective value with its layer and overrides or inherits it on this machine', () => {
+  it('selects each applied value, names its layer and overrides it on this machine', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameViewRows
@@ -135,8 +135,8 @@ describe('Show the game and the default view, per project', () => {
 
     expect(view.container.textContent).toContain('Off · global setting')
     expect(view.container.textContent).toContain('2D hd · this machine')
-    expect(optionsOf(view.container)[0]).toEqual(['inherit', 'Inherit'])
-    expect((view.container.querySelector('select') as HTMLSelectElement).value).toBe('inherit')
+    expect(optionsOf(view.container).map(([value]) => value)).not.toContain('inherit')
+    expect((view.container.querySelector('select') as HTMLSelectElement).value).toBe('2d-hd')
 
     choose(view.container, 'zen')
     click(view.container, '[aria-label="Show the game"] button', 'On')
@@ -147,7 +147,7 @@ describe('Show the game and the default view, per project', () => {
     view.unmount()
   })
 
-  it('inherits the view by dropping both keys that store it', () => {
+  it('resets the view by dropping both keys that store it', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <ProjectOrchestratorGameViewRows
@@ -162,7 +162,10 @@ describe('Show the game and the default view, per project', () => {
 
     expect((view.container.querySelector('select') as HTMLSelectElement).value).toBe('flat')
     expect(view.container.textContent).toContain('Flat · this machine')
-    choose(view.container, 'inherit')
+    const reset = view.container.querySelector<HTMLButtonElement>(
+      '[data-slot="game-row-source"] button'
+    )!
+    act(() => reset.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     expect(updates).toEqual([{ orchestratorGameProjects: { repo1: { hud: false } } }])
     view.unmount()
   })

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { orchestratorGameSceneFileId } from '../../../../shared/orchestrator-game-scene-file'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -210,11 +211,12 @@ describe('project scene file', () => {
     broken.unmount()
   })
 
-  it("previews and explains orca.yaml's scene file while this machine inherits it", async () => {
+  it("selects, previews and explains orca.yaml's scene file while this machine inherits it", async () => {
     const view = render(project(undefined, [], { sceneFile: 'scenes/gone.json' }))
     await settle()
 
-    expect(select(view.container).value).toBe('inherit')
+    expect(select(view.container).value).toBe(orchestratorGameSceneFileId('scenes/gone.json'))
+    expect(view.container.querySelector('[data-slot="game-row-source"] button')).toBeNull()
     expect(pathInput(view.container)).toBeNull()
     expect(view.container.textContent).toContain('scenes/gone.json · from orca.yaml')
     expect(view.container.querySelector('[role="alert"]')?.textContent).toContain(

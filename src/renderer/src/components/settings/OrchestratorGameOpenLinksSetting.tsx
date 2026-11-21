@@ -1,6 +1,5 @@
 import type { OrchestratorGameOpenLinks } from '../../../../shared/orchestrator-game-config'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
-import { orchestratorGameInheritLabel } from './orchestrator-game-setting-labels'
 import { translate } from '@/i18n/i18n'
 
 export const orchestratorGameOpenLinksLabels = (): Record<OrchestratorGameOpenLinks, string> => ({
@@ -11,47 +10,35 @@ export const orchestratorGameOpenLinksLabels = (): Record<OrchestratorGameOpenLi
   )
 })
 
-/** Where the game's links open; a project row also offers Inherit and says what it resolves to. */
-export function OrchestratorGameOpenLinksRow<V extends OrchestratorGameOpenLinks | 'inherit'>({
+export const openLinksLabel = (): string =>
+  translate('auto.components.settings.OrchestratorGameOpenLinksSetting.label', 'Open links in')
+
+/** Where every project's game links open; a project row is an InheritableSegmentedRow. */
+export function OrchestratorGameOpenLinksRow({
   value,
-  effective,
-  disabled,
   onChange
 }: {
-  value: V
-  /** The project's resolved choice and its source; set only on a project row. */
-  effective?: string
-  disabled?: boolean
-  onChange: (next: V) => void
+  value: OrchestratorGameOpenLinks
+  onChange: (next: OrchestratorGameOpenLinks) => void
 }): React.JSX.Element {
-  const label = translate(
-    'auto.components.settings.OrchestratorGameOpenLinksSetting.label',
-    'Open links in'
-  )
+  const label = openLinksLabel()
   const labels = orchestratorGameOpenLinksLabels()
-  const options = [
-    ...(effective === undefined
-      ? []
-      : [{ value: 'inherit' as V, label: orchestratorGameInheritLabel() }]),
-    { value: 'orca' as V, label: labels.orca },
-    { value: 'system' as V, label: labels.system }
-  ]
   return (
     <SettingsRow
       label={label}
-      description={
-        effective ??
-        translate(
-          'auto.components.settings.OrchestratorGameOpenLinksSetting.description',
-          'PR, CI, ticket and list links from the band and the Panel. The system browser has your GitHub and Jira sign-ins.'
-        )
-      }
+      description={translate(
+        'auto.components.settings.OrchestratorGameOpenLinksSetting.description',
+        'PR, CI, ticket and list links from the band and the Panel. The system browser has your GitHub and Jira sign-ins.'
+      )}
       control={
         <SettingsSegmentedControl
           value={value}
           ariaLabel={label}
           size="sm"
-          options={options.map((one) => ({ ...one, disabled }))}
+          options={[
+            { value: 'orca' as const, label: labels.orca },
+            { value: 'system' as const, label: labels.system }
+          ]}
           onChange={onChange}
         />
       }

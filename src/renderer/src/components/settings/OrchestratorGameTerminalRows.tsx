@@ -10,19 +10,21 @@ import {
 } from '../../../../shared/orchestrator-game-settings-updates'
 import { shownOrchestratorGameModeOf } from '../../../../shared/orchestrator-game-view'
 import type { SceneFileState } from './use-orchestrator-game-scene-file'
-import { SettingsRow, SettingsSegmentedControl, SettingsSwitchRow } from './SettingsFormControls'
+import { SettingsSwitchRow } from './SettingsFormControls'
 import {
-  orchestratorGameInheritLabel,
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
+import { InheritableSegmentedRow } from './InheritableSettingRow'
 import {
   OrchestratorGameOpenLinksRow,
+  openLinksLabel,
   orchestratorGameOpenLinksLabels
 } from './OrchestratorGameOpenLinksSetting'
 import {
   OrchestratorGameRenderRow,
-  orchestratorGameRenderLabels
+  orchestratorGameRenderLabels,
+  renderLabel
 } from './OrchestratorGameRenderSetting'
 import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
 import {
@@ -158,11 +160,8 @@ export function ProjectTerminalGroups({
   updateSettings: Update
 }): React.JSX.Element {
   const local = settings.orchestratorGameProjects?.[repoId]
-  const { config, sources } = resolveOrchestratorGameConfig({
-    global: settings.orchestratorGame,
-    project: projectLayer,
-    local
-  })
+  const layers = { global: settings.orchestratorGame, project: projectLayer, local }
+  const { config, sources } = resolveOrchestratorGameConfig(layers)
   const set = <K extends keyof OrchestratorGameConfig>(
     key: K,
     value: OrchestratorGameConfig[K] | undefined
@@ -176,34 +175,49 @@ export function ProjectTerminalGroups({
       )
     })
   const labels = orchestratorGameModeLabels()
-  const inherit = orchestratorGameInheritLabel()
-  const effective = (key: keyof OrchestratorGameConfig, text: string): string =>
-    `${text} · ${orchestratorGameSourceLabel(sources[key])}`
-  const toggle = (key: ToggleKey) => () => {
-    const one = switchOf(key)
-    const own = local?.[key]
+  const onOff = [
+    { value: 'true', label: labels.on },
+    { value: 'false', label: labels.off }
+  ]
+  const choice = (args: {
+    key: keyof OrchestratorGameConfig
+    label: string
+    options: { value: string; label: string }[]
+    appliedOf?: (resolved: OrchestratorGameConfig) => string
+    sourceKeyOf?: (resolved: OrchestratorGameConfig) => keyof OrchestratorGameConfig
+    onPick: (next: string | undefined) => void
+  }) => {
+    const appliedOf = args.appliedOf ?? ((resolved) => String(resolved[args.key]))
+    const sourceKeyOf = args.sourceKeyOf ?? (() => args.key)
+    // Why without this machine's value only: the inherited row is what Reset gives back.
+    const below = resolveOrchestratorGameConfig({
+      ...layers,
+      local: withOrchestratorGameField(local, args.key, undefined)
+    })
+    const inherited = appliedOf(below.config)
     return (
-      <SettingsRow
-        label={one.label}
-        description={effective(key, config[key] ? labels.on : labels.off)}
-        control={
-          <SettingsSegmentedControl
-            value={own === undefined ? 'inherit' : String(own)}
-            ariaLabel={one.label}
-            size="sm"
-            options={[
-              { value: 'inherit', label: inherit },
-              { value: 'true', label: labels.on },
-              { value: 'false', label: labels.off }
-            ]}
-            onChange={(next) => set(key, next === 'inherit' ? undefined : next === 'true')}
-          />
-        }
+      <InheritableSegmentedRow
+        label={args.label}
+        options={args.options}
+        applied={appliedOf(config)}
+        source={orchestratorGameSourceLabel(sources[sourceKeyOf(config)])}
+        inherited={{
+          value: inherited,
+          label: args.options.find((one) => one.value === inherited)?.label ?? inherited,
+          source: orchestratorGameSourceLabel(below.sources[sourceKeyOf(below.config)])
+        }}
+        isOverridden={local?.[args.key] !== undefined}
+        onPick={args.onPick}
       />
     )
   }
-  // Why band && hud: with the band off a pane draws no HUD (shownOrchestratorGameTerminalOf).
-  const hud = config.band && config.hud
+  const toggle = (key: ToggleKey) => () =>
+    choice({
+      key,
+      label: switchOf(key).label,
+      options: onOff,
+      onPick: (next) => set(key, next === undefined ? undefined : next === 'true')
+    })
   const setHud = (next: boolean | undefined): void => {
     const projects = settings.orchestratorGameProjects
     const withOwn = withOrchestratorGameProjectField(projects, repoId, 'hud', next)
@@ -214,6 +228,8 @@ export function ProjectTerminalGroups({
           : withOwn
     })
   }
+  const linkLabels = orchestratorGameOpenLinksLabels()
+  const renderLabels = orchestratorGameRenderLabels()
   const viewRow = (only: 'show' | 'view') => () => (
     <ProjectOrchestratorGameViewRows
       repoId={repoId}
@@ -226,33 +242,27 @@ export function ProjectTerminalGroups({
   const draw: GameRowDrawers = {
     show: viewRow('show'),
     view: viewRow('view'),
-    hud: () => (
-      <SettingsRow
-        label={switchOf('hud').label}
-        description={effective(config.band ? 'hud' : 'band', hud ? labels.on : labels.off)}
-        control={
-          <SettingsSegmentedControl
-            value={local?.hud === undefined ? 'inherit' : String(local.hud)}
-            ariaLabel={switchOf('hud').label}
-            size="sm"
-            options={[
-              { value: 'inherit', label: inherit },
-              { value: 'true', label: labels.on },
-              { value: 'false', label: labels.off }
-            ]}
-            onChange={(next) => setHud(next === 'inherit' ? undefined : next === 'true')}
-          />
-        }
-      />
-    ),
+    // Why band && hud: with the band off a pane draws no HUD (shownOrchestratorGameTerminalOf).
+    hud: () =>
+      choice({
+        key: 'hud',
+        label: switchOf('hud').label,
+        options: onOff,
+        appliedOf: (resolved) => String(resolved.band && resolved.hud),
+        sourceKeyOf: (resolved) => (resolved.band ? 'hud' : 'band'),
+        onPick: (next) => setHud(next === undefined ? undefined : next === 'true')
+      }),
     rewards: toggle('rewards'),
-    openLinks: () => (
-      <OrchestratorGameOpenLinksRow
-        value={local?.openLinks ?? 'inherit'}
-        effective={effective('openLinks', orchestratorGameOpenLinksLabels()[config.openLinks])}
-        onChange={(next) => set('openLinks', next === 'inherit' ? undefined : next)}
-      />
-    ),
+    openLinks: () =>
+      choice({
+        key: 'openLinks',
+        label: openLinksLabel(),
+        options: [
+          { value: 'orca', label: linkLabels.orca },
+          { value: 'system', label: linkLabels.system }
+        ],
+        onPick: (next) => set('openLinks', next as OrchestratorGameConfig['openLinks'] | undefined)
+      }),
     tracker: toggle('tracker'),
     band: toggle('band'),
     bandPreview: () => (
@@ -261,13 +271,16 @@ export function ProjectTerminalGroups({
         fileScene={fileScene}
       />
     ),
-    render: () => (
-      <OrchestratorGameRenderRow
-        value={local?.render ?? 'inherit'}
-        effective={effective('render', orchestratorGameRenderLabels()[config.render])}
-        onChange={(next) => set('render', next === 'inherit' ? undefined : next)}
-      />
-    )
+    render: () =>
+      choice({
+        key: 'render',
+        label: renderLabel(),
+        options: (['classic', 'hd', 'hd-compact'] as const).map((value) => ({
+          value,
+          label: renderLabels[value]
+        })),
+        onPick: (next) => set('render', next as OrchestratorGameConfig['render'] | undefined)
+      })
   }
   return <Groups shown={shown} draw={draw} terminalHeading={terminalHeading} />
 }
