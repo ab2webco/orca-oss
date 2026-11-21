@@ -1,4 +1,4 @@
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import type { Office3dFloor } from '../../../../shared/team-scene/team-office3d-layout'
 
 // Why a floor of its own: a chip sized in world units shrank with the building, so at a 219 px
@@ -42,4 +42,34 @@ export function keepOffice3dLabelLegible(chip: THREE.Sprite, pxPerUnit: number):
   chip.userData.aspect = aspect
   const [w, h] = office3dLabelScale(pxPerUnit, aspect)
   chip.scale.set(w, h, 1)
+}
+
+/**
+ * Slides each floor chip back inside the camera's frame, along the screen's right and up, so no
+ * chip is cut by the band's edge: following the lead, the frame shows only part of the building,
+ * and a chip hung from a slab can fall outside it (owner, 410 x 760 panel).
+ */
+export function keepOffice3dChipsInFrame(
+  chips: readonly THREE.Sprite[],
+  camera: THREE.OrthographicCamera
+): void {
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+  const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+  const halfW = camera.right / camera.zoom
+  const halfH = camera.top / camera.zoom
+  const cx = camera.position.dot(right)
+  const cy = camera.position.dot(up)
+  const margin = Math.min(halfW, halfH) * 0.03
+  const into = (lo: number, size: number, min: number, max: number) =>
+    size > max - min ? min - lo : lo < min ? min - lo : lo + size > max ? max - (lo + size) : 0
+  for (const chip of chips) {
+    const base = (chip.userData.base as THREE.Vector3 | undefined) ?? chip.position.clone()
+    chip.userData.base = base
+    // Anchored at its top-left corner (center 0, 1): it spans right and down from there.
+    const left = base.dot(right)
+    const top = base.dot(up)
+    const dx = into(left, chip.scale.x, cx - halfW + margin, cx + halfW - margin)
+    const dy = into(top - chip.scale.y, chip.scale.y, cy - halfH + margin, cy + halfH - margin)
+    chip.position.copy(base).addScaledVector(right, dx).addScaledVector(up, dy)
+  }
 }

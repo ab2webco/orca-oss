@@ -25,7 +25,11 @@ import {
   OFFICE3D_NIGHT,
   office3dFloor
 } from './team-office3d-floor'
-import { keepOffice3dLabelLegible, office3dLabelOf } from './team-office3d-labels'
+import {
+  keepOffice3dChipsInFrame,
+  keepOffice3dLabelLegible,
+  office3dLabelOf
+} from './team-office3d-labels'
 import { paintOffice3dBoard, paintOffice3dScreen, paintOffice3dWall } from './team-office3d-screens'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 import { office3dLeadActor } from './team-office3d-lead-actor'
@@ -247,6 +251,7 @@ export function office3dStage(
             : lead.g.position
         dioramaAim(args.view, fit, aim, args.width, t)
       }
+      keepOffice3dChipsInFrame(chips, fit.camera)
       renderer.render(scene, fit.camera)
     },
     dispose: () => kit.dispose(world)

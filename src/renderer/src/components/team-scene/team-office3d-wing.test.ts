@@ -1,4 +1,4 @@
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import {
   OFFICE3D_BALCONY_Y,
@@ -6,7 +6,12 @@ import {
 } from '../../../../shared/team-scene/team-office3d-layout'
 import { DAY, dioramaKit } from './team-diorama-kit'
 import { OFFICE3D_DAY } from './team-office3d-floor'
-import { OFFICE3D_LABEL_MIN_PX, office3dLabelOf, office3dLabelScale } from './team-office3d-labels'
+import {
+  OFFICE3D_LABEL_MIN_PX,
+  keepOffice3dChipsInFrame,
+  office3dLabelOf,
+  office3dLabelScale
+} from './team-office3d-labels'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 
 const status = { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' }
@@ -87,5 +92,44 @@ describe('floor labels', () => {
     expect(small * 14).toBeGreaterThanOrEqual(OFFICE3D_LABEL_MIN_PX)
     // Large views keep the diorama's chip size.
     expect(office3dLabelScale(120, 4)).toEqual([0.62 * 4, 0.62])
+  })
+})
+
+describe('floor chips inside the band', () => {
+  // A camera looking straight down -z, so screen right is +x and up is +y; the frame is x and y
+  // from -10 to 10.
+  const camera = () => {
+    const c = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
+    c.position.set(0, 0, 50)
+    c.lookAt(0, 0, 0)
+    c.updateMatrixWorld()
+    return c
+  }
+  const chip = (x: number, y: number, w = 6, h = 1) => {
+    const s = new THREE.Sprite()
+    s.center.set(0, 1)
+    s.scale.set(w, h, 1)
+    s.position.set(x, y, 0)
+    return s
+  }
+
+  it('slides a chip cut by the left, right or bottom edge back inside, whole', () => {
+    const left = chip(-12, 0)
+    const right = chip(8, 5)
+    const low = chip(0, -9.8)
+    keepOffice3dChipsInFrame([left, right, low], camera())
+    for (const c of [left, right, low]) {
+      expect(c.position.x).toBeGreaterThanOrEqual(-10)
+      expect(c.position.x + c.scale.x).toBeLessThanOrEqual(10)
+      expect(c.position.y - c.scale.y).toBeGreaterThanOrEqual(-10)
+    }
+  })
+
+  it('leaves a chip already inside where its floor put it, every frame', () => {
+    const inside = chip(-2, 3)
+    const cam = camera()
+    keepOffice3dChipsInFrame([inside], cam)
+    keepOffice3dChipsInFrame([inside], cam)
+    expect(inside.position.toArray()).toEqual([-2, 3, 0])
   })
 })
