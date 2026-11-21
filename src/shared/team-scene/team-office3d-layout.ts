@@ -166,8 +166,9 @@ export function office3dLobbyOf(width: number): Office3dLobby {
       { at: [x + 0.75, z] as Office3dPoint, face: [x, z] as Office3dPoint }
     ]),
     tv: [tv, 0.15],
-    couch: { x: tv, z: 2.05, w: 1.8, d: 0.7 },
-    console: [-0.45, 0.45].map((dx) => ({
+    // Why 2.4 wide, seats 1.3 apart: closer, two players merged into one shape.
+    couch: { x: tv, z: 2.05, w: 2.4, d: 0.7 },
+    console: [-0.65, 0.65].map((dx) => ({
       at: [tv + dx, 1.9] as Office3dPoint,
       face: [tv + dx, 0] as Office3dPoint
     })),

@@ -70,6 +70,9 @@ export function keepOffice3dChipsInFrame(
     const top = base.dot(up)
     const dx = into(left, chip.scale.x, cx - halfW + margin, cx + halfW - margin)
     const dy = into(top - chip.scale.y, chip.scale.y, cy - halfH + margin, cy + halfH - margin)
-    chip.position.copy(base).addScaledVector(right, dx).addScaledVector(up, dy)
+    // Why hidden, not moved up or down: its floor is out of frame, and two floors' chips slid to
+    // one edge landed on each other.
+    chip.visible = Math.abs(dy) < 1e-6
+    chip.position.copy(base).addScaledVector(right, dx)
   }
 }

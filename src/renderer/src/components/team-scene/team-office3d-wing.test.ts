@@ -113,16 +113,17 @@ describe('floor chips inside the band', () => {
     return s
   }
 
-  it('slides a chip cut by the left, right or bottom edge back inside, whole', () => {
+  it('slides a chip cut by the left or right edge back inside, whole; one cut below is hidden', () => {
     const left = chip(-12, 0)
     const right = chip(8, 5)
     const low = chip(0, -9.8)
     keepOffice3dChipsInFrame([left, right, low], camera())
-    for (const c of [left, right, low]) {
+    for (const c of [left, right]) {
+      expect(c.visible).toBe(true)
       expect(c.position.x).toBeGreaterThanOrEqual(-10)
       expect(c.position.x + c.scale.x).toBeLessThanOrEqual(10)
-      expect(c.position.y - c.scale.y).toBeGreaterThanOrEqual(-10)
     }
+    expect(low.visible).toBe(false)
   })
 
   it('leaves a chip already inside where its floor put it, every frame', () => {
@@ -131,5 +132,13 @@ describe('floor chips inside the band', () => {
     keepOffice3dChipsInFrame([inside], cam)
     keepOffice3dChipsInFrame([inside], cam)
     expect(inside.position.toArray()).toEqual([-2, 3, 0])
+  })
+
+  it('hides a chip whose floor is out of frame above or below, so two never stack', () => {
+    const above = chip(-2, 12)
+    const higher = chip(-2, 14)
+    const shown = chip(-2, 3)
+    keepOffice3dChipsInFrame([above, higher, shown], camera())
+    expect([above.visible, higher.visible, shown.visible]).toEqual([false, false, true])
   })
 })
