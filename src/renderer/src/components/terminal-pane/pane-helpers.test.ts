@@ -79,12 +79,15 @@ describe('fitAndFocusPanes', () => {
     vi.unstubAllGlobals()
   })
 
-  function makeManager(): { manager: PaneManager; terminal: { focus: ReturnType<typeof vi.fn> } } {
+  function makeManager(container: FakeHTMLElement | null = null): {
+    manager: PaneManager
+    terminal: { focus: ReturnType<typeof vi.fn> }
+  } {
     const terminal = { focus: vi.fn() }
     const manager = {
       fitAllPanes: vi.fn(),
-      getActivePane: () => ({ terminal }),
-      getPanes: () => [{ terminal }]
+      getActivePane: () => ({ terminal, container }),
+      getPanes: () => [{ terminal, container }]
     } as unknown as PaneManager
     return { manager, terminal }
   }
@@ -171,6 +174,39 @@ describe('fitAndFocusPanes', () => {
     fitAndFocusPanes(manager)
 
     expect(manager.fitAllPanes).toHaveBeenCalled()
+    expect(terminal.focus).toHaveBeenCalled()
+  })
+
+  // Why: a main pane's deferred refit stole focus from the floating terminal, so the next
+  // Mod+Shift+[ switched the main workspace's tab instead of the floating one (ORCA-1279).
+  it('fits without taking focus out of the floating terminal for a main-workspace pane', () => {
+    const floatingTextarea = new FakeHTMLElement({
+      tagName: 'TEXTAREA',
+      classNames: ['xterm-helper-textarea'],
+      closestSelector: '[data-floating-terminal-panel]'
+    }) as unknown as Element
+    stubDocument(floatingTextarea)
+    const { manager, terminal } = makeManager(new FakeHTMLElement({ tagName: 'DIV' }))
+
+    fitAndFocusPanes(manager)
+
+    expect(manager.fitAllPanes).toHaveBeenCalled()
+    expect(terminal.focus).not.toHaveBeenCalled()
+  })
+
+  it('still focuses a floating pane when the floating terminal holds focus', () => {
+    const floatingTextarea = new FakeHTMLElement({
+      tagName: 'TEXTAREA',
+      classNames: ['xterm-helper-textarea'],
+      closestSelector: '[data-floating-terminal-panel]'
+    }) as unknown as Element
+    stubDocument(floatingTextarea)
+    const { manager, terminal } = makeManager(
+      new FakeHTMLElement({ tagName: 'DIV', closestSelector: '[data-floating-terminal-panel]' })
+    )
+
+    fitAndFocusPanes(manager)
+
     expect(terminal.focus).toHaveBeenCalled()
   })
 })
