@@ -1,6 +1,7 @@
 import { office3dCab, type Office3dCab } from './team-office3d-elevator'
 import type { Office3dLayout } from './team-office3d-layout'
 import { office3dLeadRoundOf, type Office3dRound } from './team-office3d-walkers'
+import { office3dMembersRead, type Office3dMember } from './team-office3d-members'
 import type { TeamSceneInput } from './team-scene-types'
 
 // Why kept across reads: the stage is rebuilt on every read of the team, and a trip already under
@@ -11,9 +12,16 @@ export type Office3dTraffic = {
   cab: Office3dCab | null
   last: TeamSceneInput | null
   lead: Office3dRound | null
+  /** Each member's place, seat and trip; one that left stays until it is out of the door. */
+  members: Map<string, Office3dMember>
 }
 
-export const office3dTraffic = (): Office3dTraffic => ({ cab: null, last: null, lead: null })
+export const office3dTraffic = (): Office3dTraffic => ({
+  cab: null,
+  last: null,
+  lead: null,
+  members: new Map()
+})
 
 /**
  * The lead's events between two reads, and nothing else: a member whose CI just went red gets a
@@ -56,6 +64,15 @@ export function office3dTrafficRead(
   traffic.cab ??= office3dCab(leadFloor)
   const prev = traffic.last
   traffic.last = input
+  office3dMembersRead({
+    members: traffic.members,
+    layout,
+    input: input.members,
+    cab: traffic.cab,
+    now,
+    pace,
+    first: prev === null
+  })
   const seated = () =>
     office3dLeadRoundOf({ layout, needs: [], visits: [], pace, start: now, cab: traffic.cab! })
   if (!prev || !traffic.lead) {

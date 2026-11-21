@@ -23,7 +23,17 @@ import {
 // Each floor's advisor never walks: it sits in its own control room, so only the lead rides the lift.
 
 /** `call`: pressing the lift's call button, which lights while it does. */
-export type Office3dWalkPose = 'walk' | 'talk' | 'give' | 'idle' | 'desk' | 'call'
+/** `sit` and `stand`: a member in a room or the lead's office; `gone`: out of the building. */
+export type Office3dWalkPose =
+  | 'walk'
+  | 'talk'
+  | 'give'
+  | 'idle'
+  | 'desk'
+  | 'call'
+  | 'sit'
+  | 'stand'
+  | 'gone'
 
 /** `floor` is an index into the layout's floors; a ride's height comes from the cab. */
 export type Office3dStep =
@@ -48,13 +58,19 @@ export type Office3dStep =
 
 export type Office3dRound = { steps: Office3dStep[]; total: number; cab: Office3dCab }
 
-const WALK = 1.9
+/** Walking speed, the call press, and a Direct jump: one pace for every figure in the building. */
+export const OFFICE3D_WALK = 1.9
+const WALK = OFFICE3D_WALK
 const TALK = 3.4
-const PRESS = 0.6
+export const OFFICE3D_PRESS = 0.6
+const PRESS = OFFICE3D_PRESS
 const GIVE = 1.1
-const JUMP = 1.6
+export const OFFICE3D_JUMP = 1.6
+const JUMP = OFFICE3D_JUMP
 const HOME_PAUSE = 4.5
-const DOOR: Office3dPoint = [0.9, OFFICE3D_DOOR_Z]
+/** Just outside each floor's lift door, where riders step out. */
+export const OFFICE3D_EXIT: Office3dPoint = [0.9, OFFICE3D_DOOR_Z]
+const DOOR = OFFICE3D_EXIT
 
 /** The lead's desk in its office, and the way out of the office to the aisle. */
 const homeOf = (office: { x: number }): Office3dPoint => [office.x + OFFICE3D_WING_WIDTH / 2, 1.65]

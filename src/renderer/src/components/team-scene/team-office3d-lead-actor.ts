@@ -72,7 +72,7 @@ export function office3dLeadActor(
     } else {
       poseDioramaFigure(
         lead,
-        at.pose === 'give' ? 'talk' : at.pose === 'call' ? 'idle' : at.pose,
+        at.pose === 'walk' || at.pose === 'talk' ? at.pose : at.pose === 'give' ? 'talk' : 'idle',
         t
       )
       if (at.pose === 'call') {
