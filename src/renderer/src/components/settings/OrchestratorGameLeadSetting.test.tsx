@@ -191,6 +191,10 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     click(listed.container, '[aria-label="Member accounts"] button', 'Most free')
     listed.unmount()
     const unset = render({}, undefined, updates)
+    expect(
+      unset.container.querySelector('[aria-label="Member accounts"] [aria-checked="true"]')
+        ?.textContent
+    ).toBe('Most free')
     click(unset.container, '[aria-label="Member accounts"] button', 'Most free')
     unset.unmount()
     const stored = { orchestratorGameProjects: { repo1: { orchestrator: { accounts: 'auto' } } } }

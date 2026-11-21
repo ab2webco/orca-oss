@@ -300,7 +300,8 @@ export function ProjectOrchestratorGameLeadSetting({
           { value: 'auto', label: accountsText.autoOption }
         ]}
         // Why: an allow-list comes from orca.yaml; Settings can only override it with default or auto.
-        applied={accountsChoiceOf(lead)}
+        // Why auto when unset: Most free applies; 'unset' stays only for the inherited comparison.
+        applied={lead.accounts === undefined ? 'auto' : accountsChoiceOf(lead)}
         source={orchestratorGameSourceLabel(gameLeadSourceOf(layers, 'accounts'))}
         appliedLabel={accountsTextOf(lead)}
         inherited={{
