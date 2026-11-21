@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
 import { dioramaPaceOf } from './team-diorama-lead-round'
 import { bookOffice3dCab, office3dCab, office3dCabFloorAt } from './team-office3d-elevator'
-import { teamOffice3dLayoutOf } from './team-office3d-layout'
+import {
+  OFFICE3D_DEPTH,
+  OFFICE3D_DOOR_Z,
+  OFFICE3D_SEAT_Z,
+  OFFICE3D_WING_WIDTH,
+  teamOffice3dLayoutOf,
+  type Office3dFloor,
+  type Office3dPoint
+} from './team-office3d-layout'
 import { office3dCommuteOf, office3dLeadRoundOf, office3dWalkerAt } from './team-office3d-walkers'
 import type { TeamSceneFloor } from './team-scene-floors'
 
@@ -138,4 +146,79 @@ describe('the 3D Office commute', () => {
       office3dCommuteOf({ layout: l, key: 'c', arriving: true, pace: 'direct' })!.steps[0]!.kind
     ).toBe('jump')
   })
+})
+
+// Footprints in floor coordinates, from the numbers the drawing uses (team-office3d-floor.ts,
+// team-office3d-wing.ts, team-office3d-lift.ts); the lead's body is a circle of radius BODY.
+type Rect = { name: string; x0: number; x1: number; z0: number; z1: number }
+const BODY = 0.2
+const solidsOf = (floor: Office3dFloor): Rect[] => {
+  const r = (name: string, x: number, z: number, w: number, d: number): Rect => ({
+    name,
+    x0: x - w / 2,
+    x1: x + w / 2,
+    z0: z - d / 2,
+    z1: z + d / 2
+  })
+  const k = floor.scale
+  const out = floor.seats.flatMap((seat) => [
+    r(`desk ${seat.x.toFixed(1)}`, seat.x, OFFICE3D_SEAT_Z - 0.95 * k, 2 * k, 1.1 * k),
+    r(`chair ${seat.x.toFixed(1)}`, seat.x, OFFICE3D_SEAT_Z + 0.25 * k, 0.8 * k, 0.95 * k)
+  ])
+  // The side wall up to the lift door, and the door's leaves, solid unless the cab is here.
+  out.push(r('side wall', -0.15, (OFFICE3D_DOOR_Z - 0.85) / 2, 0.3, OFFICE3D_DOOR_Z - 0.85))
+  for (const px of [-2.25, -0.3]) {
+    for (const pz of [OFFICE3D_DOOR_Z - 1, OFFICE3D_DOOR_Z + 1]) {
+      out.push(r('shaft post', px, pz, 0.12, 0.12))
+    }
+  }
+  if (floor.office) {
+    const ox = floor.office.x
+    out.push(r("lead's desk", ox + OFFICE3D_WING_WIDTH / 2, 2.6, 2.1, 0.95))
+    out.push(r('bookshelf', ox + OFFICE3D_WING_WIDTH / 2 - 0.5, 0.3, 2.6, 0.42))
+    for (const gx of [-0.65, 0.65]) {
+      out.push(r('guest chair', ox + OFFICE3D_WING_WIDTH / 2 + gx, 3.85, 0.6, 0.6))
+    }
+    out.push(r('office glass', ox, 1.7, 0.1, 3.4))
+    out.push(r('office glass', ox, (4.7 + OFFICE3D_DEPTH) / 2, 0.1, OFFICE3D_DEPTH - 4.7))
+  }
+  return out
+}
+const inside = (p: Office3dPoint, s: Rect) =>
+  p[0] > s.x0 - BODY && p[0] < s.x1 + BODY && p[1] > s.z0 - BODY && p[1] < s.z1 + BODY
+
+describe("the 3D Office lead's path", () => {
+  const layouts = {
+    one: () => layout(floor('', ['a', 'b'])),
+    two: () => layout(floor('', ['a', 'b']), floor('m2', ['c'])),
+    three: () => building()
+  }
+  const mixes = [
+    { needs: [], visits: ['a', 'b'] },
+    { needs: ['c', 'a'], visits: ['b'] },
+    { needs: ['d', 'c', 'b'], visits: ['a'] }
+  ]
+  for (const [name, make] of Object.entries(layouts)) {
+    for (const pace of ['normal', 'fast']) {
+      it(`never walks through an object: ${name} floor(s), ${pace}`, () => {
+        const l = make()
+        for (const mix of mixes) {
+          const round = office3dLeadRoundOf({ layout: l, ...mix, pace })
+          for (let t = 0; t < round.total; t += 0.05) {
+            const at = office3dWalkerAt(round, t)
+            const fl = l.floors[Math.round(at.floor)]!
+            if (Math.abs(at.floor - Math.round(at.floor)) > 0.01) {
+              continue
+            }
+            const hit = solidsOf(fl).find((s) => inside(at.at, s))
+            expect(hit, `${hit?.name} at t=${t.toFixed(2)} ${at.at}`).toBeUndefined()
+            // Through the lift door only with the cab on this floor, so its leaves are open.
+            if (at.at[0] < 0.2 && at.at[0] > -0.5) {
+              expect(Math.round(office3dCabFloorAt(round.cab, t))).toBe(Math.round(at.floor))
+            }
+          }
+        }
+      })
+    }
+  }
 })

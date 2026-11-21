@@ -54,6 +54,8 @@ const DOOR: Office3dPoint = [0.9, OFFICE3D_DOOR_Z]
 /** The lead's desk in its office, and the way out of the office to the aisle. */
 const homeOf = (office: { x: number }): Office3dPoint => [office.x + OFFICE3D_WING_WIDTH / 2, 1.65]
 const officeDoorOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, OFFICE3D_AISLE_Z]
+// Why round the desk's left side: a straight line from the chair to the door went through the desk.
+const besideDeskOf = (office: { x: number }): Office3dPoint => [office.x + 0.6, 1.65]
 
 /**
  * The lead's round: members that need the user first, in the Team model's order and one lift trip
@@ -112,7 +114,7 @@ export function office3dLeadRoundOf(args: {
       return
     }
     if (floor === leadFloor && here === home) {
-      walk(officeDoorOf(office))
+      walk(besideDeskOf(office), officeDoorOf(office))
     }
     if (toFloor !== floor) {
       walk([here[0], OFFICE3D_AISLE_Z], [1.2, OFFICE3D_AISLE_Z], DOOR)
@@ -175,7 +177,7 @@ export function office3dLeadRoundOf(args: {
       here = home
     } else {
       goTo(leadFloor, officeDoorOf(office))
-      walk(home)
+      walk(besideDeskOf(office), home)
     }
   }
   hold('desk', HOME_PAUSE * holdScale, null)

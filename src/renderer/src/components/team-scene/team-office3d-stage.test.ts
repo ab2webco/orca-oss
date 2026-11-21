@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../../../../shared/team-panel-model-types'
 import {
   OFFICE3D_DEPTH,
+  OFFICE3D_DOOR_Z,
   OFFICE3D_PITCH,
   teamOffice3dLayoutOf
 } from '../../../../shared/team-scene/team-office3d-layout'
@@ -213,5 +214,37 @@ describe('the 3D Office stage', () => {
     }
     expect(view.target!.distanceTo(goal)).toBeLessThan(0.5)
     expect(cameras.at(-1)!.zoom).toBeGreaterThan(1.5)
+  })
+
+  it('slides the lift doors open while the lead walks through them, and shut after', () => {
+    const { stage, scenes } = stageOf(
+      [member('a', 'working'), member('c', 'needsYou')],
+      [floor('', ['a']), floor('m2', ['c'])]
+    )
+    // The leaves are the two thin boxes at the door plane, on the floor the lead stands on.
+    const leavesAt = (scene: THREE.Scene, y: number) => {
+      const out: THREE.Object3D[] = []
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh
+        const p = m.getWorldPosition(new THREE.Vector3())
+        if (m.isMesh && Math.abs(p.x + 0.08) < 1e-6 && Math.abs(p.y - (y + 1.38)) < 1e-6) {
+          out.push(m)
+        }
+      })
+      return out
+    }
+    let passed = 0
+    for (let t = 0; t < 60; t += 0.1) {
+      stage.draw(t)
+      const scene = scenes.at(-1)!
+      const lead = leadOf(scene)!.getWorldPosition(new THREE.Vector3())
+      const y = Math.round(lead.y / OFFICE3D_PITCH) * OFFICE3D_PITCH
+      if (lead.x > -0.3 && lead.x < 0.15 && Math.abs(lead.y - y) < 0.5) {
+        passed += 1
+        const gap = leavesAt(scene, y).map((l) => Math.abs(l.position.z - OFFICE3D_DOOR_Z))
+        expect(Math.min(...gap), `doors shut on the lead at ${t.toFixed(1)}`).toBeGreaterThan(0.9)
+      }
+    }
+    expect(passed, 'the lead never passed the lift door').toBeGreaterThan(0)
   })
 })

@@ -7,6 +7,8 @@ import {
 import { office3dCabFloorAt } from '../../../../shared/team-scene/team-office3d-elevator'
 import {
   OFFICE3D_DEPTH,
+  OFFICE3D_DOOR_Z,
+  OFFICE3D_LIFT,
   OFFICE3D_PITCH,
   OFFICE3D_SEAT_Z,
   type Office3dLayout
@@ -141,8 +143,10 @@ export function office3dStage(
   const ticks: ((t: number) => void)[] = []
   const chips: THREE.Sprite[] = []
   const views = new Map<string, Office3dSeatView>()
+  const doors: THREE.Mesh[][] = []
   for (const [i, floor] of layout.floors.entries()) {
     const built = office3dFloor(kit, floor, i === layout.floors.length - 1, dark)
+    doors.push(built.doors)
     world.add(built.group)
     if (floor.office) {
       world.add(office3dLeadOffice(kit, X, floor))
@@ -252,7 +256,17 @@ export function office3dStage(
       poseDioramaFigure(lead, at.pose === 'give' ? 'talk' : at.pose, t)
     }
     const tt = round.total > 0 ? t % round.total : 0
-    cab.position.y = office3dCabFloorAt(round.cab, tt) * OFFICE3D_PITCH
+    const cabAt = office3dCabFloorAt(round.cab, tt)
+    cab.position.y = cabAt * OFFICE3D_PITCH
+    // The leaves slide open while the cab waits on a floor and the lead is at its door.
+    const near = Math.hypot(at.at[0] - OFFICE3D_LIFT[0] / 2, at.at[1] - OFFICE3D_DOOR_Z)
+    for (const [fi, leaves] of doors.entries()) {
+      const here = Math.abs(cabAt - fi) < 0.05 && Math.abs(at.floor - fi) < 0.05
+      const open = here ? Math.min(1, Math.max(0, (1.9 - near) / 0.6)) : 0
+      for (const [side, leaf] of leaves.entries()) {
+        leaf.position.z = OFFICE3D_DOOR_Z + (side ? 1 : -1) * (0.42 + open * 0.8)
+      }
+    }
     const p = lead.g.position
     leadMark.position.set(p.x, p.y + 2.5 + Math.sin(t * 2.4) * 0.06, p.z)
   })
