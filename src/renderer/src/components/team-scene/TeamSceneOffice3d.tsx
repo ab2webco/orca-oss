@@ -130,6 +130,10 @@ export function TeamSceneOffice3d({
     // The machines' floors: the shared lobby is not one.
     el.dataset.office3dFloors = String(layout.floors.filter((f) => !f.lobby).length)
     el.dataset.office3dAdvisors = String(layout.floors.filter((f) => f.controlRoom).length)
+    // Where each member belongs now, for specs: 'key:place' pairs.
+    el.dataset.office3dPlaces = [...traffic.current.members.values()]
+      .map((m) => `${m.key}:${m.leaving ? 'gone' : m.place}`)
+      .join(' ')
     return () => {
       cancelAnimationFrame(raf)
       watch.disconnect()

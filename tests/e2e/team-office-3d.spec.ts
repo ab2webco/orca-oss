@@ -54,6 +54,11 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       expect(Buffer.compare(before, await canvas.screenshot()), 'the Office stood still').not.toBe(
         0
       )
+      // ORCA-1317: the idle and the finished members are in the games room, the rest at desks.
+      await expect(canvas).toHaveAttribute('data-office3d-places', /:games/, { timeout: 30_000 })
+      await expect(canvas).toHaveAttribute('data-office3d-places', /:desk/)
+      await orcaPage.waitForTimeout(20_000)
+      await canvas.screenshot({ path: testInfo.outputPath('lobby-members.png') })
       // The owner: the Office pans, zooms and follows the lead like Figures, following by default.
       await expect(canvas).toHaveAttribute('data-office3d-camera', 'lead')
       await canvas.screenshot({ path: testInfo.outputPath('camera-lead.png') })
