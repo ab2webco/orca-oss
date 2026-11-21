@@ -21,8 +21,9 @@ const LINE = 1.2 * 5
 const onFloor = (w: Office3dLiftWalker, fi: number) => Math.abs(w.floor - fi) < 0.05
 
 /** In the line at a floor's call panel, waiting: the first presses, the others queue behind. */
+// Why the line's own poses: the lobby's talkers stand at the line's depth (ORCA-1319, 2nd pass).
 const waiting = (w: Office3dLiftWalker) =>
-  w.pose !== 'walk' &&
+  (w.pose === 'idle' || w.pose === 'call') &&
   Math.abs(w.at[1] - OFFICE3D_CALL[1]) < 0.15 &&
   w.at[0] > OFFICE3D_CALL[0] - 0.15 &&
   w.at[0] < OFFICE3D_CALL[0] + LINE + 0.15
