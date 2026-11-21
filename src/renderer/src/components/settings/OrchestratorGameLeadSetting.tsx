@@ -243,8 +243,9 @@ export function ProjectOrchestratorGameLeadSetting({
       'Most free'
     )
   }
+  // Why own values for a list and unset: neither is 'auto', so Most free stays a distinct pick.
   const accountsChoiceOf = (one: OrchestratorGameLead): string =>
-    Array.isArray(one.accounts) || one.accounts !== 'default' ? 'auto' : 'default'
+    Array.isArray(one.accounts) ? 'list' : (one.accounts ?? 'unset')
   const accountsTextOf = (one: OrchestratorGameLead): string =>
     Array.isArray(one.accounts)
       ? one.accounts.join(', ')

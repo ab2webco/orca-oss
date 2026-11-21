@@ -184,6 +184,19 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     fromYaml.unmount()
   })
 
+  it('keeps Most free a distinct pick from an orca.yaml allow-list and from unset', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const listed = render({}, { orchestrator: { accounts: ['a', 'b'] } }, updates)
+    expect(listed.container.textContent).toContain('a, b · from orca.yaml')
+    click(listed.container, '[aria-label="Member accounts"] button', 'Most free')
+    listed.unmount()
+    const unset = render({}, undefined, updates)
+    click(unset.container, '[aria-label="Member accounts"] button', 'Most free')
+    unset.unmount()
+    const stored = { orchestratorGameProjects: { repo1: { orchestrator: { accounts: 'auto' } } } }
+    expect(updates).toEqual([stored, stored])
+  })
+
   it('saves a typed value on blur and inherits when the field is cleared', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
