@@ -7,7 +7,7 @@ import type { TeamSceneMemberInput } from './team-scene-types'
  * or out of the building. */
 export type Office3dPlace = 'desk' | 'office' | 'cafe' | 'games' | 'gone'
 
-/** Where a member waits on its open PR (CI running, review, queue): picked once per wait. */
+/** Where a member waits while its PR's CI runs: picked once per wait. */
 export type Office3dWait = 'desk' | 'cafe' | 'games'
 
 /** Its PR is still open: CI is read only while it is, or it sits in review or the merge queue. */
@@ -31,8 +31,9 @@ export function office3dWaitOf(key: string, waitId: string): Office3dWait {
 
 /**
  * The owner's table, by precedence: working is always the desk; the lead's office only for an
- * Inbox question or decision gate; red CI back at the desk; out of quota in the cafeteria; an open
- * PR waits where `wait` picked; merged or with nothing to do it is available in the games room.
+ * Inbox question or decision gate; red CI back at the desk; out of quota in the cafeteria; CI
+ * running waits where `wait` picked; green CI, review or the queue go on at the desk ('cuando pasan
+ * en verde sigue el flujo de trabajo', ORCA-1319); merged or with nothing to do, the games room.
  */
 export function office3dPlaceOf(m: TeamSceneMemberInput, wait: Office3dWait): Office3dPlace {
   if (m.away || m.hold === 'queued') {
@@ -53,5 +54,5 @@ export function office3dPlaceOf(m: TeamSceneMemberInput, wait: Office3dWait): Of
   if (m.activity === 'blocked' || m.hold || m.ci === 'failure') {
     return 'desk'
   }
-  return office3dPrOpen(m) ? wait : 'games'
+  return m.ci === 'pending' ? wait : office3dPrOpen(m) ? 'desk' : 'games'
 }

@@ -125,11 +125,11 @@ describe('3D Office members, by event', () => {
     expect(where(traffic, 'a', 200).slot?.kind).toBe('cafe')
   })
 
-  it('waits on its PR where its pick for that wait says, and keeps the pick while it waits', () => {
+  it('waits while its CI runs where its pick for that wait says, and keeps the pick', () => {
     const waiting = { activity: 'done' as const, ci: 'pending' as const }
     const traffic = play([
       [10, team({ a: waiting })],
-      [30, team({ a: { ...waiting, ci: 'success' } })]
+      [30, team({ a: { ...waiting, reportId: 'r' } })]
     ])
     const pick = office3dWaitOf('a', '10')
     const at = where(traffic, 'a', 200)
@@ -137,6 +137,14 @@ describe('3D Office members, by event', () => {
       pick === 'desk' ? /desk/ : pick === 'cafe' ? /cafe/ : /console|paddle|talk/
     )
     expect(traffic.members.get('a')!.wait).toBe(pick)
+  })
+
+  it('comes back to its desk when its CI goes green', () => {
+    const traffic = play([
+      [10, team({ c: { activity: 'done', ci: 'pending' } })],
+      [60, team({ c: { activity: 'done', ci: 'success' } })]
+    ])
+    expect(where(traffic, 'c', 300)).toMatchObject({ pose: 'desk', floor: 2 })
   })
 
   it('comes back to its desk when its CI goes red', () => {

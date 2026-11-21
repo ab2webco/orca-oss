@@ -42,13 +42,18 @@ describe('where a 3D Office member belongs', () => {
     expect(at({ activity: 'blocked', hold: 'asleep' })).toBe('cafe')
   })
 
-  it('waits on an open PR where its pick for that wait says', () => {
+  it('waits while its CI runs where its pick for that wait says', () => {
     for (const wait of ['desk', 'cafe', 'games'] as const) {
       expect(office3dPlaceOf(m({ activity: 'done', ci: 'pending' }), wait)).toBe(wait)
-      expect(office3dPlaceOf(m({ activity: 'done', ci: 'success' }), wait)).toBe(wait)
+    }
+  })
+
+  it('goes back to its desk once CI is green, and through review and the queue', () => {
+    for (const wait of ['desk', 'cafe', 'games'] as const) {
+      expect(office3dPlaceOf(m({ activity: 'done', ci: 'success' }), wait)).toBe('desk')
       expect(
         office3dPlaceOf(m({ activity: 'done', desk: { kind: 'queue', position: 1 } }), wait)
-      ).toBe(wait)
+      ).toBe('desk')
     }
   })
 
