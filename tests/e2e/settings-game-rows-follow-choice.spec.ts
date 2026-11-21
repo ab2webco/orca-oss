@@ -239,6 +239,13 @@ const sectionGapsOf = (panel: Locator) =>
 const PANEL_ROWS = ['look', 'style', 'stylePreview', 'scene', 'prs', 'machines', 'timezone']
 const RUNNING_ROWS = ['show', 'view', 'hud', 'rewards', 'openLinks', 'tracker']
 const BAND_ROWS = ['band', 'bandPreview', 'render']
+const DIORAMA_ROWS = [
+  ...PANEL_ROWS.slice(0, 3),
+  'diorama',
+  ...PANEL_ROWS.slice(3),
+  ...RUNNING_ROWS,
+  ...BAND_ROWS
+]
 
 // Why these five: the views that drop rows (Off, Flat) and each scene style a pixel view draws.
 const CHOICES = [
@@ -252,18 +259,13 @@ const CHOICES = [
   {
     name: 'figures',
     layer: { mode: 'on', band: true, panel: { look: 'game', style: 'figures', diorama: true } },
-    rows: [
-      ...PANEL_ROWS.slice(0, 3),
-      'diorama',
-      ...PANEL_ROWS.slice(3),
-      ...RUNNING_ROWS,
-      ...BAND_ROWS
-    ]
+    rows: DIORAMA_ROWS
   },
   {
+    // Why the diorama rows too: Scene quality switches the Office between 3D and 2D.
     name: 'office',
     layer: { mode: 'on', band: true, panel: { look: 'game', style: 'office' } },
-    rows: [...PANEL_ROWS, ...RUNNING_ROWS, ...BAND_ROWS]
+    rows: DIORAMA_ROWS
   }
 ] as const
 
