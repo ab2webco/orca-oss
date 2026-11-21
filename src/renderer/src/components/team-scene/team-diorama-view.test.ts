@@ -12,6 +12,7 @@ import {
 const fit = (): DioramaFit => ({
   camera: Object.assign(new THREE.OrthographicCamera(-20, 20, 10, -10, 0.1, 400)),
   height: 300,
+  full: 300,
   ground: new THREE.Box3(),
   center: new THREE.Vector3(1, 0, 1),
   span: 40

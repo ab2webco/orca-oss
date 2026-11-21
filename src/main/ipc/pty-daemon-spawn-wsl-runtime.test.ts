@@ -521,7 +521,8 @@ describe('registerPtyHandlers', () => {
           })
           expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
           expect(env.PATH).toContain(
-            `${join('/tmp/orca-user-data', 'cli', 'bin')}${delimiter}/system/bin`
+            // Why the wrapper dir between: Orca's gh PR-cap wrapper sits ahead of the inherited PATH (ORCA-1301).
+            `${join('/tmp/orca-user-data', 'cli', 'bin')}${delimiter}${join('/tmp/orca-user-data', 'orca-gh-pr-cap', 'posix')}${delimiter}/system/bin`
           )
         } finally {
           mockedApp.isPackaged = prev

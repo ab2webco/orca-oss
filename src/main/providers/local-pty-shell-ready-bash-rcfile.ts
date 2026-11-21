@@ -45,6 +45,14 @@ __orca_restore_agent_teams_path() {
   export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
 __orca_restore_agent_teams_path
+__orca_restore_gh_pr_cap_path() {
+  [[ -n "\${ORCA_GH_PR_CAP_SHIM_DIR:-}" ]] || return 0
+  case "$PATH" in
+    "\${ORCA_GH_PR_CAP_SHIM_DIR}"|"\${ORCA_GH_PR_CAP_SHIM_DIR}:"*) return 0 ;;
+  esac
+  export PATH="\${ORCA_GH_PR_CAP_SHIM_DIR}:$PATH"
+}
+__orca_restore_gh_pr_cap_path
 # Why: user startup files may set the default OpenCode config after Orca Lab's
 # spawn env; restore the Orca Lab-managed config dir before the first prompt.
 [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"

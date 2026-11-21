@@ -7,7 +7,41 @@ type PhaseInput = Pick<GameAgent, 'state' | 'toolName'> & {
   workItem?: { statusGroup?: string | null } | null
 }
 
-const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+// Why every agent's names: each reports its tools in its own words (agent-hook-listener's map), and
+// the 3D Office shows what each member does whatever agent it runs (ORCA-1317).
+const EDIT_TOOLS = new Set([
+  'Edit',
+  'Write',
+  'MultiEdit',
+  'NotebookEdit',
+  'Create',
+  'apply_patch',
+  'write_file',
+  'edit_file',
+  'replace',
+  'search_replace',
+  'write_to_file',
+  'replace_file_content',
+  'multi_replace_file_content',
+  'create',
+  'edit',
+  'write',
+  'patch'
+])
+const SHELL_TOOLS = new Set([
+  'Bash',
+  'Execute',
+  'exec_command',
+  'shell_command',
+  'run_shell_command',
+  'run_command',
+  'run_terminal_cmd',
+  'run_terminal_command',
+  'bash',
+  'powershell',
+  'terminal',
+  'execute_code'
+])
 const PLAN_TOOLS = new Set(['EnterPlanMode', 'ExitPlanMode', 'TodoWrite'])
 const TEST_COMMAND =
   /\b(?:vitest|jest|playwright test|pytest|go test|cargo test|(?:npm|pnpm|yarn|bun)(?: run)? test(?::\S+)?)\b/
@@ -22,7 +56,7 @@ const toolPhaseOf = (toolName: string | null, input: string): TeamFlowPhase | nu
   if (toolName !== null && EDIT_TOOLS.has(toolName)) {
     return TEST_FILE.test(input) ? 'tests' : DOCS_FILE.test(input) ? 'docs' : 'code'
   }
-  if (toolName === 'Bash' && TEST_COMMAND.test(input)) {
+  if (toolName !== null && SHELL_TOOLS.has(toolName) && TEST_COMMAND.test(input)) {
     return 'tests'
   }
   return toolName !== null && PLAN_TOOLS.has(toolName) ? 'plan' : null

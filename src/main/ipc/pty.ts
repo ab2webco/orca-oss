@@ -154,6 +154,7 @@ import {
   resolveAttributionShellFamily
 } from '../attribution/terminal-attribution'
 import { ensureLinuxTerminalOrcaCliShimDir } from '../cli/linux-terminal-orca-cli-shim'
+import { applyGhPrCapShimEnv } from '../pty/gh-pr-cap-shim'
 import { registerPty, unregisterPty } from '../memory/pty-registry'
 import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import { track } from '../telemetry/client'
@@ -2099,6 +2100,14 @@ export function buildPtyHostEnv(
       baseEnv.ORCA_USER_DATA_PATH = opts.userDataPath
     }
     delete baseEnv.ORCA_CLI_COMMAND
+  }
+  // Why before Orca's CLI and attribution dirs: those hold no real gh, and attribution hands off to this one.
+  // Why not WSL: its pane runs Linux gh, which a host-side wrapper cannot reach.
+  if (!opts.isWsl) {
+    applyGhPrCapShimEnv(baseEnv, {
+      userDataPath: opts.userDataPath,
+      shellFamily: resolveAttributionShellFamily({ shellPath: opts.shellPath, isWsl: false })
+    })
   }
   // Why: dev mode needs the launcher PATH override so `orca` resolves to the dev build instead of the production binary at /usr/local/bin/orca.
   if (!opts.isPackaged) {

@@ -5333,6 +5333,18 @@ export class OrchestrationDb {
       .get(dispatchId) as RemoteDispatchAttachmentRow | undefined
   }
 
+  /** True when a home on another host dispatched the pane and its member still runs here (ORCA-1301). */
+  hasLiveRemoteDispatchFor(terminalHandle: string | null, paneKey: string | null): boolean {
+    return (
+      this.db
+        .prepare(
+          `SELECT 1 FROM remote_dispatch_attachments
+           WHERE (terminal_handle = ? OR pane_key = ?) AND state IN ('starting', 'ready') LIMIT 1`
+        )
+        .get(terminalHandle, paneKey) !== undefined
+    )
+  }
+
   /** The scene the newest remote member in this worktree brought from its lead. */
   getGameSceneForWorktree(worktreeId: string): { id: string; text: string } | null {
     const row = this.db

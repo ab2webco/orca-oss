@@ -54,6 +54,58 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       expect(Buffer.compare(before, await canvas.screenshot()), 'the Office stood still').not.toBe(
         0
       )
+      // ORCA-1317: the idle and the finished members are in the games room, the rest at desks.
+      await expect(canvas).toHaveAttribute('data-office3d-places', /:games/, { timeout: 30_000 })
+      await expect(canvas).toHaveAttribute('data-office3d-places', /:desk/)
+      await orcaPage.waitForTimeout(20_000)
+      await canvas.screenshot({ path: testInfo.outputPath('lobby-members.png') })
+      // The owner: the Office pans, zooms and follows the lead like Figures, following by default.
+      await expect(canvas).toHaveAttribute('data-office3d-camera', 'lead')
+      await canvas.screenshot({ path: testInfo.outputPath('camera-lead.png') })
+      await panel.getByRole('button', { name: 'Show all' }).click()
+      await expect(canvas).toHaveAttribute('data-office3d-camera', 'all')
+      await orcaPage.waitForTimeout(2500)
+      await canvas.screenshot({ path: testInfo.outputPath('camera-all.png') })
+      const box = (await canvas.boundingBox())!
+      const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2]
+      await orcaPage.mouse.move(cx, cy)
+      await orcaPage.mouse.down()
+      await orcaPage.mouse.move(cx - 80, cy + 40, { steps: 6 })
+      await orcaPage.mouse.up()
+      await expect(canvas).toHaveAttribute('data-office3d-camera', 'free')
+      const panned = await canvas.screenshot({ path: testInfo.outputPath('camera-pan.png') })
+      // The owner: a plain wheel or trackpad scroll over the scene zooms it.
+      await orcaPage.mouse.wheel(0, -400)
+      await orcaPage.waitForTimeout(1500)
+      const zoomed = await canvas.screenshot({ path: testInfo.outputPath('camera-zoom.png') })
+      expect(Buffer.compare(panned, zoomed), 'the wheel did not zoom').not.toBe(0)
+      // A pinch arrives as Ctrl with the wheel, and still zooms.
+      await orcaPage.keyboard.down('Control')
+      await orcaPage.mouse.wheel(0, 300)
+      await orcaPage.keyboard.up('Control')
+      await orcaPage.waitForTimeout(1500)
+      const pinched = await canvas.screenshot({ path: testInfo.outputPath('camera-pinch.png') })
+      expect(Buffer.compare(zoomed, pinched), 'the pinch did not zoom').not.toBe(0)
+      await panel.getByRole('button', { name: 'Follow the lead' }).click()
+      await expect(canvas).toHaveAttribute('data-office3d-camera', 'lead')
+      await orcaPage.waitForTimeout(2500)
+      await canvas.screenshot({ path: testInfo.outputPath('camera-follow.png') })
+      // The owner: it opens at the 2D Office's height, three floors' strips, and grows by dragging.
+      const tall = async () => Math.round((await canvas.boundingBox())!.height)
+      expect(await tall()).toBe(336)
+      const edge = panel.locator('[data-team-scene-office3d] [data-team-building-resize]')
+      const grip = (await edge.boundingBox())!
+      await orcaPage.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+      await orcaPage.mouse.down()
+      await orcaPage.mouse.move(grip.x + grip.width / 2, grip.y + 120, { steps: 6 })
+      await orcaPage.mouse.up()
+      await expect.poll(tall).toBeGreaterThan(400)
+      const kept = await orcaPage.evaluate(() => localStorage.getItem('orca.teamOffice3d.height'))
+      expect(Number(kept)).toBe(await tall())
+      await orcaPage.waitForTimeout(1500)
+      await canvas.screenshot({ path: testInfo.outputPath('dragged.png') })
+      await edge.dblclick()
+      await expect.poll(tall).toBe(336)
     }
     // Why a wide window first: the sidebar is clamped to the room the window leaves it.
     await setWindowWidth(electronApp, orcaPage, 1440)
@@ -62,11 +114,13 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       s.setRightSidebarOpen(true)
       s.setRightSidebarTab('team')
     })
-    // The panel's container widths: its minimum, the two common ones, and the large view.
+    // The panel's container widths: its minimum, the common ones, a tall 410, 600 and the large view.
     for (const [name, width] of [
       ['panel-219', 220],
       ['panel-320', 320],
       ['panel-350', 350],
+      ['panel-410', 410],
+      ['panel-600', 600],
       ['large', 1120]
     ] as const) {
       await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)

@@ -82,6 +82,29 @@ function sky(night: boolean, grey: boolean): Office3dCanvas | null {
   return c
 }
 
+/** How far behind the seat line a desk's chair stands; its sitter sits on it. */
+export const OFFICE3D_CHAIR_BACK = 0.08
+
+/** An office chair facing -z (rotate it with `yaw`): cushion, back and stem. */
+export function office3dChair(
+  k: DioramaKit,
+  X: Office3dPalette,
+  parent: THREE.Object3D,
+  x: number,
+  z: number,
+  yaw: number
+): THREE.Group {
+  const { mesh, box, mat } = k
+  const chair = new THREE.Group()
+  chair.position.set(x, 0, z)
+  chair.rotation.y = yaw
+  parent.add(chair)
+  mesh(new THREE.CylinderGeometry(0.4, 0.38, 0.12, 14), mat(X.chair), 0, 0.52, 0, chair)
+  mesh(box(0.74, 0.74, 0.12), mat(X.chair), 0, 1, 0.42, chair)
+  mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8), mat(X.metal), 0, 0.26, 0, chair)
+  return chair
+}
+
 function desk(
   k: DioramaKit,
   X: Office3dPalette,
@@ -120,12 +143,7 @@ function desk(
     mesh(new THREE.PlaneGeometry(1.3, 0.82), b, 0, 2.5, -OFFICE3D_SEAT_Z / scale + 0.03, g, false)
   }
   // The chair seen from behind; another session's desk has a coat over its back.
-  const chair = new THREE.Group()
-  chair.position.set(0, 0, 0.08)
-  g.add(chair)
-  mesh(new THREE.CylinderGeometry(0.4, 0.38, 0.12, 14), mat(X.chair), 0, 0.52, 0, chair)
-  mesh(box(0.74, 0.74, 0.12), mat(X.chair), 0, 1, 0.42, chair)
-  mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8), mat(X.metal), 0, 0.26, 0, chair)
+  const chair = office3dChair(k, X, g, 0, OFFICE3D_CHAIR_BACK, 0)
   if (taken) {
     mesh(box(0.66, 0.58, 0.1), mat(X.coat), 0, 1.02, 0.5, chair)
   }

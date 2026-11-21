@@ -6,6 +6,10 @@ import { poseDioramaFigure } from './team-diorama-poses'
 // Why on the diorama's sit: a seated developer keeps the diorama's legs and lift, and only its
 // arms, back and head tell what it is doing at the desk (ORCA-1302).
 
+/** Where a seated figure stands so its hips rest on a chair's cushion (top 0.58): the diorama's
+ * sit lowers the body 0.3 and the legs hang from 0.34, at the 1.6 scale. */
+export const OFFICE3D_SIT_Y = 0.58 - (0.34 - 0.3) * 1.6
+
 /** What a seated figure shows: its desk pose, a play while resting, or a moment's cheer or give. */
 export type Office3dSeatedPose = Office3dPose | TeamScenePlay | 'cheer' | 'give'
 

@@ -121,13 +121,14 @@ async function dispatchCtrlCToActiveTerminalTextarea(
   }, options)
 }
 
-async function focusFloatingTerminal(page: Page): Promise<void> {
-  await page
-    .locator(
-      `[data-floating-terminal-panel][aria-hidden="false"] [data-terminal-tab-id] .xterm-helper-textarea`
-    )
-    .first()
-    .focus()
+// Why scoped to the tab: an inactive floating tab stays mounted under display:none, so
+// `.first()` could pick its textarea and the focus call silently did nothing (ORCA-1279).
+async function focusFloatingTerminal(page: Page, tabId: string): Promise<void> {
+  const textarea = page.locator(
+    `[data-floating-terminal-panel][aria-hidden="false"] [data-terminal-tab-id="${tabId}"] .xterm-helper-textarea`
+  )
+  await textarea.focus()
+  await expect(textarea).toBeFocused()
 }
 
 async function seedFloatingTerminalTabSwitchScenario(page: Page): Promise<{
@@ -698,7 +699,7 @@ test.describe('Terminal Shortcuts', () => {
     await expect(
       orcaPage.locator('[data-floating-terminal-panel][aria-hidden="false"]')
     ).toBeVisible()
-    await focusFloatingTerminal(orcaPage)
+    await focusFloatingTerminal(orcaPage, scenario.floatingFirstTabId)
 
     await orcaPage.keyboard.press(`${mod}+Shift+BracketRight`)
     await expect
@@ -714,7 +715,7 @@ test.describe('Terminal Shortcuts', () => {
       })
       .toBe(scenario.backgroundFirstTabId)
 
-    await focusFloatingTerminal(orcaPage)
+    await focusFloatingTerminal(orcaPage, scenario.floatingSecondTabId)
     await orcaPage.keyboard.press(`${mod}+Shift+BracketLeft`)
     await expect
       .poll(() => getActiveFloatingTerminalTabId(orcaPage), {

@@ -7,7 +7,7 @@ import {
 } from '../../../../shared/team-scene/team-office3d-layout'
 import type { DioramaKit } from './team-diorama-kit'
 import { OFFICE3D_LEAD_COAT } from './team-office3d-dev'
-import type { Office3dPalette } from './team-office3d-floor'
+import { office3dChair, type Office3dPalette } from './team-office3d-floor'
 import { office3dCanvas, type Office3dCanvas } from './team-office3d-screens'
 
 // Why rooms of their own: the lead works from its office and Jev from its control room (owner,
@@ -96,6 +96,8 @@ export function office3dLeadOffice(
   for (const gx of [-0.65, 0.65]) {
     mesh(box(0.6, 0.12, 0.6), mat(X.chair), dx + gx, 0.48, dz + 1.25, g)
   }
+  // The lead's own chair behind the desk, facing the room, where its round ends.
+  office3dChair(k, X, g, dx, dz - 0.95, Math.PI)
   return g
 }
 
@@ -157,6 +159,8 @@ export function office3dControlRoom(
     )
   }
   mesh(box(AW - 0.6, 0.08, 0.85), mat(0x2f3540), AW / 2, 0.98, 1, g)
+  // The advisor's chair at the console, turned as it sits.
+  office3dChair(k, X, g, room.chair[0] - room.x, room.chair[1], -0.35)
   mesh(box(AW - 0.7, 0.5, 0.05), mat(0x232831), AW / 2, 0.68, 0.6, g)
   if (night) {
     k.glow(g, AW / 2, 2.3, 0.4, 0x5ee0e0, 3.2, 0.35)
