@@ -436,7 +436,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
     // failed to load in this build falls to Pixel and stops here (ORCA-1052).
     await writeSettings(orcaPage, { uiLanguage: 'en' })
     for (const style of ART_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
+      await writeSettings(orcaPage, {
+        orchestratorGame: { panel: { style, diorama: false, quality: 'low' } }
+      })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -564,7 +566,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
       })
     }
     for (const style of ADVISOR_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
+      await writeSettings(orcaPage, {
+        orchestratorGame: { panel: { style, diorama: false, quality: 'low' } }
+      })
       await expect(sceneCanvasIn(panel.locator(`[data-team-scene="${style}"]`))).toBeVisible({
         timeout: 30_000
       })
@@ -591,7 +595,9 @@ test('the Team panel draws the live scene beside a member opened under its heade
       toolInput: { cmd: LONG_COMMAND }
     })
     for (const style of ADVISOR_STYLES) {
-      await writeSettings(orcaPage, { orchestratorGame: { panel: { style, diorama: false } } })
+      await writeSettings(orcaPage, {
+        orchestratorGame: { panel: { style, diorama: false, quality: 'low' } }
+      })
       for (const width of WIDTHS) {
         await orcaPage.setViewportSize({ width, height: 900 })
         // Why 30 s: game.state names the new tool at the panel's next 20 s read.
