@@ -136,6 +136,15 @@ describe('gameInboxThreadsOf', () => {
     expect(threads.find((thread) => thread.ticket === 'CIN-2')?.waiting).toBe(0)
   })
 
+  it("does not list a released member's open gate as Waiting (ORCA-1267)", () => {
+    sequence = 0
+    const gate = mail('term_lead', 'term_1', { type: 'decision_gate' })
+
+    const { waiting } = gameInboxThreadsOf(source([gate], { releasedSenders: ['term_1'] }))
+
+    expect(waiting).toEqual([])
+  })
+
   it('audits what the lead answered: each question with its answer and when, newest first', () => {
     sequence = 0
     const first = mail('run:run_1', 'dispatch:d1', { type: 'question', body: 'Which port?' })

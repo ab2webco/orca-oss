@@ -37,6 +37,8 @@ vi.mock('react-native-webview', async () => {
   }
 })
 
+import { getByGestureTestId } from 'react-native-gesture-handler/jest-utils'
+
 /** The last run the page was told: each injection calls `window.__teamScene(message)`. */
 const lastMotion = (): unknown =>
   webview.injected
@@ -351,6 +353,27 @@ describe('TeamSheet', () => {
       expect(band!.querySelector('[data-testid="team-scene-webview"]')).not.toBeNull()
       const tabs = container.querySelector('[role="tablist"]')!
       expect(band!.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+
+  it("lets a finger on the 3D stage move its camera ahead of the sheet's scroll and drag (ORCA-1335)", async () => {
+    const panel = { panel: { ...gamePanel('figures').panel, diorama: true } }
+    show(teamWith({ questions: [] }, leader, panel))
+    const page = (event: unknown) =>
+      act(() => webview.onMessage!({ nativeEvent: { data: JSON.stringify(event) } }))
+    page({ kind: 'loaded' })
+    page({ kind: 'ready', height: 240, camera: 'lead' })
+    expect(button('Follow the lead')).toBeTruthy()
+    // Why: RNGH registers an updated gesture in a microtask.
+    await act(async () => {})
+    const sheet = [
+      getByGestureTestId('team-sheet-scroll'),
+      getByGestureTestId('team-sheet-content-drag')
+    ]
+    for (const id of ['team-scene-camera-pan', 'team-scene-camera-pinch']) {
+      const camera = getByGestureTestId(id)
+      expect(camera.config.enabled).toBe(true)
+      expect(camera.config.blocksHandlers).toEqual(sheet.map((one) => one.handlerTag))
     }
   })
 

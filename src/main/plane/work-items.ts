@@ -190,7 +190,7 @@ export async function listWorkItems(args: {
    */
   omitDescription?: boolean
 }): Promise<PlaneWorkItem[]> {
-  const entries = getClients(args.workspaceId)
+  const entries = await getClients(args.workspaceId)
   if (entries.length === 0) {
     return []
   }
@@ -225,7 +225,7 @@ export async function searchWorkItems(args: {
   projectId?: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneWorkItem[]> {
-  const entries = getClients(args.workspaceId)
+  const entries = await getClients(args.workspaceId)
   const query = args.query.trim()
   if (entries.length === 0 || !query) {
     return []
@@ -315,7 +315,7 @@ export async function getWorkItem(args: {
   projectId?: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneWorkItem | null> {
-  const entries = getClients(args.workspaceId)
+  const entries = await getClients(args.workspaceId)
   const isIdentifier = IDENTIFIER_RE.test(args.workItemId)
   for (const client of entries) {
     await acquire()

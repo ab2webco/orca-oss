@@ -117,6 +117,74 @@ vi.stubGlobal('window', { devicePixelRatio: 1 })
 afterEach(() => vi.clearAllMocks())
 
 describe('the 3D Office stage', () => {
+  // Why: the phone rebuilds the stage on every read, in a WebView with a hard memory cap (ORCA-1334).
+  it("frees every texture it made and the sun's shadow when disposed, and keeps the shared ones", () => {
+    // Why a stand-in canvas: without a 2D canvas the screens, chips and lift make no texture.
+    const g = new Proxy({} as Record<string | symbol, unknown>, {
+      get: (own, key) =>
+        key in own ? own[key] : () => ({ width: 8, addColorStop: () => undefined })
+    })
+    const canvas = { width: 0, height: 0, getContext: () => g }
+    Object.assign(globalThis, { document: { createElement: () => canvas } })
+    const built = (() => {
+      try {
+        return stageOf([member('a', 'working')], [floor('', ['a']), floor('m2', [])])
+      } finally {
+        Reflect.deleteProperty(globalThis, 'document')
+      }
+    })()
+    const { stage, scenes } = built
+    stage.draw(0)
+    const textures = new Set<THREE.Texture>()
+    const suns: THREE.DirectionalLight[] = []
+    scenes[0]!.traverse((o) => {
+      if (o instanceof THREE.DirectionalLight) {
+        suns.push(o)
+      }
+      for (const material of [(o as THREE.Mesh).material ?? []].flat()) {
+        for (const value of Object.values(material)) {
+          if (value instanceof THREE.Texture) {
+            textures.add(value)
+          }
+        }
+      }
+    })
+    const freed = new Set<THREE.Texture>()
+    for (const one of textures) {
+      one.addEventListener('dispose', () => freed.add(one))
+    }
+    const own = [...textures].filter((one) => !one.userData.shared)
+    expect(own.length).toBeGreaterThan(3)
+    const sunGone = vi.spyOn(suns[0]!, 'dispose')
+    stage.dispose()
+    expect(own.filter((one) => !freed.has(one))).toEqual([])
+    expect([...freed].filter((one) => one.userData.shared)).toEqual([])
+    expect(sunGone).toHaveBeenCalled()
+  })
+
+  it("caps the shadow map where the client asks, and keeps the desktop's 2048 otherwise", () => {
+    const sunOf = (limits?: { pixelRatio: number; shadowMap: number }) => {
+      const r = renderer()
+      office3dStage(r.fake, {
+        width: 350,
+        dark: false,
+        status,
+        input: input([member('a', 'working')]),
+        layout: teamOffice3dLayoutOf([floor('', ['a'])], { leadAdvisor: false }),
+        pace: 'normal',
+        words: { thisMachine: 'This Mac', offline: 'Offline' },
+        ...(limits ? { limits } : {})
+      }).draw(0)
+      let sun: THREE.DirectionalLight | null = null
+      r.scenes[0]!.traverse((o) => {
+        sun = o instanceof THREE.DirectionalLight ? o : sun
+      })
+      return (sun as THREE.DirectionalLight | null)!.shadow.mapSize.x
+    }
+    expect(sunOf({ pixelRatio: 1.5, shadowMap: 1024 })).toBe(1024)
+    expect(sunOf()).toBe(2048)
+  })
+
   it('sizes the canvas to the panel width and draws a frame', () => {
     const { stage, scenes, setSize } = stageOf([member('a', 'working')], [floor('', ['a'])])
     expect(setSize).toHaveBeenCalledWith(350, stage.height, true)
@@ -576,6 +644,69 @@ describe('the 3D Office stage', () => {
         }
       })
       expect(inLobby).toHaveLength(1)
+    })
+
+    // ORCA-1336: the lobby TV shows a game while someone plays, in motion and in a still frame.
+    it('runs the lobby TV while a member sits at the console, and leaves it dark otherwise', () => {
+      const tv = { made: false }
+      const canvases: { width: number; height: number }[] = []
+      // Any 2D call answers itself, so every painter in the stage runs; fills are counted below.
+      const ctx: object = new Proxy(
+        {},
+        {
+          get: (_, key) => (key === 'measureText' ? () => ({ width: 10 }) : () => ctx),
+          set: () => true
+        }
+      )
+      const painted = new Map<object, number>()
+      vi.stubGlobal('document', {
+        createElement: () => {
+          const canvas = {
+            width: 0,
+            height: 0,
+            getContext: () =>
+              new Proxy(ctx, {
+                get: (target, key) =>
+                  key === 'fillRect'
+                    ? () => painted.set(canvas, (painted.get(canvas) ?? 0) + 1)
+                    : Reflect.get(target, key)
+              })
+          }
+          canvases.push(canvas)
+          return canvas
+        }
+      })
+      try {
+        const tvFills = (resting: string[], reads: [number, number], t: number) => {
+          painted.clear()
+          canvases.length = 0
+          const layout = teamOffice3dLayoutOf(floors(), { leadAdvisor: false })
+          const traffic = office3dTraffic()
+          office3dTrafficRead(traffic, layout, input(team([])), reads[0], 'normal')
+          office3dTrafficRead(traffic, layout, input(team(resting)), reads[1], 'normal')
+          const stage = office3dStage(renderer().fake, {
+            width: 350,
+            dark: false,
+            status,
+            input: input(team(resting)),
+            layout,
+            pace: 'normal',
+            words: { thisMachine: 'This Mac', offline: 'Offline' },
+            traffic
+          })
+          stage.draw(t)
+          const screen = canvases.find((c) => c.width === 256 && c.height === 140)
+          tv.made = screen !== undefined
+          return screen ? (painted.get(screen) ?? 0) : -1
+        }
+        expect(tvFills(['c', 'd'], [0, 1], 400)).toBeGreaterThan(5)
+        expect(tv.made).toBe(true)
+        expect(tvFills([], [0, 1], 400)).toBe(1)
+        // Reduced motion draws one still frame at 1.3, long before reads on the page's clock.
+        expect(tvFills(['c', 'd'], [400, 500], 1.3)).toBeGreaterThan(5)
+      } finally {
+        vi.stubGlobal('document', undefined)
+      }
     })
 
     it('flies the table-tennis ball only while two hold the paddles', () => {

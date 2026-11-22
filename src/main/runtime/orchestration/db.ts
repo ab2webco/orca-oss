@@ -5651,6 +5651,35 @@ export class OrchestrationDb {
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
   }
 
+  /** Ends a live attachment and keeps its pane: release never closes a detached member (ORCA-1326). */
+  detachRemoteAttachment(dispatchId: string): RemoteDispatchAttachmentRow {
+    const attachment = this.getRemoteDispatchAttachment(dispatchId)
+    if (!attachment) {
+      throw new OrchestrationError(
+        'dispatch_not_found',
+        `Remote Dispatch ${dispatchId} was not found.`
+      )
+    }
+    if (['succeeded', 'failed', 'stopped', 'abandoned'].includes(attachment.state)) {
+      return attachment
+    }
+    if (!['ready', 'start_unknown'].includes(attachment.state)) {
+      throw new OrchestrationError(
+        'dispatch_inactive',
+        `Remote Dispatch ${dispatchId} cannot detach from ${attachment.state}.`
+      )
+    }
+    this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET state = 'stopped', stage = 'detached', capability_hash = NULL,
+             updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('ready', 'start_unknown')`
+      )
+      .run(dispatchId)
+    return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
+  }
+
   // Why stage, not state: the settled outcome stays readable; only the resources are gone.
   markRemoteAttachmentReleased(dispatchId: string): void {
     this.db

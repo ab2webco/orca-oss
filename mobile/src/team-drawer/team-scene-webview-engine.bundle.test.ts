@@ -266,6 +266,18 @@ describe('the Team scene WebView bundle', () => {
     expect(page.thrown).toEqual([])
   })
 
+  // ORCA-1335: only a 3D stage has a camera; the 2D engine reads any other kind as a new stage.
+  it('leaves a 2D stage alone when the sheet sends a camera move', async () => {
+    const page = loadPage(true, { threeD: { style: { display: 'none' } } })
+    await pixelStage(page)
+    page.flush(5)
+    await page.send({ kind: 'camera', mode: 'all' })
+    await page.send({ kind: 'camera', pan: [12, -4], zoom: 1.5 })
+    page.flush(5)
+    expect(page.posted.map((one) => one.kind)).toEqual(['loaded', 'ready'])
+    expect(page.thrown).toEqual([])
+  })
+
   it('stops drawing after a paint throws, and says so once', async () => {
     const page = loadPage(true)
     await pixelStage(page)

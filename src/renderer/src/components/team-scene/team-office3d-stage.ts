@@ -17,6 +17,7 @@ import { dioramaAim, dioramaLeadZoom, type DioramaView } from './team-diorama-vi
 import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
+import type { DioramaRenderLimits } from './team-diorama-stage'
 import { office3dDev } from './team-office3d-dev'
 import { office3dCallPanel, office3dMark } from './team-office3d-lift'
 import {
@@ -33,7 +34,7 @@ import {
 import { paintOffice3dBoard, paintOffice3dScreen, paintOffice3dWall } from './team-office3d-screens'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 import { office3dLeadActor } from './team-office3d-lead-actor'
-import { office3dLobby } from './team-office3d-lobby'
+import { office3dLobby, office3dLobbyTv } from './team-office3d-lobby'
 import {
   office3dLeavers,
   office3dMover,
@@ -76,6 +77,7 @@ export function office3dStage(
     layout: Office3dLayout
     pace: string
     maxHeight?: number
+    limits?: DioramaRenderLimits
     /** The stage's exact height: the whole building is fitted into it. */
     height?: number
     /** The panel's camera, kept across reads: it follows the lead, frames it all, or stays put. */
@@ -89,7 +91,8 @@ export function office3dStage(
   const kit = dioramaKit(dark ? NIGHT : DAY, args.status)
   const X = dark ? OFFICE3D_NIGHT : OFFICE3D_DAY
   const scene = new THREE.Scene()
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  const limits = args.limits ?? { pixelRatio: 2, shadowMap: 2048 }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, limits.pixelRatio))
   renderer.shadowMap.enabled = true
   // Why see-through: the building stands on the panel's own background, not the islands' sea.
   renderer.setClearColor(0x000000, 0)
@@ -99,7 +102,7 @@ export function office3dStage(
   )
   const sun = new THREE.DirectionalLight(raw(kit.p.sun), kit.p.sunI * Math.PI)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
+  sun.shadow.mapSize.set(limits.shadowMap, limits.shadowMap)
   sun.shadow.bias = -0.0006
   scene.add(sun, sun.target)
   const world = new THREE.Group()
@@ -119,7 +122,10 @@ export function office3dStage(
     calls.push(office3dCallPanel(kit, X, built.group, i).light)
     world.add(built.group)
     if (floor.lobby) {
-      world.add(office3dLobby(kit, X, floor, dark))
+      world.add(office3dLobby(kit, X, floor))
+      const tv = office3dLobbyTv(kit, floor, i, here)
+      world.add(tv.group)
+      ticks.push(tv.tick)
     }
     if (floor.office) {
       world.add(office3dLeadOffice(kit, X, floor))
@@ -296,6 +302,10 @@ export function office3dStage(
       keepOffice3dChipsInFrame(chips, fit.camera)
       office3dRenderByFloor(renderer, scene, world, fit.camera, layout.floors.length)
     },
-    dispose: () => kit.dispose(world)
+    // Why the sun too: its shadow map lives outside the world, and leaked on every rebuild.
+    dispose: () => {
+      kit.dispose(world)
+      sun.dispose()
+    }
   }
 }

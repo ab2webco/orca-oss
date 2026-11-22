@@ -112,6 +112,17 @@ const propsOf = (component: string, i: number): Record<string, unknown> => {
 
 type Counts = { renders: number; feedback: number }
 
+type Drawn = { part?: { plugin?: string }; children?: readonly unknown[] }
+
+// Why a walk: from 2.1.328 core stacks each plugin's AbovePrompt row under its own Box (ORCA-1332).
+const pluginsDrawn = (node: unknown): string[] => {
+  if (typeof node !== 'object' || node === null) {
+    return []
+  }
+  const { part, children = [] } = node as Drawn
+  return [...(part?.plugin ? [part.plugin] : []), ...children.flatMap(pluginsDrawn)]
+}
+
 const start = async ($: Engine, on: On, role: Role, counts: Counts) => {
   const clock = mock.clock(on)
   mock.env(on, {
@@ -194,10 +205,8 @@ describe('render loops', () => {
             await ui.redraw(propsOf(target.component, i) as never)
           }
           await clock.settle()
-          // Why the drawer: a render that throws falls back to the next hook's tree.
-          expect(((await ui.drawn()) as { part?: { plugin?: string } }).part?.plugin).toBe(
-            'orca-game'
-          )
+          // Why the drawer: a render that throws leaves no orca-game part, whatever draws in its place.
+          expect(pluginsDrawn(await ui.drawn())).toContain('orca-game')
           expect(counts.renders - before.renders).toBeLessThanOrEqual(BURST)
           expect(counts.feedback - before.feedback).toBeLessThanOrEqual(FEEDBACK_MAX)
           await ui.unmount()

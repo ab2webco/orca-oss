@@ -107,7 +107,9 @@ function glowMap(): THREE.Texture | null {
   r.addColorStop(1, 'rgba(255,255,255,0)')
   g.fillStyle = r
   g.fillRect(0, 0, 64, 64)
-  return (glowTexture = new THREE.CanvasTexture(c))
+  glowTexture = new THREE.CanvasTexture(c)
+  glowTexture.userData.shared = true
+  return glowTexture
 }
 
 /** Shared geometry and materials for one world, as the approved prototype builds them. */
@@ -186,17 +188,27 @@ export function dioramaKit(p: DioramaPalette, status: TeamSceneStatusColors) {
   // Why seeded: the same team draws the same tufts, rocks and flames on every read.
   let seed = 11
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  // Why its textures too: a material's dispose leaves its maps (screens, chips, the lift) on the
+  // GPU, and a stage is rebuilt on every read; textures marked shared outlive every stage.
+  const free = (material: THREE.Material) => {
+    for (const value of Object.values(material)) {
+      if (value instanceof THREE.Texture && !value.userData.shared) {
+        value.dispose()
+      }
+    }
+    material.dispose()
+  }
   const dispose = (root: THREE.Object3D) => {
     // Why each mesh's own material too: figures and cues make their own, outside this kit's map.
     root.traverse((o) => {
       const m = o as THREE.Mesh
       m.geometry?.dispose()
       for (const one of [m.material ?? []].flat()) {
-        one.dispose()
+        free(one)
       }
     })
     for (const m of mats.values()) {
-      m.dispose()
+      free(m)
     }
   }
   return { p, status, mat, basic, mesh, box, glow, windowMat, rnd, dispose }

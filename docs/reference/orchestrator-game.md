@@ -1024,7 +1024,11 @@ matches …` (ORCA-866).
   still reports to the lead is detached first with `orchestration.workerDetach`: the dispatch
   settles as stopped (stage `detached`), its capability and questions close, and its terminal
   becomes the user's, so no release or recovery closes the pane. A live member on a paired host is
-  refused, naming the host, since that host's stop closes the pane there.
+  detached on that host first (ORCA-1326): the lead's runtime checks the host advertises
+  `orchestration.federation-detach.v1`, calls its `orchestration.federationDetach`, and settles the
+  dispatch at home only once the host answers that it detached it, so a dropped connection leaves
+  the member live in the fleet. The host's later release keeps a detached member's pane and
+  worktree. An older host is refused, naming the host and its Orca version.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
@@ -1454,6 +1458,15 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
+- An escalation or decision gate waits on the lead until a reply threads it, or until `game stop`
+  released its dispatch and no live member reuses its terminal (ORCA-1267). A member that sent
+  worker_done keeps its mail waiting, and so does one whose pane Orca has not registered yet: after a
+  restart a daemon-held pane stays unregistered until the UI opens it. `orchestration reply` takes
+  mail sent to `run:<id>` from that Run's current consumer, so the lead can answer a member's status
+  mail, not only its question. A remote member's mail arrives as from `dispatch:<id>`: while that
+  member is live the reply goes over the relay to its host, and the CLI says whether the host took
+  it. A reply to a member that reported or was released never reopens it: it is kept at home only,
+  and the CLI says so; `orchestration send --to dispatch:<id>` gives it more work.
 - What the lead asks the person is a record, not chat text (ORCA-782): `game ask-owner` keeps the
   question with its ticket, up to 6 options, a context line and the time asked in the project's board
   file, next to its events ([`orchestrator-game-owner-questions.ts`](../../src/shared/orchestrator-game-owner-questions.ts)).

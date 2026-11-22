@@ -2,7 +2,7 @@ import { teamSceneArtMaxWidth } from './team-scene-art-width'
 import type { OrchestratorGameSceneNativeStyle } from '../../../../shared/orchestrator-game-scene-native'
 import { teamSceneScaleAt } from '../../../../shared/team-scene/team-scene-motion'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
-import { figureSeedOf } from './team-scene-figure-looks'
+import { teamSceneSheetIndexOf } from '../../../../shared/team-scene/team-scene-member-looks'
 import { drawImagePortrait } from './team-scene-image-portrait'
 import type {
   TeamSceneFrame,
@@ -228,7 +228,7 @@ export function createImagePainter(args: {
   }
 
   const sheetOf = (art: RoleArt, a: TeamScenePortraitSubject): TeamSceneArtImage =>
-    image(art.sheets[figureSeedOf(a.characterKey ?? a.key) % art.sheets.length]!)
+    image(art.sheets[teamSceneSheetIndexOf(a, art.sheets.length)]!)
   const backLookOf = createOfficeBackLooks()
 
   const portrait = (g: CanvasRenderingContext2D, a: TeamScenePortraitSubject, size: number) =>

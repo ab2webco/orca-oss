@@ -10,6 +10,7 @@ import { resolveOrchestratorGamePanel } from './orchestrator-game-panel-layers'
 import {
   GAME_PANEL_STYLES,
   gamePanelLookOfLegacy,
+  gamePanelPublishedOf,
   parseGamePanel,
   resolveGamePanel,
   withGamePanelField
@@ -310,5 +311,20 @@ describe('orchestratorGame.panel.diorama', () => {
     expect(parseGamePanel({ diorama: 'yes' }).warnings).toEqual([
       'orchestratorGame.panel.diorama must be true or false'
     ])
+  })
+})
+
+describe('gamePanelPublishedOf (ORCA-1334)', () => {
+  const panel = resolveGamePanel([], legacy)
+
+  it('says the host draws the Office in 3D only for the Office at Illustrated', () => {
+    expect(gamePanelPublishedOf({ ...panel, style: 'office', quality: 'high' }).office3d).toBe(true)
+    for (const one of [
+      { style: 'office', quality: 'low' },
+      { style: 'figures', quality: 'high' },
+      { style: 'pixel', quality: 'high' }
+    ] as const) {
+      expect(gamePanelPublishedOf({ ...panel, ...one })).not.toHaveProperty('office3d')
+    }
   })
 })

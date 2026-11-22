@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { gameInboxesOf } from '../../shared/orchestrator-game-inbox'
 import { gameInboxSourceOf, type GameInboxDb } from './orchestrator-game-inbox-source'
 
 const row = (id: string, to: string) => ({
@@ -120,5 +121,54 @@ describe('gameInboxSourceOf', () => {
       { term_peer: 'Bo' }
     )
     expect(source.peerLeads).toEqual({ term_peer: 'Bo' })
+  })
+
+  // Why (ORCA-1267): a member keeps working on review rounds after worker_done, and after a restart
+  // its daemon-held pane can stay unregistered until the UI opens it.
+  it('keeps a completed member whose pane does not resolve waiting on the lead for an escalation it sends', () => {
+    const { db } = fakeDb()
+    // Why the extra fields: the real row carries them, and none of them mutes the member.
+    const worker = {
+      dispatchId: 'd1',
+      taskId: 't1',
+      agentTerminalHandle: 'term_unregistered',
+      workerState: 'succeeded',
+      dispatchStatus: 'completed',
+      terminalState: 'reclaimable' as const,
+      resource: { pane_key: 'tab:unregistered' }
+    }
+    db.listWorkerTerminalResources = () => [worker]
+    db.getAllMessagesForHandle = (handle) =>
+      handle === 'run:run_1'
+        ? [{ ...row('msg_7', 'run:run_1'), from_handle: 'term_unregistered', type: 'escalation' }]
+        : []
+
+    const source = gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' })
+
+    expect(source.releasedSenders).toEqual([])
+    const lead = gameInboxesOf(source, {}).find((inbox) => inbox.key === 'lead')
+    expect(lead?.waiting.map((one) => one.id)).toContain('msg_7')
+  })
+
+  it('names a released local and a released remote dispatch, not a live one sharing the terminal', () => {
+    const { db } = fakeDb()
+    db.listWorkerTerminalResources = () => [
+      { dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term_1', terminalState: 'released' },
+      {
+        dispatchId: 'd2',
+        taskId: 't1',
+        agentTerminalHandle: 'term_2',
+        terminalState: 'reclaimable'
+      },
+      { dispatchId: 'd3', taskId: 't9', agentTerminalHandle: 'term_3' },
+      { dispatchId: 'd4', taskId: 't9', agentTerminalHandle: 'term_4' },
+      { dispatchId: 'd5', taskId: 't9', agentTerminalHandle: 'term_1', terminalState: 'active' }
+    ]
+    db.getFederatedDispatch = (id) => (id === 'd3' || id === 'd4' ? { id } : undefined)
+    db.getWorkerDispatch = (id) => ({ stage: id === 'd3' ? 'released' : 'ready' })
+
+    expect(
+      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).releasedSenders
+    ).toEqual(['dispatch:d1', 'dispatch:d3', 'term_3'])
   })
 })

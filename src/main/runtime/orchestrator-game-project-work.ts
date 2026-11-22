@@ -244,7 +244,12 @@ export async function readGameProjectWork(
         )
       : null
   const queue = repo ? await readGitHubQueue(port) : null
-  return { reviews, todo, ...(queue ? { queue } : {}) }
+  return {
+    reviews,
+    todo,
+    ...(queue ? { queue } : {}),
+    ...(reviews ? {} : { reviewsFailedOn: repo ? ('github' as const) : ('other' as const) })
+  }
 }
 
 /**
@@ -253,12 +258,35 @@ export async function readGameProjectWork(
  */
 export class GameProjectWorkCache {
   private readonly cache: GameReadCache<GameProjectWork>
+  private readonly freshAt = new Map<string, number>()
 
-  constructor(ttlMs: GameCacheTtl, now: () => number = Date.now) {
+  constructor(
+    ttlMs: GameCacheTtl,
+    private readonly now: () => number = Date.now
+  ) {
     this.cache = new GameReadCache(ttlMs, now, { refreshInBackground: true })
   }
 
-  async read(key: string, load: () => Promise<GameProjectWork>): Promise<GameProjectWork> {
+  /** `fresh`: the panel's Retry now; honoured once per key every 10 s so taps cannot spend the budget. */
+  async read(
+    key: string,
+    load: () => Promise<GameProjectWork>,
+    options: { fresh?: boolean } = {}
+  ): Promise<GameProjectWork> {
+    if (options.fresh) {
+      const at = this.now()
+      for (const [one, since] of this.freshAt) {
+        if (at - since >= FRESH_READ_GAP_MS) {
+          this.freshAt.delete(one)
+        }
+      }
+      if (!this.freshAt.has(key)) {
+        this.freshAt.set(key, at)
+        this.cache.forget(key)
+      }
+    }
     return (await this.cache.read(key, load)) ?? { reviews: null, todo: null }
   }
 }
+
+const FRESH_READ_GAP_MS = 10_000

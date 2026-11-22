@@ -1,3 +1,4 @@
+import { teamSceneMemberLookOf } from '../../../../shared/team-scene/team-scene-member-looks'
 import type * as THREE from 'three'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
 import { dioramaActivitySpotsOf } from '../../../../shared/team-scene/team-diorama-activities'
@@ -16,7 +17,7 @@ import {
 } from '../../../../shared/team-scene/team-diorama-nav'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { dioramaPoof } from './team-diorama-cue-meshes'
-import { dioramaFigure, dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
+import { dioramaFigure, type DioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
 import { POSE_OF_ACTION, poseDioramaFigure, type DioramaPose } from './team-diorama-poses'
 import { dioramaActivity, type DioramaTick } from './team-diorama-props'
@@ -84,9 +85,17 @@ export function dioramaCast(
       if (!view || !member || view.action === 'gone' || view.action === 'start') {
         continue
       }
-      const f = dioramaFigure(k, dioramaLookOf(member.characterKey ?? member.key), {
-        lite: args.lite
-      })
+      const f = dioramaFigure(
+        k,
+        teamSceneMemberLookOf({
+          role: 'member',
+          key: member.key,
+          characterKey: member.characterKey
+        }),
+        {
+          lite: args.lite
+        }
+      )
       world.add(f.g)
       figures.set(member.key, f)
       const spot = spots.get(member.key)

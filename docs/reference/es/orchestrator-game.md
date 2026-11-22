@@ -1,5 +1,5 @@
 ---
-sourceHash: 371020a70bc0691d
+sourceHash: ab59ff47f2736525
 ---
 
 # El juego orquestador de Agent Teams
@@ -1079,8 +1079,12 @@ matches …` (ORCA-866).
   máquina cuyo dispatch todavía reporta al líder se desvincula primero con
   `orchestration.workerDetach`: el dispatch se cierra como detenido (etapa `detached`), su capacidad y
   sus preguntas se cierran, y su terminal pasa a ser del usuario, así que ninguna liberación ni
-  recuperación cierra el pane. Un miembro vivo en un host emparejado se rechaza, nombrando el host,
-  ya que la detención de ese host cierra el pane allí.
+  recuperación cierra el pane. Un miembro vivo en un host emparejado se desvincula primero en ese
+  host (ORCA-1326): el runtime del líder comprueba que el host anuncia
+  `orchestration.federation-detach.v1`, llama a su `orchestration.federationDetach` y cierra el
+  dispatch en casa sólo cuando el host responde que lo desvinculó, así que una conexión caída deja
+  al miembro vivo en la flota. La liberación posterior del host conserva el pane y el worktree de un
+  miembro desvinculado. Un host más viejo se rechaza, nombrando el host y su versión de Orca.
 - `orca game stop [<ticket>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).
@@ -1552,6 +1556,16 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   confirma su correo (ORCA-746 T6): `game fleet` muestra el NEXT del miembro como
   `waiting on you: orchestration reply --id <msg>` hasta que la pregunta se responde o se cierra, y
   `game state` la lista bajo el inbox del líder.
+- Una escalación o un decision gate espera al líder hasta que una respuesta lo enhebra, o hasta que
+  `game stop` liberó su dispatch y ningún miembro vivo reusa su terminal (ORCA-1267). Un miembro que
+  envió worker_done mantiene su correo esperando, y también uno cuyo panel Orca aún no registró: tras
+  un reinicio, un panel que vive en el daemon sigue sin registrar hasta que la UI lo abre.
+  `orchestration reply` acepta el correo enviado a `run:<id>` desde el consumidor actual de ese Run,
+  así que el líder puede responder el correo de estado de un miembro, no sólo su pregunta. El correo
+  de un miembro remoto llega como de `dispatch:<id>`: mientras ese miembro está vivo la respuesta va
+  por el relay a su host, y el CLI dice si el host la tomó. Una respuesta a un miembro que ya reportó
+  o fue liberado nunca lo reabre: queda sólo en casa, y el CLI lo dice;
+  `orchestration send --to dispatch:<id>` le da más trabajo.
 - Lo que el líder le pregunta a la persona es un registro, no texto de chat (ORCA-782): `game ask-owner`
   guarda la pregunta con su ticket, hasta 6 opciones, una línea de contexto y la hora en que se
   preguntó en el archivo del tablero del proyecto, junto a sus eventos ([`orchestrator-game-owner-questions.ts`](../../../src/shared/orchestrator-game-owner-questions.ts)).

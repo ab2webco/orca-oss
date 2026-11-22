@@ -51,10 +51,16 @@ const useTeamPanelModelStore = create<{
   source: TeamPanelModelSource
   /** The host the source was read from, for reads that must go to the same one. */
   target: RuntimeClientTarget | null
+  /** The scope the panel shows: a held team's while a remote member's worktree is focused. */
+  scopeKey: string | null
 }>(() => ({
   source: { section: { kind: 'loading' }, retry: null },
-  target: null
+  target: null,
+  scopeKey: null
 }))
+
+export const useTeamPanelScopeKey = (): string | null => useTeamPanelModelStore((s) => s.scopeKey)
+export const teamPanelScopeKeyNow = (): string | null => useTeamPanelModelStore.getState().scopeKey
 
 const NO_MEMBERS: readonly TeamMemberCard[] = []
 const membersOf = (source: TeamPanelModelSource): readonly TeamMemberCard[] =>
@@ -92,11 +98,11 @@ const poller = createTeamPanelModelPoller(
     readLeads: readTeamLeadRoster,
     findCaller: (roster, scope) => teamLeadCallerOf(roster, scope.worktreeIds),
     // Why: the scene's art and the sidebar's history come from the host game.state is read on (ORCA-1150).
-    readState: (target, caller) => {
+    readState: (target, caller, options) => {
       const { worktreeId, terminalHandle } = caller
       publishTeamSceneArtHost({ target, caller: { worktreeId, terminalHandle } })
       useTeamPanelModelStore.setState({ target })
-      return readTeamLeadState(target, caller)
+      return readTeamLeadState(target, caller, options)
     },
     readQuestions: readTeamOwnerQuestions,
     readXp: readTeamXp,
@@ -111,7 +117,7 @@ const poller = createTeamPanelModelPoller(
       if (members !== NO_MEMBERS) {
         lastTeam = { scope, members }
       }
-      useTeamPanelModelStore.setState({ source })
+      useTeamPanelModelStore.setState({ source, scopeKey: scope?.key ?? null })
     },
     record: recordRendererCrashBreadcrumb
   },
@@ -120,6 +126,9 @@ const poller = createTeamPanelModelPoller(
 
 /** Reads the panel again now, after it changed something on the host. */
 export const refreshTeamPanelModel = (): void => poller.refresh()
+
+/** Retry now: the host re-reads this project's PRs and queue; settles when that read lands. */
+export const refreshTeamPanelModelFresh = (): Promise<void> => poller.refreshFresh()
 
 /**
  * No team means the user's own sessions: no lead, no workspace, or a host with no game.
@@ -162,10 +171,14 @@ export function useTeamPanelModel(options: { background?: boolean } = {}): TeamP
     lastTeam && isRemoteMemberWorktreeActive(lastTeam.members, s) ? lastTeam.scope.key : null
   )
   const scope = heldKey !== null && lastTeam?.scope.key === heldKey ? lastTeam.scope : activeScope
-  useEffect(
-    () => (scope ? poller.subscribe(scope, { background }) : undefined),
-    [scope, background]
-  )
+  useEffect(() => {
+    if (!scope) {
+      // Why (review N2a): no project shown, so no Answered list may keep the last one's answers.
+      useTeamPanelModelStore.setState({ scopeKey: null })
+      return undefined
+    }
+    return poller.subscribe(scope, { background })
+  }, [scope, background])
   // Why: an answer changes the Inbox count, and a Jev line the scene's bubble, now, not at the next 20 s read.
   useEffect(() => {
     if (!scope) {

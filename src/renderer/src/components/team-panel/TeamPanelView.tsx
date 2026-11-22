@@ -28,6 +28,8 @@ import {
   TeamPanelMessageState,
   TeamPanelUnavailableState
 } from './team-panel-section-state'
+import { TeamPanelLoadingShell } from './team-panel-loading-shell'
+import { teamSectionErrorTitle, TeamRetryNowButton } from './team-panel-retry-now'
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import type { TeamPanelLook } from './use-team-panel-look'
 import { TeamXpRow } from './TeamXpRow'
@@ -108,7 +110,14 @@ function TeamPanelTabBody({
         <TeamPanelUnavailableState title={copy.errorTitle} />
       )
     case 'error':
-      return <TeamPanelMessageState title={copy.errorTitle} text={view.message} tone="error" />
+      return (
+        <TeamPanelMessageState
+          title={teamSectionErrorTitle(view, copy.errorTitle)}
+          text={view.message}
+          tone="error"
+          footer={tab.retryNow ? <TeamRetryNowButton error={view} /> : null}
+        />
+      )
     case 'empty':
       return <TeamPanelMessageState title={copy.emptyTitle} text={copy.emptyText} />
     case 'ready':
@@ -219,14 +228,17 @@ export function TeamPanelView({
     }),
     [activityFilter, scope]
   )
+  const header = (
+    <TeamPanelHeader
+      model={model}
+      activeRepoId={activeRepoId}
+      hasRepoSettings={hasRepoSettings}
+      onOpenSettings={onOpenSettings}
+    />
+  )
   const body = (
     <>
-      <TeamPanelHeader
-        model={model}
-        activeRepoId={activeRepoId}
-        hasRepoSettings={hasRepoSettings}
-        onOpenSettings={onOpenSettings}
-      />
+      {header}
       {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
       {model?.kind === 'solo' ? <TeamFirstRunHint /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}
@@ -234,8 +246,6 @@ export function TeamPanelView({
         <TeamReadStatusContext.Provider value={readStatus}>
           <TeamPanelTabs model={section.value} />
         </TeamReadStatusContext.Provider>
-      ) : section.kind === 'loading' ? (
-        <TeamPanelLoadingState rows={5} />
       ) : section.kind === 'error' ? (
         <TeamReadError retry={retry} />
       ) : (
@@ -252,7 +262,11 @@ export function TeamPanelView({
         data-testid="team-panel"
         data-team-panel-state={model?.kind ?? section.kind}
       >
-        {model?.kind === 'team' && look === 'game' ? (
+        {section.kind === 'loading' ? (
+          <TeamPanelLoadingShell look={look} team={section.team === true}>
+            {header}
+          </TeamPanelLoadingShell>
+        ) : model?.kind === 'team' && look === 'game' ? (
           <TeamPanelScene
             model={model}
             style={sceneStyle}

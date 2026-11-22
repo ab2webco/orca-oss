@@ -1,11 +1,38 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import type { GameInboxQuestionGroup } from '@/components/game-inbox/use-other-game-inbox-groups'
-import { TeamInboxView } from './team-panel-inbox-tab'
+import { answerTeamInboxAgentOf, TeamInboxView } from './team-panel-inbox-tab'
+import { useAppStore } from '@/store'
+import {
+  useTeamInboxAgentAnswers,
+  useTeamInboxAgentAnswersHere
+} from './team-panel-inbox-agent-answers'
+import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
+
+const { answerTeamInboxAgent } = vi.hoisted(() => ({ answerTeamInboxAgent: vi.fn() }))
+vi.mock('./team-panel-inbox-agents', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isOneTapQuestion: () => true,
+  answerTeamInboxAgent
+}))
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
+const panel = vi.hoisted(() => ({
+  key: null as string | null,
+  set: (_key: string | null): void => {}
+}))
+vi.mock('./use-team-panel-model', async () => {
+  const { create } = await import('zustand')
+  const store = create(() => ({ key: panel.key }))
+  panel.set = (key: string | null) => store.setState({ key })
+  return {
+    teamPanelScopeKeyNow: () => store.getState().key,
+    useTeamPanelScopeKey: () => store((s) => s.key)
+  }
+})
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: () => ({
@@ -98,6 +125,7 @@ function renderInbox(
       onReply={vi.fn(async () => {})}
       agentQuestions={[]}
       answeredQuestions={[]}
+      agentAnswers={[]}
       onOpenAgent={vi.fn()}
       answerAgentOf={() => null}
       memberNames={new Map([['ORCA-1033', 'Sabio']])}
@@ -452,6 +480,77 @@ describe('Inbox tab', () => {
     const first = view.getByRole('button', { name: 'Apply it now' }) as HTMLButtonElement
     expect(first.disabled).toBe(true)
     expect(view.getByRole('button', { name: 'Open terminal' })).toBeTruthy()
+  })
+
+  // ORCA-1329 P9: an agent-pane question answered from For you lands in Answered, as V30 shows.
+  it('records a sent For you answer with only its question and the option picked', () => {
+    act(() => panel.set('local|repo-a'))
+    useTeamInboxAgentAnswers.setState({ answers: [] })
+    const asked = {
+      paneKey: 'tab-1:leaf-1',
+      worktreeId: 'wt-a',
+      text: 'Which migration runs first?',
+      options: ['0042 first', '0043 first']
+    } as TeamInboxAgentQuestion
+    answerTeamInboxAgent.mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    expect(answerTeamInboxAgentOf(asked)?.(1)).toBe(false)
+    expect(useTeamInboxAgentAnswers.getState().answers).toEqual([])
+    expect(answerTeamInboxAgentOf(asked)?.(1)).toBe(true)
+    expect(useTeamInboxAgentAnswers.getState().answers).toEqual([
+      { question: 'Which migration runs first?', answer: '0043 first', scope: 'local|repo-a' }
+    ])
+  })
+
+  // Review M1 + N2: an answer files under the panel it was given from, not the asking agent's worktree.
+  it("keeps a paired-host member's answer in its team's Answered, and out of other panels", () => {
+    act(() => panel.set('local|repo-a'))
+    useAppStore.setState({ activeWorktreeId: 'wt-a' })
+    useTeamInboxAgentAnswers.setState({ answers: [] })
+    answerTeamInboxAgent.mockReturnValueOnce(true)
+    const member = {
+      paneKey: 'p',
+      worktreeId: 'wt-on-box',
+      host: { kind: 'remote', environmentId: 'box' },
+      text: 'Q?',
+      options: ['Yes']
+    }
+    answerTeamInboxAgentOf(member as unknown as TeamInboxAgentQuestion)?.(0)
+    const here = renderHook(() => useTeamInboxAgentAnswersHere())
+    expect(here.result.current.map((one) => one.question)).toEqual(['Q?'])
+
+    act(() => panel.set('local|repo-b'))
+    expect(here.result.current).toEqual([])
+    act(() => panel.set('ssh:box|repo-a'))
+    expect(here.result.current).toEqual([])
+    act(() => panel.set('local|repo-a'))
+    expect(here.result.current).toHaveLength(1)
+  })
+
+  // Review N2a: with no project shown there is no scope, so no answer is listed.
+  it('lists no agent answer when no panel scope is shown', () => {
+    act(() => panel.set('local|repo-a'))
+    useTeamInboxAgentAnswers.setState({
+      answers: [{ question: 'Q?', answer: 'Yes', scope: 'local|repo-a' }]
+    })
+    const here = renderHook(() => useTeamInboxAgentAnswersHere())
+    expect(here.result.current).toHaveLength(1)
+
+    act(() => panel.set(null))
+    expect(here.result.current).toEqual([])
+  })
+
+  it("lists this session's agent answers in Answered and counts them", () => {
+    const view = renderInbox({
+      threads: { ...THREADS, answered: [] },
+      agentAnswers: [{ question: 'Which migration runs first?', answer: '0043 first', scope: 's' }]
+    })
+
+    expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('1')
+    pick(view, /Answered/)
+    const row = view.getByTestId('team-inbox-answered-agent')
+    expect(row.textContent).toContain('Which migration runs first?')
+    expect(row.textContent).toContain('You answered: 0043 first')
   })
 
   it('lists what you answered beside what the lead answered', () => {

@@ -37,6 +37,7 @@ const ORCHESTRATION_MUTATION_METHODS = new Set([
   'orchestration.federationAck',
   'orchestration.federationImport',
   'orchestration.federationStop',
+  'orchestration.federationDetach',
   'orchestration.federationRelease'
 ])
 

@@ -16,6 +16,7 @@ import type {
   TeamPrRow,
   TeamQueueEntry,
   TeamSection,
+  TeamSectionError,
   TeamStatus
 } from './team-panel-model-types'
 
@@ -59,15 +60,27 @@ function verdictOf(item: GameProjectItem): Pick<TeamPrRow, 'status' | 'reason'> 
   return { status: 'idle', reason: 'checksUnknown' }
 }
 
+// Why the host's word: the budget is host-wide, so it explains only a repo the host read on GitHub.
+// Absent = an older host, which keeps main's budget-only wording and no provider title (review N1).
 function failureOf(
+  failedOn: 'github' | 'other' | undefined,
   budget: GameGitHubBudget | undefined,
   texts: TeamPrFailureTexts,
   now: number
-): string {
-  const spent = [budget?.graphql, budget?.core].find((one) => one?.limit && one.remaining === 0)
+): TeamSectionError {
+  const spent =
+    failedOn === 'other'
+      ? undefined
+      : [budget?.graphql, budget?.core].find((one) => one?.limit && one.remaining === 0)
+  const provider = failedOn === 'github' ? { provider: 'GitHub' } : {}
   return spent
-    ? texts.githubLimit(Math.max(1, Math.ceil((spent.resetAt * 1000 - now) / 60_000)))
-    : texts.providerFailed
+    ? {
+        kind: 'error',
+        message: texts.githubLimit(Math.max(1, Math.ceil((spent.resetAt * 1000 - now) / 60_000))),
+        ...provider,
+        limited: true
+      }
+    : { kind: 'error', message: texts.providerFailed, ...provider }
 }
 
 /** Null hides the tab: turned off, or a folder workspace with no remote to review on. */
@@ -87,7 +100,7 @@ export function teamPrSectionOf(args: {
   }
   const list = state.project.reviews
   if (!list) {
-    return { kind: 'error', message: failureOf(state.githubBudget, args.texts, args.now) }
+    return failureOf(state.project.reviewsFailedOn, state.githubBudget, args.texts, args.now)
   }
   const rows = list.items
     .map(
@@ -160,7 +173,8 @@ export function teamQueueSectionOf(args: {
     return { kind: 'unavailable' }
   }
   if (!queue.entries) {
-    return { kind: 'error', message: failureOf(state.githubBudget, args.texts, now) }
+    // Why GitHub: the host reads a merge queue only from a GitHub repo.
+    return failureOf('github', state.githubBudget, args.texts, now)
   }
   return { kind: 'ready', value: queue.entries.map((one) => queueEntryOf(one, members, now)) }
 }

@@ -271,7 +271,15 @@ for (const plugins of [false, true]) {
       // Claude reports the answered tool and moves on; For you then empties.
       await postHook({ hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion' })
       await expect(question).toHaveCount(0, { timeout: TEAM_POLL_MS })
-      await expect(panel.getByText('Nothing waits for you')).toBeVisible()
+      // Why (review L1): For you itself must empty, so a card left behind after the answer fails.
+      await inbox.getByRole('tab', { name: /For you/ }).click()
+      await expect(inbox.getByText('No questions are waiting for you.')).toBeVisible()
+      // Why not empty (ORCA-1329 P9): the answered question is kept under Answered for the session.
+      await inbox.getByRole('tab', { name: /Answered/ }).click()
+      const answered = inbox.getByTestId('team-inbox-answered-agent')
+      await expect(answered).toHaveCount(1)
+      await expect(answered).toContainText(QUESTION)
+      await expect(answered).toContainText(OPTIONS[1])
       await expect(inboxTab).not.toContainText('1')
       if (!plugins) {
         await capturePanel(orcaPage, panel, 'member-after-answer', testInfo)

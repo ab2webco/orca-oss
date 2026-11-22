@@ -49,6 +49,45 @@ describe('orchestration RPC methods', () => {
       expect(result.message.run_id).toBe(activeRunId)
     })
 
+    it("lets the Run's current consumer reply to a status message sent to the Run", async () => {
+      setup()
+      const status = db.insertMessage({
+        from: 'term_worker',
+        to: `run:${activeRunId}`,
+        subject: 'Docs pushed',
+        type: 'escalation'
+      })
+
+      const result = (await call('orchestration.reply', {
+        id: status.id,
+        body: 'Thanks',
+        from: 'term_coord'
+      })) as { message: { from_handle: string; to_handle: string; thread_id: string } }
+
+      expect(result.message).toMatchObject({
+        from_handle: `run:${activeRunId}`,
+        to_handle: 'term_worker',
+        thread_id: status.id
+      })
+      expect(db.getMessageById(status.id)?.read).toBe(1)
+    })
+
+    it("refuses a reply to the Run's mail from a terminal that is not its consumer", async () => {
+      setup()
+      const status = db.insertMessage({
+        from: 'term_worker',
+        to: `run:${activeRunId}`,
+        subject: 'Docs pushed'
+      })
+
+      for (const from of ['term_worker', 'term_other']) {
+        await expect(
+          call('orchestration.reply', { id: status.id, body: 'Thanks', from })
+        ).rejects.toThrow('orchestration_sender_identity_mismatch')
+      }
+      expect(db.getMessageById(status.id)?.read).toBe(0)
+    })
+
     it('throws on nonexistent message', async () => {
       setup()
       await expect(call('orchestration.reply', { id: 'msg_fake', body: 'nope' })).rejects.toThrow(

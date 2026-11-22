@@ -24,7 +24,9 @@ const GameStateParams = z
     advisor: z.unknown().optional(),
     steward: z.unknown().optional(),
     // Why a string: a role this host does not know must not fail the poll.
-    role: z.string().optional()
+    role: z.string().optional(),
+    // Why optional: an older host strips it and answers from its cache (ORCA-1329).
+    fresh: z.boolean().optional()
   })
   .optional()
 

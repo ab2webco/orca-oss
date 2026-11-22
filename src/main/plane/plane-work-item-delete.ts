@@ -24,7 +24,7 @@ function workItemPath(
 // Deletes a work item (project-scoped). workItemId is the work item UUID; a
 // wrong id/UUID surfaces Plane's 404 as the mapped error rather than crashing.
 export async function deleteWorkItem(args: PlaneDeleteWorkItemArgs): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }

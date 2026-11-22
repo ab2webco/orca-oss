@@ -1,4 +1,5 @@
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
+import type { WorkerTerminalListState } from './orchestration/worker-terminal-ownership'
 import type {
   GameAnsweredQuestionMail,
   GameInboxMail,
@@ -10,9 +11,15 @@ export type GameInboxDb = {
   getCurrentRunForPane: (
     paneKey: string
   ) => { id: string; coordinator_handle: string | null } | undefined
-  listWorkerTerminalResources: (params: {
-    runId?: string
-  }) => { dispatchId: string; taskId: string; agentTerminalHandle: string | null }[]
+  listWorkerTerminalResources: (params: { runId?: string }) => {
+    dispatchId: string
+    taskId: string
+    agentTerminalHandle: string | null
+    terminalState?: WorkerTerminalListState | null
+  }[]
+  /** A remote member's home worker row: its stage is `released` once game stop freed it. */
+  getWorkerDispatch?: (dispatchId: string) => { stage: string } | undefined
+  getFederatedDispatch?: (dispatchId: string) => unknown
   getTask: (id: string) => { task_title: string | null; display_name: string | null } | undefined
   getAllMessagesForHandle: (handle: string, limit?: number) => GameInboxMail[]
   listPendingQuestions: (runId: string) => GameInboxMail[]
@@ -38,7 +45,8 @@ export function gameInboxSourceOf(
     ])
   ]
   const byTicket = new Map<string, string[]>()
-  for (const worker of run ? db.listWorkerTerminalResources({ runId: run.id }) : []) {
+  const workers = run ? db.listWorkerTerminalResources({ runId: run.id }) : []
+  for (const worker of workers) {
     const task = db.getTask(worker.taskId)
     // Why the name: an adopted agent's task has no ticket, and its mail still needs a home.
     const ticket =
@@ -62,5 +70,37 @@ export function gameInboxSourceOf(
   // Why: read apart from the mail window, so an old question still waits after a hundred newer messages.
   const pendingQuestions = run ? db.listPendingQuestions(run.id) : []
   const answeredQuestions = run ? db.listAnsweredQuestions(run.id, ANSWERED_QUESTIONS_MAX) : []
-  return { leadAddresses, members, mail, peerLeads, pendingQuestions, answeredQuestions }
+  return {
+    leadAddresses,
+    members,
+    mail,
+    peerLeads,
+    pendingQuestions,
+    answeredQuestions,
+    releasedSenders: releasedSendersOf(db, workers)
+  }
+}
+
+type GameInboxWorker = ReturnType<GameInboxDb['listWorkerTerminalResources']>[number]
+
+// Why (ORCA-1267): a member often keeps working in its pane after worker_done, so only game stop's
+// release means nobody can act on an answer. Never pane registry liveness: after a restart a
+// daemon-held pane stays unregistered until the UI opens it.
+function released(db: GameInboxDb, worker: GameInboxWorker): boolean {
+  if (db.getFederatedDispatch?.(worker.dispatchId)) {
+    return db.getWorkerDispatch?.(worker.dispatchId)?.stage === 'released'
+  }
+  return worker.terminalState === 'released'
+}
+
+const addressesOf = (worker: GameInboxWorker): string[] => [
+  `dispatch:${worker.dispatchId}`,
+  ...(worker.agentTerminalHandle ? [worker.agentTerminalHandle] : [])
+]
+
+// Why: a terminal a relaunched member still uses keeps its mail waiting on the lead.
+function releasedSendersOf(db: GameInboxDb, workers: readonly GameInboxWorker[]): string[] {
+  const gone = workers.filter((worker) => released(db, worker))
+  const live = new Set(workers.filter((worker) => !gone.includes(worker)).flatMap(addressesOf))
+  return [...new Set(gone.flatMap(addressesOf).filter((one) => !live.has(one)))]
 }

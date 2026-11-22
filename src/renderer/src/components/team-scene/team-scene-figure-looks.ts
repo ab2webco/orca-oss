@@ -1,3 +1,4 @@
+import { teamSceneLookSeedOf } from '../../../../shared/team-scene/team-scene-member-looks'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 
 export type FigureHat = 'crown' | 'helm' | 'cap' | 'band' | 'wizard'
@@ -44,14 +45,8 @@ const SKINS = ['#f1c6a0', '#e6b48c', '#d9a077', '#c98f66', '#8a5a3c'] as const
 const HATS: readonly FigureHat[] = ['helm', 'cap', 'band', 'wizard']
 const TOOLS: readonly FigureTool[] = ['sword', 'shield', 'hammer', 'staff']
 
-// FNV-1a: stable across hosts and runs, so a character keeps its look everywhere.
-export function figureSeedOf(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) {
-    h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
-  }
-  return h >>> 0
-}
+// Why one seed: the Team list sheet and the 3D figure must pick the same member look (ORCA-1336).
+export { teamSceneLookSeedOf as figureSeedOf } from '../../../../shared/team-scene/team-scene-member-looks'
 
 /** The lead wears the crown; a member's look follows its persistent character, not its pane. */
 export function figureLookOf(
@@ -63,7 +58,7 @@ export function figureLookOf(
   if (actor.role === 'advisor') {
     return ADVISOR
   }
-  const h = figureSeedOf(actor.characterKey ?? actor.key)
+  const h = teamSceneLookSeedOf(actor.characterKey ?? actor.key)
   return {
     ...OUTFITS[h % OUTFITS.length]!,
     skin: SKINS[(h >>> 4) % SKINS.length]!,

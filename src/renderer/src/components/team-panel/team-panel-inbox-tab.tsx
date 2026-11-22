@@ -11,6 +11,7 @@ import { translate } from '@/i18n/i18n'
 import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { teamPanelScopeKeyNow } from './use-team-panel-model'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
 import { GameInboxUndelivered } from '@/components/game-inbox/GameInboxUndelivered'
@@ -41,6 +42,11 @@ import {
   TeamInboxWaitingRows
 } from './team-panel-inbox-items'
 import { TeamInboxGroupLabel, TeamInboxOtherProjects } from './team-panel-inbox-other-projects'
+import {
+  recordTeamInboxAgentAnswer,
+  useTeamInboxAgentAnswersHere,
+  type TeamInboxAgentAnswer
+} from './team-panel-inbox-agent-answers'
 
 type InboxSubTab = 'for-you' | 'waiting' | 'threads' | 'answered'
 
@@ -63,6 +69,8 @@ export type TeamInboxViewProps = {
   agentQuestions: TeamInboxAgentQuestion[]
   /** This project's questions you already answered, newest first. */
   answeredQuestions: GameOwnerQuestion[]
+  /** Agent-pane questions answered from For you this session, newest first. */
+  agentAnswers: TeamInboxAgentAnswer[]
   onOpenAgent: (question: TeamInboxAgentQuestion) => void
   /** Null when the question cannot be answered with one option from here. */
   answerAgentOf: (question: TeamInboxAgentQuestion) => ((optionIndex: number) => boolean) | null
@@ -94,7 +102,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       'answered',
       translate('teamPanel.inbox.answered', 'Answered'),
       translate('teamPanel.inbox.answeredShort', 'Done'),
-      threads.answered.length + answeredQuestions.length
+      threads.answered.length + answeredQuestions.length + props.agentAnswers.length
     ]
   ]
   // Why short: the panel can be about 200 px wide, where a longer placeholder is cut.
@@ -222,6 +230,7 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
       </TabsContent>
       <TabsContent value="answered" className={LIST}>
         <TeamInboxAnsweredRows
+          agents={props.agentAnswers}
           yours={answeredQuestions}
           lead={threads.answered}
           now={Date.now()}
@@ -239,7 +248,10 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
   )
 }
 
-function answerAgentOf(question: TeamInboxAgentQuestion): ((index: number) => boolean) | null {
+/** One tap from For you; a sent answer joins this session's Answered list. */
+export function answerTeamInboxAgentOf(
+  question: TeamInboxAgentQuestion
+): ((index: number) => boolean) | null {
   if (!isOneTapQuestion(question)) {
     return null
   }
@@ -249,6 +261,16 @@ function answerAgentOf(question: TeamInboxAgentQuestion): ((index: number) => bo
       toast.error(
         translate('teamPanel.inbox.answerFailed', 'Could not send the answer. Open the terminal.')
       )
+      return sent
+    }
+    // Why the panel's scope, not the agent's: a member on another host answers into its team's list.
+    const scope = teamPanelScopeKeyNow()
+    if (scope) {
+      recordTeamInboxAgentAnswer({
+        question: question.text,
+        answer: question.options[index] ?? '',
+        scope
+      })
     }
     return sent
   }
@@ -277,6 +299,7 @@ export function TeamPanelInboxTab({
   // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
+  const agentAnswers = useTeamInboxAgentAnswersHere()
   const liveState = useAppStore(
     useShallow((s) => ({
       agentStatusByPaneKey: s.agentStatusByPaneKey,
@@ -310,8 +333,9 @@ export function TeamPanelInboxTab({
       onReply={threads.reply}
       agentQuestions={agentQuestions}
       answeredQuestions={answered}
+      agentAnswers={agentAnswers}
       onOpenAgent={openTeamInboxAgent}
-      answerAgentOf={answerAgentOf}
+      answerAgentOf={answerTeamInboxAgentOf}
       memberNames={memberNames}
     />
   )

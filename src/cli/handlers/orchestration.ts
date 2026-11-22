@@ -133,6 +133,21 @@ function workerRelayLineOf(relay: WorkerRelay): string {
   return `Queued ${relay.messageId} for worker Dispatch ${relay.dispatchId}`
 }
 
+// Why (ORCA-1267): a reply to a remote member is relayed or kept at home; "Replied" alone hid both.
+function replyLineOf(r: {
+  message: { id: string }
+  relay?: WorkerRelay
+  homeOnly?: { dispatchId: string }
+}): string {
+  if (r.relay) {
+    return `Replied ${r.message.id}. ${workerRelayLineOf(r.relay)}`
+  }
+  if (r.homeOnly) {
+    return `Replied ${r.message.id} at home only: Dispatch ${r.homeOnly.dispatchId} is not active on its host, so the member will not see it. To give it more work, use orca orchestration send --to dispatch:${r.homeOnly.dispatchId}.`
+  }
+  return `Replied ${r.message.id}`
+}
+
 function resolveCompatibilityCliCommand(): 'orca' | 'orca-ide' | 'orca-dev' {
   const configured = process.env.ORCA_CLI_COMMAND
   if (configured === 'orca' || configured === 'orca-ide' || configured === 'orca-dev') {
@@ -827,20 +842,19 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
 
   'orchestration reply': async ({ flags, client, cwd, json }) => {
     const from = await resolveOrchestrationTerminalHandle(flags, cwd, client, 'from')
-    const result = await callMutation<{ message: { id: string } }>(
-      client,
-      flags,
-      'orchestration.reply',
-      {
-        id: getRequiredStringFlag(flags, 'id'),
-        body: getRequiredStringFlag(flags, 'body'),
-        run: getOptionalStringFlag(flags, 'run'),
-        from,
-        senderPaneKey: process.env.ORCA_PANE_KEY || undefined,
-        senderLaunchToken: process.env.ORCA_AGENT_LAUNCH_TOKEN || undefined
-      }
-    )
-    printResult(result, json, (r) => `Replied ${r.message.id}`)
+    const result = await callMutation<{
+      message: { id: string }
+      relay?: WorkerRelay
+      homeOnly?: { dispatchId: string }
+    }>(client, flags, 'orchestration.reply', {
+      id: getRequiredStringFlag(flags, 'id'),
+      body: getRequiredStringFlag(flags, 'body'),
+      run: getOptionalStringFlag(flags, 'run'),
+      from,
+      senderPaneKey: process.env.ORCA_PANE_KEY || undefined,
+      senderLaunchToken: process.env.ORCA_AGENT_LAUNCH_TOKEN || undefined
+    })
+    printResult(result, json, replyLineOf)
   },
 
   'orchestration inbox': async ({ flags, client, json }) => {
