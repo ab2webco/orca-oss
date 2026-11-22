@@ -538,7 +538,7 @@ function AgentRow({
           <AgentIcon agent={agentId} size={16} />
         </div>
 
-        <div className="min-w-0 flex-1 sm:min-w-[12rem]">
+        <div className="min-w-0 flex-1 @min-[42rem]/agent-row:min-w-[12rem]">
           <div className="flex items-center gap-2" data-agent-row-name>
             <span className="text-sm font-medium leading-none">{label}</span>
             {!isEnabled && (
@@ -597,6 +597,7 @@ function AgentRow({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
+                data-agent-row-command
                 onClick={() => setCmdOpen((prev) => !prev)}
                 aria-label={
                   cmdOpen
