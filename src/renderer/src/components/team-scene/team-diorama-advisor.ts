@@ -1,3 +1,4 @@
+import { FIGURES_ADVISOR_LOOK } from '../../../../shared/team-scene/team-scene-member-looks'
 import * as THREE from 'three'
 import { dioramaCuePhase, type DioramaCue } from '../../../../shared/team-scene/team-diorama-cues'
 import { DIORAMA_TOWER_AT, DIORAMA_TOWER_PLATFORM } from './team-diorama-camp'
@@ -26,7 +27,7 @@ export function dioramaAdvisor(
   lite: boolean,
   line: string | null
 ): DioramaAdvisor {
-  const figure = dioramaFigure(k, 1, { role: 'advisor', lite })
+  const figure = dioramaFigure(k, FIGURES_ADVISOR_LOOK, { lite })
   figure.g.position.set(DIORAMA_TOWER.x, 0, DIORAMA_TOWER.z)
   figure.baseY = DIORAMA_TOWER.y
   parent.add(figure.g)

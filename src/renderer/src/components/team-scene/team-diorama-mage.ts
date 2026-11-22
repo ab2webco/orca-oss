@@ -4,7 +4,7 @@ import {
   dioramaLeadJumpAt,
   type DioramaLeadRound
 } from '../../../../shared/team-scene/team-diorama-lead-round'
-import { dioramaFigure } from './team-diorama-figures'
+import { DIORAMA_MAGE_LOOK, dioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
 import { poseDioramaFigure } from './team-diorama-poses'
 import type { DioramaTick } from './team-diorama-props'
@@ -48,7 +48,7 @@ export function dioramaMage(
   round: DioramaLeadRound,
   lite: boolean
 ): DioramaTick {
-  const mage = dioramaFigure(k, 4, { role: 'mage', lite })
+  const mage = dioramaFigure(k, DIORAMA_MAGE_LOOK, { lite })
   mage.g.position.set(DIORAMA_MAGE[0], 0, DIORAMA_MAGE[1])
   parent.add(mage.g)
   const orb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), glowing(0))
