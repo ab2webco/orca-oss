@@ -10,7 +10,7 @@ const SETTLED = ['succeeded', 'failed', 'stopped', 'abandoned']
 export type FederationReleaseReceipt = {
   dispatchId: string
   state: 'released' | 'already_released' | 'retained'
-  reason?: 'not_settled' | 'identity_unproven'
+  reason?: 'not_settled' | 'identity_unproven' | 'user_takeover'
   closedTerminals: string[]
   removedWorktree: string | null
   worktreeError?: string
@@ -39,6 +39,10 @@ export const ORCHESTRATION_FEDERATION_RELEASE_METHODS: RpcMethod[] = [
       }
       if (!SETTLED.includes(attachment.state)) {
         return { ...receipt, state: 'retained', reason: 'not_settled' }
+      }
+      // Why: the lead detached it, so its pane and worktree belong to the person now (ORCA-1326).
+      if (attachment.stage === 'detached') {
+        return { ...receipt, state: 'retained', reason: 'user_takeover' }
       }
       const effects = JSON.parse(attachment.effects) as FederationEffect[]
       const agentEffect = effects.find(

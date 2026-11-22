@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
 import { requiredString } from '../schemas'
+import { detachFederatedWorker } from './orchestration-federated-worker-detach'
 import { isHostDispatchNotFound } from './orchestration-federated-worker-gone'
 import {
   inspectWorkerTerminal,
@@ -14,15 +15,15 @@ export const ORCHESTRATION_WORKER_STOP_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.workerDetach',
     params: WorkerDispatchParams,
-    // Why local only: a paired host's stop closes the pane there, so it needs a host method first.
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime, orchestrationMutation }) => {
       const db = runtime.getOrchestrationDb()
       const federated = db.getFederatedDispatch(params.dispatch)
       if (federated) {
-        throw new OrchestrationError(
-          'invalid_argument',
-          `Dispatch ${params.dispatch} runs on ${federated.environment_name}; detaching a member on a paired host needs an Orca update there.`
-        )
+        return await detachFederatedWorker({
+          runtime,
+          federated,
+          requestId: orchestrationMutation?.requestId
+        })
       }
       const detached = db.detachWorker(params.dispatch)
       if (detached.disposition === 'detached') {

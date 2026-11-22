@@ -178,6 +178,25 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         }
       }
     }
+  }),
+  defineMethod({
+    name: 'orchestration.federationDetach',
+    params: FederationDispatchParams,
+    handler: (params, { runtime, authenticatedCallerFingerprint }) => {
+      const before = requireHomeAttachment(
+        runtime,
+        params.dispatchId,
+        authenticatedCallerFingerprint
+      )
+      const attachment = runtime.getOrchestrationDb().detachRemoteAttachment(params.dispatchId)
+      return {
+        dispatchId: params.dispatchId,
+        state: attachment.state,
+        stage: attachment.stage,
+        alreadySettled: before.state === attachment.state,
+        processAction: 'none' as const
+      }
+    }
   })
 ]
 

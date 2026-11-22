@@ -25,7 +25,7 @@ export const ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS: CommandSpec[] = [
     positionalArgs: ['name'],
     notes: [
       'The agent stays out of the fleet and the Panel across refreshes and restarts, and is not resumed after a restart, until `orca game adopt` brings it back.',
-      'A member on this machine whose dispatch still reports to the lead is detached first: the dispatch ends, its pane keeps running. One on a paired host is refused until that host can detach it.'
+      'A member on this machine whose dispatch still reports to the lead is detached first: the dispatch ends, its pane keeps running. One on a paired host is detached there the same way; a host whose Orca cannot is refused by name and version.'
     ],
     examples: ['orca game drop ORCA-915', 'orca game drop orca-907 --json']
   }

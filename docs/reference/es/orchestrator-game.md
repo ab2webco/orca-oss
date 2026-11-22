@@ -1079,8 +1079,12 @@ matches …` (ORCA-866).
   máquina cuyo dispatch todavía reporta al líder se desvincula primero con
   `orchestration.workerDetach`: el dispatch se cierra como detenido (etapa `detached`), su capacidad y
   sus preguntas se cierran, y su terminal pasa a ser del usuario, así que ninguna liberación ni
-  recuperación cierra el pane. Un miembro vivo en un host emparejado se rechaza, nombrando el host,
-  ya que la detención de ese host cierra el pane allí.
+  recuperación cierra el pane. Un miembro vivo en un host emparejado se desvincula primero en ese
+  host (ORCA-1326): el runtime del líder comprueba que el host anuncia
+  `orchestration.federation-detach.v1`, llama a su `orchestration.federationDetach` y cierra el
+  dispatch en casa sólo cuando el host responde que lo desvinculó, así que una conexión caída deja
+  al miembro vivo en la flota. La liberación posterior del host conserva el pane y el worktree de un
+  miembro desvinculado. Un host más viejo se rechaza, nombrando el host y su versión de Orca.
 - `orca game stop [<ticket>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).
