@@ -373,7 +373,7 @@ describe('the Team sheet scene band', () => {
           state: State.ACTIVE,
           oldState: State.BEGAN
         })
-        for (const one of moves.slice(1)) {
+        for (const one of moves.slice(1, -1)) {
           DeviceEventEmitter.emit('onGestureHandlerEvent', { ...at(one), state: State.ACTIVE })
         }
         DeviceEventEmitter.emit('onGestureHandlerStateChange', {
@@ -440,9 +440,16 @@ describe('the Team sheet scene band', () => {
         { translationX: 34, translationY: -40 }
       ])
       await nextFrame()
-      // Why one message: the frame's moves arrive at once, not a script per touch event.
-      expect(messages().slice(injected)).toEqual([{ kind: 'camera', pan: [30, -42] }])
-      drive(pinch, [{ scale: 1 }, { scale: 1.5 }, { scale: 2 }])
+      // Why one message, the whole drag: the frame's moves arrive at once, from touch to release.
+      expect(messages().slice(injected)).toEqual([{ kind: 'camera', pan: [34, -40] }])
+      // A quick flick: its first move is already past the gesture's start, its last is the release.
+      drive(pan, [
+        { translationX: 55, translationY: 30 },
+        { translationX: 110, translationY: 60 }
+      ])
+      await nextFrame()
+      expect(messages().at(-1)).toEqual({ kind: 'camera', pan: [110, 60] })
+      drive(pinch, [{ scale: 1.2 }, { scale: 1.5 }, { scale: 2 }])
       await nextFrame()
       expect(messages().at(-1)).toEqual({ kind: 'camera', zoom: 2 })
     })

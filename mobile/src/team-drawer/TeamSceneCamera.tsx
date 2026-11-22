@@ -43,7 +43,7 @@ export function useTeamSceneCameraGesture(
       frame.current = null
       const out = pending.current
       pending.current = null
-      if (out) {
+      if (out && (out.pan[0] || out.pan[1] || out.zoom !== 1)) {
         send({
           kind: 'camera',
           ...(out.pan[0] || out.pan[1] ? { pan: out.pan } : {}),
@@ -52,6 +52,13 @@ export function useTeamSceneCameraGesture(
       }
     })
   }
+  // Why from the touch and to the release: a quick flick reports few moves, the first already past
+  // the gesture's start, so the world follows the whole drag as the desktop's pointer pan does.
+  const move = (e: { translationX: number; translationY: number }) => {
+    queue([e.translationX - last.current.x, e.translationY - last.current.y], 1)
+    last.current.x = e.translationX
+    last.current.y = e.translationY
+  }
   const pan = Gesture.Pan()
     .withTestId('team-scene-camera-pan')
     .enabled(enabled)
@@ -59,28 +66,29 @@ export function useTeamSceneCameraGesture(
     .minDistance(2)
     .runOnJS(true)
     .onStart((e) => {
-      last.current.x = e.translationX
-      last.current.y = e.translationY
+      last.current.x = 0
+      last.current.y = 0
+      move(e)
     })
-    .onUpdate((e) => {
-      queue([e.translationX - last.current.x, e.translationY - last.current.y], 1)
-      last.current.x = e.translationX
-      last.current.y = e.translationY
-    })
+    .onUpdate(move)
+    .onEnd(move)
     .blocksExternalGesture(...sheet)
+  const scale = (e: { scale: number }) => {
+    if (e.scale > 0) {
+      queue([0, 0], e.scale / last.current.scale)
+      last.current.scale = e.scale
+    }
+  }
   const pinch = Gesture.Pinch()
     .withTestId('team-scene-camera-pinch')
     .enabled(enabled)
     .runOnJS(true)
-    .onStart(() => {
+    .onStart((e) => {
       last.current.scale = 1
+      scale(e)
     })
-    .onUpdate((e) => {
-      if (e.scale > 0) {
-        queue([0, 0], e.scale / last.current.scale)
-        last.current.scale = e.scale
-      }
-    })
+    .onUpdate(scale)
+    .onEnd(scale)
     .blocksExternalGesture(...sheet)
   return Gesture.Simultaneous(pan, pinch)
 }
