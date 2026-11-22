@@ -4187,12 +4187,7 @@ export class OrcaRuntimeService {
         (handle) => this.getPaneKeyForTerminalHandle(handle) ?? null
       ),
     inboxSourceOf: (lead) =>
-      gameInboxSourceOf(
-        this.getOrchestrationDb(),
-        lead,
-        this.gameLeads.labels(),
-        (paneKey) => this.getPtyRecordForPaneKey(paneKey) !== null
-      ),
+      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
     tellLead: (lead, note) => {
       try {
         return tellGameLead(

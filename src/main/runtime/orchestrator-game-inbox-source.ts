@@ -16,7 +16,6 @@ export type GameInboxDb = {
     taskId: string
     agentTerminalHandle: string | null
     terminalState?: WorkerTerminalListState | null
-    resource?: { pane_key: string | null } | null
   }[]
   /** A remote member's home worker row: its stage is `released` once game stop freed it. */
   getWorkerDispatch?: (dispatchId: string) => { stage: string } | undefined
@@ -35,9 +34,7 @@ const ANSWERED_QUESTIONS_MAX = 100
 export function gameInboxSourceOf(
   db: GameInboxDb,
   lead: { handle: string; paneKey: string | null },
-  peerLeads: Readonly<Record<string, string>> = {},
-  /** Whether a local pane still exists; a member whose pane is gone cannot act on an answer. */
-  paneExists?: (paneKey: string) => boolean
+  peerLeads: Readonly<Record<string, string>> = {}
 ): GameInboxSource {
   const run = lead.paneKey ? db.getCurrentRunForPane(lead.paneKey) : undefined
   const leadAddresses = [
@@ -80,27 +77,20 @@ export function gameInboxSourceOf(
     peerLeads,
     pendingQuestions,
     answeredQuestions,
-    unreachableSenders: unreachableSendersOf(db, workers, paneExists)
+    releasedSenders: releasedSendersOf(db, workers)
   }
 }
 
 type GameInboxWorker = ReturnType<GameInboxDb['listWorkerTerminalResources']>[number]
 
-// Why (ORCA-1267): a member that sent worker_done often keeps working in its pane on review
-// rounds, so only a released dispatch or a gone pane means nobody can act on an answer.
-function unreachable(
-  db: GameInboxDb,
-  worker: GameInboxWorker,
-  paneExists?: (paneKey: string) => boolean
-): boolean {
-  if (worker.terminalState === 'released') {
-    return true
-  }
+// Why (ORCA-1267): a member often keeps working in its pane after worker_done, so only game stop's
+// release means nobody can act on an answer. Never pane registry liveness: after a restart a
+// daemon-held pane stays unregistered until the UI opens it.
+function released(db: GameInboxDb, worker: GameInboxWorker): boolean {
   if (db.getFederatedDispatch?.(worker.dispatchId)) {
     return db.getWorkerDispatch?.(worker.dispatchId)?.stage === 'released'
   }
-  const paneKey = worker.resource?.pane_key
-  return Boolean(paneKey && paneExists && !paneExists(paneKey))
+  return worker.terminalState === 'released'
 }
 
 const addressesOf = (worker: GameInboxWorker): string[] => [
@@ -109,12 +99,8 @@ const addressesOf = (worker: GameInboxWorker): string[] => [
 ]
 
 // Why: a terminal a relaunched member still uses keeps its mail waiting on the lead.
-function unreachableSendersOf(
-  db: GameInboxDb,
-  workers: readonly GameInboxWorker[],
-  paneExists?: (paneKey: string) => boolean
-): string[] {
-  const gone = workers.filter((worker) => unreachable(db, worker, paneExists))
+function releasedSendersOf(db: GameInboxDb, workers: readonly GameInboxWorker[]): string[] {
+  const gone = workers.filter((worker) => released(db, worker))
   const live = new Set(workers.filter((worker) => !gone.includes(worker)).flatMap(addressesOf))
   return [...new Set(gone.flatMap(addressesOf).filter((one) => !live.has(one)))]
 }

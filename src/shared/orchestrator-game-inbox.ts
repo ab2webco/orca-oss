@@ -29,8 +29,8 @@ export type GameInboxSource = {
   pendingQuestions?: readonly GameInboxMail[]
   /** Questions of this run the lead answered, with the answer; the Inbox audits them. */
   answeredQuestions?: readonly GameAnsweredQuestionMail[]
-  /** Addresses of members released or whose pane is gone, no live one shares: nobody can act on an answer. */
-  unreachableSenders?: readonly string[]
+  /** Addresses of members game stop released, that no live member shares: nobody can act on an answer. */
+  releasedSenders?: readonly string[]
 }
 
 export type GameAnsweredQuestionMail = GameInboxMail & {
@@ -113,9 +113,9 @@ function withoutRepeatedDone(rows: readonly GameInboxMail[]): GameInboxMail[] {
   })
 }
 
-/** Mail from a member nobody can answer any more: it no longer waits on the lead (ORCA-1267). */
-export function unreachableSenderOf(source: GameInboxSource): (row: GameInboxMail) => boolean {
-  const gone = new Set(source.unreachableSenders ?? [])
+/** Mail from a released member: nobody can act on an answer, so it no longer waits on the lead (ORCA-1267). */
+export function releasedSenderOf(source: GameInboxSource): (row: GameInboxMail) => boolean {
+  const gone = new Set(source.releasedSenders ?? [])
   return (row) => {
     const dispatch = dispatchOfPayload(row.payload)
     return gone.has(row.from_handle) || (dispatch !== null && gone.has(`dispatch:${dispatch}`))
@@ -208,7 +208,7 @@ export function gameInboxesOf(
   const pending = source.pendingQuestions ?? []
   // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
   const replied = new Set(allOldestFirst.flatMap((row) => (row.thread_id ? [row.thread_id] : [])))
-  const fromUnreachable = unreachableSenderOf(source)
+  const fromReleased = releasedSenderOf(source)
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
@@ -216,7 +216,7 @@ export function gameInboxesOf(
     const unanswered =
       key === 'lead'
         ? rows.filter(
-            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromUnreachable(row)
+            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromReleased(row)
           )
         : []
     const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]

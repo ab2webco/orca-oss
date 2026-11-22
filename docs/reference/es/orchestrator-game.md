@@ -1,5 +1,5 @@
 ---
-sourceHash: deac4549ff43dd7a
+sourceHash: ab334a0a767cab80
 ---
 
 # El juego orquestador de Agent Teams
@@ -1553,9 +1553,9 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   `waiting on you: orchestration reply --id <msg>` hasta que la pregunta se responde o se cierra, y
   `game state` la lista bajo el inbox del líder.
 - Una escalación o un decision gate espera al líder hasta que una respuesta lo enhebra, o hasta que
-  nadie puede actuar sobre una respuesta (ORCA-1267): su dispatch fue liberado (`game stop`) o su panel
-  local ya no existe, y ningún miembro vivo reusa su terminal. Un miembro que envió worker_done y sigue
-  trabajando en su panel mantiene su correo esperando. `orchestration reply` acepta
+  `game stop` liberó su dispatch y ningún miembro vivo reusa su terminal (ORCA-1267). Un miembro que
+  envió worker_done mantiene su correo esperando, y también uno cuyo panel Orca aún no registró: tras
+  un reinicio, un panel que vive en el daemon sigue sin registrar hasta que la UI lo abre. `orchestration reply` acepta
   el correo enviado a `run:<id>` desde el consumidor actual de ese Run, así que el líder puede
   responder el correo de estado de un miembro, no sólo su pregunta.
 - Lo que el líder le pregunta a la persona es un registro, no texto de chat (ORCA-782): `game ask-owner`
