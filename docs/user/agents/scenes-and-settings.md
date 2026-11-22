@@ -22,7 +22,7 @@ three styles, all acting out the real state of the work, never a timer:
 - **Office**: a 3D building with one floor per machine over a Lobby, the lead's first. Members sit at
   their desks in sweaters, each monitor showing what its member is doing, a mark over the head of
   whoever needs you, and a board over each desk whose note moves toward done. The lead, in a violet
-  coat, works from its own office and rides the glass lift to the member who needs you. Each
+  coat, works from its own office and rides the glass lift to a member whose CI went red. Each
   machine's Jev sits in a control room on its own floor, drawn only where Jev is installed and has
   spoken. With **Low resources** the Office draws as before: 2D floors with whiteboards and plaques,
   and **All** shows every floor.

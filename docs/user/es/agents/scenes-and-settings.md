@@ -1,5 +1,5 @@
 ---
-sourceHash: 722d0f8e8844c0a8
+sourceHash: 43735f2878a634b7
 ---
 # Escenas, estilos y ajustes
 
@@ -28,7 +28,7 @@ escena viene en tres estilos, todos representando el estado real del trabajo, nu
   en sus escritorios con suéter, cada monitor muestra lo que hace su miembro, una marca sobre la
   cabeza de quien te necesita y una pizarra sobre cada escritorio cuya nota avanza hacia terminado.
   El líder, con abrigo violeta, trabaja desde su propia oficina y sube en el ascensor de vidrio
-  hasta el miembro que te necesita. El Jev de cada máquina se sienta en un cuarto de control en su
+  hasta un miembro cuyo CI quedó en rojo. El Jev de cada máquina se sienta en un cuarto de control en su
   propio piso, dibujado solo donde Jev está instalado y ya habló. Con **Low resources** la Office se
   dibuja como antes: pisos en 2D con pizarras y placas, y **All** muestra todos los pisos.
 
