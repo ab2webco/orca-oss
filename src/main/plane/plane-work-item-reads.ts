@@ -82,7 +82,7 @@ export async function listProjects(
   workspaceId?: PlaneWorkspaceSelection | null,
   options?: { includeArchived?: boolean }
 ): Promise<PlaneProject[]> {
-  const entries = getClients(workspaceId)
+  const entries = await getClients(workspaceId)
   if (entries.length === 0) {
     return []
   }
@@ -128,7 +128,7 @@ export async function listProjects(
 export async function getViewer(
   workspaceId?: PlaneWorkspaceSelection | null
 ): Promise<PlaneViewer | null> {
-  const client = getClients(workspaceId)[0]
+  const client = (await getClients(workspaceId))[0]
   if (!client) {
     return null
   }
@@ -212,7 +212,7 @@ export async function listStates(
   projectId: string,
   workspaceId?: PlaneWorkspaceSelection | null
 ): Promise<PlaneState[]> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     return []
   }
@@ -232,7 +232,7 @@ export async function listLabels(
   projectId: string,
   workspaceId?: PlaneWorkspaceSelection | null
 ): Promise<PlaneLabel[]> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     return []
   }
@@ -254,7 +254,7 @@ async function listProjectMembers(
   projectId: string,
   workspaceId?: PlaneWorkspaceSelection | null
 ): Promise<PlaneUser[]> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     return []
   }
@@ -282,7 +282,7 @@ export async function listMembers(
       return projectMembers
     }
   }
-  const entries = getClients(workspaceId)
+  const entries = await getClients(workspaceId)
   if (entries.length === 0) {
     return []
   }

@@ -33,10 +33,10 @@ function projectPath(client: PlaneClientForWorkspace, projectId: string): string
 // Accepts a saved workspace id or a workspace slug. `getClients` only matches on
 // id (a slug selection returns [] harmlessly), so the slug lookup is a pure
 // fallback that never changes existing id semantics.
-export function resolveProjectClient(
+export async function resolveProjectClient(
   workspace: string | undefined
-): PlaneClientForWorkspace | undefined {
-  const byId = getClients(workspace)[0]
+): Promise<PlaneClientForWorkspace | undefined> {
+  const byId = (await getClients(workspace))[0]
   if (byId || !workspace) {
     return byId
   }
@@ -44,7 +44,7 @@ export function resolveProjectClient(
   const bySlug = getWorkspaceFile().workspaces.find(
     (entry) => entry.workspaceSlug.toLowerCase() === wanted
   )
-  return bySlug ? getClients(bySlug.id)[0] : undefined
+  return bySlug ? (await getClients(bySlug.id))[0] : undefined
 }
 
 function notConnected(workspace: string | undefined): { ok: false; error: string } {
@@ -59,7 +59,7 @@ function notConnected(workspace: string | undefined): { ok: false; error: string
 export async function createProject(
   args: PlaneCreateProjectArgs
 ): Promise<PlaneProjectMutationResult> {
-  const client = resolveProjectClient(args.workspace)
+  const client = await resolveProjectClient(args.workspace)
   if (!client) {
     return notConnected(args.workspace)
   }
@@ -85,7 +85,7 @@ export async function createProject(
 export async function updateProject(
   args: PlaneUpdateProjectArgs
 ): Promise<PlaneProjectMutationResult> {
-  const client = resolveProjectClient(args.workspace)
+  const client = await resolveProjectClient(args.workspace)
   if (!client) {
     return notConnected(args.workspace)
   }
@@ -121,7 +121,7 @@ export async function updateProject(
 export async function setProjectArchived(
   args: PlaneArchiveProjectArgs
 ): Promise<PlaneMutationResult> {
-  const client = resolveProjectClient(args.workspace)
+  const client = await resolveProjectClient(args.workspace)
   if (!client) {
     return notConnected(args.workspace)
   }

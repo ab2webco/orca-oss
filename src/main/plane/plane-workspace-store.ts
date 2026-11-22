@@ -238,7 +238,9 @@ export function getPlaneWorkspaceId(baseUrl: string, workspaceSlug: string): str
     .slice(0, 24)
 }
 
-export function getClients(selection?: PlaneWorkspaceSelection | null): PlaneClientForWorkspace[] {
+export async function getClients(
+  selection?: PlaneWorkspaceSelection | null
+): Promise<PlaneClientForWorkspace[]> {
   const file = getWorkspaceFile()
   const selected = selection ?? file.selectedWorkspaceId ?? file.activeWorkspaceId
   const isAllSelection = selected === 'all'
@@ -246,10 +248,10 @@ export function getClients(selection?: PlaneWorkspaceSelection | null): PlaneCli
     ? file.workspaces
     : file.workspaces.filter((workspace) => workspace.id === (selected ?? file.activeWorkspaceId))
 
-  return workspaces.flatMap((workspace) => {
+  const perWorkspace = workspaces.map(async (workspace): Promise<PlaneClientForWorkspace[]> => {
     let apiKey: string | null
     try {
-      apiKey = readWorkspaceToken(workspace.id)
+      apiKey = await readWorkspaceToken(workspace.id)
     } catch (error) {
       // Why: under an 'all' selection one un-decryptable workspace must not
       // collapse reads for the healthy ones; a specific-workspace selection
@@ -276,4 +278,5 @@ export function getClients(selection?: PlaneWorkspaceSelection | null): PlaneCli
         ]
       : []
   })
+  return (await Promise.all(perWorkspace)).flat()
 }

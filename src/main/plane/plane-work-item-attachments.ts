@@ -206,7 +206,7 @@ async function uploadBinaryToStorage(
 export async function uploadWorkItemAttachment(
   args: PlaneUploadWorkItemAttachmentArgs
 ): Promise<PlaneAttachmentUploadResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, failedStep: 'validate', error: 'Not connected to Plane.' }
   }
@@ -301,7 +301,7 @@ export async function listWorkItemAttachments(args: {
   workItemId: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneWorkItemAttachment[]> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return []
   }
