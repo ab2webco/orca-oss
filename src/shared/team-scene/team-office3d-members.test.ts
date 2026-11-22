@@ -84,6 +84,19 @@ describe('3D Office members, by event', () => {
     expect(traffic.members.get('c')!.plan.steps.some((s) => s.kind === 'ride')).toBe(true)
   })
 
+  // Why 1.3: under reduced motion the stage draws one still frame at t = 1.3, long before any read.
+  it('holds its seat in a still frame drawn before its trip, where it is drawn seated', () => {
+    // Reads run on the page's clock, minutes after the still frame's moment.
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, layout, team(), 400, 'normal')
+    office3dTrafficRead(traffic, layout, team({ c: { activity: 'resting' } }), 500, 'normal')
+    const still = where(traffic, 'c', 1.3)
+    const settled = where(traffic, 'c', 1e4)
+    expect(still.at).toEqual(settled.at)
+    expect(still.slot).not.toBeNull()
+    expect(still.slot).toBe(settled.slot)
+  })
+
   it('goes straight back to its desk on the same tick it starts working again', () => {
     const traffic = play([
       [10, team({ c: { activity: 'resting' } })],
