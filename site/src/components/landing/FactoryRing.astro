@@ -1,0 +1,573 @@
+---
+import { commandHtml } from '../../data/command-html'
+import { factoryRing } from '../../data/factory-ring'
+import type { Lang } from '../../data/product'
+
+type Props = {
+  lang: Lang
+}
+
+const { lang } = Astro.props
+const t = factoryRing(lang)
+const CX = 430
+const CY = 380
+const R = 230
+const pt = (i: number, r: number): [number, number] => {
+  const a = ((-90 + 36 * i) * Math.PI) / 180
+  return [CX + r * Math.cos(a), CY + r * Math.sin(a)]
+}
+const f = (n: number): string => n.toFixed(1)
+const hops = t.stations.map((_, i) => {
+  const [x1, y1] = pt(i, R)
+  const [x2, y2] = pt(i + 1, R)
+  return `M${f(x1)} ${f(y1)} A${R} ${R} 0 0 1 ${f(x2)} ${f(y2)}`
+})
+// Why no tick at 5.5: the removed approval gate sits there.
+const ticks = [0, 1, 2, 3, 4, 6, 7, 8, 9].map((i) => {
+  const [x, y] = pt(i + 0.5, R)
+  return `translate(${f(x)} ${f(y)}) rotate(${36 * i + 18})`
+})
+// Spokes from the lead to the stations it runs or follows up.
+const spokes = [1, 2, 5, 6, 7, 9].map((i) => ({ from: pt(i, 86), to: pt(i, R - 24), at: i + 1 }))
+const gate = pt(5.5, R)
+const stations = t.stations.map((station, i) => {
+  const [x, y] = pt(i, R)
+  const a = ((-90 + 36 * i) * Math.PI) / 180
+  const anchor = Math.cos(a) > 0.3 ? 'start' : Math.cos(a) < -0.3 ? 'end' : 'middle'
+  const [lx, ly0] = pt(i, R + 38)
+  const ly = anchor === 'middle' ? ly0 + (Math.sin(a) < 0 ? -22 : 14) : ly0
+  return { ...station, x, y, lx, ly, anchor, chip: pt(i - 0.36, R).map(f).join(' ') }
+})
+const multiline = (command: string): string => command.split('\n').map(commandHtml).join('\n')
+---
+
+<section class="section" id="factory" aria-labelledby="factory-title">
+  <div class="wrap factory" data-factory>
+    <div class="side">
+      <h2 class="h2" id="factory-title">{t.title}</h2>
+      <p class="lede">{t.lede}</p>
+      <div class="picks" hidden data-factory-picks>
+        {stations.map((s, i) => <button type="button" data-pick={i + 1} aria-label={s.name}>{i + 1}</button>)}
+        <button type="button" class="toggle" data-factory-toggle data-pause={t.pause[0]} data-play={t.pause[1]}>{t.pause[0]}</button>
+      </div>
+      <ol class="caps" aria-live="polite">
+        {
+          stations.map((s, i) => (
+            <li data-step={i + 1} data-chip={s.chip} class={s.who}>
+              <p class="who">{t.who[s.who]}</p>
+              <h3><span class="k">{i + 1}</span>{s.name}</h3>
+              <p>{s.body}</p>
+              <pre set:html={multiline(s.command)} />
+              <dl>
+                {s.rows.map((row, r) => (
+                  <div><dt>{t.rows[r]}</dt><dd>{row}</dd></div>
+                ))}
+              </dl>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+    <figure class="ring">
+      <figcaption class="legend">
+        {['you', 'lead', '', 'auto', 'plugin', 'x'].map((key, i) => <span><i class={key}></i>{t.legend[i]}</span>)}
+      </figcaption>
+      <svg viewBox="0 70 860 640" role="img" aria-labelledby="factory-svg-title">
+        <title id="factory-svg-title">{t.svg}</title>
+        <circle class="track" cx={CX} cy={CY} r={R}></circle>
+        <circle class="rail" cx={CX} cy={CY} r={R}></circle>
+        {hops.map((d, i) => <path class="arc" data-hop={i + 1} d={d}></path>)}
+        {ticks.map((transform) => <path class="dir" transform={transform} d="M-5 -4 L4 0 L-5 4"></path>)}
+        {spokes.map(({ from, to, at }) => <line class="spoke" data-at={at} x1={f(from[0])} y1={f(from[1])} x2={f(to[0])} y2={f(to[1])}></line>)}
+        <circle class="orca" cx={CX} cy={CY} r="134"></circle>
+        <circle class="hub" cx={CX} cy={CY} r="80"></circle>
+        <text class="hub-t" x={CX} y={CY - 6} text-anchor="middle">{t.lead[0]}</text>
+        <text class="sub" x={CX} y={CY + 16} text-anchor="middle">{t.lead[1]}</text>
+        {
+          t.gears.map(({ slot, at, name, plugin }) => {
+            const [x, y] = pt(slot, 134)
+            const half = plugin ? 20 : 14
+            return (
+              <g class:list={['gear', { plugin }]} data-at={at.join(' ')}>
+                <rect x={f(x - 46)} y={f(y - half)} width="92" height={half * 2} rx="8"></rect>
+                <text x={f(x)} y={f(y + (plugin ? -2 : 5))} text-anchor="middle">{name}</text>
+                {plugin && <text class="tag" x={f(x)} y={f(y + 13)} text-anchor="middle">plugin</text>}
+              </g>
+            )
+          })
+        }
+        <g class="gate" data-at="6">
+          <rect x={f(gate[0] - 10)} y={f(gate[1] - 10)} width="20" height="20" rx="4"></rect>
+          <path d={`M${f(gate[0] - 5)} ${f(gate[1] - 5)} l10 10 m0 -10 l-10 10`}></path>
+        </g>
+        <g class="chip" data-factory-chip transform={`translate(${stations[0]?.chip})`}>
+          <rect x="-32" y="-12" width="64" height="24" rx="6"></rect>
+          <text x="0" y="4" text-anchor="middle">APP-12</text>
+        </g>
+        {
+          stations.map((s, i) => (
+            <g class={`st ${s.who}`} data-at={i + 1}>
+              <circle cx={f(s.x)} cy={f(s.y)} r="19"></circle>
+              <text class="n" x={f(s.x)} y={f(s.y + 5)} text-anchor="middle">{i + 1}</text>
+              <g class="lbl">
+                <text class="name" x={f(s.lx)} y={f(s.ly)} text-anchor={s.anchor}>{s.name}</text>
+                <text class="sub" x={f(s.lx)} y={f(s.ly + 19)} text-anchor={s.anchor}>{s.sub}</text>
+              </g>
+            </g>
+          ))
+        }
+      </svg>
+    </figure>
+  </div>
+</section>
+
+<script>
+  // One station lit at a time while the ring is on screen; a click or an arrow key holds a step.
+  // Under reduced motion it starts held. Without the script every caption shows and the ring is lit.
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  for (const factory of document.querySelectorAll<HTMLElement>('[data-factory]')) {
+    const picks = factory.querySelector<HTMLElement>('[data-factory-picks]')
+    const toggle = factory.querySelector<HTMLButtonElement>('[data-factory-toggle]')
+    const chip = factory.querySelector<SVGGElement>('[data-factory-chip]')
+    const list = factory.querySelector<HTMLElement>('.caps')
+    const caps = [...factory.querySelectorAll<HTMLElement>('[data-step]')]
+    const hops = [...factory.querySelectorAll<SVGElement>('[data-hop]')]
+    const marks = [...factory.querySelectorAll<SVGElement>('svg [data-at]')]
+    if (!picks || !toggle || !chip) {
+      continue
+    }
+    const total = caps.length
+    let step = 1
+    let held = still
+    let seen = false
+    let timer: ReturnType<typeof setInterval> | undefined
+    const show = (n: number): void => {
+      step = n
+      factory.setAttribute('data-active', '')
+      factory.setAttribute('data-stepper', '')
+      picks.hidden = false
+      for (const cap of caps) {
+        cap.hidden = cap.dataset.step !== String(n)
+      }
+      for (const button of picks.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
+        button.setAttribute('aria-current', button.dataset.pick === String(n) ? 'step' : 'false')
+      }
+      for (const hop of hops) {
+        hop.classList.toggle('lit', Number(hop.dataset.hop) < n)
+      }
+      for (const mark of marks) {
+        const at = (mark.dataset.at ?? '').split(' ').map(Number)
+        const now = at.includes(n)
+        // A station stays lit once the ticket has passed it; the rest light only on their steps.
+        mark.classList.toggle('lit', now || (mark.classList.contains('st') && (at[0] ?? 0) < n))
+        mark.classList.toggle('now', now)
+      }
+      const [x, y] = (caps[n - 1]?.dataset.chip ?? '0 0').split(' ')
+      chip.style.transform = `translate(${x}px, ${y}px)`
+    }
+    const sync = (): void => {
+      const play = seen && !held
+      if (play && !timer) {
+        timer = setInterval(() => show((step % total) + 1), 4500)
+      }
+      if (!play && timer) {
+        clearInterval(timer)
+        timer = undefined
+      }
+      // Why: a region that changes by itself every 4.5 s would talk over the reader; held steps still speak.
+      list?.setAttribute('aria-live', play ? 'off' : 'polite')
+      toggle.textContent = (held ? toggle.dataset.play : toggle.dataset.pause) ?? ''
+    }
+    const hold = (n: number): void => {
+      // Why hold first: the live region must be polite before the caption changes, or the step is not read.
+      held = true
+      sync()
+      show(n)
+    }
+    for (const button of picks.querySelectorAll<HTMLButtonElement>('[data-pick]')) {
+      button.addEventListener('click', () => hold(Number(button.dataset.pick)))
+    }
+    picks.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        hold(event.key === 'ArrowRight' ? (step % total) + 1 : ((step + total - 2) % total) + 1)
+      }
+    })
+    toggle.addEventListener('click', () => {
+      held = !held
+      sync()
+    })
+    new IntersectionObserver(([entry]) => {
+      seen = entry?.isIntersecting ?? false
+      sync()
+    }).observe(factory)
+    show(1)
+  }
+</script>
+
+<style>
+  /* Why: the stepper card is dense; space before the next section keeps any 1440 screen under 95 words. */
+  .section {
+    padding-bottom: var(--space-3xl);
+  }
+  .factory {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--space-xl);
+    align-items: center;
+  }
+  .side {
+    display: grid;
+    gap: var(--space-md);
+    min-width: 0;
+  }
+  .picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+  }
+  .picks[hidden] {
+    display: none;
+  }
+  .picks button {
+    min-width: 40px;
+    min-height: 44px;
+    padding: 0 var(--space-sm);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-2);
+    font: 500 var(--text-sm) / 1 var(--font-body);
+    cursor: pointer;
+  }
+  .picks button:hover {
+    border-color: var(--muted);
+    color: var(--fg);
+  }
+  .picks [aria-current='step'] {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+  .caps {
+    display: grid;
+    gap: var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .caps li {
+    min-width: 0;
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .caps li[hidden] {
+    display: none;
+  }
+  /* One cell for every caption: the tallest sets the height, so a step never moves what follows. */
+  .factory[data-stepper] .caps li {
+    grid-area: 1 / 1;
+  }
+  .factory[data-stepper] .caps li[hidden] {
+    display: block;
+    visibility: hidden;
+  }
+  .who {
+    display: inline-block;
+    margin: 0 0 var(--space-sm);
+    padding: var(--space-2xs) var(--space-sm);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--fg-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+  li.you .who {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--bg);
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--text-title);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .k {
+    margin-right: var(--space-sm);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+  .caps p:not(.who) {
+    margin: var(--space-xs) 0 0;
+    color: var(--fg-2);
+  }
+  pre {
+    margin: var(--space-sm) 0 0;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  dl {
+    display: grid;
+    gap: var(--space-xs);
+    margin: var(--space-sm) 0 0;
+  }
+  dl div {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--line);
+    font-size: var(--text-sm);
+  }
+  dt {
+    color: var(--muted);
+  }
+  dd {
+    margin: 0;
+  }
+  dl div:last-child dd {
+    font-weight: 600;
+  }
+  .ring {
+    margin: 0;
+    min-width: 0;
+  }
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  svg text {
+    font-family: var(--font-body);
+    fill: var(--fg-2);
+  }
+  .track {
+    fill: none;
+    stroke: var(--surface);
+    stroke-width: 34;
+  }
+  .rail,
+  .orca,
+  .hub,
+  .st circle,
+  .gear rect,
+  .gate rect,
+  .gate path {
+    stroke: var(--line);
+    stroke-width: 1.5;
+  }
+  .rail,
+  .orca,
+  .dir,
+  .gate path {
+    fill: none;
+  }
+  .orca {
+    stroke-dasharray: 5 5;
+  }
+  .arc {
+    fill: none;
+    stroke: var(--fg);
+    stroke-width: 3;
+    stroke-linecap: round;
+    opacity: 0;
+  }
+  .dir {
+    stroke: var(--muted);
+    stroke-width: 1.5;
+  }
+  .spoke {
+    stroke: var(--line);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 5;
+  }
+  .hub {
+    fill: var(--surface);
+  }
+  svg .hub-t {
+    font-size: 22px;
+    font-weight: 600;
+    fill: var(--fg);
+  }
+  svg .sub {
+    font-size: 14px;
+    fill: var(--muted);
+  }
+  svg .name {
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .st circle,
+  .gear rect,
+  .gate rect {
+    fill: var(--bg);
+  }
+  .st.auto circle {
+    stroke-dasharray: 4 4;
+  }
+  .st.lead circle {
+    stroke-width: 3;
+  }
+  .st.you circle {
+    fill: var(--fg);
+    stroke: var(--fg);
+  }
+  svg .n {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 500;
+  }
+  svg .st.you .n {
+    fill: var(--bg);
+  }
+  svg .gear text {
+    font-size: 14px;
+    font-weight: 500;
+    fill: var(--muted);
+  }
+  .gear.plugin rect {
+    stroke-dasharray: 4 3;
+  }
+  svg .gear .tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .gear.lit rect,
+  .chip rect {
+    fill: var(--fg);
+    stroke: var(--fg);
+  }
+  svg .gear.lit text,
+  svg .chip text {
+    fill: var(--bg);
+  }
+  .gate rect,
+  .gate path {
+    stroke: var(--muted);
+  }
+  svg .chip text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  /* A lit step: its stretch of track, its stations and its spokes. With no active step all is lit. */
+  .arc.lit {
+    opacity: 1;
+  }
+  .factory:not([data-active]) .st:not(.you) circle,
+  .st.lit:not(.you) circle,
+  .factory:not([data-active]) .hub,
+  .gate.lit rect,
+  .gate.lit path {
+    stroke: var(--fg);
+  }
+  .factory:not([data-active]) .spoke,
+  .spoke.lit {
+    stroke: var(--fg-2);
+  }
+  .factory:not([data-active]) .name,
+  .st.lit .name {
+    fill: var(--fg);
+  }
+  .factory[data-active] .st:not(.lit) .lbl {
+    opacity: 0.5;
+  }
+  .st.now circle {
+    stroke-width: 4;
+  }
+  .factory:not([data-active]) .chip {
+    display: none;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-xs) var(--space-lg);
+    margin-bottom: var(--space-md);
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+  .legend i {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--muted);
+    border-radius: 50%;
+  }
+  .legend .you {
+    background: var(--fg);
+    border-color: var(--fg);
+  }
+  .legend .lead {
+    border-width: 3px;
+  }
+  .legend .auto {
+    border-style: dashed;
+  }
+  .legend .plugin {
+    width: 18px;
+    border-radius: 3px;
+    border-style: dashed;
+  }
+  .legend .x {
+    border-radius: 3px;
+    background:
+      linear-gradient(45deg, transparent 44%, var(--muted) 44% 56%, transparent 56%),
+      linear-gradient(-45deg, transparent 44%, var(--muted) 44% 56%, transparent 56%);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .arc,
+    .st circle,
+    .spoke,
+    .lbl,
+    .gate,
+    .gear rect {
+      transition:
+        opacity 400ms ease-out,
+        stroke 400ms ease-out;
+    }
+    .chip {
+      transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  }
+  /* Below 60rem the ring sits under the title, above the stepper. */
+  @media (max-width: 59.99rem) {
+    .factory {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-md);
+    }
+    .side {
+      display: contents;
+    }
+    .ring {
+      order: 1;
+      overflow: hidden;
+    }
+    .picks,
+    .caps {
+      order: 2;
+    }
+  }
+  /* On a phone the ring is cropped to its stations; the captions name them. */
+  @media (max-width: 39.99rem) {
+    svg {
+      width: 172%;
+      margin: -10% 0 -14% -36%;
+    }
+    .lbl {
+      display: none;
+    }
+  }
+</style>
