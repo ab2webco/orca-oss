@@ -117,6 +117,74 @@ vi.stubGlobal('window', { devicePixelRatio: 1 })
 afterEach(() => vi.clearAllMocks())
 
 describe('the 3D Office stage', () => {
+  // Why: the phone rebuilds the stage on every read, in a WebView with a hard memory cap (ORCA-1334).
+  it("frees every texture it made and the sun's shadow when disposed, and keeps the shared ones", () => {
+    // Why a stand-in canvas: without a 2D canvas the screens, chips and lift make no texture.
+    const g = new Proxy({} as Record<string | symbol, unknown>, {
+      get: (own, key) =>
+        key in own ? own[key] : () => ({ width: 8, addColorStop: () => undefined })
+    })
+    const canvas = { width: 0, height: 0, getContext: () => g }
+    Object.assign(globalThis, { document: { createElement: () => canvas } })
+    const built = (() => {
+      try {
+        return stageOf([member('a', 'working')], [floor('', ['a']), floor('m2', [])])
+      } finally {
+        Reflect.deleteProperty(globalThis, 'document')
+      }
+    })()
+    const { stage, scenes } = built
+    stage.draw(0)
+    const textures = new Set<THREE.Texture>()
+    const suns: THREE.DirectionalLight[] = []
+    scenes[0]!.traverse((o) => {
+      if (o instanceof THREE.DirectionalLight) {
+        suns.push(o)
+      }
+      for (const material of [(o as THREE.Mesh).material ?? []].flat()) {
+        for (const value of Object.values(material)) {
+          if (value instanceof THREE.Texture) {
+            textures.add(value)
+          }
+        }
+      }
+    })
+    const freed = new Set<THREE.Texture>()
+    for (const one of textures) {
+      one.addEventListener('dispose', () => freed.add(one))
+    }
+    const own = [...textures].filter((one) => !one.userData.shared)
+    expect(own.length).toBeGreaterThan(3)
+    const sunGone = vi.spyOn(suns[0]!, 'dispose')
+    stage.dispose()
+    expect(own.filter((one) => !freed.has(one))).toEqual([])
+    expect([...freed].filter((one) => one.userData.shared)).toEqual([])
+    expect(sunGone).toHaveBeenCalled()
+  })
+
+  it("caps the shadow map where the client asks, and keeps the desktop's 2048 otherwise", () => {
+    const sunOf = (limits?: { pixelRatio: number; shadowMap: number }) => {
+      const r = renderer()
+      office3dStage(r.fake, {
+        width: 350,
+        dark: false,
+        status,
+        input: input([member('a', 'working')]),
+        layout: teamOffice3dLayoutOf([floor('', ['a'])], { leadAdvisor: false }),
+        pace: 'normal',
+        words: { thisMachine: 'This Mac', offline: 'Offline' },
+        ...(limits ? { limits } : {})
+      }).draw(0)
+      let sun: THREE.DirectionalLight | null = null
+      r.scenes[0]!.traverse((o) => {
+        sun = o instanceof THREE.DirectionalLight ? o : sun
+      })
+      return (sun as THREE.DirectionalLight | null)!.shadow.mapSize.x
+    }
+    expect(sunOf({ pixelRatio: 1.5, shadowMap: 1024 })).toBe(1024)
+    expect(sunOf()).toBe(2048)
+  })
+
   it('sizes the canvas to the panel width and draws a frame', () => {
     const { stage, scenes, setSize } = stageOf([member('a', 'working')], [floor('', ['a'])])
     expect(setSize).toHaveBeenCalledWith(350, stage.height, true)

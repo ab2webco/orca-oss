@@ -31,6 +31,16 @@ export type OrchestratorGamePanel = {
   pace: GamePanelPace
 }
 
+/** The panel as game.state publishes it: `office3d` when this host draws the Office in 3D. */
+export type OrchestratorGamePublishedPanel = OrchestratorGamePanel & { office3d?: true }
+
+// Why its own key: a host older than the 3D Office (ORCA-1302) also says office and high, and
+// draws it in 2D, so a phone cannot tell from those (ORCA-1334). Mirrors TeamPanelScene's rule.
+export const gamePanelPublishedOf = (
+  panel: OrchestratorGamePanel
+): OrchestratorGamePublishedPanel =>
+  panel.style === 'office' && panel.quality === 'high' ? { ...panel, office3d: true } : panel
+
 export type OrchestratorGamePanelLayer = Partial<Omit<OrchestratorGamePanel, 'tabs'>> & {
   tabs?: Partial<Record<GamePanelTab, boolean>>
 }

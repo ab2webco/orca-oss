@@ -5,7 +5,9 @@ import { GAME_HISTORY_OUTCOMES } from '../../src/shared/orchestrator-game-histor
 import { DEFAULT_ORCHESTRATOR_GAME_CONFIG } from '../../src/shared/orchestrator-game-config'
 import {
   GAME_PANEL_TABS,
-  type OrchestratorGamePanel
+  gamePanelPublishedOf,
+  type OrchestratorGamePanel,
+  type OrchestratorGamePublishedPanel
 } from '../../src/shared/orchestrator-game-panel'
 import { orchestratorGameScenesOf } from '../../src/shared/orchestrator-game-scene'
 import { ORCHESTRATOR_GAME_SCENE_TEMPLATE } from '../../src/shared/orchestrator-game-scene-authoring'
@@ -44,12 +46,13 @@ function customScenes() {
 
 // MOCK_PANEL_STYLE=pixel|office|figures (and MOCK_PANEL_LOOK) set the project's panel;
 // MOCK_DIORAMA=1 draws Figures as the diorama, MOCK_QUALITY=low its low-resource look.
-function panelOf(): OrchestratorGamePanel | undefined {
+// MOCK_OLD_HOST=1 plays a host older than the 3D Office: office and high, but no office3d.
+function panelOf(): OrchestratorGamePublishedPanel | undefined {
   const style = process.env.MOCK_PANEL_STYLE as OrchestratorGamePanel['style'] | undefined
   if (!style) {
     return undefined
   }
-  return {
+  const panel: OrchestratorGamePanel = {
     look: (process.env.MOCK_PANEL_LOOK as OrchestratorGamePanel['look'] | undefined) ?? 'game',
     style,
     tabs: Object.fromEntries(
@@ -61,6 +64,7 @@ function panelOf(): OrchestratorGamePanel | undefined {
     quality: process.env.MOCK_QUALITY === 'low' ? 'low' : 'high',
     pace: 'normal'
   }
+  return process.env.MOCK_OLD_HOST === '1' ? panel : gamePanelPublishedOf(panel)
 }
 
 /** MOCK_CUSTOM_SCENE=1 selects a plugin scene with Figures art read from MOCK_SCENE_ART_DIR. */

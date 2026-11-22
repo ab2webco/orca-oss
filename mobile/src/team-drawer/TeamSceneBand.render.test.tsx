@@ -313,6 +313,47 @@ describe('the Team sheet scene band', () => {
     expect(messages().at(-1)).toEqual({ kind: 'motion', run: true, reduced: false })
   })
 
+  // ORCA-1334: the page draws the 3D Office only when the band says the host does.
+  it("hands the page the 3D Office's pace, words and floors when the host draws it", () => {
+    const floors = [
+      {
+        key: '',
+        host: { kind: 'local' as const },
+        members: [],
+        cap: 4,
+        running: 1,
+        reachable: true,
+        lead: true,
+        taken: 0,
+        free: 3
+      }
+    ]
+    const words = { thisMachine: 'm1', offline: 'Offline', lobby: 'Lobby' }
+    const props = {
+      ownArt: null,
+      leadLine: null,
+      leadName: 'Alfred',
+      advisorName: 'Mago',
+      members: [],
+      cameraLabels: { lead: 'Follow the lead', all: 'Show all' },
+      officeWords: words
+    }
+    render(
+      <TeamSceneBand band={{ ...officeBand, office3d: { pace: 'fast', floors } }} {...props} />
+    )
+    send({ kind: 'loaded' })
+    const [, stage, team] = messages()
+    expect(stage).toMatchObject({ kind: 'stage', stage: { office3d: { pace: 'fast', words } } })
+    expect(team).toMatchObject({ kind: 'input', floors })
+    act(() => root?.unmount())
+    root = null
+    webview.injected = []
+    render(<TeamSceneBand band={officeBand} {...props} />)
+    send({ kind: 'loaded' })
+    expect(messages()[1]!.stage).not.toHaveProperty('office3d')
+    expect(messages()[2]).not.toHaveProperty('floors')
+  })
+
   describe('the 3D stage camera (ORCA-1335)', () => {
     const figuresBand: Band = {
       ...officeBand,

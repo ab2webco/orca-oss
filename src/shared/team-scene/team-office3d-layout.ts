@@ -1,5 +1,11 @@
 import { stableOrderOf } from './team-diorama-layout'
+import type { TeamMemberCard } from '../team-panel-model-types'
 import type { TeamSceneFloor } from './team-scene-floors'
+
+/** A floor as the building reads it: each member only by its pane and Jev's decisions there. */
+export type Office3dFloorInput = Omit<TeamSceneFloor, 'members'> & {
+  members: readonly Pick<TeamMemberCard, 'paneKey' | 'decisions'>[]
+}
 
 // Why one module: the 3D Office (ORCA-1302) places every floor, seat, room and the lift here, so
 // the renderer only draws and the walkers' routes are tested without WebGL.
@@ -77,7 +83,7 @@ export type Office3dLayout = {
  * Jev made in one of that floor's panes. Why not a host flag: the model has none, and a plugin
  * that has not yet decided looks the same as no plugin.
  */
-export function office3dHasAdvisor(floor: TeamSceneFloor, leadAdvisor: boolean): boolean {
+export function office3dHasAdvisor(floor: Office3dFloorInput, leadAdvisor: boolean): boolean {
   if (floor.lead && leadAdvisor) {
     return true
   }
@@ -89,7 +95,7 @@ export const office3dFloorWidth = (seats: number): number =>
   Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, SEAT_PITCH * seats + 0.7))
 
 function seatsOf(
-  floor: TeamSceneFloor,
+  floor: Office3dFloorInput,
   previous: readonly (string | null)[]
 ): { seats: Office3dSeat[]; order: (string | null)[]; width: number; scale: number } {
   const order = stableOrderOf(
@@ -120,7 +126,7 @@ function seatsOf(
   return { seats, order, width, scale: Math.min(1, pitch / SEAT_PITCH) }
 }
 
-function controlRoomOf(floor: TeamSceneFloor, y: number, width: number): Office3dControlRoom {
+function controlRoomOf(floor: Office3dFloorInput, y: number, width: number): Office3dControlRoom {
   const balcony = floor.lead
   const chairX = width + (balcony ? 1.6 : OFFICE3D_WING_WIDTH / 2)
   return { x: width, y: balcony ? y + OFFICE3D_BALCONY_Y : y, balcony, chair: [chairX, 2] }
@@ -190,7 +196,7 @@ export function office3dLobbyOf(width: number): Office3dLobby {
  * `teamSceneFloorsOf` orders them. `previous` keeps every member on the desk it had.
  */
 export function teamOffice3dLayoutOf(
-  floors: readonly TeamSceneFloor[],
+  floors: readonly Office3dFloorInput[],
   args: { leadAdvisor: boolean; previous?: Record<string, (string | null)[]> }
 ): Office3dLayout {
   const order: Record<string, (string | null)[]> = {}

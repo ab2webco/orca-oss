@@ -1,6 +1,7 @@
 import type { OrchestratorGameSceneExtension } from '../../../src/shared/orchestrator-game-scene'
 import type { GamePanelPace, GamePanelQuality } from '../../../src/shared/orchestrator-game-panel'
 import type { DioramaMachine } from '../../../src/shared/team-scene/team-diorama-layout'
+import type { Office3dFloorInput } from '../../../src/shared/team-scene/team-office3d-layout'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import type { TeamSceneArtPick } from './team-scene-band'
 
@@ -28,6 +29,8 @@ export type TeamSceneEngineStage = {
   colors: TeamSceneEngineColors
   /** Figures as the 3D diorama, when the host's panel asks for it; absent draws Figures in 2D. */
   diorama?: { quality: GamePanelQuality; pace: GamePanelPace }
+  /** The Office as the 3D building, when the host draws it so; absent draws the 2D Office. */
+  office3d?: { pace: GamePanelPace; words: { thisMachine: string; offline: string; lobby: string } }
 }
 
 export type TeamSceneEngineMessage =
@@ -39,6 +42,8 @@ export type TeamSceneEngineMessage =
       advisorName: string
       /** The team's machines, for the diorama's islands; absent puts everyone on one island. */
       machines?: DioramaMachine[]
+      /** The team's floors, a machine each, for the 3D Office. */
+      floors?: Office3dFloorInput[]
     }
   /** `run` is false while nobody can see the band; `reduced` is the phone's Reduce Motion. */
   | { kind: 'motion'; run: boolean; reduced: boolean }
