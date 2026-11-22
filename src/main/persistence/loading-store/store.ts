@@ -202,6 +202,7 @@ import {
 } from '../../protected-secret-persistence'
 import {
   applyProtectedSecretReads,
+  holdsSealedPlaceholder,
   protectedSecretReads,
   type ProtectedSecretRead
 } from './protected-secret-load'
@@ -648,6 +649,9 @@ export class Store {
     late: ProtectedSecretDecryption,
     onLateProxy?: (settings: GlobalSettings) => void
   ): void {
+    if (!holdsSealedPlaceholder(this.state, read)) {
+      return
+    }
     const reads = [read]
     if (
       applyProtectedSecretReads(

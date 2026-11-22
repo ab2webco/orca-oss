@@ -54,10 +54,6 @@ export class ProtectedSecretPersistence {
     this.pendingKeychainSlots.delete(slot)
   }
 
-  isAwaitingKeychain(slot: string): boolean {
-    return this.pendingKeychainSlots.has(slot)
-  }
-
   // Why: without the async API (older Electron, test doubles) load keeps decrypting in place.
   canDecryptAsync(): boolean {
     return typeof safeStorage.decryptStringAsync === 'function'

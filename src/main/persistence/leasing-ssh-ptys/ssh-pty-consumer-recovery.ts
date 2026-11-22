@@ -6,10 +6,7 @@ import { normalizeSshPtyConsumerRecovery } from './ssh-normalization'
 
 export type SshPtyConsumerRecoveryOperations = {
   state: StoreOwnedPersistedState
-  protectedSecrets: Pick<
-    ProtectedSecretPersistence,
-    'isSealed' | 'removeRetainedBlob' | 'isAwaitingKeychain'
-  >
+  protectedSecrets: Pick<ProtectedSecretPersistence, 'isSealed' | 'removeRetainedBlob'>
   flushDurableStateOrThrowAsync: () => Promise<void>
 }
 
@@ -50,14 +47,6 @@ export async function upsertSshPtyConsumerRecovery(
     throw new Error('Invalid SSH PTY consumer recovery record')
   }
   const recoveries = operations.state.sshPtyConsumerRecoveries ?? []
-  // Why (ORCA-1298): the stored lease may still unseal once its Keychain prompt is answered;
-  // replacing it now would orphan the remote PTYs it owns.
-  if (
-    recoveries.some((candidate) => candidate.targetId === normalized.targetId) &&
-    operations.protectedSecrets.isAwaitingKeychain(sshPtyOwnerLeaseSecretSlot(normalized.targetId))
-  ) {
-    return
-  }
   operations.state.sshPtyConsumerRecoveries = [
     ...recoveries.filter((candidate) => candidate.targetId !== normalized.targetId),
     normalized

@@ -57,6 +57,26 @@ export function protectedSecretReads(state: PersistedState): ProtectedSecretRead
   return reads
 }
 
+// Why: a late Keychain answer must not overwrite a value saved after the timeout, such as a
+// re-typed proxy or the lease of an SSH owner the relay granted in the meantime.
+export function holdsSealedPlaceholder(state: PersistedState, read: ProtectedSecretRead): boolean {
+  switch (read.slot) {
+    case PROTECTED_SECRET_SLOT.opencodeSessionCookie:
+      return !state.settings?.opencodeSessionCookie
+    case PROTECTED_SECRET_SLOT.httpProxyUrl:
+      return !state.settings?.httpProxyUrl
+    case PROTECTED_SECRET_SLOT.browserKagiSessionLink:
+      return !state.ui?.browserKagiSessionLink
+    default:
+      // A sealed lease record keeps its ciphertext in place of the lease.
+      return (state.sshPtyConsumerRecoveries ?? []).some(
+        (record) =>
+          sshPtyOwnerLeaseSecretSlot(record.targetId) === read.slot &&
+          record.ownerLease === read.ciphertext
+      )
+  }
+}
+
 /** Writes decrypted values into `state`; returns whether the result must be re-saved. */
 export function applyProtectedSecretReads(
   state: PersistedState,
