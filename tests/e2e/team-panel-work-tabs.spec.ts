@@ -21,7 +21,7 @@ const CHECK_THEMES = CAPTURE_EVIDENCE ? THEMES : (['dark'] as const)
 
 type Language = (typeof LANGUAGES)[number]
 type Tab = (typeof TABS)[number]
-type SceneName = 'full' | 'empty' | 'error' | 'unavailable'
+type SceneName = 'full' | 'empty' | 'error' | 'limited' | 'unavailable'
 /** What the panel's `game.state` reads get on top of the real answer. */
 type Scene = { set: Record<string, unknown>; remove: string[] }
 
@@ -32,6 +32,8 @@ const COPY = {
     refused: 'Refused',
     prsEmpty: 'You have no open PRs',
     prsError: 'Could not read pull requests',
+    retryNow: 'Retry now',
+    limitTitle: 'GitHub did not answer',
     queueTitle: 'Merge queue · 16',
     viewAll: 'View all 12',
     viewTasks: 'View tasks',
@@ -43,6 +45,8 @@ const COPY = {
     refused: 'Rechazada',
     prsEmpty: 'No tienes PRs abiertos',
     prsError: 'No se pudieron leer los pull requests',
+    retryNow: 'Reintentar ahora',
+    limitTitle: 'GitHub no respondió',
     queueTitle: 'Cola de merge · 16',
     viewAll: 'Ver los 12',
     viewTasks: 'Ver tareas',
@@ -175,11 +179,27 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
       hosts: []
     }
   },
+  // Why GitHub's own budget: the one read that names the provider and says a retry cannot help yet.
+  limited: {
+    remove: ['hostCapacity'],
+    set: {
+      project: { reviews: null, todo: null },
+      hosts: [],
+      githubBudget: {
+        graphql: { limit: 5000, remaining: 0, resetAt: Math.floor(now / 1000) + 720, orcaCalls: 0 },
+        core: { limit: 5000, remaining: 4000, resetAt: Math.floor(now / 1000) + 720, orcaCalls: 0 },
+        top: [],
+        low: true
+      }
+    }
+  },
   unavailable: { remove: ['project', 'hostCapacity', 'localHost', 'hosts', 'actions'], set: {} }
 })
 
 type RigGlobal = typeof globalThis & {
   __teamScene?: Scene
+  /** game.state reads that asked for fresh lists (Retry now). */
+  __teamFreshReads?: number
   __teamGate?: Promise<void> | null
   __teamOpenGate?: () => void
 }
@@ -197,9 +217,12 @@ async function wrapGameState(electronApp: ElectronApplication): Promise<void> {
     }
     const real = handlers.get('runtime:call')!
     ipcMain.removeHandler('runtime:call')
-    ipcMain.handle('runtime:call', async (event, args: { method: string }) => {
+    ipcMain.handle('runtime:call', async (event, args: { method: string; params?: unknown }) => {
       if (args.method !== 'game.state') {
         return real(event, args)
+      }
+      if ((args.params as { fresh?: unknown } | undefined)?.fresh === true) {
+        rig.__teamFreshReads = (rig.__teamFreshReads ?? 0) + 1
       }
       await rig.__teamGate
       const response = await real(event, args)
@@ -387,14 +410,20 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
         await panel.getByRole('tab', { name: words.tabs.prs }).click()
       } else if (name === 'empty') {
         await expect(panel).toContainText(words.prsEmpty, { timeout: 30_000 })
+      } else if (name === 'limited') {
+        await expect(panel).toContainText(words.limitTitle, { timeout: 30_000 })
+        await expect(panel.getByRole('button', { name: words.retryNow })).toHaveCount(0)
       } else {
         await expect(panel).toContainText(words.prsError, { timeout: 30_000 })
+        if (name === 'error') {
+          await expect(panel.getByRole('button', { name: words.retryNow })).toBeVisible()
+        }
       }
     }
 
     for (const language of LANGUAGES) {
       await writeSettings(orcaPage, { uiLanguage: language })
-      for (const name of ['full', 'empty', 'error', 'unavailable'] as const) {
+      for (const name of ['full', 'empty', 'error', 'limited', 'unavailable'] as const) {
         await setScene(electronApp, all[name])
         await rereadPanel(orcaPage)
         await orcaPage.setViewportSize({ width: 1440, height: 900 })
@@ -442,6 +471,24 @@ test('the PRs (with its merge queue) and Machines tabs, To Do and Actions draw e
         }
       }
     }
+
+    // One Retry now reaches the host as one fresh read; the rig keeps the failure, as a host older
+    // than the flag would, so the error stays and the button comes back for another try.
+    await setScene(electronApp, all.error)
+    await rereadPanel(orcaPage)
+    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    await panel.getByRole('tab', { name: COPY.es.tabs.prs }).click()
+    const retryNow = panel.getByRole('button', { name: COPY.es.retryNow })
+    await expect(retryNow).toBeEnabled({ timeout: 30_000 })
+    const freshBefore = await electronApp.evaluate(
+      () => (globalThis as RigGlobal).__teamFreshReads ?? 0
+    )
+    await retryNow.click()
+    await expect
+      .poll(() => electronApp.evaluate(() => (globalThis as RigGlobal).__teamFreshReads ?? 0))
+      .toBe(freshBefore + 1)
+    await expect(retryNow).toBeEnabled({ timeout: 30_000 })
+    await expect(panel).toContainText(COPY.es.prsError)
 
     await setScene(electronApp, all.full)
     await rereadPanel(orcaPage)
