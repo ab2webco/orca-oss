@@ -179,13 +179,19 @@ export class ProtectedSecretPersistence {
       decryptOffMainThread(Buffer.from(ciphertext, 'base64')),
       timedOut
     ]).finally(() => clearTimeout(timer))
+    // Why: on macOS the sync fallback would read the Keychain on the main thread, unbounded.
     if (
-      outcome === ASYNC_DECRYPT_UNAVAILABLE ||
-      (outcome === ASYNC_DECRYPT_FAILED && process.platform !== 'darwin')
+      process.platform !== 'darwin' &&
+      (outcome === ASYNC_DECRYPT_UNAVAILABLE || outcome === ASYNC_DECRYPT_FAILED)
     ) {
       return this.decryptWithStatus(slot, ciphertext, isLegacyPlaintext)
     }
     this.retainedBlobs.set(slot, ciphertext)
+    if (outcome === ASYNC_DECRYPT_UNAVAILABLE) {
+      this.sealedSlots.add(slot)
+      this.keychainDeferredSlots.add(slot)
+      return { plaintext: '', status: 'unavailable' }
+    }
     if (outcome === 'timed-out') {
       this.sealedSlots.add(slot)
       this.keychainDeferredSlots.add(slot)

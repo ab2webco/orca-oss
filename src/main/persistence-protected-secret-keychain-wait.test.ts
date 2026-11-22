@@ -186,6 +186,23 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     expect(keychain.syncCalls).toBe(0)
   })
 
+  it('on macOS an unavailable async encryptor (after a Deny) keeps the blobs sealed without a sync read', async () => {
+    const seeded = await seedEncryptedProfile()
+    useAsyncKeychain(async () => {
+      throw new Error('decryptStringAsync must not run when the encryptor is unavailable')
+    })
+    safeStorageMock.isAsyncEncryptionAvailable = async () => false
+
+    const store = await createStore()
+    await store.unsealProtectedSecrets()
+    store.updateSettings({ httpProxyBypassRules: 'saved-after-deny' })
+    await settleSave(store)
+
+    expect(store.getSettings().opencodeSessionCookie).toBe('')
+    expect(persistedBlobs()).toEqual(seeded)
+    expect(keychain.syncCalls).toBe(0)
+  })
+
   it('off macOS a failed async decrypt is retried with the sync API', async () => {
     setPlatform('linux')
     await seedEncryptedProfile()
