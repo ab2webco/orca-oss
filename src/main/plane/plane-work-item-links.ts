@@ -42,7 +42,7 @@ function mapLink(raw: unknown): PlaneWorkItemLink {
 }
 
 export async function addWorkItemLink(args: PlaneAddLinkArgs): Promise<PlaneLinkMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -67,7 +67,7 @@ export async function addWorkItemLink(args: PlaneAddLinkArgs): Promise<PlaneLink
 }
 
 export async function deleteWorkItemLink(args: PlaneDeleteLinkArgs): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -92,7 +92,7 @@ export async function listWorkItemLinks(args: {
   workItemId: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneWorkItemLink[]> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return []
   }

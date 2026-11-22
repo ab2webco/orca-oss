@@ -71,7 +71,7 @@ async function resolveCreatedProjectIdentifier(
 export async function createWorkItem(
   args: PlaneCreateWorkItemArgs
 ): Promise<PlaneCreateWorkItemResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }

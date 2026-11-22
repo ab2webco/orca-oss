@@ -84,10 +84,10 @@ function mapPlanningWorkItem(raw: PlaneRecord): PlanePlanningWorkItem {
   }
 }
 
-function requireClient(
+async function requireClient(
   workspaceId: PlanePlanningContainerArgs['workspaceId']
-): PlaneClientForWorkspace {
-  const client = resolveClient(workspaceId)
+): Promise<PlaneClientForWorkspace> {
+  const client = await resolveClient(workspaceId)
   if (!client) {
     throw new PlaneApiError('Not connected to Plane.')
   }
@@ -111,7 +111,7 @@ async function listPaged<T>(
 export async function listPlanningContainers(
   args: PlanePlanningContainerArgs
 ): Promise<PlanePlanningContainer[]> {
-  const client = requireClient(args.workspaceId)
+  const client = await requireClient(args.workspaceId)
   await acquire()
   try {
     return await listPaged(client, resourceBase(client, args.kind, args.projectId), mapContainer)
@@ -149,7 +149,7 @@ async function assertPlanningContainerExists(
 export async function listPlanningWorkItems(
   args: PlanePlanningWorkItemsArgs
 ): Promise<PlanePlanningWorkItem[]> {
-  const client = requireClient(args.workspaceId)
+  const client = await requireClient(args.workspaceId)
   await acquire()
   try {
     const items = await listPaged(client, workItemsPath(client, args), mapPlanningWorkItem)
@@ -168,7 +168,7 @@ export async function listPlanningWorkItems(
 export async function addPlanningWorkItems(
   args: PlaneAddPlanningWorkItemsArgs
 ): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }

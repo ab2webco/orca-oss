@@ -17,7 +17,7 @@ function labelsPath(client: PlaneClientForWorkspace, projectId: string): string 
 }
 
 export async function createLabel(args: PlaneCreateLabelArgs): Promise<PlaneLabelMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }

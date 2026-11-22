@@ -1024,7 +1024,11 @@ matches …` (ORCA-866).
   still reports to the lead is detached first with `orchestration.workerDetach`: the dispatch
   settles as stopped (stage `detached`), its capability and questions close, and its terminal
   becomes the user's, so no release or recovery closes the pane. A live member on a paired host is
-  refused, naming the host, since that host's stop closes the pane there.
+  detached on that host first (ORCA-1326): the lead's runtime checks the host advertises
+  `orchestration.federation-detach.v1`, calls its `orchestration.federationDetach`, and settles the
+  dispatch at home only once the host answers that it detached it, so a dropped connection leaves
+  the member live in the fleet. The host's later release keeps a detached member's pane and
+  worktree. An older host is refused, naming the host and its Orca version.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is

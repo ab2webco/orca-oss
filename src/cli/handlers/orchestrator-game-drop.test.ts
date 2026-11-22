@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RuntimeClient } from '../runtime-client'
+import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { ORCHESTRATOR_GAME_DROP_HANDLERS } from './orchestrator-game-drop'
 
 const LEAD = {
@@ -33,7 +33,11 @@ const remoteMember = agent({
   worktree: { id: 'wt-915', branch: 'fabolivark/orca-915', displayName: 'orca-915' }
 })
 
-function clientWith(state: Record<string, unknown>, workers: unknown[] = []) {
+function clientWith(
+  state: Record<string, unknown>,
+  workers: unknown[] = [],
+  overrides: Record<string, unknown> = {}
+) {
   const calls: [string, unknown][] = []
   const all: Record<string, unknown> = {
     'game.state': {
@@ -44,11 +48,19 @@ function clientWith(state: Record<string, unknown>, workers: unknown[] = []) {
     },
     'orchestration.workerList': { workers },
     'game.fleetDrop': { dropped: true, count: 1 },
-    'orchestration.workerDetach': { dispatchId: 'ctx_907', state: 'stopped', processAction: 'none' }
+    'orchestration.workerDetach': {
+      dispatchId: 'ctx_907',
+      state: 'stopped',
+      processAction: 'none'
+    },
+    ...overrides
   }
   const client = {
     call: async (method: string, params: unknown) => {
       calls.push([method, params])
+      if (all[method] instanceof Error) {
+        throw all[method]
+      }
       return { ok: true, result: all[method] }
     }
   } as unknown as RuntimeClient
@@ -144,20 +156,61 @@ describe('orca game drop (ORCA-943)', () => {
     expect(output()).toMatchObject({ dropped: true, detached: 'ctx_907' })
   })
 
+  const liveOnM1 = [{ dispatchId: 'ctx_915', workerState: 'ready', agentTerminalHandle: null }]
+
+  // Why: the home refuses an older host by name and version before any effect (ORCA-1326).
   it('refuses a live member on a paired host, naming the host', async () => {
-    const { client, calls } = clientWith({ agents: [LEAD, remoteMember] }, [
-      { dispatchId: 'ctx_915', workerState: 'ready', agentTerminalHandle: null }
-    ])
+    const { client, calls } = clientWith({ agents: [LEAD, remoteMember] }, liveOnM1, {
+      'orchestration.workerDetach': new RuntimeClientError(
+        'capability_unsupported',
+        'm1 runs Orca 1.4.150-lab.110, which cannot detach a live member (orchestration.federation-detach.v1); update Orca on m1, or end it with `orca game stop`. No effects were applied.'
+      )
+    })
 
     await drop(client, 'ORCA-915')
 
-    expect(calls.map(([method]) => method)).not.toContain('orchestration.workerDetach')
     expect(drops(calls)).toEqual([])
     expect(output()).toMatchObject({
       dropped: false,
       dispatchId: 'ctx_915',
       refusal: expect.stringMatching(/on m1/)
     })
+    expect(output().refusal).toContain('m1 runs Orca 1.4.150-lab.110')
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('detaches a live member on a capable paired host, then drops it, closing nothing', async () => {
+    const { client, calls } = clientWith({ agents: [LEAD, remoteMember] }, liveOnM1, {
+      'orchestration.workerDetach': {
+        dispatchId: 'ctx_915',
+        state: 'stopped',
+        processAction: 'none'
+      }
+    })
+
+    await drop(client, 'ORCA-915')
+
+    const methods = calls.map(([method]) => method)
+    expect(calls).toContainEqual(['orchestration.workerDetach', { dispatch: 'ctx_915' }])
+    expect(methods.indexOf('orchestration.workerDetach')).toBeLessThan(
+      methods.indexOf('game.fleetDrop')
+    )
+    expect(methods).not.toContain('orchestration.workerStop')
+    expect(methods).not.toContain('orchestration.workerRelease')
+    expect(methods).not.toContain('terminal.close')
+    expect(output()).toMatchObject({ dropped: true, host: 'm1', detached: 'ctx_915' })
+  })
+
+  it('keeps a live remote member in the fleet when its host drops the connection mid-detach', async () => {
+    const { client, calls } = clientWith({ agents: [LEAD, remoteMember] }, liveOnM1, {
+      'orchestration.workerDetach': new RuntimeClientError('runtime_error', 'connection closed')
+    })
+
+    await drop(client, 'ORCA-915')
+
+    expect(drops(calls)).toEqual([])
+    expect(output()).toMatchObject({ dropped: false, host: 'm1', dispatchId: 'ctx_915' })
+    expect(output().refusal).toContain('was not detached: connection closed')
     expect(process.exitCode).toBe(1)
   })
 
