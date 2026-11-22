@@ -1457,8 +1457,11 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - An escalation or decision gate waits on the lead until a reply threads it, or until `game stop`
   released its dispatch and no live member reuses its terminal (ORCA-1267). A member that sent
   worker_done keeps its mail waiting, and so does one whose pane Orca has not registered yet: after a
-  restart a daemon-held pane stays unregistered until the UI opens it. `orchestration reply` takes mail sent to `run:<id>` from
-  that Run's current consumer, so the lead can answer a member's status mail, not only its question.
+  restart a daemon-held pane stays unregistered until the UI opens it. `orchestration reply` takes
+  mail sent to `run:<id>` from that Run's current consumer, so the lead can answer a member's status
+  mail, not only its question. A remote member's mail arrives as from `dispatch:<id>`: the reply goes
+  over the relay to its host, like `orchestration send`, and a host too old for control mail, or a
+  released member, refuses it and the mail keeps waiting.
 - What the lead asks the person is a record, not chat text (ORCA-782): `game ask-owner` keeps the
   question with its ticket, up to 6 options, a context line and the time asked in the project's board
   file, next to its events ([`orchestrator-game-owner-questions.ts`](../../src/shared/orchestrator-game-owner-questions.ts)).

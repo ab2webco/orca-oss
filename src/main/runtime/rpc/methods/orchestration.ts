@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- Why: RPC method definitions co-locate param schemas with handlers; splitting by method would scatter the shared enums and Zod transforms without reducing complexity. */
 import { z } from 'zod'
-import { waitForRelayDelivery } from '../../orchestration/federation-relay-delivery'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, OptionalBoolean, requiredString } from '../schemas'
 import {
@@ -31,6 +30,10 @@ import {
 import { clampOrchestrationAskTimeoutMs } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_GATE_METHODS } from './orchestration-gates'
 import { resolveRunScope, runConsumerOf } from './orchestration-run-scope'
+import {
+  federatedSenderOf,
+  relayFederatedControlMail
+} from './orchestration-federated-control-mail'
 import { ORCHESTRATION_RUN_METHODS } from './orchestration-runs'
 import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
@@ -38,17 +41,12 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
 import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
-import { routeFederatedMail } from '../../orchestration/federated-follow-up'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
 import type { RunRow } from '../../orchestration/types'
-import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
 import { refuseRemoteMemberMail } from '../../orchestration/remote-member-mail-refusal'
-import {
-  ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION,
-  ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION
-} from '../../../../shared/protocol-version'
+import { ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
 
 const TASK_STATUSES: TaskStatus[] = [
   'pending',
@@ -650,58 +648,22 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           federatedDispatchId && to === `dispatch:${federatedDispatchId}`
             ? db.getFederatedDispatch(federatedDispatchId)
             : undefined
-        if (federatedTarget && federatedDispatchId) {
-          const dispatchId = federatedDispatchId
-          if (
-            federatedTarget.protocol_version <
-            ORCHESTRATION_FEDERATION_CONTROL_MAIL_PROTOCOL_VERSION
-          ) {
-            throw new OrchestrationError(
-              'capability_unsupported',
-              `Federated Dispatch ${dispatchId} does not support coordinator control mail; start a fresh worker after updating its Orca Lab server.`
-            )
-          }
-          if (params.type === 'worker_done' || params.type === 'heartbeat') {
-            throw new OrchestrationError(
-              'invalid_argument',
-              'Coordinator-to-worker control mail cannot report worker lifecycle.'
-            )
-          }
-          const route = routeFederatedMail(db, federatedTarget)
-          const followUp = route.kind === 'control_message' ? undefined : route
-          revalidateLegacyCoordinator?.()
-          const relay = db.enqueueFederationRelay({
-            dispatchId,
-            direction: 'to_worker',
-            kind: route.kind,
-            ...(followUp ? { reopenSettledReason: followUp.reopenSettledReason } : {}),
-            payload: encodeFederatedControlMessage({
+        if (federatedTarget) {
+          return relayFederatedControlMail(
+            runtime,
+            db,
+            federatedTarget,
+            {
               from,
               subject: params.subject,
-              body: followUp ? `${params.body ?? ''}\n\n${followUp.note}` : (params.body ?? ''),
+              body: params.body ?? '',
               type: (params.type ?? 'status') as MessageType,
               priority: (params.priority ?? 'normal') as MessagePriority,
               threadId: params.threadId ?? null,
               payload: params.payload ?? null
-            })
-          })
-          runtime.ensureOrchestrationFederationRelay(routing.run?.id)
-          // Why: a queued send read as ok while the member never saw it (ORCA-1301).
-          const deliveredAt = await waitForRelayDelivery(() =>
-            db.getFederationRelayAckedAt(dispatchId, 'to_worker', relay.message_id)
-          )
-          return {
-            relay: {
-              messageId: relay.message_id,
-              sequence: relay.sequence,
-              dispatchId: relay.dispatch_id,
-              destination: 'worker',
-              accepted: true,
-              delivered: deliveredAt !== null,
-              deliveredAt
             },
-            ...(followUp ? { reopenedDispatchId: dispatchId } : {})
-          }
+            { runId: routing.run?.id, beforeEnqueue: revalidateLegacyCoordinator }
+          )
         }
         // Point-to-point — existing single-recipient behavior
         const contractRunId = routing.run?.id ?? legacyCoordinatorRunId
@@ -1321,16 +1283,41 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         throw new Error('orchestration_sender_identity_mismatch')
       }
 
+      const threadId = original.thread_id ?? original.id
+      // Why (ORCA-1267): a remote member's mail is imported as from dispatch:<id>; a reply written
+      // only at home never reaches its host, so relay it first and record it only once queued.
+      const federated = runConsumer ? federatedSenderOf(db, original.from_handle) : undefined
+      const relayed = federated
+        ? await relayFederatedControlMail(
+            runtime,
+            db,
+            federated,
+            {
+              from,
+              subject: `Re: ${original.subject}`,
+              body: params.body,
+              type: 'status',
+              priority: 'normal',
+              threadId,
+              payload: null
+            },
+            { runId: runConsumer?.id }
+          )
+        : undefined
+
       const reply = db.insertReplyAndMarkRead(original.id, {
         from,
         to: original.from_handle,
         subject: `Re: ${original.subject}`,
         body: params.body,
-        threadId: original.thread_id ?? original.id,
+        threadId,
         senderPaneKey: sender.paneKey,
         runId: original.run_id
       })
 
+      if (relayed) {
+        return { message: reply, ...relayed }
+      }
       runtime.notifyMessageArrived(original.from_handle, reply.type)
       return { message: reply }
     }
