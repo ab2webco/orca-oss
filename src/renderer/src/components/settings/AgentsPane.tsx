@@ -559,25 +559,28 @@ function AgentRow({
         </div>
 
         {/* Why own line below sm: beside the name it squeezes the label and its Disabled badge. */}
-        <div className="ml-auto grid shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 max-sm:ml-0 max-sm:flex max-sm:basis-full max-sm:flex-wrap max-sm:pl-10">
+        <div className="ml-auto grid shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 max-sm:ml-0 max-sm:flex max-sm:basis-full max-sm:flex-wrap">
           <AgentAvailabilityControl
             label={label}
             isEnabled={isEnabled}
             onSetEnabled={onSetEnabled}
           />
 
-          <div className="grid">
+          {/* Why last below sm: the icons then wrap with the toggle, never alone on a line. */}
+          <div
+            className={cn('grid max-sm:order-last', !(isDetected && isEnabled) && 'max-sm:hidden')}
+          >
             {/* Why: sizes every row's column to the wider label in this language, so rows align. */}
             <span
               aria-hidden
-              className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium"
+              className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium max-sm:hidden"
             >
               <Check className="size-3" />
               {defaultLabel}
             </span>
             <span
               aria-hidden
-              className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium"
+              className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium max-sm:hidden"
             >
               {setDefaultLabel}
             </span>

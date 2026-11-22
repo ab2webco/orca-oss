@@ -47,6 +47,16 @@ async function measureInstalledRows(page: Page): Promise<RowReport[]> {
           }
         }
       }
+      // Why below sm only: there the controls wrap, and an icon alone on a line reads as orphaned.
+      if (window.innerWidth < 640) {
+        const texts = boxes.filter(({ name }) => name === 'availability' || name === 'default')
+        for (const icon of boxes.filter(({ name }) => name === 'docs' || name === 'command')) {
+          const middle = (icon.rect.top + icon.rect.bottom) / 2
+          if (!texts.some(({ rect }) => middle > rect.top && middle < rect.bottom)) {
+            problems.push(`${icon.name} sits on a line of its own`)
+          }
+        }
+      }
       for (const { name, element } of boxes) {
         for (const node of [element, ...Array.from(element.querySelectorAll('*'))]) {
           if (node instanceof HTMLElement && node.scrollWidth > node.clientWidth + 1) {
@@ -62,7 +72,8 @@ async function measureInstalledRows(page: Page): Promise<RowReport[]> {
   })
 }
 
-// ORCA-1328 (L4): a disabled agent's badge and the enabled one's Set default must not collide.
+// ORCA-1328 (L4): a disabled agent's badge and the enabled one's Set default must not collide,
+// and below sm the icon buttons wrap with the row's controls, never alone.
 test('Settings → Agents: Installed rows keep name, availability and Set default apart', async ({
   electronApp,
   orcaPage
