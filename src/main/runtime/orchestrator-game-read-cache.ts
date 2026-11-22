@@ -41,6 +41,11 @@ export class GameReadCache<T> {
     return this.load(key, at, load, false)
   }
 
+  /** Drops `key`, so its next read loads and waits. */
+  forget(key: string): void {
+    this.entries.delete(key)
+  }
+
   // Why put a background reload only once it lands: the expired entry answers reads until then.
   private load(
     key: string,

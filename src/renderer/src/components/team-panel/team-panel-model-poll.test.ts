@@ -83,6 +83,72 @@ describe('createTeamPanelModelPoller', () => {
     release()
   })
 
+  // ORCA-1329: Retry now asks the host to re-read its lists once, and settles when that read lands.
+  it('makes only the next read fresh, settling Retry now when it lands', async () => {
+    const { all } = deps()
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    let settled = false
+    const retry = poller.refreshFresh().then(() => (settled = true))
+    expect(settled).toBe(false)
+    await retry
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(vi.mocked(all.readState).mock.calls.map((call) => call[2])).toEqual([
+      { fresh: false },
+      { fresh: true },
+      { fresh: false }
+    ])
+    release()
+  })
+
+  it('folds a tap during a read into one fresh read after it', async () => {
+    let land = (): void => {}
+    const readState = vi.fn<TeamPanelPollDeps['readState']>(
+      () =>
+        new Promise<OrchestratorGameState>(
+          (done) => (land = () => done({ role: 'lead' } as OrchestratorGameState))
+        )
+    )
+    const { all } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    let settled = false
+    void poller.refreshFresh().then(() => (settled = true))
+    land()
+    await flush()
+    await flush()
+    expect(settled).toBe(false)
+    expect(readState.mock.calls.map((call) => call[2])).toEqual([{ fresh: false }, { fresh: true }])
+    land()
+    await flush()
+    await flush()
+    expect(settled).toBe(true)
+    release()
+  })
+
+  // Why: an older host strips `fresh` and answers from its cache; the tap must still end, error and all.
+  it('settles Retry now on a host that ignores the flag, keeping the error it answered', async () => {
+    const failed = { ...MODEL, prs: { kind: 'error', message: 'The provider did not answer.' } }
+    const { all, last } = deps({ modelOf: vi.fn(() => failed as TeamPanelGameModel) })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    await poller.refreshFresh()
+    expect(last()).toMatchObject({ kind: 'ready', value: { prs: { kind: 'error' } } })
+    release()
+  })
+
+  it('settles Retry now when its run ends before the read', async () => {
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>(() => {}))
+    const poller = createTeamPanelModelPoller(deps({ readState }).all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    const retry = poller.refreshFresh()
+    release()
+    await expect(retry).resolves.toBeUndefined()
+  })
+
   it('reads once for every subscriber of the same project and stops when the last leaves', async () => {
     const { all, last } = deps()
     const poller = createTeamPanelModelPoller(all, 20_000)

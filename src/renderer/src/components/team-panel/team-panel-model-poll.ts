@@ -19,9 +19,11 @@ export type TeamPanelScope = {
 export type TeamPanelPollDeps = {
   readLeads: (target: RuntimeClientTarget) => Promise<TeamLeadRoster>
   findCaller: (roster: TeamLeadRoster, scope: TeamPanelScope) => TeamLeadCaller | 'restoring' | null
+  /** `fresh`: the host re-reads the project's PRs and queue instead of its cached lists. */
   readState: (
     target: RuntimeClientTarget,
-    caller: TeamLeadCaller
+    caller: TeamLeadCaller,
+    options: { fresh: boolean }
   ) => Promise<OrchestratorGameState | null>
   readQuestions: (
     target: RuntimeClientTarget,
@@ -73,6 +75,8 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     soon: ReturnType<typeof setTimeout> | null
     reading: boolean
     again: boolean
+    /** Retry now's waiters; the next read is fresh and settles them. */
+    fresh: (() => void)[]
   } | null = null
   let generation = 0
   // Why outside the run: leaving the panel ends the run, and a sick host must not cost the team.
@@ -122,6 +126,15 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     if (!run) {
       return
     }
+    const waiters = run.fresh.splice(0)
+    try {
+      await readOnce(run, waiters.length > 0)
+    } finally {
+      waiters.forEach((settle) => settle())
+    }
+  }
+
+  const readOnce = async (run: NonNullable<typeof active>, fresh: boolean): Promise<void> => {
     const mine = ++generation
     const { scope } = run
     const retry = (): void => void refresh()
@@ -147,7 +160,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       }
       const caller = found
       stage = 'game.state'
-      const state = caller ? await deps.readState(scope.target, caller) : null
+      const state = caller ? await deps.readState(scope.target, caller, { fresh }) : null
       const [questions, xp] =
         caller && state
           ? await Promise.all([
@@ -262,6 +275,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
 
   const stop = (): void => {
     if (active) {
+      active.fresh.splice(0).forEach((settle) => settle())
       clearInterval(active.timer)
       if (active.soon) {
         clearTimeout(active.soon)
@@ -276,6 +290,17 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     refresh(): void {
       void refresh()
     },
+    /** Re-reads with the host's lists fresh; settles once that read lands, or the run ends. */
+    refreshFresh(): Promise<void> {
+      const run = active
+      if (!run) {
+        return Promise.resolve()
+      }
+      return new Promise<void>((settle) => {
+        run.fresh.push(settle)
+        void refresh()
+      })
+    },
     /** `background`: the holder keeps the run going without showing it, so it never re-reads on join. */
     subscribe(scope: TeamPanelScope, options: { background?: boolean } = {}): () => void {
       const shows = options.background !== true
@@ -289,6 +314,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
           soon: null,
           reading: false,
           again: false,
+          fresh: [],
           timer: setInterval(() => void refresh(), intervalMs)
         }
         void refresh()

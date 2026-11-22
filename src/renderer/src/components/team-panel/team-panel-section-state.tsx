@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
@@ -25,12 +26,15 @@ export function TeamPanelMessageState({
   title,
   text,
   tone = 'quiet',
-  action
+  action,
+  footer
 }: {
   title: string
   text: string | null
   tone?: 'quiet' | 'error'
   action?: { label: string; onClick: () => void } | null
+  /** A control that keeps its own state, drawn where `action` goes. */
+  footer?: ReactNode
 }): React.JSX.Element {
   return (
     <div className="flex flex-col items-start gap-2 px-3 py-6 text-xs text-muted-foreground">
@@ -48,6 +52,7 @@ export function TeamPanelMessageState({
           {action.label}
         </Button>
       ) : null}
+      {footer}
     </div>
   )
 }

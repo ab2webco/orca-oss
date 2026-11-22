@@ -17461,7 +17461,9 @@
       "modelErrorText": "Orca is not responding in this project. Try again.",
       "modelUnavailableTitle": "Team data is not available",
       "retry": "Try again",
-      "updating": "Updating the team…"
+      "updating": "Updating the team…",
+      "providerErrorTitle": "{{provider}} did not answer",
+      "retryNow": "Retry now"
     },
     "tabs": {
       "label": "Panel sections",
@@ -17487,7 +17489,7 @@
       },
       "prs": {
         "title": "PRs",
-        "emptyTitle": "No open pull requests",
+        "emptyTitle": "You have no open PRs",
         "emptyText": "They show here when an agent opens one.",
         "errorTitle": "Could not read pull requests"
       },

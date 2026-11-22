@@ -105,6 +105,7 @@ function renderSheet(
       onReply={onReply}
       agentQuestions={[]}
       answeredQuestions={[]}
+      agentAnswers={[]}
       onOpenAgent={() => {}}
       memberNames={new Map()}
     />

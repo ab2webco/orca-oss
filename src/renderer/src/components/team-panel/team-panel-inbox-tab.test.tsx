@@ -5,7 +5,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import type { GameInboxQuestionGroup } from '@/components/game-inbox/use-other-game-inbox-groups'
-import { TeamInboxView } from './team-panel-inbox-tab'
+import { answerTeamInboxAgentOf, TeamInboxView } from './team-panel-inbox-tab'
+import { useTeamInboxAgentAnswers } from './team-panel-inbox-agent-answers'
+import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
+
+const { answerTeamInboxAgent } = vi.hoisted(() => ({ answerTeamInboxAgent: vi.fn() }))
+vi.mock('./team-panel-inbox-agents', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isOneTapQuestion: () => true,
+  answerTeamInboxAgent
+}))
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: () => ({
@@ -98,6 +108,7 @@ function renderInbox(
       onReply={vi.fn(async () => {})}
       agentQuestions={[]}
       answeredQuestions={[]}
+      agentAnswers={[]}
       onOpenAgent={vi.fn()}
       answerAgentOf={() => null}
       memberNames={new Map([['ORCA-1033', 'Sabio']])}
@@ -452,6 +463,37 @@ describe('Inbox tab', () => {
     const first = view.getByRole('button', { name: 'Apply it now' }) as HTMLButtonElement
     expect(first.disabled).toBe(true)
     expect(view.getByRole('button', { name: 'Open terminal' })).toBeTruthy()
+  })
+
+  // ORCA-1329 P9: an agent-pane question answered from For you lands in Answered, as V30 shows.
+  it('records a sent For you answer with only its question and the option picked', () => {
+    useTeamInboxAgentAnswers.setState({ answers: [] })
+    const asked = {
+      paneKey: 'tab-1:leaf-1',
+      text: 'Which migration runs first?',
+      options: ['0042 first', '0043 first']
+    } as TeamInboxAgentQuestion
+    answerTeamInboxAgent.mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    expect(answerTeamInboxAgentOf(asked)?.(1)).toBe(false)
+    expect(useTeamInboxAgentAnswers.getState().answers).toEqual([])
+    expect(answerTeamInboxAgentOf(asked)?.(1)).toBe(true)
+    expect(useTeamInboxAgentAnswers.getState().answers).toEqual([
+      { question: 'Which migration runs first?', answer: '0043 first' }
+    ])
+  })
+
+  it("lists this session's agent answers in Answered and counts them", () => {
+    const view = renderInbox({
+      threads: { ...THREADS, answered: [] },
+      agentAnswers: [{ question: 'Which migration runs first?', answer: '0043 first' }]
+    })
+
+    expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('1')
+    pick(view, /Answered/)
+    const row = view.getByTestId('team-inbox-answered-agent')
+    expect(row.textContent).toContain('Which migration runs first?')
+    expect(row.textContent).toContain('You answered: 0043 first')
   })
 
   it('lists what you answered beside what the lead answered', () => {

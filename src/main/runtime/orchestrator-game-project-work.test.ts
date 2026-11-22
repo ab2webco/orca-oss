@@ -654,6 +654,53 @@ describe('GameProjectWorkCache', () => {
   })
 })
 
+describe('GameProjectWorkCache fresh reads (ORCA-1329)', () => {
+  const failed = { reviews: null, todo: null }
+  const listed = { reviews: { provider: 'github', total: 0, url: null, items: [] }, todo: null }
+
+  it("reloads this project's lists on Retry now instead of serving the cached failure", async () => {
+    let now = 0
+    const cache = new GameProjectWorkCache(90_000, () => now)
+    await cache.read('repo', async () => failed)
+    now = 1_000
+    expect(await cache.read('repo', async () => listed)).toBe(failed)
+    expect(await cache.read('repo', async () => listed, { fresh: true })).toBe(listed)
+  })
+
+  it('honours one fresh read per project every 10 s, so taps cannot spend the budget', async () => {
+    let now = 0
+    let loads = 0
+    const cache = new GameProjectWorkCache(90_000, () => now)
+    const load = async () => {
+      loads += 1
+      return failed
+    }
+    await cache.read('repo', load)
+    await cache.read('repo', load, { fresh: true })
+    now = 9_999
+    await cache.read('repo', load, { fresh: true })
+    await cache.read('repo', load, { fresh: true })
+    expect(loads).toBe(2)
+    now = 10_000
+    await cache.read('repo', load, { fresh: true })
+    expect(loads).toBe(3)
+  })
+
+  it("never drops another project's lists", async () => {
+    let loads = 0
+    const cache = new GameProjectWorkCache(90_000, () => 0)
+    const load = async () => {
+      loads += 1
+      return failed
+    }
+    await cache.read('repo', load)
+    await cache.read('other', load)
+    await cache.read('repo', load, { fresh: true })
+    await cache.read('other', load)
+    expect(loads).toBe(3)
+  })
+})
+
 describe('myOpenPullRequestsOf', () => {
   const fork = { owner: 'ab2webco', repo: 'orca-oss' }
   const upstream = { owner: 'stablyai', repo: 'orca' }

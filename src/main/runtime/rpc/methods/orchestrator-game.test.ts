@@ -72,6 +72,24 @@ describe('game.state RPC', () => {
     expect(calls[1]?.steward).toBeUndefined()
   })
 
+  // ORCA-1329: the panel's Retry now; an older host's schema strips the key and answers from cache.
+  it('passes the fresh flag on only when the panel sends it', async () => {
+    const calls: Record<string, unknown>[] = []
+    const runtime = {
+      getRuntimeId: () => 'runtime',
+      getOrchestratorGameState: async (args: Record<string, unknown>) => {
+        calls.push(args)
+        return { config: { mode: 'on' } }
+      }
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })
+
+    await dispatcher.dispatch(request({ worktreeId: 'wt1', fresh: true }))
+    await dispatcher.dispatch(request({ worktreeId: 'wt1' }))
+    expect(calls[0]).toMatchObject({ worktreeId: 'wt1', fresh: true })
+    expect('fresh' in calls[1]!).toBe(false)
+  })
+
   it('rejects a non-string worktree id', async () => {
     const runtime = { getRuntimeId: () => 'runtime' } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATOR_GAME_METHODS })

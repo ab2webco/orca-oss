@@ -10,6 +10,7 @@ import type {
 } from '../../../../shared/orchestrator-game-inbox-threads'
 import { ticketInText } from '../../../../shared/orchestrator-game-ticket-id'
 import { teamAgeText, teamHostText } from './team-card-text'
+import type { TeamInboxAgentAnswer } from './team-panel-inbox-agent-answers'
 import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
 
 /** A session blocked on the user; V28's option buttons answer it, its terminal stays one click away. */
@@ -153,13 +154,15 @@ export function TeamInboxWaitingRows({
   )
 }
 
-/** Everything answered, newest first, in V28's one plain list. */
+/** Everything answered, newest first, in V28's one plain list; this session's agent answers carry no time, so they lead. */
 export function TeamInboxAnsweredRows({
+  agents,
   yours,
   lead,
   now,
   renderOverride
 }: {
+  agents: TeamInboxAgentAnswer[]
   yours: GameOwnerQuestion[]
   lead: GameAnsweredItem[]
   now: number
@@ -169,7 +172,7 @@ export function TeamInboxAnsweredRows({
     ...yours.map((one) => ({ kind: 'yours' as const, at: one.answer?.at ?? '', one })),
     ...lead.map((one) => ({ kind: 'lead' as const, at: one.answeredAt, one }))
   ].sort((a, b) => b.at.localeCompare(a.at))
-  if (rows.length === 0) {
+  if (rows.length + agents.length === 0) {
     return (
       <p className="py-6 text-center text-xs text-muted-foreground">
         {translate('teamPanel.inbox.answeredEmpty', 'Nothing answered yet.')}
@@ -178,6 +181,16 @@ export function TeamInboxAnsweredRows({
   }
   return (
     <ul>
+      {agents.map((one, index) => (
+        <li key={`agent-${index}`} data-testid="team-inbox-answered-agent" className={ROW}>
+          <p className="text-[13px] break-words">{one.question}</p>
+          <p className="text-[13px] break-words text-muted-foreground">
+            {translate('teamPanel.inbox.youAnsweredText', 'You answered: {{text}}', {
+              text: one.answer
+            })}
+          </p>
+        </li>
+      ))}
       {rows.map((row) =>
         row.kind === 'yours' ? (
           <li key={row.one.id} data-testid={`team-inbox-answered-${row.one.id}`} className={ROW}>

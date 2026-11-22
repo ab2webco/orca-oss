@@ -21,6 +21,12 @@ vi.mock('@/i18n/i18n', () => ({
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''))
 }))
 
+const { refreshFresh } = vi.hoisted(() => ({ refreshFresh: vi.fn() }))
+vi.mock('./use-team-panel-model', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  refreshTeamPanelModelFresh: refreshFresh
+}))
+
 const roots: ReturnType<typeof createRoot>[] = []
 
 afterEach(async () => {
@@ -166,6 +172,38 @@ describe('TeamPanelView', () => {
     expect(tabs(container)).not.toContain('Queue')
   })
 
+  // ORCA-1329 P6: V30's error says who failed, why, when it retries, and offers Retry now.
+  it('offers Retry now on a failed PR list, held disabled until its fresh read lands', async () => {
+    let land = (): void => {}
+    refreshFresh.mockReset().mockImplementation(() => new Promise<void>((done) => (land = done)))
+    useTeamPanelTabStore.setState({ selected: 'prs' })
+    const { container } = await render({ section: { kind: 'ready', value: game }, retry: null })
+    const button = (): HTMLButtonElement | null =>
+      container.querySelector<HTMLButtonElement>('[data-team-retry-now]')
+
+    expect(panelText(container)).toContain('Could not read pull requests')
+    expect(button()?.textContent).toBe('Retry now')
+    await act(async () => button()?.click())
+    await act(async () => button()?.click())
+    expect(refreshFresh).toHaveBeenCalledTimes(1)
+    expect(button()?.disabled).toBe(true)
+    await act(async () => land())
+    expect(button()?.disabled).toBe(false)
+  })
+
+  it('names the provider the read named, and hides Retry now while its limit is spent', async () => {
+    useTeamPanelTabStore.setState({ selected: 'prs' })
+    const limited: TeamPanelGameModel = {
+      ...game,
+      prs: { kind: 'error', message: 'Limit, 12 min', provider: 'GitHub', limited: true }
+    }
+    const { container } = await render({ section: { kind: 'ready', value: limited }, retry: null })
+
+    expect(panelText(container)).toContain('GitHub did not answer')
+    expect(panelText(container)).toContain('Limit, 12 min')
+    expect(container.querySelector('[data-team-retry-now]')).toBeNull()
+  })
+
   it('falls back to the first tab when the stored one is hidden', async () => {
     useTeamPanelTabStore.setState({ selected: 'machines' })
     const { container } = await render({
@@ -237,6 +275,44 @@ describe('TeamPanelView', () => {
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
+
+  // ORCA-1329 P4: V30 loads in its own layout, not as bare bars.
+  it.each([
+    ['game', true, true],
+    ['display', true, false],
+    ['plain', false, false]
+  ] as const)(
+    'loads the %s look as scene, header, tabs and lead skeletons',
+    async (look, scene, face) => {
+      const { container } = await render(
+        { section: { kind: 'loading' }, retry: null },
+        vi.fn(),
+        look
+      )
+      const order = [
+        '[data-team-loading-scene]',
+        'h2',
+        '[data-team-loading-tabs]',
+        '[data-team-loading-lead]'
+      ]
+        .map((selector) => container.querySelector(selector))
+        .filter((node) => node !== null)
+
+      expect(container.querySelector('[data-team-loading-scene]') !== null).toBe(scene)
+      expect(order).toHaveLength(scene ? 4 : 3)
+      order
+        .slice(1)
+        .forEach((node, index) =>
+          expect(
+            order[index]!.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING
+          ).toBeTruthy()
+        )
+      expect(container.querySelector('[data-team-loading-lead] .size-\\[38px\\]') !== null).toBe(
+        face
+      )
+      expect(container.querySelector('[aria-busy="true"] h2, [aria-busy="true"] button')).toBeNull()
+    }
+  )
 
   it('offers a retry when the model fails to load', async () => {
     const retry = vi.fn()

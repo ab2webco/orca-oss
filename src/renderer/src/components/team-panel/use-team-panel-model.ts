@@ -92,11 +92,11 @@ const poller = createTeamPanelModelPoller(
     readLeads: readTeamLeadRoster,
     findCaller: (roster, scope) => teamLeadCallerOf(roster, scope.worktreeIds),
     // Why: the scene's art and the sidebar's history come from the host game.state is read on (ORCA-1150).
-    readState: (target, caller) => {
+    readState: (target, caller, options) => {
       const { worktreeId, terminalHandle } = caller
       publishTeamSceneArtHost({ target, caller: { worktreeId, terminalHandle } })
       useTeamPanelModelStore.setState({ target })
-      return readTeamLeadState(target, caller)
+      return readTeamLeadState(target, caller, options)
     },
     readQuestions: readTeamOwnerQuestions,
     readXp: readTeamXp,
@@ -120,6 +120,9 @@ const poller = createTeamPanelModelPoller(
 
 /** Reads the panel again now, after it changed something on the host. */
 export const refreshTeamPanelModel = (): void => poller.refresh()
+
+/** Retry now: the host re-reads this project's PRs and queue; settles when that read lands. */
+export const refreshTeamPanelModelFresh = (): Promise<void> => poller.refreshFresh()
 
 /**
  * No team means the user's own sessions: no lead, no workspace, or a host with no game.

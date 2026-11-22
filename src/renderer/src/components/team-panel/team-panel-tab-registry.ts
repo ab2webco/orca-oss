@@ -88,13 +88,14 @@ const TEAM_PANEL_TABS: readonly TeamPanelTabDefinition[] = [
     // Why the queue too: V30 draws the merge queue at the top of PRs, so a queued PR is something to show.
     isEmpty: (list, model) => list.rows.length === 0 && teamQueueEntriesOf(model).length === 0,
     copy: () => ({
-      emptyTitle: translate('teamPanel.tabs.prs.emptyTitle', 'No open pull requests'),
+      emptyTitle: translate('teamPanel.tabs.prs.emptyTitle', 'You have no open PRs'),
       emptyText: translate(
         'teamPanel.tabs.prs.emptyText',
         'They show here when an agent opens one.'
       ),
       errorTitle: translate('teamPanel.tabs.prs.errorTitle', 'Could not read pull requests')
     }),
+    retryNow: true,
     Body: TeamPanelPrsTab
   }),
   defineTeamPanelTab({

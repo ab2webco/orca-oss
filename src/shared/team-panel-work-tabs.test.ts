@@ -149,7 +149,12 @@ describe('teamPrSectionOf', () => {
       now: NOW
     })
 
-    expect(section).toEqual({ kind: 'error', message: 'Limit, 12 min' })
+    expect(section).toEqual({
+      kind: 'error',
+      message: 'Limit, 12 min',
+      provider: 'GitHub',
+      limited: true
+    })
   })
 
   it('names no provider when the list failed for another reason', () => {
