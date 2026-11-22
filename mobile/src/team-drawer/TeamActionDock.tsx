@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import {
   Activity,
   ArrowRight,
@@ -42,6 +42,44 @@ const ICONS: Record<GameActionIcon, typeof Square> = {
 const LABELS_FROM_WIDTH = 360
 // Why 8 s: a 4 s line under the thumb went unread, and the owner thought the Wave never fired.
 const NOTE_MS = 8_000
+const FADE_STEPS = [0.15, 0.35, 0.55, 0.75, 0.9, 1]
+
+/** Whether chips still run past the strip's right edge, so the fade must say it scrolls. */
+export function teamDockStripOverflows(contentWidth: number, viewWidth: number, scrollX: number) {
+  return contentWidth - viewWidth - scrollX > 1
+}
+
+// Why a strip: wrapped chips pushed Stop and the menu onto a second 52 pt row over the tab (ORCA-1310).
+function ChipStrip({ children }: { children: ReactNode }) {
+  const [viewWidth, setViewWidth] = useState(0)
+  const [contentWidth, setContentWidth] = useState(0)
+  const [scrollX, setScrollX] = useState(0)
+  return (
+    <View
+      testID="team-dock-strip"
+      style={styles.strip}
+      onLayout={(event) => setViewWidth(event.nativeEvent.layout.width)}
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chips}
+        onContentSizeChange={(width) => setContentWidth(width)}
+        onScroll={(event) => setScrollX(event.nativeEvent.contentOffset.x)}
+        scrollEventThrottle={16}
+      >
+        {children}
+      </ScrollView>
+      {teamDockStripOverflows(contentWidth, viewWidth, scrollX) ? (
+        <View testID="team-dock-fade" pointerEvents="none" style={styles.fade}>
+          {FADE_STEPS.map((opacity) => (
+            <View key={opacity} style={[styles.fadeStep, { opacity }]} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  )
+}
 
 /** A STOP's line above the tabs: who stopped it, and that members still run with pushes paused. */
 export function TeamStoppedBanner({
@@ -175,27 +213,28 @@ export function TeamActionDock({
           </Text>
         </View>
       ) : null}
-      <View style={styles.dock}>
-        {chips.map((action) => {
-          const Icon = ICONS[action.icon ?? 'pulse']
-          const label = teamActionLabelOf(action, words)
-          return (
-            <Pressable
-              key={action.id}
-              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
-              onPress={() => run(action)}
-              disabled={action.off !== null}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}, ${teamActionHintOf(action, words)}`}
-              accessibilityHint={action.off ? words.off[action.off] : undefined}
-            >
-              <Icon size={14} color={colors.textSecondary} />
-              {labelled ? <Text style={styles.chipText}>{label}</Text> : null}
-              {action.now ? <Text style={styles.count}>{String(action.now.count)}</Text> : null}
-            </Pressable>
-          )
-        })}
-        <View style={styles.spacer} />
+      <View testID="team-dock-row" style={styles.row}>
+        <ChipStrip>
+          {chips.map((action) => {
+            const Icon = ICONS[action.icon ?? 'pulse']
+            const label = teamActionLabelOf(action, words)
+            return (
+              <Pressable
+                key={action.id}
+                style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                onPress={() => run(action)}
+                disabled={action.off !== null}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}, ${teamActionHintOf(action, words)}`}
+                accessibilityHint={action.off ? words.off[action.off] : undefined}
+              >
+                <Icon size={14} color={colors.textSecondary} />
+                {labelled ? <Text style={styles.chipText}>{label}</Text> : null}
+                {action.now ? <Text style={styles.count}>{String(action.now.count)}</Text> : null}
+              </Pressable>
+            )
+          })}
+        </ChipStrip>
         {stop ? (
           <Pressable
             style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
@@ -259,8 +298,31 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.metaSize
   },
-  spacer: {
-    flex: 1
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  strip: {
+    flex: 1,
+    minWidth: 0
+  },
+  chips: {
+    gap: spacing.sm
+  },
+  fade: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: spacing.xl,
+    flexDirection: 'row'
+  },
+  fadeStep: {
+    flex: 1,
+    backgroundColor: colors.bgPanel
   },
   icon: {
     width: MIN_TOUCH_TARGET,

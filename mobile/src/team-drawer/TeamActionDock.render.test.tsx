@@ -16,7 +16,7 @@ vi.mock('lucide-react-native', async () => {
 })
 
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
-import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
+import { TeamActionDock, TeamStoppedBanner, teamDockStripOverflows } from './TeamActionDock'
 import { teamControlWordsOf } from './team-control-words'
 import type { TeamTurnResult } from './team-lead-turn-send'
 import type { TeamSheetControl } from './team-sheet-control'
@@ -100,6 +100,39 @@ describe('TeamActionDock', () => {
     await act(async () => button('Wave, 4 to do, slots free').click())
     expect(onSend).toHaveBeenCalledWith(wave)
     expect(texts()).toContain('Sent to the lead: Wave')
+  })
+
+  it('keeps Stop and the menu on the chips row, with the chips in a strip that scrolls', () => {
+    show(vi.fn(async () => SENT))
+    const stopButton = button('Stop every member')
+    let row = stopButton.parentElement
+    while (row && !row.contains(button('Wave, 4 to do, slots free'))) {
+      row = row.parentElement
+    }
+    expect(row).not.toBeNull()
+    expect(getComputedStyle(row!).flexWrap).not.toBe('wrap')
+    expect(row!.contains(button('All actions'))).toBe(true)
+    const scrolls = (one: HTMLElement): boolean => {
+      for (let at = one.parentElement; at && at !== row; at = at.parentElement) {
+        if (['auto', 'scroll'].includes(getComputedStyle(at).overflowX)) {
+          return true
+        }
+      }
+      return false
+    }
+    expect(
+      ['Wave, 4 to do, slots free', 'Push, 2 stopped', 'Sweep, 1 finished to close']
+        .map(button)
+        .every(scrolls)
+    ).toBe(true)
+    expect(scrolls(stopButton)).toBe(false)
+    expect(scrolls(button('All actions'))).toBe(false)
+  })
+
+  it('fades the strip edge only while chips still run past it', () => {
+    expect(teamDockStripOverflows(300, 250, 0)).toBe(true)
+    expect(teamDockStripOverflows(300, 250, 50)).toBe(false)
+    expect(teamDockStripOverflows(240, 250, 0)).toBe(false)
   })
 
   it('asks before stopping every member, and sends Stop only on confirm', async () => {
