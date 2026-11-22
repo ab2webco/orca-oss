@@ -55,6 +55,15 @@ async function measureInstalledRows(page: Page, language: string): Promise<RowRe
           }
         }
       }
+      // Why: tab order is the DOM order, so each control must be drawn after the one before it.
+      const drawn = boxes.filter(({ name }) => name !== 'name')
+      for (let i = 1; i < drawn.length; i++) {
+        const a = drawn[i - 1].rect
+        const b = drawn[i].rect
+        if (b.top < a.bottom - 1 && b.left < a.right - 1) {
+          problems.push(`${drawn[i].name} is drawn before ${drawn[i - 1].name}`)
+        }
+      }
       // Why every width: wherever the controls wrap, an icon alone on a line reads as orphaned.
       // Why not es 640: known orphan (the es toggle leaves no room for both icons), ticketed apart.
       const knownEs640 = language === 'es' && window.innerWidth === 640
