@@ -40,16 +40,19 @@ describe('Settings > Agents es copy', () => {
     expect(es.auto.components.settings.AgentsPane.agentPermissionsInfo).not.toMatch(/Agents/)
   })
 
-  it("says 'agentes' in the rest of the Agents pane's own lines", () => {
-    const pane = es.auto.components.settings.AgentsPane
-    for (const line of [
-      pane.agentPermissionsTooltip,
-      pane.agentPermissionsDescription,
-      pane.d83834f5e6,
-      pane['024bd95089']
-    ]) {
-      expect(line).not.toMatch(/\bagents\b/i)
-    }
+  it('translates every Agents pane line, so a new or missed key fails here', () => {
+    // Why these: the same word in both languages.
+    const same = new Set(['92033495ff', 'agentPermissionsYolo', 'agentPermissionsManual'])
+    const english = en.auto.components.settings.AgentsPane as Record<string, string>
+    const spanish = es.auto.components.settings.AgentsPane as Record<string, string>
+    const untranslated = Object.keys(english).filter(
+      (key) =>
+        !same.has(key) &&
+        (spanish[key] === undefined ||
+          spanish[key] === english[key] ||
+          /\bagents?\b/i.test(spanish[key]))
+    )
+    expect(untranslated).toEqual([])
   })
 
   it('keeps placeholders the English source has', () => {

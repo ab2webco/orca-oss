@@ -267,6 +267,15 @@ describe('AgentsPane', () => {
     expect(row('claude')).toMatch(/font-mono[^"]*" title="claude/)
   })
 
+  it('puts Set default after the docs and command icons in the DOM, so tab order is the drawn order', () => {
+    const row = renderPane(getDefaultSettings('/tmp')).split('data-agent-row="claude"')[1]
+    const at = (needle: string): number => row.indexOf(needle)
+
+    expect(at('data-agent-row-default')).toBeGreaterThan(at('target="_blank"'))
+    expect(at('data-agent-row-default')).toBeGreaterThan(at('command override'))
+    expect(row.split('data-agent-row=')[0]).not.toMatch(/[\s:]order-/)
+  })
+
   it('keeps Claude Agent Teams in the install list on macOS', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 

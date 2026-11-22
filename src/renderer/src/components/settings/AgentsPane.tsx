@@ -570,58 +570,12 @@ function AgentRow({
 
         {/* Why the row's width, not the viewport's: beside the settings sidebar a row can be too narrow
             for the grid at any window width, and es's labels widen it. */}
-        <div className="ml-auto grid max-w-full shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 @max-[42rem]/agent-row:ml-0 @max-[42rem]/agent-row:flex @max-[42rem]/agent-row:basis-full @max-[42rem]/agent-row:flex-wrap">
+        <div className="ml-auto grid max-w-full shrink-0 grid-cols-[max-content_1.75rem_1.75rem_minmax(6.5rem,max-content)] items-center gap-1.5 @max-[42rem]/agent-row:ml-0 @max-[42rem]/agent-row:flex @max-[42rem]/agent-row:basis-full @max-[42rem]/agent-row:flex-wrap">
           <AgentAvailabilityControl
             label={label}
             isEnabled={isEnabled}
             onSetEnabled={onSetEnabled}
           />
-
-          {/* Why last when wrapped: the icons then wrap with the toggle, never alone on a line. */}
-          <div
-            className={cn(
-              'grid @max-[42rem]/agent-row:order-last',
-              !(isDetected && isEnabled) && '@max-[42rem]/agent-row:hidden'
-            )}
-          >
-            {/* Why installed only: sizes the column to the wider label so Installed rows align;
-                uninstalled rows never get the button and keep the room for their command. */}
-            {isDetected && (
-              <>
-                <span
-                  aria-hidden
-                  className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium @max-[42rem]/agent-row:hidden"
-                >
-                  <Check className="size-3" />
-                  {defaultLabel}
-                </span>
-                <span
-                  aria-hidden
-                  className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium @max-[42rem]/agent-row:hidden"
-                >
-                  {setDefaultLabel}
-                </span>
-              </>
-            )}
-            {isDetected && isEnabled && (
-              <Button
-                type="button"
-                variant={isDefault ? 'secondary' : 'ghost'}
-                size="xs"
-                onClick={onSetDefault}
-                data-agent-row-default
-                title={
-                  isDefault
-                    ? translate('auto.components.settings.AgentsPane.d7625cf8b2', 'Default agent')
-                    : translate('auto.components.settings.AgentsPane.5f986a9b92', 'Set as default')
-                }
-                className="col-start-1 row-start-1 h-7 w-full justify-center gap-1 text-xs"
-              >
-                {isDefault && <Check className="size-3" />}
-                {isDefault ? defaultLabel : setDefaultLabel}
-              </Button>
-            )}
-          </div>
 
           <a
             href={homepageUrl}
@@ -660,6 +614,50 @@ function AgentRow({
                 <ChevronDown
                   className={cn('size-3.5 transition-transform', cmdOpen && 'rotate-180')}
                 />
+              </Button>
+            )}
+          </div>
+
+          {/* Why after the icons, in the DOM too: wrapped, they stay with the toggle, never alone on a
+              line, and tab order matches what is drawn. */}
+          <div
+            className={cn('grid', !(isDetected && isEnabled) && '@max-[42rem]/agent-row:hidden')}
+          >
+            {/* Why installed only: sizes the column to the wider label so Installed rows align;
+                uninstalled rows never get the button and keep the room for their command. */}
+            {isDetected && (
+              <>
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium @max-[42rem]/agent-row:hidden"
+                >
+                  <Check className="size-3" />
+                  {defaultLabel}
+                </span>
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium @max-[42rem]/agent-row:hidden"
+                >
+                  {setDefaultLabel}
+                </span>
+              </>
+            )}
+            {isDetected && isEnabled && (
+              <Button
+                type="button"
+                variant={isDefault ? 'secondary' : 'ghost'}
+                size="xs"
+                onClick={onSetDefault}
+                data-agent-row-default
+                title={
+                  isDefault
+                    ? translate('auto.components.settings.AgentsPane.d7625cf8b2', 'Default agent')
+                    : translate('auto.components.settings.AgentsPane.5f986a9b92', 'Set as default')
+                }
+                className="col-start-1 row-start-1 h-7 w-full justify-center gap-1 text-xs"
+              >
+                {isDefault && <Check className="size-3" />}
+                {isDefault ? defaultLabel : setDefaultLabel}
               </Button>
             )}
           </div>

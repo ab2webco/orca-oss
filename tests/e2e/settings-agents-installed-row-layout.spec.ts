@@ -6,8 +6,8 @@ import { writeSettings } from './helpers/settings-write'
 import { THEMES, WIDTHS, setTheme, setWindowWidth } from './helpers/settings-window'
 
 const DETECTED: TuiAgent[] = ['claude', 'codex', 'gemini']
-// Why 700: between sm (640) and 768 the settings sidebar leaves a row at its narrowest.
-const SWEEP_WIDTHS = [...new Set([...WIDTHS, 700])].sort((a, b) => b - a)
+// Why 640 and 700: from sm up to 768 the settings sidebar leaves a row at its narrowest.
+const SWEEP_WIDTHS = [...new Set([...WIDTHS, 700, 640])].sort((a, b) => b - a)
 
 type RowReport = { agent: string; problems: string[] }
 
