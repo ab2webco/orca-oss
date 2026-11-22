@@ -76,6 +76,15 @@ for (const [file, title, gears] of [
       assert.match(source, /:global\(html:not\(\.no-js\)\) \.caps li \{\s*grid-area: 1 \/ 1;/)
     })
 
+    it('gives the ring the wide column and keeps steps 1-10 on one row with Play apart', () => {
+      assert.match(
+        source,
+        /\.factory \{[^}]*grid-template-columns: minmax\(0, 25rem\) minmax\(0, 1fr\);[^}]*max-width: 1440px/
+      )
+      assert.match(source, /\.picks \{[^}]*grid-template-columns: repeat\(10, minmax\(0, 48px\)\)/)
+      assert.match(source, /\.picks \.toggle \{[^}]*grid-column: 1 \/ -1/)
+    })
+
     it('keeps ring text at screen size however far the drawing scales, and buttons named by their number', () => {
       const sizes = [...source.matchAll(/svg \.[^{]*\{[^}]*font-size: ([^;]+);/g)].map((m) => m[1])
       assert.ok(sizes.length >= 6)

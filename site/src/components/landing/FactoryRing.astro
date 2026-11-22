@@ -213,27 +213,34 @@ const multiline = (command: string): string => command.split('\n').map(commandHt
   .section {
     padding-bottom: var(--space-3xl);
   }
+  /* Why wider than .wrap: the ring needs the room to read, about 500px across at 1440. */
   .factory {
     display: grid;
-    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
     gap: var(--space-xl);
     align-items: center;
+    max-width: 1440px;
   }
   .side {
     display: grid;
     gap: var(--space-md);
     min-width: 0;
   }
+  /* Steps 1 to 10 share one row; Play sits on its own below them. */
   .picks {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 48px));
     gap: var(--space-2xs);
+  }
+  .picks .toggle {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
   :global(.no-js) .picks {
     display: none;
   }
   .picks button {
-    min-width: 40px;
+    min-width: 0;
     min-height: 44px;
     padding: 0 var(--space-sm);
     border: 1px solid var(--line);
@@ -573,6 +580,14 @@ const multiline = (command: string): string => command.split('\n').map(commandHt
   }
   /* On a phone the ring is cropped to its stations; the captions name them. */
   @media (max-width: 39.99rem) {
+    /* Why wrap here: ten in a row would be under 32px wide; wrapped they keep 40px. */
+    .picks {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .picks button {
+      min-width: 40px;
+    }
     svg {
       width: 172%;
       max-width: none;
