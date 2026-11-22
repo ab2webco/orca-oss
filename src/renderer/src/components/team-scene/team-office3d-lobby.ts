@@ -5,6 +5,7 @@ import {
 } from '../../../../shared/team-scene/team-office3d-layout'
 import type { DioramaKit } from './team-diorama-kit'
 import { office3dChair, type Office3dPalette } from './team-office3d-floor'
+import { office3dCanvas, paintOffice3dTv } from './team-office3d-screens'
 
 // Why the ground floor: the owner wants an office's rhythm, members riding down for a coffee or a
 // game when they have nothing to do, so the rooms are shared and the lift is part of it (ORCA-1317).
@@ -16,8 +17,7 @@ const yawTo = (from: [number, number], to: [number, number]) =>
 export function office3dLobby(
   k: DioramaKit,
   X: Office3dPalette,
-  floor: Office3dFloor,
-  night: boolean
+  floor: Office3dFloor
 ): THREE.Group {
   const { mesh, box, mat } = k
   const L = office3dLobbyOf(floor.width)
@@ -37,18 +37,9 @@ export function office3dLobby(
     // Why π from the facing: office3dChair faces -z, its back toward +z.
     office3dChair(k, X, g, seat.at[0], seat.at[1], yawTo(seat.at, seat.face) + Math.PI)
   }
-  // The games room: a generic console under a TV, a couch for two, a table-tennis table.
+  // The games room: a generic console under a TV (its screen is office3dLobbyTv), a couch, table tennis.
   const [tx, tz] = L.tv
   mesh(box(2.2, 1.25, 0.08), mat(X.monitor), tx, 1.75, tz, g)
-  mesh(
-    new THREE.PlaneGeometry(2.05, 1.12),
-    k.basic(night ? 0x2a3f7a : 0x3d6fd6),
-    tx,
-    1.75,
-    tz + 0.05,
-    g,
-    false
-  )
   mesh(box(1.6, 0.45, 0.45), mat(X.deskSide), tx, 0.23, tz + 0.15, g)
   mesh(box(0.5, 0.1, 0.32), mat(0xe8e8ec), tx, 0.5, tz + 0.15, g)
   const couch = L.couch
@@ -67,4 +58,38 @@ export function office3dLobby(
   // A doormat where members come in from the street and leave.
   mesh(box(1.2, 0.02, 0.6), mat(0x5a4636), L.door[0], 0.01, L.door[1], g, false)
   return g
+}
+
+const TV_REPAINT = 1 / 12
+
+/** Whether anyone sits at a console seat on floor `floor` this frame (`office3dRoomCountOf`). */
+export const office3dConsolePlayed = (here: ReadonlySet<string>, floor: number): boolean =>
+  here.has(`console:${floor}:0`) || here.has(`console:${floor}:1`)
+
+/** The TV's screen: a game in motion while a member plays at the console, dark otherwise. */
+export function office3dLobbyTv(
+  k: DioramaKit,
+  floor: Office3dFloor,
+  index: number,
+  here: (t: number) => ReadonlySet<string>
+): { group: THREE.Group; tick: (t: number) => void } {
+  const [tx, tz] = office3dLobbyOf(floor.width).tv
+  const g = new THREE.Group()
+  g.position.y = floor.y
+  const screen = office3dCanvas(256, 140)
+  const face = screen ? k.basic(0xffffff, { map: screen.tex }) : k.basic(0x0b0f18)
+  k.mesh(new THREE.PlaneGeometry(2.05, 1.12), face, tx, 1.75, tz + 0.05, g, false)
+  let shown = -Infinity
+  let was: boolean | null = null
+  const tick = (t: number) => {
+    const playing = office3dConsolePlayed(here(t), index)
+    // Why only on a change while off: a dark screen needs no repaint each frame.
+    if (playing === was && (!playing || (t - shown < TV_REPAINT && t >= shown))) {
+      return
+    }
+    shown = t
+    was = playing
+    screen?.redraw((c, w, h) => paintOffice3dTv(c, w, h, playing, t))
+  }
+  return { group: g, tick }
 }

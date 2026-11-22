@@ -146,3 +146,42 @@ export function paintOffice3dWall(
   }
   g.stroke()
 }
+
+const TV_OFF = '#0b0f18'
+
+/** The lobby TV: dark with nobody at the console, else a side-scroller running under the player. */
+export function paintOffice3dTv(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  playing: boolean,
+  t: number
+): void {
+  g.fillStyle = playing ? '#5ab4f0' : TV_OFF
+  g.fillRect(0, 0, w, h)
+  if (!playing) {
+    return
+  }
+  const u = h / 14
+  const ground = h - 3 * u
+  g.fillStyle = '#3f9b5a'
+  for (let i = -1; i < 5; i++) {
+    const x = i * w * 0.32 - ((t * 8 * u) % (w * 0.32))
+    g.fillRect(x, ground - 2 * u, w * 0.22, 2 * u)
+  }
+  g.fillStyle = '#b5713a'
+  g.fillRect(0, ground, w, 3 * u)
+  g.fillStyle = '#8a5229'
+  for (let x = -((t * 20 * u) % (2 * u)); x < w; x += 2 * u) {
+    g.fillRect(x, ground + u, u, u)
+  }
+  g.fillStyle = '#f2c94c'
+  for (let i = 0; i < 4; i++) {
+    const x = w - ((t * 20 * u + i * 5 * u) % (w + 2 * u))
+    g.fillRect(x, ground - 5 * u, u, u)
+  }
+  // Why a hop every 0.8 s: the player is clearly playing, not watching a still screen.
+  const hop = Math.abs(Math.sin((t * Math.PI) / 0.8)) * 3 * u
+  g.fillStyle = '#e04848'
+  g.fillRect(w * 0.25, ground - 2 * u - hop, 1.5 * u, 2 * u)
+}

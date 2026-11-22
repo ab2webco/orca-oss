@@ -33,7 +33,7 @@ import {
 import { paintOffice3dBoard, paintOffice3dScreen, paintOffice3dWall } from './team-office3d-screens'
 import { OFFICE3D_SIT_Y, poseOffice3dSeated } from './team-office3d-seated-poses'
 import { office3dLeadActor } from './team-office3d-lead-actor'
-import { office3dLobby } from './team-office3d-lobby'
+import { office3dLobby, office3dLobbyTv } from './team-office3d-lobby'
 import {
   office3dLeavers,
   office3dMover,
@@ -119,7 +119,10 @@ export function office3dStage(
     calls.push(office3dCallPanel(kit, X, built.group, i).light)
     world.add(built.group)
     if (floor.lobby) {
-      world.add(office3dLobby(kit, X, floor, dark))
+      world.add(office3dLobby(kit, X, floor))
+      const tv = office3dLobbyTv(kit, floor, i, here)
+      world.add(tv.group)
+      ticks.push(tv.tick)
     }
     if (floor.office) {
       world.add(office3dLeadOffice(kit, X, floor))
