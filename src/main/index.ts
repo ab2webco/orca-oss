@@ -2421,6 +2421,11 @@ void app.whenReady().then(async () => {
 
   const activeOrcaProfile = ensureActiveOrcaProfile()
   store = new Store({ dataFile: activeOrcaProfile.dataFile })
+  await store.unsealProtectedSecrets((settings) => {
+    applyElectronProxySettings(settings).catch(() => {
+      console.warn('[settings] failed to apply network proxy settings')
+    })
+  })
   const windowsShellPathHydration = createWindowsShellPathHydration()
   configureWindowsHostGitEnvironmentReadiness(
     process.platform === 'win32' ? windowsShellPathHydration.whenReady : null

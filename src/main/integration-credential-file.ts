@@ -170,8 +170,8 @@ export async function boundCredentialKeychainWait<T>(
   }
 }
 
-const ASYNC_DECRYPT_UNAVAILABLE = Symbol('async-decrypt-unavailable')
-const ASYNC_DECRYPT_FAILED = Symbol('async-decrypt-failed')
+export const ASYNC_DECRYPT_UNAVAILABLE = Symbol('async-decrypt-unavailable')
+export const ASYNC_DECRYPT_FAILED = Symbol('async-decrypt-failed')
 
 // Why (ORCA-1298): decryptString and, on macOS, isEncryptionAvailable read the
 // Keychain on the main thread, so one unanswered access prompt froze every IPC
@@ -197,7 +197,7 @@ export async function readStoredCredentialTokenAsync(
   return usableToken(decrypted)
 }
 
-async function decryptOffMainThread(
+export async function decryptOffMainThread(
   raw: Buffer
 ): Promise<string | typeof ASYNC_DECRYPT_UNAVAILABLE | typeof ASYNC_DECRYPT_FAILED> {
   if (
