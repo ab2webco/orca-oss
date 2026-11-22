@@ -10,8 +10,8 @@ export const RECORDINGS = {
   'team-office-building.gif': {
     width: 1200,
     height: 750,
-    en: 'The Team panel’s Office scene: a floor per machine, and the lead riding the elevator to the member who needs you.',
-    es: 'La escena Oficina del panel Equipo: un piso por máquina, y el líder subiendo en el ascensor hasta el miembro que te necesita.'
+    en: 'The Team panel’s Office scene in 3D: a floor per machine, its Lobby with the games room and cafeteria, and the lead riding the glass lift to a member whose CI went red.',
+    es: 'La escena Oficina del panel Equipo en 3D: un piso por máquina, su Lobby con la sala de juegos y la cafetería, y el líder subiendo en el ascensor de vidrio hasta un miembro cuyo CI quedó en rojo.'
   },
   'team-merge.gif': {
     width: 1200,
@@ -22,8 +22,8 @@ export const RECORDINGS = {
   'team-style-office.gif': {
     width: 1200,
     height: 750,
-    en: 'The Office style: a floor per machine.',
-    es: 'El estilo Oficina: un piso por máquina.'
+    en: 'The Office style: a 3D building, a floor per machine.',
+    es: 'El estilo Oficina: un edificio 3D, un piso por máquina.'
   },
   'team-style-figures.gif': {
     width: 1200,

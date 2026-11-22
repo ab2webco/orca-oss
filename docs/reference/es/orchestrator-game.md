@@ -1,5 +1,5 @@
 ---
-sourceHash: f83833cc97dc52fa
+sourceHash: 371020a70bc0691d
 ---
 
 # El juego orquestador de Agent Teams
@@ -285,8 +285,8 @@ orchestratorGame:
     tabs: { prs: true, machines: true } # the merge queue shows at the top of PRs; a stored queue is ignored
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
-    quality: high # high | low: Figures' diorama illustrated, or flat without shadows
-    pace: normal # normal | fast | direct: how the diorama's lead gets about
+    quality: high # high | low: the 3D scenes illustrated (and the Office in 3D), or flat and the Office in 2D
+    pace: normal # normal | fast | direct: how the lead gets about in the diorama and the 3D Office
     diorama: true # false keeps Figures in 2D
   steward: # the Orca steward in each member pane
     highRiskPaths: [src/main/runtime/] # adds to its built-in list (below)
@@ -350,7 +350,10 @@ otros estilos, nunca de un temporizador:
 
   La primera lectura no repite nada. Con movimiento reducido no se reproduce ninguna señal.
 - **Cámara.** Sigue al líder por defecto. **Show all** encuadra el mundo, arrastrar desplaza, y
-  pellizcar, o Ctrl o ⌘ con la rueda, acerca. La rueda sola desplaza el panel.
+  la rueda sola, pellizcar, o Ctrl o ⌘ con la rueda, acerca o aleja. En el límite del zoom un
+  gesto nuevo de rueda desplaza el panel; la inercia de un trackpad sigue con la escena. La escena
+  abre a la altura que encuadra las islas, y arrastrar su borde inferior la agranda hasta el doble,
+  guardada en `orca.teamFigures.height`; un doble clic la devuelve.
 - **Calidad.** `quality: low` dibuja figuras planas sin contorno ni sombras, a un píxel por píxel.
   Settings muestra la vista previa de la calidad elegida.
 
@@ -358,6 +361,56 @@ Sin WebGL (aceleración por hardware apagada) el panel vuelve a Figures en 2D, i
 `diorama: false`. El E2E de Linux corre con la GPU apagada, así que CI comprueba ese respaldo; el
 camino 3D se comprueba en local en macOS. El canvas expone `data-diorama-islands`, `-advisor`,
 `-cues` y `-camera`, y el escenario `data-team-scene-webgl`, para los specs.
+
+### Office: el edificio 3D
+
+Desde ORCA-1302 Office con `quality: high` (Illustrated, el valor por defecto) dibuja al equipo como
+un edificio 3D con el kit toon del diorama; `quality: low` (Low resources) y un renderer sin WebGL
+dibujan la Office 2D de hoy, sin cambios.
+
+- **Pisos.** Uno por máquina, abajo el del líder, un escritorio por miembro, por otra sesión y por
+  cada lugar libre bajo el tope
+  ([`team-office3d-layout.ts`](../../../src/shared/team-scene/team-office3d-layout.ts)). El cuarto
+  de control de un piso y su advisor se dibujan solo donde el Jev de esa máquina ya habló: la fila
+  de Jev del equipo en el piso del líder, o una decisión en uno de los panes del piso.
+- **Escritorios.** Postura, monitor, marca y pizarra salen solo del estado real, como en la Office
+  2D ([`team-office3d-actions.ts`](../../../src/shared/team-scene/team-office3d-actions.ts)).
+- **A dónde van los miembros.** Solo un evento real mueve a alguien: un miembro camina cuando su
+  lugar cambia entre dos lecturas del equipo
+  ([`team-office3d-places.ts`](../../../src/shared/team-scene/team-office3d-places.ts)), por
+  precedencia:
+
+  | Evento | A dónde va el miembro |
+  | --- | --- |
+  | Lanzado | Entra por la puerta de la calle, cruza el Lobby y sube en ascensor a su escritorio |
+  | Trabajando | Su escritorio, de inmediato, en ascensor si hace falta |
+  | Una pregunta del Inbox o una compuerta de decisión | La oficina del líder, en una silla de visitas |
+  | Un permiso pendiente en su pane | Se queda en su escritorio |
+  | Sin cuota (limited o asleep) | La cafetería |
+  | CI en rojo, o bloqueado | Su escritorio; con CI en rojo el líder sube a hablar con él |
+  | CI corriendo | La cafetería, la sala de juegos o su escritorio, elegido una vez por espera |
+  | CI en verde, en review o en la cola de merge | Su escritorio |
+  | Mergeado, o sin nada que hacer | La sala de juegos |
+  | Sesión cerrada, o en cola para lanzar | Sale por la puerta de la calle |
+
+- **El Lobby.** La planta baja, bajo el piso del líder, rotulada Lobby en todos los idiomas; los
+  miembros entran y salen por ella. El panel de llamada de un piso se enciende mientras alguien lo
+  pulsa o espera en su fila a una cabina que está en otro piso, y las puertas se abren solo mientras
+  la cabina está detenida en ese piso.
+- **Cámara y altura.** Como en Figures: sigue al líder por defecto, **Show all** encuadra el
+  edificio, arrastrar desplaza la vista, y la rueda o pellizcar acerca o aleja. Abre a la altura de
+  la Office 2D, 176 px con una máquina y 112 px por piso con más, hasta tres; arrastrar su borde
+  inferior la agranda hasta encuadrar el edificio entero, guardada en `orca.teamOffice3d.height`, y
+  un doble clic la devuelve.
+- **La ronda del líder.** Primero quien pregunta, un viaje de ascensor por piso, luego una palabra
+  con los miembros ocupados de su propio piso, y de vuelta a su escritorio
+  ([`team-office3d-walkers.ts`](../../../src/shared/team-scene/team-office3d-walkers.ts)). `pace` es
+  el del diorama (`dioramaPaceOf`).
+- **Etiquetas.** La etiqueta de un piso nunca mide menos de 20 px de alto, legible en un panel de
+  219 px.
+
+El canvas expone `data-office3d-floors`, `-advisors`, `-places` y `-camera`. La hoja Team del teléfono
+sigue dibujando la Office 2D.
 
 Pixel, que tematiza un archivo de escena, dibuja un equipo en más de una máquina como el edificio de
 Office: un piso por máquina, cada uno con el nombre de su host.

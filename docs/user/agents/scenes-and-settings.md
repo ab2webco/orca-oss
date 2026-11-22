@@ -19,25 +19,36 @@ three styles, all acting out the real state of the work, never a timer:
   or chop wood, and limited ones sit by the fire. Jev watches from its lookout tower and sends a
   messenger bird when it decides. A new member walks out of the keep; a newly connected machine's
   island rises out of the sea.
-- **Office**: whiteboards whose notes move toward done, with plaques for merges. With members on
-  more than one machine it becomes a building with one floor per machine, the lead's first, and
-  **All** shows every floor.
+- **Office**: a 3D building with one floor per machine over a Lobby, the lead's first. Members sit at
+  their desks in sweaters, each monitor showing what its member is doing, a mark over the head of
+  whoever needs you, and a board over each desk whose note moves toward done. The lead, in a violet
+  coat, works from its own office and rides the glass lift to a member whose CI went red. Each
+  machine's Jev sits in a control room on its own floor, drawn only where Jev is installed and has
+  spoken. With **Low resources** the Office draws as before: 2D floors with whiteboards and plaques,
+  and **All** shows every floor.
 
 ![Settings > Agents > Panel with the scene, look, style, the style preview and the tab switches](../../assets/scenes-and-settings/panel-settings.png)
 
 In Figures the camera follows the lead. **Show all** frames every island, a drag moves around the
-base, and a pinch (or Ctrl or ⌘ with the scroll wheel) zooms; **Follow the lead** goes back. Two
-rows in **Settings > Agents > Panel** tune it:
+base, and the scroll wheel or a pinch zooms; **Follow the lead** goes back. At the zoom limit the
+wheel scrolls the panel again. The 3D Office's camera works the same way. Drag the bottom edge of
+either scene to make it taller (Figures up to twice its height, the Office up to the whole
+building); a double click puts it back. Members in the Office go where their work is: to their
+desks while they work, to the lead's office when they have a question for you, to the cafeteria or
+the games room while CI runs, and to the games room when they are done. Two rows in
+**Settings > Agents > Panel** tune it, and the Office too:
 
 - **Scene quality**: **Illustrated** (outlined figures with shadows) or **Low resources** (flat
   figures, no shadows), for slower machines. Scene quality also switches the Office between 3D
   (**Illustrated**) and 2D (**Low resources**), and the row shows for the Office too.
 - **Lead's pace**: **Normal** (it walks like a person), **Fast** (2.5 times faster) or **Direct**
-  (the court mage by the keep sends it from circle to circle by magic).
+  (in Figures the court mage sends it by magic; in the Office it steps out of the lift where it is
+  needed).
 
 Figures needs WebGL. With hardware acceleration off, Figures draws in 2D instead: a castle tower
 per member that rises from foundation to finished, and merged towers become trophies on the hills.
-`orchestratorGame.panel.diorama: false` keeps the 2D Figures on any machine.
+`orchestratorGame.panel.diorama: false` keeps the 2D Figures on any machine. The 3D Office needs
+WebGL too; without it the Office draws in 2D, as with **Low resources**.
 
 Red CI shows the build broken. **Settings > Appearance > Status colors** sets one color per state
 (**Needs you**, **At risk**, **Working**, **Verified**, **Idle**), for light and dark; the panel and
@@ -64,7 +75,7 @@ The same settings exist in three places, and each field resolves on its own: the
 </figure>
 
 - **Settings > Agents**: **Panel** (look, style, scene, **Scene quality** and **Lead's pace** for
-  Figures, and the **PRs** and **Machines** switches) and **Agent Teams game** (the game in panes,
+  Figures and Office, and the **PRs** and **Machines** switches) and **Agent Teams game** (the game in panes,
   and the **Terminal band** for a pixel view), for every project. Each row shows only while your
   current choices use it.
 - `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
