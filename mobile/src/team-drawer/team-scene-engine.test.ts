@@ -472,6 +472,24 @@ describe('the phone scene engine', () => {
     expect(named()).toContain('Toadette')
   })
 
+  it('paints no still frame under Reduce Motion while nobody sees the band, and one when someone does', async () => {
+    const { engine } = mount()
+    const painted = () => calls.some((one) => one.name === 'drawImage' || one.name === 'fillRect')
+    await engine.receive({ kind: 'motion', run: false, reduced: true })
+    await pixelStage(engine)
+    calls = []
+    await engine.receive({
+      kind: 'input',
+      input: inputOf([member('m1', 'Toadette', 'working')]),
+      leadLine: null
+    })
+    expect(frames.size).toBe(0)
+    expect(painted()).toBe(false)
+    await engine.receive({ kind: 'motion', run: true, reduced: true })
+    expect(frames.size).toBe(0)
+    expect(painted()).toBe(true)
+  })
+
   it("sizes the canvas to its stage's height, as the desktop does, also when the style changes", async () => {
     const { engine } = mount()
     const canvas = document.querySelector('canvas')!

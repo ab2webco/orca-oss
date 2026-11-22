@@ -17,11 +17,31 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
+type PageMessage = (event: { nativeEvent: { data: string } }) => void
+const webview = vi.hoisted(() => ({
+  onMessage: null as PageMessage | null,
+  injected: [] as string[]
+}))
+
 // Why a stand-in: react-native-webview ships native source; the stage's page is tested on its own.
 vi.mock('react-native-webview', async () => {
-  const { forwardRef, createElement: h } = await import('react')
-  return { WebView: forwardRef(() => h('div', { 'data-testid': 'team-scene-webview' })) }
+  const { forwardRef, useImperativeHandle, createElement: h } = await import('react')
+  return {
+    WebView: forwardRef((props: { onMessage: PageMessage }, ref) => {
+      webview.onMessage = props.onMessage
+      useImperativeHandle(ref, () => ({
+        injectJavaScript: (js: string) => webview.injected.push(js)
+      }))
+      return h('div', { 'data-testid': 'team-scene-webview' })
+    })
+  }
 })
+
+/** The last run the page was told: each injection calls `window.__teamScene(message)`. */
+const lastMotion = (): unknown =>
+  webview.injected
+    .map((js) => JSON.parse(js.match(/^window\.__teamScene\((.*)\);true;$/s)![1]!))
+    .findLast((message: { kind: string }) => message.kind === 'motion')
 
 import { gameHostLaunchOf } from '../../../src/shared/orchestrator-game-member-repo-scope'
 import { TeamSheet } from './TeamSheet'
@@ -334,11 +354,19 @@ describe('TeamSheet', () => {
     }
   })
 
-  it('mounts no stage while the sheet rests at its peek, so no frame runs unseen', () => {
+  it('keeps the stage loaded but still at the peek, so an open draws it without a reload (ORCA-1309)', () => {
+    webview.injected = []
     render(teamWith({ questions: [] }, leader, gamePanel('pixel')), false)
-    expect(container.querySelector('[data-testid="team-scene-band"]')).toBeNull()
+    const stage = container.querySelector('[data-testid="team-scene-webview"]')
+    expect(stage).not.toBeNull()
+    expect(stage!.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(container.querySelector('[role="tablist"]')).toBeNull()
+    act(() => webview.onMessage!({ nativeEvent: { data: JSON.stringify({ kind: 'loaded' }) } }))
+    expect(lastMotion()).toMatchObject({ kind: 'motion', run: false })
     show(teamWith({ questions: [] }, leader, gamePanel('pixel')))
-    expect(container.querySelector('[data-testid="team-scene-webview"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="team-scene-webview"]')).toBe(stage)
+    expect(stage!.closest('[aria-hidden="true"]')).toBeNull()
+    expect(lastMotion()).toMatchObject({ kind: 'motion', run: true })
   })
 
   it('shows the readable band, names in place of art, for a host that sends no panel', () => {
