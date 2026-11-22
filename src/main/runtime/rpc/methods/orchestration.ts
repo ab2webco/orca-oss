@@ -1287,7 +1287,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       // Why (ORCA-1267): a remote member's mail is imported as from dispatch:<id>; a reply written
       // only at home never reaches its host, so relay it first and record it only once queued.
       const federated = runConsumer ? federatedSenderOf(db, original.from_handle) : undefined
-      const relayed = federated
+      // Why: a reply is no work order; a settled or released member is not reopened, so its
+      // reply is kept at home and the lead is told the member will not see it.
+      const live = federated && db.getWorkerDispatch(federated.dispatch_id)?.state === 'ready'
+      const relayed = live
         ? await relayFederatedControlMail(
             runtime,
             db,
@@ -1317,6 +1320,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       if (relayed) {
         return { message: reply, ...relayed }
+      }
+      if (federated) {
+        return { message: reply, homeOnly: { dispatchId: federated.dispatch_id } }
       }
       runtime.notifyMessageArrived(original.from_handle, reply.type)
       return { message: reply }

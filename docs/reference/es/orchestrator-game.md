@@ -1,5 +1,5 @@
 ---
-sourceHash: fa3aa818bb5a3b65
+sourceHash: ab59ff47f2736525
 ---
 
 # El juego orquestador de Agent Teams
@@ -1562,9 +1562,10 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   un reinicio, un panel que vive en el daemon sigue sin registrar hasta que la UI lo abre.
   `orchestration reply` acepta el correo enviado a `run:<id>` desde el consumidor actual de ese Run,
   así que el líder puede responder el correo de estado de un miembro, no sólo su pregunta. El correo
-  de un miembro remoto llega como de `dispatch:<id>`: la respuesta va por el relay a su host, como
-  `orchestration send`, y un host demasiado viejo para el correo de control, o un miembro liberado,
-  la rechaza y el correo sigue esperando.
+  de un miembro remoto llega como de `dispatch:<id>`: mientras ese miembro está vivo la respuesta va
+  por el relay a su host, y el CLI dice si el host la tomó. Una respuesta a un miembro que ya reportó
+  o fue liberado nunca lo reabre: queda sólo en casa, y el CLI lo dice;
+  `orchestration send --to dispatch:<id>` le da más trabajo.
 - Lo que el líder le pregunta a la persona es un registro, no texto de chat (ORCA-782): `game ask-owner`
   guarda la pregunta con su ticket, hasta 6 opciones, una línea de contexto y la hora en que se
   preguntó en el archivo del tablero del proyecto, junto a sus eventos ([`orchestrator-game-owner-questions.ts`](../../../src/shared/orchestrator-game-owner-questions.ts)).
