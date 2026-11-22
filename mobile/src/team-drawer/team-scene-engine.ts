@@ -266,6 +266,10 @@ export function createTeamSceneEngine(deps: {
         apply()
         return
       }
+      // Why nothing: only a 3D stage has a camera (team-scene-diorama-engine.ts).
+      if (message.kind === 'camera') {
+        return
+      }
       if (message.kind === 'motion') {
         run = message.run
         // Why either: both read the phone's setting, and a still stage is the safe side.

@@ -27,6 +27,8 @@ type Words = {
   leadAsks: string
   coordinates: (count: number) => string
   advisorName: string
+  followLead: string
+  showAll: string
   advisor: string
   advisorSource: string
   level: (level: number) => string
@@ -97,6 +99,8 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     leadAsks: 'Waiting for you',
     coordinates: (count) => `Coordinates ${count} agent${count === 1 ? '' : 's'}`,
     advisorName: 'Wizard',
+    followLead: 'Follow the lead',
+    showAll: 'Show all',
     advisor: 'Advisor',
     advisorSource: 'Jev',
     level: (level) => `Lv ${level}`,
@@ -163,6 +167,8 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     leadAsks: 'Te espera',
     coordinates: (count) => `Coordina ${count} agente${count === 1 ? '' : 's'}`,
     advisorName: 'Mago',
+    followLead: 'Seguir al lead',
+    showAll: 'Ver todo',
     advisor: 'Advisor',
     advisorSource: 'Jev',
     level: (level) => `Nv ${level}`,
