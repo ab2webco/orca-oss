@@ -180,6 +180,43 @@ describe('orchestration federation control mail', () => {
     expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(0)
   })
 
+  // ORCA-1267: a reply that only landed at home read ok and never reached the member.
+  it("relays the lead's reply to a remote member's escalation to its host", async () => {
+    vi.spyOn(homeRuntime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {
+      void homeRuntime.syncOrchestrationFederation()
+    })
+    const escalation = homeDb.insertMessage({
+      from: `dispatch:${dispatchId}`,
+      to: `run:${runId}`,
+      subject: 'Blocked',
+      body: 'Which port?',
+      type: 'escalation',
+      runId
+    })
+
+    const replied = await homeDispatcher.dispatch({
+      id: 'reply-escalation',
+      authToken: 'coordinator-token',
+      orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+      orchestrationRequestId: 'reply-escalation-request',
+      method: 'orchestration.reply',
+      params: { from: 'term_coord', id: escalation.id, body: 'Use 8080' }
+    })
+
+    expect(replied).toMatchObject({
+      ok: true,
+      result: {
+        message: { from_handle: `run:${runId}`, thread_id: escalation.id },
+        relay: { dispatchId, delivered: true }
+      }
+    })
+    expect(homeDb.getMessageById(escalation.id)?.read).toBe(1)
+    await expect(workerDispatcher.dispatch(checkRequest('check-reply'))).resolves.toMatchObject({
+      ok: true,
+      result: { count: 1, messages: [{ subject: 'Re: Blocked', body: 'Use 8080' }] }
+    })
+  })
+
   it('returns remote-attached worker terminal mail alongside Dispatch mail without crossing recipients', async () => {
     const direct = workerDb.insertMessage({
       from: 'term_other_run',

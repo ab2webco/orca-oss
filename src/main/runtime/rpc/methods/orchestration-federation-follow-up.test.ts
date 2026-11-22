@@ -241,6 +241,45 @@ describe('lead follow-up on a settled remote member', () => {
     expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(0)
   })
 
+  function leadReplyToDone(runId: string, dispatchId: string) {
+    const done = homeDb
+      .getAllMessagesForHandle(`run:${runId}`)
+      .find((one) => one.type === 'worker_done' && one.from_handle === `dispatch:${dispatchId}`)!
+    requests += 1
+    const replied = homeDispatcher.dispatch({
+      id: `rpc_lead_${requests}`,
+      authToken: 'coordinator-token',
+      orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+      orchestrationRequestId: `lead_request_${requests}`,
+      method: 'orchestration.reply',
+      params: { from: 'term_coord', id: done.id, body: 'Thanks, merged.' }
+    }) as Promise<RuntimeRpcResponse<unknown>>
+    return { done, replied }
+  }
+
+  // ORCA-1267: a reply acknowledges a report; it must not reopen the member or be refused.
+  it.each([
+    ['a settled member', () => {}],
+    ['a settled member on a host without follow-ups', withoutFollowUp],
+    ['a released member', undefined]
+  ])("keeps the lead's reply to %s at home and reopens nothing", async (_name, before) => {
+    before?.()
+    const { runId, taskId, dispatchId } = await settledMember()
+    if (!before) {
+      homeDb.markFederatedWorkerReleased(dispatchId)
+    }
+    const { done, replied } = leadReplyToDone(runId, dispatchId)
+
+    await expect(replied).resolves.toMatchObject({
+      ok: true,
+      result: { message: { thread_id: done.id }, homeOnly: { dispatchId } }
+    })
+    expect(homeDb.getMessageById(done.id)?.read).toBe(1)
+    expect(homeDb.getDispatchContextById(dispatchId)?.status).toBe('completed')
+    expect(homeDb.getTask(taskId)?.status).not.toBe('dispatched')
+    expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(0)
+  })
+
   it('points a busy-agent worker-start on that terminal to the follow-up', async () => {
     const { runId, dispatchId } = await settledMember()
     vi.spyOn(workerRuntime, 'showManagedTerminalWorkspace').mockResolvedValue({

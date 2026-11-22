@@ -1,5 +1,5 @@
 ---
-sourceHash: a93cd6275ee1f54f
+sourceHash: ab59ff47f2736525
 ---
 
 # El juego orquestador de Agent Teams
@@ -1556,6 +1556,16 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   confirma su correo (ORCA-746 T6): `game fleet` muestra el NEXT del miembro como
   `waiting on you: orchestration reply --id <msg>` hasta que la pregunta se responde o se cierra, y
   `game state` la lista bajo el inbox del líder.
+- Una escalación o un decision gate espera al líder hasta que una respuesta lo enhebra, o hasta que
+  `game stop` liberó su dispatch y ningún miembro vivo reusa su terminal (ORCA-1267). Un miembro que
+  envió worker_done mantiene su correo esperando, y también uno cuyo panel Orca aún no registró: tras
+  un reinicio, un panel que vive en el daemon sigue sin registrar hasta que la UI lo abre.
+  `orchestration reply` acepta el correo enviado a `run:<id>` desde el consumidor actual de ese Run,
+  así que el líder puede responder el correo de estado de un miembro, no sólo su pregunta. El correo
+  de un miembro remoto llega como de `dispatch:<id>`: mientras ese miembro está vivo la respuesta va
+  por el relay a su host, y el CLI dice si el host la tomó. Una respuesta a un miembro que ya reportó
+  o fue liberado nunca lo reabre: queda sólo en casa, y el CLI lo dice;
+  `orchestration send --to dispatch:<id>` le da más trabajo.
 - Lo que el líder le pregunta a la persona es un registro, no texto de chat (ORCA-782): `game ask-owner`
   guarda la pregunta con su ticket, hasta 6 opciones, una línea de contexto y la hora en que se
   preguntó en el archivo del tablero del proyecto, junto a sus eventos ([`orchestrator-game-owner-questions.ts`](../../../src/shared/orchestrator-game-owner-questions.ts)).

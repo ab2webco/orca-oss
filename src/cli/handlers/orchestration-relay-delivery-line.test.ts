@@ -54,3 +54,33 @@ it('says when the host took a delivered send', async () => {
 it('keeps the plain line for an older home that reports no delivery', async () => {
   await expect(lineFor({})).resolves.toBe('Queued relay_1 for worker Dispatch ctx_1')
 })
+
+async function replyLineFor(result: Record<string, unknown>) {
+  callMock.mockResolvedValueOnce({ result: { message: { id: 'msg_reply' }, ...result } })
+  await ORCHESTRATION_HANDLERS['orchestration reply']({
+    flags: new Map([
+      ['from', 'term_lead'],
+      ['id', 'relay_escalation'],
+      ['body', 'Use 8080']
+    ]),
+    client: { call: callMock },
+    cwd: '/tmp/repo',
+    json: false
+  } as never)
+  const [response, , format] = vi.mocked(printResult).mock.calls.at(-1)!
+  return (format as (result: unknown) => string)((response as { result: unknown }).result)
+}
+
+// Why (ORCA-1267): a reply to a remote member printed "Replied" whether or not it reached it.
+it('says a reply its remote member has not taken is NOT delivered', async () => {
+  const relay = { messageId: 'relay_1', sequence: 1, dispatchId: 'ctx_1', destination: 'worker' }
+  await expect(
+    replyLineFor({ relay: { ...relay, accepted: true, delivered: false, deliveredAt: null } })
+  ).resolves.toContain('NOT delivered')
+})
+
+it('says a reply to a settled remote member was kept at home only', async () => {
+  await expect(replyLineFor({ homeOnly: { dispatchId: 'ctx_1' } })).resolves.toContain(
+    'at home only'
+  )
+})
