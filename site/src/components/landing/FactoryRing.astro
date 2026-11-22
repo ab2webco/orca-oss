@@ -95,6 +95,12 @@ const multiline = (command: string): string => command.split('\n').map(commandHt
             )
           })
         }
+        <g class="mark" data-at="6" transform={`translate(${CX} ${CY + 184})`}>
+          <g class="ms">
+            <circle cx="-4" r="5.25"></circle>
+            <circle cx="4" r="5.25"></circle>
+          </g>
+        </g>
         <g class="chip" data-factory-chip transform={`translate(${stations[0]?.chip})`}>
           <g class="cs">
             <rect x="-30" y="-14" width="60" height="28" rx="6"></rect>
@@ -462,8 +468,19 @@ const multiline = (command: string): string => command.split('\n').map(commandHt
   svg .chip text {
     fill: var(--bg);
   }
-  .cs {
+  .cs,
+  .ms {
     transform: scale(var(--k));
+  }
+  /* The legend's review mark, drawn on the lead's spoke to the review station. */
+  .mark circle {
+    fill: var(--bg);
+    stroke: var(--muted);
+    stroke-width: 1.5;
+  }
+  .factory:not([data-active]) .mark circle,
+  .mark.lit circle {
+    stroke: var(--fg);
   }
   .chip circle {
     display: none;
@@ -576,6 +593,12 @@ const multiline = (command: string): string => command.split('\n').map(commandHt
     .picks,
     .caps {
       order: 2;
+    }
+  }
+  /* Why: under 45rem the side sublabels run past the drawing; the captions say the same. */
+  @media (max-width: 44.99rem) {
+    .lbl .sub {
+      display: none;
     }
   }
   /* On a phone the ring is cropped to its stations; the captions name them. */

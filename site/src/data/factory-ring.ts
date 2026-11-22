@@ -48,7 +48,7 @@ const copy: Record<
   en: {
     title: 'The software factory',
     lede: 'Follow one ticket through ten stations: what runs in Orca and what Orca Game shows.',
-    svg: 'The factory loop as a ring of ten stations, with the lead at the centre. One ticket, APP-12, travels around it, and a second agent reviews every change before it merges.',
+    svg: 'The factory loop as a ring of ten stations, with the lead at the centre. One ticket, APP-12, travels around it, and the lead sends a second agent to review the change.',
     lead: ['Lead', 'coordinates'],
     rows: ['Orca Game', 'Watching', 'You here'],
     who: { you: 'You', lead: 'Lead', agent: 'Agent', auto: 'Automation' },
@@ -59,7 +59,7 @@ const copy: Record<
       'Agents',
       'Automation',
       'Plugin',
-      'A second agent reviews every change'
+      'The lead sends a second agent to review the change'
     ],
     pause: ['Pause', 'Play'],
     stations: [
@@ -111,7 +111,7 @@ const copy: Record<
       [
         'Review',
         'another agent, not the author',
-        'A second member reviews the diff against the criteria.',
+        'The lead sends a second agent to review the change against the criteria.',
         'orca game launch APP-12 --kind review',
         'Two characters on one ticket.',
         'Findings go back to the author.',
@@ -158,7 +158,7 @@ const copy: Record<
   es: {
     title: 'La fábrica de software',
     lede: 'Sigue un ticket por diez estaciones: lo que corre en Orca y lo que muestra Orca Game.',
-    svg: 'El bucle de la fábrica como un anillo de diez estaciones, con el líder al centro. Un ticket, APP-12, lo recorre, y un segundo agente revisa cada cambio antes de integrarlo.',
+    svg: 'El bucle de la fábrica como un anillo de diez estaciones, con el líder al centro. Un ticket, APP-12, lo recorre, y el líder envía un segundo agente a revisar el cambio.',
     lead: ['Líder', 'coordina'],
     rows: ['Orca Game', 'Vigila', 'Tú aquí'],
     who: { you: 'Tú', lead: 'Líder', agent: 'Agente', auto: 'Automatización' },
@@ -169,7 +169,7 @@ const copy: Record<
       'Agentes',
       'Automatización',
       'Plugin',
-      'Un segundo agente revisa cada cambio'
+      'El líder envía un segundo agente a revisar el cambio'
     ],
     pause: ['Pausa', 'Reproducir'],
     stations: [
@@ -221,7 +221,7 @@ const copy: Record<
       [
         'Revisión',
         'otro agente, no el autor',
-        'Un segundo miembro revisa el diff contra los criterios.',
+        'El líder envía un segundo agente a revisar el cambio contra los criterios.',
         'orca game launch APP-12 --kind review',
         'Dos personajes en un ticket.',
         'Los hallazgos vuelven al autor.',

@@ -49,6 +49,23 @@ for (const [file, title, gears] of [
         text,
         /what to test|against the old|qué probar|lo que ya existía|WhatsApp/
       )
+      // Orca does not make a review mandatory: the lead sends one.
+      assert.doesNotMatch(
+        text,
+        /reviews every change|revisa cada cambio|before it merges|antes de integrarlo/
+      )
+    })
+
+    it('drops the side sublabels below 45rem, where they would run past the drawing', () => {
+      assert.match(source, /@media \(max-width: 44\.99rem\) \{\s*\.lbl \.sub \{\s*display: none;/)
+    })
+
+    it('draws the legend review mark at the review station', () => {
+      assert.match(section, /<i class="review[ "]/)
+      assert.match(
+        section,
+        /<g class="mark[ "][^>]*data-at="6"[^>]*>\s*<g class="ms[ "][^>]*>(\s*<circle[^>]*><\/circle>){2}/
+      )
     })
 
     it('parks the ticket chip midway between stations, clear of both and inside the phone crop', () => {
