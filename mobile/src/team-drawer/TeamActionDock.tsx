@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import {
   Activity,
@@ -23,6 +23,7 @@ import type { TeamTurnResult } from './team-lead-turn-send'
 import type { TeamSheetControl } from './team-sheet-control'
 import { TeamActionMenu } from './TeamActionMenu'
 import { useTeamTones } from './team-status-tone'
+import { teamDockStripOverflows } from './team-dock-strip-overflow'
 
 // Why these glyphs: the desktop dock's (team-action-icons.tsx), so both surfaces read the same.
 const ICONS: Record<GameActionIcon, typeof Square> = {
@@ -44,33 +45,47 @@ const LABELS_FROM_WIDTH = 360
 const NOTE_MS = 8_000
 const FADE_STEPS = [0.15, 0.35, 0.55, 0.75, 0.9, 1]
 
-/** Whether chips still run past the strip's right edge, so the fade must say it scrolls. */
-export function teamDockStripOverflows(contentWidth: number, viewWidth: number, scrollX: number) {
-  return contentWidth - viewWidth - scrollX > 1
-}
-
 // Why a strip: wrapped chips pushed Stop and the menu onto a second 52 pt row over the tab (ORCA-1310).
 function ChipStrip({ children }: { children: ReactNode }) {
-  const [viewWidth, setViewWidth] = useState(0)
-  const [contentWidth, setContentWidth] = useState(0)
-  const [scrollX, setScrollX] = useState(0)
+  const metrics = useRef({ view: 0, content: 0, x: 0 })
+  const [fading, setFading] = useState(false)
+  // Why a ref check: scroll fires every frame; state moves only when the fade flips.
+  const settle = (): void => {
+    const next = teamDockStripOverflows(
+      metrics.current.content,
+      metrics.current.view,
+      metrics.current.x
+    )
+    if (next !== fading) {
+      setFading(next)
+    }
+  }
   return (
     <View
       testID="team-dock-strip"
       style={styles.strip}
-      onLayout={(event) => setViewWidth(event.nativeEvent.layout.width)}
+      onLayout={(event) => {
+        metrics.current.view = event.nativeEvent.layout.width
+        settle()
+      }}
     >
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
-        onContentSizeChange={(width) => setContentWidth(width)}
-        onScroll={(event) => setScrollX(event.nativeEvent.contentOffset.x)}
+        onContentSizeChange={(width) => {
+          metrics.current.content = width
+          settle()
+        }}
+        onScroll={(event) => {
+          metrics.current.x = event.nativeEvent.contentOffset.x
+          settle()
+        }}
         scrollEventThrottle={16}
       >
         {children}
       </ScrollView>
-      {teamDockStripOverflows(contentWidth, viewWidth, scrollX) ? (
+      {fading ? (
         <View testID="team-dock-fade" pointerEvents="none" style={styles.fade}>
           {FADE_STEPS.map((opacity) => (
             <View key={opacity} style={[styles.fadeStep, { opacity }]} />

@@ -16,7 +16,8 @@ vi.mock('lucide-react-native', async () => {
 })
 
 import type { TeamAction } from '../../../src/shared/team-panel-actions'
-import { TeamActionDock, TeamStoppedBanner, teamDockStripOverflows } from './TeamActionDock'
+import { TeamActionDock, TeamStoppedBanner } from './TeamActionDock'
+import { teamDockStripOverflows } from './team-dock-strip-overflow'
 import { teamControlWordsOf } from './team-control-words'
 import type { TeamTurnResult } from './team-lead-turn-send'
 import type { TeamSheetControl } from './team-sheet-control'
