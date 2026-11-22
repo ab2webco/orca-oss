@@ -192,6 +192,11 @@ export function TeamSheet({
                       shown={sceneBand.shown && !parked}
                       parked={parked}
                       cameraLabels={{ lead: words.followLead, all: words.showAll }}
+                      officeWords={{
+                        thisMachine: hostName ?? '',
+                        offline: workWords.offline,
+                        lobby: workWords.lobby
+                      }}
                       sheetGestures={[drag.scrollGesture, drag.contentPan]}
                       onLayout={sceneBand.onLayout}
                     />

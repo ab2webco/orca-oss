@@ -3,6 +3,12 @@ import {
   type DioramaMachine,
   type DioramaOrder
 } from '../../../src/shared/team-scene/team-diorama-layout'
+import { teamOffice3dLayoutOf } from '../../../src/shared/team-scene/team-office3d-layout'
+import {
+  office3dTraffic,
+  office3dTrafficRead
+} from '../../../src/shared/team-scene/team-office3d-traffic'
+import type { TeamSceneFloor } from '../../../src/shared/team-scene/team-scene-floors'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import {
   dioramaCuesAfter,
@@ -11,9 +17,10 @@ import {
 } from '../../../src/renderer/src/components/team-scene/team-diorama-read'
 import {
   dioramaRenderer,
-  dioramaStage,
-  type DioramaStage
+  dioramaStage
 } from '../../../src/renderer/src/components/team-scene/team-diorama-stage'
+import { office3dDefaultHeight } from '../../../src/renderer/src/components/team-scene/team-office3d-height'
+import { office3dStage } from '../../../src/renderer/src/components/team-scene/team-office3d-stage'
 import {
   dioramaPan,
   dioramaView,
@@ -25,18 +32,33 @@ import type {
   TeamSceneEngineStage
 } from './team-scene-engine-messages'
 
-// Why the desktop's own stage: the phone draws the diorama the panel draws, in the same WebView
-// that draws the 2D styles; it takes over only for Figures, and only where WebGL opens (ORCA-1296).
+// Why the desktop's own stages: the phone draws the 3D scenes the panel draws, in the same WebView
+// that draws the 2D styles; it takes over only for Figures' diorama (ORCA-1296) and the 3D Office
+// (ORCA-1334), and only where WebGL opens.
 
 const FRAME_MS = 1000 / 30
 const PHONE_MAX_HEIGHT = 300
 
+type Gl = NonNullable<ReturnType<typeof dioramaRenderer>>
+type Read = {
+  input: TeamSceneInput
+  machines: DioramaMachine[]
+  floors: TeamSceneFloor[] | undefined
+}
+type Colors = TeamSceneEngineStage['colors']
+type Office = NonNullable<TeamSceneEngineStage['office3d']>
+type Figures = NonNullable<TeamSceneEngineStage['diorama']>
+
 type Scheduler = { request: (cb: (now: number) => void) => number; cancel: (id: number) => void }
 
 export type TeamSceneDioramaEngine = {
-  /** Takes the stage when it asks for the diorama and WebGL opens; false hands it to the 2D engine. */
+  /** Takes a stage that asks for a 3D scene where WebGL opens; false hands it to the 2D engine. */
   take: (stage: TeamSceneEngineStage) => boolean
-  input: (input: TeamSceneInput, machines: DioramaMachine[] | undefined) => void
+  input: (
+    input: TeamSceneInput,
+    machines: DioramaMachine[] | undefined,
+    floors?: TeamSceneFloor[]
+  ) => void
   motion: (run: boolean, reduced: boolean) => void
   camera: (message: Extract<TeamSceneEngineMessage, { kind: 'camera' }>) => void
 }
@@ -63,11 +85,14 @@ export function createTeamSceneDioramaEngine(deps: {
 }): TeamSceneDioramaEngine {
   const view = dioramaView()
   const moments = dioramaMoments()
-  let renderer: ReturnType<typeof dioramaRenderer> = null
+  let renderer: Gl | null = null
   let wanted: TeamSceneEngineStage | null = null
-  let read: { input: TeamSceneInput; machines: DioramaMachine[] } | null = null
+  let read: Read | null = null
   let order: DioramaOrder | undefined
-  let stage: DioramaStage | null = null
+  let officeOrder: Record<string, (string | null)[]> | undefined
+  // Why kept: each read rebuilds the stage, and a lead's trip under way must carry on.
+  const traffic = office3dTraffic()
+  let stage: { height: number; draw: (t: number) => void; dispose: () => void } | null = null
   let frame: number | null = null
   let last = 0
   let run = false
@@ -83,7 +108,8 @@ export function createTeamSceneDioramaEngine(deps: {
     if (reduced) {
       view.target = null
     }
-    stage?.draw(reduced ? 1.3 : Date.now() / 1000)
+    // Why the Office on performance.now: its traffic is read on the clock the desktop uses.
+    stage?.draw(reduced ? 1.3 : (wanted?.office3d ? performance.now() : Date.now()) / 1000)
   }
   const loop = (now: number) => {
     frame = deps.scheduler.request(loop)
@@ -98,28 +124,60 @@ export function createTeamSceneDioramaEngine(deps: {
       frame = deps.scheduler.request(loop)
     }
   }
-  const build = () => {
-    if (!renderer || !wanted?.diorama || !read) {
-      return
-    }
-    const width = deps.width()
-    const layout = teamDioramaLayoutOf(read.machines, order, width < 300)
+  const officeStage = (gl: Gl, width: number, status: Colors, want: Office, at: Read) => {
+    const layout = teamOffice3dLayoutOf(at.floors ?? [], {
+      leadAdvisor: at.input.advisor !== null,
+      previous: officeOrder
+    })
+    officeOrder = layout.order
+    office3dTrafficRead(traffic, layout, at.input, performance.now() / 1000, want.pace)
+    const machines = layout.floors.filter((f) => !f.lobby).length
+    return office3dStage(gl, {
+      width,
+      height: Math.min(PHONE_MAX_HEIGHT, office3dDefaultHeight(machines)),
+      dark: deps.dark(),
+      status,
+      input: at.input,
+      layout,
+      pace: want.pace,
+      view,
+      traffic,
+      words: want.words
+    })
+  }
+  const figuresStage = (gl: Gl, width: number, status: Colors, want: Figures, at: Read) => {
+    const layout = teamDioramaLayoutOf(at.machines, order, width < 300)
     order = layout.order
-    const cues = dioramaCuesAfter(moments, read.input, layout, Date.now() / 1000, reduced)
-    stage?.dispose()
-    stage = dioramaStage(renderer, {
+    const cues = dioramaCuesAfter(moments, at.input, layout, Date.now() / 1000, reduced)
+    return dioramaStage(gl, {
       width,
       dark: deps.dark(),
-      status: wanted.colors,
-      input: read.input,
+      status,
+      input: at.input,
       layout,
-      views: dioramaViewsOf(read.input),
+      views: dioramaViewsOf(at.input),
       cues,
-      lite: wanted.diorama.quality === 'low',
-      pace: wanted.diorama.pace,
+      lite: want.quality === 'low',
+      pace: want.pace,
       view,
       maxHeight: PHONE_MAX_HEIGHT
     })
+  }
+  const build = () => {
+    if (!renderer || !wanted || !read) {
+      return
+    }
+    const { colors, office3d, diorama } = wanted
+    const width = deps.width()
+    stage?.dispose()
+    stage = office3d
+      ? officeStage(renderer, width, colors, office3d, read)
+      : diorama
+        ? figuresStage(renderer, width, colors, diorama, read)
+        : null
+    if (!stage) {
+      return
+    }
     deps.post({ kind: 'ready', height: stage.height, camera: view.mode })
     draw()
     start()
@@ -127,11 +185,18 @@ export function createTeamSceneDioramaEngine(deps: {
 
   return {
     take: (next) => {
-      const figures = next.art.kind === 'bundled' && next.art.style === 'figures'
-      if (!renderer && next.diorama && figures) {
-        renderer = dioramaRenderer(deps.canvas)
+      const threeD =
+        (next.diorama && next.art.kind === 'bundled' && next.art.style === 'figures') ||
+        next.office3d !== undefined
+      // Why alpha: the Office stands on the page's own background, as on the desktop.
+      if (!renderer && threeD) {
+        renderer = dioramaRenderer(deps.canvas, true)
       }
-      wanted = next.diorama && figures && renderer ? next : null
+      // Why a fresh aim: the camera sits in the last scene's world, which the other style does not share.
+      if (wanted && threeD && Boolean(wanted.office3d) !== Boolean(next.office3d)) {
+        view.target = null
+      }
+      wanted = threeD && renderer ? next : null
       if (!wanted) {
         stop()
         stage?.dispose()
@@ -141,8 +206,8 @@ export function createTeamSceneDioramaEngine(deps: {
       build()
       return true
     },
-    input: (input, machines) => {
-      read = { input, machines: machines ?? homeOnly(input) }
+    input: (input, machines, floors) => {
+      read = { input, machines: machines ?? homeOnly(input), floors }
       build()
     },
     motion: (nextRun, nextReduced) => {

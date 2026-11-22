@@ -33,6 +33,8 @@ import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-t
 
 const NO_SHEET_GESTURES: GestureType[] = []
 
+type OfficeWords = NonNullable<TeamSceneEngineStage['office3d']>['words']
+
 /** The desktop stage's height (TEAM_SCENE_ART_HEIGHT), held until the page says its own. */
 export const TEAM_SCENE_BAND_HEIGHT = 176
 
@@ -104,6 +106,7 @@ function StageBand({
   advisorName,
   shown,
   cameraLabels,
+  officeWords,
   sheetGestures,
   onLayout,
   onBroken
@@ -114,6 +117,7 @@ function StageBand({
   advisorName: string
   shown: boolean
   cameraLabels: { lead: string; all: string }
+  officeWords: OfficeWords | undefined
   sheetGestures: GestureType[]
   onLayout?: (event: LayoutChangeEvent) => void
   /** The stage stopped drawing, so the sheet shows the names instead. */
@@ -139,7 +143,9 @@ function StageBand({
     band.timezone,
     tones,
     ownArt?.kind,
-    band.diorama
+    band.diorama,
+    band.office3d?.pace,
+    officeWords
   ])
   const stage = useMemo<TeamSceneEngineStage>(
     () => ({
@@ -149,12 +155,16 @@ function StageBand({
       timezone: band.timezone,
       nowMs: Date.now(),
       colors: sceneColorsOf(tones),
-      ...(band.diorama ? { diorama: band.diorama } : {})
+      ...(band.diorama ? { diorama: band.diorama } : {}),
+      ...(band.office3d && officeWords
+        ? { office3d: { pace: band.office3d.pace, words: officeWords } }
+        : {})
     }),
     // Why by text: every 20 s poll hands a new band, and a new stage re-decodes megabytes of art.
     [stageKey]
   )
-  const inputKey = JSON.stringify([band.input, leadLine, advisorName, band.machines])
+  const floors = band.office3d?.floors
+  const inputKey = JSON.stringify([band.input, leadLine, advisorName, band.machines, floors])
   const run = useAppInForeground() && shown
   const reduced = useReducedMotionEnabled()
   // Why before the stage: a page that loads with the app in the background must not start frames.
@@ -176,7 +186,8 @@ function StageBand({
           input: band.input,
           leadLine,
           advisorName,
-          machines: band.machines
+          machines: band.machines,
+          ...(floors ? { floors } : {})
         })
       )
     }
@@ -278,6 +289,7 @@ export function TeamSceneBand({
   members,
   shown = true,
   cameraLabels,
+  officeWords,
   sheetGestures = NO_SHEET_GESTURES,
   parked = false,
   onLayout
@@ -295,6 +307,8 @@ export function TeamSceneBand({
   shown?: boolean
   /** Follow the lead and Show all, for a 3D stage's camera. */
   cameraLabels: { lead: string; all: string }
+  /** The 3D Office's labels: this desktop's name, an offline floor, the ground floor. */
+  officeWords?: OfficeWords
   /** The sheet's scroll and drag, which a finger on a 3D stage must not move. */
   sheetGestures?: GestureType[]
   /** True while the sheet rests at its peek, where the stage stays loaded so an open draws at once. */
@@ -314,6 +328,7 @@ export function TeamSceneBand({
       advisorName={advisorName}
       shown={shown}
       cameraLabels={cameraLabels}
+      officeWords={officeWords}
       sheetGestures={sheetGestures}
       onLayout={onLayout}
       onBroken={() => setBroken(true)}

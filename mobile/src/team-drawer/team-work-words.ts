@@ -24,6 +24,8 @@ type Words = {
   providerFailed: string
   githubLimit: (minutes: number) => string
   offline: string
+  /** The 3D Office's ground floor. */
+  lobby: string
   lowMemory: string
   free: string
   launch: Record<Exclude<TeamMachine['launch']['kind'], 'ready'>, string>
@@ -80,6 +82,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     providerFailed: 'The provider did not answer. It retries on its own.',
     githubLimit: (minutes) => `GitHub API limit reached. It retries on its own in ${minutes} min.`,
     offline: 'Offline',
+    lobby: 'Lobby',
     lowMemory: 'Low memory',
     free: 'Free',
     launch: {
@@ -141,6 +144,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     githubLimit: (minutes) =>
       `Límite de la API de GitHub alcanzado. Se reintenta solo en ${minutes} min.`,
     offline: 'Sin conexión',
+    lobby: 'Lobby',
     lowMemory: 'Poca memoria',
     free: 'Libre',
     launch: {

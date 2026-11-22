@@ -150,6 +150,47 @@ describe('the Team sheet scene band', () => {
     expect(stageOf({ panel: { ...diorama, style: 'office' } }).diorama).toBeUndefined()
   })
 
+  // ORCA-1334: the phone draws the 3D Office only for a host that says it draws it so.
+  describe('the 3D Office', () => {
+    const office = { ...panel('game', 'office'), quality: 'high', pace: 'fast' }
+    const hostCapacity = [
+      { host: 'local', status: 'ok', running: 2, cap: 4 },
+      { host: 'imac', status: 'ok', running: 0, cap: 2 },
+      { host: 'contabo', status: 'unreachable', running: 0 }
+    ]
+
+    // Why the machines list: as on the desktop, it gives each floor its cap and reach.
+    it("asks for it with each machine's floor, cap and reach, when the host says it draws it", () => {
+      const agents = [
+        leader,
+        member('tab-1:leaf'),
+        member('tab-2:leaf', 'working', { remote: { host: 'imac', stateKnown: true } }),
+        member('tab-3:leaf', 'working', { remote: { host: 'contabo', stateKnown: true } })
+      ]
+      const band = stageOf({ panel: { ...office, office3d: true }, hostCapacity, agents })
+      expect(band.office3d?.pace).toBe('fast')
+      expect(
+        band.office3d?.floors.map((one) => [one.key, one.lead, one.cap, one.reachable])
+      ).toEqual([
+        ['', true, 4, true],
+        ['imac', false, 2, true],
+        ['contabo', false, null, false]
+      ])
+      expect(band.art).toEqual({ kind: 'bundled', style: 'office' })
+    })
+
+    it('keeps the 2D Office for a host that does not say so, though it says office and high', () => {
+      expect(stageOf({ panel: office, hostCapacity }).office3d).toBeUndefined()
+      expect(stageOf({ panel: { ...office, office3d: 'yes' } }).office3d).toBeUndefined()
+    })
+
+    it("leaves Figures' islands as they were, without the machines list's caps", () => {
+      const band = stageOf({ panel: { ...panel('game', 'figures'), office3d: true }, hostCapacity })
+      expect(band.office3d).toBeUndefined()
+      expect(band.machines.map((one) => [one.key, one.cap])).toEqual([['', null]])
+    })
+  })
+
   it('names an island per machine its members run on, this one first', () => {
     const machines = stageOf({
       agents: [

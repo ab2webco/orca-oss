@@ -8,7 +8,7 @@ import type { GameLeadPeersState, OrchestratorGameLead } from './orchestrator-ga
 import type { GameHostCapacity } from './orchestrator-game-host-capacity'
 import type { GameHostCap } from './orchestrator-game-host-load'
 import type { GameRewardWeights, GameTeamXp } from './orchestrator-game-reward-weights'
-import type { OrchestratorGamePanel } from './orchestrator-game-panel'
+import type { OrchestratorGamePublishedPanel } from './orchestrator-game-panel'
 import type { GameProjectWork } from './orchestrator-game-project-work'
 import type { GameMerge } from './orchestrator-game-events'
 import type { GameArcadeCredits } from './orchestrator-game-arcade-credits'
@@ -204,7 +204,7 @@ export type OrchestratorGameState = GameLeadPeersState & {
   /** My open PRs and tickets across the project; absent with the tracker off or from an older host. */
   project?: GameProjectWork
   /** The native panel's resolved look and tabs; absent from an older host. */
-  panel?: OrchestratorGamePanel
+  panel?: OrchestratorGamePublishedPanel
   /** The project's buttons, filled for this worktree; absent when it declares none. */
   actions?: GameAction[]
   /** How this project's lead orchestrates; absent from an older host. */

@@ -46,8 +46,8 @@ const ENTRY = `
     decode,
     post
   })
-  // Figures as the diorama takes the stage where the host asks for it and WebGL opens; every other
-  // stage, and a page with no 3D canvas, stays with the 2D engine.
+  // Figures' diorama and the 3D Office take the stage where the host asks for them and WebGL opens;
+  // every other stage, and a page with no 3D canvas, stays with the 2D engine.
   const canvas3d = document.getElementById('stage3d')
   const diorama = canvas3d && createTeamSceneDioramaEngine({
     canvas: canvas3d,
@@ -70,7 +70,7 @@ const ENTRY = `
       show(diorama.take(message.stage))
       if (threeD) {
         await engine.receive({ kind: 'motion', run: false, reduced: true })
-        return lastInput && diorama.input(lastInput.input, lastInput.machines)
+        return lastInput && diorama.input(lastInput.input, lastInput.machines, lastInput.floors)
       }
       for (const one of [message, lastMotion, lastInput]) if (one) await engine.receive(one)
       return
@@ -78,7 +78,7 @@ const ENTRY = `
     if (message.kind === 'input') lastInput = message
     if (message.kind === 'motion') { lastMotion = message; diorama.motion(message.run, message.reduced) }
     if (!threeD) return engine.receive(message)
-    if (message.kind === 'input') diorama.input(message.input, message.machines)
+    if (message.kind === 'input') diorama.input(message.input, message.machines, message.floors)
   }
   window.__teamScene = (message) => {
     route(message).catch((error) => post({ kind: 'error', message: String(error) }))

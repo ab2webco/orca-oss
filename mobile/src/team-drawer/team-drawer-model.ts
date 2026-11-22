@@ -172,15 +172,16 @@ export function teamLeadViewOf(
     .map(({ one }) => one)
     .concat(teamHeldMemberRowsOf(raw))
   const control = teamSheetControlOf(raw)
+  const work = teamSheetWorkOf(raw, cards, locale, now)
   return {
     members,
     lead,
     advisor,
-    work: teamSheetWorkOf(raw, cards, locale, now),
+    work,
     scene: teamSceneBandOf(
       raw,
       { lead, members: cards, advisor, stopped: control.stopped !== null },
-      options
+      { ...options, machines: work.machines }
     ),
     control,
     metrics: metricsOf(raw.metrics),

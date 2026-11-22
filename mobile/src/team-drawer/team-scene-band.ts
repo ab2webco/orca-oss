@@ -15,13 +15,18 @@ import {
 import type {
   TeamAdvisorRow,
   TeamLeadCard,
-  TeamMemberCard
+  TeamMachine,
+  TeamMemberCard,
+  TeamSection
 } from '../../../src/shared/team-panel-model-types'
 import {
   teamDioramaMachinesOf,
   type DioramaMachine
 } from '../../../src/shared/team-scene/team-diorama-layout'
-import { teamSceneFloorsOf } from '../../../src/shared/team-scene/team-scene-floors'
+import {
+  teamSceneFloorsOf,
+  type TeamSceneFloor
+} from '../../../src/shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../src/shared/team-scene/team-scene-input'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 
@@ -53,6 +58,8 @@ export type TeamSceneBand =
       diorama?: { quality: GamePanelQuality; pace: GamePanelPace }
       /** The team's machines, an island each in the diorama. */
       machines: DioramaMachine[]
+      /** The Office as the 3D building, where the host draws it so; absent draws the 2D Office. */
+      office3d?: { pace: GamePanelPace; floors: TeamSceneFloor[] }
     }
 
 const QUEST = 'quest'
@@ -73,8 +80,11 @@ export function teamSceneBandOf(
     advisor: TeamAdvisorRow | null
     stopped: boolean
   },
-  /** `sceneArt`: the host advertises mobile.team-scene.v1, so a scene file's own art can be read. */
-  options: { sceneArt?: boolean } = {}
+  /**
+   * `sceneArt`: the host advertises mobile.team-scene.v1, so a scene file's own art can be read.
+   * `machines`: the Hosts tab's machines, a floor each in the 3D Office.
+   */
+  options: { sceneArt?: boolean; machines?: TeamSection<TeamMachine[]> | null } = {}
 ): TeamSceneBand | null {
   const panel = isRecord(state.panel) ? state.panel : null
   if (panel && panel.look !== 'game') {
@@ -98,12 +108,25 @@ export function teamSceneBandOf(
     sceneId,
     native
   )
+  const pace = GAME_PANEL_PACES.find((one) => one === panel.pace) ?? 'normal'
   // Why only when the host says so: a host older than the diorama draws Figures in 2D itself.
   const diorama =
     style === 'figures' && panel.diorama === true
       ? {
           quality: GAME_PANEL_QUALITIES.find((one) => one === panel.quality) ?? 'high',
-          pace: GAME_PANEL_PACES.find((one) => one === panel.pace) ?? 'normal'
+          pace
+        }
+      : undefined
+  // Why the host's word, not its quality: a host older than the 3D Office also says office and high.
+  const office3d =
+    style === 'office' && panel.office3d === true
+      ? {
+          pace,
+          floors: teamSceneFloorsOf({
+            lead: cards.lead,
+            members: cards.members,
+            machines: options.machines ?? null
+          })
         }
       : undefined
   return {
@@ -111,6 +134,7 @@ export function teamSceneBandOf(
     art,
     fallback,
     ...(diorama ? { diorama } : {}),
+    ...(office3d ? { office3d } : {}),
     machines: teamDioramaMachinesOf(
       teamSceneFloorsOf({ lead: cards.lead, members: cards.members, machines: null })
     ),
