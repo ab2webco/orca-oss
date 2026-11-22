@@ -11,6 +11,7 @@ import { dioramaCast } from './team-diorama-cast'
 import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
+import { scene3dHoverMark, scene3dPick } from './team-scene3d-hover'
 import { dioramaRises } from './team-diorama-rise'
 import { dioramaHomeProps } from './team-diorama-camp'
 import { dioramaAim, type DioramaView } from './team-diorama-view'
@@ -22,6 +23,10 @@ export type DioramaStage = {
   fitted: number
   draw: (t: number) => void
   dispose: () => void
+  /** The figure under a canvas point: a member's pane key, `lead` or `advisor`. */
+  pick: (at: { x: number; y: number }, size: { width: number; height: number }) => string | null
+  /** Rings the figure a Team row points at (same keys); null clears it. */
+  light: (key: string | null) => void
 }
 
 /** The canvas's WebGL renderer, or null where WebGL does not open (hardware acceleration off). */
@@ -99,6 +104,13 @@ export function dioramaStage(
   if (advisor) {
     ticks.push(advisor.tick)
   }
+  const figures = new Map<string, THREE.Object3D>([
+    ['lead', lead.figure.g],
+    ...(advisor ? [['advisor', advisor.figure.g] as const] : []),
+    ...[...cast.figures].map(([key, f]) => [key, f.g] as const)
+  ])
+  const mark = scene3dHoverMark(world, args.status.working)
+  let lit: string | null = null
   const anchorOf = (key: string) => {
     const f = key === 'lead' ? lead.figure : cast.figures.get(key)
     return f ? f.g.position.clone() : null
@@ -139,7 +151,13 @@ export function dioramaStage(
         tick(t)
       }
       dioramaAim(args.view, fit, lead.figure.g.position, args.width, t)
+      // Why each frame: the lit figure may be walking.
+      mark.place((lit && figures.get(lit)) || null)
       renderer.render(scene, fit.camera)
+    },
+    pick: (at, size) => scene3dPick(fit.camera, figures, at, size),
+    light: (key) => {
+      lit = key
     },
     // Why the sun too: its shadow map lives outside the world, and leaked on every rebuild.
     dispose: () => {

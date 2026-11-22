@@ -64,3 +64,17 @@ export function drawTeamSceneHighlight(
   g.stroke()
   g.restore()
 }
+
+/** A Team row's half of the link: lit while its figure is pointed at, and lighting it on hover. */
+export function useTeamSceneHoverRow(key: string) {
+  const lit = useTeamSceneHover((s) => s.key === key)
+  const set = useTeamSceneHover((s) => s.set)
+  return {
+    lit,
+    rowProps: {
+      'data-team-card-lit': lit ? '' : undefined,
+      onPointerEnter: () => set(key),
+      onPointerLeave: () => useTeamSceneHover.getState().key === key && set(null)
+    }
+  }
+}

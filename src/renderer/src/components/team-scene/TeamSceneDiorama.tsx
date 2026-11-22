@@ -16,6 +16,8 @@ import {
 } from './team-diorama-read'
 import { dioramaRenderer, dioramaStage } from './team-diorama-stage'
 import { teamSceneLabel } from './team-scene-copy'
+import type { TeamSceneWho } from './team-scene-hit'
+import { linkScene3dHover } from './team-scene3d-hover'
 import { useTeamSceneStatusColors } from './team-scene-status-colors'
 import { useTeamSceneDioramaLook } from './use-team-scene-style'
 import { useDioramaCameraInput } from './use-diorama-camera-input'
@@ -34,11 +36,14 @@ const FIGURES_STEP = 56
 /** Figures as the 3D diorama (ORCA-1296): one island per machine, each member at its own plot. */
 export function TeamSceneDiorama({
   model,
-  onNoWebgl
+  onNoWebgl,
+  members
 }: {
   model: TeamPanelGameModel
   /** Without WebGL (hardware acceleration off) the panel draws the 2D Figures instead. */
   onNoWebgl: () => void
+  /** What a click on a member's figure opens, as its Team row does. */
+  members?: ReadonlyMap<string, TeamSceneWho>
 }): React.JSX.Element {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -46,6 +51,9 @@ export function TeamSceneDiorama({
   const moments = useRef<DioramaMoments>(dioramaMoments())
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const redraw = useRef<(() => void) | null>(null)
+  // Why a ref: a new map each read must not rebuild the stage.
+  const who = useRef(members)
+  who.current = members
   const camera = useDioramaCameraInput(canvas, redraw)
   const status = useTeamSceneStatusColors()
   const look = useTeamSceneDioramaLook()
@@ -150,11 +158,22 @@ export function TeamSceneDiorama({
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
+    const unlink = linkScene3dHover({
+      el,
+      pick: stage.pick,
+      light: (key) => {
+        stage.light(key)
+        redraw.current?.()
+        el.dataset.dioramaLit = key ?? ''
+      },
+      open: (key) => who.current?.get(key)?.open()
+    })
     el.dataset.dioramaIslands = String(layout.islands.length)
     el.dataset.dioramaAdvisor = input.advisor ? 'tower' : 'none'
     el.dataset.dioramaCues = cues.map((c) => `${c.kind}:${c.key}`).join(' ')
     return () => {
       cancelAnimationFrame(raf)
+      unlink()
       watch.disconnect()
       stage.dispose()
     }

@@ -29,7 +29,9 @@ vi.mock('./team-diorama-stage', () => ({
     height: Math.max(FITTED, args.height ?? 0),
     fitted: FITTED,
     draw: () => {},
-    dispose: () => {}
+    dispose: () => {},
+    pick: () => null,
+    light: () => {}
   }))
 }))
 
