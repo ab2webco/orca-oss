@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
-import questArt from '../../renderer/src/assets/quest-art/native.json'
 import {
   FIGURES_ADVISOR_LOOK,
   FIGURES_LEAD_LOOK,
@@ -13,7 +12,13 @@ import {
 } from './team-scene-member-looks'
 
 const ART = join(__dirname, '../../renderer/src/assets/quest-art')
-const roles = questArt.native.figures.roles
+type Roles = Record<'lead' | 'member' | 'advisor', { sheets: string[] }>
+// Why read, not imported: the node project does not list the renderer's assets (TS6307).
+const roles = (
+  JSON.parse(readFileSync(join(ART, 'native.json'), 'utf8')) as {
+    native: { figures: { roles: Roles } }
+  }
+).native.figures.roles
 
 type Rgb = [number, number, number]
 const rgbOf = (hex: number): Rgb => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255]
