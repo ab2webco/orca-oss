@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { openGamePanelSettings } from '@/components/settings/game-panel-settings-link'
 import { getRepositoryGameActionsSectionId } from '@/components/settings/repository-settings-targets'
 import { useAppStore } from '@/store'
+import { useActiveWorktree } from '@/store/selectors'
 import { TeamActionDockConnected } from './TeamActionDockConnected'
 import { TeamPanelView } from './TeamPanelView'
 import { teamPanelModelWithSettings } from './team-panel-model-settings'
@@ -28,6 +29,10 @@ export default function TeamPanel(): React.JSX.Element {
         : read,
     [read, panel, pluginsOn]
   )
+  const worktreeRepoId = useActiveWorktree()?.repoId ?? null
+  const activeRepoId = useAppStore((s) =>
+    worktreeRepoId && s.repos.some((repo) => repo.id === worktreeRepoId) ? worktreeRepoId : null
+  )
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettings = (repoId: string | null): void =>
@@ -36,6 +41,7 @@ export default function TeamPanel(): React.JSX.Element {
     <TeamPanelView
       source={source}
       look={panel.look}
+      activeRepoId={activeRepoId}
       onOpenSettings={openSettings}
       dock={(model) => (
         <TeamActionDockConnected

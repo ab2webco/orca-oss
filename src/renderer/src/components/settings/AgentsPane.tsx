@@ -521,15 +521,18 @@ function AgentRow({
     Boolean(cmdOverride) || argsOverride !== defaultArgs || envSummary !== defaultEnvSummary
   )
 
+  const defaultLabel = translate('auto.components.settings.AgentsPane.24e032fa34', 'Default')
+  const setDefaultLabel = translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')
+
   return (
-    <div className={cn('py-3', !isDetected && 'opacity-70')}>
+    <div className={cn('py-3', !isDetected && 'opacity-70')} data-agent-row={agentId}>
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
           <AgentIcon agent={agentId} size={16} />
         </div>
 
         <div className="min-w-0 flex-1 sm:min-w-[12rem]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-agent-row-name>
             <span className="text-sm font-medium leading-none">{label}</span>
             {!isEnabled && (
               <SettingsBadge tone="muted">
@@ -555,32 +558,45 @@ function AgentRow({
           )}
         </div>
 
-        {/* Why flex below sm: the fixed column grid is wider than a phone-width card. */}
-        <div className="ml-auto grid shrink-0 grid-cols-[max-content_6.5rem_1.75rem_1.75rem] items-center gap-1.5 max-sm:flex max-sm:max-w-full max-sm:flex-wrap">
+        {/* Why own line below sm: beside the name it squeezes the label and its Disabled badge. */}
+        <div className="ml-auto grid shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 max-sm:ml-0 max-sm:flex max-sm:basis-full max-sm:flex-wrap max-sm:pl-10">
           <AgentAvailabilityControl
             label={label}
             isEnabled={isEnabled}
             onSetEnabled={onSetEnabled}
           />
 
-          <div className="flex justify-start">
+          <div className="grid">
+            {/* Why: sizes every row's column to the wider label in this language, so rows align. */}
+            <span
+              aria-hidden
+              className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium"
+            >
+              <Check className="size-3" />
+              {defaultLabel}
+            </span>
+            <span
+              aria-hidden
+              className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium"
+            >
+              {setDefaultLabel}
+            </span>
             {isDetected && isEnabled && (
               <Button
                 type="button"
                 variant={isDefault ? 'secondary' : 'ghost'}
                 size="xs"
                 onClick={onSetDefault}
+                data-agent-row-default
                 title={
                   isDefault
                     ? translate('auto.components.settings.AgentsPane.d7625cf8b2', 'Default agent')
                     : translate('auto.components.settings.AgentsPane.5f986a9b92', 'Set as default')
                 }
-                className="h-7 w-full justify-center gap-1 text-xs"
+                className="col-start-1 row-start-1 h-7 w-full justify-center gap-1 text-xs"
               >
                 {isDefault && <Check className="size-3" />}
-                {isDefault
-                  ? translate('auto.components.settings.AgentsPane.24e032fa34', 'Default')
-                  : translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')}
+                {isDefault ? defaultLabel : setDefaultLabel}
               </Button>
             )}
           </div>

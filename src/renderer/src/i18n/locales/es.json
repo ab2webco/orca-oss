@@ -1041,7 +1041,9 @@
         "pluginPanelDescription": "Proporcionado por el plugin {{value0}}.",
         "tasksDescription": "Conecta proveedores, instala la habilidad de Linear y elige qué aparece en Tareas.",
         "planeTitle": "Plane",
-        "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
+        "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane.",
+        "accountSwitchTitle": "Cambio de cuenta",
+        "accountSwitchDescription": "Permite que los agentes cambien esta terminal a otra cuenta de Claude sin perder la conversación."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
@@ -5953,8 +5955,8 @@
           "6f99bf5dd0": "Sin argumentos predeterminados",
           "8fbe1f37c1": "Entorno",
           "2d133152fa": "Sin entorno predeterminado",
-          "agentPermissions": "Permisos de Agents",
-          "agentPermissionsInfo": "Información de permisos de Agents",
+          "agentPermissions": "Permisos de los agentes",
+          "agentPermissionsInfo": "Información de permisos de los agentes",
           "agentPermissionsTooltip": "No se aplica a agents con argumentos de lanzamiento sobrescritos.",
           "agentPermissionsDescription": "Elige si Orca Lab lanza agents con menos prompts de permisos o con checks manuales.",
           "agentPermissionsYolo": "Yolo",
@@ -6439,7 +6441,7 @@
           "487b176240": "Muestra una cuenta regresiva en la barra lateral después de que un agente de Claude quede inactivo.",
           "9c20253679": "Muestra una cuenta regresiva después de que un agente de Claude quede inactivo.",
           "fe590653c1": "Claude cachea tu conversación para reducir costos. Si queda inactiva demasiado tiempo, la caché caduca y el siguiente mensaje reenvía todo el contexto con mayor costo. Esto muestra una cuenta regresiva para que sepas cuándo reanudar.",
-          "a137f8854d": "Prompt Cache Timer",
+          "a137f8854d": "Temporizador de caché de prompts",
           "80c454e8a6": "Haz que esto coincida con el TTL de caché de tu proveedor."
         },
         "GeneralEditorSettingsSection": {
@@ -7521,7 +7523,9 @@
           "linearDescription": "Cómo funciona Linear en Orca Lab, lista de configuración, habilidad del agente y ejemplos de prompts.",
           "tasksDescription": "Conecta proveedores, instala la habilidad de Linear y elige qué aparece en Tareas.",
           "planeTitle": "Plane",
-          "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
+          "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane.",
+          "accountSwitchTitle": "Cambio de cuenta",
+          "accountSwitchDescription": "Permite que los agentes cambien esta terminal a otra cuenta de Claude sin perder la conversación."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No hay fuentes coincidentes.",
@@ -16381,6 +16385,14 @@
       "title": "El inicio de sesión de Claude necesita reparación",
       "message": "El inicio de sesión de Claude Code de todo el sistema ya no es utilizable.",
       "detail": "Tus cuentas de Claude administradas por Orca Lab no se ven afectadas. Para restaurar el inicio de sesión de todo el sistema, ejecuta claude fuera de Orca Lab y completa /login una vez."
+    }
+  },
+  "resumeVault": {
+    "section": {
+      "title": "Sesiones de agentes preservadas",
+      "description": "Orca Lab guarda un registro para reanudar cuando no puede confirmar que el agente de una sesión cerrada terminó su turno. Revisa y libera los que no necesites.",
+      "manage": "Administrar",
+      "manageWithCount": "Administrar ({{value0}})"
     }
   },
   "auto.components.settings.HostAccountLoginDialog.title": "Iniciar sesión en {{server}}",

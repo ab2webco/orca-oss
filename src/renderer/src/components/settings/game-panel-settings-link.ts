@@ -9,7 +9,7 @@ type SettingsActions = {
   openSettingsPage: () => void
 }
 
-/** The panel gear: the project's game section with a team, the global Panel section without one. */
+/** The panel gear: the given project's game section, or the global Panel section with no project. */
 export function openGamePanelSettings(actions: SettingsActions, repoId: string | null): void {
   actions.openSettingsTarget(
     repoId
