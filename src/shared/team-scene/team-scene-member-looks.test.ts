@@ -8,6 +8,7 @@ import {
   FIGURES_MEMBER_LOOKS,
   teamSceneLookSeedOf,
   teamSceneMemberLookOf,
+  teamSceneSheetIndexOf,
   type TeamSceneFigureLook
 } from './team-scene-member-looks'
 
@@ -76,13 +77,14 @@ describe('the Figures member looks', () => {
 
   it('picks the sheet the Team list face draws, by the persistent character before the pane', () => {
     const subject = { role: 'member' as const, key: 'pane-1', characterKey: 'char-ada' }
-    const index = teamSceneLookSeedOf('char-ada') % roles.member.sheets.length
+    const index = teamSceneSheetIndexOf(subject, roles.member.sheets.length)
+    expect(index).toBe(teamSceneLookSeedOf('char-ada') % roles.member.sheets.length)
     expect(teamSceneMemberLookOf(subject).sheet).toBe(roles.member.sheets[index])
     expect(teamSceneMemberLookOf({ ...subject, key: 'pane-9' })).toBe(
       teamSceneMemberLookOf(subject)
     )
     const paneOnly = { role: 'member' as const, key: 'pane-1', characterKey: null }
-    const byPane = teamSceneLookSeedOf('pane-1') % roles.member.sheets.length
+    const byPane = teamSceneSheetIndexOf(paneOnly, roles.member.sheets.length)
     expect(teamSceneMemberLookOf(paneOnly).sheet).toBe(roles.member.sheets[byPane])
   })
 
@@ -93,6 +95,13 @@ describe('the Figures member looks', () => {
     expect(teamSceneMemberLookOf({ role: 'advisor', key: 'x', characterKey: null })).toBe(
       FIGURES_ADVISOR_LOOK
     )
+  })
+
+  it('refuses the steward, which only the 2D scenes draw, from its own sheet', () => {
+    // @ts-expect-error a steward has no 3D look.
+    teamSceneMemberLookOf({ role: 'steward', key: 'x', characterKey: null })
+    const all = roles as unknown as Record<string, { sheets: string[] }>
+    expect(all.steward?.sheets).toEqual(['figures/steward.png'])
   })
 
   it('keeps the seed the image painter has always used, so no face changes', () => {

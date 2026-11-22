@@ -46,28 +46,36 @@ function hat(part: DioramaPart, look: TeamSceneFigureLook, head: THREE.Group): v
   const { headwear, headwearColor: hw, trim, hair } = look
   if (headwear === 'wizard') {
     part(cyl(0.44, 0.44, 0.04, 20), hw, 0, 0.17, 0, head)
-    part(new THREE.ConeGeometry(0.27, 0.62, 16), hw, 0, 0.48, -0.03, head).rotation.x = -0.18
+    const cone = part(new THREE.ConeGeometry(0.27, 0.62, 16), hw, 0, 0.48, -0.03, head)
+    cone.rotation.x = -0.18
+    cone.name = 'headwear:wizard'
     part(cyl(0.275, 0.275, 0.07, 16), trim, 0, 0.22, 0, head, { outline: false })
   } else if (headwear === 'helm') {
-    part(sphere(0.33, 18, 12, Math.PI * 0.55), hw, 0, 0.02, 0, head).rotation.x = -0.3
+    const dome = part(sphere(0.33, 18, 12, Math.PI * 0.55), hw, 0, 0.02, 0, head)
+    dome.rotation.x = -0.3
+    dome.name = 'headwear:helm'
     part(new THREE.BoxGeometry(0.06, 0.2, 0.32), trim, 0, 0.36, -0.05, head)
   } else if (headwear === 'hood') {
-    part(sphere(0.335, 18, 12, Math.PI * 0.6), hw, 0, 0.02, -0.03, head).rotation.x = -0.45
+    const hood = part(sphere(0.335, 18, 12, Math.PI * 0.6), hw, 0, 0.02, -0.03, head)
+    hood.rotation.x = -0.45
+    hood.name = 'headwear:hood'
     part(new THREE.BoxGeometry(0.5, 0.3, 0.12), hw, 0, -0.2, -0.2, head)
   } else {
     part(sphere(0.315, 18, 10, Math.PI * 0.55), hair, 0, 0.02, -0.03, head).rotation.x = -0.35
   }
   if (headwear === 'hair') {
     // Why a bob: the sheet's long hair reaches the shoulders.
-    part(new THREE.SphereGeometry(0.2, 12, 10), hair, 0, -0.16, -0.16, head).scale.set(1.4, 1, 0.8)
+    const bob = part(new THREE.SphereGeometry(0.2, 12, 10), hair, 0, -0.16, -0.16, head)
+    bob.scale.set(1.4, 1, 0.8)
+    bob.name = 'headwear:hair'
   } else if (headwear === 'headband') {
-    part(cyl(0.32, 0.32, 0.08, 18), hw, 0, 0.1, 0, head)
+    part(cyl(0.32, 0.32, 0.08, 18), hw, 0, 0.1, 0, head).name = 'headwear:headband'
   } else if (headwear === 'cap') {
-    part(sphere(0.325, 18, 10, Math.PI * 0.42), hw, 0, 0.05, 0, head)
+    part(sphere(0.325, 18, 10, Math.PI * 0.42), hw, 0, 0.05, 0, head).name = 'headwear:cap'
     part(cyl(0.2, 0.2, 0.025, 14), hw, 0, 0.1, 0.22, head)
     part(new THREE.ConeGeometry(0.05, 0.36, 8), trim, 0.06, 0.4, -0.12, head).rotation.x = -0.6
   } else if (headwear === 'crown') {
-    part(cyl(0.21, 0.23, 0.13, 10, true), hw, 0, 0.33, 0, head)
+    part(cyl(0.21, 0.23, 0.13, 10, true), hw, 0, 0.33, 0, head).name = 'headwear:crown'
     for (let n = 0; n < 5; n++) {
       const a = (n / 5) * Math.PI * 2
       const tip = new THREE.ConeGeometry(0.045, 0.12, 6)
@@ -77,29 +85,40 @@ function hat(part: DioramaPart, look: TeamSceneFigureLook, head: THREE.Group): v
   if (look.beard !== null) {
     const beard = part(new THREE.SphereGeometry(0.17, 12, 10), look.beard, 0, -0.24, 0.13, head)
     beard.scale.set(1, 1.2, 0.7)
+    beard.name = 'beard'
   }
 }
 
 /** What the look carries: the lead's banner, a staff or wand with its orb, a hammer, a bow. */
-function gear(k: DioramaKit, part: DioramaPart, look: TeamSceneFigureLook, u: DioramaUnit): void {
+export function dioramaGear(
+  k: DioramaKit,
+  part: DioramaPart,
+  look: TeamSceneFigureLook,
+  u: DioramaUnit
+): void {
   const [left, hand] = [u.arms[0]!, u.arms[1]!]
   if (look.cape !== null) {
-    part(new THREE.BoxGeometry(0.52, 0.72, 0.05), look.cape, 0, 0.5, -0.24, u.g).rotation.x = 0.14
+    const cape = part(new THREE.BoxGeometry(0.52, 0.72, 0.05), look.cape, 0, 0.5, -0.24, u.g)
+    cape.rotation.x = 0.14
+    cape.name = 'cape'
   }
   if (look.tool === 'banner') {
     part(cyl(0.03, 0.03, 1.7, 8), k.p.woodDark, -0.06, -0.05, 0.08, left)
     const banner = part(new THREE.PlaneGeometry(0.42, 0.3), 0xf7f5ef, -0.29, 0.62, 0.08, left)
     ;(banner.material as THREE.Material).side = THREE.DoubleSide
+    banner.name = 'tool:banner'
   } else if (look.tool === 'staff' || look.tool === 'wand') {
     const staff = look.tool === 'staff'
     part(cyl(0.03, 0.03, staff ? 1.2 : 0.6, 8), k.p.woodDark, 0, staff ? -0.2 : -0.4, 0.05, hand)
     const orb = new THREE.SphereGeometry(staff ? 0.08 : 0.06, 12, 10)
-    part(orb, look.trim, 0, staff ? 0.42 : -0.1, 0.05, hand, { emissive: look.trim })
+    const tip = part(orb, look.trim, 0, staff ? 0.42 : -0.1, 0.05, hand, { emissive: look.trim })
+    tip.name = `tool:${look.tool}`
   } else if (look.tool === 'hammer') {
     const tool = new THREE.Group()
     tool.position.set(0, -0.38, 0.05)
     hand.add(tool)
     u.tool = tool
+    tool.name = 'tool:hammer'
     part(new THREE.BoxGeometry(0.05, 0.05, 0.36), k.p.woodDark, 0, 0, 0.16, tool)
     part(new THREE.BoxGeometry(0.16, 0.12, 0.12), 0x8c8f94, 0, 0, 0.34, tool)
   } else if (look.tool === 'bow') {
@@ -112,6 +131,7 @@ function gear(k: DioramaKit, part: DioramaPart, look: TeamSceneFigureLook, u: Di
       hand
     )
     bow.rotation.set(0, Math.PI / 2, Math.PI / 2)
+    bow.name = 'tool:bow'
   }
 }
 
@@ -153,6 +173,6 @@ export function dioramaToonUnit(
   face(head)
   hat(part, look, head)
   const u: DioramaUnit = { g, legs, arms, body, head, tool: null, bodyY: 0.56 }
-  gear(k, part, look, u)
+  dioramaGear(k, part, look, u)
   return u
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { DioramaKit } from './team-diorama-kit'
 import type { DioramaPart } from './team-diorama-unit-parts'
 import type { TeamSceneFigureLook } from '../../../../shared/team-scene/team-scene-member-looks'
-import type { DioramaUnit } from './team-diorama-units'
+import { dioramaGear, type DioramaUnit } from './team-diorama-units'
 
 // Why its own model: Low resources draws the prototype's low-poly unit (makeUnitLite), a few
 // faceted parts with no outline, not the toon figure with its outline turned off (ORCA-1296).
@@ -14,7 +14,7 @@ export function dioramaLiteUnit(
   look: TeamSceneFigureLook
 ): DioramaUnit {
   const g = new THREE.Group()
-  const { tunic, skin, headwear, headwearColor } = look
+  const { tunic, skin } = look
   const legs: THREE.Group[] = []
   const arms: THREE.Group[] = []
   for (const sx of [-0.1, 0.1]) {
@@ -39,33 +39,41 @@ export function dioramaLiteUnit(
   for (const ex of [-0.1, 0.1]) {
     part(new THREE.BoxGeometry(0.05, 0.07, 0.03), 0x1b1815, ex, 0, 0.26, head)
   }
-  if (headwear === 'wizard') {
-    part(new THREE.ConeGeometry(0.3, 0.6, 6), headwearColor, 0, 0.42, 0, head)
-  } else if (headwear === 'crown') {
-    part(new THREE.CylinderGeometry(0.21, 0.23, 0.13, 6), headwearColor, 0, 0.33, 0, head)
-  }
-  if (headwear !== 'wizard' && headwear !== 'crown') {
-    const cover = headwear === 'hair' ? look.hair : headwearColor
-    part(new THREE.IcosahedronGeometry(0.31, 0), cover, 0, 0.07, -0.05, head)
-  } else {
-    part(new THREE.IcosahedronGeometry(0.3, 0), look.hair, 0, 0.04, -0.07, head)
-  }
+  liteHat(part, look, head)
   const u: DioramaUnit = { g, legs, arms, body, head, tool: null, bodyY: 0.56 }
-  if (look.cape !== null) {
-    part(new THREE.BoxGeometry(0.5, 0.7, 0.05), look.cape, 0, 0.5, -0.24, g)
-  }
-  if (look.tool === 'banner') {
-    part(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 5), k.p.woodDark, -0.06, -0.05, 0.08, arms[0]!)
-    const banner = part(new THREE.PlaneGeometry(0.42, 0.3), 0xf7f5ef, -0.29, 0.62, 0.08, arms[0]!)
-    banner.material = (banner.material as THREE.Material).clone()
-    ;(banner.material as THREE.Material).side = THREE.DoubleSide
-  } else if (look.tool === 'hammer') {
-    const tool = new THREE.Group()
-    tool.position.set(0, -0.38, 0.05)
-    arms[1]!.add(tool)
-    part(new THREE.BoxGeometry(0.05, 0.05, 0.36), k.p.woodDark, 0, 0, 0.16, tool)
-    part(new THREE.BoxGeometry(0.16, 0.12, 0.12), 0x8c8f94, 0, 0, 0.34, tool)
-    u.tool = tool
-  }
+  dioramaGear(k, part, look, u)
   return u
+}
+
+/** One faceted shape per headwear, so each member still reads apart at Low resources. */
+function liteHat(part: DioramaPart, look: TeamSceneFigureLook, head: THREE.Group): void {
+  const { headwear, headwearColor: hw, trim, hair } = look
+  const name = `headwear:${headwear}`
+  const hat = (geo: THREE.BufferGeometry, hex: number, x: number, y: number, z: number) => {
+    part(geo, hex, x, y, z, head).name = name
+  }
+  if (headwear !== 'helm' && headwear !== 'hood') {
+    part(new THREE.IcosahedronGeometry(0.3, 0), hair, 0, 0.04, -0.07, head)
+  }
+  if (headwear === 'wizard') {
+    hat(new THREE.ConeGeometry(0.3, 0.6, 6), hw, 0, 0.42, 0)
+  } else if (headwear === 'crown') {
+    hat(new THREE.CylinderGeometry(0.21, 0.23, 0.13, 6), hw, 0, 0.33, 0)
+  } else if (headwear === 'helm') {
+    hat(new THREE.DodecahedronGeometry(0.32, 0), hw, 0, 0.06, 0)
+    hat(new THREE.BoxGeometry(0.06, 0.2, 0.32), trim, 0, 0.38, -0.05)
+  } else if (headwear === 'hood') {
+    hat(new THREE.IcosahedronGeometry(0.33, 0), hw, 0, 0.05, -0.06)
+    hat(new THREE.BoxGeometry(0.5, 0.3, 0.12), hw, 0, -0.2, -0.2)
+  } else if (headwear === 'headband') {
+    hat(new THREE.CylinderGeometry(0.31, 0.31, 0.08, 6), hw, 0, 0.1, 0)
+  } else if (headwear === 'cap') {
+    hat(new THREE.CylinderGeometry(0.26, 0.31, 0.16, 6), hw, 0, 0.2, 0)
+    hat(new THREE.ConeGeometry(0.05, 0.36, 4), trim, 0.06, 0.42, -0.12)
+  } else {
+    hat(new THREE.BoxGeometry(0.4, 0.3, 0.16), hair, 0, -0.16, -0.16)
+  }
+  if (look.beard !== null) {
+    part(new THREE.OctahedronGeometry(0.17, 0), look.beard, 0, -0.24, 0.13, head).name = 'beard'
+  }
 }

@@ -91,4 +91,11 @@ describe('the diorama cast', () => {
       expect(tunicOf(castOf(null, characterKey))).toBe(want)
     }
   })
+
+  it('dresses char-ada in member-5, the red cap and tunic its Team list face shows', () => {
+    // Why literal: this is red on behaviour against the old random outfits, not on an import.
+    const f = castOf(null, 'char-ada').figures.get('a')!
+    expect((f.body.material as THREE.MeshBasicMaterial).color.getHex()).toBe(0xaa4844)
+    expect(f.g.getObjectByName('headwear:cap')).toBeDefined()
+  })
 })

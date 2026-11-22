@@ -161,9 +161,20 @@ export function teamSceneLookSeedOf(text: string): number {
   return h >>> 0
 }
 
-/** A member's look follows its persistent character, not its pane, as its Team list face does. */
+/** Which of `count` sheets a member wears: its persistent character first, then its pane. */
+export function teamSceneSheetIndexOf(
+  who: Pick<TeamSceneActor, 'key' | 'characterKey'>,
+  count: number
+): number {
+  return teamSceneLookSeedOf(who.characterKey ?? who.key) % count
+}
+
+/**
+ * A member's look follows its persistent character, not its pane, as its Team list face does.
+ * No steward: it is drawn only in 2D, from its own sheet, so the type refuses it.
+ */
 export function teamSceneMemberLookOf(
-  who: Pick<TeamSceneActor, 'role' | 'key' | 'characterKey'>
+  who: Pick<TeamSceneActor, 'key' | 'characterKey'> & { role: 'lead' | 'member' | 'advisor' }
 ): TeamSceneFigureLook {
   if (who.role === 'lead') {
     return FIGURES_LEAD_LOOK
@@ -171,6 +182,5 @@ export function teamSceneMemberLookOf(
   if (who.role === 'advisor') {
     return FIGURES_ADVISOR_LOOK
   }
-  const seed = teamSceneLookSeedOf(who.characterKey ?? who.key)
-  return FIGURES_MEMBER_LOOKS[seed % FIGURES_MEMBER_LOOKS.length]!
+  return FIGURES_MEMBER_LOOKS[teamSceneSheetIndexOf(who, FIGURES_MEMBER_LOOKS.length)]!
 }
