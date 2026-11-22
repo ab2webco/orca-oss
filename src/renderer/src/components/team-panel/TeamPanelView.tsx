@@ -38,21 +38,26 @@ import { useTeamSceneDiorama, useTeamSceneStyle } from '../team-scene/use-team-s
 /** The team's project, else the active worktree's; null sends the gear to the global Panel settings. */
 export function teamPanelSettingsRepoId(
   model: TeamPanelModel | null,
-  activeRepoId: string | null
+  activeRepoId: string | null,
+  hasRepoSettings: (repoId: string) => boolean = () => true
 ): string | null {
-  return model?.kind === 'team' ? model.repoId : activeRepoId
+  const repoId = model?.kind === 'team' ? model.repoId : activeRepoId
+  // Why: a folder workspace's id (folder-workspace:<group>) or a removed repo has no settings pane.
+  return repoId && hasRepoSettings(repoId) ? repoId : null
 }
 
 function TeamPanelHeader({
   model,
   activeRepoId,
+  hasRepoSettings,
   onOpenSettings
 }: {
   model: TeamPanelModel | null
   activeRepoId: string | null
+  hasRepoSettings?: (repoId: string) => boolean
   onOpenSettings: (repoId: string | null) => void
 }): React.JSX.Element {
-  const settingsRepoId = teamPanelSettingsRepoId(model, activeRepoId)
+  const settingsRepoId = teamPanelSettingsRepoId(model, activeRepoId, hasRepoSettings)
   const title =
     model?.kind === 'team'
       ? model.projectName
@@ -178,6 +183,7 @@ export function TeamPanelView({
   source,
   look,
   activeRepoId = null,
+  hasRepoSettings,
   onOpenSettings,
   dock
 }: {
@@ -185,6 +191,8 @@ export function TeamPanelView({
   look: TeamPanelLook
   /** The active worktree's project, which the gear opens when there is no team. */
   activeRepoId?: string | null
+  /** Whether a project has a settings pane; the gear falls back to the global one when not. */
+  hasRepoSettings?: (repoId: string) => boolean
   onOpenSettings: (repoId: string | null) => void
   /** The action dock at the panel's foot; a slot so this view stays free of the store. */
   dock?: (model: TeamPanelGameModel) => React.ReactNode
@@ -213,7 +221,12 @@ export function TeamPanelView({
   )
   const body = (
     <>
-      <TeamPanelHeader model={model} activeRepoId={activeRepoId} onOpenSettings={onOpenSettings} />
+      <TeamPanelHeader
+        model={model}
+        activeRepoId={activeRepoId}
+        hasRepoSettings={hasRepoSettings}
+        onOpenSettings={onOpenSettings}
+      />
       {model?.kind === 'team' && look === 'game' && model.xp ? <TeamXpRow xp={model.xp} /> : null}
       {model?.kind === 'solo' ? <TeamFirstRunHint /> : null}
       {model?.kind === 'solo' ? <TeamSessionCount rows={model.rows} /> : null}

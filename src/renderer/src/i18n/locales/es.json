@@ -5920,8 +5920,8 @@
           "updateLabel": "Actualizar"
         },
         "AgentsPane": {
-          "d83834f5e6": "Detectando agents instalados…",
-          "024bd95089": "agents",
+          "d83834f5e6": "Detectando agentes instalados…",
+          "024bd95089": "agentes",
           "e8da2af684": "Disponible para instalar",
           "runsInProcessTitle": "Se ejecuta en proceso",
           "runsInProcessNote": "Se ejecuta en proceso en {{value0}}: los compañeros de equipo quedan en el mismo panel de Claude. No hay nada que instalar.",
@@ -5957,8 +5957,8 @@
           "2d133152fa": "Sin entorno predeterminado",
           "agentPermissions": "Permisos de los agentes",
           "agentPermissionsInfo": "Información de permisos de los agentes",
-          "agentPermissionsTooltip": "No se aplica a agents con argumentos de lanzamiento sobrescritos.",
-          "agentPermissionsDescription": "Elige si Orca Lab lanza agents con menos prompts de permisos o con checks manuales.",
+          "agentPermissionsTooltip": "No se aplica a agentes con argumentos de lanzamiento sobrescritos.",
+          "agentPermissionsDescription": "Elige si Orca Lab lanza agentes con menos prompts de permisos o con checks manuales.",
           "agentPermissionsYolo": "Yolo",
           "agentPermissionsManual": "Manual",
           "3f1bdf3cb4": "El texto de entorno es demasiado grande para analizarlo de forma segura.",

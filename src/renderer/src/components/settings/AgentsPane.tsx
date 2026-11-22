@@ -529,7 +529,10 @@ function AgentRow({
   const setDefaultLabel = translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')
 
   return (
-    <div className={cn('py-3', !isDetected && 'opacity-70')} data-agent-row={agentId}>
+    <div
+      className={cn('@container/agent-row py-3', !isDetected && 'opacity-70')}
+      data-agent-row={agentId}
+    >
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
           <AgentIcon agent={agentId} size={16} />
@@ -565,17 +568,21 @@ function AgentRow({
           )}
         </div>
 
-        {/* Why own line below sm: beside the name it squeezes the label and its Disabled badge. */}
-        <div className="ml-auto grid shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 max-sm:ml-0 max-sm:flex max-sm:basis-full max-sm:flex-wrap">
+        {/* Why the row's width, not the viewport's: beside the settings sidebar a row can be too narrow
+            for the grid at any window width, and es's labels widen it. */}
+        <div className="ml-auto grid max-w-full shrink-0 grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem] items-center gap-1.5 @max-[42rem]/agent-row:ml-0 @max-[42rem]/agent-row:flex @max-[42rem]/agent-row:basis-full @max-[42rem]/agent-row:flex-wrap">
           <AgentAvailabilityControl
             label={label}
             isEnabled={isEnabled}
             onSetEnabled={onSetEnabled}
           />
 
-          {/* Why last below sm: the icons then wrap with the toggle, never alone on a line. */}
+          {/* Why last when wrapped: the icons then wrap with the toggle, never alone on a line. */}
           <div
-            className={cn('grid max-sm:order-last', !(isDetected && isEnabled) && 'max-sm:hidden')}
+            className={cn(
+              'grid @max-[42rem]/agent-row:order-last',
+              !(isDetected && isEnabled) && '@max-[42rem]/agent-row:hidden'
+            )}
           >
             {/* Why installed only: sizes the column to the wider label so Installed rows align;
                 uninstalled rows never get the button and keep the room for their command. */}
@@ -583,14 +590,14 @@ function AgentRow({
               <>
                 <span
                   aria-hidden
-                  className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium max-sm:hidden"
+                  className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium @max-[42rem]/agent-row:hidden"
                 >
                   <Check className="size-3" />
                   {defaultLabel}
                 </span>
                 <span
                   aria-hidden
-                  className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium max-sm:hidden"
+                  className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium @max-[42rem]/agent-row:hidden"
                 >
                   {setDefaultLabel}
                 </span>

@@ -40,6 +40,18 @@ describe('Settings > Agents es copy', () => {
     expect(es.auto.components.settings.AgentsPane.agentPermissionsInfo).not.toMatch(/Agents/)
   })
 
+  it("says 'agentes' in the rest of the Agents pane's own lines", () => {
+    const pane = es.auto.components.settings.AgentsPane
+    for (const line of [
+      pane.agentPermissionsTooltip,
+      pane.agentPermissionsDescription,
+      pane.d83834f5e6,
+      pane['024bd95089']
+    ]) {
+      expect(line).not.toMatch(/\bagents\b/i)
+    }
+  })
+
   it('keeps placeholders the English source has', () => {
     expect(lookup(es, 'resumeVault.section.manageWithCount')).toContain('{{value0}}')
   })

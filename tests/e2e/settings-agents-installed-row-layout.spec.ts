@@ -6,6 +6,8 @@ import { writeSettings } from './helpers/settings-write'
 import { THEMES, WIDTHS, setTheme, setWindowWidth } from './helpers/settings-window'
 
 const DETECTED: TuiAgent[] = ['claude', 'codex', 'gemini']
+// Why 700: between sm (640) and 768 the settings sidebar leaves a row at its narrowest.
+const SWEEP_WIDTHS = [...new Set([...WIDTHS, 700])].sort((a, b) => b - a)
 
 type RowReport = { agent: string; problems: string[] }
 
@@ -36,6 +38,12 @@ async function measureInstalledRows(page: Page): Promise<RowReport[]> {
         .map(([name, element]) => ({ name, element, rect: element.getBoundingClientRect() }))
         .filter(({ rect }) => rect.width > 0)
       const problems: string[] = []
+      const rowRect = row.getBoundingClientRect()
+      for (const { name, rect } of boxes) {
+        if (rect.right > rowRect.right + 1 || rect.left < rowRect.left - 1) {
+          problems.push(`${name} runs out of its row`)
+        }
+      }
       for (let i = 0; i < boxes.length; i++) {
         for (let j = i + 1; j < boxes.length; j++) {
           const a = boxes[i].rect
@@ -47,14 +55,12 @@ async function measureInstalledRows(page: Page): Promise<RowReport[]> {
           }
         }
       }
-      // Why below sm only: there the controls wrap, and an icon alone on a line reads as orphaned.
-      if (window.innerWidth < 640) {
-        const texts = boxes.filter(({ name }) => name === 'availability' || name === 'default')
-        for (const icon of boxes.filter(({ name }) => name === 'docs' || name === 'command')) {
-          const middle = (icon.rect.top + icon.rect.bottom) / 2
-          if (!texts.some(({ rect }) => middle > rect.top && middle < rect.bottom)) {
-            problems.push(`${icon.name} sits on a line of its own`)
-          }
+      // Why every width: wherever the controls wrap, an icon alone on a line reads as orphaned.
+      const texts = boxes.filter(({ name }) => name === 'availability' || name === 'default')
+      for (const icon of boxes.filter(({ name }) => name === 'docs' || name === 'command')) {
+        const middle = (icon.rect.top + icon.rect.bottom) / 2
+        if (!texts.some(({ rect }) => middle > rect.top && middle < rect.bottom)) {
+          problems.push(`${icon.name} sits on a line of its own`)
         }
       }
       for (const { name, element } of boxes) {
@@ -91,7 +97,7 @@ test('Settings → Agents: Installed rows keep name, availability and Set defaul
     await expect(orcaPage.locator('[data-agent-row="codex"] [data-agent-row-name]')).toContainText(
       language === 'es' ? 'Desactivado' : 'Disabled'
     )
-    for (const width of WIDTHS) {
+    for (const width of SWEEP_WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
       for (const theme of THEMES) {
         await setTheme(orcaPage, theme)

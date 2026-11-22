@@ -478,4 +478,12 @@ describe('teamPanelSettingsRepoId', () => {
     expect(teamPanelSettingsRepoId(solo, null)).toBeNull()
     expect(teamPanelSettingsRepoId(null, null)).toBeNull()
   })
+
+  it('falls back to the global settings for a project with no settings pane, team or not', () => {
+    const folder = 'folder-workspace:group-1'
+    const known = (repoId: string): boolean => repoId === 'repo-2'
+    expect(teamPanelSettingsRepoId({ ...game, repoId: folder }, 'repo-2', known)).toBeNull()
+    expect(teamPanelSettingsRepoId(solo, folder, known)).toBeNull()
+    expect(teamPanelSettingsRepoId(solo, 'repo-2', known)).toBe('repo-2')
+  })
 })

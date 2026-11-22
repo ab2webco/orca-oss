@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { openGamePanelSettings } from '@/components/settings/game-panel-settings-link'
 import { getRepositoryGameActionsSectionId } from '@/components/settings/repository-settings-targets'
@@ -29,9 +29,11 @@ export default function TeamPanel(): React.JSX.Element {
         : read,
     [read, panel, pluginsOn]
   )
-  const worktreeRepoId = useActiveWorktree()?.repoId ?? null
-  const activeRepoId = useAppStore((s) =>
-    worktreeRepoId && s.repos.some((repo) => repo.id === worktreeRepoId) ? worktreeRepoId : null
+  const activeRepoId = useActiveWorktree()?.repoId ?? null
+  const repos = useAppStore((s) => s.repos)
+  const hasRepoSettings = useCallback(
+    (repoId: string) => repos.some((repo) => repo.id === repoId),
+    [repos]
   )
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
@@ -42,6 +44,7 @@ export default function TeamPanel(): React.JSX.Element {
       source={source}
       look={panel.look}
       activeRepoId={activeRepoId}
+      hasRepoSettings={hasRepoSettings}
       onOpenSettings={openSettings}
       dock={(model) => (
         <TeamActionDockConnected
