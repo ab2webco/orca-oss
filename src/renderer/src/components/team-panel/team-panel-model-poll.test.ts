@@ -267,6 +267,35 @@ describe('createTeamPanelModelPoller', () => {
     expect(sources.slice(opened).map((one) => one.section.kind)).toEqual(['unavailable'])
   })
 
+  // Review N5: an old read landing after a new opening must not end that opening's skeleton.
+  it('keeps the new opening skeleton when an older read lands after it restarts', async () => {
+    let landOld: (state: OrchestratorGameState) => void = () => {}
+    let leadsNew: (leads: { leads: { handle: string }[]; restoring: never[] }) => void = () => {}
+    const readLeads = vi
+      .fn()
+      .mockResolvedValueOnce({ leads: [{ handle: 'term' }], restoring: [] })
+      .mockImplementationOnce(() => new Promise((done) => (leadsNew = done)))
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (landOld = done)))
+    const { all, sources } = deps({ readLeads, readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE, { background: true })
+    await flush()
+    poller.subscribe(SCOPE)
+    await flush()
+    const restarted = sources.length
+
+    landOld({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    leadsNew({ leads: [{ handle: 'term' }], restoring: [] })
+    await flush()
+
+    expect(
+      sources
+        .slice(restarted)
+        .some((one) => one.section.kind === 'loading' && 'team' in one.section)
+    ).toBe(true)
+  })
+
   it('never marks loading as a team when game.leads finds no lead', async () => {
     const { all, sources } = deps({ findCaller: vi.fn(() => null) })
 

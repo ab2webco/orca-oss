@@ -527,6 +527,19 @@ describe('Inbox tab', () => {
     expect(here.result.current).toHaveLength(1)
   })
 
+  // Review N2a: with no project shown there is no scope, so no answer is listed.
+  it('lists no agent answer when no panel scope is shown', () => {
+    act(() => panel.set('local|repo-a'))
+    useTeamInboxAgentAnswers.setState({
+      answers: [{ question: 'Q?', answer: 'Yes', scope: 'local|repo-a' }]
+    })
+    const here = renderHook(() => useTeamInboxAgentAnswersHere())
+    expect(here.result.current).toHaveLength(1)
+
+    act(() => panel.set(null))
+    expect(here.result.current).toEqual([])
+  })
+
   it("lists this session's agent answers in Answered and counts them", () => {
     const view = renderInbox({
       threads: { ...THREADS, answered: [] },

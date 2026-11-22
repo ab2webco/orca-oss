@@ -140,13 +140,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       if (found === 'restoring') {
         if (current()) {
           endStreak(scope, false)
-          const team = lastTeams.get(scope.key)
-          deps.publish(
-            team
-              ? { section: { kind: 'ready', value: team }, retry: null, updating: true }
-              : { section: { kind: 'loading' }, retry: null },
-            scope
-          )
+          publishOpening(scope)
           run.soon ??= setTimeout(() => {
             run.soon = null
             void refresh()
@@ -164,7 +158,10 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       try {
         state = caller ? await deps.readState(scope.target, caller, { fresh }) : null
       } finally {
-        run.opening = false
+        // Why current(): an older read must not end a newer opening's skeleton (review N5).
+        if (current()) {
+          run.opening = false
+        }
       }
       const [questions, xp] =
         caller && state
@@ -205,7 +202,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
       )
     } catch (error) {
       // Why: a failed game.leads read shows its error too, which a later skeleton must not replace.
-      run.opening = false
+      if (current()) {
+        run.opening = false
+      }
       if (!current()) {
         return
       }
