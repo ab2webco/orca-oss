@@ -7,6 +7,8 @@ import type {
   TeamSection
 } from '../../../../shared/team-panel-model-types'
 import { resolveTeamPanelTabs } from './team-panel-tab-registry'
+import en from '../../i18n/locales/en.json'
+import es from '../../i18n/locales/es.json'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -201,6 +203,16 @@ describe('resolveTeamPanelTabs', () => {
     })
     const prs = resolveTeamPanelTabs(model).find((tab) => tab.id === 'prs')
     expect(prs?.view.kind).toBe('ready')
+  })
+
+  // ORCA-1329 P2: V30's empty PRs title speaks to the person.
+  it('titles an empty PRs tab as V30 does, in English and Spanish', () => {
+    const prs = resolveTeamPanelTabs(gameModel({ prs: NO_PRS })).find((tab) => tab.id === 'prs')
+    expect(prs?.view.kind).toBe('empty')
+    expect(prs?.copy.emptyTitle).toBe('You have no open PRs')
+    expect(en.teamPanel.tabs.prs.emptyTitle).toBe('You have no open PRs')
+    expect(es.teamPanel.tabs.prs.emptyTitle).toBe('No tienes PRs abiertos')
+    expect(es.teamPanel.tabs.prs.emptyText).toBe('Aparecen aquí cuando un agente abre uno.')
   })
 
   it('draws the Team tab with no members, since the lead is its first card', () => {

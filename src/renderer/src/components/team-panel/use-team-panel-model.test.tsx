@@ -12,7 +12,7 @@ import { signalGameAdvisorChanged } from './game-advisor-signal'
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
 let publish: (source: TeamPanelModelSource, scope?: unknown) => void = () => {}
-type ReadState = (target: unknown, caller: unknown) => Promise<unknown>
+type ReadState = (target: unknown, caller: unknown, options: { fresh: boolean }) => Promise<unknown>
 let readState: ReadState = async () => null
 vi.mock('./team-panel-model-poll', () => ({
   createTeamPanelModelPoller: (deps: { publish: typeof publish; readState: ReadState }) => {
@@ -93,10 +93,12 @@ describe('Team model polling', () => {
     const target = { kind: 'environment', environmentId: 'env-1' }
     const caller = { worktreeId: 'wt-lead', terminalHandle: 'h-lead', paneKey: 'tab:leaf' }
 
-    await expect(readState(target, caller)).resolves.toEqual({ config: { mode: 'on' } })
+    await expect(readState(target, caller, { fresh: true })).resolves.toEqual({
+      config: { mode: 'on' }
+    })
 
     expect(readTeamLeadState).toHaveBeenCalledTimes(1)
-    expect(readTeamLeadState).toHaveBeenCalledWith(target, caller)
+    expect(readTeamLeadState).toHaveBeenCalledWith(target, caller, { fresh: true })
     expect(useTeamSceneArtHostStore.getState().host).toEqual({
       target,
       caller: { worktreeId: 'wt-lead', terminalHandle: 'h-lead' }

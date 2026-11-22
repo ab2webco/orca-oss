@@ -16481,7 +16481,9 @@
       "modelErrorText": "Orca no responde en este proyecto. Vuelve a intentarlo.",
       "modelUnavailableTitle": "Los datos del equipo no están disponibles",
       "retry": "Reintentar",
-      "updating": "Actualizando el equipo…"
+      "updating": "Actualizando el equipo…",
+      "providerErrorTitle": "{{provider}} no respondió",
+      "retryNow": "Reintentar ahora"
     },
     "tabs": {
       "label": "Secciones del panel",
@@ -16507,7 +16509,7 @@
       },
       "prs": {
         "title": "PRs",
-        "emptyTitle": "No hay pull requests abiertos",
+        "emptyTitle": "No tienes PRs abiertos",
         "emptyText": "Aparecen aquí cuando un agente abre uno.",
         "errorTitle": "No se pudieron leer los pull requests"
       },

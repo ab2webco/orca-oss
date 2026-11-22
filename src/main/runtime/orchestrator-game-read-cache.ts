@@ -41,6 +41,11 @@ export class GameReadCache<T> {
     return this.load(key, at, load, false)
   }
 
+  /** Drops `key`, so its next read loads and waits. */
+  forget(key: string): void {
+    this.entries.delete(key)
+  }
+
   // Why put a background reload only once it lands: the expired entry answers reads until then.
   private load(
     key: string,
@@ -50,9 +55,11 @@ export class GameReadCache<T> {
   ): Promise<T | null> {
     const value = load().catch(() => null)
     const entry: { at: number; value: Promise<T | null>; settled?: T | null } = { at, value }
+    const replaces = this.entries.get(key)
     void value.then((settled) => {
       entry.settled = settled
-      if (behind) {
+      // Why: a forget() or a newer load while this ran means its answer is older than the cache's.
+      if (behind && this.entries.get(key) === replaces) {
         this.put(key, entry)
       }
     })

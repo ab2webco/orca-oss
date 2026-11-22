@@ -95,7 +95,8 @@ export async function readTeamLeads(target: RuntimeClientTarget): Promise<{ hand
  */
 export async function readTeamLeadState(
   target: RuntimeClientTarget,
-  caller: TeamLeadCaller
+  caller: TeamLeadCaller,
+  options: { fresh?: boolean } = {}
 ): Promise<OrchestratorGameState | null> {
   const state = await callRuntimeRpc<OrchestratorGameState>(
     target,
@@ -103,7 +104,9 @@ export async function readTeamLeadState(
     {
       worktreeId: caller.worktreeId,
       terminalHandle: caller.terminalHandle,
-      paneKey: caller.paneKey
+      paneKey: caller.paneKey,
+      // Why only when set: the band's every poll stays the call it was.
+      ...(options.fresh ? { fresh: true } : {})
     },
     { timeoutMs: TEAM_RPC_TIMEOUT_MS }
   )

@@ -2,6 +2,7 @@ import { createElement, type ComponentType, type ReactNode } from 'react'
 import type {
   TeamPanelModel,
   TeamSection,
+  TeamSectionError,
   TeamTabId
 } from '../../../../shared/team-panel-model-types'
 
@@ -24,7 +25,7 @@ export type TeamPanelTabCopy = {
 export type TeamPanelTabView =
   | { kind: 'loading' }
   | { kind: 'unavailable' }
-  | { kind: 'error'; message: string }
+  | TeamSectionError
   | { kind: 'empty' }
   | { kind: 'ready'; render: (selectTab: SelectTeamPanelTab) => ReactNode }
 
@@ -37,6 +38,8 @@ export type TeamPanelResolvedTab = {
   count: number | null
   copy: TeamPanelTabCopy
   view: TeamPanelTabView
+  /** Its error offers Retry now, a fresh read on the host (ORCA-1329). */
+  retryNow: boolean
 }
 
 export type TeamPanelTabSpec<V> = {
@@ -48,6 +51,7 @@ export type TeamPanelTabSpec<V> = {
   isEmpty: (value: V, model: TeamPanelModel) => boolean
   copy: () => TeamPanelTabCopy
   count?: (model: TeamPanelModel) => number | null
+  retryNow?: boolean
   Body: ComponentType<TeamPanelTabBodyProps<V>>
 }
 
@@ -85,7 +89,8 @@ export function defineTeamPanelTab<V>(spec: TeamPanelTabSpec<V>): TeamPanelTabDe
         shortTitle: spec.shortTitle?.() ?? title,
         count: spec.count?.(model) ?? null,
         copy: spec.copy(),
-        view: viewOf(section, model)
+        view: viewOf(section, model),
+        retryNow: spec.retryNow === true
       }
     }
   }

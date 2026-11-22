@@ -281,10 +281,20 @@ export type TeamMetrics = {
 
 /** Every tab draws these four states; `unavailable` is a host or setting that cannot supply it. */
 export type TeamSection<T> =
-  | { kind: 'loading' }
+  /** `team`: game.leads found a lead, so the read is a team's and its skeleton may show (P4). */
+  | { kind: 'loading'; team?: true }
   | { kind: 'unavailable' }
-  | { kind: 'error'; message: string }
+  | TeamSectionError
   | { kind: 'ready'; value: T }
+
+export type TeamSectionError = {
+  kind: 'error'
+  message: string
+  /** Named only when the read says which provider failed; never guessed from the remote. */
+  provider?: string
+  /** The provider's budget is spent, so a retry cannot succeed before the reset the message names. */
+  limited?: boolean
+}
 
 export type TeamTabId = 'team' | 'activity' | 'inbox' | 'prs' | 'queue' | 'machines'
 

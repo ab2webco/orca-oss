@@ -5,6 +5,7 @@ import type { TeamPrList, TeamPrRow } from '../../../../shared/team-panel-model-
 import { teamStatusTone } from './team-card-text'
 import type { TeamPanelTabBodyProps } from './team-panel-tab-definition'
 import { TeamPanelQueueSection, teamQueueEntriesOf } from './team-panel-queue-section'
+import { teamSectionErrorTitle, TeamRetryNowButton } from './team-panel-retry-now'
 import { TeamStatusMark } from './TeamStatusMark'
 import { useTeamLeadPrompt } from './use-team-lead-prompt'
 
@@ -69,9 +70,12 @@ export function TeamPanelPrsTab({
     <div className="flex flex-col pb-3 pt-1.5">
       <TeamPanelQueueSection entries={teamQueueEntriesOf(model)} />
       {model.prs?.kind === 'error' ? (
-        <p data-team-pr-failure="" className="px-3 py-2 text-xs text-muted-foreground">
-          {`${translate('teamPanel.tabs.prs.errorTitle', 'Could not read pull requests')} · ${model.prs.message}`}
-        </p>
+        <div className="flex flex-col items-start gap-2 px-3 py-2">
+          <p data-team-pr-failure="" className="text-xs text-muted-foreground">
+            {`${teamSectionErrorTitle(model.prs, translate('teamPanel.tabs.prs.errorTitle', 'Could not read pull requests'))} · ${model.prs.message}`}
+          </p>
+          <TeamRetryNowButton error={model.prs} />
+        </div>
       ) : null}
       {rows.map((row) => (
         <PrRow key={row.url} row={row} />

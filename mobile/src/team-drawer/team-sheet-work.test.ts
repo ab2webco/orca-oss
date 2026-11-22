@@ -69,7 +69,7 @@ describe('the Team sheet PRs and Hosts tabs', () => {
   it("words an unread PR list with the provider's failure, the GitHub limit included", () => {
     const work = teamLeadViewOf(
       leadState({
-        project: { reviews: null, todo: null },
+        project: { reviews: null, todo: null, reviewsFailedOn: 'github' },
         githubBudget: { core: { limit: 5000, remaining: 0, resetAt: NOW / 1000 + 600 } }
       }),
       new Set(),
@@ -78,7 +78,9 @@ describe('the Team sheet PRs and Hosts tabs', () => {
     )?.work
     expect(work?.prs).toEqual({
       kind: 'error',
-      message: 'GitHub API limit reached. It retries on its own in 10 min.'
+      message: 'GitHub API limit reached. It retries on its own in 10 min.',
+      provider: 'GitHub',
+      limited: true
     })
     expect(work?.queue).toEqual({ kind: 'unavailable' })
   })

@@ -100,6 +100,19 @@ describe('readTeamLeadState', () => {
     )
   })
 
+  it("adds Retry now's fresh flag to the same identity, and only then (ORCA-1329)", async () => {
+    callRuntimeRpc.mockResolvedValue({ role: 'lead', agents: [] })
+    const caller = { worktreeId: 'wt-main', terminalHandle: 'term-lead', paneKey: PANE }
+
+    await readTeamLeadState({ kind: 'local' }, caller, { fresh: true })
+    await readTeamLeadState({ kind: 'local' }, caller, { fresh: false })
+
+    expect(callRuntimeRpc.mock.calls.slice(-2).map((call) => call[2])).toEqual([
+      { ...caller, fresh: true },
+      caller
+    ])
+  })
+
   it('reads no state that is not the lead role', async () => {
     callRuntimeRpc.mockResolvedValue({ role: 'member', agents: [] })
 

@@ -83,6 +83,72 @@ describe('createTeamPanelModelPoller', () => {
     release()
   })
 
+  // ORCA-1329: Retry now asks the host to re-read its lists once, and settles when that read lands.
+  it('makes only the next read fresh, settling Retry now when it lands', async () => {
+    const { all } = deps()
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    let settled = false
+    const retry = poller.refreshFresh().then(() => (settled = true))
+    expect(settled).toBe(false)
+    await retry
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(vi.mocked(all.readState).mock.calls.map((call) => call[2])).toEqual([
+      { fresh: false },
+      { fresh: true },
+      { fresh: false }
+    ])
+    release()
+  })
+
+  it('folds a tap during a read into one fresh read after it', async () => {
+    let land = (): void => {}
+    const readState = vi.fn<TeamPanelPollDeps['readState']>(
+      () =>
+        new Promise<OrchestratorGameState>(
+          (done) => (land = () => done({ role: 'lead' } as OrchestratorGameState))
+        )
+    )
+    const { all } = deps({ readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    let settled = false
+    void poller.refreshFresh().then(() => (settled = true))
+    land()
+    await flush()
+    await flush()
+    expect(settled).toBe(false)
+    expect(readState.mock.calls.map((call) => call[2])).toEqual([{ fresh: false }, { fresh: true }])
+    land()
+    await flush()
+    await flush()
+    expect(settled).toBe(true)
+    release()
+  })
+
+  // Why: an older host strips `fresh` and answers from its cache; the tap must still end, error and all.
+  it('settles Retry now on a host that ignores the flag, keeping the error it answered', async () => {
+    const failed = { ...MODEL, prs: { kind: 'error', message: 'The provider did not answer.' } }
+    const { all, last } = deps({ modelOf: vi.fn(() => failed as TeamPanelGameModel) })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    await flush()
+    await poller.refreshFresh()
+    expect(last()).toMatchObject({ kind: 'ready', value: { prs: { kind: 'error' } } })
+    release()
+  })
+
+  it('settles Retry now when its run ends before the read', async () => {
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>(() => {}))
+    const poller = createTeamPanelModelPoller(deps({ readState }).all, 20_000)
+    const release = poller.subscribe(SCOPE)
+    const retry = poller.refreshFresh()
+    release()
+    await expect(retry).resolves.toBeUndefined()
+  })
+
   it('reads once for every subscriber of the same project and stops when the last leaves', async () => {
     const { all, last } = deps()
     const poller = createTeamPanelModelPoller(all, 20_000)
@@ -134,6 +200,111 @@ describe('createTeamPanelModelPoller', () => {
     releasePanel()
     await vi.advanceTimersByTimeAsync(20_000)
     expect(readState).toHaveBeenCalledTimes(3)
+  })
+
+  // Review N3: P4's team skeleton only once game.leads found a lead; no lead means never team-shaped.
+  it('marks loading as a team once game.leads finds a lead, before game.state lands', async () => {
+    let land: (state: OrchestratorGameState) => void = () => {}
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (land = done)))
+    const { all, sources, last } = deps({ readState })
+
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    expect(sources.map((one) => one.section)).toEqual([
+      { kind: 'loading' },
+      { kind: 'loading', team: true }
+    ])
+
+    land({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+  })
+
+  // Review N4: after the opening read, a poll must not swap the error (and its Retry) for the skeleton.
+  it('keeps a failed read on screen through the next poll, with no team skeleton', async () => {
+    const readState = vi.fn(async () => {
+      throw new Error('down')
+    })
+    const { all, sources } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(2)
+    expect(
+      sources.slice(opened).some((one) => one.section.kind === 'loading' && 'team' in one.section)
+    ).toBe(false)
+  })
+
+  it('keeps a failed game.leads read on screen when the next poll finds the lead', async () => {
+    let land: (state: OrchestratorGameState) => void = () => {}
+    const readLeads = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValue({ leads: [{ handle: 'term' }], restoring: [] })
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (land = done)))
+    const { all, sources } = deps({ readLeads, readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(1)
+    expect(sources.slice(opened).some((one) => one.section.kind === 'loading')).toBe(false)
+    land({ role: 'lead' } as OrchestratorGameState)
+  })
+
+  it('never marks loading as a team on a later poll of a project with no team', async () => {
+    const readState = vi.fn(async () => null)
+    const { all, sources } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(2)
+    expect(sources.slice(opened).map((one) => one.section.kind)).toEqual(['unavailable'])
+  })
+
+  // Review N5: an old read landing after a new opening must not end that opening's skeleton.
+  it('keeps the new opening skeleton when an older read lands after it restarts', async () => {
+    let landOld: (state: OrchestratorGameState) => void = () => {}
+    let leadsNew: (leads: { leads: { handle: string }[]; restoring: never[] }) => void = () => {}
+    const readLeads = vi
+      .fn()
+      .mockResolvedValueOnce({ leads: [{ handle: 'term' }], restoring: [] })
+      .mockImplementationOnce(() => new Promise((done) => (leadsNew = done)))
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (landOld = done)))
+    const { all, sources } = deps({ readLeads, readState })
+    const poller = createTeamPanelModelPoller(all, 20_000)
+    poller.subscribe(SCOPE, { background: true })
+    await flush()
+    poller.subscribe(SCOPE)
+    await flush()
+    const restarted = sources.length
+
+    landOld({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    leadsNew({ leads: [{ handle: 'term' }], restoring: [] })
+    await flush()
+
+    expect(
+      sources
+        .slice(restarted)
+        .some((one) => one.section.kind === 'loading' && 'team' in one.section)
+    ).toBe(true)
+  })
+
+  it('never marks loading as a team when game.leads finds no lead', async () => {
+    const { all, sources } = deps({ findCaller: vi.fn(() => null) })
+
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    expect(sources.some((one) => one.section.kind === 'loading' && 'team' in one.section)).toBe(
+      false
+    )
   })
 
   it('says unavailable when no live lead runs in the project, without reading game.state', async () => {

@@ -220,6 +220,48 @@ async function captureScene(
   await page.setViewportSize({ width: 1440, height: 900 })
 }
 
+const ANSWERED = {
+  en: { tab: /^(Answered|Done)/, you: 'You answered: ' },
+  es: { tab: /^(Respondidas|Hechas)/, you: 'Respondiste: ' }
+} as const
+
+// ORCA-1329 P9: the question answered from For you is listed under Answered with the option picked.
+async function expectAnsweredAgentRow(
+  page: Page,
+  panel: Locator,
+  picked: string,
+  name: string,
+  testInfo: { outputPath: (n: string) => string }
+) {
+  const inbox = panel.getByTestId('team-panel-inbox')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await inbox.getByRole('tab', { name: ANSWERED.en.tab }).click()
+  for (const language of ['en', 'es'] as const) {
+    await writeSettings(page, { uiLanguage: language })
+    const row = inbox.getByTestId('team-inbox-answered-agent')
+    await expect(row).toHaveCount(1, { timeout: 15_000 })
+    await expect(row).toContainText(QUESTION)
+    await expect(row).toContainText(`${ANSWERED[language].you}${picked}`)
+    await expect(inbox.getByRole('tab', { name: ANSWERED[language].tab })).toContainText('1')
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const theme of THEMES) {
+        await setTheme(page, theme)
+        const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth)
+        expect(overflow, `${name} overflows at ${width}px ${theme} ${language}`).toBe(0)
+        if (CAPTURE) {
+          await panel.screenshot({
+            animations: 'disabled',
+            path: testInfo.outputPath(`${name}-${language}-${width}-${theme}.png`)
+          })
+        }
+      }
+    }
+  }
+  await writeSettings(page, { uiLanguage: 'en' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+}
+
 for (const plugins of [false, true]) {
   const label = plugins ? 'plugins on' : 'plugins off'
 
@@ -307,6 +349,13 @@ for (const plugins of [false, true]) {
       await card.getByRole('button', { name: 'Wait for #915' }).click()
       // Why '2': Claude's selector commits on the option's 1-based number.
       await expect.poll(agent.keys, { timeout: 15_000 }).toBe('2')
+      await expectAnsweredAgentRow(
+        orcaPage,
+        panel,
+        'Wait for #915',
+        `team-answered-${plugins ? 'plugins' : 'plain'}`,
+        testInfo
+      )
     } finally {
       agent.dispose()
       rmSync(otherRepo, { recursive: true, force: true })
@@ -375,6 +424,7 @@ test('a no-team question is answered from the Inbox, and its notification opens 
     await card.getByRole('button', { name: 'Merge now' }).click()
     await expect.poll(agent.keys, { timeout: 15_000 }).toBe('1')
     await expect(card.getByRole('button', { name: 'Wait for #915' })).toBeDisabled()
+    await expectAnsweredAgentRow(orcaPage, panel, 'Merge now', 'solo-answered', testInfo)
   } finally {
     agent.dispose()
   }

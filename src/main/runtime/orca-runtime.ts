@@ -32837,6 +32837,8 @@ export class OrcaRuntimeService {
     steward?: unknown
     /** 'member' when the pane was launched as one; a remote member has no parent pane here. */
     role?: string
+    /** The panel's Retry now: re-read this project's PRs and queue instead of the cached lists. */
+    fresh?: boolean
   }): Promise<OrchestratorGameState> {
     if (
       args.paneKey &&
@@ -33028,8 +33030,15 @@ export class OrcaRuntimeService {
           ? `${workItem.provider}:${workItem.identifier.split('-')[0]}`
           : ''
         const key = JSON.stringify([repoId, todo, planeProject, trackerKey])
-        return await this.gameProjectWork.read(key, () =>
-          readGameProjectWork(this.gameProjectWorkPortFor(repoId), { todo, workItem, planeProject })
+        return await this.gameProjectWork.read(
+          key,
+          () =>
+            readGameProjectWork(this.gameProjectWorkPortFor(repoId), {
+              todo,
+              workItem,
+              planeProject
+            }),
+          { fresh: args.fresh === true }
         )
       },
       readReview: async () =>

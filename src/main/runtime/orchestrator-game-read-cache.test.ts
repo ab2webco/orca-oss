@@ -75,6 +75,23 @@ describe('GameReadCache refreshing in the background', () => {
     expect(loads).toEqual([1, 2])
   })
 
+  // Review L2: Retry now's fresh read must not be overwritten by a reload that began before it.
+  it('drops a background reload that lands after the key was forgotten and read again', async () => {
+    let now = 0
+    let release: (value: number) => void = () => {}
+    const cache = new GameReadCache<number>(60_000, () => now, { refreshInBackground: true })
+    await cache.read('a', async () => 1)
+    now = 60_000
+    await cache.read('a', () => new Promise<number>((resolve) => (release = resolve)))
+
+    cache.forget('a')
+    expect(await cache.read('a', async () => 3)).toBe(3)
+    release(2)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(await cache.read('a', async () => 4)).toBe(3)
+  })
+
   it('still waits for the first load of a key, which has no last value', async () => {
     let release: (value: number) => void = () => {}
     const cache = new GameReadCache<number>(60_000, () => 0, { refreshInBackground: true })
