@@ -11019,7 +11019,6 @@
         "OrchestratorGameSetting": {
           "title": "Juego de Agent Teams",
           "description": "Escenas en pixel art, un HUD del equipo y recompensas dentro de Claude Agent Teams. Cada proyecto puede cambiarlo en su orca.yaml.",
-          "mode": "Modo del juego",
           "on": "Activado",
           "zen": "Zen",
           "flat": "Plano",
@@ -11031,14 +11030,13 @@
           "tracker": "Seguimiento de tareas",
           "trackerDescription": "Sigue en el flujo la tarea vinculada de Plane, Jira, Linear, GitHub o GitLab.",
           "scene": "Escena",
-          "sceneDescription": "El arte que dibuja el juego. Los plugins instalados pueden añadir escenas.",
+          "sceneDescription": "El arte que dibuja Pixel y los nombres de los miembros, salvo que Nombres los defina.",
           "sceneQuest": "Quest (integrada)",
           "sceneVigilante": "Night Watch (integrada)",
           "sceneJrpg": "Crystal Saga (integrada)",
           "sceneTamer": "Beast Tamer (integrada)",
           "sceneMissing": "{{value0}} (no instalada)",
           "sceneProjectFile": "{{value0}} (propia)",
-          "inherit": "Heredar",
           "projectDescription": "Cambia el juego para este proyecto en este equipo. El orca.yaml del proyecto define su valor por defecto.",
           "sourceDefault": "por defecto",
           "sourceGlobal": "ajuste global",
@@ -11047,8 +11045,6 @@
           "scope": "Solo se aplica a los paneles de Claude Agent Teams. Claude normal, Codex y los demás agentes nunca lo cargan.",
           "previewLabel": "Vista previa de la escena",
           "previewImage": "Vista previa de {{value0}}",
-          "previewOff": "El juego está desactivado, así que los paneles de Agent Teams arrancan como Claude normal.",
-          "previewFlat": "Plano dibuja el juego como texto, sin escena ni personajes.",
           "previewZen": "Zen dibuja la misma escena y además oculta las notas breves de trabajo.",
           "previewPlugin": "El arte de este plugin solo se dibuja dentro de un panel de Agent Teams.",
           "previewMissing": "No está instalada, así que el juego dibuja Quest.",
@@ -11119,7 +11115,7 @@
           "label": "Render",
           "description": "Clásico es el pixel art de 5 filas. HD dibuja una escena de 9 a 14 filas con luz, clima y día y noche; HD compacto la dibuja en 7 filas.",
           "timezone": "Zona horaria",
-          "timezoneDescription": "Cuándo se hace de noche en HD. Vacía o local sigue el reloj de este equipo.",
+          "timezoneDescription": "Cuándo anochece en las escenas y empiezan los números del día. Vacía o local sigue el reloj de este equipo.",
           "timezoneInvalid": "Usa local o una zona horaria IANA como America/Bogota."
         },
         "orcaGameScenes": {
@@ -11183,9 +11179,7 @@
           "machines": "Máquinas",
           "machinesDescription": "Pestaña con los hosts y su memoria.",
           "prs": "PRs",
-          "prsDescription": "Pestaña con tus PRs abiertos.",
-          "queue": "Cola",
-          "queueDescription": "La cola de merge arriba de PRs.",
+          "prsDescription": "Pestaña con tus PRs abiertos. La cola de merge aparece arriba si existe.",
           "show": "Mostrar {{label}}",
           "style": "Estilo de la escena",
           "styleDescription": "Todas actúan el mismo estado real.",
@@ -11241,6 +11235,13 @@
           "hours24": "24 h",
           "days3": "3 d",
           "days7": "7 d"
+        },
+        "OrchestratorGameTerminalBand": {
+          "terminalPanes": "Paneles de terminal",
+          "terminalPanesDescription": "Cómo arrancan y dibujan el juego los paneles de terminal de Agent Teams en esta máquina."
+        },
+        "InheritableSettingRow": {
+          "resetTo": "Volver a {{value}} ({{source}})"
         }
       },
       "right": {

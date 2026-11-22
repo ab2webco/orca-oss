@@ -2,7 +2,9 @@ import type { OrchestratorGameConfig } from './orchestrator-game-config'
 
 export const GAME_PANEL_LOOKS = ['game', 'display', 'plain'] as const
 export const GAME_PANEL_STYLES = ['figures', 'office', 'pixel'] as const
-export const GAME_PANEL_TABS = ['prs', 'queue', 'machines'] as const
+export const GAME_PANEL_TABS = ['prs', 'machines'] as const
+/** The Queue tab V30 folded into PRs (ORCA-1112); a stored value is read and ignored. */
+export const RETIRED_GAME_PANEL_TAB = 'queue'
 /** The diorama's drawing: illustrated (outlined, shadowed) or low resources (flat, no shadows). */
 export const GAME_PANEL_QUALITIES = ['high', 'low'] as const
 /** How the diorama's lead gets about: walking, 2.5 times faster, or sent by the court mage. */
@@ -71,6 +73,9 @@ function parseTabs(raw: unknown): {
   const value: Partial<Record<GamePanelTab, boolean>> = {}
   const warnings: string[] = []
   for (const [key, entry] of Object.entries(raw)) {
+    if (key === RETIRED_GAME_PANEL_TAB) {
+      continue
+    }
     if (!isTab(key)) {
       warnings.push(`${at(`tabs.${key}`)} is not a tab that can be hidden`)
     } else if (typeof entry === 'boolean') {
@@ -145,14 +150,14 @@ export function gamePanelLookOfLegacy(
   return { look, style: 'pixel' }
 }
 
-// Why key by key: orca.yaml can hide Queue while this machine picks its own look.
+// Why key by key: orca.yaml can hide PRs while this machine picks its own look.
 export function resolveGamePanel(
   layers: readonly (OrchestratorGamePanelLayer | undefined)[],
   legacy: Pick<OrchestratorGameConfig, 'mode' | 'render'>
 ): OrchestratorGamePanel {
   const panel: OrchestratorGamePanel = {
     ...gamePanelLookOfLegacy(legacy),
-    tabs: { prs: true, queue: true, machines: true },
+    tabs: { prs: true, machines: true },
     advisor: true,
     arcade: true,
     diorama: true,

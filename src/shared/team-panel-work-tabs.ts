@@ -151,7 +151,8 @@ export function teamQueueSectionOf(args: {
   now: number
 }): TeamSection<TeamQueueEntry[]> | null {
   const { state, members, now } = args
-  if (args.isFolder || state.panel?.tabs.queue === false) {
+  // Why not tabs.queue: V30 draws the queue whenever there is one (ORCA-1112).
+  if (args.isFolder) {
     return null
   }
   const queue = state.project?.queue

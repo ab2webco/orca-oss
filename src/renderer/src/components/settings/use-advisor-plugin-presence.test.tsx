@@ -49,6 +49,27 @@ describe('useAdvisorPluginPresence', () => {
     expect(callRuntimeRpcMock).not.toHaveBeenCalled()
   })
 
+  it('asks a remote host once when the project page and its search both ask', async () => {
+    callRuntimeRpcMock.mockResolvedValue(listed(ADVISOR))
+    const seen: string[] = []
+    const Probe = (): null => {
+      seen.push(useAdvisorPluginPresence(runtime))
+      return null
+    }
+    const root = createRoot(document.createElement('div'))
+    await act(async () =>
+      root.render(
+        <>
+          <Probe />
+          <Probe />
+        </>
+      )
+    )
+    expect(callRuntimeRpcMock).toHaveBeenCalledTimes(1)
+    expect(seen.slice(-2)).toEqual(['installed', 'installed'])
+    await act(async () => root.unmount())
+  })
+
   it('does not call a local plugin missing before the list has loaded', async () => {
     usePluginPanelsStore.setState({ fetchStatus: 'loading' })
     expect(await presenceOf({})).toBe('unknown')

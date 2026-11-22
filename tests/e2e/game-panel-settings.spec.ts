@@ -130,7 +130,13 @@ test('panel rows save to their layer and the Advisor row follows the project hos
   await expectSectionInView(orcaPage, projectSection)
   await press(projectSection, 'Panel look', 'Display')
   await expect.poll(savedPanel).toMatchObject({ project: 'display' })
-  await press(projectSection, 'Panel look', 'Inherit')
+  // Why Reset by keyboard: it is the only way back to the inherited look once one is picked (D3).
+  const reset = orcaPage.locator(
+    `[id="${projectSection}"] [data-game-row="look"] [data-slot="game-row-source"] button`
+  )
+  await expect(reset).toHaveText('Reset to Game (global setting)')
+  await reset.focus()
+  await orcaPage.keyboard.press('Enter')
   await expect.poll(async () => (await savedPanel()).project).toBeUndefined()
 
   // Why: the fixture host has no Advisor plugin, and an SSH host cannot be asked.
@@ -186,7 +192,7 @@ test('a saved soft shows as Pixel in both rows, stays on disk, and is not offere
   await save('figures', 'soft')
   const projectSection = await openTarget(orcaPage, repoId)
   await expectSectionInView(orcaPage, projectSection)
-  await expect(styles(projectSection)).toHaveText(['Inherit', 'Figures', 'Office', 'Pixel'])
+  await expect(styles(projectSection)).toHaveText(['Figures', 'Office', 'Pixel'])
   await expect(checked(projectSection)).toHaveText('Pixel')
   await expect(orcaPage.locator(`[id="${projectSection}"]`)).toContainText('Pixel · this machine')
   await checked(projectSection).scrollIntoViewIfNeeded()
@@ -290,9 +296,11 @@ test('the terminal band is off by default, and its switch shows what it draws', 
   const drawn = [
     band.locator('[data-slot="game-scene-preview"]'),
     band.locator('[aria-label="Render"]'),
-    band.locator('[aria-label="Time zone"]'),
-    band.locator('[aria-label="Teammate HUD"]')
+    // Why outside the band group: V30 lists the HUD with the panes, though only a drawn band has one.
+    orcaPage.locator('[data-game-group="terminal"] [aria-label="Teammate HUD"]')
   ]
+  // Why both states: the Game look's scenes read the time zone whether or not the band draws.
+  const timezone = orcaPage.locator('[data-game-group="panel"] [aria-label="Time zone"]')
 
   await openTarget(orcaPage, null)
   await expect(band).toBeVisible({ timeout: 15_000 })
@@ -316,6 +324,7 @@ test('the terminal band is off by default, and its switch shows what it draws', 
     for (const row of drawn) {
       await expect(row).toHaveCount(state === 'on' ? 1 : 0)
     }
+    await expect(timezone).toHaveCount(1)
     for (const theme of THEMES) {
       await applySettings(orcaPage, { theme })
       for (const width of WIDTHS) {

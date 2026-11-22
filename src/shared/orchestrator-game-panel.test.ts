@@ -20,13 +20,26 @@ const legacy = DEFAULT_ORCHESTRATOR_GAME_CONFIG
 // Why parsed: Soft is no longer in the type, but a settings file or orca.yaml can still say it.
 const savedSoft = JSON.parse('{"style":"soft"}') as Parameters<typeof resolveGamePanel>[0][number]
 
+describe('the retired Queue tab (ORCA-1112)', () => {
+  it('reads a stored tabs.queue without a warning and ignores it', () => {
+    expect(parseGamePanel({ tabs: { queue: false, prs: false } })).toEqual({
+      value: { tabs: { prs: false } },
+      warnings: []
+    })
+    expect(resolveGamePanel([{ tabs: { queue: false } } as never], legacy).tabs).toEqual({
+      prs: true,
+      machines: true
+    })
+  })
+})
+
 describe('parseGamePanel', () => {
   it('keeps every valid key', () => {
     expect(
       parseGamePanel({
         look: 'display',
         style: 'office',
-        tabs: { prs: false, queue: true, machines: false },
+        tabs: { prs: false, machines: false },
         advisor: false,
         arcade: true,
         diorama: false,
@@ -37,7 +50,7 @@ describe('parseGamePanel', () => {
       value: {
         look: 'display',
         style: 'office',
-        tabs: { prs: false, queue: true, machines: false },
+        tabs: { prs: false, machines: false },
         advisor: false,
         arcade: true,
         diorama: false,
@@ -112,7 +125,7 @@ describe('resolveGamePanel', () => {
     expect(resolveGamePanel([], { ...legacy, mode: 'zen' })).toEqual({
       look: 'display',
       style: 'pixel',
-      tabs: { prs: true, queue: true, machines: true },
+      tabs: { prs: true, machines: true },
       advisor: true,
       arcade: true,
       diorama: true,
@@ -124,8 +137,8 @@ describe('resolveGamePanel', () => {
   it('merges key by key and tab by tab, the later layer winning', () => {
     const panel = resolveGamePanel(
       [
-        { look: 'plain', tabs: { prs: false, queue: false } },
-        { style: 'figures', tabs: { queue: true } },
+        { look: 'plain', tabs: { prs: false, machines: false } },
+        { style: 'figures', tabs: { machines: true } },
         { look: 'game', arcade: false }
       ],
       legacy
@@ -134,7 +147,7 @@ describe('resolveGamePanel', () => {
     expect(panel).toEqual({
       look: 'game',
       style: 'figures',
-      tabs: { prs: false, queue: true, machines: true },
+      tabs: { prs: false, machines: true },
       advisor: true,
       arcade: false,
       diorama: true,
@@ -170,10 +183,10 @@ describe('withGamePanelField', () => {
   })
 
   it('stores one tab without touching the others', () => {
-    const one = withGamePanelField({ panel: { tabs: { queue: false } } }, 'prs', false)
-    expect(one).toEqual({ panel: { tabs: { queue: false, prs: false } } })
+    const one = withGamePanelField({ panel: { tabs: { machines: false } } }, 'prs', false)
+    expect(one).toEqual({ panel: { tabs: { machines: false, prs: false } } })
     expect(
-      withGamePanelField(withGamePanelField(one, 'prs', undefined), 'queue', undefined)
+      withGamePanelField(withGamePanelField(one, 'prs', undefined), 'machines', undefined)
     ).toEqual({})
   })
 })
@@ -228,13 +241,13 @@ describe('orchestratorGame.panel across versions and writers', () => {
   panel:
     look: plain
     tabs:
-      queue: false
+      machines: false
     arcade: false
 `)
 
     expect(parsed?.orchestratorGame).toEqual({
       mode: 'zen',
-      panel: { look: 'plain', tabs: { queue: false }, arcade: false }
+      panel: { look: 'plain', tabs: { machines: false }, arcade: false }
     })
     expect(parsed?.orchestratorGameWarnings).toBeUndefined()
   })
@@ -245,14 +258,14 @@ describe('orchestratorGame.panel across versions and writers', () => {
 
     expect(
       resolveOrchestratorGamePanel({
-        global: { panel: { tabs: { queue: false } } },
+        global: { panel: { tabs: { machines: false } } },
         project: olderHostLayer,
         local: { panel: { style: 'office' } }
       })
     ).toEqual({
       look: 'plain',
       style: 'office',
-      tabs: { prs: true, queue: false, machines: true },
+      tabs: { prs: true, machines: false },
       advisor: true,
       arcade: true,
       diorama: true,

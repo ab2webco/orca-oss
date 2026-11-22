@@ -15,7 +15,6 @@ import {
 import type { OrchestratorGameBuiltInScene } from '../../../../shared/orchestrator-game-config'
 import { translate } from '@/i18n/i18n'
 
-export const INHERIT_SCENE = 'inherit'
 export const CUSTOM_SCENE_FILE = 'custom-file'
 
 const builtInLabels = (): Record<OrchestratorGameBuiltInScene, string> => ({
@@ -62,12 +61,10 @@ export const sceneLabel = (option: OrchestratorGameSceneOption): string => {
   return `${option.scene} · ${option.pluginName}`
 }
 
-/** `value` is a scene id, `inherit` when `inheritLabel` is given, or `custom-file` when
- *  `onCustomFile` is; `null` asks to inherit. */
+/** `value` is a scene id, or `custom-file` when `onCustomFile` is given. */
 export function OrchestratorGameSceneSelect({
   value,
   ariaLabel,
-  inheritLabel,
   disabled,
   onChange,
   onCustomFile,
@@ -75,9 +72,8 @@ export function OrchestratorGameSceneSelect({
 }: {
   value: string
   ariaLabel: string
-  inheritLabel?: string
   disabled?: boolean
-  onChange: (scene: string | null) => void
+  onChange: (scene: string) => void
   onCustomFile?: () => void
   /** The project's `.orca/scenes` files, offered as `file:<path>` scene ids. */
   projectFiles?: readonly string[]
@@ -94,19 +90,13 @@ export function OrchestratorGameSceneSelect({
     () =>
       orchestratorGameSceneOptions(
         plugins,
-        (value === INHERIT_SCENE && inheritLabel) || (value === CUSTOM_SCENE_FILE && onCustomFile)
-          ? undefined
-          : value,
+        value === CUSTOM_SCENE_FILE && onCustomFile ? undefined : value,
         projectFiles
       ),
-    [plugins, value, inheritLabel, onCustomFile, projectFiles]
+    [plugins, value, onCustomFile, projectFiles]
   )
   const selected = options.find((option) => option.value === value)
-  const title = selected
-    ? sceneLabel(selected)
-    : value === CUSTOM_SCENE_FILE && onCustomFile
-      ? customLabel
-      : inheritLabel
+  const title = selected ? sceneLabel(selected) : customLabel
 
   return (
     <Select
@@ -116,7 +106,7 @@ export function OrchestratorGameSceneSelect({
         if (next === CUSTOM_SCENE_FILE && onCustomFile) {
           onCustomFile()
         } else {
-          onChange(next === INHERIT_SCENE ? null : next)
+          onChange(next)
         }
       }}
     >
@@ -130,7 +120,6 @@ export function OrchestratorGameSceneSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent position="popper" side="bottom" sideOffset={4}>
-        {inheritLabel ? <SelectItem value={INHERIT_SCENE}>{inheritLabel}</SelectItem> : null}
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {sceneLabel(option)}

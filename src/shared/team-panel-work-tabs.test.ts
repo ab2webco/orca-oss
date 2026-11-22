@@ -274,11 +274,13 @@ describe('teamQueueSectionOf', () => {
     expect(result).toBeNull()
   })
 
-  it('hides the tab when the project turned it off', () => {
+  it('ignores a Queue toggle an old host still publishes (ORCA-1112)', () => {
     const state = stateOf({})
-    state.panel = { tabs: { queue: false } } as OrchestratorGameState['panel']
+    state.panel = { tabs: { queue: false } } as unknown as OrchestratorGameState['panel']
 
-    expect(teamQueueSectionOf({ state, members: [], isFolder: false, texts, now: NOW })).toBeNull()
+    expect(teamQueueSectionOf({ state, members: [], isFolder: false, texts, now: NOW })).toEqual({
+      kind: 'unavailable'
+    })
   })
 })
 

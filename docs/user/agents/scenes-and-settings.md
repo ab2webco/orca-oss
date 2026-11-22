@@ -30,7 +30,8 @@ base, and a pinch (or Ctrl or ⌘ with the scroll wheel) zooms; **Follow the lea
 rows in **Settings > Agents > Panel** tune it:
 
 - **Scene quality**: **Illustrated** (outlined figures with shadows) or **Low resources** (flat
-  figures, no shadows), for slower machines.
+  figures, no shadows), for slower machines. Scene quality also switches the Office between 3D
+  (**Illustrated**) and 2D (**Low resources**), and the row shows for the Office too.
 - **Lead's pace**: **Normal** (it walks like a person), **Fast** (2.5 times faster) or **Direct**
   (the court mage by the keep sends it from circle to circle by magic).
 
@@ -62,15 +63,17 @@ The same settings exist in three places, and each field resolves on its own: the
 </ol>
 </figure>
 
-- **Settings > Agents**: **Agent Teams game** (the game in panes, and the **Terminal band**) and
-  **Panel** (scene, look, style, **Scene quality** and **Lead's pace** for Figures, and the **PRs**,
-  **Queue** and **Machines** switches), for every project.
+- **Settings > Agents**: **Panel** (look, style, scene, **Scene quality** and **Lead's pace** for
+  Figures, and the **PRs** and **Machines** switches) and **Agent Teams game** (the game in panes,
+  and the **Terminal band** for a pixel view), for every project. Each row shows only while your
+  current choices use it.
 - `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
   `pace`, `diorama`),
   `orchestratorGame.scene` and `orchestratorGame.sceneFile`, plus the lead's
   `orchestratorGame.orchestrator.rules`.
 - The project's page in **Settings**, section **Agent Teams game**: the same rows for this project
-  on this machine, each with **Inherit**, plus **Advisor**, **Arcade** and a scene file.
+  on this machine, plus **Advisor**, **Arcade** and a scene file. Each row shows the value it
+  applies and where it comes from; **Reset to …** appears while this machine changes it.
 
 So a setting you change on the project's page beats the repo's `orca.yaml` on your machine only,
 and `orca.yaml` beats your global Settings. To see what a pane resolved and which layer set each

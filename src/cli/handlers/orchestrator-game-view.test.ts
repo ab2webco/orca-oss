@@ -48,7 +48,9 @@ describe('orca game hide-tab', () => {
   it('refuses a tab that is not one', async () => {
     const client = { call: vi.fn() } as unknown as RuntimeClient
 
-    await expect(hide(client, 'team')).rejects.toThrow('Name a tab: prs, queue, machines.')
+    await expect(hide(client, 'team')).rejects.toThrow('Name a tab: prs, machines.')
+    // Why: V30 folded Queue into PRs (ORCA-1112); only an older CLI still sends it.
+    await expect(hide(client, 'queue')).rejects.toThrow('Name a tab: prs, machines.')
     expect(client.call).not.toHaveBeenCalled()
   })
 })

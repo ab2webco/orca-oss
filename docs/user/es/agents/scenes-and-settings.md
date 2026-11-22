@@ -1,5 +1,5 @@
 ---
-sourceHash: bed93b04ea804705
+sourceHash: 6c54ff7509969c5c
 ---
 # Escenas, estilos y ajustes
 
@@ -35,7 +35,8 @@ por la base, y pellizcar (o Ctrl o ⌘ con la rueda) acerca o aleja; **Follow th
 filas en **Settings > Agents > Panel** lo ajustan:
 
 - **Scene quality**: **Illustrated** (figuras con contorno y sombras) o **Low resources** (figuras
-  planas, sin sombras), para equipos más lentos.
+  planas, sin sombras), para equipos más lentos. Scene quality también cambia la Office entre 3D
+  (**Illustrated**) y 2D (**Low resources**), y la fila también aparece con la Office.
 - **Lead's pace**: **Normal** (camina como una persona), **Fast** (2,5 veces más rápido) o
   **Direct** (el mago de la corte, junto al castillo, lo envía de círculo en círculo con magia).
 
@@ -69,16 +70,17 @@ posterior.
 </ol>
 </figure>
 
-- **Settings > Agents**: **Agent Teams game** (el juego en los paneles y la **Terminal band**) y
-  **Panel** (escena, apariencia, estilo, **Scene quality** y **Lead's pace** para Figures, y los
-  interruptores **PRs**, **Queue** y **Machines**), para todos los proyectos.
+- **Settings > Agents**: **Panel** (apariencia, estilo, escena, **Scene quality** y **Lead's pace**
+  para Figures, y los interruptores **PRs** y **Machines**) y **Agent Teams game** (el juego en los
+  paneles y, con una vista de píxeles, la **Terminal band**), para todos los proyectos. Cada fila
+  aparece solo mientras tus elecciones actuales la usan.
 - `orca.yaml`: `orchestratorGame.panel` (`look`, `style`, `tabs`, `advisor`, `arcade`, `quality`,
   `pace`, `diorama`),
   `orchestratorGame.scene` y `orchestratorGame.sceneFile`, más las
   `orchestratorGame.orchestrator.rules` del líder.
 - La página del proyecto en **Settings**, sección **Agent Teams game**: las mismas filas para este
-  proyecto en este equipo, cada una con **Inherit**, más **Advisor**, **Arcade** y un archivo de
-  escena.
+  proyecto en este equipo, más **Advisor**, **Arcade** y un archivo de escena. Cada fila muestra el
+  valor que aplica y de dónde viene; **Reset to …** aparece mientras este equipo lo cambia.
 
 Así, un ajuste que cambias en la página del proyecto gana al `orca.yaml` del repo solo en tu equipo,
 y `orca.yaml` gana a tus ajustes globales. Para ver qué resolvió un panel y qué capa definió cada
