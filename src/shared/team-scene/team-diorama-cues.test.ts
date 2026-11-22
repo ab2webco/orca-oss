@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dioramaAskerOf,
+  dioramaAttendCueOf,
   dioramaCuePhase,
   dioramaCuesLive,
   dioramaCuesOf,
-  dioramaIslandCuesOf
+  dioramaIslandCuesOf,
+  type DioramaCue
 } from './team-diorama-cues'
-import type { DioramaIsland } from './team-diorama-layout'
+import { teamDioramaLayoutOf, type DioramaIsland, type DioramaMachine } from './team-diorama-layout'
+import { dioramaLeadRoundOf } from './team-diorama-lead-round'
+import { dioramaWaterGrid } from './team-diorama-nav'
+import { dioramaRoadNet } from './team-diorama-roads'
+import type { TeamSceneActivity, TeamSceneInput } from './team-scene-types'
 
 describe('the diorama cues', () => {
   it('turns the team moments into what the diorama plays', () => {
@@ -83,5 +90,85 @@ describe('the cues of a newly connected machine', () => {
     expect(
       dioramaIslandCuesOf(['', 'm2'], [island('', true, []), island('m2', false, ['a'])], 5)
     ).toEqual([])
+  })
+})
+
+// ORCA-1336: the lead sets out only for a member who asks, and stays until it is answered.
+describe("the lead's attend cue", () => {
+  const machine = (key: string, members: string[], over: Partial<DioramaMachine> = {}) => ({
+    key,
+    name: key,
+    home: key === '',
+    reachable: true,
+    members,
+    cap: null,
+    taken: 0,
+    ...over
+  })
+  const layout = teamDioramaLayoutOf([
+    machine('', ['a', 'b']),
+    machine('m3', ['z'], { reachable: false })
+  ])
+  const team = (asking: string[], lead: TeamSceneActivity = 'working'): TeamSceneInput => ({
+    lead: { key: 'lead', name: 'Lead', characterKey: null, activity: lead },
+    advisor: null,
+    members: ['a', 'b', 'z'].map((key) => ({
+      key,
+      name: key,
+      characterKey: null,
+      activity: asking.includes(key) ? 'needsYou' : 'working',
+      reportId: null,
+      mergedPr: null,
+      site: { stage: 1, broken: false }
+    }))
+  })
+  const trip = (c: DioramaCue | null) => (c ? `${c.from}>${c.key}@${c.start}` : null)
+
+  it('has none while nobody asks, however much the members work', () => {
+    expect(dioramaAttendCueOf(undefined, team([]), layout, 5, 'normal')).toBeNull()
+    expect(dioramaAskerOf(team([]), layout)).toBeNull()
+  })
+
+  it('sets out from the gate when a member asks, and keeps its start while it still asks', () => {
+    const first = dioramaAttendCueOf(undefined, team(['b']), layout, 5, 'normal')
+    expect(trip(first)).toBe('>b@5')
+    expect(first!.until).toBe(Infinity)
+    expect(dioramaAttendCueOf(first!, team(['b']), layout, 9, 'normal')).toBe(first)
+  })
+
+  it('goes on to the next asker from the one just answered, and home when none is left', () => {
+    const atB = dioramaAttendCueOf(undefined, team(['b']), layout, 5, 'normal')!
+    const atA = dioramaAttendCueOf(atB, team(['a']), layout, 20, 'normal')
+    expect(trip(atA)).toBe('b>a@20')
+    const home = dioramaAttendCueOf(atA!, team([]), layout, 30, 'normal')
+    expect(trip(home)).toBe('a>@30')
+    expect(dioramaAttendCueOf(home!, team([]), layout, 40, 'normal')).toBe(home)
+  })
+
+  // Why: a lead still walking to the asker it was sent to must not jump to the next asker's spot.
+  it('takes the next asker only once the trip to the last one has arrived, from that asker', () => {
+    const atB = dioramaAttendCueOf(undefined, team(['b']), layout, 5, 'normal')!
+    const arrival = dioramaLeadRoundOf({
+      layout,
+      roads: dioramaRoadNet(layout),
+      water: dioramaWaterGrid(layout),
+      trip: { from: null, to: 'b', start: 5 },
+      pace: 'normal'
+    }).steps.at(-1)!.start
+    const atA = dioramaAttendCueOf(atB, team(['a']), layout, 6, 'normal')
+    expect(atA!.from).toBe('b')
+    expect(atA!.start).toBeGreaterThanOrEqual(arrival)
+    expect(atA!.start).toBeGreaterThanOrEqual(6)
+  })
+
+  // Why: two members asking at once must pick the same one every read, or the lead walks back and forth.
+  it('goes to the first asker in Team order when two members ask at once', () => {
+    expect(dioramaAskerOf(team(['b', 'a']), layout)).toBe('a')
+    expect(trip(dioramaAttendCueOf(undefined, team(['b', 'a']), layout, 5, 'normal'))).toBe('>a@5')
+  })
+
+  it('never sets out to an unreachable machine, nor while the lead cannot work', () => {
+    expect(dioramaAskerOf(team(['z']), layout)).toBeNull()
+    expect(dioramaAttendCueOf(undefined, team(['b'], 'blocked'), layout, 5, 'normal')).toBeNull()
   })
 })

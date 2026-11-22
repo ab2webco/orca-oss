@@ -131,3 +131,28 @@ src/shared/orchestrator-game-scene-native.test.ts # a scene's own art, and Pixel
 # ORCA-1311: both only recorded orphan clips (game-view-switcher, owner-inbox) that no page uses.
 tests/e2e/settings-orchestrator-game-view-showcase.spec.ts # covered by settings-orchestrator-game-view.spec.ts
 tests/e2e/game-inbox-showcase.spec.ts # covered by game-inbox.spec.ts and game-inbox-threads.spec.ts; only the local live-lead check is gone
+
+# ORCA-1336 (PR #1427): the owner's rule, the lead leaves its spot only for a member who asks. Removed
+# the ambient give round and its cases: 'walks to a working member, hands it work, and walks back',
+# 'carries the work on the way out', 'visits every working member in turn', 'skips members that are not
+# working', 'stays home when nobody is working', 'stands in the gap beside a member, never on the next
+# seat of a long row', 'turns back when the member it walks to stops working', 'drops a round to attend
+# a member who starts asking', 'walks back home when the lead stops working mid-round', 'never holds on a
+# round that hands out work'. Replaced by: 'a working lead with no asker and no send never leaves its
+# spot', 'takes a member report at its spot' (renamed from 'lets a member report first'), 'walks to a
+# member who needs you and stays with it while it asks', 'walks home once the member is answered', 'a lead
+# that is not working stays at its spot when nobody needs you', 'never holds with nobody asking', and the
+# attend tests in team-diorama-cues.test.ts.
+src/shared/team-scene/team-scene-lead-rounds.test.ts # ORCA-1336 give round removed, see above
+# ORCA-1336 (PR #1427): the 3D lead makes one trip to the member who asks and stays there, not a looping
+# round. Removed: 'talks first to the member who needs the user', 'loops: a moment past the end is the same
+# step as its remainder', 'visits every member of an island in one boat trip, and never an unreachable
+# machine', 'names each jump of the Direct round with its progress, and none on foot', 'blinks the lead out
+# and in on a direct jump, and walks it otherwise'. Replaced by: 'with nobody asking, stays idle at the gate
+# at every moment', 'sets out when the member starts asking and stays talking to it until answered', 'walks
+# home to the gate and idles there once nobody asks', 'finds the boat at the island the lead stayed on, and
+# rows it home on the way back', 'the direct pace under reduced motion'. Four renamed, marked in the file:
+# 'talks to the member where its state stands it', 'walks only on the roads and rows only on open water,
+# one row per crossing', 'goes by magic at the direct pace, and arrives sooner at the fast one', 'seats the
+# lead while it rows, and leaves the boat at the island while it stays'.
+src/shared/team-scene/team-diorama-lead-round.test.ts # ORCA-1336 looping round removed, see above

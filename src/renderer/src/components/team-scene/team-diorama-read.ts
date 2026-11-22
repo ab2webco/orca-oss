@@ -3,11 +3,13 @@ import {
   type DioramaPlotView
 } from '../../../../shared/team-scene/team-diorama-actions'
 import {
+  dioramaAttendCueOf,
   dioramaCuesLive,
   dioramaCuesOf,
   dioramaIslandCuesOf,
   type DioramaCue
 } from '../../../../shared/team-scene/team-diorama-cues'
+import type { DioramaPace } from '../../../../shared/team-scene/team-diorama-lead-round'
 import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
 import { teamSceneEventsBetween } from '../../../../shared/team-scene/team-scene-events'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
@@ -46,7 +48,8 @@ export function dioramaCuesAfter(
   input: TeamSceneInput,
   layout: DioramaLayout,
   now: number,
-  reduced: boolean
+  reduced: boolean,
+  pace: DioramaPace
 ): DioramaCue[] {
   const events = teamSceneEventsBetween(moments.seen, input)
   const added = [
@@ -55,6 +58,16 @@ export function dioramaCuesAfter(
   ]
   moments.seen = input
   moments.islands = layout.islands.map((island) => island.key)
-  moments.cues = reduced ? [] : dioramaCuesLive(moments.cues, added, now)
+  const live = dioramaCuesLive(moments.cues, added, now)
+  // Why kept like a moment: the lead's walk to an asker started at the read that saw it ask.
+  const attend = dioramaAttendCueOf(
+    live.find((c) => c.kind === 'attend'),
+    input,
+    layout,
+    now,
+    pace
+  )
+  const others = live.filter((c) => c.kind !== 'attend')
+  moments.cues = reduced ? [] : attend ? [...others, attend] : others
   return moments.cues
 }

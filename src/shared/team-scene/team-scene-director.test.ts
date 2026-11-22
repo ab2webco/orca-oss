@@ -608,7 +608,8 @@ describe('team scene director, the lead on a narrow building floor', () => {
   const OFFICE = { rowSize: 5, workSeated: true, firstX: 0.16 }
   const roams = (width: number, leadStays: boolean) => {
     const world = createTeamSceneWorld()
-    const members = [member('a'), member('b'), member('c'), member('d')]
+    // Why b asks: the lead walks only to an asker (ORCA-1336).
+    const members = [member('a'), member('b', { activity: 'needsYou' }), member('c'), member('d')]
     applyTeamSceneInput(
       world,
       { ...input(members), ...(leadStays ? { leadStays: true } : {}) },
