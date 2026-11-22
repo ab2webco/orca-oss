@@ -1,6 +1,5 @@
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
-import type { DispatchStatus, WorkerDispatchState } from './orchestration/types'
-import { WORKER_SETTLED_STATES } from './orchestration/worker-terminal-ownership'
+import type { WorkerTerminalListState } from './orchestration/worker-terminal-ownership'
 import type {
   GameAnsweredQuestionMail,
   GameInboxMail,
@@ -16,9 +15,12 @@ export type GameInboxDb = {
     dispatchId: string
     taskId: string
     agentTerminalHandle: string | null
-    workerState?: WorkerDispatchState
-    dispatchStatus?: DispatchStatus
+    terminalState?: WorkerTerminalListState | null
+    resource?: { pane_key: string | null } | null
   }[]
+  /** A remote member's home worker row: its stage is `released` once game stop freed it. */
+  getWorkerDispatch?: (dispatchId: string) => { stage: string } | undefined
+  getFederatedDispatch?: (dispatchId: string) => unknown
   getTask: (id: string) => { task_title: string | null; display_name: string | null } | undefined
   getAllMessagesForHandle: (handle: string, limit?: number) => GameInboxMail[]
   listPendingQuestions: (runId: string) => GameInboxMail[]
@@ -33,7 +35,9 @@ const ANSWERED_QUESTIONS_MAX = 100
 export function gameInboxSourceOf(
   db: GameInboxDb,
   lead: { handle: string; paneKey: string | null },
-  peerLeads: Readonly<Record<string, string>> = {}
+  peerLeads: Readonly<Record<string, string>> = {},
+  /** Whether a local pane still exists; a member whose pane is gone cannot act on an answer. */
+  paneExists?: (paneKey: string) => boolean
 ): GameInboxSource {
   const run = lead.paneKey ? db.getCurrentRunForPane(lead.paneKey) : undefined
   const leadAddresses = [
@@ -76,17 +80,28 @@ export function gameInboxSourceOf(
     peerLeads,
     pendingQuestions,
     answeredQuestions,
-    settledSenders: settledSendersOf(workers)
+    unreachableSenders: unreachableSendersOf(db, workers, paneExists)
   }
 }
 
 type GameInboxWorker = ReturnType<GameInboxDb['listWorkerTerminalResources']>[number]
 
-const isSettled = (worker: GameInboxWorker): boolean =>
-  (worker.workerState !== undefined && WORKER_SETTLED_STATES.includes(worker.workerState)) ||
-  (worker.dispatchStatus !== undefined &&
-    worker.dispatchStatus !== 'pending' &&
-    worker.dispatchStatus !== 'dispatched')
+// Why (ORCA-1267): a member that sent worker_done often keeps working in its pane on review
+// rounds, so only a released dispatch or a gone pane means nobody can act on an answer.
+function unreachable(
+  db: GameInboxDb,
+  worker: GameInboxWorker,
+  paneExists?: (paneKey: string) => boolean
+): boolean {
+  if (worker.terminalState === 'released') {
+    return true
+  }
+  if (db.getFederatedDispatch?.(worker.dispatchId)) {
+    return db.getWorkerDispatch?.(worker.dispatchId)?.stage === 'released'
+  }
+  const paneKey = worker.resource?.pane_key
+  return Boolean(paneKey && paneExists && !paneExists(paneKey))
+}
 
 const addressesOf = (worker: GameInboxWorker): string[] => [
   `dispatch:${worker.dispatchId}`,
@@ -94,14 +109,12 @@ const addressesOf = (worker: GameInboxWorker): string[] => [
 ]
 
 // Why: a terminal a relaunched member still uses keeps its mail waiting on the lead.
-function settledSendersOf(workers: readonly GameInboxWorker[]): string[] {
-  const live = new Set(workers.filter((worker) => !isSettled(worker)).flatMap(addressesOf))
-  return [
-    ...new Set(
-      workers
-        .filter(isSettled)
-        .flatMap(addressesOf)
-        .filter((one) => !live.has(one))
-    )
-  ]
+function unreachableSendersOf(
+  db: GameInboxDb,
+  workers: readonly GameInboxWorker[],
+  paneExists?: (paneKey: string) => boolean
+): string[] {
+  const gone = workers.filter((worker) => unreachable(db, worker, paneExists))
+  const live = new Set(workers.filter((worker) => !gone.includes(worker)).flatMap(addressesOf))
+  return [...new Set(gone.flatMap(addressesOf).filter((one) => !live.has(one)))]
 }

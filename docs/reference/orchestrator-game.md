@@ -1454,9 +1454,10 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member's question the lead has not answered stays waiting on the lead after its mail is acked
   (ORCA-746 T6): `game fleet` shows the member's NEXT as `waiting on you: orchestration reply --id <msg>`
   until the question is answered or closed, and `game state` lists it under the lead's inbox.
-- An escalation or decision gate waits on the lead until a reply threads it, and only while its member's
-  dispatch is live (ORCA-1267): mail from a settled dispatch, whose terminal no live member reuses,
-  is never re-alerted by `game watch --lead`. `orchestration reply` takes mail sent to `run:<id>` from
+- An escalation or decision gate waits on the lead until a reply threads it, or until nobody can act
+  on an answer (ORCA-1267): its dispatch was released (`game stop`) or its local pane is gone, and no
+  live member reuses its terminal. A member that sent worker_done and still works in its pane keeps
+  its mail waiting. `orchestration reply` takes mail sent to `run:<id>` from
   that Run's current consumer, so the lead can answer a member's status mail, not only its question.
 - What the lead asks the person is a record, not chat text (ORCA-782): `game ask-owner` keeps the
   question with its ticket, up to 6 options, a context line and the time asked in the project's board

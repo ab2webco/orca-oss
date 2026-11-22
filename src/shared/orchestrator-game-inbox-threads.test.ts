@@ -136,11 +136,11 @@ describe('gameInboxThreadsOf', () => {
     expect(threads.find((thread) => thread.ticket === 'CIN-2')?.waiting).toBe(0)
   })
 
-  it("does not list a settled member's open gate as Waiting (ORCA-1267)", () => {
+  it("does not list a released or paneless member's open gate as Waiting (ORCA-1267)", () => {
     sequence = 0
     const gate = mail('term_lead', 'term_1', { type: 'decision_gate' })
 
-    const { waiting } = gameInboxThreadsOf(source([gate], { settledSenders: ['term_1'] }))
+    const { waiting } = gameInboxThreadsOf(source([gate], { unreachableSenders: ['term_1'] }))
 
     expect(waiting).toEqual([])
   })

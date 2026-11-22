@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { gameInboxesOf } from '../../shared/orchestrator-game-inbox'
 import { gameInboxSourceOf, type GameInboxDb } from './orchestrator-game-inbox-source'
 
 const row = (id: string, to: string) => ({
@@ -122,23 +123,66 @@ describe('gameInboxSourceOf', () => {
     expect(source.peerLeads).toEqual({ term_peer: 'Bo' })
   })
 
-  it('names the addresses of settled dispatches no live member shares (ORCA-1267)', () => {
+  // Why (ORCA-1267): a member often keeps working on review rounds after its worker_done.
+  it('keeps a completed member with a live pane waiting on the lead for an escalation it sends', () => {
+    const { db } = fakeDb()
+    // Why the extra fields: the real row carries them, and none of them mutes the member.
+    const worker = {
+      dispatchId: 'd1',
+      taskId: 't1',
+      agentTerminalHandle: 'term_1',
+      workerState: 'succeeded',
+      dispatchStatus: 'completed',
+      terminalState: 'reclaimable' as const,
+      resource: { pane_key: 'tab:m1' }
+    }
+    db.listWorkerTerminalResources = () => [worker]
+    db.getAllMessagesForHandle = (handle) =>
+      handle === 'run:run_1'
+        ? [{ ...row('msg_7', 'run:run_1'), from_handle: 'term_1', type: 'escalation' }]
+        : []
+
+    const source = gameInboxSourceOf(
+      db,
+      { handle: 'term_lead', paneKey: 'tab:lead' },
+      {},
+      (paneKey) => paneKey === 'tab:m1'
+    )
+
+    expect(source.unreachableSenders).toEqual([])
+    const lead = gameInboxesOf(source, {}).find((inbox) => inbox.key === 'lead')
+    expect(lead?.waiting.map((one) => one.id)).toContain('msg_7')
+  })
+
+  it('names a released dispatch, a gone local pane and a released remote member, not a live one sharing the terminal', () => {
     const { db } = fakeDb()
     db.listWorkerTerminalResources = () => [
-      { dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term_1', workerState: 'stopped' },
-      { dispatchId: 'd2', taskId: 't1', agentTerminalHandle: 'term_1', workerState: 'ready' },
+      { dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term_1', terminalState: 'released' },
       {
-        dispatchId: 'd3',
-        taskId: 't9',
-        agentTerminalHandle: 'term_9',
-        workerState: 'ready',
-        dispatchStatus: 'completed'
+        dispatchId: 'd2',
+        taskId: 't1',
+        agentTerminalHandle: 'term_2',
+        resource: { pane_key: 'tab:gone' }
       },
-      { dispatchId: 'd4', taskId: 't9', agentTerminalHandle: 'term_4', workerState: 'starting' }
+      { dispatchId: 'd3', taskId: 't9', agentTerminalHandle: 'term_3' },
+      { dispatchId: 'd4', taskId: 't9', agentTerminalHandle: 'term_4' },
+      {
+        dispatchId: 'd5',
+        taskId: 't9',
+        agentTerminalHandle: 'term_1',
+        resource: { pane_key: 'tab:live' }
+      }
     ]
+    db.getFederatedDispatch = (id) => (id === 'd3' || id === 'd4' ? { id } : undefined)
+    db.getWorkerDispatch = (id) => ({ stage: id === 'd3' ? 'released' : 'ready' })
 
     expect(
-      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).settledSenders
-    ).toEqual(['dispatch:d1', 'dispatch:d3', 'term_9'])
+      gameInboxSourceOf(
+        db,
+        { handle: 'term_lead', paneKey: 'tab:lead' },
+        {},
+        (paneKey) => paneKey === 'tab:live'
+      ).unreachableSenders
+    ).toEqual(['dispatch:d1', 'dispatch:d2', 'term_2', 'dispatch:d3', 'term_3'])
   })
 })

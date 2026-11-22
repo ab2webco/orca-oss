@@ -29,8 +29,8 @@ export type GameInboxSource = {
   pendingQuestions?: readonly GameInboxMail[]
   /** Questions of this run the lead answered, with the answer; the Inbox audits them. */
   answeredQuestions?: readonly GameAnsweredQuestionMail[]
-  /** Addresses of members whose dispatch settled, and no live one shares: nobody is left to answer. */
-  settledSenders?: readonly string[]
+  /** Addresses of members released or whose pane is gone, no live one shares: nobody can act on an answer. */
+  unreachableSenders?: readonly string[]
 }
 
 export type GameAnsweredQuestionMail = GameInboxMail & {
@@ -113,14 +113,12 @@ function withoutRepeatedDone(rows: readonly GameInboxMail[]): GameInboxMail[] {
   })
 }
 
-/** Mail a settled member sent: it can no longer wait on the lead (ORCA-1267). */
-export function settledSenderOf(source: GameInboxSource): (row: GameInboxMail) => boolean {
-  const settled = new Set(source.settledSenders ?? [])
+/** Mail from a member nobody can answer any more: it no longer waits on the lead (ORCA-1267). */
+export function unreachableSenderOf(source: GameInboxSource): (row: GameInboxMail) => boolean {
+  const gone = new Set(source.unreachableSenders ?? [])
   return (row) => {
     const dispatch = dispatchOfPayload(row.payload)
-    return (
-      settled.has(row.from_handle) || (dispatch !== null && settled.has(`dispatch:${dispatch}`))
-    )
+    return gone.has(row.from_handle) || (dispatch !== null && gone.has(`dispatch:${dispatch}`))
   }
 }
 
@@ -210,7 +208,7 @@ export function gameInboxesOf(
   const pending = source.pendingQuestions ?? []
   // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
   const replied = new Set(allOldestFirst.flatMap((row) => (row.thread_id ? [row.thread_id] : [])))
-  const fromSettled = settledSenderOf(source)
+  const fromUnreachable = unreachableSenderOf(source)
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
@@ -218,7 +216,7 @@ export function gameInboxesOf(
     const unanswered =
       key === 'lead'
         ? rows.filter(
-            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromSettled(row)
+            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromUnreachable(row)
           )
         : []
     const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]
