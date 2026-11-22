@@ -83,4 +83,38 @@ describe('the lobby TV', () => {
     tv.tick(3)
     expect(screen.fills).toHaveLength(1)
   })
+
+  it('repaints a running game at most 12 times a second', () => {
+    const screen = recorder()
+    vi.stubGlobal('document', {
+      createElement: () => ({ width: 0, height: 0, getContext: () => screen.g })
+    })
+    const tv = office3dLobbyTv(dioramaKit(DAY, status), lobby, 0, () => new Set(['console:0:1']))
+    const paintsAt = (t: number) => {
+      screen.fills.length = 0
+      tv.tick(t)
+      return screen.fills.length
+    }
+    expect(paintsAt(2)).toBeGreaterThan(5)
+    expect(paintsAt(2.03)).toBe(0)
+    expect(paintsAt(2.1)).toBeGreaterThan(5)
+  })
+
+  it('frees its screen texture with the stage', () => {
+    vi.stubGlobal('document', {
+      createElement: () => ({ width: 0, height: 0, getContext: () => recorder().g })
+    })
+    const tv = office3dLobbyTv(dioramaKit(DAY, status), lobby, 0, () => new Set())
+    const materials: THREE.MeshBasicMaterial[] = []
+    tv.group.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined
+      if (m?.map) {
+        materials.push(m)
+      }
+    })
+    expect(materials).toHaveLength(1)
+    const freed = vi.spyOn(materials[0]!.map!, 'dispose')
+    materials[0]!.dispose()
+    expect(freed).toHaveBeenCalled()
+  })
 })

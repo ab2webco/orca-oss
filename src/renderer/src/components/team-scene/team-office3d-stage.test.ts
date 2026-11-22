@@ -578,6 +578,69 @@ describe('the 3D Office stage', () => {
       expect(inLobby).toHaveLength(1)
     })
 
+    // ORCA-1336: the lobby TV shows a game while someone plays, in motion and in a still frame.
+    it('runs the lobby TV while a member sits at the console, and leaves it dark otherwise', () => {
+      const tv = { made: false }
+      const canvases: { width: number; height: number }[] = []
+      // Any 2D call answers itself, so every painter in the stage runs; fills are counted below.
+      const ctx: object = new Proxy(
+        {},
+        {
+          get: (_, key) => (key === 'measureText' ? () => ({ width: 10 }) : () => ctx),
+          set: () => true
+        }
+      )
+      const painted = new Map<object, number>()
+      vi.stubGlobal('document', {
+        createElement: () => {
+          const canvas = {
+            width: 0,
+            height: 0,
+            getContext: () =>
+              new Proxy(ctx, {
+                get: (target, key) =>
+                  key === 'fillRect'
+                    ? () => painted.set(canvas, (painted.get(canvas) ?? 0) + 1)
+                    : Reflect.get(target, key)
+              })
+          }
+          canvases.push(canvas)
+          return canvas
+        }
+      })
+      try {
+        const tvFills = (resting: string[], reads: [number, number], t: number) => {
+          painted.clear()
+          canvases.length = 0
+          const layout = teamOffice3dLayoutOf(floors(), { leadAdvisor: false })
+          const traffic = office3dTraffic()
+          office3dTrafficRead(traffic, layout, input(team([])), reads[0], 'normal')
+          office3dTrafficRead(traffic, layout, input(team(resting)), reads[1], 'normal')
+          const stage = office3dStage(renderer().fake, {
+            width: 350,
+            dark: false,
+            status,
+            input: input(team(resting)),
+            layout,
+            pace: 'normal',
+            words: { thisMachine: 'This Mac', offline: 'Offline' },
+            traffic
+          })
+          stage.draw(t)
+          const screen = canvases.find((c) => c.width === 256 && c.height === 140)
+          tv.made = screen !== undefined
+          return screen ? (painted.get(screen) ?? 0) : -1
+        }
+        expect(tvFills(['c', 'd'], [0, 1], 400)).toBeGreaterThan(5)
+        expect(tv.made).toBe(true)
+        expect(tvFills([], [0, 1], 400)).toBe(1)
+        // Reduced motion draws one still frame at 1.3, long before reads on the page's clock.
+        expect(tvFills(['c', 'd'], [400, 500], 1.3)).toBeGreaterThan(5)
+      } finally {
+        vi.stubGlobal('document', undefined)
+      }
+    })
+
     it('flies the table-tennis ball only while two hold the paddles', () => {
       // Two at the console first, then the paddles: four free members fill both.
       expect(ballOf(drawAt(['c', 'd', 'e', 'f'], 400))?.visible).toBe(true)

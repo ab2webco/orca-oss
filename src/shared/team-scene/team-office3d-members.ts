@@ -248,6 +248,9 @@ export function office3dMembersRead(args: {
 export function office3dMemberAt(m: Office3dMember, t: number) {
   const at = office3dWalkerAt(m.plan, t)
   const last = m.plan.steps.at(-1)
-  const arrived = last !== undefined && t >= last.start
+  // Why before its first step too: the walker draws it at its last step then, as under reduced
+  // motion's still frame, so it holds that seat and the lobby TV sees it playing (ORCA-1336).
+  const before = t < (m.plan.steps[0]?.start ?? -Infinity)
+  const arrived = last !== undefined && (t >= last.start || before)
   return { ...at, slot: arrived ? m.slot : null }
 }

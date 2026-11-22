@@ -78,6 +78,8 @@ export function office3dLobbyTv(
   g.position.y = floor.y
   const screen = office3dCanvas(256, 140)
   const face = screen ? k.basic(0xffffff, { map: screen.tex }) : k.basic(0x0b0f18)
+  // Why on the material's dispose: the stage frees each mesh's material, never its texture.
+  face.addEventListener('dispose', () => screen?.tex.dispose())
   k.mesh(new THREE.PlaneGeometry(2.05, 1.12), face, tx, 1.75, tz + 0.05, g, false)
   let shown = -Infinity
   let was: boolean | null = null
