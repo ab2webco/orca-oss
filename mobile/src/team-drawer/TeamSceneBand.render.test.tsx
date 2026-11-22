@@ -388,8 +388,10 @@ describe('the Team sheet scene band', () => {
         await new Promise((resolve) => requestAnimationFrame(resolve))
       })
 
-    it('offers Follow the lead and Show all under a 3D stage, following the lead first', () => {
+    it('offers Follow the lead and Show all under a 3D stage, following the lead first', async () => {
       renderStage(figuresBand)
+      // Why: the phone's Reduce Motion setting resolves after the first render.
+      await act(async () => {})
       send({ kind: 'loaded' })
       expect(cameraButton('lead')).toBeNull()
       send({ kind: 'ready', height: 240, camera: 'lead' })
@@ -401,8 +403,10 @@ describe('the Team sheet scene band', () => {
       expect(getComputedStyle(cameraButton('all')!).minHeight).toBe('44px')
     })
 
-    it('tells the page each button, and a camera moved by hand selects neither', () => {
+    it('tells the page each button, and a camera moved by hand selects neither', async () => {
       renderStage(figuresBand)
+      // Why: the phone's Reduce Motion setting resolves after the first render.
+      await act(async () => {})
       send({ kind: 'loaded' })
       send({ kind: 'ready', height: 240, camera: 'lead' })
       act(() => cameraButton('all')!.click())
