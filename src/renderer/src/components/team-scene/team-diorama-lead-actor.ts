@@ -1,8 +1,9 @@
 import { FIGURES_LEAD_LOOK } from '../../../../shared/team-scene/team-scene-member-looks'
 import type * as THREE from 'three'
-import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
+import { dioramaAskerOf, type DioramaCue } from '../../../../shared/team-scene/team-diorama-cues'
 import type { DioramaLayout, DioramaPoint } from '../../../../shared/team-scene/team-diorama-layout'
 import {
+  type DioramaLeadTrip,
   type DioramaPace,
   dioramaBoatAt,
   dioramaLeadAt,
@@ -17,23 +18,29 @@ import type { DioramaKit } from './team-diorama-kit'
 import { dioramaMage } from './team-diorama-mage'
 import { poseDioramaFigure } from './team-diorama-poses'
 
-const VISITABLE = new Set(['build', 'inspect', 'wait', 'repair', 'cheer'])
+const tripOf = (cues: readonly DioramaCue[], asker: string | null): DioramaLeadTrip => {
+  const attend = cues.find((c) => c.kind === 'attend')
+  return attend
+    ? { from: attend.from || null, to: attend.key || null, start: attend.start }
+    : { from: asker, to: asker, start: 0 }
+}
 
-/** The lead on its round: needs-you first, then each island by boat; only roads and water. */
+/** The lead at the castle, or on its way to the member who asks and standing by it; roads and water. */
 export function dioramaLeadActor(
   k: DioramaKit,
   world: THREE.Object3D,
   args: {
     layout: DioramaLayout
-    views: ReadonlyMap<string, DioramaPlotView>
     input: TeamSceneInput
+    /** The read's cues: its `attend` cue is the lead's trip; without one (reduced motion) it stands. */
+    cues: readonly DioramaCue[]
     lite: boolean
     pace: DioramaPace
     /** Where each member stands on its plot, so the lead talks to it there. */
     stands?: ReadonlyMap<string, DioramaPoint>
   }
 ): { figure: DioramaFigure; tick: (t: number) => void } {
-  const { layout, views, input } = args
+  const { layout, input } = args
   const lead = dioramaFigure(k, FIGURES_LEAD_LOOK, { lead: true, lite: args.lite })
   world.add(lead.g)
   const leadScale = lead.g.scale.x
@@ -41,10 +48,7 @@ export function dioramaLeadActor(
     layout,
     roads: dioramaRoadNet(layout),
     water: dioramaWaterGrid(layout),
-    needs: input.members.filter((m) => views.get(m.key)?.action === 'signal').map((m) => m.key),
-    visits: input.members
-      .filter((m) => VISITABLE.has(views.get(m.key)?.action ?? ''))
-      .map((m) => m.key),
+    trip: tripOf(args.cues, dioramaAskerOf(input, layout)),
     pace: args.pace,
     stands: args.stands
   })

@@ -1,5 +1,5 @@
-import type { DioramaIsland } from './team-diorama-layout'
-import type { TeamSceneEvent, TeamSceneVerdictTone } from './team-scene-types'
+import type { DioramaIsland, DioramaLayout } from './team-diorama-layout'
+import type { TeamSceneEvent, TeamSceneInput, TeamSceneVerdictTone } from './team-scene-types'
 
 // Why cues outlive a read: the diorama is rebuilt on every read of the team, so a moment that
 // just happened is kept by its start time and replayed by the next build until it ends (ORCA-1296).
@@ -9,15 +9,18 @@ import type { TeamSceneEvent, TeamSceneVerdictTone } from './team-scene-types'
  * `arrive` a dust puff at the keep's gate and a walk to the plot; `confetti` over a merged build;
  * `flash` a ring of light at a member; `bird` the advisor's messenger bird flying from its tower;
  * `talk` the advisor lowering its spyglass to speak; `rise` a newly connected machine's island
- * coming up out of the sea and building its dock.
+ * coming up out of the sea and building its dock; `attend` the lead setting out to the member who
+ * asks (`key`, empty for home) from where it stood (`from`), held until the next one.
  */
 export type DioramaCue = {
-  kind: 'arrive' | 'confetti' | 'flash' | 'bird' | 'talk' | 'rise'
+  kind: 'arrive' | 'confetti' | 'flash' | 'bird' | 'talk' | 'rise' | 'attend'
   /** The member's pane key, `lead`, `advisor`, or an island's machine key for `rise`. */
   key: string
   tone: TeamSceneVerdictTone
   start: number
   until: number
+  /** `attend` only: the member the lead walks from, empty for the gate. */
+  from?: string
 }
 
 const LENGTH: Record<DioramaCue['kind'], number> = {
@@ -26,7 +29,8 @@ const LENGTH: Record<DioramaCue['kind'], number> = {
   flash: 2.4,
   bird: 3.2,
   talk: 4,
-  rise: 4.5
+  rise: 4.5,
+  attend: Infinity
 }
 
 const cue = (
@@ -107,3 +111,31 @@ export function dioramaCuesLive(
 /** How far along `c` is at `t`: 0 to 1 while it plays, outside that range otherwise. */
 export const dioramaCuePhase = (c: DioramaCue, t: number): number =>
   (t - c.start) / (c.until - c.start)
+
+/** The member the lead stands by: the first who asks on a reachable island, unless it cannot work. */
+export function dioramaAskerOf(input: TeamSceneInput, layout: DioramaLayout): string | null {
+  if (input.lead.activity === 'blocked') {
+    return null
+  }
+  const reachable = new Set(
+    layout.islands.flatMap((i) => (i.reachable ? i.plots.flatMap((p) => p.key ?? []) : []))
+  )
+  return input.members.find((m) => m.activity === 'needsYou' && reachable.has(m.key))?.key ?? null
+}
+
+/**
+ * The lead's trip after a read at `now`: kept while its asker still asks, else a new one from that
+ * asker to the next, or home. None before anyone has asked, so the lead stays at the castle.
+ */
+export function dioramaAttendCueOf(
+  prev: DioramaCue | undefined,
+  input: TeamSceneInput,
+  layout: DioramaLayout,
+  now: number
+): DioramaCue | null {
+  const to = dioramaAskerOf(input, layout) ?? ''
+  if (prev ? prev.key === to : to === '') {
+    return prev ?? null
+  }
+  return { ...cue('attend', to, 'ask', now), from: prev?.key ?? '' }
+}

@@ -25,13 +25,6 @@ function poseOf(world: TeamSceneWorld, body: TeamSceneBody): TeamScenePose {
   if (atLead && (body.role === 'lead' || body.key === world.visitor)) {
     return atLead.kind === 'handoff' ? 'give' : atLead.kind === 'finish' ? 'cheer' : 'wave'
   }
-  if (
-    body.role === 'lead' &&
-    world.rounds.stage === 'atMember' &&
-    world.rounds.purpose === 'give'
-  ) {
-    return 'give'
-  }
   if (body.role === 'advisor') {
     return world.t < world.advisorRaiseUntil || advisorGestureOf(world) ? 'raise' : 'idle'
   }
@@ -79,10 +72,7 @@ export function teamSceneActors(world: TeamSceneWorld): TeamSceneActor[] {
         carrying:
           ((plan.kind === 'handoff' || (plan.kind === 'finish' && plan.report === true)) &&
             plan.stage === 'toLead') ||
-          (plan.kind === 'seated' && body.work.step === 'carry') ||
-          (body.role === 'lead' &&
-            world.rounds.stage === 'toMember' &&
-            world.rounds.purpose === 'give'),
+          (plan.kind === 'seated' && body.work.step === 'carry'),
         emote: timed ?? seatedMark,
         ...(body.role === 'advisor' ? { gesture: advisorGestureOf(world) } : {}),
         ...(body.role === 'steward' ? { gesture: stewardGestureOf(world) } : {}),

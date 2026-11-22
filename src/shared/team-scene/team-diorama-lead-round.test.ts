@@ -5,7 +5,6 @@ import {
   dioramaLeadAt,
   dioramaLeadJumpAt,
   dioramaLeadRoundOf,
-  dioramaLeadStepAt,
   dioramaStandOf,
   type DioramaPace
 } from './team-diorama-lead-round'
@@ -24,13 +23,19 @@ const machine = (key: string, over: Partial<DioramaMachine> = {}): DioramaMachin
 })
 const layout = teamDioramaLayoutOf([
   machine('', { home: true, members: ['a', 'b'], cap: null }),
-  machine('m2', { members: ['x', 'y'] }),
-  machine('m3', { members: ['z'], reachable: false })
+  machine('m2', { members: ['x', 'y'] })
 ])
 const roads = dioramaRoadNet(layout)
 const water = dioramaWaterGrid(layout)
-const roundOf = (pace: DioramaPace = 'normal', needs = ['b'], visits = ['a', 'x', 'y', 'z']) =>
-  dioramaLeadRoundOf({ layout, roads, water, needs, visits, pace })
+const tripOf = (
+  from: string | null,
+  to: string | null,
+  start = 10,
+  pace: DioramaPace = 'normal',
+  stands?: ReadonlyMap<string, [number, number]>
+) => dioramaLeadRoundOf({ layout, roads, water, pace, stands, trip: { from, to, start } })
+const plotOf = (key: string) => layout.islands.flatMap((i) => i.plots).find((p) => p.key === key)!
+const far = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1])
 const dSeg = (p: [number, number], a: [number, number], b: [number, number]) => {
   const dx = b[0] - a[0],
     dz = b[1] - a[1],
@@ -40,82 +45,90 @@ const dSeg = (p: [number, number], a: [number, number], b: [number, number]) => 
 }
 const offRoad = (p: [number, number]) =>
   Math.min(...layout.roads.flatMap(({ pts }) => pts.slice(1).map((b, k) => dSeg(p, pts[k]!, b))))
+const arrivalOf = (round: ReturnType<typeof tripOf>) => round.steps.at(-1)!.start
 
-describe("the lead's round", () => {
-  it('talks first to the member who needs the user', () => {
-    const talk = roundOf().steps.find((s) => s.kind === 'hold' && s.pose === 'talk')!
-    const b = layout.islands[0]!.plots.find((p) => p.key === 'b')!
-    expect(talk.kind === 'hold' && talk.face).toEqual(dioramaStandOf(b))
+// ORCA-1336: the lead leaves the castle only for a real event, as the 3D Office lead does.
+describe("the lead's trip", () => {
+  it('with nobody asking, stays idle at the gate at every moment', () => {
+    const round = tripOf(null, null)
+    for (const t of [0, 3, 10, 60, 600, 1e5]) {
+      const at = dioramaLeadAt(round, t)
+      expect(at.pose).toBe('idle')
+      expect(far(at.at, DIORAMA_GATE)).toBeLessThan(0.5)
+    }
   })
 
-  it('talks to each member where its state stands it, from a step away on the road', () => {
-    const b = layout.islands[0]!.plots.find((p) => p.key === 'b')!
-    // A needs-you member stands at its signal, a little off the default stand.
-    const stand: [number, number] = [b.x + 1.6, b.z + 1.25]
-    const round = dioramaLeadRoundOf({
-      layout,
-      roads,
-      water,
-      needs: ['b'],
-      visits: ['a', 'x', 'y'],
-      pace: 'normal',
-      stands: new Map([['b', stand]])
-    })
-    const talks = round.steps.filter((s) => s.kind === 'hold' && s.pose === 'talk')
-    expect(talks[0]!.kind === 'hold' && talks[0]!.face).toEqual(stand)
-    // Never inside the member it talks to: figures are drawn 1.6 times the prototype's size.
-    for (const talk of talks) {
-      if (talk.kind === 'hold' && talk.face) {
-        expect(Math.hypot(talk.at[0] - talk.face[0], talk.at[1] - talk.face[1])).toBeGreaterThan(
-          1.29
-        )
+  it('sets out when the member starts asking and stays talking to it until answered', () => {
+    const round = tripOf(null, 'b', 10)
+    expect(far(dioramaLeadAt(round, 5).at, DIORAMA_GATE)).toBeLessThan(0.5)
+    expect(dioramaLeadAt(round, 10.5).pose).toBe('walk')
+    for (const t of [arrivalOf(round) + 1, 600, 1e5]) {
+      const at = dioramaLeadAt(round, t)
+      expect(at.pose).toBe('talk')
+      // A step away on the road, facing the member, never inside it.
+      expect(far(at.at, dioramaStandOf(plotOf('b')))).toBeGreaterThan(1.29)
+    }
+  })
+
+  it('talks to the member where its state stands it', () => {
+    const stand: [number, number] = [plotOf('b').x + 1.6, plotOf('b').z + 1.25]
+    const last = tripOf(null, 'b', 0, 'normal', new Map([['b', stand]])).steps.at(-1)!
+    expect(last.kind === 'hold' && last.face).toEqual(stand)
+  })
+
+  it('walks only on the roads and rows only on open water, one row per crossing', () => {
+    for (const [from, to, rows] of [
+      [null, 'x', 1],
+      ['x', 'a', 1],
+      ['x', 'y', 0],
+      ['a', 'b', 0],
+      ['y', null, 1]
+    ] as const) {
+      const { steps } = tripOf(from, to)
+      expect(
+        steps.filter((s) => s.kind === 'row' && s.dur > 0),
+        `${from} to ${to}`
+      ).toHaveLength(rows)
+      for (const step of steps) {
+        if (step.kind === 'walk') {
+          for (let d = 0; d <= step.cum.at(-1)!; d += 0.1) {
+            expect(offRoad(polyAt(step.pts, step.cum, d).at)).toBeLessThan(0.375)
+          }
+        }
+        if (step.kind === 'row') {
+          for (let d = 0; d <= step.cum.at(-1)!; d += 0.1) {
+            expect(water.free(polyAt(step.pts, step.cum, d).at)).toBe(true)
+          }
+        }
       }
     }
   })
 
-  it('walks only on the roads, rows only on open water, and ends idle at the gate', () => {
-    const { steps } = roundOf()
-    for (const step of steps) {
-      if (step.kind === 'walk') {
-        for (let d = 0; d <= step.cum.at(-1)!; d += 0.1) {
-          expect(offRoad(polyAt(step.pts, step.cum, d).at)).toBeLessThan(0.375)
-        }
-      }
-      if (step.kind === 'row') {
-        for (let d = 0; d <= step.cum.at(-1)!; d += 0.1) {
-          expect(water.free(polyAt(step.pts, step.cum, d).at)).toBe(true)
-        }
-      }
-    }
-    const last = steps.at(-1)!
-    expect(last.kind === 'hold' && last.pose).toBe('idle')
-    expect(
-      last.kind === 'hold' && Math.hypot(last.at[0] - DIORAMA_GATE[0], last.at[1] - DIORAMA_GATE[1])
-    ).toBeLessThan(0.5)
+  it('walks home to the gate and idles there once nobody asks', () => {
+    const round = tripOf('b', null, 10)
+    expect(dioramaLeadAt(round, 9).pose).toBe('talk')
+    const end = dioramaLeadAt(round, 1e5)
+    expect(end.pose).toBe('idle')
+    expect(far(end.at, DIORAMA_GATE)).toBeLessThan(0.5)
   })
 
-  it('visits every member of an island in one boat trip, and never an unreachable machine', () => {
-    const { steps } = roundOf()
-    expect(steps.filter((s) => s.kind === 'row')).toHaveLength(2)
-    const talks = steps.filter((s) => s.kind === 'hold' && s.pose === 'talk')
-    expect(talks).toHaveLength(4)
-  })
-
-  it('sends the lead by magic at the direct pace, and faster at the fast one', () => {
-    expect(roundOf('direct').steps.some((s) => s.kind === 'walk' || s.kind === 'row')).toBe(false)
-    expect(roundOf('fast').total).toBeLessThan(roundOf('normal').total * 0.6)
-  })
-
-  it('loops: a moment past the end is the same step as its remainder', () => {
-    const round = roundOf()
-    expect(dioramaLeadStepAt(round, round.total + 1)).toBe(dioramaLeadStepAt(round, 1))
+  it('goes by magic at the direct pace, and arrives sooner at the fast one', () => {
+    const direct = tripOf(null, 'x', 0, 'direct')
+    expect(direct.steps.some((s) => s.kind === 'walk' || s.kind === 'row')).toBe(false)
+    const jump = direct.steps.find((s) => s.kind === 'jump')!
+    expect(dioramaLeadAt(direct, jump.start + jump.dur / 2).blink).toBeLessThan(0.1)
+    expect(dioramaLeadJumpAt(direct, jump.start + jump.dur / 2)?.k).toBeCloseTo(0.5, 5)
+    expect(dioramaLeadJumpAt(tripOf(null, 'x', 0), 1)).toBeNull()
+    expect(arrivalOf(tripOf(null, 'x', 0, 'fast'))).toBeLessThan(
+      arrivalOf(tripOf(null, 'x', 0)) * 0.6
+    )
   })
 })
 
-describe('the lead and the boats at a moment', () => {
-  it('seats the lead in its boat while rowing, and moors the boat where the trip left it', () => {
-    const round = roundOf()
-    const row = round.steps.find((s) => s.kind === 'row')!
+describe('the boats on a trip', () => {
+  it('seats the lead while it rows, and leaves the boat at the island while it stays', () => {
+    const round = tripOf(null, 'x', 0)
+    const row = round.steps.find((s) => s.kind === 'row' && s.dur > 0)!
     const mid = row.start + row.dur / 2
     const lead = dioramaLeadAt(round, mid)
     expect(lead.pose).toBe('sit')
@@ -123,36 +136,16 @@ describe('the lead and the boats at a moment', () => {
     const boat = dioramaBoatAt(round, lead.column!, home, mid)
     expect(boat.moving).toBe(true)
     expect(boat.at).toEqual(lead.at)
-    // Just after the outbound row, the boat waits at the island while the lead talks.
-    const moored = dioramaBoatAt(round, lead.column!, home, row.start + row.dur + 0.5)
+    const moored = dioramaBoatAt(round, lead.column!, home, 1e5)
     expect(moored.moving).toBe(false)
-    expect(Math.hypot(moored.at[0] - home[0], moored.at[1] - home[1])).toBeGreaterThan(1)
-    // A whole loop later every boat is home again.
-    const back = dioramaBoatAt(round, lead.column!, home, round.total - 0.01).at
-    expect(Math.hypot(back[0] - home[0], back[1] - home[1])).toBeLessThan(0.3)
+    expect(far(moored.at, home)).toBeGreaterThan(1)
   })
 
-  it('blinks the lead out and in on a direct jump, and walks it otherwise', () => {
-    const direct = roundOf('direct')
-    const jump = direct.steps.find((s) => s.kind === 'jump')!
-    expect(dioramaLeadAt(direct, jump.start + jump.dur / 2).blink).toBeLessThan(0.1)
-    const walk = roundOf().steps.find((s) => s.kind === 'walk')!
-    expect(dioramaLeadAt(roundOf(), walk.start + walk.dur / 2)).toMatchObject({
-      pose: 'walk',
-      blink: 1
-    })
-  })
-})
-
-describe("the court mage's jumps", () => {
-  it('names each jump of the Direct round with its progress, and none on foot', () => {
-    const direct = roundOf('direct')
-    const jump = direct.steps.find((s) => s.kind === 'jump')!
-    const mid = dioramaLeadJumpAt(direct, jump.start + jump.dur / 2)
-    expect(mid?.k).toBeCloseTo(0.5, 5)
-    expect(mid?.from).toEqual(jump.kind === 'jump' ? jump.from : null)
-    const walk = roundOf('normal')
-    const step = walk.steps.find((s) => s.kind === 'walk')!
-    expect(dioramaLeadJumpAt(walk, step.start + step.dur / 2)).toBeNull()
+  it('finds the boat at the island the lead stayed on, and rows it home on the way back', () => {
+    const round = tripOf('x', 'a', 10)
+    const column = layout.islands.find((i) => !i.home)!.column
+    const home = layout.homeDocks[column]!.boat
+    expect(far(dioramaBoatAt(round, column, home, 5).at, home)).toBeGreaterThan(1)
+    expect(far(dioramaBoatAt(round, column, home, 1e5).at, home)).toBeLessThan(0.3)
   })
 })

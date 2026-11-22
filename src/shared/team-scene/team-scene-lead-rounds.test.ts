@@ -68,77 +68,27 @@ function scene(members: TeamSceneMemberInput[]): TeamSceneWorld {
 }
 
 describe('team scene lead rounds', () => {
-  it('stands in the gap beside a member, never on the next seat of a long row', () => {
-    const world = createTeamSceneWorld()
-    const keys = ['a', 'b', 'c', 'd', 'e']
-    applyTeamSceneInput(world, input(keys.map((k) => member(k))), {
-      rowSize: 5,
-      workSeated: true
-    })
-    const seats = world.stations.map((s) => s.x)
-    const gap = Math.min(...seats.slice(1).map((x, i) => x - seats[i]!))
-    let visits = 0
-    let closest = Infinity
-    for (let t = 0; t < 40; t += DT) {
-      stepTeamScene(world, DT, { width: WIDTH })
-      if (world.rounds.stage === 'atMember') {
-        visits += 1
-        const x = world.bodies.get('lead')!.x
-        closest = Math.min(closest, ...seats.map((s) => Math.abs(s - x)))
-      }
+  // ORCA-1336: the lead moves only for a real event, as in the 3D Office (ORCA-1317).
+  it('a working lead with no asker and no send never leaves its spot', () => {
+    for (const members of [[member('a')], [member('a'), member('b'), member('c')], []]) {
+      const world = scene(members)
+      const home = actor(world, 'lead').x
+      let walked = false
+      const effects = run(world, 40, () => {
+        walked ||= leadWalking(world) || world.rounds.stage !== 'rest'
+        return false
+      })
+      expect(walked).toBe(false)
+      expect(handsTo(effects)).toEqual([])
+      expect(actor(world, 'lead').x).toBe(home)
+      expect(actor(world, 'lead').pose).not.toBe('give')
+      expect(actor(world, 'lead').carrying).toBe(false)
     }
-    expect(visits).toBeGreaterThan(0)
-    expect(closest).toBeGreaterThanOrEqual(gap / 2 - 0.001)
   })
 
-  it('walks to a working member, hands it work, and walks back', () => {
-    const world = scene([member('a')])
-    const home = actor(world, 'lead').x
-    const effects = run(world, 12, () => actor(world, 'lead').pose === 'give')
-    expect(handsTo(effects)).toEqual(['a'])
-    expect(Math.abs(actor(world, 'lead').x - actor(world, 'a').x)).toBeLessThan(0.12)
-    expect(actor(world, 'lead').pose).toBe('give')
-    expect(actor(world, 'a').emote).toBe('check')
-    run(world, 15, () => actor(world, 'lead').x === home)
-    expect(actor(world, 'lead').x).toBe(home)
-  })
-
-  it('carries the work on the way out', () => {
-    const world = scene([member('a')])
-    run(world, 6, () => leadWalking(world))
-    expect(actor(world, 'lead').carrying).toBe(true)
-  })
-
-  it('visits every working member in turn', () => {
-    const world = scene([member('a'), member('b'), member('c')])
-    expect(handsTo(run(world, 40))).toEqual(expect.arrayContaining(['a', 'b', 'c']))
-    expect(handsTo(run(world, 0)).length).toBe(0)
-  })
-
-  it('skips members that are not working', () => {
-    const world = scene([member('a', 'resting'), member('b'), member('c', 'done')])
-    expect(new Set(handsTo(run(world, 30)))).toEqual(new Set(['b']))
-  })
-
-  it('stays home when nobody is working', () => {
-    const world = scene([member('a', 'resting')])
-    const home = actor(world, 'lead').x
-    expect(handsTo(run(world, 15))).toEqual([])
-    expect(actor(world, 'lead').x).toBe(home)
-  })
-
-  it('turns back when the member it walks to stops working', () => {
-    const world = scene([member('a')])
-    const home = actor(world, 'lead').x
-    run(world, 6, () => leadWalking(world))
-    applyTeamSceneInput(world, input([member('a', 'resting')]))
-    expect(handsTo(run(world, 10))).toEqual([])
-    expect(actor(world, 'lead').x).toBe(home)
-  })
-
-  it('lets a member report first: the lead is home when a visitor walks up', () => {
+  it('takes a member report at its spot: the visitor walks up to the lead', () => {
     const world = scene([member('a'), member('b')])
-    run(world, 6, () => leadWalking(world))
+    run(world, 2)
     applyTeamSceneInput(world, input([{ ...member('a'), reportId: 'r1' }, member('b')]))
     const effects = run(
       world,
@@ -166,15 +116,6 @@ describe('team scene lead rounds', () => {
     applyTeamSceneInput(world, input([member('b', 'resting')]))
     run(world, 15, () => actor(world, 'lead').x === home)
     expect(actor(world, 'lead').x).toBe(home)
-  })
-
-  it('drops a round to attend a member who starts asking', () => {
-    const world = scene([member('a'), member('b', 'resting')])
-    run(world, 6, () => leadWalking(world))
-    applyTeamSceneInput(world, input([member('a'), member('b', 'needsYou')]))
-    const nearB = () => Math.abs(actor(world, 'lead').x - actor(world, 'b').x) < 0.12
-    expect(handsTo(run(world, 15, () => nearB() && !leadWalking(world)))).toEqual([])
-    expect(nearB()).toBe(true)
   })
 
   // Why (owner, #1167): the lead travels to whoever needs you even when it is not working itself.
@@ -207,17 +148,8 @@ describe('team scene lead rounds', () => {
     }
   })
 
-  it('walks back home when the lead stops working mid-round', () => {
-    const world = scene([member('a')])
-    const home = actor(world, 'lead').x
-    run(world, 6, () => leadWalking(world))
-    applyTeamSceneInput(world, input([member('a')], 'resting'))
-    expect(handsTo(run(world, 15))).toEqual([])
-    expect(actor(world, 'lead').x).toBe(home)
-  })
-
   it('reduced motion settles the lead at home', () => {
-    const world = scene([member('a')])
+    const world = scene([member('a', 'needsYou')])
     const home = actor(world, 'lead').x
     run(world, 6, () => leadWalking(world))
     settleTeamScene(world)
@@ -245,7 +177,7 @@ describe('teamSceneLeadAttends', () => {
     expect(teamSceneLeadAttends(world)).toBe(false)
   })
 
-  it('never holds on a round that hands out work', () => {
+  it('never holds with nobody asking', () => {
     const world = createTeamSceneWorld()
     applyTeamSceneInput(world, input([member('a')]))
     for (let t = 0; t < 4; t += DT) {
@@ -271,13 +203,24 @@ describe('the lead walking home', () => {
         firstX: 0.16,
         rowGrows: true
       })
+      // Why c asks on and off: the lead walks only to an asker, and home once answered.
+      const asking = (on: boolean) =>
+        applyTeamSceneInput(
+          world,
+          input(keys.map((k) => member(k, on && k === 'c' ? 'needsYou' : 'working'))),
+          { rowSize: 5, workSeated: true, firstX: 0.16, rowGrows: true }
+        )
       const row = Math.min(...world.stations.map((s) => s.depth)) - BEHIND_ROW
       const left = Math.min(...world.stations.map((s) => s.x)) - DESK_HALF
       const right = Math.max(...world.stations.map((s) => s.x)) + DESK_HALF
       const lead = world.bodies.get('lead')!
       let returns = 0
       let wasOut = false
-      for (let t = 0; t < 60; t += DT) {
+      // Why 12 s a phase: at 640 px each way takes longer than 6 s.
+      for (let frame = 0; frame < 120 / DT; frame++) {
+        if (frame % 360 === 0) {
+          asking(frame % 720 === 0)
+        }
         stepTeamScene(world, DT, { width })
         const out = world.rounds.stage !== 'rest'
         if (wasOut && !out) {
