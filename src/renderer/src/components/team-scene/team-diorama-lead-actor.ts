@@ -1,3 +1,4 @@
+import { FIGURES_LEAD_LOOK } from '../../../../shared/team-scene/team-scene-member-looks'
 import type * as THREE from 'three'
 import type { DioramaPlotView } from '../../../../shared/team-scene/team-diorama-actions'
 import type { DioramaLayout, DioramaPoint } from '../../../../shared/team-scene/team-diorama-layout'
@@ -33,7 +34,7 @@ export function dioramaLeadActor(
   }
 ): { figure: DioramaFigure; tick: (t: number) => void } {
   const { layout, views, input } = args
-  const lead = dioramaFigure(k, 0, { lead: true, lite: args.lite })
+  const lead = dioramaFigure(k, FIGURES_LEAD_LOOK, { lead: true, lite: args.lite })
   world.add(lead.g)
   const leadScale = lead.g.scale.x
   const round = dioramaLeadRoundOf({

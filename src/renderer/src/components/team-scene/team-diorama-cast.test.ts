@@ -6,6 +6,7 @@ import {
   DIORAMA_GATE,
   teamDioramaLayoutOf
 } from '../../../../shared/team-scene/team-diorama-layout'
+import { teamSceneMemberLookOf } from '../../../../shared/team-scene/team-scene-member-looks'
 import type {
   TeamSceneInput,
   TeamSceneMemberInput
@@ -15,20 +16,20 @@ import { DAY, dioramaKit } from './team-diorama-kit'
 
 const kit = () =>
   dioramaKit(DAY, { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' })
-const member = (key: string): TeamSceneMemberInput => ({
+const member = (key: string, characterKey: string | null = null): TeamSceneMemberInput => ({
   key,
   name: key,
-  characterKey: null,
+  characterKey,
   activity: 'working',
   reportId: null,
   mergedPr: null,
   site: { stage: 1, broken: false }
 })
-const castOf = (joinedAt: number | null) => {
+const castOf = (joinedAt: number | null, characterKey: string | null = null) => {
   const input = {
     lead: { key: 'lead', name: 'lead' },
     advisor: null,
-    members: [member('a')]
+    members: [member('a', characterKey)]
   } as unknown as TeamSceneInput
   const layout = teamDioramaLayoutOf([
     {
@@ -80,5 +81,14 @@ describe('the diorama cast', () => {
       last = f.g.position.clone()
     }
     expect(f.g.position.distanceTo(rest)).toBeLessThan(0.01)
+  })
+
+  it('dresses a member as its Team list face, by its persistent character', () => {
+    const tunicOf = (cast: ReturnType<typeof castOf>) =>
+      (cast.figures.get('a')!.body.material as THREE.MeshBasicMaterial).color.getHex()
+    for (const characterKey of ['char-ada', 'char-bo', 'char-cy', null]) {
+      const want = teamSceneMemberLookOf({ role: 'member', key: 'a', characterKey }).tunic
+      expect(tunicOf(castOf(null, characterKey))).toBe(want)
+    }
   })
 })
