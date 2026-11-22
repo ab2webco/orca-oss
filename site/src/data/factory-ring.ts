@@ -53,14 +53,7 @@ const copy: Record<
     rows: ['Orca Game', 'Watching', 'You here'],
     who: { you: 'You', lead: 'Lead', agent: 'Agent', auto: 'Automation' },
     gears: ['Panel', 'Sonar', 'Jev', 'Reports', 'Monitors'],
-    legend: [
-      'You',
-      'Lead',
-      'Agents',
-      'Automation',
-      'Plugin',
-      'The lead sends a second agent to review the change'
-    ],
+    legend: ['You', 'Lead', 'Agents', 'Automation', 'Plugin', 'The lead sends a reviewer'],
     pause: ['Pause', 'Play'],
     stations: [
       [
@@ -111,7 +104,7 @@ const copy: Record<
       [
         'Review',
         'another agent, not the author',
-        'The lead sends a second agent to review the change against the criteria.',
+        'A second agent, sent by the lead, reviews the change against the criteria.',
         'orca game launch APP-12 --kind review',
         'Two characters on one ticket.',
         'Findings go back to the author.',
@@ -163,14 +156,7 @@ const copy: Record<
     rows: ['Orca Game', 'Vigila', 'Tú aquí'],
     who: { you: 'Tú', lead: 'Líder', agent: 'Agente', auto: 'Automatización' },
     gears: ['Panel', 'Sonar', 'Jev', 'Reportes', 'Monitores'],
-    legend: [
-      'Tú',
-      'Líder',
-      'Agentes',
-      'Automatización',
-      'Plugin',
-      'El líder envía un segundo agente a revisar el cambio'
-    ],
+    legend: ['Tú', 'Líder', 'Agentes', 'Automatización', 'Plugin', 'El líder envía un revisor'],
     pause: ['Pausa', 'Reproducir'],
     stations: [
       [
@@ -221,7 +207,7 @@ const copy: Record<
       [
         'Revisión',
         'otro agente, no el autor',
-        'El líder envía un segundo agente a revisar el cambio contra los criterios.',
+        'Un segundo agente, enviado por el líder, revisa el cambio contra los criterios.',
         'orca game launch APP-12 --kind review',
         'Dos personajes en un ticket.',
         'Los hallazgos vuelven al autor.',

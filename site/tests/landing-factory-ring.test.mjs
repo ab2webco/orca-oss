@@ -56,8 +56,8 @@ for (const [file, title, gears] of [
       )
     })
 
-    it('drops the side sublabels below 45rem, where they would run past the drawing', () => {
-      assert.match(source, /@media \(max-width: 44\.99rem\) \{\s*\.lbl \.sub \{\s*display: none;/)
+    it('drops the side sublabels below 47rem, where they would run past the drawing', () => {
+      assert.match(source, /@media \(max-width: 46\.99rem\) \{\s*\.lbl \.sub \{\s*display: none;/)
     })
 
     it('draws the legend review mark at the review station', () => {
