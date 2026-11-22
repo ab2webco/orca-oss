@@ -43,12 +43,19 @@ export class ProtectedSecretPersistence {
   private readonly asyncDecryptedPlaintexts = new Map<string, string>()
   // Slots sealed without asking the sync API whether encryption is available.
   private readonly keychainDeferredSlots = new Set<string>()
+  // Slots whose async read outlived the bound and may still unseal them.
+  private readonly pendingKeychainSlots = new Set<string>()
 
   removeRetainedBlob(slot: string): void {
     this.retainedBlobs.delete(slot)
     this.sealedSlots.delete(slot)
     this.asyncDecryptedPlaintexts.delete(slot)
     this.keychainDeferredSlots.delete(slot)
+    this.pendingKeychainSlots.delete(slot)
+  }
+
+  isAwaitingKeychain(slot: string): boolean {
+    return this.pendingKeychainSlots.has(slot)
   }
 
   // Why: without the async API (older Electron, test doubles) load keeps decrypting in place.
@@ -80,6 +87,7 @@ export class ProtectedSecretPersistence {
         this.sealedSlots.delete(update.slot)
         this.asyncDecryptedPlaintexts.delete(update.slot)
         this.keychainDeferredSlots.delete(update.slot)
+        this.pendingKeychainSlots.delete(update.slot)
       }
     }
   }
@@ -166,6 +174,7 @@ export class ProtectedSecretPersistence {
     slot: string,
     ciphertext: string,
     isLegacyPlaintext?: LegacyPlaintextValidator,
+    onLateDecrypt?: (decryption: ProtectedSecretDecryption) => void,
     timeoutMs = CREDENTIAL_KEYCHAIN_WAIT_MS
   ): Promise<ProtectedSecretDecryption> {
     if (!ciphertext) {
@@ -175,10 +184,8 @@ export class ProtectedSecretPersistence {
     const timedOut = new Promise<'timed-out'>((resolve) => {
       timer = setTimeout(() => resolve('timed-out'), timeoutMs)
     })
-    const outcome = await Promise.race([
-      decryptOffMainThread(Buffer.from(ciphertext, 'base64')),
-      timedOut
-    ]).finally(() => clearTimeout(timer))
+    const read = decryptOffMainThread(Buffer.from(ciphertext, 'base64'))
+    const outcome = await Promise.race([read, timedOut]).finally(() => clearTimeout(timer))
     // Why: on macOS the sync fallback would read the Keychain on the main thread, unbounded.
     if (
       process.platform !== 'darwin' &&
@@ -195,6 +202,9 @@ export class ProtectedSecretPersistence {
     if (outcome === 'timed-out') {
       this.sealedSlots.add(slot)
       this.keychainDeferredSlots.add(slot)
+      this.pendingKeychainSlots.add(slot)
+      // Why: a prompt answered after the bound must still unseal the value for this session.
+      void read.then((late) => this.settleLateDecrypt(slot, ciphertext, late, onLateDecrypt))
       console.warn(
         '[persistence] Keychain did not answer in time; retaining the protected value without exposing it.'
       )
@@ -211,6 +221,25 @@ export class ProtectedSecretPersistence {
     this.keychainDeferredSlots.delete(slot)
     this.asyncDecryptedPlaintexts.set(slot, outcome)
     return { plaintext: outcome, status: 'decrypted' }
+  }
+
+  private settleLateDecrypt(
+    slot: string,
+    ciphertext: string,
+    late: Awaited<ReturnType<typeof decryptOffMainThread>>,
+    onLateDecrypt?: (decryption: ProtectedSecretDecryption) => void
+  ): void {
+    // Why: a save or clear since the timeout replaced this blob, so its late plaintext is stale.
+    if (!this.pendingKeychainSlots.delete(slot) || this.retainedBlobs.get(slot) !== ciphertext) {
+      return
+    }
+    if (typeof late !== 'string') {
+      return
+    }
+    this.sealedSlots.delete(slot)
+    this.keychainDeferredSlots.delete(slot)
+    this.asyncDecryptedPlaintexts.set(slot, late)
+    onLateDecrypt?.({ plaintext: late, status: 'decrypted' })
   }
 
   private failDecryption(

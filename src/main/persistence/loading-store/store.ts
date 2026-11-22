@@ -616,7 +616,7 @@ export class Store {
 
   // Why (ORCA-1298): awaited once at startup; a Keychain prompt nobody answers costs at most
   // CREDENTIAL_KEYCHAIN_WAIT_MS and leaves the secret sealed, its blob kept for later saves.
-  async unsealProtectedSecrets(): Promise<void> {
+  async unsealProtectedSecrets(onLateProxy?: (settings: GlobalSettings) => void): Promise<void> {
     const reads = this.pendingProtectedSecretReads
     this.pendingProtectedSecretReads = []
     if (reads.length === 0) {
@@ -630,13 +630,44 @@ export class Store {
             await this.protectedSecrets.decryptWithStatusAsync(
               read.slot,
               read.ciphertext,
-              read.isLegacyPlaintext
+              read.isLegacyPlaintext,
+              (late) => this.applyLateProtectedSecret(read, late, onLateProxy)
             )
           ] as const
       )
     )
     if (applyProtectedSecretReads(this.state, reads, new Map(decrypted), this.protectedSecrets)) {
       this.scheduleSave()
+    }
+  }
+
+  // Why: a prompt answered after the bound fills the value in place; without the notice the
+  // renderer keeps a blank secret and the proxy stays DIRECT for the session.
+  private applyLateProtectedSecret(
+    read: ProtectedSecretRead,
+    late: ProtectedSecretDecryption,
+    onLateProxy?: (settings: GlobalSettings) => void
+  ): void {
+    const reads = [read]
+    if (
+      applyProtectedSecretReads(
+        this.state,
+        reads,
+        new Map([[read.slot, late]]),
+        this.protectedSecrets
+      )
+    ) {
+      this.scheduleSave()
+    }
+    if (read.slot === PROTECTED_SECRET_SLOT.httpProxyUrl) {
+      this.notifySettingsChanged({ httpProxyUrl: this.state.settings.httpProxyUrl })
+      onLateProxy?.(this.state.settings)
+    } else if (read.slot === PROTECTED_SECRET_SLOT.opencodeSessionCookie) {
+      this.notifySettingsChanged({
+        opencodeSessionCookie: this.state.settings.opencodeSessionCookie
+      })
+    } else if (read.slot === PROTECTED_SECRET_SLOT.browserKagiSessionLink) {
+      this.notifyUIChanged()
     }
   }
 

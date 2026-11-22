@@ -150,6 +150,70 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     expect(keychain.syncCalls).toBe(0)
   })
 
+  it('a prompt answered after the bound still fills the secrets, tells listeners and re-applies the proxy', async () => {
+    const seeded = await seedEncryptedProfile()
+    let answer!: () => void
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve
+    })
+    useAsyncKeychain(async (ciphertext) => {
+      await answered
+      return { result: decode(ciphertext), shouldReEncrypt: false }
+    })
+
+    const store = await createStore()
+    const settingsUpdates: string[][] = []
+    store.onSettingsChanged((updates) => settingsUpdates.push(Object.keys(updates)))
+    const lateProxies: string[] = []
+    const unseal = store.unsealProtectedSecrets((settings) =>
+      lateProxies.push(settings.httpProxyUrl ?? '')
+    )
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+    await unseal
+    expect(store.getSettings().httpProxyUrl).toBe('')
+
+    answer()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(store.getSettings().opencodeSessionCookie).toBe(ORIGINAL.cookie)
+    expect(store.getSettings().httpProxyUrl).toBe(ORIGINAL.proxy)
+    expect(store.getUI().browserKagiSessionLink).toBe(ORIGINAL.kagi)
+    expect(store.getSshPtyConsumerRecovery('ssh-1')?.ownerLease).toBe(ORIGINAL.ownerLease)
+    expect(settingsUpdates.flat()).toEqual(
+      expect.arrayContaining(['httpProxyUrl', 'opencodeSessionCookie'])
+    )
+    expect(lateProxies.at(-1)).toBe(ORIGINAL.proxy)
+    await settleSave(store)
+    expect(persistedBlobs()).toEqual(seeded)
+    expect(keychain.syncCalls).toBe(0)
+  })
+
+  it('an SSH reconnect while the lease read is pending does not replace the sealed lease on disk', async () => {
+    const seeded = await seedEncryptedProfile()
+    useAsyncKeychain(() => new Promise(() => {}))
+
+    const store = await createStore()
+    const unseal = store.unsealProtectedSecrets()
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+    await unseal
+    expect(store.getSshPtyConsumerRecovery('ssh-1')).toBeNull()
+    // Why: a working sync API makes the overwrite real instead of masked by a degraded save.
+    keychain.syncAllowed = true
+
+    await store.upsertSshPtyConsumerRecovery({
+      targetId: 'ssh-1',
+      clientInstanceId: 'client-2',
+      serverBuildId: 'relay-build-1',
+      clientGeneration: 1,
+      ownerGeneration: 2,
+      ownerLease: `ssh-owner-lease-${'y'.repeat(480)}`
+    })
+    await settleSave(store)
+
+    expect(persistedBlobs().ownerLease).toBe(seeded.ownerLease)
+    expect(keychain.syncCalls).toBe(0)
+  })
+
   it('an answered prompt fills the secrets, and later saves reuse their blobs without a sync Keychain read', async () => {
     const seeded = await seedEncryptedProfile()
     useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: false }))
