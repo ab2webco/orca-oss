@@ -78,7 +78,7 @@ const HOSTS = [
   machine('render-01', 1, 3, { cores: 16, memory: [20, 32], load: 0.8, cpu: 9, disk: [380, 512] }),
   machine('ci-runner', 1, 2, { cores: 8, memory: [7, 16], load: 5.2, cpu: 71, disk: [41, 256] })
 ]
-// Why Juno waits on another floor: a member there who needs you is what sends the lead up the elevator.
+// Why Juno waits on another floor: in the 2D Office a member there who needs you sends the lead up the elevator.
 const MEMBERS: DemoMember[] = [
   {
     name: 'Pico',
@@ -138,11 +138,10 @@ const STYLES = ['office', 'figures', 'pixel'] as const
 // The lead's own pane in every clip: the owner asks, the scripted lead answers from the team's state.
 const OWNER_PROMPT = 'Who needs me right now?'
 const LEAD_STATUS =
-  'Juno on studio: LUM-17 is waiting on a permission prompt, so I am going up. ' +
-  'Kai has #44 in CI for LUM-19, Pico is coding LUM-14 here, and Orin and Nova ' +
-  'keep working on render-01 and ci-runner.'
+  'Juno on studio has a permission prompt in its terminal. Nova has #47 in CI for LUM-25 ' +
+  'on ci-runner; if it goes red I go up. Kai has #44 for LUM-19, and Pico is coding LUM-14 here.'
 const HOLD_MS = 2_500
-/** Long enough for the 3D Office's lead to leave its office, ride the lift and talk to Juno. */
+/** Long enough for the 3D Office's lead to leave its office, ride the lift and talk to Nova. */
 const OFFICE3D_RIDE_MS = 16_000
 // Why past 3.8 s: the level row plays each gain that long (use-team-xp-motion.ts), so both stills see it settled.
 const XP_MOTION_MS = 4_200
@@ -176,7 +175,7 @@ const PICO_STEWARD = {
 }
 
 type Award = { id: string; kind: GameRewardKind; xp: number; label: string }
-type Demo = { members: DemoMember[]; awards: Award[]; queue: string[] }
+type Demo = { members: DemoMember[]; awards: Award[]; queue: string[]; limited?: string }
 
 // Why these labels: the ones the mod toasts (rewards.ts), at its default weights.
 const award = (kind: GameRewardKind, label: string): Award => ({
@@ -222,17 +221,26 @@ const teamXpOf = (awards: Award[]) => ({
     .toReversed()
 })
 
-// Why `asking`: the ride starts when Juno starts waiting, so the hero clip turns it on mid-take.
-const demoOf = (step: number, asking = true): Demo => ({
+// Why `asking`: the 2D Office's ride starts when Juno starts waiting, so its clip turns it on mid-take.
+// Why `rooms`: the 3D Office fills its games room and cafeteria only with an idle and an out-of-quota
+// member, and its lead rides only when CI turns red, so 'calm' holds Nova's CI pending until 'red'.
+const demoOf = (step: number, asking = true, rooms?: 'calm' | 'red'): Demo => ({
   members: MEMBERS.map((one) =>
     one.name === 'Kai'
       ? { ...one, ...KAI_STEPS[step]!.kai }
       : one.name === 'Juno' && !asking
         ? { ...one, state: 'working', tool: 'Edit' }
-        : one
+        : one.name === 'Orin' && rooms
+          ? { ...one, state: 'idle', tool: null }
+          : one.name === 'Vega' && rooms
+            ? { ...one, state: 'idle', tool: null }
+            : one.name === 'Nova' && rooms === 'calm'
+              ? { ...one, pr: { number: 47, ci: 'pending', state: 'open' } }
+              : one
   ),
   awards: KAI_STEPS[step]!.awards,
-  queue: KAI_STEPS[step]!.queue
+  queue: KAI_STEPS[step]!.queue,
+  ...(rooms ? { limited: 'Vega' } : {})
 })
 
 // What game.state carries for a demo: the cards, the PRs tab and its merge queue.
@@ -241,7 +249,8 @@ function payloadOf(demo: Demo) {
   return {
     members: demo.members.map((one) => ({
       ...demoMember(one),
-      ...(one.name === 'Pico' ? { steward: PICO_STEWARD } : {})
+      ...(one.name === 'Pico' ? { steward: PICO_STEWARD } : {}),
+      ...(one.name === demo.limited ? { limit: { resetsAt: Date.now() + 90 * 60_000 } } : {})
     })),
     teamXp: teamXpOf(demo.awards),
     project: {
@@ -416,9 +425,7 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
           timeout: 20_000
         })
         .toBe(true)
-      await expect
-        .poll(async () => screenText(orcaPage), { timeout: 20_000 })
-        .toContain('keep working')
+      await expect.poll(async () => screenText(orcaPage), { timeout: 20_000 }).toContain('LUM-25')
     }
 
     // One real member, as a launch makes it, so the panel reads a team; the demo members are its clones.
@@ -462,7 +469,7 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
       state: 'working',
       prompt: 'Work'
     })
-    await serveDemoTeam(electronApp, demoOf(2, false))
+    await serveDemoTeam(electronApp, demoOf(2, false, 'calm'))
     // Why back to the lead's tab: the member's pane shows a shell line with the machine's name.
     await orcaPage.evaluate(
       (tabId) => window.__store!.getState().setActiveTab(tabId),
@@ -507,16 +514,20 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
       await expect(office3d).toHaveAttribute('data-office3d-floors', String(HOSTS.length), {
         timeout: 30_000
       })
+      // Orin plays in the games room and Vega waits out its quota in the cafeteria, in the Lobby.
+      await expect(office3d).toHaveAttribute('data-office3d-places', /:games/, { timeout: 30_000 })
+      await expect(office3d).toHaveAttribute('data-office3d-places', /:cafe/)
+      await expect(office3d).toHaveAttribute('data-office3d-camera', 'lead')
       const ride = await showcaseClip(electronApp, testInfo, 'team-office-building')
       await orcaPage.waitForTimeout(1_500)
-      await stepDemo(electronApp, demoOf(2))
+      await stepDemo(electronApp, demoOf(2, true, 'red'))
       await emitCodexHookStatus(endpoint, {
         paneKey: pane.paneKey,
         worktreeId,
         state: 'working',
         tool: 'PushNotification'
       })
-      // The lead leaves its office, takes the glass lift and talks to Juno on its floor.
+      // Nova's CI turns red: the lead leaves its office, rides the glass lift and talks to Nova.
       await orcaPage.waitForTimeout(OFFICE3D_RIDE_MS)
       await ride.stop()
       for (const theme of ['dark', 'light'] as const) {
@@ -591,7 +602,11 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
             ? office3d
             : building
       await expect(scene).toBeVisible({ timeout: 30_000 })
-      await orcaPage.waitForTimeout(1_500)
+      // Why the wait: by now the lead is back at its desk, its floor over the Lobby and both rooms.
+      await orcaPage.waitForTimeout(style === 'office' && threeD ? OFFICE3D_RIDE_MS : 1_500)
+      if (style === 'office' && threeD) {
+        await expect(office3d).toHaveAttribute('data-office3d-camera', 'lead')
+      }
       const clip = await showcaseClip(electronApp, testInfo, `team-style-${style}`)
       await orcaPage.waitForTimeout(HOLD_MS * 2)
       await clip.stop()
