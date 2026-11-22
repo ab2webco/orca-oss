@@ -106,7 +106,7 @@ async function setPanel(page: Page, panel: Record<string, unknown>): Promise<voi
   await writeSettings(page, { orchestratorGame: { panel } })
 }
 
-// Why queue: V30 draws the merge queue at the top of PRs; its toggle drops that part, not a tab.
+// Why queue-off still draws the queue: V30 has no Queue toggle, so a stored one is ignored (ORCA-1112).
 const CASES = [
   { name: 'all-on', panel: {}, hidden: [] as string[], queue: true, advisor: true },
   {
@@ -120,7 +120,7 @@ const CASES = [
     name: 'queue-off',
     panel: { tabs: { queue: false } },
     hidden: [] as string[],
-    queue: false,
+    queue: true,
     advisor: true
   },
   {
