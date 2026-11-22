@@ -143,6 +143,9 @@ const LEAD_STATUS =
 const HOLD_MS = 2_500
 /** Long enough for the 3D Office's lead to leave its office, ride the lift and talk to Nova. */
 const OFFICE3D_RIDE_MS = 16_000
+// Why 18.5 s: at 16 s the lead is still at ci-runner's lift door, and the poster is the last second,
+// so the take ends inside its 3.4 s talk beside Nova (team-office3d-walkers.ts TALK).
+const OFFICE3D_TALK_MS = 18_500
 // Why past 3.8 s: the level row plays each gain that long (use-team-xp-motion.ts), so both stills see it settled.
 const XP_MOTION_MS = 4_200
 const pick = (model: string, effort: string) => ({ model, effort })
@@ -528,7 +531,7 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
         tool: 'PushNotification'
       })
       // Nova's CI turns red: the lead leaves its office, rides the glass lift and talks to Nova.
-      await orcaPage.waitForTimeout(OFFICE3D_RIDE_MS)
+      await orcaPage.waitForTimeout(OFFICE3D_TALK_MS)
       await ride.stop()
       for (const theme of ['dark', 'light'] as const) {
         await setTheme(orcaPage, theme)
