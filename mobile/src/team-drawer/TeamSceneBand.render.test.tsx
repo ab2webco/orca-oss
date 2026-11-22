@@ -1,6 +1,13 @@
 import { act, forwardRef, useImperativeHandle, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, DeviceEventEmitter, View } from 'react-native'
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+  State
+} from 'react-native-gesture-handler'
+import { getByGestureTestId } from 'react-native-gesture-handler/jest-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import type { TeamSceneBand as Band } from './team-scene-band'
@@ -304,5 +311,148 @@ describe('the Team sheet scene band', () => {
       />
     )
     expect(messages().at(-1)).toEqual({ kind: 'motion', run: true, reduced: false })
+  })
+
+  describe('the 3D stage camera (ORCA-1335)', () => {
+    const figuresBand: Band = {
+      ...officeBand,
+      art: { kind: 'bundled', style: 'figures' },
+      fallback: { kind: 'bundled', style: 'figures' },
+      diorama: { quality: 'high', pace: 'normal' },
+      machines: []
+    }
+    const labels = { lead: 'Follow the lead', all: 'Show all' }
+    // Why attached around the band: as in the sheet, a relation names gestures by their handler tag.
+    let sheet = [Gesture.Native(), Gesture.Pan()]
+    const renderStage = (band: Band) => {
+      sheet = [Gesture.Native(), Gesture.Pan()]
+      return render(
+        <GestureHandlerRootView>
+          <GestureDetector gesture={Gesture.Simultaneous(...sheet)}>
+            <View collapsable={false}>
+              <TeamSceneBand
+                band={band}
+                ownArt={null}
+                leadLine={null}
+                leadName="Alfred"
+                advisorName="Mago"
+                members={[]}
+                cameraLabels={labels}
+                sheetGestures={sheet}
+              />
+            </View>
+          </GestureDetector>
+        </GestureHandlerRootView>
+      )
+    }
+    const cameraButton = (mode: 'lead' | 'all') =>
+      document.querySelector<HTMLElement>(`[data-testid="team-scene-camera-${mode}"]`)
+    const selected = () =>
+      (['lead', 'all'] as const).filter(
+        (mode) => cameraButton(mode)?.getAttribute('aria-selected') === 'true'
+      )
+    const bandHeight = () =>
+      getComputedStyle(document.querySelector<HTMLElement>('[data-testid="team-scene-band"]')!)
+        .height
+    // Why the emitter, not jest-utils' fireGestureHandler: under Vite that emits on another copy of
+    // react-native; this one reaches the handler's callbacks through RNGH's own event receiver.
+    const drive = (
+      gesture: ReturnType<typeof getByGestureTestId>,
+      moves: Record<string, number>[]
+    ) => {
+      const handlerTag = gesture.handlerTag
+      const at = (one: Record<string, number>) => ({ handlerTag, numberOfPointers: 1, ...one })
+      act(() => {
+        DeviceEventEmitter.emit('onGestureHandlerStateChange', {
+          ...at(moves[0]!),
+          state: State.BEGAN,
+          oldState: State.UNDETERMINED
+        })
+        DeviceEventEmitter.emit('onGestureHandlerStateChange', {
+          ...at(moves[0]!),
+          state: State.ACTIVE,
+          oldState: State.BEGAN
+        })
+        for (const one of moves.slice(1)) {
+          DeviceEventEmitter.emit('onGestureHandlerEvent', { ...at(one), state: State.ACTIVE })
+        }
+        DeviceEventEmitter.emit('onGestureHandlerStateChange', {
+          ...at(moves.at(-1)!),
+          state: State.END,
+          oldState: State.ACTIVE
+        })
+      })
+    }
+    const nextFrame = () =>
+      act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+
+    it('offers Follow the lead and Show all under a 3D stage, following the lead first', () => {
+      renderStage(figuresBand)
+      send({ kind: 'loaded' })
+      expect(cameraButton('lead')).toBeNull()
+      send({ kind: 'ready', height: 240, camera: 'lead' })
+      expect(cameraButton('lead')?.textContent).toBe('Follow the lead')
+      expect(cameraButton('all')?.textContent).toBe('Show all')
+      expect(selected()).toEqual(['lead'])
+      // Why a row of its own: buttons over the stage would cover the figures.
+      expect(bandHeight()).toBe('284px')
+      expect(getComputedStyle(cameraButton('all')!).minHeight).toBe('44px')
+    })
+
+    it('tells the page each button, and a camera moved by hand selects neither', () => {
+      renderStage(figuresBand)
+      send({ kind: 'loaded' })
+      send({ kind: 'ready', height: 240, camera: 'lead' })
+      act(() => cameraButton('all')!.click())
+      expect(messages().at(-1)).toEqual({ kind: 'camera', mode: 'all' })
+      send({ kind: 'camera', mode: 'all' })
+      expect(selected()).toEqual(['all'])
+      send({ kind: 'camera', mode: 'free' })
+      expect(selected()).toEqual([])
+      act(() => cameraButton('lead')!.click())
+      expect(messages().at(-1)).toEqual({ kind: 'camera', mode: 'lead' })
+    })
+
+    it('pans and pinches the 3D stage, ahead of the sheet scroll and drag', async () => {
+      renderStage(figuresBand)
+      send({ kind: 'loaded' })
+      send({ kind: 'ready', height: 240, camera: 'lead' })
+      // Why: RNGH registers an updated gesture in a microtask.
+      await act(async () => {})
+      const pan = getByGestureTestId('team-scene-camera-pan')
+      const pinch = getByGestureTestId('team-scene-camera-pinch')
+      // Why blocks: a touch that starts on the stage must never scroll or close the sheet.
+      const tags = sheet.map((one) => one.handlerTag)
+      expect(tags.every((tag) => tag > 0)).toBe(true)
+      expect(pan.config.enabled).toBe(true)
+      expect(pan.config.blocksHandlers).toEqual(tags)
+      expect(pinch.config.blocksHandlers).toEqual(tags)
+      const injected = webview.injected.length
+      drive(pan, [
+        { translationX: 4, translationY: 2 },
+        { translationX: 30, translationY: -10 },
+        { translationX: 34, translationY: -40 }
+      ])
+      await nextFrame()
+      // Why one message: the frame's moves arrive at once, not a script per touch event.
+      expect(messages().slice(injected)).toEqual([{ kind: 'camera', pan: [30, -42] }])
+      drive(pinch, [{ scale: 1 }, { scale: 1.5 }, { scale: 2 }])
+      await nextFrame()
+      expect(messages().at(-1)).toEqual({ kind: 'camera', zoom: 2 })
+    })
+
+    it('leaves a 2D stage to the sheet: no buttons, and its gestures off', async () => {
+      renderStage(officeBand)
+      send({ kind: 'loaded' })
+      send({ kind: 'ready', height: 200 })
+      expect(cameraButton('lead')).toBeNull()
+      expect(bandHeight()).toBe('200px')
+      await act(async () => {})
+      // Why disabled: RNGH never begins a disabled gesture, so the sheet's scroll takes the drag.
+      expect(getByGestureTestId('team-scene-camera-pan').config.enabled).toBe(false)
+      expect(getByGestureTestId('team-scene-camera-pinch').config.enabled).toBe(false)
+    })
   })
 })

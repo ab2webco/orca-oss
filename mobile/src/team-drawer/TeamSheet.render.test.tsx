@@ -17,12 +17,22 @@ vi.mock('lucide-react-native', async () => {
   )
 })
 
+const stagePage = vi.hoisted(() => ({
+  onMessage: null as ((event: { nativeEvent: { data: string } }) => void) | null
+}))
+
 // Why a stand-in: react-native-webview ships native source; the stage's page is tested on its own.
 vi.mock('react-native-webview', async () => {
   const { forwardRef, createElement: h } = await import('react')
-  return { WebView: forwardRef(() => h('div', { 'data-testid': 'team-scene-webview' })) }
+  return {
+    WebView: forwardRef((props: { onMessage: typeof stagePage.onMessage }, _ref) => {
+      stagePage.onMessage = props.onMessage
+      return h('div', { 'data-testid': 'team-scene-webview' })
+    })
+  }
 })
 
+import { getByGestureTestId } from 'react-native-gesture-handler/jest-utils'
 import { gameHostLaunchOf } from '../../../src/shared/orchestrator-game-member-repo-scope'
 import { TeamSheet } from './TeamSheet'
 import type { TeamDrawerData } from './team-drawer-model'
@@ -331,6 +341,27 @@ describe('TeamSheet', () => {
       expect(band!.querySelector('[data-testid="team-scene-webview"]')).not.toBeNull()
       const tabs = container.querySelector('[role="tablist"]')!
       expect(band!.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+
+  it("lets a finger on the 3D stage move its camera ahead of the sheet's scroll and drag (ORCA-1335)", async () => {
+    const panel = { panel: { ...gamePanel('figures').panel, diorama: true } }
+    show(teamWith({ questions: [] }, leader, panel))
+    const page = (event: unknown) =>
+      act(() => stagePage.onMessage!({ nativeEvent: { data: JSON.stringify(event) } }))
+    page({ kind: 'loaded' })
+    page({ kind: 'ready', height: 240, camera: 'lead' })
+    expect(button('Follow the lead')).toBeTruthy()
+    // Why: RNGH registers an updated gesture in a microtask.
+    await act(async () => {})
+    const sheet = [
+      getByGestureTestId('team-sheet-scroll'),
+      getByGestureTestId('team-sheet-content-drag')
+    ]
+    for (const id of ['team-scene-camera-pan', 'team-scene-camera-pinch']) {
+      const camera = getByGestureTestId(id)
+      expect(camera.config.enabled).toBe(true)
+      expect(camera.config.blocksHandlers).toEqual(sheet.map((one) => one.handlerTag))
     }
   })
 

@@ -15,18 +15,21 @@ import {
   type DioramaStage
 } from '../../../src/renderer/src/components/team-scene/team-diorama-stage'
 import {
+  dioramaPan,
   dioramaView,
   dioramaZoomBy
 } from '../../../src/renderer/src/components/team-scene/team-diorama-view'
-import type { TeamSceneEngineEvent, TeamSceneEngineStage } from './team-scene-engine-messages'
+import type {
+  TeamSceneEngineEvent,
+  TeamSceneEngineMessage,
+  TeamSceneEngineStage
+} from './team-scene-engine-messages'
 
 // Why the desktop's own stage: the phone draws the diorama the panel draws, in the same WebView
 // that draws the 2D styles; it takes over only for Figures, and only where WebGL opens (ORCA-1296).
 
 const FRAME_MS = 1000 / 30
 const PHONE_MAX_HEIGHT = 300
-const TAP_MS = 250
-const TAP_PX = 8
 
 type Scheduler = { request: (cb: (now: number) => void) => number; cancel: (id: number) => void }
 
@@ -35,6 +38,7 @@ export type TeamSceneDioramaEngine = {
   take: (stage: TeamSceneEngineStage) => boolean
   input: (input: TeamSceneInput, machines: DioramaMachine[] | undefined) => void
   motion: (run: boolean, reduced: boolean) => void
+  camera: (message: Extract<TeamSceneEngineMessage, { kind: 'camera' }>) => void
 }
 
 /** One home island for a host that names no machines. */
@@ -116,52 +120,9 @@ export function createTeamSceneDioramaEngine(deps: {
       view,
       maxHeight: PHONE_MAX_HEIGHT
     })
-    deps.post({ kind: 'ready', height: stage.height })
+    deps.post({ kind: 'ready', height: stage.height, camera: view.mode })
     draw()
     start()
-  }
-
-  // A tap swaps following the lead for the whole base; a pinch zooms. Why no drag: on the phone a
-  // one-finger drag scrolls the sheet the band sits in.
-  const listen = () => {
-    const pointers = new Map<number, [number, number, number]>()
-    let pinch: number | null = null
-    deps.canvas.style.touchAction = 'pan-y'
-    deps.canvas.addEventListener('pointerdown', (e) => {
-      pointers.set(e.pointerId, [e.clientX, e.clientY, Date.now()])
-    })
-    deps.canvas.addEventListener('pointermove', (e) => {
-      if (pointers.size !== 2 || !pointers.has(e.pointerId)) {
-        return
-      }
-      const at = pointers.get(e.pointerId)!
-      pointers.set(e.pointerId, [e.clientX, e.clientY, at[2]])
-      const [a, b] = [...pointers.values()]
-      const d = Math.hypot(a![0] - b![0], a![1] - b![1])
-      if (pinch) {
-        dioramaZoomBy(view, d / pinch)
-        if (reduced) {
-          draw()
-        }
-      }
-      pinch = d
-    })
-    const up = (e: PointerEvent) => {
-      const at = pointers.get(e.pointerId)
-      const tap =
-        at &&
-        pointers.size === 1 &&
-        Date.now() - at[2] < TAP_MS &&
-        Math.hypot(e.clientX - at[0], e.clientY - at[1]) < TAP_PX
-      pointers.delete(e.pointerId)
-      pinch = null
-      if (tap) {
-        view.mode = view.mode === 'lead' ? 'all' : 'lead'
-        draw()
-      }
-    }
-    deps.canvas.addEventListener('pointerup', up)
-    deps.canvas.addEventListener('pointercancel', up)
   }
 
   return {
@@ -169,9 +130,6 @@ export function createTeamSceneDioramaEngine(deps: {
       const figures = next.art.kind === 'bundled' && next.art.style === 'figures'
       if (!renderer && next.diorama && figures) {
         renderer = dioramaRenderer(deps.canvas)
-        if (renderer) {
-          listen()
-        }
       }
       wanted = next.diorama && figures && renderer ? next : null
       if (!wanted) {
@@ -191,6 +149,23 @@ export function createTeamSceneDioramaEngine(deps: {
       run = nextRun
       reduced = nextReduced
       start()
+    },
+    // Why the sheet's fingers, not the page's: its gestures decide whether a drag moves the camera
+    // or the sheet, and the desktop's pan and zoom keep its limits and its hand-off to free.
+    camera: ({ mode, pan, zoom }) => {
+      if (mode) {
+        view.mode = mode
+      }
+      if (pan) {
+        dioramaPan(view, pan[0], pan[1])
+      }
+      if (zoom) {
+        dioramaZoomBy(view, zoom)
+      }
+      if (reduced) {
+        draw()
+      }
+      deps.post({ kind: 'camera', mode: view.mode })
     }
   }
 }

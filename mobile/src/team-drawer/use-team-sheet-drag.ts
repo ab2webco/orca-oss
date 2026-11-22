@@ -83,9 +83,10 @@ export function useTeamSheetDrag(
     })
     .onEnd((e) => release(e.velocityY))
 
-  const scrollGesture = Gesture.Native()
+  const scrollGesture = Gesture.Native().withTestId('team-sheet-scroll')
   // Why from the top only: a flick that scrolls back to the top must not carry on and close the sheet.
   const contentPan = Gesture.Pan()
+    .withTestId('team-sheet-content-drag')
     .activeOffsetY([-8, 8])
     .simultaneousWithExternalGesture(scrollGesture)
     .onBegin(() => {

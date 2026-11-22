@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native'
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler'
 import { WebView } from 'react-native-webview'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
 import { useAppInForeground } from '../plugin-panels/use-plugin-panel-session'
@@ -8,10 +9,16 @@ import { colors, spacing, typography } from '../theme/mobile-theme'
 import type { TeamMemberRow } from './team-drawer-model'
 import type { TeamSceneArtPick, TeamSceneBand as Band } from './team-scene-band'
 import type {
+  TeamSceneCameraMode,
   TeamSceneEngineEvent,
   TeamSceneEngineMessage,
   TeamSceneEngineStage
 } from './team-scene-engine-messages'
+import {
+  TEAM_SCENE_CAMERA_ROW,
+  TeamSceneCameraButtons,
+  useTeamSceneCameraGesture
+} from './TeamSceneCamera'
 import {
   TEAM_SCENE_ENGINE_JS,
   TEAM_SCENE_QUEST_IMAGES
@@ -23,6 +30,8 @@ import {
   TEAM_SCENE_NAME_STRIP
 } from './team-scene-engine-names'
 import { MEMBER_STATE_ROLE, useTeamTones, type TeamTones } from './team-status-tone'
+
+const NO_SHEET_GESTURES: GestureType[] = []
 
 /** The desktop stage's height (TEAM_SCENE_ART_HEIGHT), held until the page says its own. */
 export const TEAM_SCENE_BAND_HEIGHT = 176
@@ -94,6 +103,8 @@ function StageBand({
   leadLine,
   advisorName,
   shown,
+  cameraLabels,
+  sheetGestures,
   onLayout,
   onBroken
 }: {
@@ -102,6 +113,8 @@ function StageBand({
   leadLine: string | null
   advisorName: string
   shown: boolean
+  cameraLabels: { lead: string; all: string }
+  sheetGestures: GestureType[]
   onLayout?: (event: LayoutChangeEvent) => void
   /** The stage stopped drawing, so the sheet shows the names instead. */
   onBroken: () => void
@@ -112,6 +125,11 @@ function StageBand({
   const [loaded, setLoaded] = useState(0)
   const [failed, setFailed] = useState(false)
   const [height, setHeight] = useState(TEAM_SCENE_BAND_HEIGHT)
+  // Why the page's word: it holds the camera across stage rebuilds, and null means a 2D stage.
+  const [camera, setCamera] = useState<TeamSceneCameraMode | null>(null)
+  const sendCamera = (message: Extract<TeamSceneEngineMessage, { kind: 'camera' }>) =>
+    ref.current?.injectJavaScript(scriptOf(message))
+  const gesture = useTeamSceneCameraGesture(camera !== null, sendCamera, sheetGestures)
   const ownFailed = band.art.kind === 'scene' && ownArt?.kind === 'failed'
   const art = failed || ownFailed ? band.fallback : band.art
   const waitsForArt = art.kind === 'scene' && ownArt?.kind !== 'ready'
@@ -166,35 +184,54 @@ function StageBand({
   return (
     <View
       testID="team-scene-band"
-      style={[styles.band, { height }]}
+      style={[styles.band, { height: height + (camera ? TEAM_SCENE_CAMERA_ROW : 0) }]}
       onLayout={onLayout}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
     >
-      <WebView
-        ref={ref}
-        style={styles.webview}
-        originWhitelist={['*']}
-        source={{ html: HTML }}
-        javaScriptEnabled
-        scrollEnabled={false}
-        // Why: the stage is self-contained; nothing it draws may navigate the sheet.
-        onShouldStartLoadWithRequest={(request) =>
-          request.url === 'about:blank' || request.url.startsWith('data:')
-        }
-        onMessage={(event) => {
-          const page = pageEventOf(event.nativeEvent.data)
-          if (page?.kind === 'loaded') {
-            setLoaded((count) => count + 1)
-          } else if (page?.kind === 'ready') {
-            setHeight(page.height)
-          } else if (page?.kind === 'artFailed') {
-            setFailed(true)
-          } else if (page?.kind === 'error') {
-            onBroken()
-          }
-        }}
-      />
+      <GestureDetector gesture={gesture}>
+        <View
+          style={{ height }}
+          collapsable={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <WebView
+            ref={ref}
+            // Why: the sheet's gestures read every touch, so the stage pans only when they say so.
+            pointerEvents="none"
+            style={styles.webview}
+            originWhitelist={['*']}
+            source={{ html: HTML }}
+            javaScriptEnabled
+            scrollEnabled={false}
+            // Why: the stage is self-contained; nothing it draws may navigate the sheet.
+            onShouldStartLoadWithRequest={(request) =>
+              request.url === 'about:blank' || request.url.startsWith('data:')
+            }
+            onMessage={(event) => {
+              const page = pageEventOf(event.nativeEvent.data)
+              if (page?.kind === 'loaded') {
+                setLoaded((count) => count + 1)
+              } else if (page?.kind === 'ready') {
+                setHeight(page.height)
+                setCamera(page.camera ?? null)
+              } else if (page?.kind === 'camera') {
+                setCamera(page.mode)
+              } else if (page?.kind === 'artFailed') {
+                setFailed(true)
+              } else if (page?.kind === 'error') {
+                onBroken()
+              }
+            }}
+          />
+        </View>
+      </GestureDetector>
+      {camera ? (
+        <TeamSceneCameraButtons
+          mode={camera}
+          labels={cameraLabels}
+          onMode={(mode) => sendCamera({ kind: 'camera', mode })}
+        />
+      ) : null}
     </View>
   )
 }
@@ -240,6 +277,8 @@ export function TeamSceneBand({
   advisorName,
   members,
   shown = true,
+  cameraLabels,
+  sheetGestures = NO_SHEET_GESTURES,
   onLayout
 }: {
   band: Band
@@ -253,6 +292,10 @@ export function TeamSceneBand({
   members: TeamMemberRow[]
   /** False while the sheet is scrolled past the band, so its stage runs no frames unseen. */
   shown?: boolean
+  /** Follow the lead and Show all, for a 3D stage's camera. */
+  cameraLabels: { lead: string; all: string }
+  /** The sheet's scroll and drag, which a finger on a 3D stage must not move. */
+  sheetGestures?: GestureType[]
   onLayout?: (event: LayoutChangeEvent) => void
 }) {
   // Why for the band's life: a stage that threw once would only throw again; reopening retries it.
@@ -264,6 +307,8 @@ export function TeamSceneBand({
       leadLine={leadLine}
       advisorName={advisorName}
       shown={shown}
+      cameraLabels={cameraLabels}
+      sheetGestures={sheetGestures}
       onLayout={onLayout}
       onBroken={() => setBroken(true)}
     />

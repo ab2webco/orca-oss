@@ -63,6 +63,8 @@ const ENTRY = `
     for (const id of ['stage', 'overlay', 'names']) document.getElementById(id).style.display = on ? 'none' : ''
   }
   const route = async (message) => {
+    // Why first: only a 3D stage has a camera, and the 2D engine reads any other kind as a stage.
+    if (message.kind === 'camera') return threeD && diorama.camera(message)
     if (!diorama) return engine.receive(message)
     if (message.kind === 'stage') {
       show(diorama.take(message.stage))

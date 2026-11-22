@@ -184,6 +184,8 @@ export function TeamSheet({
                         advisorName={words.advisorName}
                         members={view.members}
                         shown={sceneBand.shown}
+                        cameraLabels={{ lead: words.followLead, all: words.showAll }}
+                        sheetGestures={[drag.scrollGesture, drag.contentPan]}
                         onLayout={sceneBand.onLayout}
                       />
                     ) : null}
