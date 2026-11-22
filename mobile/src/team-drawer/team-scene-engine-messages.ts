@@ -1,7 +1,7 @@
 import type { OrchestratorGameSceneExtension } from '../../../src/shared/orchestrator-game-scene'
 import type { GamePanelPace, GamePanelQuality } from '../../../src/shared/orchestrator-game-panel'
 import type { DioramaMachine } from '../../../src/shared/team-scene/team-diorama-layout'
-import type { TeamSceneFloor } from '../../../src/shared/team-scene/team-scene-floors'
+import type { Office3dFloorInput } from '../../../src/shared/team-scene/team-office3d-layout'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import type { TeamSceneArtPick } from './team-scene-band'
 
@@ -43,7 +43,7 @@ export type TeamSceneEngineMessage =
       /** The team's machines, for the diorama's islands; absent puts everyone on one island. */
       machines?: DioramaMachine[]
       /** The team's floors, a machine each, for the 3D Office. */
-      floors?: TeamSceneFloor[]
+      floors?: Office3dFloorInput[]
     }
   /** `run` is false while nobody can see the band; `reduced` is the phone's Reduce Motion. */
   | { kind: 'motion'; run: boolean; reduced: boolean }

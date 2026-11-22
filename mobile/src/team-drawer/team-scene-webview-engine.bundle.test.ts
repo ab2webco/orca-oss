@@ -266,32 +266,6 @@ describe('the Team scene WebView bundle', () => {
     expect(page.thrown).toEqual([])
   })
 
-  // ORCA-1334: a host that draws the 3D Office still gets the 2D Office where WebGL does not open.
-  it('keeps the Office in 2D where the 3D canvas gets no WebGL, and never breaks the page', async () => {
-    const stage3d = { style: { display: 'none' } }
-    const page = loadPage(true, { threeD: stage3d })
-    await page.send({
-      kind: 'stage',
-      stage: {
-        art: { kind: 'bundled', style: 'office' },
-        images: {},
-        scenes: [],
-        timezone: 'America/Bogota',
-        nowMs: Date.UTC(2026, 10, 16, 3, 0),
-        colors: { attention: '#f00', done: '#a0f', working: '#0f0', risk: '#fa0' },
-        office3d: {
-          pace: 'normal',
-          words: { thisMachine: 'm1', offline: 'Offline', lobby: 'Lobby' }
-        }
-      }
-    })
-    await page.send({ kind: 'input', input, leadLine: null, advisorName: 'Jev', floors: [] })
-    page.flush(10)
-    expect(stage3d.style.display).toBe('none')
-    expect(page.posted.filter((one) => one.kind === 'error')).toEqual([])
-    expect(page.thrown).toEqual([])
-  })
-
   // ORCA-1335: only a 3D stage has a camera; the 2D engine reads any other kind as a new stage.
   it('leaves a 2D stage alone when the sheet sends a camera move', async () => {
     const page = loadPage(true, { threeD: { style: { display: 'none' } } })

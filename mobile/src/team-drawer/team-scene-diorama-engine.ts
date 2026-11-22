@@ -3,12 +3,14 @@ import {
   type DioramaMachine,
   type DioramaOrder
 } from '../../../src/shared/team-scene/team-diorama-layout'
-import { teamOffice3dLayoutOf } from '../../../src/shared/team-scene/team-office3d-layout'
+import {
+  teamOffice3dLayoutOf,
+  type Office3dFloorInput
+} from '../../../src/shared/team-scene/team-office3d-layout'
 import {
   office3dTraffic,
   office3dTrafficRead
 } from '../../../src/shared/team-scene/team-office3d-traffic'
-import type { TeamSceneFloor } from '../../../src/shared/team-scene/team-scene-floors'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 import {
   dioramaCuesAfter,
@@ -43,7 +45,7 @@ type Gl = NonNullable<ReturnType<typeof dioramaRenderer>>
 type Read = {
   input: TeamSceneInput
   machines: DioramaMachine[]
-  floors: TeamSceneFloor[] | undefined
+  floors: Office3dFloorInput[] | undefined
 }
 type Colors = TeamSceneEngineStage['colors']
 type Office = NonNullable<TeamSceneEngineStage['office3d']>
@@ -57,7 +59,7 @@ export type TeamSceneDioramaEngine = {
   input: (
     input: TeamSceneInput,
     machines: DioramaMachine[] | undefined,
-    floors?: TeamSceneFloor[]
+    floors?: Office3dFloorInput[]
   ) => void
   motion: (run: boolean, reduced: boolean) => void
   camera: (message: Extract<TeamSceneEngineMessage, { kind: 'camera' }>) => void
@@ -97,6 +99,9 @@ export function createTeamSceneDioramaEngine(deps: {
   let last = 0
   let run = false
   let reduced = false
+  // A read that came while parked, built once on resume; and the scene the camera last aimed in.
+  let dirty = false
+  let aimed: 'figures' | 'office' | null = null
 
   const stop = () => {
     if (frame !== null) {
@@ -124,20 +129,27 @@ export function createTeamSceneDioramaEngine(deps: {
       frame = deps.scheduler.request(loop)
     }
   }
-  const officeStage = (gl: Gl, width: number, status: Colors, want: Office, at: Read) => {
-    const layout = teamOffice3dLayoutOf(at.floors ?? [], {
-      leadAdvisor: at.input.advisor !== null,
+  const officeStage = (
+    gl: Gl,
+    width: number,
+    status: Colors,
+    want: Office,
+    input: TeamSceneInput,
+    floors: Office3dFloorInput[]
+  ) => {
+    const layout = teamOffice3dLayoutOf(floors, {
+      leadAdvisor: input.advisor !== null,
       previous: officeOrder
     })
     officeOrder = layout.order
-    office3dTrafficRead(traffic, layout, at.input, performance.now() / 1000, want.pace)
+    office3dTrafficRead(traffic, layout, input, performance.now() / 1000, want.pace)
     const machines = layout.floors.filter((f) => !f.lobby).length
     return office3dStage(gl, {
       width,
       height: Math.min(PHONE_MAX_HEIGHT, office3dDefaultHeight(machines)),
       dark: deps.dark(),
       status,
-      input: at.input,
+      input,
       layout,
       pace: want.pace,
       view,
@@ -167,19 +179,42 @@ export function createTeamSceneDioramaEngine(deps: {
     if (!renderer || !wanted || !read) {
       return
     }
+    // Why not while parked: each build uploads a whole scene and draws nothing anyone sees; the first
+    // is kept so an open draws at once (ORCA-1309).
+    if (stage && !run) {
+      dirty = true
+      return
+    }
+    dirty = false
     const { colors, office3d, diorama } = wanted
-    const width = deps.width()
     stage?.dispose()
-    stage = office3d
-      ? officeStage(renderer, width, colors, office3d, read)
-      : diorama
-        ? figuresStage(renderer, width, colors, diorama, read)
-        : null
+    stage = null
+    const { floors } = read
+    // Why wait: a switch to the Office comes before the read that carries its floors.
+    if (office3d && !floors) {
+      stop()
+      return
+    }
+    // Why a fresh aim: the camera sits in the last 3D scene's world, which the other does not share.
+    const kind = office3d ? 'office' : 'figures'
+    if (kind !== aimed) {
+      view.target = null
+      aimed = kind
+    }
+    const width = deps.width()
+    stage =
+      office3d && floors
+        ? officeStage(renderer, width, colors, office3d, read.input, floors)
+        : diorama
+          ? figuresStage(renderer, width, colors, diorama, read)
+          : null
     if (!stage) {
       return
     }
     deps.post({ kind: 'ready', height: stage.height, camera: view.mode })
-    draw()
+    if (run) {
+      draw()
+    }
     start()
   }
 
@@ -191,10 +226,6 @@ export function createTeamSceneDioramaEngine(deps: {
       // Why alpha: the Office stands on the page's own background, as on the desktop.
       if (!renderer && threeD) {
         renderer = dioramaRenderer(deps.canvas, true)
-      }
-      // Why a fresh aim: the camera sits in the last scene's world, which the other style does not share.
-      if (wanted && threeD && Boolean(wanted.office3d) !== Boolean(next.office3d)) {
-        view.target = null
       }
       wanted = threeD && renderer ? next : null
       if (!wanted) {
@@ -213,6 +244,13 @@ export function createTeamSceneDioramaEngine(deps: {
     motion: (nextRun, nextReduced) => {
       run = nextRun
       reduced = nextReduced
+      if (run && dirty) {
+        build()
+        return
+      }
+      if (run && reduced) {
+        draw()
+      }
       start()
     },
     // Why the sheet's fingers, not the page's: its gestures decide whether a drag moves the camera

@@ -136,6 +136,10 @@ export function dioramaStage(
       dioramaAim(args.view, fit, lead.figure.g.position, args.width, t)
       renderer.render(scene, fit.camera)
     },
-    dispose: () => kit.dispose(world)
+    // Why the sun too: its shadow map lives outside the world, and leaked on every rebuild.
+    dispose: () => {
+      kit.dispose(world)
+      sun.dispose()
+    }
   }
 }

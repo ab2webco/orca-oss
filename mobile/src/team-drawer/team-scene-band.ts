@@ -23,10 +23,8 @@ import {
   teamDioramaMachinesOf,
   type DioramaMachine
 } from '../../../src/shared/team-scene/team-diorama-layout'
-import {
-  teamSceneFloorsOf,
-  type TeamSceneFloor
-} from '../../../src/shared/team-scene/team-scene-floors'
+import type { Office3dFloorInput } from '../../../src/shared/team-scene/team-office3d-layout'
+import { teamSceneFloorsOf } from '../../../src/shared/team-scene/team-scene-floors'
 import { teamSceneInputOf } from '../../../src/shared/team-scene/team-scene-input'
 import type { TeamSceneInput } from '../../../src/shared/team-scene/team-scene-types'
 
@@ -59,7 +57,7 @@ export type TeamSceneBand =
       /** The team's machines, an island each in the diorama. */
       machines: DioramaMachine[]
       /** The Office as the 3D building, where the host draws it so; absent draws the 2D Office. */
-      office3d?: { pace: GamePanelPace; floors: TeamSceneFloor[] }
+      office3d?: { pace: GamePanelPace; floors: Office3dFloorInput[] }
     }
 
 const QUEST = 'quest'
@@ -122,11 +120,16 @@ export function teamSceneBandOf(
     style === 'office' && panel.office3d === true
       ? {
           pace,
+          // Why only pane and decisions: the building reads no more, and a summary or PR change
+          // must not resend and rebuild it.
           floors: teamSceneFloorsOf({
             lead: cards.lead,
             members: cards.members,
             machines: options.machines ?? null
-          })
+          }).map((floor) => ({
+            ...floor,
+            members: floor.members.map(({ paneKey, decisions }) => ({ paneKey, decisions }))
+          }))
         }
       : undefined
   return {

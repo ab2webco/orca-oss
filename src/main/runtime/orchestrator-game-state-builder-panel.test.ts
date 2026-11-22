@@ -37,12 +37,9 @@ const stateWith = (panel: Record<string, unknown>) => {
 
 // Why: a phone draws the 3D Office only for a host that says so; an older host says nothing (ORCA-1334).
 describe('the panel the phone reads', () => {
-  it('says this host draws the Office in 3D when the Office is at Illustrated', async () => {
+  it('says this host draws the Office in 3D only when the Office is at Illustrated', async () => {
     const { panel } = await stateWith({ look: 'game', style: 'office', quality: 'high' })
     expect(panel).toMatchObject({ style: 'office', quality: 'high', office3d: true })
-  })
-
-  it('says nothing for the 2D Office at Low resources or for another style', async () => {
     for (const one of [
       { style: 'office', quality: 'low' },
       { style: 'figures', quality: 'high' }

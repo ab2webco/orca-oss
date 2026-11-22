@@ -296,6 +296,10 @@ export function office3dStage(
       keepOffice3dChipsInFrame(chips, fit.camera)
       office3dRenderByFloor(renderer, scene, world, fit.camera, layout.floors.length)
     },
-    dispose: () => kit.dispose(world)
+    // Why the sun too: its shadow map lives outside the world, and leaked on every rebuild.
+    dispose: () => {
+      kit.dispose(world)
+      sun.dispose()
+    }
   }
 }

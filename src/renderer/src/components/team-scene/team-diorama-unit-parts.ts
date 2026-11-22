@@ -14,6 +14,7 @@ const gradientMap = (): THREE.DataTexture => {
     gradient.minFilter = gradient.magFilter = THREE.NearestFilter
     gradient.generateMipmaps = false
     gradient.needsUpdate = true
+    gradient.userData.shared = true
   }
   return gradient
 }

@@ -193,7 +193,7 @@ export function TeamSheet({
                       parked={parked}
                       cameraLabels={{ lead: words.followLead, all: words.showAll }}
                       officeWords={{
-                        thisMachine: hostName ?? '',
+                        thisMachine: hostName || workWords.desktop,
                         offline: workWords.offline,
                         lobby: workWords.lobby
                       }}

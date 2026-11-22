@@ -159,8 +159,8 @@ describe('the Team sheet scene band', () => {
       { host: 'contabo', status: 'unreachable', running: 0 }
     ]
 
-    // Why the machines list: as on the desktop, it gives each floor its cap and reach.
-    it("asks for it with each machine's floor, cap and reach, when the host says it draws it", () => {
+    // Why the host's word: a host older than the 3D Office also says office and high (ORCA-1334).
+    it("asks for it, with each machine's floor, cap and reach, only where the host says it draws it", () => {
       const agents = [
         leader,
         member('tab-1:leaf'),
@@ -176,18 +176,12 @@ describe('the Team sheet scene band', () => {
         ['imac', false, 2, true],
         ['contabo', false, null, false]
       ])
-      expect(band.art).toEqual({ kind: 'bundled', style: 'office' })
-    })
-
-    it('keeps the 2D Office for a host that does not say so, though it says office and high', () => {
-      expect(stageOf({ panel: office, hostCapacity }).office3d).toBeUndefined()
-      expect(stageOf({ panel: { ...office, office3d: 'yes' } }).office3d).toBeUndefined()
-    })
-
-    it("leaves Figures' islands as they were, without the machines list's caps", () => {
-      const band = stageOf({ panel: { ...panel('game', 'figures'), office3d: true }, hostCapacity })
-      expect(band.office3d).toBeUndefined()
-      expect(band.machines.map((one) => [one.key, one.cap])).toEqual([['', null]])
+      // Why only pane and decisions: a summary or PR change must not resend and rebuild the building.
+      expect(band.office3d?.floors[0]!.members).toEqual([
+        { paneKey: 'tab-1:leaf', decisions: undefined }
+      ])
+      expect(stageOf({ panel: office, hostCapacity, agents }).office3d).toBeUndefined()
+      expect(stageOf({ panel: { ...office, office3d: 'yes' }, agents }).office3d).toBeUndefined()
     })
   })
 
