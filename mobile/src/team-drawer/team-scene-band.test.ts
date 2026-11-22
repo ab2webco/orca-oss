@@ -159,6 +159,13 @@ describe('the Team sheet scene band', () => {
       { host: 'contabo', status: 'unreachable', running: 0 }
     ]
 
+    // Why: Figures keeps its islands as #1372 shipped them; the machines list feeds only the Office.
+    it("leaves Figures' islands without the machines list's caps", () => {
+      const band = stageOf({ panel: { ...panel('game', 'figures'), office3d: true }, hostCapacity })
+      expect(band.office3d).toBeUndefined()
+      expect(band.machines.map((one) => [one.key, one.cap])).toEqual([['', null]])
+    })
+
     // Why the host's word: a host older than the 3D Office also says office and high (ORCA-1334).
     it("asks for it, with each machine's floor, cap and reach, only where the host says it draws it", () => {
       const agents = [

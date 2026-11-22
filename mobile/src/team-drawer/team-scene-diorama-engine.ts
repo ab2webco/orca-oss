@@ -40,6 +40,11 @@ import type {
 
 const FRAME_MS = 1000 / 30
 const PHONE_MAX_HEIGHT = 300
+// Why below the desktop's 2 and 2048: no frame rate was measured on a phone, only on a simulator
+// that renders with a Mac's GPU (lead's call on ORCA-1334).
+export const PHONE_3D_LIMITS = { pixelRatio: 1.5, shadowMap: 1024 }
+const officeHeight = (floors: readonly unknown[]) =>
+  Math.min(PHONE_MAX_HEIGHT, office3dDefaultHeight(floors.length))
 
 type Gl = NonNullable<ReturnType<typeof dioramaRenderer>>
 type Read = {
@@ -143,10 +148,10 @@ export function createTeamSceneDioramaEngine(deps: {
     })
     officeOrder = layout.order
     office3dTrafficRead(traffic, layout, input, performance.now() / 1000, want.pace)
-    const machines = layout.floors.filter((f) => !f.lobby).length
     return office3dStage(gl, {
       width,
-      height: Math.min(PHONE_MAX_HEIGHT, office3dDefaultHeight(machines)),
+      height: officeHeight(floors),
+      limits: PHONE_3D_LIMITS,
       dark: deps.dark(),
       status,
       input,
@@ -172,7 +177,8 @@ export function createTeamSceneDioramaEngine(deps: {
       lite: want.quality === 'low',
       pace: want.pace,
       view,
-      maxHeight: PHONE_MAX_HEIGHT
+      maxHeight: PHONE_MAX_HEIGHT,
+      limits: PHONE_3D_LIMITS
     })
   }
   const build = () => {
@@ -183,6 +189,10 @@ export function createTeamSceneDioramaEngine(deps: {
     // is kept so an open draws at once (ORCA-1309).
     if (stage && !run) {
       dirty = true
+      // Why the height now: the band must have its new size before the sheet opens, not during.
+      if (wanted.office3d && read.floors) {
+        deps.post({ kind: 'ready', height: officeHeight(read.floors), camera: view.mode })
+      }
       return
     }
     dirty = false

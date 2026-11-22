@@ -36,6 +36,9 @@ export function dioramaRenderer(
   }
 }
 
+/** A client's caps on pixel ratio and shadow-map size; absent keeps the desktop's 2 and 2048. */
+export type DioramaRenderLimits = { pixelRatio: number; shadowMap: number }
+
 /** One read of the team as a lit world with its cast, its lead's round and the moments playing. */
 export function dioramaStage(
   renderer: THREE.WebGLRenderer,
@@ -54,6 +57,7 @@ export function dioramaStage(
     view: DioramaView
     /** The tallest the stage may be; the phone keeps its band short. */
     maxHeight?: number
+    limits?: DioramaRenderLimits
     /** A taller stage the person dragged to; the world draws bigger in it. */
     height?: number
     /** The island chips' words; a client without them names only remote machines. */
@@ -64,7 +68,8 @@ export function dioramaStage(
   const { lite } = args
   const kit = dioramaKit(args.dark ? NIGHT : DAY, args.status)
   const scene = new THREE.Scene()
-  renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, 2))
+  const limits = args.limits ?? { pixelRatio: 2, shadowMap: 2048 }
+  renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, limits.pixelRatio))
   renderer.shadowMap.enabled = !lite
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.setClearColor(kit.p.sea)
@@ -76,7 +81,7 @@ export function dioramaStage(
   )
   const sun = new THREE.DirectionalLight(raw(kit.p.sun), kit.p.sunI * Math.PI)
   sun.castShadow = !lite
-  sun.shadow.mapSize.set(2048, 2048)
+  sun.shadow.mapSize.set(limits.shadowMap, limits.shadowMap)
   // Why a bias: without it thin decks and planks shade themselves in stripes that shimmer.
   sun.shadow.bias = -0.0006
   sun.shadow.normalBias = 0.02

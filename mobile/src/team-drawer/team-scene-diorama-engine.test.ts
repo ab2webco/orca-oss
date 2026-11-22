@@ -19,7 +19,7 @@ const { built, stageOf } = vi.hoisted(() => {
     const one: Built = { kind, args, aimAtBuild: args.view.target, draws: 0, disposed: 0 }
     built.push(one)
     return {
-      height: 224,
+      height: (args.height as number | undefined) ?? 220,
       full: 224,
       draw: () => {
         one.draws++
@@ -171,6 +171,30 @@ describe('the 3D Office on the phone (ORCA-1334)', () => {
     one.motion(true, false)
     expect(offices()).toHaveLength(2)
     expect(offices()[1]!.draws).toBe(1)
+  })
+
+  // Why the phone's own caps: no frame rate was measured on a device (lead's call).
+  it('draws both 3D scenes at pixel ratio 1.5 and a 1024 shadow map, below the desktop', () => {
+    const { one } = officeEngine()
+    one.motion(true, false)
+    one.take(figures)
+    one.input(input, undefined, floors)
+    one.take(office)
+    expect(built.map((b) => [b.kind, b.args.limits])).toEqual([
+      ['figures', { pixelRatio: 1.5, shadowMap: 1024 }],
+      ['office', { pixelRatio: 1.5, shadowMap: 1024 }]
+    ])
+  })
+
+  it("sends the Office's new height while parked, so the band is sized before the sheet opens", () => {
+    const { one, posted, offices } = officeEngine()
+    one.motion(false, false)
+    one.take(office)
+    one.input(input, undefined, [floor('', 'a')])
+    expect(posted.at(-1)).toMatchObject({ kind: 'ready', height: 176 })
+    one.input(input, undefined, floors)
+    expect(posted.at(-1)).toMatchObject({ kind: 'ready', height: 224 })
+    expect(offices()).toHaveLength(1)
   })
 
   it('aims the camera afresh when the 3D scene changes, even through a 2D stage', () => {

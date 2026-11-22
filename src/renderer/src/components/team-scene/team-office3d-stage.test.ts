@@ -162,6 +162,29 @@ describe('the 3D Office stage', () => {
     expect(sunGone).toHaveBeenCalled()
   })
 
+  it("caps the shadow map where the client asks, and keeps the desktop's 2048 otherwise", () => {
+    const sunOf = (limits?: { pixelRatio: number; shadowMap: number }) => {
+      const r = renderer()
+      office3dStage(r.fake, {
+        width: 350,
+        dark: false,
+        status,
+        input: input([member('a', 'working')]),
+        layout: teamOffice3dLayoutOf([floor('', ['a'])], { leadAdvisor: false }),
+        pace: 'normal',
+        words: { thisMachine: 'This Mac', offline: 'Offline' },
+        ...(limits ? { limits } : {})
+      }).draw(0)
+      let sun: THREE.DirectionalLight | null = null
+      r.scenes[0]!.traverse((o) => {
+        sun = o instanceof THREE.DirectionalLight ? o : sun
+      })
+      return (sun as THREE.DirectionalLight | null)!.shadow.mapSize.x
+    }
+    expect(sunOf({ pixelRatio: 1.5, shadowMap: 1024 })).toBe(1024)
+    expect(sunOf()).toBe(2048)
+  })
+
   it('sizes the canvas to the panel width and draws a frame', () => {
     const { stage, scenes, setSize } = stageOf([member('a', 'working')], [floor('', ['a'])])
     expect(setSize).toHaveBeenCalledWith(350, stage.height, true)
