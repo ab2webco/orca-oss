@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { factoryRing } from '../../site/src/data/factory-ring'
 import {
   findCommandSpec,
   normalizeCommandPositionals,
@@ -14,13 +15,16 @@ import { parseGameEffortPlan } from '../shared/orchestrator-game-effort-plan'
 const words = (line: string): string[] =>
   [...line.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2] ?? '')
 
-const orcaLines = (['en', 'es'] as const).flatMap((lang) =>
-  factoryRing(lang).stations.flatMap((station) =>
-    station.command
-      .split('\n')
-      .filter((line) => line.startsWith('orca '))
-      .map((line) => ({ lang, line }))
-  )
+// Read as text: the site is its own TypeScript project and the CLI build cannot import it.
+const landingSource = readFileSync(
+  path.join(__dirname, '../../site/src/data/factory-ring.ts'),
+  'utf8'
+)
+const orcaLines = [...landingSource.matchAll(/'((?:orca )[^']*)'/g)].flatMap(([, command = '']) =>
+  command
+    .split('\\n')
+    .filter((line) => line.startsWith('orca '))
+    .map((line) => ({ line }))
 )
 
 describe('the landing factory ring commands', () => {
@@ -28,7 +32,7 @@ describe('the landing factory ring commands', () => {
     expect(orcaLines.length).toBeGreaterThanOrEqual(20)
   })
 
-  it.each(orcaLines)('the CLI accepts $lang: $line', ({ line }) => {
+  it.each(orcaLines)('the CLI accepts $line', ({ line }) => {
     const argv = words(line).slice(1)
     const passthrough = COMMAND_SPECS.find(
       (spec) => spec.argumentMode === 'passthrough' && spec.path[0] === argv[0]
