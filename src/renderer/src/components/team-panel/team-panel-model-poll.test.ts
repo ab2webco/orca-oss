@@ -220,6 +220,53 @@ describe('createTeamPanelModelPoller', () => {
     expect(last()).toEqual({ kind: 'ready', value: MODEL })
   })
 
+  // Review N4: after the opening read, a poll must not swap the error (and its Retry) for the skeleton.
+  it('keeps a failed read on screen through the next poll, with no team skeleton', async () => {
+    const readState = vi.fn(async () => {
+      throw new Error('down')
+    })
+    const { all, sources } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(2)
+    expect(
+      sources.slice(opened).some((one) => one.section.kind === 'loading' && 'team' in one.section)
+    ).toBe(false)
+  })
+
+  it('keeps a failed game.leads read on screen when the next poll finds the lead', async () => {
+    let land: (state: OrchestratorGameState) => void = () => {}
+    const readLeads = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValue({ leads: [{ handle: 'term' }], restoring: [] })
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (land = done)))
+    const { all, sources } = deps({ readLeads, readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(1)
+    expect(sources.slice(opened).some((one) => one.section.kind === 'loading')).toBe(false)
+    land({ role: 'lead' } as OrchestratorGameState)
+  })
+
+  it('never marks loading as a team on a later poll of a project with no team', async () => {
+    const readState = vi.fn(async () => null)
+    const { all, sources } = deps({ readState })
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    const opened = sources.length
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(readState).toHaveBeenCalledTimes(2)
+    expect(sources.slice(opened).map((one) => one.section.kind)).toEqual(['unavailable'])
+  })
+
   it('never marks loading as a team when game.leads finds no lead', async () => {
     const { all, sources } = deps({ findCaller: vi.fn(() => null) })
 

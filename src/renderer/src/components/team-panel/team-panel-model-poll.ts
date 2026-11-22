@@ -77,6 +77,8 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     again: boolean
     /** Retry now's waiters; the next read is fresh and settles them. */
     fresh: (() => void)[]
+    /** The panel still shows the opening's loading view; no game.state read has settled since. */
+    opening: boolean
   } | null = null
   let generation = 0
   // Why outside the run: leaving the panel ends the run, and a sick host must not cost the team.
@@ -123,26 +125,20 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
 
   const read = async (): Promise<void> => {
     const run = active
-    if (!run) {
-      return
-    }
-    const waiters = run.fresh.splice(0)
-    try {
-      await readOnce(run, waiters.length > 0)
-    } finally {
-      waiters.forEach((settle) => settle())
-    }
+    const waiters = run?.fresh.splice(0) ?? []
+    await (run && readOnce(run, waiters.length > 0))?.finally(() => waiters.forEach((one) => one()))
   }
 
   const readOnce = async (run: NonNullable<typeof active>, fresh: boolean): Promise<void> => {
     const mine = ++generation
+    const current = (): boolean => mine === generation && active === run
     const { scope } = run
     const retry = (): void => void refresh()
     let stage: ReadStage = 'game.leads'
     try {
       const found = deps.findCaller(await deps.readLeads(scope.target), scope)
       if (found === 'restoring') {
-        if (mine === generation && active === run) {
+        if (current()) {
           endStreak(scope, false)
           const team = lastTeams.get(scope.key)
           deps.publish(
@@ -159,12 +155,17 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       const caller = found
-      // Why: a lead was found, so the skeleton may take the team's shape while game.state is read.
-      if (caller && !lastTeams.has(scope.key) && mine === generation && active === run) {
+      // Why only while opening: a later poll would swap an error or the no-team view for it (review N4).
+      if (caller && run.opening && !lastTeams.has(scope.key) && current()) {
         deps.publish({ section: { kind: 'loading', team: true }, retry: null }, scope)
       }
       stage = 'game.state'
-      const state = caller ? await deps.readState(scope.target, caller, { fresh }) : null
+      let state: OrchestratorGameState | null = null
+      try {
+        state = caller ? await deps.readState(scope.target, caller, { fresh }) : null
+      } finally {
+        run.opening = false
+      }
       const [questions, xp] =
         caller && state
           ? await Promise.all([
@@ -184,7 +185,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
             xp
           })
         : null
-      if (mine !== generation || active !== run) {
+      if (!current()) {
         return
       }
       if (!model) {
@@ -203,7 +204,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         scope
       )
     } catch (error) {
-      if (mine !== generation || active !== run) {
+      // Why: a failed game.leads read shows its error too, which a later skeleton must not replace.
+      run.opening = false
+      if (!current()) {
         return
       }
       // Why: a host older than the game has nothing to read, which is no team and not a failure.
@@ -273,6 +276,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     run.timer = setInterval(() => void refresh(), intervalMs)
     run.reading = false
     run.again = false
+    run.opening = true
     publishOpening(run.scope)
     void refresh()
   }
@@ -319,6 +323,7 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
           reading: false,
           again: false,
           fresh: [],
+          opening: true,
           timer: setInterval(() => void refresh(), intervalMs)
         }
         void refresh()

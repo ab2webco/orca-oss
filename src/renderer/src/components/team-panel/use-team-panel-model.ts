@@ -171,10 +171,14 @@ export function useTeamPanelModel(options: { background?: boolean } = {}): TeamP
     lastTeam && isRemoteMemberWorktreeActive(lastTeam.members, s) ? lastTeam.scope.key : null
   )
   const scope = heldKey !== null && lastTeam?.scope.key === heldKey ? lastTeam.scope : activeScope
-  useEffect(
-    () => (scope ? poller.subscribe(scope, { background }) : undefined),
-    [scope, background]
-  )
+  useEffect(() => {
+    if (!scope) {
+      // Why (review N2a): no project shown, so no Answered list may keep the last one's answers.
+      useTeamPanelModelStore.setState({ scopeKey: null })
+      return undefined
+    }
+    return poller.subscribe(scope, { background })
+  }, [scope, background])
   // Why: an answer changes the Inbox count, and a Jev line the scene's bubble, now, not at the next 20 s read.
   useEffect(() => {
     if (!scope) {
