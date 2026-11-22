@@ -161,6 +161,12 @@ describe("the lead's attend cue", () => {
     expect(atA!.start).toBeGreaterThanOrEqual(6)
   })
 
+  // Why: two members asking at once must pick the same one every read, or the lead walks back and forth.
+  it('goes to the first asker in Team order when two members ask at once', () => {
+    expect(dioramaAskerOf(team(['b', 'a']), layout)).toBe('a')
+    expect(trip(dioramaAttendCueOf(undefined, team(['b', 'a']), layout, 5, 'normal'))).toBe('>a@5')
+  })
+
   it('never sets out to an unreachable machine, nor while the lead cannot work', () => {
     expect(dioramaAskerOf(team(['z']), layout)).toBeNull()
     expect(dioramaAttendCueOf(undefined, team(['b'], 'blocked'), layout, 5, 'normal')).toBeNull()

@@ -70,12 +70,14 @@ describe("the lead's trip", () => {
     }
   })
 
+  // ORCA-1336 rename of "talks to each member where its state stands it, from a step away on the road"
   it('talks to the member where its state stands it', () => {
     const stand: [number, number] = [plotOf('b').x + 1.6, plotOf('b').z + 1.25]
     const last = tripOf(null, 'b', 0, 'normal', new Map([['b', stand]])).steps.at(-1)!
     expect(last.kind === 'hold' && last.face).toEqual(stand)
   })
 
+  // ORCA-1336 rename of "walks only on the roads, rows only on open water, and ends idle at the gate"
   it('walks only on the roads and rows only on open water, one row per crossing', () => {
     for (const [from, to, rows] of [
       [null, 'x', 1],
@@ -112,6 +114,7 @@ describe("the lead's trip", () => {
     expect(far(end.at, DIORAMA_GATE)).toBeLessThan(0.5)
   })
 
+  // ORCA-1336 rename of "sends the lead by magic at the direct pace, and faster at the fast one"
   it('goes by magic at the direct pace, and arrives sooner at the fast one', () => {
     const direct = tripOf(null, 'x', 0, 'direct')
     expect(direct.steps.some((s) => s.kind === 'walk' || s.kind === 'row')).toBe(false)
@@ -144,6 +147,7 @@ describe('the direct pace under reduced motion', () => {
 })
 
 describe('the boats on a trip', () => {
+  // ORCA-1336 rename of "seats the lead in its boat while rowing, and moors the boat where the trip left it"
   it('seats the lead while it rows, and leaves the boat at the island while it stays', () => {
     const round = tripOf(null, 'x', 0)
     const row = round.steps.find((s) => s.kind === 'row' && s.dur > 0)!
