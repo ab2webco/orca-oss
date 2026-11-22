@@ -131,3 +131,19 @@ src/shared/orchestrator-game-scene-native.test.ts # a scene's own art, and Pixel
 # ORCA-1311: both only recorded orphan clips (game-view-switcher, owner-inbox) that no page uses.
 tests/e2e/settings-orchestrator-game-view-showcase.spec.ts # covered by settings-orchestrator-game-view.spec.ts
 tests/e2e/game-inbox-showcase.spec.ts # covered by game-inbox.spec.ts and game-inbox-threads.spec.ts; only the local live-lead check is gone
+
+# ORCA-1336 (PR #1427): the owner's rule, the lead leaves its spot only for a member who asks. Removed
+# the ambient give round (walk to a working member, hand it work, walk back, carry the work, visit each
+# working member, skip the rest, turn back when stopped, drop a round to attend, walk back mid-round,
+# never hold on a round that hands work). Replaced by: 'a working lead with no asker and no send never
+# leaves its spot', 'takes a member report at its spot' (was 'lets a member report first'), 'walks to a
+# member who needs you and stays with it while it asks', 'walks home once the member is answered', 'a
+# lead that is not working stays at its spot when nobody needs you', 'never holds with nobody asking'.
+src/shared/team-scene/team-scene-lead-rounds.test.ts # ORCA-1336 give round removed, see above
+# ORCA-1336 (PR #1427): the 3D lead now makes one trip to the member who asks and stays there, not a
+# looping round. Removed: loops, names each Direct jump, visits every member of an island in one boat
+# trip. Replaced by: 'with nobody asking, stays idle at the gate at every moment', 'walks only on the
+# roads and rows only on open water, one row per crossing', 'goes by magic at the direct pace', 'seats
+# the lead while it rows, and leaves the boat at the island while it stays', 'the direct pace under
+# reduced motion stands still'.
+src/shared/team-scene/team-diorama-lead-round.test.ts # ORCA-1336 looping round removed, see above

@@ -125,6 +125,24 @@ describe("the lead's trip", () => {
   })
 })
 
+// Why: reduced motion draws one still frame at t = 1.3, so a jump must not be mid-air there.
+describe('the direct pace under reduced motion', () => {
+  it('stands still at the gate with nobody asking, and at the asker it already talks to', () => {
+    for (const [from, to] of [
+      [null, null],
+      ['b', 'b']
+    ] as const) {
+      const round = tripOf(from, to, 0, 'direct')
+      const at = dioramaLeadAt(round, 1.3)
+      expect(at.blink, `${from} to ${to}`).toBe(1)
+      expect(at.pose).toBe(from ? 'talk' : 'idle')
+      if (!from) {
+        expect(far(at.at, DIORAMA_GATE)).toBeLessThan(0.5)
+      }
+    }
+  })
+})
+
 describe('the boats on a trip', () => {
   it('seats the lead while it rows, and leaves the boat at the island while it stays', () => {
     const round = tripOf(null, 'x', 0)

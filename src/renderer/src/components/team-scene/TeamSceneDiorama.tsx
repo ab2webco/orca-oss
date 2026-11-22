@@ -103,7 +103,7 @@ export function TeamSceneDiorama({
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     // Why the moments live in a ref: each read rebuilds the stage, and a moment keeps playing.
     const at = performance.now() / 1000
-    const cues = dioramaCuesAfter(moments.current, input, layout, at, reduced)
+    const cues = dioramaCuesAfter(moments.current, input, layout, at, reduced, look.pace)
     const stage = dioramaStage(renderer, {
       width,
       dark: document.documentElement.classList.contains('dark'),

@@ -1,4 +1,7 @@
+import { dioramaLeadRoundOf, type DioramaPace } from './team-diorama-lead-round'
 import type { DioramaIsland, DioramaLayout } from './team-diorama-layout'
+import { dioramaWaterGrid } from './team-diorama-nav'
+import { dioramaRoadNet } from './team-diorama-roads'
 import type { TeamSceneEvent, TeamSceneInput, TeamSceneVerdictTone } from './team-scene-types'
 
 // Why cues outlive a read: the diorama is rebuilt on every read of the team, so a moment that
@@ -125,17 +128,32 @@ export function dioramaAskerOf(input: TeamSceneInput, layout: DioramaLayout): st
 
 /**
  * The lead's trip after a read at `now`: kept while its asker still asks, else a new one from that
- * asker to the next, or home. None before anyone has asked, so the lead stays at the castle.
+ * asker to the next, or home. None before anyone has asked, so the lead stays at the castle. A
+ * new trip waits until the lead has reached the last asker, so it never jumps mid-walk.
  */
 export function dioramaAttendCueOf(
   prev: DioramaCue | undefined,
   input: TeamSceneInput,
   layout: DioramaLayout,
-  now: number
+  now: number,
+  pace: DioramaPace
 ): DioramaCue | null {
   const to = dioramaAskerOf(input, layout) ?? ''
   if (prev ? prev.key === to : to === '') {
     return prev ?? null
   }
-  return { ...cue('attend', to, 'ask', now), from: prev?.key ?? '' }
+  const start = prev ? Math.max(now, arrivalOf(prev, layout, pace)) : now
+  return { ...cue('attend', to, 'ask', start), from: prev?.key ?? '' }
+}
+
+/** When the lead, on `prev`'s trip, stands at its last member. */
+function arrivalOf(prev: DioramaCue, layout: DioramaLayout, pace: DioramaPace): number {
+  const round = dioramaLeadRoundOf({
+    layout,
+    roads: dioramaRoadNet(layout),
+    water: dioramaWaterGrid(layout),
+    trip: { from: prev.from || null, to: prev.key || null, start: prev.start },
+    pace
+  })
+  return round.steps.at(-1)!.start
 }

@@ -9,6 +9,7 @@ import {
   dioramaIslandCuesOf,
   type DioramaCue
 } from '../../../../shared/team-scene/team-diorama-cues'
+import type { DioramaPace } from '../../../../shared/team-scene/team-diorama-lead-round'
 import type { DioramaLayout } from '../../../../shared/team-scene/team-diorama-layout'
 import { teamSceneEventsBetween } from '../../../../shared/team-scene/team-scene-events'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
@@ -47,7 +48,8 @@ export function dioramaCuesAfter(
   input: TeamSceneInput,
   layout: DioramaLayout,
   now: number,
-  reduced: boolean
+  reduced: boolean,
+  pace: DioramaPace
 ): DioramaCue[] {
   const events = teamSceneEventsBetween(moments.seen, input)
   const added = [
@@ -62,7 +64,8 @@ export function dioramaCuesAfter(
     live.find((c) => c.kind === 'attend'),
     input,
     layout,
-    now
+    now,
+    pace
   )
   const others = live.filter((c) => c.kind !== 'attend')
   moments.cues = reduced ? [] : attend ? [...others, attend] : others

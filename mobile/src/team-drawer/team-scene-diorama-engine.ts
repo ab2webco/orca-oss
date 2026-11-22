@@ -165,7 +165,7 @@ export function createTeamSceneDioramaEngine(deps: {
   const figuresStage = (gl: Gl, width: number, status: Colors, want: Figures, at: Read) => {
     const layout = teamDioramaLayoutOf(at.machines, order, width < 300)
     order = layout.order
-    const cues = dioramaCuesAfter(moments, at.input, layout, Date.now() / 1000, reduced)
+    const cues = dioramaCuesAfter(moments, at.input, layout, Date.now() / 1000, reduced, want.pace)
     return dioramaStage(gl, {
       width,
       dark: deps.dark(),

@@ -141,7 +141,9 @@ export function dioramaLeadRoundOf(args: {
     dur: trip.start - LONG_AGO
   })
   let here = start
-  if (jump) {
+  const same = start[0] === end[0] && start[1] === end[1]
+  // Why: a jump between two spots that are the same is a blink in mid-air, not a move.
+  if (jump && !same) {
     push({ kind: 'jump', from: start, to: end, start: t, dur: JUMP })
     here = end
   } else if (fromIsland !== toIsland || fromIsland === null) {
@@ -160,7 +162,7 @@ export function dioramaLeadRoundOf(args: {
       here = outbound ? island.dock!.end : dock.end
     }
   }
-  if (here !== end) {
+  if (!same && here !== end) {
     walk(here, end)
   }
   steps.push(

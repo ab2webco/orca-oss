@@ -33,9 +33,9 @@ const kit = () =>
   dioramaKit(DAY, { attention: '#e40014', done: '#15803d', working: '#0369a1', risk: '#b45309' })
 const leadAt = (input: TeamSceneInput, reads: number[]) => {
   const moments = dioramaMoments()
-  let cues = dioramaCuesAfter(moments, input, layout, reads[0]!, false)
+  let cues = dioramaCuesAfter(moments, input, layout, reads[0]!, false, 'normal')
   for (const at of reads.slice(1)) {
-    cues = dioramaCuesAfter(moments, input, layout, at, false)
+    cues = dioramaCuesAfter(moments, input, layout, at, false, 'normal')
   }
   return dioramaLeadActor(kit(), new THREE.Group(), {
     layout,
