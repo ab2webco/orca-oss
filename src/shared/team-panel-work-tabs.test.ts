@@ -180,9 +180,25 @@ describe('teamPrSectionOf', () => {
   })
 
   // Review M2: the budget is host-wide; another project spending it says nothing about a GitLab repo.
-  it('never blames GitHub, nor hides Retry, for a list the host did not read on GitHub', () => {
+  // Review N1: an older host sends no reviewsFailedOn; keep main's limit wording, with no provider title.
+  it("keeps main's GitHub limit wording for an older host that does not say who failed", () => {
     const section = teamPrSectionOf({
       state: stateOf({ project: { reviews: null, todo: null }, githubBudget: budget(0) }),
+      members: [],
+      isFolder: false,
+      texts,
+      now: NOW
+    })
+
+    expect(section).toEqual({ kind: 'error', message: 'Limit, 12 min', limited: true })
+  })
+
+  it('never blames GitHub, nor hides Retry, for a list the host did not read on GitHub', () => {
+    const section = teamPrSectionOf({
+      state: stateOf({
+        project: { reviews: null, todo: null, reviewsFailedOn: 'other' },
+        githubBudget: budget(0)
+      }),
       members: [],
       isFolder: false,
       texts,

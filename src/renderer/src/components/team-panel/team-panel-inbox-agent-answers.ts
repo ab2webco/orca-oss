@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
-import { useAppStore, type AppState } from '@/store'
+import { useTeamPanelScopeKey } from './use-team-panel-model'
 
 /** An agent-pane question answered from For you: its text and the option picked, nothing else. */
 export type TeamInboxAgentAnswer = { question: string; answer: string; scope: string }
@@ -19,19 +19,9 @@ export function recordTeamInboxAgentAnswer(answer: TeamInboxAgentAnswer): void {
   }))
 }
 
-/** The project an answer belongs to; a repo on another host is its own entry, the host keeps it apart. */
-export function teamInboxAnswerScopeOf(
-  state: Pick<AppState, 'getKnownWorktreeById' | 'repos'>,
-  worktreeId: string | null
-): string | null {
-  const repoId = worktreeId ? state.getKnownWorktreeById(worktreeId)?.repoId : null
-  const repo = state.repos.find((one) => one.id === repoId)
-  return repo ? `${repo.executionHostId ?? repo.connectionId ?? 'local'}|${repo.id}` : null
-}
-
-/** Only the answers given in the project shown, on its host (review M1: no other project's rows). */
+/** Only the answers given from the panel shown (review M1, N2): a held team keeps its members' answers. */
 export function useTeamInboxAgentAnswersHere(): TeamInboxAgentAnswer[] {
-  const scope = useAppStore((s) => teamInboxAnswerScopeOf(s, s.activeWorktreeId))
+  const scope = useTeamPanelScopeKey()
   const answers = useTeamInboxAgentAnswers((s) => s.answers)
   return useMemo(() => answers.filter((one) => one.scope === scope), [answers, scope])
 }

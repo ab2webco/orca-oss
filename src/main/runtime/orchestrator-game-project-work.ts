@@ -248,7 +248,7 @@ export async function readGameProjectWork(
     reviews,
     todo,
     ...(queue ? { queue } : {}),
-    ...(repo && !reviews ? { reviewsFailedOn: 'github' as const } : {})
+    ...(reviews ? {} : { reviewsFailedOn: repo ? ('github' as const) : ('other' as const) })
   }
 }
 

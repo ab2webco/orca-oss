@@ -240,7 +240,9 @@ export function TeamPanelView({
         data-team-panel-state={model?.kind ?? section.kind}
       >
         {section.kind === 'loading' ? (
-          <TeamPanelLoadingShell look={look}>{header}</TeamPanelLoadingShell>
+          <TeamPanelLoadingShell look={look} team={section.team === true}>
+            {header}
+          </TeamPanelLoadingShell>
         ) : model?.kind === 'team' && look === 'game' ? (
           <TeamPanelScene
             model={model}

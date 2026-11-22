@@ -11,6 +11,7 @@ import { translate } from '@/i18n/i18n'
 import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { teamPanelScopeKeyNow } from './use-team-panel-model'
 import { GameOwnerQuestionCard } from '@/components/game-inbox/GameOwnerQuestionCard'
 import { GameInboxThreadsView } from '@/components/game-inbox/GameInboxThreadsView'
 import { GameInboxUndelivered } from '@/components/game-inbox/GameInboxUndelivered'
@@ -43,7 +44,6 @@ import {
 import { TeamInboxGroupLabel, TeamInboxOtherProjects } from './team-panel-inbox-other-projects'
 import {
   recordTeamInboxAgentAnswer,
-  teamInboxAnswerScopeOf,
   useTeamInboxAgentAnswersHere,
   type TeamInboxAgentAnswer
 } from './team-panel-inbox-agent-answers'
@@ -263,11 +263,8 @@ export function answerTeamInboxAgentOf(
       )
       return sent
     }
-    const state = useAppStore.getState()
-    // Why the active project as fallback: an agent with no worktree is answered from the project shown.
-    const scope =
-      teamInboxAnswerScopeOf(state, question.worktreeId) ??
-      teamInboxAnswerScopeOf(state, state.activeWorktreeId)
+    // Why the panel's scope, not the agent's: a member on another host answers into its team's list.
+    const scope = teamPanelScopeKeyNow()
     if (scope) {
       recordTeamInboxAgentAnswer({
         question: question.text,

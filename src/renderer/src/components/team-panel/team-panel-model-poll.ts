@@ -159,6 +159,10 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       const caller = found
+      // Why: a lead was found, so the skeleton may take the team's shape while game.state is read.
+      if (caller && !lastTeams.has(scope.key) && mine === generation && active === run) {
+        deps.publish({ section: { kind: 'loading', team: true }, retry: null }, scope)
+      }
       stage = 'game.state'
       const state = caller ? await deps.readState(scope.target, caller, { fresh }) : null
       const [questions, xp] =

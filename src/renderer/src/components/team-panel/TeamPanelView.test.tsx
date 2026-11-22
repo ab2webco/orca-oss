@@ -276,7 +276,45 @@ describe('TeamPanelView', () => {
     expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
 
-  // Review M3: a loading scope may have no team, so nothing team-shaped is drawn before the read says so.
+  // ORCA-1329 P4: once game.leads found a lead, V30 loads in its own layout, not as bare bars.
+  it.each([
+    ['game', true, true],
+    ['display', true, false],
+    ['plain', false, false]
+  ] as const)(
+    'loads a found team in the %s look as scene, header, tabs and lead skeletons',
+    async (look, scene, face) => {
+      const { container } = await render(
+        { section: { kind: 'loading', team: true }, retry: null },
+        vi.fn(),
+        look
+      )
+      const order = [
+        '[data-team-loading-scene]',
+        'h2',
+        '[data-team-loading-tabs]',
+        '[data-team-loading-lead]'
+      ]
+        .map((selector) => container.querySelector(selector))
+        .filter((node) => node !== null)
+
+      expect(container.querySelector('[data-team-loading-scene]') !== null).toBe(scene)
+      expect(order).toHaveLength(scene ? 4 : 3)
+      order
+        .slice(1)
+        .forEach((node, index) =>
+          expect(
+            order[index]!.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING
+          ).toBeTruthy()
+        )
+      expect(container.querySelector('[data-team-loading-lead] .size-\\[38px\\]') !== null).toBe(
+        face
+      )
+      expect(container.querySelector('[aria-busy="true"] h2, [aria-busy="true"] button')).toBeNull()
+    }
+  )
+
+  // Review M3: before game.leads finds a lead the scope may have no team, so nothing team-shaped is drawn.
   it.each(['game', 'display', 'plain'] as const)(
     'loads the %s look as the header and rows, with no scene, tabs or lead card',
     async (look) => {

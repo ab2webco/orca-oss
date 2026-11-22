@@ -202,6 +202,35 @@ describe('createTeamPanelModelPoller', () => {
     expect(readState).toHaveBeenCalledTimes(3)
   })
 
+  // Review N3: P4's team skeleton only once game.leads found a lead; no lead means never team-shaped.
+  it('marks loading as a team once game.leads finds a lead, before game.state lands', async () => {
+    let land: (state: OrchestratorGameState) => void = () => {}
+    const readState = vi.fn(() => new Promise<OrchestratorGameState>((done) => (land = done)))
+    const { all, sources, last } = deps({ readState })
+
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+    expect(sources.map((one) => one.section)).toEqual([
+      { kind: 'loading' },
+      { kind: 'loading', team: true }
+    ])
+
+    land({ role: 'lead' } as OrchestratorGameState)
+    await flush()
+    expect(last()).toEqual({ kind: 'ready', value: MODEL })
+  })
+
+  it('never marks loading as a team when game.leads finds no lead', async () => {
+    const { all, sources } = deps({ findCaller: vi.fn(() => null) })
+
+    createTeamPanelModelPoller(all, 20_000).subscribe(SCOPE)
+    await flush()
+
+    expect(sources.some((one) => one.section.kind === 'loading' && 'team' in one.section)).toBe(
+      false
+    )
+  })
+
   it('says unavailable when no live lead runs in the project, without reading game.state', async () => {
     const { all, last } = deps({ findCaller: vi.fn(() => null) })
 

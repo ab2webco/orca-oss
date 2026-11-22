@@ -335,7 +335,7 @@ describe('readGameProjectWork', () => {
   })
 
   // Review M2: the renderer may blame GitHub only for a list the host read on GitHub.
-  it('says a failed list was read on GitHub, and only then', async () => {
+  it('says whether a failed list was read on GitHub', async () => {
     const down = async (): Promise<never> => {
       throw new Error('down')
     }
@@ -351,7 +351,7 @@ describe('readGameProjectWork', () => {
     expect(github.reviews).toBeNull()
     expect(github.reviewsFailedOn).toBe('github')
     expect(gitlab.reviews).toBeNull()
-    expect(gitlab).not.toHaveProperty('reviewsFailedOn')
+    expect(gitlab.reviewsFailedOn).toBe('other')
   })
 
   it("opens the project's own PR list when no repo holds my open PRs", async () => {

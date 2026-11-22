@@ -281,7 +281,8 @@ export type TeamMetrics = {
 
 /** Every tab draws these four states; `unavailable` is a host or setting that cannot supply it. */
 export type TeamSection<T> =
-  | { kind: 'loading' }
+  /** `team`: game.leads found a lead, so the read is a team's and its skeleton may show (P4). */
+  | { kind: 'loading'; team?: true }
   | { kind: 'unavailable' }
   | TeamSectionError
   | { kind: 'ready'; value: T }

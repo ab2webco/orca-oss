@@ -51,10 +51,16 @@ const useTeamPanelModelStore = create<{
   source: TeamPanelModelSource
   /** The host the source was read from, for reads that must go to the same one. */
   target: RuntimeClientTarget | null
+  /** The scope the panel shows: a held team's while a remote member's worktree is focused. */
+  scopeKey: string | null
 }>(() => ({
   source: { section: { kind: 'loading' }, retry: null },
-  target: null
+  target: null,
+  scopeKey: null
 }))
+
+export const useTeamPanelScopeKey = (): string | null => useTeamPanelModelStore((s) => s.scopeKey)
+export const teamPanelScopeKeyNow = (): string | null => useTeamPanelModelStore.getState().scopeKey
 
 const NO_MEMBERS: readonly TeamMemberCard[] = []
 const membersOf = (source: TeamPanelModelSource): readonly TeamMemberCard[] =>
@@ -111,7 +117,7 @@ const poller = createTeamPanelModelPoller(
       if (members !== NO_MEMBERS) {
         lastTeam = { scope, members }
       }
-      useTeamPanelModelStore.setState({ source })
+      useTeamPanelModelStore.setState({ source, scopeKey: scope?.key ?? null })
     },
     record: recordRendererCrashBreadcrumb
   },

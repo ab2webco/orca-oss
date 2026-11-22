@@ -20,6 +20,19 @@ vi.mock('./team-panel-inbox-agents', async (importOriginal) => ({
   answerTeamInboxAgent
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
+const panel = vi.hoisted(() => ({
+  key: null as string | null,
+  set: (_key: string | null): void => {}
+}))
+vi.mock('./use-team-panel-model', async () => {
+  const { create } = await import('zustand')
+  const store = create(() => ({ key: panel.key }))
+  panel.set = (key: string | null) => store.setState({ key })
+  return {
+    teamPanelScopeKeyNow: () => store.getState().key,
+    useTeamPanelScopeKey: () => store((s) => s.key)
+  }
+})
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: () => ({
@@ -31,25 +44,6 @@ vi.mock('@tanstack/react-virtual', () => ({
 }))
 
 afterEach(cleanup)
-
-// Why an SSH twin of repo-a: the same project on another host keeps its own Answered list.
-function seedProjects(active: string): void {
-  const repoOf: Record<string, string> = {
-    'wt-a': 'repo-a',
-    'wt-b': 'repo-b',
-    'wt-ssh': 'repo-a-ssh'
-  }
-  useAppStore.setState({
-    activeWorktreeId: active,
-    repos: [
-      { id: 'repo-a', executionHostId: 'local' },
-      { id: 'repo-b', executionHostId: 'local' },
-      { id: 'repo-a-ssh', executionHostId: 'ssh:box' }
-    ] as never,
-    getKnownWorktreeById: ((id: string) =>
-      repoOf[id] ? { repoId: repoOf[id] } : undefined) as never
-  })
-}
 
 const AT = '2026-11-06T10:00:00.000Z'
 
@@ -490,7 +484,7 @@ describe('Inbox tab', () => {
 
   // ORCA-1329 P9: an agent-pane question answered from For you lands in Answered, as V30 shows.
   it('records a sent For you answer with only its question and the option picked', () => {
-    seedProjects('wt-a')
+    act(() => panel.set('local|repo-a'))
     useTeamInboxAgentAnswers.setState({ answers: [] })
     const asked = {
       paneKey: 'tab-1:leaf-1',
@@ -508,21 +502,28 @@ describe('Inbox tab', () => {
     ])
   })
 
-  // Review M1: an answer given in project A must not fill B's Answered, nor the same repo on an SSH host.
-  it("shows an agent answer only in its own project's and host's Answered", () => {
-    seedProjects('wt-a')
+  // Review M1 + N2: an answer files under the panel it was given from, not the asking agent's worktree.
+  it("keeps a paired-host member's answer in its team's Answered, and out of other panels", () => {
+    act(() => panel.set('local|repo-a'))
+    useAppStore.setState({ activeWorktreeId: 'wt-a' })
     useTeamInboxAgentAnswers.setState({ answers: [] })
     answerTeamInboxAgent.mockReturnValueOnce(true)
-    const asked = { paneKey: 'p', worktreeId: 'wt-a', text: 'Q?', options: ['Yes'] }
-    answerTeamInboxAgentOf(asked as TeamInboxAgentQuestion)?.(0)
+    const member = {
+      paneKey: 'p',
+      worktreeId: 'wt-on-box',
+      host: { kind: 'remote', environmentId: 'box' },
+      text: 'Q?',
+      options: ['Yes']
+    }
+    answerTeamInboxAgentOf(member as unknown as TeamInboxAgentQuestion)?.(0)
     const here = renderHook(() => useTeamInboxAgentAnswersHere())
     expect(here.result.current.map((one) => one.question)).toEqual(['Q?'])
 
-    act(() => useAppStore.setState({ activeWorktreeId: 'wt-b' }))
+    act(() => panel.set('local|repo-b'))
     expect(here.result.current).toEqual([])
-    act(() => useAppStore.setState({ activeWorktreeId: 'wt-ssh' }))
+    act(() => panel.set('ssh:box|repo-a'))
     expect(here.result.current).toEqual([])
-    act(() => useAppStore.setState({ activeWorktreeId: 'wt-a' }))
+    act(() => panel.set('local|repo-a'))
     expect(here.result.current).toHaveLength(1)
   })
 

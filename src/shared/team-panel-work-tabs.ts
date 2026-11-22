@@ -60,25 +60,27 @@ function verdictOf(item: GameProjectItem): Pick<TeamPrRow, 'status' | 'reason'> 
   return { status: 'idle', reason: 'checksUnknown' }
 }
 
-// Why the host's word: the budget is host-wide, so it only explains a repo the host read on GitHub.
+// Why the host's word: the budget is host-wide, so it explains only a repo the host read on GitHub.
+// Absent = an older host, which keeps main's budget-only wording and no provider title (review N1).
 function failureOf(
-  failedOn: 'github' | undefined,
+  failedOn: 'github' | 'other' | undefined,
   budget: GameGitHubBudget | undefined,
   texts: TeamPrFailureTexts,
   now: number
 ): TeamSectionError {
-  if (failedOn !== 'github') {
-    return { kind: 'error', message: texts.providerFailed }
-  }
-  const spent = [budget?.graphql, budget?.core].find((one) => one?.limit && one.remaining === 0)
+  const spent =
+    failedOn === 'other'
+      ? undefined
+      : [budget?.graphql, budget?.core].find((one) => one?.limit && one.remaining === 0)
+  const provider = failedOn === 'github' ? { provider: 'GitHub' } : {}
   return spent
     ? {
         kind: 'error',
         message: texts.githubLimit(Math.max(1, Math.ceil((spent.resetAt * 1000 - now) / 60_000))),
-        provider: 'GitHub',
+        ...provider,
         limited: true
       }
-    : { kind: 'error', message: texts.providerFailed, provider: 'GitHub' }
+    : { kind: 'error', message: texts.providerFailed, ...provider }
 }
 
 /** Null hides the tab: turned off, or a folder workspace with no remote to review on. */
