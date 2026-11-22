@@ -27,8 +27,6 @@ import type {
   AutomationRunTrigger,
   AutomationUpdateInput
 } from '../../../shared/automations-types'
-import { normalizeProxyUrl } from '../../../shared/network-proxy'
-import { normalizeKagiSessionLink } from '../../../shared/browser-url'
 import type { FolderWorkspace, WorkspaceKey } from '../../../shared/folder-workspace-types'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type {
@@ -199,12 +197,14 @@ import {
   PROTECTED_SECRET_SLOT,
   ProtectedSecretPersistence,
   sshPtyOwnerLeaseSecretSlot,
+  type ProtectedSecretDecryption,
   type ProtectedSecretRetentionUpdate
 } from '../../protected-secret-persistence'
 import {
-  isLegacyOpenCodeSessionCookie,
-  isLegacySshPtyOwnerLease
-} from '../leasing-ssh-ptys/secret-validation'
+  applyProtectedSecretReads,
+  protectedSecretReads,
+  type ProtectedSecretRead
+} from './protected-secret-load'
 import { getDataFile, getGithubCacheFile, readGithubCacheSnapshot } from './user-data-path'
 import {
   STALE_DURABLE_WRITE_TEMP_AGE_MS,
@@ -559,6 +559,7 @@ export class Store {
   private readonly staleGithubCacheTempCleanup: Promise<void>
   private readonly gitUsernameCache = new Map<string, string>()
   private readonly protectedSecrets = new ProtectedSecretPersistence()
+  private pendingProtectedSecretReads: ProtectedSecretRead[] = []
   private loadNeedsSave = false
   private settingsChangeListeners = new Set<
     (
@@ -609,6 +610,32 @@ export class Store {
     })
     if (normalized.changed || this.loadNeedsSave || adaptedProjectGroups) {
       // Why: rewrite legacy pane:1 leaves so older renderer writes can't revive them; other migrations also set loadNeedsSave.
+      this.scheduleSave()
+    }
+  }
+
+  // Why (ORCA-1298): awaited once at startup; a Keychain prompt nobody answers costs at most
+  // CREDENTIAL_KEYCHAIN_WAIT_MS and leaves the secret sealed, its blob kept for later saves.
+  async unsealProtectedSecrets(): Promise<void> {
+    const reads = this.pendingProtectedSecretReads
+    this.pendingProtectedSecretReads = []
+    if (reads.length === 0) {
+      return
+    }
+    const decrypted = await Promise.all(
+      reads.map(
+        async (read) =>
+          [
+            read.slot,
+            await this.protectedSecrets.decryptWithStatusAsync(
+              read.slot,
+              read.ciphertext,
+              read.isLegacyPlaintext
+            )
+          ] as const
+      )
+    )
+    if (applyProtectedSecretReads(this.state, reads, new Map(decrypted), this.protectedSecrets)) {
       this.scheduleSave()
     }
   }
@@ -827,6 +854,7 @@ export class Store {
   }
 
   private load(allowBackupRecovery = true): PersistedState {
+    this.pendingProtectedSecretReads = []
     // Capture "has run Orca before?" for telemetry cohort; the telemetry field is new, so field inference misclassifies old users as fresh.
     const dataFile = this.dataFile
     const fileExistedOnLoad = existsSync(dataFile)
@@ -847,46 +875,6 @@ export class Store {
         const parsed = JSON.parse(raw) as PersistedState
         logPersistenceStartupMilestone('persistence-json-parse-done')
 
-        // Why: secrets are stored encrypted via safeStorage; decrypt at the load boundary so the app sees plaintext.
-        if (parsed.settings?.opencodeSessionCookie) {
-          parsed.settings.opencodeSessionCookie = this.protectedSecrets.decrypt(
-            PROTECTED_SECRET_SLOT.opencodeSessionCookie,
-            parsed.settings.opencodeSessionCookie,
-            isLegacyOpenCodeSessionCookie
-          )
-        }
-        if (parsed.settings?.httpProxyUrl) {
-          const decryptedProxy = this.protectedSecrets.decryptWithStatus(
-            PROTECTED_SECRET_SLOT.httpProxyUrl,
-            parsed.settings.httpProxyUrl,
-            (value) => normalizeProxyUrl(value).ok
-          )
-          // Why (STA-3442): after a keychain reset decrypt returns raw ciphertext; a non-URL
-          // value must not masquerade as a configured proxy (silent DIRECT fallback) or
-          // re-persist as garbage. Plaintext URLs still pass, preserving the upgrade path.
-          if (
-            decryptedProxy.status === 'unavailable' ||
-            (decryptedProxy.status === 'failed' && !decryptedProxy.plaintext)
-          ) {
-            parsed.settings.httpProxyUrl = ''
-          } else if (normalizeProxyUrl(decryptedProxy.plaintext).ok) {
-            parsed.settings.httpProxyUrl = decryptedProxy.plaintext
-          } else {
-            console.warn(
-              '[persistence] httpProxyUrl could not be decrypted — clearing the stored proxy URL. Re-enter it in Settings > Advanced > Network.'
-            )
-            parsed.settings.httpProxyUrl = ''
-            this.protectedSecrets.removeRetainedBlob(PROTECTED_SECRET_SLOT.httpProxyUrl)
-            this.loadNeedsSave = true
-          }
-        }
-        if (parsed.ui?.browserKagiSessionLink) {
-          parsed.ui.browserKagiSessionLink = this.protectedSecrets.decrypt(
-            PROTECTED_SECRET_SLOT.browserKagiSessionLink,
-            parsed.ui.browserKagiSessionLink,
-            (value) => normalizeKagiSessionLink(value) !== null
-          )
-        }
         parsed.sshPtyConsumerRecoveries = (
           Array.isArray(parsed.sshPtyConsumerRecoveries) ? parsed.sshPtyConsumerRecoveries : []
         )
@@ -894,24 +882,30 @@ export class Store {
             normalizeSshPtyConsumerRecovery(record, ENCRYPTED_SSH_PTY_OWNER_LEASE_MAX_LENGTH)
           )
           .filter((record): record is SshPtyConsumerRecovery => record !== null)
-          .map((record) => {
-            const slot = sshPtyOwnerLeaseSecretSlot(record.targetId)
-            const decrypted = this.protectedSecrets.decryptWithStatus(
-              slot,
-              record.ownerLease,
-              isLegacySshPtyOwnerLease
-            )
-            const normalized =
-              decrypted.status === 'unavailable' ||
-              (decrypted.status === 'failed' && !decrypted.plaintext)
-                ? record
-                : normalizeSshPtyConsumerRecovery({ ...record, ownerLease: decrypted.plaintext })
-            if (!normalized) {
-              this.protectedSecrets.removeRetainedBlob(slot)
-            }
-            return normalized
-          })
-          .filter((record): record is SshPtyConsumerRecovery => record !== null)
+        // Why: secrets are stored encrypted via safeStorage; decrypt at the load boundary so the app sees plaintext.
+        const reads = protectedSecretReads(parsed)
+        let decrypted = new Map<string, ProtectedSecretDecryption>()
+        if (this.protectedSecrets.canDecryptAsync()) {
+          // Why (ORCA-1298): sealed here, decrypted off the main thread by unsealProtectedSecrets().
+          for (const read of reads) {
+            this.protectedSecrets.seal(read.slot, read.ciphertext)
+          }
+          this.pendingProtectedSecretReads = reads
+        } else {
+          decrypted = new Map(
+            reads.map((read) => [
+              read.slot,
+              this.protectedSecrets.decryptWithStatus(
+                read.slot,
+                read.ciphertext,
+                read.isLegacyPlaintext
+              )
+            ])
+          )
+        }
+        if (applyProtectedSecretReads(parsed, reads, decrypted, this.protectedSecrets)) {
+          this.loadNeedsSave = true
+        }
 
         // Merge with defaults in case new fields were added
         const homeDir = homedir()
