@@ -20,7 +20,8 @@ import { matchesSettingsSearch } from './settings-search'
 import { useAppStore } from '../../store'
 import { getRepositoryIconSectionId } from './repository-settings-targets'
 import { RepositoryIconPicker } from './RepositoryIconPicker'
-import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import { gameSearchEntryTitles } from './orchestrator-game-panel-search'
+import { useProjectGameRowFacts } from './use-project-game-row-facts'
 import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
@@ -118,6 +119,7 @@ export function RepositoryPane({
   )
   const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null)
   const [copiedTemplate, setCopiedTemplate] = useState(false)
+  const gameFacts = useProjectGameRowFacts(repo, settings, yamlHooks?.orchestratorGame)
   const copiedTemplateResetTimerRef = useRef<number | null>(null)
   // Why: clipboard IPC can resolve after settings navigation; avoid starting
   // a reset timer that will outlive this pane.
@@ -178,7 +180,7 @@ export function RepositoryPane({
     }, 1500)
   }
 
-  const allEntries = getRepositoryPaneSearchEntries(repo, { isLocalWindowsProject })
+  const allEntries = getRepositoryPaneSearchEntries(repo, { isLocalWindowsProject, gameFacts })
   const identityEntryTitles = new Set([
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
     translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
@@ -191,8 +193,8 @@ export function RepositoryPane({
     translate('auto.components.settings.repository.search.externalWorktrees', 'External worktrees'),
     translate('auto.components.settings.repository.search.projectRuntime', 'Project Runtime'),
     translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project'),
-    // Why: the game section renders inside Identity, so its panel rows must keep Identity visible.
-    ...getGamePanelSearchEntries().map((entry) => entry.title)
+    // Why: the game section renders inside Identity, so its rows must keep Identity visible.
+    ...gameSearchEntryTitles()
   ])
   const identityEntries = allEntries.filter((entry) => identityEntryTitles.has(entry.title))
   const sparsePresetEntries = allEntries.filter((entry) =>

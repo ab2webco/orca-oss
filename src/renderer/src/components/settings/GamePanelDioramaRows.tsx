@@ -11,10 +11,9 @@ import {
   type OrchestratorGamePanel
 } from '../../../../shared/orchestrator-game-panel'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
-import {
-  orchestratorGameInheritLabel,
-  orchestratorGameSourceLabel
-} from './orchestrator-game-setting-labels'
+import { orchestratorGameSourceLabel } from './orchestrator-game-setting-labels'
+import { resolveOrchestratorGamePanel } from '../../../../shared/orchestrator-game-panel-layers'
+import { InheritableSegmentedRow } from './InheritableSettingRow'
 import { ownGamePanelValueOf } from './game-panel-overrides'
 import { GamePanelOverrideNote, type GamePanelOverrideProject } from './GamePanelOverrideNote'
 import { translate } from '@/i18n/i18n'
@@ -56,11 +55,6 @@ const choicesOf = (field: Field) =>
     value,
     label: valueLabels()[value]!
   }))
-
-/** Whether the rows apply: the Game look drawing Figures as the diorama, or the Office. */
-export const dioramaRowsShown = (panel: OrchestratorGamePanel): boolean =>
-  panel.look === 'game' &&
-  ((panel.style === 'figures' && panel.diorama) || panel.style === 'office')
 
 /** The global rows, each with the projects that override it. */
 export function GamePanelDioramaRows(p: {
@@ -108,45 +102,42 @@ export function GamePanelDioramaRows(p: {
   )
 }
 
-/** This machine's override for one project, each row offering Inherit. */
+/** This machine's override for one project, each row showing the value it applies. */
 export function ProjectGamePanelDioramaRows(p: {
   layers: Partial<Record<'global' | 'project' | 'local', OrchestratorGameLayer>>
   panel: OrchestratorGamePanel
   set: (field: Field, value: string | undefined) => void
 }): React.JSX.Element {
   const text = copy()
+  const sourceOf = (
+    layers: Partial<Record<'global' | 'project' | 'local', OrchestratorGameLayer>>,
+    field: Field
+  ) =>
+    orchestratorGameSourceLabel(
+      ORCHESTRATOR_GAME_LAYER_ORDER.findLast(
+        (one) => ownGamePanelValueOf(layers[one], field) !== undefined
+      ) ?? 'default'
+    )
   return (
     <>
       {(['quality', 'pace'] as const).map((field) => {
-        const own = ownGamePanelValueOf(p.layers.local, field)
-        const source =
-          ORCHESTRATOR_GAME_LAYER_ORDER.findLast(
-            (one) => ownGamePanelValueOf(p.layers[one], field) !== undefined
-          ) ?? 'default'
+        const below = { ...p.layers, local: withGamePanelField(p.layers.local, field, undefined) }
+        const inherited = resolveOrchestratorGamePanel(below)[field]
         return (
-          <SettingsRow
+          <InheritableSegmentedRow
             key={field}
             label={text[field][0]}
-            description={
-              <>
-                {text[field][1]}
-                <span className="block">
-                  {`${valueLabels()[p.panel[field]]} · ${orchestratorGameSourceLabel(source)}`}
-                </span>
-              </>
-            }
-            control={
-              <SettingsSegmentedControl
-                value={own === undefined ? 'inherit' : String(own)}
-                ariaLabel={text[field][0]}
-                size="sm"
-                options={[
-                  { value: 'inherit', label: orchestratorGameInheritLabel() },
-                  ...choicesOf(field)
-                ]}
-                onChange={(next) => p.set(field, next === 'inherit' ? undefined : next)}
-              />
-            }
+            text={text[field][1]}
+            options={choicesOf(field)}
+            applied={p.panel[field]}
+            source={sourceOf(p.layers, field)}
+            inherited={{
+              value: inherited,
+              label: valueLabels()[inherited]!,
+              source: sourceOf(below, field)
+            }}
+            isOverridden={ownGamePanelValueOf(p.layers.local, field) !== undefined}
+            onPick={(next) => p.set(field, next)}
           />
         )
       })}

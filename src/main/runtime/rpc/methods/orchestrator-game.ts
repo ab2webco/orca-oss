@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isHttpUrl } from '../../../../shared/orchestrator-game-integrations'
 import { gameEffortPlanOf } from '../../../../shared/orchestrator-game-effort-plan'
-import { GAME_PANEL_TABS } from '../../../../shared/orchestrator-game-panel'
+import { GAME_PANEL_TABS, RETIRED_GAME_PANEL_TAB } from '../../../../shared/orchestrator-game-panel'
 import {
   ORCHESTRATOR_GAME_VIEWS,
   ORCHESTRATOR_GAME_VIEW_SCOPES
@@ -35,8 +35,9 @@ const GameSetViewParams = z.object({
   terminalHandle: z.string().optional()
 })
 
+// Why the retired tab too: an older CLI or mod may still send it; it answers unchanged.
 const GameHidePanelTabParams = z.object({
-  tab: z.enum(GAME_PANEL_TABS),
+  tab: z.enum([...GAME_PANEL_TABS, RETIRED_GAME_PANEL_TAB]),
   worktreeId: z.string().optional(),
   terminalHandle: z.string().optional()
 })
@@ -190,11 +191,13 @@ export const ORCHESTRATOR_GAME_METHODS: RpcMethod[] = [
     name: 'game.hidePanelTab',
     params: GameHidePanelTabParams,
     handler: async (params, { runtime }) =>
-      runtime.hideOrchestratorGamePanelTab({
-        tab: params.tab,
-        worktreeId: params.worktreeId,
-        terminalHandle: params.terminalHandle
-      })
+      params.tab === RETIRED_GAME_PANEL_TAB
+        ? { tab: params.tab, changed: false }
+        : runtime.hideOrchestratorGamePanelTab({
+            tab: params.tab,
+            worktreeId: params.worktreeId,
+            terminalHandle: params.terminalHandle
+          })
   }),
   defineMethod({
     name: 'game.historyRecord',

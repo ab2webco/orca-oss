@@ -583,9 +583,11 @@ test.describe('Scenes and settings: the Panel group', () => {
     })
     const group = page.locator('#agents-game-panel')
     await expect(group).toBeVisible({ timeout: 15_000 })
-    for (const label of ['Scene', 'Panel look', 'Scene style', 'PRs', 'Queue', 'Machines']) {
+    for (const label of ['Scene', 'Panel look', 'Scene style', 'PRs', 'Machines']) {
       await expect.soft(group.getByText(label, { exact: true }).first()).toBeVisible()
     }
+    // Why no Queue row: V30 draws the merge queue at the top of PRs with no switch (ORCA-1112).
+    await expect.soft(group.getByText('Queue', { exact: true })).toHaveCount(0)
     // A new profile starts on the defaults the page names: Game, Pixel and the Quest scene.
     await expect.soft(group.getByRole('radio', { name: 'Game' })).toBeChecked()
     await expect.soft(group.getByRole('radio', { name: 'Pixel' })).toBeChecked()

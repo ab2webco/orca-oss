@@ -25,7 +25,7 @@ const member = (paneKey: string, state = 'working', over: Record<string, unknown
 const panel = (look: string, style: string) => ({
   look,
   style,
-  tabs: { prs: true, queue: true, machines: true },
+  tabs: { prs: true, machines: true },
   advisor: true,
   arcade: true
 })

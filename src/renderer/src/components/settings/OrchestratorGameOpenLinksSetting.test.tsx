@@ -40,20 +40,4 @@ describe('OrchestratorGameOpenLinksRow', () => {
     expect(picked).toEqual(['system'])
     view.unmount()
   })
-
-  it('lets a project inherit, showing the effective choice and where it comes from', () => {
-    const picked: unknown[] = []
-    const view = render(
-      <OrchestratorGameOpenLinksRow
-        value="inherit"
-        effective="system · from orca.yaml"
-        onChange={(next) => picked.push(next)}
-      />
-    )
-    expect(view.container.textContent).toContain('system · from orca.yaml')
-    click(view.container, 'Orca')
-    click(view.container, 'Inherit')
-    expect(picked).toEqual(['orca', 'inherit'])
-    view.unmount()
-  })
 })

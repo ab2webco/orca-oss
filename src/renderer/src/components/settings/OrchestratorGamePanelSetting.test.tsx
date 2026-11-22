@@ -91,7 +91,7 @@ describe('GamePanelSetting', () => {
     view.unmount()
   })
 
-  it('is the global Panel section the gear targets, with look, style and the three tabs', () => {
+  it('is the global Panel section the gear targets, with look, style, PRs and Machines, no Queue', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render(
       <GamePanelSetting
@@ -109,11 +109,12 @@ describe('GamePanelSetting', () => {
     expect(view.container.textContent).not.toContain('Advisor')
     expect(view.container.textContent).not.toContain('Arcade')
     press(view.container, 'Scene style', 'Figures')
-    toggle(view.container, 'Show Queue')
+    expect(view.container.querySelector('[aria-label="Show Queue"]')).toBeNull()
+    toggle(view.container, 'Show Machines')
     expect(updates).toEqual([
       { orchestratorGame: { scene: 'quest', panel: { style: 'figures' } } },
       {
-        orchestratorGame: { scene: 'quest', panel: { tabs: { queue: false } } }
+        orchestratorGame: { scene: 'quest', panel: { tabs: { machines: false } } }
       }
     ])
     view.unmount()
@@ -151,13 +152,14 @@ describe('ProjectGamePanelRows', () => {
     return { ...view, updates }
   }
 
-  it("stores this machine's choice for the repo and inherits it again", () => {
+  it("stores this machine's choice for the repo, and picking the inherited value clears it", () => {
     const view = projectRows({
       orchestratorGameProjects: { r1: { panel: { advisor: false } } }
     })
 
     press(view.container, 'Panel look', 'Display')
-    press(view.container, 'Advisor', 'Inherit')
+    expect(selected(view.container, 'Advisor')).toBe('Off')
+    press(view.container, 'Advisor', 'On')
     expect(view.updates).toEqual([
       {
         orchestratorGameProjects: {
@@ -169,15 +171,11 @@ describe('ProjectGamePanelRows', () => {
     view.unmount()
   })
 
-  it('offers only the scene styles something draws, plus Inherit', () => {
+  it('offers only the scene styles something draws, with the applied one selected', () => {
     const view = projectRows({})
 
-    expect(segments(view.container, 'Scene style')).toEqual([
-      'Inherit',
-      'Figures',
-      'Office',
-      'Pixel'
-    ])
+    expect(selected(view.container, 'Scene style')).toBe('Pixel')
+    expect(segments(view.container, 'Scene style')).toEqual(['Figures', 'Office', 'Pixel'])
     view.unmount()
   })
 

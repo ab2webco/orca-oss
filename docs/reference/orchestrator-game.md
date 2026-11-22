@@ -150,11 +150,23 @@ Each field resolves on its own; a later layer wins
 2. Global Settings → Agents → **Agent Teams game** (`orchestratorGame`).
 3. The project's committed `orca.yaml` — owned by whoever owns the repo, a dev or a company.
 4. Settings → the project → **Agent Teams game**, this machine only
-   (`orchestratorGameProjects[repoId]`). Each row can say **Inherit**.
+   (`orchestratorGameProjects[repoId]`). Each row selects the value it applies and names the layer
+   that sets it; **Reset to …** shows only while this machine overrides the row, and picking the
+   inherited value clears the override.
 
-Both Settings pages group the game's controls (**Show the game**, **Default view** with each view's cost, rewards, work item
-tracking, where links open, and the **Terminal band** group with the band switch, render, time zone and teammate HUD; the scene heads the Panel group) under an **Agent Teams game** heading that says they apply only to Claude Agent Teams
-panes. Under the scene picker a preview paints the effective scene with the mod's own drawing code
+Both Settings pages show a game row only while the current choice uses it (ORCA-1112). One table,
+[`orchestrator-game-row-visibility.ts`](../../src/renderer/src/components/settings/orchestrator-game-row-visibility.ts),
+names each row's condition from its reader and drives both the page and Settings search; a hidden
+row keeps its stored value, a group with no row shown draws no heading, and a choice that hides or
+shows rows above the pressed control keeps that control in place
+([`KeepControlInPlace.tsx`](../../src/renderer/src/components/settings/KeepControlInPlace.tsx)). In V30's order:
+- **Panel**: look, style, preview, diorama rows, scene, PRs, Machines, Advisor, Arcade, time zone.
+- On the project page, **Actions**, **Names** and **Lead**.
+- **Terminal panes**, under the **Agent Teams game** heading on the global page: **Show the game**,
+  **Default view** with each view's cost, teammate HUD, rewards, where links open, work item
+  tracking. These apply only to Claude Agent Teams panes.
+- **Terminal band**, only for a pixel view (Zen, 2D classic, 2D hd): the band switch, then its preview
+  and render while the band is on. Under the scene picker a preview paints the effective scene with the mod's own drawing code
 ([`OrchestratorGameScenePreview.tsx`](../../src/renderer/src/components/settings/OrchestratorGameScenePreview.tsx)
 imports `hooks/scene.ts`, `scenery.ts`, `scenes/` and, for `render: hd`, `scene-hd.ts`), so it
 cannot drift from what a pane draws in the effective render:
@@ -191,10 +203,10 @@ Settings, `orca game view` or `/orca-game:view` also sets `band: true` in that l
 would change nothing on screen. `mode` itself is never rewritten, so the Panel's look, which follows
 it, stays put.
 
-In Settings the scene (built-in or a project's file) heads the **Panel** group, above the look and
-style, and the panel preview draws it in the chosen style, since the Team panel is where it shows by
-default. The **Terminal band** group holds the band switch; the 5-row scene preview, render, time
-zone and teammate HUD show only while the band is on.
+In Settings the scene (built-in or a project's file) sits in the **Panel** group under the look and
+style, shown for the Game look or a drawing band, and the panel preview draws it in the chosen style.
+The time zone sits there too: the panel scene's day and night, Display's day metrics and an HD band
+all read it.
 
 Mixed versions: every mod since flat (ORCA-689) reads `ORCA_GAME_MODE=flat` and `ORCA_GAME_HUD`; an
 older mod reads `flat` as unknown and keeps drawing, as before. A paired host older than `band`
@@ -255,7 +267,7 @@ orchestratorGame:
   panel: # the native panel; mode and render keep driving the terminal (see below)
     look: game # game | display | plain; unset follows mode
     style: pixel # figures | office | pixel, for the game look
-    tabs: { prs: true, queue: false, machines: true }
+    tabs: { prs: true, machines: true } # the merge queue shows at the top of PRs; a stored queue is ignored
     advisor: true # the Advisor row, drawn only with its plugin
     arcade: true # saved arcade credits, game look only
     quality: high # high | low: the 3D scenes illustrated (and the Office in 3D), or flat and the Office in 2D

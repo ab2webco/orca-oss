@@ -76,7 +76,7 @@ type PanelSettings = OrchestratorGamePanel & { pluginsOn: boolean }
 const panel = (overrides: Partial<PanelSettings> = {}): PanelSettings => ({
   look: 'game',
   style: 'pixel',
-  tabs: { prs: true, queue: true, machines: true },
+  tabs: { prs: true, machines: true },
   advisor: true,
   arcade: true,
   diorama: false,
@@ -98,15 +98,15 @@ describe('teamPanelModelWithSettings', () => {
     expect(shown.kind === 'team' && shown.advisor).toEqual(advisor)
   })
 
-  it('drops the merge queue from PRs when the Queue toggle is off', () => {
-    const tabs = { prs: true, queue: false, machines: true }
+  it('keeps the merge queue at the top of PRs whatever a stored Queue toggle says (ORCA-1112)', () => {
+    const tabs = { prs: true, queue: false, machines: true } as never
 
-    expect(teamPanelModelWithSettings(team, panel({ tabs })).queue).toBeNull()
-    expect(teamPanelModelWithSettings(solo, panel({ tabs })).queue).toBeNull()
+    expect(teamPanelModelWithSettings(team, panel({ tabs })).queue).toEqual(team.queue)
+    expect(teamPanelModelWithSettings(solo, panel({ tabs })).queue).toEqual(solo.queue)
   })
 
   it.each(['prs', 'machines'] as const)('hides the %s tab when its toggle is off', (id) => {
-    const tabs = { prs: true, queue: true, machines: true, [id]: false }
+    const tabs = { prs: true, machines: true, [id]: false }
 
     expect(tabIds(teamPanelModelWithSettings(team, panel({ tabs })))).not.toContain(id)
     expect(tabIds(teamPanelModelWithSettings(solo, panel({ tabs })))).not.toContain(id)

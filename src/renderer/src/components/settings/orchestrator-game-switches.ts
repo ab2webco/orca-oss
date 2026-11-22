@@ -43,7 +43,3 @@ export const orchestratorGameSwitches = (): {
     )
   }
 ]
-
-/** Where a switch sits: the band's own switch, what the band draws, or the game itself. */
-export const switchPlaceOf = (key: ToggleKey): 'band' | 'drawn' | 'game' =>
-  key === 'band' ? 'band' : key === 'hud' ? 'drawn' : 'game'

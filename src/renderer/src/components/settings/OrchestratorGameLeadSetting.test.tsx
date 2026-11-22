@@ -99,7 +99,7 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     view.unmount()
   })
 
-  it('starts as lead on this machine, and inherits again', () => {
+  it('starts as lead on this machine, and resets to the inherited value', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({ orchestratorGameProjects: { repo1: { hud: false } } }, undefined, updates)
     click(view.container, '[aria-label="Start as lead"] button', 'On')
@@ -110,7 +110,7 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
       undefined,
       updates
     )
-    click(overridden.container, '[aria-label="Start as lead"] button', 'Inherit')
+    click(overridden.container, '[data-slot="game-row-source"] button', 'Reset to Off (default)')
     expect(updates).toEqual([
       { orchestratorGameProjects: { repo1: { hud: false, orchestrator: { autostart: true } } } },
       { orchestratorGameProjects: {} }
@@ -182,6 +182,23 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     const fromYaml = render({}, { orchestrator: { accounts: 'default' } })
     expect(fromYaml.container.textContent).toContain("Orca's account · from orca.yaml")
     fromYaml.unmount()
+  })
+
+  it('keeps Most free a distinct pick from an orca.yaml allow-list and from unset', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const listed = render({}, { orchestrator: { accounts: ['a', 'b'] } }, updates)
+    expect(listed.container.textContent).toContain('a, b · from orca.yaml')
+    click(listed.container, '[aria-label="Member accounts"] button', 'Most free')
+    listed.unmount()
+    const unset = render({}, undefined, updates)
+    expect(
+      unset.container.querySelector('[aria-label="Member accounts"] [aria-checked="true"]')
+        ?.textContent
+    ).toBe('Most free')
+    click(unset.container, '[aria-label="Member accounts"] button', 'Most free')
+    unset.unmount()
+    const stored = { orchestratorGameProjects: { repo1: { orchestrator: { accounts: 'auto' } } } }
+    expect(updates).toEqual([stored, stored])
   })
 
   it('saves a typed value on blur and inherits when the field is cleared', () => {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_ORCHESTRATOR_GAME_CONFIG,
   parseOrchestratorGameLayer,
-  resolveOrchestratorGameConfig
+  resolveOrchestratorGameConfig,
+  type OrchestratorGameMode
 } from './orchestrator-game-config'
 import type { OrchestratorGameRender } from './orchestrator-game-render'
 import {
@@ -11,7 +13,8 @@ import {
   orchestratorGameViewPatchOf,
   shownOrchestratorGameModeOf,
   shownOrchestratorGameTerminalOf,
-  suggestedOrchestratorGameView
+  suggestedOrchestratorGameView,
+  type OrchestratorGameViewId
 } from './orchestrator-game-view'
 
 const GIB = 1024 ** 3
@@ -142,5 +145,26 @@ describe('what a pane draws in its terminal', () => {
   it('leaves off and a hidden game off', () => {
     expect(shownOrchestratorGameTerminalOf({ ...config, mode: 'off' }).mode).toBe('off')
     expect(shownOrchestratorGameTerminalOf({ ...config, band: true, show: false }).mode).toBe('off')
+  })
+})
+
+describe('the default terminal in every view (ORCA-1112 keeps it)', () => {
+  // Why literal: the settings refactor must not move what a default config draws.
+  const PINNED: Record<OrchestratorGameViewId, { mode: OrchestratorGameMode; hud: boolean }> = {
+    off: { mode: 'off', hud: false },
+    flat: { mode: 'flat', hud: false },
+    zen: { mode: 'flat', hud: false },
+    '2d-classic': { mode: 'flat', hud: false },
+    '2d-hd': { mode: 'flat', hud: false }
+  }
+
+  it('draws what it drew before, the band being off by default', () => {
+    for (const { id } of ORCHESTRATOR_GAME_VIEWS) {
+      const config = {
+        ...DEFAULT_ORCHESTRATOR_GAME_CONFIG,
+        ...orchestratorGameViewPatchOf(id, DEFAULT_ORCHESTRATOR_GAME_CONFIG)
+      }
+      expect(shownOrchestratorGameTerminalOf(config), id).toEqual(PINNED[id])
+    }
   })
 })

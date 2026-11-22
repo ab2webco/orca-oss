@@ -3,8 +3,8 @@ import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-win
 import { waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
 
-// Why: a flat pane draws no scene, so neither may its preview; nor may Off picked as the default view.
-test('the preview follows the default view: no scene for flat or off, the scene again for zen', async ({
+// Why: a flat pane draws no scene, so the band group and its preview go; Off also drops what the mod reads.
+test('the preview follows the default view: no band group for flat or off, the scene again for zen', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -24,14 +24,15 @@ test('the preview follows the default view: no scene for flat or off, the scene 
   await defaultView.click()
   await orcaPage.getByRole('option', { name: 'Flat · light' }).click()
   await expect(quest).toBeHidden()
-  const flatNote = orcaPage.getByText('Flat draws the game as text, with no scene or characters.')
-  await expect(flatNote).toBeVisible()
+  const bandGroup = orcaPage.locator('[data-game-group="band"]')
+  await expect(bandGroup).toHaveCount(0)
+  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeVisible()
   await expect(orcaPage.getByRole('option')).toHaveCount(0)
   for (const theme of THEMES) {
     await setTheme(orcaPage, theme)
     for (const width of WIDTHS) {
       await setWindowWidth(electronApp, orcaPage, width)
-      await flatNote.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await defaultView.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       await orcaPage.screenshot({ path: testInfo.outputPath(`preview-flat-${theme}-${width}.png`) })
     }
   }
@@ -39,10 +40,8 @@ test('the preview follows the default view: no scene for flat or off, the scene 
   await setWindowWidth(electronApp, orcaPage, 1440)
   await defaultView.click()
   await orcaPage.getByRole('option', { name: 'Off · light' }).click()
-  await expect(
-    orcaPage.getByText('The game is off, so Agent Teams panes start as plain Claude.')
-  ).toBeVisible()
-  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toBeDisabled()
+  await expect(bandGroup).toHaveCount(0)
+  await expect(orcaPage.getByRole('switch', { name: 'Rewards' })).toHaveCount(0)
   await expect(orcaPage.getByRole('option')).toHaveCount(0)
   await orcaPage.screenshot({ path: testInfo.outputPath('preview-view-off-1440.png') })
 

@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   DEFAULT_ORCHESTRATOR_GAME_CONFIG,
@@ -9,13 +9,10 @@ import {
 } from '../../../../shared/orchestrator-game-config'
 import { resolveOrchestratorGamePanel } from '../../../../shared/orchestrator-game-panel-layers'
 import {
-  GAME_PANEL_LOOKS,
-  GAME_PANEL_STYLES,
-  GAME_PANEL_TABS,
   withGamePanelField,
   type GamePanelField,
-  type GamePanelLook,
   type GamePanelStyle,
+  type GamePanelTab,
   type GamePanelValue as PanelValue
 } from '../../../../shared/orchestrator-game-panel'
 import { SearchableSetting } from './SearchableSetting'
@@ -26,10 +23,10 @@ import {
   SettingsSwitchRow
 } from './SettingsFormControls'
 import {
-  orchestratorGameInheritLabel,
   orchestratorGameModeLabels,
   orchestratorGameSourceLabel
 } from './orchestrator-game-setting-labels'
+import { InheritableSegmentedRow } from './InheritableSettingRow'
 import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
 import { GAME_PANEL_GLOBAL_SECTION_ID } from './repository-settings-targets'
 import type { AdvisorPluginPresence } from './use-advisor-plugin-presence'
@@ -41,104 +38,25 @@ import type { OrchestratorGameSceneExtension } from '../../../../shared/orchestr
 import { withOrchestratorGameField } from '../../../../shared/orchestrator-game-settings-updates'
 import { gamePanelValueOf, ownGamePanelValueOf } from './game-panel-overrides'
 import { GamePanelOverrideNote, useGamePanelOverrideProjects } from './GamePanelOverrideNote'
+import { GamePanelDioramaRows, ProjectGamePanelDioramaRows } from './GamePanelDioramaRows'
+import { OrchestratorGameTimezoneRow } from './OrchestratorGameRenderSetting'
+import { gameRowFactsOf, shownGameRows } from './orchestrator-game-row-visibility'
+import { GameRowGroupView, type GameRowDrawers } from './GameRowList'
 import {
-  dioramaRowsShown,
-  GamePanelDioramaRows,
-  ProjectGamePanelDioramaRows
-} from './GamePanelDioramaRows'
+  gamePanelChoicesOf as choicesOf,
+  gamePanelRowCopy as copy,
+  gamePanelShowLabel as showLabel,
+  gamePanelStyleLabels as styleLabels,
+  gamePanelValueNameOf as valueNameOf,
+  gameSceneTitle as sceneTitle
+} from './game-panel-setting-copy'
 
 type GameSettings = Pick<GlobalSettings, 'orchestratorGame' | 'orchestratorGameProjects'>
 type Update = (updates: Partial<GlobalSettings>) => void
-type Toggle = Exclude<GamePanelField, 'look' | 'style'>
-
-const lookLabels = (): Record<GamePanelLook, string> => ({
-  game: translate('auto.components.settings.OrchestratorGamePanelSetting.lookGame', 'Game'),
-  display: translate(
-    'auto.components.settings.OrchestratorGamePanelSetting.lookDisplay',
-    'Display'
-  ),
-  plain: translate('auto.components.settings.OrchestratorGamePanelSetting.lookPlain', 'Plain')
-})
-
-const styleLabels = (): Record<GamePanelStyle, string> => ({
-  figures: translate(
-    'auto.components.settings.OrchestratorGamePanelSetting.styleFigures',
-    'Figures'
-  ),
-  office: translate('auto.components.settings.OrchestratorGamePanelSetting.styleOffice', 'Office'),
-  pixel: translate('auto.components.settings.OrchestratorGamePanelSetting.stylePixel', 'Pixel')
-})
-
-const copy = () => ({
-  look: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.look', 'Panel look'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.lookDescription',
-      'The Team panel in the right sidebar; Default view sets the terminal panes. Same data and actions in all three.'
-    )
-  ],
-  style: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.style', 'Scene style'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.styleDescription',
-      'They all act out the same real state.'
-    )
-  ],
-  prs: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.prs', 'PRs'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.prsDescription',
-      'Tab with your open PRs.'
-    )
-  ],
-  queue: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.queue', 'Queue'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.queueDescription',
-      'The merge queue at the top of PRs.'
-    )
-  ],
-  machines: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.machines', 'Machines'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.machinesDescription',
-      'Tab with the hosts and their memory.'
-    )
-  ],
-  advisor: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.advisor', 'Advisor'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.advisorDescription',
-      'Row under the lead. Shows only when the plugin is installed.'
-    )
-  ],
-  arcade: [
-    translate('auto.components.settings.OrchestratorGamePanelSetting.arcade', 'Arcade'),
-    translate(
-      'auto.components.settings.OrchestratorGamePanelSetting.arcadeDescription',
-      'A perfect merge saves a game.'
-    )
-  ]
-})
-
-const sceneTitle = (): string =>
-  translate('auto.components.settings.OrchestratorGameSetting.scene', 'Scene')
-
-const showLabel = (label: string): string =>
-  translate('auto.components.settings.OrchestratorGamePanelSetting.show', 'Show {{label}}', {
-    label
-  })
+type Toggle = GamePanelTab | 'advisor' | 'arcade'
 
 const ownOf = ownGamePanelValueOf
 const valueOf = gamePanelValueOf
-
-const valueNameOf = (value: PanelValue): string => {
-  if (typeof value === 'boolean') {
-    const onOff = orchestratorGameModeLabels()
-    return value ? onOff.on : onOff.off
-  }
-  return ({ ...lookLabels(), ...styleLabels() } as Record<string, string>)[value]
-}
 
 // Why parsed: only a key the layer sets validly counts, so a bad hand edit names the layer below.
 function sourceOf(
@@ -163,8 +81,9 @@ export function GamePanelSetting({
   const panel = resolveOrchestratorGamePanel({ global: layer })
   const sceneId = resolveOrchestratorGameConfig({ global: layer }).config.scene
   const scene = useMemo(() => ({ id: sceneId, extensions: [] }), [sceneId])
+  const facts = gameRowFactsOf({ page: 'global', layers: { global: layer } })
   const text = copy()
-  const [{ title, description, keywords }] = getGamePanelSearchEntries()
+  const [{ title, description, keywords }] = getGamePanelSearchEntries(facts)
   const set = (field: GamePanelField, value: boolean | string): void =>
     updateSettings({ orchestratorGame: withGamePanelField(layer, field, value as PanelValue) })
   const projects = useGamePanelOverrideProjects(settings)
@@ -177,20 +96,66 @@ export function GamePanelSetting({
       updateSettings={updateSettings}
     />
   )
-  return (
-    <SearchableSetting
-      id={GAME_PANEL_GLOBAL_SECTION_ID}
-      title={title}
-      description={description}
-      keywords={keywords}
-      className="space-y-1"
-    >
-      <SettingsSubsectionHeader title={title} description={description} />
+  const segment = (field: 'look' | 'style') => () => (
+    <SettingsRow
+      label={text[field][0]}
+      description={
+        <>
+          {text[field][1]}
+          <StyleNote field={field} style={panel.style} sceneId={sceneId} />
+          {overrideNote(field)}
+        </>
+      }
+      control={
+        <SettingsSegmentedControl
+          value={panel[field]}
+          ariaLabel={text[field][0]}
+          size="sm"
+          options={choicesOf(field)}
+          onChange={(next) => set(field, next)}
+        />
+      }
+    />
+  )
+  const tab = (id: GamePanelTab) => () => (
+    <SettingsSwitchRow
+      label={text[id][0]}
+      description={
+        <>
+          {text[id][1]}
+          {overrideNote(id)}
+        </>
+      }
+      ariaLabel={showLabel(text[id][0])}
+      checked={panel.tabs[id]}
+      onChange={() => set(id, !panel.tabs[id])}
+    />
+  )
+  const draw: GameRowDrawers = {
+    look: segment('look'),
+    style: segment('style'),
+    stylePreview: () => (
+      <GamePanelStylePreview
+        style={panel.style}
+        scene={scene}
+        diorama={panel.diorama}
+        lite={panel.quality === 'low'}
+      />
+    ),
+    diorama: () => (
+      <GamePanelDioramaRows
+        settings={settings}
+        panel={panel}
+        projects={projects}
+        updateSettings={updateSettings}
+      />
+    ),
+    scene: () => (
       <SettingsRow
         label={sceneTitle()}
         description={translate(
           'auto.components.settings.OrchestratorGameSetting.sceneDescription',
-          'The art the game draws. Installed plugins can add scenes.'
+          'The art Pixel draws, and member names unless Names sets them.'
         )}
         control={
           <OrchestratorGameSceneSelect
@@ -208,61 +173,29 @@ export function GamePanelSetting({
           />
         }
       />
-      {(['look', 'style'] as const)
-        .filter((field) => field === 'look' || panel.look === 'game')
-        .map((field) => (
-          <SettingsRow
-            key={field}
-            label={text[field][0]}
-            description={
-              <>
-                {text[field][1]}
-                <StyleNote field={field} style={panel.style} sceneId={sceneId} />
-                {overrideNote(field)}
-              </>
-            }
-            control={
-              <SettingsSegmentedControl
-                value={panel[field]}
-                ariaLabel={text[field][0]}
-                size="sm"
-                options={choicesOf(field)}
-                onChange={(next) => set(field, next)}
-              />
-            }
-          />
-        ))}
-      {panel.look === 'game' ? (
-        <GamePanelStylePreview
-          style={panel.style}
-          scene={scene}
-          diorama={panel.diorama}
-          lite={panel.quality === 'low'}
-        />
-      ) : null}
-      {dioramaRowsShown(panel) ? (
-        <GamePanelDioramaRows
-          settings={settings}
-          panel={panel}
-          projects={projects}
-          updateSettings={updateSettings}
-        />
-      ) : null}
-      {GAME_PANEL_TABS.map((tab) => (
-        <SettingsSwitchRow
-          key={tab}
-          label={text[tab][0]}
-          description={
-            <>
-              {text[tab][1]}
-              {overrideNote(tab)}
-            </>
-          }
-          ariaLabel={showLabel(text[tab][0])}
-          checked={panel.tabs[tab]}
-          onChange={() => set(tab, !panel.tabs[tab])}
-        />
-      ))}
+    ),
+    prs: tab('prs'),
+    machines: tab('machines'),
+    timezone: () => (
+      <OrchestratorGameTimezoneRow
+        key={layer?.timezone ?? ''}
+        stored={layer?.timezone ?? ''}
+        onCommit={(value) =>
+          updateSettings({ orchestratorGame: withOrchestratorGameField(layer, 'timezone', value) })
+        }
+      />
+    )
+  }
+  return (
+    <SearchableSetting
+      id={GAME_PANEL_GLOBAL_SECTION_ID}
+      title={title}
+      description={description}
+      keywords={keywords}
+      className="space-y-1"
+    >
+      <SettingsSubsectionHeader title={title} description={description} />
+      <GameRowGroupView group="panel" shown={shownGameRows(facts)} draw={draw} />
     </SearchableSetting>
   )
 }
@@ -273,14 +206,6 @@ function StyleNote(p: { field: GamePanelField; style: GamePanelStyle; sceneId: s
   return note ? <span className="block">{note}</span> : null
 }
 
-function choicesOf(field: 'look' | 'style'): { value: string; label: string }[] {
-  const labels: Record<string, string> = field === 'look' ? lookLabels() : styleLabels()
-  return (field === 'look' ? GAME_PANEL_LOOKS : GAME_PANEL_STYLES).map((value) => ({
-    value,
-    label: labels[value]
-  }))
-}
-
 /** This machine's override of the panel for one project, each row offering Inherit. */
 export function ProjectGamePanelRows({
   repoId,
@@ -288,6 +213,7 @@ export function ProjectGamePanelRows({
   projectLayer,
   advisorPlugin,
   scene,
+  drawers,
   updateSettings
 }: {
   repoId: string
@@ -296,28 +222,19 @@ export function ProjectGamePanelRows({
   advisorPlugin: AdvisorPluginPresence
   /** The project's scene with a custom file's definition; without it the preview resolves the id. */
   scene?: { id: string; extensions: OrchestratorGameSceneExtension[] }
+  /** Rows of the Panel group the project page draws itself (scene, time zone). */
+  drawers?: GameRowDrawers
   updateSettings: Update
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const local = settings.orchestratorGameProjects?.[repoId]
   const layers = { global: settings.orchestratorGame, project: projectLayer, local }
   const panel = resolveOrchestratorGamePanel(layers)
   const sceneId = resolveOrchestratorGameConfig(layers).config.scene
   const ownScene = useMemo(() => ({ id: sceneId, extensions: [] }), [sceneId])
   const shownScene = scene ?? ownScene
+  const shown = shownGameRows(gameRowFactsOf({ page: 'project', layers, advisorPlugin }))
   const text = copy()
-  const inherit = orchestratorGameInheritLabel()
   const onOff = orchestratorGameModeLabels()
-  const named = (field: GamePanelField, value: PanelValue): string => {
-    const line = `${valueNameOf(value)} · ${orchestratorGameSourceLabel(sourceOf(layers, field))}`
-    // Why named: the band preview below also draws pixels, and only this row sets the Team panel.
-    return field === 'look'
-      ? translate(
-          'auto.components.settings.OrchestratorGamePanelSetting.teamPanelLook',
-          'Team panel: {{look}}',
-          { look: line }
-        )
-      : line
-  }
   const set = (field: GamePanelField, value: boolean | string | undefined): void => {
     const nextLayer = withGamePanelField(local, field, value as PanelValue | undefined)
     const projects = { ...settings.orchestratorGameProjects, [repoId]: nextLayer }
@@ -326,74 +243,66 @@ export function ProjectGamePanelRows({
     }
     updateSettings({ orchestratorGameProjects: projects })
   }
-  const toggles: Toggle[] = [
-    ...GAME_PANEL_TABS,
-    ...(advisorPlugin === 'missing' ? [] : (['advisor'] as const)),
-    ...(panel.look === 'game' ? (['arcade'] as const) : [])
-  ]
-  const choices = (field: 'look' | 'style') => [
-    { value: 'inherit', label: inherit },
-    ...choicesOf(field)
-  ]
-  const rows: { field: GamePanelField; options: { value: string; label: string }[] }[] = [
-    { field: 'look', options: choices('look') },
-    ...(panel.look === 'game' ? [{ field: 'style' as const, options: choices('style') }] : []),
-    ...toggles.map((field) => ({
-      field,
-      options: [
-        { value: 'inherit', label: inherit },
-        { value: 'true', label: onOff.on },
-        { value: 'false', label: onOff.off }
-      ]
-    }))
-  ]
-  return (
-    <>
-      {rows.map(({ field, options }) => {
-        const own = ownOf(local, field)
-        const isToggle = field !== 'look' && field !== 'style'
-        const value = own === undefined ? 'inherit' : String(own)
-        const row = (
-          <SettingsRow
-            key={field}
-            label={text[field][0]}
-            description={
-              <>
-                {text[field][1]}
-                <span className="block">{named(field, valueOf(panel, field))}</span>
-                <StyleNote field={field} style={panel.style} sceneId={sceneId} />
-              </>
-            }
-            control={
-              <SettingsSegmentedControl
-                value={value}
-                ariaLabel={text[field][0]}
-                size="sm"
-                options={options}
-                onChange={(next) =>
-                  set(field, next === 'inherit' ? undefined : isToggle ? next === 'true' : next)
-                }
-              />
-            }
-          />
-        )
-        return field === 'style' ? (
-          <Fragment key={field}>
-            {row}
-            <GamePanelStylePreview
-              style={panel.style}
-              scene={shownScene}
-              diorama={panel.diorama}
-              lite={panel.quality === 'low'}
-            />
-            {dioramaRowsShown(panel) ? (
-              <ProjectGamePanelDioramaRows layers={layers} panel={panel} set={set} />
-            ) : null}
-          </Fragment>
-        ) : (
-          row
-        )
-      })}
-    </>
-  )
+  const row = (field: 'look' | 'style' | Toggle) => () => {
+    const isToggle = field !== 'look' && field !== 'style'
+    const options = isToggle
+      ? [
+          { value: 'true', label: onOff.on },
+          { value: 'false', label: onOff.off }
+        ]
+      : choicesOf(field)
+    // Why without this machine's value only: the inherited row is what Reset gives back.
+    const below = { ...layers, local: withGamePanelField(local, field, undefined) }
+    const inheritedValue = String(valueOf(resolveOrchestratorGamePanel(below), field))
+    const label = (value: string) => options.find((one) => one.value === value)?.label ?? value
+    return (
+      <InheritableSegmentedRow
+        label={text[field][0]}
+        text={text[field][1]}
+        note={<StyleNote field={field} style={panel.style} sceneId={sceneId} />}
+        options={options}
+        applied={String(valueOf(panel, field))}
+        source={orchestratorGameSourceLabel(sourceOf(layers, field))}
+        inherited={{
+          value: inheritedValue,
+          label: label(inheritedValue),
+          source: orchestratorGameSourceLabel(sourceOf(below, field))
+        }}
+        isOverridden={ownOf(local, field) !== undefined}
+        // Why named: the band preview below also draws pixels, and only this row sets the Team panel.
+        lineOf={
+          field === 'look'
+            ? (look) =>
+                translate(
+                  'auto.components.settings.OrchestratorGamePanelSetting.teamPanelLook',
+                  'Team panel: {{look}}',
+                  { look }
+                )
+            : undefined
+        }
+        onPick={(next) =>
+          set(field, next === undefined ? undefined : isToggle ? next === 'true' : next)
+        }
+      />
+    )
+  }
+  const draw: GameRowDrawers = {
+    look: row('look'),
+    style: row('style'),
+    stylePreview: () => (
+      <GamePanelStylePreview
+        style={panel.style}
+        scene={shownScene}
+        diorama={panel.diorama}
+        lite={panel.quality === 'low'}
+      />
+    ),
+    diorama: () => <ProjectGamePanelDioramaRows layers={layers} panel={panel} set={set} />,
+    prs: row('prs'),
+    machines: row('machines'),
+    advisor: row('advisor'),
+    arcade: row('arcade'),
+    ...drawers
+  }
+  return <GameRowGroupView group="panel" shown={shown} draw={draw} />
 }

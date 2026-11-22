@@ -4,9 +4,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PluginHostListEntry } from '../../../../preload/api/plugin-host-api'
-import type { OrchestratorGameMode } from '../../../../shared/orchestrator-game-config'
 import { usePluginPanelsStore } from '../../store/plugin-panels'
-import { OrchestratorGameScenePreview } from './OrchestratorGameScenePreview'
+import { OrchestratorGameScenePreview, type ScenePreviewMode } from './OrchestratorGameScenePreview'
 import { PREVIEW_TICK_MS } from './orchestrator-game-scene-preview-frame'
 
 const spacePack: PluginHostListEntry = {
@@ -42,7 +41,7 @@ const setReducedMotion = (reduce: boolean): void => {
 let container: HTMLDivElement
 let root: Root
 
-const show = (scene: string, mode: OrchestratorGameMode): void => {
+const show = (scene: string, mode: ScenePreviewMode): void => {
   act(() => {
     root.render(
       <OrchestratorGameScenePreview
@@ -91,20 +90,14 @@ describe('OrchestratorGameScenePreview', () => {
     expect(figure().textContent).toContain('Night Watch')
   })
 
-  it('follows the mode: zen notes what it hides, off draws nothing', () => {
+  it('follows the mode: zen notes what it hides', () => {
     show('quest', 'zen')
     expect(figure().dataset.mode).toBe('zen')
     expect(figure().textContent).toContain('also hides short working notes')
 
-    show('quest', 'off')
-    expect(figure().dataset.mode).toBe('off')
-    expect(container.querySelector('canvas')).toBeNull()
-    expect(figure().textContent).toContain('start as plain Claude')
-
-    show('quest', 'flat')
-    expect(figure().dataset.mode).toBe('flat')
-    expect(container.querySelector('canvas')).toBeNull()
-    expect(figure().textContent).toContain('Flat draws the game as text, with no scene')
+    show('quest', 'on')
+    expect(figure().dataset.mode).toBe('on')
+    expect(figure().textContent).not.toContain('also hides short working notes')
   })
 
   it('draws quest for a scene nothing installed serves and says why', () => {

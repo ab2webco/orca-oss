@@ -4,7 +4,11 @@ import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../sha
 import type { SettingsSearchEntry } from './settings-search'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
-import { getGamePanelSearchEntries } from './orchestrator-game-panel-search'
+import {
+  getAgentTeamsGameSearchEntry,
+  getGamePanelSearchEntries
+} from './orchestrator-game-panel-search'
+import type { GameRowFacts } from './orchestrator-game-row-visibility'
 import { getRepositoryGitAuthorSearchEntries } from './repository-git-author-search-entries'
 import { getRepositoryGitHooksSearchEntries } from './repository-git-hooks-search-entries'
 import { getRepositoryGitWorktreeSearchEntries } from './repository-git-worktree-search-entries'
@@ -12,6 +16,8 @@ import { getRepositoryGitWorktreeSearchEntries } from './repository-git-worktree
 type RepositoryPaneSearchOptions = {
   isLocalWindowsProject?: boolean
   windowsRuntimeSupported?: boolean
+  /** The project's game rows in use; without it every game row is searchable. */
+  gameFacts?: GameRowFacts
 }
 
 export function getRepositoryPaneSearchEntries(
@@ -192,6 +198,7 @@ export function getRepositoryPaneSearchEntries(
           ...getRepositoryGitAuthorSearchEntries(repo),
           ...getRepositoryGitHooksSearchEntries(repo)
         ]),
-    ...getGamePanelSearchEntries()
+    ...getGamePanelSearchEntries(options.gameFacts),
+    getAgentTeamsGameSearchEntry(options.gameFacts)
   ]
 }

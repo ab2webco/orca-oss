@@ -18,6 +18,28 @@ function presenceInList(plugins: unknown): AdvisorPluginPresence {
   return plugins.some(isAdvisor) ? 'installed' : 'missing'
 }
 
+// Why shared: the project page and its search both ask; a remote host gets one plugins.list.
+const pendingLists = new Map<string, Promise<AdvisorPluginPresence>>()
+
+function remotePresence(environmentId: string): Promise<AdvisorPluginPresence> {
+  const pending = pendingLists.get(environmentId)
+  if (pending) {
+    return pending
+  }
+  const asked = callRuntimeRpc<unknown>(
+    { kind: 'environment', environmentId },
+    'plugins.list',
+    undefined,
+    { timeoutMs: 15_000 }
+  )
+    .then(presenceInList)
+    // Why: an older or unreachable host must not take the setting away.
+    .catch((): AdvisorPluginPresence => 'unknown')
+    .finally(() => pendingLists.delete(environmentId))
+  pendingLists.set(environmentId, asked)
+  return asked
+}
+
 /** Whether the Advisor plugin is on the host that runs this project, which may not be this one. */
 export function useAdvisorPluginPresence(
   repo: Pick<Repo, 'connectionId' | 'executionHostId'>
@@ -45,12 +67,7 @@ export function useAdvisorPluginPresence(
         setAnswer({ environmentId, presence })
       }
     }
-    callRuntimeRpc<unknown>({ kind: 'environment', environmentId }, 'plugins.list', undefined, {
-      timeoutMs: 15_000
-    })
-      .then((plugins) => settle(presenceInList(plugins)))
-      // Why: an older or unreachable host must not take the setting away.
-      .catch(() => settle('unknown'))
+    void remotePresence(environmentId).then(settle)
     return () => {
       isStale = true
     }
