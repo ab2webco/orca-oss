@@ -29,6 +29,8 @@ export type GameInboxSource = {
   pendingQuestions?: readonly GameInboxMail[]
   /** Questions of this run the lead answered, with the answer; the Inbox audits them. */
   answeredQuestions?: readonly GameAnsweredQuestionMail[]
+  /** Addresses of members whose dispatch settled, and no live one shares: nobody is left to answer. */
+  settledSenders?: readonly string[]
 }
 
 export type GameAnsweredQuestionMail = GameInboxMail & {
@@ -109,6 +111,17 @@ function withoutRepeatedDone(rows: readonly GameInboxMail[]): GameInboxMail[] {
     seen.add(key)
     return true
   })
+}
+
+/** Mail a settled member sent: it can no longer wait on the lead (ORCA-1267). */
+export function settledSenderOf(source: GameInboxSource): (row: GameInboxMail) => boolean {
+  const settled = new Set(source.settledSenders ?? [])
+  return (row) => {
+    const dispatch = dispatchOfPayload(row.payload)
+    return (
+      settled.has(row.from_handle) || (dispatch !== null && settled.has(`dispatch:${dispatch}`))
+    )
+  }
 }
 
 const dispatchOfRow = (row: GameInboxMail): string | null =>
@@ -197,13 +210,16 @@ export function gameInboxesOf(
   const pending = source.pendingQuestions ?? []
   // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
   const replied = new Set(allOldestFirst.flatMap((row) => (row.thread_id ? [row.thread_id] : [])))
+  const fromSettled = settledSenderOf(source)
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
     const rows = withoutRepeatedDone(oldestFirst.filter((row) => to.has(row.to_handle)))
     const unanswered =
       key === 'lead'
-        ? rows.filter((row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id))
+        ? rows.filter(
+            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromSettled(row)
+          )
         : []
     const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]
       .filter((row) => to.has(row.to_handle))

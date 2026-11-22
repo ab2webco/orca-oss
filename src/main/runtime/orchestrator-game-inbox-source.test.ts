@@ -121,4 +121,24 @@ describe('gameInboxSourceOf', () => {
     )
     expect(source.peerLeads).toEqual({ term_peer: 'Bo' })
   })
+
+  it('names the addresses of settled dispatches no live member shares (ORCA-1267)', () => {
+    const { db } = fakeDb()
+    db.listWorkerTerminalResources = () => [
+      { dispatchId: 'd1', taskId: 't1', agentTerminalHandle: 'term_1', workerState: 'stopped' },
+      { dispatchId: 'd2', taskId: 't1', agentTerminalHandle: 'term_1', workerState: 'ready' },
+      {
+        dispatchId: 'd3',
+        taskId: 't9',
+        agentTerminalHandle: 'term_9',
+        workerState: 'ready',
+        dispatchStatus: 'completed'
+      },
+      { dispatchId: 'd4', taskId: 't9', agentTerminalHandle: 'term_4', workerState: 'starting' }
+    ]
+
+    expect(
+      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }).settledSenders
+    ).toEqual(['dispatch:d1', 'dispatch:d3', 'term_9'])
+  })
 })

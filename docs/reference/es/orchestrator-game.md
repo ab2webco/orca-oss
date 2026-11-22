@@ -1552,6 +1552,11 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   confirma su correo (ORCA-746 T6): `game fleet` muestra el NEXT del miembro como
   `waiting on you: orchestration reply --id <msg>` hasta que la pregunta se responde o se cierra, y
   `game state` la lista bajo el inbox del líder.
+- Una escalación o un decision gate espera al líder hasta que una respuesta lo enhebra, y sólo mientras
+  el dispatch de su miembro sigue vivo (ORCA-1267): el correo de un dispatch asentado, cuya terminal
+  ningún miembro vivo reusa, `game watch --lead` no lo vuelve a alertar. `orchestration reply` acepta
+  el correo enviado a `run:<id>` desde el consumidor actual de ese Run, así que el líder puede
+  responder el correo de estado de un miembro, no sólo su pregunta.
 - Lo que el líder le pregunta a la persona es un registro, no texto de chat (ORCA-782): `game ask-owner`
   guarda la pregunta con su ticket, hasta 6 opciones, una línea de contexto y la hora en que se
   preguntó en el archivo del tablero del proyecto, junto a sus eventos ([`orchestrator-game-owner-questions.ts`](../../../src/shared/orchestrator-game-owner-questions.ts)).

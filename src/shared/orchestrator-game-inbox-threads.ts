@@ -2,6 +2,7 @@
 import {
   isMemberFailure,
   payloadOf,
+  settledSenderOf,
   type GameInboxMail,
   type GameInboxSource
 } from './orchestrator-game-inbox'
@@ -144,9 +145,10 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
       row.type === 'decision_gate' && ticketOf.has(row.from_handle) && lead.has(row.to_handle)
   )
 
+  const fromSettled = settledSenderOf(source)
   const waitingRows = [
     ...(source.pendingQuestions ?? []).filter((row) => lead.has(row.to_handle)),
-    ...gates.filter((gate) => !leadReplyAfter(gate))
+    ...gates.filter((gate) => !leadReplyAfter(gate) && !fromSettled(gate))
   ].sort((a, b) => a.sequence - b.sequence)
   const waiting = waitingRows.map(
     (row): GameWaitingItem => ({

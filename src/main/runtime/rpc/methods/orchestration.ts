@@ -30,7 +30,7 @@ import {
 } from '../../../../shared/orchestration-rpc-contract'
 import { clampOrchestrationAskTimeoutMs } from '../../../../shared/orchestration-ask-timeout'
 import { ORCHESTRATION_GATE_METHODS } from './orchestration-gates'
-import { resolveRunScope } from './orchestration-run-scope'
+import { resolveRunScope, runConsumerOf } from './orchestration-run-scope'
 import { ORCHESTRATION_RUN_METHODS } from './orchestration-runs'
 import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
@@ -1303,9 +1303,18 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       // Why: a shell with none of Orca's terminal env vars resolves to no identity at all; answering
       // as the addressed recipient (the pre-authentication default) beats refusing its reply.
       const identityless = sender.handle === 'unknown' && !sender.paneKey
-      const from = identityless ? original.to_handle : sender.handle
+      // Why (ORCA-1267): a Run's mailbox has no pane, so its current consumer answers for it.
+      const runConsumer =
+        !identityless && original.to_handle.startsWith('run:')
+          ? runConsumerOf(runtime, original.to_handle.slice('run:'.length), sender, {
+              legacyCoordinatorRunId,
+              callerEvidence: orchestrationCompatibilityEvidence
+            })
+          : undefined
+      const from = identityless || runConsumer ? original.to_handle : sender.handle
       if (
         !identityless &&
+        !runConsumer &&
         sender.handle !== original.to_handle &&
         (!recipientPaneKey || recipientPaneKey !== sender.paneKey)
       ) {

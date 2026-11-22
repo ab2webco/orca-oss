@@ -118,3 +118,25 @@ export function resolveRunScope(runtime: OrcaRuntimeService, params: RunScopePar
   }
   return current
 }
+
+/** The Run when `sender` is its current consumer; undefined for anyone else (ORCA-1267). */
+export function runConsumerOf(
+  runtime: OrcaRuntimeService,
+  runId: string,
+  sender: { handle: string },
+  scope: Pick<RunScopeParams, 'legacyCoordinatorRunId' | 'callerEvidence'>
+): RunRow | undefined {
+  try {
+    return resolveRunScope(runtime, {
+      ...scope,
+      runId,
+      callerTerminalHandle: sender.handle,
+      requireCurrentConsumer: true
+    })
+  } catch (error) {
+    if (error instanceof OrchestrationError) {
+      return undefined
+    }
+    throw error
+  }
+}

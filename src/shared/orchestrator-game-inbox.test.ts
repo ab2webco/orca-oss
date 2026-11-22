@@ -236,4 +236,23 @@ describe('gameInboxesOf: escalations and gates waiting on the lead', () => {
     const [after] = gameInboxesOf(source([escalation, gate, status, reply]), {})
     expect(after?.waiting.map((one) => one.id)).toEqual(['msg_2'])
   })
+
+  // Why (ORCA-1267): a stopped member can never be answered, so its mail re-alerted on every watch start.
+  it("drops a settled member's escalation and gate from waiting, by sender or by the dispatch it names", () => {
+    sequence = 0
+    const escalation = mail('run:run_1', 'term_1', { type: 'escalation', subject: 'Report' })
+    const named = mail('term_lead', 'term_x', {
+      type: 'decision_gate',
+      payload: JSON.stringify({ dispatchId: 'd1' })
+    })
+    const live = mail('term_lead', 'term_2', { type: 'escalation', subject: 'Blocked' })
+
+    const [lead] = gameInboxesOf(
+      { ...source([escalation, named, live]), settledSenders: ['term_1', 'dispatch:d1'] },
+      {}
+    )
+
+    expect(lead?.waiting.map((one) => one.id)).toEqual([live.id])
+    expect(lead?.messages.map((one) => one.id)).toContain(escalation.id)
+  })
 })

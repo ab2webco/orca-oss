@@ -1,4 +1,6 @@
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
+import type { DispatchStatus, WorkerDispatchState } from './orchestration/types'
+import { WORKER_SETTLED_STATES } from './orchestration/worker-terminal-ownership'
 import type {
   GameAnsweredQuestionMail,
   GameInboxMail,
@@ -10,9 +12,13 @@ export type GameInboxDb = {
   getCurrentRunForPane: (
     paneKey: string
   ) => { id: string; coordinator_handle: string | null } | undefined
-  listWorkerTerminalResources: (params: {
-    runId?: string
-  }) => { dispatchId: string; taskId: string; agentTerminalHandle: string | null }[]
+  listWorkerTerminalResources: (params: { runId?: string }) => {
+    dispatchId: string
+    taskId: string
+    agentTerminalHandle: string | null
+    workerState?: WorkerDispatchState
+    dispatchStatus?: DispatchStatus
+  }[]
   getTask: (id: string) => { task_title: string | null; display_name: string | null } | undefined
   getAllMessagesForHandle: (handle: string, limit?: number) => GameInboxMail[]
   listPendingQuestions: (runId: string) => GameInboxMail[]
@@ -38,7 +44,8 @@ export function gameInboxSourceOf(
     ])
   ]
   const byTicket = new Map<string, string[]>()
-  for (const worker of run ? db.listWorkerTerminalResources({ runId: run.id }) : []) {
+  const workers = run ? db.listWorkerTerminalResources({ runId: run.id }) : []
+  for (const worker of workers) {
     const task = db.getTask(worker.taskId)
     // Why the name: an adopted agent's task has no ticket, and its mail still needs a home.
     const ticket =
@@ -62,5 +69,39 @@ export function gameInboxSourceOf(
   // Why: read apart from the mail window, so an old question still waits after a hundred newer messages.
   const pendingQuestions = run ? db.listPendingQuestions(run.id) : []
   const answeredQuestions = run ? db.listAnsweredQuestions(run.id, ANSWERED_QUESTIONS_MAX) : []
-  return { leadAddresses, members, mail, peerLeads, pendingQuestions, answeredQuestions }
+  return {
+    leadAddresses,
+    members,
+    mail,
+    peerLeads,
+    pendingQuestions,
+    answeredQuestions,
+    settledSenders: settledSendersOf(workers)
+  }
+}
+
+type GameInboxWorker = ReturnType<GameInboxDb['listWorkerTerminalResources']>[number]
+
+const isSettled = (worker: GameInboxWorker): boolean =>
+  (worker.workerState !== undefined && WORKER_SETTLED_STATES.includes(worker.workerState)) ||
+  (worker.dispatchStatus !== undefined &&
+    worker.dispatchStatus !== 'pending' &&
+    worker.dispatchStatus !== 'dispatched')
+
+const addressesOf = (worker: GameInboxWorker): string[] => [
+  `dispatch:${worker.dispatchId}`,
+  ...(worker.agentTerminalHandle ? [worker.agentTerminalHandle] : [])
+]
+
+// Why: a terminal a relaunched member still uses keeps its mail waiting on the lead.
+function settledSendersOf(workers: readonly GameInboxWorker[]): string[] {
+  const live = new Set(workers.filter((worker) => !isSettled(worker)).flatMap(addressesOf))
+  return [
+    ...new Set(
+      workers
+        .filter(isSettled)
+        .flatMap(addressesOf)
+        .filter((one) => !live.has(one))
+    )
+  ]
 }
