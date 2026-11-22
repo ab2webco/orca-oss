@@ -93,4 +93,43 @@ describe('mergeQueueDepartureOfResponse (ORCA-1273)', () => {
     ).toEqual({ state: 'open', reason: null, actor: null })
     expect(mergeQueueDepartureOfResponse(departure(null))).toBeNull()
   })
+
+  it('names the failed checks of the merge-group commit, latest run of each check only', () => {
+    const check = (name: string, conclusion: string, runId: number) => ({
+      name,
+      status: 'COMPLETED',
+      conclusion,
+      checkSuite: { workflowRun: { databaseId: runId, workflow: { name: 'PR Checks' } } }
+    })
+    const beforeCommit = {
+      statusCheckRollup: {
+        contexts: {
+          nodes: [
+            check('typecheck', 'SUCCESS', 9),
+            check('e2e 6-of-16', 'FAILURE', 9),
+            check('verify', 'FAILURE', 9),
+            check('lint', 'FAILURE', 8),
+            check('lint', 'SUCCESS', 9),
+            { context: 'ci/legacy', state: 'ERROR' },
+            {}
+          ]
+        }
+      }
+    }
+    const nodes = [
+      { reason: 'failed_checks', actor: { login: 'github-merge-queue' }, beforeCommit }
+    ]
+    expect(
+      mergeQueueDepartureOfResponse(departure({ state: 'OPEN', timelineItems: { nodes } }))
+    ).toEqual({
+      state: 'open',
+      reason: 'failed_checks',
+      actor: 'github-merge-queue',
+      failedChecks: [
+        { name: 'e2e 6-of-16', runId: 9 },
+        { name: 'verify', runId: 9 },
+        { name: 'ci/legacy', runId: null }
+      ]
+    })
+  })
 })

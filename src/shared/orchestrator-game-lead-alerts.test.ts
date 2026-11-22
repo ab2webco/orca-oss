@@ -124,7 +124,7 @@ describe('gameLeadAlertsOf: members (ORCA-1214)', () => {
 })
 
 describe('gameLeadAlertsOf: the merge queue (ORCA-1214)', () => {
-  it('tells a drop from a merge, and does not guess for a PR it cannot see', () => {
+  it("says merged only when a member's review says so, and never dropped without GitHub's word", () => {
     const memory = emptyGameLeadAlertMemory()
     const agents = [
       member('CIN-1', { review: review(41, 'merged') }),
@@ -138,10 +138,13 @@ describe('gameLeadAlertsOf: the merge queue (ORCA-1214)', () => {
     const lines = linesOf(stateOf(agents, {}, []), memory, NOW + MIN)
 
     expect(lines).toContain('#41 merged from the queue: close its ticket and clean up its member.')
+    // Why #42 is not dropped: its cached review said open while #1404 had merged (ORCA-1273).
     expect(lines).toContain(
-      '#42 dropped from the merge queue: find why, then fix it or queue it again.'
+      "#42 left the merge queue and GitHub's reason was not read: check whether it merged (gh pr view 42)."
     )
-    expect(lines).toContain('#43 left the merge queue: check whether it merged.')
+    expect(lines).toContain(
+      "#43 left the merge queue and GitHub's reason was not read: check whether it merged (gh pr view 43)."
+    )
   })
 
   it('reads nothing as left the queue when the queue could not be read', () => {
@@ -223,6 +226,24 @@ describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () =
   it('calls a PR the queue removed for failed checks dropped, naming the reason', () => {
     expect(leftLine({ state: 'open', reason: 'failed_checks', actor: 'github-merge-queue' })).toBe(
       '#42 dropped from the merge queue (failed_checks): find why, then fix it or queue it again.'
+    )
+  })
+
+  it('names the failed checks and their run when GitHub read them (#1408)', () => {
+    const failedChecks = [
+      { name: 'e2e (full) / e2e 6-of-16', runId: 44962899011 },
+      { name: 'e2e (full) / e2e 14-of-16', runId: 44962899011 },
+      { name: 'verify', runId: 44962899011 },
+      { name: 'Windows platform tests', runId: 44962899011 }
+    ]
+    expect(leftLine({ state: 'open', reason: 'failed_checks', actor: null, failedChecks })).toBe(
+      '#42 dropped from the merge queue (failed_checks: e2e (full) / e2e 6-of-16, e2e (full) / e2e 14-of-16, verify and 1 more; run 44962899011): find why, then fix it or queue it again.'
+    )
+  })
+
+  it('says neither merged nor dropped for an open PR whose removal GitHub has not recorded', () => {
+    expect(leftLine({ state: 'open', reason: null, actor: null })).toBe(
+      "#42 left the merge queue and GitHub's reason was not read: check whether it merged (gh pr view 42)."
     )
   })
 
