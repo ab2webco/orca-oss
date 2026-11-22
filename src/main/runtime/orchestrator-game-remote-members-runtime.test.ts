@@ -92,6 +92,39 @@ describe("a lead's game state with a member on a paired host (ORCA-824)", () => 
     ])
   })
 
+  it("sends the lead's open PRs and cap to the member's host with each read (ORCA-1301)", async () => {
+    const { runtime, dispatchId } = leadWithRemoteMember()
+    const show = vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({
+      terminal: { branch: 'fabolivark/orca-805', title: '✳ Claude Code', liveness: 'running' }
+    })
+    const lead = await runtime.getOrchestratorGameState({ paneKey: LEAD_PANE })
+    show.mockClear()
+    // Why the private step: the review list needs GitHub, so the test hands it a read one.
+    const withRemoteGameMembers = Reflect.get(runtime, 'withRemoteGameMembers') as (
+      ...args: unknown[]
+    ) => Promise<unknown>
+
+    await withRemoteGameMembers.call(
+      runtime,
+      {
+        ...lead,
+        agents: lead.agents.filter((agent) => !agent.isMember),
+        lead: { ...lead.lead, cap: 6 },
+        project: { reviews: { total: 6, url: null, items: [] }, todo: null }
+      },
+      LEAD_PANE,
+      null,
+      new Map()
+    )
+
+    expect(show).toHaveBeenCalledWith(
+      'env_imac',
+      'orchestration.federationShow',
+      { dispatchId, prCap: { open: 6, cap: 6 } },
+      3_000
+    )
+  })
+
   it("shows a settled member the host's hooks still see working (ORCA-837)", async () => {
     const { runtime, dispatchId } = leadWithRemoteMember()
     const sqlite = (
