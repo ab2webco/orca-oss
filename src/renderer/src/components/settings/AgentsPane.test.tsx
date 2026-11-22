@@ -253,6 +253,20 @@ describe('AgentsPane', () => {
     expect(markup.match(/title="Install"/g)?.length).toBe(AGENT_CATALOG.length - 2)
   })
 
+  // ORCA-1328: an uninstalled row never shows Set default, so it must not reserve that label's width.
+  it('reserves the Set default width only on installed rows and titles every command line', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+    const row = (id: string): string =>
+      markup.split(`data-agent-row="${id}"`)[1].split('data-agent-row=')[0]
+    const sizers = (id: string): number =>
+      row(id).match(/aria-hidden="true" class="invisible/g)?.length ?? 0
+
+    expect(sizers('claude')).toBe(2)
+    expect(sizers('codex')).toBe(0)
+    expect(row('codex')).toMatch(/font-mono[^"]*" title="codex /)
+    expect(row('claude')).toMatch(/font-mono[^"]*" title="claude/)
+  })
+
   it('keeps Claude Agent Teams in the install list on macOS', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 

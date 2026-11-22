@@ -521,6 +521,10 @@ function AgentRow({
     Boolean(cmdOverride) || argsOverride !== defaultArgs || envSummary !== defaultEnvSummary
   )
 
+  // Why: the line truncates, and an uninstalled row has no expand to read it in full.
+  const commandLine = [cmdOverride ?? defaultCmd, argsOverride, envSummary]
+    .filter(Boolean)
+    .join(' ')
   const defaultLabel = translate('auto.components.settings.AgentsPane.24e032fa34', 'Default')
   const setDefaultLabel = translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')
 
@@ -543,7 +547,10 @@ function AgentRow({
           {inProcessNote ? (
             <div className="mt-1 text-[11px] text-muted-foreground">{inProcessNote}</div>
           ) : (
-            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            <div
+              className="mt-1 truncate font-mono text-[11px] text-muted-foreground"
+              title={commandLine}
+            >
               {cmdOverride ? (
                 <span>
                   <span className="text-muted-foreground/60 line-through">{defaultCmd}</span>
@@ -570,20 +577,25 @@ function AgentRow({
           <div
             className={cn('grid max-sm:order-last', !(isDetected && isEnabled) && 'max-sm:hidden')}
           >
-            {/* Why: sizes every row's column to the wider label in this language, so rows align. */}
-            <span
-              aria-hidden
-              className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium max-sm:hidden"
-            >
-              <Check className="size-3" />
-              {defaultLabel}
-            </span>
-            <span
-              aria-hidden
-              className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium max-sm:hidden"
-            >
-              {setDefaultLabel}
-            </span>
+            {/* Why installed only: sizes the column to the wider label so Installed rows align;
+                uninstalled rows never get the button and keep the room for their command. */}
+            {isDetected && (
+              <>
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium max-sm:hidden"
+                >
+                  <Check className="size-3" />
+                  {defaultLabel}
+                </span>
+                <span
+                  aria-hidden
+                  className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium max-sm:hidden"
+                >
+                  {setDefaultLabel}
+                </span>
+              </>
+            )}
             {isDetected && isEnabled && (
               <Button
                 type="button"
