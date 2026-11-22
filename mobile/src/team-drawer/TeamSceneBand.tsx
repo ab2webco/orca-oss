@@ -279,6 +279,7 @@ export function TeamSceneBand({
   shown = true,
   cameraLabels,
   sheetGestures = NO_SHEET_GESTURES,
+  parked = false,
   onLayout
 }: {
   band: Band
@@ -290,16 +291,21 @@ export function TeamSceneBand({
   /** The advisor's name on its card, for its label under the stage. */
   advisorName: string
   members: TeamMemberRow[]
-  /** False while the sheet is scrolled past the band, so its stage runs no frames unseen. */
+  /** False while the sheet is scrolled past the band or rests at its peek, so its stage runs no frames unseen. */
   shown?: boolean
   /** Follow the lead and Show all, for a 3D stage's camera. */
   cameraLabels: { lead: string; all: string }
   /** The sheet's scroll and drag, which a finger on a 3D stage must not move. */
   sheetGestures?: GestureType[]
+  /** True while the sheet rests at its peek, where the stage stays loaded so an open draws at once. */
+  parked?: boolean
   onLayout?: (event: LayoutChangeEvent) => void
 }) {
-  // Why for the band's life: a stage that threw once would only throw again; reopening retries it.
+  // Why until the peek: a stage that threw would only throw again while open; the peek loads a fresh page.
   const [broken, setBroken] = useState(false)
+  if (parked && broken) {
+    setBroken(false)
+  }
   return band.kind === 'stage' && !broken ? (
     <StageBand
       band={band}

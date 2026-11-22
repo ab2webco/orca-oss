@@ -241,7 +241,8 @@ export function createTeamSceneEngine(deps: {
       return
     }
     loop.setRunning(run && !reduced)
-    if (reduced) {
+    // Why run too: the sheet keeps its stage loaded at the peek, where even a still frame goes unseen.
+    if (reduced && run) {
       settleTeamScene(world)
       paintOrStop(0)
     }

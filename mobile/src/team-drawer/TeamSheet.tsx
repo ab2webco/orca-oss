@@ -102,11 +102,12 @@ export function TeamSheet({
   const { scrollY } = drag
   const sceneBand = useTeamSceneBandShown(scrollY)
   const scrollRef = useRef<Animated.ScrollView>(null)
+  const parked = drag.resting
   // Why scroll, not a key: a keyed ScrollView remounted the stage's WebView on every switch (ORCA-1307).
   useLayoutEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false })
     scrollY.value = 0
-  }, [tab, scrollY])
+  }, [tab, scrollY, parked])
   useEffect(() => {
     if (!open) {
       return
@@ -158,38 +159,45 @@ export function TeamSheet({
               <PeekBar peek={peek} open={open} words={words} onPress={() => setOpen(!open)} />
             </View>
           </GestureDetector>
-          {drag.resting ? null : (
-            <GestureDetector gesture={drag.contentPan}>
-              <View style={styles.body} collapsable={false}>
-                <GestureDetector gesture={drag.scrollGesture}>
-                  <Animated.ScrollView
-                    ref={scrollRef}
-                    bounces={false}
-                    onScroll={drag.scrollHandler}
-                    scrollEventThrottle={16}
-                    contentContainerStyle={[
-                      styles.content,
-                      { paddingBottom: insets.bottom + spacing.lg }
-                    ]}
-                  >
-                    {view.control.stopped ? (
-                      <TeamStoppedBanner stopped={view.control.stopped} words={controlWords} />
-                    ) : null}
-                    {view.scene ? (
-                      <TeamSceneBand
-                        band={view.scene}
-                        ownArt={team.sceneArt}
-                        leadLine={view.lead ? teamSceneLeadLineOf(view.lead, words) : null}
-                        leadName={view.lead?.name ?? null}
-                        advisorName={words.advisorName}
-                        members={view.members}
-                        shown={sceneBand.shown}
-                        cameraLabels={{ lead: words.followLead, all: words.showAll }}
-                        sheetGestures={[drag.scrollGesture, drag.contentPan]}
-                        onLayout={sceneBand.onLayout}
-                      />
-                    ) : null}
-                    {team.level ? <TeamLevelRow level={team.level} words={words} /> : null}
+          {/* Why mounted at the peek: a band made on each open stayed blank ~2 s while its page loaded (ORCA-1309). */}
+          <GestureDetector gesture={drag.contentPan}>
+            <View
+              style={[styles.body, parked && styles.parked]}
+              collapsable={false}
+              pointerEvents={parked ? 'none' : 'auto'}
+              aria-hidden={parked}
+            >
+              <GestureDetector gesture={drag.scrollGesture}>
+                <Animated.ScrollView
+                  ref={scrollRef}
+                  bounces={false}
+                  onScroll={drag.scrollHandler}
+                  scrollEventThrottle={16}
+                  contentContainerStyle={[
+                    styles.content,
+                    { paddingBottom: insets.bottom + spacing.lg }
+                  ]}
+                >
+                  {!parked && view.control.stopped ? (
+                    <TeamStoppedBanner stopped={view.control.stopped} words={controlWords} />
+                  ) : null}
+                  {view.scene ? (
+                    <TeamSceneBand
+                      band={view.scene}
+                      ownArt={team.sceneArt}
+                      leadLine={view.lead ? teamSceneLeadLineOf(view.lead, words) : null}
+                      leadName={view.lead?.name ?? null}
+                      advisorName={words.advisorName}
+                      members={view.members}
+                      shown={sceneBand.shown && !parked}
+                      parked={parked}
+                      cameraLabels={{ lead: words.followLead, all: words.showAll }}
+                      sheetGestures={[drag.scrollGesture, drag.contentPan]}
+                      onLayout={sceneBand.onLayout}
+                    />
+                  ) : null}
+                  {!parked && team.level ? <TeamLevelRow level={team.level} words={words} /> : null}
+                  {parked ? null : (
                     <TeamSheetTabBar
                       active={tab}
                       inboxCount={questions.length}
@@ -198,78 +206,78 @@ export function TeamSheet({
                       workWords={workWords}
                       onSelect={setPicked}
                     />
-                    {tab === 'prs' ? (
-                      <TeamPrsTab work={view.work} words={workWords} onOpenLink={onOpenLink} />
-                    ) : tab === 'hosts' ? (
-                      <TeamHostsTab
-                        machines={view.work.machines}
-                        members={view.members}
-                        hostName={hostName}
-                        locale={view.locale}
-                        words={workWords}
-                      />
-                    ) : tab === 'inbox' ? (
-                      <TeamInboxTab
-                        team={team}
-                        now={now}
-                        words={teamInboxWordsOf(view.locale)}
-                        onOpenLink={onOpenLink}
-                      />
-                    ) : (
-                      <>
-                        <View style={styles.section}>
-                          <Text style={styles.sectionTitle}>
-                            {words.members(view.members.length)}
-                          </Text>
-                          {view.members.length > 0 ? (
-                            view.members.map((member) => (
-                              <TeamMemberCard
-                                key={member.key}
-                                member={member}
-                                hostName={hostName}
-                                now={now}
-                                words={words}
-                                expanded={expanded === member.key}
-                                onToggle={() =>
-                                  setExpanded(expanded === member.key ? null : member.key)
-                                }
-                                onAnswer={() => setPicked('inbox')}
-                                onOpenLink={onOpenLink}
-                                onOpenTerminal={(terminal) => {
-                                  close()
-                                  onOpenTerminal(terminal)
-                                }}
-                              />
-                            ))
-                          ) : (
-                            <Text style={styles.empty}>{words.noMembersRunning}</Text>
-                          )}
-                          {view.lead ? (
-                            <TeamLeadCardView
-                              lead={view.lead}
-                              memberCount={view.members.length}
+                  )}
+                  {parked ? null : tab === 'prs' ? (
+                    <TeamPrsTab work={view.work} words={workWords} onOpenLink={onOpenLink} />
+                  ) : tab === 'hosts' ? (
+                    <TeamHostsTab
+                      machines={view.work.machines}
+                      members={view.members}
+                      hostName={hostName}
+                      locale={view.locale}
+                      words={workWords}
+                    />
+                  ) : tab === 'inbox' ? (
+                    <TeamInboxTab
+                      team={team}
+                      now={now}
+                      words={teamInboxWordsOf(view.locale)}
+                      onOpenLink={onOpenLink}
+                    />
+                  ) : (
+                    <>
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>
+                          {words.members(view.members.length)}
+                        </Text>
+                        {view.members.length > 0 ? (
+                          view.members.map((member) => (
+                            <TeamMemberCard
+                              key={member.key}
+                              member={member}
                               hostName={hostName}
+                              now={now}
                               words={words}
+                              expanded={expanded === member.key}
+                              onToggle={() =>
+                                setExpanded(expanded === member.key ? null : member.key)
+                              }
+                              onAnswer={() => setPicked('inbox')}
+                              onOpenLink={onOpenLink}
+                              onOpenTerminal={(terminal) => {
+                                close()
+                                onOpenTerminal(terminal)
+                              }}
                             />
-                          ) : null}
-                          {view.advisor ? (
-                            <TeamAdvisorCardView advisor={view.advisor} words={words} />
-                          ) : null}
-                        </View>
-                        {view.metrics ? (
-                          <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>{words.metrics}</Text>
-                            <MetricsSummary metrics={view.metrics} words={words} />
-                          </View>
+                          ))
+                        ) : (
+                          <Text style={styles.empty}>{words.noMembersRunning}</Text>
+                        )}
+                        {view.lead ? (
+                          <TeamLeadCardView
+                            lead={view.lead}
+                            memberCount={view.members.length}
+                            hostName={hostName}
+                            words={words}
+                          />
                         ) : null}
-                      </>
-                    )}
-                  </Animated.ScrollView>
-                </GestureDetector>
-              </View>
-            </GestureDetector>
-          )}
-          {!drag.resting && team.sendAction ? (
+                        {view.advisor ? (
+                          <TeamAdvisorCardView advisor={view.advisor} words={words} />
+                        ) : null}
+                      </View>
+                      {view.metrics ? (
+                        <View style={styles.section}>
+                          <Text style={styles.sectionTitle}>{words.metrics}</Text>
+                          <MetricsSummary metrics={view.metrics} words={words} />
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+                </Animated.ScrollView>
+              </GestureDetector>
+            </View>
+          </GestureDetector>
+          {!parked && team.sendAction ? (
             <View style={{ paddingBottom: insets.bottom }}>
               <TeamActionDock
                 control={view.control}
@@ -318,6 +326,10 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1
+  },
+  // Why invisible, not unmounted: its stage keeps its page; the peek's inset strip must not show it.
+  parked: {
+    opacity: 0
   },
   content: {
     paddingHorizontal: spacing.lg
