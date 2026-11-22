@@ -142,6 +142,78 @@ export function readStoredCredentialToken(
   return readPlaintextLegacyCredential(service, raw)
 }
 
+// Why: an unanswered Keychain prompt must fail the call, not hold it until the CLI times out.
+export const CREDENTIAL_KEYCHAIN_WAIT_MS = 10_000
+
+export class CredentialKeychainWaitError extends Error {
+  constructor(service: IntegrationCredentialService) {
+    super(
+      `Orca is waiting for Keychain access to read the saved ${service} credential. Answer the system prompt, then try again.`
+    )
+    this.name = 'CredentialKeychainWaitError'
+  }
+}
+
+export async function boundCredentialKeychainWait<T>(
+  service: IntegrationCredentialService,
+  read: Promise<T>,
+  timeoutMs = CREDENTIAL_KEYCHAIN_WAIT_MS
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const wait = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new CredentialKeychainWaitError(service)), timeoutMs)
+  })
+  try {
+    return await Promise.race([read, wait])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const ASYNC_DECRYPT_UNAVAILABLE = Symbol('async-decrypt-unavailable')
+const ASYNC_DECRYPT_FAILED = Symbol('async-decrypt-failed')
+
+// Why (ORCA-1298): decryptString and, on macOS, isEncryptionAvailable read the
+// Keychain on the main thread, so one unanswered access prompt froze every IPC
+// and CLI call. The async API reads it on a background thread.
+export async function readStoredCredentialTokenAsync(
+  service: IntegrationCredentialService,
+  raw: Buffer
+): Promise<string | null> {
+  if (raw.length === 0) {
+    return null
+  }
+  const decrypted = await decryptOffMainThread(raw)
+  if (decrypted === ASYNC_DECRYPT_UNAVAILABLE) {
+    return readStoredCredentialToken(service, raw)
+  }
+  if (decrypted === ASYNC_DECRYPT_FAILED) {
+    // Why: on macOS the sync retry would raise the same Keychain prompt on the
+    // main thread; elsewhere it keeps today's reading of keyring-less data.
+    return process.platform === 'darwin'
+      ? readPlaintextLegacyCredential(service, raw)
+      : readStoredCredentialToken(service, raw)
+  }
+  return usableToken(decrypted)
+}
+
+async function decryptOffMainThread(
+  raw: Buffer
+): Promise<string | typeof ASYNC_DECRYPT_UNAVAILABLE | typeof ASYNC_DECRYPT_FAILED> {
+  if (
+    typeof safeStorage.decryptStringAsync !== 'function' ||
+    typeof safeStorage.isAsyncEncryptionAvailable !== 'function' ||
+    !(await safeStorage.isAsyncEncryptionAvailable().catch(() => false))
+  ) {
+    return ASYNC_DECRYPT_UNAVAILABLE
+  }
+  try {
+    return (await safeStorage.decryptStringAsync(raw)).result
+  } catch {
+    return ASYNC_DECRYPT_FAILED
+  }
+}
+
 function readPlaintextLegacyCredential(
   service: IntegrationCredentialService,
   raw: Buffer

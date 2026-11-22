@@ -30,10 +30,10 @@ import type {
 
 export type PlaneRecord = Record<string, unknown>
 
-export function resolveClient(
+export async function resolveClient(
   workspaceId: PlaneWorkspaceSelection | null | undefined
-): PlaneClientForWorkspace | undefined {
-  return getClients(workspaceId)[0]
+): Promise<PlaneClientForWorkspace | undefined> {
+  return (await getClients(workspaceId))[0]
 }
 
 export function commentsPath(
@@ -107,7 +107,7 @@ export async function updateWorkItem(args: {
   workspaceId?: PlaneWorkspaceSelection | null
   updates: PlaneWorkItemUpdate
 }): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -134,7 +134,7 @@ export async function addWorkItemComment(args: {
   body: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -166,7 +166,7 @@ export async function deleteWorkItemComment(args: {
   commentId: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -201,7 +201,7 @@ const DEFAULT_STATE_GROUP_COLORS: Record<PlaneStateGroup, string> = {
 export async function createPlaneState(
   args: PlaneCreateStateArgs
 ): Promise<PlaneStateMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -232,7 +232,7 @@ export async function createPlaneState(
 export async function updatePlaneState(
   args: PlaneUpdateStateArgs
 ): Promise<PlaneStateMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -267,7 +267,7 @@ export async function updatePlaneState(
 // still has work items or the project's default/last state; the API error is
 // surfaced to the caller rather than crashing.
 export async function deletePlaneState(args: PlaneDeleteStateArgs): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }

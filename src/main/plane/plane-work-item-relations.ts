@@ -67,7 +67,7 @@ function mapRelationEntry(raw: unknown, relationType: PlaneRelationType): PlaneW
 export async function addWorkItemRelation(
   args: PlaneAddRelationArgs
 ): Promise<PlaneMutationResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -94,7 +94,7 @@ export async function listWorkItemRelations(args: {
   workItemId: string
   workspaceId?: PlaneWorkspaceSelection | null
 }): Promise<PlaneWorkItemRelation[]> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return []
   }
