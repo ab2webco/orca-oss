@@ -5333,16 +5333,16 @@ export class OrchestrationDb {
       .get(dispatchId) as RemoteDispatchAttachmentRow | undefined
   }
 
-  /** True when a home on another host dispatched the pane and its member still runs here (ORCA-1301). */
-  hasLiveRemoteDispatchFor(terminalHandle: string | null, paneKey: string | null): boolean {
-    return (
-      this.db
-        .prepare(
-          `SELECT 1 FROM remote_dispatch_attachments
-           WHERE (terminal_handle = ? OR pane_key = ?) AND state IN ('starting', 'ready') LIMIT 1`
-        )
-        .get(terminalHandle, paneKey) !== undefined
-    )
+  /** The Dispatch a home on another host gave this pane while its member still runs here (ORCA-1301). */
+  liveRemoteDispatchIdFor(terminalHandle: string | null, paneKey: string | null): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT dispatch_id FROM remote_dispatch_attachments
+         WHERE (terminal_handle = ? OR pane_key = ?) AND state IN ('starting', 'ready')
+         ORDER BY created_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(terminalHandle, paneKey) as { dispatch_id: string } | undefined
+    return row?.dispatch_id ?? null
   }
 
   /** The scene the newest remote member in this worktree brought from its lead. */
