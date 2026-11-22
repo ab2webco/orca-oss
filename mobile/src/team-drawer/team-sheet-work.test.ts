@@ -78,7 +78,9 @@ describe('the Team sheet PRs and Hosts tabs', () => {
     )?.work
     expect(work?.prs).toEqual({
       kind: 'error',
-      message: 'GitHub API limit reached. It retries on its own in 10 min.'
+      message: 'GitHub API limit reached. It retries on its own in 10 min.',
+      provider: 'GitHub',
+      limited: true
     })
     expect(work?.queue).toEqual({ kind: 'unavailable' })
   })

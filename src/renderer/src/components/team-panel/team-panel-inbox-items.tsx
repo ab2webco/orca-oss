@@ -154,6 +154,18 @@ export function TeamInboxWaitingRows({
   )
 }
 
+// Why identity: a record holds only its question and answer, and each one is a new object.
+const agentAnswerKeys = new WeakMap<TeamInboxAgentAnswer, string>()
+let agentAnswerCount = 0
+const agentAnswerKey = (one: TeamInboxAgentAnswer): string => {
+  let key = agentAnswerKeys.get(one)
+  if (!key) {
+    key = `agent-${(agentAnswerCount += 1)}`
+    agentAnswerKeys.set(one, key)
+  }
+  return key
+}
+
 /** Everything answered, newest first, in V28's one plain list; this session's agent answers carry no time, so they lead. */
 export function TeamInboxAnsweredRows({
   agents,
@@ -181,8 +193,8 @@ export function TeamInboxAnsweredRows({
   }
   return (
     <ul>
-      {agents.map((one, index) => (
-        <li key={`agent-${index}`} data-testid="team-inbox-answered-agent" className={ROW}>
+      {agents.map((one) => (
+        <li key={agentAnswerKey(one)} data-testid="team-inbox-answered-agent" className={ROW}>
           <p className="text-[13px] break-words">{one.question}</p>
           <p className="text-[13px] break-words text-muted-foreground">
             {translate('teamPanel.inbox.youAnsweredText', 'You answered: {{text}}', {
