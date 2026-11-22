@@ -15,7 +15,7 @@ for (const [file, title, gears] of [
     ['Panel', 'Sonar', 'Jev', 'Reportes', 'WhatsApp', 'Monitores']
   ]
 ]) {
-  describe(`landing factory ring (${file})`, () => {
+  describe(`landing factory ring (${String(file)})`, () => {
     const html = readBuilt(file)
     const section = html.match(/<section[^>]*id="factory"[\s\S]*?<\/section>/)?.[0] ?? ''
 
