@@ -183,7 +183,7 @@ const scenes = (now: number): Record<SceneName, Scene> => ({
   limited: {
     remove: ['hostCapacity'],
     set: {
-      project: { reviews: null, todo: null },
+      project: { reviews: null, todo: null, reviewsFailedOn: 'github' },
       hosts: [],
       githubBudget: {
         graphql: { limit: 5000, remaining: 0, resetAt: Math.floor(now / 1000) + 720, orcaCalls: 0 },

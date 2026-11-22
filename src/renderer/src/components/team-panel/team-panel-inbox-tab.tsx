@@ -43,7 +43,8 @@ import {
 import { TeamInboxGroupLabel, TeamInboxOtherProjects } from './team-panel-inbox-other-projects'
 import {
   recordTeamInboxAgentAnswer,
-  useTeamInboxAgentAnswers,
+  teamInboxAnswerScopeOf,
+  useTeamInboxAgentAnswersHere,
   type TeamInboxAgentAnswer
 } from './team-panel-inbox-agent-answers'
 
@@ -256,12 +257,23 @@ export function answerTeamInboxAgentOf(
   }
   return (index) => {
     const sent = answerTeamInboxAgent(question, index)
-    if (sent) {
-      recordTeamInboxAgentAnswer({ question: question.text, answer: question.options[index] ?? '' })
-    } else {
+    if (!sent) {
       toast.error(
         translate('teamPanel.inbox.answerFailed', 'Could not send the answer. Open the terminal.')
       )
+      return sent
+    }
+    const state = useAppStore.getState()
+    // Why the active project as fallback: an agent with no worktree is answered from the project shown.
+    const scope =
+      teamInboxAnswerScopeOf(state, question.worktreeId) ??
+      teamInboxAnswerScopeOf(state, state.activeWorktreeId)
+    if (scope) {
+      recordTeamInboxAgentAnswer({
+        question: question.text,
+        answer: question.options[index] ?? '',
+        scope
+      })
     }
     return sent
   }
@@ -290,7 +302,7 @@ export function TeamPanelInboxTab({
   // Why open: the tab follows every message while it is shown.
   const threads = useGameInboxThreads(scope, true)
   const otherGroups = useOtherGameInboxGroups()
-  const agentAnswers = useTeamInboxAgentAnswers((s) => s.answers)
+  const agentAnswers = useTeamInboxAgentAnswersHere()
   const liveState = useAppStore(
     useShallow((s) => ({
       agentStatusByPaneKey: s.agentStatusByPaneKey,

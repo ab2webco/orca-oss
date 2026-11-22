@@ -75,6 +75,8 @@ export type GameProjectWork = {
   todo: GameProjectList | null
   /** Absent with no merge queue, another provider, a low GitHub budget, or from an older host. */
   queue?: GameProjectQueue
+  /** Set only when `reviews` failed on a repo the host knows is GitHub's; absent from an older host. */
+  reviewsFailedOn?: 'github'
 }
 
 const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]{0,31}$/

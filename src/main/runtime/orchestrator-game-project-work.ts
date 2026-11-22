@@ -244,7 +244,12 @@ export async function readGameProjectWork(
         )
       : null
   const queue = repo ? await readGitHubQueue(port) : null
-  return { reviews, todo, ...(queue ? { queue } : {}) }
+  return {
+    reviews,
+    todo,
+    ...(queue ? { queue } : {}),
+    ...(repo && !reviews ? { reviewsFailedOn: 'github' as const } : {})
+  }
 }
 
 /**

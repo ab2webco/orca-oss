@@ -334,6 +334,26 @@ describe('readGameProjectWork', () => {
     )
   })
 
+  // Review M2: the renderer may blame GitHub only for a list the host read on GitHub.
+  it('says a failed list was read on GitHub, and only then', async () => {
+    const down = async (): Promise<never> => {
+      throw new Error('down')
+    }
+    const github = await readGameProjectWork(
+      port({ githubRepo: async () => ({ owner: 'o', repo: 'r' }), githubPullRequests: down }),
+      { todo: 'off', workItem: null }
+    )
+    const gitlab = await readGameProjectWork(port({ gitlabMergeRequests: down }), {
+      todo: 'off',
+      workItem: null
+    })
+
+    expect(github.reviews).toBeNull()
+    expect(github.reviewsFailedOn).toBe('github')
+    expect(gitlab.reviews).toBeNull()
+    expect(gitlab).not.toHaveProperty('reviewsFailedOn')
+  })
+
   it("opens the project's own PR list when no repo holds my open PRs", async () => {
     const work = await readGameProjectWork(
       port({

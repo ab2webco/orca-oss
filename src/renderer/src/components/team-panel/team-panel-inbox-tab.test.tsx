@@ -1,12 +1,16 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
 import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbox-threads'
 import type { GameInboxQuestionGroup } from '@/components/game-inbox/use-other-game-inbox-groups'
 import { answerTeamInboxAgentOf, TeamInboxView } from './team-panel-inbox-tab'
-import { useTeamInboxAgentAnswers } from './team-panel-inbox-agent-answers'
+import { useAppStore } from '@/store'
+import {
+  useTeamInboxAgentAnswers,
+  useTeamInboxAgentAnswersHere
+} from './team-panel-inbox-agent-answers'
 import type { TeamInboxAgentQuestion } from './team-panel-inbox-agents'
 
 const { answerTeamInboxAgent } = vi.hoisted(() => ({ answerTeamInboxAgent: vi.fn() }))
@@ -27,6 +31,25 @@ vi.mock('@tanstack/react-virtual', () => ({
 }))
 
 afterEach(cleanup)
+
+// Why an SSH twin of repo-a: the same project on another host keeps its own Answered list.
+function seedProjects(active: string): void {
+  const repoOf: Record<string, string> = {
+    'wt-a': 'repo-a',
+    'wt-b': 'repo-b',
+    'wt-ssh': 'repo-a-ssh'
+  }
+  useAppStore.setState({
+    activeWorktreeId: active,
+    repos: [
+      { id: 'repo-a', executionHostId: 'local' },
+      { id: 'repo-b', executionHostId: 'local' },
+      { id: 'repo-a-ssh', executionHostId: 'ssh:box' }
+    ] as never,
+    getKnownWorktreeById: ((id: string) =>
+      repoOf[id] ? { repoId: repoOf[id] } : undefined) as never
+  })
+}
 
 const AT = '2026-11-06T10:00:00.000Z'
 
@@ -467,9 +490,11 @@ describe('Inbox tab', () => {
 
   // ORCA-1329 P9: an agent-pane question answered from For you lands in Answered, as V30 shows.
   it('records a sent For you answer with only its question and the option picked', () => {
+    seedProjects('wt-a')
     useTeamInboxAgentAnswers.setState({ answers: [] })
     const asked = {
       paneKey: 'tab-1:leaf-1',
+      worktreeId: 'wt-a',
       text: 'Which migration runs first?',
       options: ['0042 first', '0043 first']
     } as TeamInboxAgentQuestion
@@ -479,14 +504,32 @@ describe('Inbox tab', () => {
     expect(useTeamInboxAgentAnswers.getState().answers).toEqual([])
     expect(answerTeamInboxAgentOf(asked)?.(1)).toBe(true)
     expect(useTeamInboxAgentAnswers.getState().answers).toEqual([
-      { question: 'Which migration runs first?', answer: '0043 first' }
+      { question: 'Which migration runs first?', answer: '0043 first', scope: 'local|repo-a' }
     ])
+  })
+
+  // Review M1: an answer given in project A must not fill B's Answered, nor the same repo on an SSH host.
+  it("shows an agent answer only in its own project's and host's Answered", () => {
+    seedProjects('wt-a')
+    useTeamInboxAgentAnswers.setState({ answers: [] })
+    answerTeamInboxAgent.mockReturnValueOnce(true)
+    const asked = { paneKey: 'p', worktreeId: 'wt-a', text: 'Q?', options: ['Yes'] }
+    answerTeamInboxAgentOf(asked as TeamInboxAgentQuestion)?.(0)
+    const here = renderHook(() => useTeamInboxAgentAnswersHere())
+    expect(here.result.current.map((one) => one.question)).toEqual(['Q?'])
+
+    act(() => useAppStore.setState({ activeWorktreeId: 'wt-b' }))
+    expect(here.result.current).toEqual([])
+    act(() => useAppStore.setState({ activeWorktreeId: 'wt-ssh' }))
+    expect(here.result.current).toEqual([])
+    act(() => useAppStore.setState({ activeWorktreeId: 'wt-a' }))
+    expect(here.result.current).toHaveLength(1)
   })
 
   it("lists this session's agent answers in Answered and counts them", () => {
     const view = renderInbox({
       threads: { ...THREADS, answered: [] },
-      agentAnswers: [{ question: 'Which migration runs first?', answer: '0043 first' }]
+      agentAnswers: [{ question: 'Which migration runs first?', answer: '0043 first', scope: 's' }]
     })
 
     expect(view.getByRole('tab', { name: /Answered/ }).textContent).toContain('1')

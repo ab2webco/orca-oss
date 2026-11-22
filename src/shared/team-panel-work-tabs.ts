@@ -60,12 +60,16 @@ function verdictOf(item: GameProjectItem): Pick<TeamPrRow, 'status' | 'reason'> 
   return { status: 'idle', reason: 'checksUnknown' }
 }
 
-// Why GitHub only on a spent budget: that is GitHub's own answer; a failed list does not say who failed.
+// Why the host's word: the budget is host-wide, so it only explains a repo the host read on GitHub.
 function failureOf(
+  failedOn: 'github' | undefined,
   budget: GameGitHubBudget | undefined,
   texts: TeamPrFailureTexts,
   now: number
 ): TeamSectionError {
+  if (failedOn !== 'github') {
+    return { kind: 'error', message: texts.providerFailed }
+  }
   const spent = [budget?.graphql, budget?.core].find((one) => one?.limit && one.remaining === 0)
   return spent
     ? {
@@ -74,7 +78,7 @@ function failureOf(
         provider: 'GitHub',
         limited: true
       }
-    : { kind: 'error', message: texts.providerFailed }
+    : { kind: 'error', message: texts.providerFailed, provider: 'GitHub' }
 }
 
 /** Null hides the tab: turned off, or a folder workspace with no remote to review on. */
@@ -94,7 +98,7 @@ export function teamPrSectionOf(args: {
   }
   const list = state.project.reviews
   if (!list) {
-    return failureOf(state.githubBudget, args.texts, args.now)
+    return failureOf(state.project.reviewsFailedOn, state.githubBudget, args.texts, args.now)
   }
   const rows = list.items
     .map(
@@ -167,7 +171,8 @@ export function teamQueueSectionOf(args: {
     return { kind: 'unavailable' }
   }
   if (!queue.entries) {
-    return failureOf(state.githubBudget, args.texts, now)
+    // Why GitHub: the host reads a merge queue only from a GitHub repo.
+    return failureOf('github', state.githubBudget, args.texts, now)
   }
   return { kind: 'ready', value: queue.entries.map((one) => queueEntryOf(one, members, now)) }
 }

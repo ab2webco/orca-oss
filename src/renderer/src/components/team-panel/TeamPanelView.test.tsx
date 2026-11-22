@@ -276,40 +276,25 @@ describe('TeamPanelView', () => {
     expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
 
-  // ORCA-1329 P4: V30 loads in its own layout, not as bare bars.
-  it.each([
-    ['game', true, true],
-    ['display', true, false],
-    ['plain', false, false]
-  ] as const)(
-    'loads the %s look as scene, header, tabs and lead skeletons',
-    async (look, scene, face) => {
+  // Review M3: a loading scope may have no team, so nothing team-shaped is drawn before the read says so.
+  it.each(['game', 'display', 'plain'] as const)(
+    'loads the %s look as the header and rows, with no scene, tabs or lead card',
+    async (look) => {
       const { container } = await render(
         { section: { kind: 'loading' }, retry: null },
         vi.fn(),
         look
       )
-      const order = [
-        '[data-team-loading-scene]',
-        'h2',
-        '[data-team-loading-tabs]',
-        '[data-team-loading-lead]'
-      ]
-        .map((selector) => container.querySelector(selector))
-        .filter((node) => node !== null)
+      const header = container.querySelector('h2')
+      const busy = container.querySelector('[aria-busy="true"]')
 
-      expect(container.querySelector('[data-team-loading-scene]') !== null).toBe(scene)
-      expect(order).toHaveLength(scene ? 4 : 3)
-      order
-        .slice(1)
-        .forEach((node, index) =>
-          expect(
-            order[index]!.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING
-          ).toBeTruthy()
+      expect(header).not.toBeNull()
+      expect(header!.compareDocumentPosition(busy!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(
+        container.querySelector(
+          '[data-team-loading-scene], [data-team-loading-tabs], [data-team-loading-lead]'
         )
-      expect(container.querySelector('[data-team-loading-lead] .size-\\[38px\\]') !== null).toBe(
-        face
-      )
+      ).toBeNull()
       expect(container.querySelector('[aria-busy="true"] h2, [aria-busy="true"] button')).toBeNull()
     }
   )

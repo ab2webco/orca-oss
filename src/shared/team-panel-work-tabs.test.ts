@@ -142,7 +142,10 @@ describe('teamPrSectionOf', () => {
 
   it('says the GitHub limit when the list failed with the budget spent', () => {
     const section = teamPrSectionOf({
-      state: stateOf({ project: { reviews: null, todo: null }, githubBudget: budget(0) }),
+      state: stateOf({
+        project: { reviews: null, todo: null, reviewsFailedOn: 'github' },
+        githubBudget: budget(0)
+      }),
       members: [],
       isFolder: false,
       texts,
@@ -157,9 +160,29 @@ describe('teamPrSectionOf', () => {
     })
   })
 
-  it('names no provider when the list failed for another reason', () => {
+  it('names GitHub, with no limit, when a GitHub list failed for another reason', () => {
     const section = teamPrSectionOf({
-      state: stateOf({ project: { reviews: null, todo: null }, githubBudget: budget(3000) }),
+      state: stateOf({
+        project: { reviews: null, todo: null, reviewsFailedOn: 'github' },
+        githubBudget: budget(3000)
+      }),
+      members: [],
+      isFolder: false,
+      texts,
+      now: NOW
+    })
+
+    expect(section).toEqual({
+      kind: 'error',
+      message: 'The provider did not answer.',
+      provider: 'GitHub'
+    })
+  })
+
+  // Review M2: the budget is host-wide; another project spending it says nothing about a GitLab repo.
+  it('never blames GitHub, nor hides Retry, for a list the host did not read on GitHub', () => {
+    const section = teamPrSectionOf({
+      state: stateOf({ project: { reviews: null, todo: null }, githubBudget: budget(0) }),
       members: [],
       isFolder: false,
       texts,
@@ -263,7 +286,8 @@ describe('teamQueueSectionOf', () => {
   it('reports a failed read as an error', () => {
     expect(section({ provider: 'github', entries: null })).toEqual({
       kind: 'error',
-      message: 'The provider did not answer.'
+      message: 'The provider did not answer.',
+      provider: 'GitHub'
     })
   })
 
