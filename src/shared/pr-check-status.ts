@@ -1,11 +1,11 @@
 import { summarizeProviderChecks } from './provider-check-summary'
-import { withoutSupersededCancelledRuns } from './pr-check-rollup-supersession'
+import { latestRunsOfRollup } from './pr-check-rollup-supersession'
 import type { PRCheckDetail } from './github/check-types'
 import type { CheckStatus } from './github/pull-request-types'
 
 /** Derives the review status from the normalized check contract. */
 export function derivePRCheckStatus(checks: readonly PRCheckDetail[]): CheckStatus {
-  const { state } = summarizeProviderChecks(withoutSupersededCancelledRuns(checks))
+  const { state } = summarizeProviderChecks(latestRunsOfRollup(checks))
   // Why: CheckStatus has no 'none'; an empty rollup carries the same "nothing to report" meaning.
   return state === 'none' ? 'neutral' : state
 }
@@ -48,7 +48,7 @@ export function derivePRCheckStatusFromRollup(rollup: unknown): CheckStatus {
     return 'neutral'
   }
   return derivePRCheckStatus(
-    withoutSupersededCancelledRuns(rollup as unknown[]).map((raw, index) =>
+    latestRunsOfRollup(rollup as unknown[]).map((raw, index) =>
       normalizeRollupCheck(raw && typeof raw === 'object' ? (raw as RawCheckRollup) : {}, index)
     )
   )

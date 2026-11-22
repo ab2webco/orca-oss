@@ -3,7 +3,7 @@ import { readGamePrCap, type GamePrCapPorts } from './orchestrator-game-pr-cap-r
 
 const portsOf = (over: Partial<GamePrCapPorts> = {}): GamePrCapPorts => ({
   parentPaneKeyOf: async (paneKey) => (paneKey === 'member-pane' ? 'lead-pane' : null),
-  isRemoteMember: () => false,
+  remoteLeadCapOf: () => null,
   leadHandleOf: (paneKey) => (paneKey === 'lead-pane' ? 'term_lead' : null),
   readLeadCap: async () => ({ open: 6, cap: 6 }),
   ...over
@@ -29,13 +29,27 @@ describe('readGamePrCap (ORCA-1301)', () => {
     expect(readLeadCap).not.toHaveBeenCalled()
   })
 
-  it('says why it cannot read the cap of a member dispatched from another host', async () => {
+  it("reads a member dispatched from another host from the count its lead's home sent", async () => {
+    const remoteLeadCapOf = ({ terminalHandle }: { terminalHandle?: string }) =>
+      terminalHandle === 'term_remote' ? { open: 6, cap: 6 } : null
     expect(
       await readGamePrCap(
         { paneKey: 'remote-pane', terminalHandle: 'term_remote' },
-        portsOf({ isRemoteMember: ({ terminalHandle }) => terminalHandle === 'term_remote' })
+        portsOf({ remoteLeadCapOf })
       )
-    ).toEqual({ member: true, unknown: 'its lead runs on another host' })
+    ).toEqual({ member: true, open: 6, cap: 6 })
+  })
+
+  it('names both causes when the remote lead sent no fresh count', async () => {
+    expect(
+      await readGamePrCap(
+        { paneKey: 'remote-pane', terminalHandle: 'term_remote' },
+        portsOf({ remoteLeadCapOf: () => ({}) })
+      )
+    ).toEqual({
+      member: true,
+      unknown: expect.stringContaining('an older Orca there, or its lead is not reading the team')
+    })
   })
 
   it("says the lead's review list is unread when its view has no open-PR count", async () => {

@@ -34,7 +34,7 @@ describe('orchestration.workerDetach', () => {
     db?.close()
   })
 
-  function contextWith(federated: { environment_name: string } | null) {
+  function contextWith(federated: Record<string, string> | null) {
     db = new OrchestrationDb(':memory:')
     const closeTerminal = vi.fn()
     const notifyMessageArrived = vi.fn()
@@ -48,7 +48,17 @@ describe('orchestration.workerDetach', () => {
               : Reflect.get(target, key, target)
         }),
       closeTerminal,
-      notifyMessageArrived
+      notifyMessageArrived,
+      resolveOrchestrationWorkerServer: () => ({
+        environmentId: 'env_m1',
+        name: 'm1',
+        peerFingerprint: 'peer_m1'
+      }),
+      // Why: an older host's status has no federation-detach capability.
+      callOrchestrationWorkerServer: vi.fn(async () => ({
+        appVersion: '1.4.150-lab.110',
+        capabilities: []
+      }))
     }
     return { db, ctx: { runtime } as unknown as RpcContext, closeTerminal, notifyMessageArrived }
   }
@@ -71,11 +81,15 @@ describe('orchestration.workerDetach', () => {
   })
 
   it('refuses a dispatch on a paired host, naming the host', async () => {
-    const { db: d, ctx } = contextWith({ environment_name: 'm1' })
+    const { db: d, ctx } = contextWith({
+      environment_name: 'm1',
+      environment_id: 'env_m1',
+      peer_fingerprint: 'peer_m1'
+    })
     const dispatchId = readyWorker(d)
 
     await expect((async () => detach!.handler({ dispatch: dispatchId }, ctx))()).rejects.toThrow(
-      /runs on m1/
+      /m1 runs Orca 1\.4\.150-lab\.110, which cannot detach/
     )
     expect(d.getWorkerDispatch(dispatchId)?.state).toBe('ready')
   })

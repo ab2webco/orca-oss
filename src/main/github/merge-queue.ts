@@ -1,5 +1,10 @@
 import type { GameQueueEntry } from '../../shared/orchestrator-game-project-work'
-import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
+import type {
+  GameQueueDeparture,
+  GameQueueFailedCheck
+} from '../../shared/orchestrator-game-queue-departure'
+import { classifyCheckOutcome } from '../../shared/provider-check-summary'
+import { latestRunsOfRollup } from '../../shared/pr-check-rollup-supersession'
 import { ghExecFileAsync, type LocalGitExecOptions } from './gh-utils'
 import { githubHostExecOptions, resolveGitHubRepoExecution } from './github-api-repository'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from './rate-limit'
@@ -111,7 +116,27 @@ const DEPARTURE_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
     pullRequest(number: $pr) {
       state
       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-        nodes { ... on RemovedFromMergeQueueEvent { reason actor { login } } }
+        nodes {
+          ... on RemovedFromMergeQueueEvent {
+            reason
+            actor { login }
+            beforeCommit {
+              statusCheckRollup {
+                contexts(first: 100) {
+                  nodes {
+                    ... on CheckRun {
+                      name
+                      status
+                      conclusion
+                      checkSuite { workflowRun { databaseId workflow { name } } }
+                    }
+                    ... on StatusContext { context state }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -123,6 +148,49 @@ const DEPARTURE_STATES: Record<string, GameQueueDeparture['state']> = {
   CLOSED: 'closed'
 }
 
+type RawContext = {
+  name?: unknown
+  status?: unknown
+  conclusion?: unknown
+  checkSuite?: { workflowRun?: { databaseId?: unknown; workflow?: { name?: unknown } } } | null
+  context?: unknown
+  state?: unknown
+} | null
+
+type RawRemoval = {
+  reason?: unknown
+  actor?: { login?: unknown } | null
+  beforeCommit?: {
+    statusCheckRollup?: { contexts?: { nodes?: RawContext[] | null } | null } | null
+  } | null
+} | null
+
+// Why the removal's commit: for failed_checks it is the merge-group commit whose checks failed.
+function failedChecksOfRemoval(removal: RawRemoval): GameQueueFailedCheck[] {
+  const checks = (removal?.beforeCommit?.statusCheckRollup?.contexts?.nodes ?? []).flatMap(
+    (raw) => {
+      const name = typeof raw?.name === 'string' ? raw.name : raw?.context
+      if (typeof name !== 'string') {
+        return []
+      }
+      const run = raw?.checkSuite?.workflowRun
+      const conclusion = typeof raw?.state === 'string' ? raw.state : raw?.conclusion
+      return [
+        {
+          name,
+          workflowName: typeof run?.workflow?.name === 'string' ? run.workflow.name : undefined,
+          workflowRunId: typeof run?.databaseId === 'number' ? run.databaseId : undefined,
+          status: typeof raw?.status === 'string' ? raw.status : 'COMPLETED',
+          conclusion: typeof conclusion === 'string' ? conclusion : null
+        }
+      ]
+    }
+  )
+  return latestRunsOfRollup(checks)
+    .filter((one) => classifyCheckOutcome(one) === 'failed')
+    .map((one) => ({ name: one.name, runId: one.workflowRunId ?? null }))
+}
+
 /** Null when GitHub names no such PR. */
 export function mergeQueueDepartureOfResponse(stdout: string): GameQueueDeparture | null {
   const parsed = JSON.parse(stdout) as {
@@ -130,9 +198,7 @@ export function mergeQueueDepartureOfResponse(stdout: string): GameQueueDepartur
       repository?: {
         pullRequest?: {
           state?: unknown
-          timelineItems?: {
-            nodes?: ({ reason?: unknown; actor?: { login?: unknown } | null } | null)[]
-          } | null
+          timelineItems?: { nodes?: RawRemoval[] } | null
         } | null
       } | null
     }
@@ -142,11 +208,13 @@ export function mergeQueueDepartureOfResponse(stdout: string): GameQueueDepartur
   if (!state) {
     return null
   }
-  const removal = pr?.timelineItems?.nodes?.at(-1)
+  const removal = pr?.timelineItems?.nodes?.at(-1) ?? null
+  const failedChecks = failedChecksOfRemoval(removal)
   return {
     state,
     reason: typeof removal?.reason === 'string' ? removal.reason : null,
-    actor: typeof removal?.actor?.login === 'string' ? removal.actor.login : null
+    actor: typeof removal?.actor?.login === 'string' ? removal.actor.login : null,
+    ...(failedChecks.length > 0 ? { failedChecks } : {})
   }
 }
 

@@ -86,27 +86,32 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
     }
     const host = agent.remote?.host
     const live = await liveDispatchOf(client, agent)
-    // Why: a paired host's stop closes the pane there; detaching there needs a host method first.
-    if (live && host) {
-      return print({
-        name,
-        dropped: false,
-        host,
-        dispatchId: live,
-        refusal: `its dispatch ${live} on ${host} is live, and a member on a paired host cannot be detached yet; drop it after its worker_done, or \`orca game stop\` ends it`
-      })
-    }
     // Why: a drop is kept by worktree, and a host that no longer knows the member shows none.
     if (!gameDropTargetOf(agent)) {
       return print({
         name,
         dropped: false,
         ...(host ? { host } : {}),
+        ...(live ? { dispatchId: live } : {}),
         refusal: `${host ?? 'its host'} no longer shows its worktree, so there is nothing to keep the drop by; \`orca game stop ${ticketOfMember(agent) ?? name}\` ends it`
       })
     }
     if (live) {
-      await client.call('orchestration.workerDetach', { dispatch: live })
+      try {
+        await client.call('orchestration.workerDetach', { dispatch: live })
+      } catch (error) {
+        // Why: the home refuses an old host by name, and a lost host answer leaves the member live (ORCA-1326).
+        if (!host || !(error instanceof RuntimeClientError)) {
+          throw error
+        }
+        return print({
+          name,
+          dropped: false,
+          host,
+          dispatchId: live,
+          refusal: `its dispatch ${live} on ${host} is live and was not detached: ${error.message}`
+        })
+      }
     }
     await setGameAgentDropped(client, agent, name, true)
     print({ name, dropped: true, ...(host ? { host } : {}), ...(live ? { detached: live } : {}) })

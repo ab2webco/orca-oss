@@ -249,7 +249,7 @@ describe('connect', () => {
     expect(result.ok).toBe(true)
     const currentStatus = status()
     expect(currentStatus.workspaces).toHaveLength(1)
-    const clients = getClients('all')
+    const clients = await getClients('all')
     expect(clients).toHaveLength(1)
     expect(clients[0]?.headers['x-api-key']).toBe('new-key')
   })
@@ -271,7 +271,7 @@ describe('clearWorkspaceTokenOnAuthError', () => {
     mockConnectSuccess()
     await connect({ baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', apiKey: 'secret-key' })
     expect(status().connected).toBe(true)
-    const [connectedClient] = getClients('all')
+    const [connectedClient] = await getClients('all')
 
     clearWorkspaceTokenOnAuthError(connectedClient!, new PlaneApiError('Unauthorized', 401))
 
@@ -283,7 +283,7 @@ describe('clearWorkspaceTokenOnAuthError', () => {
       await loadClientModule()
     mockConnectSuccess()
     await connect({ baseUrl: 'https://api.plane.so', workspaceSlug: 'acme', apiKey: 'secret-key' })
-    const [connectedClient] = getClients('all')
+    const [connectedClient] = await getClients('all')
 
     clearWorkspaceTokenOnAuthError(connectedClient!, new PlaneApiError('Forbidden', 403))
 

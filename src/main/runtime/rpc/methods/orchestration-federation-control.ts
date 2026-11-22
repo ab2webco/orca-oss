@@ -10,6 +10,13 @@ import { readExactWorkerOutput } from './orchestration-worker-output'
 const FederationDispatchParams = z.object({
   dispatchId: requiredString('Missing Dispatch ID')
 })
+// Why optional and caught: an older home sends none, and a bad count must not fail the lead's read.
+const FederationShowParams = FederationDispatchParams.extend({
+  prCap: z
+    .object({ open: z.number().int().nonnegative(), cap: z.number().int().positive() })
+    .optional()
+    .catch(undefined)
+})
 const FederationReadParams = FederationDispatchParams.extend({
   cursor: OptionalFiniteNumber,
   limit: OptionalFiniteNumber
@@ -23,13 +30,16 @@ const FederationOutputReadParams = FederationDispatchParams.extend({
 export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.federationShow',
-    params: FederationDispatchParams,
+    params: FederationShowParams,
     handler: async (params, { runtime, authenticatedCallerFingerprint }) => {
       const attachment = requireHomeAttachment(
         runtime,
         params.dispatchId,
         authenticatedCallerFingerprint
       )
+      if (params.prCap) {
+        runtime.noteRemoteGamePrCap(params.dispatchId, params.prCap)
+      }
       const observation = await inspectRemoteAttachment(runtime, params.dispatchId)
       // Why optional: an older home ignores it, and the home reads its absence as an older host (ORCA-837).
       const agent =
@@ -176,6 +186,25 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
           processAction: 'unknown',
           lastError: reason
         }
+      }
+    }
+  }),
+  defineMethod({
+    name: 'orchestration.federationDetach',
+    params: FederationDispatchParams,
+    handler: (params, { runtime, authenticatedCallerFingerprint }) => {
+      const before = requireHomeAttachment(
+        runtime,
+        params.dispatchId,
+        authenticatedCallerFingerprint
+      )
+      const attachment = runtime.getOrchestrationDb().detachRemoteAttachment(params.dispatchId)
+      return {
+        dispatchId: params.dispatchId,
+        state: attachment.state,
+        stage: attachment.stage,
+        alreadySettled: before.state === attachment.state,
+        processAction: 'none' as const
       }
     }
   })

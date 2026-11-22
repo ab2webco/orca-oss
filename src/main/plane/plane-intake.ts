@@ -114,7 +114,7 @@ function createBody(args: PlaneCreateIntakeIssueArgs): PlaneRecord {
 export async function createIntakeIssue(
   args: PlaneCreateIntakeIssueArgs
 ): Promise<PlaneCreateIntakeIssueResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -136,7 +136,7 @@ export async function createIntakeIssue(
 export async function setIntakeEnabled(
   args: PlaneSetIntakeEnabledArgs
 ): Promise<PlaneSetIntakeEnabledResult> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: 'Not connected to Plane.' }
   }
@@ -150,7 +150,8 @@ export async function setIntakeEnabled(
     if (flag === undefined) {
       return {
         ok: false,
-        error: 'Plane accepted the update but reported no intake flag, so it could not be confirmed.'
+        error:
+          'Plane accepted the update but reported no intake flag, so it could not be confirmed.'
       }
     }
     if (flag !== args.enabled) {
@@ -171,7 +172,7 @@ export async function setIntakeEnabled(
 export async function listIntakeIssues(
   args: PlaneListIntakeIssuesArgs
 ): Promise<PlaneIntakeIssue[]> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return []
   }

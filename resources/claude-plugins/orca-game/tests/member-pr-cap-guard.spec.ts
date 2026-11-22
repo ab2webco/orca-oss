@@ -1,26 +1,34 @@
 import { describe, expect, it } from 'vitest'
 
-import { isGhPrCreate, memberPrCapDenyOf } from '../hooks/member-pr-cap-guard'
+import { PR_CAP_REFUSE_EXIT } from '../../../../src/shared/orchestrator-game-pr-cap'
+import { isGhPrCreate, memberPrCapDenyOf, prCapCheckArgvOf } from '../hooks/member-pr-cap-guard'
 
-const CREATE = 'gh pr create --title "x" --body-file /tmp/b.md'
+const REFUSAL = 'Orca refused gh pr create: this project has 6 open PRs and its cap is 6.'
 
 describe('memberPrCapDenyOf (ORCA-1301)', () => {
-  it("refuses a member's gh pr create once the open PRs reach the cap, naming both", () => {
-    const reason = memberPrCapDenyOf({ role: 'member', command: CREATE, open: 1, cap: 1 })
-
-    expect(reason).toContain('1 open PRs already reach the project')
-    expect(reason).toContain('cap of 1')
+  it("refuses with the host's line only when pr-cap-check exits with the wrapper's refuse code", () => {
+    expect(memberPrCapDenyOf({ exitCode: PR_CAP_REFUSE_EXIT, stderr: `${REFUSAL}\n` })).toBe(
+      REFUSAL
+    )
+    expect(memberPrCapDenyOf({ exitCode: PR_CAP_REFUSE_EXIT, stderr: '' })).toContain('cap')
   })
 
-  it('lets a member under the cap, a lead, and an unknown cap or count through', () => {
-    expect(memberPrCapDenyOf({ role: 'member', command: CREATE, open: 0, cap: 1 })).toBeNull()
-    expect(memberPrCapDenyOf({ role: 'lead', command: CREATE, open: 9, cap: 1 })).toBeNull()
-    expect(
-      memberPrCapDenyOf({ role: 'member', command: CREATE, open: undefined, cap: 1 })
-    ).toBeNull()
-    expect(
-      memberPrCapDenyOf({ role: 'member', command: CREATE, open: 3, cap: undefined })
-    ).toBeNull()
+  it('lets gh run on a pass, an unchecked cap, an older CLI, or no CLI at all', () => {
+    expect(memberPrCapDenyOf({ exitCode: 0, stderr: '' })).toBeNull()
+    expect(memberPrCapDenyOf({ exitCode: 4, stderr: 'Orca did not check' })).toBeNull()
+    expect(memberPrCapDenyOf({ exitCode: 1, stderr: 'unknown command' })).toBeNull()
+    expect(memberPrCapDenyOf(undefined)).toBeNull()
+  })
+
+  it('asks pr-cap-check only through an absolute CLI path', () => {
+    expect(prCapCheckArgvOf('/opt/orca/bin/orca')).toEqual([
+      '/opt/orca/bin/orca',
+      'game',
+      'pr-cap-check'
+    ])
+    expect(prCapCheckArgvOf('C:\\Orca\\orca.cmd')?.slice(1)).toEqual(['game', 'pr-cap-check'])
+    expect(prCapCheckArgvOf('orca')).toBeUndefined()
+    expect(prCapCheckArgvOf(undefined)).toBeUndefined()
   })
 
   it('reads gh pr create only at command position', () => {

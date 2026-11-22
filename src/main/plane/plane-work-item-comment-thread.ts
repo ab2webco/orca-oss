@@ -57,7 +57,7 @@ async function fetchComments(
 export async function readWorkItemCommentThread(
   args: PlaneCommentThreadArgs
 ): Promise<PlaneCommentThreadRead> {
-  const client = resolveClient(args.workspaceId)
+  const client = await resolveClient(args.workspaceId)
   if (!client) {
     return { ok: false, error: NOT_CONNECTED_MESSAGE }
   }

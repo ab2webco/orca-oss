@@ -83,6 +83,25 @@ describe('superseded cancelled runs in a GitHub rollup (ORCA-1269)', () => {
     expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
   })
 
+  it('reads a failed check green once a newer run of the same check passed on the head', () => {
+    // Why: PR text re-judges on every edit, so a fixed title leaves its failed run in the rollup.
+    const rollup = [
+      run(700, 'PR text', 'pr text attribution', 'FAILURE'),
+      run(705, 'PR text', 'pr text attribution', 'SUCCESS'),
+      run(701, 'PR Checks', 'verify', 'SUCCESS')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('success')
+  })
+
+  it('still reads red when the latest run of a check failed after an older one passed', () => {
+    const rollup = [
+      run(800, 'PR Checks', 'changed e2e specs 2-of-2', 'SUCCESS'),
+      run(801, 'PR Checks', 'changed e2e specs 2-of-2', 'FAILURE'),
+      run(801, 'PR Checks', 'verify', 'FAILURE')
+    ]
+    expect(derivePRCheckStatusFromRollup(rollup)).toBe('failure')
+  })
+
   it('keeps a cancelled run of another workflow red', () => {
     const rollup = [
       run(600, 'CodeQL', 'analyze', 'CANCELLED'),

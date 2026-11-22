@@ -100,7 +100,7 @@ export async function testConnection(args?: {
 }): Promise<{ ok: true; viewer: PlaneViewer } | { ok: false; error: string }> {
   let client: PlaneClientForWorkspace | undefined
   try {
-    client = getClients(args?.workspaceId ?? undefined)[0]
+    client = (await getClients(args?.workspaceId ?? undefined))[0]
   } catch (error) {
     return {
       ok: false,

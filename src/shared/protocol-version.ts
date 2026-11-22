@@ -80,6 +80,9 @@ export const ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY =
 // Why: an older host has no federationRelease, so the home must keep its member retained (ORCA-790).
 export const ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY =
   'orchestration.federation-release.v1' as const
+// Why: an older host has no federationDetach, so the home must refuse a live remote drop by name (ORCA-1326).
+export const ORCHESTRATION_FEDERATION_DETACH_RUNTIME_CAPABILITY =
+  'orchestration.federation-detach.v1' as const
 // Why: an older host's attach schema strips `account`, starting the member on its global login (ORCA-798).
 export const ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY =
   'orchestration.federation-member-account.v1' as const
@@ -237,6 +240,7 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_FEDERATION_GAME_MEMBER_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_GAME_SCENE_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY,
+  ORCHESTRATION_FEDERATION_DETACH_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_READINGS_RUNTIME_CAPABILITY,

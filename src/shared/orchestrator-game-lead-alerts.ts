@@ -4,7 +4,11 @@ import {
   type GameFleetInput
 } from './orchestrator-game-fleet-verbs'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
-import { queueDepartureLineOf, type GameQueueDeparture } from './orchestrator-game-queue-departure'
+import {
+  queueDepartureLineOf,
+  unprovenQueueDepartureLineOf,
+  type GameQueueDeparture
+} from './orchestrator-game-queue-departure'
 import { GAME_LEAD_REPLY_ALERT_MINUTES, leadWaitAlertsOf } from './orchestrator-game-lead-wait'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 
@@ -106,7 +110,6 @@ export function queueLeftOf(state: GameLeadAlertInput, memory: GameLeadAlertMemo
   return entries ? (memory.queue?.filter((one) => !ids.has(one.id)) ?? []) : []
 }
 
-// Why the members' PRs next: the project's open list keeps only its first few items.
 function leftQueueLineOf(
   entry: GameQueueEntry,
   state: GameLeadAlertInput,
@@ -116,14 +119,11 @@ function leftQueueLineOf(
   if (departure) {
     return queueDepartureLineOf(entry.id, departure)
   }
+  // Why not "open" too: the cached review still says open after the queue merged it (#1304, #1404).
   const member = state.agents.find((agent) => agent.review?.url === entry.url)?.review
-  const open = state.project?.reviews?.items.some((item) => item.url === entry.url)
-  if (member?.state === 'merged') {
-    return `${entry.id} merged from the queue: close its ticket and clean up its member.`
-  }
-  return member?.state === 'open' || open
-    ? `${entry.id} dropped from the merge queue: find why, then fix it or queue it again.`
-    : `${entry.id} left the merge queue: check whether it merged.`
+  return member?.state === 'merged'
+    ? `${entry.id} merged from the queue: close its ticket and clean up its member.`
+    : unprovenQueueDepartureLineOf(entry.id)
 }
 
 function queueAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {

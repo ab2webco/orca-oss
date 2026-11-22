@@ -5333,16 +5333,16 @@ export class OrchestrationDb {
       .get(dispatchId) as RemoteDispatchAttachmentRow | undefined
   }
 
-  /** True when a home on another host dispatched the pane and its member still runs here (ORCA-1301). */
-  hasLiveRemoteDispatchFor(terminalHandle: string | null, paneKey: string | null): boolean {
-    return (
-      this.db
-        .prepare(
-          `SELECT 1 FROM remote_dispatch_attachments
-           WHERE (terminal_handle = ? OR pane_key = ?) AND state IN ('starting', 'ready') LIMIT 1`
-        )
-        .get(terminalHandle, paneKey) !== undefined
-    )
+  /** The Dispatch a home on another host gave this pane while its member still runs here (ORCA-1301). */
+  liveRemoteDispatchIdFor(terminalHandle: string | null, paneKey: string | null): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT dispatch_id FROM remote_dispatch_attachments
+         WHERE (terminal_handle = ? OR pane_key = ?) AND state IN ('starting', 'ready')
+         ORDER BY created_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(terminalHandle, paneKey) as { dispatch_id: string } | undefined
+    return row?.dispatch_id ?? null
   }
 
   /** The scene the newest remote member in this worktree brought from its lead. */
@@ -5646,6 +5646,35 @@ export class OrchestrationDb {
         `UPDATE remote_dispatch_attachments
          SET state = 'stopped', stage = 'process_stopped', updated_at = datetime('now')
          WHERE dispatch_id = ? AND state = 'stopping'`
+      )
+      .run(dispatchId)
+    return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
+  }
+
+  /** Ends a live attachment and keeps its pane: release never closes a detached member (ORCA-1326). */
+  detachRemoteAttachment(dispatchId: string): RemoteDispatchAttachmentRow {
+    const attachment = this.getRemoteDispatchAttachment(dispatchId)
+    if (!attachment) {
+      throw new OrchestrationError(
+        'dispatch_not_found',
+        `Remote Dispatch ${dispatchId} was not found.`
+      )
+    }
+    if (['succeeded', 'failed', 'stopped', 'abandoned'].includes(attachment.state)) {
+      return attachment
+    }
+    if (!['ready', 'start_unknown'].includes(attachment.state)) {
+      throw new OrchestrationError(
+        'dispatch_inactive',
+        `Remote Dispatch ${dispatchId} cannot detach from ${attachment.state}.`
+      )
+    }
+    this.db
+      .prepare(
+        `UPDATE remote_dispatch_attachments
+         SET state = 'stopped', stage = 'detached', capability_hash = NULL,
+             updated_at = datetime('now')
+         WHERE dispatch_id = ? AND state IN ('ready', 'start_unknown')`
       )
       .run(dispatchId)
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow

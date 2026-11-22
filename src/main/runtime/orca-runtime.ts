@@ -986,6 +986,11 @@ import { getMergeQueueDeparture, getMergeQueueEntries } from '../github/merge-qu
 import type { GameQueueDeparture } from '../../shared/orchestrator-game-queue-departure'
 import type { GamePrCap } from '../../shared/orchestrator-game-pr-cap'
 import { readGamePrCap, type GamePrCapCaller } from './orchestrator-game-pr-cap-read'
+import {
+  RemoteGamePrCaps,
+  remotePrCapOf,
+  type RemoteGamePrCap
+} from './orchestrator-game-remote-pr-cap'
 import { getPullRequestsMergeable } from '../github/pull-request-mergeable'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
 import {
@@ -3990,6 +3995,7 @@ export class OrcaRuntimeService {
   )
   // Why one gate for every game read of a host: a host silent to one read is skipped by all (ORCA-1199).
   private readonly gameHostAnswers = new GameHostAnswerGate({ downForMs: GAME_HOST_SILENT_SKIP_MS })
+  private readonly remoteGamePrCaps = new RemoteGamePrCaps()
   private readonly gameHostCapacity = new GameHostCapacityReader({
     list: () => this.orchestrationEnvironmentTransport?.list?.() ?? [],
     readLocal: () => collectHostMemory({ workspaceDir: this.store?.getSettings().workspaceDir }),
@@ -33250,6 +33256,8 @@ export class OrcaRuntimeService {
     if (sources.length === 0) {
       return state
     }
+    // Why on federationShow: an optional field an older host strips, so its members stay unchecked.
+    const prCap = remotePrCapOf(state)
     const remote = await remoteGameMembersOf(sources, {
       // Why federationShow: every federation-capable host already answers it, so no wire change.
       showOf: async (source) => {
@@ -33260,7 +33268,7 @@ export class OrcaRuntimeService {
               this.callOrchestrationWorkerServer(
                 source.environmentId,
                 'orchestration.federationShow',
-                { dispatchId: source.dispatchId },
+                { dispatchId: source.dispatchId, ...(prCap ? { prCap } : {}) },
                 REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS
               ),
             REMOTE_GAME_MEMBER_SHOW_TIMEOUT_MS + GAME_HOST_QUEUE_GRACE_MS
@@ -33379,14 +33387,24 @@ export class OrcaRuntimeService {
 
   /** A PR's state and last queue removal for the caller's project, read when its watch saw it leave. */
   /** A member's open PRs against its lead's cap, which the gh wrapper checks before `gh pr create`. */
+  /** Keeps the open-PR count a member's home sent, for that member's gh pr create (ORCA-1301). */
+  noteRemoteGamePrCap(dispatchId: string, count: RemoteGamePrCap): void {
+    this.remoteGamePrCaps.note(dispatchId, count)
+  }
+
   async readGamePrCap(caller: GamePrCapCaller): Promise<GamePrCap> {
     return readGamePrCap(caller, {
       parentPaneKeyOf: async (paneKey) =>
         (await this.getWorktreePs()).worktrees
           .flatMap((one) => one.agents)
           .find((row) => row.paneKey === paneKey)?.parentPaneKey ?? null,
-      isRemoteMember: ({ terminalHandle, paneKey }) =>
-        this.getOrchestrationDb().hasLiveRemoteDispatchFor(terminalHandle ?? null, paneKey ?? null),
+      remoteLeadCapOf: ({ terminalHandle, paneKey }) => {
+        const dispatchId = this.getOrchestrationDb().liveRemoteDispatchIdFor(
+          terminalHandle ?? null,
+          paneKey ?? null
+        )
+        return dispatchId ? (this.remoteGamePrCaps.freshOf(dispatchId) ?? {}) : null
+      },
       leadHandleOf: (leadPaneKey) => this.getTerminalHandleForPaneKey(leadPaneKey),
       readLeadCap: async (terminalHandle, paneKey) => {
         const lead = await this.getOrchestratorGameState({ terminalHandle, paneKey })
