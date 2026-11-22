@@ -4,7 +4,7 @@ import { registerActionCommands } from './action-commands'
 import { dropAdvisorCall } from './advisor-state'
 import { actOutGate, registerAdvisor } from './advisor-sync'
 import { POLL_EVERY_MS, refreshSoon, viewOf } from './fleet-sync'
-import { isGhPrCreate, memberPrCapDenyOf } from './member-pr-cap-guard'
+import { isGhPrCreate, memberPrCapDeny } from './member-pr-cap-guard'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
 import { markLeadStarted, startOrRearmLead, unmarkLeadStarted } from './lead-autostart'
@@ -107,15 +107,9 @@ export const register: Register = (on) => {
   on('classic.PreToolUse', async ($, e, next) => {
     const tool = String(e.tool)
     const command: unknown = Reflect.get(e, 'command')
-    // Why the test first: only a PR create pays for the fleet read.
+    // Why the test first: only a PR create pays for the host's check.
     if (tool === 'Bash' && isGhPrCreate(command)) {
-      const { state } = await viewOf($)
-      const reason = memberPrCapDenyOf({
-        role: state?.role,
-        command,
-        open: state?.project?.reviews?.total,
-        cap: state?.lead?.cap
-      })
+      const reason = await memberPrCapDeny($)
       if (reason !== null) {
         return { deny: reason }
       }
