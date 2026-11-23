@@ -95,6 +95,8 @@ export function office3dLeadRoundOf(args: {
   cab?: Office3dCab
   /** Its place in the call-panel line it shares with the members; alone it presses at once. */
   queued?: (floor: number, t: number) => number
+  /** Where it sets out from when not at its desk. */
+  from?: { floor: number; at: Office3dPoint }
 }): Office3dRound {
   const { speed, holdScale, jump } = dioramaPaceOf(args.pace)
   const floors = args.layout.floors
@@ -112,6 +114,9 @@ export function office3dLeadRoundOf(args: {
   const push = (step: Office3dStep) => {
     steps.push(step)
     t += step.dur
+  }
+  if (args.from) {
+    ;({ floor, at: here } = args.from)
   }
   const walk = (...to: Office3dPoint[]) => {
     const pts = [here, ...to]
@@ -152,12 +157,7 @@ export function office3dLeadRoundOf(args: {
         [1.2, OFFICE3D_AISLE_Z],
         OFFICE3D_CALL
       ]).at(-1)!
-      const ready =
-        t +
-        (toPanel +
-          Math.hypot(OFFICE3D_CALL[0] - OFFICE3D_LIFT[0], OFFICE3D_CALL[1] - OFFICE3D_LIFT[1])) /
-          (WALK * speed) +
-        PRESS / speed
+      const ready = t + toPanel / (WALK * speed) + PRESS / speed
       const busy = office3dCabBusyFor(cab, floor, toFloor, ready, speed)
       if (busy > 0) {
         const last = steps.findLast((s) => s.kind === 'hold')
@@ -176,20 +176,21 @@ export function office3dLeadRoundOf(args: {
       const place = args.queued?.(floor, t) ?? 0
       const spot: Office3dPoint = [OFFICE3D_CALL[0] + 1.2 * place, OFFICE3D_CALL[1]]
       walk([here[0], OFFICE3D_AISLE_Z], [1.2 + 1.2 * place, OFFICE3D_AISLE_Z], spot)
-      // Why booked for when it reaches the cab: the cab must not leave while it is still walking in.
+      // Why its walk in is booked: the doors must not shut while it is still stepping in.
       const walkIn = Math.max(
         0.2,
         Math.hypot(spot[0] - OFFICE3D_LIFT[0], spot[1] - OFFICE3D_LIFT[1]) / (WALK * speed)
       )
       // It presses the call button first; the cab answers only once it has.
       hold(place === 0 ? 'call' : 'idle', PRESS / speed, OFFICE3D_CALL_PANEL)
-      const booked = bookOffice3dCab(cab, floor, toFloor, t + walkIn, speed)
-      // It presses the call button and waits at the panel until the cab is here.
-      hold('idle', booked.board - walkIn - t, OFFICE3D_CALL_PANEL)
+      const booked = bookOffice3dCab(cab, floor, toFloor, t, speed, 1, walkIn)
+      // It waits at the panel until the cab is here and its doors are fully open (ORCA-1374).
+      hold('idle', booked.board - t, OFFICE3D_CALL_PANEL)
       walk(OFFICE3D_LIFT)
       hold('idle', booked.depart - t, null)
       push({ kind: 'ride', start: t, dur: booked.arrive - t })
       floor = toFloor
+      hold('idle', booked.out - t, null)
       walk(DOOR)
     }
     walk([here[0], OFFICE3D_AISLE_Z], [stand[0], OFFICE3D_AISLE_Z], stand)

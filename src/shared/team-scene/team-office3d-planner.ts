@@ -134,18 +134,22 @@ export function office3dPlanner(
         spot
       )
       hold(queued === 0 ? 'call' : 'idle', OFFICE3D_PRESS / speed, OFFICE3D_CALL_PANEL)
+      // Why to the far spot: whichever spot it gets, the doors must not shut while it walks in.
       const walkIn = Math.max(
         0.2,
-        Math.hypot(spot[0] - OFFICE3D_LIFT[0], spot[1] - OFFICE3D_LIFT[1]) / (OFFICE3D_WALK * speed)
+        Math.hypot(spot[0] - OFFICE3D_LIFT[0] + 0.45, spot[1] - OFFICE3D_LIFT[1]) /
+          (OFFICE3D_WALK * speed)
       )
-      const booked = bookOffice3dCab(cab, level, toFloor, t + walkIn, speed, CAB_CAPACITY)
-      hold('idle', booked.board - walkIn - t, OFFICE3D_CALL_PANEL)
+      const booked = bookOffice3dCab(cab, level, toFloor, t, speed, CAB_CAPACITY, walkIn)
+      // It waits at the panel until the cab is here and its doors are fully open (ORCA-1374).
+      hold('idle', booked.board - t, OFFICE3D_CALL_PANEL)
       // Riders stand side by side in the cab, never in one another.
       const inCab: Office3dPoint = [OFFICE3D_LIFT[0] + (booked.seat - 1) * 0.45, OFFICE3D_LIFT[1]]
       walk(inCab)
       hold('idle', booked.depart - t, null)
       push({ kind: 'ride', start: t, dur: booked.arrive - t, at: inCab })
       level = toFloor
+      hold('idle', booked.out - t, null)
       walk(OFFICE3D_EXIT)
     }
   }

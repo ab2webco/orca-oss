@@ -76,10 +76,17 @@ const inDoorway = (at: Office3dPoint) =>
   at[0] > -0.45 && at[0] < 0.3 && Math.abs(at[1] - OFFICE3D_DOOR_Z) < 0.84
 const inShaft = (at: Office3dPoint) => at[0] < -0.3 && Math.abs(at[1] - OFFICE3D_DOOR_Z) < 1
 
-/** Every 20 ms: who passes a floor's lift doorway sees its doors fully open, the cab there. */
-function expectDoorsOpen(traffic: Office3dTraffic, floors: number, to: number, only?: string) {
+/** Every 20 ms: who steps through a floor's lift doorway, or in or out of the cab, sees its doors
+ * fully open, and the cab there. */
+function expectDoorsOpen(
+  traffic: Office3dTraffic,
+  floors: number,
+  to: number,
+  only?: string,
+  from = 0
+) {
   let crossings = 0
-  for (let t = 0; t <= to; t += 0.02) {
+  for (let t = from; t <= to; t += 0.02) {
     const walkers = [
       ['lead', traffic.lead!] as const,
       ...[...traffic.members].map(([k, m]) => [k, m.plan] as const)
@@ -98,6 +105,9 @@ function expectDoorsOpen(traffic: Office3dTraffic, floors: number, to: number, o
       if (inDoorway(w.at)) {
         crossings += 1
         expect(lift.open[fi], `${w.key} in floor ${fi}'s doorway at ${t.toFixed(2)}`).toBe(1)
+      }
+      if (inShaft(w.at) && w.pose === 'walk') {
+        expect(lift.open[fi], `${w.key} steps in floor ${fi}'s cab at ${t.toFixed(2)}`).toBe(1)
       }
       if (inShaft(w.at)) {
         expect(
@@ -141,5 +151,32 @@ describe('boarding and leaving the cab', () => {
       'normal'
     )
     expect(expectDoorsOpen(traffic, building.floors.length, 120, 'lead')).toBeGreaterThan(0)
+  })
+
+  it('lets a member called back mid-ride step out only once the doors open', () => {
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, building, input(team), 0, 'normal')
+    const rest = [member('a'), member('b'), member('c', { activity: 'resting' }), member('d')]
+    office3dTrafficRead(traffic, building, input(rest), 1, 'normal')
+    const ride = traffic.members.get('c')!.plan.steps.find((s) => s.kind === 'ride')!
+    const mid = ride.start + ride.dur / 2
+    office3dTrafficRead(traffic, building, input(team), mid, 'normal')
+    expect(expectDoorsOpen(traffic, building.floors.length, 90, 'c', mid)).toBeGreaterThan(0)
+  })
+
+  it('keeps that rule when the floor the lead rides to goes away mid-ride', () => {
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, building, input(team), 0, 'normal')
+    const red = [member('a'), member('b'), member('c'), member('d', { ci: 'failure' })]
+    office3dTrafficRead(traffic, building, input(red), 1, 'normal')
+    const ride = traffic.lead!.steps.find((s) => s.kind === 'ride')!
+    const two = teamOffice3dLayoutOf([floor('', ['a', 'b']), floor('koombea', ['c'])], {
+      leadAdvisor: false
+    })
+    const left = [member('a'), member('b'), member('c')]
+    const mid = ride.start + ride.dur / 2
+    office3dTrafficRead(traffic, two, input(left), mid, 'normal')
+    // From the cut on: a plan made at `mid` cannot change what was drawn before it.
+    expect(expectDoorsOpen(traffic, two.floors.length, 120, undefined, mid)).toBeGreaterThan(0)
   })
 })

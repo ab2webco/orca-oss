@@ -43,7 +43,7 @@ export type Office3dMember = {
 }
 
 /** Plans `m`'s trip from where its plan has it at `now` to `to`; null `to` walks out the door. */
-function tripTo(
+export function office3dTripTo(
   m: Office3dMember,
   to: Office3dSlot | null,
   layout: Office3dLayout,
@@ -54,8 +54,11 @@ function tripTo(
 ): void {
   const at = office3dWalkerAt(m.plan, now)
   const step = m.plan.steps.find((s) => now >= s.start && now < s.start + s.dur)
-  // Mid-ride it rides on; otherwise it starts at once (owner: 'debe volver de una').
-  const start = step?.kind === 'ride' ? step.start + step.dur : now
+  // Mid-ride it rides on, and steps out once the doors open; otherwise it starts at once (owner:
+  // 'debe volver de una').
+  const next = step ? m.plan.steps[m.plan.steps.indexOf(step) + 1] : undefined
+  const start =
+    step?.kind === 'ride' ? step.start + step.dur + (next?.kind === 'hold' ? next.dur : 0) : now
   const from = step?.kind === 'ride' ? office3dWalkerAt(m.plan, start) : at
   const p = office3dPlanner(start, Math.round(from.floor), from.at, pace)
   const kept = m.plan.steps
@@ -231,7 +234,7 @@ export function office3dMembersRead(args: {
     if (!want.has(key)) {
       if (!m.leaving) {
         m.leaving = true
-        tripTo(m, null, layout, cab, now, pace, queued)
+        office3dTripTo(m, null, layout, cab, now, pace, queued)
       } else if (now > m.plan.steps.at(-1)!.start + 5) {
         // Out of the door a while ago: it no longer exists in the building.
         members.delete(key)
@@ -242,7 +245,7 @@ export function office3dMembersRead(args: {
       m.leaving = false
       // Why one after another: a team let go in one read stood up as one; back to work never waits.
       const delay = target && target.kind !== 'desk' ? STAGGER * leavingNow++ : 0
-      tripTo(m, target, layout, cab, now + delay, pace, queued)
+      office3dTripTo(m, target, layout, cab, now + delay, pace, queued)
     }
   }
 }

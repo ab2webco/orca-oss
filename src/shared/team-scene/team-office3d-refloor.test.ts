@@ -116,6 +116,8 @@ describe('the 3D Office lift when a floor appears or disappears mid-ride (ORCA-1
     expectInside(traffic, four, mid, mid + 120)
     const talk = traffic.lead!.steps.find((s) => s.kind === 'hold' && s.pose === 'talk')
     expect(talk?.kind === 'hold' && talk.floor).toBe(4)
+    // d's floor only moved: it stays at its desk instead of riding to its new number.
+    expect(traffic.members.get('d')!.plan.steps.some((s) => s.kind === 'ride')).toBe(false)
   })
 
   it("ends at its new desk when the lead's machine changes mid-ride", () => {
