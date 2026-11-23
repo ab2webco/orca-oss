@@ -87,13 +87,11 @@ export const runtime: Runtime = {
 
 export async function isMember($: EngineInterface): Promise<boolean> {
   if (runtime.role === null) {
-    const [role, isOwn] = await Promise.all([
-      $.env.get('ORCA_GAME_ROLE').catch(() => undefined),
-      isPaneSession($)
-    ])
-    runtime.role = role === 'member' && isOwn ? 'member' : 'other'
+    const role = await $.env.get('ORCA_GAME_ROLE').catch(() => undefined)
+    runtime.role = role === 'member' ? 'member' : 'other'
   }
-  return runtime.role === 'member'
+  // Why each step: after a /clear the pane's session claims its mark again here.
+  return runtime.role === 'member' && (await isPaneSession($))
 }
 
 const recordOf = (): StewardRecord => ({

@@ -102,6 +102,8 @@ export function buildOrchestratorGameLaunch(args: {
       ORCA_GAME_TIMEZONE: desktopGameTimezoneOf(config.timezone),
       ORCA_GAME_LOCALE: args.locale ?? DEFAULT_UI_LOCALE,
       ...(args.role === 'member' ? { ORCA_GAME_ROLE: 'member' } : {}),
+      // Why: an Orca started inside a game pane's claude inherits its mark; each pane starts unmarked.
+      ORCA_GAME_PANE_SESSION: '',
       // Why: Team panes carry TMUX, which keeps Claude on the main screen, where the terminal
       // reports no clicks; the fullscreen layout is the only one where the game's buttons click.
       CLAUDE_CODE_NO_FLICKER: '1'
