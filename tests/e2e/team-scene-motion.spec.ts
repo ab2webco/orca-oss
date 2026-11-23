@@ -81,9 +81,9 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       const canvas = await webglScene(orcaPage, '[data-team-scene-office3d]')
       await follow(orcaPage, 'Follow the lead')
       await seedOfficeTeam(electronApp, { members: withState('Fi', 'waiting'), jev: JEV })
-      await record(canvas, testInfo.outputPath, 'office-lead-lift-out', 30)
+      await record(canvas, (f) => testInfo.outputPath(f), 'office-lead-lift-out', 30)
       await seedOfficeTeam(electronApp, { members: team, jev: JEV })
-      await record(canvas, testInfo.outputPath, 'office-lead-lift-back', 30)
+      await record(canvas, (f) => testInfo.outputPath(f), 'office-lead-lift-back', 30)
     } finally {
       dispose()
     }
@@ -100,11 +100,11 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       await follow(orcaPage, 'Show all')
       const ho = { name: 'Ho · ORCA-408 Build', state: 'working', host: 'm2' }
       await seedOfficeTeam(electronApp, { members: [...team, ho], jev: JEV })
-      await record(canvas, testInfo.outputPath, 'office-join-and-sit', 25)
+      await record(canvas, (f) => testInfo.outputPath(f), 'office-join-and-sit', 25)
       await seedOfficeTeam(electronApp, { members: [...team, { ...ho, state: 'idle' }], jev: JEV })
-      await record(canvas, testInfo.outputPath, 'office-stand-to-lobby', 25)
+      await record(canvas, (f) => testInfo.outputPath(f), 'office-stand-to-lobby', 25)
       await seedOfficeTeam(electronApp, { members: team, jev: JEV })
-      await record(canvas, testInfo.outputPath, 'office-leave', 20)
+      await record(canvas, (f) => testInfo.outputPath(f), 'office-leave', 20)
     } finally {
       dispose()
     }
@@ -120,9 +120,9 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       const canvas = await webglScene(orcaPage, '[data-team-scene-diorama]')
       await follow(orcaPage, 'Follow the lead')
       await seedOfficeTeam(electronApp, { members: withState('Fi', 'waiting'), jev: JEV })
-      await record(canvas, testInfo.outputPath, 'figures-lead-crossing-out', 30)
+      await record(canvas, (f) => testInfo.outputPath(f), 'figures-lead-crossing-out', 30)
       await seedOfficeTeam(electronApp, { members: team, jev: JEV })
-      await record(canvas, testInfo.outputPath, 'figures-lead-crossing-back', 30)
+      await record(canvas, (f) => testInfo.outputPath(f), 'figures-lead-crossing-back', 30)
     } finally {
       dispose()
     }
@@ -139,9 +139,9 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       await follow(orcaPage, 'Show all')
       const ho = { name: 'Ho · ORCA-408 Build', state: 'working' }
       await seedOfficeTeam(electronApp, { members: [...team, ho], jev: JEV })
-      await record(canvas, testInfo.outputPath, 'figures-arrive', 15)
+      await record(canvas, (f) => testInfo.outputPath(f), 'figures-arrive', 15)
       await seedOfficeTeam(electronApp, { members: [...withState('Bo', 'waiting'), ho], jev: JEV })
-      await record(canvas, testInfo.outputPath, 'figures-lead-to-asker-home', 25)
+      await record(canvas, (f) => testInfo.outputPath(f), 'figures-lead-to-asker-home', 25)
     } finally {
       dispose()
     }
