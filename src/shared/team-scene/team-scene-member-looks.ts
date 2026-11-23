@@ -184,3 +184,58 @@ export function teamSceneMemberLookOf(
   }
   return FIGURES_MEMBER_LOOKS[teamSceneSheetIndexOf(who, FIGURES_MEMBER_LOOKS.length)]!
 }
+
+/** An Office figure as its sheet draws it: the 3D Office dresses its developer from this. */
+export type TeamSceneOfficeLook = {
+  sheet: string
+  sweater: number
+  hair: number
+  skin: number
+  pants: number
+  beard: boolean
+}
+
+const office = (sheet: string, look: Omit<TeamSceneOfficeLook, 'sheet' | 'beard'>, beard = false) =>
+  ({ sheet: `office/${sheet}.png`, ...look, beard }) as const
+
+// Read off each Office sheet's first frame; the test samples the art, so a wrong colour fails.
+const DARK_PANTS = 0x202430
+export const OFFICE_LEAD_LOOK: TeamSceneOfficeLook = office('lead', {
+  sweater: 0x445064,
+  hair: 0x482c1c,
+  skin: 0xf0c4a0,
+  pants: 0x181c2c
+})
+export const OFFICE_ADVISOR_LOOK: TeamSceneOfficeLook = office('advisor', {
+  sweater: 0xcca84c,
+  hair: 0x7c7878,
+  skin: 0xe4b48c,
+  pants: 0x282830
+})
+export const OFFICE_MEMBER_LOOKS: readonly TeamSceneOfficeLook[] = [
+  office('member-1', { sweater: 0xd0844c, hair: 0x14100c, skin: 0x88583c, pants: DARK_PANTS }),
+  office('member-2', { sweater: 0x94a4b8, hair: 0x1c1818, skin: 0xe4b48c, pants: DARK_PANTS }),
+  office('member-3', { sweater: 0x7c5cb0, hair: 0xc8b8a0, skin: 0xf0c4a0, pants: DARK_PANTS }),
+  office('member-4', { sweater: 0x449470, hair: 0xa85828, skin: 0xe4b48c, pants: 0x342820 }),
+  office('member-5', { sweater: 0xbc5854, hair: 0x281810, skin: 0xb87c54, pants: DARK_PANTS }),
+  office(
+    'member-6',
+    { sweater: 0xd4d0cc, hair: 0x6c6868, skin: 0xd8a074, pants: DARK_PANTS },
+    true
+  ),
+  office('member-7', { sweater: 0x48848c, hair: 0x14100c, skin: 0xb87c54, pants: DARK_PANTS }),
+  office('member-8', { sweater: 0xb4884c, hair: 0x482c1c, skin: 0xf0c4a0, pants: DARK_PANTS })
+]
+
+/** The Office sheet a member wears in the Team list, by the same index as the Figures sheet. */
+export function teamSceneOfficeLookOf(
+  who: Pick<TeamSceneActor, 'key' | 'characterKey'> & { role: 'lead' | 'member' | 'advisor' }
+): TeamSceneOfficeLook {
+  if (who.role === 'lead') {
+    return OFFICE_LEAD_LOOK
+  }
+  if (who.role === 'advisor') {
+    return OFFICE_ADVISOR_LOOK
+  }
+  return OFFICE_MEMBER_LOOKS[teamSceneSheetIndexOf(who, OFFICE_MEMBER_LOOKS.length)]!
+}

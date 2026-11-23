@@ -12,7 +12,7 @@ import {
 } from '../../../../shared/team-scene/team-office3d-walkers'
 import type { Office3dMember } from '../../../../shared/team-scene/team-office3d-members'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
-import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
+import type { DioramaFigure } from './team-diorama-figures'
 import type { DioramaKit } from './team-diorama-kit'
 import { poseDioramaFigure } from './team-diorama-poses'
 import { OFFICE3D_LEAD_COAT, office3dDev } from './team-office3d-dev'
@@ -49,10 +49,7 @@ export function office3dLeadActor(
   }
   // Needing the person is the one signal that asks them for something: a raised hand.
   const asks = args.input.lead.activity === 'needsYou'
-  const lead = office3dDev(
-    dioramaLookOf(args.input.lead.characterKey ?? args.input.lead.key),
-    'lead'
-  )
+  const lead = office3dDev(args.input.lead.characterKey ?? args.input.lead.key, 'lead')
   const leadScale = lead.g.scale.x
   world.add(lead.g)
   const { group: shaft, cab } = office3dLiftShaft(kit, X, args.layout.floors.length)

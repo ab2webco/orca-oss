@@ -14,7 +14,7 @@ import type { TeamSceneStatusColors } from './team-scene-painter-marks'
 import type { Office3dTraffic } from '../../../../shared/team-scene/team-office3d-traffic'
 import { dioramaFitCamera } from './team-diorama-camera'
 import { dioramaAim, dioramaLeadZoom, type DioramaView } from './team-diorama-view'
-import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
+import type { DioramaFigure } from './team-diorama-figures'
 import { dioramaChip } from './team-diorama-fx'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import type { DioramaRenderLimits } from './team-diorama-stage'
@@ -133,7 +133,7 @@ export function office3dStage(
     const room = office3dControlRoom(kit, X, floor, dark)
     if (room && floor.controlRoom) {
       world.add(room.group)
-      const advisor = office3dDev(dioramaLookOf(`advisor:${floor.key}`), 'advisor')
+      const advisor = office3dDev(`advisor:${floor.key}`, 'advisor')
       const [cx, cz] = floor.controlRoom.chair
       advisor.g.position.set(cx, 0, cz)
       advisor.baseY = floor.controlRoom.y + OFFICE3D_SIT_Y
@@ -169,7 +169,7 @@ export function office3dStage(
       }
       let figure: DioramaFigure | null = null
       if (m && view && !view.empty) {
-        figure = office3dDev(dioramaLookOf(m.characterKey ?? m.key), 'dev')
+        figure = office3dDev(m.characterKey ?? m.key, 'dev')
         figure.g.scale.multiplyScalar(floor.scale)
         // Why the chair's own centre: the desk sets its chair 0.08 behind the seat line, scaled.
         figure.g.position.set(seat.x, 0, OFFICE3D_SEAT_Z + OFFICE3D_CHAIR_BACK * floor.scale)

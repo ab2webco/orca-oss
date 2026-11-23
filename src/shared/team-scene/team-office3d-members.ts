@@ -38,6 +38,8 @@ export type Office3dMember = {
   /** Its current trip's steps start here; an interrupted trip is retraced from this step on. */
   tripFrom: number
   leaving: boolean
+  /** Whose Office sheet it wears, kept so a leaver walks out in the clothes it sat in. */
+  look?: string
 }
 
 /** Plans `m`'s trip from where its plan has it at `now` to `to`; null `to` walks out the door. */
@@ -194,6 +196,7 @@ export function office3dMembersRead(args: {
       const home = target ?? { floor: 0, at: L.door, face: L.door }
       const created: Office3dMember = {
         key: input.key,
+        look: input.characterKey ?? input.key,
         place,
         waitSince,
         wait,
