@@ -8,3 +8,41 @@ orchestratorGame:
     provider: plane
     project: e665c0d5-22e7-495e-9ecf-3effee3ae370
     workspace: ab2web
+  actions:
+    - label: Limpieza
+      command: cleanup
+      icon: scan
+      pin: true
+      prompt: |
+        Clean up merged work on every host. For each host, list this project's worktrees
+        (orca worktree list --environment <host>) and check each head on GitHub: in main or
+        in a merged PR. Remove only those with `orca worktree rm`, never --force. For any that
+        is refused or holds unpushed commits, launch a read-only member to show its diff first.
+        Then delete the Claude scratchpads of tickets that Plane shows Done or Cancelled: local
+        ones yourself, each paired host through one member. Report what was removed, the space
+        freed, and what was kept and why.
+    - label: Release
+      command: release
+      icon: tag
+      pin: true
+      prompt: |
+        Prepare the next Orca Lab release. Compare the latest v*-lab.N tag with main, list the
+        merged PRs and their tickets, build a what-to-test list per ticket, and name the tickets
+        waiting on a release for their live check. Then ask me with game ask-owner whether to
+        cut it. Tag or publish nothing without my yes.
+    - label: Board
+      command: board
+      icon: list
+      pin: true
+      prompt: |
+        Reconcile the Plane board with GitHub: tickets In Progress whose PRs are all merged and
+        nothing left, tickets Done with an open PR, merged PRs with no ticket, and members whose
+        ticket is not In Progress. Fix what is clear and record it on each ticket; tell me only
+        what needs my decision.
+  orchestrator:
+    label: Alfred
+    rules: |
+      - After every merge, in the same turn: remove the ticket's worktree and branch on its host,
+        and its Claude scratchpad with its captures.
+      - Never remove a worktree that has changes before showing its diff.
+      - On every lead start, check this project's worktrees on every host and clean what merged.
