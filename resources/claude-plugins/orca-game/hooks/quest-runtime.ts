@@ -9,6 +9,7 @@ import { gameLocaleOf, gameStrings, setGameLocale } from './game-strings'
 import { isSceneMode, restoredNotesOf, type FlowPhase, type StoredRow } from './quest-policy'
 import { bumpLive, isLiveTicking, LIVE_EVERY_TICKS } from './live-turn'
 import { setLaunchRole } from './member-pane'
+import { isPaneSession } from './pane-session'
 import { demoNow, gameConfig, quest } from './quest-state'
 import { REACTION_TICKS, SCENE_KEY, SCENE_TICK_MS, type Reaction } from './scene'
 import { stageCellsOf } from './scene-frame'
@@ -146,7 +147,7 @@ async function repaint($: EngineInterface): Promise<void> {
 
 async function load($: EngineInterface): Promise<void> {
   // The engine lists what a mod reads only from literal names.
-  const [mode, scene, hud, rewards, render, timezone, locale, role] = await Promise.all([
+  const [mode, scene, hud, rewards, render, timezone, locale, role, isOwn] = await Promise.all([
     $.env.get('ORCA_GAME_MODE').catch(() => undefined),
     $.env.get('ORCA_GAME_SCENE').catch(() => undefined),
     $.env.get('ORCA_GAME_HUD').catch(() => undefined),
@@ -154,10 +155,11 @@ async function load($: EngineInterface): Promise<void> {
     $.env.get('ORCA_GAME_RENDER').catch(() => undefined),
     $.env.get('ORCA_GAME_TIMEZONE').catch(() => undefined),
     $.env.get('ORCA_GAME_LOCALE').catch(() => undefined),
-    $.env.get('ORCA_GAME_ROLE').catch(() => undefined)
+    $.env.get('ORCA_GAME_ROLE').catch(() => undefined),
+    isPaneSession($)
   ])
   setGameLocale(gameLocaleOf(locale))
-  setLaunchRole(role)
+  setLaunchRole(isOwn ? role : undefined)
   quest.envConfig = gameConfigOfEnv({
     ORCA_GAME_MODE: mode,
     ORCA_GAME_SCENE: scene,

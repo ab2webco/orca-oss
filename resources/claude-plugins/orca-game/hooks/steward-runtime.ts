@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { AdvisorPins } from './advisor-report'
+import { isPaneSession } from './pane-session'
 import type { CacheEnv, CacheGate, CacheState } from './steward-cache'
 import { CACHE_TRACK_START, type CacheTrack } from './steward-cache-track'
 import type { StewardJudgeBudget } from './steward-judge'
@@ -86,8 +87,11 @@ export const runtime: Runtime = {
 
 export async function isMember($: EngineInterface): Promise<boolean> {
   if (runtime.role === null) {
-    const role = await $.env.get('ORCA_GAME_ROLE').catch(() => undefined)
-    runtime.role = role === 'member' ? 'member' : 'other'
+    const [role, isOwn] = await Promise.all([
+      $.env.get('ORCA_GAME_ROLE').catch(() => undefined),
+      isPaneSession($)
+    ])
+    runtime.role = role === 'member' && isOwn ? 'member' : 'other'
   }
   return runtime.role === 'member'
 }

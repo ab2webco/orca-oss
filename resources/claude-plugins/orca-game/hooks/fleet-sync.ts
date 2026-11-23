@@ -27,6 +27,7 @@ import { raiseTeamEvent, syncHdTeam } from './hd-team'
 import { fleetPhaseOf, partyOf } from './party'
 import { isLeadStarted } from './lead-started'
 import { runningLeadSubagents, withLeadSubagents } from './lead-subagents'
+import { isPaneSession } from './pane-session'
 import { projectKeyOf } from './panel-layout'
 import { migrateHiddenReviews } from './panel-layout-store'
 import { teamEventsOf } from './team-events'
@@ -67,6 +68,10 @@ let hasReportedAdvisor = false
 
 /** Jev's model, effort and Orca's pins for this pane's lead; nothing while Jev never published. */
 async function advisorEnvOf($: EngineInterface): Promise<Record<string, string>> {
+  // Why: a claude started inside the pane polls for it too, and its Jev is not the pane's.
+  if (!(await isPaneSession($))) {
+    return {}
+  }
   const advisor = await readJevAdvisor($, quest.tick).catch(() => null)
   if (advisor === null && !hasReportedAdvisor) {
     return {}

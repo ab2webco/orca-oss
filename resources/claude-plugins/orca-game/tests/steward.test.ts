@@ -40,6 +40,8 @@ type World = {
   memory?: Record<string, unknown>
   polls?: (Record<string, string> | undefined)[]
   highRiskPaths?: string[]
+  /** Set to record each `$.env.set` the mods make. */
+  sets?: { name: string; value?: string }[]
 }
 type Seen = { model: string; effort: unknown; agentId?: string }
 
@@ -103,6 +105,10 @@ const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
   on('session.id', () => ({ value: 's1' }))
+  on('env.set', (_$, e) => {
+    world.sets?.push({ name: e.name, ...(e.value === undefined ? {} : { value: e.value }) })
+    return { value: {} }
+  })
   on('store.get', (_$, e) => ({ value: world.memory?.[e.key] }))
   on('store.set', (_$, e) => {
     world.stores?.push(e.key === 'steward' ? e.value : undefined)
@@ -398,6 +404,38 @@ describe("the steward's report to Orca (ORCA-1242)", () => {
       'plan:true',
       'edit:true'
     ])
+  })
+
+  // Why: a claude started inside the pane inherits ORCA_GAME_ROLE=member and the mark (ORCA-1351).
+  test("a claude started inside a member's pane is never steered and keeps no record", async ($, on) => {
+    const seen: Seen[] = []
+    const env = { ORCA_GAME_PANE_SESSION: 'member-session' }
+    const world: World = { plan: PLAN, env, memory: {}, stores: [], polls: [] }
+    const clock = await start($, on, world, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.map((one) => one.model)).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5'])
+    expect(world.stores?.some(Boolean)).toBe(false)
+    expect(world.polls?.some((one) => one?.ORCA_GAME_STEWARD)).toBe(false)
+  })
+
+  test("the member's own session marks the pane for the claudes it starts", async ($, on) => {
+    const world: World = { plan: PLAN, sets: [] }
+    await start($, on, world, [])
+    await step($, 0)
+    expect(world.sets).toContainEqual({ name: 'ORCA_GAME_PANE_SESSION', value: 's1' })
+  })
+
+  test('a pane its own session already marked, as after a reload, is still steered', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN, env: { ORCA_GAME_PANE_SESSION: 's1' } }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)?.model).toBe('claude-opus-5-5')
   })
 
   test('a lead pane sends no steward report', async ($, on) => {

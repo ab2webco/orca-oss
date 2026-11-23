@@ -154,6 +154,20 @@ describe("a member pane's Jev report", () => {
     expect(reportsOf(runs).at(-1)).toMatchObject({ model: 'Sonnet 5.5', effort: 'high' })
   })
 
+  // Why: its poll answers for the member's pane, so its own Jev would take over the card (ORCA-1351).
+  test("a claude started inside the member's pane sends no Jev report", WITH_JEV, async ($, on) => {
+    const runs: Run[] = []
+    const env = {
+      TEST_ADVISOR: JSON.stringify(advisorOn('Opus 5.5', 'high')),
+      ORCA_GAME_PANE_SESSION: 'member-session'
+    }
+    const clock = await start($, on, env, runs)
+    await $.turn.complete(TURN)
+    await clock.settle()
+    expect(runs.length).toBeGreaterThan(0)
+    expect(reportsOf(runs).every((one) => one === undefined)).toBe(true)
+  })
+
   test(
     'once Jev stops, the next poll says so once, then sends nothing',
     WITH_JEV,

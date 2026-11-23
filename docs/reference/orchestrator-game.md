@@ -422,6 +422,10 @@ on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1+ (not on Bedrock or Vertex, or 
   The command-line flag counts for the whole session: a later `/model sonnet` does not clear it, so
   the steward stays out of the model choice until the session ends. `ANTHROPIC_MODEL=opusplan` in
   the env is not detected; the `ps` read was proven live on a headless `claude -p` member only.
+- It steers only the session Orca launched in the pane. That session marks its env with its id
+  (`ORCA_GAME_PANE_SESSION`), so a `claude` started inside the pane, which inherits
+  `ORCA_GAME_ROLE=member`, is not steered, keeps no steward record and sends no Jev report for the
+  member's card (ORCA-1351). A `/clear` keeps the mark.
 - Each decision logs the cache: warm or cold, TTL, context tokens, why the model stayed or moved,
   the switch's extra cost and N*. The member card's steward rows show the latest, with its time,
   as "09:20 PM the cache was warm · 1 h · 120k tokens: kept the model, moved only effort", and
