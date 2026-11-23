@@ -153,3 +153,51 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
     dispose()
   }
 })
+
+// ORCA-1336: a Team row rings its Figures figure; leaving the row clears the ring.
+test('hovering a Team row rings its Figures figure and leaving clears it, at both looks', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(600_000)
+  const jev = 'Jev · approves Ada’s Edit'
+  const { dispose } = await openOfficeTeam(electronApp, orcaPage, { members: team, jev })
+  try {
+    const panel = orcaPage.getByTestId('team-panel')
+    const canvas = panel.locator('[data-team-scene-diorama] canvas')
+    const row = panel.locator('[data-team-card="member"]').filter({ hasText: 'Bo · ORCA-402' })
+    for (const look of [
+      { name: 'illustrated', quality: 'high' },
+      { name: 'low', quality: 'low' }
+    ] as const) {
+      for (const theme of THEMES) {
+        await writeSettings(orcaPage, {
+          pluginSystemEnabled: true,
+          orchestratorGame: {
+            scene: 'quest',
+            panel: { look: 'game', style: 'figures', diorama: true, quality: look.quality }
+          }
+        })
+        await setTheme(orcaPage, theme)
+        await expect(canvas).toHaveAttribute('data-diorama-islands', /\d/)
+        const paneKey = (await row.getAttribute('data-pane-key'))!
+        const tag = `${look.name}-${theme}`
+
+        await row.hover()
+        // The row's figure is the one the stage lights: the canvas names it by its pane key.
+        await expect(canvas).toHaveAttribute('data-diorama-lit', paneKey)
+        await expect(row).toHaveAttribute('data-team-card-lit', '')
+        await orcaPage.waitForTimeout(500)
+        await canvas.screenshot({ path: testInfo.outputPath(`hover-ring-${tag}.png`) })
+
+        await orcaPage.mouse.move(1, 1)
+        await expect(canvas).toHaveAttribute('data-diorama-lit', '')
+        await expect(row).not.toHaveAttribute('data-team-card-lit')
+        await orcaPage.waitForTimeout(500)
+        await canvas.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
+      }
+    }
+  } finally {
+    dispose()
+  }
+})
