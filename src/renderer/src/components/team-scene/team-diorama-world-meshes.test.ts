@@ -4,6 +4,7 @@ import {
   teamDioramaLayoutOf,
   type DioramaMachine
 } from '../../../../shared/team-scene/team-diorama-layout'
+import { DIORAMA_BODY_CLEAR } from '../../../../shared/team-scene/team-diorama-roads'
 import {
   dioramaPlotViewOf,
   type DioramaPlotView
@@ -138,6 +139,37 @@ describe('the diorama world meshes', () => {
       }
       expect([...new Set(clashes)]).toEqual([])
       k.dispose(built.world)
+    }
+  })
+
+  // ORCA-1336 C1: the lead walks the roads, so a member standing on one is walked through.
+  it('stands every member a body clear of the roads, in every state', () => {
+    const keys = ['a', 'b', 'c', 'd', 'e', 'f']
+    const layout = teamDioramaLayoutOf([
+      machine('', { home: true, members: keys, cap: null }),
+      machine('m2', { members: ['x', 'y'] })
+    ])
+    const dSeg = (p: [number, number], a: [number, number], b: [number, number]) => {
+      const dx = b[0] - a[0],
+        dz = b[1] - a[1]
+      const u = Math.max(
+        0,
+        Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))
+      )
+      return Math.hypot(p[0] - (a[0] + dx * u), p[1] - (a[1] + dz * u))
+    }
+    const toRoad = (p: [number, number]) =>
+      Math.min(
+        ...layout.roads.flatMap(({ pts }) => pts.slice(1).map((b, i) => dSeg(p, pts[i]!, b)))
+      )
+    const k = dioramaKit(DAY, STATUS)
+    for (const action of ['build', 'inspect', 'wait', 'signal', 'repair', 'cheer'] as const) {
+      const views = new Map([...keys, 'x', 'y'].map((key) => [key, view({ action, stage: 3 })]))
+      const { stands } = dioramaWorld(k, layout, views)
+      expect(stands.size).toBe(8)
+      for (const [key, { at }] of stands) {
+        expect(toRoad(at), `${action} ${key}`).toBeGreaterThanOrEqual(DIORAMA_BODY_CLEAR - 1e-6)
+      }
     }
   })
 

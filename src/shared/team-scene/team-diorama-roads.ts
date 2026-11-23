@@ -12,6 +12,9 @@ export type DioramaRoadNet = {
   islandOf: (p: DioramaPoint) => number
 }
 
+/** Two figures' half-widths at the diorama's scale: centres closer than this overlap. */
+export const DIORAMA_BODY_CLEAR = 1.1
+
 const STEP = 0.5
 const JOIN = 0.36
 
@@ -133,4 +136,48 @@ export function dioramaRoadNet(layout: Pick<DioramaLayout, 'roads'>): DioramaRoa
     return out
   }
   return { route, on: (p) => nodes[snap(p)] ?? p, islandOf: (p) => part[snap(p)] ?? -1 }
+}
+
+const toSegment = (p: DioramaPoint, a: DioramaPoint, b: DioramaPoint): number => {
+  const dx = b[0] - a[0],
+    dz = b[1] - a[1]
+  const u = Math.max(
+    0,
+    Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))
+  )
+  return Math.hypot(p[0] - (a[0] + dx * u), p[1] - (a[1] + dz * u))
+}
+
+/**
+ * Where a member stands, pulled from `at` toward its plot's middle until it is a body clear of
+ * every road: the lead walks the roads, and walked through members standing on one (ORCA-1336).
+ */
+export function dioramaStandClear(
+  layout: Pick<DioramaLayout, 'roads'>,
+  at: DioramaPoint,
+  plot: DioramaPoint
+): DioramaPoint {
+  const toRoad = (p: DioramaPoint) =>
+    Math.min(
+      Infinity,
+      ...layout.roads.flatMap(({ pts }) => pts.slice(1).map((b, i) => toSegment(p, pts[i]!, b)))
+    )
+  const along = (k: number): DioramaPoint => [
+    at[0] + (plot[0] - at[0]) * k,
+    at[1] + (plot[1] - at[1]) * k
+  ]
+  if (toRoad(at) >= DIORAMA_BODY_CLEAR) {
+    return at
+  }
+  let lo = 0,
+    hi = 1
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2
+    if (toRoad(along(mid)) >= DIORAMA_BODY_CLEAR) {
+      hi = mid
+    } else {
+      lo = mid
+    }
+  }
+  return along(hi)
 }

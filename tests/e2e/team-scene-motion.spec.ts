@@ -71,7 +71,7 @@ const follow = async (page: Page, mode: 'Follow the lead' | 'Show all') => {
 test.describe('@ondemand ORCA-1336 movement recordings', () => {
   test.describe.configure({ timeout: 600_000 })
 
-  test('Office: the lead rides the lift to a member upstairs who needs the user, and back', async ({
+  test('Office: the lead rides the lift to a member who joins upstairs, and back', async ({
     electronApp,
     orcaPage
   }, testInfo) => {
@@ -80,9 +80,10 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       await writeSettings(orcaPage, office)
       const canvas = await webglScene(orcaPage, '[data-team-scene-office3d]')
       await follow(orcaPage, 'Follow the lead')
-      await seedOfficeTeam(electronApp, { members: withState('Fi', 'waiting'), jev: JEV })
+      // Why a join: the Office lead moves only for events (a join, a red CI), never for an asker.
+      const ho = { name: 'Ho · ORCA-408 Build', state: 'working', host: 'm2' }
+      await seedOfficeTeam(electronApp, { members: [...team, ho], jev: JEV })
       await record(canvas, (f) => testInfo.outputPath(f), 'office-lead-lift-out', 30)
-      await seedOfficeTeam(electronApp, { members: team, jev: JEV })
       await record(canvas, (f) => testInfo.outputPath(f), 'office-lead-lift-back', 30)
     } finally {
       dispose()
