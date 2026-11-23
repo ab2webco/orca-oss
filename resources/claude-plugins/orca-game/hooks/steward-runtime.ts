@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { AdvisorPins } from './advisor-report'
+import { isPaneSession } from './pane-session'
 import type { CacheEnv, CacheGate, CacheState } from './steward-cache'
 import { CACHE_TRACK_START, type CacheTrack } from './steward-cache-track'
 import type { StewardJudgeBudget } from './steward-judge'
@@ -89,7 +90,8 @@ export async function isMember($: EngineInterface): Promise<boolean> {
     const role = await $.env.get('ORCA_GAME_ROLE').catch(() => undefined)
     runtime.role = role === 'member' ? 'member' : 'other'
   }
-  return runtime.role === 'member'
+  // Why each step: after a /clear the pane's session claims its mark again here.
+  return runtime.role === 'member' && (await isPaneSession($))
 }
 
 const recordOf = (): StewardRecord => ({

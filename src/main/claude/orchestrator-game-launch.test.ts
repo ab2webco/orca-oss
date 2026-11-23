@@ -35,6 +35,7 @@ describe('buildOrchestratorGameLaunch', () => {
       // Why the desktop's zone: an SSH pane's mod would otherwise read the host's clock.
       ORCA_GAME_TIMEZONE: Intl.DateTimeFormat().resolvedOptions().timeZone,
       ORCA_GAME_LOCALE: 'es',
+      ORCA_GAME_PANE_SESSION: '',
       CLAUDE_CODE_NO_FLICKER: '1'
     })
   })
@@ -59,6 +60,17 @@ describe('buildOrchestratorGameLaunch', () => {
     expect(member.args).toEqual(['--plugin-dir', PLUGIN_DIR])
     expect(member.env.ORCA_GAME_ROLE).toBe('member')
     expect(buildOrchestratorGameLaunch(args).env).not.toHaveProperty('ORCA_GAME_ROLE')
+  })
+
+  // Why: an Orca started inside a marked claude (E2E, pnpm dev) must not hand its panes that mark.
+  it('clears the pane-session mark for the member and the lead launch alike (ORCA-1351)', () => {
+    const resolved = resolveOrchestratorGameConfig({})
+    const args = { resolved, claudeVersion: '2.1.301', pluginDir: PLUGIN_DIR }
+
+    expect(
+      buildOrchestratorGameLaunch({ ...args, role: 'member' }).env.ORCA_GAME_PANE_SESSION
+    ).toBe('')
+    expect(buildOrchestratorGameLaunch(args).env.ORCA_GAME_PANE_SESSION).toBe('')
   })
 
   it('launches a member plain when the project turns the member game off', () => {

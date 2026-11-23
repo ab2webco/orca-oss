@@ -8,6 +8,7 @@ import { isGhPrCreate, memberPrCapDeny } from './member-pr-cap-guard'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
 import { registerStewardCompact } from './steward-step'
+import { registerPaneSession } from './pane-session'
 import { markLeadStarted, startOrRearmLead, unmarkLeadStarted } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
@@ -25,6 +26,7 @@ import { bumpLive, liveAsk, liveTurnEnd, liveTurnStart } from './live-turn'
 export const register: Register = (on) => {
   registerQuest(on)
   registerStewardCompact(on)
+  registerPaneSession(on)
   registerTextLayer(on)
   registerAdvisor(on)
   registerLeadName(on)

@@ -40,6 +40,10 @@ type World = {
   memory?: Record<string, unknown>
   polls?: (Record<string, string> | undefined)[]
   highRiskPaths?: string[]
+  /** Set to record each `$.env.set` the mods make. */
+  sets?: { name: string; value?: string }[]
+  /** The session id; a /clear moves it. */
+  session?: string
 }
 type Seen = { model: string; effort: unknown; agentId?: string }
 
@@ -98,11 +102,22 @@ const answer = (stdout: unknown) => ({
 
 const start = async ($: Engine, on: On, world: World, seen: Seen[]) => {
   const clock = mock.clock(on)
-  mock.env(on, { ORCA_GAME_CLI: '/opt/orca/bin/orca', ORCA_GAME_ROLE: 'member', ...world.env })
+  const vars: Record<string, string | undefined> = {
+    ORCA_GAME_CLI: '/opt/orca/bin/orca',
+    ORCA_GAME_ROLE: 'member',
+    ...world.env
+  }
+  on('env.get', (_$, e) => ({ value: vars[e.name] }))
   on('session.start', ($s, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: '/w' }))
   on('session.root', () => ({ value: '/w' }))
-  on('session.id', () => ({ value: 's1' }))
+  on('session.id', () => ({ value: world.session ?? 's1' }))
+  on('session.end', (_$, e) => ({ sessionId: e.sessionId }))
+  on('env.set', (_$, e) => {
+    vars[e.name] = e.value
+    world.sets?.push({ name: e.name, ...(e.value === undefined ? {} : { value: e.value }) })
+    return { value: {} }
+  })
   on('store.get', (_$, e) => ({ value: world.memory?.[e.key] }))
   on('store.set', (_$, e) => {
     world.stores?.push(e.key === 'steward' ? e.value : undefined)
@@ -398,6 +413,57 @@ describe("the steward's report to Orca (ORCA-1242)", () => {
       'plan:true',
       'edit:true'
     ])
+  })
+
+  // Why: a claude started inside the pane inherits ORCA_GAME_ROLE=member and the mark (ORCA-1351).
+  test("a claude started inside a member's pane is never steered and keeps no record", async ($, on) => {
+    const seen: Seen[] = []
+    const env = { ORCA_GAME_PANE_SESSION: 'member-session' }
+    const world: World = { plan: PLAN, env, memory: {}, stores: [], polls: [] }
+    const clock = await start($, on, world, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.map((one) => one.model)).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5'])
+    expect(world.stores?.some(Boolean)).toBe(false)
+    expect(world.polls?.some((one) => one?.ORCA_GAME_STEWARD)).toBe(false)
+  })
+
+  test("the member's own session marks the pane for the claudes it starts", async ($, on) => {
+    const world: World = { plan: PLAN, sets: [] }
+    await start($, on, world, [])
+    await step($, 0)
+    expect(world.sets).toContainEqual({ name: 'ORCA_GAME_PANE_SESSION', value: 's1' })
+  })
+
+  test("a /clear moves the member's mark to its new id, so a reload after it still steers", async ($, on) => {
+    const seen: Seen[] = []
+    const world: World = { plan: PLAN, sets: [] }
+    const clock = await start($, on, world, seen)
+    await step($, 0)
+    world.session = 's2'
+    await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } } as never)
+    await step($, 1)
+    await edit($)
+    await clock.settle()
+    await step($, 2)
+    expect(world.sets).toEqual([
+      { name: 'ORCA_GAME_PANE_SESSION', value: 's1' },
+      { name: 'ORCA_GAME_PANE_SESSION' },
+      { name: 'ORCA_GAME_PANE_SESSION', value: 's2' }
+    ])
+    expect(seen.at(-1)?.model).toBe('claude-opus-5-5')
+  })
+
+  test('a pane its own session already marked, as after a reload, is still steered', async ($, on) => {
+    const seen: Seen[] = []
+    const clock = await start($, on, { plan: PLAN, env: { ORCA_GAME_PANE_SESSION: 's1' } }, seen)
+    await step($, 0)
+    await edit($)
+    await clock.settle()
+    await step($, 1)
+    expect(seen.at(-1)?.model).toBe('claude-opus-5-5')
   })
 
   test('a lead pane sends no steward report', async ($, on) => {

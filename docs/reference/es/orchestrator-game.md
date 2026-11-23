@@ -1,5 +1,5 @@
 ---
-sourceHash: ac4d153840937a9c
+sourceHash: a58c570a0225e198
 ---
 
 # El juego orquestador de Agent Teams
@@ -447,6 +447,11 @@ Por eso:
   `/model sonnet` posterior no lo borra, así que el steward queda fuera de la elección de modelo
   hasta que la sesión termina. `ANTHROPIC_MODEL=opusplan` en el entorno no se detecta; la lectura con
   `ps` se probó en vivo solo con un miembro headless `claude -p`.
+- Solo dirige la sesión que Orca lanzó en el pane. Esa sesión marca su entorno con su id
+  (`ORCA_GAME_PANE_SESSION`), así que un `claude` iniciado dentro del pane, que hereda
+  `ORCA_GAME_ROLE=member`, no se dirige, no guarda registro del steward ni manda reporte de Jev para
+  la tarjeta del miembro (ORCA-1351). Un `/clear` mueve la marca al nuevo id de sesión, y cada pane
+  que Orca lanza empieza con ella vacía.
 - Cada decisión registra la caché: caliente o fría, TTL, tokens de contexto, por qué el modelo se
   quedó o cambió, el costo extra del cambio y N*. Las filas del steward en la tarjeta del miembro
   muestran la última, con su hora, como "21:20 la caché estaba caliente · 1 h · 120k tokens: mantuvo

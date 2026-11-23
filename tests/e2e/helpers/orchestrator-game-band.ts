@@ -227,7 +227,9 @@ export async function startGameBand(
   const play = join(projectDir, 'play')
   await writeFile(
     play,
-    `#!/bin/sh\nunset ORCA_GAME_ROLE CLAUDE_CODE_OAUTH_TOKEN TMUX TMUX_PANE\n${Object.entries(env)
+    `#!/bin/sh\nunset ORCA_GAME_ROLE ORCA_GAME_PANE_SESSION CLAUDE_CODE_OAUTH_TOKEN TMUX TMUX_PANE\n${Object.entries(
+      env
+    )
       .map(([key, value]) => `export ${key}='${value}'`)
       .join('\n')}\nexec claude ${pluginDirs}\n`
   )
