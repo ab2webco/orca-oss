@@ -1,3 +1,4 @@
+import type { CacheGateWhy, CacheTtl } from './steward-cache'
 import {
   STEWARD_EFFORTS,
   STEWARD_PHASES,
@@ -21,19 +22,50 @@ const REPORT_DECISIONS = 10
 
 export type StewardPlanState = 'none-yet' | 'none' | 'plan'
 
+/** The member's prompt cache when the steward picked, and what a switch would cost it (ORCA-1350). */
+export type StewardCacheNote = {
+  warm: boolean
+  known: boolean
+  ttl: CacheTtl
+  contextTokens: number
+  why: CacheGateWhy
+  extraUsd: number | null
+  breakEven: number | null
+}
+
 export type StewardDecision = {
   at: number
-  moment: StewardMomentReason | 'plan' | 'announce' | 'judged' | 'quota' | 'stand-down'
+  moment:
+    | StewardMomentReason
+    | 'plan'
+    | 'announce'
+    | 'judged'
+    | 'quota'
+    | 'stand-down'
+    | 'cold'
+    | 'compacted'
   phase: StewardPhase | null
   from: StewardPick
   to: StewardPick
   applied: boolean
-  source: 'plan' | 'default' | 'haiku' | 'router' | 'override' | 'none'
+  source:
+    | 'plan'
+    | 'default'
+    | 'haiku'
+    | 'router'
+    | 'override'
+    | 'opusplan'
+    | 'fallback'
+    | 'cache'
+    | 'none'
   why: string
   isFloored?: true
   confidence?: number
   failure?: string
   tokens?: { input: number; output: number }
+  cache?: StewardCacheNote
+  /** The phase this decision left, and the main-loop requests it really took. */
+  phaseTurns?: { phase: StewardPhase; turns: number }
 }
 
 /** The why a decision carries when no plan or judgment gives one; the card words it in PR 3. */
@@ -48,7 +80,9 @@ export const STEWARD_MOMENT_WHY: Readonly<Record<StewardDecision['moment'], stri
   captures: 'taking or reading captures',
   judged: 'judged by Haiku',
   quota: 'a usage window is past 85 %',
-  'stand-down': 'another choice is in force'
+  'stand-down': 'another choice is in force',
+  cold: 'the cache went cold: the held switch costs nothing more now',
+  compacted: 'a compaction rewrote the history: the held switch lands with it'
 }
 
 /** What the steward keeps in the plugin store, for the card in PR 3. */
