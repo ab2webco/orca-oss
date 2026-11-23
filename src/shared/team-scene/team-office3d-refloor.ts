@@ -1,10 +1,11 @@
 import { dioramaPaceOf } from './team-diorama-lead-round'
 import { OFFICE3D_DOOR_SWING, office3dCabCut, office3dCabFloorAt } from './team-office3d-elevator'
 import { OFFICE3D_LIFT, type Office3dLayout } from './team-office3d-layout'
-import { office3dTripTo } from './team-office3d-members'
-import { office3dQueued } from './team-office3d-planner'
+import { office3dCabOutAt, office3dTripTo } from './team-office3d-members'
+import { office3dPlanner, office3dQueued } from './team-office3d-planner'
 import type { Office3dTraffic } from './team-office3d-traffic'
 import {
+  OFFICE3D_EXIT,
   OFFICE3D_JUMP,
   office3dLeadRoundOf,
   office3dWalkerAt,
@@ -12,9 +13,8 @@ import {
   type Office3dStep
 } from './team-office3d-walkers'
 
-// Why: the cab, every plan and the call lines hold floor indexes, kept across reads, while a
-// machine's floor exists only while one of ours sits there; a floor that went away left the cab
-// riding to an index past the top, with the lead in it (ORCA-1374).
+// Why: the traffic kept floor indexes across reads, and a floor that went away left the cab riding
+// past the top with the lead in it (ORCA-1374).
 
 /** The floors a traffic was planned on, bottom up, and the lead's. */
 export type Office3dFloorKeys = { keys: string[]; lead: string }
@@ -53,12 +53,9 @@ const renumbered = (s: Office3dStep, f: (x: number) => number): Office3dStep =>
 const stepAt = (plan: Office3dRound, t: number) =>
   plan.steps.find((s) => t >= s.start && t < s.start + s.dur)
 
-/**
- * Carries the traffic over to `layout`'s floors at `now`. A floor that only moved keeps every
- * trip, re-numbered. When one went away, or the lead's machine changed, the cab finishes the ride
- * under way inside the building and books nothing more; whoever needed it plans again, the lead
- * back to its desk, and whoever stood on the floor that went away is gone with it.
- */
+/** Carries the traffic over to `layout`'s floors at `now`: a moved floor keeps its trips,
+ * re-numbered; when one went away or the lead's machine changed, the cab ends its ride inside,
+ * books nothing more, whoever needed it plans again, and whoever stood on the gone floor is gone. */
 export function office3dRefloor(
   traffic: Office3dTraffic,
   layout: Office3dLayout,
@@ -123,20 +120,17 @@ export function office3dRefloor(
     if (step?.kind !== 'ride' || end === null) {
       return
     }
-    const i = plan.steps.indexOf(step)
-    const out = Math.round(office3dCabFloorAt(cab, end))
+    const p = office3dPlanner(
+      end,
+      Math.round(office3dCabFloorAt(cab, end)),
+      step.at ?? OFFICE3D_LIFT,
+      pace
+    )
+    p.hold('idle', OFFICE3D_DOOR_SWING / speed, null)
     plan.steps = [
-      ...plan.steps.slice(0, i),
+      ...plan.steps.slice(0, plan.steps.indexOf(step)),
       { ...step, dur: end - step.start },
-      {
-        kind: 'hold',
-        floor: out,
-        at: step.at ?? OFFICE3D_LIFT,
-        pose: 'idle',
-        face: null,
-        start: end,
-        dur: OFFICE3D_DOOR_SWING / speed
-      }
+      ...p.steps
     ]
   }
   const queued = office3dQueued(traffic.queue)
@@ -154,7 +148,7 @@ export function office3dRefloor(
   }
 }
 
-/** The lead's plan up to `now`, or the end of the ride it is on, then straight back to its desk. */
+/** The lead's plan up to `now`, or until it is out of the cab it is in, then straight back to its desk. */
 function leadHome(
   plan: Office3dRound,
   layout: Office3dLayout,
@@ -163,10 +157,8 @@ function leadHome(
   queued: (floor: number, t: number) => number,
   lost: boolean
 ): Office3dRound {
-  const step = stepAt(plan, now)
-  const riding = step?.kind === 'ride'
-  const next = step ? plan.steps[plan.steps.indexOf(step) + 1] : undefined
-  const start = riding ? step.start + step.dur + (next?.kind === 'hold' ? next.dur : 0) : now
+  const out = office3dCabOutAt(plan, now)
+  let start = out ?? now
   const kept = plan.steps
     .filter((s) => s.start < start)
     .map((s) => (s.start + s.dur > start ? { ...s, dur: start - s.start } : s))
@@ -174,12 +166,17 @@ function leadHome(
     0,
     layout.floors.findIndex((fl) => fl.lead)
   )
-  const at = riding
-    ? { floor: Math.round(office3dCabFloorAt(plan.cab, start)), at: OFFICE3D_LIFT, pose: 'idle' }
-    : office3dWalkerAt(plan, now)
+  const at = office3dWalkerAt(plan, start)
   const atDesk = at.pose === 'desk'
   // Why a blink: from a floor that is gone, or a desk on a floor no longer the lead's, no walk leads home.
   const blink = lost || (atDesk && Math.round(at.floor) !== leadFloor)
+  const p = office3dPlanner(start, Math.round(at.floor), at.at, pace)
+  // Out of the cab on a walk of its own, as at any stop: one long eased walk lingers in the doorway.
+  if (out !== null && !blink && !p.jump) {
+    p.walk(OFFICE3D_EXIT)
+    kept.push(...p.steps)
+    start = p.t
+  }
   const trip = office3dLeadRoundOf({
     layout,
     needs: [],
@@ -188,7 +185,7 @@ function leadHome(
     start: blink ? start + OFFICE3D_JUMP / 2 : start,
     cab: plan.cab,
     queued,
-    from: blink || atDesk ? undefined : { floor: Math.round(at.floor), at: at.at }
+    from: blink || atDesk ? undefined : { floor: p.level, at: p.here }
   })
   const desk = trip.steps[0]
   if (blink && desk?.kind === 'hold') {

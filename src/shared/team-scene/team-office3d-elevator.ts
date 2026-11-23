@@ -18,8 +18,7 @@ export type Office3dCabRide = {
 /** The one glass cab every floor shares, and when it is next free. */
 export type Office3dCab = { rides: Office3dCabRide[]; freeAt: number; home: number }
 
-/** One swing of the doors; how long they stay open once a rider is in, so the next in line joins it,
- * and once it steps out. */
+/** One door swing; how long they stay open once a rider is in (for the next in line), and after. */
 const DOOR = 0.5
 export const OFFICE3D_DOOR_SWING = DOOR
 const LINGER = 0.8
@@ -32,7 +31,7 @@ export const office3dRideDur = (from: number, to: number, speed = 1): number =>
   (0.8 + Math.abs(from - to) * 1.15) / speed
 
 const ease = (x: number): number => {
-  const k = Math.min(1, Math.max(0, x))
+  const k = Math.min(1, Math.max(0, x)) || 0
   return k * k * (3 - 2 * k)
 }
 
@@ -90,10 +89,9 @@ export function office3dCabDoorsAt(cab: Office3dCab, floor: number, t: number): 
 }
 
 /**
- * Books the cab from floor `from` to `to` for a rider at its door from `earliest`: the cab first
- * comes to `from` if it is elsewhere, and the rider steps in only once the doors are fully open
- * (`board`), takes `walkIn` to reach its spot, and the doors shut before it departs. At `to` it
- * steps out at `out`, once they are open again. Riders queue; a second booking waits for the first.
+ * Books the cab from floor `from` to `to` for a rider at its door from `earliest`: it comes to
+ * `from` first, the rider steps in once the doors are fully open (`board`) and takes `walkIn` to
+ * its spot, and at `to` steps out at `out`, once they open again. Riders queue in order.
  */
 export function bookOffice3dCab(
   cab: Office3dCab,
@@ -143,11 +141,8 @@ export function bookOffice3dCab(
   return { board, depart, arrive, out: arrive + door, seat: 0 }
 }
 
-/**
- * Cuts the cab's bookings at `now` for a building whose floors changed: a ride under way goes on
- * from `at` to its floor, doors already opening stay open a moment for whoever is in them, and
- * nothing later stays booked. Returns when the ride under way, if any, now ends.
- */
+/** Cuts the cab's bookings at `now` for changed floors: a ride under way goes on from `at`, doors
+ * opening stay open a moment, nothing later stays booked. Returns when that ride now ends. */
 export function office3dCabCut(
   cab: Office3dCab,
   now: number,
