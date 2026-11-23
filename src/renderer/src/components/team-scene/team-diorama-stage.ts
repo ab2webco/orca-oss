@@ -11,7 +11,7 @@ import { dioramaCast } from './team-diorama-cast'
 import { dioramaCueEffects } from './team-diorama-cue-meshes'
 import { DAY, NIGHT, dioramaKit } from './team-diorama-kit'
 import { dioramaLeadActor } from './team-diorama-lead-actor'
-import { scene3dHoverMark, scene3dPick } from './team-scene3d-hover'
+import { scene3dHoverMark, scene3dPick } from './team-scene3d-pick'
 import { dioramaRises } from './team-diorama-rise'
 import { dioramaHomeProps } from './team-diorama-camp'
 import { dioramaAim, type DioramaView } from './team-diorama-view'
@@ -152,7 +152,9 @@ export function dioramaStage(
       }
       dioramaAim(args.view, fit, lead.figure.g.position, args.width, t)
       // Why each frame: the lit figure may be walking.
-      mark.place((lit && figures.get(lit)) || null)
+      // Why not a hidden one: a member still arriving is not drawn, so its ring would float on ground.
+      const f = lit ? figures.get(lit) : undefined
+      mark.place(f?.visible ? f : null)
       renderer.render(scene, fit.camera)
     },
     pick: (at, size) => scene3dPick(fit.camera, figures, at, size),

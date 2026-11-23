@@ -23,7 +23,7 @@ import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 import { teamHostWorktreeMissing } from './team-session-host-worktree'
 import { teamHelpersOf } from './team-member-helpers'
-import { useTeamSceneHover } from '../team-scene/team-scene-hit'
+import { useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 
 /** The live count of helpers (subagents) inside a member's session; nothing once they stop. */
 function HelpersMark({ paneKey }: { paneKey: string }): React.JSX.Element | null {
@@ -95,8 +95,7 @@ export function TeamMemberCardRow({
 }): React.JSX.Element {
   const ticket = teamTicketBesideName(card, showName)
   // Why both ways: the scene lights this row's character, and hovering the row lights it there.
-  const lit = useTeamSceneHover((s) => s.key === card.paneKey)
-  const setHover = useTeamSceneHover((s) => s.set)
+  const { lit, rowProps } = useTeamSceneHoverRow(card.paneKey)
   const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   // Why the pane: only its terminal can answer a prompt there, and the Inbox does not hold it (ORCA-1231).
   const inPane = card.ask?.kind === 'permission'
@@ -116,9 +115,7 @@ export function TeamMemberCardRow({
     <article
       data-team-card="member"
       data-pane-key={card.paneKey}
-      data-team-card-lit={lit ? '' : undefined}
-      onPointerEnter={() => setHover(card.paneKey)}
-      onPointerLeave={() => useTeamSceneHover.getState().key === card.paneKey && setHover(null)}
+      {...rowProps}
       // Why one surface: V30's .card.sel and .more read as one card, not loose text under a row.
       className={cn(
         'relative',

@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useTeamSceneHover } from './team-scene-hit'
-import { linkScene3dHover, scene3dHoverMark, scene3dPick } from './team-scene3d-hover'
+import { linkScene3dHover, type Scene3dHoverHold } from './team-scene3d-hover'
+import { scene3dHoverMark, scene3dPick } from './team-scene3d-pick'
 
 const figure = (x: number): THREE.Group => {
   const g = new THREE.Group()
@@ -10,8 +11,9 @@ const figure = (x: number): THREE.Group => {
   g.updateMatrixWorld(true)
   return g
 }
+// Why orthographic: the diorama's camera is one (team-diorama-camera.ts), so the ray path matches.
 const camera = () => {
-  const c = new THREE.PerspectiveCamera(40, 2, 0.1, 100)
+  const c = new THREE.OrthographicCamera(-6, 6, 3, -3, 0.1, 100)
   c.position.set(0, 1, 12)
   c.lookAt(0, 1, 0)
   c.updateMatrixWorld(true)
@@ -59,6 +61,7 @@ describe('the lit mark under a 3D figure', () => {
 
 describe('linking the Team list and the 3D figures', () => {
   afterEach(() => useTeamSceneHover.getState().set(null))
+  const hold = (): Scene3dHoverHold => ({ own: null, down: null })
   const canvas = () => {
     const el = new EventTarget() as EventTarget & { getBoundingClientRect: () => DOMRect }
     el.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 100 }) as DOMRect
@@ -66,13 +69,13 @@ describe('linking the Team list and the 3D figures', () => {
   }
   const fire = (el: EventTarget, type: string, x: number, y: number) =>
     el.dispatchEvent(
-      Object.assign(new Event(type), { clientX: x, clientY: y, pointerType: 'mouse' })
+      Object.assign(new Event(type), { clientX: x, clientY: y, pointerType: 'mouse', buttons: 0 })
     )
 
   it('lights the row of the figure under the pointer, and clears it on leaving', () => {
     const el = canvas()
     const pick = vi.fn((p: { x: number; y: number }) => (p.x < 100 ? 'a' : null))
-    const stop = linkScene3dHover({ el, pick, light: () => {}, open: () => {} })
+    const stop = linkScene3dHover({ el, pick, light: () => {}, open: () => {}, hold: hold() })
     fire(el, 'pointermove', 60, 50)
     expect(pick).toHaveBeenLastCalledWith({ x: 50, y: 30 }, { width: 200, height: 100 })
     expect(useTeamSceneHover.getState().key).toBe('a')
@@ -83,7 +86,13 @@ describe('linking the Team list and the 3D figures', () => {
 
   it('marks the figure of the row the pointer is on, and follows it off', () => {
     const light = vi.fn()
-    const stop = linkScene3dHover({ el: canvas(), pick: () => null, light, open: () => {} })
+    const stop = linkScene3dHover({
+      el: canvas(),
+      pick: () => null,
+      light,
+      open: () => {},
+      hold: hold()
+    })
     expect(light).toHaveBeenLastCalledWith(null)
     useTeamSceneHover.getState().set('lead')
     expect(light).toHaveBeenLastCalledWith('lead')
@@ -97,7 +106,7 @@ describe('linking the Team list and the 3D figures', () => {
   it('opens a clicked figure as its row does, but not at the end of a drag', () => {
     const el = canvas()
     const open = vi.fn()
-    const stop = linkScene3dHover({ el, pick: () => 'a', light: () => {}, open })
+    const stop = linkScene3dHover({ el, pick: () => 'a', light: () => {}, open, hold: hold() })
     fire(el, 'pointerdown', 60, 50)
     fire(el, 'click', 61, 50)
     expect(open).toHaveBeenCalledWith('a')
@@ -105,6 +114,39 @@ describe('linking the Team list and the 3D figures', () => {
     fire(el, 'pointerdown', 60, 50)
     fire(el, 'click', 120, 70)
     expect(open).not.toHaveBeenCalled()
+    stop()
+  })
+
+  // Why: each stage rebuild relinks the canvas; the hover it lit must not outlive the pointer.
+  it('clears a lit row when the pointer leaves, even after a rebuild relinked the canvas', () => {
+    const el = canvas()
+    const h = hold()
+    const pick = vi.fn((p: { x: number; y: number }) => (p.x < 100 ? 'a' : null))
+    const first = linkScene3dHover({ el, pick, light: () => {}, open: () => {}, hold: h })
+    fire(el, 'pointermove', 60, 50)
+    expect(useTeamSceneHover.getState().key).toBe('a')
+    first()
+    const second = linkScene3dHover({ el, pick, light: () => {}, open: () => {}, hold: h })
+    fire(el, 'pointermove', 180, 50)
+    expect(useTeamSceneHover.getState().key).toBeNull()
+    second()
+  })
+
+  // Why: a camera drag owns the pointer, so the rows it passes over must not flicker.
+  it('does not pick while a button is held down', () => {
+    const el = canvas()
+    const pick = vi.fn(() => 'a')
+    const stop = linkScene3dHover({ el, pick, light: () => {}, open: () => {}, hold: hold() })
+    el.dispatchEvent(
+      Object.assign(new Event('pointermove'), {
+        clientX: 60,
+        clientY: 50,
+        pointerType: 'mouse',
+        buttons: 1
+      })
+    )
+    expect(pick).not.toHaveBeenCalled()
+    expect(useTeamSceneHover.getState().key).toBeNull()
     stop()
   })
 })
