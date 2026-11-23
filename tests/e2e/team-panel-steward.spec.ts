@@ -173,7 +173,19 @@ test("Team cards show the Orca steward's model choice and its moves", async ({
         stewardReport(raised.ticket, {
           decisions: [
             decision(t0, 'plan', haiku, sonnet),
-            decision(t0 + 60_000, 'edit', sonnet, opus)
+            {
+              ...decision(t0 + 60_000, 'edit', sonnet, opus),
+              // ORCA-1350: the raise read a warm 1 h cache and paid its rewrite.
+              cache: {
+                warm: true,
+                known: true,
+                ttl: '1h',
+                contextTokens: 120_000,
+                why: 'upward',
+                extraUsd: 0.79,
+                breakEven: null
+              }
+            }
           ]
         })
       ],
@@ -317,6 +329,9 @@ test("Team cards show the Orca steward's model choice and its moves", async ({
     await expect(detail.locator('[data-team-steward-step]').last()).toContainText(
       'editing code · Sonnet 5.5 · medium → Opus 5.5 · high'
     )
+    await expect(detail.locator('[data-team-steward-cache="warm"]')).toHaveText(
+      'Cache warm · 1 h · 120k tokens: the work needed a bigger model'
+    )
     await expect(detail).toContainText('a new effort from the next turn')
     await capture('card', 900, async () => {
       await raisedCard.evaluate((node) => node.scrollIntoView({ block: 'start' }))
@@ -328,6 +343,9 @@ test("Team cards show the Orca steward's model choice and its moves", async ({
       'editando código (Orca steward)'
     )
     await expect(detail.locator('[data-team-steward-plan]')).toHaveText('Sigue el plan · implement')
+    await expect(detail.locator('[data-team-steward-cache]')).toHaveText(
+      'Caché caliente · 1 h · 120k tokens: el trabajo pedía un modelo mayor'
+    )
     await capture('card-es', 900, async () => {
       await raisedCard.evaluate((node) => node.scrollIntoView({ block: 'start' }))
     })

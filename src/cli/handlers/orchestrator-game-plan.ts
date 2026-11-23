@@ -8,7 +8,10 @@ import {
   parseGameEffortPlan,
   type GameEffortPlan
 } from '../../shared/orchestrator-game-effort-plan'
-import type { GameStewardDecision } from '../../shared/orchestrator-game-member-steward'
+import type {
+  GameStewardCache,
+  GameStewardDecision
+} from '../../shared/orchestrator-game-member-steward'
 
 export type GameEffortPlanResult = { ticket: string; known: boolean; plan: GameEffortPlan | null }
 
@@ -32,6 +35,16 @@ export type GameStewardLogResult = {
 const pickText = (pick: { model: string; effort: string | null }): string =>
   pick.effort ? `${pick.model} ${pick.effort}` : pick.model
 
+const cacheText = (cache: GameStewardCache | undefined): string => {
+  if (!cache) {
+    return ''
+  }
+  const state = cache.known ? (cache.warm ? 'warm' : 'cold') : 'unread'
+  const cost = cache.extraUsd === null ? '' : `, switch $${cache.extraUsd.toFixed(2)}`
+  const breakEven = cache.breakEven === null ? '' : `, N* ${cache.breakEven}`
+  return ` · cache ${state} ${cache.ttl} ${Math.round(cache.contextTokens / 1000)}k: ${cache.why}${cost}${breakEven}`
+}
+
 export function formatGameStewardLog(result: GameStewardLogResult): string {
   if (result.entries.length === 0) {
     return `The Orca steward has logged no decision for ${result.ticket} in this project.`
@@ -40,7 +53,7 @@ export function formatGameStewardLog(result: GameStewardLogResult): string {
     .map((one) => {
       const move = `${pickText(one.from)} → ${pickText(one.to)}`
       const kept = one.applied ? '' : ' (not applied)'
-      return `${new Date(one.at).toISOString()} ${one.moment} ${one.phase ?? '-'} ${move}${kept} · ${one.source}: ${one.why}`
+      return `${new Date(one.at).toISOString()} ${one.moment} ${one.phase ?? '-'} ${move}${kept} · ${one.source}: ${one.why}${cacheText(one.cache)}`
     })
     .join('\n')
 }

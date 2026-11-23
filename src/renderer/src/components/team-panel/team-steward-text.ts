@@ -2,6 +2,7 @@ import { translate } from '@/i18n/i18n'
 import {
   TEAM_STEWARD_NAME,
   type TeamSteward,
+  type TeamStewardCache,
   type TeamStewardCredit
 } from '../../../../shared/team-panel-steward'
 import type { TeamSceneStewardMove } from '../../../../shared/team-scene/team-scene-types'
@@ -33,6 +34,10 @@ export function teamStewardMomentText(moment: string): string {
       return translate('teamPanel.steward.moment.plan', "the lead's plan")
     case 'judged':
       return translate('teamPanel.steward.moment.judged', 'judged by Haiku')
+    case 'cold':
+      return translate('teamPanel.steward.moment.cold', 'the cache went cold')
+    case 'compacted':
+      return translate('teamPanel.steward.moment.compacted', 'a compaction rewrote the history')
     default:
       return moment
   }
@@ -99,3 +104,55 @@ export const teamStewardTimingText = (): string =>
     'teamPanel.steward.timing',
     'A new model applies from the next step, a new effort from the next turn.'
   )
+
+function cacheWhyText(why: string): string {
+  switch (why) {
+    case 'effort-only':
+      return translate('teamPanel.steward.cache.why.effortOnly', 'only the effort changed')
+    case 'warm-hold':
+      return translate('teamPanel.steward.cache.why.warmHold', 'kept the model, moved only effort')
+    case 'cold':
+      return translate(
+        'teamPanel.steward.cache.why.cold',
+        'the cache was cold, so the model switched'
+      )
+    case 'quota':
+      return translate('teamPanel.steward.cache.why.quota', 'a usage window is past 85 %')
+    case 'pays-back':
+      return translate(
+        'teamPanel.steward.cache.why.paysBack',
+        'the switch pays for its cache rewrite'
+      )
+    case 'upward':
+      return translate('teamPanel.steward.cache.why.upward', 'the work needed a bigger model')
+    default:
+      return why
+  }
+}
+
+/** The member's prompt cache at the steward's latest pick, and why the model stayed or moved (ORCA-1350). */
+export function teamStewardCacheText(cache: TeamStewardCache): string {
+  const why = cacheWhyText(cache.why)
+  if (!cache.known) {
+    return translate(
+      'teamPanel.steward.cache.unknown',
+      'Cache not read yet, counted warm: {{why}}',
+      {
+        why
+      }
+    )
+  }
+  const state = cache.warm
+    ? translate('teamPanel.steward.cache.warm', 'warm')
+    : translate('teamPanel.steward.cache.cold', 'cold')
+  const ttl =
+    cache.ttl === '1h'
+      ? translate('teamPanel.steward.cache.ttl1h', '1 h')
+      : translate('teamPanel.steward.cache.ttl5m', '5 min')
+  const tokens = `${Math.round(cache.contextTokens / 1000)}k`
+  return translate(
+    'teamPanel.steward.cache.line',
+    'Cache {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}',
+    { state, ttl, tokens, why }
+  )
+}

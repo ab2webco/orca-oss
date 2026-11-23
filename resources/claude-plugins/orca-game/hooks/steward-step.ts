@@ -43,7 +43,7 @@ async function envOf($: EngineInterface): Promise<CacheEnv> {
   })
 }
 
-const OPUSPLAN_FLAG = /(?:^|\s)--model(?:=|\s+)opusplan(?:\s|$)/i
+const OPUSPLAN_FLAG = /(?:^|\s)--model(?:=|\s+)opusplan(?:\[1m\])?(?:\s|$)/i
 
 /** `--model opusplan` is no settings layer, so only the process's own command line shows it. */
 async function isOpusplanFlag($: EngineInterface): Promise<boolean> {

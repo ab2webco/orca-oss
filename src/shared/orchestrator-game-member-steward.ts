@@ -22,6 +22,20 @@ export type GameStewardDecision = {
   confidence?: number
   failure?: string
   tokens?: { input: number; output: number }
+  cache?: GameStewardCache
+}
+
+/** The member's prompt cache when the steward picked, and the cost of a switch (ORCA-1350). */
+export type GameStewardCache = {
+  warm: boolean
+  /** False before the steward has seen a request: it assumes warm. */
+  known: boolean
+  ttl: '5m' | '1h'
+  contextTokens: number
+  /** effort-only, warm-hold, cold, quota, pays-back or upward. */
+  why: string
+  extraUsd: number | null
+  breakEven: number | null
 }
 
 export type GameMemberSteward = {
@@ -63,6 +77,36 @@ const pickOf = (value: unknown): GameStewardPick | null => {
   return name === null ? null : { model: name, effort: wordsOf(effort) }
 }
 
+// Why any sign: a switch to a cheaper cache write can cost less than staying.
+const costOf = (value: unknown): number | null | undefined =>
+  value === null ? null : typeof value === 'number' && Number.isFinite(value) ? value : undefined
+
+// Why all or nothing: a half-read note would show a cost the steward never weighed.
+function cacheOf(value: unknown): GameStewardCache | null {
+  const raw = shapeOf(value)
+  const [ttl, contextTokens, why] = [
+    oneOf(['5m', '1h'], raw.ttl),
+    countOf(raw.contextTokens),
+    wordsOf(raw.why)
+  ]
+  const [extraUsd, breakEven] = [
+    costOf(raw.extraUsd),
+    raw.breakEven === null ? null : (countOf(raw.breakEven) ?? undefined)
+  ]
+  if (
+    typeof raw.warm !== 'boolean' ||
+    typeof raw.known !== 'boolean' ||
+    !ttl ||
+    contextTokens === null ||
+    !why ||
+    extraUsd === undefined ||
+    breakEven === undefined
+  ) {
+    return null
+  }
+  return { warm: raw.warm, known: raw.known, ttl, contextTokens, why, extraUsd, breakEven }
+}
+
 // Why one bad decision is dropped alone: the rest of the history still reads.
 export function parseGameStewardDecision(value: unknown): GameStewardDecision | null {
   const raw = shapeOf(value)
@@ -76,6 +120,7 @@ export function parseGameStewardDecision(value: unknown): GameStewardDecision | 
   const tokens = shapeOf(raw.tokens)
   const [input, output] = [countOf(tokens.input), countOf(tokens.output)]
   const phase = wordsOf(raw.phase)
+  const cache = cacheOf(raw.cache)
   return {
     at,
     moment,
@@ -88,7 +133,8 @@ export function parseGameStewardDecision(value: unknown): GameStewardDecision | 
     ...(raw.isFloored === true ? { isFloored: true as const } : {}),
     ...(confidence !== null && confidence <= 1 ? { confidence } : {}),
     ...(failure ? { failure } : {}),
-    ...(input !== null && output !== null ? { tokens: { input, output } } : {})
+    ...(input !== null && output !== null ? { tokens: { input, output } } : {}),
+    ...(cache ? { cache } : {})
   }
 }
 

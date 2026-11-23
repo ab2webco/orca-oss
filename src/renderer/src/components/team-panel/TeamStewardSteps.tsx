@@ -1,6 +1,7 @@
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import type { TeamSteward } from '../../../../shared/team-panel-steward'
 import {
+  teamStewardCacheText,
   teamStewardMomentText,
   teamStewardPlanText,
   teamStewardTimingText
@@ -16,6 +17,11 @@ export function TeamStewardSteps({ row }: { row: TeamSteward }): React.JSX.Eleme
   return (
     <div data-team-steward="" className="flex min-w-0 flex-col gap-0.5">
       {plan ? <span data-team-steward-plan={row.plan}>{plan}</span> : null}
+      {row.cache ? (
+        <span data-team-steward-cache={row.cache.warm ? 'warm' : 'cold'}>
+          {teamStewardCacheText(row.cache)}
+        </span>
+      ) : null}
       {row.steps.length > 0 ? (
         <ol className="flex min-w-0 flex-col gap-0.5 text-muted-foreground">
           {row.steps.map((step) => (

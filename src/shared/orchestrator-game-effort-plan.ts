@@ -2,7 +2,6 @@ import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 import {
   GAME_KIND_LAUNCH,
   GAME_TICKET_KINDS,
-  type GameKindLaunch,
   type GameTicketKind
 } from './orchestrator-game-ticket-kind'
 
@@ -41,28 +40,22 @@ export type GameEffortPlan = {
 
 export type GamePlanParse<T> = ({ ok: true } & T) | { ok: false; error: string }
 
-const PHASE_DEFAULTS: Readonly<
-  Record<GamePlanPhaseName, { model: string; effort: GamePlanEffort; why: string }>
-> = {
-  map: { ...kindRow('audit'), why: 'read and map the code before changing it' },
-  design: { ...kindRow('review'), why: 'review and design judgement' },
-  implement: { ...kindRow('implement'), why: 'editing product code' },
-  'test-fix': { ...kindRow('implement'), why: 'fixing failing tests edits code' },
-  captures: { ...kindRow('captures'), why: 'taking and reading captures' },
-  // Why Haiku (owner, 2026-11-15): watching CI only reads statuses; a fix there is test-fix.
-  'pr-ci': { model: 'claude-haiku-5-5', effort: 'low', why: 'watching the PR and CI' }
-}
+// Why effort only (ORCA-1350): a model switch rewrites a warm prompt cache; the kind picks the model.
+const PHASE_DEFAULTS: Readonly<Record<GamePlanPhaseName, { effort: GamePlanEffort; why: string }>> =
+  {
+    map: { effort: 'medium', why: 'read and map the code before changing it' },
+    design: { effort: 'high', why: 'review and design judgement' },
+    implement: { effort: 'high', why: 'editing product code' },
+    'test-fix': { effort: 'high', why: 'fixing failing tests edits code' },
+    captures: { effort: 'medium', why: 'taking and reading captures' },
+    'pr-ci': { effort: 'low', why: 'watching the PR and CI' }
+  }
 
 const KIND_PHASES: Readonly<Record<GameTicketKind, readonly GamePlanPhaseName[]>> = {
   audit: ['map'],
   review: ['map', 'design'],
   captures: ['map', 'captures'],
   implement: GAME_PLAN_PHASES
-}
-
-function kindRow(kind: GameTicketKind): { model: string; effort: GamePlanEffort } {
-  const row: Omit<GameKindLaunch, 'kind'> = GAME_KIND_LAUNCH[kind]
-  return { model: row.model, effort: row.effort as GamePlanEffort }
 }
 
 const CLAUDE_MODEL = /^claude-(?:opus|sonnet|haiku|fable)(?:-[a-z0-9]+)+$/
@@ -172,7 +165,11 @@ export function gameKindEffortPlanOf(kind: GameTicketKind): GameEffortPlan {
   return {
     source: 'kind',
     kind,
-    phases: KIND_PHASES[kind].map((phase) => ({ phase, ...PHASE_DEFAULTS[phase] }))
+    phases: KIND_PHASES[kind].map((phase) => ({
+      phase,
+      model: GAME_KIND_LAUNCH[kind].model,
+      ...PHASE_DEFAULTS[phase]
+    }))
   }
 }
 
@@ -188,10 +185,18 @@ export function gameEffortPlanText(plan: GameEffortPlan): string {
   })
   const nameWidth = Math.max(...rows.map(([name]) => name.length))
   const modelWidth = Math.max(...rows.map(([, model]) => model.length))
+  const models = new Set(plan.phases.map(({ model }) => model)).size
+  const note =
+    models > 1
+      ? [
+          `  note: ${models} models in one session; each switch rewrites its prompt cache. Keep one model and move effort, unless a phase outlasts the switch cost.`
+        ]
+      : []
   return [
     head,
     ...rows.map(
       ([name, model, why]) => `  ${name.padEnd(nameWidth)}  ${model.padEnd(modelWidth)}  ${why}`
-    )
+    ),
+    ...note
   ].join('\n')
 }

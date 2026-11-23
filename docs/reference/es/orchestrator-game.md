@@ -1,5 +1,5 @@
 ---
-sourceHash: ab59ff47f2736525
+sourceHash: 7806147b2cbcca73
 ---
 
 # El juego orquestador de Agent Teams
@@ -421,6 +421,34 @@ Office: un piso por máquina, cada uno con el nombre de su host.
 esfuerzo del miembro a `xhigh` sobre el plan del lead, una vez por sesión; el piso de Opus 5.5 para
 editar no cambia. Se lee solo de `orca.yaml` y llega al miembro con el plan que lee (`orca game plan`).
 `orca game steward-log <ticket>` imprime las decisiones del steward para un ticket.
+
+**La caché de prompts (ORCA-1350).** Cada modelo tiene su propia caché de prompts, así que cambiar de
+modelo reenvía toda la conversación del miembro al precio de escritura del modelo nuevo; cambiar el
+esfuerzo conserva la caché en Opus 5.5, Sonnet 5.5, Haiku 5.5 y Fable 5.1+ (no en Bedrock ni Vertex).
+Por eso:
+
+- Un launch por tipo siembra un solo modelo para toda la sesión del miembro (el del tipo: Opus 5.5
+  para implement y review, Sonnet 5.5 para audit y captures) y varía el esfuerzo por fase: map y
+  captures `medium`, design, implement y test-fix `high`, pr-ci `low`. Sin plan, el steward conserva
+  el modelo de la sesión y mueve el esfuerzo igual. `orca game plan` avisa cuando un plan mezcla
+  modelos; escribe otro modelo sólo para una fase lo bastante larga como para pagar la reescritura.
+- Mientras la caché está caliente (el último pedido está dentro de su TTL: 1 h con suscripción, 5 min
+  con API key o por encima del plan), el steward retiene un cambio de modelo hacia abajo y aplica sólo
+  su esfuerzo, salvo que una ventana de uso pase el 85 % o que los pedidos que le quedan a la fase
+  paguen el cambio (N*, a partir de la página de precios, el tamaño del contexto y el TTL). El cambio
+  retenido entra cuando la caché se enfría o una compactación reescribe el historial. Una subida por
+  riesgo o por un piso siempre pasa.
+- Se hace a un lado mientras Claude Code cambia de modelo por su cuenta: bajo `opusplan` (el setting
+  `model`, o `--model opusplan` u `opusplan[1m]` en la línea de comandos, leído una vez por sesión del
+  propio proceso del miembro con `ps`, así que no en Windows), durante un paso cuando un paso de Opus
+  corre en una sesión de Sonnet (el `model: opus` de un skill), y por el resto de un turno que
+  respondió un fallback automático. El flag de la línea de comandos vale para toda la sesión: un
+  `/model sonnet` posterior no lo borra, así que el steward queda fuera de la elección de modelo
+  hasta que la sesión termina.
+- Cada decisión registra la caché: caliente o fría, TTL, tokens de contexto, por qué el modelo se
+  quedó o cambió, el costo extra del cambio y N*. Las filas del steward en la tarjeta del miembro
+  muestran la última como "Caché caliente · 1 h · 120k tokens: mantuvo el modelo y sólo movió el
+  esfuerzo", y `orca game steward-log` la imprime por decisión.
 
 `rewardWeights` se fusiona clave por clave como `orchestrator`: el proyecto puede bajar una recompensa
 en `orca.yaml` mientras un dev desactiva otra en el JSON de Settings del proyecto. Igual que las listas

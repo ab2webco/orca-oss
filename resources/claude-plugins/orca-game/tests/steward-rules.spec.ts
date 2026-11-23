@@ -39,13 +39,14 @@ describe('stewardChoiceOf (ORCA-1242)', () => {
     })
   })
 
-  it('falls back to the kind table when the plan or the phase is missing', () => {
+  // Why the session's model (ORCA-1350): a model switch rewrites its prompt cache; effort keeps it.
+  it("falls back to the session's model at the phase's effort when the plan or the phase is missing", () => {
     expect(stewardChoiceOf({ phase: 'captures', plan: PLAN, current: SONNET })).toMatchObject({
       pick: { model: 'claude-sonnet-5-5', effort: 'medium' },
       source: 'default'
     })
     expect(stewardChoiceOf({ phase: 'pr-ci', plan: null, current: SONNET }).pick).toEqual({
-      model: 'claude-haiku-5-5',
+      model: 'claude-sonnet-5-5',
       effort: 'low'
     })
   })
@@ -97,7 +98,7 @@ describe('stewardChoiceOf (ORCA-1242)', () => {
     const low = stewardChoiceOf({ phase: 'map', plan: null, current: opus, confidence: 0.5 })
     expect(low.pick).toEqual(opus)
     const sure = stewardChoiceOf({ phase: 'map', plan: null, current: opus, confidence: 0.9 })
-    expect(sure.pick).toEqual({ model: 'claude-sonnet-5-5', effort: 'medium' })
+    expect(sure.pick).toEqual({ model: 'claude-opus-5-5', effort: 'medium' })
     const raise = stewardChoiceOf({
       phase: 'implement',
       plan: null,

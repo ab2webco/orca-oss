@@ -417,4 +417,27 @@ describe('the steward and the prompt cache (ORCA-1350)', () => {
       .map((one) => one.source)
     expect(sources).toEqual(['fallback'])
   })
+
+  test('stands down for --model opusplan[1m], the 1M-context form of the flag', async ($, on) => {
+    const seen: Seen[] = []
+    const sonnet = { model: 'claude-sonnet-5-5', effort: 'medium' }
+    const world: World = {
+      memory: {},
+      usage: usageOf(120_000),
+      sessionModel: 'claude-sonnet-5-5',
+      settingModel: 'opus',
+      commandLine: 'claude --model opusplan[1m] --effort medium'
+    }
+    const clock = await start($, on, world, seen)
+    await step($, 0, sonnet)
+    await $.tool.call({
+      tool: 'Edit',
+      file_path: '/w/src/a.ts',
+      old_string: 'a',
+      new_string: 'b'
+    } as never)
+    await clock.settle()
+    await step($, 1, sonnet)
+    expect(picks(seen).at(-1)).toBe('claude-sonnet-5-5/medium')
+  })
 })

@@ -22,13 +22,14 @@ export const STEWARD_PHASES: readonly StewardPhase[] = [
 export const STEWARD_EFFORTS: readonly StewardEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
 
 // Why a copy: the plugin cannot import Orca's src/shared; it mirrors PHASE_DEFAULTS there.
-const PHASE_DEFAULTS: Readonly<Record<StewardPhase, Required<StewardPick>>> = {
-  map: { model: 'claude-sonnet-5-5', effort: 'medium' },
-  design: { model: 'claude-opus-5-5', effort: 'high' },
-  implement: { model: 'claude-opus-5-5', effort: 'high' },
-  'test-fix': { model: 'claude-opus-5-5', effort: 'high' },
-  captures: { model: 'claude-sonnet-5-5', effort: 'medium' },
-  'pr-ci': { model: 'claude-haiku-5-5', effort: 'low' }
+// Why effort only (ORCA-1350): with no plan the session keeps its model, so its cache stays warm.
+const PHASE_EFFORTS: Readonly<Record<StewardPhase, StewardEffort>> = {
+  map: 'medium',
+  design: 'high',
+  implement: 'high',
+  'test-fix': 'high',
+  captures: 'medium',
+  'pr-ci': 'low'
 }
 
 // Why (owner): editing code and review/design never run below Opus 5.5.
@@ -73,7 +74,7 @@ const higherOf = (a: StewardPick, b: StewardPick): StewardPick => ({
 export type StewardChoice = { pick: StewardPick; source: 'plan' | 'default'; isFloored: boolean }
 
 /**
- * The phase's planned pick, else the kind table's; a judgment under 0.7 only raises; floors last.
+ * The phase's planned pick, else the session's model at the phase's effort; a judgment under 0.7 only raises; floors last.
  * Why the floor after an edit: a lower model would write the next edit before a moment raised it.
  */
 export function stewardChoiceOf(input: {
@@ -86,8 +87,9 @@ export function stewardChoiceOf(input: {
   isHighRisk?: boolean
 }): StewardChoice {
   const planned = input.plan?.find((one) => one.phase === input.phase)
-  const base = planned ?? PHASE_DEFAULTS[input.phase]
-  let pick: StewardPick = { model: base.model, effort: base.effort }
+  let pick: StewardPick = planned
+    ? { model: planned.model, effort: planned.effort }
+    : { model: input.current.model, effort: PHASE_EFFORTS[input.phase] }
   if (input.confidence !== undefined && input.confidence < SURE) {
     pick = higherOf(input.current, pick)
   }
