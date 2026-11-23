@@ -1,4 +1,4 @@
-import type { Locator } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
 import { writeSettings } from './helpers/settings-write'
@@ -154,19 +154,35 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
   }
 })
 
-// ORCA-1336: a Team row lights its figure in the scene; leaving the row clears it.
-test('hovering a Team row lights its figure in Figures, and leaving clears it, at both looks', async ({
+/** Sweeps the canvas until a pointer position lights `key`, so a figure is hovered by what it shows. */
+async function hoverFigureOnCanvas(page: Page, canvas: Locator, key: string): Promise<void> {
+  const box = (await canvas.boundingBox())!
+  for (let fy = 0.15; fy <= 0.9; fy += 0.05) {
+    for (let fx = 0.05; fx <= 0.95; fx += 0.05) {
+      await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy)
+      if ((await canvas.getAttribute('data-diorama-lit')) === key) {
+        return
+      }
+    }
+  }
+  throw new Error(`no point on the diorama lights ${key}`)
+}
+
+// ORCA-1336: a Team row and its figure light each other, the lead and advisor too; leaving clears them.
+test('hovering a Team row or a figure lights the other in Figures, and leaving clears it, at both looks', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
-  test.setTimeout(600_000)
+  test.setTimeout(900_000)
   const jev = 'Jev · approves Ada’s Edit'
   const { dispose } = await openOfficeTeam(electronApp, orcaPage, { members: team, jev })
   try {
     const panel = orcaPage.getByTestId('team-panel')
     const canvas = panel.locator('[data-team-scene-diorama] canvas')
     const flat = panel.getByRole('img', { name: 'Live team scene' })
-    const row = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-402' })
+    const bo = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-402' })
+    const lead = panel.locator('[data-team-card="lead"]')
+    const advisor = panel.locator('[data-team-card="advisor"]')
     for (const look of [
       { name: 'illustrated', quality: 'high' },
       { name: 'low', quality: 'low' }
@@ -180,39 +196,56 @@ test('hovering a Team row lights its figure in Figures, and leaving clears it, a
           }
         })
         await setTheme(orcaPage, theme)
-        const paneKey = (await row.getAttribute('data-pane-key'))!
+        const boKey = (await bo.getAttribute('data-pane-key'))!
         const tag = `${look.name}-${theme}`
         const webgl = await dioramaWebgl(panel)
         testInfo.annotations.push({ type: 'webgl', description: webgl })
 
         if (webgl === 'on') {
           await expect(canvas).toHaveAttribute('data-diorama-islands', /\d/)
-          await row.hover()
-          // The row's figure is the one the stage lights: the canvas names it by its pane key.
-          await expect(canvas).toHaveAttribute('data-diorama-lit', paneKey)
-          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          // Row to figure: the Bo row, the lead row and the advisor row each light their figure.
+          for (const [row, key] of [
+            [bo, boKey],
+            [lead, 'lead'],
+            [advisor, 'advisor']
+          ] as const) {
+            await row.hover()
+            await expect(canvas).toHaveAttribute('data-diorama-lit', key)
+            await expect(row).toHaveAttribute('data-team-card-lit', '')
+            await orcaPage.mouse.move(1, 1)
+            await expect(canvas).toHaveAttribute('data-diorama-lit', '')
+            await expect(row).not.toHaveAttribute('data-team-card-lit')
+          }
+          // Figure to row: a pointer over Bo's figure lights Bo's row, and the ring is captured.
+          await hoverFigureOnCanvas(orcaPage, canvas, boKey)
+          await expect(bo).toHaveAttribute('data-team-card-lit', '')
           await orcaPage.waitForTimeout(500)
           await canvas.screenshot({ path: testInfo.outputPath(`hover-ring-${tag}.png`) })
-
           await orcaPage.mouse.move(1, 1)
           await expect(canvas).toHaveAttribute('data-diorama-lit', '')
-          await expect(row).not.toHaveAttribute('data-team-card-lit')
+          await expect(bo).not.toHaveAttribute('data-team-card-lit')
           await orcaPage.waitForTimeout(500)
           await canvas.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
         } else {
           // WebGL is off on Linux E2E, so Figures is the 2D scene: its lit label names the row.
           await expect(canvas).toHaveCount(0)
-          await row.hover()
-          await expect(panel.locator(`[data-scene-who="${paneKey}"]`)).toHaveCount(1)
-          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          await bo.hover()
+          await expect(panel.locator(`[data-scene-who="${boKey}"]`)).toHaveCount(1)
+          await expect(bo).toHaveAttribute('data-team-card-lit', '')
           await orcaPage.waitForTimeout(500)
           await flat.screenshot({ path: testInfo.outputPath(`hover-2d-lit-${tag}.png`) })
-
           await orcaPage.mouse.move(1, 1)
           await expect(panel.locator('[data-scene-who]')).toHaveCount(0)
-          await expect(row).not.toHaveAttribute('data-team-card-lit')
+          await expect(bo).not.toHaveAttribute('data-team-card-lit')
           await orcaPage.waitForTimeout(500)
           await flat.screenshot({ path: testInfo.outputPath(`hover-2d-clear-${tag}.png`) })
+          // The lead and the advisor rows light their own row in the 2D scene too.
+          for (const row of [lead, advisor]) {
+            await row.hover()
+            await expect(row).toHaveAttribute('data-team-card-lit', '')
+            await orcaPage.mouse.move(1, 1)
+            await expect(row).not.toHaveAttribute('data-team-card-lit')
+          }
         }
       }
     }
