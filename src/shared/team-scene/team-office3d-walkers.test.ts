@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
 import { dioramaPaceOf } from './team-diorama-lead-round'
-import { bookOffice3dCab, office3dCab, office3dCabFloorAt } from './team-office3d-elevator'
+import {
+  bookOffice3dCab,
+  office3dCab,
+  office3dCabFloorAt,
+  office3dRideDur
+} from './team-office3d-elevator'
 import {
   OFFICE3D_CALL,
   OFFICE3D_CALL_PANEL,
@@ -214,6 +219,32 @@ describe('the 3D Office lift call', () => {
       })
       expect(round.steps[i - 2]).toMatchObject({ kind: 'walk' })
     }
+  })
+})
+
+// ORCA-1336 C2: with the cab serving a member, the lead stood frozen at the door for about 9 s.
+describe('the 3D Office lift call while the cab is busy', () => {
+  it('keeps the lead at its desk, so it waits at the panel only for the cab to come', () => {
+    const l = building()
+    const lead = l.floors.findIndex((f) => f.lead)
+    const top = l.floors.length - 1
+    const cab = office3dCab(lead)
+    // A member from the lobby to the top floor takes the cab just as the lead sets out.
+    bookOffice3dCab(cab, 0, top, 8)
+    const round = office3dLeadRoundOf({ layout: l, needs: [], visits: ['c'], pace: 'normal', cab })
+    const atPanel = round.steps.filter(
+      (s) =>
+        s.kind === 'hold' &&
+        s.pose === 'idle' &&
+        s.at[0] === OFFICE3D_CALL[0] &&
+        s.at[1] === OFFICE3D_CALL[1]
+    )
+    expect(atPanel.length).toBeGreaterThan(0)
+    for (const s of atPanel) {
+      expect(s.dur).toBeLessThanOrEqual(office3dRideDur(0, top) + 1e-6)
+    }
+    expect(office3dWalkerAt(round, 5).pose).toBe('desk')
+    expect(talksOf(round)).toEqual([[l.floors.findIndex((f) => f.key === 'm2'), 'give']])
   })
 })
 

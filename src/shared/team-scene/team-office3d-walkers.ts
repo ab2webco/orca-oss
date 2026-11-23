@@ -3,6 +3,7 @@ import { polyAt, polyLengths } from './team-diorama-nav'
 import {
   bookOffice3dCab,
   office3dCab,
+  office3dCabBusyFor,
   office3dCabFloorAt,
   type Office3dCab
 } from './team-office3d-elevator'
@@ -140,7 +141,34 @@ export function office3dLeadRoundOf(args: {
       here = stand
       return
     }
-    if (floor === leadFloor && here === home) {
+    const fromDesk = floor === leadFloor && here === home
+    if (toFloor !== floor) {
+      // Why stay put: while the cab serves riders booked first, the lead stood frozen at its door
+      // (ORCA-1336); it keeps working, or talking, and sets out to press the call as the cab frees.
+      const toPanel = polyLengths([
+        here,
+        ...(fromDesk ? [besideDeskOf(office), officeDoorOf(office)] : []),
+        [fromDesk ? officeDoorOf(office)[0] : here[0], OFFICE3D_AISLE_Z],
+        [1.2, OFFICE3D_AISLE_Z],
+        OFFICE3D_CALL
+      ]).at(-1)!
+      const ready =
+        t +
+        (toPanel +
+          Math.hypot(OFFICE3D_CALL[0] - OFFICE3D_LIFT[0], OFFICE3D_CALL[1] - OFFICE3D_LIFT[1])) /
+          (WALK * speed) +
+        PRESS / speed
+      const busy = office3dCabBusyFor(cab, floor, toFloor, ready, speed)
+      if (busy > 0) {
+        const last = steps.findLast((s) => s.kind === 'hold')
+        hold(
+          fromDesk ? 'desk' : 'talk',
+          busy,
+          !fromDesk && last?.kind === 'hold' ? last.face : null
+        )
+      }
+    }
+    if (fromDesk) {
       walk(besideDeskOf(office), officeDoorOf(office))
     }
     if (toFloor !== floor) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
-import { teamOffice3dLayoutOf } from './team-office3d-layout'
+import { office3dRideDur } from './team-office3d-elevator'
+import { OFFICE3D_CALL_PANEL, teamOffice3dLayoutOf } from './team-office3d-layout'
 import { office3dTraffic, office3dTrafficRead } from './team-office3d-traffic'
 import { office3dWalkerAt } from './team-office3d-walkers'
 import type { TeamSceneFloor } from './team-scene-floors'
@@ -81,6 +82,28 @@ describe("the 3D Office lead's events", () => {
     expect(traffic.lead!.steps.filter((s) => s.kind === 'hold' && s.pose === 'give')).toHaveLength(
       1
     )
+  })
+
+  // ORCA-1336 C2, from the Mac recording: Ho joined on m2 and the lead stood ~9 s at the lift door.
+  it('stays at its desk while a joiner rides up, then waits at the panel only for the cab', () => {
+    const before = teamOffice3dLayoutOf([floor('', ['a', 'b']), floor('m2', ['c'])], {
+      leadAdvisor: false
+    })
+    const after = teamOffice3dLayoutOf([floor('', ['a', 'b']), floor('m2', ['c', 'ho'])], {
+      leadAdvisor: false
+    })
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, before, input(team), 0, 'normal')
+    office3dTrafficRead(traffic, after, input([...team, member('ho')]), 5, 'normal')
+    const steps = traffic.lead!.steps
+    const panel = steps.filter(
+      (s) => s.kind === 'hold' && s.pose === 'idle' && s.face === OFFICE3D_CALL_PANEL
+    )
+    expect(panel.length).toBeGreaterThan(0)
+    for (const s of panel) {
+      expect(s.dur).toBeLessThanOrEqual(office3dRideDur(0, after.floors.length - 1) + 1e-6)
+    }
+    expect(steps.filter((s) => s.kind === 'hold' && s.pose === 'give')).toHaveLength(1)
   })
 
   it("stays seated for a member's question: the member comes to its office", () => {
