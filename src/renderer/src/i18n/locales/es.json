@@ -1041,7 +1041,9 @@
         "pluginPanelDescription": "Proporcionado por el plugin {{value0}}.",
         "tasksDescription": "Conecta proveedores, instala la habilidad de Linear y elige qué aparece en Tareas.",
         "planeTitle": "Plane",
-        "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
+        "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane.",
+        "accountSwitchTitle": "Cambio de cuenta",
+        "accountSwitchDescription": "Permite que los agentes cambien esta terminal a otra cuenta de Claude sin perder la conversación."
       },
       "useAppMenuPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
@@ -5646,6 +5648,11 @@
             }
           }
         },
+        "AgentAwakeSetting": {
+          "on": "Activado",
+          "auto": "Agente",
+          "off": "Desactivado"
+        },
         "ClaudeAccountAuthStatusLine": {
           "justNow": "justo ahora",
           "checkedAgo": "hace {{value0}}",
@@ -5918,8 +5925,8 @@
           "updateLabel": "Actualizar"
         },
         "AgentsPane": {
-          "d83834f5e6": "Detectando agents instalados…",
-          "024bd95089": "agents",
+          "d83834f5e6": "Detectando agentes instalados…",
+          "024bd95089": "agentes",
           "e8da2af684": "Disponible para instalar",
           "runsInProcessTitle": "Se ejecuta en proceso",
           "runsInProcessNote": "Se ejecuta en proceso en {{value0}}: los compañeros de equipo quedan en el mismo panel de Claude. No hay nada que instalar.",
@@ -5927,9 +5934,9 @@
           "02e0143be5": "Instalado",
           "110b74b022": "Sin agente (terminal en blanco)",
           "92033495ff": "Auto",
-          "9b175d0f5e": "Agent preseleccionado al abrir un nuevo espacio de trabajo.",
-          "385212c7a1": "Agent predeterminado",
-          "f9f127d664": "Override de la ruta o nombre del binario, y edición de argumentos de lanzamiento o entorno predeterminados para este agent.",
+          "9b175d0f5e": "Agente preseleccionado al abrir un nuevo espacio de trabajo.",
+          "385212c7a1": "Agente predeterminado",
+          "f9f127d664": "Cambia la ruta o el nombre del binario, y edita los argumentos de lanzamiento o el entorno predeterminados de este agente.",
           "f95b5c79b8": "Instalar",
           "fe4d630c94": "Documentación",
           "8dc0192e48": "Desactivado",
@@ -5941,32 +5948,32 @@
           "1c9a9679ec": "{{value0}} disponibilidad",
           "0d9e293a02": "Refrescar",
           "c9b33eb5c0": "Actualizando…",
-          "13647f9f80": "Vuelve a leer PATH de tu shell y vuelve a detectar los Agents instalados",
+          "13647f9f80": "Vuelve a leer el PATH de tu shell y vuelve a detectar los agentes instalados",
           "dc4a2ffdc0": "Expandir override del comando",
           "cea7d97be1": "Contraer override del comando",
           "db9e9e5887": "Personalizar comando",
           "959b67385b": "Establecer predeterminado",
           "24e032fa34": "Predeterminado",
           "5f986a9b92": "Establecer como predeterminado",
-          "d7625cf8b2": "Agent predeterminado",
+          "d7625cf8b2": "Agente predeterminado",
           "cfb3f35775": "Argumentos",
           "6f99bf5dd0": "Sin argumentos predeterminados",
           "8fbe1f37c1": "Entorno",
           "2d133152fa": "Sin entorno predeterminado",
-          "agentPermissions": "Permisos de Agents",
-          "agentPermissionsInfo": "Información de permisos de Agents",
-          "agentPermissionsTooltip": "No se aplica a agents con argumentos de lanzamiento sobrescritos.",
-          "agentPermissionsDescription": "Elige si Orca Lab lanza agents con menos prompts de permisos o con checks manuales.",
+          "agentPermissions": "Permisos de los agentes",
+          "agentPermissionsInfo": "Información de permisos de los agentes",
+          "agentPermissionsTooltip": "No se aplica a agentes con argumentos de lanzamiento sobrescritos.",
+          "agentPermissionsDescription": "Elige si Orca Lab lanza agentes con menos prompts de permisos o con checks manuales.",
           "agentPermissionsYolo": "Yolo",
           "agentPermissionsManual": "Manual",
           "3f1bdf3cb4": "El texto de entorno es demasiado grande para analizarlo de forma segura.",
           "codexSessionSource": "Directorio Codex a importar",
           "codexSessionSourceInfo": "Sobre la importación del historial de Codex",
           "codexSessionSourceTooltip": "Orca Lab ejecuta Codex en un directorio aislado. Señala aquí a tu directorio Codex existente para importar el historial de sesiones. Dejar vacío usa ~/.codex.",
-          "03e1a5081a": "on {{value0}}",
-          "25a41a9aad": "Re-detect agents installed on the active server",
-          "remoteDetectionFailed": "Couldn’t detect installed agents. Check the host connection and try again.",
-          "retryDetection": "Retry"
+          "03e1a5081a": "en {{value0}}",
+          "25a41a9aad": "Vuelve a detectar los agentes instalados en el servidor activo",
+          "remoteDetectionFailed": "No se pudieron detectar los agentes instalados. Revisa la conexión con el host y vuelve a intentarlo.",
+          "retryDetection": "Reintentar"
         },
         "AppIconSelector": {
           "d5a112dc9b": "Icono siguiente",
@@ -6439,7 +6446,7 @@
           "487b176240": "Muestra una cuenta regresiva en la barra lateral después de que un agente de Claude quede inactivo.",
           "9c20253679": "Muestra una cuenta regresiva después de que un agente de Claude quede inactivo.",
           "fe590653c1": "Claude cachea tu conversación para reducir costos. Si queda inactiva demasiado tiempo, la caché caduca y el siguiente mensaje reenvía todo el contexto con mayor costo. Esto muestra una cuenta regresiva para que sepas cuándo reanudar.",
-          "a137f8854d": "Prompt Cache Timer",
+          "a137f8854d": "Temporizador de caché de prompts",
           "80c454e8a6": "Haz que esto coincida con el TTL de caché de tu proveedor."
         },
         "GeneralEditorSettingsSection": {
@@ -7521,7 +7528,9 @@
           "linearDescription": "Cómo funciona Linear en Orca Lab, lista de configuración, habilidad del agente y ejemplos de prompts.",
           "tasksDescription": "Conecta proveedores, instala la habilidad de Linear y elige qué aparece en Tareas.",
           "planeTitle": "Plane",
-          "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane."
+          "planeDescription": "Da a los agentes la habilidad para leer y actualizar tus elementos de trabajo de Plane.",
+          "accountSwitchTitle": "Cambio de cuenta",
+          "accountSwitchDescription": "Permite que los agentes cambien esta terminal a otra cuenta de Claude sin perder la conversación."
         },
         "SettingsFormControls": {
           "42a4d15a30": "No hay fuentes coincidentes.",
@@ -9818,7 +9827,10 @@
         "agent-awake-copy": {
           "e5995ce268": "Mantener la computadora activa mientras los agentes están trabajando",
           "95d3031db2": "Mantiene esta computadora y la pantalla activas mientras los agentes están trabajando. El comportamiento al cerrar la tapa sigue la configuración de energía de este dispositivo.",
-          "a42f6fbdd8": "Mantiene esta computadora y la pantalla activas mientras los agentes están trabajando. Orca Lab también le pide a este dispositivo que permanezca activo cuando la tapa está cerrada, sujeto a su política de energía."
+          "a42f6fbdd8": "Mantiene esta computadora y la pantalla activas mientras los agentes están trabajando. Orca Lab también le pide a este dispositivo que permanezca activo cuando la tapa está cerrada, sujeto a su política de energía.",
+          "modeTitle": "Mantener la computadora activa",
+          "modeDescriptionWindows": "Elige Activado, Agente o Desactivado. El modo Agente mantiene la computadora activa mientras los agentes están trabajando; el comportamiento al cerrar la tapa sigue la configuración de energía de este dispositivo.",
+          "modeDescriptionDefault": "Elige Activado, Agente o Desactivado. El modo Agente mantiene la computadora activa mientras los agentes están trabajando. Orca Lab también le pide a este dispositivo que permanezca activo cuando la tapa está cerrada, sujeto a su política de energía."
         },
         "agent-status-hooks-copy": {
           "7707c15abb": "Hooks de estado del agente",
@@ -16381,6 +16393,14 @@
       "title": "El inicio de sesión de Claude necesita reparación",
       "message": "El inicio de sesión de Claude Code de todo el sistema ya no es utilizable.",
       "detail": "Tus cuentas de Claude administradas por Orca Lab no se ven afectadas. Para restaurar el inicio de sesión de todo el sistema, ejecuta claude fuera de Orca Lab y completa /login una vez."
+    }
+  },
+  "resumeVault": {
+    "section": {
+      "title": "Sesiones de agentes preservadas",
+      "description": "Orca Lab guarda un registro para reanudar cuando no puede confirmar que el agente de una sesión cerrada terminó su turno. Revisa y libera los que no necesites.",
+      "manage": "Administrar",
+      "manageWithCount": "Administrar ({{value0}})"
     }
   },
   "auto.components.settings.HostAccountLoginDialog.title": "Iniciar sesión en {{server}}",

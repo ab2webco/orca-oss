@@ -6,6 +6,9 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { AGENT_CATALOG } from '@/lib/agent-catalog'
 import { useAppStore } from '../../store'
+import { setRendererUiLanguage } from '@/i18n/i18n'
+import en from '@/i18n/locales/en.json'
+import es from '@/i18n/locales/es.json'
 import { getAgentGeneratedTabTitlesTitle } from './agent-generated-tab-title-copy'
 import { getAgentStatusHooksTitle } from './agent-status-hooks-copy'
 import { getAgentAwakeDescription, getAgentAwakeTitle } from './agent-awake-copy'
@@ -251,6 +254,70 @@ describe('AgentsPane', () => {
 
     expect(markup).toContain('Runs in-process on WSL')
     expect(markup.match(/title="Install"/g)?.length).toBe(AGENT_CATALOG.length - 2)
+  })
+
+  // ORCA-1328: an uninstalled row never shows Set default, so it must not reserve that label's width.
+  it('reserves the Set default width only on installed rows and titles every command line', () => {
+    const markup = renderPane(getDefaultSettings('/tmp'))
+    const row = (id: string): string =>
+      markup.split(`data-agent-row="${id}"`)[1].split('data-agent-row=')[0]
+    const sizers = (id: string): number =>
+      row(id).match(/aria-hidden="true" class="invisible/g)?.length ?? 0
+
+    expect(sizers('claude')).toBe(2)
+    expect(sizers('codex')).toBe(0)
+    expect(row('codex')).toMatch(/font-mono[^"]*" title="codex /)
+    expect(row('claude')).toMatch(/font-mono[^"]*" title="claude/)
+  })
+
+  it('draws the row controls in DOM order: toggle, Set default, docs, command', () => {
+    const row = renderPane(getDefaultSettings('/tmp')).split('data-agent-row="claude"')[1]
+    const at = (needle: string): number => row.indexOf(needle)
+
+    expect(at('role="radiogroup"')).toBeLessThan(at('data-agent-row-default'))
+    expect(at('data-agent-row-default')).toBeLessThan(at('target="_blank"'))
+    expect(at('target="_blank"')).toBeLessThan(at('command override'))
+    expect(row.split('data-agent-row=')[0]).not.toMatch(/[\s:]order-/)
+  })
+
+  it('gives an uninstalled row no Set default cell, so its command keeps the room', () => {
+    const row = renderPane(getDefaultSettings('/tmp')).split('data-agent-row="codex"')[1]
+    const controls = row.split('data-agent-row=')[0]
+
+    expect(controls).not.toContain('data-agent-row-default')
+    expect(controls).toContain('grid-cols-[max-content_1.75rem_1.75rem]')
+  })
+
+  it('renders no English string in es from any component the pane shows', async () => {
+    // Why: commands and names read the same in both languages.
+    const sameInBoth = new Set(['Auto', 'YOLO', 'Manual', 'Claude', 'Codex'])
+    const strings = (node: unknown, out: Set<string>): Set<string> => {
+      if (typeof node === 'string') {
+        out.add(node)
+      } else if (node && typeof node === 'object') {
+        Object.values(node).forEach((child) => strings(child, out))
+      }
+      return out
+    }
+    const english = strings(en.auto.components.settings, new Set())
+    const spanish = strings(es, new Set())
+    await setRendererUiLanguage('es')
+    let markup = ''
+    try {
+      markup = renderPane(getDefaultSettings('/tmp'))
+    } finally {
+      await setRendererUiLanguage('en')
+    }
+    const leaked = [...new Set(markup.match(/(?<=>)[^<>]+(?=<)/g) ?? [])]
+      .map((text) => text.trim())
+      .filter(
+        (text) =>
+          english.has(text) &&
+          !spanish.has(text) &&
+          !sameInBoth.has(text) &&
+          !/^[a-z0-9-]+$/.test(text)
+      )
+    expect(leaked).toEqual([])
   })
 
   it('keeps Claude Agent Teams in the install list on macOS', () => {

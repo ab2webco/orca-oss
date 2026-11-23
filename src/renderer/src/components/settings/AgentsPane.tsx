@@ -521,15 +521,25 @@ function AgentRow({
     Boolean(cmdOverride) || argsOverride !== defaultArgs || envSummary !== defaultEnvSummary
   )
 
+  // Why: the line truncates, and an uninstalled row has no expand to read it in full.
+  const commandLine = [cmdOverride ?? defaultCmd, argsOverride, envSummary]
+    .filter(Boolean)
+    .join(' ')
+  const defaultLabel = translate('auto.components.settings.AgentsPane.24e032fa34', 'Default')
+  const setDefaultLabel = translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')
+
   return (
-    <div className={cn('py-3', !isDetected && 'opacity-70')}>
+    <div
+      className={cn('@container/agent-row py-3', !isDetected && 'opacity-70')}
+      data-agent-row={agentId}
+    >
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
           <AgentIcon agent={agentId} size={16} />
         </div>
 
-        <div className="min-w-0 flex-1 sm:min-w-[12rem]">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 @min-[42rem]/agent-row:min-w-[12rem]">
+          <div className="flex items-center gap-2" data-agent-row-name>
             <span className="text-sm font-medium leading-none">{label}</span>
             {!isEnabled && (
               <SettingsBadge tone="muted">
@@ -540,7 +550,10 @@ function AgentRow({
           {inProcessNote ? (
             <div className="mt-1 text-[11px] text-muted-foreground">{inProcessNote}</div>
           ) : (
-            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            <div
+              className="mt-1 truncate font-mono text-[11px] text-muted-foreground"
+              title={commandLine}
+            >
               {cmdOverride ? (
                 <span>
                   <span className="text-muted-foreground/60 line-through">{defaultCmd}</span>
@@ -555,35 +568,67 @@ function AgentRow({
           )}
         </div>
 
-        {/* Why flex below sm: the fixed column grid is wider than a phone-width card. */}
-        <div className="ml-auto grid shrink-0 grid-cols-[max-content_6.5rem_1.75rem_1.75rem] items-center gap-1.5 max-sm:flex max-sm:max-w-full max-sm:flex-wrap">
-          <AgentAvailabilityControl
-            label={label}
-            isEnabled={isEnabled}
-            onSetEnabled={onSetEnabled}
-          />
-
-          <div className="flex justify-start">
-            {isDetected && isEnabled && (
-              <Button
-                type="button"
-                variant={isDefault ? 'secondary' : 'ghost'}
-                size="xs"
-                onClick={onSetDefault}
-                title={
-                  isDefault
-                    ? translate('auto.components.settings.AgentsPane.d7625cf8b2', 'Default agent')
-                    : translate('auto.components.settings.AgentsPane.5f986a9b92', 'Set as default')
-                }
-                className="h-7 w-full justify-center gap-1 text-xs"
-              >
-                {isDefault && <Check className="size-3" />}
-                {isDefault
-                  ? translate('auto.components.settings.AgentsPane.24e032fa34', 'Default')
-                  : translate('auto.components.settings.AgentsPane.959b67385b', 'Set default')}
-              </Button>
-            )}
+        {/* Why the row's width, not the viewport's: beside the settings sidebar a row can be too narrow
+            for the grid at any window width, and es's labels widen it. */}
+        <div
+          className={cn(
+            'ml-auto grid max-w-full shrink-0 items-center gap-1.5 @max-[42rem]/agent-row:ml-0 @max-[42rem]/agent-row:flex @max-[42rem]/agent-row:basis-full @max-[42rem]/agent-row:flex-wrap',
+            isDetected
+              ? 'grid-cols-[max-content_minmax(6.5rem,max-content)_1.75rem_1.75rem]'
+              : 'grid-cols-[max-content_1.75rem_1.75rem]'
+          )}
+        >
+          <div
+            className={cn('flex', isDetected && isEnabled && '@max-[42rem]/agent-row:basis-full')}
+          >
+            <AgentAvailabilityControl
+              label={label}
+              isEnabled={isEnabled}
+              onSetEnabled={onSetEnabled}
+            />
           </div>
+
+          {/* Why right after the toggle, in the DOM too: tab order is the drawn order. Uninstalled rows
+              have no cell, so their command keeps the room. */}
+          {isDetected && (
+            <div className={cn('grid', !isEnabled && '@max-[42rem]/agent-row:hidden')}>
+              {/* Why the sizers: the column takes the wider label so Installed rows align. */}
+              <span
+                aria-hidden
+                className="invisible col-start-1 row-start-1 flex h-0 items-center gap-1 whitespace-nowrap px-1.5 text-xs font-medium @max-[42rem]/agent-row:hidden"
+              >
+                <Check className="size-3" />
+                {defaultLabel}
+              </span>
+              <span
+                aria-hidden
+                className="invisible col-start-1 row-start-1 h-0 whitespace-nowrap px-2 text-xs font-medium @max-[42rem]/agent-row:hidden"
+              >
+                {setDefaultLabel}
+              </span>
+              {isEnabled && (
+                <Button
+                  type="button"
+                  variant={isDefault ? 'secondary' : 'ghost'}
+                  size="xs"
+                  onClick={onSetDefault}
+                  data-agent-row-default
+                  title={
+                    isDefault
+                      ? translate('auto.components.settings.AgentsPane.d7625cf8b2', 'Default agent')
+                      : translate(
+                          'auto.components.settings.AgentsPane.5f986a9b92',
+                          'Set as default'
+                        )
+                  }
+                  className="col-start-1 row-start-1 h-7 w-full justify-center gap-1 text-xs"
+                >
+                  {isDefault && <Check className="size-3" />}
+                  {isDefault ? defaultLabel : setDefaultLabel}
+                </Button>
+              )}
+            </div>
+          )}
 
           <a
             href={homepageUrl}
@@ -605,6 +650,7 @@ function AgentRow({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
+                data-agent-row-command
                 onClick={() => setCmdOpen((prev) => !prev)}
                 aria-label={
                   cmdOpen

@@ -37,28 +37,38 @@ import { TeamPanelScene } from '../team-scene/TeamPanelScene'
 import { TeamDisplayCarousel } from './TeamDisplayCarousel'
 import { useTeamSceneDiorama, useTeamSceneStyle } from '../team-scene/use-team-scene-style'
 
-/** With a team the gear opens the project; without one, the global Panel settings. */
-export function teamPanelSettingsRepoId(model: TeamPanelModel | null): string | null {
-  return model?.kind === 'team' ? model.repoId : null
+/** The team's project, else the active worktree's; null sends the gear to the global Panel settings. */
+export function teamPanelSettingsRepoId(
+  model: TeamPanelModel | null,
+  activeRepoId: string | null,
+  hasRepoSettings: (repoId: string) => boolean = () => true
+): string | null {
+  const repoId = model?.kind === 'team' ? model.repoId : activeRepoId
+  // Why: a folder workspace's id (folder-workspace:<group>) or a removed repo has no settings pane.
+  return repoId && hasRepoSettings(repoId) ? repoId : null
 }
 
 function TeamPanelHeader({
   model,
+  activeRepoId,
+  hasRepoSettings,
   onOpenSettings
 }: {
   model: TeamPanelModel | null
+  activeRepoId: string | null
+  hasRepoSettings?: (repoId: string) => boolean
   onOpenSettings: (repoId: string | null) => void
 }): React.JSX.Element {
+  const settingsRepoId = teamPanelSettingsRepoId(model, activeRepoId, hasRepoSettings)
   const title =
     model?.kind === 'team'
       ? model.projectName
       : model?.kind === 'solo'
         ? translate('teamPanel.header.noTeamTitle', 'Your work')
         : translate('teamPanel.header.title', 'Team')
-  const gearLabel =
-    model?.kind === 'team'
-      ? translate('teamPanel.header.projectSettings', 'Project settings')
-      : translate('teamPanel.header.panelSettings', 'Panel settings')
+  const gearLabel = settingsRepoId
+    ? translate('teamPanel.header.projectSettings', 'Project settings')
+    : translate('teamPanel.header.panelSettings', 'Panel settings')
   return (
     <div className="flex h-11 min-h-11 items-center gap-2 pl-3 pr-1.5">
       <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">{title}</h2>
@@ -69,7 +79,7 @@ function TeamPanelHeader({
             size="icon-xs"
             className="text-muted-foreground"
             aria-label={gearLabel}
-            onClick={() => onOpenSettings(teamPanelSettingsRepoId(model))}
+            onClick={() => onOpenSettings(settingsRepoId)}
           >
             <Settings2 />
           </Button>
@@ -181,11 +191,17 @@ function TeamPanelTabs({ model }: { model: TeamPanelModel }): React.JSX.Element 
 export function TeamPanelView({
   source,
   look,
+  activeRepoId = null,
+  hasRepoSettings,
   onOpenSettings,
   dock
 }: {
   source: TeamPanelModelSource
   look: TeamPanelLook
+  /** The active worktree's project, which the gear opens when there is no team. */
+  activeRepoId?: string | null
+  /** Whether a project has a settings pane; the gear falls back to the global one when not. */
+  hasRepoSettings?: (repoId: string) => boolean
   onOpenSettings: (repoId: string | null) => void
   /** The action dock at the panel's foot; a slot so this view stays free of the store. */
   dock?: (model: TeamPanelGameModel) => React.ReactNode
@@ -212,7 +228,14 @@ export function TeamPanelView({
     }),
     [activityFilter, scope]
   )
-  const header = <TeamPanelHeader model={model} onOpenSettings={onOpenSettings} />
+  const header = (
+    <TeamPanelHeader
+      model={model}
+      activeRepoId={activeRepoId}
+      hasRepoSettings={hasRepoSettings}
+      onOpenSettings={onOpenSettings}
+    />
+  )
   const body = (
     <>
       {header}
