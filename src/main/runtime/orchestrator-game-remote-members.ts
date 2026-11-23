@@ -119,7 +119,7 @@ const sourceOf = (
   }
 }
 
-const sqliteOf = (db: OrchestrationDb): Database.Database =>
+export const sqliteOf = (db: OrchestrationDb): Database.Database =>
   (db as unknown as { db: Database.Database }).db
 
 /**

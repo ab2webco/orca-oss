@@ -200,6 +200,7 @@ import {
   remoteGameMembersOf,
   type RemoteGameMemberShow
 } from './orchestrator-game-remote-members'
+import { remoteMemberWorktreesOf } from './orchestrator-game-remote-member-worktrees'
 import { remoteAsleepShowOf } from './orchestrator-game-remote-asleep-show'
 import { wakeRemoteMemberOnHost } from './orchestrator-game-remote-member-wake'
 import { GameHostAnswerGate } from './orchestrator-game-host-answer-gate'
@@ -845,8 +846,8 @@ import { GamePausedMembers } from './orchestrator-game-paused-members'
 import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
 import {
   RemoteHostSessionsReader,
-  remoteFoundSessionsOf,
-  remoteWorktreeKeyOf
+  listedRemoteWorktreesOf,
+  remoteFoundSessionsOf
 } from './orchestrator-game-remote-found'
 import { withGameHostCapacity } from '../../shared/orchestrator-game-host-capacity'
 import { LOCAL_GAME_HOST } from '../../shared/orchestrator-game-host-load'
@@ -33346,13 +33347,17 @@ export class OrcaRuntimeService {
       return state
     }
     const hosts = await this.gameRemoteSessions.read().catch(() => [])
-    const listed = new Set(
-      state.agents.flatMap((agent) =>
-        agent.remote?.environmentId && agent.worktree
-          ? [remoteWorktreeKeyOf(agent.remote.environmentId, agent.worktree.id)]
-          : []
-      )
-    )
+    const placed =
+      hosts.length > 0 && this._orchestrationDb
+        ? remoteMemberWorktreesOf(
+            this._orchestrationDb,
+            state.agents.flatMap((agent) =>
+              agent.paneKey.startsWith('remote:') ? [agent.paneKey.slice('remote:'.length)] : []
+            ),
+            Math.min(...hosts.map((one) => one.readAt))
+          )
+        : []
+    const listed = listedRemoteWorktreesOf(state.agents, placed, hosts)
     const found = remoteFoundSessionsOf(hosts, { repoName, listed })
     return found.length === 0 ? state : { ...state, agents: [...state.agents, ...found] }
   }

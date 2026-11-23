@@ -1,16 +1,54 @@
 import { gameAgentOf, type GameAgent } from '../../shared/orchestrator-game-state'
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-types'
+import type { RemoteMemberWorktree } from './orchestrator-game-remote-member-worktrees'
 
-/** One paired host's `worktree.ps` worktrees. */
+/** One paired host's `worktree.ps` worktrees, as read at `readAt` (ms). */
 export type RemoteHostSessions = {
   environmentId: string
   host: string
   worktrees: readonly RuntimeWorktreePsSummary[]
+  readAt: number
 }
 
 /** Key of a host worktree a lead already lists, as `remoteFoundSessionsOf` matches it. */
 export const remoteWorktreeKeyOf = (environmentId: string, worktreeId: string): string =>
   `${environmentId}\0${worktreeId}`
+
+/**
+ * Host worktrees no found row may claim (ORCA-1377): those the lead lists, its live remote members'
+ * even with no branch (a detached HEAD), and those released since the host read that still shows them.
+ */
+export function listedRemoteWorktreesOf(
+  agents: readonly GameAgent[],
+  placed: readonly RemoteMemberWorktree[],
+  hosts: readonly RemoteHostSessions[]
+): Set<string> {
+  const live = new Set(
+    agents.flatMap((agent) =>
+      agent.paneKey.startsWith('remote:') && agent.remote && !agent.remote.gone
+        ? [agent.paneKey.slice('remote:'.length)]
+        : []
+    )
+  )
+  const readAt = new Map(hosts.map((one) => [one.environmentId, one.readAt]))
+  // Why whole seconds: the home records a release at sqlite's second precision.
+  const releasedSinceRead = (one: RemoteMemberWorktree): boolean => {
+    const read = readAt.get(one.environmentId)
+    return one.releasedAt !== null && read !== undefined && one.releasedAt >= read - (read % 1000)
+  }
+  return new Set([
+    ...agents.flatMap((agent) =>
+      agent.remote?.environmentId && agent.worktree
+        ? [remoteWorktreeKeyOf(agent.remote.environmentId, agent.worktree.id)]
+        : []
+    ),
+    ...placed
+      .filter(
+        (one) => (one.releasedAt === null && live.has(one.dispatchId)) || releasedSinceRead(one)
+      )
+      .map((one) => remoteWorktreeKeyOf(one.environmentId, one.worktreeId))
+  ])
+}
 
 /**
  * Agents of this project on paired hosts that no lead lists: not a host's own lead or its members,
@@ -91,30 +129,35 @@ export class RemoteHostSessionsReader {
       environments.map(async ({ id, name }) => ({
         environmentId: id,
         host: name,
-        worktrees: await this.worktreesOf(id)
+        ...(await this.worktreesOf(id))
       }))
     )
   }
 
-  private async worktreesOf(environmentId: string): Promise<RuntimeWorktreePsSummary[]> {
+  private async worktreesOf(
+    environmentId: string
+  ): Promise<{ worktrees: RuntimeWorktreePsSummary[]; readAt: number }> {
     const cached = this.cache.get(environmentId)
     if (cached && this.now() - cached.at < FRESH_MS) {
-      return cached.worktrees
+      return { worktrees: cached.worktrees, readAt: cached.at }
     }
     if (cached) {
       cached.refresh ??= this.reread(environmentId)
-      return cached.worktrees
+      return { worktrees: cached.worktrees, readAt: cached.at }
     }
     await this.reread(environmentId)
-    return this.cache.get(environmentId)?.worktrees ?? []
+    const read = this.cache.get(environmentId)
+    return { worktrees: read?.worktrees ?? [], readAt: read?.at ?? this.now() }
   }
 
   private async reread(environmentId: string): Promise<void> {
+    // Why the start: a worktree released while the host answers may still be in what it lists.
+    const at = this.now()
     const worktrees = await this.deps
       .readPs(environmentId)
       .then((ps) => ps.worktrees ?? [])
       .catch(() => [])
-    this.cache.set(environmentId, { at: this.now(), worktrees })
+    this.cache.set(environmentId, { at, worktrees })
   }
 
   private now(): number {
