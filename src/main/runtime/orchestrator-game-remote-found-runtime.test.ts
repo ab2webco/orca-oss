@@ -246,4 +246,23 @@ describe('a remote member is one fleet row, before and after its release (ORCA-1
     expect(await membersOf(runtime)).toEqual([])
     expect(hostReads()).toBe(1)
   })
+
+  // Why: the band reads every 30 s, so a release usually lands seconds into a fresh read's window.
+  it('leaves no found ghost when the release lands seconds after a host read that is still fresh', async () => {
+    const { runtime, db, dispatchId, hostReads } = leadWithDetachedMember()
+    const real = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(real - 20_000)
+    await membersOf(runtime)
+    clock.mockRestore()
+    const sqlite = (db as unknown as { db: { prepare: (sql: string) => { run: () => void } } }).db
+    sqlite
+      .prepare(
+        `UPDATE worker_dispatches SET state = 'succeeded', stage = 'released',
+           updated_at = datetime('now', '-10 seconds') WHERE dispatch_id = '${dispatchId}'`
+      )
+      .run()
+
+    expect(await membersOf(runtime)).toEqual([])
+    expect(hostReads()).toBe(1)
+  })
 })
