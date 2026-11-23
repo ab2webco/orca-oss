@@ -203,13 +203,13 @@ test('hovering a Team row lights its figure in Figures, and leaving clears it, a
           // WebGL is off on Linux E2E, so Figures is the 2D scene: its lit label names the row.
           await expect(canvas).toHaveCount(0)
           await row.hover()
-          await expect(flat.locator(`[data-scene-who="${paneKey}"]`)).toHaveCount(1)
+          await expect(panel.locator(`[data-scene-who="${paneKey}"]`)).toHaveCount(1)
           await expect(row).toHaveAttribute('data-team-card-lit', '')
           await orcaPage.waitForTimeout(500)
           await flat.screenshot({ path: testInfo.outputPath(`hover-2d-lit-${tag}.png`) })
 
           await orcaPage.mouse.move(1, 1)
-          await expect(flat.locator('[data-scene-who]')).toHaveCount(0)
+          await expect(panel.locator('[data-scene-who]')).toHaveCount(0)
           await expect(row).not.toHaveAttribute('data-team-card-lit')
           await orcaPage.waitForTimeout(500)
           await flat.screenshot({ path: testInfo.outputPath(`hover-2d-clear-${tag}.png`) })
