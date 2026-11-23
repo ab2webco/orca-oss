@@ -17,7 +17,7 @@ export const ORCHESTRATOR_GAME_PLAN_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: [
       'orca game plan ORCA-12',
-      'orca game plan ORCA-12 --phase "map:sonnet-5-5:medium:map the relay" --phase "implement:opus-5-5:high:risky path src/main/runtime" --phase "pr-ci:haiku-5-5:low:watch CI"'
+      'orca game plan ORCA-12 --phase "map:opus-5-5:medium:map the relay" --phase "implement:opus-5-5:high:risky path src/main/runtime" --phase "pr-ci:opus-5-5:low:watch CI"'
     ]
   },
   {

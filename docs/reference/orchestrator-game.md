@@ -402,7 +402,8 @@ It is read from `orca.yaml` only and reaches the member with the plan it reads (
 
 **The prompt cache (ORCA-1350).** Each model has its own prompt cache, so a model switch re-sends
 the member's whole conversation at the new model's write price; an effort change keeps the cache
-on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1+ (not on Bedrock or Vertex). So:
+on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1+ (not on Bedrock or Vertex, or with
+`CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` set). So:
 
 - A launch by kind seeds one model for the whole member session (the kind's: Opus 5.5 for
   implement and review, Sonnet 5.5 for audit and captures) and varies effort by phase: map and
@@ -410,7 +411,7 @@ on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1+ (not on Bedrock or Vertex). So
   keeps the session's model and moves effort the same way. `orca game plan` notes a plan that mixes
   models; write another model only for a phase long enough to repay the rewrite.
 - While the cache is warm (the last request is within its TTL: 1 h on a subscription, 5 min on an
-  API key or over the plan), the steward holds a downward model switch and applies only its effort,
+  API key; over the plan it sees 5 min only from the request's own cache write), the steward holds a downward model switch and applies only its effort,
   unless a usage window is past 85 % or the phase's remaining requests repay the switch (N*, from
   the pricing page, the context size and the TTL). The held switch lands once the cache goes cold or
   a compaction rewrites the history. A raise for risk or a floor always goes through.
@@ -419,11 +420,13 @@ on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1+ (not on Bedrock or Vertex). So
   own process with `ps`, so not on Windows), for one step when an Opus step runs in a Sonnet
   session (a skill's `model: opus`), and for the rest of a turn an automatic fallback answered.
   The command-line flag counts for the whole session: a later `/model sonnet` does not clear it, so
-  the steward stays out of the model choice until the session ends.
+  the steward stays out of the model choice until the session ends. `ANTHROPIC_MODEL=opusplan` in
+  the env is not detected; the `ps` read was proven live on a headless `claude -p` member only.
 - Each decision logs the cache: warm or cold, TTL, context tokens, why the model stayed or moved,
-  the switch's extra cost and N*. The member card's steward rows show the latest as
-  "Cache warm · 1 h · 120k tokens: kept the model, moved only effort", and `orca game steward-log`
-  prints it per decision.
+  the switch's extra cost and N*. The member card's steward rows show the latest, with its time,
+  as "09:20 PM the cache was warm · 1 h · 120k tokens: kept the model, moved only effort", and
+  hide it while the steward stands down. `orca game steward-log` prints it per decision, with the
+  turns each phase it left really took.
 
 `rewardWeights` merges key by key like `orchestrator`: the project can lower one reward in
 `orca.yaml` while a dev turns another off in the project's Settings JSON. Like the lists below it

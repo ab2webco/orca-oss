@@ -1,3 +1,4 @@
+import { GAME_PLAN_PHASES, type GamePlanPhaseName } from './orchestrator-game-effort-plan'
 import { stripTerminalControl } from './terminal-control-stripping'
 
 // What a member pane's Orca steward reports on each state poll (ORCA-1242): its pick, the plan it
@@ -23,6 +24,8 @@ export type GameStewardDecision = {
   failure?: string
   tokens?: { input: number; output: number }
   cache?: GameStewardCache
+  /** The phase this decision left, and the main-loop requests it really took (ORCA-1350). */
+  phaseTurns?: { phase: GamePlanPhaseName; turns: number }
 }
 
 /** The member's prompt cache when the steward picked, and the cost of a switch (ORCA-1350). */
@@ -107,6 +110,13 @@ function cacheOf(value: unknown): GameStewardCache | null {
   return { warm: raw.warm, known: raw.known, ttl, contextTokens, why, extraUsd, breakEven }
 }
 
+function phaseTurnsOf(value: unknown): GameStewardDecision['phaseTurns'] | null {
+  const raw = shapeOf(value)
+  const phase = oneOf(GAME_PLAN_PHASES, raw.phase)
+  const turns = countOf(raw.turns)
+  return phase && turns !== null && Number.isInteger(turns) ? { phase, turns } : null
+}
+
 // Why one bad decision is dropped alone: the rest of the history still reads.
 export function parseGameStewardDecision(value: unknown): GameStewardDecision | null {
   const raw = shapeOf(value)
@@ -121,6 +131,7 @@ export function parseGameStewardDecision(value: unknown): GameStewardDecision | 
   const [input, output] = [countOf(tokens.input), countOf(tokens.output)]
   const phase = wordsOf(raw.phase)
   const cache = cacheOf(raw.cache)
+  const phaseTurns = phaseTurnsOf(raw.phaseTurns)
   return {
     at,
     moment,
@@ -134,7 +145,8 @@ export function parseGameStewardDecision(value: unknown): GameStewardDecision | 
     ...(confidence !== null && confidence <= 1 ? { confidence } : {}),
     ...(failure ? { failure } : {}),
     ...(input !== null && output !== null ? { tokens: { input, output } } : {}),
-    ...(cache ? { cache } : {})
+    ...(cache ? { cache } : {}),
+    ...(phaseTurns ? { phaseTurns } : {})
   }
 }
 

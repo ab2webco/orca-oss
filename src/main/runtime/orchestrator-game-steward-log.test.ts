@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { parseGameMemberSteward } from '../../shared/orchestrator-game-member-steward'
 import { GameStewardLog } from './orchestrator-game-steward-log'
 
 const decision = (at: number, moment = 'edit') => ({
@@ -35,6 +36,27 @@ describe('GameStewardLog', () => {
     expect(await log.append('repo:a', entry('ORCA-12', 's1', [decision(1)]))).toBe(1)
     expect(await log.append('repo:a', entry('ORCA-12', 's1', [decision(1), decision(2)]))).toBe(1)
     expect((await log.read('repo:a', 'ORCA-12')).map((one) => one.at)).toEqual([1, 2])
+  })
+
+  // Why (ORCA-1350): the lead tunes the steward's per-phase turn table from this log.
+  it("keeps the plugin's phase turn count from the pane's report through the file", async () => {
+    const left = { ...decision(5, 'pr-ci'), phaseTurns: { phase: 'implement', turns: 37 } }
+    const steward = parseGameMemberSteward({
+      version: 1,
+      session: 's1',
+      ticket: 'ORCA-12',
+      decisions: [left]
+    })
+    const log = new GameStewardLog(() => dir)
+    await log.append('repo:a', {
+      ticket: 'ORCA-12',
+      session: 's1',
+      decisions: steward?.decisions ?? []
+    })
+    expect((await log.read('repo:a', 'ORCA-12'))[0]?.phaseTurns).toEqual({
+      phase: 'implement',
+      turns: 37
+    })
   })
 
   it('a decision with the same time from another session is its own line', async () => {

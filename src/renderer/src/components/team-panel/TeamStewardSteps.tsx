@@ -19,7 +19,7 @@ export function TeamStewardSteps({ row }: { row: TeamSteward }): React.JSX.Eleme
       {plan ? <span data-team-steward-plan={row.plan}>{plan}</span> : null}
       {row.cache ? (
         <span data-team-steward-cache={row.cache.warm ? 'warm' : 'cold'}>
-          {teamStewardCacheText(row.cache)}
+          {teamStewardCacheText(row.cache, timeOf(row.cache.at))}
         </span>
       ) : null}
       {row.steps.length > 0 ? (

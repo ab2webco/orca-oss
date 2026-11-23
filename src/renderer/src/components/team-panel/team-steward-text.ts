@@ -130,16 +130,14 @@ function cacheWhyText(why: string): string {
   }
 }
 
-/** The member's prompt cache at the steward's latest pick, and why the model stayed or moved (ORCA-1350). */
-export function teamStewardCacheText(cache: TeamStewardCache): string {
+/** The member's prompt cache at the steward's latest pick that read it, and why the model stayed or moved (ORCA-1350). */
+export function teamStewardCacheText(cache: TeamStewardCache, time: string): string {
   const why = cacheWhyText(cache.why)
   if (!cache.known) {
     return translate(
       'teamPanel.steward.cache.unknown',
-      'Cache not read yet, counted warm: {{why}}',
-      {
-        why
-      }
+      '{{time}} the cache was not read yet, counted warm: {{why}}',
+      { time, why }
     )
   }
   const state = cache.warm
@@ -152,7 +150,7 @@ export function teamStewardCacheText(cache: TeamStewardCache): string {
   const tokens = `${Math.round(cache.contextTokens / 1000)}k`
   return translate(
     'teamPanel.steward.cache.line',
-    'Cache {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}',
-    { state, ttl, tokens, why }
+    '{{time}} the cache was {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}',
+    { time, state, ttl, tokens, why }
   )
 }

@@ -42,7 +42,7 @@ export type TeamStewardStep = {
 export type TeamStewardCache = Pick<
   GameStewardCache,
   'warm' | 'known' | 'ttl' | 'contextTokens' | 'why'
->
+> & { at: number }
 
 /** The card detail's steward rows; `plan` is how its latest pick stands against the lead's plan. */
 export type TeamSteward = {
@@ -110,16 +110,22 @@ export function teamStewardOf(steward: GameMemberSteward | undefined): { steward
       lift: liftOf(one.from, one.to)
     }))
   const plan = steward.plan !== 'plan' ? 'none' : isPlanned ? 'following' : 'deviated'
-  const note = steward.decisions.findLast((one) => one.cache !== undefined)?.cache
-  const cache = note
-    ? {
-        warm: note.warm,
-        known: note.known,
-        ttl: note.ttl,
-        contextTokens: note.contextTokens,
-        why: note.why
-      }
-    : undefined
+  // Why hidden while it stands down: those decisions carry no note, so the last would read as now.
+  const noted = steward.standDown
+    ? undefined
+    : steward.decisions.findLast((one) => one.cache !== undefined)
+  const note = noted?.cache
+  const cache =
+    noted && note
+      ? {
+          at: noted.at,
+          warm: note.warm,
+          known: note.known,
+          ttl: note.ttl,
+          contextTokens: note.contextTokens,
+          why: note.why
+        }
+      : undefined
   return { steward: { phase: steward.phase, plan, steps, ...(cache ? { cache } : {}) } }
 }
 

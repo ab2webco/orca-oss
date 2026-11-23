@@ -154,4 +154,11 @@ describe('formatGameStewardLog', () => {
     )
     expect(formatGameStewardLog({ ticket: 'ORCA-7', entries: [entry] })).not.toContain('cache')
   })
+
+  it('says how many turns the phase it left took', () => {
+    const left = { ...entry, phaseTurns: { phase: 'implement' as const, turns: 37 } }
+    expect(formatGameStewardLog({ ticket: 'ORCA-7', entries: [left] })).toMatch(
+      / · left implement after 37 turns$/
+    )
+  })
 })

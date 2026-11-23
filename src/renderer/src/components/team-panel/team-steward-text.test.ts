@@ -25,6 +25,7 @@ describe('teamStewardVisitText', () => {
 // ORCA-1350: whether the member's prompt cache was warm, and why the steward kept or moved the model.
 describe('teamStewardCacheText', () => {
   const cache = {
+    at: 1,
     warm: true,
     known: true,
     ttl: '1h' as const,
@@ -33,20 +34,22 @@ describe('teamStewardCacheText', () => {
   }
 
   it('says warm or cold, the TTL, the context and why the model stayed or moved', () => {
-    expect(teamStewardCacheText(cache)).toBe(
-      'Cache warm · 1 h · 120k tokens: kept the model, moved only effort'
+    expect(teamStewardCacheText(cache, '09:20 PM')).toBe(
+      '09:20 PM the cache was warm · 1 h · 120k tokens: kept the model, moved only effort'
     )
-    expect(teamStewardCacheText({ ...cache, warm: false, ttl: '5m', why: 'cold' })).toBe(
-      'Cache cold · 5 min · 120k tokens: the cache was cold, so the model switched'
+    expect(
+      teamStewardCacheText({ ...cache, warm: false, ttl: '5m', why: 'cold' }, '09:20 PM')
+    ).toBe(
+      '09:20 PM the cache was cold · 5 min · 120k tokens: the cache was cold, so the model switched'
     )
-    expect(teamStewardCacheText({ ...cache, why: 'pays-back' })).toBe(
-      'Cache warm · 1 h · 120k tokens: the switch pays for its cache rewrite'
+    expect(teamStewardCacheText({ ...cache, why: 'pays-back' }, '09:20 PM')).toBe(
+      '09:20 PM the cache was warm · 1 h · 120k tokens: the switch pays for its cache rewrite'
     )
   })
 
   it('says when it has not read the cache yet, which counts as warm', () => {
-    expect(teamStewardCacheText({ ...cache, known: false, why: 'effort-only' })).toBe(
-      'Cache not read yet, counted warm: only the effort changed'
+    expect(teamStewardCacheText({ ...cache, known: false, why: 'effort-only' }, '09:20 PM')).toBe(
+      '09:20 PM the cache was not read yet, counted warm: only the effort changed'
     )
   })
 

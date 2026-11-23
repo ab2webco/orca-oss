@@ -128,6 +128,7 @@ describe('teamStewardOf', () => {
       decision({ at: 3, moment: 'stand-down', source: 'router' })
     ]
     expect(teamStewardOf(steward({ decisions })).steward?.cache).toEqual({
+      at: 2,
       warm: false,
       known: true,
       ttl: '1h',
@@ -135,6 +136,9 @@ describe('teamStewardOf', () => {
       why: 'cold'
     })
     expect(teamStewardOf(steward()).steward).not.toHaveProperty('cache')
+    // Why hidden: a stand-down's decision has no note, so the last one would read as current.
+    const stoodDown = steward({ decisions, standDown: 'router' })
+    expect(teamStewardOf(stoodDown).steward).not.toHaveProperty('cache')
   })
 
   it('keeps its last five moves as the card reads them, without stand-downs', () => {

@@ -330,7 +330,7 @@ test("Team cards show the Orca steward's model choice and its moves", async ({
       'editing code · Sonnet 5.5 · medium → Opus 5.5 · high'
     )
     await expect(detail.locator('[data-team-steward-cache="warm"]')).toHaveText(
-      'Cache warm · 1 h · 120k tokens: the work needed a bigger model'
+      /^\S.* the cache was warm · 1 h · 120k tokens: the work needed a bigger model$/
     )
     await expect(detail).toContainText('a new effort from the next turn')
     await capture('card', 900, async () => {
@@ -344,7 +344,7 @@ test("Team cards show the Orca steward's model choice and its moves", async ({
     )
     await expect(detail.locator('[data-team-steward-plan]')).toHaveText('Sigue el plan · implement')
     await expect(detail.locator('[data-team-steward-cache]')).toHaveText(
-      'Caché caliente · 1 h · 120k tokens: el trabajo pedía un modelo mayor'
+      /^\S.* la caché estaba caliente · 1 h · 120k tokens: el trabajo pedía un modelo mayor$/
     )
     await capture('card-es', 900, async () => {
       await raisedCard.evaluate((node) => node.scrollIntoView({ block: 'start' }))

@@ -45,6 +45,9 @@ const cacheText = (cache: GameStewardCache | undefined): string => {
   return ` · cache ${state} ${cache.ttl} ${Math.round(cache.contextTokens / 1000)}k: ${cache.why}${cost}${breakEven}`
 }
 
+const turnsText = (left: GameStewardDecision['phaseTurns']): string =>
+  left ? ` · left ${left.phase} after ${left.turns} turns` : ''
+
 export function formatGameStewardLog(result: GameStewardLogResult): string {
   if (result.entries.length === 0) {
     return `The Orca steward has logged no decision for ${result.ticket} in this project.`
@@ -53,7 +56,7 @@ export function formatGameStewardLog(result: GameStewardLogResult): string {
     .map((one) => {
       const move = `${pickText(one.from)} → ${pickText(one.to)}`
       const kept = one.applied ? '' : ' (not applied)'
-      return `${new Date(one.at).toISOString()} ${one.moment} ${one.phase ?? '-'} ${move}${kept} · ${one.source}: ${one.why}${cacheText(one.cache)}`
+      return `${new Date(one.at).toISOString()} ${one.moment} ${one.phase ?? '-'} ${move}${kept} · ${one.source}: ${one.why}${cacheText(one.cache)}${turnsText(one.phaseTurns)}`
     })
     .join('\n')
 }

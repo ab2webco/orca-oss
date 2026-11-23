@@ -105,6 +105,19 @@ describe('parseGameMemberSteward', () => {
     expect(odd?.decisions).toHaveLength(1)
   })
 
+  // Why (ORCA-1350): the lead tunes the steward's per-phase turn table from these counts.
+  it('keeps the turns the phase it left really took, and drops an unknown phase or count', () => {
+    const read = (phaseTurns: unknown) =>
+      parseGameMemberSteward(report({ decisions: [decision(1, { phaseTurns })] }))?.decisions[0]
+    expect(read({ phase: 'implement', turns: 37 })?.phaseTurns).toEqual({
+      phase: 'implement',
+      turns: 37
+    })
+    expect(read({ phase: 'deploy', turns: 3 })).not.toHaveProperty('phaseTurns')
+    expect(read({ phase: 'map', turns: -1 })).not.toHaveProperty('phaseTurns')
+    expect(read({ phase: 'map', turns: 2.5 })).not.toHaveProperty('phaseTurns')
+  })
+
   it('an unknown plan state or stand-down reads as the safe default', () => {
     const parsed = parseGameMemberSteward(report({ plan: 'later', standDown: 'other' }))
     expect(parsed).toMatchObject({ plan: 'none-yet', standDown: null })

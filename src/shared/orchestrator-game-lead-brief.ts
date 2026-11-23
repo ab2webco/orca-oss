@@ -52,7 +52,7 @@ export function gameLeadBriefOf(
     "- Pass `--kind audit|implement|review|captures` to every game launch: it picks a Claude member's model when",
     '  no --model or orca.yaml does (audit, captures: Sonnet 5.5; implement, review: Opus 5.5), and the card shows it.',
     `- The launch seeds the kind's effort plan. As the ticket's technical lead, replace it with ${run('game plan <ticket>')}`,
-    '  `--phase name:model:effort:why` (map, design, implement, test-fix, captures, pr-ci): never more model than a',
+    '  `--phase name:model:effort:why` (map, design, implement, test-fix, captures, pr-ci): never more effort than a',
     '  phase needs, never less than it can do well. Write it again when the scope changes.',
     "  A model switch rewrites the member's prompt cache and an effort change keeps it, so:",
     '  keep one model for the whole member session and vary effort by phase; plan another model',

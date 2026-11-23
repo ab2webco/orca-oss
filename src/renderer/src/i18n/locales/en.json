@@ -17798,8 +17798,8 @@
       "raised": "Up to {{to}}: {{reason}}",
       "lowered": "Down to {{to}}: {{reason}}",
       "cache": {
-        "line": "Cache {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}",
-        "unknown": "Cache not read yet, counted warm: {{why}}",
+        "line": "{{time}} the cache was {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}",
+        "unknown": "{{time}} the cache was not read yet, counted warm: {{why}}",
         "warm": "warm",
         "cold": "cold",
         "ttl1h": "1 h",
