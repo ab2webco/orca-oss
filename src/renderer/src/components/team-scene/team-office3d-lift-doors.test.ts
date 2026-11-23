@@ -180,3 +180,69 @@ describe('boarding and leaving the cab', () => {
     expect(expectDoorsOpen(traffic, two.floors.length, 120, undefined, mid)).toBeGreaterThan(0)
   })
 })
+
+// Review of #1440: the cut ride ended on the lead's own floor, and its walk home was one long eased
+// walk, so the doors shut on it in the doorway; a re-plan in the hold after a ride walked out
+// through half-open doors.
+describe('stepping out after a floor change or a re-plan', () => {
+  const three = teamOffice3dLayoutOf(
+    [floor('', ['a', 'b']), floor('koombea', ['c']), floor('m1', ['d'])],
+    { leadAdvisor: false }
+  )
+  const two = teamOffice3dLayoutOf([floor('', ['a', 'b']), floor('koombea', ['c'])], {
+    leadAdvisor: false
+  })
+  const one = teamOffice3dLayoutOf([floor('', ['a', 'b'])], { leadAdvisor: false })
+  const team = [member('a'), member('b'), member('c'), member('d')]
+
+  for (const share of [0.2, 0.5, 0.8]) {
+    it(`walks the lead home from the cab only once the doors open, ${share * 100}% into a ride to a floor that goes away`, () => {
+      const traffic = office3dTraffic()
+      const pair = [member('a'), member('b'), member('c')]
+      office3dTrafficRead(traffic, two, input(pair), 0, 'normal')
+      const red = [member('a'), member('b'), member('c', { ci: 'failure' })]
+      office3dTrafficRead(traffic, two, input(red), 1, 'normal')
+      const ride = traffic.lead!.steps.find((s) => s.kind === 'ride')!
+      const cut = ride.start + ride.dur * share
+      office3dTrafficRead(traffic, one, input([member('a'), member('b')]), cut, 'normal')
+      expect(expectDoorsOpen(traffic, one.floors.length, 120, undefined, cut)).toBeGreaterThan(0)
+    })
+  }
+
+  it('walks the lead home only once the doors open when two floors go away in one read', () => {
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, three, input(team), 0, 'normal')
+    const red = [member('a'), member('b'), member('c'), member('d', { ci: 'failure' })]
+    office3dTrafficRead(traffic, three, input(red), 1, 'normal')
+    const ride = traffic.lead!.steps.find((s) => s.kind === 'ride')!
+    const cut = ride.start + ride.dur / 2
+    office3dTrafficRead(traffic, one, input([member('a'), member('b')]), cut, 'normal')
+    expect(expectDoorsOpen(traffic, one.floors.length, 120, undefined, cut)).toBeGreaterThan(0)
+  })
+
+  it('lets a member called back just after its ride ends step out only once the doors open', () => {
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, three, input(team), 0, 'normal')
+    const rest = [member('a'), member('b'), member('c', { activity: 'resting' }), member('d')]
+    office3dTrafficRead(traffic, three, input(rest), 1, 'normal')
+    const ride = traffic.members.get('c')!.plan.steps.find((s) => s.kind === 'ride')!
+    const back = ride.start + ride.dur + 0.25
+    office3dTrafficRead(traffic, three, input(team), back, 'normal')
+    expect(expectDoorsOpen(traffic, three.floors.length, 90, 'c', back)).toBeGreaterThan(0)
+  })
+
+  it('walks the lead out only once the doors open when a floor goes away just after its ride', () => {
+    const traffic = office3dTraffic()
+    office3dTrafficRead(traffic, three, input(team), 0, 'normal')
+    const red = [member('a'), member('b'), member('c'), member('d', { ci: 'failure' })]
+    office3dTrafficRead(traffic, three, input(red), 1, 'normal')
+    const ride = traffic.lead!.steps.find((s) => s.kind === 'ride')!
+    const after = ride.start + ride.dur + 0.1
+    const noKoombea = teamOffice3dLayoutOf([floor('', ['a', 'b']), floor('m1', ['d'])], {
+      leadAdvisor: false
+    })
+    const left = [member('a'), member('b'), member('d', { ci: 'failure' })]
+    office3dTrafficRead(traffic, noKoombea, input(left), after, 'normal')
+    expect(expectDoorsOpen(traffic, noKoombea.floors.length, 120, 'lead', after)).toBeGreaterThan(0)
+  })
+})
