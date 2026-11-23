@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ORCHESTRATOR_GAME_PLAN_HANDLERS } from './orchestrator-game-plan'
+import { ORCHESTRATOR_GAME_PLAN_HANDLERS, formatGameStewardLog } from './orchestrator-game-plan'
 import { RuntimeClientError, type RuntimeClient } from '../runtime-client'
 import { REPEATED_FLAG_SEPARATOR } from '../args'
 import { gameKindEffortPlanOf } from '../../shared/orchestrator-game-effort-plan'
@@ -122,5 +122,43 @@ describe('orca game steward-log (ORCA-1242)', () => {
     const old = fakeClient(new RuntimeClientError('method_not_found', 'no'))
     await expect(runLog(old.client, [['ticket', 'ORCA-7']])).rejects.toThrow('steward logs')
     await expect(runLog(old.client, [])).rejects.toThrow('orca game steward-log <ticket>')
+  })
+})
+
+// ORCA-1350: the log says how warm the member's cache was and what a switch would have cost.
+describe('formatGameStewardLog', () => {
+  const entry = {
+    at: Date.UTC(2026, 10, 22, 12),
+    moment: 'pr-ci',
+    phase: 'pr-ci',
+    from: { model: 'claude-opus-5-5', effort: 'high' },
+    to: { model: 'claude-opus-5-5', effort: 'low' },
+    applied: true,
+    source: 'default',
+    why: 'watching the PR and CI',
+    session: 's1'
+  }
+
+  it('adds the cache state, its TTL and the break-even to a decision that read the cache', () => {
+    const cache = {
+      warm: true,
+      known: true,
+      ttl: '1h' as const,
+      contextTokens: 120_000,
+      why: 'warm-hold',
+      extraUsd: 0.4712,
+      breakEven: 38
+    }
+    expect(formatGameStewardLog({ ticket: 'ORCA-7', entries: [{ ...entry, cache }] })).toBe(
+      '2026-11-22T12:00:00.000Z pr-ci pr-ci claude-opus-5-5 high → claude-opus-5-5 low · default: watching the PR and CI · cache warm 1h 120k: warm-hold, switch $0.47, N* 38'
+    )
+    expect(formatGameStewardLog({ ticket: 'ORCA-7', entries: [entry] })).not.toContain('cache')
+  })
+
+  it('says how many turns the phase it left took', () => {
+    const left = { ...entry, phaseTurns: { phase: 'implement' as const, turns: 37 } }
+    expect(formatGameStewardLog({ ticket: 'ORCA-7', entries: [left] })).toMatch(
+      / · left implement after 37 turns$/
+    )
   })
 })

@@ -78,6 +78,46 @@ describe('parseGameMemberSteward', () => {
     })
   })
 
+  // Why (ORCA-1350): the card shows warm or cold and the cost the steward weighed.
+  it("keeps a decision's cache note, and drops one it cannot read whole", () => {
+    const cache = {
+      warm: true,
+      known: true,
+      ttl: '1h',
+      contextTokens: 120_000,
+      why: 'warm-hold',
+      extraUsd: 0.47,
+      breakEven: 38
+    }
+    const read = parseGameMemberSteward(report({ decisions: [decision(1, { cache })] }))
+    expect(read?.decisions[0]?.cache).toEqual(cache)
+    const unknown = { ...cache, extraUsd: null, breakEven: null, known: false }
+    const loose = parseGameMemberSteward(report({ decisions: [decision(1, { cache: unknown })] }))
+    expect(loose?.decisions[0]?.cache).toEqual(unknown)
+    // Why negative: a 5m Haiku write costs less than an Opus read, so that switch saves money.
+    const saving = { ...cache, extraUsd: -0.01 }
+    const cheaper = parseGameMemberSteward(report({ decisions: [decision(1, { cache: saving })] }))
+    expect(cheaper?.decisions[0]?.cache).toEqual(saving)
+    const odd = parseGameMemberSteward(
+      report({ decisions: [decision(1, { cache: { ...cache, ttl: '2h' } })] })
+    )
+    expect(odd?.decisions[0]).not.toHaveProperty('cache')
+    expect(odd?.decisions).toHaveLength(1)
+  })
+
+  // Why (ORCA-1350): the lead tunes the steward's per-phase turn table from these counts.
+  it('keeps the turns the phase it left really took, and drops an unknown phase or count', () => {
+    const read = (phaseTurns: unknown) =>
+      parseGameMemberSteward(report({ decisions: [decision(1, { phaseTurns })] }))?.decisions[0]
+    expect(read({ phase: 'implement', turns: 37 })?.phaseTurns).toEqual({
+      phase: 'implement',
+      turns: 37
+    })
+    expect(read({ phase: 'deploy', turns: 3 })).not.toHaveProperty('phaseTurns')
+    expect(read({ phase: 'map', turns: -1 })).not.toHaveProperty('phaseTurns')
+    expect(read({ phase: 'map', turns: 2.5 })).not.toHaveProperty('phaseTurns')
+  })
+
   it('an unknown plan state or stand-down reads as the safe default', () => {
     const parsed = parseGameMemberSteward(report({ plan: 'later', standDown: 'other' }))
     expect(parsed).toMatchObject({ plan: 'none-yet', standDown: null })

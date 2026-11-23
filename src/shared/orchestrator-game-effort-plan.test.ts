@@ -60,19 +60,28 @@ describe('parseGameEffortPlan', () => {
 })
 
 describe('gameKindEffortPlanOf', () => {
-  // Why: the launch table stays the one source; a kind's plan reuses its rows per phase.
-  it('seeds an implement ticket with every phase, each on the kind table row it maps to', () => {
+  // Why one model (ORCA-1350): a model switch rewrites the member's prompt cache; effort keeps it.
+  it("seeds an implement ticket with every phase on the kind's one model, effort by phase", () => {
     const plan = gameKindEffortPlanOf('implement')
     expect(plan.source).toBe('kind')
     expect(plan.kind).toBe('implement')
     expect(plan.phases.map(({ phase, model, effort }) => [phase, model, effort])).toEqual([
-      ['map', 'claude-sonnet-5-5', 'medium'],
+      ['map', 'claude-opus-5-5', 'medium'],
       ['design', 'claude-opus-5-5', 'high'],
       ['implement', 'claude-opus-5-5', 'high'],
       ['test-fix', 'claude-opus-5-5', 'high'],
-      ['captures', 'claude-sonnet-5-5', 'medium'],
-      ['pr-ci', 'claude-haiku-5-5', 'low']
+      ['captures', 'claude-opus-5-5', 'medium'],
+      ['pr-ci', 'claude-opus-5-5', 'low']
     ])
+  })
+
+  it('keeps every narrower kind on its launch model', () => {
+    const modelsOf = (kind: 'audit' | 'review' | 'captures') => [
+      ...new Set(gameKindEffortPlanOf(kind).phases.map(({ model }) => model))
+    ]
+    expect(modelsOf('audit')).toEqual(['claude-sonnet-5-5'])
+    expect(modelsOf('review')).toEqual(['claude-opus-5-5'])
+    expect(modelsOf('captures')).toEqual(['claude-sonnet-5-5'])
   })
 
   it('seeds the narrower kinds with only the phases they run', () => {
@@ -93,9 +102,23 @@ describe('gameEffortPlanText', () => {
     expect(gameEffortPlanText(gameKindEffortPlanOf('review'))).toBe(
       [
         'plan: review ticket default',
-        '  map     Sonnet 5.5 · medium  read and map the code before changing it',
-        '  design  Opus 5.5 · high      review and design judgement'
+        '  map     Opus 5.5 · medium  read and map the code before changing it',
+        '  design  Opus 5.5 · high    review and design judgement'
       ].join('\n')
     )
+  })
+
+  it('notes that a plan with two models rewrites the prompt cache at each switch', () => {
+    const parsed = parseGameEffortPlan([
+      'implement:opus-5-5:high:edit',
+      'pr-ci:haiku-5-5:low:watch CI'
+    ])
+    if (!parsed.ok) {
+      throw new Error(parsed.error)
+    }
+    expect(gameEffortPlanText(parsed.plan).split('\n').at(-1)).toBe(
+      '  note: 2 models in one session; each switch rewrites its prompt cache. Keep one model and move effort, unless a phase outlasts the switch cost.'
+    )
+    expect(gameEffortPlanText(gameKindEffortPlanOf('implement'))).not.toContain('note:')
   })
 })

@@ -53,6 +53,14 @@ describe('gameLeadBriefOf', () => {
     expect(brief).toContain('when the scope changes')
   })
 
+  // Why (ORCA-1350): a model switch rewrites the member's prompt cache; an effort change keeps it.
+  it('tells the lead to keep one model per member session and vary effort by phase', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+    expect(brief).toContain('keep one model for the whole member session and vary effort by phase')
+    expect(brief).toContain('only for a phase long enough to repay')
+    expect(brief).not.toContain('never more model than')
+  })
+
   it('names the fleet verbs: status, a wave from the To Do, a verified sweep and a push', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 

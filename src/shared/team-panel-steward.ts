@@ -1,4 +1,8 @@
-import type { GameMemberSteward, GameStewardPick } from './orchestrator-game-member-steward'
+import type {
+  GameMemberSteward,
+  GameStewardCache,
+  GameStewardPick
+} from './orchestrator-game-member-steward'
 import { GAME_PLAN_EFFORTS } from './orchestrator-game-effort-plan'
 import { gameMemberLaunchOf } from './orchestrator-game-member-launch'
 
@@ -34,11 +38,18 @@ export type TeamStewardStep = {
   lift: 'raise' | 'lower' | 'same'
 }
 
+/** The member's prompt cache at the steward's latest pick that read it (ORCA-1350). */
+export type TeamStewardCache = Pick<
+  GameStewardCache,
+  'warm' | 'known' | 'ttl' | 'contextTokens' | 'why'
+> & { at: number }
+
 /** The card detail's steward rows; `plan` is how its latest pick stands against the lead's plan. */
 export type TeamSteward = {
   phase: string | null
   plan: 'following' | 'deviated' | 'none'
   steps: TeamStewardStep[]
+  cache?: TeamStewardCache
 }
 
 export const teamStewardLabelOf = (model: string): string =>
@@ -99,7 +110,23 @@ export function teamStewardOf(steward: GameMemberSteward | undefined): { steward
       lift: liftOf(one.from, one.to)
     }))
   const plan = steward.plan !== 'plan' ? 'none' : isPlanned ? 'following' : 'deviated'
-  return { steward: { phase: steward.phase, plan, steps } }
+  // Why hidden while it stands down: those decisions carry no note, so the last would read as now.
+  const noted = steward.standDown
+    ? undefined
+    : steward.decisions.findLast((one) => one.cache !== undefined)
+  const note = noted?.cache
+  const cache =
+    noted && note
+      ? {
+          at: noted.at,
+          warm: note.warm,
+          known: note.known,
+          ttl: note.ttl,
+          contextTokens: note.contextTokens,
+          why: note.why
+        }
+      : undefined
+  return { steward: { phase: steward.phase, plan, steps, ...(cache ? { cache } : {}) } }
 }
 
 const ENGLISH_MOMENTS: Readonly<Record<string, string>> = {
@@ -111,7 +138,9 @@ const ENGLISH_MOMENTS: Readonly<Record<string, string>> = {
   captures: 'taking or reading captures',
   quota: 'a usage window is past 85 %',
   plan: "the lead's plan",
-  judged: 'judged by Haiku'
+  judged: 'judged by Haiku',
+  cold: 'the cache went cold',
+  compacted: 'a compaction rewrote the history'
 }
 
 /** The steward's credit in English, as the CLI prints it; the renderer words its own. */

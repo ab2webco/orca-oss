@@ -17781,7 +17781,9 @@
         "plan": "the lead's plan",
         "judged": "judged by Haiku",
         "highRisk": "editing a high-risk path",
-        "announce": "the plan is approved, implementing next"
+        "announce": "the plan is approved, implementing next",
+        "cold": "the cache went cold",
+        "compacted": "a compaction rewrote the history"
       },
       "keptOverride": "kept the model you chose ({{steward}})",
       "keptPinned": "kept the model pinned at launch ({{steward}})",
@@ -17794,7 +17796,23 @@
       "notApplied": "not applied",
       "notServed": "picked {{model}}, not served: another plugin may skip its hooks ({{steward}})",
       "raised": "Up to {{to}}: {{reason}}",
-      "lowered": "Down to {{to}}: {{reason}}"
+      "lowered": "Down to {{to}}: {{reason}}",
+      "cache": {
+        "line": "{{time}} the cache was {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}",
+        "unknown": "{{time}} the cache was not read yet, counted warm: {{why}}",
+        "warm": "warm",
+        "cold": "cold",
+        "ttl1h": "1 h",
+        "ttl5m": "5 min",
+        "why": {
+          "effortOnly": "only the effort changed",
+          "warmHold": "kept the model, moved only effort",
+          "cold": "the cache was cold, so the model switched",
+          "quota": "a usage window is past 85 %",
+          "paysBack": "the switch pays for its cache rewrite",
+          "upward": "the work needed a bigger model"
+        }
+      }
     },
     "firstRun": {
       "title": "Start a team",

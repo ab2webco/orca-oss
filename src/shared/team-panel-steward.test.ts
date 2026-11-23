@@ -110,6 +110,37 @@ describe('teamStewardOf', () => {
     expect(teamStewardOf(undefined)).toEqual({})
   })
 
+  // Why (ORCA-1350): the card says whether the member's cache was warm and why the model stayed.
+  it('carries the cache note of its latest decision that has one', () => {
+    const cache = {
+      warm: true,
+      known: true,
+      ttl: '1h' as const,
+      contextTokens: 120_000,
+      why: 'warm-hold',
+      extraUsd: 0.47,
+      breakEven: 38
+    }
+    const cold = { ...cache, warm: false, why: 'cold' }
+    const decisions = [
+      decision({ at: 1, cache }),
+      decision({ at: 2, moment: 'pr-ci', cache: cold }),
+      decision({ at: 3, moment: 'stand-down', source: 'router' })
+    ]
+    expect(teamStewardOf(steward({ decisions })).steward?.cache).toEqual({
+      at: 2,
+      warm: false,
+      known: true,
+      ttl: '1h',
+      contextTokens: 120_000,
+      why: 'cold'
+    })
+    expect(teamStewardOf(steward()).steward).not.toHaveProperty('cache')
+    // Why hidden: a stand-down's decision has no note, so the last one would read as current.
+    const stoodDown = steward({ decisions, standDown: 'router' })
+    expect(teamStewardOf(stoodDown).steward).not.toHaveProperty('cache')
+  })
+
   it('keeps its last five moves as the card reads them, without stand-downs', () => {
     const many = Array.from({ length: 7 }, (_, i) => decision({ at: i }))
     const standDown = decision({ at: 99, moment: 'stand-down', source: 'router' })

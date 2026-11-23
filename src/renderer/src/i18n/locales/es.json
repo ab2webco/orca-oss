@@ -16821,7 +16821,9 @@
         "plan": "el plan del lead",
         "judged": "juzgado por Haiku",
         "highRisk": "editando una ruta de alto riesgo",
-        "announce": "el plan está aprobado, sigue implementar"
+        "announce": "el plan está aprobado, sigue implementar",
+        "cold": "la caché se enfrió",
+        "compacted": "una compactación reescribió el historial"
       },
       "keptOverride": "mantuvo el modelo que elegiste ({{steward}})",
       "keptPinned": "mantuvo el modelo fijado al lanzar ({{steward}})",
@@ -16834,7 +16836,23 @@
       "notApplied": "no aplicado",
       "notServed": "eligió {{model}}, no se sirve: otro plugin puede saltarse sus hooks ({{steward}})",
       "raised": "Sube a {{to}}: {{reason}}",
-      "lowered": "Baja a {{to}}: {{reason}}"
+      "lowered": "Baja a {{to}}: {{reason}}",
+      "cache": {
+        "line": "{{time}} la caché estaba {{state}} · {{ttl}} · {{tokens}} tokens: {{why}}",
+        "unknown": "{{time}} la caché aún no se había leído, cuenta como caliente: {{why}}",
+        "warm": "caliente",
+        "cold": "fría",
+        "ttl1h": "1 h",
+        "ttl5m": "5 min",
+        "why": {
+          "effortOnly": "solo cambió el esfuerzo",
+          "warmHold": "mantuvo el modelo y solo movió el esfuerzo",
+          "cold": "la caché estaba fría, así que cambió el modelo",
+          "quota": "una ventana de uso pasó el 85 %",
+          "paysBack": "el cambio paga la reescritura de su caché",
+          "upward": "el trabajo pedía un modelo mayor"
+        }
+      }
     },
     "firstRun": {
       "title": "Arma un equipo",
