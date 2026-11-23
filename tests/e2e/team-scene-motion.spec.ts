@@ -5,7 +5,8 @@ import { openOfficeTeam, seedOfficeTeam, type SeededMember } from './helpers/tea
 
 // Why @ondemand: ORCA-1336 item 5 asks for recordings of every movement before any fix; these
 // frames are watched by a person, not asserted, so the suite shards never run them. Run with
-// ORCA_E2E_FORCE_HEADFUL=1 --project electron-ondemand on a host whose WebGL draws.
+// ORCA_E2E_FORCE_HEADFUL=1 --project electron-ondemand on a host whose WebGL draws; elsewhere,
+// including the PR's changed-specs job on Linux, each test skips with that reason.
 
 test.use({ orcaAppExtraEnv: { ORCA_E2E_SHOW_INACTIVE: '1' } })
 
@@ -51,12 +52,17 @@ async function record(canvas: Locator, out: (f: string) => string, name: string,
   return n
 }
 
-/** Waits for the 3D scene and fails loudly where WebGL is off: the frames would show nothing. */
+/**
+ * Waits for the 3D scene. Where WebGL is off (Linux CI, the iMac) the frames would show only the 2D
+ * building, so the recording is skipped with that reason instead of saving frames nobody can use.
+ */
 async function webglScene(page: Page, selector: string): Promise<Locator> {
   const panel = page.getByTestId('team-panel')
   const scene = panel.locator('[data-team-scene-webgl]')
   await expect(scene).toHaveAttribute('data-team-scene-webgl', /on|off/, { timeout: 30_000 })
-  expect(await scene.getAttribute('data-team-scene-webgl'), 'WebGL is off on this host').toBe('on')
+  const webgl = await scene.getAttribute('data-team-scene-webgl')
+  test.info().annotations.push({ type: 'webgl', description: String(webgl) })
+  test.skip(webgl !== 'on', `WebGL is ${webgl} on this host: no 3D frames to record`)
   const canvas = panel.locator(`${selector} canvas`)
   await expect(canvas).toBeVisible({ timeout: 30_000 })
   await page.evaluate(() => window.__store!.getState().setRightSidebarWidth(420))
