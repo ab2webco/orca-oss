@@ -11,7 +11,7 @@ const actionsOf = () => {
 }
 
 describe('openGamePanelSettings', () => {
-  it("opens this project's game section with a team, target before page", () => {
+  it("opens the given project's game section, target before page", () => {
     const actions = actionsOf()
     openGamePanelSettings(actions, 'repo-1')
 
@@ -23,7 +23,7 @@ describe('openGamePanelSettings', () => {
     expect(actions.calls).toEqual(['target', 'page'])
   })
 
-  it('opens the global Panel section under Agents with no team', () => {
+  it('opens the global Panel section under Agents with no project', () => {
     const actions = actionsOf()
     openGamePanelSettings(actions, null)
 

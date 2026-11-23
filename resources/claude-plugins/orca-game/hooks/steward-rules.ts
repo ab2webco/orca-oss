@@ -48,12 +48,12 @@ export const STEWARD_HIGH_RISK_PATHS: readonly string[] = [
   'infra/',
   'terraform/'
 ]
-const QUOTA_NEAR = 85
+export const QUOTA_NEAR = 85
 
 const FAMILY_RANK: Readonly<Record<string, number>> = { haiku: 1, sonnet: 2, opus: 3, fable: 4 }
 
 // Why unknown ranks as Opus: a model this build does not know is never lowered toward Haiku.
-const modelRankOf = (model: string): number =>
+export const modelRankOf = (model: string): number =>
   FAMILY_RANK[/(haiku|sonnet|opus|fable)/i.exec(model)?.[1]?.toLowerCase() ?? ''] ?? 3
 
 export const stewardEffortOf = (value: unknown): StewardEffort | null =>

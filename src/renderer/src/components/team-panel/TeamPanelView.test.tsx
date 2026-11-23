@@ -113,7 +113,8 @@ async function render(
   source: TeamPanelModelSource,
   onOpenSettings = vi.fn(),
   look: TeamPanelLook = 'plain',
-  dock?: (model: TeamPanelGameModel) => React.ReactNode
+  dock?: (model: TeamPanelGameModel) => React.ReactNode,
+  activeRepoId: string | null = null
 ) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -122,7 +123,13 @@ async function render(
   await act(async () => {
     root.render(
       <TooltipProvider>
-        <TeamPanelView source={source} look={look} onOpenSettings={onOpenSettings} dock={dock} />
+        <TeamPanelView
+          source={source}
+          look={look}
+          activeRepoId={activeRepoId}
+          onOpenSettings={onOpenSettings}
+          dock={dock}
+        />
       </TooltipProvider>
     )
   })
@@ -441,6 +448,31 @@ describe('TeamPanelView', () => {
     await act(async () => gear?.click())
     expect(onOpenSettings).toHaveBeenCalledWith('repo-1')
   })
+
+  it("opens the active worktree's project from the gear with no team", async () => {
+    const { container, onOpenSettings } = await render(
+      { section: { kind: 'ready', value: solo }, retry: null },
+      vi.fn(),
+      'plain',
+      undefined,
+      'repo-2'
+    )
+    const gear = container.querySelector<HTMLButtonElement>('button[aria-label="Project settings"]')
+
+    await act(async () => gear?.click())
+    expect(onOpenSettings).toHaveBeenCalledWith('repo-2')
+  })
+
+  it('opens the global Panel settings from the gear with no team and no project', async () => {
+    const { container, onOpenSettings } = await render({
+      section: { kind: 'ready', value: solo },
+      retry: null
+    })
+    const gear = container.querySelector<HTMLButtonElement>('button[aria-label="Panel settings"]')
+
+    await act(async () => gear?.click())
+    expect(onOpenSettings).toHaveBeenCalledWith(null)
+  })
 })
 
 describe('TeamPanelView scene area', () => {
@@ -538,9 +570,19 @@ describe('the action dock', () => {
 })
 
 describe('teamPanelSettingsRepoId', () => {
-  it('names the project with a team and no project without one', () => {
-    expect(teamPanelSettingsRepoId(game)).toBe('repo-1')
-    expect(teamPanelSettingsRepoId(solo)).toBeNull()
-    expect(teamPanelSettingsRepoId(null)).toBeNull()
+  it("names the team's project, else the active worktree's, else none", () => {
+    expect(teamPanelSettingsRepoId(game, 'repo-2')).toBe('repo-1')
+    expect(teamPanelSettingsRepoId(solo, 'repo-2')).toBe('repo-2')
+    expect(teamPanelSettingsRepoId(null, 'repo-2')).toBe('repo-2')
+    expect(teamPanelSettingsRepoId(solo, null)).toBeNull()
+    expect(teamPanelSettingsRepoId(null, null)).toBeNull()
+  })
+
+  it('falls back to the global settings for a project with no settings pane, team or not', () => {
+    const folder = 'folder-workspace:group-1'
+    const known = (repoId: string): boolean => repoId === 'repo-2'
+    expect(teamPanelSettingsRepoId({ ...game, repoId: folder }, 'repo-2', known)).toBeNull()
+    expect(teamPanelSettingsRepoId(solo, folder, known)).toBeNull()
+    expect(teamPanelSettingsRepoId(solo, 'repo-2', known)).toBe('repo-2')
   })
 })

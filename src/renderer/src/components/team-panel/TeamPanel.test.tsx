@@ -4,7 +4,11 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OrchestratorGameLayer } from '../../../../shared/orchestrator-game-config'
-import type { TeamLeadCard, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
+import type {
+  TeamLeadCard,
+  TeamPanelGameModel,
+  TeamPanelSoloModel
+} from '../../../../shared/team-panel-model-types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useTeamPanelTabStore } from './team-panel-tab-store'
 
@@ -14,14 +18,20 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
 const settings = { pluginSystemEnabled: true }
+const openSettingsTarget = vi.fn()
+const store = { repos: [{ id: 'repo-1' }, { id: 'repo-2' }], activeRepoId: null as string | null }
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       settings,
-      openSettingsTarget: vi.fn(),
+      repos: store.repos,
+      openSettingsTarget,
       openSettingsPage: vi.fn(),
       openTaskPage: vi.fn()
     })
+}))
+vi.mock('@/store/selectors', () => ({
+  useActiveWorktree: () => (store.activeRepoId ? { repoId: store.activeRepoId } : null)
 }))
 // Why: the dock reads the lead pane from the store; its own tests cover it, these cover the tabs.
 vi.mock('./TeamActionDockConnected', () => ({ TeamActionDockConnected: () => null }))
@@ -74,8 +84,18 @@ const team: TeamPanelGameModel = {
   machines: { kind: 'ready', value: [] },
   actions: []
 }
+const solo: TeamPanelSoloModel = {
+  kind: 'solo',
+  selectedPaneKey: null,
+  rows: [],
+  inbox: { kind: 'loading' },
+  prs: null,
+  queue: null,
+  machines: null
+}
+let model: TeamPanelGameModel | TeamPanelSoloModel = team
 vi.mock('./use-team-panel-model', () => ({
-  useTeamPanelModel: () => ({ section: { kind: 'ready', value: team }, retry: null }),
+  useTeamPanelModel: () => ({ section: { kind: 'ready', value: model }, retry: null }),
   refreshTeamPanelModel: vi.fn(),
   useTeamLeadHandle: () => null
 }))
@@ -92,6 +112,9 @@ afterEach(async () => {
   document.body.innerHTML = ''
   useTeamPanelTabStore.setState({ selected: null })
   settings.pluginSystemEnabled = true
+  model = team
+  store.activeRepoId = null
+  openSettingsTarget.mockClear()
 })
 
 async function render(panel: OrchestratorGameLayer['panel']): Promise<HTMLElement> {
@@ -141,5 +164,31 @@ describe('TeamPanel settings', () => {
     const container = await render({})
 
     expect(container.querySelector('[data-team-card="advisor"]')).toBeNull()
+  })
+})
+
+describe('TeamPanel gear', () => {
+  const gearTarget = async (): Promise<unknown> => {
+    const container = await render({})
+    const gear = container.querySelector<HTMLButtonElement>('button[aria-label$="settings"]')
+    await act(async () => gear?.click())
+    return openSettingsTarget.mock.calls[0]?.[0]
+  }
+
+  it("opens the active worktree's project with no team", async () => {
+    model = solo
+    store.activeRepoId = 'repo-2'
+    expect(await gearTarget()).toMatchObject({ pane: 'repo', repoId: 'repo-2' })
+  })
+
+  it('opens the global settings for a stale worktree id or a folder workspace', async () => {
+    model = solo
+    store.activeRepoId = 'repo-gone'
+    expect(await gearTarget()).toMatchObject({ pane: 'agents', repoId: null })
+  })
+
+  it("opens the global settings for a folder workspace's team", async () => {
+    model = { ...team, repoId: 'folder-workspace:group-1' }
+    expect(await gearTarget()).toMatchObject({ pane: 'agents', repoId: null })
   })
 })

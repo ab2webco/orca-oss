@@ -21,13 +21,13 @@ const COPY = {
     title: 'Your work',
     empty: 'No agents running',
     firstRun: 'Start a team',
-    gear: 'Panel settings'
+    gear: 'Project settings'
   },
   es: {
     title: 'Tu trabajo',
     empty: 'No hay agentes en marcha',
     firstRun: 'Arma un equipo',
-    gear: 'Ajustes del panel'
+    gear: 'Ajustes del proyecto'
   }
 } as const
 
@@ -88,6 +88,15 @@ test('the Team tab opens in the right sidebar as Your work when there is no team
     }
   }
 
+  // ORCA-1328: with no team the gear opens the active worktree's project, not the global section.
+  const repoId = await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    const id = state.activeWorktreeId
+    return Object.values(state.worktreesByRepo)
+      .flat()
+      .find((worktree) => worktree.id === id)?.repoId
+  })
+  expect(repoId).toBeTruthy()
   await setLanguage(orcaPage, 'en')
   await orcaPage.setViewportSize({ width: 1440, height: 900 })
   await panel.getByRole('button', { name: COPY.en.gear }).click()
@@ -97,10 +106,11 @@ test('the Team tab opens in the right sidebar as Your work when there is no team
         const state = window.__store!.getState()
         return {
           view: state.activeView,
-          pane: state.settingsNavigationTarget?.pane ?? null
+          pane: state.settingsNavigationTarget?.pane ?? null,
+          repoId: state.settingsNavigationTarget?.repoId ?? null
         }
       })
     )
-    .toEqual({ view: 'settings', pane: 'agents' })
-  await expect(orcaPage.locator('[id="agents-game-panel"]')).toBeInViewport({ timeout: 15_000 })
+    .toEqual({ view: 'settings', pane: 'repo', repoId })
+  await expect(orcaPage.locator(`[id="repo-${repoId}-game"]`)).toBeInViewport({ timeout: 15_000 })
 })
