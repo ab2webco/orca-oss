@@ -154,8 +154,8 @@ test('Figures draws the team as the diorama, an island per machine, at every wid
   }
 })
 
-// ORCA-1336: a Team row rings its Figures figure; leaving the row clears the ring.
-test('hovering a Team row rings its Figures figure and leaving clears it, at both looks', async ({
+// ORCA-1336: a Team row lights its figure in the scene; leaving the row clears it.
+test('hovering a Team row lights its figure in Figures, and leaving clears it, at both looks', async ({
   electronApp,
   orcaPage
 }, testInfo) => {
@@ -165,6 +165,7 @@ test('hovering a Team row rings its Figures figure and leaving clears it, at bot
   try {
     const panel = orcaPage.getByTestId('team-panel')
     const canvas = panel.locator('[data-team-scene-diorama] canvas')
+    const flat = panel.getByRole('img', { name: 'Live team scene' })
     const row = panel.locator('[data-team-card="member"]').filter({ hasText: 'Bo · ORCA-402' })
     for (const look of [
       { name: 'illustrated', quality: 'high' },
@@ -179,22 +180,40 @@ test('hovering a Team row rings its Figures figure and leaving clears it, at bot
           }
         })
         await setTheme(orcaPage, theme)
-        await expect(canvas).toHaveAttribute('data-diorama-islands', /\d/)
         const paneKey = (await row.getAttribute('data-pane-key'))!
         const tag = `${look.name}-${theme}`
+        const webgl = await dioramaWebgl(panel)
+        testInfo.annotations.push({ type: 'webgl', description: webgl })
 
-        await row.hover()
-        // The row's figure is the one the stage lights: the canvas names it by its pane key.
-        await expect(canvas).toHaveAttribute('data-diorama-lit', paneKey)
-        await expect(row).toHaveAttribute('data-team-card-lit', '')
-        await orcaPage.waitForTimeout(500)
-        await canvas.screenshot({ path: testInfo.outputPath(`hover-ring-${tag}.png`) })
+        if (webgl === 'on') {
+          await expect(canvas).toHaveAttribute('data-diorama-islands', /\d/)
+          await row.hover()
+          // The row's figure is the one the stage lights: the canvas names it by its pane key.
+          await expect(canvas).toHaveAttribute('data-diorama-lit', paneKey)
+          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          await orcaPage.waitForTimeout(500)
+          await canvas.screenshot({ path: testInfo.outputPath(`hover-ring-${tag}.png`) })
 
-        await orcaPage.mouse.move(1, 1)
-        await expect(canvas).toHaveAttribute('data-diorama-lit', '')
-        await expect(row).not.toHaveAttribute('data-team-card-lit')
-        await orcaPage.waitForTimeout(500)
-        await canvas.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
+          await orcaPage.mouse.move(1, 1)
+          await expect(canvas).toHaveAttribute('data-diorama-lit', '')
+          await expect(row).not.toHaveAttribute('data-team-card-lit')
+          await orcaPage.waitForTimeout(500)
+          await canvas.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
+        } else {
+          // WebGL is off on Linux E2E, so Figures is the 2D scene: its lit label names the row.
+          await expect(canvas).toHaveCount(0)
+          await row.hover()
+          await expect(flat.locator(`[data-scene-who="${paneKey}"]`)).toHaveCount(1)
+          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          await orcaPage.waitForTimeout(500)
+          await flat.screenshot({ path: testInfo.outputPath(`hover-2d-lit-${tag}.png`) })
+
+          await orcaPage.mouse.move(1, 1)
+          await expect(flat.locator('[data-scene-who]')).toHaveCount(0)
+          await expect(row).not.toHaveAttribute('data-team-card-lit')
+          await orcaPage.waitForTimeout(500)
+          await flat.screenshot({ path: testInfo.outputPath(`hover-2d-clear-${tag}.png`) })
+        }
       }
     }
   } finally {
