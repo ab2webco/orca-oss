@@ -286,9 +286,10 @@ test('freed members stay under their lead as Entregados, by ticket, PR and state
       )
       .toBe(2)
 
-    // Entregados · 3: the two inside 24 h and the CI failure, newest first.
+    // Entregados · 5 counts every row it lists, the two folded past 24 h included (ORCA-1245).
     await expect(header.locator('[data-delivered-label]')).toHaveText('Entregados')
-    await expect(header.locator('[data-delivered-count]')).toHaveText('3')
+    await expect(header.locator('[data-delivered-count]')).toHaveText('5')
+    // The two inside 24 h and the CI failure, newest first.
     const recentIds = () =>
       orcaPage
         .locator('[data-delivered-slot="recent"] > [data-worktree-id]')
@@ -366,33 +367,51 @@ test('freed members stay under their lead as Entregados, by ticket, PR and state
     await capture('opened')
 
     // The hover card carries what the row leaves out: who did it, the PR, the branch, the lead.
-    await orcaPage.setViewportSize({ width: 1440, height: 900 })
+    // At every width it stays inside the window: under the row where beside it would not fit.
     const hoverCard = orcaPage.locator('[data-sidebar-delivered-hover]')
-    for (const theme of ['dark', 'light'] as const) {
-      await setTheme(orcaPage, theme)
-      await orcaPage.mouse.move(0, 0)
-      await expect(hoverCard).toHaveCount(0)
-      await deliveredRow('ORCA-1203').hover()
-      await expect(hoverCard).toBeVisible()
-      await expect(hoverCard.locator('[data-delivered-hover-header]')).toHaveText(
-        'ORCA-1203· Hecho por Peach'
-      )
-      await expect(hoverCard.locator('[data-delivered-field="pr"]')).toHaveText('PR#1208 mergeado')
-      await expect(hoverCard.locator('[data-delivered-field="title"]')).toHaveText(
-        'TítuloShip ORCA-1203'
-      )
-      await expect(hoverCard.locator('[data-delivered-field="branch"]')).toHaveText('Ramaorca-1203')
-      await expect(hoverCard.locator('[data-delivered-field="lead"]')).toContainText('Alfred · ')
-      await expect(hoverCard.locator('[data-delivered-field="freed"]')).toContainText(
-        'worktree en espera'
-      )
-      await expect(hoverCard.locator('[data-delivered-also]')).toHaveText(
-        'Peach también: ORCA-1149 (mergeado)'
-      )
-      await orcaPage.screenshot({
-        animations: 'disabled',
-        path: testInfo.outputPath(`delivered-hover-1440-${theme}.png`)
-      })
+    for (const width of WIDTHS) {
+      await orcaPage.setViewportSize({ width, height: 900 })
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(orcaPage, theme)
+        await orcaPage.mouse.move(0, 0)
+        await expect(hoverCard).toHaveCount(0)
+        await deliveredRow('ORCA-1203').hover()
+        await expect(hoverCard).toBeVisible()
+        await expect(hoverCard.locator('[data-delivered-hover-header]')).toHaveText(
+          'ORCA-1203· Hecho por Peach'
+        )
+        await expect(hoverCard.locator('[data-delivered-field="pr"]')).toHaveText(
+          'PR#1208 mergeado'
+        )
+        await expect(hoverCard.locator('[data-delivered-field="title"]')).toHaveText(
+          'TítuloShip ORCA-1203'
+        )
+        await expect(hoverCard.locator('[data-delivered-field="branch"]')).toHaveText(
+          'Ramaorca-1203'
+        )
+        await expect(hoverCard.locator('[data-delivered-field="lead"]')).toContainText('Alfred · ')
+        await expect(hoverCard.locator('[data-delivered-field="freed"]')).toContainText(
+          'worktree en espera'
+        )
+        await expect(hoverCard.locator('[data-delivered-also]')).toHaveText(
+          'Peach también: ORCA-1149 (mergeado)'
+        )
+        // Why poll: Radix places the card a frame after it becomes visible.
+        await expect
+          .poll(
+            () =>
+              hoverCard.evaluate((node) => {
+                const box = node.getBoundingClientRect()
+                return box.left >= 0 && box.right <= window.innerWidth && box.width > 0
+              }),
+            { message: `the hover card runs past the window at ${width}px ${theme}` }
+          )
+          .toBe(true)
+        await orcaPage.screenshot({
+          animations: 'disabled',
+          path: testInfo.outputPath(`delivered-hover-${width}-${theme}.png`)
+        })
+      }
     }
     await orcaPage.mouse.move(0, 0)
   } finally {

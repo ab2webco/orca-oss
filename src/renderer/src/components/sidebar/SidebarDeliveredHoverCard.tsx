@@ -16,6 +16,9 @@ import {
   deliveredPrValue
 } from './sidebar-delivered-words'
 import { WORKTREE_NATIVE_CONTEXT_MENU_ATTR } from './WorktreeContextMenu'
+import { SIDEBAR_HOVER_CARD_OFFSET, sidebarHoverCardSide } from './sidebar-hover-card-side'
+
+const CARD_WIDTH = 320
 
 function Field({
   name,
@@ -110,14 +113,32 @@ export function SidebarDeliveredHoverCard({
       }),
     [view.member.character, view.member.ticket, history, members]
   )
+  const [side, setSide] = React.useState<'right' | 'bottom'>('right')
+  // Why on enter: the side must be known before the open delay ends and the card is placed.
+  const placeFrom = (trigger: Element): void =>
+    setSide(
+      sidebarHoverCardSide({
+        triggerRight: trigger.getBoundingClientRect().right,
+        viewportWidth: window.innerWidth,
+        cardWidth: CARD_WIDTH
+      })
+    )
   return (
     <HoverCard openDelay={100} closeDelay={120}>
-      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+      <HoverCardTrigger
+        asChild
+        onPointerEnter={(event) => placeFrom(event.currentTarget)}
+        onFocus={(event) => placeFrom(event.currentTarget)}
+      >
+        {children}
+      </HoverCardTrigger>
       <HoverCardContent
-        side="right"
+        side={side}
         align="start"
-        sideOffset={8}
-        className="w-80 p-3 text-xs"
+        sideOffset={SIDEBAR_HOVER_CARD_OFFSET}
+        collisionPadding={8}
+        // Why the cap: at 320 px the card is as wide as the window.
+        className="w-80 max-w-[calc(100vw-16px)] p-3 text-xs"
         data-sidebar-delivered-hover=""
         {...{ [WORKTREE_NATIVE_CONTEXT_MENU_ATTR]: '' }}
         onClick={(event) => event.stopPropagation()}

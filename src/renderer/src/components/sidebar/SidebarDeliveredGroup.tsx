@@ -45,7 +45,7 @@ const stop = (event: React.SyntheticEvent): void => event.stopPropagation()
 const TOGGLE_CLASS =
   'flex h-6 w-full min-w-0 cursor-pointer items-center gap-1 rounded-md pl-[9px] text-left text-[11.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-sidebar-ring'
 
-/** Delivered · N under the live members; rows freed over 24 h ago fold into one count row. */
+/** Delivered · N, folded rows counted, under the live members; rows past 24 h fold into one count row. */
 export function SidebarDeliveredGroup({
   leadWorktreeId,
   rows
@@ -83,7 +83,7 @@ export function SidebarDeliveredGroup({
         <HeaderChevron className="size-3 shrink-0" aria-hidden="true" />
         <span data-delivered-label="">{deliveredGroupLabel()}</span>
         <span data-delivered-count="" className="ml-1 tabular-nums">
-          {recent.length}
+          {rows.length}
         </span>
       </button>
       {/* Why hidden, not unmounted: each card reads its own PR, and a folded CI failure must surface.

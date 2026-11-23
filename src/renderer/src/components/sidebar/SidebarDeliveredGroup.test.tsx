@@ -268,12 +268,26 @@ describe("the lead's Delivered group", () => {
     expect(order(host, '[data-sidebar-team-children]')).toEqual(['wt-live'])
     const header = host.querySelector('[data-sidebar-delivered-header]')!
     expect(text(header.querySelector('[data-delivered-label]'))).toBe('Delivered')
-    expect(text(header.querySelector('[data-delivered-count]'))).toBe('3')
+    // Every row the group lists, folded ones included.
+    expect(text(header.querySelector('[data-delivered-count]'))).toBe('5')
     // The CI failure is 40 h old and still shows; the merged rows past 24 h fold.
     expect(order(host, '[data-delivered-slot="recent"]')).toEqual(['wt-1195', 'wt-1203', 'wt-1198'])
     expect(order(host, '[data-delivered-slot="folded"]')).toEqual(['wt-1170', 'wt-1166'])
     expect(text(host.querySelector('[data-sidebar-delivered-folded-toggle]'))).toBe(
       '2 delivered · over 24 h'
+    )
+  })
+
+  it('counts the folded rows in the header when every row is past 24 h', async () => {
+    useSidebarTeamRosterStore.setState({ model: { lead, members: [] } })
+    useSidebarDeliveredStore.setState({
+      delivered: { 'wt-1170': delivered('wt-1170', 30, '#1180 merged') }
+    })
+    const host = await render(cardOf('wt-lead', { lineageChildren: [childRow(cardOf('wt-1170'))] }))
+
+    expect(text(host.querySelector('[data-delivered-count]'))).toBe('1')
+    expect(text(host.querySelector('[data-sidebar-delivered-folded-toggle]'))).toBe(
+      '1 delivered · over 24 h'
     )
   })
 
