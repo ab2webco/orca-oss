@@ -6,10 +6,11 @@ import {
   dioramaLeadJumpAt,
   dioramaLeadRoundOf,
   dioramaStandOf,
+  DIORAMA_VIEW_XZ,
   type DioramaPace
 } from './team-diorama-lead-round'
 import { dioramaWaterGrid, polyAt } from './team-diorama-nav'
-import { dioramaRoadNet } from './team-diorama-roads'
+import { DIORAMA_BODY_CLEAR, dioramaRoadNet } from './team-diorama-roads'
 
 const machine = (key: string, over: Partial<DioramaMachine> = {}): DioramaMachine => ({
   key,
@@ -75,6 +76,49 @@ describe("the lead's trip", () => {
     const stand: [number, number] = [plotOf('b').x + 1.6, plotOf('b').z + 1.25]
     const last = tripOf(null, 'b', 0, 'normal', new Map([['b', stand]])).steps.at(-1)!
     expect(last.kind === 'hold' && last.face).toEqual(stand)
+  })
+
+  // ORCA-1336 C1: it stood between the camera and the asker and hid it, Bo for about 18 s.
+  it('stops on the road beside the asker as the camera sees it, clear of every member', () => {
+    const keys = ['a', 'b', 'c', 'd', 'e', 'f']
+    const big = teamDioramaLayoutOf([
+      machine('', { home: true, members: keys, cap: null }),
+      machine('m2', { members: ['x', 'y'] })
+    ])
+    const bigRoads = dioramaRoadNet(big)
+    const plots = big.islands.flatMap((i) => i.plots).filter((p) => p.key)
+    const [vx, vz] = DIORAMA_VIEW_XZ
+    for (const asker of plots) {
+      const stands = new Map<string, [number, number]>(
+        plots.map((p) => [p.key!, [p.x + 1.55, p.z + 1.2]])
+      )
+      stands.set(asker.key!, [asker.x + 1.6, asker.z + 1.25])
+      const last = dioramaLeadRoundOf({
+        layout: big,
+        roads: bigRoads,
+        water: dioramaWaterGrid(big),
+        pace: 'normal',
+        stands,
+        trip: { from: null, to: asker.key!, start: 0 }
+      }).steps.at(-1)!
+      if (last.kind !== 'hold') {
+        throw new Error('the trip ends in a hold')
+      }
+      const own = stands.get(asker.key!)!
+      const [dx, dz] = [last.at[0] - own[0], last.at[1] - own[1]]
+      const side = Math.abs(dx * vz - dz * vx) / Math.hypot(vx, vz)
+      const nearer = (dx * vx + dz * vz) / Math.hypot(vx, vz)
+      expect(far(last.at, own), asker.key!).toBeGreaterThan(1.29)
+      expect(side >= DIORAMA_BODY_CLEAR || nearer <= 0, `${asker.key} side ${side}`).toBe(true)
+      expect(far(bigRoads.on(last.at), last.at)).toBeLessThan(1e-9)
+      for (const [key, at] of stands) {
+        if (key !== asker.key) {
+          expect(far(last.at, at), `${asker.key} by ${key}`).toBeGreaterThan(
+            DIORAMA_BODY_CLEAR - 1e-6
+          )
+        }
+      }
+    }
   })
 
   // ORCA-1336 rename of "walks only on the roads, rows only on open water, and ends idle at the gate"

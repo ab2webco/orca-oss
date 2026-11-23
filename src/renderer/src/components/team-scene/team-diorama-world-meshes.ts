@@ -7,6 +7,7 @@ import {
   type DioramaLayout,
   type DioramaPoint
 } from '../../../../shared/team-scene/team-diorama-layout'
+import { dioramaStandClear } from '../../../../shared/team-scene/team-diorama-roads'
 import { dioramaKeep, type DioramaTick } from './team-diorama-buildings'
 import { dioramaChip } from './team-diorama-fx'
 import { dioramaOffKit, type DioramaKit } from './team-diorama-kit'
@@ -114,7 +115,12 @@ export function dioramaWorld(
         ticks
       )
       if (plot.key && stand) {
-        stands.set(plot.key, { at: [plot.x + stand.dx, plot.z + stand.dz], stand })
+        const at = dioramaStandClear(
+          layout,
+          [plot.x + stand.dx, plot.z + stand.dz],
+          [plot.x, plot.z]
+        )
+        stands.set(plot.key, { at, stand })
       }
       if (isl.home) {
         // Each home plot's own path out to the street or the lane.

@@ -1,6 +1,6 @@
 import { DIORAMA_GATE, type DioramaLayout, type DioramaPoint } from './team-diorama-layout'
 import { polyAt, polyLengths, type DioramaGrid } from './team-diorama-nav'
-import type { DioramaRoadNet } from './team-diorama-roads'
+import { DIORAMA_BODY_CLEAR, type DioramaRoadNet } from './team-diorama-roads'
 
 // Why a plan, not a simulation: the lead's trip is laid out once per read of the team, so any
 // moment of it is a pure lookup and reduced motion can show one still frame of it. It never loops:
@@ -40,6 +40,9 @@ export const dioramaStandOf = (plot: { x: number; z: number }): DioramaPoint => 
   plot.z + 1.2
 ]
 
+/** The camera's ground direction (team-diorama-camera's DIORAMA_VIEW): it looks from +x, +z. */
+export const DIORAMA_VIEW_XZ: DioramaPoint = [1, 1]
+
 const WALK = 1.8
 const ROW = 1.5
 const JUMP = 1.6
@@ -51,6 +54,13 @@ const TALK_FROM: DioramaPoint[] = [
   [-1.4, 0],
   [0, -1.4]
 ]
+/** Further road spots around a member, nearest first, for when the five above would hide it. */
+const TALK_RING: DioramaPoint[] = [1.6, 2.2, 2.8].flatMap((r) =>
+  Array.from({ length: 16 }, (_, i): DioramaPoint => {
+    const a = (i / 16) * Math.PI * 2
+    return [r * Math.cos(a), r * Math.sin(a)]
+  })
+)
 /** Before any read: the boat a lead stayed by is already moored at that island. */
 const LONG_AGO = -1e6
 
@@ -106,17 +116,35 @@ export function dioramaLeadRoundOf(args: {
     }
     return null
   }
-  // Why apart: the lead talks from the road a step away, never inside the member it talks to.
-  const talkSpotOf = (stand: DioramaPoint): DioramaPoint => {
-    const spots = TALK_FROM.map(([dx, dz]) => roads.on([stand[0] + dx, stand[1] + dz]))
-    const apart = spots.find((p) => Math.hypot(p[0] - stand[0], p[1] - stand[1]) >= TALK_APART)
-    return apart ?? spots[0]!
+  // Why apart and beside: the lead talks from the road a step away, never inside the member, never
+  // between the camera and it (it hid the asker, ORCA-1336), and never inside another member.
+  const talkSpotOf = (stand: DioramaPoint, key: string): DioramaPoint => {
+    const others = [...(args.stands ?? [])].filter(([k]) => k !== key).map(([, at]) => at)
+    const spots = [
+      ...TALK_FROM.map(([dx, dz]) => roads.on([stand[0] + dx, stand[1] + dz])),
+      ...TALK_RING.map(([dx, dz]) => roads.on([stand[0] + dx, stand[1] + dz]))
+    ]
+    const away = (p: DioramaPoint, q: DioramaPoint) => Math.hypot(p[0] - q[0], p[1] - q[1])
+    const shown = (p: DioramaPoint) => {
+      const [dx, dz] = [p[0] - stand[0], p[1] - stand[1]]
+      const [vx, vz] = DIORAMA_VIEW_XZ
+      const side = Math.abs(dx * vz - dz * vx) / Math.hypot(vx, vz)
+      return side >= DIORAMA_BODY_CLEAR || dx * vx + dz * vz <= 0
+    }
+    const fits = spots.filter(
+      (p) =>
+        away(p, stand) >= TALK_APART &&
+        shown(p) &&
+        others.every((o) => away(p, o) >= DIORAMA_BODY_CLEAR)
+    )
+    const best = fits.toSorted((p, q) => away(p, stand) - away(q, stand))[0]
+    return best ?? spots.find((p) => away(p, stand) >= TALK_APART) ?? spots[0]!
   }
   const gate = roads.on(DIORAMA_GATE)
   const from = placeOf(trip.from)
   const to = placeOf(trip.to)
-  const start = from ? talkSpotOf(from.stand) : gate
-  const end = to ? talkSpotOf(to.stand) : gate
+  const start = from ? talkSpotOf(from.stand, trip.from!) : gate
+  const end = to ? talkSpotOf(to.stand, trip.to!) : gate
   const away = (p: typeof from) => (p && !p.island.home && p.island.dock ? p.island : null)
   const fromIsland = away(from)
   const toIsland = away(to)

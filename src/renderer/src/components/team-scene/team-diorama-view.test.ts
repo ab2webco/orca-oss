@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import type { DioramaFit } from './team-diorama-camera'
+import { DIORAMA_VIEW_XZ } from '../../../../shared/team-scene/team-diorama-lead-round'
+import { DIORAMA_VIEW, type DioramaFit } from './team-diorama-camera'
 import {
   dioramaAim,
   dioramaLeadZoom,
@@ -19,6 +20,13 @@ const fit = (): DioramaFit => ({
 })
 
 describe('the diorama camera', () => {
+  // The lead stops beside an asker as this camera sees it, so the shared rule must use its direction.
+  it('looks along the ground direction the lead round assumes', () => {
+    const ground = new THREE.Vector2(DIORAMA_VIEW.x, DIORAMA_VIEW.z).normalize()
+    const assumed = new THREE.Vector2(...DIORAMA_VIEW_XZ).normalize()
+    expect(ground.dot(assumed)).toBeCloseTo(1, 6)
+  })
+
   it('follows the lead by default: it starts on it and eases after it, never jumping', () => {
     const view = dioramaView()
     const f = fit()
