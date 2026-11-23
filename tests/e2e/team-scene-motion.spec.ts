@@ -71,10 +71,12 @@ async function webglScene(page: Page, selector: string): Promise<Locator> {
 }
 
 /** The lift's highest floor from now on, and how many machine floors the building draws. */
-const readLift = async (canvas: Locator) => ({
-  top: Number(await canvas.getAttribute('data-office3d-lift-top')),
-  floors: Number(await canvas.getAttribute('data-office3d-floors'))
-})
+const readLift = async (canvas: Locator) => {
+  const top = await canvas.getAttribute('data-office3d-lift-top')
+  // Why refused: a missing attribute reads as 0, which passes every `top <=` check.
+  expect(top, 'data-office3d-lift-top').not.toBeNull()
+  return { top: Number(top), floors: Number(await canvas.getAttribute('data-office3d-floors')) }
+}
 
 const follow = async (page: Page, mode: 'Follow the lead' | 'Show all') => {
   await page.getByTestId('team-panel').getByRole('button', { name: mode }).click()
@@ -104,7 +106,9 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
   })
 
   // ORCA-1374: the cab rose past the top floor with the lead in it, and riders walked into it
-  // before its doors opened. These frames are the owner's videos; the floor changes are asserted.
+  // before its doors opened. These frames are the owner's videos. Only the floor-gone checks go red
+  // without the fix; the fixed building and the floor that appears are guarded by unit tests
+  // (team-office3d-refloor.test.ts, team-office3d-lift-doors.test.ts).
   test('Office: the lift serves the top floor at 1440 and 390, light and dark', async ({
     electronApp,
     orcaPage
@@ -125,6 +129,8 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
           )
           // A join on gpu-box, the top floor, sends the lead up with a folder, then back.
           await seedOfficeTeam(electronApp, { members: [...team, io], jev: JEV })
+          // The take shows the lift serving the top floor, not a lead that stays at its desk.
+          await expect.poll(async () => (await readLift(canvas)).top).toBe(3)
           await record(canvas, (f) => testInfo.outputPath(f), `lift-top-${theme}-${width}`, 36)
           const lift = await readLift(canvas)
           expect(lift.floors).toBe(3)
@@ -155,6 +161,7 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       const left = team.filter((m) => m.host !== 'gpu-box')
       await seedOfficeTeam(electronApp, { members: left, jev: JEV })
       await expect.poll(() => readLift(canvas)).toMatchObject({ floors: 2 })
+      // Red without the fix: the booking to gpu-box's old index, 3, stayed until the ride home.
       expect((await readLift(canvas)).top).toBeLessThanOrEqual(2)
       await record(canvas, (f) => testInfo.outputPath(f), 'lift-floor-gone', 30)
       expect((await readLift(canvas)).top).toBeLessThanOrEqual(2)
@@ -165,6 +172,7 @@ test.describe('@ondemand ORCA-1336 movement recordings', () => {
       const ny = { name: 'Ny · ORCA-410 Build', state: 'working', host: 'nube' }
       await seedOfficeTeam(electronApp, { members: [...left, ny, ...team.slice(4), io], jev: JEV })
       await expect.poll(() => readLift(canvas)).toMatchObject({ floors: 4 })
+      // A sanity check only: the wrong-floor trip this fixes stays inside, so the unit test guards it.
       expect((await readLift(canvas)).top).toBeLessThanOrEqual(4)
       await record(canvas, (f) => testInfo.outputPath(f), 'lift-floor-appears', 30)
     } finally {
