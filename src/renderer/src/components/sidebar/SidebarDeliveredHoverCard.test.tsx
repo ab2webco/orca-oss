@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
+import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { fireEvent, render as renderTl } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DeliveredView } from './use-sidebar-delivered-view'
 
@@ -11,13 +12,25 @@ vi.mock('@/i18n/i18n', () => ({
   getIntlLocale: () => 'en'
 }))
 
-const { SidebarDeliveredHoverDetails } = await import('./SidebarDeliveredHoverCard')
+type Slot = { children: React.ReactElement } & Record<string, unknown>
+vi.mock('@/components/ui/hover-card', () => ({
+  HoverCard: ({ children }: { children: React.ReactNode }) => children,
+  HoverCardTrigger: ({ children, onPointerEnter, onFocus }: Slot) =>
+    React.cloneElement(children, { onPointerEnter, onFocus } as Record<string, unknown>),
+  HoverCardContent: ({ side, collisionPadding }: Slot) => (
+    <div data-card-side={String(side)} data-card-padding={String(collisionPadding)} />
+  )
+}))
+
+const { SidebarDeliveredHoverCard, SidebarDeliveredHoverDetails } =
+  await import('./SidebarDeliveredHoverCard')
 
 const NOW = new Date(2026, 10, 15, 12, 0).getTime()
 const FREED = new Date(2026, 10, 15, 6, 10).getTime()
 
 const roots: ReturnType<typeof createRoot>[] = []
 afterEach(async () => {
+  vi.restoreAllMocks()
   await act(async () => {
     for (const root of roots.splice(0)) {
       root.unmount()
@@ -102,5 +115,31 @@ describe('SidebarDeliveredHoverDetails', () => {
     expect(host.querySelector('[data-delivered-field="title"]')).toBeNull()
     expect(fieldOf(host, 'lead')).toBe('LeadAlfred')
     expect(host.querySelector('[data-delivered-also]')).toBeNull()
+  })
+})
+
+describe('SidebarDeliveredHoverCard placement', () => {
+  function sideAt(viewportWidth: number, triggerRight: number): string | null {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(viewportWidth)
+    const { container } = renderTl(
+      <SidebarDeliveredHoverCard view={view}>
+        <button type="button" data-trigger="" />
+      </SidebarDeliveredHoverCard>
+    )
+    const trigger = container.querySelector<HTMLElement>('[data-trigger]')!
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ right: triggerRight } as DOMRect)
+    fireEvent.pointerEnter(trigger)
+    const card = container.querySelector('[data-card-side]')!
+    expect(card.getAttribute('data-card-padding')).toBe('8')
+    return card.getAttribute('data-card-side')
+  }
+
+  it('opens beside the row while the card fits in the window', () => {
+    expect(sideAt(1440, 300)).toBe('right')
+  })
+
+  it('opens under the row on a phone-width window, where it would run past the edge', () => {
+    expect(sideAt(390, 380)).toBe('bottom')
+    expect(sideAt(320, 312)).toBe('bottom')
   })
 })
