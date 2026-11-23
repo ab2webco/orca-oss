@@ -3,6 +3,7 @@ import type { Office3dLayout } from './team-office3d-layout'
 import { office3dLeadRoundOf, type Office3dRound } from './team-office3d-walkers'
 import { office3dMembersRead, type Office3dMember } from './team-office3d-members'
 import { office3dQueued, type Office3dQueue } from './team-office3d-planner'
+import { office3dRefloor, type Office3dFloorKeys } from './team-office3d-refloor'
 import type { TeamSceneInput } from './team-scene-types'
 
 // Why kept across reads: the stage is rebuilt on every read of the team, and a trip already under
@@ -17,6 +18,8 @@ export type Office3dTraffic = {
   members: Map<string, Office3dMember>
   /** The call-panel lines the lead and the members share. */
   queue: Office3dQueue
+  /** The floors all of it was planned on, so a floor that comes or goes is carried over. */
+  floors: Office3dFloorKeys | null
 }
 
 export const office3dTraffic = (): Office3dTraffic => ({
@@ -24,7 +27,8 @@ export const office3dTraffic = (): Office3dTraffic => ({
   last: null,
   lead: null,
   members: new Map(),
-  queue: new Map()
+  queue: new Map(),
+  floors: null
 })
 
 /**
@@ -66,6 +70,7 @@ export function office3dTrafficRead(
     layout.floors.findIndex((f) => f.lead)
   )
   traffic.cab ??= office3dCab(leadFloor)
+  office3dRefloor(traffic, layout, now, pace)
   const prev = traffic.last
   traffic.last = input
   office3dMembersRead({

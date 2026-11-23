@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
+import { office3dCabHighest } from '../../../../shared/team-scene/team-office3d-elevator'
 import { teamOffice3dLayoutOf } from '../../../../shared/team-scene/team-office3d-layout'
 import {
   office3dTraffic,
@@ -170,6 +171,10 @@ export function TeamSceneOffice3d({
     // The machines' floors: the shared lobby is not one.
     el.dataset.office3dFloors = String(layout.floors.filter((f) => !f.lobby).length)
     el.dataset.office3dAdvisors = String(layout.floors.filter((f) => f.controlRoom).length)
+    // The lift's highest floor from now on, for specs: never past the top one (ORCA-1374).
+    el.dataset.office3dLiftTop = String(
+      office3dCabHighest(traffic.current.cab, performance.now() / 1000)
+    )
     // Where each member belongs now, for specs: 'key:place' pairs.
     el.dataset.office3dPlaces = [...traffic.current.members.values()]
       .map((m) => `${m.key}:${m.leaving ? 'gone' : m.place}`)
