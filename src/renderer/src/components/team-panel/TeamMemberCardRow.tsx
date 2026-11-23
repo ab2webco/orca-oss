@@ -23,7 +23,7 @@ import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 import { teamHostWorktreeMissing } from './team-session-host-worktree'
 import { teamHelpersOf } from './team-member-helpers'
-import { useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
+import { TEAM_ROW_LIT_CLASS, useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 
 /** The live count of helpers (subagents) inside a member's session; nothing once they stop. */
 function HelpersMark({ paneKey }: { paneKey: string }): React.JSX.Element | null {
@@ -132,7 +132,8 @@ export function TeamMemberCardRow({
           'flex w-full min-w-0 items-start gap-2.5 py-2 pr-9 text-left hover:bg-sidebar-accent',
           // Why indented: V28's Plain and Display looks set members under the lead (ORCA-1094).
           showName ? 'pl-3' : 'pl-5',
-          (expanded || lit) && 'bg-sidebar-accent'
+          expanded && 'bg-sidebar-accent',
+          lit && TEAM_ROW_LIT_CLASS
         )}
       >
         {showName ? (

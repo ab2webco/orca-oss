@@ -154,7 +154,7 @@ export function dioramaStage(
       // Why each frame: the lit figure may be walking.
       // Why not a hidden one: a member still arriving is not drawn, so its ring would float on ground.
       const f = lit ? figures.get(lit) : undefined
-      mark.place(f?.visible ? f : null)
+      mark.place(f?.visible ? f : null, figures.values())
       renderer.render(scene, fit.camera)
     },
     pick: (at, size) => scene3dPick(fit.camera, figures, at, size),

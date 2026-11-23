@@ -80,15 +80,19 @@ describe('the lead and advisor rows in the Team list', () => {
     })
     expect(useTeamSceneHover.getState().key).toBe('lead')
     expect(leadRow.hasAttribute('data-team-card-lit')).toBe(true)
+    // The lit row carries the bar in the ring's blue, not only the hover tint.
+    expect(leadRow.outerHTML).toContain('shadow-[inset_3px_0_0_var(--status-info)]')
     await act(async () => {
       leadRow.dispatchEvent(
         new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body })
       )
     })
     expect(useTeamSceneHover.getState().key).toBeNull()
+    expect(leadRow.outerHTML).not.toContain('shadow-[inset_3px_0_0_var(--status-info)]')
     await act(async () => {
       advisorRow.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
     })
     expect(useTeamSceneHover.getState().key).toBe('advisor')
+    expect(advisorRow.outerHTML).toContain('shadow-[inset_3px_0_0_var(--status-info)]')
   })
 })

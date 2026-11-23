@@ -43,7 +43,7 @@ describe('picking a 3D figure', () => {
 })
 
 describe('the lit mark under a 3D figure', () => {
-  it('rings the lit figure in the working colour, drawn over anything in front of it', () => {
+  it('rings the lit figure in the working colour, hidden by its body rather than drawn over it', () => {
     const parent = new THREE.Group()
     const mark = scene3dHoverMark(parent, '#0369a1')
     const f = figure(3)
@@ -54,8 +54,35 @@ describe('the lit mark under a 3D figure', () => {
     expect(mark.ring.position.x).toBeCloseTo(3)
     const m = mark.ring.material as THREE.MeshBasicMaterial
     expect(m.color.getHexString()).toBe('0369a1')
-    // Why: an unreachable figure is see-through, and the ring must still show under it.
-    expect(m.depthTest).toBe(false)
+    // Why: drawn over everything, the ring's far arc crossed the figure's waist (owner review).
+    expect(m.depthTest).toBe(true)
+  })
+
+  it('lies on the surface a raised figure stands on, centred under its feet, inside its neighbours', () => {
+    // The world the ring hangs in is offset, and the figure stands on a booth 1.2 above the ground.
+    const world = new THREE.Group()
+    world.position.set(-2, 0.5, 1)
+    const booth = new THREE.Group()
+    booth.position.set(4, 1.2, -1)
+    world.add(booth)
+    const lit = figure(0)
+    const next = figure(1)
+    booth.add(lit, next)
+    world.updateMatrixWorld(true)
+    const mark = scene3dHoverMark(world, '#0369a1')
+    mark.place(lit, [lit, next])
+    mark.ring.updateMatrixWorld(true)
+
+    const feet = lit.getWorldPosition(new THREE.Vector3())
+    const ring = mark.ring.getWorldPosition(new THREE.Vector3())
+    expect(ring.x).toBeCloseTo(feet.x)
+    expect(ring.z).toBeCloseTo(feet.z)
+    expect(ring.y).toBeGreaterThanOrEqual(feet.y)
+    expect(ring.y).toBeLessThan(feet.y + 0.1)
+    // Its outer edge stops before halfway to the next figure, so it never rings two.
+    const outer = new THREE.Box3().setFromObject(mark.ring).getSize(new THREE.Vector3()).x / 2
+    expect(outer).toBeLessThan(0.5)
+    expect(outer).toBeGreaterThan(0.2)
   })
 })
 

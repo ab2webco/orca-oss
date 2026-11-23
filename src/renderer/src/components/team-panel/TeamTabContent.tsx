@@ -6,7 +6,7 @@ import type { TeamAdvisorRow, TeamPanelGameModel } from '../../../../shared/team
 import { TeamAdvisorLine } from './TeamAdvisorLine'
 import { TeamCardFace } from './TeamCardFace'
 import { cn } from '@/lib/utils'
-import { useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
+import { TEAM_ROW_LIT_CLASS, useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 import { TeamMemberCardRow } from './TeamMemberCardRow'
 import { TeamLeadCardRow } from './TeamLeadCardRow'
 import { TeamReadNotice } from './team-panel-read-error'
@@ -35,7 +35,7 @@ function AdvisorCardRow({
       {...rowProps}
       className={cn(
         'flex items-start gap-2.5 border-b border-border px-3 py-2',
-        lit && 'bg-sidebar-accent'
+        lit && TEAM_ROW_LIT_CLASS
       )}
     >
       {showName ? (

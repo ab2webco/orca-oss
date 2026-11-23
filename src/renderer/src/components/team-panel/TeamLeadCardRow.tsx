@@ -14,7 +14,7 @@ import { TeamOpenTerminalButton } from './TeamOpenTerminalButton'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { useTeamLeadPrompt } from './use-team-lead-prompt'
 import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
-import { useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
+import { TEAM_ROW_LIT_CLASS, useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 
 function coordinatesText(count: number): string {
   return count === 1
@@ -129,7 +129,8 @@ export function TeamLeadCardRow({
         onClick={onToggle}
         className={cn(
           'flex w-full min-w-0 items-start gap-2.5 py-2 pl-3 pr-9 text-left hover:bg-sidebar-accent',
-          (expanded || lit) && 'bg-sidebar-accent'
+          expanded && 'bg-sidebar-accent',
+          lit && TEAM_ROW_LIT_CLASS
         )}
       >
         {showName ? (

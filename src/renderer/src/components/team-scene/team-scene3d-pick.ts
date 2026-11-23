@@ -31,24 +31,51 @@ export function scene3dPick(
   return best?.key ?? null
 }
 
-/** A ring on the ground under the lit figure; drawn over everything, so a see-through one shows it. */
+// A figure is about 1.2 wide at the arms; the ring sits just inside that, under its feet.
+const RING_RADIUS = 0.6
+const RING_GAP = 0.05
+
+/** A ring on the surface the lit figure stands on, under its feet, never reaching a neighbour. */
 export function scene3dHoverMark(parent: THREE.Object3D, color: string) {
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.7, 0.9, 32),
-    new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.95 })
+    new THREE.RingGeometry(0.72, 1, 40),
+    // Why depth-tested: drawn over everything, its far arc crossed the figure's waist.
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    })
   )
   ring.rotation.x = -Math.PI / 2
   ring.renderOrder = 10
   ring.visible = false
   parent.add(ring)
+  const at = new THREE.Vector3()
+  const other = new THREE.Vector3()
+  const box = new THREE.Box3()
   return {
     ring,
-    place: (figure: THREE.Object3D | null) => {
+    place: (figure: THREE.Object3D | null, others: Iterable<THREE.Object3D> = []) => {
       ring.visible = figure !== null
-      if (figure) {
-        const at = figure.getWorldPosition(new THREE.Vector3())
-        ring.position.set(at.x, at.y + 0.04, at.z)
+      if (!figure) {
+        return
       }
+      figure.getWorldPosition(at)
+      // Why the box: the figure's lowest point is the booth or desk floor it stands on.
+      const base = Math.max(box.setFromObject(figure).min.y, at.y)
+      let radius = RING_RADIUS
+      for (const o of others) {
+        if (o !== figure && o.visible) {
+          o.getWorldPosition(other)
+          radius = Math.min(radius, Math.hypot(other.x - at.x, other.z - at.z) / 2 - RING_GAP)
+        }
+      }
+      ring.scale.setScalar(Math.max(radius, 0.25))
+      ring.position.copy(parent.worldToLocal(at.setY(base + 0.03)))
     }
   }
 }
