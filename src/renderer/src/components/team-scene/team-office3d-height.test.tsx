@@ -30,6 +30,8 @@ vi.mock('./team-office3d-stage', () => ({
     height: args.height,
     full: FULL,
     draw: () => {},
+    pick: () => null,
+    light: () => {},
     dispose: () => {}
   }))
 }))

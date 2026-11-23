@@ -75,7 +75,7 @@ export function TeamPanelScene({
           {diorama && drawn === 'figures' && !noWebgl ? (
             <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} members={members} />
           ) : office3d && !noWebgl ? (
-            <TeamSceneOffice3d model={model} onNoWebgl={onNoWebgl} />
+            <TeamSceneOffice3d model={model} onNoWebgl={onNoWebgl} members={members} />
           ) : painter && (drawn === 'office' || drawn === 'pixel') && teamSceneHasFloors(model) ? (
             <TeamSceneBuilding
               model={model}

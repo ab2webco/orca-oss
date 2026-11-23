@@ -195,6 +195,65 @@ describe('the 3D Office stage', () => {
     stage.dispose()
   })
 
+  // ORCA-1336: a Team row lights its figure in the 3D Office, and a figure picks its row.
+  it('rings the lit member and the lead under their feet, and picks a figure by where it is drawn', () => {
+    const { stage, scenes, cameras } = stageOf(
+      [member('a', 'working'), member('b', 'working')],
+      [floor('', ['a', 'b'])]
+    )
+    const ringOf = (scene: THREE.Scene) => {
+      let ring: THREE.Mesh | null = null
+      scene.traverse((o) => {
+        if ((o as THREE.Mesh).geometry?.type === 'RingGeometry') {
+          ring = o as THREE.Mesh
+        }
+      })
+      return ring as THREE.Mesh | null
+    }
+    stage.draw(1)
+    const scene = scenes.at(-1)!
+    const ring = ringOf(scene)!
+    expect(ring.visible).toBe(false)
+    const seated: THREE.Object3D[] = []
+    scene.traverse((o) => {
+      if (o.userData.seated === 'member') {
+        seated.push(o)
+      }
+    })
+    expect(seated).toHaveLength(2)
+    const at = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3())
+
+    stage.light('a')
+    stage.draw(1.1)
+    expect(ring.visible).toBe(true)
+    // The ring sits under one seated member, on its floor: a seated developer's origin is at floor
+    // level (its legs reach forward, above it), so the ring is within a hair of it, not at the seat.
+    const under = seated.find((o) => Math.abs(at(o).x - at(ring).x) < 1e-6)!
+    expect(under).toBeDefined()
+    expect(at(ring).y - at(under).y).toBeGreaterThanOrEqual(0)
+    expect(at(ring).y - at(under).y).toBeLessThan(0.1)
+    expect(at(ring).z).toBeCloseTo(at(under).z)
+    // Picking where that figure's body is drawn names the lit member.
+    const cam = cameras.at(-1)!
+    // A real render updates the camera's and the figures' matrices; the stand-in renderer does not.
+    cam.updateMatrixWorld(true)
+    scene.updateMatrixWorld(true)
+    const body = at(under)
+      .add(new THREE.Vector3(0, 0.6, 0))
+      .project(cam)
+    const size = { width: 350, height: stage.height }
+    const point = { x: ((body.x + 1) / 2) * size.width, y: ((1 - body.y) / 2) * size.height }
+    expect(stage.pick(point, size)).toBe('a')
+
+    stage.light('lead')
+    stage.draw(1.2)
+    expect(at(ring).x).toBeCloseTo(at(leadOf(scene)!).x)
+    stage.light(null)
+    stage.draw(1.3)
+    expect(ring.visible).toBe(false)
+    stage.dispose()
+  })
+
   it('draws each floor in its own pass, so nothing upstairs shadows the floor below', () => {
     const { stage, fake } = stageOf(
       [member('a', 'working'), member('b', 'resting')],
