@@ -4,7 +4,12 @@ import { act, cleanup, fireEvent, render, renderHook } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TeamSceneActor } from '../../../../shared/team-scene/team-scene-types'
 import { TeamBuildingResizeHandle } from './TeamBuildingResizeHandle'
-import { teamSceneActorBox, teamSceneMemberAt, useTeamSceneHover } from './team-scene-hit'
+import {
+  teamSceneActorBox,
+  teamSceneMemberAt,
+  useTeamSceneHover,
+  useTeamSceneHoverRow
+} from './team-scene-hit'
 import type { TeamScenePainter } from './team-scene-painter'
 import { teamBuildingHeightOf, useTeamBuildingHeight } from './use-team-building-height'
 import { useTeamScenePointer } from './use-team-scene-pointer'
@@ -129,6 +134,25 @@ describe('pointing at a member in the scene', () => {
     act(() => result.current!.handlers.onClick(over as React.MouseEvent))
     expect(open).not.toHaveBeenCalled()
     vi.useRealTimers()
+  })
+})
+
+// ORCA-1336: the 3D scenes key the lead's and the advisor's figures so; their rows join the link.
+describe('a Team row in the hover link', () => {
+  afterEach(() => act(() => useTeamSceneHover.getState().set(null)))
+
+  it.each(['lead', 'advisor', 'pane-a'])('lights figure %s on hover and is lit by it', (key) => {
+    const { result } = renderHook(() => useTeamSceneHoverRow(key))
+    expect(result.current.lit).toBe(false)
+    act(() => result.current.rowProps.onPointerEnter())
+    expect(useTeamSceneHover.getState().key).toBe(key)
+    expect(result.current.lit).toBe(true)
+    expect(result.current.rowProps['data-team-card-lit']).toBe('')
+    act(() => result.current.rowProps.onPointerLeave())
+    expect(useTeamSceneHover.getState().key).toBeNull()
+    // A figure pointed at in the scene lights the row; leaving another row keeps it.
+    act(() => useTeamSceneHover.getState().set(key))
+    expect(result.current.lit).toBe(true)
   })
 })
 

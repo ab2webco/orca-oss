@@ -14,6 +14,7 @@ import { TeamOpenTerminalButton } from './TeamOpenTerminalButton'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { useTeamLeadPrompt } from './use-team-lead-prompt'
 import { TeamSceneLeadLineContext } from '../team-scene/team-scene-lead-line-context'
+import { TEAM_ROW_LIT_CLASS, useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 
 function coordinatesText(count: number): string {
   return count === 1
@@ -109,9 +110,12 @@ export function TeamLeadCardRow({
   const sceneLine = useContext(TeamSceneLeadLineContext)
   const sendToLead = useTeamLeadPrompt()
   const setupLabel = translate('teamPanel.lead.nameSetup', 'Name your lead')
+  // Why 'lead': the 3D scenes key the lead's figure so, as its card face does.
+  const { lit, rowProps } = useTeamSceneHoverRow('lead')
   return (
     <article
       data-team-card="lead"
+      {...rowProps}
       className={cn(
         'relative',
         expanded
@@ -125,7 +129,8 @@ export function TeamLeadCardRow({
         onClick={onToggle}
         className={cn(
           'flex w-full min-w-0 items-start gap-2.5 py-2 pl-3 pr-9 text-left hover:bg-sidebar-accent',
-          expanded && 'bg-sidebar-accent'
+          expanded && 'bg-sidebar-accent',
+          lit && TEAM_ROW_LIT_CLASS
         )}
       >
         {showName ? (

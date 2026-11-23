@@ -5,6 +5,8 @@ import type { TeamPanelLook } from './use-team-panel-look'
 import type { TeamAdvisorRow, TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import { TeamAdvisorLine } from './TeamAdvisorLine'
 import { TeamCardFace } from './TeamCardFace'
+import { cn } from '@/lib/utils'
+import { TEAM_ROW_LIT_CLASS, useTeamSceneHoverRow } from '../team-scene/team-scene-hit'
 import { TeamMemberCardRow } from './TeamMemberCardRow'
 import { TeamLeadCardRow } from './TeamLeadCardRow'
 import { TeamReadNotice } from './team-panel-read-error'
@@ -26,10 +28,15 @@ function AdvisorCardRow({
   showName: boolean
 }): React.JSX.Element {
   const name = translate('teamPanel.advisor.name', 'Wizard')
+  const { lit, rowProps } = useTeamSceneHoverRow('advisor')
   return (
     <article
       data-team-card="advisor"
-      className="flex items-start gap-2.5 border-b border-border px-3 py-2"
+      {...rowProps}
+      className={cn(
+        'flex items-start gap-2.5 border-b border-border px-3 py-2',
+        lit && TEAM_ROW_LIT_CLASS
+      )}
     >
       {showName ? (
         <TeamCardFace who={{ role: 'advisor', key: 'advisor', characterKey: null, name }} />

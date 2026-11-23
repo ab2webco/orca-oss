@@ -73,7 +73,7 @@ export function TeamPanelScene({
         >
           {/* Why Office and Pixel: a floor per machine; one machine keeps its single stage. */}
           {diorama && drawn === 'figures' && !noWebgl ? (
-            <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} />
+            <TeamSceneDiorama model={model} onNoWebgl={onNoWebgl} members={members} />
           ) : office3d && !noWebgl ? (
             <TeamSceneOffice3d model={model} onNoWebgl={onNoWebgl} />
           ) : painter && (drawn === 'office' || drawn === 'pixel') && teamSceneHasFloors(model) ? (

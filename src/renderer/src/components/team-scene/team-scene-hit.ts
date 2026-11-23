@@ -64,3 +64,21 @@ export function drawTeamSceneHighlight(
   g.stroke()
   g.restore()
 }
+
+/** A lit Team row: a bar and a tint in the ring's blue, kept on the hovered row too. */
+export const TEAM_ROW_LIT_CLASS =
+  'bg-status-info/15 hover:bg-status-info/15 shadow-[inset_3px_0_0_var(--status-info)]'
+
+/** A Team row's half of the link: lit while its figure is pointed at, and lighting it on hover. */
+export function useTeamSceneHoverRow(key: string) {
+  const lit = useTeamSceneHover((s) => s.key === key)
+  const set = useTeamSceneHover((s) => s.set)
+  return {
+    lit,
+    rowProps: {
+      'data-team-card-lit': lit ? '' : undefined,
+      onPointerEnter: () => set(key),
+      onPointerLeave: () => useTeamSceneHover.getState().key === key && set(null)
+    }
+  }
+}
