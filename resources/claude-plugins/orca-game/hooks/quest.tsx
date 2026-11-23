@@ -41,7 +41,7 @@ import { storeHead, storedHeadOf, type MessageHead } from './message-heads'
 import { terminalPalette } from './terminal-palette'
 import { viewCommandOf, viewListOf } from './view-command'
 import { currentView, switchView, viewChoicesOf } from './view-switch'
-import { stewardStepOf } from './steward'
+import { noteStewardStepResult, stewardStepOf } from './steward-step'
 
 const isOff = (): boolean => gameConfig().mode === 'off'
 const isSceneDrawn = (): boolean => isSceneMode(gameConfig().mode)
@@ -161,6 +161,7 @@ const registerNotes = (on: On) => {
       yield chunk
     }
     const result = await stream.result
+    noteStewardStepResult(e.agentId, result)
     if (e.agentId !== undefined) {
       return result
     }
