@@ -166,7 +166,7 @@ test('hovering a Team row lights its figure in Figures, and leaving clears it, a
     const panel = orcaPage.getByTestId('team-panel')
     const canvas = panel.locator('[data-team-scene-diorama] canvas')
     const flat = panel.getByRole('img', { name: 'Live team scene' })
-    const row = panel.locator('[data-team-card="member"]').filter({ hasText: 'Bo · ORCA-402' })
+    const row = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-402' })
     for (const look of [
       { name: 'illustrated', quality: 'high' },
       { name: 'low', quality: 'low' }
