@@ -57,16 +57,14 @@ sin pipe, o `set -o pipefail`, cuando lo que estás midiendo es el exit code
 ([detalle](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status));
 y un test que pasa igual contra el código viejo no prueba nada.
 
-## Rotar la sesión del lead
+## Lead tras una compactación
 
-Tras la segunda compactación en una sesión de lead o coordinador, se actualiza `tmp/handoff.md`
-(workers vivos, PRs abiertos, decisiones pendientes) y se avisa al dueño de que toca abrir un lead
-nuevo desde ese handoff. Nadie sigue coordinando después de la tercera compactación: cada resumen
-pierde detalle, y las correcciones más fuertes de la ventana de 65 días cayeron al final de las dos
-sesiones que llegaron a 11 y 21 compactaciones.
-
-El lead nuevo se abre, con el anterior ya cerrado, con `/orca-game:lead fresh` (`orca game lead --fresh`):
-sin ese flag Orca reabre la conversación compactada del lead anterior.
+No hay límite de compactaciones: el lead sigue coordinando. En cada arranque, reanudación o compactación
+vuelve a armar la espera de reportes y `game watch --lead`, relee `orca game fleet` y `orca game inbox`
+antes de actuar (el hook de Orca reinyecta la flota actual) y atiende cada NEXT; responde desde esa
+lectura, no desde el resumen. `/orca-game:lead fresh` (`orca game lead --fresh`) queda sólo para abrir un
+lead nuevo cuando la persona lo pide, con el anterior ya cerrado: sin ese flag Orca reabre la
+conversación compactada.
 
 ## Atribución en commits y PRs
 
