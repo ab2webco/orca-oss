@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { setTheme, setWindowWidth, THEMES } from './helpers/settings-window'
 import { writeSettings } from './helpers/settings-write'
@@ -143,6 +144,103 @@ test('Illustrated draws the Office in 3D at every container width; Low resources
       // Low resources is today's Office: its floors, never the 3D canvas.
       await expect(canvas).toHaveCount(0)
       await expect(panel.locator('[data-team-floor]').first()).toBeVisible()
+    }
+  } finally {
+    dispose()
+  }
+})
+
+/** Sweeps the canvas until a pointer position lights `key`, so a figure is hovered by what it shows. */
+async function hoverFigureOnCanvas(page: Page, canvas: Locator, key: string): Promise<void> {
+  const box = (await canvas.boundingBox())!
+  for (let fy = 0.1; fy <= 0.95; fy += 0.04) {
+    for (let fx = 0.04; fx <= 0.96; fx += 0.04) {
+      await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy)
+      if ((await canvas.getAttribute('data-office3d-lit')) === key) {
+        return
+      }
+    }
+  }
+  throw new Error(`no point on the Office lights ${key}`)
+}
+
+// ORCA-1336: a Team row and its Office figure light each other, the lead and advisor too.
+test('hovering a Team row or a figure lights the other in the Office, and leaving clears it', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(600_000)
+  const { dispose } = await openOfficeTeam(electronApp, orcaPage, {
+    members: team,
+    jev: 'Jev · approves Ada’s Edit'
+  })
+  try {
+    const panel = orcaPage.getByTestId('team-panel')
+    const scene = panel.locator('[data-team-scene-webgl]')
+    const canvas = panel.locator('[data-team-scene-office3d] canvas')
+    const bo = panel.locator('[data-team-card="member"]').filter({ hasText: 'ORCA-402' })
+    const lead = panel.locator('[data-team-card="lead"]')
+    const advisor = panel.locator('[data-team-card="advisor"]')
+    for (const theme of THEMES) {
+      await writeSettings(orcaPage, office('high'))
+      await setTheme(orcaPage, theme)
+      await expect(scene).toHaveAttribute('data-team-scene-webgl', /on|off/, { timeout: 30_000 })
+      const webgl = await scene.getAttribute('data-team-scene-webgl')
+      testInfo.annotations.push({ type: 'webgl', description: String(webgl) })
+      const boKey = (await bo.getAttribute('data-pane-key'))!
+
+      if (webgl !== 'off') {
+        await expect(canvas).toHaveAttribute('data-office3d-floors', '3', { timeout: 30_000 })
+        // Jev sits in 3D only on a floor whose advisor has spoken.
+        const advisors = await canvas.getAttribute('data-office3d-advisors')
+        const rows = [
+          [bo, boKey],
+          [lead, 'lead'],
+          ...(advisors !== '0' ? [[advisor, 'advisor'] as const] : [])
+        ] as const
+        for (const [row, key] of rows) {
+          await row.hover()
+          await expect(canvas).toHaveAttribute('data-office3d-lit', key)
+          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          if (row === bo) {
+            // The whole panel, so the hovered row and its ringed figure share one image.
+            await orcaPage.waitForTimeout(500)
+            await panel.screenshot({
+              path: testInfo.outputPath(`office-hover-row-to-figure-${theme}.png`)
+            })
+          }
+          await orcaPage.mouse.move(1, 1)
+          await expect(canvas).toHaveAttribute('data-office3d-lit', '')
+          await expect(row).not.toHaveAttribute('data-team-card-lit')
+        }
+        // Figure to row: a pointer over Bo's figure lights Bo's row.
+        await hoverFigureOnCanvas(orcaPage, canvas, boKey)
+        await expect(bo).toHaveAttribute('data-team-card-lit', '')
+        await orcaPage.waitForTimeout(500)
+        await panel.screenshot({
+          path: testInfo.outputPath(`office-hover-figure-to-row-${theme}.png`)
+        })
+        await orcaPage.mouse.move(1, 1)
+        await expect(canvas).toHaveAttribute('data-office3d-lit', '')
+        await expect(bo).not.toHaveAttribute('data-team-card-lit')
+        await orcaPage.waitForTimeout(500)
+        await panel.screenshot({ path: testInfo.outputPath(`office-hover-clear-${theme}.png`) })
+      } else {
+        // WebGL is off on Linux E2E, so the Office is the 2D building: its lit label names the row.
+        await expect(canvas).toHaveCount(0)
+        await bo.hover()
+        await expect(panel.locator(`[data-scene-who="${boKey}"]`)).toHaveCount(1)
+        await expect(bo).toHaveAttribute('data-team-card-lit', '')
+        await orcaPage.mouse.move(1, 1)
+        await expect(panel.locator('[data-scene-who]')).toHaveCount(0)
+        await expect(bo).not.toHaveAttribute('data-team-card-lit')
+        for (const row of [lead, advisor]) {
+          await row.hover()
+          await expect(row).toHaveAttribute('data-team-card-lit', '')
+          await orcaPage.mouse.move(1, 1)
+          await expect(row).not.toHaveAttribute('data-team-card-lit')
+        }
+      }
     }
   } finally {
     dispose()

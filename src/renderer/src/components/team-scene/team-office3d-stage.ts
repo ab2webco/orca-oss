@@ -43,12 +43,17 @@ import {
 } from './team-office3d-cast'
 import { office3dControlRoom, office3dLeadOffice } from './team-office3d-wing'
 import { office3dRenderByFloor } from './team-office3d-floor-passes'
+import { scene3dHoverMark, scene3dPick } from './team-scene3d-pick'
 
 export type Office3dStage = {
   height: number
   /** The height that shows the building at full size at this width. */
   full: number
   draw: (t: number) => void
+  /** The figure drawn under `at` (canvas px), by its Team row key: a member, 'lead' or 'advisor'. */
+  pick: (at: { x: number; y: number }, size: { width: number; height: number }) => string | null
+  /** Rings the figure of `key` from the next frame on; null clears it. */
+  light: (key: string | null) => void
   dispose: () => void
 }
 
@@ -114,6 +119,8 @@ export function office3dStage(
   const views = new Map<string, Office3dSeatView>()
   const doors: THREE.Mesh[][] = []
   const drawn = new Set<string>()
+  // The figures a Team row can light, by its key (ORCA-1336).
+  const figures = new Map<string, THREE.Object3D>()
   const here = office3dRoomCounter(args.traffic)
   const calls: ((on: boolean) => void)[] = []
   for (const [i, floor] of layout.floors.entries()) {
@@ -139,6 +146,7 @@ export function office3dStage(
       advisor.baseY = floor.controlRoom.y + OFFICE3D_SIT_Y
       advisor.g.rotation.y = Math.PI - 0.35
       advisor.g.userData.seated = 'advisor'
+      figures.set('advisor', figures.get('advisor') ?? advisor.g)
       world.add(advisor.g)
       ticks.push((t) => poseOffice3dSeated(advisor, 'type', t))
       const floorMembers = floor.seats.flatMap((s) => (s.key && members.get(s.key)) || [])
@@ -176,6 +184,7 @@ export function office3dStage(
         figure.baseY = floor.y + OFFICE3D_SIT_Y * floor.scale
         figure.g.rotation.y = Math.PI
         figure.g.userData.seated = 'member'
+        figures.set(m.key, figure.g)
         if (view.faded) {
           ghost(figure.g)
         }
@@ -239,6 +248,9 @@ export function office3dStage(
     members: args.traffic?.members
   })
   ticks.push(leadTick)
+  figures.set('lead', lead.g)
+  const mark = scene3dHoverMark(world, args.status.working)
+  let lit: string | null = null
 
   const fit = dioramaFitCamera(world, args.width, args.height ?? args.maxHeight, args.height)
   renderer.setSize(args.width, fit.height, true)
@@ -300,7 +312,14 @@ export function office3dStage(
         keepOffice3dLabelLegible(chip, pxPerUnit * fit.camera.zoom)
       }
       keepOffice3dChipsInFrame(chips, fit.camera)
+      // Why each frame: the lit figure may be walking; a hidden one would leave its ring floating.
+      const f = lit ? figures.get(lit) : undefined
+      mark.place(f?.visible ? f : null, figures.values())
       office3dRenderByFloor(renderer, scene, world, fit.camera, layout.floors.length)
+    },
+    pick: (at, size) => scene3dPick(fit.camera, figures, at, size),
+    light: (key) => {
+      lit = key
     },
     // Why the sun too: its shadow map lives outside the world, and leaked on every rebuild.
     dispose: () => {

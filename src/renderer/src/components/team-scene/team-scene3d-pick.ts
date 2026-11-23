@@ -56,7 +56,6 @@ export function scene3dHoverMark(parent: THREE.Object3D, color: string) {
   parent.add(ring)
   const at = new THREE.Vector3()
   const other = new THREE.Vector3()
-  const box = new THREE.Box3()
   return {
     ring,
     place: (figure: THREE.Object3D | null, others: Iterable<THREE.Object3D> = []) => {
@@ -65,8 +64,9 @@ export function scene3dHoverMark(parent: THREE.Object3D, color: string) {
         return
       }
       figure.getWorldPosition(at)
-      // Why the box: the figure's lowest point is the booth or desk floor it stands on.
-      const base = Math.max(box.setFromObject(figure).min.y, at.y)
+      // Why the origin, not the lowest point: a figure stands on its origin, and a seated Office
+      // developer's legs reach forward above it, so its lowest point floated the ring at its knees.
+      const base = at.y
       let radius = RING_RADIUS
       for (const o of others) {
         if (o !== figure && o.visible) {

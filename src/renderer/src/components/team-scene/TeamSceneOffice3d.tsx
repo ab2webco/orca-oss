@@ -10,6 +10,8 @@ import { teamSceneFloorsOf } from '../../../../shared/team-scene/team-scene-floo
 import { teamSceneInputOf } from '../../../../shared/team-scene/team-scene-input'
 import { dioramaRenderer } from './team-diorama-stage'
 import { office3dStage } from './team-office3d-stage'
+import type { TeamSceneWho } from './team-scene-hit'
+import { linkScene3dHover, type Scene3dHoverHold } from './team-scene3d-hover'
 import { DioramaCameraButtons } from './DioramaCameraButtons'
 import { useDioramaCameraInput } from './use-diorama-camera-input'
 import { teamSceneLabel } from './team-scene-copy'
@@ -28,11 +30,14 @@ const OFFICE3D_STEP = 112
 /** The Office as the 3D building (ORCA-1302); Low resources keeps the 2D Office, so no lite mode. */
 export function TeamSceneOffice3d({
   model,
-  onNoWebgl
+  onNoWebgl,
+  members
 }: {
   model: TeamPanelGameModel
   /** Without WebGL the panel draws today's 2D Office instead. */
   onNoWebgl: () => void
+  /** What a click on a member's figure opens, as its Team row does. */
+  members?: ReadonlyMap<string, TeamSceneWho>
 }): React.JSX.Element {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -40,6 +45,13 @@ export function TeamSceneOffice3d({
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   // Why the diorama's own camera: the owner asked the Office to pan, zoom and follow like Figures.
   const redraw = useRef<(() => void) | null>(null)
+  // Why a ref: a rebuild relinks the canvas, and the hover it lit must survive that.
+  const hover = useRef<Scene3dHoverHold>({ own: null, down: null })
+  // Why a ref: a new map each read must not rebuild the stage.
+  const who = useRef(members)
+  useEffect(() => {
+    who.current = members
+  }, [members])
   const camera = useDioramaCameraInput(canvas, redraw)
   const status = useTeamSceneStatusColors()
   const look = useTeamSceneDioramaLook()
@@ -141,6 +153,20 @@ export function TeamSceneOffice3d({
     if (!reduced) {
       raf = requestAnimationFrame(loop)
     }
+    const unlink = linkScene3dHover({
+      el,
+      pick: stage.pick,
+      light: (key) => {
+        stage.light(key)
+        // Under reduced motion no frame runs, so the ring paints its own still frame.
+        if (reduced) {
+          stage.draw(1.3)
+        }
+        el.dataset.office3dLit = key ?? ''
+      },
+      open: (key) => who.current?.get(key)?.open(),
+      hold: hover.current
+    })
     // The machines' floors: the shared lobby is not one.
     el.dataset.office3dFloors = String(layout.floors.filter((f) => !f.lobby).length)
     el.dataset.office3dAdvisors = String(layout.floors.filter((f) => f.controlRoom).length)
@@ -150,6 +176,7 @@ export function TeamSceneOffice3d({
       .join(' ')
     return () => {
       cancelAnimationFrame(raf)
+      unlink()
       watch.disconnect()
       stage.dispose()
     }
