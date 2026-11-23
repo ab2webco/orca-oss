@@ -212,6 +212,13 @@ test('hovering a Team row or a figure lights the other in Figures, and leaving c
             await row.hover()
             await expect(canvas).toHaveAttribute('data-diorama-lit', key)
             await expect(row).toHaveAttribute('data-team-card-lit', '')
+            if (row === bo) {
+              // The whole panel, so the hovered row and its ringed figure share one image.
+              await orcaPage.waitForTimeout(500)
+              await panel.screenshot({
+                path: testInfo.outputPath(`hover-row-to-figure-${tag}.png`)
+              })
+            }
             await orcaPage.mouse.move(1, 1)
             await expect(canvas).toHaveAttribute('data-diorama-lit', '')
             await expect(row).not.toHaveAttribute('data-team-card-lit')
@@ -220,12 +227,12 @@ test('hovering a Team row or a figure lights the other in Figures, and leaving c
           await hoverFigureOnCanvas(orcaPage, canvas, boKey)
           await expect(bo).toHaveAttribute('data-team-card-lit', '')
           await orcaPage.waitForTimeout(500)
-          await canvas.screenshot({ path: testInfo.outputPath(`hover-ring-${tag}.png`) })
+          await panel.screenshot({ path: testInfo.outputPath(`hover-figure-to-row-${tag}.png`) })
           await orcaPage.mouse.move(1, 1)
           await expect(canvas).toHaveAttribute('data-diorama-lit', '')
           await expect(bo).not.toHaveAttribute('data-team-card-lit')
           await orcaPage.waitForTimeout(500)
-          await canvas.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
+          await panel.screenshot({ path: testInfo.outputPath(`hover-clear-${tag}.png`) })
         } else {
           // WebGL is off on Linux E2E, so Figures is the 2D scene: its lit label names the row.
           await expect(canvas).toHaveCount(0)
