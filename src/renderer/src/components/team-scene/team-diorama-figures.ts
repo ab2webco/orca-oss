@@ -34,15 +34,6 @@ export const DIORAMA_MAGE_LOOK: TeamSceneFigureLook = {
   tool: 'staff'
 }
 
-/** Office 3D's look number until it follows the Team list sheets too (ORCA-1336, A2). */
-export const dioramaLookOf = (seed: string): number => {
-  let h = 2166136261
-  for (let i = 0; i < seed.length; i++) {
-    h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
-  }
-  return (h >>> 0) % 36
-}
-
 /** Builds a figure dressed as `look`: the toon chibi with its outline, or the low-poly unit when `lite`. */
 export function dioramaFigure(
   k: DioramaKit,

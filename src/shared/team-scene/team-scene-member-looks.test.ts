@@ -6,7 +6,11 @@ import {
   FIGURES_ADVISOR_LOOK,
   FIGURES_LEAD_LOOK,
   FIGURES_MEMBER_LOOKS,
+  OFFICE_ADVISOR_LOOK,
+  OFFICE_LEAD_LOOK,
+  OFFICE_MEMBER_LOOKS,
   teamSceneLookSeedOf,
+  teamSceneOfficeLookOf,
   teamSceneMemberLookOf,
   teamSceneSheetIndexOf,
   type TeamSceneFigureLook
@@ -107,5 +111,53 @@ describe('the Figures member looks', () => {
   it('keeps the seed the image painter has always used, so no face changes', () => {
     // FNV-1a of 'a', as figureSeedOf returned it before the move.
     expect(teamSceneLookSeedOf('a')).toBe(0xe40c292c)
+  })
+})
+
+const officeRoles = (
+  JSON.parse(readFileSync(join(ART, 'native.json'), 'utf8')) as {
+    native: { office: { roles: Roles } }
+  }
+).native.office.roles
+// Boxes on an Office sheet's first frame, read off the art: the figure stands at x 46-81.
+const OFFICE_BOX = {
+  hair: [52, 37, 64, 43],
+  skin: [64, 48, 72, 56],
+  sweater: [50, 68, 62, 84],
+  pants: [52, 102, 62, 110],
+  chin: [66, 62, 76, 68]
+} satisfies Record<string, [number, number, number, number]>
+const officeNear = (hex: number, sheet: string, box: [number, number, number, number]) =>
+  far(rgbOf(hex), dominant(sheet, box, 1)[0]!) < 24
+
+describe('the Office looks', () => {
+  it('has one look per Office member sheet, in the sheets order', () => {
+    expect(OFFICE_MEMBER_LOOKS.map((look) => look.sheet)).toEqual(officeRoles.member.sheets)
+    expect(OFFICE_LEAD_LOOK.sheet).toBe(officeRoles.lead.sheets[0])
+    expect(OFFICE_ADVISOR_LOOK.sheet).toBe(officeRoles.advisor.sheets[0])
+  })
+
+  it.each([...OFFICE_MEMBER_LOOKS, OFFICE_LEAD_LOOK, OFFICE_ADVISOR_LOOK])(
+    'matches the sweater, hair, skin, trousers and beard drawn in $sheet',
+    (look) => {
+      expect(officeNear(look.sweater, look.sheet, OFFICE_BOX.sweater)).toBe(true)
+      expect(officeNear(look.hair, look.sheet, OFFICE_BOX.hair)).toBe(true)
+      expect(officeNear(look.skin, look.sheet, OFFICE_BOX.skin)).toBe(true)
+      expect(officeNear(look.pants, look.sheet, OFFICE_BOX.pants)).toBe(true)
+      // A beard is drawn in the hair colour over the chin; without one the chin is skin.
+      expect(officeNear(look.hair, look.sheet, OFFICE_BOX.chin)).toBe(look.beard)
+    }
+  )
+
+  it('picks the Office sheet the Team list face draws, by the same index as Figures', () => {
+    const subject = { role: 'member' as const, key: 'pane-1', characterKey: 'char-ada' }
+    const index = teamSceneSheetIndexOf(subject, officeRoles.member.sheets.length)
+    expect(teamSceneOfficeLookOf(subject).sheet).toBe(officeRoles.member.sheets[index])
+    expect(teamSceneOfficeLookOf({ role: 'lead', key: 'x', characterKey: null })).toBe(
+      OFFICE_LEAD_LOOK
+    )
+    expect(teamSceneOfficeLookOf({ role: 'advisor', key: 'x', characterKey: null })).toBe(
+      OFFICE_ADVISOR_LOOK
+    )
   })
 })

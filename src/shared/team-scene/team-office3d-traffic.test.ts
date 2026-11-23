@@ -132,3 +132,16 @@ describe('riders in the cab', () => {
     expect(together, 'c and d never shared a ride').toBeGreaterThan(0)
   })
 })
+
+describe('a member walking out of the 3D Office', () => {
+  it('keeps the sheet of its persistent character after its card is gone, not its pane', () => {
+    const traffic = office3dTraffic()
+    const ada = member('a', { characterKey: 'char-ada' })
+    office3dTrafficRead(traffic, layout, input([ada, member('b')]), 0, 'normal')
+    office3dTrafficRead(traffic, layout, input([member('b')]), 5, 'normal')
+    const leaver = traffic.members.get('a')!
+    expect(leaver.leaving).toBe(true)
+    expect(leaver.look).toBe('char-ada')
+    expect(traffic.members.get('b')!.look).toBe('b')
+  })
+})

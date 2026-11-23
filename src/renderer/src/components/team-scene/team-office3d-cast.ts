@@ -13,7 +13,7 @@ import {
   office3dSlotId,
   type Office3dSlot
 } from '../../../../shared/team-scene/team-office3d-slots'
-import { dioramaLookOf, type DioramaFigure } from './team-diorama-figures'
+import type { DioramaFigure } from './team-diorama-figures'
 import type { Office3dTraffic } from '../../../../shared/team-scene/team-office3d-traffic'
 import { office3dDev } from './team-office3d-dev'
 import type { DioramaKit } from './team-diorama-kit'
@@ -176,7 +176,7 @@ export function office3dLeavers(
     if (drawn.has(key) || !member.leaving) {
       continue
     }
-    const figure = office3dDev(dioramaLookOf(key), 'dev')
+    const figure = office3dDev(member.look ?? key, 'dev')
     world.add(figure.g)
     ticks.push(
       office3dMover({
