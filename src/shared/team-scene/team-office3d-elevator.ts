@@ -174,3 +174,12 @@ export function office3dCabCut(
   cab.freeAt = Math.max(now, ...rides.map((r) => r.shut ?? r.end))
   return end
 }
+
+/** The highest floor the cab stands at or is booked to from `t` on. */
+export const office3dCabHighest = (cab: Office3dCab | null, t: number): number =>
+  cab
+    ? Math.max(
+        office3dCabFloorAt(cab, t),
+        ...cab.rides.filter((r) => r.end >= t).flatMap((r) => [r.from, r.to])
+      )
+    : 0

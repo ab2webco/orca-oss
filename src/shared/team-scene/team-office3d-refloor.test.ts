@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamHost, TeamMemberCard } from '../team-panel-model-types'
-import { office3dCabFloorAt } from './team-office3d-elevator'
+import { office3dCabFloorAt, office3dCabHighest } from './team-office3d-elevator'
 import { teamOffice3dLayoutOf, type Office3dLayout } from './team-office3d-layout'
 import { office3dTraffic, office3dTrafficRead, type Office3dTraffic } from './team-office3d-traffic'
 import { office3dWalkerAt } from './team-office3d-walkers'
@@ -61,6 +61,8 @@ const expectInside = (
   to: number
 ) => {
   const top = layout.floors.length - 1
+  // What the panel tells specs: the highest floor the cab is at or booked to.
+  expect(office3dCabHighest(traffic.cab, from)).toBeLessThanOrEqual(top)
   for (let t = from; t <= to; t += 0.05) {
     const cab = office3dCabFloorAt(traffic.cab!, t)
     expect(cab, `cab at ${t.toFixed(2)}`).toBeLessThanOrEqual(top + 1e-6)
