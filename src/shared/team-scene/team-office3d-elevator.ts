@@ -45,6 +45,24 @@ export function office3dCabFloorAt(cab: Office3dCab, t: number): number {
 }
 
 /**
+ * How long a rider ready at `earliest` would wait for the cab beyond its own trip to `from`: the
+ * time it spends serving riders booked first. Books nothing.
+ */
+export function office3dCabBusyFor(
+  cab: Office3dCab,
+  from: number,
+  to: number,
+  earliest: number,
+  speed = 1
+): number {
+  const probe: Office3dCab = { ...cab, rides: cab.rides.map((r) => ({ ...r })) }
+  const booked = probe.rides.length
+  const { board } = bookOffice3dCab(probe, from, to, earliest, speed)
+  const fetch = probe.rides.slice(booked).find((r) => r.to === from && r.from !== from)
+  return Math.max(0, board - earliest - (fetch ? fetch.end - fetch.start : 0))
+}
+
+/**
  * Books the cab from floor `from` to `to`, no earlier than `earliest`: it first comes to `from` if
  * it is elsewhere, waits while the rider boards, then rides. Riders queue; a second booking starts
  * once the first has stepped out.
