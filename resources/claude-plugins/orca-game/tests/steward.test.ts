@@ -277,7 +277,7 @@ describe('the Orca steward', () => {
     expect(seen.at(-1)).toEqual(LAUNCHED)
   })
 
-  test('without a plan Haiku judges, and a sure answer moves the member', async ($, on) => {
+  test('without a plan Haiku judges, and a sure answer moves the member on its effort', async ($, on) => {
     const seen: Seen[] = []
     const haiku = {
       isAnswered: true,
@@ -288,7 +288,8 @@ describe('the Orca steward', () => {
     await step($, 0, { model: 'claude-opus-5-5', effort: 'high' })
     await clock.settle()
     await step($, 1, { model: 'claude-opus-5-5', effort: 'high' })
-    expect(seen.at(-1)).toEqual({ model: 'claude-sonnet-5-5', effort: 'medium' })
+    // Why Opus stays (ORCA-1350): an unread cache counts as warm, so only the effort moves.
+    expect(seen.at(-1)).toEqual({ model: 'claude-opus-5-5', effort: 'medium' })
   })
 
   test('Haiku slow or failing keeps the current model, silently', async ($, on) => {

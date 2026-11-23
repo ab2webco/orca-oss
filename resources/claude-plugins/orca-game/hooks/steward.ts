@@ -1,32 +1,26 @@
-import type { EngineInterface, TurnStepInput } from 'claude-code'
+import type { EngineInterface } from 'claude-code'
 
-import { advisorPinsOf, type AdvisorPins } from './advisor-report'
-import { askStewardJudge, stewardJudgeAllowed, type StewardJudgeBudget } from './steward-judge'
-import { readStewardPlan, readStewardTicket } from './steward-plan-read'
-import { routerRouteOf } from './steward-router'
+import { withCache } from './steward-cache'
 import {
-  STEWARD_MOMENT_WHY,
-  STEWARD_STORE_KEY,
-  stewardLogWith,
-  stewardSessionsWith,
-  type StewardDecision,
-  type StewardPlanState,
-  type StewardRecord
-} from './steward-record'
+  STEWARD_PHASE_TURNS,
+  STEWARD_RETURNING_PHASES,
+  cacheNowOf,
+  outputPerTurnOf
+} from './steward-cache-track'
+import { askStewardJudge, stewardJudgeAllowed } from './steward-judge'
+import { readStewardPlan, readStewardTicket } from './steward-plan-read'
+import { STEWARD_MOMENT_WHY, type StewardDecision } from './steward-record'
 import {
   isSamePick,
   stewardChoiceOf,
-  stewardEffortOf,
   stewardMomentOf,
   stewardStartPhaseOf,
   STEWARD_HIGH_RISK_PATHS,
   withPins,
   withQuota,
-  type StewardPhase,
-  type StewardPick,
-  type StewardPlanPhase,
-  type StewardTrack
+  type StewardPhase
 } from './steward-rules'
+import { cacheNoteOf, note, runtime, saveRecord } from './steward-runtime'
 
 // The Orca steward (ORCA-1242): in a member pane, at key moments, it picks the main loop's model
 // and effort from the lead's plan and the floors, and re-applies that pick on every main step,
@@ -36,92 +30,25 @@ const PLAN_EVERY_MS = 120_000
 const TOOL_LINES = 10
 const ANNOUNCE_TOOLS: ReadonlySet<string> = new Set(['ExitPlanMode', 'TodoWrite'])
 
-type Runtime = {
-  role: 'member' | 'other' | null
-  base: StewardPick | null
-  pins: AdvisorPins
-  pick: StewardPick | null
-  track: StewardTrack
-  ticket: string | null
-  title: string
-  plan: StewardPlanPhase[] | null
-  riskyPaths: readonly string[]
-  planState: StewardPlanState
-  planReadAt: number | null
-  budget: StewardJudgeBudget
-  quota: number
-  tools: string[]
-  standDown: 'router' | 'override' | null
-  stepsSeen: number
-  decisions: StewardDecision[]
-}
-
-// Module state: one member session; a hot reload starts it over from the next step.
-const runtime: Runtime = {
-  role: null,
-  base: null,
-  pins: { model: false, effort: false },
-  pick: null,
-  track: { phase: null, failing: null, hasEdited: false },
-  ticket: null,
-  title: '',
-  plan: null,
-  riskyPaths: STEWARD_HIGH_RISK_PATHS,
-  planState: 'none-yet',
-  planReadAt: null,
-  budget: { calls: 0, lastAt: null },
-  quota: 0,
-  tools: [],
-  standDown: null,
-  stepsSeen: 0,
-  decisions: []
-}
-
-async function isMember($: EngineInterface): Promise<boolean> {
-  if (runtime.role === null) {
-    const role = await $.env.get('ORCA_GAME_ROLE').catch(() => undefined)
-    runtime.role = role === 'member' ? 'member' : 'other'
-  }
-  return runtime.role === 'member'
-}
-
-const recordOf = (): StewardRecord => ({
-  version: 1,
-  phase: runtime.track.phase,
-  pick: runtime.pick,
-  planState: runtime.planState,
-  standDown: runtime.standDown,
-  stepsSeen: runtime.stepsSeen,
-  decisions: runtime.decisions,
-  ticket: runtime.ticket,
-  pins: runtime.pins
-})
-
-async function saveRecord($: EngineInterface): Promise<void> {
-  const [session, held] = await Promise.all([$.session.id(), $.store.get(STEWARD_STORE_KEY)]).catch(
-    () => []
-  )
-  if (session !== undefined) {
-    const sessions = stewardSessionsWith(held, session, recordOf())
-    await $.store.set(STEWARD_STORE_KEY, sessions).catch(() => undefined)
-  }
-}
-
-async function note($: EngineInterface, entry: Omit<StewardDecision, 'at'>): Promise<void> {
-  const at = await $.clock.now()
-  runtime.decisions = stewardLogWith(runtime.decisions, { at, ...entry })
-  await saveRecord($)
-}
-
 type Judged = { confidence: number; why: string; tokens: { input: number; output: number } }
 
-/** Applies a moment's choice: the plan's or the kind table's, a judgment's, quota, pins, floors. */
-function decide(
+/** Leaving a phase logs the requests it took, so STEWARD_PHASE_TURNS can be tuned from data. */
+function phaseTurnsOf(phase: StewardPhase): StewardDecision['phaseTurns'] {
+  const run = runtime.phaseRun
+  if (run.phase === phase) {
+    return undefined
+  }
+  runtime.phaseRun = { phase, from: runtime.stepsSeen }
+  return run.phase === null ? undefined : { phase: run.phase, turns: runtime.stepsSeen - run.from }
+}
+
+/** Applies a moment's choice: the plan's or the kind table's, a judgment's, quota, pins, floors, the cache. */
+async function decide(
   $: EngineInterface,
   phase: StewardPhase,
   moment: StewardDecision['moment'],
   judged?: Judged
-): void {
+): Promise<void> {
   const base = runtime.base
   const current = runtime.pick ?? base
   if (base === null || current === null) {
@@ -135,8 +62,23 @@ function decide(
     isHighRisk: runtime.track.hasRiskyEdit === true,
     ...(judged ? { confidence: judged.confidence } : {})
   })
-  const to = withPins(withQuota(choice.pick, runtime.quota), base, runtime.pins)
+  const next = withPins(withQuota(choice.pick, runtime.quota), base, runtime.pins)
+  const state = cacheNowOf(runtime.cache, await $.clock.now(), runtime.env)
+  const phaseTurns = phaseTurnsOf(phase)
+  const spent = runtime.stepsSeen - runtime.phaseRun.from
+  const gate = withCache({
+    current,
+    next,
+    cache: state,
+    quota: runtime.quota,
+    remainingTurns: Math.max(0, STEWARD_PHASE_TURNS[phase] - spent),
+    outputTokensPerTurn: outputPerTurnOf(runtime.cache),
+    login: runtime.env.login,
+    returns: STEWARD_RETURNING_PHASES.has(phase)
+  })
+  const to = gate.pick
   runtime.pick = to
+  runtime.cache = { ...runtime.cache, held: gate.held }
   runtime.track = { ...runtime.track, phase }
   void note($, {
     moment,
@@ -147,7 +89,9 @@ function decide(
     source: judged ? 'haiku' : choice.source,
     why: judged?.why ?? STEWARD_MOMENT_WHY[moment],
     ...(choice.isFloored ? { isFloored: true as const } : {}),
-    ...(judged ? { confidence: judged.confidence, tokens: judged.tokens } : {})
+    ...(judged ? { confidence: judged.confidence, tokens: judged.tokens } : {}),
+    cache: cacheNoteOf(state, gate),
+    ...(phaseTurns ? { phaseTurns } : {})
   })
 }
 
@@ -162,7 +106,7 @@ async function judge($: EngineInterface): Promise<void> {
   const task = `${runtime.ticket ?? ''} ${runtime.title}`.trim()
   const answer = await askStewardJudge($, { task, tools: runtime.tools })
   if (answer.verdict !== null) {
-    decide($, answer.verdict.phase, 'judged', { ...answer.verdict, tokens: answer.tokens })
+    await decide($, answer.verdict.phase, 'judged', { ...answer.verdict, tokens: answer.tokens })
     return
   }
   await note($, {
@@ -178,7 +122,7 @@ async function judge($: EngineInterface): Promise<void> {
 }
 
 /** Reads the lead's plan once the first state poll names the ticket, then every two minutes. */
-async function refreshPlan($: EngineInterface): Promise<void> {
+export async function refreshPlan($: EngineInterface): Promise<void> {
   const now = await $.clock.now()
   if (runtime.planReadAt !== null && now - runtime.planReadAt < PLAN_EVERY_MS) {
     return
@@ -205,7 +149,7 @@ async function refreshPlan($: EngineInterface): Promise<void> {
   if (read.state === 'none') {
     await (isFirst ? judge($) : saveRecord($))
   } else if (phase !== null && (isFirst || isChanged)) {
-    decide($, phase, 'plan')
+    await decide($, phase, 'plan')
   }
 }
 
@@ -225,12 +169,12 @@ function onToolCall($: EngineInterface, tool: string, e: object, isError: boolea
   const isPlanned = runtime.planState === 'plan'
   const isEditing = runtime.track.phase === 'implement' || runtime.track.phase === 'test-fix'
   if (moment.phase !== undefined && moment.reason !== undefined) {
-    decide($, moment.phase, moment.reason)
+    void decide($, moment.phase, moment.reason).catch(() => undefined)
   } else if (ANNOUNCE_TOOLS.has(tool) && runtime.planState === 'none') {
     void judge($).catch(() => undefined)
   } else if (tool === 'ExitPlanMode' && isPlanned && !isEditing) {
     // Why ExitPlanMode alone: a plan approved means editing is next; a todo list is only bookkeeping.
-    decide($, 'implement', 'announce')
+    void decide($, 'implement', 'announce').catch(() => undefined)
   }
 }
 
@@ -240,45 +184,10 @@ async function onTurnComplete($: EngineInterface): Promise<void> {
   const crossed = runtime.quota < 85 && used >= 85
   runtime.quota = used
   if (crossed && runtime.track.phase !== null) {
-    decide($, runtime.track.phase, 'quota')
+    await decide($, runtime.track.phase, 'quota')
   }
   await refreshPlan($)
   await saveRecord($)
-}
-
-/** The step as the steward sends it: the member's sticky pick, unless it stands down. */
-export async function stewardStepOf($: EngineInterface, e: TurnStepInput): Promise<TurnStepInput> {
-  if (e.agentId !== undefined || !(await isMember($))) {
-    return e
-  }
-  runtime.stepsSeen += 1
-  if (runtime.base === null) {
-    runtime.base = { model: e.model, effort: stewardEffortOf(e.effort) }
-    runtime.pins = await advisorPinsOf($)
-    void refreshPlan($).catch(() => undefined)
-  }
-  const base = runtime.base
-  const served = { model: e.model, effort: stewardEffortOf(e.effort) }
-  const routed = await routerRouteOf($)
-  const standDown = routed ? 'router' : isSamePick(served, base) ? null : 'override'
-  if (standDown !== runtime.standDown) {
-    runtime.standDown = standDown
-    const kept = runtime.pick ?? base
-    void note($, {
-      moment: 'stand-down',
-      phase: runtime.track.phase,
-      from: kept,
-      to: routed ?? (standDown === null ? kept : served),
-      applied: standDown === null,
-      source: standDown ?? 'none',
-      why: standDown === null ? 'the steward picks again' : STEWARD_MOMENT_WHY['stand-down']
-    })
-  }
-  const pick = runtime.pick
-  if (standDown !== null || pick === null) {
-    return e
-  }
-  return { ...e, model: pick.model, ...(pick.effort ? { effort: pick.effort } : {}) }
 }
 
 /** A main-loop tool call that just ran: a key moment when it moves the member to another phase. */

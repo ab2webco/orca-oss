@@ -7,6 +7,7 @@ import { POLL_EVERY_MS, refreshSoon, viewOf } from './fleet-sync'
 import { isGhPrCreate, memberPrCapDeny } from './member-pr-cap-guard'
 import { watchFleet } from './fleet-watch'
 import { questSessionStart, registerQuest } from './quest'
+import { registerStewardCompact } from './steward-step'
 import { markLeadStarted, startOrRearmLead, unmarkLeadStarted } from './lead-autostart'
 import { registerLeadBrief } from './lead-brief'
 import { registerStateCommand } from './state-command'
@@ -23,6 +24,7 @@ import { bumpLive, liveAsk, liveTurnEnd, liveTurnStart } from './live-turn'
 
 export const register: Register = (on) => {
   registerQuest(on)
+  registerStewardCompact(on)
   registerTextLayer(on)
   registerAdvisor(on)
   registerLeadName(on)
