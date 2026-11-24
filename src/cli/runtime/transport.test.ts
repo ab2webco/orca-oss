@@ -80,7 +80,9 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     }
 
     await expect(sendRequest(metadata, 'status.get', undefined, 200)).rejects.toMatchObject({
-      code: 'runtime_unavailable'
+      code: 'runtime_unavailable',
+      // Why: worker-start reads this to say its start did not apply (ORCA-1398).
+      data: { requestSent: false }
     })
   })
 
@@ -207,11 +209,14 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     // A generous timeout: a passing fix rejects on close well before this; the
     // pre-fix behavior would hang the full duration and trip vitest's own limit.
     const start = Date.now()
-    await expect(sendRequest(metadata, 'status.get', undefined, 60000)).rejects.toMatchObject({
+    const error = await sendRequest(metadata, 'status.get', undefined, 60000).catch((e) => e)
+    expect(error).toMatchObject({
       code: 'runtime_unavailable',
       message:
         'The Orca Lab runtime closed the connection before responding. Restart Orca Lab and try again.'
     })
+    // Why: the runtime read the request, so whether it applied stays a question (ORCA-1398).
+    expect(error.data?.requestSent).toBeUndefined()
     expect(Date.now() - start).toBeLessThan(5000)
   })
 })

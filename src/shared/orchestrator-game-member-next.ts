@@ -33,6 +33,13 @@ export const silentHostNextOf = (host: string, paneKey: string): string =>
 /** What a remote member asks of the lead before its phase does; null when nothing (ORCA-793). */
 export function remoteNextOf(agent: GameAgent, ticket: string | null): string | null {
   const remote = agent.remote
+  // Why first: the home recorded the failure, so a silent host does not hide it (ORCA-1398).
+  if (remote?.startFailed) {
+    const why = remote.startError
+      ? `: ${remote.startError.replace(/[.\s]+$/, '')}`
+      : ' with no recorded reason'
+    return `failed to start on ${remote.host}${why}. Find the cause before launching ${ticket ?? agent.displayName ?? agent.paneKey} again.`
+  }
   if (remote?.stateKnown === false) {
     return silentHostNextOf(remote.host, agent.paneKey)
   }

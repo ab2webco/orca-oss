@@ -17,6 +17,8 @@ export type DurableMutationInvocation = {
 
 export class OrchestrationMutationExecutor {
   private readonly inFlight = new Map<string, Promise<unknown>>()
+  // Why: a start awaits before run() marks it in flight; a probe in that gap must not read not_applied.
+  private readonly receivedStarts = new Map<string, number>()
 
   constructor(private readonly runtime: OrcaRuntimeService) {}
 
@@ -119,6 +121,39 @@ export class OrchestrationMutationExecutor {
     }
   }
 
+  /** Holds a worker start's request id from dispatcher entry until its reply; returns the release. */
+  noteReceived(request: RpcRequest): () => void {
+    const id = request.orchestrationRequestId
+    if (!id || request.method !== 'orchestration.workerStart') {
+      return () => undefined
+    }
+    this.receivedStarts.set(id, (this.receivedStarts.get(id) ?? 0) + 1)
+    return () => {
+      const left = (this.receivedStarts.get(id) ?? 1) - 1
+      if (left > 0) {
+        this.receivedStarts.set(id, left)
+      } else {
+        this.receivedStarts.delete(id)
+      }
+    }
+  }
+
+  /** Whether a worker start under this request id was accepted, read without running it (ORCA-1398). */
+  workerStartOutcomeOf(callerFingerprint: string, requestId: string): WorkerStartOutcome {
+    const row = this.runtime.getOrchestrationDb().getMutationReceipt(callerFingerprint, requestId)
+    const dispatchId =
+      row?.method === 'orchestration.workerStart' ? acceptedDispatchIdOf(row.receipt) : undefined
+    if (dispatchId) {
+      return { applied: 'applied', dispatchId }
+    }
+    // Why in-flight is unknown: its acceptance may still commit after this read.
+    return row ||
+      this.receivedStarts.has(requestId) ||
+      this.inFlight.has(`${callerFingerprint}:${requestId}`)
+      ? { applied: 'unknown' }
+      : { applied: 'not_applied' }
+  }
+
   getLocalAuthenticatedCallerFingerprint(): string {
     return this.runtime.getOrchestrationDb().getOrCreateLocalMutationCallerFingerprint()
   }
@@ -189,6 +224,24 @@ function attachMutationReceipt(result: unknown, requestId: string, replayed: boo
     return { result, mutation: { requestId, replayed } }
   }
   return { ...(result as Record<string, unknown>), mutation: { requestId, replayed } }
+}
+
+export type WorkerStartOutcome =
+  | { applied: 'applied'; dispatchId: string }
+  | { applied: 'not_applied' | 'unknown' }
+
+// Why both shapes: a pending receipt holds `accepted`, a completed one the start's own result.
+function acceptedDispatchIdOf(receipt: string | null): string | undefined {
+  try {
+    const parsed = JSON.parse(receipt ?? 'null') as {
+      dispatchId?: unknown
+      accepted?: { dispatchId?: unknown }
+    } | null
+    const id = parsed?.dispatchId ?? parsed?.accepted?.dispatchId
+    return typeof id === 'string' ? id : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function getPendingWorkerStartRecovery(

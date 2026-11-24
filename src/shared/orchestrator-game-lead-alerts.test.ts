@@ -207,6 +207,43 @@ describe('a remote member still starting (ORCA-1263)', () => {
   })
 })
 
+describe('a remote member whose accepted start failed later (ORCA-1398)', () => {
+  // Why this shape: what remoteGameMembersOf builds for a failed start, whose host shows no terminal.
+  const failed = (startError?: string) =>
+    member('ORCA-9', {
+      state: 'done',
+      terminalHandle: undefined,
+      remote: {
+        host: 'm1',
+        environmentId: 'env_m1',
+        stateKnown: true,
+        gone: true,
+        startFailed: true,
+        ...(startError ? { startError } : {})
+      }
+    })
+
+  it('raises one alert naming the member, its host and the recorded reason', () => {
+    const alerts = gameLeadAlertsOf(
+      stateOf([failed('The worker server reported failed: setup exited 1.')]),
+      emptyGameLeadAlertMemory(),
+      NOW
+    )
+    expect(alerts).toEqual([
+      {
+        key: 'start-failed:ORCA-9',
+        line: 'ORCA-9 failed to start on m1: The worker server reported failed: setup exited 1. Find the cause before launching ORCA-9 again.'
+      }
+    ])
+  })
+
+  it('says no reason was recorded instead of inventing one', () => {
+    expect(linesOf(stateOf([failed()]))).toEqual([
+      'ORCA-9 failed to start on m1 with no recorded reason. Find the cause before launching ORCA-9 again.'
+    ])
+  })
+})
+
 describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () => {
   const leftLine = (departure: GameQueueDeparture): string | undefined => {
     const memory = emptyGameLeadAlertMemory()

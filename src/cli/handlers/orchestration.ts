@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: orchestration CLI handlers share flag-parsing helpers and dispatch/preamble logic; splitting by verb would fragment the RuntimeClient call shape without reducing complexity. */
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { CommandHandler } from '../dispatch'
 import type { RuntimeClient } from '../runtime-client'
@@ -37,6 +38,10 @@ import {
   type RetiredRunMailNotice
 } from '../../shared/orchestration-check-output'
 import { orchestrationMutationRecoveryError } from '../orchestration-mutation-recovery'
+import {
+  workerStartFailureOf,
+  workerStartOutcomeProbe
+} from '../orchestration-worker-start-applied'
 
 // Why: 15 s is well under Claude Code's ~2 min Bash-tool silence budget while keeping log volume low. See design doc §3.4.
 const DEFAULT_KEEPALIVE_INTERVAL_MS = 15_000
@@ -1017,17 +1022,9 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
         )
       }
     }
-    const result = await callMutation<{
-      runId: string
-      taskId: string
-      dispatchId: string
-      state: string
-      failedStage?: string
-      lastError?: string
-      warning?: string
-      effects: unknown[]
-      residualResources: unknown[]
-    }>(client, flags, 'orchestration.workerStart', {
+    // Why our own id: a lost answer is then looked up by it instead of guessed (ORCA-1398).
+    const requestId = getOptionalStringFlag(flags, 'retry-request') ?? randomUUID()
+    const params = {
       task: getRequiredStringFlag(flags, 'task'),
       on: getOptionalStringFlag(flags, 'on'),
       worktree: getOptionalStringFlag(flags, 'worktree'),
@@ -1047,7 +1044,22 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       from: await resolveCoordinatorTerminalHandle(flags, cwd, client),
       devMode: isDevCliInvocation(),
       ...accountPins
-    })
+    }
+    const result = await client
+      .call<{
+        runId: string
+        taskId: string
+        dispatchId: string
+        state: string
+        failedStage?: string
+        lastError?: string
+        warning?: string
+        effects: unknown[]
+        residualResources: unknown[]
+      }>('orchestration.workerStart', params, { orchestrationRequestId: requestId })
+      .catch(async (error: unknown) => {
+        throw await workerStartFailureOf(error, requestId, workerStartOutcomeProbe(client))
+      })
     if (result.result.state !== 'ready') {
       process.exitCode = 1
     }

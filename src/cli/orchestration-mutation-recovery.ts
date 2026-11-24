@@ -21,7 +21,7 @@ export function orchestrationMutationRecoveryError(error: unknown): unknown {
   return new RuntimeClientError(error.code, message.join('\n'), error.data)
 }
 
-function isUnknownMutationOutcomeCode(code: string): boolean {
+export function isUnknownMutationOutcomeCode(code: string): boolean {
   return [
     'runtime_unavailable',
     'remote_runtime_unavailable',
@@ -36,7 +36,7 @@ function objectRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-function stripUnsafeRetryAdvice(message: string, requestId: string): string {
+export function stripUnsafeRetryAdvice(message: string, requestId: string): string {
   return message
     .replace(' Restart Orca Lab and try again.', '')
     .replace(' Retry the command.', '')

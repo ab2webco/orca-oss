@@ -7,7 +7,10 @@ import { localAttachRecoveryData } from './local-attach-recovery'
 import { RuntimeClientError, type RuntimeRpcResponse } from './types'
 import { MAX_TIMER_DELAY_MS, isSafeTimerDelayMs } from '../../shared/timer-delay'
 
-export function classifyRuntimeConnectionError(error: unknown): RuntimeClientError {
+export function classifyRuntimeConnectionError(
+  error: unknown,
+  requestSent = true
+): RuntimeClientError {
   const code = getErrorCode(error)
   if (code === 'EACCES' || code === 'EPERM') {
     return new RuntimeClientError(
@@ -18,7 +21,8 @@ export function classifyRuntimeConnectionError(error: unknown): RuntimeClientErr
   return new RuntimeClientError(
     'runtime_unavailable',
     'Could not connect to the Orca Lab runtime transport from this shell.',
-    localAttachRecoveryData()
+    // Why the flag: a failure before the write proves the runtime never saw the request (ORCA-1398).
+    requestSent ? localAttachRecoveryData() : { ...localAttachRecoveryData(), requestSent: false }
   )
 }
 
@@ -56,7 +60,7 @@ export async function sendRequest<TResult>(
         new RuntimeClientError(
           'runtime_unavailable',
           'No compatible transport found in Orca Lab runtime metadata.',
-          localAttachRecoveryData()
+          { ...localAttachRecoveryData(), requestSent: false }
         )
       )
       return
@@ -64,6 +68,7 @@ export async function sendRequest<TResult>(
     const socket = createConnection(transport.endpoint)
     let buffer = ''
     let settled = false
+    let connected = false
     const requestId = randomUUID()
 
     const timeout = setTimeout(() => {
@@ -100,7 +105,7 @@ export async function sendRequest<TResult>(
     socket.once('error', (error) => {
       finish({
         ok: false,
-        error: classifyRuntimeConnectionError(error)
+        error: classifyRuntimeConnectionError(error, connected)
       })
     })
     // Why: a clean peer close (FIN, no 'error') before a terminal frame never
@@ -214,6 +219,7 @@ export async function sendRequest<TResult>(
       }
     })
     socket.on('connect', () => {
+      connected = true
       socket.write(
         `${JSON.stringify({
           id: requestId,

@@ -56,7 +56,9 @@ function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, 
   for (const row of fleet.rows) {
     const who = row.ticket ?? row.name
     const review = row.review ?? 'no PR'
-    if (row.next.startsWith('gone from ')) {
+    if (row.next.startsWith('failed to start on ')) {
+      add(who, 'start-failed', row.next)
+    } else if (row.next.startsWith('gone from ')) {
       add(who, 'gone', `${row.next}. Compare its host worktree head with the pushed branch first.`)
     } else if (row.review?.endsWith(' merged')) {
       add(

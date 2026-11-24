@@ -121,7 +121,8 @@ describe('orchestration worker-start CLI contract', () => {
         agent: 'claude',
         model: 'aws-bedrock-opus-5',
         effort: 'high'
-      })
+      }),
+      { orchestrationRequestId: expect.any(String) }
     )
   })
 
@@ -179,7 +180,8 @@ describe('orchestration worker-start CLI contract', () => {
       expect.objectContaining({
         claudeAccountId: 'claude-acct-1',
         codexAccountId: 'codex-acct-1'
-      })
+      }),
+      { orchestrationRequestId: expect.any(String) }
     )
   })
 

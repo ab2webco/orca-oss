@@ -83,6 +83,7 @@ export class RpcDispatcher {
     if (request.method.startsWith('emulator.')) {
       emulatorProbe(`rpc ${request.method}`, request.params)
     }
+    const releaseReceived = this.orchestrationMutations.noteReceived(request)
     try {
       const compatibility = await this.legacyOrchestration.tryHandle(
         request,
@@ -149,6 +150,8 @@ export class RpcDispatcher {
         })
       }
       return mapDispatcherError(request, meta, error)
+    } finally {
+      releaseReceived()
     }
   }
 
@@ -184,6 +187,7 @@ export class RpcDispatcher {
     }
 
     if (!isStreamingMethod(method)) {
+      const releaseReceived = this.orchestrationMutations.noteReceived(request)
       try {
         const compatibility = await this.legacyOrchestration.tryHandle(
           request,
@@ -254,6 +258,8 @@ export class RpcDispatcher {
         reply(JSON.stringify(successResponse(request.id, meta, result)))
       } catch (error) {
         reply(JSON.stringify(mapDispatcherError(request, meta, error)))
+      } finally {
+        releaseReceived()
       }
       return
     }
