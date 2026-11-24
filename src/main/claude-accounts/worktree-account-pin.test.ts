@@ -71,7 +71,7 @@ describe('worktree Claude account pin runtime', () => {
     ])
     expect(() =>
       assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'debian', HOST_REPO)
-    ).toThrow('lives on WSL Debian, so it cannot launch Claude in the host')
+    ).toThrow('lives on WSL Debian, so it cannot launch Claude on the host')
     expect(() =>
       assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'debian', WSL_REPO)
     ).toThrow('lives on WSL Debian, so it cannot launch Claude in WSL Ubuntu-24.04')

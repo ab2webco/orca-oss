@@ -154,7 +154,7 @@ export type ClaudeAccountRemovalOptions = {
   reassignPinnedTo?: string | null
 }
 
-export type ClaudeCustomEndpointAccountInput = {
+export type ClaudeCustomEndpointAccountInput = ClaudeAccountAddTarget & {
   label: string
   baseUrl: string
   token: string
@@ -881,7 +881,11 @@ export class ClaudeAccountService {
     }
 
     const accountId = randomUUID()
-    const managedAuth = this.createManagedAuthDir(accountId)
+    // Why the target: a WSL repo only launches an account whose vault lives in that distro.
+    const managedAuth = this.createManagedAuthDir(accountId, {
+      runtime: input.runtime,
+      wslDistro: input.wslDistro
+    })
     try {
       // Why: the claude CLI reads this env at startup from CLAUDE_CONFIG_DIR;
       // the token lives only here (mode 600), never in Orca settings.

@@ -72,6 +72,7 @@ import {
   setSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from './runtime-selection'
+import { claudeAccountRuntimeMismatchOf, type ClaudeLaunchRuntime } from './worktree-account-pin'
 
 const execFileAsync = promisify(execFile)
 const OWNED_WSL_AUTH_PATH_SUCCESS_TTL_MS = 30_000
@@ -245,9 +246,7 @@ export class ClaudeRuntimeAuthService {
     if (overrideAccountId) {
       // Why: an unavailable or incompatible identity pin must fail closed;
       // silently substituting the global account can cross billing/org boundaries.
-      throw new Error(
-        'The Claude account assigned to this worktree is unavailable for this runtime. Reassign the account before launching Claude.'
-      )
+      throw this.pinnedAccountUnavailableError(overrideAccountId, effectiveTarget, settings)
     }
     try {
       // Why inside the try: getRuntimeConfigDir() creates the dir and can throw,
@@ -1008,6 +1007,24 @@ export class ClaudeRuntimeAuthService {
       return null
     }
     return accounts.find((account) => account.id === activeAccountId) ?? null
+  }
+
+  private pinnedAccountUnavailableError(
+    accountId: string,
+    target: ClaudeAccountSelectionTarget | undefined,
+    settings: ReturnType<Store['getSettings']>
+  ): Error {
+    const account = settings.claudeManagedAccounts.find((candidate) => candidate.id === accountId)
+    const normalized = normalizeClaudeAccountSelectionTarget(target)
+    const launch: ClaudeLaunchRuntime =
+      normalized.runtime === 'wsl'
+        ? { runtime: 'wsl', wslDistro: normalized.wslDistro ?? getCachedWslDistros()?.[0] ?? null }
+        : { runtime: 'host' }
+    const mismatch = account ? claudeAccountRuntimeMismatchOf(account, launch) : null
+    return new Error(
+      mismatch ??
+        'The Claude account assigned to this worktree is unavailable for this runtime. Reassign the account before launching Claude.'
+    )
   }
 
   // Resolves a per-worktree pinned account into the account to inject, or null

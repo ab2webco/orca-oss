@@ -1344,6 +1344,9 @@ export function AccountsPane({
             // the host that owns the accounts. The helper routes it.
             await addClaudeCustomEndpointProviderAccount(settings, {
               token: endpointTokenDraft.trim(),
+              // Why: same location control as Add Account; a remote scope is always host.
+              runtime: accountRuntime.runtime,
+              wslDistro: accountRuntime.wslDistro,
               ...fields
             })
         // Why: close only on success so a validation error keeps the draft editable.
@@ -3076,6 +3079,13 @@ export function AccountsPane({
                     'auto.components.settings.AccountsPane.customEndpointDescription',
                     'Connect an Anthropic-compatible endpoint (like z.ai GLM) as a managed Claude account. The token is stored only on this device and used when a worktree is assigned to this account.'
                   )}
+              {!isEditingEndpoint && accountRuntime.runtime === 'wsl'
+                ? ` ${translate(
+                    'auto.components.settings.AccountsPane.customEndpointWslLocation',
+                    'It is created in {{value0}} and launches Claude only in repositories there.',
+                    { value0: accountRuntime.label }
+                  )}`
+                : null}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

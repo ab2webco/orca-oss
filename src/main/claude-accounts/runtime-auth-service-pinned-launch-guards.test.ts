@@ -445,7 +445,7 @@ describe('ClaudeRuntimeAuthService pinned launch guards', () => {
         wslDistro: 'Ubuntu',
         overrideAccountId: 'pinned-debian-account'
       })
-    ).rejects.toThrow('assigned to this worktree is unavailable')
+    ).rejects.toThrow('lives on WSL Debian, so it cannot launch Claude in WSL Ubuntu')
   })
 
   it('injects a default-WSL pinned account (wslDistro: null) when the launch resolves to the default distro', async () => {
@@ -623,7 +623,7 @@ describe('ClaudeRuntimeAuthService pinned launch guards', () => {
         runtime: 'host',
         overrideAccountId: 'wsl-account'
       })
-    ).rejects.toThrow('assigned to this worktree is unavailable')
+    ).rejects.toThrow('lives on WSL Ubuntu, so it cannot launch Claude on the host')
   })
 
   it('fails closed when the pinned account no longer exists', async () => {

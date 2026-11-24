@@ -2375,6 +2375,8 @@ const api = {
       sonnetModel?: string | null
       haikuModel?: string | null
       subagentModel?: string | null
+      runtime?: 'host' | 'wsl'
+      wslDistro?: string | null
     }): Promise<unknown> => ipcRenderer.invoke('claudeAccounts:addCustomEndpoint', args),
     updateCustomEndpoint: (args: {
       accountId: string

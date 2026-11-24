@@ -3,6 +3,7 @@ import { app, ipcMain, type BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../persistence'
 import {
+  assertClaudeAccountPinMatchesRepoRuntime,
   assertValidClaudeAccountPin,
   normalizeClaudeAccountPinForCreate
 } from '../claude-accounts/worktree-account-pin'
@@ -2290,6 +2291,11 @@ export function registerWorktreeHandlers(
         try {
           // Why: a removed pin fails visibly like the runtime create; the later normalize only covers a mid-create removal.
           assertValidClaudeAccountPin(store, args.claudeAccountId)
+          assertClaudeAccountPinMatchesRepoRuntime(
+            store.getSettings().claudeManagedAccounts,
+            args.claudeAccountId,
+            repo
+          )
           assertValidCodexAccountPin(store, args.codexAccountId)
           // Why: wrap only the helpers; the pre-validation throws above are IPC-shape bugs, not the git/filesystem failures the funnel tracks.
           result = isFolderRepo(repo)

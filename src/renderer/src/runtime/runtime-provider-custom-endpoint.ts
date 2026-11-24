@@ -14,10 +14,16 @@ export type ClaudeCustomEndpointAccountDraft = {
   sonnetModel?: string | null
   haikuModel?: string | null
   subagentModel?: string | null
+  /** Where the vault lives; WSL only for a local Windows owner (see AccountsPane). */
+  runtime?: 'host' | 'wsl'
+  wslDistro?: string | null
 }
 
 /** Edit variant of the draft: a blank token keeps the one already stored. */
-export type ClaudeCustomEndpointAccountEdit = Omit<ClaudeCustomEndpointAccountDraft, 'token'> & {
+export type ClaudeCustomEndpointAccountEdit = Omit<
+  ClaudeCustomEndpointAccountDraft,
+  'token' | 'runtime' | 'wslDistro'
+> & {
   accountId: string
   token?: string | null
 }

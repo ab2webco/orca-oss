@@ -5827,6 +5827,7 @@
           "customEndpointBaseUrl": "URL base",
           "customEndpointBaseUrlPlaceholder": "https://api.z.ai/api/anthropic",
           "customEndpointDescription": "Conecta un endpoint compatible con Anthropic (como z.ai GLM) como una cuenta administrada de Claude. El token se guarda solo en este dispositivo y se usa cuando un worktree se asigna a esta cuenta.",
+          "customEndpointWslLocation": "Se crea en {{value0}} y lanza Claude solo en repositorios de ese lugar.",
           "customEndpointHaikuModel": "Haiku →",
           "customEndpointHaikuModelPlaceholder": "glm-4.5-air",
           "customEndpointLabel": "Etiqueta",
