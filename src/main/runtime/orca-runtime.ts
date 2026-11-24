@@ -738,6 +738,7 @@ import {
 } from '../claude/orchestrator-game-member-launch'
 import { buildOrchestratorGameState } from './orchestrator-game-state-builder'
 import { orcaGameAppearanceOf } from './orchestrator-game-appearance'
+import { withCallerOwnRow } from './orchestrator-game-lead-own-row'
 import { foundGameSessionsOf, recoveredGameMembersOf } from './orchestrator-game-found-sessions'
 import { readLeadGameScene, type CarriedGameScene } from './orchestrator-game-carried-scene'
 import { readGameSceneArt } from './orchestrator-game-scene-art'
@@ -32928,7 +32929,7 @@ export class OrcaRuntimeService {
             ...(inFolder ? { folder: true } : {})
           }
         : null,
-      agents: ownRows ?? [],
+      agents: withCallerOwnRow(ownRows ?? [], summaries, args.paneKey ?? null),
       members,
       found: args.paneKey
         ? foundGameSessionsOf(summaries, {
