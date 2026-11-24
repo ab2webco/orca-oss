@@ -4,6 +4,7 @@ import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
 import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
 import { memberAskOf, teamIdleCiOf } from '../../../src/shared/team-member-shown-state'
+import { memberTicketStatusOf } from '../../../src/shared/orchestrator-game-member-next'
 import type { CheckStatus } from '../../../src/shared/github/pull-request-types'
 import type { HostedReviewState } from '../../../src/shared/hosted-review'
 import type { TeamMemberCard } from '../../../src/shared/team-panel-model-types'
@@ -62,6 +63,26 @@ function liveOf(raw: Rec, state: GameAgent['state']): string | null {
   return input ? `${agentToolLabelOf(tool)} · ${input}` : agentToolLabelOf(tool)
 }
 
+// Why the desktop rule (ORCA-1401): a completed home Run is not done while its PR is open or queued.
+function remoteTicketStatusOf(
+  raw: Rec,
+  pr: TeamMemberRow['pr'],
+  mergeQueued: ReadonlySet<string>
+): string | null {
+  const chosenBy =
+    isRecord(raw.launch) && isRecord(raw.launch.chosenBy) ? raw.launch.chosenBy : null
+  const kind = chosenBy ? text(chosenBy.kind) : null
+  return memberTicketStatusOf(
+    {
+      displayName: text(raw.displayName) ?? undefined,
+      remote: { ticketDone: true },
+      review: pr ? { number: pr.number, url: pr.url, state: pr.state } : undefined,
+      launch: kind ? { chosenBy: { kind } } : undefined
+    } as GameAgent,
+    mergeQueued
+  )
+}
+
 function modelOf(launch: unknown): string | null {
   const model = isRecord(launch) ? text(launch.model) : null
   const effort = model && isRecord(launch) ? text(launch.effort) : null
@@ -98,6 +119,7 @@ export function memberRowOf(
   const email = isRecord(raw.account) ? text(raw.account.email) : null
   const used = email ? usage.get(email) : undefined
   const review = isRecord(raw.review) ? raw.review : null
+  const pr = prOf(raw.review)
   return {
     key,
     name,
@@ -110,11 +132,11 @@ export function memberRowOf(
     host: remote ? text(remote.host) : null,
     agent: text(raw.agentType),
     model: modelOf(raw.launch),
-    pr: prOf(raw.review),
+    pr,
     ticketStatus: item
       ? (text(item.status) ?? text(item.statusGroup))
       : remote?.ticketDone === true
-        ? 'done'
+        ? remoteTicketStatusOf(raw, pr, context.mergeQueued)
         : null,
     live: liveOf(raw, state),
     since: num(raw.stateSince),

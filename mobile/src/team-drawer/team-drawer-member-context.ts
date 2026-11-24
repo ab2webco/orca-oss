@@ -14,6 +14,7 @@ export type TeamMemberContext = {
   questionTickets: ReadonlySet<string>
   usage: ReadonlyMap<string, Usage>
   summaries: ReadonlyMap<string, string>
+  mergeQueued: ReadonlySet<string>
   terminalOf: (raw: Rec, paneKey: string) => TerminalOpenTarget | null
 }
 
@@ -45,6 +46,15 @@ function summariesOf(inboxes: unknown): Map<string, string> {
   )
 }
 
+/** The PR urls the project's merge queue lists, as the desktop fleet reads them. */
+function mergeQueuedOf(project: unknown): Set<string> {
+  const queue = isRecord(project) && isRecord(project.queue) ? project.queue : null
+  const entries = queue && Array.isArray(queue.entries) ? queue.entries : []
+  return new Set(
+    entries.flatMap((one) => (isRecord(one) && text(one.url) ? [one.url as string] : []))
+  )
+}
+
 export function teamMemberContextOf(
   state: Rec,
   questionTickets: ReadonlySet<string>
@@ -54,6 +64,7 @@ export function teamMemberContextOf(
     questionTickets,
     usage: accountUsageOf(state.metrics),
     summaries: summariesOf(state.inboxes),
+    mergeQueued: mergeQueuedOf(state.project),
     terminalOf: (raw, paneKey) => {
       // Why: game.state omits a local member's worktree when it is the lead's.
       const worktreeId = (isRecord(raw.worktree) ? text(raw.worktree.id) : null) ?? leadWorktreeId

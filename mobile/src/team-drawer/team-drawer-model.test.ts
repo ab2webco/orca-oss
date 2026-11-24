@@ -129,6 +129,37 @@ describe('teamLeadViewOf', () => {
     expect(view?.members[0]).toMatchObject({ pr: null, ticket: null, ticketStatus: null })
   })
 
+  it('says what a remote member whose home Run completed still waits for, as the desktop fleet does', () => {
+    const pr = (state: string) => ({
+      provider: 'github',
+      number: 41,
+      title: 't',
+      url: 'https://pr/41',
+      state,
+      ci: 'success'
+    })
+    const statusOf = (over: Record<string, unknown>, state: Record<string, unknown> = {}) =>
+      teamLeadViewOf(
+        leadState({
+          agents: [member({ state: 'idle', remote: { host: 'iMac', ticketDone: true }, ...over })],
+          ...state
+        })
+      )?.members[0].ticketStatus
+    expect(statusOf({ review: pr('open') })).toBe('run done, PR #41 open')
+    expect(
+      statusOf(
+        { review: pr('open') },
+        { project: { queue: { entries: [{ url: 'https://pr/41' }] } } }
+      )
+    ).toBe('run done, PR #41 in the merge queue')
+    expect(statusOf({})).toBe('run done, no PR')
+    expect(statusOf({ review: pr('merged') })).toBe('done')
+    expect(
+      statusOf({ launch: { chosenBy: { by: 'lead', kind: 'audit', source: 'ticket' } } })
+    ).toBe('done')
+    expect(statusOf({ remote: { host: 'iMac' }, review: pr('open') })).toBeNull()
+  })
+
   it('takes the ticket from the member name before one is linked', () => {
     const view = teamLeadViewOf(leadState({ agents: [member({ displayName: 'ORCA-12 worker' })] }))
     expect(view?.members[0].ticket).toBe('ORCA-12')
