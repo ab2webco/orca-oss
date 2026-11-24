@@ -1023,7 +1023,8 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
       }
     }
     // Why our own id: a lost answer is then looked up by it instead of guessed (ORCA-1398).
-    const requestId = getOptionalStringFlag(flags, 'retry-request') ?? randomUUID()
+    const retryRequest = getOptionalStringFlag(flags, 'retry-request')
+    const requestId = retryRequest ?? randomUUID()
     const params = {
       task: getRequiredStringFlag(flags, 'task'),
       on: getOptionalStringFlag(flags, 'on'),
@@ -1058,7 +1059,12 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
         residualResources: unknown[]
       }>('orchestration.workerStart', params, { orchestrationRequestId: requestId })
       .catch(async (error: unknown) => {
-        throw await workerStartFailureOf(error, requestId, workerStartOutcomeProbe(client))
+        throw await workerStartFailureOf(
+          error,
+          requestId,
+          workerStartOutcomeProbe(client),
+          retryRequest !== undefined
+        )
       })
     if (result.result.state !== 'ready') {
       process.exitCode = 1

@@ -8,7 +8,13 @@ import {
 /** Whether a worker-start whose answer was lost took effect (ORCA-1398). */
 export type WorkerStartApplied =
   | { applied: 'applied'; dispatchId: string }
-  | { applied: 'not_applied' | 'unknown' }
+  | { applied: 'not_applied' }
+  | { applied: 'unknown'; reason: WorkerStartUnknownReason }
+
+/** Why the outcome is unknown: the runtime's own answer, or that it gave none. */
+export type WorkerStartUnknownReason = 'in_flight' | 'no_dispatch' | 'undecided' | 'unanswered'
+
+const ANSWERED_UNKNOWN: ReadonlySet<unknown> = new Set(['in_flight', 'no_dispatch'])
 
 export type WorkerStartOutcomeProbe = (requestId: string) => Promise<WorkerStartApplied>
 
@@ -18,17 +24,21 @@ const PROBE_TIMEOUT_MS = 10_000
 export function workerStartOutcomeProbe(client: RuntimeClient): WorkerStartOutcomeProbe {
   return async (requestId) => {
     try {
-      const { result } = await client.call<Partial<{ applied: string; dispatchId: string }>>(
-        'orchestration.workerStartOutcome',
-        { requestId },
-        { timeoutMs: PROBE_TIMEOUT_MS }
-      )
+      const { result } = await client.call<
+        Partial<{ applied: string; dispatchId: string; reason: string }>
+      >('orchestration.workerStartOutcome', { requestId }, { timeoutMs: PROBE_TIMEOUT_MS })
       if (result.applied === 'applied' && typeof result.dispatchId === 'string') {
         return { applied: 'applied', dispatchId: result.dispatchId }
       }
-      return { applied: result.applied === 'not_applied' ? 'not_applied' : 'unknown' }
+      if (result.applied === 'not_applied') {
+        return { applied: 'not_applied' }
+      }
+      const reason = ANSWERED_UNKNOWN.has(result.reason)
+        ? (result.reason as WorkerStartUnknownReason)
+        : 'undecided'
+      return { applied: 'unknown', reason }
     } catch {
-      return { applied: 'unknown' }
+      return { applied: 'unknown', reason: 'unanswered' }
     }
   }
 }
@@ -48,18 +58,27 @@ function neverSent(error: RuntimeClientError): boolean {
   )
 }
 
+const unknownLineOf = (reason: WorkerStartUnknownReason, requestId: string): string =>
+  ({
+    in_flight: `Orca Lab is still handling request ${requestId}.`,
+    no_dispatch: `Orca Lab recorded request ${requestId} but no Dispatch for it, as a start queued for setup does.`,
+    undecided: 'Orca Lab answered but could not tell.',
+    unanswered: 'Orca Lab could not be asked.'
+  })[reason]
+
 /** The worker-start error, reworded to say whether the start applied; other errors pass through. */
 export async function workerStartFailureOf(
   error: unknown,
   requestId: string,
-  probe: WorkerStartOutcomeProbe
+  probe: WorkerStartOutcomeProbe,
+  retriedRequest = false
 ): Promise<unknown> {
   if (!(error instanceof RuntimeClientError) || !isUnknownMutationOutcomeCode(error.code)) {
     return error
   }
-  const outcome: WorkerStartApplied = neverSent(error)
-    ? { applied: 'not_applied' }
-    : await probe(requestId)
+  // Why not for a retried id: an earlier attempt under it may have applied (ORCA-1398).
+  const outcome: WorkerStartApplied =
+    !retriedRequest && neverSent(error) ? { applied: 'not_applied' } : await probe(requestId)
   const data = { ...dataOf(error), orchestrationRequestId: requestId, ...outcome }
   if (outcome.applied === 'applied') {
     const message = stripUnsafeRetryAdvice(error.message, requestId)
@@ -82,7 +101,7 @@ export async function workerStartFailureOf(
   return recovered instanceof RuntimeClientError
     ? new RuntimeClientError(
         recovered.code,
-        `${recovered.message}\nWhether the start applied is unknown: Orca Lab could not be asked.`,
+        `${recovered.message}\nWhether the start applied is unknown: ${unknownLineOf(outcome.reason, requestId)}`,
         recovered.data
       )
     : recovered

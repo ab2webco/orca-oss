@@ -147,11 +147,14 @@ export class OrchestrationMutationExecutor {
       return { applied: 'applied', dispatchId }
     }
     // Why in-flight is unknown: its acceptance may still commit after this read.
-    return row ||
+    if (
       this.receivedStarts.has(requestId) ||
       this.inFlight.has(`${callerFingerprint}:${requestId}`)
-      ? { applied: 'unknown' }
-      : { applied: 'not_applied' }
+    ) {
+      return { applied: 'unknown', reason: 'in_flight' }
+    }
+    // Why a receipt without a Dispatch is unknown: a start queued for setup took effect without one.
+    return row ? { applied: 'unknown', reason: 'no_dispatch' } : { applied: 'not_applied' }
   }
 
   getLocalAuthenticatedCallerFingerprint(): string {
@@ -228,7 +231,8 @@ function attachMutationReceipt(result: unknown, requestId: string, replayed: boo
 
 export type WorkerStartOutcome =
   | { applied: 'applied'; dispatchId: string }
-  | { applied: 'not_applied' | 'unknown' }
+  | { applied: 'not_applied' }
+  | { applied: 'unknown'; reason: 'in_flight' | 'no_dispatch' }
 
 // Why both shapes: a pending receipt holds `accepted`, a completed one the start's own result.
 function acceptedDispatchIdOf(receipt: string | null): string | undefined {

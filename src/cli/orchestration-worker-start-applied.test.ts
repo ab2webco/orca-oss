@@ -73,10 +73,56 @@ describe('worker-start says whether a start with a lost answer applied (ORCA-139
   })
 
   it('unknown: keeps the idempotent retry advice and says the outcome is unknown', async () => {
-    const error = await failureOf(dropped(), async () => ({ applied: 'unknown' }))
+    const error = await failureOf(dropped(), async () => ({
+      applied: 'unknown',
+      reason: 'unanswered'
+    }))
     expect(error.message).toContain(`--retry-request ${REQ}`)
-    expect(error.message).toContain('Whether the start applied is unknown')
+    expect(error.message).toContain(
+      'Whether the start applied is unknown: Orca Lab could not be asked.'
+    )
     expect(error.data).toMatchObject({ applied: 'unknown', orchestrationRequestId: REQ })
+  })
+
+  it('unknown: words the line from what Orca Lab answered, not as unasked', async () => {
+    const inFlight = await failureOf(dropped(), async () => ({
+      applied: 'unknown',
+      reason: 'in_flight'
+    }))
+    expect(inFlight.message).toContain(
+      `Whether the start applied is unknown: Orca Lab is still handling request ${REQ}.`
+    )
+    expect(inFlight.message).not.toContain('could not be asked')
+    const noDispatch = await failureOf(dropped(), async () => ({
+      applied: 'unknown',
+      reason: 'no_dispatch'
+    }))
+    expect(noDispatch.message).toContain(
+      `Whether the start applied is unknown: Orca Lab recorded request ${REQ} but no Dispatch for it, as a start queued for setup does.`
+    )
+    expect(noDispatch.message).not.toContain('could not be asked')
+  })
+
+  it('a --retry-request start asks the runtime even when the connection never opened', async () => {
+    // Why: the id may have applied on an earlier attempt, so a refused connection proves nothing.
+    const probe = vi.fn<WorkerStartOutcomeProbe>(async () => ({
+      applied: 'unknown',
+      reason: 'unanswered'
+    }))
+    const neverConnected = new RuntimeClientError(
+      'runtime_unavailable',
+      'Could not connect to the Orca Lab runtime transport from this shell.',
+      { requestSent: false, orchestrationRequestId: REQ }
+    )
+    const error = (await workerStartFailureOf(
+      neverConnected,
+      REQ,
+      probe,
+      true
+    )) as RuntimeClientError
+    expect(probe).toHaveBeenCalledWith(REQ)
+    expect(error.data).toMatchObject({ applied: 'unknown' })
+    expect(error.message).not.toContain('did not apply')
   })
 
   it('leaves an answer that is not an unknown outcome untouched', async () => {
@@ -87,7 +133,7 @@ describe('worker-start says whether a start with a lost answer applied (ORCA-139
   it('probe: an older runtime without the lookup, or a silent one, is unknown', async () => {
     const call = vi.fn().mockRejectedValue(new RuntimeClientError('method_not_found', 'Unknown'))
     const probe = workerStartOutcomeProbe({ call } as never)
-    await expect(probe(REQ)).resolves.toEqual({ applied: 'unknown' })
+    await expect(probe(REQ)).resolves.toEqual({ applied: 'unknown', reason: 'unanswered' })
     expect(call).toHaveBeenCalledWith(
       'orchestration.workerStartOutcome',
       { requestId: REQ },
@@ -103,6 +149,17 @@ describe('worker-start says whether a start with a lost answer applied (ORCA-139
       dispatchId: 'ctx_9'
     })
     await expect(reply({ applied: 'not_applied' })).resolves.toEqual({ applied: 'not_applied' })
-    await expect(reply({ applied: 'applied' })).resolves.toEqual({ applied: 'unknown' })
+    await expect(reply({ applied: 'applied' })).resolves.toEqual({
+      applied: 'unknown',
+      reason: 'undecided'
+    })
+    await expect(reply({ applied: 'unknown', reason: 'in_flight' })).resolves.toEqual({
+      applied: 'unknown',
+      reason: 'in_flight'
+    })
+    await expect(reply({ applied: 'unknown', reason: 'no_dispatch' })).resolves.toEqual({
+      applied: 'unknown',
+      reason: 'no_dispatch'
+    })
   })
 })

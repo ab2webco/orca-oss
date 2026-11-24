@@ -1,8 +1,10 @@
 import {
+  gameFleetMembersOf,
   gameFleetReportOf,
   ticketOfMember,
   type GameFleetInput
 } from './orchestrator-game-fleet-verbs'
+import { remoteNextOf } from './orchestrator-game-member-next'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
 import {
   queueDepartureLineOf,
@@ -47,6 +49,16 @@ export const emptyGameLeadAlertMemory = (): GameLeadAlertMemory => ({
 
 const minutesOf = (ms: number): number => Math.floor(ms / 60_000)
 
+// Why by pane, not ticket: a relaunch can fail while the first failed start is still listed (ORCA-1398).
+function startFailedAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
+  return gameFleetMembersOf(state).flatMap((agent) => {
+    const ticket = ticketOfMember(agent)
+    const next = agent.remote?.startFailed ? remoteNextOf(agent, ticket) : null
+    const who = ticket ?? agent.displayName ?? agent.paneKey
+    return next ? [{ key: `start-failed:${agent.paneKey}`, line: `${who} ${next}` }] : []
+  })
+}
+
 function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {
   const fleet = gameFleetReportOf(state)
   const alerts: GameLeadAlert[] = []
@@ -57,7 +69,7 @@ function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, 
     const who = row.ticket ?? row.name
     const review = row.review ?? 'no PR'
     if (row.next.startsWith('failed to start on ')) {
-      add(who, 'start-failed', row.next)
+      // Alerted per start by startFailedAlertsOf.
     } else if (row.next.startsWith('gone from ')) {
       add(who, 'gone', `${row.next}. Compare its host worktree head with the pushed branch first.`)
     } else if (row.review?.endsWith(' merged')) {
@@ -234,6 +246,7 @@ export function gameLeadAlertsOf(
 ): GameLeadAlert[] {
   return [
     ...duplicateLeadAlertsOf(state),
+    ...startFailedAlertsOf(state),
     ...memberAlertsOf(state, memory, now),
     ...undeliveredMailAlertsOf(state, now),
     ...prCapAlertsOf(state),
