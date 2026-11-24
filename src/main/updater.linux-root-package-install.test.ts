@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type * as UpdaterModule from './updater'
 import type * as RecoveryModule from './linux-package-update-recovery'
+import type * as DiagnosticModule from './linux-package-install-diagnostic'
 import type { UpdateStatus } from '../shared/update-status-types'
 import { PRE_COMMIT_INSTALL_FAILURE } from './updater-test-harness'
 
@@ -23,6 +24,10 @@ const {
   rotateAutoUpdaterMock
 } = await vi.hoisted(async () => (await import('./updater-test-harness')).createUpdaterMocks())
 let autoUpdaterMock = initialAutoUpdaterMock
+const { relaunchAppMock, escalationBlockedMock } = vi.hoisted(() => ({
+  relaunchAppMock: vi.fn(),
+  escalationBlockedMock: vi.fn(() => false)
+}))
 
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
@@ -37,6 +42,11 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
+vi.mock('./app-relaunch', () => ({ relaunchApp: relaunchAppMock }))
+vi.mock('./linux-package-install-diagnostic', async (importOriginal) => ({
+  ...(await importOriginal<typeof DiagnosticModule>()),
+  isPrivilegeEscalationBlocked: escalationBlockedMock
+}))
 
 type RevalidationVerdict = Awaited<
   ReturnType<typeof RecoveryModule.revalidateLinuxPackageForInstall>
@@ -83,6 +93,9 @@ describe('updater', () => {
   beforeEach(() => {
     autoUpdaterMock = rotateAutoUpdaterMock()
     resetUpdaterMocks()
+    relaunchAppMock.mockReset()
+    escalationBlockedMock.mockReset()
+    escalationBlockedMock.mockReturnValue(false)
   })
 
   describe('linux root package install recovery', () => {
@@ -480,6 +493,82 @@ describe('updater', () => {
       )
     })
 
+    // Why: real pkexec output as DebUpdater sees it: stderr is logged, then 'error' carries only the code.
+    it.each([
+      ['no polkit output', '', 'authorization-not-obtained'],
+      [
+        'English polkit output',
+        'Error executing command as another user: No authentication agent found.',
+        'authentication-agent-unavailable'
+      ],
+      [
+        'localized polkit output',
+        'Error al ejecutar la orden como otro usuario: no se encontró ningún agente de autenticación.',
+        'authorization-not-obtained'
+      ],
+      ['the no_new_privs refusal', 'pkexec must be setuid root', 'privilege-escalation-blocked']
+    ])('names the cause of a pkexec exit 127 with %s', async (_label, stderr, reason) => {
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.quitAndInstall.mockImplementation(() => {
+        autoUpdaterMock.logger?.error(stderr)
+        autoUpdaterMock.emit('error', new Error('Command pkexec exited with code 127'))
+      })
+
+      updater.quitAndInstall()
+      await settleQuitAndInstall()
+
+      expect(lastStatus(send)).toMatchObject({
+        state: 'error',
+        recovery: { kind: 'linux-package-install', reason }
+      })
+      expect(relaunchAppMock).not.toHaveBeenCalled()
+    })
+
+    it('names no_new_privs when this process carries it, whatever pkexec printed', async () => {
+      escalationBlockedMock.mockReturnValue(true)
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.quitAndInstall.mockImplementation(() => {
+        autoUpdaterMock.emit('error', new Error('Command pkexec exited with code 127'))
+      })
+
+      updater.quitAndInstall()
+      await settleQuitAndInstall()
+
+      expect(lastStatus(send)).toMatchObject({
+        recovery: { reason: 'privilege-escalation-blocked' }
+      })
+    })
+
+    // Why: electron-updater's own app.relaunch() hands the new version no_new_privs (ORCA-1349).
+    it('relaunches through Orca, not electron-updater, after a root package install', async () => {
+      const { updater } = await startUpdater('deb')
+      expect(autoUpdaterMock.autoRunAppAfterInstall).toBe(false)
+      await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.quitAndInstall.mockImplementation(() => {
+        expect(relaunchAppMock).not.toHaveBeenCalled()
+      })
+
+      updater.quitAndInstall()
+      await settleQuitAndInstall()
+
+      expect(relaunchAppMock).toHaveBeenCalledExactlyOnceWith('update-install')
+    })
+
+    it('leaves electron-updater relaunch alone without a root package marker', async () => {
+      vi.resetModules()
+      getLinuxRootPackageTypeMock.mockReturnValue(null)
+      const { setupAutoUpdater } = await import('./updater')
+
+      setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+        getLastUpdateCheckAt: () => Date.now(),
+        installMode: 'interactive'
+      })
+
+      expect(autoUpdaterMock.autoRunAppAfterInstall).toBe(true)
+    })
+
     it('installs normally when the retained package still matches its digest', async () => {
       const { send, updater } = await startUpdater('deb')
       await reachDownloaded(updater, downloadedEvent())
@@ -557,7 +646,7 @@ describe('updater', () => {
         recovery: {
           kind: 'linux-package-install',
           packageType: 'deb',
-          reason: 'package-install-failed',
+          reason: 'authorization-not-obtained',
           version: '1.0.61'
         }
       })

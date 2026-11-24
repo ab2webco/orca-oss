@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import os from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as DiagnosticModule from './linux-package-install-diagnostic'
@@ -311,6 +312,74 @@ describe('classifyLinuxPackageInstallFailure', () => {
     )
     expect(diagnostic.classifyLinuxPackageInstallFailure(null)).toBe('package-install-failed')
     expect(diagnostic.classifyLinuxPackageInstallFailure('')).toBe('package-install-failed')
+  })
+})
+
+describe('privilege escalation blocked by no_new_privs', () => {
+  it('classifies the pkexec refusal under no_new_privs', () => {
+    expect(diagnostic.classifyLinuxPackageInstallFailure('pkexec must be setuid root')).toBe(
+      'privilege-escalation-blocked'
+    )
+  })
+
+  const statusWith = (flag: string): string =>
+    `Name:\torca-ide\nNoNewPrivs:\t${flag}\nSeccomp:\t0\n`
+
+  it('reads NoNewPrivs from this process status', () => {
+    vi.spyOn(process, 'getuid').mockReturnValue(1000)
+    const read = vi.spyOn(fs, 'readFileSync').mockReturnValue(statusWith('1'))
+    expect(diagnostic.isPrivilegeEscalationBlocked()).toBe(true)
+    expect(read).toHaveBeenCalledWith('/proc/self/status', 'utf8')
+
+    read.mockReturnValue(statusWith('0'))
+    expect(diagnostic.isPrivilegeEscalationBlocked()).toBe(false)
+  })
+
+  it('is not blocked when running as root or when status is unreadable', () => {
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(statusWith('1'))
+    vi.spyOn(process, 'getuid').mockReturnValue(0)
+    expect(diagnostic.isPrivilegeEscalationBlocked()).toBe(false)
+
+    vi.spyOn(process, 'getuid').mockReturnValue(1000)
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('ENOENT')
+    })
+    expect(diagnostic.isPrivilegeEscalationBlocked()).toBe(false)
+  })
+})
+
+describe('resolveLinuxPackageInstallFailureReason', () => {
+  const resolve = (
+    outputReason: Parameters<typeof diagnostic.resolveLinuxPackageInstallFailureReason>[0],
+    exitCode: number | null,
+    escalationBlocked = false
+  ) => diagnostic.resolveLinuxPackageInstallFailureReason(outputReason, exitCode, escalationBlocked)
+
+  it('names no_new_privs whatever pkexec printed', () => {
+    expect(resolve(null, 127, true)).toBe('privilege-escalation-blocked')
+    expect(resolve('package-install-failed', 1, true)).toBe('privilege-escalation-blocked')
+  })
+
+  it('keeps a reason the captured output proved', () => {
+    expect(resolve('authentication-agent-unavailable', 127)).toBe(
+      'authentication-agent-unavailable'
+    )
+    expect(resolve('authentication-denied', 127)).toBe('authentication-denied')
+  })
+
+  // Why: pkexec(1) exit statuses hold in every locale and when it prints nothing.
+  it('reads pkexec exit 127 as authorization not obtained when output proves nothing', () => {
+    expect(resolve(null, 127)).toBe('authorization-not-obtained')
+    expect(resolve('package-install-failed', 127)).toBe('authorization-not-obtained')
+  })
+
+  it('reads pkexec exit 126 as a dismissed prompt', () => {
+    expect(resolve(null, 126)).toBe('authentication-denied')
+  })
+
+  it('stays generic for a package manager failure', () => {
+    expect(resolve('package-install-failed', 1)).toBe('package-install-failed')
+    expect(resolve(null, null)).toBe('package-install-failed')
   })
 })
 

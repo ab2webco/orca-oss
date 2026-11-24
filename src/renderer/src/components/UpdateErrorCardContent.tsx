@@ -25,6 +25,8 @@ export type UpdateErrorCardModel = {
   summary: string
   /** Optional guidance box between the summary and the raw error output. */
   explainer?: string
+  /** Always-visible content after the explainer, before the collapsed raw error. */
+  body?: React.ReactNode
   /** Raw error text, shown only when the user expands "Show details". */
   detail?: string
   releaseUrl?: string
@@ -71,6 +73,7 @@ export function UpdateErrorCardContent({
   title,
   summary,
   explainer,
+  body,
   detail,
   releaseUrl,
   manualLabel,
@@ -118,6 +121,8 @@ export function UpdateErrorCardContent({
           <p className="text-xs leading-relaxed text-muted-foreground">{explainer}</p>
         </div>
       ) : null}
+
+      {body}
 
       {/* Caret disclosure that reveals the raw error while the plain summary stays the lead. */}
       {detail ? (

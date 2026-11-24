@@ -37,6 +37,7 @@ import {
   checkForUpdatesFromMenu,
   downloadUpdate,
   getLinuxPackageInstallInstructions,
+  getLinuxPackageInstallPreview,
   getUpdateStatus,
   quitAndInstall,
   setupAutoUpdater,
@@ -595,6 +596,7 @@ export function registerUpdaterHandlers(_store: Store): void {
   ipcMain.removeHandler('updater:dismissNudge')
   ipcMain.removeHandler('updater:dismissAvailableUpdate')
   ipcMain.removeHandler('updater:getLinuxPackageInstallInstructions')
+  ipcMain.removeHandler('updater:getLinuxPackageInstallPreview')
   ipcMain.removeHandler('updater:showLinuxPackage')
   ipcMain.removeHandler('updater:listBuilds')
 
@@ -613,6 +615,10 @@ export function registerUpdaterHandlers(_store: Store): void {
   ipcMain.handle('updater:getLinuxPackageInstallInstructions', (event) => {
     assertTrustedUpdaterRecoverySender(event)
     return getLinuxPackageInstallInstructions()
+  })
+  ipcMain.handle('updater:getLinuxPackageInstallPreview', (event) => {
+    assertTrustedUpdaterRecoverySender(event)
+    return getLinuxPackageInstallPreview()
   })
   ipcMain.handle('updater:showLinuxPackage', (event) => {
     assertTrustedUpdaterRecoverySender(event)

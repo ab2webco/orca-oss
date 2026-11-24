@@ -3383,6 +3383,7 @@ function createUpdaterApi(): NonNullable<Partial<PreloadApi>['updater']> {
     dismissNudge: () => Promise.resolve(),
     dismissAvailableUpdate: () => Promise.resolve(),
     getLinuxPackageInstallInstructions: () => Promise.reject(new Error(desktopOnlyMessage)),
+    getLinuxPackageInstallPreview: () => Promise.reject(new Error(desktopOnlyMessage)),
     showLinuxPackage: () => Promise.reject(new Error(desktopOnlyMessage)),
     // Why: the web client cannot install a desktop build, so channel switching
     // reports unavailable rather than an empty list that looks like a fetch miss.

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
+  LinuxPackageInstallFailureReason,
   LinuxPackageInstallInstructions,
+  LinuxPackageInstallPreview,
   LinuxPackageInstallRecovery
 } from '../../../shared/update-status-types'
 import { UpdateErrorCardContent } from './UpdateErrorCardContent'
@@ -16,6 +18,34 @@ function copiedNote(packageFileName: string): string {
       value0: packageFileName
     }
   )
+}
+
+// Only causes main proved; a generic package-manager failure names none.
+function causeNote(reason: LinuxPackageInstallFailureReason): string | null {
+  switch (reason) {
+    case 'authentication-agent-unavailable':
+      return translate(
+        'auto.components.LinuxPackageInstallRecoveryCard.53c4b8e148',
+        'No usable authentication agent answered the privileged install request.'
+      )
+    case 'authentication-denied':
+      return translate(
+        'auto.components.LinuxPackageInstallRecoveryCard.62e76ff8b8',
+        'The administrator password prompt was dismissed or authentication failed.'
+      )
+    case 'authorization-not-obtained':
+      return translate(
+        'auto.components.LinuxPackageInstallRecoveryCard.3eb547793c',
+        'The system did not grant administrator authorization (pkexec exit 127), so the package was not installed.'
+      )
+    case 'privilege-escalation-blocked':
+      return translate(
+        'auto.components.LinuxPackageInstallRecoveryCard.8518002a26',
+        'This Orca Lab window was started by an automatic restart that blocks administrator prompts. Quit Orca Lab and open it again from your app menu to retry, or run the command in a terminal outside Orca Lab.'
+      )
+    default:
+      return null
+  }
 }
 
 function toMessage(error: unknown): string {
@@ -49,10 +79,6 @@ export function LinuxPackageInstallRecoveryCard({
     'auto.components.LinuxPackageInstallRecoveryCard.82c6dbea00',
     'Copy the command and run it in a system terminal on the computer where Orca Lab is installed. After it finishes, quit and reopen Orca Lab to run the new version.'
   )
-  const AGENT_NOTE = translate(
-    'auto.components.LinuxPackageInstallRecoveryCard.53c4b8e148',
-    'No usable authentication agent answered the privileged install request.'
-  )
   const TRUST_NOTE = translate(
     'auto.components.LinuxPackageInstallRecoveryCard.b7e7c5bc95',
     'Orca Lab checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca Lab cannot vouch for the file after that point.'
@@ -66,6 +92,9 @@ export function LinuxPackageInstallRecoveryCard({
   const [copiedFileName, setCopiedFileName] = useState<string | null>(null)
   // Why: the trusted system directories lack sudo or a package manager — no command can be offered at all.
   const [commandUnavailable, setCommandUnavailable] = useState(false)
+  const [preview, setPreview] = useState<Extract<LinuxPackageInstallPreview, { ok: true }> | null>(
+    null
+  )
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -74,6 +103,26 @@ export function LinuxPackageInstallRecoveryCard({
       mountedRef.current = false
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+    // Why: display only — the preview is never copied; Copy re-proves the package before it builds.
+    window.api.updater
+      .getLinuxPackageInstallPreview()
+      .then((result) => {
+        if (active) {
+          setPreview(result.ok ? result : null)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPreview(null)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [recovery])
 
   // Why: quitAndInstall resolves as soon as main schedules the install, so a failed retry never
   // rejects — it arrives as a new recovery status. Without this the busy slot never clears and every
@@ -213,13 +262,34 @@ export function LinuxPackageInstallRecoveryCard({
       }
     : undefined
 
-  const detail = [
-    recovery.reason === 'authentication-agent-unavailable' ? AGENT_NOTE : null,
-    diagnostic,
-    TRUST_NOTE
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const detail = [diagnostic, TRUST_NOTE].filter(Boolean).join(' ')
+  const cause = causeNote(recovery.reason)
+  // Why: no_new_privs is permanent for this process, so its own retry would fail the same way.
+  const canRetry = recovery.reason !== 'privilege-escalation-blocked'
+  const fieldLabel = 'mb-0.5 text-[11px] font-medium uppercase text-muted-foreground'
+  const fieldValue = 'select-text break-all font-mono text-xs leading-relaxed text-foreground'
+  const body =
+    cause || (preview && !commandUnavailable) ? (
+      <div className="flex flex-col gap-2">
+        {cause ? <p className="text-xs leading-relaxed text-foreground">{cause}</p> : null}
+        {preview && !commandUnavailable ? (
+          <div className="flex flex-col gap-1.5 rounded-md bg-muted/40 px-3 py-2">
+            <div>
+              <p className={fieldLabel}>
+                {translate('auto.components.LinuxPackageInstallRecoveryCard.7431e3df24', 'Package')}
+              </p>
+              <p className={fieldValue}>{preview.packagePath}</p>
+            </div>
+            <div>
+              <p className={fieldLabel}>
+                {translate('auto.components.LinuxPackageInstallRecoveryCard.8901895fb1', 'Command')}
+              </p>
+              <p className={fieldValue}>{preview.command}</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : undefined
 
   const footnote = actionError
     ? { text: actionError, tone: 'destructive' as const }
@@ -232,10 +302,11 @@ export function LinuxPackageInstallRecoveryCard({
       title={TITLE}
       summary={SUMMARY}
       explainer={commandUnavailable ? undefined : EXPLAINER}
+      body={body}
       detail={detail}
       // Why: with no safe command to copy, revealing the retained package becomes the primary path.
       primaryAction={commandUnavailable ? showAction : copyAction}
-      secondaryAction={retryAction}
+      secondaryAction={canRetry ? retryAction : undefined}
       // Why: the button row only fits two actions at this card width, so the demoted mode keeps
       // Show Package and Retry there and drops the official-release link to the link row.
       tertiaryAction={commandUnavailable ? officialReleaseAction : showAction}

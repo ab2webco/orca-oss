@@ -11,6 +11,7 @@ const {
   resolveLinuxPackageInstallInstructionsMock,
   revalidateLinuxPackageForInstallMock,
   revealLinuxPackageMock,
+  buildCommandMock,
   resetHandlers
 } = vi.hoisted(() => {
   const updaterHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
@@ -45,6 +46,7 @@ const {
     resolveLinuxPackageInstallInstructionsMock: vi.fn(),
     revalidateLinuxPackageForInstallMock: vi.fn(),
     revealLinuxPackageMock: vi.fn(),
+    buildCommandMock: vi.fn(),
     resetHandlers: () => updaterHandlers.clear()
   }
 })
@@ -88,6 +90,10 @@ vi.mock('./linux-package-update-recovery', () => ({
   revealLinuxPackage: revealLinuxPackageMock
 }))
 
+vi.mock('./linux-package-install-command', () => ({
+  buildLinuxPackageInstallCommand: buildCommandMock
+}))
+
 const ARTIFACT = {
   packageType: 'deb' as const,
   version: '1.0.61',
@@ -118,6 +124,7 @@ describe('linux package recovery actions', () => {
       .mockResolvedValue({ ok: true, command: "sudo apt install -- '<pkg>'", packageFileName: 'p' })
     revalidateLinuxPackageForInstallMock.mockReset().mockResolvedValue({ ok: true })
     revealLinuxPackageMock.mockReset().mockResolvedValue({ ok: true })
+    buildCommandMock.mockReset().mockReturnValue({ ok: true, command: 'preview command' })
   })
 
   const startUpdater = async (): Promise<{
@@ -162,6 +169,35 @@ describe('linux package recovery actions', () => {
     expect(revealLinuxPackageMock).not.toHaveBeenCalled()
   })
 
+  // Why: the card shows the path and command on mount; hashing 160 MB there would stall it.
+  it('previews the command and package path without re-proving the package', async () => {
+    const { updater } = await startUpdater()
+    expect(updater.getLinuxPackageInstallPreview()).toEqual({ ok: false })
+    await failInstall(updater)
+    const reproofsBefore = revalidateLinuxPackageForInstallMock.mock.calls.length
+
+    expect(updater.getLinuxPackageInstallPreview()).toEqual({
+      ok: true,
+      command: 'preview command',
+      packagePath: ARTIFACT.path
+    })
+    expect(buildCommandMock).toHaveBeenCalledWith('deb', ARTIFACT.path)
+    expect(resolveLinuxPackageInstallInstructionsMock).not.toHaveBeenCalled()
+    expect(revalidateLinuxPackageForInstallMock).toHaveBeenCalledTimes(reproofsBefore)
+  })
+
+  it('previews nothing for another version or when no safe command exists', async () => {
+    const { updater } = await startUpdater()
+    await failInstall(updater)
+
+    getTrackedLinuxPackageArtifactMock.mockReturnValue({ ...ARTIFACT, version: '1.0.62' })
+    expect(updater.getLinuxPackageInstallPreview()).toEqual({ ok: false })
+
+    getTrackedLinuxPackageArtifactMock.mockReturnValue(ARTIFACT)
+    buildCommandMock.mockReturnValue({ ok: false, reason: 'no-sudo' })
+    expect(updater.getLinuxPackageInstallPreview()).toEqual({ ok: false })
+  })
+
   it('revalidates the retained package on every invocation', async () => {
     const { updater } = await startUpdater()
     await failInstall(updater)
@@ -178,7 +214,7 @@ describe('linux package recovery actions', () => {
     const recovery = {
       kind: 'linux-package-install',
       packageType: 'deb',
-      reason: 'package-install-failed',
+      reason: 'authorization-not-obtained',
       version: '1.0.61'
     }
     expect(resolveLinuxPackageInstallInstructionsMock.mock.calls).toEqual([[recovery], [recovery]])
