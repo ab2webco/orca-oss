@@ -157,6 +157,11 @@ describe('teamLeadViewOf', () => {
     expect(
       statusOf({ launch: { chosenBy: { by: 'lead', kind: 'audit', source: 'ticket' } } })
     ).toBe('done')
+    expect(statusOf({ displayName: 'ORCA-12 audit' })).toBe('done')
+    // An unknown kind falls back to the title, as the desktop's launch parser drops it.
+    expect(
+      statusOf({ displayName: 'ORCA-12 audit', launch: { chosenBy: { kind: 'bogus' } } })
+    ).toBe('done')
     expect(statusOf({ remote: { host: 'iMac' }, review: pr('open') })).toBeNull()
   })
 
