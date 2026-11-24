@@ -4,14 +4,15 @@ import {
   gameFleetReportOf,
   gameFleetRowOf,
   gamePushPlanOf,
-  gameSweepOf,
   gameWavePlanOf,
   memberPhaseOf,
   ticketInText
 } from './orchestrator-game-fleet-verbs'
+import { gameSweepOf } from './orchestrator-game-sweep'
 import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
 import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
+import type { GameMemberLaunch } from './orchestrator-game-member-launch'
 
 const review = (state: GameReview['state'], ci: GameReview['ci'] = 'success'): GameReview => ({
   provider: 'github',
@@ -81,6 +82,12 @@ const finished = member({
   worktree: { id: 'wt9', branch: 'cin-9', displayName: 'cin-9' }
 })
 
+const AUDIT_LAUNCH: GameMemberLaunch = {
+  model: 'Sonnet 5.5',
+  effort: 'medium',
+  chosenBy: { by: 'lead', kind: 'audit', source: 'flag' }
+}
+
 describe('memberPhaseOf', () => {
   it('is finished only with a merged PR and a ticket in review or done, or no ticket', () => {
     expect(memberPhaseOf(finished)).toBe('finished')
@@ -102,6 +109,7 @@ describe('a member its live state reports busy', () => {
       paneKey: 'remote:ctx_8eba552ae8ed',
       displayName: 'CIN-1295',
       lastActivityAt: '2026-10-29T19:34:00.000Z',
+      launch: AUDIT_LAUNCH,
       remote: { host: 'imac', stateKnown: true, ticketDone: true }
     }),
     member({ paneKey: 'q', displayName: 'CIN-4', state: 'waiting', review: review('merged') })
@@ -121,7 +129,7 @@ describe('a member its live state reports busy', () => {
       agents: [{ ...busy[1]!, state: 'idle' }]
     })
 
-    expect(swept?.reason).toBe('its home Run completed the task; agent idle')
+    expect(swept?.reason).toBe('its home Run completed the audit task, no PR needed; agent idle')
     expect(swept?.row).toEqual(
       expect.objectContaining({ host: 'imac', lastActivityAt: '2026-10-29T19:34:00.000Z' })
     )
@@ -383,6 +391,7 @@ describe('gameFleetReportOf', () => {
           displayName: 'ORCA-829 versionCode',
           state: 'done',
           terminalHandle: 'term_5c58ff4d',
+          launch: AUDIT_LAUNCH,
           remote: {
             host: 'imac',
             stateKnown: true,
@@ -419,6 +428,7 @@ describe('gameFleetReportOf', () => {
           paneKey: 'remote:ctx_829',
           displayName: 'ORCA-829',
           state: 'done',
+          launch: AUDIT_LAUNCH,
           remote: { host: 'imac', stateKnown: true, ticketDone: true }
         })
       ]

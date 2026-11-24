@@ -3,8 +3,11 @@ import type { GameMemberPhase } from './orchestrator-game-fleet-verbs'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from './agent-question-answered-intent'
 import { agentToolLabelOf } from './agent-tool-label'
+import { finishedSignalOf, runDoneWaitOf } from './orchestrator-game-member-finished'
 
-export function idleNextOf(review: GameAgent['review']): string {
+const NONE_QUEUED: ReadonlySet<string> = new Set()
+
+export function idleNextOf(review: GameAgent['review'], queued = NONE_QUEUED): string {
   if (!review) {
     return 'push'
   }
@@ -13,6 +16,9 @@ export function idleNextOf(review: GameAgent['review']): string {
   }
   if (review.state === 'closed') {
     return `check: PR #${review.number} closed`
+  }
+  if (queued.has(review.url)) {
+    return 'wait for the merge queue'
   }
   if (review.ci === 'failure') {
     return 'push: CI failing'
@@ -43,18 +49,22 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
     // Why rebind first: a terminal replaced outside Orca leaves the member running there (CIN-1297).
     return `gone from ${remote.host}: orca game rebind ${name} if it runs on in another terminal there, else orca game stop ${name}`
   }
-  return remote?.earlierLead && remote.ticketDone
+  return remote?.earlierLead && remote.ticketDone && finishedSignalOf(agent) !== null
     ? `left by an earlier lead, ticket done: orca game stop ${ticket ?? agent.paneKey}`
     : null
 }
 
-/** The linked ticket's status, or `done` once the home Run completed a remote member's task. */
-export const memberTicketStatusOf = (agent: GameAgent): string | null =>
-  agent.workItem
-    ? agent.workItem.status || agent.workItem.statusGroup
-    : agent.remote?.ticketDone
-      ? 'done'
-      : null
+/** The linked ticket's status; once a remote member's home Run completed, `done` or what it still waits for. */
+export function memberTicketStatusOf(agent: GameAgent, queued = NONE_QUEUED): string | null {
+  if (agent.workItem) {
+    return agent.workItem.status || agent.workItem.statusGroup
+  }
+  if (!agent.remote?.ticketDone) {
+    return null
+  }
+  const wait = runDoneWaitOf(agent, queued)
+  return wait ? `run done, ${wait}` : 'done'
+}
 
 // Why the name and branch: `game launch` names the member after its ticket before any ticket is linked.
 export function ticketOfMember(agent: GameAgent): string | null {
@@ -71,7 +81,11 @@ export function ticketOfMember(agent: GameAgent): string | null {
 }
 
 /** What the lead does next for a member, from its phase alone. */
-export function phaseNextOf(agent: GameAgent, phase: GameMemberPhase): string {
+export function phaseNextOf(
+  agent: GameAgent,
+  phase: GameMemberPhase,
+  queued = NONE_QUEUED
+): string {
   switch (phase) {
     case 'finished':
       // Why: sweep never closes a session the lead did not launch (ORCA-914).
@@ -85,7 +99,9 @@ export function phaseNextOf(agent: GameAgent, phase: GameMemberPhase): string {
     case 'working':
       return 'wait'
     case 'idle':
-      return idleNextOf(agent.review)
+      return agent.remote?.ticketDone && !agent.review
+        ? `run done with no PR: open one, or game stop ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey} if nothing is ahead of main`
+        : idleNextOf(agent.review, queued)
   }
 }
 

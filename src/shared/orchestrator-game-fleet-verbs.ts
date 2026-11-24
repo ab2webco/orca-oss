@@ -14,7 +14,7 @@ import type { GameWaitingMessage } from './orchestrator-game-inbox'
 import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { gameMemberModelTextOf } from './team-panel-agent-model'
-import { finishedSignalOf, isFinishedMember } from './orchestrator-game-member-finished'
+import { isFinishedMember } from './orchestrator-game-member-finished'
 import type { GamePausedMember } from './orchestrator-game-member-sessions'
 import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
@@ -94,7 +94,14 @@ export type GameFleetInput = Pick<
   OrchestratorGameState,
   'agents' | 'lead' | 'hosts' | 'otherProjectMembers'
 > &
-  Pick<OrchestratorGameState, 'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes'>
+  Pick<
+    OrchestratorGameState,
+    'pausedMembers' | 'pausedMembersError' | 'queuedMembers' | 'inboxes' | 'project'
+  >
+
+/** The PR urls the project's merge queue lists; empty while it is unread. */
+const mergeQueuedOf = (state: Pick<OrchestratorGameState, 'project'>): ReadonlySet<string> =>
+  new Set(state.project?.queue?.entries?.map((entry) => entry.url))
 
 export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   if (isFinishedMember(agent)) {
@@ -112,18 +119,24 @@ export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
   return agent.state === 'working' ? 'working' : 'idle'
 }
 
-export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage): GameFleetRow {
+export function gameFleetRowOf(
+  agent: GameAgent,
+  question?: GameWaitingMessage,
+  queued?: ReadonlySet<string>
+): GameFleetRow {
   const phase = memberPhaseOf(agent)
   return {
     name: agent.displayName ?? agent.paneKey,
     ticket: ticketOfMember(agent),
-    ticketStatus: memberTicketStatusOf(agent),
+    ticketStatus: memberTicketStatusOf(agent, queued),
     state: agent.state,
     review: agent.review ? `#${agent.review.number} ${agent.review.state}` : null,
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next: remoteNextOf(agent, ticketOfMember(agent)) ?? nextWithQuestionOf(agent, phase, question),
+    next:
+      remoteNextOf(agent, ticketOfMember(agent)) ??
+      nextWithQuestionOf(agent, phase, question, queued),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
@@ -146,12 +159,13 @@ export function gameFleetRowOf(agent: GameAgent, question?: GameWaitingMessage):
 function nextWithQuestionOf(
   agent: GameAgent,
   phase: GameMemberPhase,
-  question: GameWaitingMessage | undefined
+  question: GameWaitingMessage | undefined,
+  queued: ReadonlySet<string> | undefined
 ): string {
   if (question && phase !== 'finished') {
     return waitingOnYouNextOf(question)
   }
-  return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : phaseNextOf(agent, phase)
+  return agent.orphaned && phase !== 'finished' ? ORPHANED_NEXT : phaseNextOf(agent, phase, queued)
 }
 
 export const gameFleetMembersOf = (state: GameFleetInput): GameAgent[] =>
@@ -166,11 +180,13 @@ const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
 export function gameFleetReportOf(state: GameFleetInput): GameFleet {
   // Why: questions reach the lead's inbox, and each asking member is one ticket there.
   const waiting = state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? []
+  const mergeQueued = mergeQueuedOf(state)
   const rows = byPhase(
     gameFleetMembersOf(state).map((agent) =>
       gameFleetRowOf(
         agent,
-        waiting.find((question) => question.from === ticketOfMember(agent))
+        waiting.find((question) => question.from === ticketOfMember(agent)),
+        mergeQueued
       )
     ),
     (row) => row.phase
@@ -270,40 +286,6 @@ export function gameWavePlanOf(
     }
   }
   return plan
-}
-
-export type GameSweepEntry = {
-  row: GameFleetRow
-  /** Why it counts as finished, with the live state that let it through. */
-  reason: string
-  pending: string[]
-}
-
-/** Finished members, each with what releasing its tab still leaves for someone to do. */
-export function gameSweepOf(state: GameFleetInput): GameSweepEntry[] {
-  return gameFleetMembersOf(state)
-    .filter((agent) => !agent.found && isFinishedMember(agent))
-    .map((agent) => {
-      const pending: string[] = []
-      if (agent.worktree) {
-        pending.push(`worktree ${agent.worktree.branch} stays`)
-      }
-      if (!agent.workItem && !agent.remote?.ticketDone) {
-        pending.push('no linked ticket to confirm')
-      } else if (agent.workItem && agent.workItem.statusGroup !== 'done') {
-        pending.push(
-          `ticket ${agent.workItem.identifier} is ${agent.workItem.status || agent.workItem.statusGroup}, not done`
-        )
-      }
-      if (!agent.terminalHandle) {
-        pending.push('no terminal to close')
-      }
-      return {
-        row: gameFleetRowOf(agent),
-        reason: `${finishedSignalOf(agent)}; agent ${agent.state}`,
-        pending
-      }
-    })
 }
 
 export type GamePushEntry = {

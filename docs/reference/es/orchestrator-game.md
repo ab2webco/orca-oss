@@ -946,8 +946,12 @@ launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea un
     así que solo fija pins a partir de una versión que tenga esto.
 - `orca game fleet` — el ticket, estado, PR, CI, rama, agente, cuenta, fase
   (`needs-you`, `limited`, `working`, `idle`, `finished`) y siguiente paso de cada miembro, con los huecos libres. Un miembro está **finished** cuando su PR
-  tiene merge y su ticket está en revisión o hecho (o no tiene ninguno); todos los demás miembros
-  cuentan para el tope, incluso uno cuyo turno terminó.
+  tiene merge y su ticket está en revisión o hecho (o no tiene ninguno), o su PR está cerrado; un
+  miembro remoto lanzado como audit, review o captures también lo está cuando su Run de origen se
+  completó sin PR abierto. Un Run completado no termina por sí solo una implementación (ORCA-1397):
+  su STATUS dice `run done, PR #41 open`, `run done, PR #41 in the merge queue` o `run done, no PR`,
+  y sweep lo deja. El historial registra `merged` solo cuando la revisión dice merged. Todos los
+  demás miembros cuentan para el tope, incluso uno cuyo turno terminó.
 - **Topes por host (ORCA-888).** Con un entorno guardado, el tope del líder es la suma del de cada
   host alcanzable: el de este Orca a partir de su memoria y núcleos (uno por cada 4 GB y 2 núcleos, de
   1 a 12), el `memberCap` de cada host emparejado según `status.get`, en caché 30 s. El

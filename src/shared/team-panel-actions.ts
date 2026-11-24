@@ -1,5 +1,6 @@
 import type { GameAction, GameActionIcon } from './orchestrator-game-actions'
-import { gamePushPlanOf, gameSweepOf, gameWavePlanOf } from './orchestrator-game-fleet-verbs'
+import { gamePushPlanOf, gameWavePlanOf } from './orchestrator-game-fleet-verbs'
+import { gameSweepOf } from './orchestrator-game-sweep'
 import { GAME_ORCA_ACTION_IDS, type GameOrcaActionId } from './orchestrator-game-orca-actions'
 import type { OrchestratorGameState } from './orchestrator-game-state'
 

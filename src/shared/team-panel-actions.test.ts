@@ -80,6 +80,20 @@ describe('teamActionsOf', () => {
     expect(stopped['lead:stop']).toMatchObject({ off: 'alreadyStopped' })
   })
 
+  // Why (ORCA-1397): the Sweep button offered to close a member whose Run completed with its PR open.
+  it('counts no member for Sweep whose home Run completed with its PR open, and one once it merged', () => {
+    const runDone = (state: 'open' | 'merged') =>
+      member('remote:ctx_1', {
+        review: { ...merged.review, state },
+        remote: { host: 'm1', stateKnown: true, ticketDone: true }
+      })
+    const open = byId(stateOf({ agents: [runDone('open')] }))
+    expect(open['lead:sweep']).toMatchObject({ now: null, off: 'nothingToClose' })
+    expect(byId(stateOf({ agents: [runDone('merged')] }))['lead:sweep']).toMatchObject({
+      now: { count: 1 }
+    })
+  })
+
   it("sends a project prompt as written, an MCP action as its slash command, or says it can't", () => {
     const actions = byId(stateOf())
     expect(actions['action-0']).toMatchObject({

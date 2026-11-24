@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  gameFleetReportOf,
-  gamePushPlanOf,
-  gameSweepOf,
-  gameWavePlanOf
-} from './orchestrator-game-fleet-verbs'
+import { gameFleetReportOf, gamePushPlanOf, gameWavePlanOf } from './orchestrator-game-fleet-verbs'
+import { gameSweepOf } from './orchestrator-game-sweep'
 import { gameStopTargetsOf } from './orchestrator-game-stop-targets'
 import { observedGameEventsOf } from './orchestrator-game-observed-events'
 import { DEFAULT_GAME_LEAD } from './orchestrator-game-lead'
