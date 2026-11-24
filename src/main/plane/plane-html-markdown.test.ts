@@ -131,6 +131,50 @@ describe('markdownToPlaneHtml', () => {
     const html = markdownToPlaneHtml('Fish & chips <tag>')
     expect(html).toBe('<p>Fish &amp; chips &lt;tag&gt;</p>')
   })
+
+  it('keeps a code span with an identifier that has two underscores as one code element', () => {
+    expect(markdownToPlaneHtml('Call `read_plane_issue` now.')).toBe(
+      '<p>Call <code>read_plane_issue</code> now.</p>'
+    )
+  })
+
+  it('keeps two backticked identifiers with one underscore each on one line plain', () => {
+    expect(markdownToPlaneHtml('Both `work_item` and `state_id` change.')).toBe(
+      '<p>Both <code>work_item</code> and <code>state_id</code> change.</p>'
+    )
+  })
+
+  it('leaves asterisks inside backticks untouched', () => {
+    expect(markdownToPlaneHtml('Match `src/*.ts` and `*.md` files.')).toBe(
+      '<p>Match <code>src/*.ts</code> and <code>*.md</code> files.</p>'
+    )
+    expect(markdownToPlaneHtml('Use `**/*.ts` here.')).toBe('<p>Use <code>**/*.ts</code> here.</p>')
+  })
+
+  it('does not turn a link inside a code span into an anchor', () => {
+    expect(markdownToPlaneHtml('Write `[a](b)` literally.')).toBe(
+      '<p>Write <code>[a](b)</code> literally.</p>'
+    )
+  })
+
+  it('keeps intra-word underscores literal outside code spans', () => {
+    expect(markdownToPlaneHtml('The snake_case_name and foo_bar stay.')).toBe(
+      '<p>The snake_case_name and foo_bar stay.</p>'
+    )
+    expect(markdownToPlaneHtml('An _emphasized_ word.')).toBe('<p>An <em>emphasized</em> word.</p>')
+  })
+
+  it('keeps underscores in a link URL literal', () => {
+    expect(markdownToPlaneHtml('See [the doc](https://x.test/a_b/c_d).')).toBe(
+      '<p>See <a href="https://x.test/a_b/c_d">the doc</a>.</p>'
+    )
+  })
+
+  it('still applies emphasis around and next to code spans', () => {
+    expect(markdownToPlaneHtml('**bold `a_b_c`** and *it* with [`x_y_z`](https://x.test)')).toBe(
+      '<p><strong>bold <code>a_b_c</code></strong> and <em>it</em> with <a href="https://x.test"><code>x_y_z</code></a></p>'
+    )
+  })
 })
 
 describe('planeHtmlToMarkdown <-> markdownToPlaneHtml round-trip', () => {
