@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { RuntimeWorktreeAgentRow, RuntimeWorktreePsSummary } from '../../shared/runtime-types'
-import { RemoteHostSessionsReader, remoteFoundSessionsOf } from './orchestrator-game-remote-found'
+import type { GameAgent } from '../../shared/orchestrator-game-state'
+import {
+  RemoteHostSessionsReader,
+  listedRemoteWorktreesOf,
+  remoteFoundSessionsOf
+} from './orchestrator-game-remote-found'
 
 const agentRow = (overrides: Partial<RuntimeWorktreeAgentRow> = {}): RuntimeWorktreeAgentRow => ({
   paneKey: 'tab_a:11111111-1111-4111-8111-111111111111',
@@ -37,10 +42,11 @@ const worktree = (
     ...overrides
   }) as RuntimeWorktreePsSummary
 
-const m1 = (worktrees: RuntimeWorktreePsSummary[]) => ({
+const m1 = (worktrees: RuntimeWorktreePsSummary[], readAt = 0) => ({
   environmentId: 'env_m1',
   host: 'm1',
-  worktrees
+  worktrees,
+  readAt
 })
 
 // Why: agents an earlier lead run started on m1 were in no Panel or fleet; m1 showed 0/5 (ORCA-943).
@@ -130,5 +136,61 @@ describe('reading paired hosts for sessions (ORCA-943)', () => {
       ['imac', 0]
     ])
     expect(reads).toEqual(['env_m1', 'env_imac'])
+  })
+})
+
+describe('host worktrees a found row may not claim (ORCA-1377)', () => {
+  const member = (dispatchId: string, remote: Partial<NonNullable<GameAgent['remote']>> = {}) =>
+    ({
+      paneKey: `remote:${dispatchId}`,
+      isMember: true,
+      remote: {
+        host: 'm1',
+        environmentId: 'env_m1',
+        stateKnown: true,
+        ...remote
+      }
+    }) as GameAgent
+  const placed = (dispatchId: string, worktreeId: string, releasedAt: number | null = null) => ({
+    dispatchId,
+    environmentId: 'env_m1',
+    worktreeId,
+    releasedAt
+  })
+
+  it("holds a live member's worktree with no branch, but not a gone one's, which may run on there", () => {
+    const listed = listedRemoteWorktreesOf(
+      [member('d_review'), member('d_gone', { gone: true })],
+      [placed('d_review', 'orca-1374'), placed('d_gone', 'orca-1297')],
+      [m1([])]
+    )
+
+    expect([...listed]).toEqual(['env_m1\0orca-1374'])
+  })
+
+  it('holds a released worktree only for a host read taken before its release', () => {
+    const released = [placed('d_a', 'orca-1351', 61_000), placed('d_b', 'orca-1300', 59_000)]
+
+    expect([...listedRemoteWorktreesOf([], released, [m1([], 60_500)])]).toEqual([
+      'env_m1\0orca-1351'
+    ])
+  })
+
+  it('stamps a host read with when it was asked, and keeps that stamp while it serves stale', async () => {
+    let now = 5_000
+    const reader = new RemoteHostSessionsReader({
+      list: () => [{ id: 'env_m1', name: 'm1' }],
+      readPs: async () => {
+        now += 400
+        return { worktrees: [] }
+      },
+      now: () => now
+    })
+
+    const first = await reader.read()
+    now = 40_000
+    const stale = await reader.read()
+
+    expect([first[0]?.readAt, stale[0]?.readAt]).toEqual([5_000, 5_000])
   })
 })
