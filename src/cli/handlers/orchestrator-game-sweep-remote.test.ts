@@ -99,6 +99,53 @@ describe('game sweep --close on a remote member', () => {
     expect(JSON.parse(output.join('')).result).toEqual({ closed: true, finished: [] })
   })
 
+  it('sweeps an audit member whose Run completed with no PR and records it stopped, not merged', async () => {
+    const agents = [
+      LEAD,
+      member({
+        paneKey: 'remote:ctx_audit',
+        displayName: 'ORCA-1383',
+        state: 'done',
+        terminalHandle: 'term_audit',
+        launch: {
+          model: 'Sonnet 5.5',
+          effort: 'medium',
+          chosenBy: { by: 'lead', kind: 'audit', source: 'flag' }
+        },
+        remote: { host: 'm1', stateKnown: true, ticketDone: true }
+      })
+    ]
+    const { client, calls } = fakeClient(stateWith({ agents }), {
+      'orchestration.workerList': {
+        workers: [
+          {
+            dispatchId: 'ctx_audit',
+            agentTerminalHandle: 'term_audit',
+            workerState: 'succeeded',
+            terminalState: 'retained'
+          }
+        ],
+        counts: {}
+      },
+      'orchestration.workerRelease': {
+        dispatchId: 'ctx_audit',
+        state: 'released',
+        processAction: 'closed_agent_terminal'
+      }
+    })
+
+    await run('game sweep', client, [['close', true]])
+
+    const recorded = calls.find(([method]) => method === 'game.historyRecord')?.[1] as {
+      record: { outcome: string; pr: string | null }
+    }
+    expect(recorded.record).toEqual(expect.objectContaining({ outcome: 'stopped', pr: null }))
+    expect(freeing(calls.slice(1))).toEqual([
+      ['orchestration.workerList', {}],
+      ['orchestration.workerRelease', { dispatch: 'ctx_audit' }]
+    ])
+  })
+
   it('names the other dispatches of its worktree that the release freed', () => {
     const entry = {
       row: { ticket: 'ORCA-1011', name: 'Daisy · ORCA-1011', host: 'm1' },

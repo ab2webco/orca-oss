@@ -48,29 +48,33 @@ describe('game history', () => {
     ])
   })
 
-  it('names the outcome: merged or QA when swept, limited, failed or stopped when stopped', () => {
+  it('names the outcome: merged or QA from a merged review, else limited, failed or stopped', () => {
     const merged = {
       review: { state: 'merged' as const },
       workItem: { statusGroup: 'done' as const }
     }
-    expect(gameHistoryOutcomeOf(merged, 'sweep')).toBe('merged')
-    expect(
-      gameHistoryOutcomeOf({ ...merged, workItem: { statusGroup: 'review' as const } }, 'sweep')
-    ).toBe('qa')
-    expect(gameHistoryOutcomeOf({ limit: { resetsAt: null } }, 'stop')).toBe('limited')
-    expect(gameHistoryOutcomeOf({}, 'stop', 'failed')).toBe('failed')
-    expect(gameHistoryOutcomeOf({}, 'stop', 'ready')).toBe('stopped')
+    expect(gameHistoryOutcomeOf(merged)).toBe('merged')
+    expect(gameHistoryOutcomeOf({ ...merged, workItem: { statusGroup: 'review' as const } })).toBe(
+      'qa'
+    )
+    expect(gameHistoryOutcomeOf({ limit: { resetsAt: null } })).toBe('limited')
+    expect(gameHistoryOutcomeOf({}, 'failed')).toBe('failed')
+    expect(gameHistoryOutcomeOf({}, 'ready')).toBe('stopped')
+    // Why (ORCA-1397): a sweep once recorded merged for any member it freed.
+    expect(gameHistoryOutcomeOf({ review: { state: 'closed' as const } }, 'succeeded')).toBe(
+      'stopped'
+    )
   })
 
   // Why (ORCA-1170): a lead stops a member whose PR already merged, and its character earned nothing.
   it('records a stopped member whose review reads merged as merged, and as qa while its ticket is in review', () => {
     const merged = { review: { state: 'merged' as const } }
-    expect(gameHistoryOutcomeOf(merged, 'stop', 'ready')).toBe('merged')
-    expect(gameHistoryOutcomeOf({ ...merged, limit: { resetsAt: null } }, 'stop')).toBe('merged')
-    expect(
-      gameHistoryOutcomeOf({ ...merged, workItem: { statusGroup: 'review' as const } }, 'stop')
-    ).toBe('qa')
-    expect(gameHistoryOutcomeOf({ review: { state: 'open' as const } }, 'stop')).toBe('stopped')
+    expect(gameHistoryOutcomeOf(merged, 'ready')).toBe('merged')
+    expect(gameHistoryOutcomeOf({ ...merged, limit: { resetsAt: null } })).toBe('merged')
+    expect(gameHistoryOutcomeOf({ ...merged, workItem: { statusGroup: 'review' as const } })).toBe(
+      'qa'
+    )
+    expect(gameHistoryOutcomeOf({ review: { state: 'open' as const } })).toBe('stopped')
   })
 
   it('accepts a well-formed record over the wire and refuses the rest', () => {

@@ -65,7 +65,6 @@ async function recordOf(
   const failure = await recordFreedMember({
     client,
     member: agent,
-    freedBy: 'stop',
     workers,
     roster: []
   })

@@ -61,11 +61,10 @@ export function gameHistoryOutcomeOf(
     limit?: GameAgent['limit']
     review?: { state: string } | null
   },
-  freedBy: 'sweep' | 'stop',
   workerState?: string
 ): GameHistoryOutcome {
-  // Why the review on a stop: a lead often stops a member once its PR merged (ORCA-1170).
-  if (freedBy === 'sweep' || agent.review?.state === 'merged') {
+  // Why the review alone: a lead stops merged members (ORCA-1170), and a sweep frees unmerged ones (ORCA-1397).
+  if (agent.review?.state === 'merged') {
     return agent.workItem?.statusGroup === 'review' ? 'qa' : 'merged'
   }
   if (agent.limit) {

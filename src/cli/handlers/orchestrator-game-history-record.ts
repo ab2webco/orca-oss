@@ -111,7 +111,6 @@ async function lastReportOf(
 export async function recordFreedMember(args: {
   client: Client
   member: GameAgent
-  freedBy: 'sweep' | 'stop'
   workers: readonly GameStopWorker[]
   /** The dispatch the caller frees, when it found it its own way. */
   dispatch?: Pick<GameStopWorker, 'dispatchId' | 'workerState' | 'runId'>
@@ -133,7 +132,7 @@ export async function recordFreedMember(args: {
     account: member.account?.email ?? null,
     launchedAt,
     endedAt: new Date().toISOString(),
-    outcome: gameHistoryOutcomeOf(member, args.freedBy, dispatch?.workerState),
+    outcome: gameHistoryOutcomeOf(member, dispatch?.workerState),
     pr: member.review ? `#${member.review.number} ${member.review.state}` : null,
     lastReport,
     ...(character === null ? {} : { character }),

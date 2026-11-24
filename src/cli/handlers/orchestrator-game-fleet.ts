@@ -167,7 +167,6 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           ? await recordFreedMember({
               client,
               member,
-              freedBy: 'sweep',
               workers: result.workers,
               dispatch,
               roster: memberRosterOf(response.result)

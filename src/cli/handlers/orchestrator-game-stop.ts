@@ -177,7 +177,6 @@ export async function stopGameMembers(
         ? await recordFreedMember({
             client,
             member,
-            freedBy: 'stop',
             workers: result.workers,
             roster: memberRosterOf(state)
           })
