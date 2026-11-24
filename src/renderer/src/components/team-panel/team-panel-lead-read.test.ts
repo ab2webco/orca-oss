@@ -90,10 +90,17 @@ describe('unplacedLeadCountOf', () => {
   it('counts listed leads with no pane, or whose pane has no tab here', () => {
     const leads = [
       { handle: 'a', paneKey: PANE },
-      { handle: 'b', paneKey: 'tab-gone:1' },
+      { handle: 'b', paneKey: 'tab-gone:9f8e7d6c-5b4a-4321-8fed-cba987654321' },
       { handle: 'c' }
     ]
     expect(unplacedLeadCountOf(leads, (tabId) => (tabId === 'tab-lead' ? 'wt' : null))).toBe(2)
+  })
+
+  it('does not count a lead with no tab here that the worktree fallback places', () => {
+    const leads = [
+      { handle: 'b', paneKey: 'tab-gone:9f8e7d6c-5b4a-4321-8fed-cba987654321', worktreeId: 'wt-b' }
+    ]
+    expect(unplacedLeadCountOf(leads, () => null)).toBe(0)
   })
 })
 

@@ -67,14 +67,15 @@ export function findTeamLeadCaller(args: {
   return args.restoring?.some((paneKey) => worktreeOf(paneKey)) ? 'restoring' : null
 }
 
-/** Listed leads this window cannot place by tab: no pane listed, or no tab here holds it. */
+/** Listed leads this window cannot place: no pane listed, or neither a tab here nor a registered worktree. */
 export const unplacedLeadCountOf = (
   leads: readonly TeamLeadListing[],
   worktreeIdOfTab: (tabId: string) => string | null
 ): number =>
   leads.filter((lead) => {
     const tabId = lead.paneKey ? parsePaneKey(lead.paneKey)?.tabId : null
-    return !tabId || worktreeIdOfTab(tabId) === null
+    // Why: findTeamLeadCaller's last fallback places a paned lead by the worktree it registered from.
+    return !tabId || (worktreeIdOfTab(tabId) === null && !lead.worktreeId)
   }).length
 
 const stringOf = (value: unknown, key: string): string | null => {
