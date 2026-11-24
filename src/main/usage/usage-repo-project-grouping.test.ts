@@ -110,3 +110,26 @@ describe.each([
     expect(summary.topProject).toBe('orca-oss')
   })
 })
+
+describe('repo project labels', () => {
+  it('labels a shared repo id with the local repo, not a remote one', async () => {
+    const { getUsageRepoLabels } = await import('./usage-repo-project-grouping')
+    const labels = getUsageRepoLabels([
+      { id: 'repo-1', displayName: 'orca-oss' },
+      { id: 'repo-1', displayName: 'orca-oss (m1)', connectionId: 'ssh-1' }
+    ])
+    expect(labels.get('repo-1')).toBe('orca-oss')
+  })
+
+  it('gives every row of a removed repo the same label', async () => {
+    const { groupProjectRowsByRepo } = await import('./usage-repo-project-grouping')
+    const rows = groupProjectRowsByRepo(
+      [
+        { projectKey: 'worktree:gone::/a', projectLabel: 'wt-a', repoId: 'gone' },
+        { projectKey: 'worktree:gone::/b', projectLabel: 'wt-b', repoId: 'gone' }
+      ],
+      new Map()
+    )
+    expect(rows.map((row) => row.projectLabel)).toEqual(['wt-a', 'wt-a'])
+  })
+})
