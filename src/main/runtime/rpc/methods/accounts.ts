@@ -148,21 +148,20 @@ const AddClaudeCustomEndpointParams = z.object({
   opusModel: z.string().nullish(),
   sonnetModel: z.string().nullish(),
   haikuModel: z.string().nullish(),
-  subagentModel: z.string().nullish()
+  subagentModel: z.string().nullish(),
+  // Why optional: absent keeps the host vault older clients always got.
+  runtime: z.enum(['host', 'wsl']).optional(),
+  wslDistro: z.string().nullish()
 })
 
 // Edit counterpart of the add params. Why token is optional here: a blank token
 // keeps the stored secret, so a base URL or model can be fixed without re-typing it.
-const UpdateClaudeCustomEndpointParams = z.object({
+const UpdateClaudeCustomEndpointParams = AddClaudeCustomEndpointParams.omit({
+  runtime: true,
+  wslDistro: true
+}).extend({
   accountId: z.string().min(1, 'Missing accountId'),
-  label: z.string().min(1, 'Missing label'),
-  baseUrl: z.string().min(1, 'Missing baseUrl'),
-  token: z.string().nullish(),
-  model: z.string().nullish(),
-  opusModel: z.string().nullish(),
-  sonnetModel: z.string().nullish(),
-  haikuModel: z.string().nullish(),
-  subagentModel: z.string().nullish()
+  token: z.string().nullish()
 })
 
 const GetClaudeCustomEndpointConfigParams = z.object({

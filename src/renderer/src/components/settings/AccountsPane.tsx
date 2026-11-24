@@ -1344,6 +1344,9 @@ export function AccountsPane({
             // the host that owns the accounts. The helper routes it.
             await addClaudeCustomEndpointProviderAccount(settings, {
               token: endpointTokenDraft.trim(),
+              // Why: same location control as Add Account; a remote scope is always host.
+              runtime: accountRuntime.runtime,
+              wslDistro: accountRuntime.wslDistro,
               ...fields
             })
         // Why: close only on success so a validation error keeps the draft editable.
@@ -1789,6 +1792,15 @@ export function AccountsPane({
                 const isTokenOnly = !isCustomEndpoint && account.tokenOnly === true
                 // Why: the token lives in a vault on the host that runs the agents; only a
                 // host that can mint it there itself is offered, so it never crosses the wire.
+                // Why: the service edits only host vaults; WSL edit is ORCA-1381.
+                const editBlockedReason =
+                  endpointEditBlockedReason ??
+                  (account.managedAuthRuntime === 'wsl'
+                    ? translate(
+                        'auto.components.settings.AccountsPane.editEndpointWslUnsupported',
+                        'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+                      )
+                    : null)
                 const tokenBlockedReason =
                   isRemoteAccountScope && !remoteSetupTokenSupported
                     ? translate(
@@ -1930,14 +1942,7 @@ export function AccountsPane({
                         {isCustomEndpoint ? (
                           // Why the span carries the reason: the disabled Button sets
                           // pointer-events-none, so its own title never surfaces.
-                          <span
-                            className="inline-flex"
-                            title={
-                              endpointEditBlockedReason === null
-                                ? undefined
-                                : endpointEditBlockedReason
-                            }
-                          >
+                          <span className="inline-flex" title={editBlockedReason ?? undefined}>
                             <Button
                               variant="ghost"
                               size="xs"
@@ -1945,7 +1950,7 @@ export function AccountsPane({
                                 event.stopPropagation()
                                 void openEditEndpointDialog(account.id)
                               }}
-                              disabled={endpointEditBlockedReason !== null || isBusy}
+                              disabled={editBlockedReason !== null || isBusy}
                               className="h-6 px-2 text-muted-foreground hover:text-foreground"
                             >
                               <Pencil className="size-3" />
@@ -3076,6 +3081,13 @@ export function AccountsPane({
                     'auto.components.settings.AccountsPane.customEndpointDescription',
                     'Connect an Anthropic-compatible endpoint (like z.ai GLM) as a managed Claude account. The token is stored only on this device and used when a worktree is assigned to this account.'
                   )}
+              {!isEditingEndpoint && accountRuntime.runtime === 'wsl'
+                ? ` ${translate(
+                    'auto.components.settings.AccountsPane.customEndpointWslLocation',
+                    'It is created in {{value0}} and launches Claude only in repositories there.',
+                    { value0: accountRuntime.label }
+                  )}`
+                : null}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

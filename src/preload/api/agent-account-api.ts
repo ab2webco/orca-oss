@@ -60,6 +60,8 @@ export type ClaudeAccountsApi = {
     sonnetModel?: string | null
     haikuModel?: string | null
     subagentModel?: string | null
+    runtime?: 'host' | 'wsl'
+    wslDistro?: string | null
   }) => Promise<ClaudeRateLimitAccountsState>
   updateCustomEndpoint: (args: {
     accountId: string

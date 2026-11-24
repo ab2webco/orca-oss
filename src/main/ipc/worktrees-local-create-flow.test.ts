@@ -517,6 +517,28 @@ describe('registerWorktreeHandlers', () => {
     expect(addWorktreeMock).not.toHaveBeenCalled()
   })
 
+  it('refuses a host Claude account pin for a WSL repo before creating it (ORCA-1380)', async () => {
+    store.getRepo.mockReturnValue({
+      id: 'repo-1',
+      path: '\\\\wsl.localhost\\Ubuntu-24.04\\home\\dev\\repo',
+      displayName: 'repo',
+      badgeColor: '#000',
+      addedAt: 0
+    })
+    store.getSettings.mockReturnValue({
+      workspaceDir: '/workspace',
+      claudeManagedAccounts: [
+        { id: 'glm', email: 'GLM', managedAuthPath: 'C:\\auth', managedAuthRuntime: 'host' }
+      ],
+      codexManagedAccounts: []
+    } as never)
+
+    await expect(
+      handlers['worktrees:create'](null, { repoId: 'repo-1', name: 'f', claudeAccountId: 'glm' })
+    ).rejects.toThrow('The Claude account GLM lives on the host')
+    expect(addWorktreeMock).not.toHaveBeenCalled()
+  })
+
   it('pins the requested Codex account on a new folder-mode workspace', async () => {
     store.getRepo.mockReturnValue({
       id: 'repo-folder',

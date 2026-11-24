@@ -190,6 +190,72 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     })
   })
 
+  it('creates the custom endpoint account in the requested WSL distro (ORCA-1380)', async () => {
+    const harness = createCustomEndpointHarness()
+    const service = await createService(harness)
+    type AuthDir = (id: string, target?: { runtime?: string; wslDistro?: string | null }) => object
+    const internals = service as unknown as { createManagedAuthDir: AuthDir }
+    const createHostDir = internals.createManagedAuthDir.bind(service)
+    // Why a stub: the real WSL lane shells out to wsl.exe; this records the target it gets.
+    const createManagedAuthDir = vi.fn<AuthDir>((id, target) => ({
+      ...createHostDir(id),
+      ...(target?.runtime === 'wsl'
+        ? { managedAuthRuntime: 'wsl', wslDistro: target.wslDistro, wslLinuxAuthPath: '/home/dev' }
+        : {})
+    }))
+    internals.createManagedAuthDir = createManagedAuthDir
+
+    await service.addCustomEndpointAccount({
+      label: 'z.ai · GLM',
+      baseUrl: 'https://api.z.ai/api/anthropic',
+      token: 'tok',
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu-24.04'
+    })
+
+    expect(createManagedAuthDir).toHaveBeenCalledWith(expect.any(String), {
+      runtime: 'wsl',
+      wslDistro: 'Ubuntu-24.04'
+    })
+    expect(harness.settings().claudeManagedAccounts[0]).toMatchObject({
+      authMethod: 'custom-endpoint',
+      managedAuthRuntime: 'wsl',
+      wslDistro: 'Ubuntu-24.04'
+    })
+  })
+
+  it('refuses to edit a WSL custom endpoint account with a reason that says so (ORCA-1380 B2)', async () => {
+    const now = Date.now()
+    const harness = createCustomEndpointHarness({
+      claudeManagedAccounts: [
+        {
+          id: 'wsl-glm',
+          email: 'WSL GLM',
+          managedAuthPath: '\\\\wsl.localhost\\Ubuntu-24.04\\home\\dev\\auth',
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu-24.04',
+          authMethod: 'custom-endpoint',
+          organizationUuid: null,
+          organizationName: null,
+          createdAt: now,
+          updatedAt: now,
+          lastAuthenticatedAt: now
+        }
+      ]
+    })
+    const service = await createService(harness)
+
+    await expect(
+      service.updateCustomEndpointAccount({
+        accountId: 'wsl-glm',
+        label: 'WSL GLM',
+        baseUrl: 'https://api.z.ai/api/anthropic'
+      })
+    ).rejects.toThrow(
+      'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+    )
+  })
+
   it('keeps an explicit model and trims input fields', async () => {
     const harness = createCustomEndpointHarness()
     const service = await createService(harness)

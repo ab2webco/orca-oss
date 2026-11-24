@@ -337,6 +337,7 @@ import { resolveClaudeTerminalAccountReport } from '../claude-accounts/claude-pt
 import { resolveClaudeTranscriptUniverse } from '../../shared/claude-transcript-universe'
 import { describeVaultSettingsInheritance } from '../claude-accounts/vault-settings-inheritance'
 import { readClaudeManagedAuthFile } from '../claude-accounts/managed-auth-path'
+import { assertClaudeAccountPinMatchesRepoRuntime } from '../claude-accounts/worktree-account-pin'
 import { readClaudeTerminalSwitchReadiness } from './claude-terminal-account-switch-service'
 import { getCodexPtyAccountOwner } from '../codex/codex-pane-account-registry'
 import type { TaskSourceContext } from '../../shared/task-source-context'
@@ -24826,6 +24827,15 @@ export class OrcaRuntimeService {
 
     const repo = await this.resolveRepoSelector(args.repoSelector)
     this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: args.claudeAccountId }])
+    if (args.claudeAccountId) {
+      const { accounts } = this.requireAccountServices().claudeAccounts.listAccounts()
+      assertClaudeAccountPinMatchesRepoRuntime(
+        accounts,
+        args.claudeAccountId,
+        repo,
+        resolveLocalProjectRuntimeForRepo(this.requireStore(), repo)
+      )
+    }
     this.assertCurrentManagedCodexAccountPins([{ codexAccountId: args.codexAccountId }])
     const createSettings = this.store.getSettings()
     const requestedAgent = args.startupAgent ?? args.createdWithAgent

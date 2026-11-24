@@ -154,7 +154,7 @@ export type ClaudeAccountRemovalOptions = {
   reassignPinnedTo?: string | null
 }
 
-export type ClaudeCustomEndpointAccountInput = {
+export type ClaudeCustomEndpointAccountInput = ClaudeAccountAddTarget & {
   label: string
   baseUrl: string
   token: string
@@ -881,7 +881,11 @@ export class ClaudeAccountService {
     }
 
     const accountId = randomUUID()
-    const managedAuth = this.createManagedAuthDir(accountId)
+    // Why the target: a WSL repo only launches an account whose vault lives in that distro.
+    const managedAuth = this.createManagedAuthDir(accountId, {
+      runtime: input.runtime,
+      wslDistro: input.wslDistro
+    })
     try {
       // Why: the claude CLI reads this env at startup from CLAUDE_CONFIG_DIR;
       // the token lives only here (mode 600), never in Orca settings.
@@ -953,7 +957,9 @@ export class ClaudeAccountService {
       throw new Error('Only custom endpoint accounts can be edited.')
     }
     if ((account.managedAuthRuntime ?? 'host') !== 'host') {
-      throw new Error('Editing custom endpoint accounts is only supported on this device.')
+      throw new Error(
+        'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+      )
     }
     const label = input.label.trim()
     if (!label) {
