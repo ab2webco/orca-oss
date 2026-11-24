@@ -1792,6 +1792,15 @@ export function AccountsPane({
                 const isTokenOnly = !isCustomEndpoint && account.tokenOnly === true
                 // Why: the token lives in a vault on the host that runs the agents; only a
                 // host that can mint it there itself is offered, so it never crosses the wire.
+                // Why: the service edits only host vaults; WSL edit is ORCA-1381.
+                const editBlockedReason =
+                  endpointEditBlockedReason ??
+                  (account.managedAuthRuntime === 'wsl'
+                    ? translate(
+                        'auto.components.settings.AccountsPane.editEndpointWslUnsupported',
+                        'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+                      )
+                    : null)
                 const tokenBlockedReason =
                   isRemoteAccountScope && !remoteSetupTokenSupported
                     ? translate(
@@ -1933,14 +1942,7 @@ export function AccountsPane({
                         {isCustomEndpoint ? (
                           // Why the span carries the reason: the disabled Button sets
                           // pointer-events-none, so its own title never surfaces.
-                          <span
-                            className="inline-flex"
-                            title={
-                              endpointEditBlockedReason === null
-                                ? undefined
-                                : endpointEditBlockedReason
-                            }
-                          >
+                          <span className="inline-flex" title={editBlockedReason ?? undefined}>
                             <Button
                               variant="ghost"
                               size="xs"
@@ -1948,7 +1950,7 @@ export function AccountsPane({
                                 event.stopPropagation()
                                 void openEditEndpointDialog(account.id)
                               }}
-                              disabled={endpointEditBlockedReason !== null || isBusy}
+                              disabled={editBlockedReason !== null || isBusy}
                               className="h-6 px-2 text-muted-foreground hover:text-foreground"
                             >
                               <Pencil className="size-3" />

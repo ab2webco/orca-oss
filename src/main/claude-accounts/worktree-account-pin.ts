@@ -1,5 +1,6 @@
 import type { ClaudeManagedAccount, GlobalSettings } from '../../shared/types'
 import { parseWslUncPath } from '../../shared/wsl-paths'
+import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 
 type ClaudeAccountPinStore = {
   getSettings(): Pick<GlobalSettings, 'claudeManagedAccounts'>
@@ -54,16 +55,25 @@ export function claudeLaunchRuntimeLabel(target: ClaudeLaunchRuntime): string {
   return target.wslDistro ? `WSL ${target.wslDistro}` : 'the default WSL distro'
 }
 
-/** Why null for SSH: a remote repo's agent runs on that host, which owns its own auth. */
-export function claudeLaunchRuntimeOfRepo(repo: {
-  path: string
-  connectionId?: string | null
-}): ClaudeLaunchRuntime | null {
+/** Null skips the check: SSH runs on its own host, and an unresolved project runtime is decided at launch. */
+export function claudeLaunchRuntimeOfRepo(
+  repo: { path: string; connectionId?: string | null },
+  projectRuntime?: ProjectExecutionRuntimeResolution
+): ClaudeLaunchRuntime | null {
   if (repo.connectionId) {
     return null
   }
   const wsl = parseWslUncPath(repo.path)
-  return wsl ? { runtime: 'wsl', wslDistro: wsl.distro } : { runtime: 'host' }
+  if (wsl) {
+    return { runtime: 'wsl', wslDistro: wsl.distro }
+  }
+  // Why: a drive-letter repo in a WSL project launches Claude in that distro (pty.ts).
+  if (projectRuntime?.status !== 'resolved') {
+    return null
+  }
+  return projectRuntime.runtime.kind === 'wsl'
+    ? { runtime: 'wsl', wslDistro: projectRuntime.runtime.distro }
+    : { runtime: 'host' }
 }
 
 /** The refusal text when a pinned account cannot run where the launch runs, else null. */
@@ -94,12 +104,13 @@ export function claudeAccountRuntimeMismatchOf(
 export function assertClaudeAccountPinMatchesRepoRuntime(
   accounts: readonly PinnedClaudeAccount[],
   accountId: string | null | undefined,
-  repo: { path: string; connectionId?: string | null }
+  repo: { path: string; connectionId?: string | null },
+  projectRuntime?: ProjectExecutionRuntimeResolution
 ): void {
   if (typeof accountId !== 'string') {
     return
   }
-  const target = claudeLaunchRuntimeOfRepo(repo)
+  const target = claudeLaunchRuntimeOfRepo(repo, projectRuntime)
   const account = accounts.find((candidate) => candidate.id === accountId)
   if (!target || !account) {
     return

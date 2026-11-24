@@ -5864,6 +5864,7 @@
           "syncAccountConfig": "Sync global config",
           "clearAccountConfig": "Clear config (start fresh)",
           "editEndpointLoadFailed": "Could not load the endpoint settings.",
+          "editEndpointWslUnsupported": "Todavía no se puede editar una cuenta de endpoint personalizado en WSL. Elimínala y vuelve a agregarla con los valores nuevos.",
           "editEndpointRemoteUnsupported": "Este endpoint vive en {{value0}}, que ejecuta una versión de Orca que no puede editarlo. Actualiza el servidor.",
           "globalConfigSyncRemoteUnsupported": "Estas cuentas viven en {{value0}}, que ejecuta una versión de Orca que no puede sincronizar la configuración global. Actualiza el servidor.",
           "editEndpoint": "Edit",

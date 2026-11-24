@@ -6187,6 +6187,7 @@
           "checkSignInHint": "Asks the provider whether this credential still works. One request for this account only.",
           "checkSignIn": "Check sign-in",
           "hostReauthUnsupported": "This server is too old to re-authenticate an account in place. Update it, or sign in on the server itself.",
+          "editEndpointWslUnsupported": "Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.",
           "editEndpointRemoteUnsupported": "This endpoint lives on {{value0}}, which is running a version of Orca that cannot edit it. Update the server.",
           "globalConfigSyncRemoteUnsupported": "These accounts live on {{value0}}, which is running a version of Orca that cannot sync global config. Update the server.",
           "longLivedTokenRemoteHint": "Set it on that host with orca account token set.",

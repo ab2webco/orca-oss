@@ -24828,7 +24828,12 @@ export class OrcaRuntimeService {
     this.assertCurrentManagedClaudeAccountPins([{ claudeAccountId: args.claudeAccountId }])
     if (args.claudeAccountId) {
       const { accounts } = this.requireAccountServices().claudeAccounts.listAccounts()
-      assertClaudeAccountPinMatchesRepoRuntime(accounts, args.claudeAccountId, repo)
+      assertClaudeAccountPinMatchesRepoRuntime(
+        accounts,
+        args.claudeAccountId,
+        repo,
+        resolveLocalProjectRuntimeForRepo(this.requireStore(), repo)
+      )
     }
     this.assertCurrentManagedCodexAccountPins([{ codexAccountId: args.codexAccountId }])
     const createSettings = this.store.getSettings()

@@ -957,7 +957,9 @@ export class ClaudeAccountService {
       throw new Error('Only custom endpoint accounts can be edited.')
     }
     if ((account.managedAuthRuntime ?? 'host') !== 'host') {
-      throw new Error('Editing custom endpoint accounts is only supported on this device.')
+      throw new Error(
+        'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+      )
     }
     const label = input.label.trim()
     if (!label) {
