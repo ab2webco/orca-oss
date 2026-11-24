@@ -2,7 +2,8 @@
 
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { i18n } from '@/i18n/i18n'
 import type {
   TeamLeadCard,
   TeamMemberCard,
@@ -10,12 +11,6 @@ import type {
 } from '../../../../shared/team-panel-model-types'
 import { teamRowOfWorktree } from './sidebar-team-roster'
 import { SidebarTeamAgentRow } from './SidebarTeamAgentRow'
-
-vi.mock('@/i18n/i18n', () => ({
-  translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
-    fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? '')),
-  getIntlLocale: () => 'en'
-}))
 
 const NOW = Date.UTC(2026, 10, 9, 12, 0, 0)
 
@@ -75,6 +70,7 @@ const model = (members: TeamMemberCard[]): Pick<TeamPanelGameModel, 'lead' | 'me
 
 const roots: ReturnType<typeof createRoot>[] = []
 afterEach(async () => {
+  await i18n.changeLanguage('en')
   await act(async () => {
     for (const root of roots.splice(0)) {
       root.unmount()
@@ -392,5 +388,62 @@ describe('SidebarTeamAgentRow (V30 row)', () => {
       />
     )
     expect(host.querySelector('[data-team-row-part="name"] b')!.textContent).toBe('Lead')
+  })
+
+  it('says the age is time in the current state, in English and Spanish', async () => {
+    const age = (host: HTMLElement): Element => host.querySelector('[data-team-row-part="age"]')!
+    const row = (since: number): React.JSX.Element => (
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={since}
+      />
+    )
+    const en = await render(row(NOW - 4 * 60_000))
+    expect(age(en).getAttribute('title')).toBe('In this state for 4 min')
+    expect(age(en).getAttribute('aria-label')).toBe('In this state for 4 min')
+    const enNow = await render(row(NOW - 20_000))
+    expect(age(enNow).getAttribute('title')).toBe('In this state for less than a minute')
+
+    await i18n.changeLanguage('es')
+    const es = await render(row(NOW - 3 * 60_000))
+    expect(age(es).getAttribute('title')).toBe('En este estado desde hace 3 min')
+    expect(age(es).getAttribute('aria-label')).toBe('En este estado desde hace 3 min')
+    const esNow = await render(row(NOW - 20_000))
+    expect(age(esNow).getAttribute('aria-label')).toBe(
+      'En este estado desde hace menos de un minuto'
+    )
+  })
+
+  it('labels the lead row that falls back to its pane state start the same way', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'lead', card: { ...lead, since: null } }}
+        look="game"
+        showPr
+        now={NOW}
+        since={NOW - 2 * 3_600_000}
+      />
+    )
+    expect(host.querySelector('[data-team-row-part="age"]')!.getAttribute('aria-label')).toBe(
+      'In this state for 2 h'
+    )
+  })
+
+  it('labels no age it does not have', async () => {
+    const host = await render(
+      <SidebarTeamAgentRow
+        row={{ role: 'member', card: member() }}
+        look="game"
+        showPr
+        now={NOW}
+        since={null}
+      />
+    )
+    const age = host.querySelector('[data-team-row-part="age"]')!
+    expect(age.hasAttribute('title')).toBe(false)
+    expect(age.hasAttribute('aria-label')).toBe(false)
   })
 })

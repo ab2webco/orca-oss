@@ -58,6 +58,18 @@ export function teamAgeText(since: number, now: number): string {
   return formatShortActivityAge(since, now) ?? ''
 }
 
+/** Says the row age is time in the current state: QA read the bare age as time worked. */
+export function teamAgeLabel(since: number, now: number): string | undefined {
+  const age = teamAgeText(since, now)
+  if (!age) {
+    return undefined
+  }
+  if (now - since < 60_000) {
+    return translate('teamPanel.card.ageInStateNow', 'In this state for less than a minute')
+  }
+  return translate('teamPanel.card.ageInState', 'In this state for {{age}}', { age })
+}
+
 export function teamConditionText(condition: TeamCondition): string {
   switch (condition) {
     case 'working':
