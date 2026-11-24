@@ -121,23 +121,29 @@ function convertInlineMarkdown(text: string): string {
   // Why: code spans and link URLs are stashed so the emphasis rules never see
   // their '_' and '*'; restored once every inline rule has run.
   const placeholders: string[] = []
-  function stash(value: string): string {
+  const sources: string[] = []
+  function stash(value: string, source = value): string {
     const token = `\0${placeholders.length}\0`
     placeholders.push(value)
+    sources.push(source)
     return token
   }
+  const resolve = (value: string, from: string[]): string =>
+    value.replace(/\0(\d+)\0/g, (_match, index: string) => from[Number(index)] ?? '')
 
   let out = escapeHtml(text.replace(/\0/g, ''))
-  out = out.replace(/`([^`]+)`/g, (_match, code: string) => stash(`<code>${code}</code>`))
+  out = out.replace(/`([^`]+)`/g, (match, code: string) => stash(`<code>${code}</code>`, match))
+  // Why: a code span inside a URL goes back to its backtick source, so no token nests.
   out = out.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    (_match, label: string, href: string) => `<a href="${stash(href)}">${label}</a>`
+    (_match, label: string, href: string) =>
+      `<a href="${stash(resolve(href, sources))}">${label}</a>`
   )
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   out = out.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
   // Why: intra-word underscores (snake_case) stay literal, as in CommonMark.
   out = out.replace(/(?<![\p{L}\p{N}_])_([^_]+)_(?![\p{L}\p{N}_])/gu, '<em>$1</em>')
-  return out.replace(/\0(\d+)\0/g, (_match, index: string) => placeholders[Number(index)] ?? '')
+  return resolve(out, placeholders)
 }
 
 function convertBlockToHtml(block: string): string {

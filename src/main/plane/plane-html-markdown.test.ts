@@ -170,6 +170,39 @@ describe('markdownToPlaneHtml', () => {
     )
   })
 
+  it('keeps underscore and asterisk pairs in a link URL out of emphasis', () => {
+    expect(markdownToPlaneHtml('[q](https://x.test/?q=_x_)')).toBe(
+      '<p><a href="https://x.test/?q=_x_">q</a></p>'
+    )
+    expect(markdownToPlaneHtml('[q](https://x.test/?a=*b*)')).toBe(
+      '<p><a href="https://x.test/?a=*b*">q</a></p>'
+    )
+  })
+
+  it('keeps a code span inside a link URL as its backtick source', () => {
+    expect(markdownToPlaneHtml('[docs](`http://x_y`)')).toBe(
+      '<p><a href="`http://x_y`">docs</a></p>'
+    )
+    expect(markdownToPlaneHtml('[a](b `c` d)')).toBe('<p><a href="b `c` d">a</a></p>')
+  })
+
+  it('does not open emphasis at an underscore that follows a word character', () => {
+    expect(markdownToPlaneHtml('a_b_ c')).toBe('<p>a_b_ c</p>')
+  })
+
+  it('never leaves a placeholder NUL in the output', () => {
+    const inputs = [
+      '[docs](`http://x_y`)',
+      '[a](b `c` d)',
+      '[`a_b`](`c_d`) and `e` [f](g)',
+      '**`x`** _`y`_ [z](`w`)',
+      'nul \0 in \u00000\u0000 text'
+    ]
+    for (const input of inputs) {
+      expect(markdownToPlaneHtml(input)).not.toContain('\0')
+    }
+  })
+
   it('still applies emphasis around and next to code spans', () => {
     expect(markdownToPlaneHtml('**bold `a_b_c`** and *it* with [`x_y_z`](https://x.test)')).toBe(
       '<p><strong>bold <code>a_b_c</code></strong> and <em>it</em> with <a href="https://x.test"><code>x_y_z</code></a></p>'
