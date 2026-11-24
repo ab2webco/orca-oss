@@ -43,7 +43,7 @@ function causeNote(reason: LinuxPackageInstallFailureReason): string | null {
         'auto.components.LinuxPackageInstallRecoveryCard.8518002a26',
         'This Orca Lab window was started by an automatic restart that blocks administrator prompts. Quit Orca Lab and open it again from your app menu to retry, or run the command in a terminal outside Orca Lab.'
       )
-    default:
+    case 'package-install-failed':
       return null
   }
 }
