@@ -3842,7 +3842,8 @@
           "rangeLast7Days": "Últimos 7 días",
           "rangeLast30Days": "Últimos 30 días",
           "rangeLast90Days": "Últimos 90 días",
-          "rangeAllTime": "Todo el tiempo"
+          "rangeAllTime": "Todo el tiempo",
+          "tokensIncludeCache": "Los tokens incluyen lectura y escritura de caché"
         },
         "CodexUsageDailyChart": {
           "1e6f62d7e3": "Razonamiento",

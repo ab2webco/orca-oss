@@ -8,6 +8,7 @@ import { ClaudeUsageDailyChart } from './ClaudeUsageDailyChart'
 import { UsageBreakdownSection } from './UsageBreakdownSection'
 import { UsageRecentSessionsTable } from './UsageRecentSessionsTable'
 import { translate } from '@/i18n/i18n'
+import { getClaudeTotalTokens } from '../../../../shared/claude-usage-token-total'
 
 type ClaudeUsageDetailsProps = {
   daily: ClaudeUsageDailyPoint[]
@@ -24,6 +25,10 @@ export function ClaudeUsageDetails({
   recentSessions,
   summary
 }: ClaudeUsageDetailsProps): React.JSX.Element {
+  const tokensNote = translate(
+    'auto.components.stats.ClaudeUsagePane.tokensIncludeCache',
+    'Tokens include cache read and write'
+  )
   return (
     <>
       <ClaudeUsageDailyChart daily={daily} />
@@ -36,11 +41,12 @@ export function ClaudeUsageDetails({
           rows={modelBreakdown.map((row) => ({
             key: row.key,
             label: row.label,
-            tokens: row.inputTokens + row.outputTokens,
+            tokens: getClaudeTotalTokens(row),
             sessions: row.sessions,
             eventsOrTurns: row.turns
           }))}
           eventsOrTurns="turns"
+          tokensNote={tokensNote}
         />
         <UsageBreakdownSection
           title={translate('auto.components.stats.ClaudeUsagePane.7dc9e5613b', 'By project')}
@@ -49,11 +55,12 @@ export function ClaudeUsageDetails({
           rows={projectBreakdown.map((row) => ({
             key: row.key,
             label: row.label,
-            tokens: row.inputTokens + row.outputTokens,
+            tokens: getClaudeTotalTokens(row),
             sessions: row.sessions,
             eventsOrTurns: row.turns
           }))}
           eventsOrTurns="turns"
+          tokensNote={tokensNote}
         />
       </div>
 

@@ -4053,7 +4053,8 @@
           "rangeLast7Days": "Last 7 days",
           "rangeLast30Days": "Last 30 days",
           "rangeLast90Days": "Last 90 days",
-          "rangeAllTime": "All time"
+          "rangeAllTime": "All time",
+          "tokensIncludeCache": "Tokens include cache read and write"
         },
         "CodexUsageDailyChart": {
           "1e6f62d7e3": "Reasoning",

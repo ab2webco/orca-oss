@@ -4,6 +4,7 @@ import { UsageCacheSnapshotWriter } from '../usage-cache-snapshot-writer'
 import { loadKnownUsageWorktreesByRepo } from '../usage-worktree-metadata'
 import type { UsageScanWorktreeRef } from './usage-provider-contract'
 import { createWorktreeRefs, getUsageWorktreeFingerprint } from './usage-worktree-refs'
+import { getUsageRepoLabels, type UsageRepoLabels } from './usage-repo-project-grouping'
 
 const STALE_MS = 5 * 60_000
 
@@ -98,6 +99,10 @@ export abstract class UsageProviderStoreLifecycle<
     }
     await this.runScan()
     return this.getScanState()
+  }
+
+  protected getRepoLabels(): UsageRepoLabels {
+    return getUsageRepoLabels(this.store.getRepos())
   }
 
   protected writeToDisk(): Promise<void> {

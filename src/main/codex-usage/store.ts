@@ -18,6 +18,7 @@ import { CODEX_USAGE_SCHEMA_VERSION, codexUsageProvider } from './codex-usage-pr
 import { getLocalUsageDay, getUsageRangeCutoff } from '../usage/usage-calendar-range'
 import { estimateCostUsd as estimateModelCostUsd } from './codex-usage-cost-estimate'
 import { UsageProviderStoreLifecycle } from '../usage/usage-provider-store-lifecycle'
+import { getRepoLocationKey, groupProjectRowsByRepo } from '../usage/usage-repo-project-grouping'
 
 const SCHEMA_VERSION = CODEX_USAGE_SCHEMA_VERSION
 const AUTOMATION_ATTRIBUTION_WINDOW_MS = 5 * 60_000
@@ -164,7 +165,10 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
   }
 
   private buildSummary(scope: CodexUsageScope, range: CodexUsageRange): CodexUsageSummary {
-    const filteredDaily = this.getFilteredDaily(scope, range)
+    const filteredDaily = groupProjectRowsByRepo(
+      this.getFilteredDaily(scope, range),
+      this.getRepoLabels()
+    )
     const filteredSessions = this.getFilteredSessions(scope, range)
 
     let inputTokens = 0
@@ -176,7 +180,7 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
     let estimatedCostUsd = 0
     let hasAnyBillableCost = false
     const byModel = new Map<string, number>()
-    const byProject = new Map<string, number>()
+    const byProject = new Map<string, { label: string; tokens: number }>()
 
     for (const row of filteredDaily) {
       inputTokens += row.inputTokens
@@ -189,7 +193,10 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
         row.model ?? 'Unknown model',
         (byModel.get(row.model ?? 'Unknown model') ?? 0) + row.totalTokens
       )
-      byProject.set(row.projectLabel, (byProject.get(row.projectLabel) ?? 0) + row.totalTokens)
+      byProject.set(row.projectKey, {
+        label: row.projectLabel,
+        tokens: (byProject.get(row.projectKey)?.tokens ?? 0) + row.totalTokens
+      })
       const cost = estimateCostUsd(
         row.model,
         row.inputTokens,
@@ -205,7 +212,7 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
     const topModel =
       [...byModel.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
     const topProject =
-      [...byProject.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
+      [...byProject.values()].sort((left, right) => right.tokens - left.tokens)[0]?.label ?? null
 
     return {
       scope,
@@ -265,7 +272,10 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
     kind: CodexUsageBreakdownKind
   ): CodexUsageBreakdownRow[] {
     const rows = new Map<string, CodexUsageBreakdownRow>()
-    const filteredDaily = this.getFilteredDaily(scope, range)
+    const filteredDaily = groupProjectRowsByRepo(
+      this.getFilteredDaily(scope, range),
+      this.getRepoLabels()
+    )
     const filteredSessions = this.getFilteredSessions(scope, range)
 
     for (const daily of filteredDaily) {
@@ -314,11 +324,12 @@ export class CodexUsageStore extends UsageProviderStoreLifecycle<
       )
       const seen = new Set<string>()
       for (const location of matchingLocations) {
-        if (seen.has(location.locationKey)) {
+        const key = getRepoLocationKey(location)
+        if (seen.has(key)) {
           continue
         }
-        seen.add(location.locationKey)
-        const row = rows.get(location.locationKey)
+        seen.add(key)
+        const row = rows.get(key)
         if (row) {
           row.sessions++
         }

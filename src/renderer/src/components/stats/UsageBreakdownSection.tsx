@@ -17,6 +17,8 @@ type UsageBreakdownSectionProps = {
   topValue: string | null | undefined
   rows: UsageBreakdownRow[]
   eventsOrTurns: 'events' | 'turns'
+  /** Says what the row token figure counts when the cards above split it up. */
+  tokensNote?: string
 }
 
 export function UsageBreakdownSection({
@@ -24,7 +26,8 @@ export function UsageBreakdownSection({
   topLabel,
   topValue,
   rows,
-  eventsOrTurns
+  eventsOrTurns,
+  tokensNote
 }: UsageBreakdownSectionProps): React.JSX.Element {
   const eventsOrTurnsLabel =
     eventsOrTurns === 'turns'
@@ -39,6 +42,7 @@ export function UsageBreakdownSection({
           {topLabel}{' '}
           {topValue ?? translate('auto.components.stats.UsageBreakdownSection.7765a4c3e1', 'n/a')}
         </p>
+        {tokensNote ? <p className="text-xs text-muted-foreground">{tokensNote}</p> : null}
       </div>
       <div className="space-y-3">
         {rows.slice(0, 5).map((row) => (
