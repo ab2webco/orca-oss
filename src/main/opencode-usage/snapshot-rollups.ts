@@ -8,6 +8,7 @@ import type {
   OpenCodeUsageSummary
 } from '../../shared/opencode-usage-types'
 import type { OpenCodeUsageDailyAggregate, OpenCodeUsageSession } from './types'
+import { getRepoLocationKey } from '../usage/usage-repo-project-grouping'
 
 function addCost(left: number | null, right: number | null): number | null {
   if (left === null && right === null) {
@@ -30,7 +31,7 @@ export function buildOpenCodeUsageSummary(
   let events = 0
   let estimatedCostUsd: number | null = null
   const byModel = new Map<string, number>()
-  const byProject = new Map<string, number>()
+  const byProject = new Map<string, { label: string; tokens: number }>()
 
   for (const row of filteredDaily) {
     inputTokens += row.inputTokens
@@ -44,12 +45,15 @@ export function buildOpenCodeUsageSummary(
       row.model ?? 'Unknown model',
       (byModel.get(row.model ?? 'Unknown model') ?? 0) + row.totalTokens
     )
-    byProject.set(row.projectLabel, (byProject.get(row.projectLabel) ?? 0) + row.totalTokens)
+    byProject.set(row.projectKey, {
+      label: row.projectLabel,
+      tokens: (byProject.get(row.projectKey)?.tokens ?? 0) + row.totalTokens
+    })
   }
 
   const topModel = [...byModel.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
   const topProject =
-    [...byProject.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
+    [...byProject.values()].sort((left, right) => right.tokens - left.tokens)[0]?.label ?? null
 
   return {
     scope,
@@ -134,8 +138,8 @@ export function buildOpenCodeUsageBreakdownRows(
     }
   } else {
     for (const session of filteredSessions) {
-      for (const entry of session.locationBreakdown) {
-        const row = rows.get(entry.locationKey)
+      for (const key of new Set(session.locationBreakdown.map(getRepoLocationKey))) {
+        const row = rows.get(key)
         if (row) {
           row.sessions++
         }

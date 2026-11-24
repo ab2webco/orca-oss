@@ -29,6 +29,7 @@ import {
   buildOpenCodeUsageSummary
 } from './snapshot-rollups'
 import { UsageProviderStoreLifecycle } from '../usage/usage-provider-store-lifecycle'
+import { groupProjectRowsByRepo } from '../usage/usage-repo-project-grouping'
 
 let _openCodeUsageFile: string | null = null
 
@@ -88,7 +89,7 @@ export class OpenCodeUsageStore extends UsageProviderStoreLifecycle<
     return buildOpenCodeUsageSummary(
       scope,
       range,
-      this.getFilteredDaily(scope, range),
+      this.getProjectGroupedDaily(scope, range),
       this.getFilteredSessions(scope, range)
     )
   }
@@ -124,7 +125,7 @@ export class OpenCodeUsageStore extends UsageProviderStoreLifecycle<
   ): OpenCodeUsageBreakdownRow[] {
     return buildOpenCodeUsageBreakdownRows(
       kind,
-      this.getFilteredDaily(scope, range),
+      this.getProjectGroupedDaily(scope, range),
       this.getFilteredSessions(scope, range)
     )
   }
@@ -151,6 +152,13 @@ export class OpenCodeUsageStore extends UsageProviderStoreLifecycle<
     range: OpenCodeUsageRange
   ): OpenCodeUsageDailyAggregate[] {
     return filterDailyAggregatesByScopeAndRange(this.state.dailyAggregates, scope, range)
+  }
+
+  private getProjectGroupedDaily(
+    scope: OpenCodeUsageScope,
+    range: OpenCodeUsageRange
+  ): OpenCodeUsageDailyAggregate[] {
+    return groupProjectRowsByRepo(this.getFilteredDaily(scope, range), this.getRepoLabels())
   }
 
   private getFilteredSessions(

@@ -22,6 +22,8 @@ import {
   getUsageRangeCutoff
 } from '../usage/usage-calendar-range'
 import { UsageProviderStoreLifecycle } from '../usage/usage-provider-store-lifecycle'
+import { getRepoLocationKey, groupProjectRowsByRepo } from '../usage/usage-repo-project-grouping'
+import { getClaudeTotalTokens } from '../../shared/claude-usage-token-total'
 
 // Why: v5 widens Claude ownership keys (message-id / uuid fallbacks). Older
 // caches either lack ownership or used narrower keys and can under/over-count
@@ -386,7 +388,10 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
   }
 
   private buildSummary(scope: ClaudeUsageScope, range: ClaudeUsageRange): ClaudeUsageSummary {
-    const filteredDaily = this.getFilteredDaily(scope, range)
+    const filteredDaily = groupProjectRowsByRepo(
+      this.getFilteredDaily(scope, range),
+      this.getRepoLabels()
+    )
     const filteredSessions = this.getFilteredSessions(scope, range)
 
     let inputTokens = 0
@@ -396,7 +401,7 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
     let turns = 0
     let zeroCacheReadTurns = 0
     const byModel = new Map<string, number>()
-    const byProject = new Map<string, number>()
+    const byProject = new Map<string, { label: string; tokens: number }>()
     let estimatedCostUsd = 0
     let hasAnyBillableCost = false
 
@@ -408,11 +413,12 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
       turns += row.turnCount
       zeroCacheReadTurns += row.zeroCacheReadTurnCount
       const modelKey = row.model ?? 'Unknown model'
-      byModel.set(modelKey, (byModel.get(modelKey) ?? 0) + row.inputTokens + row.outputTokens)
-      byProject.set(
-        row.projectLabel,
-        (byProject.get(row.projectLabel) ?? 0) + row.inputTokens + row.outputTokens
-      )
+      const rowTokens = getClaudeTotalTokens(row)
+      byModel.set(modelKey, (byModel.get(modelKey) ?? 0) + rowTokens)
+      byProject.set(row.projectKey, {
+        label: row.projectLabel,
+        tokens: (byProject.get(row.projectKey)?.tokens ?? 0) + rowTokens
+      })
       const cost = estimateCostUsd(
         row.model,
         row.inputTokens,
@@ -430,7 +436,7 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
     const topModel =
       [...byModel.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
     const topProject =
-      [...byProject.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null
+      [...byProject.values()].sort((left, right) => right.tokens - left.tokens)[0]?.label ?? null
 
     return {
       scope,
@@ -498,7 +504,10 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
     kind: ClaudeUsageBreakdownKind
   ): ClaudeUsageBreakdownRow[] {
     const rows = new Map<string, ClaudeUsageBreakdownRow>()
-    const filteredDaily = this.getFilteredDaily(scope, range)
+    const filteredDaily = groupProjectRowsByRepo(
+      this.getFilteredDaily(scope, range),
+      this.getRepoLabels()
+    )
     const filteredSessions = this.getFilteredSessions(scope, range)
 
     for (const daily of filteredDaily) {
@@ -550,22 +559,21 @@ export class ClaudeUsageStore extends UsageProviderStoreLifecycle<
       )
       const seen = new Set<string>()
       for (const location of matchingLocations) {
-        if (seen.has(location.locationKey)) {
+        const key = getRepoLocationKey(location)
+        if (seen.has(key)) {
           continue
         }
-        seen.add(location.locationKey)
-        const row = rows.get(location.locationKey)
+        seen.add(key)
+        const row = rows.get(key)
         if (row) {
           row.sessions++
         }
       }
     }
 
-    return [...rows.values()].sort((left, right) => {
-      const leftTotal = left.inputTokens + left.outputTokens
-      const rightTotal = right.inputTokens + right.outputTokens
-      return rightTotal - leftTotal
-    })
+    return [...rows.values()].sort(
+      (left, right) => getClaudeTotalTokens(right) - getClaudeTotalTokens(left)
+    )
   }
 
   async getRecentSessions(

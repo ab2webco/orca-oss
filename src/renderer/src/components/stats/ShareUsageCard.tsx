@@ -15,6 +15,7 @@ import {
 } from './share-card-utils'
 import type { ClaudeShareData, CodexShareData } from './share-card-utils'
 import { translate } from '@/i18n/i18n'
+import { getClaudeTotalTokens } from '../../../../shared/claude-usage-token-total'
 
 export type ShareUsageCardProps = (ClaudeShareData | CodexShareData) & {
   range: string
@@ -29,7 +30,7 @@ export const ShareUsageCard = forwardRef<HTMLDivElement, ShareUsageCardProps>(
 
     const totalTokens =
       provider === 'claude'
-        ? summary.inputTokens + summary.outputTokens
+        ? getClaudeTotalTokens(summary)
         : (summary as CodexUsageSummary).totalTokens
 
     const topModel =
