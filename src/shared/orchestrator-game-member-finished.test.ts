@@ -97,4 +97,53 @@ describe('a remote member whose home Run completed', () => {
       rowOf(runDone({ launch: launchOf('audit'), review: review('open') }))?.ticketStatus
     ).toBe('run done, PR #41 open')
   })
+
+  // Why: --model, a Codex member, a host without chosenBy and a moved model all leave no lead kind.
+  it('reads the kind from its title when the launch names none', () => {
+    const title = 'Adversarial review of PR #1446 for ORCA-1397'
+    const modelOnly = { model: 'Opus 5.5', effort: 'high' }
+    for (const shape of [
+      { launch: modelOnly },
+      { launch: undefined, agentType: 'codex' },
+      { launch: { ...modelOnly, source: 'launch' as const } }
+    ]) {
+      const [swept] = gameSweepOf({ agents: [runDone({ displayName: title, ...shape })] })
+      expect(swept?.reason).toBe('its home Run completed the review task, no PR needed; agent done')
+    }
+    expect(gameSweepOf({ agents: [runDone({ launch: modelOnly })] })).toEqual([])
+    expect(
+      gameSweepOf({ agents: [runDone({ displayName: title, launch: launchOf('implement') })] })
+    ).toEqual([])
+  })
+
+  it('is not finished by a closed PR while its ticket is in progress, local or remote', () => {
+    const inProgress = {
+      provider: 'plane' as const,
+      identifier: 'ORCA-1397',
+      title: 'x',
+      url: 'https://plane.example/ORCA-1397',
+      status: 'In Progress',
+      statusGroup: 'in_progress' as const
+    }
+    const local = runDone({ state: 'idle', remote: undefined, review: review('closed') })
+    expect(gameSweepOf({ agents: [{ ...local, workItem: inProgress }] })).toEqual([])
+    expect(
+      gameSweepOf({ agents: [runDone({ review: review('closed'), workItem: inProgress })] })
+    ).toEqual([])
+    const done = { ...inProgress, status: 'Done', statusGroup: 'done' as const }
+    expect(gameSweepOf({ agents: [{ ...local, workItem: done }] })[0]?.reason).toBe(
+      'PR #41 closed, ticket Done; agent idle'
+    )
+  })
+
+  it('gets no earlier-lead stop hint while its PR is open', () => {
+    const earlier = runDone({
+      launch: launchOf('implement'),
+      review: review('open'),
+      remote: { host: 'm1', stateKnown: true, ticketDone: true, earlierLead: true }
+    })
+    expect(rowOf(earlier)).toEqual(
+      expect.objectContaining({ phase: 'idle', next: 'review PR #41' })
+    )
+  })
 })
