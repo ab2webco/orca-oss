@@ -235,7 +235,7 @@ export class GameLeads {
     // Why: an idle lead never reports agent status, so a client finds its pane only from here (ORCA-1130).
     const leads = live
       .filter((_, index) => running[index])
-      .map((one) => gameLeadListingOf(one, this.deps.paneOf?.(one.handle) ?? null))
+      .map((one) => gameLeadListingOf(one, this.deps))
     const restoring = [...this.pending.values()]
       .filter((one) => this.restoringOf(one.projectKey, null) === one)
       .map((one) => ({ project: one.project, paneKey: one.paneKey }))

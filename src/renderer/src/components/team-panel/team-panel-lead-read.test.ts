@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import {
   findTeamLeadCaller,
   readTeamHistory,
+  readTeamLeadRoster,
   readTeamLeadState,
   readTeamXp
 } from './team-panel-lead-read'
@@ -50,12 +52,55 @@ describe('findTeamLeadCaller', () => {
     })
   })
 
+  // Why (ORCA-1402): game.leads listed the lead, yet the panel showed no team and no breadcrumb.
+  it('finds a listed lead by the worktree it registered from when no tab here holds its pane', () => {
+    const leads = [{ handle: 'term-lead', paneKey: PANE, worktreeId: 'wt-main' }]
+    const noTab = { ...base, leads, entries: {}, worktreeIdOfTab: () => null }
+    expect(findTeamLeadCaller(noTab)).toEqual({
+      worktreeId: 'wt-main',
+      terminalHandle: 'term-lead',
+      paneKey: PANE
+    })
+    expect(findTeamLeadCaller({ ...noTab, repoWorktreeIds: new Set(['wt-member']) })).toBeNull()
+    // Why: game.state finds the lead only by its pane, so a listing without one stays unplaced.
+    const paneless = [{ handle: 'term-lead', worktreeId: 'wt-main' }]
+    expect(findTeamLeadCaller({ ...noTab, leads: paneless })).toBeNull()
+  })
+
+  it('places a folder workspace lead by its registered workspace key', () => {
+    const folder = folderWorkspaceKey('ws-1')
+    const leads = [{ handle: 'term-lead', paneKey: PANE, worktreeId: folder }]
+    const noTab = { ...base, leads, entries: {}, worktreeIdOfTab: () => null }
+    expect(findTeamLeadCaller({ ...noTab, repoWorktreeIds: new Set([folder]) })).toMatchObject({
+      worktreeId: folder
+    })
+  })
+
   it('says restoring while the host is bringing back a lead of this project', () => {
     const restoring = { leads: [], entries: {}, restoring: [PANE] }
     expect(findTeamLeadCaller({ ...base, ...restoring })).toBe('restoring')
     expect(
       findTeamLeadCaller({ ...base, ...restoring, repoWorktreeIds: new Set(['wt-member']) })
     ).toBeNull()
+  })
+})
+
+describe('readTeamLeadRoster', () => {
+  it('keeps the worktree each lead registered from, and drops one that is not a string', async () => {
+    callRuntimeRpc.mockResolvedValueOnce({
+      leads: [
+        { handle: 'term-lead', paneKey: PANE, worktreeId: 'wt-main', project: 'orca' },
+        { handle: 'term-old', worktreeId: 7 }
+      ]
+    })
+
+    expect(await readTeamLeadRoster({ kind: 'local' })).toEqual({
+      leads: [
+        { handle: 'term-lead', paneKey: PANE, worktreeId: 'wt-main' },
+        { handle: 'term-old' }
+      ],
+      restoring: []
+    })
   })
 })
 

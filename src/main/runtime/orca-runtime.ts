@@ -4162,6 +4162,7 @@ export class OrcaRuntimeService {
     },
     roster: new GameLeadRoster(() => join(app.getPath('userData'), 'orchestrator-game-leads')),
     paneOf: (handle) => this.getPaneKeyForTerminalHandle(handle),
+    worktreeOfPane: (paneKey) => this.getTerminalWorktreeIdForPaneKey(paneKey),
     handleOfPane: (paneKey) =>
       this.getPtyRecordForPaneKey(paneKey)?.connected
         ? this.getTerminalHandleForPaneKey(paneKey)
