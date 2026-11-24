@@ -256,8 +256,8 @@ Built in ORCA-793: a new lead opens a new Run, so the fleet also lists unrelease
 Run whose lead is gone, and of the current Run from before this lead claimed it, as long as their
 host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
 task is completed carries `remote.ticketDone`; it counts as finished, with `game stop` as its next
-step, only once its PR merged or closed, or with no open PR when launched as an audit, review or
-captures (ORCA-1397).
+step, only once its PR merged or closed with its ticket in review or done, or with no open PR when
+launched as an audit, review or captures (ORCA-1397).
 Another live lead's members are never listed. Both fields are optional on the wire.
 Scoped in ORCA-848: an earlier Run counts only when its lead pane belongs to this lead's project
 (`repo:<id>`, the key the game board and paused members use). The pane is the Run's coordinator pane,

@@ -905,12 +905,15 @@ The lead's verbs, run from the lead's terminal
     that has this.
 - `orca game fleet` — each member's ticket, state, PR, CI, branch, agent, account, phase
   (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
-  merged and its ticket is in review or done (or it has none), or its PR is closed; a remote member
-  launched as an audit, review or captures is also finished once its home Run completed with no
-  open PR. A completed Run alone never finishes an implementation (ORCA-1397): its STATUS reads
-  `run done, PR #41 open`, `run done, PR #41 in the merge queue` or `run done, no PR`, and sweep
-  leaves it. History records `merged` only when the review says merged. Every other member counts
-  toward the cap, even one whose turn ended.
+  merged or closed and its ticket is in review or done (or it has none); a remote member launched
+  as an audit, review or captures is also finished once its home Run completed with no open PR.
+  The kind is the lead's `game launch` choice, or, when the launch carries none (`--model`, Codex,
+  an older host, a moved model), the one the member's title names. A completed Run alone never
+  finishes an implementation (ORCA-1397): its STATUS reads `run done, PR #41 open`,
+  `run done, PR #41 in the merge queue` or `run done, no PR`, and sweep leaves it. Any idle member
+  whose PR is in the merge queue reads `wait for the merge queue`. History records `merged` only
+  when the review says merged. Every other member counts toward the cap, even one whose turn
+  ended.
 - **Per-host caps (ORCA-888).** With a saved environment, the lead's cap is the sum of each
   reachable host's: this Orca's from its memory and cores (one per 4 GB and 2 cores, 1 to 12), each
   paired host's `memberCap` from `status.get`, cached 30 s. A layer's `orchestrator.cap` only caps
