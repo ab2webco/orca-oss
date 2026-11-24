@@ -207,6 +207,67 @@ describe('a remote member still starting (ORCA-1263)', () => {
   })
 })
 
+describe('a remote member whose accepted start failed later (ORCA-1398)', () => {
+  // Why this shape: what remoteGameMembersOf builds for a failed start, whose host shows no terminal.
+  const failed = (startError?: string, paneKey = 'remote:ctx_1') =>
+    member('ORCA-9', {
+      paneKey,
+      state: 'done',
+      terminalHandle: undefined,
+      remote: {
+        host: 'm1',
+        environmentId: 'env_m1',
+        stateKnown: true,
+        gone: true,
+        startFailed: true,
+        ...(startError ? { startError } : {})
+      }
+    })
+
+  it('raises one alert naming the member, its host and the recorded reason', () => {
+    const alerts = gameLeadAlertsOf(
+      stateOf([failed('The worker server reported failed: setup exited 1.')]),
+      emptyGameLeadAlertMemory(),
+      NOW
+    )
+    expect(alerts).toEqual([
+      {
+        key: 'start-failed:remote:ctx_1',
+        line: 'ORCA-9 failed to start on m1: The worker server reported failed: setup exited 1. Find the cause before launching ORCA-9 again.'
+      }
+    ])
+  })
+
+  it('alerts again when a relaunch of the ticket fails while the first failed start is still listed', () => {
+    const printed = new Set<string>()
+    const tick = (agents: GameAgent[]) =>
+      newGameLeadAlertsOf(
+        gameLeadAlertsOf(stateOf(agents), emptyGameLeadAlertMemory(), NOW),
+        printed
+      ).map((one) => one.line)
+    const first = failed('first', 'remote:ctx_1')
+    expect(tick([first])).toEqual([
+      'ORCA-9 failed to start on m1: first. Find the cause before launching ORCA-9 again.'
+    ])
+    expect(tick([first, failed('again', 'remote:ctx_2')])).toEqual([
+      'ORCA-9 failed to start on m1: again. Find the cause before launching ORCA-9 again.'
+    ])
+  })
+
+  it('keeps a multi-line reason on the one alert line, capped', () => {
+    const [line] = linesOf(stateOf([failed(`first\n  second line\n${'x'.repeat(400)}`)]))
+    expect(line).not.toContain('\n')
+    expect(line).toMatch(/^ORCA-9 failed to start on m1: first second line x+…\. Find the cause/)
+    expect(line.length).toBeLessThan(320)
+  })
+
+  it('says no reason was published instead of claiming none was recorded', () => {
+    expect(linesOf(stateOf([failed()]))).toEqual([
+      'ORCA-9 failed to start on m1 (no reason was published). Find the cause before launching ORCA-9 again.'
+    ])
+  })
+})
+
 describe('gameLeadAlertsOf: why an entry left the merge queue (ORCA-1273)', () => {
   const leftLine = (departure: GameQueueDeparture): string | undefined => {
     const memory = emptyGameLeadAlertMemory()

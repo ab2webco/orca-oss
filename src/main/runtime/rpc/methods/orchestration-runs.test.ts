@@ -26,7 +26,7 @@ describe('orchestration RPC methods', () => {
 
   it('registers all expected methods', () => {
     const registry = buildRegistry(ORCHESTRATION_METHODS)
-    expect(registry.size).toBe(41)
+    expect(registry.size).toBe(42)
     expect(registry.has('orchestration.workerRelease')).toBe(true)
     expect(registry.has('orchestration.workerRetain')).toBe(true)
     expect(registry.has('orchestration.workerList')).toBe(true)
@@ -46,6 +46,7 @@ describe('orchestration RPC methods', () => {
     expect(registry.has('orchestration.dispatch')).toBe(true)
     expect(registry.has('orchestration.dispatchShow')).toBe(true)
     expect(registry.has('orchestration.workerStart')).toBe(true)
+    expect(registry.has('orchestration.workerStartOutcome')).toBe(true)
     expect(registry.has('orchestration.workerShow')).toBe(true)
     expect(registry.has('orchestration.workerRead')).toBe(true)
     expect(registry.has('orchestration.workerStop')).toBe(true)

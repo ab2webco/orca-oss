@@ -27,6 +27,8 @@ export type RemoteGameMemberSource = {
   createdAt: string
   finished: boolean
   startFailed?: boolean
+  /** Why its start failed, as the home recorded it (ORCA-1398). */
+  startError?: string | null
   starting?: boolean // Its worker start has not finished (ORCA-1263).
   undeliveredSince?: string | null // Oldest lead mail its host has not taken (ORCA-1301).
   /** The home Run completed the member's task. */
@@ -67,7 +69,8 @@ const SOURCE_COLUMNS = `f.dispatch_id AS dispatchId, t.task_title AS taskTitle,
               COALESCE(d.last_activity_at, d.last_heartbeat_at) AS lastActivityAt,
               d.created_at AS createdAt,
               d.status NOT IN ('pending', 'dispatched') AS finished,
-              COALESCE(w.state, '') = 'failed' AS startFailed,
+              COALESCE(w.state, '') = 'failed' AND COALESCE(w.stage, '') <> 'settled' AS startFailed,
+              w.last_error AS startError,
               COALESCE(w.state, '') = 'starting' AS starting,
               (SELECT strftime('%Y-%m-%dT%H:%M:%SZ', MIN(i.created_at)) FROM federation_relay_items i
                 WHERE i.dispatch_id = f.dispatch_id AND i.direction = 'to_worker'
@@ -302,7 +305,12 @@ export async function remoteGameMembersOf(
           ...(starting ? { starting: true as const } : {}),
           ...(source.undeliveredSince ? { undeliveredSince: source.undeliveredSince } : {}),
           ...(show?.asleep ? { asleep: true as const } : {}),
-          ...(source.startFailed && !agent ? { startFailed: true as const } : {})
+          ...(source.startFailed && !agent
+            ? {
+                startFailed: true as const,
+                ...(source.startError ? { startError: source.startError } : {})
+              }
+            : {})
         },
         ...(source.remoteTerminalHandle ? { terminalHandle: source.remoteTerminalHandle } : {}),
         ...(source.remoteWorktreeId && show?.branch

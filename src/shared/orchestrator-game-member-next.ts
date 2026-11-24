@@ -30,9 +30,27 @@ export function idleNextOf(review: GameAgent['review'], queued = NONE_QUEUED): s
 export const silentHostNextOf = (host: string, paneKey: string): string =>
   `${host} does not answer: orca orchestration worker-show --dispatch ${paneKey.replace(/^remote:/, '')}`
 
+const START_ERROR_MAX = 200
+
+// Why: the host's reason goes on one `alert` line, so its newlines must not split it.
+function oneLineReasonOf(error: string): string {
+  const line = error
+    .replace(/\s+/g, ' ')
+    .replace(/[.\s]+$/, '')
+    .trim()
+  return line.length > START_ERROR_MAX ? `${line.slice(0, START_ERROR_MAX).trimEnd()}…` : line
+}
+
 /** What a remote member asks of the lead before its phase does; null when nothing (ORCA-793). */
 export function remoteNextOf(agent: GameAgent, ticket: string | null): string | null {
   const remote = agent.remote
+  // Why first: the home recorded the failure, so a silent host does not hide it (ORCA-1398).
+  if (remote?.startFailed) {
+    const why = remote.startError
+      ? `: ${oneLineReasonOf(remote.startError)}`
+      : ' (no reason was published)'
+    return `failed to start on ${remote.host}${why}. Find the cause before launching ${ticket ?? agent.displayName ?? agent.paneKey} again.`
+  }
   if (remote?.stateKnown === false) {
     return silentHostNextOf(remote.host, agent.paneKey)
   }

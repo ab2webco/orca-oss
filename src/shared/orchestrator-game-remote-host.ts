@@ -17,4 +17,6 @@ export type GameRemoteHost = {
   asleep?: true
   /** Its start failed and no agent answers for it, so its name is free again (ORCA-1034). */
   startFailed?: true
+  /** The reason the home recorded for that failed start (ORCA-1398). */
+  startError?: string
 }

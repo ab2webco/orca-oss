@@ -9,6 +9,7 @@ vi.mock('../selectors', () => ({ getTerminalHandle: vi.fn() }))
 import { ORCHESTRATION_HANDLERS } from './orchestration'
 import { printResult } from '../format'
 import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+import { RuntimeClientError } from '../runtime-client'
 
 describe('orchestration worker-start CLI contract', () => {
   beforeEach(() => {
@@ -121,8 +122,74 @@ describe('orchestration worker-start CLI contract', () => {
         agent: 'claude',
         model: 'aws-bedrock-opus-5',
         effort: 'high'
-      })
+      }),
+      { orchestrationRequestId: expect.any(String) }
     )
+  })
+
+  describe('a start whose answer was lost (ORCA-1398)', () => {
+    const lostAnswer = (data: Record<string, unknown>) => (method: string) =>
+      method === 'orchestration.workerStart'
+        ? Promise.reject(
+            new RuntimeClientError(
+              'runtime_unavailable',
+              'The runtime closed the connection.',
+              data
+            )
+          )
+        : Promise.resolve({ result: { applied: 'applied', dispatchId: 'ctx_9' } })
+
+    it('asks the runtime and says the start applied', async () => {
+      callMock.mockImplementation(lostAnswer({ orchestrationRequestId: 'request_1' }))
+      const error = await invokeWorkerStart(
+        new Map([
+          ['task', 'task_1'],
+          ['from', 'term_coord'],
+          ['retry-request', 'request_1']
+        ])
+      ).catch((e: unknown) => e)
+      expect(callMock).toHaveBeenCalledWith(
+        'orchestration.workerStartOutcome',
+        { requestId: 'request_1' },
+        expect.anything()
+      )
+      expect((error as Error).message).toContain(
+        'The start applied: Orca Lab accepted it as Dispatch ctx_9'
+      )
+    })
+
+    it('asks the runtime for a --retry-request start whose connection never opened', async () => {
+      callMock.mockImplementation(lostAnswer({ requestSent: false }))
+      const error = await invokeWorkerStart(
+        new Map([
+          ['task', 'task_1'],
+          ['from', 'term_coord'],
+          ['retry-request', 'request_1']
+        ])
+      ).catch((e: unknown) => e)
+      expect(callMock).toHaveBeenCalledWith(
+        'orchestration.workerStartOutcome',
+        { requestId: 'request_1' },
+        expect.anything()
+      )
+      expect((error as Error).message).not.toContain('did not apply')
+    })
+
+    it('says a fresh start whose connection never opened did not apply, without asking', async () => {
+      callMock.mockImplementation(lostAnswer({ requestSent: false }))
+      const error = await invokeWorkerStart(
+        new Map([
+          ['task', 'task_1'],
+          ['from', 'term_coord']
+        ])
+      ).catch((e: unknown) => e)
+      expect(callMock).not.toHaveBeenCalledWith(
+        'orchestration.workerStartOutcome',
+        expect.anything(),
+        expect.anything()
+      )
+      expect((error as Error).message).toContain('The start did not apply')
+    })
   })
 
   it('fails before worker-start when the runtime would strip launch preferences', async () => {
@@ -179,7 +246,8 @@ describe('orchestration worker-start CLI contract', () => {
       expect.objectContaining({
         claudeAccountId: 'claude-acct-1',
         codexAccountId: 'codex-acct-1'
-      })
+      }),
+      { orchestrationRequestId: expect.any(String) }
     )
   })
 

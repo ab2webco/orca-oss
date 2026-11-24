@@ -10,6 +10,8 @@ import { OrchestrationDb } from '../orchestration/db'
 import { defineMethod, type RpcRequest } from './core'
 import { RpcDispatcher } from './dispatcher'
 import { ORCHESTRATION_METHODS } from './methods/orchestration'
+import { ORCHESTRATION_WORKER_START_OUTCOME_METHODS } from './methods/orchestration-worker-start-outcome'
+import { getOrchestrationMutationExecutor } from './orchestration-mutation-executor'
 
 const Params = z.object({ subject: z.string(), accountReadings: z.array(z.unknown()).optional() })
 
@@ -365,6 +367,180 @@ describe('durable orchestration mutation ledger', () => {
     })
     expect(effect).not.toHaveBeenCalled()
     db.close()
+  })
+
+  describe('orchestration.workerStartOutcome (ORCA-1398)', () => {
+    // Why accept in the handler: the real start writes its receipt with the Dispatch it accepts.
+    function outcomeHarness(
+      beforeAcceptance: () => Promise<void> = async () => undefined,
+      queueForSetup = false
+    ) {
+      const db = new OrchestrationDb(':memory:')
+      const runtime = new OrcaRuntimeService()
+      runtime.setOrchestrationDb(db)
+      const dispatcher = new RpcDispatcher({
+        runtime,
+        methods: [
+          defineMethod({
+            name: 'orchestration.workerStart',
+            params: z.object({ from: z.string(), task: z.string() }),
+            handler: async (_params, { orchestrationMutation }) => {
+              await beforeAcceptance()
+              // Why begin it: the real setup-queued start writes its receipt with no Dispatch.
+              if (queueForSetup && orchestrationMutation) {
+                db.beginMutationReceipt(orchestrationMutation)
+                return { state: 'queued' }
+              }
+              const started = db.createStartingWorkerDispatch({
+                taskId: db.createTask({ spec: 'start' }).id,
+                startOptions: {},
+                mutationReceipt: orchestrationMutation
+              })
+              return { dispatchId: started.dispatch.id }
+            }
+          }),
+          ...ORCHESTRATION_WORKER_START_OUTCOME_METHODS
+        ]
+      })
+      const start = (requestId: string, task = 'task_1') =>
+        dispatcher.dispatch({
+          id: `rpc_${requestId}`,
+          authToken: 'caller-token',
+          method: 'orchestration.workerStart',
+          params: { from: 'term_coord', task },
+          orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+          orchestrationRequestId: requestId
+        })
+      const outcome = async (requestId: string, authenticatedCallerFingerprint?: string) => {
+        const reply = await dispatcher.dispatch(
+          {
+            id: `rpc_outcome_${requestId}`,
+            authToken: 'caller-token',
+            method: 'orchestration.workerStartOutcome',
+            params: { requestId }
+          },
+          authenticatedCallerFingerprint ? { authenticatedCallerFingerprint } : undefined
+        )
+        return reply.ok ? reply.result : reply
+      }
+      return { db, runtime, start, outcome }
+    }
+
+    it('says applied, with the Dispatch, once a start completed', async () => {
+      const { db, start, outcome } = outcomeHarness()
+      const reply = await start('req_done')
+      const dispatchId = reply.ok ? (reply.result as { dispatchId: string }).dispatchId : null
+      expect(await outcome('req_done')).toEqual({
+        requestId: 'req_done',
+        applied: 'applied',
+        dispatchId
+      })
+      db.close()
+    })
+
+    it('says applied for a start accepted but not finished', async () => {
+      const { db, outcome } = outcomeHarness()
+      const task = db.createTask({ spec: 'accepted' }).id
+      const started = db.createStartingWorkerDispatch({
+        taskId: task,
+        startOptions: {},
+        mutationReceipt: {
+          callerFingerprint: db.getOrCreateLocalMutationCallerFingerprint(),
+          requestId: 'req_accepted',
+          method: 'orchestration.workerStart',
+          payloadHash: 'hash'
+        }
+      })
+      expect(await outcome('req_accepted')).toMatchObject({
+        applied: 'applied',
+        dispatchId: started.dispatch.id
+      })
+      db.close()
+    })
+
+    it('says not applied for a request it never accepted, or another caller accepted', async () => {
+      const { db, start, outcome } = outcomeHarness()
+      await start('req_done')
+      expect(await outcome('req_never')).toEqual({ requestId: 'req_never', applied: 'not_applied' })
+      expect(await outcome('req_done', 'paired-device-b')).toMatchObject({
+        applied: 'not_applied'
+      })
+      db.close()
+    })
+
+    it('says unknown while the start is still running and not yet accepted', async () => {
+      let accept: () => void = () => undefined
+      const { db, start, outcome } = outcomeHarness(
+        () => new Promise<void>((resolve) => (accept = resolve))
+      )
+      const running = start('req_running')
+      await vi.waitFor(async () =>
+        expect(await outcome('req_running')).toMatchObject({ applied: 'unknown' })
+      )
+      accept()
+      await running
+      expect(await outcome('req_running')).toMatchObject({ applied: 'applied' })
+      db.close()
+    })
+
+    it('says unknown for a start received but still before the executor', async () => {
+      const { db, runtime, start } = outcomeHarness()
+      const executor = getOrchestrationMutationExecutor(runtime)
+      const caller = executor.getLocalAuthenticatedCallerFingerprint()
+      const running = start('req_entering')
+      expect(executor.workerStartOutcomeOf(caller, 'req_entering')).toEqual({
+        applied: 'unknown',
+        reason: 'in_flight'
+      })
+      await running
+      expect(executor.workerStartOutcomeOf(caller, 'req_entering')).toMatchObject({
+        applied: 'applied'
+      })
+      db.close()
+    })
+
+    it('says unknown, not not applied, for a completed start that recorded no Dispatch', async () => {
+      const { db, start, outcome } = outcomeHarness(undefined, true)
+      expect(await start('req_queued')).toMatchObject({ ok: true, result: { state: 'queued' } })
+      expect(await outcome('req_queued')).toEqual({
+        requestId: 'req_queued',
+        applied: 'unknown',
+        reason: 'no_dispatch'
+      })
+      db.close()
+    })
+
+    it('says unknown for a start the executor runs that no dispatcher received', async () => {
+      const { db, runtime } = outcomeHarness()
+      const executor = getOrchestrationMutationExecutor(runtime)
+      const caller = executor.getLocalAuthenticatedCallerFingerprint()
+      let finish: () => void = () => undefined
+      const running = executor.run(
+        {
+          id: 'rpc_direct',
+          authToken: 'caller-token',
+          method: 'orchestration.workerStart',
+          params: { from: 'term_coord', task: 'task_1' },
+          orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+          orchestrationRequestId: 'req_direct'
+        },
+        { from: 'term_coord', task: 'task_1' },
+        async (mutation) => {
+          await new Promise<void>((resolve) => (finish = resolve))
+          db.beginMutationReceipt(mutation!.identity)
+          return { state: 'queued' }
+        }
+      )
+      await vi.waitFor(() =>
+        expect(executor.workerStartOutcomeOf(caller, 'req_direct')).toEqual({
+          applied: 'unknown',
+          reason: 'in_flight'
+        })
+      )
+      finish()
+      await running
+      db.close()
+    })
   })
 
   it('recovers a lost ask acceptance without creating a second question', async () => {

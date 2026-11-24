@@ -1,11 +1,26 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type * as net from 'node:net'
 import { createServer, type Socket } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import { MAX_TIMER_DELAY_MS } from '../../shared/timer-delay'
 import { classifyRuntimeConnectionError, sendRequest } from './transport'
+
+// Why: Unix sockets cannot be reset from Node, so a test injects the error on the client's own socket.
+const clientSockets = vi.hoisted(() => [] as Socket[])
+vi.mock('node:net', async (importOriginal) => {
+  const actual = await importOriginal<typeof net>()
+  return {
+    ...actual,
+    createConnection: (...args: Parameters<typeof actual.createConnection>) => {
+      const socket = actual.createConnection(...args)
+      clientSockets.push(socket)
+      return socket
+    }
+  }
+})
 
 const servers = new Set<ReturnType<typeof createServer>>()
 const sockets = new Set<Socket>()
@@ -80,7 +95,9 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     }
 
     await expect(sendRequest(metadata, 'status.get', undefined, 200)).rejects.toMatchObject({
-      code: 'runtime_unavailable'
+      code: 'runtime_unavailable',
+      // Why: worker-start reads this to say its start did not apply (ORCA-1398).
+      data: { requestSent: false }
     })
   })
 
@@ -207,11 +224,45 @@ describe.skipIf(process.platform === 'win32')('runtime transport', () => {
     // A generous timeout: a passing fix rejects on close well before this; the
     // pre-fix behavior would hang the full duration and trip vitest's own limit.
     const start = Date.now()
-    await expect(sendRequest(metadata, 'status.get', undefined, 60000)).rejects.toMatchObject({
+    const error = await sendRequest(metadata, 'status.get', undefined, 60000).catch((e) => e)
+    expect(error).toMatchObject({
       code: 'runtime_unavailable',
       message:
         'The Orca Lab runtime closed the connection before responding. Restart Orca Lab and try again.'
     })
+    // Why: the runtime read the request, so whether it applied stays a question (ORCA-1398).
+    expect(error.data?.requestSent).toBeUndefined()
     expect(Date.now() - start).toBeLessThan(5000)
+  })
+
+  it('does not claim the request went unsent when the socket errors after the write', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-transport-'))
+    const endpoint = join(userDataPath, 'runtime.sock')
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      socket.once('close', () => sockets.delete(socket))
+      // Why: the runtime has the request, then the connection resets, as when Orca Lab dies mid-call.
+      socket.once('data', () =>
+        clientSockets
+          .at(-1)
+          ?.destroy(Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }))
+      )
+    })
+    servers.add(server)
+    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
+
+    const metadata: RuntimeMetadata = {
+      runtimeId: 'runtime-1',
+      pid: 123,
+      transports: [{ kind: 'unix', endpoint }],
+      authToken: 'token',
+      startedAt: 1
+    }
+    const error = await sendRequest(metadata, 'status.get', undefined, 60000).catch((e) => e)
+    expect(error).toMatchObject({
+      code: 'runtime_unavailable',
+      message: 'Could not connect to the Orca Lab runtime transport from this shell.'
+    })
+    expect(error.data?.requestSent).toBeUndefined()
   })
 })
