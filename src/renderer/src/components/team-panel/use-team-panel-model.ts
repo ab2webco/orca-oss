@@ -20,12 +20,14 @@ import {
   readTeamLeadState,
   readTeamOwnerQuestions,
   readTeamXp,
+  unplacedLeadCountOf,
   type TeamLeadCaller,
   type TeamLeadRoster
 } from './team-panel-lead-read'
 import { teamPanelModelOf } from './team-panel-model-of'
 import { isMemberInTab, isRemoteMemberWorktreeActive } from './team-member-tab-match'
 import { createTeamPanelModelPoller, type TeamPanelScope } from './team-panel-model-poll'
+import { createTeamPanelNoTeamNotes } from './team-panel-no-team-breadcrumb'
 import { withAddedInboxQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { onGameAdvisorChanged } from './game-advisor-signal'
@@ -119,7 +121,11 @@ const poller = createTeamPanelModelPoller(
       }
       useTeamPanelModelStore.setState({ source, scopeKey: scope?.key ?? null })
     },
-    record: recordRendererCrashBreadcrumb
+    record: recordRendererCrashBreadcrumb,
+    noTeam: createTeamPanelNoTeamNotes({
+      record: recordRendererCrashBreadcrumb,
+      countUnplaced: ({ leads }) => unplacedLeadCountOf(leads, worktreeIdOfTab)
+    })
   },
   TEAM_REFRESH_MS
 )

@@ -5,7 +5,8 @@ import {
   readTeamHistory,
   readTeamLeadRoster,
   readTeamLeadState,
-  readTeamXp
+  readTeamXp,
+  unplacedLeadCountOf
 } from './team-panel-lead-read'
 
 const callRuntimeRpc = vi.fn()
@@ -82,6 +83,17 @@ describe('findTeamLeadCaller', () => {
     expect(
       findTeamLeadCaller({ ...base, ...restoring, repoWorktreeIds: new Set(['wt-member']) })
     ).toBeNull()
+  })
+})
+
+describe('unplacedLeadCountOf', () => {
+  it('counts listed leads with no pane, or whose pane has no tab here', () => {
+    const leads = [
+      { handle: 'a', paneKey: PANE },
+      { handle: 'b', paneKey: 'tab-gone:1' },
+      { handle: 'c' }
+    ]
+    expect(unplacedLeadCountOf(leads, (tabId) => (tabId === 'tab-lead' ? 'wt' : null))).toBe(2)
   })
 })
 

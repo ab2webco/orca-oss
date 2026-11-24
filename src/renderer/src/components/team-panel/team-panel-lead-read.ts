@@ -67,6 +67,16 @@ export function findTeamLeadCaller(args: {
   return args.restoring?.some((paneKey) => worktreeOf(paneKey)) ? 'restoring' : null
 }
 
+/** Listed leads this window cannot place by tab: no pane listed, or no tab here holds it. */
+export const unplacedLeadCountOf = (
+  leads: readonly TeamLeadListing[],
+  worktreeIdOfTab: (tabId: string) => string | null
+): number =>
+  leads.filter((lead) => {
+    const tabId = lead.paneKey ? parsePaneKey(lead.paneKey)?.tabId : null
+    return !tabId || worktreeIdOfTab(tabId) === null
+  }).length
+
 const stringOf = (value: unknown, key: string): string | null => {
   const field = (value as Record<string, unknown>)[key]
   return typeof field === 'string' ? field : null

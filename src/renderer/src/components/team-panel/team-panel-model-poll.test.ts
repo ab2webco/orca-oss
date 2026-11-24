@@ -8,6 +8,7 @@ import {
   type TeamPanelPollDeps
 } from './team-panel-model-poll'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import { createTeamPanelNoTeamNotes } from './team-panel-no-team-breadcrumb'
 
 const CALLER = { worktreeId: 'wt', terminalHandle: 'term', paneKey: 'pane' }
 const MODEL = { kind: 'team', projectName: 'orca-oss' } as unknown as TeamPanelGameModel
@@ -502,6 +503,59 @@ describe('createTeamPanelModelPoller', () => {
     await vi.advanceTimersByTimeAsync(20_000)
     expect(record).toHaveBeenLastCalledWith('team_panel_read_recovered', { failedForMs: 80_000 })
     expect(record).toHaveBeenCalledTimes(3)
+  })
+
+  // ORCA-1402: the panel showed 'Arma un equipo' while game.leads listed a lead, and left no trace.
+  it('records once per cause why it shows no team while the host lists a lead', async () => {
+    const record = vi.fn()
+    const findCaller = vi.fn<TeamPanelPollDeps['findCaller']>(() => null)
+    const readState = vi.fn<TeamPanelPollDeps['readState']>(async () => null)
+    const modelOf = vi.fn<TeamPanelPollDeps['modelOf']>(() => null)
+    const noTeam = createTeamPanelNoTeamNotes({ record, countUnplaced: () => 1 })
+    const read = deps({ findCaller, readState, modelOf, noTeam })
+    const poller = createTeamPanelModelPoller(read.all, 20_000)
+    poller.subscribe(SCOPE)
+    await flush()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(read.last()).toEqual({ kind: 'unavailable' })
+    expect(record.mock.calls).toEqual([
+      ['team_panel_no_team', { reason: 'lead_unplaced', leads: 1, unplaced: 1 }]
+    ])
+
+    findCaller.mockReturnValue(CALLER)
+    await vi.advanceTimersByTimeAsync(20_000)
+    readState.mockResolvedValue({ role: 'lead', agents: [] } as unknown as OrchestratorGameState)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(record.mock.calls.slice(1).map(([, data]) => data.reason)).toEqual([
+      'state_not_lead',
+      'state_without_leader'
+    ])
+
+    // Why: a team shown in between makes the same cause news again.
+    modelOf.mockReturnValueOnce(MODEL)
+    await vi.advanceTimersByTimeAsync(40_000)
+    expect(record).toHaveBeenCalledTimes(4)
+    expect(record).toHaveBeenLastCalledWith('team_panel_no_team', {
+      reason: 'state_without_leader',
+      leads: 1,
+      unplaced: 1
+    })
+  })
+
+  it('records nothing when no lead is listed, or every listed lead is placed in another project', async () => {
+    const record = vi.fn()
+    const readLeads = vi
+      .fn<TeamPanelPollDeps['readLeads']>()
+      .mockResolvedValueOnce({ leads: [], restoring: [] })
+      .mockResolvedValue({ leads: [{ handle: 'term' }], restoring: [] })
+    const noTeam = createTeamPanelNoTeamNotes({ record, countUnplaced: () => 0 })
+    const read = deps({ readLeads, findCaller: () => null, noTeam })
+    createTeamPanelModelPoller(read.all, 20_000).subscribe(SCOPE)
+    await flush()
+    await vi.advanceTimersByTimeAsync(20_000)
+
+    expect(read.last()).toEqual({ kind: 'unavailable' })
+    expect(record).not.toHaveBeenCalled()
   })
 
   it('names the leads read when game.leads is the one that fails', async () => {
