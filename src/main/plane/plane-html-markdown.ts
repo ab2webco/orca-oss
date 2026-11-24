@@ -19,7 +19,11 @@ function decodeHtmlEntities(value: string): string {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function stripTags(value: string): string {

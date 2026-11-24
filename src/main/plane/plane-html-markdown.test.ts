@@ -186,6 +186,15 @@ describe('markdownToPlaneHtml', () => {
     expect(markdownToPlaneHtml('[a](b `c` d)')).toBe('<p><a href="b `c` d">a</a></p>')
   })
 
+  it('escapes a double quote in a link URL so it stays inside href', () => {
+    expect(markdownToPlaneHtml('[x](https://x.test/a"onmouseover="alert(1))')).toBe(
+      '<p><a href="https://x.test/a&quot;onmouseover=&quot;alert(1">x</a>)</p>'
+    )
+    expect(markdownToPlaneHtml('[q](https://x.test/?q="a b")')).toBe(
+      '<p><a href="https://x.test/?q=&quot;a b&quot;">q</a></p>'
+    )
+  })
+
   it('does not open emphasis at an underscore that follows a word character', () => {
     expect(markdownToPlaneHtml('a_b_ c')).toBe('<p>a_b_ c</p>')
   })
@@ -228,5 +237,10 @@ describe('planeHtmlToMarkdown <-> markdownToPlaneHtml round-trip', () => {
     expect(roundTripped).toContain('- item two')
     expect(roundTripped).toContain('> a quote')
     expect(roundTripped).toContain('```\ncode here\n```')
+  })
+
+  it('keeps a double quote in a link URL and in text', () => {
+    const original = 'Say "hi" at [q](https://x.test/?q="a b")'
+    expect(planeHtmlToMarkdown(markdownToPlaneHtml(original))).toBe(original)
   })
 })
