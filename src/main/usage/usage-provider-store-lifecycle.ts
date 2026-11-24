@@ -1,10 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs'
 import type { Store } from '../persistence'
+import type { Repo } from '../../shared/repo-types'
 import { UsageCacheSnapshotWriter } from '../usage-cache-snapshot-writer'
 import { loadKnownUsageWorktreesByRepo } from '../usage-worktree-metadata'
 import type { UsageScanWorktreeRef } from './usage-provider-contract'
 import { createWorktreeRefs, getUsageWorktreeFingerprint } from './usage-worktree-refs'
 import { getUsageRepoLabels, type UsageRepoLabels } from './usage-repo-project-grouping'
+import {
+  getPreviouslyAttributedWorktreeRefs,
+  getRepoWorkspaceRootRefs
+} from './usage-retired-worktree-refs'
 
 const STALE_MS = 5 * 60_000
 
@@ -45,6 +50,9 @@ type UsageProviderStoreLifecycleConfig<
   ) => Promise<UsageProviderScanProjection<SourceKey, State>>
 }
 
+type UsageProviderBackingStore = Pick<Store, 'getRepos' | 'getAllWorktreeMeta'> &
+  Partial<Pick<Store, 'getSettings'>>
+
 type PublicUsageProviderScanState<DataPresenceKey extends string> = UsageProviderScanState & {
   isScanning: boolean
 } & Record<DataPresenceKey, boolean>
@@ -59,7 +67,7 @@ export abstract class UsageProviderStoreLifecycle<
   private readonly writer: UsageCacheSnapshotWriter
 
   constructor(
-    private readonly store: Pick<Store, 'getRepos' | 'getAllWorktreeMeta'>,
+    private readonly store: UsageProviderBackingStore,
     private readonly config: UsageProviderStoreLifecycleConfig<SourceKey, State, DataPresenceKey>
   ) {
     this.writer = new UsageCacheSnapshotWriter(config.logTag, config.resolveCacheFile)
@@ -140,11 +148,12 @@ export abstract class UsageProviderStoreLifecycle<
     // Assign before yielding so concurrent refreshes share one scan.
     this.scanPromise = (async () => {
       try {
-        const repos = this.store.getRepos()
-        const worktreesByRepo = loadKnownUsageWorktreesByRepo(this.store, repos)
-        const worktreeFingerprint = getUsageWorktreeFingerprint(worktreesByRepo)
+        const { repos, refs, worktreeFingerprint } = await this.loadScanWorktrees()
         const result = await this.config.scan(
-          createWorktreeRefs(repos, worktreesByRepo),
+          [
+            ...refs,
+            ...getPreviouslyAttributedWorktreeRefs(this.state.dailyAggregates, repos, refs)
+          ],
           this.state.worktreeFingerprint === worktreeFingerprint
             ? this.state[this.config.sourceKey]
             : this.config.createDefaultState()[this.config.sourceKey]
@@ -169,7 +178,26 @@ export abstract class UsageProviderStoreLifecycle<
   }
 
   private async getCurrentWorktreeFingerprint(): Promise<string> {
+    return (await this.loadScanWorktrees()).worktreeFingerprint
+  }
+
+  private async loadScanWorktrees(): Promise<{
+    repos: Repo[]
+    refs: UsageScanWorktreeRef[]
+    worktreeFingerprint: string
+  }> {
     const repos = this.store.getRepos()
-    return getUsageWorktreeFingerprint(loadKnownUsageWorktreesByRepo(this.store, repos))
+    const worktreesByRepo = loadKnownUsageWorktreesByRepo(this.store, repos)
+    const rootRefs = await getRepoWorkspaceRootRefs(repos, this.store.getSettings?.() ?? null)
+    const baseFingerprint = getUsageWorktreeFingerprint(worktreesByRepo)
+    return {
+      repos,
+      refs: [...createWorktreeRefs(repos, worktreesByRepo), ...rootRefs],
+      // Why: roots join the fingerprint so the first scan after upgrade re-attributes old turns.
+      worktreeFingerprint:
+        rootRefs.length === 0
+          ? baseFingerprint
+          : JSON.stringify([baseFingerprint, rootRefs.map((ref) => ref.worktreeId).sort()])
+    }
   }
 }
