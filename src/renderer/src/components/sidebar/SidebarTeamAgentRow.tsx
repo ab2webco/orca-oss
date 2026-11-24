@@ -7,6 +7,7 @@ import { statusToneTextClass } from '@/components/status-tone'
 import { TeamStatusMark } from '@/components/team-panel/TeamStatusMark'
 import {
   statusToneOfCi,
+  teamAgeLabel,
   teamAgeText,
   teamTicketBesideName
 } from '@/components/team-panel/team-card-text'
@@ -63,6 +64,7 @@ export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
   const ciTone = pr ? statusToneOfCi(pr) : null
   const KindIcon = pr ? GitPullRequest : GitBranch
   const hasLines = Boolean(lines?.activity || lines?.extra)
+  const ageLabel = since !== null ? teamAgeLabel(since, now) : undefined
   return (
     <div
       data-sidebar-team-row={row.role}
@@ -110,6 +112,8 @@ export const SidebarTeamAgentRow = React.memo(function SidebarTeamAgentRow({
         </span>
         <span
           data-team-row-part="age"
+          title={ageLabel}
+          aria-label={ageLabel}
           className="shrink-0 text-[11px] tabular-nums text-muted-foreground"
         >
           {since !== null ? teamAgeText(since, now) : null}

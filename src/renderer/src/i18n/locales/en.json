@@ -17542,6 +17542,8 @@
       "ciPassed": "CI green",
       "answerInInbox": "Answer in Inbox",
       "waitingForAnswer": "Waiting for your answer",
+      "ageInState": "In this state for {{age}}",
+      "ageInStateNow": "In this state for less than a minute",
       "permissionPrompt": "Permission prompt: {{tool}}",
       "permissionPromptAny": "Permission prompt in its terminal",
       "answerInTerminal": "Answer in its terminal",

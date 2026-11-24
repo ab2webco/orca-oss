@@ -16582,6 +16582,8 @@
       "ciPassed": "CI en verde",
       "answerInInbox": "Responder en Bandeja",
       "waitingForAnswer": "Esperando tu respuesta",
+      "ageInState": "En este estado desde hace {{age}}",
+      "ageInStateNow": "En este estado desde hace menos de un minuto",
       "permissionPrompt": "Permiso pendiente: {{tool}}",
       "permissionPromptAny": "Permiso pendiente en su terminal",
       "answerInTerminal": "Responder en su terminal",
