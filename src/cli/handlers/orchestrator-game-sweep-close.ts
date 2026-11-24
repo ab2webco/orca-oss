@@ -1,5 +1,5 @@
 import type { CommandHandler } from '../dispatch'
-import type { GameSweepEntry } from '../../shared/orchestrator-game-fleet-verbs'
+import type { GameSweepEntry } from '../../shared/orchestrator-game-sweep'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import type { SweepClose } from './orchestrator-game-fleet-format'
 

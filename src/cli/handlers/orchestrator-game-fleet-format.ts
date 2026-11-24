@@ -15,9 +15,9 @@ import type {
   GameFleet,
   GameFleetRow,
   GamePushEntry,
-  GameSweepEntry,
   GameWavePlan
 } from '../../shared/orchestrator-game-fleet-verbs'
+import type { GameSweepEntry } from '../../shared/orchestrator-game-sweep'
 import {
   gameHostLoadLineOf,
   LOCAL_GAME_HOST,

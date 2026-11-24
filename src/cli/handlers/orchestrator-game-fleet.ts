@@ -21,10 +21,10 @@ import { agentOfRow, recordFreedMember } from './orchestrator-game-history-recor
 import {
   gameFleetReportOf,
   gamePushPlanOf,
-  gameSweepOf,
   gameWavePlanOf,
   localGameFreeOf
 } from '../../shared/orchestrator-game-fleet-verbs'
+import { gameSweepOf } from '../../shared/orchestrator-game-sweep'
 import { openPrWarningOf } from '../../shared/orchestrator-game-open-prs'
 import { sendFollowingRemoteMember, sendOnHost } from './remote-member-terminal-send'
 import { observedGameEventsOf } from '../../shared/orchestrator-game-observed-events'
@@ -167,7 +167,6 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
           ? await recordFreedMember({
               client,
               member,
-              freedBy: 'sweep',
               workers: result.workers,
               dispatch,
               roster: memberRosterOf(response.result)

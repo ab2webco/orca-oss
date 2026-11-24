@@ -255,7 +255,9 @@ requested role. It returns the chosen host or a named refusal.
 Built in ORCA-793: a new lead opens a new Run, so the fleet also lists unreleased remote members of a
 Run whose lead is gone, and of the current Run from before this lead claimed it, as long as their
 host still reports the terminal running. Those rows carry `remote.earlierLead`; a member whose home
-task is completed carries `remote.ticketDone`, counts as finished, and its next step is `game stop`.
+task is completed carries `remote.ticketDone`; it counts as finished, with `game stop` as its next
+step, only once its PR merged or closed with its ticket in review or done, or with no open PR when
+launched as an audit, review or captures (ORCA-1397).
 Another live lead's members are never listed. Both fields are optional on the wire.
 Scoped in ORCA-848: an earlier Run counts only when its lead pane belongs to this lead's project
 (`repo:<id>`, the key the game board and paused members use). The pane is the Run's coordinator pane,
