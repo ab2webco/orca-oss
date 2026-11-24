@@ -275,4 +275,43 @@ describe('ClaudeRuntimeAuthService', () => {
       }
     }
   })
+  it('names the pinned host account and the WSL target when it refuses the launch (ORCA-1380)', async () => {
+    setPlatform('win32')
+    vi.doMock('../wsl', () => ({
+      getCachedWslDistros: () => ['Ubuntu'],
+      getDefaultWslDistro: () => 'Ubuntu',
+      getWslHome: () => null,
+      listWslDistrosAsync: async () => ['Ubuntu'],
+      toWindowsWslPath: (value: string) => value
+    }))
+    const hostAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'glm-host',
+      createClaudeCredentialsJson('glm@example.com', 'glm-token')
+    )
+    const store = createStore(
+      createSettings({
+        claudeManagedAccounts: [
+          createClaudeAccount('glm-host', hostAuthPath, {
+            email: 'z.ai · GLM',
+            authMethod: 'custom-endpoint',
+            managedAuthRuntime: 'host'
+          })
+        ],
+        activeClaudeManagedAccountId: null
+      })
+    )
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    await expect(
+      service.prepareForClaudeLaunch({
+        runtime: 'wsl',
+        wslDistro: 'Ubuntu',
+        overrideAccountId: 'glm-host'
+      })
+    ).rejects.toThrow(
+      'The Claude account z.ai · GLM lives on the host, so it cannot launch Claude in WSL Ubuntu.'
+    )
+  })
 })

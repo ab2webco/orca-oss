@@ -4363,6 +4363,44 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('refuses a host Claude account pin for a WSL repo before any worktree exists (ORCA-1380)', async () => {
+    const wslRepo = {
+      id: 'wsl-repo',
+      path: '\\\\wsl.localhost\\Ubuntu-24.04\\home\\dev\\project',
+      displayName: 'WSL',
+      badgeColor: 'blue',
+      addedAt: 1,
+      kind: 'folder' as const
+    }
+    const setWorktreeMeta = vi.fn()
+    const hostAccount = {
+      id: 'glm-host',
+      email: 'z.ai · GLM',
+      managedAuthPath: 'C:\\orca\\claude-accounts\\glm-host\\auth',
+      managedAuthRuntime: 'host' as const
+    }
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getRepos: () => [wslRepo],
+      getRepo: (id: string) => (id === wslRepo.id ? wslRepo : undefined),
+      setWorktreeMeta
+    } as never)
+    runtime.setAccountServices({
+      claudeAccounts: { listAccounts: () => ({ accounts: [hostAccount] }) }
+    } as never)
+
+    await expect(
+      runtime.createManagedWorktree({
+        repoSelector: 'id:wsl-repo',
+        name: 'glm-member',
+        claudeAccountId: hostAccount.id
+      })
+    ).rejects.toThrow(
+      'The Claude account z.ai · GLM lives on the host, so it cannot launch Claude in WSL Ubuntu-24.04.'
+    )
+    expect(setWorktreeMeta).not.toHaveBeenCalled()
+  })
+
   it('fails a create whose requested agent was refused instead of reporting success', async () => {
     // Why: `worktree create --agent` folded a refused agent launch into `warning`
     // and still answered ok, so a dispatch blocked by the Claude live-PTY gate left
