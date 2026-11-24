@@ -5,8 +5,10 @@ import { safeStorage } from 'electron'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
-  readStoredCredentialToken
+  readIntegrationCredentialFileSync,
+  readStoredCredentialTokenAsync
 } from '../integration-credential-file'
+import { PendingCredentialReads } from '../integration-credential-pending-reads'
 import type { JiraSite, JiraSiteSelection } from '../../shared/jira-types'
 
 export type JiraSiteFile = {
@@ -19,6 +21,7 @@ export type JiraSiteFile = {
 let cachedSiteFile: JiraSiteFile | null = null
 let siteFileLoaded = false
 const cachedTokens = new Map<string, string>()
+const pendingReads = new PendingCredentialReads<string>('Jira')
 // Why: decrypt failures are recorded per site so getStatus can explain
 // failing reads without re-touching the keychain on every status poll.
 export const credentialErrors = new Map<string, string>()
@@ -165,7 +168,7 @@ function writeEncryptedToken(path: string, apiToken: string): void {
   writeFileSync(path, apiToken, { encoding: 'utf-8', mode: 0o600 })
 }
 
-export function readToken(siteId: string): string | null {
+export async function readToken(siteId: string): Promise<string | null> {
   const cached = cachedTokens.get(siteId)
   if (cached !== undefined) {
     return cached
@@ -174,32 +177,37 @@ export function readToken(siteId: string): string | null {
   if (!existsSync(path)) {
     return null
   }
-  try {
-    const raw = readFileSync(path)
-    const token = readStoredCredentialToken('Jira', raw)
-    if (token) {
-      cachedTokens.set(siteId, token)
-    }
-    credentialErrors.delete(siteId)
-    return token
-  } catch (error) {
-    if (error instanceof CredentialDecryptionError) {
-      credentialErrors.set(siteId, error.message)
-      throw error
-    }
-    return null
-  }
+  return pendingReads.read(siteId, {
+    load: async () =>
+      readStoredCredentialTokenAsync('Jira', readIntegrationCredentialFileSync(path)),
+    commit: (token) => {
+      if (token) {
+        cachedTokens.set(siteId, token)
+      }
+      credentialErrors.delete(siteId)
+    },
+    fail: (error) => {
+      if (error instanceof CredentialDecryptionError) {
+        credentialErrors.set(siteId, error.message)
+        throw error
+      }
+      return null
+    },
+    latest: () => cachedTokens.get(siteId) ?? null
+  })
 }
 
 export function saveToken(siteId: string, apiToken: string): void {
   ensureOrcaDir()
   ensureTokenDir()
   writeEncryptedToken(getTokenPath(siteId), apiToken)
+  pendingReads.forget(siteId)
   cachedTokens.set(siteId, apiToken)
   credentialErrors.delete(siteId)
 }
 
 export function deleteToken(siteId: string): void {
+  pendingReads.forget(siteId)
   cachedTokens.delete(siteId)
   credentialErrors.delete(siteId)
   try {

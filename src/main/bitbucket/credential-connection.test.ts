@@ -167,7 +167,7 @@ describe('Bitbucket credential connection', () => {
     // is per-setting, not all-or-nothing.
     process.env.ORCA_BITBUCKET_API_BASE_URL = 'https://env.example.com/2.0'
     const { resolveBitbucketAuthConfig } = await import('./resolve-auth')
-    expect(resolveBitbucketAuthConfig().baseUrl).toBe('https://env.example.com/2.0')
+    expect((await resolveBitbucketAuthConfig()).baseUrl).toBe('https://env.example.com/2.0')
   })
 
   it('clears the stored connection on disconnect', async () => {

@@ -119,7 +119,7 @@ export async function createBitbucketPullRequest(
     }
   }
 
-  const config = resolveBitbucketAuthConfig()
+  const config = await resolveBitbucketAuthConfig()
   if (!hasAuth(config)) {
     return {
       ok: false,

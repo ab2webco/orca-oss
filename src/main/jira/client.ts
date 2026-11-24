@@ -1,4 +1,7 @@
-import { CredentialDecryptionError } from '../integration-credential-file'
+import {
+  CredentialDecryptionError,
+  CredentialKeychainWaitError
+} from '../integration-credential-file'
 import type {
   JiraAuthType,
   JiraConnectArgs,
@@ -28,7 +31,9 @@ import {
 } from './authenticated-request'
 import { getSiteId, normalizeJiraSiteUrl, siteToViewer, toViewer } from './site-identity'
 
-export function getClients(selection?: JiraSiteSelection | null): JiraClientForSite[] {
+export async function getClients(
+  selection?: JiraSiteSelection | null
+): Promise<JiraClientForSite[]> {
   const file = getSiteFile()
   const selected = selection ?? file.selectedSiteId ?? file.activeSiteId
   const isAllSelection = selected === 'all'
@@ -36,21 +41,30 @@ export function getClients(selection?: JiraSiteSelection | null): JiraClientForS
     ? file.sites
     : file.sites.filter((site) => site.id === (selected ?? file.activeSiteId))
 
-  return sites.flatMap((site) => {
-    let token: string | null
-    try {
-      token = readToken(site.id)
-    } catch (error) {
-      // Why: under an 'all' selection one un-decryptable site must not collapse
-      // reads for the healthy ones. readToken already recorded the per-site
-      // credentialError for getStatus to surface, so skip this site like a
-      // missing token. A specific-site selection still rethrows so the renderer
-      // can surface the decrypt banner promptly.
-      if (isAllSelection && error instanceof CredentialDecryptionError) {
-        return []
+  // Why: in parallel, so N sites waiting on Keychain cost one bound, not N.
+  const tokens = await Promise.all(
+    sites.map(async (site) => {
+      try {
+        return await readToken(site.id)
+      } catch (error) {
+        // Why: under an 'all' selection one unreadable site must not collapse
+        // reads for the healthy ones. readToken already recorded a decrypt
+        // failure for getStatus to surface, so skip this site like a missing
+        // token. A specific-site selection still rethrows so the renderer can
+        // surface the decrypt banner promptly.
+        if (
+          isAllSelection &&
+          (error instanceof CredentialDecryptionError ||
+            error instanceof CredentialKeychainWaitError)
+        ) {
+          return null
+        }
+        throw error
       }
-      throw error
-    }
+    })
+  )
+  return sites.flatMap((site, index) => {
+    const token = tokens[index]
     return token ? [{ site, authorization: authHeader(site.email, token, site.authType) }] : []
   })
 }
@@ -176,7 +190,7 @@ export async function testConnection(
 ): Promise<{ ok: true; viewer: JiraViewer } | { ok: false; error: string }> {
   let client: JiraClientForSite | undefined
   try {
-    client = getClients(siteId)[0]
+    client = (await getClients(siteId))[0]
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Connection failed.' }
   }

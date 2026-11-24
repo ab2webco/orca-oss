@@ -30,7 +30,7 @@ export async function writeIssueRelation(params: {
   workspaceId: string
   signal?: AbortSignal
 }): Promise<LinearIssueRelationWriteResult> {
-  const entry = getClients(params.workspaceId)[0]
+  const entry = (await getClients(params.workspaceId))[0]
   if (!entry) {
     throw new LinearWriteFailure('failed', 'Not connected to Linear')
   }

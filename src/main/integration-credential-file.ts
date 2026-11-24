@@ -184,12 +184,9 @@ export async function readStoredCredentialTokenAsync(
     return null
   }
   const decrypted = await decryptOffMainThread(raw)
-  if (decrypted === ASYNC_DECRYPT_UNAVAILABLE) {
-    return readStoredCredentialToken(service, raw)
-  }
-  if (decrypted === ASYNC_DECRYPT_FAILED) {
-    // Why: on macOS the sync retry would raise the same Keychain prompt on the
-    // main thread; elsewhere it keeps today's reading of keyring-less data.
+  if (decrypted === ASYNC_DECRYPT_UNAVAILABLE || decrypted === ASYNC_DECRYPT_FAILED) {
+    // Why: on macOS the sync path would read the Keychain on the main thread, unbounded;
+    // Linux without a keyring and Windows keep today's sync reading.
     return process.platform === 'darwin'
       ? readPlaintextLegacyCredential(service, raw)
       : readStoredCredentialToken(service, raw)

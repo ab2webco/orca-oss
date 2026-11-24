@@ -75,7 +75,7 @@ async function requestJson<T>(
   // branch's real review, so only that caller opts into it.
   notFoundIsNull = false
 ): Promise<T | null> {
-  const config = resolveBitbucketAuthConfig()
+  const config = await resolveBitbucketAuthConfig()
   // Why: a denied keychain prompt leaves no usable credential. Issuing the
   // request anyway gets a 404 on private repos, which reads as "no pull
   // request" and offers Create for a branch that already has one.
@@ -169,7 +169,7 @@ export async function getBitbucketAuthStatus(): Promise<BitbucketAuthStatus> {
     if (getStoredBitbucketCredentialError()) {
       return { configured: true, authenticated: false, account: metadata.account }
     }
-    const cached = loadStoredBitbucketSecret()
+    const cached = await loadStoredBitbucketSecret()
     if (!cached) {
       return { configured: true, authenticated: true, account: metadata.account }
     }

@@ -555,7 +555,7 @@ export async function searchIssues(
   siteId?: JiraSiteSelection | null,
   signal?: AbortSignal
 ): Promise<JiraIssue[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   if (entries.length === 0 || !jql.trim()) {
     return []
   }
@@ -607,7 +607,7 @@ export async function getIssue(
   key: string,
   siteId?: JiraSiteSelection | null
 ): Promise<JiraIssue | null> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   for (const entry of entries) {
     let mediaRequest: MediaRequest | undefined
     let issue: JiraRecord | undefined
@@ -667,7 +667,7 @@ export async function getIssueSummary(
 ): Promise<JiraIssue | null> {
   let entries: JiraClientForSite[]
   try {
-    entries = getClients(siteId)
+    entries = await getClients(siteId)
   } catch (error) {
     throw new JiraSummaryLookupError('auth', error)
   }
@@ -704,7 +704,7 @@ export async function getIssueSummary(
 }
 
 export async function createIssue(args: JiraCreateIssueArgs): Promise<JiraCreateIssueResult> {
-  const entry = getClients(args.siteId)[0]
+  const entry = (await getClients(args.siteId))[0]
   if (!entry) {
     return { ok: false, error: 'Not connected to Jira.' }
   }
@@ -754,7 +754,7 @@ export async function updateIssue(
   updates: JiraIssueUpdate,
   siteId?: string | null
 ): Promise<JiraMutationResult> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return { ok: false, error: 'Not connected to Jira.' }
   }
@@ -812,7 +812,7 @@ export async function addIssueComment(
   body: string,
   siteId?: string | null
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return { ok: false, error: 'Not connected to Jira.' }
   }
@@ -915,7 +915,7 @@ export async function getIssueComments(
   key: string,
   siteId?: string | null
 ): Promise<JiraComment[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -964,7 +964,7 @@ export async function getIssueComments(
 }
 
 export async function listProjects(siteId?: JiraSiteSelection | null): Promise<JiraProject[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   if (entries.length === 0) {
     return []
   }
@@ -1007,7 +1007,7 @@ export async function listIssueTypes(
   projectIdOrKey: string,
   siteId?: string | null
 ): Promise<JiraIssueType[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -1041,7 +1041,7 @@ export async function listCreateFields(
   issueTypeId: string,
   siteId?: string | null
 ): Promise<JiraCreateField[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -1086,7 +1086,7 @@ export async function listCreateFields(
 }
 
 export async function listPriorities(siteId?: string | null): Promise<JiraPriority[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -1111,7 +1111,7 @@ export async function listAssignableUsers(
   query?: string,
   siteId?: string | null
 ): Promise<JiraUser[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -1144,7 +1144,7 @@ export async function listTransitions(
   key: string,
   siteId?: string | null
 ): Promise<JiraTransition[]> {
-  const entry = getClients(siteId)[0]
+  const entry = (await getClients(siteId))[0]
   if (!entry) {
     return []
   }
@@ -1177,7 +1177,7 @@ export async function getProjectStatusOrder(
 ): Promise<JiraProjectStatusOrder> {
   // Why: an omitted site can resolve to the persisted "all" selection; board
   // metadata is only truthful when exactly one Jira connection owns the project.
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   const entry = entries.length === 1 ? entries[0] : undefined
   if (!entry) {
     return { statusIdsByColumn: [] }
