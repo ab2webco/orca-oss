@@ -70,7 +70,10 @@ describe('worktree Claude account pin runtime', () => {
       { id: 'debian', managedAuthRuntime: 'wsl', wslDistro: 'Debian' }
     ])
     expect(() =>
-      assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'debian', HOST_REPO)
+      assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'debian', HOST_REPO, {
+        status: 'resolved',
+        runtime: { kind: 'windows-host' }
+      } as never)
     ).toThrow('lives on WSL Debian, so it cannot launch Claude on the host')
     expect(() =>
       assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'debian', WSL_REPO)
@@ -115,5 +118,31 @@ describe('worktree Claude account pin runtime', () => {
     expect(() =>
       assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), 'legacy', WSL_REPO)
     ).toThrow('lives on WSL Debian')
+  })
+
+  it('follows the project runtime for a drive-letter repo (review B1)', () => {
+    const store = makeRuntimeStore([
+      { id: 'host', managedAuthRuntime: 'host' },
+      { id: 'ubuntu', managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu-24.04' }
+    ])
+    const wslProject = {
+      status: 'resolved',
+      runtime: { kind: 'wsl', hostPlatform: 'wsl', projectId: 'p', distro: 'Ubuntu-24.04' }
+    } as const
+    const hostProject = {
+      status: 'resolved',
+      runtime: { kind: 'windows-host', hostPlatform: 'win32', projectId: 'p' }
+    } as const
+    const repair = { status: 'repair-required' } as const
+    const check = (id: string, runtime: unknown) => () =>
+      assertClaudeAccountPinMatchesRepoRuntime(accountsOf(store), id, HOST_REPO, runtime as never)
+
+    expect(check('ubuntu', wslProject)).not.toThrow()
+    expect(check('host', wslProject)).toThrow('cannot launch Claude in WSL Ubuntu-24.04')
+    expect(check('host', hostProject)).not.toThrow()
+    expect(check('ubuntu', hostProject)).toThrow('cannot launch Claude on the host')
+    expect(check('host', repair)).not.toThrow()
+    expect(check('ubuntu', repair)).not.toThrow()
+    expect(check('ubuntu', undefined)).not.toThrow()
   })
 })

@@ -203,6 +203,23 @@ describe('account RPC methods', () => {
     expect(add).toHaveBeenLastCalledWith(expect.objectContaining(params))
   })
 
+  it('passes an optional WSL target through accounts.addCustomEndpoint (ORCA-1380)', async () => {
+    const add = vi.fn().mockResolvedValue({ accounts: [] })
+    const runtime = { addClaudeCustomEndpointAccount: add } as unknown as OrcaRuntimeService
+    const addMethod = method('accounts.addCustomEndpoint')
+    if (isStreamingMethod(addMethod)) {
+      throw new Error('accounts.addCustomEndpoint must be a request method')
+    }
+    const base = { label: 'GLM', baseUrl: 'https://api.z.ai/api/anthropic', token: 'tok' }
+    const target = { runtime: 'wsl', wslDistro: 'Ubuntu-24.04' }
+
+    await addMethod.handler(addMethod.params!.parse({ ...base, ...target }), { runtime })
+    expect(add).toHaveBeenLastCalledWith(expect.objectContaining(target))
+    await addMethod.handler(addMethod.params!.parse(base), { runtime })
+    expect(add.mock.lastCall![0]).not.toHaveProperty('runtime')
+    expect(() => addMethod.params!.parse({ ...base, runtime: 'ssh' })).toThrow()
+  })
+
   // Why alongside the add: the edit lane is the same exemption, so the guard
   // table above must keep leaving all three out.
   it('allows paired-device reads and edits of a custom endpoint', async () => {

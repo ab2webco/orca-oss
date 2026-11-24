@@ -224,6 +224,38 @@ describe('ClaudeAccountService custom endpoint accounts', () => {
     })
   })
 
+  it('refuses to edit a WSL custom endpoint account with a reason that says so (ORCA-1380 B2)', async () => {
+    const now = Date.now()
+    const harness = createCustomEndpointHarness({
+      claudeManagedAccounts: [
+        {
+          id: 'wsl-glm',
+          email: 'WSL GLM',
+          managedAuthPath: '\\\\wsl.localhost\\Ubuntu-24.04\\home\\dev\\auth',
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu-24.04',
+          authMethod: 'custom-endpoint',
+          organizationUuid: null,
+          organizationName: null,
+          createdAt: now,
+          updatedAt: now,
+          lastAuthenticatedAt: now
+        }
+      ]
+    })
+    const service = await createService(harness)
+
+    await expect(
+      service.updateCustomEndpointAccount({
+        accountId: 'wsl-glm',
+        label: 'WSL GLM',
+        baseUrl: 'https://api.z.ai/api/anthropic'
+      })
+    ).rejects.toThrow(
+      'Editing a custom endpoint account in WSL is not supported yet. Remove it and add it again with the new values.'
+    )
+  })
+
   it('keeps an explicit model and trims input fields', async () => {
     const harness = createCustomEndpointHarness()
     const service = await createService(harness)
